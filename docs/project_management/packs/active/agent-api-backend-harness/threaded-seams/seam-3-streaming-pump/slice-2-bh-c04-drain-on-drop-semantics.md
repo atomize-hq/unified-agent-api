@@ -1,0 +1,99 @@
+# S2 — Pin drain-on-drop semantics (forward flag) + completion eligibility rule
+
+- **User/system value**: Pins the highest-risk semantics explicitly: “stop forwarding when receiver drops, but keep draining,” while ensuring completion readiness is not coupled to receiver liveness in a way that cancels backend work.
+- **Scope (in/out)**:
+  - In:
+    - Fully implement `BH-C04 stream forwarding + drain-on-drop` semantics in the harness pump:
+      - forward while receiver is alive,
+      - detect receiver drop deterministically,
+      - disable forwarding after drop (forward-flag),
+      - keep draining the backend stream until end regardless.
+    - Define the pump’s completion “eligibility” rule in one place and document it (how receiver drop and stream finality interact).
+  - Out:
+    - The canonical `run_handle_gate` wiring (SEAM-4).
+    - Backend adoption/migration (SEAM-5).
+- **Acceptance criteria**:
+  - Once the downstream `mpsc::Receiver<AgentWrapperEvent>` is dropped, the pump:
+    - stops attempting to send,
+    - continues draining the backend stream to completion (no cancellation),
+    - continues polling completion (no cancellation).
+  - The pump defines and implements a deterministic “completion eligibility” rule that is compatible with SEAM-4’s gating expectations (DR-0012), and this rule is pinned by S3 tests.
+  - `crate::bounds` is applied to every forwarded event (and forwarding is never attempted without bounds).
+  - The behavior is deterministic and does not depend on hash iteration order or timing races for correctness.
+- **Dependencies**:
+  - Slice S1: pump scaffold and basic loop.
+  - Upstream contract: `BH-C01 backend harness adapter interface` (SEAM-1).
+- **Verification**:
+  - `cargo test -p agent_api --features codex,claude_code`
+  - Harness regression tests from S3 must pass.
+- **Rollout/safety**:
+  - Treat S2 as the “semantics pin”: avoid changing semantics after S3 lands without updating tests and re-validating against both backends during SEAM-5 adoption.
+
+## Atomic Tasks
+
+#### S2.T1 — Implement receiver-drop detection + forward-flag behavior
+
+- **Outcome**: A pump implementation that deterministically flips from “forwarding” to “draining-only” when the receiver is dropped.
+- **Inputs/outputs**:
+  - Output: pump implementation updates in `crates/agent_api/src/backend_harness.rs`
+- **Implementation notes**:
+  - Receiver drop should be detected via bounded sender behavior (send returns closed) rather than out-of-band signaling.
+  - Once the forward flag flips to “off,” avoid doing extra work that only exists for forwarding (e.g., mapping/bounds) unless required for drain correctness.
+  - Keep draining the backend stream even after forward is off; do not exit early.
+- **Acceptance criteria**:
+  - Dropping the receiver never stops draining the backend stream.
+  - Dropping the receiver never cancels the completion future.
+  - Forwarding attempts stop after receiver drop is detected (no repeated send failures in a tight loop).
+- **Test notes**: pinned by S3 receiver-drop regression test(s).
+- **Risk/rollback notes**: this is the behavior most likely to regress; keep it simple and test-driven.
+
+Checklist:
+- Implement: forward flag + receiver-drop detection path.
+- Test: receiver-drop regression tests (S3).
+- Validate: `cargo test -p agent_api --features codex,claude_code`.
+- Cleanup: document the forward flag semantics next to the code.
+
+#### S2.T2 — Define and document the pump’s “completion eligibility” rule
+
+- **Outcome**: A single, explicit rule for when the pump resolves its completion output relative to (a) backend stream finality and (b) receiver drop.
+- **Inputs/outputs**:
+  - Output: doc comment + implementation in `crates/agent_api/src/backend_harness.rs`
+- **Implementation notes**:
+  - The rule must be consistent with the seam briefs:
+    - SEAM-3: completion outcome resolves only after backend stream ended *or* after consumer-drop semantics are satisfied.
+    - SEAM-4: completion must not resolve “early” relative to stream finality, except as permitted when the consumer drops the events stream.
+  - Choose one deterministic rule and pin it with tests (S3) so SEAM-4 can treat it as an input contract.
+  - If the rule allows completion to resolve after receiver drop but before stream end, ensure draining still continues to completion (no hidden cancellation).
+- **Acceptance criteria**:
+  - The chosen rule is written down next to the pump implementation and referenced by S3 tests.
+  - The rule does not rely on timing accidents (e.g., “usually the stream ends soon”).
+- **Test notes**: S3 must include at least one test that would fail if eligibility changes accidentally.
+- **Risk/rollback notes**: if SEAM-4 requires a different rule, change this task first (definition), then update S3 tests, then update SEAM-4 wiring.
+
+Checklist:
+- Implement: explicit eligibility rule + code path.
+- Test: eligibility rule regression test(s) (S3).
+- Validate: `make clippy`.
+- Cleanup: keep the rule local and auditable (no distributed gating logic).
+
+#### S2.T3 — Ensure bounded forwarding cannot deadlock draining
+
+- **Outcome**: Backpressure on the bounded event channel does not prevent the pump from continuing to drain and complete (including after receiver drop).
+- **Inputs/outputs**:
+  - Output: pump implementation adjustments in `crates/agent_api/src/backend_harness.rs`
+- **Implementation notes**:
+  - Avoid designs where a full channel stalls the pump forever while the backend stream continues producing (deadlock risk).
+  - Define what happens under backpressure (e.g., await send while receiver is alive; once dropped, stop forwarding and drain).
+  - Keep behavior explicit and testable; avoid “best effort” that silently drops events while receiver is alive unless explicitly justified.
+- **Acceptance criteria**:
+  - With a slow receiver, the pump behavior is well-defined and does not violate drain-on-drop semantics.
+  - Receiver drop always allows draining to proceed (forward flag off).
+- **Test notes**: can be covered with a small “bounded channel backpressure” test in S3 (optional if too costly).
+- **Risk/rollback notes**: if this becomes complex, capture the intended behavior in a comment and a targeted test before optimizing.
+
+Checklist:
+- Implement: backpressure behavior that preserves drain correctness.
+- Test: optional backpressure regression test (S3).
+- Validate: `cargo test -p agent_api --features codex,claude_code`.
+- Cleanup: keep the behavior minimal; revisit tuning during SEAM-5 adoption if needed.
+
