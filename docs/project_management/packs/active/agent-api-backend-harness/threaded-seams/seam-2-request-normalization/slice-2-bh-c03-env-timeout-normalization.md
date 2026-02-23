@@ -68,6 +68,10 @@ Checklist:
       - Codex wrapper (`codex::CodexClient`): map with `effective_timeout.unwrap_or(Duration::ZERO)`
         because `Duration::ZERO` means “no timeout” in `crates/codex/src/client_core.rs`.
       - Claude Code wrapper (`claude_code::ClaudeClient`): pass the `Option<Duration>` directly.
+        - If any adapter layer uses `tokio::time::timeout(...)` (current behavior in
+          `crates/agent_api/src/backends/claude_code.rs`), it MUST treat
+          `Some(Duration::ZERO)` as “disable timeout” (i.e., do not call
+          `tokio::time::timeout(Duration::ZERO, ...)` which would fail immediately).
   - Operations subject to timeout (v1):
     - The harness does not add a second “overall run” timeout.
     - Timeouts are enforced by the wrapper runtime (spawned CLI wait / stream/completion as implemented by that wrapper).

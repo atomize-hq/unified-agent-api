@@ -116,6 +116,10 @@ Derived:
   - `Some(t)` when `request.timeout == Some(t)` (including `t == Duration::ZERO`, which is an explicit “no timeout” request), else
   - `defaults.default_timeout` when `request.timeout == None`.
 
+Explicit “no timeout” (`Duration::ZERO`) semantics (pinned for this pack):
+- If `effective_timeout == Some(Duration::ZERO)`, adapters MUST treat it as “disable timeout”
+  (MUST NOT interpret it as “timeout immediately”).
+
 ### Normalization function signature + call order (exact)
 
 Normalization is a single harness-owned entrypoint:

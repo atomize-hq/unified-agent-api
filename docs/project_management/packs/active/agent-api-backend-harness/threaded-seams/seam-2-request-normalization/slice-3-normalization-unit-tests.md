@@ -58,6 +58,9 @@ Checklist:
     - request env includes `B=2`
     - merged env should include `A=1`, `B=2`
   - Timeout tests: cover the four presence/absence combinations (request vs default).
+  - `Duration::ZERO` test: if the request sets `timeout=Some(Duration::ZERO)`, normalization MUST
+    preserve `effective_timeout=Some(Duration::ZERO)` and downstream enforcement MUST treat it as
+    “disable timeout” (not “timeout immediately”).
 - **Acceptance criteria**:
   - Env precedence matches `BH-C03`.
   - Timeout derivation follows “request overrides default” and preserves absence semantics.
