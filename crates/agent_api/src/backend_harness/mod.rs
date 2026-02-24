@@ -23,3 +23,5 @@ pub(crate) use contract::{
 };
 pub(crate) use normalize::normalize_request;
 pub(crate) use runtime::run_harnessed_backend;
+#[allow(unused_imports)]
+pub(crate) use runtime::run_harnessed_backend_control;

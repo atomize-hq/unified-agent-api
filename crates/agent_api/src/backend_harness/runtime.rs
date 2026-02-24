@@ -12,8 +12,8 @@ use super::{
     DynBackendCompletionFuture, DynBackendEventStream,
 };
 use crate::{
-    AgentWrapperCompletion, AgentWrapperError, AgentWrapperEvent, AgentWrapperEventKind,
-    AgentWrapperRunHandle, AgentWrapperRunRequest,
+    AgentWrapperCancelHandle, AgentWrapperCompletion, AgentWrapperError, AgentWrapperEvent,
+    AgentWrapperEventKind, AgentWrapperRunControl, AgentWrapperRunHandle, AgentWrapperRunRequest,
 };
 
 #[allow(dead_code)]
@@ -235,6 +235,81 @@ async fn send_completion_with_cancel<A: BackendHarnessAdapter>(
             let _ = completion_tx.send(completion_outcome);
         }
     }
+}
+
+#[allow(dead_code)]
+pub(crate) fn run_harnessed_backend_control<A: BackendHarnessAdapter>(
+    adapter: Arc<A>,
+    defaults: BackendDefaults,
+    request: AgentWrapperRunRequest,
+    request_termination: Option<Arc<dyn Fn() + Send + Sync + 'static>>,
+) -> Result<AgentWrapperRunControl, AgentWrapperError> {
+    let normalized = normalize_request(adapter.as_ref(), &defaults, request)?;
+    let agent_kind = normalized.agent_kind.clone();
+
+    let cancel_signal = HarnessCancelSignal::new();
+    let cancel = AgentWrapperCancelHandle::new({
+        let cancel_signal = cancel_signal.clone();
+        move || cancel_signal.cancel()
+    });
+
+    let (tx, rx) = mpsc::channel::<AgentWrapperEvent>(super::DEFAULT_EVENT_CHANNEL_CAPACITY);
+    let (completion_tx, completion_rx) =
+        oneshot::channel::<Result<AgentWrapperCompletion, AgentWrapperError>>();
+
+    tokio::spawn({
+        let cancel_signal = cancel_signal.clone();
+        async move {
+            let spawned = match adapter.spawn(normalized).await {
+                Ok(spawned) => spawned,
+                Err(err) => {
+                    let message = adapter.redact_error(BackendHarnessErrorPhase::Spawn, &err);
+
+                    if !cancel_signal.is_cancelled() {
+                        for bounded in crate::bounds::enforce_event_bounds(pump_error_event(
+                            agent_kind,
+                            message.clone(),
+                        )) {
+                            let _ = tx.send(bounded).await;
+                        }
+                    }
+
+                    // Finality signal: there is no stream to drain; drop sender immediately.
+                    drop(tx);
+
+                    let completion_outcome = if cancel_signal.is_cancelled() {
+                        Err(cancelled_completion_error())
+                    } else {
+                        Err(AgentWrapperError::Backend { message })
+                    };
+                    let _ = completion_tx.send(completion_outcome);
+                    return;
+                }
+            };
+
+            let BackendSpawn { events, completion } = spawned;
+
+            tokio::spawn(send_completion_with_cancel(
+                adapter.clone(),
+                completion,
+                cancel_signal.clone(),
+                request_termination,
+                completion_tx,
+            ));
+
+            tokio::spawn(pump_backend_events_with_cancel(
+                adapter,
+                events,
+                tx,
+                cancel_signal,
+            ));
+        }
+    });
+
+    Ok(AgentWrapperRunControl {
+        handle: crate::run_handle_gate::build_gated_run_handle(rx, completion_rx),
+        cancel,
+    })
 }
 
 pub(crate) fn run_harnessed_backend<A: BackendHarnessAdapter>(
