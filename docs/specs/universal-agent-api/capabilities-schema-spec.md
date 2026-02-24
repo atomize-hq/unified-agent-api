@@ -77,6 +77,11 @@ Backends that provide live streaming MUST include:
 
 This section defines stable universal capability ids and their minimum semantics.
 
+- `agent_api.control.cancel.v1`:
+  - A backend that advertises this capability MUST support explicit cancellation via
+    `AgentWrapperGateway::run_control(...)` and `AgentWrapperCancelHandle::cancel()` per
+    `run-protocol-spec.md`.
+  - A backend that does not support explicit cancellation MUST NOT advertise this capability.
 - `agent_api.tools.structured.v1`:
   - A backend that advertises this capability MUST attach `AgentWrapperEvent.data` with
     `schema="agent_api.tools.structured.v1"` on every `ToolCall` and `ToolResult` event it emits

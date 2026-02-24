@@ -34,7 +34,8 @@ resolve for downstream consumers):
 use agent_api::{
     AgentWrapperBackend, AgentWrapperCapabilities, AgentWrapperCompletion, AgentWrapperError,
     AgentWrapperEvent, AgentWrapperEventKind, AgentWrapperGateway, AgentWrapperKind,
-    AgentWrapperRunHandle, AgentWrapperRunRequest, AgentWrapperRunResult,
+    AgentWrapperRunControl, AgentWrapperRunHandle, AgentWrapperRunRequest, AgentWrapperRunResult,
+    AgentWrapperCancelHandle,
 };
 ```
 
@@ -116,6 +117,24 @@ pub struct AgentWrapperRunHandle {
     pub completion: DynAgentWrapperCompletion,
 }
 
+#[derive(Clone)]
+pub struct AgentWrapperCancelHandle {
+    // private
+}
+
+impl AgentWrapperCancelHandle {
+    /// Requests best-effort cancellation of the underlying backend process.
+    ///
+    /// This method MUST be idempotent.
+    pub fn cancel(&self);
+}
+
+#[derive(Debug)]
+pub struct AgentWrapperRunControl {
+    pub handle: AgentWrapperRunHandle,
+    pub cancel: AgentWrapperCancelHandle,
+}
+
 #[derive(Clone, Debug)]
 pub struct AgentWrapperCompletion {
     pub status: ExitStatus,
@@ -155,6 +174,20 @@ pub trait AgentWrapperBackend: Send + Sync {
     ///
     /// Backends MUST enforce capability gating per `run-protocol-spec.md`.
     fn run(&self, request: AgentWrapperRunRequest) -> Pin<Box<dyn Future<Output = Result<AgentWrapperRunHandle, AgentWrapperError>> + Send + '_>>;
+
+    /// Starts a run and returns a handle plus an explicit cancellation handle.
+    ///
+    /// Backends that do not advertise `agent_api.control.cancel.v1` MUST return:
+    /// `AgentWrapperError::UnsupportedCapability { capability: "agent_api.control.cancel.v1" }`.
+    fn run_control(&self, _request: AgentWrapperRunRequest) -> Pin<Box<dyn Future<Output = Result<AgentWrapperRunControl, AgentWrapperError>> + Send + '_>> {
+        let agent_kind = self.kind().as_str().to_string();
+        Box::pin(async move {
+            Err(AgentWrapperError::UnsupportedCapability {
+                agent_kind,
+                capability: "agent_api.control.cancel.v1".to_string(),
+            })
+        })
+    }
 }
 
 #[derive(Clone, Default)]
@@ -177,6 +210,11 @@ impl AgentWrapperGateway {
     ///
     /// This MUST return `AgentWrapperError::UnknownBackend` when no backend is registered for `agent_kind`.
     pub fn run(&self, agent_kind: &AgentWrapperKind, request: AgentWrapperRunRequest) -> Pin<Box<dyn Future<Output = Result<AgentWrapperRunHandle, AgentWrapperError>> + Send + '_>>;
+
+    /// Starts a run and returns a control object including an explicit cancellation handle.
+    ///
+    /// Cancellation is best-effort and is defined by `run-protocol-spec.md`.
+    pub fn run_control(&self, agent_kind: &AgentWrapperKind, request: AgentWrapperRunRequest) -> Pin<Box<dyn Future<Output = Result<AgentWrapperRunControl, AgentWrapperError>> + Send + '_>>;
 }
 ```
 

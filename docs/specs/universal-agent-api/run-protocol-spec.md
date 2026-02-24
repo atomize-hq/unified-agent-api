@@ -49,8 +49,29 @@ This ensures that when `completion` resolves, the consumer can treat the event s
 ## Cancellation semantics (minimum)
 
 - Cancellation is best-effort:
-  - Dropping `AgentWrapperRunHandle` is a best-effort cancellation signal; the backend MAY attempt to terminate the underlying process.
-  - If the consumer still awaits `AgentWrapperRunHandle.completion`, failures to terminate MUST be reported via `completion` as an error.
+  - Dropping `AgentWrapperRunHandle` (or dropping its `events` stream) is a best-effort cancellation
+    signal; the backend MAY attempt to terminate the underlying process.
+  - Consumers requiring deterministic cancellation MUST use the explicit cancellation handle
+    (`run_control(...)`) when available.
+
+## Explicit cancellation semantics (v1, normative)
+
+When a caller uses `AgentWrapperGateway::run_control(...)`, the returned `AgentWrapperCancelHandle`
+provides an explicit cancellation signal.
+
+- Capability gating:
+  - Backends MUST advertise `agent_api.control.cancel.v1` if and only if they support explicit
+    cancellation.
+  - If a backend does not advertise `agent_api.control.cancel.v1`, `run_control(...)` MUST fail-closed
+    with `AgentWrapperError::UnsupportedCapability { capability: "agent_api.control.cancel.v1" }`.
+
+- Calling `AgentWrapperCancelHandle::cancel()` MUST be idempotent.
+- Backends MUST attempt best-effort termination of the underlying backend process when `cancel()`
+  is invoked.
+- If `cancel()` occurs before completion resolves successfully, `completion` MUST resolve to:
+  - `Err(AgentWrapperError::Backend { message })` where `message == "cancelled"`.
+- If `cancel()` is called after completion already resolved, cancellation is a no-op and MUST NOT
+  change the resolved completion value.
 
 ## Capability validation timing
 

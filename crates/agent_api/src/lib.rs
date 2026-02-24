@@ -20,23 +20,6 @@ mod backend_harness;
 
 pub mod backends;
 
-#[cfg(any(feature = "codex", feature = "claude_code"))]
-#[doc(hidden)]
-pub mod __test_support {
-    use tokio::sync::{mpsc, oneshot};
-
-    use super::{
-        AgentWrapperCompletion, AgentWrapperError, AgentWrapperEvent, AgentWrapperRunHandle,
-    };
-
-    pub fn build_gated_run_handle(
-        rx: mpsc::Receiver<AgentWrapperEvent>,
-        completion_rx: oneshot::Receiver<Result<AgentWrapperCompletion, AgentWrapperError>>,
-    ) -> AgentWrapperRunHandle {
-        super::run_handle_gate::build_gated_run_handle(rx, completion_rx)
-    }
-}
-
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct AgentWrapperKind(String);
 

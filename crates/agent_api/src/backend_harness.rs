@@ -6,7 +6,7 @@ use std::{collections::BTreeMap, future::Future, pin::Pin, time::Duration};
 use futures_core::Stream;
 use futures_util::StreamExt;
 use serde_json::Value;
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, oneshot};
 
 use crate::{
     AgentWrapperCompletion, AgentWrapperError, AgentWrapperEvent, AgentWrapperEventKind,
@@ -279,13 +279,63 @@ fn parse_ext_string_enum<'a>(
 }
 
 pub(crate) fn run_harnessed_backend<A: BackendHarnessAdapter>(
-    _adapter: std::sync::Arc<A>,
-    _defaults: BackendDefaults,
-    _request: AgentWrapperRunRequest,
+    adapter: std::sync::Arc<A>,
+    defaults: BackendDefaults,
+    request: AgentWrapperRunRequest,
 ) -> Result<AgentWrapperRunHandle, AgentWrapperError> {
-    Err(AgentWrapperError::Backend {
-        message: "backend harness not implemented (BH-C01 contract-only)".to_string(),
-    })
+    let normalized = normalize_request(adapter.as_ref(), &defaults, request)?;
+
+    let (tx, rx) = mpsc::channel::<AgentWrapperEvent>(DEFAULT_EVENT_CHANNEL_CAPACITY);
+    let (completion_tx, completion_rx) =
+        oneshot::channel::<Result<AgentWrapperCompletion, AgentWrapperError>>();
+
+    tokio::spawn(async move {
+        let spawned = match adapter.spawn(normalized).await {
+            Ok(spawned) => spawned,
+            Err(err) => {
+                let message = adapter.redact_error(BackendHarnessErrorPhase::Spawn, &err);
+                for bounded in crate::bounds::enforce_event_bounds(pump_error_event(
+                    adapter.kind(),
+                    message.clone(),
+                )) {
+                    let _ = tx.send(bounded).await;
+                }
+
+                // Finality signal: there is no stream to drain; drop sender immediately.
+                drop(tx);
+
+                let _ = completion_tx.send(Err(AgentWrapperError::Backend { message }));
+                return;
+            }
+        };
+
+        let BackendSpawn { events, completion } = spawned;
+
+        tokio::spawn({
+            let adapter = adapter.clone();
+            async move {
+                let completion_outcome = completion.await;
+                let completion_outcome: Result<AgentWrapperCompletion, AgentWrapperError> =
+                    match completion_outcome {
+                        Ok(typed) => adapter.map_completion(typed),
+                        Err(err) => Err(AgentWrapperError::Backend {
+                            message: adapter
+                                .redact_error(BackendHarnessErrorPhase::Completion, &err),
+                        }),
+                    }
+                    .map(crate::bounds::enforce_completion_bounds);
+
+                let _ = completion_tx.send(completion_outcome);
+            }
+        });
+
+        tokio::spawn(pump_backend_events(adapter, events, tx));
+    });
+
+    Ok(crate::run_handle_gate::build_gated_run_handle(
+        rx,
+        completion_rx,
+    ))
 }
 
 #[cfg(test)]

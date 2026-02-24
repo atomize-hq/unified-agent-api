@@ -2,12 +2,6 @@ use super::*;
 use crate::{AgentWrapperBackend, AgentWrapperEventKind};
 use codex::ThreadEvent;
 use serde_json::Value;
-use std::sync::{
-    atomic::{AtomicBool, Ordering},
-    Arc,
-};
-use std::time::Duration;
-use tokio::sync::mpsc;
 
 fn parse_thread_event(json: &str) -> ThreadEvent {
     serde_json::from_str(json).expect("valid codex::ThreadEvent JSON")
@@ -48,6 +42,54 @@ fn codex_backend_reports_required_capabilities() {
     assert!(capabilities.contains(EXT_NON_INTERACTIVE));
     assert!(capabilities.contains(EXT_CODEX_APPROVAL_POLICY));
     assert!(capabilities.contains(EXT_CODEX_SANDBOX_MODE));
+}
+
+#[test]
+fn codex_adapter_implements_backend_harness_adapter_contract() {
+    fn assert_impl<T: crate::backend_harness::BackendHarnessAdapter>() {}
+    assert_impl::<CodexHarnessAdapter>();
+}
+
+#[test]
+fn codex_backend_routes_through_harness_and_does_not_reintroduce_orchestration_primitives() {
+    const SOURCE: &str = include_str!("../codex.rs");
+
+    assert!(
+        SOURCE.contains("run_harnessed_backend("),
+        "expected Codex backend to route through the harness entrypoint"
+    );
+
+    assert!(
+        !SOURCE.contains("build_gated_run_handle("),
+        "expected Codex backend to not bypass harness-owned completion gating"
+    );
+    assert!(
+        !SOURCE.contains("mpsc::channel::<AgentWrapperEvent>(32)"),
+        "expected Codex backend to not create a backend-local events channel"
+    );
+    assert!(
+        !SOURCE.contains("tokio::time::timeout("),
+        "expected Codex backend to not wrap runs with backend-local timeout orchestration"
+    );
+}
+
+#[test]
+fn redact_exec_stream_error_does_not_leak_raw_jsonl_line() {
+    let secret = "RAW-LINE-SECRET-DO-NOT-LEAK";
+    let err = ExecStreamError::Normalize {
+        line: secret.to_string(),
+        message: "missing required context".to_string(),
+    };
+
+    let redacted = redact_exec_stream_error(&err);
+    assert!(
+        !redacted.contains(secret),
+        "expected redaction to avoid raw JSONL line content"
+    );
+    assert!(
+        redacted.contains("line_bytes="),
+        "expected `line_bytes=<n>` metadata"
+    );
 }
 
 #[test]
@@ -214,57 +256,4 @@ fn item_payload_error_maps_to_error_with_message() {
     );
     assert_eq!(mapped.kind, AgentWrapperEventKind::Error);
     assert!(mapped.message.is_some());
-}
-
-#[tokio::test]
-async fn codex_backend_enforces_timeout_while_draining_events() {
-    let stop = Arc::new(AtomicBool::new(false));
-
-    let events_stop = Arc::clone(&stop);
-    let events = futures_util::stream::unfold((), move |_| {
-        let events_stop = Arc::clone(&events_stop);
-        async move {
-            if events_stop.load(Ordering::SeqCst) {
-                None
-            } else {
-                tokio::time::sleep(Duration::from_millis(5)).await;
-                Some((
-                    Ok(parse_thread_event(
-                        r#"{"type":"thread.started","thread_id":"thread-1"}"#,
-                    )),
-                    (),
-                ))
-            }
-        }
-    });
-    let events = Box::pin(events);
-
-    let completion_stop = Arc::clone(&stop);
-    let completion = async move {
-        tokio::time::sleep(Duration::from_millis(30)).await;
-        completion_stop.store(true, Ordering::SeqCst);
-        Err(ExecStreamError::Codex(CodexError::Timeout {
-            timeout: Duration::from_millis(10),
-        }))
-    };
-
-    let (tx, mut rx) = mpsc::channel::<AgentWrapperEvent>(16);
-
-    let outcome = tokio::time::timeout(
-        Duration::from_millis(250),
-        drain_events_while_polling_completion(events, completion, &tx),
-    )
-    .await
-    .expect("should not hang")
-    .expect("helper should not fail");
-
-    match outcome {
-        Err(ExecStreamError::Codex(CodexError::Timeout { .. })) => {}
-        other => panic!("expected codex timeout, got {other:?}"),
-    }
-
-    assert!(
-        rx.recv().await.is_some(),
-        "should forward at least one event while draining"
-    );
 }

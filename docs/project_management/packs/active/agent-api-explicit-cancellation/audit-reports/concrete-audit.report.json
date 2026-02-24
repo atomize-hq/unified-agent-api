@@ -1,0 +1,25 @@
+{
+  "meta": {
+    "generated_at": "2026-02-24T02:17:17Z",
+    "repo_root": ".",
+    "git_commit": "06a881d069302c16fc015c9109d9455cfee023a2",
+    "audited_files": [
+      "docs/adr/0014-agent-api-explicit-cancellation.md",
+      "docs/project_management/packs/active/agent-api-explicit-cancellation/README.md",
+      "docs/project_management/packs/active/agent-api-explicit-cancellation/scope_brief.md",
+      "docs/project_management/packs/active/agent-api-explicit-cancellation/seam_map.md",
+      "docs/project_management/packs/active/agent-api-explicit-cancellation/threading.md",
+      "docs/project_management/packs/active/agent-api-explicit-cancellation/decision_register.md",
+      "docs/project_management/packs/active/agent-api-explicit-cancellation/seam-1-cancellation-contract.md",
+      "docs/project_management/packs/active/agent-api-explicit-cancellation/seam-2-harness-cancel-propagation.md",
+      "docs/project_management/packs/active/agent-api-explicit-cancellation/seam-3-backend-termination.md",
+      "docs/project_management/packs/active/agent-api-explicit-cancellation/seam-4-tests.md",
+      "docs/specs/universal-agent-api/contract.md",
+      "docs/specs/universal-agent-api/run-protocol-spec.md",
+      "docs/specs/universal-agent-api/capabilities-schema-spec.md"
+    ],
+    "definition_of_concrete": "Concrete means implementable and testable without assumptions: explicit API/contract surfaces, absence semantics, and pinned error/ordering behavior."
+  },
+  "issues": []
+}
+
