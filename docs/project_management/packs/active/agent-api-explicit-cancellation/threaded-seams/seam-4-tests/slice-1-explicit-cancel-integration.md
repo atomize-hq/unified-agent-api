@@ -3,10 +3,11 @@
 - **User/system value**: A single, stable end-to-end test that proves explicit cancellation terminates a blocked backend process best-effort and yields the pinned cancellation completion outcome without leaks.
 - **Pinned test parameters (v1)**:
   - `FIRST_EVENT_TIMEOUT`: `1s` (prove the fake process started)
-  - `CANCEL_TERMINATION_TIMEOUT`: `3s` (after calling `cancel()`, both:
-    - the consumer-visible `events` stream reaches `None`, and
-    - `completion` resolves to the pinned cancellation error)
-  - These timeouts are the same on all supported platforms (no platform-specific adjustment in v1).
+  - `CANCEL_TERMINATION_TIMEOUT`: `3s` (after calling `cancel()`, within this timeout:
+    - `completion` resolves to the pinned cancellation error (this is treated as the termination signal, because DR-0012
+      gates `completion` on backend process exit), and
+    - while the consumer keeps `events` alive, the consumer-visible `events` stream reaches `None` (stream closure rule))
+  - These timeouts are the same on all supported platforms as defined by SEAM-4 (`seam-4-tests.md`).
 - **Scope (in/out)**:
   - In:
     - A fake backend process that:
@@ -22,8 +23,9 @@
     - Detailed platform-specific guarantees about kill signaling; this is best-effort.
 - **Acceptance criteria**:
   - Calling `cancel()` causes the fake backend process to be terminated best-effort, observed via:
-    - the consumer-visible `events` stream reaching `None` within `CANCEL_TERMINATION_TIMEOUT`, and
-    - `completion` resolving within `CANCEL_TERMINATION_TIMEOUT`.
+    - `completion` resolving within `CANCEL_TERMINATION_TIMEOUT` (termination signal due to DR-0012 gating), and
+    - while the consumer keeps `events` alive, the consumer-visible `events` stream reaching `None` within
+      `CANCEL_TERMINATION_TIMEOUT` (stream closure rule).
   - Completion gating (DR-0012) is preserved under cancellation:
     - the `"cancelled"` completion MUST NOT resolve before the underlying backend process exits
       (this test uses a fake process that blocks until killed).

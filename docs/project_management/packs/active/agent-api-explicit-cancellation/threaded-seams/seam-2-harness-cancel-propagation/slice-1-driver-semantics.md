@@ -23,8 +23,11 @@
     - stops forwarding after cancellation,
     - still drains the typed backend stream to completion.
   - Completion sender:
-    - if cancellation happens first, `completion` resolves to `Err(AgentWrapperError::Backend { message: "cancelled" })`,
-    - if backend completion happens first, cancellation does not change the already-resolved outcome.
+    - if cancellation is requested before `completion` resolves (i.e., before it would resolve as `Ok(...)` or `Err(...)`),
+      `completion` resolves to `Err(AgentWrapperError::Backend { message: "cancelled" })` (this MUST override any backend
+      error completion that would otherwise occur after cancellation is requested),
+    - if backend completion resolves before cancellation is requested, cancellation does not change the already-resolved outcome,
+    - tie-breaking (concurrent readiness): cancellation wins (the pinned `"cancelled"` error).
   - No late consumer-visible events after cancellation completion is observed.
   - Cancellation changes the completion *value*, not the completion *timing*:
     - completion MUST still obey DR-0012 completion gating (wait for backend process exit; and wait

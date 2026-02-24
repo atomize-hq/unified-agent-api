@@ -18,7 +18,7 @@ Selection: **A**
 
 ## DR-CA-0002 — Completion error shape on cancellation
 
-- Option A: represent cancellation as `AgentWrapperError::Backend { message: <pinned string> }`.
+- Option A: represent cancellation as `AgentWrapperError::Backend { message: "cancelled" }`.
   - Pros: no breaking change to the public `AgentWrapperError` enum.
   - Cons: stringly-typed; cancellation is not structurally distinguishable.
 - Option B: add `AgentWrapperError::Cancelled`.
@@ -26,6 +26,11 @@ Selection: **A**
   - Cons: breaking change to a public enum (requires a compatibility policy decision).
 
 Selection: **A** (v1)
+
+Pinned message:
+- `"cancelled"` is defined canonically in:
+  - `docs/project_management/packs/active/agent-api-explicit-cancellation/seam-1-cancellation-contract.md`, and
+  - `docs/specs/universal-agent-api/run-protocol-spec.md`.
 
 ## DR-CA-0003 — Capability gating for explicit cancellation
 

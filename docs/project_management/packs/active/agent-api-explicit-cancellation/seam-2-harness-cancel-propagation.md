@@ -51,7 +51,9 @@ Explicit cancellation introduces a third shared signal:
 - On cancellation:
   - the pump/drainer stops forwarding but MUST still drain as required,
   - the backend process is requested to terminate (best-effort), and
-  - the completion sender selects the pinned cancellation error if cancellation is requested before
-    backend completion, but MUST still obey completion gating (BH-C05 / DR-0012): completion MUST
-    NOT resolve before process exit, and MUST wait for consumer-visible stream finality unless the
-    consumer opts out by dropping `events`.
+  - the completion sender selects the pinned cancellation error if cancellation is requested before backend completion
+    resolves (i.e., before it would resolve as `Ok(...)` or `Err(...)`); if cancellation and backend completion become
+    ready concurrently, cancellation wins.
+    This is completion *value* selection only and MUST still obey completion gating (BH-C05 / DR-0012): completion MUST
+    NOT resolve before process exit, and MUST wait for consumer-visible stream finality unless the consumer opts out by
+    dropping `events`.

@@ -95,8 +95,12 @@ In particular:
 
 ### Backend harness (internal module)
 
-Add an internal module (name TBD; e.g. `agent_api::backend_harness`) which implements the common
-run loop and enforces universal invariants.
+Add an internal module `agent_api::backend_harness` which implements the common run loop and enforces universal
+invariants.
+
+Pinned module path (internal):
+- Rust module: `agent_api::backend_harness`
+- Module root: `crates/agent_api/src/backend_harness/mod.rs`
 
 Each backend adapter provides only:
 
@@ -117,7 +121,10 @@ The harness provides:
 
 ### File/module boundaries (informative)
 
-- `crates/agent_api/src/backend_harness.rs` (new; internal)
+- `crates/agent_api/src/backend_harness/mod.rs` (internal module root)
+- `crates/agent_api/src/backend_harness/runtime.rs` (run driver + pump/drainer + completion sender tasks)
+- `crates/agent_api/src/backend_harness/normalize.rs` (request normalization)
+- `crates/agent_api/src/backend_harness/contract.rs` (crate-private harness contract types, if needed)
 - `crates/agent_api/src/backends/codex.rs` and `.../claude_code.rs` refactored to use the harness
   (no behavior changes intended; smaller files)
 

@@ -5,7 +5,7 @@
   - `FIRST_EVENT_TIMEOUT`: `1s` (prove the fake process started)
   - `DROP_COMPLETION_TIMEOUT`: `3s` (after dropping `events`, `completion` resolves)
   - `MANY_EVENTS_N`: `200` (backpressure/drain regression stimulus)
-  - These timeouts are the same on all supported platforms (no platform-specific adjustment in v1).
+  - These timeouts are the same on all supported platforms as defined by SEAM-4 (`seam-4-tests.md`).
 - **Scope (in/out)**:
   - In:
     - A regression test that drops `events` early (without calling explicit `cancel()`):

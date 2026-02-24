@@ -119,12 +119,24 @@ provides an explicit cancellation signal that is orthogonal to drop semantics.
 
 ## Capability validation timing
 
-- Unsupported operations must fail-closed:
-  - validate capabilities before spawning work where possible
-  - if an operation becomes unsupported mid-run (backend error), complete with error and emit an `Error` event if feasible
+Rules (v1, normative):
 
-Extension validation (v1, normative):
-- Backends MUST validate `AgentWrapperRunRequest.extensions` keys and values before spawning any backend process.
+- Pre-spawn validation (capabilities):
+  - Backends MUST validate required capability ids for the requested operation before spawning any backend process.
+  - If validation fails, the operation MUST return the appropriate `AgentWrapperError` and MUST NOT spawn any backend
+    process.
+
+- Pre-spawn validation (extensions):
+  - Backends MUST validate `AgentWrapperRunRequest.extensions` keys and values before spawning any backend process.
+
+- Error event emission for post-spawn unsupported operations (backend fault):
+  - If a backend run reaches a terminal error because the backend cannot honor a capability/extension it previously
+    accepted, the backend MUST:
+    - resolve `completion` with `Err(...)`, and
+    - if (and only if) the consumer-visible `events` stream is still open, emit exactly one `AgentWrapperEventKind::Error`
+      event (with a safe/redacted `message`) before closing the stream.
+  - If emitting the `Error` event is impossible because the consumer has opted out (dropped `events`) or the stream is
+    already closed, the backend MUST proceed without emitting an `Error` event.
 
 ## Required completion semantics (v1, normative)
 

@@ -62,6 +62,21 @@ Notes:
 - Core `agent_api.*` capability ids are stable once shipped.
 - Backend-specific capability ids are stable per backend once shipped, but may be added over time.
 
+## Capability matrix (generated artifact)
+
+The repository capability matrix is a generated artifact:
+- Location: `docs/specs/universal-agent-api/capability-matrix.md`
+- Generator: `cargo run -p xtask -- capability-matrix`
+
+Semantics (pinned):
+- The matrix lists only capability ids advertised by at least one built-in backend at generation time (it is a union of
+  `AgentWrapperBackend::capabilities().ids` across built-in backends).
+- The matrix is **not** an exhaustive registry of standard `agent_api.*` capability ids.
+- If a standard capability id defined in this spec is absent from the matrix, that means no built-in backend currently
+  advertises it (not that the id is invalid or removed).
+- Runtime availability checks MUST use `AgentWrapperCapabilities.ids` from the selected backend; the matrix is a
+  maintenance/overview artifact, not a runtime truth source.
+
 ## Required minimum capabilities (v1, normative)
 
 Every registered backend MUST include:

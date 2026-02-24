@@ -112,9 +112,27 @@ the base run handle shape stable while enabling orchestrator-grade cancellation.
 - Capability gating:
   - Backends MUST advertise `agent_api.control.cancel.v1` if and only if they support explicit cancellation.
   - If a backend does not support explicit cancellation, `run_control(...)` fails-closed as `UnsupportedCapability`.
-- Cancellation completion error (pinned):
-  - If cancellation occurs before success completion, `completion` resolves to:
+  - Runtime availability checks MUST use backend-advertised capabilities (`AgentWrapperCapabilities.ids`);
+    `docs/specs/universal-agent-api/capability-matrix.md` is a non-exhaustive repo artifact.
+- Completion outcome and precedence (pinned):
+  - If cancellation is requested before `completion` resolves (i.e., before it would resolve as `Ok(...)` or `Err(...)`),
+    `completion` MUST resolve to:
     - `Err(AgentWrapperError::Backend { message: "cancelled" })`
+    This MUST override any backend error completion that would otherwise occur after cancellation is requested.
+  - If `completion` resolves before cancellation is requested, `cancel()` is a no-op and MUST NOT change the
+    resolved completion value.
+  - Tie-breaking (concurrent readiness): cancellation wins (the pinned `"cancelled"` error).
+- Completion timing / gating (DR-0012, pinned):
+  - Selecting the `"cancelled"` completion *value* does **not** relax DR-0012 completion *timing*.
+  - `completion` MUST NOT resolve until:
+    - the underlying backend process has exited, and
+    - the consumer-visible `events` stream has reached finality (unless the consumer opts out by dropping `events`,
+      in which case completion MAY resolve after process exit without waiting for stream finality).
+  - Canonical: `docs/specs/universal-agent-api/run-protocol-spec.md` (DR-0012 + explicit cancellation completion gating).
+- Consumer-visible event stream behavior after `cancel()` (pinned):
+  - After cancellation is requested, the backend MUST stop forwarding any additional `AgentWrapperEvent` items and MUST
+    close the consumer-visible `events` stream.
+  - Canonical: `docs/specs/universal-agent-api/run-protocol-spec.md` (explicit cancellation event stream rules).
 
 ## Architecture Shape
 

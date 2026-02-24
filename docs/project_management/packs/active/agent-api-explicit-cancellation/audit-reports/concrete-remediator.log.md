@@ -12,199 +12,182 @@ Scope:
 ## Triage
 
 Issues by severity:
-- Blocker: CA-0001
-- Critical: CA-0002, CA-0003
-- Major: CA-0004, CA-0005, CA-0006, CA-0007
+- Critical: CA-0001
+- Major: CA-0002, CA-0003, CA-0006
+- Minor: CA-0004, CA-0005
 
 Buckets (fix strategy):
-- A. Local clarification: CA-0003, CA-0004, CA-0005
-- B. Code-defined contract: CA-0004, CA-0005, CA-0007 (timeout calibration), part of CA-0001
-- C. Doc-defined standard: CA-0001, CA-0002, CA-0006, CA-0007
+- A. Local clarification: CA-0004, CA-0005
+- B. Code-defined contract (evidence source): CA-0003 (matrix generator semantics), CA-0005 (actual module layout), CA-0002 (CI platform)
+- C. Doc-defined standard: CA-0001, CA-0002, CA-0006
 - D. External standard: (none used)
-- E. Decision required: CA-0001, CA-0002, CA-0007
-
-Decision log:
-- `docs/decisions/concrete-remediation-decisions.md`
+- E. Decision required: (none)
 
 ## Files changed
 
-- `docs/specs/universal-agent-api/run-protocol-spec.md`
-- `docs/specs/universal-agent-api/contract.md`
-- `docs/project_management/packs/active/agent-api-explicit-cancellation/seam-1-cancellation-contract.md`
-- `docs/project_management/packs/active/agent-api-explicit-cancellation/threaded-seams/seam-1-cancellation-contract/slice-2-agent-api-surface.md`
+- `docs/adr/0013-agent-api-backend-harness.md`
+- `docs/adr/0014-agent-api-explicit-cancellation.md`
+- `docs/project_management/packs/active/agent-api-explicit-cancellation/decision_register.md`
+- `docs/project_management/packs/active/agent-api-explicit-cancellation/seam-2-harness-cancel-propagation.md`
 - `docs/project_management/packs/active/agent-api-explicit-cancellation/seam-3-backend-termination.md`
+- `docs/project_management/packs/active/agent-api-explicit-cancellation/seam-4-tests.md`
+- `docs/project_management/packs/active/agent-api-explicit-cancellation/threaded-seams/seam-2-harness-cancel-propagation/slice-1-driver-semantics.md`
 - `docs/project_management/packs/active/agent-api-explicit-cancellation/threaded-seams/seam-4-tests/slice-1-explicit-cancel-integration.md`
 - `docs/project_management/packs/active/agent-api-explicit-cancellation/threaded-seams/seam-4-tests/slice-2-drop-regression.md`
-- `docs/project_management/packs/active/agent-api-explicit-cancellation/threaded-seams/seam-4-tests/seam.md`
-- `docs/decisions/concrete-remediation-decisions.md`
+- `docs/specs/universal-agent-api/capabilities-schema-spec.md`
+- `docs/specs/universal-agent-api/run-protocol-spec.md`
 
 ## Issue-by-issue remediation
 
-### CA-0001 — Explicit cancellation does not define required event-stream + completion gating behavior
+### CA-0001 — Explicit cancellation completion precedence + gating are ambiguous/inconsistent in ADR-0014 and SEAM-2 docs
 
 Status: **Fixed**
 
 Restated requirement:
-- Pin how explicit cancellation interacts with DR-0012 completion gating and pin consumer-visible
-  event-stream behavior after `cancel()` (including buffered events and cancel-handle lifetime).
+- Pin cancellation precedence and tie-breaking in `Result` terms (cancellation overrides any not-yet-resolved `Ok(...)` or `Err(...)` and wins concurrent readiness), and restate that completion *value* selection does not relax DR-0012 completion *timing*.
 
 Evidence used:
-- Harness driver plan requires “close universal stream” + “stop forwarding” + “keep draining”:
-  - `docs/project_management/packs/active/agent-api-explicit-cancellation/threaded-seams/seam-2-harness-cancel-propagation/slice-1-driver-semantics.md` L9-L14
-  - `docs/project_management/packs/active/agent-api-explicit-cancellation/seam-2-harness-cancel-propagation.md` L13-L27
-- Code already pins DR-0012 opt-out semantics (completion gated on stream finality unless consumer drops `events`):
-  - `crates/agent_api/src/run_handle_gate.rs` L1-L14, L27-L50, L77-L81
-  - `crates/agent_api/src/backend_harness/runtime.rs` L32-L38, L66-L68 (stream finality signal and drain-on-drop posture)
+- Canonical explicit cancellation semantics + DR-0012 completion gating:
+  - `docs/specs/universal-agent-api/run-protocol-spec.md` L64-L118
+- SEAM-2 driver model and slice acceptance criteria are the pinned pack-level driver contract:
+  - `docs/project_management/packs/active/agent-api-explicit-cancellation/seam-2-harness-cancel-propagation.md` L41-L59
+  - `docs/project_management/packs/active/agent-api-explicit-cancellation/threaded-seams/seam-2-harness-cancel-propagation/slice-1-driver-semantics.md` L1-L35
 
 Changes made:
-- Updated `docs/specs/universal-agent-api/run-protocol-spec.md` to:
-  - define stream finality + consumer opt-out and pin DR-0012 gating rules,
-  - require consumer-visible `events` stream closure on explicit cancellation,
-  - pin buffered (non-live) event handling on cancellation (drop not-yet-emitted buffered events),
-  - pin cancel-handle orthogonality/lifetime (must still function even if `events`/handle dropped),
-  - explicitly state whether cancellation is an exception to gating (it is **not**; see decision CRD-0001).
+- Updated `docs/adr/0014-agent-api-explicit-cancellation.md` to:
+  - replace “before success completion” phrasing with `Ok(...)`/`Err(...)`-based precedence,
+  - pin tie-breaking (“cancellation wins”) and explicitly state cancellation overrides backend error completion when requested first,
+  - restate DR-0012 gating explicitly (value selection ≠ timing), and
+  - explicitly point implementers/consumers to runtime capability checks via `AgentWrapperCapabilities.ids` (matrix is non-exhaustive).
+- Updated `docs/project_management/packs/active/agent-api-explicit-cancellation/seam-2-harness-cancel-propagation.md` and the threaded SEAM-2 driver slice to:
+  - restate precedence using `Ok(...)`/`Err(...)` terms,
+  - pin tie-breaking (concurrent readiness), and
+  - keep explicit cross-links to run protocol gating + event-stream closure rules.
 
 Decisions introduced:
-- CRD-0001, CRD-0002 (see `docs/decisions/concrete-remediation-decisions.md`).
+- None (aligned to the already-normative run protocol spec).
 
-### CA-0002 — Cancellation outcome precedence is ambiguous for error completion and simultaneous races
+### CA-0002 — SEAM-4 test contract does not pin a non-ambiguous termination signal or clearly connect seam-level requirements to the pinned slice parameters
 
 Status: **Fixed**
 
 Restated requirement:
-- Define whether “completion resolves successfully” means `Ok` only vs any resolution, and pin
-  precedence/tie-breaking for cancellation vs backend completion (including backend error completion).
+- Pin a cross-platform, non-ambiguous termination signal for the SEAM-4 explicit-cancel integration test and make the inference chain concrete (stream closure is required by cancellation and is not itself a termination signal).
+- Define “supported platforms” for the pinned timeouts so “same timeouts on all supported platforms” is enforceable.
 
 Evidence used:
-- Pack driver plan uses explicit race language and “cancel wins” semantics (but previously lacked tie-breaking):
-  - `docs/project_management/packs/active/agent-api-explicit-cancellation/threaded-seams/seam-2-harness-cancel-propagation/slice-1-driver-semantics.md` L22-L25
-  - `docs/project_management/packs/active/agent-api-explicit-cancellation/seam-2-harness-cancel-propagation.md` L22-L27
+- DR-0012 defines completion gating in terms of backend process exit + stream finality, making `completion` resolution a usable termination signal for this test contract:
+  - `docs/specs/universal-agent-api/run-protocol-spec.md` L35-L49
+- CI currently runs on `ubuntu-latest`:
+  - `.github/workflows/ci.yml` L18-L22
+- Existing pinned timeouts already live in the threaded SEAM-4 slice docs:
+  - `docs/project_management/packs/active/agent-api-explicit-cancellation/seam-4-tests.md` L26-L38
 
 Changes made:
-- Updated `docs/specs/universal-agent-api/run-protocol-spec.md` to:
-  - define cancellation precedence against both `Ok(...)` and `Err(...)`,
-  - specify that cancellation overrides backend error completion if cancellation is requested first,
-  - pin tie-breaking (concurrent readiness) with “cancellation wins”.
-- Updated `docs/project_management/packs/active/agent-api-explicit-cancellation/seam-1-cancellation-contract.md`
-  to match the pinned precedence rules.
+- Updated `docs/project_management/packs/active/agent-api-explicit-cancellation/seam-4-tests.md` to:
+  - define termination pass/fail criteria concretely:
+    - `completion` resolving within `CANCEL_TERMINATION_TIMEOUT` is the termination signal (due to DR-0012 gating),
+    - `events` reaching `None` is necessary to test the stream-closure rule but is not sufficient as a termination signal,
+  - declare the supported platform set for v1 timeouts as CI’s `ubuntu-latest` (`x86_64-unknown-linux-gnu`),
+  - explicitly declare the threaded slice docs as the authoritative source for pinned parameters + test-specific criteria.
+- Updated the threaded SEAM-4 slice docs to match the pinned termination-signal definition and to reference SEAM-4’s supported-platform definition:
+  - `threaded-seams/seam-4-tests/slice-1-explicit-cancel-integration.md`
+  - `threaded-seams/seam-4-tests/slice-2-drop-regression.md`
+- Updated `docs/project_management/packs/active/agent-api-explicit-cancellation/seam-3-backend-termination.md` to reference the now-pinned supported-platform definition in SEAM-4.
 
 Decisions introduced:
-- CRD-0003 (see `docs/decisions/concrete-remediation-decisions.md`).
+- None (supported platforms defined by existing CI configuration).
 
-### CA-0003 — Pack-local SEAM-1 contract leaves `run_control` signature as `-> ...`
-
-Status: **Fixed**
-
-Restated requirement:
-- Remove placeholders and pin the exact Rust signature/return type for gateway `run_control(...)`,
-  plus concrete gateway error behavior (unknown backend + unsupported capability) with full error shapes.
-
-Evidence used:
-- Canonical contract already shows the exact signature shape:
-  - `docs/specs/universal-agent-api/contract.md` (gateway `run_control` signature and error taxonomy)
-- Pack’s own canonicalization slice calls out removal of `-> ...` placeholders:
-  - `docs/project_management/packs/active/agent-api-explicit-cancellation/threaded-seams/seam-1-cancellation-contract/slice-1-canonical-contracts.md` L28-L36
-
-Changes made:
-- Updated `docs/project_management/packs/active/agent-api-explicit-cancellation/seam-1-cancellation-contract.md` to:
-  - replace `-> ...` with the exact `Pin<Box<dyn Future<...>>>` signature,
-  - pin gateway error behavior for UnknownBackend and UnsupportedCapability (full shapes + exact field values).
-
-### CA-0004 — `AgentWrapperGateway::run_control` does not specify UnknownBackend error behavior
+### CA-0003 — Capability matrix does not define absence semantics for standard capability ids (explicit cancellation capability missing)
 
 Status: **Fixed**
 
 Restated requirement:
-- Pin that `AgentWrapperGateway::run_control(...)` returns UnknownBackend when no backend is registered,
-  and pin how the `agent_kind` string value is derived.
+- Define what it means for a standard capability id (e.g., `agent_api.control.cancel.v1`) to be absent from the generated capability matrix, and ensure readers treat runtime capability checks (`AgentWrapperCapabilities.ids`) as the authoritative signal.
 
 Evidence used:
-- Existing `AgentWrapperGateway::run(...)` implementation in code derives the string via `as_str().to_string()`:
-  - `crates/agent_api/src/lib.rs` L183-L198
-- Pack implementation plan already assumes UnknownBackend for `run_control(...)`:
-  - `docs/project_management/packs/active/agent-api-explicit-cancellation/threaded-seams/seam-1-cancellation-contract/slice-2-agent-api-surface.md` L109-L115
+- Capability matrix generator includes only capability ids advertised by at least one built-in backend (union across built-in backends):
+  - `crates/xtask/src/capability_matrix.rs` L26-L43, L53-L60
+- Standard capability ids (including explicit cancellation) are defined canonically in:
+  - `docs/specs/universal-agent-api/capabilities-schema-spec.md` (standard ids registry)
 
 Changes made:
-- Updated `docs/specs/universal-agent-api/contract.md` to pin UnknownBackend behavior for
-  `AgentWrapperGateway::run_control(...)`, including the `agent_kind` value source.
-
-### CA-0005 — Fail-closed UnsupportedCapability examples omit required `agent_kind` field
-
-Status: **Fixed**
-
-Restated requirement:
-- Remove partial-field `UnsupportedCapability` examples and pin the required `agent_kind` value
-  (at minimum for the gateway path).
-
-Evidence used:
-- Canonical error shape includes `agent_kind` + `capability`:
-  - `docs/specs/universal-agent-api/contract.md` (AgentWrapperError enum)
-- Fail-closed capability gating for extensions already uses the full shape in the extensions spec:
-  - `docs/specs/universal-agent-api/extensions-spec.md` L39-L46
-
-Changes made:
-- Updated `docs/specs/universal-agent-api/run-protocol-spec.md` to use the full error shape for
-  explicit cancellation capability gating and to pin the gateway’s `agent_kind` value source.
-- Updated pack docs to remove partial-field examples:
-  - `docs/project_management/packs/active/agent-api-explicit-cancellation/seam-1-cancellation-contract.md`
-  - `docs/project_management/packs/active/agent-api-explicit-cancellation/threaded-seams/seam-1-cancellation-contract/slice-2-agent-api-surface.md`
-- Updated `docs/specs/universal-agent-api/contract.md` to remove a partial-field example in the
-  “Extensions and capability gating” section (full shape with `agent_kind`).
-
-### CA-0006 — Backend termination contract does not define minimum 'best-effort termination' behavior
-
-Status: **Fixed**
-
-Restated requirement:
-- Define a minimum, testable “best-effort termination” contract for built-in backends (Codex + Claude Code),
-  including idempotence/non-blocking constraints and failure handling.
-
-Evidence used:
-- Run protocol requires best-effort termination attempt on `cancel()`:
-  - `docs/specs/universal-agent-api/run-protocol-spec.md` (explicit cancellation section)
-- Pack SEAM-3 already identifies termination hook approach points (kill_on_drop, channel-close semantics):
-  - `docs/project_management/packs/active/agent-api-explicit-cancellation/threaded-seams/seam-3-backend-termination/slice-2-termination-hooks.md` L34-L39, L62-L67
-- Existing wrapper code uses `kill_on_drop(true)` for spawned processes:
-  - `crates/codex/src/exec/streaming.rs` (various call sites; not reprinted here)
-
-Changes made:
-- Updated `docs/project_management/packs/active/agent-api-explicit-cancellation/seam-3-backend-termination.md` to:
-  - define “termination hook” and “best-effort termination”,
-  - require idempotent + non-blocking termination hooks,
-  - pin observable safety constraints and failure handling (no leaking; no non-pinned error strings),
-  - clarify time bounds are defined by SEAM-4 pinned test parameters.
-
-### CA-0007 — Test requirements rely on unspecified 'bounded/modest' timeouts and termination criteria
-
-Status: **Fixed**
-
-Restated requirement:
-- Pin numeric timeouts and explicit pass/fail termination criteria, including numeric backpressure parameters.
-
-Evidence used:
-- Existing `agent_api` integration tests already use 1–3 second timeouts:
-  - `crates/agent_api/tests/c1_codex_exec_policy.rs` L76-L87
-  - `crates/agent_api/tests/c2_codex_stream_exec_parity.rs` L88-L116
-
-Changes made:
-- Updated SEAM-4 slice docs to pin numeric timeouts and criteria:
-  - `docs/project_management/packs/active/agent-api-explicit-cancellation/threaded-seams/seam-4-tests/slice-1-explicit-cancel-integration.md`
-    - pinned `FIRST_EVENT_TIMEOUT = 1s`
-    - pinned `CANCEL_TERMINATION_TIMEOUT = 3s`
-    - pinned termination observation criteria: `events` reaches `None` and `completion` resolves within the timeout
-  - `docs/project_management/packs/active/agent-api-explicit-cancellation/threaded-seams/seam-4-tests/slice-2-drop-regression.md`
-    - pinned `FIRST_EVENT_TIMEOUT = 1s`
-    - pinned `DROP_COMPLETION_TIMEOUT = 3s`
-    - pinned `MANY_EVENTS_N = 200`
-- Updated `docs/project_management/packs/active/agent-api-explicit-cancellation/threaded-seams/seam-4-tests/seam.md`
-  to reference the pinned timeouts (removed qualitative “bounded timeouts” phrasing).
+- Updated `docs/specs/universal-agent-api/capabilities-schema-spec.md` to add a pinned “Capability matrix (generated artifact)” section that defines:
+  - matrix non-exhaustiveness,
+  - absence semantics (“absent => no built-in backend currently advertises it”), and
+  - the requirement to use `AgentWrapperCapabilities.ids` for runtime availability checks.
+- Updated `docs/adr/0014-agent-api-explicit-cancellation.md` to explicitly direct runtime availability checks to `AgentWrapperCapabilities.ids` and to note the matrix is non-exhaustive.
 
 Decisions introduced:
-- CRD-0004 (see `docs/decisions/concrete-remediation-decisions.md`).
+- None (semantics aligned to the generator behavior already in the repo).
+
+### CA-0006 — `run-protocol-spec.md` uses non-testable qualifiers for capability validation timing and error-event emission
+
+Status: **Fixed**
+
+Restated requirement:
+- Replace “where possible” / “if feasible” language with concrete, testable rules for:
+  - when capability validation MUST occur relative to spawning backend work, and
+  - when an `AgentWrapperEventKind::Error` event MUST be emitted (and what to do when emission is not possible).
+
+Evidence used:
+- The run protocol spec is normative and already pins pre-spawn validation for extensions:
+  - `docs/specs/universal-agent-api/run-protocol-spec.md` (capability validation timing section)
+
+Changes made:
+- Updated `docs/specs/universal-agent-api/run-protocol-spec.md` to define concrete rules:
+  - required capability validation occurs before spawning any backend process (no “where possible”),
+  - extension key/value validation occurs before spawn, and
+  - post-spawn “unsupported operation” faults require exactly one `Error` event if (and only if) the consumer-visible
+    stream is still open; otherwise the error is reported only via `completion`.
+
+Decisions introduced:
+- None.
+
+### CA-0004 — DR-CA-0002 uses a `<pinned string>` placeholder instead of the pinned cancellation message
+
+Status: **Fixed**
+
+Restated requirement:
+- Replace `<pinned string>` with the exact pinned message (`"cancelled"`) and add an explicit pointer to the canonical pinned definition so the DR cannot drift.
+
+Evidence used:
+- Pinned cancellation message is defined in:
+  - `docs/project_management/packs/active/agent-api-explicit-cancellation/seam-1-cancellation-contract.md` L70-L85
+  - `docs/specs/universal-agent-api/run-protocol-spec.md` L104-L118
+
+Changes made:
+- Updated `docs/project_management/packs/active/agent-api-explicit-cancellation/decision_register.md` DR-CA-0002 to:
+  - use `"cancelled"` explicitly in Option A, and
+  - add explicit pointers to the canonical pinned definitions.
+
+Decisions introduced:
+- None.
+
+### CA-0005 — ADR-0013 leaves the backend harness module name as TBD
+
+Status: **Fixed**
+
+Restated requirement:
+- Pin the backend harness module name and canonical file path so there is exactly one stable internal module boundary in ADR-0013, and ensure the file/module boundaries section is consistent with that pin.
+
+Evidence used:
+- Backend harness module exists as a module directory (module root + submodules) in `crates/agent_api/src/backend_harness/`.
+
+Changes made:
+- Updated `docs/adr/0013-agent-api-backend-harness.md` to:
+  - pin the module name as `agent_api::backend_harness`, and
+  - pin the module root file as `crates/agent_api/src/backend_harness/mod.rs`,
+  - update “File/module boundaries” to match the current module layout (`mod.rs` + `runtime.rs` / `normalize.rs` / `contract.rs`).
+
+Decisions introduced:
+- None.
 
 ## Verification
 
-- Re-ran the concrete lexical scan over the audited doc set after remediation.
-  - Output: `docs/project_management/packs/active/agent-api-explicit-cancellation/audit-reports/concrete-audit.scan.after.json`
-- Note: the lexical scan’s match count is not a pass/fail signal; closure is validated against the
-  concrete issue IDs above.
+Completed:
+- Concrete scan:
+  - Before: `docs/project_management/packs/active/agent-api-explicit-cancellation/audit-reports/concrete-audit.scan.json` (match_count: 38)
+  - After: `docs/project_management/packs/active/agent-api-explicit-cancellation/audit-reports/concrete-audit.scan.after.json` (match_count: 27)
+- Manual closure check:
+  - CA-0001..CA-0006 “Required to be concrete” checklists are directly addressed by the patched sections cited above.
