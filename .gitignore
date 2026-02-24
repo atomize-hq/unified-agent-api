@@ -1,5 +1,6 @@
 target
 .archived
+.codex
 /.idea
 /.vscode
 /wt
