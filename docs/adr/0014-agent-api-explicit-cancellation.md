@@ -34,7 +34,7 @@
 
 ## Executive Summary (Operator)
 
-ADR_BODY_SHA256: 4e134673671dfd5faa909d50055a11afa792ac2c327f6eea67e278c678703125
+ADR_BODY_SHA256: 945ad2eb20694418a0c3f233e62c56d7a3645e7f9767ef8a7134382cc5d35eba
 
 ### Changes (operator-facing)
 
@@ -65,8 +65,9 @@ backend/wrapper itself enforces a timeout.
 
 Additionally, the backend harness (ADR-0013) intentionally preserves “drain-on-drop” semantics to
 avoid deadlocks/cancellation hazards when a consumer drops the events stream. That safety posture
-increases the importance of a separate, explicit cancellation mechanism: dropping must not imply
-cancel, but consumers still need a supported way to cancel intentionally.
+increases the importance of a separate, explicit cancellation mechanism: dropping must not be
+relied upon as intentional/deterministic cancellation (drop is only a best-effort signal per the
+run protocol), but consumers still need a supported way to explicitly cancel.
 
 ## Goals
 
