@@ -5,13 +5,37 @@ use std::sync::{
     atomic::{AtomicUsize, Ordering},
     Mutex,
 };
+use std::task::{Context, Poll};
+use std::time::Duration;
 
 use futures_core::Stream;
+use futures_util::{task::noop_waker, StreamExt};
 use tokio::sync::{mpsc, oneshot};
 
 use super::super::test_support::{toy_kind, ToyAdapter, ToyBackendError, ToyEvent};
 use super::*;
 use crate::AgentWrapperEventKind;
+
+#[tokio::test]
+async fn cancel_signal_is_idempotent_and_supports_late_subscribers() {
+    let cancel = HarnessCancelSignal::new();
+
+    let waiter = tokio::spawn({
+        let cancel = cancel.clone();
+        async move {
+            cancel.cancelled().await;
+        }
+    });
+
+    tokio::task::yield_now().await;
+
+    cancel.cancel();
+    cancel.cancel();
+    assert!(cancel.is_cancelled());
+    waiter.await.expect("waiter observes cancellation");
+
+    cancel.cancelled().await;
+}
 
 #[tokio::test]
 async fn pump_backend_events_smoke_forwards_in_order() {
@@ -282,6 +306,436 @@ async fn pump_stops_forwarding_after_receiver_drop_but_drains_to_end() {
         total,
         "backend stream must be fully drained after receiver drop"
     );
+}
+
+struct GatedCountingStream<E, BE> {
+    first: Option<Result<E, BE>>,
+    rest: VecDeque<Result<E, BE>>,
+    gate_rx: Option<oneshot::Receiver<()>>,
+    consumed: std::sync::Arc<AtomicUsize>,
+}
+
+impl<E, BE> Unpin for GatedCountingStream<E, BE> {}
+
+impl<E, BE> Stream for GatedCountingStream<E, BE> {
+    type Item = Result<E, BE>;
+
+    fn poll_next(
+        self: Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Option<Self::Item>> {
+        let this = self.get_mut();
+        if let Some(first) = this.first.take() {
+            this.consumed.fetch_add(1, Ordering::SeqCst);
+            return std::task::Poll::Ready(Some(first));
+        }
+
+        if let Some(gate_rx) = &mut this.gate_rx {
+            match Pin::new(gate_rx).poll(cx) {
+                std::task::Poll::Ready(_) => {
+                    this.gate_rx = None;
+                }
+                std::task::Poll::Pending => {
+                    return std::task::Poll::Pending;
+                }
+            }
+        }
+
+        let next = this.rest.pop_front();
+        if next.is_some() {
+            this.consumed.fetch_add(1, Ordering::SeqCst);
+        }
+        std::task::Poll::Ready(next)
+    }
+}
+
+#[tokio::test]
+async fn pump_with_cancel_closes_universal_stream_but_still_drains_typed_stream() {
+    struct DrainAdapter;
+
+    impl BackendHarnessAdapter for DrainAdapter {
+        fn kind(&self) -> crate::AgentWrapperKind {
+            toy_kind()
+        }
+
+        fn supported_extension_keys(&self) -> &'static [&'static str] {
+            &[]
+        }
+
+        type Policy = ();
+
+        fn validate_and_extract_policy(
+            &self,
+            _request: &crate::AgentWrapperRunRequest,
+        ) -> Result<Self::Policy, crate::AgentWrapperError> {
+            Ok(())
+        }
+
+        type BackendEvent = String;
+        type BackendCompletion = ();
+        type BackendError = ();
+
+        fn spawn(
+            &self,
+            _req: super::super::contract::NormalizedRequest<Self::Policy>,
+        ) -> std::pin::Pin<
+            Box<
+                dyn std::future::Future<
+                        Output = Result<
+                            super::super::contract::BackendSpawn<
+                                Self::BackendEvent,
+                                Self::BackendCompletion,
+                                Self::BackendError,
+                            >,
+                            Self::BackendError,
+                        >,
+                    > + Send
+                    + 'static,
+            >,
+        > {
+            panic!("spawn unused in pump tests");
+        }
+
+        fn map_event(&self, event: Self::BackendEvent) -> Vec<crate::AgentWrapperEvent> {
+            vec![crate::AgentWrapperEvent {
+                agent_kind: toy_kind(),
+                kind: AgentWrapperEventKind::TextOutput,
+                channel: Some("assistant".to_string()),
+                text: Some(event),
+                message: None,
+                data: None,
+            }]
+        }
+
+        fn map_completion(
+            &self,
+            _completion: Self::BackendCompletion,
+        ) -> Result<crate::AgentWrapperCompletion, crate::AgentWrapperError> {
+            panic!("map_completion unused in pump tests");
+        }
+
+        fn redact_error(
+            &self,
+            _phase: BackendHarnessErrorPhase,
+            _err: &Self::BackendError,
+        ) -> String {
+            "unused".to_string()
+        }
+    }
+
+    let total = 3usize;
+    let consumed = std::sync::Arc::new(AtomicUsize::new(0));
+    let (gate_tx, gate_rx) = oneshot::channel::<()>();
+
+    let stream = GatedCountingStream {
+        first: Some(Ok::<String, ()>("ev-0".to_string())),
+        rest: (1..total).map(|i| Ok::<String, ()>(format!("ev-{i}"))).collect(),
+        gate_rx: Some(gate_rx),
+        consumed: consumed.clone(),
+    };
+    let events: DynBackendEventStream<_, _> = Box::pin(stream);
+
+    let adapter = std::sync::Arc::new(DrainAdapter);
+    let (tx, mut rx) = mpsc::channel::<crate::AgentWrapperEvent>(8);
+    let cancel = HarnessCancelSignal::new();
+    let handle = tokio::spawn(pump_backend_events_with_cancel(
+        adapter,
+        events,
+        tx,
+        cancel.clone(),
+    ));
+
+    let first = rx.recv().await.expect("at least one forwarded event");
+    assert_eq!(first.kind, AgentWrapperEventKind::TextOutput);
+
+    cancel.cancel();
+
+    assert!(
+        tokio::time::timeout(Duration::from_secs(1), rx.recv())
+            .await
+            .expect("recv does not hang")
+            .is_none(),
+        "universal stream must close after cancellation"
+    );
+
+    let _ = gate_tx.send(());
+    handle.await.expect("pump task completes");
+    assert_eq!(
+        consumed.load(Ordering::SeqCst),
+        total,
+        "typed backend stream must be drained to end after cancellation"
+    );
+}
+
+#[tokio::test]
+async fn pump_with_cancel_preserves_drain_on_drop_posture() {
+    struct DrainAdapter;
+
+    impl BackendHarnessAdapter for DrainAdapter {
+        fn kind(&self) -> crate::AgentWrapperKind {
+            toy_kind()
+        }
+
+        fn supported_extension_keys(&self) -> &'static [&'static str] {
+            &[]
+        }
+
+        type Policy = ();
+
+        fn validate_and_extract_policy(
+            &self,
+            _request: &crate::AgentWrapperRunRequest,
+        ) -> Result<Self::Policy, crate::AgentWrapperError> {
+            Ok(())
+        }
+
+        type BackendEvent = String;
+        type BackendCompletion = ();
+        type BackendError = ();
+
+        fn spawn(
+            &self,
+            _req: super::super::contract::NormalizedRequest<Self::Policy>,
+        ) -> std::pin::Pin<
+            Box<
+                dyn std::future::Future<
+                        Output = Result<
+                            super::super::contract::BackendSpawn<
+                                Self::BackendEvent,
+                                Self::BackendCompletion,
+                                Self::BackendError,
+                            >,
+                            Self::BackendError,
+                        >,
+                    > + Send
+                    + 'static,
+            >,
+        > {
+            panic!("spawn unused in pump tests");
+        }
+
+        fn map_event(&self, event: Self::BackendEvent) -> Vec<crate::AgentWrapperEvent> {
+            vec![crate::AgentWrapperEvent {
+                agent_kind: toy_kind(),
+                kind: AgentWrapperEventKind::TextOutput,
+                channel: Some("assistant".to_string()),
+                text: Some(event),
+                message: None,
+                data: None,
+            }]
+        }
+
+        fn map_completion(
+            &self,
+            _completion: Self::BackendCompletion,
+        ) -> Result<crate::AgentWrapperCompletion, crate::AgentWrapperError> {
+            panic!("map_completion unused in pump tests");
+        }
+
+        fn redact_error(
+            &self,
+            _phase: BackendHarnessErrorPhase,
+            _err: &Self::BackendError,
+        ) -> String {
+            "unused".to_string()
+        }
+    }
+
+    let total = 20usize;
+    let consumed = std::sync::Arc::new(AtomicUsize::new(0));
+    let items: VecDeque<Result<String, ()>> = (0..total)
+        .map(|i| Ok::<String, ()>(format!("ev-{i}")))
+        .collect();
+
+    let events = CountingStream {
+        items,
+        consumed: consumed.clone(),
+    };
+    let events: DynBackendEventStream<_, _> = Box::pin(events);
+
+    let adapter = std::sync::Arc::new(DrainAdapter);
+    let (tx, mut rx) = mpsc::channel::<crate::AgentWrapperEvent>(1);
+    let cancel = HarnessCancelSignal::new();
+    let handle = tokio::spawn(pump_backend_events_with_cancel(adapter, events, tx, cancel));
+
+    let first = rx.recv().await.expect("at least one forwarded event");
+    assert_eq!(first.kind, AgentWrapperEventKind::TextOutput);
+    drop(rx);
+
+    handle.await.expect("pump task completes");
+    assert_eq!(
+        consumed.load(Ordering::SeqCst),
+        total,
+        "backend stream must be fully drained after receiver drop"
+    );
+}
+
+#[tokio::test]
+async fn completion_sender_selects_cancelled_error_but_waits_for_backend_exit() {
+    let adapter = std::sync::Arc::new(ToyAdapter { fail_spawn: false });
+    let cancel = HarnessCancelSignal::new();
+
+    let term_calls = std::sync::Arc::new(AtomicUsize::new(0));
+    let request_termination: RequestTerminationHook = {
+        let term_calls = term_calls.clone();
+        std::sync::Arc::new(move || {
+            term_calls.fetch_add(1, Ordering::SeqCst);
+        })
+    };
+
+    let (backend_done_tx, backend_done_rx) = oneshot::channel::<()>();
+    let completion: DynBackendCompletionFuture<_, _> = Box::pin(async move {
+        backend_done_rx.await.expect("backend completion released");
+        Ok::<super::super::test_support::ToyCompletion, ToyBackendError>(
+            super::super::test_support::ToyCompletion,
+        )
+    });
+
+    let (completion_tx, mut completion_rx) =
+        oneshot::channel::<Result<AgentWrapperCompletion, AgentWrapperError>>();
+
+    let task = tokio::spawn(send_completion_with_cancel(
+        adapter,
+        completion,
+        cancel.clone(),
+        Some(request_termination),
+        completion_tx,
+    ));
+
+    cancel.cancel();
+
+    let waker = noop_waker();
+    let mut cx = Context::from_waker(&waker);
+    assert!(matches!(
+        Pin::new(&mut completion_rx).poll(&mut cx),
+        Poll::Pending
+    ));
+
+    let _ = backend_done_tx.send(());
+    let outcome = completion_rx.await.expect("completion sent");
+    assert!(
+        matches!(
+            outcome,
+            Err(AgentWrapperError::Backend { ref message }) if message == "cancelled"
+        ),
+        "completion must resolve to the pinned cancelled error"
+    );
+    assert_eq!(term_calls.load(Ordering::SeqCst), 1);
+
+    task.await.expect("completion task completes");
+}
+
+#[tokio::test]
+async fn completion_sender_preserves_backend_outcome_when_completion_wins() {
+    let adapter = std::sync::Arc::new(ToyAdapter { fail_spawn: false });
+    let cancel = HarnessCancelSignal::new();
+
+    let term_calls = std::sync::Arc::new(AtomicUsize::new(0));
+    let request_termination: RequestTerminationHook = {
+        let term_calls = term_calls.clone();
+        std::sync::Arc::new(move || {
+            term_calls.fetch_add(1, Ordering::SeqCst);
+        })
+    };
+
+    let completion: DynBackendCompletionFuture<_, _> =
+        Box::pin(async move { Ok::<_, ToyBackendError>(super::super::test_support::ToyCompletion) });
+
+    let (completion_tx, completion_rx) =
+        oneshot::channel::<Result<AgentWrapperCompletion, AgentWrapperError>>();
+
+    let task = tokio::spawn(send_completion_with_cancel(
+        adapter,
+        completion,
+        cancel.clone(),
+        Some(request_termination),
+        completion_tx,
+    ));
+
+    let outcome = completion_rx.await.expect("completion sent");
+    assert!(outcome.is_ok(), "backend completion should win when ready first");
+
+    cancel.cancel();
+    assert_eq!(term_calls.load(Ordering::SeqCst), 0);
+
+    task.await.expect("completion task completes");
+}
+
+#[tokio::test]
+async fn cancellation_closes_events_but_does_not_accelerate_completion() {
+    let adapter = std::sync::Arc::new(ToyAdapter { fail_spawn: false });
+    let cancel = HarnessCancelSignal::new();
+
+    let (backend_done_tx, backend_done_rx) = oneshot::channel::<()>();
+    let completion: DynBackendCompletionFuture<_, _> = Box::pin(async move {
+        backend_done_rx.await.expect("backend completion released");
+        Ok::<super::super::test_support::ToyCompletion, ToyBackendError>(
+            super::super::test_support::ToyCompletion,
+        )
+    });
+
+    let (events_finish_tx, events_finish_rx) = oneshot::channel::<()>();
+    let events = ControlledEndStream::<ToyEvent, ToyBackendError> {
+        first: Some(Ok::<ToyEvent, ToyBackendError>(ToyEvent::Text("one".to_string()))),
+        finish_rx: events_finish_rx,
+    };
+    let events: DynBackendEventStream<_, _> = Box::pin(events);
+
+    let (tx, rx) = mpsc::channel::<crate::AgentWrapperEvent>(8);
+    let (completion_tx, completion_rx) =
+        oneshot::channel::<Result<AgentWrapperCompletion, AgentWrapperError>>();
+
+    let pump_task =
+        tokio::spawn(pump_backend_events_with_cancel(adapter.clone(), events, tx, cancel.clone()));
+    let completion_task = tokio::spawn(send_completion_with_cancel(
+        adapter,
+        completion,
+        cancel.clone(),
+        None,
+        completion_tx,
+    ));
+
+    let mut handle = crate::run_handle_gate::build_gated_run_handle(rx, completion_rx);
+
+    let first = handle
+        .events
+        .next()
+        .await
+        .expect("first event forwarded");
+    assert_eq!(first.kind, AgentWrapperEventKind::TextOutput);
+
+    cancel.cancel();
+
+    assert!(
+        tokio::time::timeout(Duration::from_secs(1), handle.events.next())
+            .await
+            .expect("events do not hang")
+            .is_none(),
+        "events stream must be closed after cancellation"
+    );
+
+    {
+        let waker = noop_waker();
+        let mut cx = Context::from_waker(&waker);
+        assert!(matches!(
+            handle.completion.as_mut().poll(&mut cx),
+            Poll::Pending
+        ));
+    }
+
+    let _ = backend_done_tx.send(());
+    let outcome = handle.completion.await;
+    assert!(
+        matches!(
+            outcome,
+            Err(AgentWrapperError::Backend { ref message }) if message == "cancelled"
+        ),
+        "completion must resolve to the pinned cancelled error after backend exit"
+    );
+
+    let _ = events_finish_tx.send(());
+    pump_task.await.expect("pump task completes");
+    completion_task.await.expect("completion task completes");
 }
 
 #[tokio::test]
