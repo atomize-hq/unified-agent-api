@@ -120,8 +120,8 @@ pub use events::{
     TurnCompleted, TurnFailed, TurnStarted, WebSearchDelta, WebSearchState, WebSearchStatus,
 };
 pub use exec::{
-    DynExecCompletion, DynThreadEventStream, ExecCompletion, ExecStream, ExecStreamError,
-    ExecStreamRequest, ResumeRequest, ResumeSelector,
+    DynExecCompletion, DynThreadEventStream, ExecCompletion, ExecStream, ExecStreamControl,
+    ExecStreamError, ExecStreamRequest, ExecTerminationHandle, ResumeRequest, ResumeSelector,
 };
 pub use execpolicy::{
     ExecPolicyCheckRequest, ExecPolicyCheckResult, ExecPolicyDecision, ExecPolicyEvaluation,

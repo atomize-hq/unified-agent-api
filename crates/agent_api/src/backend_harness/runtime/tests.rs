@@ -429,7 +429,9 @@ async fn pump_with_cancel_closes_universal_stream_but_still_drains_typed_stream(
 
     let stream = GatedCountingStream {
         first: Some(Ok::<String, ()>("ev-0".to_string())),
-        rest: (1..total).map(|i| Ok::<String, ()>(format!("ev-{i}"))).collect(),
+        rest: (1..total)
+            .map(|i| Ok::<String, ()>(format!("ev-{i}")))
+            .collect(),
         gate_rx: Some(gate_rx),
         consumed: consumed.clone(),
     };
@@ -639,7 +641,9 @@ async fn completion_sender_preserves_backend_outcome_when_completion_wins() {
     };
 
     let completion: DynBackendCompletionFuture<_, _> =
-        Box::pin(async move { Ok::<_, ToyBackendError>(super::super::test_support::ToyCompletion) });
+        Box::pin(
+            async move { Ok::<_, ToyBackendError>(super::super::test_support::ToyCompletion) },
+        );
 
     let (completion_tx, completion_rx) =
         oneshot::channel::<Result<AgentWrapperCompletion, AgentWrapperError>>();
@@ -653,7 +657,10 @@ async fn completion_sender_preserves_backend_outcome_when_completion_wins() {
     ));
 
     let outcome = completion_rx.await.expect("completion sent");
-    assert!(outcome.is_ok(), "backend completion should win when ready first");
+    assert!(
+        outcome.is_ok(),
+        "backend completion should win when ready first"
+    );
 
     cancel.cancel();
     assert_eq!(term_calls.load(Ordering::SeqCst), 0);
@@ -676,7 +683,9 @@ async fn cancellation_closes_events_but_does_not_accelerate_completion() {
 
     let (events_finish_tx, events_finish_rx) = oneshot::channel::<()>();
     let events = ControlledEndStream::<ToyEvent, ToyBackendError> {
-        first: Some(Ok::<ToyEvent, ToyBackendError>(ToyEvent::Text("one".to_string()))),
+        first: Some(Ok::<ToyEvent, ToyBackendError>(ToyEvent::Text(
+            "one".to_string(),
+        ))),
         finish_rx: events_finish_rx,
     };
     let events: DynBackendEventStream<_, _> = Box::pin(events);
@@ -685,8 +694,12 @@ async fn cancellation_closes_events_but_does_not_accelerate_completion() {
     let (completion_tx, completion_rx) =
         oneshot::channel::<Result<AgentWrapperCompletion, AgentWrapperError>>();
 
-    let pump_task =
-        tokio::spawn(pump_backend_events_with_cancel(adapter.clone(), events, tx, cancel.clone()));
+    let pump_task = tokio::spawn(pump_backend_events_with_cancel(
+        adapter.clone(),
+        events,
+        tx,
+        cancel.clone(),
+    ));
     let completion_task = tokio::spawn(send_completion_with_cancel(
         adapter,
         completion,
@@ -697,11 +710,7 @@ async fn cancellation_closes_events_but_does_not_accelerate_completion() {
 
     let mut handle = crate::run_handle_gate::build_gated_run_handle(rx, completion_rx);
 
-    let first = handle
-        .events
-        .next()
-        .await
-        .expect("first event forwarded");
+    let first = handle.events.next().await.expect("first event forwarded");
     assert_eq!(first.kind, AgentWrapperEventKind::TextOutput);
 
     cancel.cancel();
@@ -859,19 +868,11 @@ async fn control_entrypoint_exposes_cancel_handle_wired_to_driver() {
         ..Default::default()
     };
 
-    let crate::AgentWrapperRunControl { mut handle, cancel } = run_harnessed_backend_control(
-        adapter,
-        BackendDefaults::default(),
-        request,
-        None,
-    )
-    .expect("control entrypoint succeeds");
+    let crate::AgentWrapperRunControl { mut handle, cancel } =
+        run_harnessed_backend_control(adapter, BackendDefaults::default(), request, None)
+            .expect("control entrypoint succeeds");
 
-    let first = handle
-        .events
-        .next()
-        .await
-        .expect("first event forwarded");
+    let first = handle.events.next().await.expect("first event forwarded");
     assert_eq!(first.kind, AgentWrapperEventKind::TextOutput);
 
     cancel.cancel();

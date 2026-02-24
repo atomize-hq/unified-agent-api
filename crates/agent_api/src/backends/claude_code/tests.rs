@@ -65,6 +65,7 @@ fn claude_backend_reports_required_capabilities() {
     assert!(capabilities.contains("agent_api.run"));
     assert!(capabilities.contains("agent_api.events"));
     assert!(capabilities.contains("agent_api.events.live"));
+    assert!(capabilities.contains(crate::CAPABILITY_CONTROL_CANCEL_V1));
     assert!(capabilities.contains(CAP_TOOLS_STRUCTURED_V1));
     assert!(capabilities.contains(CAP_TOOLS_RESULTS_V1));
     assert!(capabilities.contains(CAP_ARTIFACTS_FINAL_TEXT_V1));
@@ -83,6 +84,14 @@ fn claude_backend_routes_through_harness_and_does_not_reintroduce_orchestration_
     assert!(
         SOURCE.contains("run_harnessed_backend("),
         "expected Claude backend to route through the harness entrypoint"
+    );
+    assert!(
+        SOURCE.contains("run_harnessed_backend_control("),
+        "expected Claude backend to route cancellation through the harness control entrypoint"
+    );
+    assert!(
+        SOURCE.contains("TerminationState::new"),
+        "expected Claude backend control path to register a termination hook"
     );
 
     assert!(

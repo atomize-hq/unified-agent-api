@@ -6,12 +6,16 @@ use std::{
     path::{Path, PathBuf},
     pin::Pin,
     process::ExitStatus,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
 use futures_core::Stream;
 use thiserror::Error;
-use tokio::{fs, io::AsyncWriteExt, process::Command, time};
+use tokio::{fs, io::AsyncWriteExt, process::Command, sync::Notify, time};
 use tracing::debug;
 
 use crate::{
@@ -23,6 +27,66 @@ use crate::{
 };
 
 mod streaming;
+
+#[derive(Clone)]
+pub struct ExecTerminationHandle {
+    inner: Arc<ExecTerminationInner>,
+}
+
+#[derive(Debug)]
+struct ExecTerminationInner {
+    requested: AtomicBool,
+    notify: Notify,
+}
+
+impl ExecTerminationHandle {
+    fn new() -> Self {
+        Self {
+            inner: Arc::new(ExecTerminationInner {
+                requested: AtomicBool::new(false),
+                notify: Notify::new(),
+            }),
+        }
+    }
+
+    pub fn request_termination(&self) {
+        if !self.inner.requested.swap(true, Ordering::SeqCst) {
+            self.inner.notify.notify_waiters();
+        }
+    }
+
+    fn is_requested(&self) -> bool {
+        self.inner.requested.load(Ordering::SeqCst)
+    }
+
+    async fn requested(&self) {
+        if self.is_requested() {
+            return;
+        }
+
+        let notified = self.inner.notify.notified();
+        if self.is_requested() {
+            return;
+        }
+
+        notified.await;
+    }
+}
+
+impl std::fmt::Debug for ExecTerminationHandle {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ExecTerminationHandle")
+            .field("requested", &self.is_requested())
+            .finish()
+    }
+}
+
+/// Control-capable variant of [`ExecStream`], providing a best-effort termination hook.
+pub struct ExecStreamControl {
+    pub events: DynThreadEventStream,
+    pub completion: DynExecCompletion,
+    pub termination: ExecTerminationHandle,
+}
 
 impl CodexClient {
     /// Sends `prompt` to `codex exec` and returns its stdout (the final agent message) on success.
@@ -85,6 +149,30 @@ impl CodexClient {
             .map(|(key, value)| (key.clone(), value.clone()))
             .collect();
         streaming::stream_exec_with_overrides_and_env_overrides(
+            self,
+            request,
+            CliOverridesPatch::default(),
+            &env_overrides,
+        )
+        .await
+    }
+
+    /// Streams JSONL events from `codex exec --json` and returns a termination handle alongside the
+    /// stream and completion future.
+    ///
+    /// The termination handle is best-effort and idempotent; callers may request termination at any
+    /// point after this returns.
+    pub async fn stream_exec_with_env_overrides_control(
+        &self,
+        request: ExecStreamRequest,
+        env_overrides: &BTreeMap<String, String>,
+    ) -> Result<ExecStreamControl, ExecStreamError> {
+        let env_overrides: Vec<(String, String)> = env_overrides
+            .iter()
+            .map(|(key, value)| (key.clone(), value.clone()))
+            .collect();
+
+        streaming::stream_exec_with_overrides_and_env_overrides_control(
             self,
             request,
             CliOverridesPatch::default(),

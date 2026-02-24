@@ -19,8 +19,15 @@ use crate::{
         NormalizedRequest,
     },
     AgentWrapperBackend, AgentWrapperCapabilities, AgentWrapperCompletion, AgentWrapperError,
-    AgentWrapperEvent, AgentWrapperKind, AgentWrapperRunHandle, AgentWrapperRunRequest,
+    AgentWrapperEvent, AgentWrapperKind, AgentWrapperRunControl, AgentWrapperRunHandle,
+    AgentWrapperRunRequest,
 };
+
+impl super::termination::TerminationHandle for codex::ExecTerminationHandle {
+    fn request_termination(&self) {
+        codex::ExecTerminationHandle::request_termination(self);
+    }
+}
 
 #[derive(Clone, Debug, Default)]
 pub struct CodexBackendConfig {
@@ -229,6 +236,8 @@ fn redact_exec_stream_error(err: &ExecStreamError) -> String {
 struct CodexHarnessAdapter {
     config: CodexBackendConfig,
     run_start_cwd: Option<PathBuf>,
+    termination:
+        Option<std::sync::Arc<super::termination::TerminationState<codex::ExecTerminationHandle>>>,
 }
 
 #[derive(Debug)]
@@ -296,6 +305,7 @@ impl BackendHarnessAdapter for CodexHarnessAdapter {
     > {
         let config = self.config.clone();
         let run_start_cwd = self.run_start_cwd.clone();
+        let termination = self.termination.clone();
         let policy = req.policy;
         let prompt = req.prompt;
         let working_dir = req.working_dir;
@@ -353,7 +363,7 @@ impl BackendHarnessAdapter for CodexHarnessAdapter {
             let client = builder.build();
 
             let handle = client
-                .stream_exec_with_env_overrides(
+                .stream_exec_with_env_overrides_control(
                     ExecStreamRequest {
                         prompt,
                         idle_timeout: None,
@@ -366,7 +376,15 @@ impl BackendHarnessAdapter for CodexHarnessAdapter {
                 .await
                 .map_err(CodexBackendError::Exec)?;
 
-            let codex::ExecStream { events, completion } = handle;
+            let codex::ExecStreamControl {
+                events,
+                completion,
+                termination: termination_handle,
+            } = handle;
+
+            if let Some(state) = termination.as_ref() {
+                state.set_handle(termination_handle);
+            }
 
             let (completion_tx, completion_rx) =
                 oneshot::channel::<Result<CodexBackendCompletion, CodexBackendError>>();
@@ -481,6 +499,7 @@ impl AgentWrapperBackend for CodexBackend {
         ids.insert("agent_api.run".to_string());
         ids.insert("agent_api.events".to_string());
         ids.insert("agent_api.events.live".to_string());
+        ids.insert(crate::CAPABILITY_CONTROL_CANCEL_V1.to_string());
         ids.insert(CAP_TOOLS_STRUCTURED_V1.to_string());
         ids.insert(CAP_TOOLS_RESULTS_V1.to_string());
         ids.insert(CAP_ARTIFACTS_FINAL_TEXT_V1.to_string());
@@ -502,6 +521,7 @@ impl AgentWrapperBackend for CodexBackend {
             let adapter = Arc::new(CodexHarnessAdapter {
                 config: config.clone(),
                 run_start_cwd,
+                termination: None,
             });
 
             let defaults = BackendDefaults {
@@ -510,6 +530,53 @@ impl AgentWrapperBackend for CodexBackend {
             };
 
             crate::backend_harness::run_harnessed_backend(adapter, defaults, request)
+        })
+    }
+
+    fn run_control(
+        &self,
+        request: AgentWrapperRunRequest,
+    ) -> Pin<Box<dyn Future<Output = Result<AgentWrapperRunControl, AgentWrapperError>> + Send + '_>>
+    {
+        if !self
+            .capabilities()
+            .contains(crate::CAPABILITY_CONTROL_CANCEL_V1)
+        {
+            let agent_kind = self.kind().as_str().to_string();
+            return Box::pin(async move {
+                Err(AgentWrapperError::UnsupportedCapability {
+                    agent_kind,
+                    capability: crate::CAPABILITY_CONTROL_CANCEL_V1.to_string(),
+                })
+            });
+        }
+
+        let config = self.config.clone();
+        Box::pin(async move {
+            let termination_state = Arc::new(super::termination::TerminationState::new());
+            let request_termination: Option<Arc<dyn Fn() + Send + Sync + 'static>> = Some({
+                let termination_state = Arc::clone(&termination_state);
+                Arc::new(move || termination_state.request())
+            });
+
+            let run_start_cwd = std::env::current_dir().ok();
+            let adapter = Arc::new(CodexHarnessAdapter {
+                config: config.clone(),
+                run_start_cwd,
+                termination: Some(termination_state),
+            });
+
+            let defaults = BackendDefaults {
+                env: config.env,
+                default_timeout: config.default_timeout,
+            };
+
+            crate::backend_harness::run_harnessed_backend_control(
+                adapter,
+                defaults,
+                request,
+                request_termination,
+            )
         })
     }
 }

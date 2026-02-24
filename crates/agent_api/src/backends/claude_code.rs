@@ -19,9 +19,15 @@ use crate::{
         NormalizedRequest,
     },
     AgentWrapperBackend, AgentWrapperCapabilities, AgentWrapperCompletion, AgentWrapperError,
-    AgentWrapperEvent, AgentWrapperEventKind, AgentWrapperKind, AgentWrapperRunHandle,
-    AgentWrapperRunRequest,
+    AgentWrapperEvent, AgentWrapperEventKind, AgentWrapperKind, AgentWrapperRunControl,
+    AgentWrapperRunHandle, AgentWrapperRunRequest,
 };
+
+impl super::termination::TerminationHandle for claude_code::ClaudeTerminationHandle {
+    fn request_termination(&self) {
+        claude_code::ClaudeTerminationHandle::request_termination(self);
+    }
+}
 
 const AGENT_KIND: &str = "claude_code";
 const CHANNEL_ASSISTANT: &str = "assistant";
@@ -62,6 +68,9 @@ impl ClaudeCodeBackend {
 #[derive(Clone, Debug)]
 struct ClaudeHarnessAdapter {
     config: ClaudeCodeBackendConfig,
+    termination: Option<
+        std::sync::Arc<super::termination::TerminationState<claude_code::ClaudeTerminationHandle>>,
+    >,
 }
 
 #[derive(Clone, Debug)]
@@ -131,6 +140,7 @@ impl BackendHarnessAdapter for ClaudeHarnessAdapter {
         >,
     > {
         let config = self.config.clone();
+        let termination = self.termination.clone();
         Box::pin(async move {
             let mut builder = claude_code::ClaudeClient::builder();
             if let Some(binary) = config.binary.as_ref() {
@@ -165,9 +175,13 @@ impl BackendHarnessAdapter for ClaudeHarnessAdapter {
             }
 
             let handle = client
-                .print_stream_json(print_req)
+                .print_stream_json_control(print_req)
                 .await
                 .map_err(ClaudeBackendError::Spawn)?;
+
+            if let Some(state) = termination.as_ref() {
+                state.set_handle(handle.termination.clone());
+            }
 
             let last_assistant_text: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
             let (events_done_tx, events_done_rx) = oneshot::channel::<()>();
@@ -267,6 +281,7 @@ impl AgentWrapperBackend for ClaudeCodeBackend {
         ids.insert("agent_api.run".to_string());
         ids.insert("agent_api.events".to_string());
         ids.insert("agent_api.events.live".to_string());
+        ids.insert(crate::CAPABILITY_CONTROL_CANCEL_V1.to_string());
         ids.insert(CAP_TOOLS_STRUCTURED_V1.to_string());
         ids.insert(CAP_TOOLS_RESULTS_V1.to_string());
         ids.insert(CAP_ARTIFACTS_FINAL_TEXT_V1.to_string());
@@ -284,6 +299,7 @@ impl AgentWrapperBackend for ClaudeCodeBackend {
         Box::pin(async move {
             let adapter = Arc::new(ClaudeHarnessAdapter {
                 config: config.clone(),
+                termination: None,
             });
             let defaults = BackendDefaults {
                 env: config.env,
@@ -291,6 +307,50 @@ impl AgentWrapperBackend for ClaudeCodeBackend {
             };
 
             crate::backend_harness::run_harnessed_backend(adapter, defaults, request)
+        })
+    }
+
+    fn run_control(
+        &self,
+        request: AgentWrapperRunRequest,
+    ) -> Pin<Box<dyn Future<Output = Result<AgentWrapperRunControl, AgentWrapperError>> + Send + '_>>
+    {
+        if !self
+            .capabilities()
+            .contains(crate::CAPABILITY_CONTROL_CANCEL_V1)
+        {
+            let agent_kind = self.kind().as_str().to_string();
+            return Box::pin(async move {
+                Err(AgentWrapperError::UnsupportedCapability {
+                    agent_kind,
+                    capability: crate::CAPABILITY_CONTROL_CANCEL_V1.to_string(),
+                })
+            });
+        }
+
+        let config = self.config.clone();
+        Box::pin(async move {
+            let termination_state = Arc::new(super::termination::TerminationState::new());
+            let request_termination: Option<Arc<dyn Fn() + Send + Sync + 'static>> = Some({
+                let termination_state = Arc::clone(&termination_state);
+                Arc::new(move || termination_state.request())
+            });
+
+            let adapter = Arc::new(ClaudeHarnessAdapter {
+                config: config.clone(),
+                termination: Some(termination_state),
+            });
+            let defaults = BackendDefaults {
+                env: config.env,
+                default_timeout: config.default_timeout,
+            };
+
+            crate::backend_harness::run_harnessed_backend_control(
+                adapter,
+                defaults,
+                request,
+                request_termination,
+            )
         })
     }
 }

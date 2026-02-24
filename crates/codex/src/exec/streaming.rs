@@ -1,8 +1,8 @@
 use tokio::{io::AsyncWriteExt, process::Command, sync::mpsc, time};
 
 use super::{
-    read_last_message, unique_temp_path, ExecCompletion, ExecStream, ExecStreamError,
-    ExecStreamRequest, ResumeRequest, ResumeSelector,
+    read_last_message, unique_temp_path, ExecCompletion, ExecStream, ExecStreamControl,
+    ExecStreamError, ExecStreamRequest, ExecTerminationHandle, ResumeRequest, ResumeSelector,
 };
 use crate::{
     builder::{apply_cli_overrides, resolve_cli_overrides},
@@ -26,6 +26,26 @@ pub(super) async fn stream_exec_with_overrides_and_env_overrides(
     overrides: CliOverridesPatch,
     env_overrides: &[(String, String)],
 ) -> Result<ExecStream, ExecStreamError> {
+    let control = stream_exec_with_overrides_and_env_overrides_control(
+        client,
+        request,
+        overrides,
+        env_overrides,
+    )
+    .await?;
+
+    Ok(ExecStream {
+        events: control.events,
+        completion: control.completion,
+    })
+}
+
+pub(super) async fn stream_exec_with_overrides_and_env_overrides_control(
+    client: &CodexClient,
+    request: ExecStreamRequest,
+    overrides: CliOverridesPatch,
+    env_overrides: &[(String, String)],
+) -> Result<ExecStreamControl, ExecStreamError> {
     if request.prompt.trim().is_empty() {
         return Err(CodexError::EmptyPrompt.into());
     }
@@ -146,16 +166,23 @@ pub(super) async fn stream_exec_with_overrides_and_env_overrides(
     ));
     let stderr_task = tokio::spawn(tee_stream(stderr, ConsoleTarget::Stderr, !client.quiet));
 
+    let termination = ExecTerminationHandle::new();
+    let termination_for_completion = termination.clone();
+
     let events = jsonl::EventChannelStream::new(rx, idle_timeout);
     let timeout = client.timeout;
     let schema_path = output_schema.clone();
     let completion = Box::pin(async move {
         let _dir_ctx = dir_ctx;
         let wait_task = async move {
-            let status = child
-                .wait()
-                .await
-                .map_err(|source| CodexError::Wait { source })?;
+            let status = tokio::select! {
+                status = child.wait() => status,
+                _ = termination_for_completion.requested() => {
+                    let _ = child.start_kill();
+                    child.wait().await
+                }
+            }
+            .map_err(|source| CodexError::Wait { source })?;
             let stdout_result = stdout_task.await.map_err(CodexError::Join)?;
             stdout_result?;
             let stderr_bytes = stderr_task
@@ -188,9 +215,10 @@ pub(super) async fn stream_exec_with_overrides_and_env_overrides(
         }
     });
 
-    Ok(ExecStream {
+    Ok(ExecStreamControl {
         events: Box::pin(events),
         completion,
+        termination,
     })
 }
 
