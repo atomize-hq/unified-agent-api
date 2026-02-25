@@ -55,7 +55,7 @@ exec sleep 1000000
         let client = ClaudeClient::builder()
             .binary(&script_path)
             .env("PID_FILE", pid_file.to_string_lossy().to_string())
-            .timeout(Some(Duration::from_millis(150)))
+            .timeout(Some(Duration::from_millis(750)))
             .build();
 
         let err = client.version().await.unwrap_err();
@@ -64,11 +64,24 @@ exec sleep 1000000
             "expected timeout, got: {err:?}"
         );
 
-        let pid: i32 = fs::read_to_string(&pid_file)
-            .expect("pid file")
-            .trim()
-            .parse()
-            .expect("pid parse");
+        let pid: i32 = {
+            let deadline = time::Instant::now() + Duration::from_secs(1);
+            loop {
+                match fs::read_to_string(&pid_file) {
+                    Ok(contents) => break contents,
+                    Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
+                        if time::Instant::now() >= deadline {
+                            panic!("pid file was not created before timeout");
+                        }
+                        time::sleep(Duration::from_millis(25)).await;
+                    }
+                    Err(err) => panic!("failed to read pid file: {err}"),
+                }
+            }
+        }
+        .trim()
+        .parse()
+        .expect("pid parse");
         assert_pid_gone(pid).await;
     }
 }
