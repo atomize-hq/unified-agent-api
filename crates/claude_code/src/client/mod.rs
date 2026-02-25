@@ -34,9 +34,10 @@ use crate::{
     commands::print::{ClaudeOutputFormat, ClaudePrintRequest},
     commands::update::ClaudeUpdateRequest,
     home::{ClaudeHomeLayout, ClaudeHomeSeedRequest},
-    parse_stream_json_lines, process, ClaudeCodeError, ClaudePrintStreamJsonHandle,
-    ClaudeStreamJsonEvent, ClaudeStreamJsonParseError, ClaudeStreamJsonParser, CommandOutput,
-    DynClaudeStreamJsonCompletion, DynClaudeStreamJsonEventStream, StreamJsonLineOutcome,
+    parse_stream_json_lines, process, ClaudeCodeError, ClaudePrintStreamJsonControlHandle,
+    ClaudePrintStreamJsonHandle, ClaudeStreamJsonEvent, ClaudeStreamJsonParseError,
+    ClaudeStreamJsonParser, ClaudeTerminationHandle, CommandOutput, DynClaudeStreamJsonCompletion,
+    DynClaudeStreamJsonEventStream, StreamJsonLineOutcome,
 };
 
 mod setup_token;
@@ -160,96 +161,134 @@ impl ClaudeClient {
         Box<dyn Future<Output = Result<ClaudePrintStreamJsonHandle, ClaudeCodeError>> + Send + '_>,
     > {
         Box::pin(async move {
-            let allow_missing_prompt = request.stdin.is_some()
-                || request.continue_session
-                || request.resume
-                || request.resume_value.is_some()
-                || request.from_pr
-                || request.from_pr_value.is_some();
-            if request.prompt.is_none() && !allow_missing_prompt {
-                return Err(ClaudeCodeError::InvalidRequest(
-                    "either prompt, stdin_bytes, or a continuation flag must be provided"
-                        .to_string(),
-                ));
-            }
-
-            self.ensure_home_prepared()?;
-            let binary = self.resolve_binary();
-
-            let mut request = request;
-            request.output_format = ClaudeOutputFormat::StreamJson;
-            let stdin_bytes = request.stdin.take();
-            let mirror_stdout = self.mirror_stdout;
-            let mirror_stderr = self.mirror_stderr;
-            let timeout = request.timeout.or(self.timeout);
-
-            let mut cmd = Command::new(&binary);
-            cmd.args(request.argv());
-
-            if let Some(dir) = self.working_dir.as_ref() {
-                cmd.current_dir(dir);
-            }
-
-            process::apply_env(&mut cmd, &self.env);
-
-            cmd.kill_on_drop(true);
-            cmd.stdin(if stdin_bytes.is_some() {
-                std::process::Stdio::piped()
-            } else {
-                std::process::Stdio::null()
-            });
-            cmd.stdout(std::process::Stdio::piped());
-            cmd.stderr(if mirror_stderr {
-                std::process::Stdio::piped()
-            } else {
-                std::process::Stdio::null()
-            });
-
-            let mut child = process::spawn_with_retry(&mut cmd, &binary)?;
-
-            if let Some(bytes) = stdin_bytes {
-                if let Some(mut stdin) = child.stdin.take() {
-                    stdin
-                        .write_all(&bytes)
-                        .await
-                        .map_err(ClaudeCodeError::StdinWrite)?;
-                }
-            }
-
-            let stdout = child.stdout.take().ok_or(ClaudeCodeError::MissingStdout)?;
-            let stderr = if mirror_stderr {
-                Some(child.stderr.take().ok_or(ClaudeCodeError::MissingStderr)?)
-            } else {
-                None
-            };
-
-            let (events_tx, events_rx) = mpsc::channel(32);
-            let (completion_tx, completion_rx) = oneshot::channel();
-
-            tokio::spawn(async move {
-                let res = run_print_stream_json_child(
-                    child,
-                    stdout,
-                    stderr,
-                    events_tx,
-                    mirror_stdout,
-                    timeout,
-                )
-                .await;
-                let _ = completion_tx.send(res);
-            });
-
-            let events: DynClaudeStreamJsonEventStream =
-                Box::pin(ClaudeStreamJsonEventChannelStream::new(events_rx));
-
-            let completion: DynClaudeStreamJsonCompletion = Box::pin(async move {
-                completion_rx
-                    .await
-                    .map_err(|_| ClaudeCodeError::Join("stream-json task dropped".to_string()))?
-            });
-
+            let (events, completion, _termination) = self.spawn_print_stream_json(request).await?;
             Ok(ClaudePrintStreamJsonHandle { events, completion })
         })
+    }
+
+    pub fn print_stream_json_control(
+        &self,
+        request: ClaudePrintRequest,
+    ) -> Pin<
+        Box<
+            dyn Future<Output = Result<ClaudePrintStreamJsonControlHandle, ClaudeCodeError>>
+                + Send
+                + '_,
+        >,
+    > {
+        Box::pin(async move {
+            let (events, completion, termination) = self.spawn_print_stream_json(request).await?;
+            Ok(ClaudePrintStreamJsonControlHandle {
+                events,
+                completion,
+                termination,
+            })
+        })
+    }
+
+    async fn spawn_print_stream_json(
+        &self,
+        request: ClaudePrintRequest,
+    ) -> Result<
+        (
+            DynClaudeStreamJsonEventStream,
+            DynClaudeStreamJsonCompletion,
+            ClaudeTerminationHandle,
+        ),
+        ClaudeCodeError,
+    > {
+        let allow_missing_prompt = request.stdin.is_some()
+            || request.continue_session
+            || request.resume
+            || request.resume_value.is_some()
+            || request.from_pr
+            || request.from_pr_value.is_some();
+        if request.prompt.is_none() && !allow_missing_prompt {
+            return Err(ClaudeCodeError::InvalidRequest(
+                "either prompt, stdin_bytes, or a continuation flag must be provided".to_string(),
+            ));
+        }
+
+        self.ensure_home_prepared()?;
+        let binary = self.resolve_binary();
+
+        let mut request = request;
+        request.output_format = ClaudeOutputFormat::StreamJson;
+        let stdin_bytes = request.stdin.take();
+        let mirror_stdout = self.mirror_stdout;
+        let mirror_stderr = self.mirror_stderr;
+        let timeout = request.timeout.or(self.timeout);
+
+        let mut cmd = Command::new(&binary);
+        cmd.args(request.argv());
+
+        if let Some(dir) = self.working_dir.as_ref() {
+            cmd.current_dir(dir);
+        }
+
+        process::apply_env(&mut cmd, &self.env);
+
+        cmd.kill_on_drop(true);
+        cmd.stdin(if stdin_bytes.is_some() {
+            std::process::Stdio::piped()
+        } else {
+            std::process::Stdio::null()
+        });
+        cmd.stdout(std::process::Stdio::piped());
+        cmd.stderr(if mirror_stderr {
+            std::process::Stdio::piped()
+        } else {
+            std::process::Stdio::null()
+        });
+
+        let mut child = process::spawn_with_retry(&mut cmd, &binary)?;
+
+        if let Some(bytes) = stdin_bytes {
+            if let Some(mut stdin) = child.stdin.take() {
+                stdin
+                    .write_all(&bytes)
+                    .await
+                    .map_err(ClaudeCodeError::StdinWrite)?;
+            }
+        }
+
+        let stdout = child.stdout.take().ok_or(ClaudeCodeError::MissingStdout)?;
+        let stderr = if mirror_stderr {
+            Some(child.stderr.take().ok_or(ClaudeCodeError::MissingStderr)?)
+        } else {
+            None
+        };
+
+        let termination = ClaudeTerminationHandle::new();
+        let termination_for_runner = termination.clone();
+
+        let (events_tx, events_rx) = mpsc::channel(32);
+        let (completion_tx, completion_rx) = oneshot::channel();
+
+        tokio::spawn(async move {
+            let res = run_print_stream_json_child(
+                child,
+                stdout,
+                stderr,
+                events_tx,
+                mirror_stdout,
+                timeout,
+                termination_for_runner,
+            )
+            .await;
+            let _ = completion_tx.send(res);
+        });
+
+        let events: DynClaudeStreamJsonEventStream =
+            Box::pin(ClaudeStreamJsonEventChannelStream::new(events_rx));
+
+        let completion: DynClaudeStreamJsonCompletion = Box::pin(async move {
+            completion_rx
+                .await
+                .map_err(|_| ClaudeCodeError::Join("stream-json task dropped".to_string()))?
+        });
+
+        Ok((events, completion, termination))
     }
 
     pub async fn mcp_list(&self) -> Result<CommandOutput, ClaudeCodeError> {
@@ -524,6 +563,7 @@ async fn run_print_stream_json_child(
     events_tx: mpsc::Sender<Result<ClaudeStreamJsonEvent, ClaudeStreamJsonParseError>>,
     mirror_stdout: bool,
     timeout: Option<Duration>,
+    termination: ClaudeTerminationHandle,
 ) -> Result<std::process::ExitStatus, ClaudeCodeError> {
     let mut parser = ClaudeStreamJsonParser::new();
     let mut lines = BufReader::new(stdout).lines();
@@ -546,6 +586,10 @@ async fn run_print_stream_json_child(
     loop {
         let next = tokio::select! {
             _ = closed_tx.closed() => {
+                cancelled = true;
+                break;
+            }
+            _ = termination.requested() => {
                 cancelled = true;
                 break;
             }
@@ -605,6 +649,10 @@ async fn run_print_stream_json_child(
                 cancelled = true;
                 break;
             }
+            _ = termination.requested() => {
+                cancelled = true;
+                break;
+            }
             _ = async {
                 if let Some(sleep) = timeout_sleep.as_mut() {
                     sleep.as_mut().await;
@@ -624,66 +672,58 @@ async fn run_print_stream_json_child(
         }
     }
 
+    // Close the event channel as soon as we stop producing events so downstream consumers can
+    // observe stream finality independent of process-exit cleanup.
+    drop(events_tx);
+    drop(closed_tx);
+    drop(lines);
+
+    // `start_kill` may leave a zombie until `wait()` reaps the process (Tokio docs). For Agent API
+    // DR-0012 / CA-C02 invariants, completion must not resolve before backend process exit.
     if timed_out || cancelled || io_error.is_some() {
         let _ = child.start_kill();
     }
 
-    if let Some(err) = io_error {
-        let _ = child.wait().await;
-        return Err(err);
-    }
-
-    if cancelled {
-        let status = match time::timeout(Duration::from_secs(2), child.wait()).await {
-            Ok(res) => res.map_err(ClaudeCodeError::Wait)?,
-            Err(_) => {
-                return Err(ClaudeCodeError::Wait(std::io::Error::new(
-                    std::io::ErrorKind::TimedOut,
-                    "timed out waiting for claude process after cancellation",
-                )));
-            }
-        };
-
-        if let Some(task) = stderr_task {
-            match task.await {
-                Ok(Ok(())) => {}
-                Ok(Err(err)) => {
-                    return Err(ClaudeCodeError::StderrRead(err));
-                }
-                Err(err) => {
-                    return Err(ClaudeCodeError::Join(err.to_string()));
-                }
+    let status: Result<std::process::ExitStatus, ClaudeCodeError> = match io_error {
+        Some(err) => {
+            let _ = child.wait().await;
+            Err(err)
+        }
+        None if cancelled => child.wait().await.map_err(ClaudeCodeError::Wait),
+        None if timed_out => {
+            let timeout = timeout.expect("timed_out implies timeout");
+            match child.wait().await.map_err(ClaudeCodeError::Wait) {
+                Ok(_status) => Err(ClaudeCodeError::Timeout { timeout }),
+                Err(err) => Err(err),
             }
         }
-
-        return Ok(status);
-    }
-
-    if timed_out {
-        if let Some(timeout) = timeout {
-            let _ = time::timeout(Duration::from_secs(2), child.wait()).await;
-            return Err(ClaudeCodeError::Timeout { timeout });
+        None => {
+            if let Some(deadline) = deadline {
+                let remaining = deadline.saturating_duration_since(time::Instant::now());
+                if remaining.is_zero() {
+                    let timeout = timeout.expect("deadline implies timeout");
+                    let _ = child.start_kill();
+                    match child.wait().await.map_err(ClaudeCodeError::Wait) {
+                        Ok(_status) => Err(ClaudeCodeError::Timeout { timeout }),
+                        Err(err) => Err(err),
+                    }
+                } else {
+                    match time::timeout(remaining, child.wait()).await {
+                        Ok(res) => res.map_err(ClaudeCodeError::Wait),
+                        Err(_) => {
+                            let timeout = timeout.expect("deadline implies timeout");
+                            let _ = child.start_kill();
+                            match child.wait().await.map_err(ClaudeCodeError::Wait) {
+                                Ok(_status) => Err(ClaudeCodeError::Timeout { timeout }),
+                                Err(err) => Err(err),
+                            }
+                        }
+                    }
+                }
+            } else {
+                child.wait().await.map_err(ClaudeCodeError::Wait)
+            }
         }
-    }
-
-    let status = if let Some(deadline) = deadline {
-        let remaining = deadline.saturating_duration_since(time::Instant::now());
-        if remaining.is_zero() {
-            let _ = child.start_kill();
-            let _ = time::timeout(Duration::from_secs(2), child.wait()).await;
-            Err(ClaudeCodeError::Timeout {
-                timeout: timeout.expect("deadline implies timeout"),
-            })
-        } else {
-            time::timeout(remaining, child.wait())
-                .await
-                .map_err(|_| ClaudeCodeError::Timeout {
-                    timeout: timeout.expect("deadline implies timeout"),
-                })?
-                .map_err(ClaudeCodeError::Wait)
-        }
-    } else {
-        child.wait().await.map_err(ClaudeCodeError::Wait)
     };
 
     if let Some(task) = stderr_task {
