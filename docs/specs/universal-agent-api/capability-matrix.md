@@ -38,6 +38,12 @@ Do not edit by hand.
 |---|---|---|
 | `agent_api.artifacts.final_text.v1` | ✅ | ✅ |
 
+## `agent_api.control`
+
+| capability id | `claude_code` | `codex` |
+|---|---|---|
+| `agent_api.control.cancel.v1` | ✅ | ✅ |
+
 ## `backend.claude_code`
 
 | capability id | `claude_code` | `codex` |

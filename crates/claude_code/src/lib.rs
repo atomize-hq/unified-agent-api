@@ -4,9 +4,17 @@
 //! This crate intentionally does **not** attempt to wrap interactive default mode (no `--print`)
 //! as a parity target. It shells out to a locally installed/pinned `claude` binary.
 
-use std::{future::Future, pin::Pin};
+use std::{
+    future::Future,
+    pin::Pin,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
+};
 
 use futures_core::Stream;
+use tokio::sync::Notify;
 
 mod builder;
 mod cli;
@@ -57,6 +65,59 @@ pub type DynClaudeStreamJsonEventStream =
 pub type DynClaudeStreamJsonCompletion =
     Pin<Box<dyn Future<Output = Result<std::process::ExitStatus, ClaudeCodeError>> + Send>>;
 
+#[derive(Clone)]
+pub struct ClaudeTerminationHandle {
+    inner: Arc<ClaudeTerminationInner>,
+}
+
+#[derive(Debug)]
+struct ClaudeTerminationInner {
+    requested: AtomicBool,
+    notify: Notify,
+}
+
+impl ClaudeTerminationHandle {
+    fn new() -> Self {
+        Self {
+            inner: Arc::new(ClaudeTerminationInner {
+                requested: AtomicBool::new(false),
+                notify: Notify::new(),
+            }),
+        }
+    }
+
+    pub fn request_termination(&self) {
+        if !self.inner.requested.swap(true, Ordering::SeqCst) {
+            self.inner.notify.notify_waiters();
+        }
+    }
+
+    fn is_requested(&self) -> bool {
+        self.inner.requested.load(Ordering::SeqCst)
+    }
+
+    async fn requested(&self) {
+        if self.is_requested() {
+            return;
+        }
+
+        let notified = self.inner.notify.notified();
+        if self.is_requested() {
+            return;
+        }
+
+        notified.await;
+    }
+}
+
+impl std::fmt::Debug for ClaudeTerminationHandle {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ClaudeTerminationHandle")
+            .field("requested", &self.is_requested())
+            .finish()
+    }
+}
+
 pub struct ClaudePrintStreamJsonHandle {
     pub events: DynClaudeStreamJsonEventStream,
     pub completion: DynClaudeStreamJsonCompletion,
@@ -67,6 +128,22 @@ impl std::fmt::Debug for ClaudePrintStreamJsonHandle {
         f.debug_struct("ClaudePrintStreamJsonHandle")
             .field("events", &"<stream>")
             .field("completion", &"<future>")
+            .finish()
+    }
+}
+
+pub struct ClaudePrintStreamJsonControlHandle {
+    pub events: DynClaudeStreamJsonEventStream,
+    pub completion: DynClaudeStreamJsonCompletion,
+    pub termination: ClaudeTerminationHandle,
+}
+
+impl std::fmt::Debug for ClaudePrintStreamJsonControlHandle {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ClaudePrintStreamJsonControlHandle")
+            .field("events", &"<stream>")
+            .field("completion", &"<future>")
+            .field("termination", &self.termination)
             .finish()
     }
 }

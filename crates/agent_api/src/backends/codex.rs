@@ -3,18 +3,31 @@ use std::{
     future::Future,
     path::PathBuf,
     pin::Pin,
+    process::ExitStatus,
+    sync::Arc,
     time::Duration,
 };
 
 use codex::{CodexError, ExecStreamError, ExecStreamRequest, ThreadEvent};
-use futures_util::StreamExt;
+use futures_util::future::poll_fn;
 use serde_json::Value;
-use tokio::sync::{mpsc, oneshot};
+use tokio::sync::oneshot;
 
 use crate::{
+    backend_harness::{
+        BackendDefaults, BackendHarnessAdapter, BackendHarnessErrorPhase, BackendSpawn,
+        NormalizedRequest,
+    },
     AgentWrapperBackend, AgentWrapperCapabilities, AgentWrapperCompletion, AgentWrapperError,
-    AgentWrapperEvent, AgentWrapperKind, AgentWrapperRunHandle, AgentWrapperRunRequest,
+    AgentWrapperEvent, AgentWrapperKind, AgentWrapperRunControl, AgentWrapperRunHandle,
+    AgentWrapperRunRequest,
 };
+
+impl super::termination::TerminationHandle for codex::ExecTerminationHandle {
+    fn request_termination(&self) {
+        codex::ExecTerminationHandle::request_termination(self);
+    }
+}
 
 #[derive(Clone, Debug, Default)]
 pub struct CodexBackendConfig {
@@ -109,18 +122,6 @@ struct CodexExecPolicy {
 fn validate_and_extract_exec_policy(
     request: &AgentWrapperRunRequest,
 ) -> Result<CodexExecPolicy, AgentWrapperError> {
-    for key in request.extensions.keys() {
-        if key != EXT_NON_INTERACTIVE
-            && key != EXT_CODEX_APPROVAL_POLICY
-            && key != EXT_CODEX_SANDBOX_MODE
-        {
-            return Err(AgentWrapperError::UnsupportedCapability {
-                agent_kind: "codex".to_string(),
-                capability: key.clone(),
-            });
-        }
-    }
-
     let non_interactive = request
         .extensions
         .get(EXT_NON_INTERACTIVE)
@@ -231,6 +232,263 @@ fn redact_exec_stream_error(err: &ExecStreamError) -> String {
     }
 }
 
+#[derive(Clone, Debug)]
+struct CodexHarnessAdapter {
+    config: CodexBackendConfig,
+    run_start_cwd: Option<PathBuf>,
+    termination:
+        Option<std::sync::Arc<super::termination::TerminationState<codex::ExecTerminationHandle>>>,
+}
+
+#[derive(Debug)]
+enum CodexBackendEvent {
+    Thread(Box<ThreadEvent>),
+    NonZeroExit { status: ExitStatus },
+}
+
+#[derive(Debug)]
+enum CodexBackendCompletion {
+    Ok(codex::ExecCompletion),
+    NonZeroExit { status: ExitStatus },
+}
+
+#[derive(Debug)]
+enum CodexBackendError {
+    Exec(ExecStreamError),
+    CompletionTaskDropped,
+    WorkingDirectoryUnresolved,
+}
+
+impl BackendHarnessAdapter for CodexHarnessAdapter {
+    fn kind(&self) -> AgentWrapperKind {
+        AgentWrapperKind("codex".to_string())
+    }
+
+    fn supported_extension_keys(&self) -> &'static [&'static str] {
+        &[
+            EXT_NON_INTERACTIVE,
+            EXT_CODEX_APPROVAL_POLICY,
+            EXT_CODEX_SANDBOX_MODE,
+        ]
+    }
+
+    type Policy = CodexExecPolicy;
+
+    fn validate_and_extract_policy(
+        &self,
+        request: &AgentWrapperRunRequest,
+    ) -> Result<Self::Policy, AgentWrapperError> {
+        validate_and_extract_exec_policy(request)
+    }
+
+    type BackendEvent = CodexBackendEvent;
+    type BackendCompletion = CodexBackendCompletion;
+    type BackendError = CodexBackendError;
+
+    fn spawn(
+        &self,
+        req: NormalizedRequest<Self::Policy>,
+    ) -> Pin<
+        Box<
+            dyn Future<
+                    Output = Result<
+                        BackendSpawn<
+                            Self::BackendEvent,
+                            Self::BackendCompletion,
+                            Self::BackendError,
+                        >,
+                        Self::BackendError,
+                    >,
+                > + Send
+                + 'static,
+        >,
+    > {
+        let config = self.config.clone();
+        let run_start_cwd = self.run_start_cwd.clone();
+        let termination = self.termination.clone();
+        let policy = req.policy;
+        let prompt = req.prompt;
+        let working_dir = req.working_dir;
+        let effective_timeout = req.effective_timeout;
+        let env = req.env;
+
+        Box::pin(async move {
+            fn map_approval_policy(policy: &CodexApprovalPolicy) -> codex::ApprovalPolicy {
+                match policy {
+                    CodexApprovalPolicy::Untrusted => codex::ApprovalPolicy::Untrusted,
+                    CodexApprovalPolicy::OnFailure => codex::ApprovalPolicy::OnFailure,
+                    CodexApprovalPolicy::OnRequest => codex::ApprovalPolicy::OnRequest,
+                    CodexApprovalPolicy::Never => codex::ApprovalPolicy::Never,
+                }
+            }
+
+            fn map_sandbox_mode(mode: &CodexSandboxMode) -> codex::SandboxMode {
+                match mode {
+                    CodexSandboxMode::ReadOnly => codex::SandboxMode::ReadOnly,
+                    CodexSandboxMode::WorkspaceWrite => codex::SandboxMode::WorkspaceWrite,
+                    CodexSandboxMode::DangerFullAccess => codex::SandboxMode::DangerFullAccess,
+                }
+            }
+
+            let mut builder = codex::CodexClient::builder()
+                .json(true)
+                .mirror_stdout(false)
+                .quiet(true)
+                .color_mode(codex::ColorMode::Never)
+                .sandbox_mode(map_sandbox_mode(&policy.sandbox_mode));
+
+            if policy.non_interactive {
+                builder = builder.approval_policy(codex::ApprovalPolicy::Never);
+            } else if let Some(value) = policy.approval_policy.as_ref() {
+                builder = builder.approval_policy(map_approval_policy(value));
+            }
+
+            if let Some(binary) = config.binary.as_ref() {
+                builder = builder.binary(binary.clone());
+            }
+
+            if let Some(codex_home) = config.codex_home.as_ref() {
+                builder = builder.codex_home(codex_home.clone());
+            }
+
+            let working_dir = working_dir
+                .or_else(|| config.default_working_dir.clone())
+                .or(run_start_cwd)
+                .ok_or(CodexBackendError::WorkingDirectoryUnresolved)?;
+            builder = builder.working_dir(working_dir);
+
+            // Codex wrapper treats `Duration::ZERO` as “no timeout”.
+            builder = builder.timeout(effective_timeout.unwrap_or(Duration::ZERO));
+
+            let client = builder.build();
+
+            let handle = client
+                .stream_exec_with_env_overrides_control(
+                    ExecStreamRequest {
+                        prompt,
+                        idle_timeout: None,
+                        output_last_message: None,
+                        output_schema: None,
+                        json_event_log: None,
+                    },
+                    &env,
+                )
+                .await
+                .map_err(CodexBackendError::Exec)?;
+
+            let codex::ExecStreamControl {
+                events,
+                completion,
+                termination: termination_handle,
+            } = handle;
+
+            if let Some(state) = termination.as_ref() {
+                state.set_handle(termination_handle);
+            }
+
+            let (completion_tx, completion_rx) =
+                oneshot::channel::<Result<CodexBackendCompletion, CodexBackendError>>();
+            let (tail_tx, tail_rx) = oneshot::channel::<Option<ExitStatus>>();
+
+            tokio::spawn(async move {
+                let outcome = completion.await;
+                match outcome {
+                    Ok(exec_completion) => {
+                        let _ = completion_tx.send(Ok(CodexBackendCompletion::Ok(exec_completion)));
+                        let _ = tail_tx.send(None);
+                    }
+                    Err(ExecStreamError::Codex(CodexError::NonZeroExit { status, .. })) => {
+                        let _ =
+                            completion_tx.send(Ok(CodexBackendCompletion::NonZeroExit { status }));
+                        let _ = tail_tx.send(Some(status));
+                    }
+                    Err(err) => {
+                        let _ = completion_tx.send(Err(CodexBackendError::Exec(err)));
+                        let _ = tail_tx.send(None);
+                    }
+                }
+            });
+
+            let events = Box::pin(futures_util::stream::unfold(
+                (events, Some(tail_rx), false),
+                |(mut events, mut tail_rx, tail_emitted)| async move {
+                    let item = poll_fn(|cx| events.as_mut().poll_next(cx)).await;
+                    match item {
+                        Some(Ok(thread_ev)) => Some((
+                            Ok(CodexBackendEvent::Thread(Box::new(thread_ev))),
+                            (events, tail_rx, tail_emitted),
+                        )),
+                        Some(Err(err)) => Some((
+                            Err(CodexBackendError::Exec(err)),
+                            (events, tail_rx, tail_emitted),
+                        )),
+                        None => {
+                            if tail_emitted {
+                                return None;
+                            }
+
+                            let status = match tail_rx.take() {
+                                Some(rx) => rx.await.ok().flatten(),
+                                None => None,
+                            }?;
+
+                            Some((
+                                Ok(CodexBackendEvent::NonZeroExit { status }),
+                                (events, tail_rx, true),
+                            ))
+                        }
+                    }
+                },
+            ));
+
+            let completion = Box::pin(async move {
+                completion_rx
+                    .await
+                    .unwrap_or(Err(CodexBackendError::CompletionTaskDropped))
+            });
+
+            Ok(BackendSpawn { events, completion })
+        })
+    }
+
+    fn map_event(&self, event: Self::BackendEvent) -> Vec<AgentWrapperEvent> {
+        match event {
+            CodexBackendEvent::Thread(ev) => vec![map_thread_event(&ev)],
+            CodexBackendEvent::NonZeroExit { status } => vec![error_event(format!(
+                "codex exited non-zero: {status:?} (stderr redacted)"
+            ))],
+        }
+    }
+
+    fn map_completion(
+        &self,
+        completion: Self::BackendCompletion,
+    ) -> Result<AgentWrapperCompletion, AgentWrapperError> {
+        match completion {
+            CodexBackendCompletion::Ok(completion) => Ok(AgentWrapperCompletion {
+                status: completion.status,
+                final_text: crate::bounds::enforce_final_text_bound(completion.last_message),
+                data: None,
+            }),
+            CodexBackendCompletion::NonZeroExit { status } => Ok(AgentWrapperCompletion {
+                status,
+                final_text: None,
+                data: None,
+            }),
+        }
+    }
+
+    fn redact_error(&self, _phase: BackendHarnessErrorPhase, err: &Self::BackendError) -> String {
+        match err {
+            CodexBackendError::Exec(err) => redact_exec_stream_error(err),
+            CodexBackendError::CompletionTaskDropped => "codex completion task dropped".to_string(),
+            CodexBackendError::WorkingDirectoryUnresolved => {
+                "codex backend failed to resolve working directory".to_string()
+            }
+        }
+    }
+}
+
 impl AgentWrapperBackend for CodexBackend {
     fn kind(&self) -> AgentWrapperKind {
         AgentWrapperKind("codex".to_string())
@@ -241,6 +499,7 @@ impl AgentWrapperBackend for CodexBackend {
         ids.insert("agent_api.run".to_string());
         ids.insert("agent_api.events".to_string());
         ids.insert("agent_api.events.live".to_string());
+        ids.insert(crate::CAPABILITY_CONTROL_CANCEL_V1.to_string());
         ids.insert(CAP_TOOLS_STRUCTURED_V1.to_string());
         ids.insert(CAP_TOOLS_RESULTS_V1.to_string());
         ids.insert(CAP_ARTIFACTS_FINAL_TEXT_V1.to_string());
@@ -257,215 +516,69 @@ impl AgentWrapperBackend for CodexBackend {
     ) -> Pin<Box<dyn Future<Output = Result<AgentWrapperRunHandle, AgentWrapperError>> + Send + '_>>
     {
         let config = self.config.clone();
-        Box::pin(async move { run_impl(config, request).await })
-    }
-}
+        Box::pin(async move {
+            let run_start_cwd = std::env::current_dir().ok();
+            let adapter = Arc::new(CodexHarnessAdapter {
+                config: config.clone(),
+                run_start_cwd,
+                termination: None,
+            });
 
-async fn run_impl(
-    config: CodexBackendConfig,
-    request: AgentWrapperRunRequest,
-) -> Result<AgentWrapperRunHandle, AgentWrapperError> {
-    if request.prompt.trim().is_empty() {
-        return Err(AgentWrapperError::InvalidRequest {
-            message: "prompt must not be empty".to_string(),
-        });
-    }
+            let defaults = BackendDefaults {
+                env: config.env,
+                default_timeout: config.default_timeout,
+            };
 
-    let policy = validate_and_extract_exec_policy(&request)?;
-    let run_start_cwd = std::env::current_dir().ok();
-
-    let (tx, rx) = mpsc::channel::<AgentWrapperEvent>(32);
-    let (completion_tx, completion_rx) =
-        oneshot::channel::<Result<AgentWrapperCompletion, AgentWrapperError>>();
-
-    tokio::spawn(async move {
-        let result = run_codex_inner(config, request, policy, run_start_cwd, tx).await;
-        let _ = completion_tx.send(result);
-    });
-
-    Ok(crate::run_handle_gate::build_gated_run_handle(
-        rx,
-        completion_rx,
-    ))
-}
-
-async fn run_codex_inner(
-    config: CodexBackendConfig,
-    request: AgentWrapperRunRequest,
-    policy: CodexExecPolicy,
-    run_start_cwd: Option<PathBuf>,
-    tx: mpsc::Sender<AgentWrapperEvent>,
-) -> Result<AgentWrapperCompletion, AgentWrapperError> {
-    fn map_approval_policy(policy: &CodexApprovalPolicy) -> codex::ApprovalPolicy {
-        match policy {
-            CodexApprovalPolicy::Untrusted => codex::ApprovalPolicy::Untrusted,
-            CodexApprovalPolicy::OnFailure => codex::ApprovalPolicy::OnFailure,
-            CodexApprovalPolicy::OnRequest => codex::ApprovalPolicy::OnRequest,
-            CodexApprovalPolicy::Never => codex::ApprovalPolicy::Never,
-        }
+            crate::backend_harness::run_harnessed_backend(adapter, defaults, request)
+        })
     }
 
-    fn map_sandbox_mode(mode: &CodexSandboxMode) -> codex::SandboxMode {
-        match mode {
-            CodexSandboxMode::ReadOnly => codex::SandboxMode::ReadOnly,
-            CodexSandboxMode::WorkspaceWrite => codex::SandboxMode::WorkspaceWrite,
-            CodexSandboxMode::DangerFullAccess => codex::SandboxMode::DangerFullAccess,
-        }
-    }
-
-    let mut builder = codex::CodexClient::builder()
-        .json(true)
-        .mirror_stdout(false)
-        .quiet(true)
-        .color_mode(codex::ColorMode::Never)
-        .sandbox_mode(map_sandbox_mode(&policy.sandbox_mode));
-
-    if policy.non_interactive {
-        builder = builder.approval_policy(codex::ApprovalPolicy::Never);
-    } else if let Some(value) = policy.approval_policy.as_ref() {
-        builder = builder.approval_policy(map_approval_policy(value));
-    }
-
-    if let Some(binary) = config.binary.as_ref() {
-        builder = builder.binary(binary.clone());
-    }
-
-    if let Some(codex_home) = config.codex_home.as_ref() {
-        builder = builder.codex_home(codex_home.clone());
-    }
-
-    let working_dir = request
-        .working_dir
-        .clone()
-        .or_else(|| config.default_working_dir.clone())
-        .or(run_start_cwd);
-    let working_dir = working_dir.ok_or_else(|| AgentWrapperError::Backend {
-        message: "codex backend failed to resolve working directory".to_string(),
-    })?;
-    builder = builder.working_dir(working_dir);
-
-    let timeout = request
-        .timeout
-        .or(config.default_timeout)
-        .unwrap_or(Duration::ZERO);
-    builder = builder.timeout(timeout);
-
-    let client = builder.build();
-
-    let mut env_overrides = BTreeMap::new();
-    env_overrides.extend(config.env);
-    env_overrides.extend(request.env);
-
-    let handle = match client
-        .stream_exec_with_env_overrides(
-            ExecStreamRequest {
-                prompt: request.prompt,
-                idle_timeout: None,
-                output_last_message: None,
-                output_schema: None,
-                json_event_log: None,
-            },
-            &env_overrides,
-        )
-        .await
+    fn run_control(
+        &self,
+        request: AgentWrapperRunRequest,
+    ) -> Pin<Box<dyn Future<Output = Result<AgentWrapperRunControl, AgentWrapperError>> + Send + '_>>
     {
-        Ok(handle) => handle,
-        Err(err) => {
-            let message = redact_exec_stream_error(&err);
-            for bounded in crate::bounds::enforce_event_bounds(error_event(message.clone())) {
-                if tx.send(bounded).await.is_err() {
-                    break;
-                }
-            }
-            drop(tx);
-            return Err(AgentWrapperError::Backend { message });
-        }
-    };
-
-    let completion_outcome =
-        drain_events_while_polling_completion(handle.events, handle.completion, &tx).await?;
-
-    let completion = match completion_outcome {
-        Ok(completion) => completion,
-        Err(ExecStreamError::Codex(CodexError::NonZeroExit { status, .. })) => {
-            for bounded in crate::bounds::enforce_event_bounds(error_event(format!(
-                "codex exited non-zero: {status:?} (stderr redacted)"
-            ))) {
-                let _ = tx.send(bounded).await;
-            }
-            drop(tx);
-            return Ok(crate::bounds::enforce_completion_bounds(
-                AgentWrapperCompletion {
-                    status,
-                    final_text: None,
-                    data: None,
-                },
-            ));
-        }
-        Err(err) => {
-            for bounded in
-                crate::bounds::enforce_event_bounds(error_event(redact_exec_stream_error(&err)))
-            {
-                let _ = tx.send(bounded).await;
-            }
-            drop(tx);
-            return Err(AgentWrapperError::Backend {
-                message: redact_exec_stream_error(&err),
+        if !self
+            .capabilities()
+            .contains(crate::CAPABILITY_CONTROL_CANCEL_V1)
+        {
+            let agent_kind = self.kind().as_str().to_string();
+            return Box::pin(async move {
+                Err(AgentWrapperError::UnsupportedCapability {
+                    agent_kind,
+                    capability: crate::CAPABILITY_CONTROL_CANCEL_V1.to_string(),
+                })
             });
         }
-    };
 
-    drop(tx);
+        let config = self.config.clone();
+        Box::pin(async move {
+            let termination_state = Arc::new(super::termination::TerminationState::new());
+            let request_termination: Option<Arc<dyn Fn() + Send + Sync + 'static>> = Some({
+                let termination_state = Arc::clone(&termination_state);
+                Arc::new(move || termination_state.request())
+            });
 
-    Ok(crate::bounds::enforce_completion_bounds(
-        AgentWrapperCompletion {
-            status: completion.status,
-            final_text: crate::bounds::enforce_final_text_bound(completion.last_message),
-            data: None,
-        },
-    ))
-}
+            let run_start_cwd = std::env::current_dir().ok();
+            let adapter = Arc::new(CodexHarnessAdapter {
+                config: config.clone(),
+                run_start_cwd,
+                termination: Some(termination_state),
+            });
 
-async fn drain_events_while_polling_completion(
-    mut events: impl futures_core::Stream<Item = Result<ThreadEvent, ExecStreamError>> + Unpin,
-    completion: impl Future<Output = Result<codex::ExecCompletion, ExecStreamError>> + Send + 'static,
-    tx: &mpsc::Sender<AgentWrapperEvent>,
-) -> Result<Result<codex::ExecCompletion, ExecStreamError>, AgentWrapperError> {
-    let (completion_tx, completion_rx) = oneshot::channel();
-    tokio::spawn(async move {
-        let _ = completion_tx.send(completion.await);
-    });
+            let defaults = BackendDefaults {
+                env: config.env,
+                default_timeout: config.default_timeout,
+            };
 
-    // If the caller drops the universal events stream, we MUST keep draining the backend stream so
-    // the underlying process isn't accidentally cancelled (and so we avoid deadlocks on bounded
-    // channels). We simply stop forwarding once the receiver is gone.
-    let mut forward = true;
-    while let Some(outcome) = events.next().await {
-        if !forward {
-            continue;
-        }
-
-        let mapped_events = match outcome {
-            Ok(event) => vec![map_thread_event(&event)],
-            Err(err) => vec![error_event(redact_exec_stream_error(&err))],
-        };
-
-        for event in mapped_events {
-            for bounded in crate::bounds::enforce_event_bounds(event) {
-                if tx.send(bounded).await.is_err() {
-                    forward = false;
-                    break;
-                }
-            }
-            if !forward {
-                break;
-            }
-        }
+            crate::backend_harness::run_harnessed_backend_control(
+                adapter,
+                defaults,
+                request,
+                request_termination,
+            )
+        })
     }
-
-    completion_rx.await.map_err(|_| AgentWrapperError::Backend {
-        message: "codex completion task dropped".to_string(),
-    })
 }
 
 #[cfg(test)]

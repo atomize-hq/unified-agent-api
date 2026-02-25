@@ -81,7 +81,19 @@ def _tail_lines(path: Path, n: int) -> str:
 
 def _looks_like_path(s: str) -> bool:
     s = s.strip()
-    return ("/" in s or s.endswith(".md") or s.endswith(".txt")) and not s.startswith("#")
+    # kickoff_prompt can be either:
+    # - a file path reference, or
+    # - literal prompt text.
+    #
+    # Prompts frequently mention file paths ("/"), so only treat the value as a path
+    # when it's a single token (no whitespace/newlines).
+    if not s or s.startswith("#"):
+        return False
+    if "\n" in s or "\r" in s:
+        return False
+    if any(ch.isspace() for ch in s):
+        return False
+    return ("/" in s) or s.endswith(".md") or s.endswith(".txt")
 
 
 def _load_kickoff_text(repo_root: Path, kickoff_ref: str) -> str:
@@ -90,8 +102,12 @@ def _load_kickoff_text(repo_root: Path, kickoff_ref: str) -> str:
         return ""
     if _looks_like_path(ref):
         p = (repo_root / ref).resolve()
-        if p.exists():
-            return p.read_text(encoding="utf-8")
+        try:
+            if p.exists():
+                return p.read_text(encoding="utf-8")
+        except OSError:
+            # Oversized or invalid paths should be treated as literal kickoff prompt text.
+            return ref
     return ref
 
 

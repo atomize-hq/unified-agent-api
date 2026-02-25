@@ -3,19 +3,31 @@ use std::{
     future::Future,
     path::PathBuf,
     pin::Pin,
+    sync::{Arc, Mutex},
     time::Duration,
 };
 
 use claude_code::{ClaudeOutputFormat, ClaudePrintRequest};
+use futures_util::stream;
 use futures_util::StreamExt;
 use serde_json::Value;
-use tokio::sync::{mpsc, oneshot};
+use tokio::sync::oneshot;
 
 use crate::{
+    backend_harness::{
+        BackendDefaults, BackendHarnessAdapter, BackendHarnessErrorPhase, BackendSpawn,
+        NormalizedRequest,
+    },
     AgentWrapperBackend, AgentWrapperCapabilities, AgentWrapperCompletion, AgentWrapperError,
-    AgentWrapperEvent, AgentWrapperEventKind, AgentWrapperKind, AgentWrapperRunHandle,
-    AgentWrapperRunRequest,
+    AgentWrapperEvent, AgentWrapperEventKind, AgentWrapperKind, AgentWrapperRunControl,
+    AgentWrapperRunHandle, AgentWrapperRunRequest,
 };
+
+impl super::termination::TerminationHandle for claude_code::ClaudeTerminationHandle {
+    fn request_termination(&self) {
+        claude_code::ClaudeTerminationHandle::request_termination(self);
+    }
+}
 
 const AGENT_KIND: &str = "claude_code";
 const CHANNEL_ASSISTANT: &str = "assistant";
@@ -33,26 +45,6 @@ fn parse_bool(value: &Value, key: &str) -> Result<bool, AgentWrapperError> {
         .ok_or_else(|| AgentWrapperError::InvalidRequest {
             message: format!("{key} must be a boolean"),
         })
-}
-
-fn validate_and_extract_non_interactive(
-    request: &AgentWrapperRunRequest,
-) -> Result<bool, AgentWrapperError> {
-    for key in request.extensions.keys() {
-        if key != EXT_NON_INTERACTIVE {
-            return Err(AgentWrapperError::UnsupportedCapability {
-                agent_kind: AGENT_KIND.to_string(),
-                capability: key.clone(),
-            });
-        }
-    }
-
-    Ok(request
-        .extensions
-        .get(EXT_NON_INTERACTIVE)
-        .map(|value| parse_bool(value, EXT_NON_INTERACTIVE))
-        .transpose()?
-        .unwrap_or(true))
 }
 
 #[derive(Clone, Debug, Default)]
@@ -73,6 +65,212 @@ impl ClaudeCodeBackend {
     }
 }
 
+#[derive(Clone, Debug)]
+struct ClaudeHarnessAdapter {
+    config: ClaudeCodeBackendConfig,
+    termination: Option<
+        std::sync::Arc<super::termination::TerminationState<claude_code::ClaudeTerminationHandle>>,
+    >,
+}
+
+#[derive(Clone, Debug)]
+struct ClaudeExecPolicy {
+    non_interactive: bool,
+}
+
+#[derive(Clone, Debug)]
+struct ClaudeBackendCompletion {
+    status: std::process::ExitStatus,
+    final_text: Option<String>,
+}
+
+#[derive(Debug)]
+enum ClaudeBackendError {
+    Spawn(claude_code::ClaudeCodeError),
+    StreamParse(claude_code::ClaudeStreamJsonParseError),
+    Completion(claude_code::ClaudeCodeError),
+}
+
+impl BackendHarnessAdapter for ClaudeHarnessAdapter {
+    fn kind(&self) -> AgentWrapperKind {
+        AgentWrapperKind(AGENT_KIND.to_string())
+    }
+
+    fn supported_extension_keys(&self) -> &'static [&'static str] {
+        const SUPPORTED: [&str; 1] = [EXT_NON_INTERACTIVE];
+        &SUPPORTED
+    }
+
+    type Policy = ClaudeExecPolicy;
+
+    fn validate_and_extract_policy(
+        &self,
+        request: &AgentWrapperRunRequest,
+    ) -> Result<Self::Policy, AgentWrapperError> {
+        let non_interactive = request
+            .extensions
+            .get(EXT_NON_INTERACTIVE)
+            .map(|value| parse_bool(value, EXT_NON_INTERACTIVE))
+            .transpose()?
+            .unwrap_or(true);
+
+        Ok(ClaudeExecPolicy { non_interactive })
+    }
+
+    type BackendEvent = claude_code::ClaudeStreamJsonEvent;
+    type BackendCompletion = ClaudeBackendCompletion;
+    type BackendError = ClaudeBackendError;
+
+    fn spawn(
+        &self,
+        req: NormalizedRequest<Self::Policy>,
+    ) -> Pin<
+        Box<
+            dyn Future<
+                    Output = Result<
+                        BackendSpawn<
+                            Self::BackendEvent,
+                            Self::BackendCompletion,
+                            Self::BackendError,
+                        >,
+                        Self::BackendError,
+                    >,
+                > + Send
+                + 'static,
+        >,
+    > {
+        let config = self.config.clone();
+        let termination = self.termination.clone();
+        Box::pin(async move {
+            let mut builder = claude_code::ClaudeClient::builder();
+            if let Some(binary) = config.binary.as_ref() {
+                builder = builder.binary(binary.clone());
+            }
+
+            let working_dir = req
+                .working_dir
+                .clone()
+                .or_else(|| config.default_working_dir.clone());
+            if let Some(dir) = working_dir {
+                builder = builder.working_dir(dir);
+            }
+
+            let timeout = match req.effective_timeout {
+                Some(t) if t == Duration::ZERO => None,
+                other => other,
+            };
+            builder = builder.timeout(timeout);
+
+            for (k, v) in req.env.iter() {
+                builder = builder.env(k.clone(), v.clone());
+            }
+
+            let client = builder.build();
+
+            let mut print_req = ClaudePrintRequest::new(req.prompt)
+                .output_format(ClaudeOutputFormat::StreamJson)
+                .include_partial_messages(true);
+            if req.policy.non_interactive {
+                print_req = print_req.permission_mode("bypassPermissions");
+            }
+
+            let handle = client
+                .print_stream_json_control(print_req)
+                .await
+                .map_err(ClaudeBackendError::Spawn)?;
+
+            if let Some(state) = termination.as_ref() {
+                state.set_handle(handle.termination.clone());
+            }
+
+            let last_assistant_text: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
+            let (events_done_tx, events_done_rx) = oneshot::channel::<()>();
+
+            let events = Box::pin(stream::unfold(
+                (
+                    handle.events,
+                    last_assistant_text.clone(),
+                    Some(events_done_tx),
+                ),
+                |(mut events, last_assistant_text, mut events_done_tx)| async move {
+                    match events.next().await {
+                        Some(Ok(ev)) => {
+                            if let claude_code::ClaudeStreamJsonEvent::AssistantMessage {
+                                raw,
+                                ..
+                            } = &ev
+                            {
+                                if let Some(text) = extract_assistant_message_final_text(raw) {
+                                    if let Ok(mut guard) = last_assistant_text.lock() {
+                                        *guard = Some(text);
+                                    }
+                                }
+                            }
+
+                            Some((Ok(ev), (events, last_assistant_text, events_done_tx)))
+                        }
+                        Some(Err(err)) => Some((
+                            Err(ClaudeBackendError::StreamParse(err)),
+                            (events, last_assistant_text, events_done_tx),
+                        )),
+                        None => {
+                            if let Some(tx) = events_done_tx.take() {
+                                let _ = tx.send(());
+                            }
+                            None
+                        }
+                    }
+                },
+            ));
+
+            let completion = Box::pin(async move {
+                let _ = events_done_rx.await;
+
+                let status = handle
+                    .completion
+                    .await
+                    .map_err(ClaudeBackendError::Completion)?;
+
+                let final_text = last_assistant_text
+                    .lock()
+                    .ok()
+                    .and_then(|guard| guard.clone());
+
+                Ok(ClaudeBackendCompletion { status, final_text })
+            });
+
+            Ok(BackendSpawn { events, completion })
+        })
+    }
+
+    fn map_event(&self, event: Self::BackendEvent) -> Vec<AgentWrapperEvent> {
+        map_stream_json_event(event)
+    }
+
+    fn map_completion(
+        &self,
+        completion: Self::BackendCompletion,
+    ) -> Result<AgentWrapperCompletion, AgentWrapperError> {
+        Ok(AgentWrapperCompletion {
+            status: completion.status,
+            final_text: crate::bounds::enforce_final_text_bound(completion.final_text),
+            data: None,
+        })
+    }
+
+    fn redact_error(&self, phase: BackendHarnessErrorPhase, err: &Self::BackendError) -> String {
+        match (phase, err) {
+            (BackendHarnessErrorPhase::Stream, ClaudeBackendError::StreamParse(err)) => {
+                err.message.clone()
+            }
+            (_, ClaudeBackendError::Spawn(err) | ClaudeBackendError::Completion(err)) => {
+                format!("claude_code error: {err}")
+            }
+            (_, ClaudeBackendError::StreamParse(err)) => err.message.clone(),
+        }
+    }
+}
+
 impl AgentWrapperBackend for ClaudeCodeBackend {
     fn kind(&self) -> AgentWrapperKind {
         AgentWrapperKind(AGENT_KIND.to_string())
@@ -83,6 +281,7 @@ impl AgentWrapperBackend for ClaudeCodeBackend {
         ids.insert("agent_api.run".to_string());
         ids.insert("agent_api.events".to_string());
         ids.insert("agent_api.events.live".to_string());
+        ids.insert(crate::CAPABILITY_CONTROL_CANCEL_V1.to_string());
         ids.insert(CAP_TOOLS_STRUCTURED_V1.to_string());
         ids.insert(CAP_TOOLS_RESULTS_V1.to_string());
         ids.insert(CAP_ARTIFACTS_FINAL_TEXT_V1.to_string());
@@ -97,186 +296,63 @@ impl AgentWrapperBackend for ClaudeCodeBackend {
     ) -> Pin<Box<dyn Future<Output = Result<AgentWrapperRunHandle, AgentWrapperError>> + Send + '_>>
     {
         let config = self.config.clone();
-        Box::pin(async move { run_impl(config, request).await })
-    }
-}
+        Box::pin(async move {
+            let adapter = Arc::new(ClaudeHarnessAdapter {
+                config: config.clone(),
+                termination: None,
+            });
+            let defaults = BackendDefaults {
+                env: config.env,
+                default_timeout: config.default_timeout,
+            };
 
-async fn run_impl(
-    config: ClaudeCodeBackendConfig,
-    request: AgentWrapperRunRequest,
-) -> Result<AgentWrapperRunHandle, AgentWrapperError> {
-    if request.prompt.trim().is_empty() {
-        return Err(AgentWrapperError::InvalidRequest {
-            message: "prompt must not be empty".to_string(),
-        });
-    }
-
-    let non_interactive = validate_and_extract_non_interactive(&request)?;
-
-    let (tx, rx) = mpsc::channel::<AgentWrapperEvent>(32);
-    let (completion_tx, completion_rx) =
-        oneshot::channel::<Result<AgentWrapperCompletion, AgentWrapperError>>();
-
-    tokio::spawn(async move {
-        let result = run_claude_code(config, request, non_interactive, tx).await;
-        let _ = completion_tx.send(result);
-    });
-
-    Ok(crate::run_handle_gate::build_gated_run_handle(
-        rx,
-        completion_rx,
-    ))
-}
-
-async fn run_claude_code(
-    config: ClaudeCodeBackendConfig,
-    request: AgentWrapperRunRequest,
-    non_interactive: bool,
-    tx: mpsc::Sender<AgentWrapperEvent>,
-) -> Result<AgentWrapperCompletion, AgentWrapperError> {
-    let timeout = request.timeout.or(config.default_timeout);
-    if let Some(timeout) = timeout {
-        return tokio::time::timeout(
-            timeout,
-            run_claude_code_inner(config, request, non_interactive, tx),
-        )
-        .await
-        .map_err(|_| AgentWrapperError::Backend {
-            message: format!("claude_code exceeded timeout of {timeout:?}"),
-        })?;
+            crate::backend_harness::run_harnessed_backend(adapter, defaults, request)
+        })
     }
 
-    run_claude_code_inner(config, request, non_interactive, tx).await
-}
-
-async fn run_claude_code_inner(
-    config: ClaudeCodeBackendConfig,
-    request: AgentWrapperRunRequest,
-    non_interactive: bool,
-    tx: mpsc::Sender<AgentWrapperEvent>,
-) -> Result<AgentWrapperCompletion, AgentWrapperError> {
-    let mut builder = claude_code::ClaudeClient::builder();
-    if let Some(binary) = config.binary.as_ref() {
-        builder = builder.binary(binary.clone());
-    }
-
-    let working_dir = request
-        .working_dir
-        .clone()
-        .or_else(|| config.default_working_dir.clone());
-    if let Some(dir) = working_dir {
-        builder = builder.working_dir(dir);
-    }
-
-    builder = builder.timeout(request.timeout.or(config.default_timeout));
-
-    for (k, v) in config.env.iter() {
-        builder = builder.env(k.clone(), v.clone());
-    }
-    for (k, v) in request.env.iter() {
-        builder = builder.env(k.clone(), v.clone());
-    }
-
-    let client = builder.build();
-    let mut print_req = ClaudePrintRequest::new(request.prompt)
-        .output_format(ClaudeOutputFormat::StreamJson)
-        .include_partial_messages(true);
-    if non_interactive {
-        print_req = print_req.permission_mode("bypassPermissions");
-    }
-
-    let handle = match client.print_stream_json(print_req).await {
-        Ok(handle) => handle,
-        Err(err) => {
-            for bounded in crate::bounds::enforce_event_bounds(error_event(format!(
-                "claude_code error: {err}"
-            ))) {
-                if tx.send(bounded).await.is_err() {
-                    break;
-                }
-            }
-            drop(tx);
-            return Err(AgentWrapperError::Backend {
-                message: format!("claude_code error: {err}"),
+    fn run_control(
+        &self,
+        request: AgentWrapperRunRequest,
+    ) -> Pin<Box<dyn Future<Output = Result<AgentWrapperRunControl, AgentWrapperError>> + Send + '_>>
+    {
+        if !self
+            .capabilities()
+            .contains(crate::CAPABILITY_CONTROL_CANCEL_V1)
+        {
+            let agent_kind = self.kind().as_str().to_string();
+            return Box::pin(async move {
+                Err(AgentWrapperError::UnsupportedCapability {
+                    agent_kind,
+                    capability: crate::CAPABILITY_CONTROL_CANCEL_V1.to_string(),
+                })
             });
         }
-    };
 
-    let mut events = handle.events;
-    let completion = handle.completion;
-
-    let mut last_assistant_text: Option<String> = None;
-
-    // If the caller drops the universal events stream, we MUST keep draining the backend stream so
-    // the underlying process isn't accidentally cancelled (and so we avoid deadlocks on bounded
-    // channels). We simply stop forwarding once the receiver is gone.
-    let mut forward = true;
-    while let Some(outcome) = events.next().await {
-        match outcome {
-            Ok(ev) => {
-                if let claude_code::ClaudeStreamJsonEvent::AssistantMessage { raw, .. } = &ev {
-                    if let Some(text) = extract_assistant_message_final_text(raw) {
-                        last_assistant_text = Some(text);
-                    }
-                }
-
-                if !forward {
-                    continue;
-                }
-
-                for event in map_stream_json_event(ev) {
-                    for bounded in crate::bounds::enforce_event_bounds(event) {
-                        if tx.send(bounded).await.is_err() {
-                            forward = false;
-                            break;
-                        }
-                    }
-                    if !forward {
-                        break;
-                    }
-                }
-            }
-            Err(err) => {
-                if !forward {
-                    continue;
-                }
-
-                for bounded in
-                    crate::bounds::enforce_event_bounds(error_event(redact_parse_error(&err)))
-                {
-                    if tx.send(bounded).await.is_err() {
-                        forward = false;
-                        break;
-                    }
-                }
-            }
-        }
-    }
-
-    let status = match completion.await {
-        Ok(status) => status,
-        Err(err) => {
-            for bounded in crate::bounds::enforce_event_bounds(error_event(format!(
-                "claude_code error: {err}"
-            ))) {
-                let _ = tx.send(bounded).await;
-            }
-            drop(tx);
-            return Err(AgentWrapperError::Backend {
-                message: format!("claude_code error: {err}"),
+        let config = self.config.clone();
+        Box::pin(async move {
+            let termination_state = Arc::new(super::termination::TerminationState::new());
+            let request_termination: Option<Arc<dyn Fn() + Send + Sync + 'static>> = Some({
+                let termination_state = Arc::clone(&termination_state);
+                Arc::new(move || termination_state.request())
             });
-        }
-    };
 
-    drop(tx);
+            let adapter = Arc::new(ClaudeHarnessAdapter {
+                config: config.clone(),
+                termination: Some(termination_state),
+            });
+            let defaults = BackendDefaults {
+                env: config.env,
+                default_timeout: config.default_timeout,
+            };
 
-    Ok(crate::bounds::enforce_completion_bounds(
-        AgentWrapperCompletion {
-            status,
-            final_text: crate::bounds::enforce_final_text_bound(last_assistant_text),
-            data: None,
-        },
-    ))
+            crate::backend_harness::run_harnessed_backend_control(
+                adapter,
+                defaults,
+                request,
+                request_termination,
+            )
+        })
+    }
 }
 
 fn map_stream_json_event(ev: claude_code::ClaudeStreamJsonEvent) -> Vec<AgentWrapperEvent> {
@@ -549,10 +625,6 @@ fn text_output_events(text: &str, channel: Option<&str>) -> Vec<AgentWrapperEven
         message: None,
         data: None,
     }]
-}
-
-fn redact_parse_error(err: &claude_code::ClaudeStreamJsonParseError) -> String {
-    err.message.clone()
 }
 
 #[cfg(test)]

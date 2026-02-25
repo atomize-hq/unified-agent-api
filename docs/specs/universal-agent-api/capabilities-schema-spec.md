@@ -62,6 +62,21 @@ Notes:
 - Core `agent_api.*` capability ids are stable once shipped.
 - Backend-specific capability ids are stable per backend once shipped, but may be added over time.
 
+## Capability matrix (generated artifact)
+
+The repository capability matrix is a generated artifact:
+- Location: `docs/specs/universal-agent-api/capability-matrix.md`
+- Generator: `cargo run -p xtask -- capability-matrix`
+
+Semantics (pinned):
+- The matrix lists only capability ids advertised by at least one built-in backend at generation time (it is a union of
+  `AgentWrapperBackend::capabilities().ids` across built-in backends).
+- The matrix is **not** an exhaustive registry of standard `agent_api.*` capability ids.
+- If a standard capability id defined in this spec is absent from the matrix, that means no built-in backend currently
+  advertises it (not that the id is invalid or removed).
+- Runtime availability checks MUST use `AgentWrapperCapabilities.ids` from the selected backend; the matrix is a
+  maintenance/overview artifact, not a runtime truth source.
+
 ## Required minimum capabilities (v1, normative)
 
 Every registered backend MUST include:
@@ -77,6 +92,15 @@ Backends that provide live streaming MUST include:
 
 This section defines stable universal capability ids and their minimum semantics.
 
+- `agent_api.control.cancel.v1`:
+  - A backend that advertises this capability MUST support explicit cancellation via
+    `AgentWrapperGateway::run_control(...)` and `AgentWrapperCancelHandle::cancel()` per
+    `run-protocol-spec.md`.
+  - `AgentWrapperCancelHandle::cancel()` MUST be idempotent and best-effort.
+  - If cancellation is requested before `AgentWrapperRunHandle.completion` resolves,
+    `AgentWrapperRunHandle.completion` MUST resolve to:
+    `Err(AgentWrapperError::Backend { message: "cancelled" })`.
+  - A backend that does not support explicit cancellation MUST NOT advertise this capability.
 - `agent_api.tools.structured.v1`:
   - A backend that advertises this capability MUST attach `AgentWrapperEvent.data` with
     `schema="agent_api.tools.structured.v1"` on every `ToolCall` and `ToolResult` event it emits

@@ -5,34 +5,24 @@ use std::future::Future;
 use std::path::PathBuf;
 use std::pin::Pin;
 use std::process::ExitStatus;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
 use futures_core::Stream;
 
+#[cfg(any(feature = "codex", feature = "claude_code"))]
 mod bounds;
 
 #[cfg(any(feature = "codex", feature = "claude_code"))]
 mod run_handle_gate;
 
+#[cfg(any(feature = "codex", feature = "claude_code"))]
+mod backend_harness;
+
 pub mod backends;
 
-#[cfg(any(feature = "codex", feature = "claude_code"))]
-#[doc(hidden)]
-pub mod __test_support {
-    use tokio::sync::{mpsc, oneshot};
-
-    use super::{
-        AgentWrapperCompletion, AgentWrapperError, AgentWrapperEvent, AgentWrapperRunHandle,
-    };
-
-    pub fn build_gated_run_handle(
-        rx: mpsc::Receiver<AgentWrapperEvent>,
-        completion_rx: oneshot::Receiver<Result<AgentWrapperCompletion, AgentWrapperError>>,
-    ) -> AgentWrapperRunHandle {
-        super::run_handle_gate::build_gated_run_handle(rx, completion_rx)
-    }
-}
+const CAPABILITY_CONTROL_CANCEL_V1: &str = "agent_api.control.cancel.v1";
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct AgentWrapperKind(String);
@@ -115,6 +105,60 @@ impl std::fmt::Debug for AgentWrapperRunHandle {
     }
 }
 
+struct AgentWrapperCancelInner {
+    called: AtomicBool,
+    cancel: Box<dyn Fn() + Send + Sync + 'static>,
+}
+
+#[derive(Clone)]
+pub struct AgentWrapperCancelHandle {
+    inner: Arc<AgentWrapperCancelInner>,
+}
+
+impl std::fmt::Debug for AgentWrapperCancelHandle {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("AgentWrapperCancelHandle")
+            .finish_non_exhaustive()
+    }
+}
+
+impl AgentWrapperCancelHandle {
+    #[allow(dead_code)]
+    pub(crate) fn new(cancel: impl Fn() + Send + Sync + 'static) -> Self {
+        Self {
+            inner: Arc::new(AgentWrapperCancelInner {
+                called: AtomicBool::new(false),
+                cancel: Box::new(cancel),
+            }),
+        }
+    }
+
+    /// Requests best-effort cancellation of the underlying backend process.
+    ///
+    /// This method MUST be idempotent.
+    ///
+    /// If cancellation is requested before `AgentWrapperRunHandle.completion` resolves, the completion
+    /// MUST resolve to `Err(AgentWrapperError::Backend { message: "cancelled" })`.
+    ///
+    /// Canonical semantics: `docs/specs/universal-agent-api/run-protocol-spec.md` ("Explicit
+    /// cancellation semantics").
+    pub fn cancel(&self) {
+        if self.inner.called.swap(true, Ordering::SeqCst) {
+            return;
+        }
+
+        let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            (self.inner.cancel)();
+        }));
+    }
+}
+
+#[derive(Debug)]
+pub struct AgentWrapperRunControl {
+    pub handle: AgentWrapperRunHandle,
+    pub cancel: AgentWrapperCancelHandle,
+}
+
 #[derive(Clone, Debug)]
 pub struct AgentWrapperCompletion {
     pub status: ExitStatus,
@@ -160,6 +204,25 @@ pub trait AgentWrapperBackend: Send + Sync {
         &self,
         request: AgentWrapperRunRequest,
     ) -> Pin<Box<dyn Future<Output = Result<AgentWrapperRunHandle, AgentWrapperError>> + Send + '_>>;
+
+    /// Starts a run and returns a handle plus an explicit cancellation handle.
+    ///
+    /// Backends that do not advertise `agent_api.control.cancel.v1` MUST return:
+    /// `AgentWrapperError::UnsupportedCapability { agent_kind, capability: "agent_api.control.cancel.v1" }`,
+    /// where `agent_kind == self.kind().as_str().to_string()`.
+    fn run_control(
+        &self,
+        _request: AgentWrapperRunRequest,
+    ) -> Pin<Box<dyn Future<Output = Result<AgentWrapperRunControl, AgentWrapperError>> + Send + '_>>
+    {
+        let agent_kind = self.kind().as_str().to_string();
+        Box::pin(async move {
+            Err(AgentWrapperError::UnsupportedCapability {
+                agent_kind,
+                capability: CAPABILITY_CONTROL_CANCEL_V1.to_string(),
+            })
+        })
+    }
 }
 
 #[derive(Clone, Default)]
@@ -210,6 +273,46 @@ impl AgentWrapperGateway {
             backend.run(request).await
         })
     }
+
+    /// Starts a run and returns a control object including an explicit cancellation handle.
+    ///
+    /// This MUST return `AgentWrapperError::UnknownBackend { agent_kind }` when no backend is
+    /// registered for the requested `agent_kind`, where
+    /// `agent_kind == <requested AgentWrapperKind>.as_str().to_string()`.
+    ///
+    /// If the resolved backend does not advertise `agent_api.control.cancel.v1`, this MUST return:
+    /// `AgentWrapperError::UnsupportedCapability { agent_kind, capability: "agent_api.control.cancel.v1" }`,
+    /// where `agent_kind == <requested AgentWrapperKind>.as_str().to_string()`.
+    ///
+    /// Cancellation is best-effort and is defined by
+    /// `docs/specs/universal-agent-api/run-protocol-spec.md`, including the pinned `"cancelled"`
+    /// completion outcome.
+    pub fn run_control(
+        &self,
+        agent_kind: &AgentWrapperKind,
+        request: AgentWrapperRunRequest,
+    ) -> Pin<Box<dyn Future<Output = Result<AgentWrapperRunControl, AgentWrapperError>> + Send + '_>>
+    {
+        let backend = self.backends.get(agent_kind).cloned();
+        let agent_kind = agent_kind.as_str().to_string();
+        Box::pin(async move {
+            let backend = backend.ok_or(AgentWrapperError::UnknownBackend {
+                agent_kind: agent_kind.clone(),
+            })?;
+
+            if !backend
+                .capabilities()
+                .contains(CAPABILITY_CONTROL_CANCEL_V1)
+            {
+                return Err(AgentWrapperError::UnsupportedCapability {
+                    agent_kind,
+                    capability: CAPABILITY_CONTROL_CANCEL_V1.to_string(),
+                });
+            }
+
+            backend.run_control(request).await
+        })
+    }
 }
 
 fn validate_agent_kind(value: &str) -> Result<(), AgentWrapperError> {
@@ -233,4 +336,26 @@ fn validate_agent_kind(value: &str) -> Result<(), AgentWrapperError> {
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::atomic::AtomicUsize;
+
+    use super::*;
+
+    #[test]
+    fn cancel_handle_is_idempotent() {
+        let calls = Arc::new(AtomicUsize::new(0));
+        let calls_for_cancel = Arc::clone(&calls);
+        let cancel = AgentWrapperCancelHandle::new(move || {
+            calls_for_cancel.fetch_add(1, Ordering::SeqCst);
+        });
+
+        cancel.cancel();
+        cancel.cancel();
+        cancel.cancel();
+
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+    }
 }

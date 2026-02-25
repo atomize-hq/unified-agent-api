@@ -137,3 +137,58 @@ fn gateway_run_unknown_backend_is_error() {
         Err(AgentWrapperError::UnknownBackend { .. })
     ));
 }
+
+#[test]
+fn gateway_run_control_unknown_backend_is_error() {
+    let gateway = AgentWrapperGateway::new();
+    let kind = AgentWrapperKind::new("dummy").unwrap();
+    let request = AgentWrapperRunRequest {
+        prompt: "hello".to_string(),
+        ..Default::default()
+    };
+
+    let result = block_on_ready(gateway.run_control(&kind, request));
+    assert!(matches!(
+        result,
+        Err(AgentWrapperError::UnknownBackend { .. })
+    ));
+}
+
+#[test]
+fn gateway_run_control_missing_capability_is_unsupported() {
+    let kind = AgentWrapperKind::new("dummy").unwrap();
+    let backend = Arc::new(DummyBackend::new(kind.clone()));
+
+    let mut gateway = AgentWrapperGateway::new();
+    gateway.register(backend).unwrap();
+
+    let request = AgentWrapperRunRequest {
+        prompt: "hello".to_string(),
+        ..Default::default()
+    };
+
+    let result = block_on_ready(gateway.run_control(&kind, request));
+    assert!(matches!(
+        result,
+        Err(AgentWrapperError::UnsupportedCapability {
+            agent_kind,
+            capability,
+        }) if agent_kind == "dummy" && capability == "agent_api.control.cancel.v1"
+    ));
+}
+
+#[test]
+fn backend_run_control_default_is_fail_closed() {
+    let kind = AgentWrapperKind::new("dummy").unwrap();
+    let backend = DummyBackend::new(kind);
+    let request = AgentWrapperRunRequest::default();
+
+    let result = block_on_ready(backend.run_control(request));
+    assert!(matches!(
+        result,
+        Err(AgentWrapperError::UnsupportedCapability {
+            agent_kind,
+            capability,
+        }) if agent_kind == "dummy" && capability == "agent_api.control.cancel.v1"
+    ));
+}
