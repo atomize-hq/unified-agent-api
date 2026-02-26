@@ -366,7 +366,7 @@ Keys in `AgentWrapperRunRequest.extensions` MUST:
 - be namespaced:
   - MUST contain at least one `.` character
   - MUST start with either:
-    - `agent_api.` (reserved for universal options; none defined in v1), or
+    - `agent_api.` (reserved for universal options; see `extensions-spec.md` for core keys), or
     - `backend.<agent_kind>.` (backend-specific options)
 
 If a key starts with `backend.`, the backend MUST validate that the key begins with

@@ -88,6 +88,84 @@ Backend mapping requirements:
   - Codex: map to an explicit approval policy that never prompts.
   - Claude Code: map to `--permission-mode bypassPermissions` (or equivalent).
 
+### `agent_api.session.resume.v1` (object)
+
+Owner: this spec (`extensions-spec.md`).
+
+Schema:
+- Type: object
+- Required keys:
+  - `selector` (string): `"last"` | `"id"`
+- Conditional keys:
+  - If `selector == "id"`, `id` (string) MUST be present and MUST be non-empty (after trimming).
+  - If `selector == "last"`, `id` MUST be absent.
+- Default when absent: no session resume behavior (backend starts a new session per its defaults).
+
+Meaning:
+- When present, the backend MUST resume the targeted prior session/thread and treat
+  `AgentWrapperRunRequest.prompt` as a follow-up prompt for that resumed session (i.e., this is
+  “resume + send prompt”, not “resume with no new prompt”).
+- `selector == "last"`:
+  - Resume the backend’s most recent session/thread in the run’s effective working directory
+    (backend-defined persistence store).
+- `selector == "id"`:
+  - Resume the session/thread identified by `id` (identifier format is backend-defined).
+
+Validation rules:
+- Value MUST be an object; otherwise the backend MUST fail before spawn with
+  `AgentWrapperError::InvalidRequest`.
+- The request MUST NOT also include `agent_api.session.fork.v1`; if both are present, the backend
+  MUST fail before spawn with `AgentWrapperError::InvalidRequest`.
+- Unknown object keys MUST cause `AgentWrapperError::InvalidRequest` (closed schema for `.v1`).
+
+Backend mapping requirements:
+- Each backend that advertises this key MUST document its concrete mapping in its backend
+  contract/spec docs (examples):
+  - Codex: map to `codex exec resume --last` / `codex exec resume <id>` (or an equivalent headless
+    resume surface) while ensuring the prompt is provided.
+  - Claude Code: map to `claude --print --continue` / `claude --print --resume <id>` (or equivalent)
+    while ensuring the prompt is provided.
+
+### `agent_api.session.fork.v1` (object)
+
+Owner: this spec (`extensions-spec.md`).
+
+Schema:
+- Type: object
+- Required keys:
+  - `selector` (string): `"last"` | `"id"`
+- Conditional keys:
+  - If `selector == "id"`, `id` (string) MUST be present and MUST be non-empty (after trimming).
+  - If `selector == "last"`, `id` MUST be absent.
+- Default when absent: no fork behavior (backend starts a new session per its defaults).
+
+Meaning:
+- When present, the backend MUST fork a new session/thread from the targeted prior session/thread
+  and treat `AgentWrapperRunRequest.prompt` as a follow-up prompt for the forked session.
+- `selector == "last"`:
+  - Fork from the backend’s most recent session/thread in the run’s effective working directory
+    (backend-defined persistence store).
+- `selector == "id"`:
+  - Fork from the session/thread identified by `id` (identifier format is backend-defined).
+
+Validation rules:
+- Value MUST be an object; otherwise the backend MUST fail before spawn with
+  `AgentWrapperError::InvalidRequest`.
+- The request MUST NOT also include `agent_api.session.resume.v1`; if both are present, the backend
+  MUST fail before spawn with `AgentWrapperError::InvalidRequest`.
+- Unknown object keys MUST cause `AgentWrapperError::InvalidRequest` (closed schema for `.v1`).
+
+Backend mapping requirements:
+- Each backend that advertises this key MUST document its concrete mapping in its backend
+  contract/spec docs (examples):
+  - Codex: map to the `codex app-server` JSON-RPC surface:
+    - resolve the fork source thread (for `selector == "last"`, via `thread/list` filtered by the
+      effective working directory),
+    - fork via `thread/fork`, and
+    - send the follow-up prompt via `turn/start` on the forked thread.
+  - Claude Code: map to `--fork-session` (or equivalent) together with `--continue` / `--resume <id>`
+    (or equivalent), while ensuring the prompt is provided.
+
 ## Adding new extension keys (process rules)
 
 ### Adding a new core key (`agent_api.*`)
