@@ -39,12 +39,14 @@ This is the “final sweep before implementation” for backlog work item `uaa-0
 
 ## Executive Summary (Operator)
 
-ADR_BODY_SHA256: 79feee2c2db4f89f5f5732d5eb5bd7bad62bbadda13aa8be72044aea0441615e
+ADR_BODY_SHA256: 3caeade6ee1cd4decaef6cc78c263bd340f1caeaa4270bfaaceb91505b9afae0
 
 ### Decision (draft)
 
 - Promote only **backend-neutral, stable semantics** into core extension keys under `agent_api.*`.
   - Concrete near-term universals: model selection + extra context roots.
+- When we need to express “the host provides isolation externally”, use an explicit, dangerous core
+  key (`agent_api.exec.external_sandbox.v1`) rather than ad-hoc backend keys or implicit behavior.
 - Everything else remains backend-specific, but may still be surfaced via **bounded pass-through**
   keys under `backend.<agent_kind>.*`.
 - “Bounded pass-through” means: versioned keys, closed schemas, strict bounds, deterministic
@@ -55,6 +57,7 @@ ADR_BODY_SHA256: 79feee2c2db4f89f5f5732d5eb5bd7bad62bbadda13aa8be72044aea0441615
 **Universal (`agent_api.*`)**
 
 - `agent_api.exec.non_interactive` (boolean, already Approved)
+- `agent_api.exec.external_sandbox.v1` (boolean; explicit dangerous mode for externally sandboxed hosts)
 - `agent_api.config.model.v1` (string; backlog `uaa-0002`)
 - `agent_api.exec.add_dirs.v1` (object; backlog `uaa-0003`)
 
@@ -68,7 +71,6 @@ ADR_BODY_SHA256: 79feee2c2db4f89f5f5732d5eb5bd7bad62bbadda13aa8be72044aea0441615
 - Claude Code (new, proposed):
   - `backend.claude_code.settings.v1` (object; bounded settings file inputs)
   - `backend.claude_code.print.overrides.v1` (object; bounded print-mode knobs)
-  - `backend.claude_code.exec.dangerously_skip_permissions` (boolean; backlog `uaa-0016`)
 
 ## Problem / Context
 
@@ -96,7 +98,8 @@ If we allow arbitrary CLI arg pass-through, we lose the core Universal Agent API
 - Replace “raw string pass-through” with bounded, versioned backend keys when backend-specific knobs
   are still required.
 - Keep safe defaults for general Universal Agent API consumers, while allowing internally sandboxed
-  hosts (e.g. Substrate) to opt into explicitly dangerous backend knobs.
+  hosts (e.g. Substrate) to opt into explicitly dangerous exec policy via
+  `agent_api.exec.external_sandbox.v1`.
 
 ## Non-Goals
 
@@ -106,8 +109,9 @@ If we allow arbitrary CLI arg pass-through, we lose the core Universal Agent API
   promoted in this pass).
 - Supporting Claude Code `--plugin-dir` via the Universal Agent API (intentionally unbounded and
   difficult to validate safely).
-- Adding a universal “YOLO” key that disables sandboxing/approvals/permissions across all backends.
-  Dangerous shortcuts remain backend-scoped and must be explicitly requested.
+- Making `agent_api.exec.non_interactive` imply “full bypass” behavior. Dangerous behavior MUST be
+  explicitly requested via a dedicated dangerous key (`agent_api.exec.external_sandbox.v1`) and MUST
+  be capability-gated.
 
 ## Inventory (from manifests)
 
@@ -205,6 +209,33 @@ Backend mapping:
 Notes:
 - Track in `docs/backlog.json` as `uaa-0003`.
 
+### Core: `agent_api.exec.external_sandbox.v1` (boolean; dangerous)
+
+Schema:
+- Type: boolean
+- Default when absent: `false`
+
+Meaning:
+- Indicates the host runtime provides an external isolation boundary and wants the backend to
+  relax/disable internal guardrails that would otherwise block headless automation.
+- This is explicitly dangerous: it can enable “no approvals / no internal sandbox / no permission
+  checks” behavior depending on backend capabilities.
+
+Validation rules (proposed):
+- Value MUST be boolean; otherwise fail before spawn.
+- If `agent_api.exec.external_sandbox.v1=true`, backends MUST ensure the run remains
+  non-interactive (it MUST NOT hang on prompts). If the request explicitly sets
+  `agent_api.exec.non_interactive=false`, the backend SHOULD fail closed with
+  `AgentWrapperError::InvalidRequest` (contradictory intent).
+- Backends SHOULD NOT advertise this capability by default; it is intended for explicitly
+  externally sandboxed hosts (e.g. Substrate).
+
+Backend mapping:
+- Codex: pass `--dangerously-bypass-approvals-and-sandbox` (or an equivalent combination of
+  “never prompt” + “no internal sandbox” when the convenience flag is unavailable).
+- Claude Code: pass `--dangerously-skip-permissions` (and, if required by the detected CLI version,
+  also pass `--allow-dangerously-skip-permissions`).
+
 ### Backend (Codex): `backend.codex.exec.cli_overrides.v1` (object)
 
 Intent: replace open-ended `--config`/`--enable/--disable` pass-through with a typed subset of
@@ -284,29 +315,6 @@ Validation rules (proposed):
 Backend mapping:
 - Map to `crates/claude_code/src/commands/print.rs` fields on `ClaudePrintRequest`.
 
-### Backend (Claude Code): `backend.claude_code.exec.dangerously_skip_permissions` (boolean)
-
-Schema:
-- Type: boolean
-- Default when absent: `false`
-
-Meaning:
-- When true, Claude Code bypasses permission checks in headless mode.
-- This is explicitly dangerous and intended only for hosts that already enforce isolation (e.g.
-  an external sandbox like Substrate).
-
-Validation rules:
-- Value MUST be boolean; otherwise fail before spawn.
-- If `agent_api.exec.non_interactive=false`, this key MAY still be applied (it is orthogonal and
-  explicitly dangerous), but backends MUST remain deterministic (no interactive hangs).
-
-Backend mapping:
-- When true, pass `--dangerously-skip-permissions`.
-- If required by the detected CLI version, also pass `--allow-dangerously-skip-permissions`.
-
-Tracking:
-- `docs/backlog.json`: `uaa-0016`.
-
 ## Consequences
 
 Pros:
@@ -326,8 +334,8 @@ Cons:
 - Define + implement:
   - `agent_api.config.model.v1` (uaa-0002)
   - `agent_api.exec.add_dirs.v1` (uaa-0003)
+  - `agent_api.exec.external_sandbox.v1` (new; needs backlog item + owner-doc spec entry)
 - Define backend-owned docs for the new backend keys and implement them in `agent_api`:
   - `backend.codex.exec.cli_overrides.v1`
   - `backend.claude_code.settings.v1`
   - `backend.claude_code.print.overrides.v1`
-  - `backend.claude_code.exec.dangerously_skip_permissions` (uaa-0016)
