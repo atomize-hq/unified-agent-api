@@ -25,6 +25,33 @@
 - **Key invariants / rules**:
   - Accessors are best-effort and must return `None` when the event carries no id (e.g., Codex `ThreadEvent::Error`).
   - Accessors MUST NOT parse raw stdout/stderr lines; they only read already-typed fields.
+  - Variant coverage is pinned (to make tests and downstream expectations deterministic):
+    - Codex (`codex::ThreadEvent::thread_id()`):
+      - MUST return `Some(thread_id.as_str())` for:
+        - `ThreadEvent::ThreadStarted`
+        - `ThreadEvent::TurnStarted`
+        - `ThreadEvent::TurnCompleted`
+        - `ThreadEvent::TurnFailed`
+        - `ThreadEvent::ItemStarted`
+        - `ThreadEvent::ItemDelta`
+        - `ThreadEvent::ItemCompleted`
+        - `ThreadEvent::ItemFailed`
+      - MUST return `None` for:
+        - `ThreadEvent::Error`
+      - Precedence/normalization: the accessor MUST return the stored `thread_id` field as-is (no trimming/normalization); there is only one candidate `thread_id` field per id-bearing variant.
+    - Claude Code (`claude_code::ClaudeStreamJsonEvent::session_id()`):
+      - MUST return `Some(session_id.as_str())` for:
+        - `ClaudeStreamJsonEvent::SystemInit`
+        - `ClaudeStreamJsonEvent::SystemOther`
+        - `ClaudeStreamJsonEvent::UserMessage`
+        - `ClaudeStreamJsonEvent::AssistantMessage`
+        - `ClaudeStreamJsonEvent::ResultSuccess`
+        - `ClaudeStreamJsonEvent::ResultError`
+        - `ClaudeStreamJsonEvent::StreamEvent`
+      - MUST return:
+        - `Unknown { session_id: Some(id), .. }` → `Some(id.as_str())`
+        - `Unknown { session_id: None, .. }` → `None`
+      - Precedence/normalization: the accessor MUST return the stored `session_id` field as-is (no trimming/normalization); there is only one candidate id field per variant.
 - **Dependencies**
   - Blocks:
     - **SEAM-2** (handle facet emission) — SEAM-2 should source ids via these accessors to avoid duplicated match logic.
@@ -42,8 +69,8 @@
     - `crates/wrapper_events/src/claude_code_adapter.rs`
 - **Verification**:
   - Unit tests demonstrate:
-    - `thread_id()` returns `Some(...)` for `ThreadStarted` and other id-bearing variants.
-    - `session_id()` returns `Some(...)` for known variants and `Unknown { session_id: Some(...) }`.
+    - `thread_id()` returns `Some(...)` exactly for the pinned Codex variant set above, and `None` for `ThreadEvent::Error`.
+    - `session_id()` returns `Some(...)` exactly for the pinned Claude variant set above (including `Unknown { session_id: Some(...) }`), and `None` for `Unknown { session_id: None, .. }`.
     - Returned references point into the event (no allocation required).
   - wrapper_events no longer duplicates per-variant match logic for session/thread ids; adapters call the accessors.
 - **Risks / unknowns**

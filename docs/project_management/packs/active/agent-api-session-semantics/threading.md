@@ -21,6 +21,9 @@ This section makes coupling explicit: contracts/interfaces, dependency edges, cr
     - exactly one early `Status` event whose `data` is the handle facet, and
     - `completion.data` containing the handle facet when a completion is produced and the id is known,
     per `docs/specs/universal-agent-api/event-envelope-schema-spec.md`.
+  - **Additional pinned rules** (restated for pack/test determinism):
+    - `session.id` MUST be non-empty after trimming (whitespace-only ids are treated as “not known” and MUST NOT be emitted).
+    - Oversize ids (`len(session.id) > 1024` bytes) MUST be omitted (MUST NOT truncate).
   - **Versioning/compat**: stable `schema` string; facet-level `session.id` is opaque and backend-defined.
 
 - **Contract ID**: `SA-C03 resume extension key (resume.v1)`
@@ -41,22 +44,35 @@ This section makes coupling explicit: contracts/interfaces, dependency edges, cr
   - **Type**: API (wrapper/library surface)
   - **Owner seam**: SEAM-3
   - **Consumers (seams)**: SEAM-3 (Codex `agent_api` backend mapping)
-  - **Definition**: A Codex wrapper entrypoint for `codex exec resume` that preserves the invariants needed by `agent_api`:
-    - per-run env overrides (merged `request.env`),
-    - termination handle support (for explicit cancellation / `run_control`), and
-    - a completion future that is consistent with existing exec streaming semantics.
+  - **Definition**: `agent_api` MUST use a pinned, control-capable Codex wrapper entrypoint for
+    `codex exec resume` that preserves the invariants needed by the Universal Agent API:
+    - API shape (pinned):
+      - `codex::CodexClient::stream_resume_with_env_overrides_control(request: codex::ResumeRequest, env_overrides: &BTreeMap<String, String>) -> Result<codex::ExecStreamControl, codex::ExecStreamError>`
+      - `ExecStreamControl.termination` MUST always be present for this entrypoint.
+    - Spawn + prompt plumbing (pinned for `agent_api.session.resume.v1`):
+      - argv MUST be `codex exec resume --last -` for selector `"last"` and `codex exec resume <ID> -` for selector `"id"`,
+      - stdin MUST receive the follow-up prompt (newline-terminated) and then be closed.
+    - Env overrides (pinned):
+      - `AgentWrapperRunRequest.env` MUST be applied as per-run env overrides on top of backend config env (request keys win; owned by `docs/specs/universal-agent-api/contract.md`).
+    - Termination + timeout semantics (pinned):
+      - MUST satisfy `docs/specs/codex-streaming-exec-contract.md` and the universal cancellation semantics in `docs/specs/universal-agent-api/run-protocol-spec.md`.
   - **Versioning/compat**: internal; keep behavior parity with exec where possible.
 
 - **Contract ID**: `SA-C06 codex app-server fork RPC surface`
   - **Type**: API (JSON-RPC method contract + notifications)
   - **Owner seam**: SEAM-4
   - **Consumers (seams)**: SEAM-4 (Codex fork mapping in `agent_api`)
-  - **Definition**: A headless fork flow implemented via `codex app-server`:
-    - identify fork source thread (for selector `"last"` likely via a discovery/listing method scoped to working dir),
-    - fork via `thread/fork`,
-    - prompt via `turn/start`,
-    plus bounded mapping of notifications into Universal Agent API events.
-  - **Versioning/compat**: pinned to the app-server protocol version used by `crates/codex::mcp`.
+  - **Definition**: A headless fork flow implemented via `codex app-server` stdio JSON-RPC, with
+    the concrete wire contract defined in `docs/specs/codex-app-server-jsonrpc-contract.md`.
+    - Required methods (pinned):
+      - `thread/list` (selector `"last"` only; filtered by effective working directory) using the pinned paging + deterministic selection algorithm.
+      - `thread/fork` (fork source thread → new thread id).
+      - `turn/start` (follow-up prompt on the forked thread) using the pinned prompt → `input[]` mapping.
+    - Notifications (pinned minimum):
+      - MUST be mapped into `AgentWrapperEvent` kinds/fields per the app-server contract while preserving Universal Agent API safety/bounds posture (no raw backend payload embedding in `data`).
+    - Cancellation (pinned):
+      - MUST use `$/cancelRequest` for in-flight `turn/start` requests and enforce universal cancellation precedence (`run-protocol-spec.md`).
+  - **Versioning/compat**: pinned to the app-server wire schema emitted by the Codex CLI under test; this repo’s tests treat the contract doc as authoritative.
 
 ## Dependency graph (text)
 

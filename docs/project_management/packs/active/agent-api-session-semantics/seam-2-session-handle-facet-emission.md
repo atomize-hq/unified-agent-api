@@ -11,6 +11,7 @@
         - `data = { "schema": "agent_api.session.handle.v1", "session": { "id": "<opaque>" } }`
       - Attach the same facet to `AgentWrapperCompletion.data` whenever a completion is produced and the id is known and within bounds.
     - Enforce facet-level bounds:
+      - `session.id` MUST be non-empty after trimming (whitespace-only ids are treated as “not known” and MUST NOT be emitted).
       - `len(session.id) <= 1024` bytes (UTF-8) or else omit (MUST NOT truncate) and SHOULD emit a safe warning `Status`.
     - Advertise `agent_api.session.handle.v1` in `AgentWrapperCapabilities.ids` only once the above is implemented and tested.
     - Add tests pinning placement rules and bounds behavior for both backends.
@@ -45,6 +46,7 @@
     - an early `Status` event includes the facet **exactly once**,
     - `completion.data` includes the facet when completion exists and id was observed, and
     - oversize ids are omitted (not truncated) and cause only safe/bounded warnings.
+    - whitespace-only ids are treated as invalid (trim-to-empty) and do not emit the facet (regression case for both extension validation and handle facet emission).
 - **Risks / unknowns**
   - Risk: emitting a synthetic `Status` event changes event ordering expectations.
   - De-risk plan: prefer attaching the facet to an existing early `Status` event when feasible (Codex `thread.started`, Claude `system init`), falling back to a synthetic event only when needed.

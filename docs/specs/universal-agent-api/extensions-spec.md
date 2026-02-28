@@ -141,6 +141,29 @@ Validation rules:
   `AgentWrapperError::InvalidRequest`.
 - Unknown object keys MUST cause `AgentWrapperError::InvalidRequest` (closed schema for `.v1`).
 
+Selection failure behavior (v1, normative):
+
+- If `selector == "last"` and no prior session/thread exists in the effective working directory,
+  the backend MUST fail the run (MUST NOT start a new session implicitly).
+- If `selector == "id"` and the id is unknown/unresumable, the backend MUST fail the run (MUST NOT
+  fall back to `"last"` or start a new session).
+- The failure MUST be surfaced as:
+  - `AgentWrapperError::Backend { message }`
+  - with `message` pinned as:
+    - `"no session found"` for `selector == "last"` (empty scope),
+    - `"session not found"` for `selector == "id"` (unknown/unresumable id).
+- The error `message` MUST be safe-by-default and MUST NOT embed raw backend output.
+- Timing:
+  - Backends SHOULD validate selection before spawning any long-lived backend process when the
+    backend can check cheaply/deterministically (e.g., local store lookup).
+  - If a backend cannot determine selection failure pre-spawn, it MUST still translate the
+    backend’s “not found” outcome into the pinned `AgentWrapperError::Backend` message above and
+    MUST NOT surface backend-specific stderr content.
+- Event emission when an events stream exists:
+  - If selection failure occurs after the backend has already returned an `AgentWrapperRunHandle`,
+    the backend MUST emit exactly one terminal `AgentWrapperEventKind::Error` event with
+    `event.message == <pinned message>` before closing the consumer-visible stream.
+
 Backend mapping requirements:
 - Each backend that advertises this key MUST document its concrete mapping in its backend
   contract/spec docs (examples):
@@ -186,6 +209,12 @@ Validation rules:
   are supported by the backend (per R0), the backend MUST fail before spawn with
   `AgentWrapperError::InvalidRequest`.
 - Unknown object keys MUST cause `AgentWrapperError::InvalidRequest` (closed schema for `.v1`).
+
+Selection failure behavior (v1, normative):
+
+The fork key MUST follow the same selection-failure behavior as `agent_api.session.resume.v1`
+(including pinned `AgentWrapperError::Backend` messages and the terminal `Error` event emission rule
+when a stream exists).
 
 Backend mapping requirements:
 - Each backend that advertises this key MUST document its concrete mapping in its backend

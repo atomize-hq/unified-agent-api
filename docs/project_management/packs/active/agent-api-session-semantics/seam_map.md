@@ -17,5 +17,4 @@ Primary extraction axis: **integration-first (risk-first)** — the initiative s
 
 - After **SEAM-3**, orchestrators can resume “last” or “by id” using a universal extension key (per-backend capability-gated).
 - After **SEAM-2**, orchestrators can *discover* the backend-defined id to persist/round-trip for resume-by-id flows.
-- After **SEAM-4**, orchestrators can fork sessions via a universal extension key (likely shipping Claude first; Codex fork is riskier).
-
+- After **SEAM-4**, orchestrators can fork sessions via a universal extension key (ship Claude first; Codex fork remains the higher-risk path due to app-server protocol integration).

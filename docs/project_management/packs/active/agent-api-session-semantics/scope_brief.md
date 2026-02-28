@@ -38,8 +38,8 @@
     - `docs/specs/codex-thread-event-jsonl-parser-contract.md`
     - `docs/specs/claude-stream-json-parser-contract.md`
 - **Known unknowns / risks**:
-  - Codex fork mapping: confirm the app-server protocol supports `thread/fork` (and any required discovery such as `thread/list`) and implement typed wrappers if missing.
-  - Codex resume mapping: `crates/codex` currently exposes streaming resume without a termination handle and without per-run env overrides; `agent_api` will likely need a control/override-capable variant to preserve cancellation + env semantics parity with `exec`.
+  - Codex fork mapping: implement/extend typed `crates/codex` app-server wrappers for `thread/list`, `thread/fork`, and `turn/start` per `docs/specs/codex-app-server-jsonrpc-contract.md`.
+  - Codex resume mapping: `crates/codex` streaming resume currently lacks a termination handle and per-run env overrides; `agent_api` requires the control + env-override entrypoint pinned in SA-C05 to preserve cancellation + env semantics parity with `exec`.
   - Ensuring the handle facet is emitted **exactly once** per run and attached to completion when known, without violating bounds (omit-on-oversize + safe warning).
 - **Assumptions**:
   - Canonical specs under `docs/specs/universal-agent-api/**` already register:

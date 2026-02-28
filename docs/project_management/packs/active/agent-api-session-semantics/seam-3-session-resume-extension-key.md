@@ -11,21 +11,29 @@
       - Validate the JSON value per `docs/specs/universal-agent-api/extensions-spec.md`:
         - type object, closed schema,
         - `selector` is `"last"` or `"id"`,
-        - `"id"` requires a non-empty string, `"last"` forbids `id`,
+        - `"id"` requires a non-empty string after trimming (whitespace-only is invalid), `"last"` forbids `id`,
         - reject contradictory presence of `agent_api.session.fork.v1` as `InvalidRequest` when both keys are supported.
     - Backend mappings (pinned intent; exact shapes are backend-owned):
       - Claude Code:
         - selector `"last"` → `claude --print --continue <PROMPT>`
         - selector `"id"` → `claude --print --resume <ID> <PROMPT>`
+        - when `agent_api.exec.non_interactive == true` (default), MUST also include `--permission-mode bypassPermissions` (or equivalent) to avoid interactive hangs.
       - Codex:
-        - selector `"last"` → `codex exec resume --last` + follow-up prompt
-        - selector `"id"` → `codex exec resume <ID>` + follow-up prompt
+        - selector `"last"` → `codex exec resume --last -` (prompt on stdin)
+        - selector `"id"` → `codex exec resume <ID> -` (prompt on stdin)
+        - when `agent_api.exec.non_interactive == true` (default), MUST also set approval policy to “never” (Codex CLI: `--ask-for-approval never`) to avoid interactive approval prompts.
     - Ensure Codex resume streaming supports `agent_api` invariants:
       - per-run env overrides (merged `request.env`),
       - best-effort termination handle for explicit cancellation flows (`run_control`), and
       - consistent safety posture (no raw backend lines in errors/events).
+    - Pin the Codex wrapper API surface that `agent_api` uses for resume (to keep tests deterministic):
+      - `codex::CodexClient::stream_resume_with_env_overrides_control(request: codex::ResumeRequest, env_overrides: &BTreeMap<String, String>) -> Result<codex::ExecStreamControl, codex::ExecStreamError>`
+      - `ExecStreamControl.termination` MUST always be present for this entrypoint (required to satisfy `run_control` cancellation semantics).
+      - Env override merge rule is owned by the Universal Agent API contract (`docs/specs/universal-agent-api/contract.md`): request keys win over backend config env.
+    - Pin the `codex exec resume` prompt plumbing:
+      - For `agent_api.session.resume.v1`, the prompt is always required (universal run contract), so Codex resume MUST always pass `-` and write `AgentWrapperRunRequest.prompt` to stdin (newline-terminated) and then close stdin.
     - Add tests covering:
-      - invalid request shapes (type errors, missing/extra keys, invalid selectors, empty id),
+      - invalid request shapes (type errors, missing/extra keys, invalid selectors, empty/whitespace-only id),
       - fail-closed unknown-key behavior,
       - CLI mapping (fake-binary where appropriate),
       - extension-validation precedence during staged rollout (per `docs/specs/universal-agent-api/extensions-spec.md` R0):
@@ -45,6 +53,7 @@
   - Prompt remains non-empty and is always treated as the follow-up prompt for the resumed session.
   - Unknown extension keys still fail-closed pre-spawn as `UnsupportedCapability`.
   - Validation errors use `AgentWrapperError::InvalidRequest` and occur pre-spawn.
+  - Selection failures (no session for `"last"`, unknown id for `"id"`) are **not** validation errors; they must follow the pinned selection-failure error model in `docs/specs/universal-agent-api/extensions-spec.md` (safe `AgentWrapperError::Backend` messages; no fallback to start-new).
 - **Dependencies**
   - Blocks:
     - None.
@@ -53,7 +62,7 @@
 - **Touch surface**:
   - `crates/agent_api/src/backends/claude_code.rs`
   - `crates/agent_api/src/backends/codex.rs`
-  - Codex wrapper (likely):
+  - Codex wrapper:
     - `crates/codex/src/exec.rs` (public streaming API surface)
     - `crates/codex/src/exec/streaming.rs` (spawn wiring for `codex exec resume`)
   - `crates/agent_api/tests/**` (new tests for resume semantics)

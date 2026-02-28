@@ -14,17 +14,31 @@
         - selector `"last"` → `claude --print --continue --fork-session <PROMPT>`
         - selector `"id"` → `claude --print --resume <ID> --fork-session <PROMPT>`
       - Codex (ADR-0015 recommended headless surface):
-        - Implement via `codex app-server` JSON-RPC:
-          - identify the fork source thread (for selector `"last"`, likely via a discovery/listing surface scoped to the effective working directory; see `docs/specs/universal-agent-api/contract.md`),
-          - fork via `thread/fork`,
-          - send the follow-up prompt via `turn/start`.
+        - Implement via `codex app-server` stdio JSON-RPC per `docs/specs/codex-app-server-jsonrpc-contract.md`:
+          - selector `"last"`:
+            - MUST resolve the fork source thread via `thread/list` filtered by the **effective working directory** (per `docs/specs/universal-agent-api/contract.md`) using the pinned selection algorithm in the app-server contract.
+          - selector `"id"`:
+            - MUST treat the selector `id` as the source thread id (after trimming for validation per `extensions-spec.md`).
+          - MUST fork via `thread/fork` and MUST send the follow-up prompt via `turn/start` on the forked thread using the pinned request shapes in the app-server contract.
         - Do not rely on `codex fork` if it is interactive/TUI or cannot provide safe bounded streaming semantics.
     - Add tests:
       - Claude: argv mapping + validation failures (fake-binary).
-      - Codex: protocol-level tests for app-server request/notification flows (fake JSON-RPC server) + `agent_api` integration tests proving bounded event mapping + cancellation/termination behavior.
+      - Codex:
+        - protocol-level tests for app-server request/response flows (fake JSON-RPC server):
+          - `thread/list` paging + deterministic “last” selection,
+          - `thread/fork` response parsing (`result.thread.id`),
+          - `turn/start` prompt mapping, and
+          - `$/cancelRequest` cancellation behavior.
+        - `agent_api` integration tests proving:
+          - bounded notification → `AgentWrapperEvent` mapping (no raw backend payloads in `data`),
+          - pinned cancellation precedence (`run-protocol-spec.md`),
+          - pinned selection-failure behavior (`extensions-spec.md`), and
+          - non-interactive safety (no approval-request hangs).
       - extension-validation precedence during staged rollout (per `docs/specs/universal-agent-api/extensions-spec.md` R0):
         - only fork supported + both keys present → `UnsupportedCapability` (unsupported resume key),
         - both supported + both present → `InvalidRequest` (mutual exclusivity).
+      - selector/id validation includes whitespace-only ids:
+        - `selector == "id"` with `id = "   "` MUST fail pre-spawn as `InvalidRequest` (trim-to-empty).
   - Out:
     - A universal session listing API (any listing used for selector `"last"` remains backend-owned implementation detail).
     - Guaranteeing the same fork semantics or id formats across backends beyond the spec’s “opaque id” posture.
@@ -36,19 +50,22 @@
     - A forked session/thread is created and the universal prompt is executed as the first follow-up message.
     - Capability advertisement (extension key string present in `AgentWrapperCapabilities.ids`).
 - **Key invariants / rules**:
-  - Must be headless and deterministic for orchestrators (no interactive prompts; respect `agent_api.exec.non_interactive` policy where applicable).
+  - Must be headless and deterministic for orchestrators (no interactive prompts; `agent_api.exec.non_interactive` applies to session flows; see below).
   - Must keep Universal Agent API safety posture: bounded/redacted events; no raw backend line embedding in `data`.
   - Mutual exclusivity with resume is enforced pre-spawn when both keys are supported.
+  - Non-interactive policy application is pinned per backend (default is `true` when the key is absent):
+    - Claude Code: when `agent_api.exec.non_interactive == true`, the fork path MUST include `--permission-mode bypassPermissions` (or equivalent) so the process cannot hang on permission prompts.
+    - Codex app-server: when `agent_api.exec.non_interactive == true`, the fork path MUST set `approvalPolicy = "never"` on both `thread/fork` and `turn/start` requests (per `docs/specs/codex-app-server-jsonrpc-contract.md`) and MUST fail fast (safe backend error) if the server attempts an approval-request roundtrip instead of hanging.
 - **Dependencies**
   - Blocks:
     - None.
   - Blocked by:
-    - Codex contract-definition spike: confirm/implement `codex app-server` protocol support for `thread/fork` (and any required discovery API such as `thread/list`) and expose typed wrappers in `crates/codex`.
+    - Codex contract-definition + wrappers: use `docs/specs/codex-app-server-jsonrpc-contract.md` as the pinned wire contract, then implement/extend typed wrappers in `crates/codex` for the required methods (`thread/list`, `thread/fork`, `turn/start`) and cancellation (`$/cancelRequest`).
     - (Recommended) Implementing resume first for a backend so mutual-exclusivity errors can be pinned as `InvalidRequest` rather than “unsupported key” ordering artifacts.
 - **Touch surface**:
   - `crates/agent_api/src/backends/claude_code.rs`
-  - `crates/agent_api/src/backends/codex.rs` (new fork path; likely additional adapter code)
-  - Codex app-server client/protocol (likely):
+  - `crates/agent_api/src/backends/codex.rs` (new fork path; isolate adapter logic in a dedicated module to minimize churn)
+  - Codex app-server client/protocol:
     - `crates/codex/src/mcp/protocol.rs`
     - `crates/codex/src/mcp/client.rs`
     - `crates/codex/src/mcp/tests_core/**` (protocol flow tests)
@@ -68,7 +85,7 @@
     - then integrate into `agent_api` with bounded mapping and cancellation/termination wiring.
 - **Rollout / safety**:
   - Stage by backend:
-    - Claude can likely ship fork earlier.
+    - Claude fork can ship earlier once Claude mapping + tests land.
     - Codex fork ships once app-server protocol + bounded mapping + tests exist.
 
 ## Downstream decomposition prompt
