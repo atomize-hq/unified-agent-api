@@ -4,7 +4,7 @@
 # after editing to update the ADR_BODY_SHA256 drift guard.
 
 ## Status
-- Status: Draft
+- Status: Draft (implementation plan; normative semantics are pinned in the Universal Agent API specs)
 - Date (UTC): 2026-02-28
 - Owner(s): spensermcconnell
 
@@ -38,7 +38,7 @@
 
 ## Executive Summary (Operator)
 
-ADR_BODY_SHA256: c42f12e686a008b55a974a3a97658c7d2650cef02cc673a4b4df03352e547644
+ADR_BODY_SHA256: 8aec1c30e97650a3a4208ccf95b3bce90efb96eff8ec55ff1ca3afa77e4a8cca
 
 ### Decision (draft)
 
@@ -208,13 +208,11 @@ When `agent_api.session.handle.v1` is advertised:
   - bounds enforcement omits (does not truncate) oversize ids.
 - Use fake-binary / fixture-backed event streams when the behavior depends on backend output shape.
 
-## Follow-on Spec Updates (required before shipping)
+## Spec Updates (landed)
 
-This ADR introduces a new capability id and a new structured `data` facet. Before implementation
-is considered “shipped”, update the canonical specs:
+The canonical specs now register this capability id and structured `data` facet:
 
 - `docs/specs/universal-agent-api/capabilities-schema-spec.md`:
   - register `agent_api.session.handle.v1` and its semantics.
 - `docs/specs/universal-agent-api/event-envelope-schema-spec.md`:
   - register the facet schema and emission rules for `AgentWrapperEvent.data` and `AgentWrapperCompletion.data`.
-

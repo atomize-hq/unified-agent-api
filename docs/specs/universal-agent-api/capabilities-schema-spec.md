@@ -116,6 +116,13 @@ This section defines stable universal capability ids and their minimum semantics
   - The backend can deterministically populate `AgentWrapperCompletion.final_text` when full
     assistant message text blocks are observed in the supported flow; `final_text=None` is valid
     otherwise.
+- `agent_api.session.handle.v1`:
+  - When a backend advertises this capability, it MUST surface the current run’s backend-defined
+    session/thread identifier as a bounded JSON facet in:
+    - exactly one early `AgentWrapperEventKind::Status` event `data` payload, and
+    - `AgentWrapperCompletion.data` whenever a completion is produced and the id is known,
+    per `event-envelope-schema-spec.md` ("Session handle facet (handle.v1)").
+  - A backend that does not implement this MUST NOT advertise the capability.
 
 ## Extension keys (v1, normative)
 

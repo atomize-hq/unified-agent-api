@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
-  "updated_at_utc": "2026-02-28T00:00:00Z",
+  "updated_at_utc": "2026-02-28T15:42:31Z",
   "items": [
     {
       "id": "uaa-0013",
       "title": "Tooling/spec updates for agent_api.session bucket",
-      "status": "todo",
+      "status": "done",
       "bucket": "agent_api.session",
       "type": "task",
       "kickoff": {
@@ -159,17 +159,21 @@
       "kickoff": {
         "prompt": [
           "Work item: uaa-0015 — Session/thread id surfacing (for resume-by-id UX).",
-          "Goal: expose the backend’s session/thread identifier to the caller as stable, bounded metadata so resume-by-id is ergonomic.",
+          "Goal: expose the backend’s session/thread identifier to the caller as stable, bounded metadata so resume-by-id is ergonomic (see ADR-0017).",
           "Inputs already exist via streaming/log parsing:",
           "- Codex: ThreadEvent::ThreadStarted.thread_id (thread.started/thread.resumed).",
           "- Claude: stream-json session_id (SystemInit and other events).",
           "Steps:",
-          "1) Decide the universal surface: where does the identifier live (completion.data vs an early Status event data payload vs both) and what is the stable schema/name.",
-          "2) Implement extraction + storage in both agent_api backends (Claude: capture session_id from stream-json; Codex: capture thread_id from JSONL ThreadStarted).",
-          "3) Gate it behind a capability id (recommended) and ensure it respects bounds + redaction rules.",
+          "1) Decision: capability id `agent_api.session.handle.v1`; emit a bounded facet in both an early Status event `data` payload and in `AgentWrapperCompletion.data` (schema pinned in ADR-0017).",
+          "2) Update canonical specs to register the capability + facet schema/emission rules:",
+          "   - docs/specs/universal-agent-api/capabilities-schema-spec.md",
+          "   - docs/specs/universal-agent-api/event-envelope-schema-spec.md",
+          "3) Implement extraction + run-local storage in both agent_api backends (Claude: capture session_id from stream-json; Codex: capture thread_id from JSONL ThreadStarted).",
+          "4) Advertise `agent_api.session.handle.v1` only once extraction + bounds/redaction posture is implemented + tested.",
           "Output: cross-backend consistent session/thread id surfacing + tests (fake-binary where appropriate)."
         ],
         "files_to_read": [
+          "docs/adr/0017-universal-agent-api-session-thread-id-surfacing.md",
           "docs/specs/claude-stream-json-parser-contract.md",
           "docs/specs/codex-thread-event-jsonl-parser-contract.md",
           "docs/specs/universal-agent-api/contract.md",
@@ -186,7 +190,7 @@
       "notes": [
         "Make session/thread identifiers discoverable to callers as a stable, bounded payload (so resume-by-id can be ergonomic).",
         "Leverage existing streaming/log parsing: Codex exposes thread_id in thread.started/thread.resumed events; Claude exposes session_id in stream-json events.",
-        "Decide where the identifier lives (e.g. completion.data and/or an initial Status event facet) and whether it is always emitted or gated behind an explicit capability."
+        "Decision: when capability `agent_api.session.handle.v1` is advertised, emit the handle facet once in an early Status event `data` payload and attach it to `AgentWrapperCompletion.data` when a completion is produced and the id is known."
       ],
       "backend_mapping": {
         "claude_code": {
@@ -345,7 +349,7 @@
       "proposed_capability_id": "agent_api.session.fork.v1",
       "notes": [
         "Expose a cross-agent 'fork conversation' operation when both CLIs support it in headless mode.",
-        "Verify Codex fork is available in the minimum supported Codex version for this repo's policy; older Codex builds may have only interactive / slash-command equivalents."
+        "Codex mapping MUST use a headless surface; prefer `codex app-server` JSON-RPC (`thread/fork` + `turn/start`) over any interactive/TUI `codex fork` flow."
       ],
       "backend_mapping": {
         "claude_code": {
@@ -353,8 +357,8 @@
           "impl_hint": "crates/claude_code: ClaudePrintRequest::fork_session(true)"
         },
         "codex": {
-          "cli": "codex fork [--last|SESSION_ID] [PROMPT]",
-          "impl_hint": "crates/codex: CodexClient::fork_session(ForkSessionRequest { ... })"
+          "cli": "codex app-server --stdio (JSON-RPC): thread/list (optional) -> thread/fork -> turn/start",
+          "impl_hint": "crates/codex::mcp: launch app-server + call thread/fork + turn/start (or equivalent typed client)"
         }
       }
     },
@@ -434,14 +438,13 @@
     {
       "id": "uaa-0011",
       "title": "Session: consolidate universal session controls",
-      "status": "todo",
+      "status": "done",
       "bucket": "agent_api.session",
       "type": "design",
-      "proposed_capability_id": "agent_api.session.v1",
       "notes": [
         "Introduce `agent_api.session.*` as a first-class bucket for conversation/thread semantics (orthogonal to execution policy).",
-        "Update docs/specs/universal-agent-api/capabilities-schema-spec.md rubric to add `agent_api.session.*`.",
-        "Decide whether to keep separate keys (resume/fork) or consolidate into a single session object under one extension key."
+        "Decision: keep separate core extension keys (`agent_api.session.resume.v1`, `agent_api.session.fork.v1`) rather than a single consolidated `agent_api.session.v1` object; see ADR-0015 and the canonical `extensions-spec.md` registry.",
+        "Bucket + tooling support for `agent_api.session.*` is tracked in uaa-0013 (now done)."
       ],
       "backend_mapping": {
         "claude_code": {

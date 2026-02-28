@@ -111,6 +111,11 @@ Meaning:
 - `selector == "id"`:
   - Resume the session/thread identified by `id` (identifier format is backend-defined).
 
+Note:
+- Callers that need to discover a usable backend-defined session/thread id SHOULD observe the
+  session handle facet when capability id `agent_api.session.handle.v1` is advertised (see
+  `event-envelope-schema-spec.md`).
+
 Validation rules:
 - Value MUST be an object; otherwise the backend MUST fail before spawn with
   `AgentWrapperError::InvalidRequest`.
@@ -147,6 +152,11 @@ Meaning:
     (backend-defined persistence store).
 - `selector == "id"`:
   - Fork from the session/thread identified by `id` (identifier format is backend-defined).
+
+Note:
+- Callers that need to discover a usable backend-defined session/thread id SHOULD observe the
+  session handle facet when capability id `agent_api.session.handle.v1` is advertised (see
+  `event-envelope-schema-spec.md`).
 
 Validation rules:
 - Value MUST be an object; otherwise the backend MUST fail before spawn with

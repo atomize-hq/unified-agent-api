@@ -4,7 +4,7 @@
 # to update the ADR_BODY_SHA256 drift guard.
 
 ## Status
-- Status: Draft
+- Status: Draft (implementation plan; normative semantics are pinned in the Universal Agent API specs)
 - Date (UTC): 2026-02-26
 - Owner(s): spensermcconnell
 
@@ -31,7 +31,7 @@
 
 ## Executive Summary (Operator)
 
-ADR_BODY_SHA256: 27be94425925c30494b2583db9681f3a549f649448874269f454402a9105e597
+ADR_BODY_SHA256: 7fe4428bd2105685fe04447ce6374b1d9102405b363002d3c736a6a0ca88b24f
 
 ### Changes (operator-facing)
 
