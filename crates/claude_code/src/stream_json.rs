@@ -82,6 +82,19 @@ impl ClaudeStreamJsonEvent {
         }
     }
 
+    pub fn session_id(&self) -> Option<&str> {
+        match self {
+            ClaudeStreamJsonEvent::SystemInit { session_id, .. } => Some(session_id.as_str()),
+            ClaudeStreamJsonEvent::SystemOther { session_id, .. } => Some(session_id.as_str()),
+            ClaudeStreamJsonEvent::UserMessage { session_id, .. } => Some(session_id.as_str()),
+            ClaudeStreamJsonEvent::AssistantMessage { session_id, .. } => Some(session_id.as_str()),
+            ClaudeStreamJsonEvent::ResultSuccess { session_id, .. } => Some(session_id.as_str()),
+            ClaudeStreamJsonEvent::ResultError { session_id, .. } => Some(session_id.as_str()),
+            ClaudeStreamJsonEvent::StreamEvent { session_id, .. } => Some(session_id.as_str()),
+            ClaudeStreamJsonEvent::Unknown { session_id, .. } => session_id.as_deref(),
+        }
+    }
+
     pub fn into_raw(self) -> Value {
         match self {
             ClaudeStreamJsonEvent::SystemInit { raw, .. } => raw,
