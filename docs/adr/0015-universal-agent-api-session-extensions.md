@@ -142,12 +142,14 @@ Mapping guidance for `agent_api.session.*`:
   - `selector == "last"`:
     - map to `claude --print --continue --fork-session <PROMPT>`
   - `selector == "id"`:
-    - map to `claude --print --resume <SESSION_ID> --fork-session <PROMPT>`
+    - map to `claude --print --fork-session --resume <SESSION_ID> <PROMPT>`
 
 Notes:
 - Claude Code session ids are backend-defined strings (commonly UUIDs).
 - `agent_api.session.*` semantics remain “resume/fork + send follow-up prompt”; the universal run
   contract still requires a non-empty prompt.
+- Canonical, testable Claude argv + non-interactive mapping is pinned in:
+  - `docs/specs/claude-code-session-mapping-contract.md`
 
 ## User Contract (Authoritative)
 

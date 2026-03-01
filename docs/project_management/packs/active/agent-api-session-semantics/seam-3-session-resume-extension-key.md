@@ -15,12 +15,15 @@
         - reject contradictory presence of `agent_api.session.fork.v1` as `InvalidRequest` when both keys are supported.
     - Backend mappings (pinned intent; exact shapes are backend-owned):
       - Claude Code:
-        - selector `"last"` → `claude --print --continue <PROMPT>`
-        - selector `"id"` → `claude --print --resume <ID> <PROMPT>`
-        - when `agent_api.exec.non_interactive == true` (default), MUST also include `--permission-mode bypassPermissions` (or equivalent) to avoid interactive hangs.
+        - Canonical mapping owner: `docs/specs/claude-code-session-mapping-contract.md`.
+        - selector `"last"` → `claude --print --output-format stream-json --continue <PROMPT>`
+        - selector `"id"` → `claude --print --output-format stream-json --resume <ID> <PROMPT>`
+        - Note: `crates/claude_code` injects `--verbose` when `--output-format stream-json` is used (upstream requirement; see the canonical mapping contract).
+        - when `agent_api.exec.non_interactive == true` (default), MUST include `--permission-mode bypassPermissions` (see the canonical mapping contract; no "equivalent" fallback in non-interactive mode).
       - Codex:
-        - selector `"last"` → `codex exec resume --last -` (prompt on stdin)
-        - selector `"id"` → `codex exec resume <ID> -` (prompt on stdin)
+        - selector `"last"` → `codex exec --json resume --last -` (prompt on stdin)
+        - selector `"id"` → `codex exec --json resume <ID> -` (prompt on stdin)
+        - Note: `crates/codex` streaming defaults (e.g. `--skip-git-repo-check`, `--color <MODE>`, `--output-last-message <PATH>`) are always present per `docs/specs/codex-wrapper-coverage-scenarios-v1.md` (Scenarios 2–3).
         - when `agent_api.exec.non_interactive == true` (default), MUST also set approval policy to “never” (Codex CLI: `--ask-for-approval never`) to avoid interactive approval prompts.
     - Ensure Codex resume streaming supports `agent_api` invariants:
       - per-run env overrides (merged `request.env`),
@@ -30,8 +33,9 @@
       - `codex::CodexClient::stream_resume_with_env_overrides_control(request: codex::ResumeRequest, env_overrides: &BTreeMap<String, String>) -> Result<codex::ExecStreamControl, codex::ExecStreamError>`
       - `ExecStreamControl.termination` MUST always be present for this entrypoint (required to satisfy `run_control` cancellation semantics).
       - Env override merge rule is owned by the Universal Agent API contract (`docs/specs/universal-agent-api/contract.md`): request keys win over backend config env.
-    - Pin the `codex exec resume` prompt plumbing:
+    - Pin the `codex exec --json resume` prompt plumbing:
       - For `agent_api.session.resume.v1`, the prompt is always required (universal run contract), so Codex resume MUST always pass `-` and write `AgentWrapperRunRequest.prompt` to stdin (newline-terminated) and then close stdin.
+      - Canonical prompt plumbing owner: `docs/specs/codex-wrapper-coverage-scenarios-v1.md` (Scenario 3).
     - Add tests covering:
       - invalid request shapes (type errors, missing/extra keys, invalid selectors, empty/whitespace-only id),
       - fail-closed unknown-key behavior,
@@ -58,7 +62,9 @@
   - Blocks:
     - None.
   - Blocked by:
-    - Codex wrapper capability gap (if `crates/codex` needs a control/override-capable streaming resume API to preserve cancellation + env semantics parity with `exec`).
+    - **SA-C05 (required)** — Codex streaming resume API surface (control + env overrides) in `crates/codex`:
+      - Implement the pinned `CodexClient::stream_resume_with_env_overrides_control(...)->ExecStreamControl` entrypoint and require `ExecStreamControl.termination` for `run_control` cancellation semantics.
+      - Ordering: land SA-C05 before implementing/advertising Codex support for `agent_api.session.resume.v1` in `crates/agent_api`.
 - **Touch surface**:
   - `crates/agent_api/src/backends/claude_code.rs`
   - `crates/agent_api/src/backends/codex.rs`
@@ -70,6 +76,10 @@
   - For each backend that advertises `agent_api.session.resume.v1`:
     - a request with selector `"last"` resumes and produces a live event stream + completion,
     - a request with selector `"id"` resumes by id and produces a live event stream + completion,
+    - selection failures follow `extensions-spec.md` (pinned safe backend messages; no fallback):
+      - selector `"last"` with empty scope → `AgentWrapperError::Backend("no session found")`,
+      - selector `"id"` with unknown/unresumable id → `AgentWrapperError::Backend("session not found")`,
+      - if failure occurs after returning an `AgentWrapperRunHandle`, emit exactly one terminal `AgentWrapperEventKind::Error` with `event.message == <pinned message>` before closing the stream,
     - invalid schemas fail before spawn with `InvalidRequest`.
     - staged-rollout precedence is pinned (per `extensions-spec.md` R0):
       - only resume supported + both keys present → `UnsupportedCapability`,
@@ -78,7 +88,7 @@
   - Risk: Codex resume streaming currently lacks per-run env overrides and a termination handle, which may cause behavior drift vs `exec`.
   - De-risk plan: add/extend a control/override-capable streaming resume entrypoint in `crates/codex` and use it from `agent_api`.
 - **Rollout / safety**:
-  - Capability-gated rollout: only advertise the extension key once validated spawn mapping + tests are in place.
+  - Capability-gated rollout: only advertise the extension key once validated spawn mapping + verification passes (including selection-failure behavior). For Codex, capability advertisement is blocked on SA-C05.
 
 ## Downstream decomposition prompt
 

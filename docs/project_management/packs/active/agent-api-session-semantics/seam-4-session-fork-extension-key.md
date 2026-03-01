@@ -11,8 +11,10 @@
       - Validate the JSON value per `docs/specs/universal-agent-api/extensions-spec.md` (closed schema) and reject contradictory presence of `agent_api.session.resume.v1` as `InvalidRequest` when both keys are supported.
     - Backend mappings (pinned intent):
       - Claude Code:
-        - selector `"last"` → `claude --print --continue --fork-session <PROMPT>`
-        - selector `"id"` → `claude --print --resume <ID> --fork-session <PROMPT>`
+        - Canonical mapping owner: `docs/specs/claude-code-session-mapping-contract.md`.
+        - selector `"last"` → `claude --print --output-format stream-json --continue --fork-session <PROMPT>`
+        - selector `"id"` → `claude --print --output-format stream-json --fork-session --resume <ID> <PROMPT>`
+        - Note: `crates/claude_code` also injects `--verbose` when `--output-format stream-json` is used (upstream requirement).
       - Codex (ADR-0015 recommended headless surface):
         - Implement via `codex app-server` stdio JSON-RPC per `docs/specs/codex-app-server-jsonrpc-contract.md`:
           - selector `"last"`:
@@ -54,7 +56,7 @@
   - Must keep Universal Agent API safety posture: bounded/redacted events; no raw backend line embedding in `data`.
   - Mutual exclusivity with resume is enforced pre-spawn when both keys are supported.
   - Non-interactive policy application is pinned per backend (default is `true` when the key is absent):
-    - Claude Code: when `agent_api.exec.non_interactive == true`, the fork path MUST include `--permission-mode bypassPermissions` (or equivalent) so the process cannot hang on permission prompts.
+    - Claude Code: when `agent_api.exec.non_interactive == true`, the fork path MUST include `--permission-mode bypassPermissions` (see `docs/specs/claude-code-session-mapping-contract.md`) so the process cannot hang on permission prompts.
     - Codex app-server: when `agent_api.exec.non_interactive == true`, the fork path MUST set `approvalPolicy = "never"` on both `thread/fork` and `turn/start` requests (per `docs/specs/codex-app-server-jsonrpc-contract.md`) and MUST fail fast (safe backend error) if the server attempts an approval-request roundtrip instead of hanging.
 - **Dependencies**
   - Blocks:

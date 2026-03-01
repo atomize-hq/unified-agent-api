@@ -184,8 +184,65 @@ For app-server fork flows:
   - `turn/start` params `approvalPolicy = "never"`.
 - The goal is to prevent server-initiated approval requests (which would otherwise hang an
   unattended client).
-- If the server still sends an approval request despite non-interactive configuration, the backend
-  MUST fail the run as a backend error (safe message) rather than hanging.
+
+### Approval request definition (wire, pinned)
+
+For the purposes of this contract, an **approval request** is any JSON-RPC notification that
+matches:
+
+- `method == "codex/event"`
+- `params` payload is an object, either:
+  - directly as `params`, or
+  - nested under `params.msg` (some servers wrap the payload)
+- `params.type` is `"approval_required"` (preferred) or `"approval"` (alias)
+
+Required payload fields (pinned):
+- `approval_id: string` (alias: `id`)
+- `kind: string` (alias: `approval_kind`)
+
+All other fields are server-defined and MAY be ignored by clients. Clients MUST NOT embed the raw
+payload into Universal Agent API event/completion `data`.
+
+### Fail-fast handling (non-interactive, pinned)
+
+If the server still emits an approval request despite non-interactive configuration, the backend
+MUST fail the run as a backend error (safe message) rather than hanging.
+
+Pinned translation into Universal Agent API failure:
+
+- Safe error message (pinned): `"approval required"`
+- Event/completion ordering (pinned):
+  1) If the consumer-visible events stream exists and is still open, emit exactly one terminal
+     `AgentWrapperEventKind::Error` event with `event.message == "approval required"` (bounded).
+  2) Close the events stream.
+  3) Resolve `completion` with `Err(AgentWrapperError::Backend { message: "approval required" })`.
+
+Interaction with JSON-RPC cancellation (pinned):
+
+- Approval requests MAY occur during `thread/fork`, `turn/start`, or both.
+- If an approval request is observed while a `turn/start` request with JSON-RPC id `N` is in-flight,
+  the client MUST immediately send `$/cancelRequest` for that id before failing:
+
+```json
+{ "jsonrpc": "2.0", "method": "$/cancelRequest", "params": { "id": N } }
+```
+
+This cancellation is best-effort and exists only to ensure the client does not hang waiting for an
+approval roundtrip.
+
+### Example transcript (approval required, non-interactive)
+
+Minimal, deterministic sequence (one JSON object per line):
+
+```json
+{ "jsonrpc": "2.0", "id": 1, "method": "initialize", "params": { "clientInfo": { "name": "tests", "version": "0.0.0" }, "capabilities": { "experimentalApi": true } } }
+{ "jsonrpc": "2.0", "id": 1, "result": { "ready": true } }
+
+{ "jsonrpc": "2.0", "id": 2, "method": "turn/start", "params": { "threadId": "t-1", "approvalPolicy": "never", "input": [{ "type": "text", "text": "prompt", "text_elements": [] }] } }
+{ "jsonrpc": "2.0", "method": "codex/event", "params": { "type": "approval_required", "approval_id": "ap-2", "kind": "exec" } }
+{ "jsonrpc": "2.0", "method": "$/cancelRequest", "params": { "id": 2 } }
+{ "jsonrpc": "2.0", "id": 2, "error": { "code": -32800, "message": "cancelled" } }
+```
 
 ## Cancellation / termination wiring (pinned)
 
@@ -209,4 +266,3 @@ exposing `run_control`.
 ```json
 { "jsonrpc": "2.0", "method": "exit", "params": null }
 ```
-

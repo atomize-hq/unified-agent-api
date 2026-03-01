@@ -297,3 +297,36 @@ Pinned in `docs/specs/codex-app-server-jsonrpc-contract.md` under:
 
 - Tool details must be carried via the structured tools facet (`agent_api.tools.structured.v1`) in
   future work, not via raw payload embedding.
+
+## CRD-0010 — Non-interactive approval request fails fast with a pinned safe message
+
+**Decision**
+
+When `agent_api.exec.non_interactive == true` and an approval request is observed during a Codex
+app-server-backed flow, the backend MUST fail the run with:
+
+- `AgentWrapperError::Backend { message: "approval required" }`
+
+If an events stream exists and is still open, the backend MUST emit exactly one terminal
+`AgentWrapperEventKind::Error` event with `event.message == "approval required"` before closing the
+stream.
+
+**Context**
+
+CA-0003 required the app-server contract to define what constitutes an “approval request” on the
+wire and to pin deterministic fail-fast behavior (including a safe error message) under
+non-interactive configuration.
+
+**Chosen spec**
+
+Pinned in `docs/specs/codex-app-server-jsonrpc-contract.md` under:
+- “Non-interactive safety (`agent_api.exec.non_interactive`) (pinned)” → “Fail-fast handling (non-interactive, pinned)”
+
+**Rationale**
+
+- Provides a single safe-by-default string suitable for contract-based tests.
+- Avoids embedding raw server approval payloads in universal errors/events.
+
+**Implications**
+
+- Tests MUST assert the exact string `"approval required"` when exercising this failure mode.

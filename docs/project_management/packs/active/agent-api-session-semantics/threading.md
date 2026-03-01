@@ -50,7 +50,10 @@ This section makes coupling explicit: contracts/interfaces, dependency edges, cr
       - `codex::CodexClient::stream_resume_with_env_overrides_control(request: codex::ResumeRequest, env_overrides: &BTreeMap<String, String>) -> Result<codex::ExecStreamControl, codex::ExecStreamError>`
       - `ExecStreamControl.termination` MUST always be present for this entrypoint.
     - Spawn + prompt plumbing (pinned for `agent_api.session.resume.v1`):
-      - argv MUST be `codex exec resume --last -` for selector `"last"` and `codex exec resume <ID> -` for selector `"id"`,
+      - argv MUST be a streaming resume invocation of the form:
+        - selector `"last"` → `codex exec --json resume --last -`
+        - selector `"id"` → `codex exec --json resume <ID> -`
+      - Wrapper streaming/default flags (e.g., `--skip-git-repo-check`, `--color <MODE>`, `--output-last-message <PATH>`) MUST be present for streaming resume; tests MUST NOT treat the forms above as the complete argv (see `docs/specs/codex-wrapper-coverage-scenarios-v1.md`, Scenarios 2–3).
       - stdin MUST receive the follow-up prompt (newline-terminated) and then be closed.
     - Env overrides (pinned):
       - `AgentWrapperRunRequest.env` MUST be applied as per-run env overrides on top of backend config env (request keys win; owned by `docs/specs/universal-agent-api/contract.md`).

@@ -100,7 +100,8 @@ Backend mapping requirements:
 - Each backend that advertises this capability MUST document its concrete mapping in its backend
   contract/spec docs (examples):
   - Codex: map to an explicit approval policy that never prompts.
-  - Claude Code: map to `--permission-mode bypassPermissions` (or equivalent).
+  - Claude Code: map to `--permission-mode bypassPermissions` (see
+    `docs/specs/claude-code-session-mapping-contract.md`).
 
 ### `agent_api.session.resume.v1` (object)
 
@@ -167,10 +168,9 @@ Selection failure behavior (v1, normative):
 Backend mapping requirements:
 - Each backend that advertises this key MUST document its concrete mapping in its backend
   contract/spec docs (examples):
-  - Codex: map to `codex exec resume --last` / `codex exec resume <id>` (or an equivalent headless
-    resume surface) while ensuring the prompt is provided.
-  - Claude Code: map to `claude --print --continue` / `claude --print --resume <id>` (or equivalent)
-    while ensuring the prompt is provided.
+  - Codex: map to `codex exec --json resume --last -` / `codex exec --json resume <id> -` (prompt on
+    stdin; see `docs/specs/codex-wrapper-coverage-scenarios-v1.md`, Scenario 3).
+  - Claude Code: map per `docs/specs/claude-code-session-mapping-contract.md`.
 
 ### `agent_api.session.fork.v1` (object)
 
@@ -224,8 +224,8 @@ Backend mapping requirements:
       effective working directory; see `contract.md`),
     - fork via `thread/fork`, and
     - send the follow-up prompt via `turn/start` on the forked thread.
-  - Claude Code: map to `--fork-session` (or equivalent) together with `--continue` / `--resume <id>`
-    (or equivalent), while ensuring the prompt is provided.
+  - Claude Code: map to `--fork-session` together with `--continue` / `--resume <id>` (see
+    `docs/specs/claude-code-session-mapping-contract.md`).
 
 ## Adding new extension keys (process rules)
 
