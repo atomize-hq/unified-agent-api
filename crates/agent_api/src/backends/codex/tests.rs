@@ -320,7 +320,7 @@ fn fork_selector_is_extracted_into_policy_when_validate_and_extract_policy_is_ca
 }
 
 #[test]
-fn fork_key_is_still_unsupported_via_backend_harness_normalize_request() {
+fn fork_key_is_supported_via_backend_harness_normalize_request() {
     let adapter = test_adapter();
     let defaults = BackendDefaults::default();
     let mut request = AgentWrapperRunRequest {
@@ -332,16 +332,10 @@ fn fork_key_is_still_unsupported_via_backend_harness_normalize_request() {
         json!({"selector": "last"}),
     );
 
-    let err = match crate::backend_harness::normalize_request(&adapter, &defaults, request) {
-        Ok(_) => panic!("expected fork extension key to remain unsupported in S4a"),
-        Err(err) => err,
-    };
-    match err {
-        AgentWrapperError::UnsupportedCapability { capability, .. } => {
-            assert_eq!(capability, EXT_SESSION_FORK_V1);
-        }
-        other => panic!("expected UnsupportedCapability, got: {other:?}"),
-    }
+    let normalized =
+        crate::backend_harness::normalize_request(&adapter, &defaults, request)
+            .expect("expected fork extension key to be supported in S4b");
+    assert_eq!(normalized.policy.fork, Some(SessionSelectorV1::Last));
 }
 
 #[test]

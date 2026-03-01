@@ -15,7 +15,7 @@ use tokio::sync::oneshot;
 
 use super::session_selectors::{
     parse_session_resume_v1, validate_resume_fork_mutual_exclusion, SessionSelectorV1,
-    EXT_SESSION_RESUME_V1,
+    EXT_SESSION_FORK_V1, EXT_SESSION_RESUME_V1,
 };
 
 use crate::{
@@ -303,6 +303,7 @@ enum CodexTailEvent {
 #[derive(Debug)]
 enum CodexBackendEvent {
     Thread(Box<ThreadEvent>),
+    AppServerNotification(codex::mcp::AppNotification),
     NonZeroExit { status: ExitStatus },
     TerminalError { message: String },
 }
@@ -317,6 +318,8 @@ struct CodexBackendCompletion {
 #[derive(Debug)]
 enum CodexBackendError {
     Exec(ExecStreamError),
+    AppServer(codex::mcp::McpError),
+    ForkSelectionEmpty,
     CompletionTaskDropped,
     WorkingDirectoryUnresolved,
 }
@@ -339,6 +342,7 @@ impl BackendHarnessAdapter for CodexHarnessAdapter {
             EXT_CODEX_APPROVAL_POLICY,
             EXT_CODEX_SANDBOX_MODE,
             EXT_SESSION_RESUME_V1,
+            EXT_SESSION_FORK_V1,
         ]
     }
 
@@ -392,12 +396,13 @@ impl BackendHarnessAdapter for CodexHarnessAdapter {
         let config = self.config.clone();
         let run_start_cwd = self.run_start_cwd.clone();
         let termination = self.termination.clone();
+        let handle_state = self.handle_state.clone();
         let CodexExecPolicy {
             non_interactive,
             approval_policy,
             sandbox_mode,
             resume,
-            fork: _fork,
+            fork,
         } = req.policy;
         let prompt = req.prompt;
         let working_dir = req.working_dir;
@@ -405,6 +410,22 @@ impl BackendHarnessAdapter for CodexHarnessAdapter {
         let env = req.env;
 
         Box::pin(async move {
+            if let Some(selector) = fork {
+                return fork::spawn_fork_v1_flow(fork::ForkFlowRequest {
+                    selector,
+                    prompt,
+                    working_dir,
+                    env,
+                    config,
+                    run_start_cwd,
+                    non_interactive,
+                    approval_policy,
+                    sandbox_mode,
+                    handle_state,
+                })
+                .await;
+            }
+
             fn map_approval_policy(policy: &CodexApprovalPolicy) -> codex::ApprovalPolicy {
                 match policy {
                     CodexApprovalPolicy::Untrusted => codex::ApprovalPolicy::Untrusted,
@@ -757,6 +778,12 @@ impl BackendHarnessAdapter for CodexHarnessAdapter {
 
                 mapped
             }
+            CodexBackendEvent::AppServerNotification(notification) => match notification {
+                codex::mcp::AppNotification::Error { .. } => {
+                    vec![error_event("codex app-server error".to_string())]
+                }
+                _ => Vec::new(),
+            },
             CodexBackendEvent::NonZeroExit { status } => vec![error_event(format!(
                 "codex exited non-zero: {status:?} (stderr redacted)"
             ))],
@@ -795,6 +822,11 @@ impl BackendHarnessAdapter for CodexHarnessAdapter {
     fn redact_error(&self, _phase: BackendHarnessErrorPhase, err: &Self::BackendError) -> String {
         match err {
             CodexBackendError::Exec(err) => redact_exec_stream_error(err),
+            CodexBackendError::AppServer(codex::mcp::McpError::Handshake(_)) => {
+                "codex app-server handshake failed".to_string()
+            }
+            CodexBackendError::AppServer(_) => "codex app-server rpc error".to_string(),
+            CodexBackendError::ForkSelectionEmpty => "codex fork flow failed".to_string(),
             CodexBackendError::CompletionTaskDropped => "codex completion task dropped".to_string(),
             CodexBackendError::WorkingDirectoryUnresolved => {
                 "codex backend failed to resolve working directory".to_string()

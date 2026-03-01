@@ -113,10 +113,9 @@ fn read_stdin_to_end_with_timeout(timeout: Duration) -> io::Result<Vec<u8>> {
             io::ErrorKind::TimedOut,
             "stdin read timed out (stdin may not have been closed)",
         )),
-        Err(mpsc::RecvTimeoutError::Disconnected) => Err(io::Error::new(
-            io::ErrorKind::Other,
-            "stdin reader thread disconnected",
-        )),
+        Err(mpsc::RecvTimeoutError::Disconnected) => {
+            Err(io::Error::other("stdin reader thread disconnected"))
+        }
     }
 }
 
