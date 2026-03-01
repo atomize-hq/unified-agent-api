@@ -4,7 +4,7 @@ use std::{
     path::PathBuf,
     pin::Pin,
     process::ExitStatus,
-    sync::Arc,
+    sync::{Arc, Mutex},
     time::Duration,
 };
 
@@ -19,8 +19,8 @@ use crate::{
         NormalizedRequest,
     },
     AgentWrapperBackend, AgentWrapperCapabilities, AgentWrapperCompletion, AgentWrapperError,
-    AgentWrapperEvent, AgentWrapperKind, AgentWrapperRunControl, AgentWrapperRunHandle,
-    AgentWrapperRunRequest,
+    AgentWrapperEvent, AgentWrapperEventKind, AgentWrapperKind, AgentWrapperRunControl,
+    AgentWrapperRunHandle, AgentWrapperRunRequest,
 };
 
 impl super::termination::TerminationHandle for codex::ExecTerminationHandle {
@@ -165,8 +165,12 @@ fn validate_and_extract_exec_policy(
 const CAP_TOOLS_STRUCTURED_V1: &str = "agent_api.tools.structured.v1";
 const CAP_TOOLS_RESULTS_V1: &str = "agent_api.tools.results.v1";
 const CAP_ARTIFACTS_FINAL_TEXT_V1: &str = "agent_api.artifacts.final_text.v1";
+const CAP_SESSION_HANDLE_V1: &str = "agent_api.session.handle.v1";
 
 const TOOLS_FACET_SCHEMA: &str = "agent_api.tools.structured.v1";
+
+const SESSION_HANDLE_ID_BOUND_BYTES: usize = 1024;
+const SESSION_HANDLE_OVERSIZE_WARNING_MARKER: &str = "session handle id oversize";
 
 #[path = "codex/mapping.rs"]
 mod mapping;
@@ -238,6 +242,14 @@ struct CodexHarnessAdapter {
     run_start_cwd: Option<PathBuf>,
     termination:
         Option<std::sync::Arc<super::termination::TerminationState<codex::ExecTerminationHandle>>>,
+    handle_state: Arc<Mutex<CodexHandleFacetState>>,
+}
+
+#[derive(Debug, Default)]
+struct CodexHandleFacetState {
+    thread_id: Option<String>,
+    handle_facet_emitted: bool,
+    oversize_warning_emitted: bool,
 }
 
 #[derive(Debug)]
@@ -257,6 +269,13 @@ enum CodexBackendError {
     Exec(ExecStreamError),
     CompletionTaskDropped,
     WorkingDirectoryUnresolved,
+}
+
+fn session_handle_facet(thread_id: &str) -> serde_json::Value {
+    serde_json::json!({
+        "schema": CAP_SESSION_HANDLE_V1,
+        "session": { "id": thread_id },
+    })
 }
 
 impl BackendHarnessAdapter for CodexHarnessAdapter {
@@ -453,7 +472,62 @@ impl BackendHarnessAdapter for CodexHarnessAdapter {
 
     fn map_event(&self, event: Self::BackendEvent) -> Vec<AgentWrapperEvent> {
         match event {
-            CodexBackendEvent::Thread(ev) => vec![map_thread_event(&ev)],
+            CodexBackendEvent::Thread(ev) => {
+                let mut emit_oversize_warning_len: Option<usize> = None;
+
+                if let Ok(mut state) = self.handle_state.lock() {
+                    if state.thread_id.is_none() {
+                        if let Some(thread_id) = ev.thread_id() {
+                            if !thread_id.trim().is_empty() {
+                                let len = thread_id.len();
+                                if len <= SESSION_HANDLE_ID_BOUND_BYTES {
+                                    state.thread_id = Some(thread_id.to_string());
+                                } else if !state.oversize_warning_emitted {
+                                    state.oversize_warning_emitted = true;
+                                    emit_oversize_warning_len = Some(len);
+                                }
+                            }
+                        }
+                    }
+                }
+
+                let mut mapped = vec![map_thread_event(&ev)];
+
+                let emit_handle_facet: Option<String> =
+                    self.handle_state.lock().ok().and_then(|mut state| {
+                        if state.handle_facet_emitted {
+                            return None;
+                        }
+                        let thread_id = state.thread_id.clone()?;
+                        state.handle_facet_emitted = true;
+                        Some(thread_id)
+                    });
+
+                if let Some(thread_id) = emit_handle_facet.as_deref() {
+                    let mut attached = false;
+                    for event in mapped.iter_mut() {
+                        if event.kind == AgentWrapperEventKind::Status && event.data.is_none() {
+                            event.data = Some(session_handle_facet(thread_id));
+                            attached = true;
+                            break;
+                        }
+                    }
+
+                    if !attached {
+                        let mut event = mapping::status_event(None);
+                        event.data = Some(session_handle_facet(thread_id));
+                        mapped.push(event);
+                    }
+                }
+
+                if let Some(len) = emit_oversize_warning_len {
+                    mapped.push(mapping::status_event(Some(format!(
+                        "{SESSION_HANDLE_OVERSIZE_WARNING_MARKER}: len_bytes={len}"
+                    ))));
+                }
+
+                mapped
+            }
             CodexBackendEvent::NonZeroExit { status } => vec![error_event(format!(
                 "codex exited non-zero: {status:?} (stderr redacted)"
             ))],
@@ -464,16 +538,23 @@ impl BackendHarnessAdapter for CodexHarnessAdapter {
         &self,
         completion: Self::BackendCompletion,
     ) -> Result<AgentWrapperCompletion, AgentWrapperError> {
+        let handle_facet = self
+            .handle_state
+            .lock()
+            .ok()
+            .and_then(|state| state.thread_id.clone())
+            .map(|thread_id| session_handle_facet(&thread_id));
+
         match completion {
             CodexBackendCompletion::Ok(completion) => Ok(AgentWrapperCompletion {
                 status: completion.status,
                 final_text: crate::bounds::enforce_final_text_bound(completion.last_message),
-                data: None,
+                data: handle_facet,
             }),
             CodexBackendCompletion::NonZeroExit { status } => Ok(AgentWrapperCompletion {
                 status,
                 final_text: None,
-                data: None,
+                data: handle_facet,
             }),
         }
     }
@@ -503,6 +584,7 @@ impl AgentWrapperBackend for CodexBackend {
         ids.insert(CAP_TOOLS_STRUCTURED_V1.to_string());
         ids.insert(CAP_TOOLS_RESULTS_V1.to_string());
         ids.insert(CAP_ARTIFACTS_FINAL_TEXT_V1.to_string());
+        ids.insert(CAP_SESSION_HANDLE_V1.to_string());
         ids.insert("backend.codex.exec_stream".to_string());
         ids.insert(EXT_NON_INTERACTIVE.to_string());
         ids.insert(EXT_CODEX_APPROVAL_POLICY.to_string());
@@ -522,6 +604,7 @@ impl AgentWrapperBackend for CodexBackend {
                 config: config.clone(),
                 run_start_cwd,
                 termination: None,
+                handle_state: Arc::new(Mutex::new(CodexHandleFacetState::default())),
             });
 
             let defaults = BackendDefaults {
@@ -564,6 +647,7 @@ impl AgentWrapperBackend for CodexBackend {
                 config: config.clone(),
                 run_start_cwd,
                 termination: Some(termination_state),
+                handle_state: Arc::new(Mutex::new(CodexHandleFacetState::default())),
             });
 
             let defaults = BackendDefaults {

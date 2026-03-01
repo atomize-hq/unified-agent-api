@@ -20,7 +20,9 @@ fn stored_thread_id(event: &ThreadEvent) -> &String {
 }
 
 fn assert_thread_id_borrowed(event: &ThreadEvent, expected: &str) {
-    let id = event.thread_id().expect("expected thread_id() to return Some");
+    let id = event
+        .thread_id()
+        .expect("expected thread_id() to return Some");
     assert_eq!(id, expected);
 
     let stored = stored_thread_id(event);
@@ -140,4 +142,3 @@ fn accessor_does_not_normalize_thread_id() {
 
     assert_thread_id_borrowed(&event, raw);
 }
-

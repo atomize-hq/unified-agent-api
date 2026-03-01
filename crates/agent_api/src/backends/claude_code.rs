@@ -263,7 +263,7 @@ impl BackendHarnessAdapter for ClaudeHarnessAdapter {
                 if let Some(session_id) = event.session_id() {
                     let session_id = session_id.trim();
                     if !session_id.is_empty() {
-                        if session_id.as_bytes().len() <= SESSION_HANDLE_ID_BOUND_BYTES {
+                        if session_id.len() <= SESSION_HANDLE_ID_BOUND_BYTES {
                             state.session_id = Some(session_id.to_string());
                         } else if !state.oversize_warning_emitted {
                             state.oversize_warning_emitted = true;
