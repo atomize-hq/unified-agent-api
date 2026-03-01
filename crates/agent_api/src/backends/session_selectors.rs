@@ -19,9 +19,7 @@ pub(crate) fn parse_session_resume_v1(
     parse_session_selector_object_v1(value, EXT_SESSION_RESUME_V1)
 }
 
-pub(crate) fn parse_session_fork_v1(
-    value: &Value,
-) -> Result<SessionSelectorV1, AgentWrapperError> {
+pub(crate) fn parse_session_fork_v1(value: &Value) -> Result<SessionSelectorV1, AgentWrapperError> {
     parse_session_selector_object_v1(value, EXT_SESSION_FORK_V1)
 }
 

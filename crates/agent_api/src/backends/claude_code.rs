@@ -14,8 +14,8 @@ use serde_json::Value;
 use tokio::sync::oneshot;
 
 use super::session_selectors::{
-    parse_session_resume_v1, validate_resume_fork_mutual_exclusion, SessionSelectorV1,
-    EXT_SESSION_RESUME_V1,
+    parse_session_fork_v1, parse_session_resume_v1, validate_resume_fork_mutual_exclusion,
+    SessionSelectorV1, EXT_SESSION_FORK_V1, EXT_SESSION_RESUME_V1,
 };
 
 use crate::{
@@ -87,6 +87,7 @@ struct ClaudeHarnessAdapter {
 struct ClaudeExecPolicy {
     non_interactive: bool,
     resume: Option<SessionSelectorV1>,
+    fork: Option<SessionSelectorV1>,
 }
 
 #[derive(Clone, Debug)]
@@ -129,7 +130,11 @@ impl BackendHarnessAdapter for ClaudeHarnessAdapter {
     }
 
     fn supported_extension_keys(&self) -> &'static [&'static str] {
-        const SUPPORTED: [&str; 2] = [EXT_NON_INTERACTIVE, EXT_SESSION_RESUME_V1];
+        const SUPPORTED: [&str; 3] = [
+            EXT_NON_INTERACTIVE,
+            EXT_SESSION_RESUME_V1,
+            EXT_SESSION_FORK_V1,
+        ];
         &SUPPORTED
     }
 
@@ -152,11 +157,18 @@ impl BackendHarnessAdapter for ClaudeHarnessAdapter {
             .map(parse_session_resume_v1)
             .transpose()?;
 
+        let fork = request
+            .extensions
+            .get(EXT_SESSION_FORK_V1)
+            .map(parse_session_fork_v1)
+            .transpose()?;
+
         validate_resume_fork_mutual_exclusion(&request.extensions)?;
 
         Ok(ClaudeExecPolicy {
             non_interactive,
             resume,
+            fork,
         })
     }
 
@@ -228,6 +240,18 @@ impl BackendHarnessAdapter for ClaudeHarnessAdapter {
                 }
             }
 
+            if let Some(fork) = req.policy.fork.as_ref() {
+                print_req = print_req.fork_session(true);
+                match fork {
+                    SessionSelectorV1::Last => {
+                        print_req = print_req.continue_session(true);
+                    }
+                    SessionSelectorV1::Id { id } => {
+                        print_req = print_req.resume_value(id.clone());
+                    }
+                }
+            }
+
             let handle = client
                 .print_stream_json_control(print_req)
                 .await
@@ -237,12 +261,12 @@ impl BackendHarnessAdapter for ClaudeHarnessAdapter {
                 state.set_handle(handle.termination.clone());
             }
 
-            let resume_selector = req.policy.resume.clone();
+            let selection_selector = req.policy.resume.clone().or(req.policy.fork.clone());
             let stream_state: Arc<Mutex<ClaudeStreamState>> =
                 Arc::new(Mutex::new(ClaudeStreamState::default()));
             let (events_done_tx, events_done_rx) = oneshot::channel::<()>();
 
-            let (tail_tx, tail_rx) = if resume_selector.is_some() {
+            let (tail_tx, tail_rx) = if selection_selector.is_some() {
                 let (tx, rx) = oneshot::channel::<Option<String>>();
                 (Some(tx), Some(rx))
             } else {
@@ -255,7 +279,7 @@ impl BackendHarnessAdapter for ClaudeHarnessAdapter {
                     stream_state.clone(),
                     Some(events_done_tx),
                     tail_rx,
-                    resume_selector.clone(),
+                    selection_selector.clone(),
                     false,
                 ),
                 |(
@@ -263,7 +287,7 @@ impl BackendHarnessAdapter for ClaudeHarnessAdapter {
                     stream_state,
                     mut events_done_tx,
                     mut tail_rx,
-                    resume_selector,
+                    selection_selector,
                     tail_emitted,
                 )| async move {
                     loop {
@@ -284,7 +308,7 @@ impl BackendHarnessAdapter for ClaudeHarnessAdapter {
                                     }
                                 }
 
-                                if resume_selector.is_some()
+                                if selection_selector.is_some()
                                     && matches!(
                                         ev,
                                         claude_code::ClaudeStreamJsonEvent::ResultError { .. }
@@ -300,7 +324,7 @@ impl BackendHarnessAdapter for ClaudeHarnessAdapter {
                                         stream_state,
                                         events_done_tx,
                                         tail_rx,
-                                        resume_selector,
+                                        selection_selector,
                                         tail_emitted,
                                     ),
                                 ));
@@ -317,7 +341,7 @@ impl BackendHarnessAdapter for ClaudeHarnessAdapter {
                                         stream_state,
                                         events_done_tx,
                                         tail_rx,
-                                        resume_selector,
+                                        selection_selector,
                                         tail_emitted,
                                     ),
                                 ));
@@ -347,7 +371,7 @@ impl BackendHarnessAdapter for ClaudeHarnessAdapter {
                                         stream_state,
                                         events_done_tx,
                                         tail_rx,
-                                        resume_selector,
+                                        selection_selector,
                                         true,
                                     ),
                                 ));
@@ -370,7 +394,7 @@ impl BackendHarnessAdapter for ClaudeHarnessAdapter {
                     .ok()
                     .and_then(|guard| guard.last_assistant_text.clone());
 
-                let selection_failure_message = match resume_selector {
+                let selection_failure_message = match selection_selector {
                     Some(SessionSelectorV1::Last) => {
                         let state = stream_state.lock().ok();
                         if !status.success()
@@ -532,6 +556,7 @@ impl AgentWrapperBackend for ClaudeCodeBackend {
         ids.insert("backend.claude_code.print_stream_json".to_string());
         ids.insert(EXT_NON_INTERACTIVE.to_string());
         ids.insert(EXT_SESSION_RESUME_V1.to_string());
+        ids.insert(EXT_SESSION_FORK_V1.to_string());
         AgentWrapperCapabilities { ids }
     }
 

@@ -108,6 +108,7 @@ fn claude_backend_reports_required_capabilities() {
     assert!(capabilities.contains(CAP_ARTIFACTS_FINAL_TEXT_V1));
     assert!(capabilities.contains(CAP_SESSION_HANDLE_V1));
     assert!(capabilities.contains(EXT_SESSION_RESUME_V1));
+    assert!(capabilities.contains(EXT_SESSION_FORK_V1));
 }
 
 #[test]
