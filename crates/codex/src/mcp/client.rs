@@ -275,8 +275,10 @@ impl CodexAppServer {
                 let candidate = (thread.updated_at, thread.created_at, thread.id);
                 let should_replace = match best.as_ref() {
                     None => true,
-                    Some(current) => (candidate.0, candidate.1, &candidate.2)
-                        > (current.0, current.1, &current.2),
+                    Some(current) => {
+                        (candidate.0, candidate.1, &candidate.2)
+                            > (current.0, current.1, &current.2)
+                    }
                 };
 
                 if should_replace {

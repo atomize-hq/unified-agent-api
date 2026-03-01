@@ -57,6 +57,7 @@ const EXT_NON_INTERACTIVE: &str = "agent_api.exec.non_interactive";
 const EXT_CODEX_APPROVAL_POLICY: &str = "backend.codex.exec.approval_policy";
 const EXT_CODEX_SANDBOX_MODE: &str = "backend.codex.exec.sandbox_mode";
 
+const PINNED_APPROVAL_REQUIRED: &str = "approval required";
 const PINNED_NO_SESSION_FOUND: &str = "no session found";
 const PINNED_SESSION_NOT_FOUND: &str = "session not found";
 
@@ -211,6 +212,35 @@ mod fork;
 
 use mapping::{error_event, map_thread_event};
 
+enum CodexTerminationHandle {
+    Exec(codex::ExecTerminationHandle),
+    AppServerTurn(fork::AppServerTurnCancelHandle),
+}
+
+impl std::fmt::Debug for CodexTerminationHandle {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            CodexTerminationHandle::Exec(_) => f.debug_tuple("Exec").field(&"<handle>").finish(),
+            CodexTerminationHandle::AppServerTurn(_) => {
+                f.debug_tuple("AppServerTurn").field(&"<handle>").finish()
+            }
+        }
+    }
+}
+
+impl super::termination::TerminationHandle for CodexTerminationHandle {
+    fn request_termination(&self) {
+        match self {
+            CodexTerminationHandle::Exec(handle) => {
+                codex::ExecTerminationHandle::request_termination(handle);
+            }
+            CodexTerminationHandle::AppServerTurn(handle) => {
+                super::termination::TerminationHandle::request_termination(handle);
+            }
+        }
+    }
+}
+
 fn codex_error_kind(err: &CodexError) -> &'static str {
     match err {
         CodexError::Spawn { .. } => "spawn",
@@ -275,7 +305,7 @@ struct CodexHarnessAdapter {
     config: CodexBackendConfig,
     run_start_cwd: Option<PathBuf>,
     termination:
-        Option<std::sync::Arc<super::termination::TerminationState<codex::ExecTerminationHandle>>>,
+        Option<std::sync::Arc<super::termination::TerminationState<CodexTerminationHandle>>>,
     handle_state: Arc<Mutex<CodexHandleFacetState>>,
 }
 
@@ -320,6 +350,7 @@ enum CodexBackendError {
     Exec(ExecStreamError),
     AppServer(codex::mcp::McpError),
     ForkSelectionEmpty,
+    ForkSessionNotFound,
     CompletionTaskDropped,
     WorkingDirectoryUnresolved,
 }
@@ -418,6 +449,7 @@ impl BackendHarnessAdapter for CodexHarnessAdapter {
                     env,
                     config,
                     run_start_cwd,
+                    termination,
                     non_interactive,
                     approval_policy,
                     sandbox_mode,
@@ -520,7 +552,7 @@ impl BackendHarnessAdapter for CodexHarnessAdapter {
             } = handle;
 
             if let Some(state) = termination.as_ref() {
-                state.set_handle(termination_handle);
+                state.set_handle(CodexTerminationHandle::Exec(termination_handle));
             }
 
             let (completion_tx, completion_rx) =
@@ -778,12 +810,48 @@ impl BackendHarnessAdapter for CodexHarnessAdapter {
 
                 mapped
             }
-            CodexBackendEvent::AppServerNotification(notification) => match notification {
-                codex::mcp::AppNotification::Error { .. } => {
-                    vec![error_event("codex app-server error".to_string())]
+            CodexBackendEvent::AppServerNotification(notification) => {
+                let mut mapped = match notification {
+                    codex::mcp::AppNotification::Raw { method, params } => {
+                        fork::map_app_server_notification(&method, &params)
+                            .into_iter()
+                            .collect()
+                    }
+                    codex::mcp::AppNotification::Error { message, .. } => {
+                        vec![error_event(message)]
+                    }
+                    _ => Vec::new(),
+                };
+
+                let emit_handle_facet: Option<String> =
+                    self.handle_state.lock().ok().and_then(|mut state| {
+                        if state.handle_facet_emitted {
+                            return None;
+                        }
+                        let thread_id = state.thread_id.clone()?;
+                        state.handle_facet_emitted = true;
+                        Some(thread_id)
+                    });
+
+                if let Some(thread_id) = emit_handle_facet.as_deref() {
+                    let mut attached = false;
+                    for event in mapped.iter_mut() {
+                        if event.kind == AgentWrapperEventKind::Status && event.data.is_none() {
+                            event.data = Some(session_handle_facet(thread_id));
+                            attached = true;
+                            break;
+                        }
+                    }
+
+                    if !attached {
+                        let mut event = mapping::status_event(None);
+                        event.data = Some(session_handle_facet(thread_id));
+                        mapped.push(event);
+                    }
                 }
-                _ => Vec::new(),
-            },
+
+                mapped
+            }
             CodexBackendEvent::NonZeroExit { status } => vec![error_event(format!(
                 "codex exited non-zero: {status:?} (stderr redacted)"
             ))],
@@ -826,7 +894,8 @@ impl BackendHarnessAdapter for CodexHarnessAdapter {
                 "codex app-server handshake failed".to_string()
             }
             CodexBackendError::AppServer(_) => "codex app-server rpc error".to_string(),
-            CodexBackendError::ForkSelectionEmpty => "codex fork flow failed".to_string(),
+            CodexBackendError::ForkSelectionEmpty => PINNED_NO_SESSION_FOUND.to_string(),
+            CodexBackendError::ForkSessionNotFound => PINNED_SESSION_NOT_FOUND.to_string(),
             CodexBackendError::CompletionTaskDropped => "codex completion task dropped".to_string(),
             CodexBackendError::WorkingDirectoryUnresolved => {
                 "codex backend failed to resolve working directory".to_string()
@@ -902,7 +971,9 @@ impl AgentWrapperBackend for CodexBackend {
 
         let config = self.config.clone();
         Box::pin(async move {
-            let termination_state = Arc::new(super::termination::TerminationState::new());
+            let termination_state: Arc<
+                super::termination::TerminationState<CodexTerminationHandle>,
+            > = Arc::new(super::termination::TerminationState::new());
             let request_termination: Option<Arc<dyn Fn() + Send + Sync + 'static>> = Some({
                 let termination_state = Arc::clone(&termination_state);
                 Arc::new(move || termination_state.request())
