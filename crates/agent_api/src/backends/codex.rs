@@ -13,6 +13,11 @@ use futures_util::future::poll_fn;
 use serde_json::Value;
 use tokio::sync::oneshot;
 
+use super::session_selectors::{
+    parse_session_resume_v1, validate_resume_fork_mutual_exclusion, SessionSelectorV1,
+    EXT_SESSION_RESUME_V1,
+};
+
 use crate::{
     backend_harness::{
         BackendDefaults, BackendHarnessAdapter, BackendHarnessErrorPhase, BackendSpawn,
@@ -117,6 +122,7 @@ struct CodexExecPolicy {
     non_interactive: bool,
     approval_policy: Option<CodexApprovalPolicy>,
     sandbox_mode: CodexSandboxMode,
+    resume: Option<SessionSelectorV1>,
 }
 
 fn validate_and_extract_exec_policy(
@@ -159,6 +165,7 @@ fn validate_and_extract_exec_policy(
         non_interactive,
         approval_policy,
         sandbox_mode,
+        resume: None,
     })
 }
 
@@ -297,7 +304,17 @@ impl BackendHarnessAdapter for CodexHarnessAdapter {
         &self,
         request: &AgentWrapperRunRequest,
     ) -> Result<Self::Policy, AgentWrapperError> {
-        validate_and_extract_exec_policy(request)
+        let exec_policy = validate_and_extract_exec_policy(request)?;
+
+        let resume = request
+            .extensions
+            .get(EXT_SESSION_RESUME_V1)
+            .map(parse_session_resume_v1)
+            .transpose()?;
+
+        validate_resume_fork_mutual_exclusion(&request.extensions)?;
+
+        Ok(CodexExecPolicy { resume, ..exec_policy })
     }
 
     type BackendEvent = CodexBackendEvent;
@@ -325,7 +342,12 @@ impl BackendHarnessAdapter for CodexHarnessAdapter {
         let config = self.config.clone();
         let run_start_cwd = self.run_start_cwd.clone();
         let termination = self.termination.clone();
-        let policy = req.policy;
+        let CodexExecPolicy {
+            non_interactive,
+            approval_policy,
+            sandbox_mode,
+            resume,
+        } = req.policy;
         let prompt = req.prompt;
         let working_dir = req.working_dir;
         let effective_timeout = req.effective_timeout;
@@ -354,11 +376,11 @@ impl BackendHarnessAdapter for CodexHarnessAdapter {
                 .mirror_stdout(false)
                 .quiet(true)
                 .color_mode(codex::ColorMode::Never)
-                .sandbox_mode(map_sandbox_mode(&policy.sandbox_mode));
+                .sandbox_mode(map_sandbox_mode(&sandbox_mode));
 
-            if policy.non_interactive {
+            if non_interactive {
                 builder = builder.approval_policy(codex::ApprovalPolicy::Never);
-            } else if let Some(value) = policy.approval_policy.as_ref() {
+            } else if let Some(value) = approval_policy.as_ref() {
                 builder = builder.approval_policy(map_approval_policy(value));
             }
 
@@ -381,19 +403,39 @@ impl BackendHarnessAdapter for CodexHarnessAdapter {
 
             let client = builder.build();
 
-            let handle = client
-                .stream_exec_with_env_overrides_control(
-                    ExecStreamRequest {
-                        prompt,
-                        idle_timeout: None,
-                        output_last_message: None,
-                        output_schema: None,
-                        json_event_log: None,
-                    },
-                    &env,
-                )
-                .await
-                .map_err(CodexBackendError::Exec)?;
+            let handle = match resume {
+                None => {
+                    client
+                        .stream_exec_with_env_overrides_control(
+                            ExecStreamRequest {
+                                prompt,
+                                idle_timeout: None,
+                                output_last_message: None,
+                                output_schema: None,
+                                json_event_log: None,
+                            },
+                            &env,
+                        )
+                        .await
+                }
+                Some(SessionSelectorV1::Last) => {
+                    client
+                        .stream_resume_with_env_overrides_control(
+                            codex::ResumeRequest::last().prompt(prompt),
+                            &env,
+                        )
+                        .await
+                }
+                Some(SessionSelectorV1::Id { id }) => {
+                    client
+                        .stream_resume_with_env_overrides_control(
+                            codex::ResumeRequest::with_id(id).prompt(prompt),
+                            &env,
+                        )
+                        .await
+                }
+            }
+            .map_err(CodexBackendError::Exec)?;
 
             let codex::ExecStreamControl {
                 events,
