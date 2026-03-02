@@ -5,6 +5,8 @@ use std::{
     time::Duration,
 };
 
+use serde_json::json;
+
 const SYSTEM_INIT: &str =
     include_str!("../../../claude_code/tests/fixtures/stream_json/v1/system_init.jsonl");
 const USER_MESSAGE: &str =
@@ -33,11 +35,70 @@ fn write_line(out: &mut impl Write, line: &str) -> io::Result<()> {
     Ok(())
 }
 
+fn write_assistant_text(out: &mut impl Write, text: &str) -> io::Result<()> {
+    let payload = json!({
+        "type": "assistant",
+        "session_id": "sess-1",
+        "message": {
+            "content": [{
+                "type": "text",
+                "text": text,
+            }],
+        },
+    });
+    write_line(out, &payload.to_string())?;
+    write_line(out, "\n")?;
+    Ok(())
+}
+
+fn write_result_error_with_message(out: &mut impl Write, message: &str) -> io::Result<()> {
+    let payload = json!({
+        "type": "result",
+        "subtype": "error",
+        "session_id": "sess-1",
+        "is_error": true,
+        "message": message,
+    });
+    write_line(out, &payload.to_string())?;
+    write_line(out, "\n")?;
+    Ok(())
+}
+
 fn has_flag_value(args: &[String], flag: &str, expected: &str) -> bool {
     args.iter()
         .position(|arg| arg == flag)
         .and_then(|idx| args.get(idx + 1))
         .is_some_and(|value| value == expected)
+}
+
+fn has_flag(args: &[String], flag: &str) -> bool {
+    args.iter().any(|arg| arg == flag)
+}
+
+fn contains_ordered_subsequence(args: &[String], subseq: &[&str]) -> bool {
+    if subseq.is_empty() {
+        return true;
+    }
+
+    let mut idx = 0usize;
+    for arg in args {
+        if arg == subseq[idx] {
+            idx += 1;
+            if idx == subseq.len() {
+                return true;
+            }
+        }
+    }
+    false
+}
+
+fn require(env_key: &str) -> String {
+    env::var(env_key).unwrap_or_else(|_| panic!("missing required env var {env_key}"))
+}
+
+fn fail(mut out: impl Write, message: &str) -> ! {
+    let _ = write_assistant_text(&mut out, message);
+    std::process::exit(2);
 }
 
 fn main() -> io::Result<()> {
@@ -49,14 +110,12 @@ fn main() -> io::Result<()> {
     // The universal agent wrapper contract defaults to non-interactive behavior; require that the
     // wrapper passes `--permission-mode bypassPermissions` so tests fail loudly if we regress.
     let args: Vec<String> = env::args().collect();
+    let mut out = io::stdout().lock();
     if !has_flag_value(&args, "--permission-mode", "bypassPermissions") {
-        let mut out = io::stdout().lock();
-        write_line(
+        fail(
             &mut out,
-            r#"{"type":"result","subtype":"error","error":{"type":"invalid_request_error","message":"missing --permission-mode bypassPermissions"}}"#,
-        )?;
-        write_line(&mut out, "\n")?;
-        std::process::exit(1);
+            "assertion failed: missing --permission-mode bypassPermissions",
+        );
     }
 
     let scenario = env::var("FAKE_CLAUDE_SCENARIO").unwrap_or_else(|_| "two_events_delayed".into());
@@ -64,9 +123,337 @@ fn main() -> io::Result<()> {
     let init = first_nonempty_line(SYSTEM_INIT);
     let user = first_nonempty_line(USER_MESSAGE);
 
-    let mut out = io::stdout().lock();
-
     match scenario.as_str() {
+        "fork_last_assert" => {
+            let expected_prompt = require("FAKE_CLAUDE_EXPECT_PROMPT");
+            if args.last() != Some(&expected_prompt) {
+                fail(
+                    &mut out,
+                    "assertion failed: prompt must be final argv token",
+                );
+            }
+            if !has_flag(&args, "--verbose") {
+                fail(&mut out, "assertion failed: missing --verbose");
+            }
+
+            let ok = contains_ordered_subsequence(
+                &args,
+                &[
+                    "--print",
+                    "--output-format",
+                    "stream-json",
+                    "--permission-mode",
+                    "bypassPermissions",
+                    "--continue",
+                    "--fork-session",
+                    "--verbose",
+                    &expected_prompt,
+                ],
+            );
+            if !ok {
+                fail(
+                    &mut out,
+                    "assertion failed: missing fork(last) argv subsequence",
+                );
+            }
+
+            write_line(&mut out, &format!("{init}\n"))?;
+        }
+        "fork_id_assert" => {
+            let expected_prompt = require("FAKE_CLAUDE_EXPECT_PROMPT");
+            let expected_id = require("FAKE_CLAUDE_EXPECT_RESUME_ID");
+            if args.last() != Some(&expected_prompt) {
+                fail(
+                    &mut out,
+                    "assertion failed: prompt must be final argv token",
+                );
+            }
+            if !has_flag(&args, "--verbose") {
+                fail(&mut out, "assertion failed: missing --verbose");
+            }
+
+            let ok = contains_ordered_subsequence(
+                &args,
+                &[
+                    "--print",
+                    "--output-format",
+                    "stream-json",
+                    "--permission-mode",
+                    "bypassPermissions",
+                    "--fork-session",
+                    "--resume",
+                    &expected_id,
+                    "--verbose",
+                    &expected_prompt,
+                ],
+            );
+            if !ok {
+                fail(
+                    &mut out,
+                    "assertion failed: missing fork(id) argv subsequence",
+                );
+            }
+
+            write_line(&mut out, &format!("{init}\n"))?;
+        }
+        "resume_last_assert" => {
+            let expected_prompt = require("FAKE_CLAUDE_EXPECT_PROMPT");
+            if args.last() != Some(&expected_prompt) {
+                fail(
+                    &mut out,
+                    "assertion failed: prompt must be final argv token",
+                );
+            }
+            if !has_flag(&args, "--verbose") {
+                fail(&mut out, "assertion failed: missing --verbose");
+            }
+
+            let ok = contains_ordered_subsequence(
+                &args,
+                &[
+                    "--print",
+                    "--output-format",
+                    "stream-json",
+                    "--permission-mode",
+                    "bypassPermissions",
+                    "--continue",
+                    "--verbose",
+                    &expected_prompt,
+                ],
+            );
+            if !ok {
+                fail(
+                    &mut out,
+                    "assertion failed: missing resume(last) argv subsequence",
+                );
+            }
+
+            write_line(&mut out, &format!("{init}\n"))?;
+        }
+        "resume_id_assert" => {
+            let expected_prompt = require("FAKE_CLAUDE_EXPECT_PROMPT");
+            let expected_id = require("FAKE_CLAUDE_EXPECT_RESUME_ID");
+            if args.last() != Some(&expected_prompt) {
+                fail(
+                    &mut out,
+                    "assertion failed: prompt must be final argv token",
+                );
+            }
+            if !has_flag(&args, "--verbose") {
+                fail(&mut out, "assertion failed: missing --verbose");
+            }
+
+            let ok = contains_ordered_subsequence(
+                &args,
+                &[
+                    "--print",
+                    "--output-format",
+                    "stream-json",
+                    "--permission-mode",
+                    "bypassPermissions",
+                    "--resume",
+                    &expected_id,
+                    "--verbose",
+                    &expected_prompt,
+                ],
+            );
+            if !ok {
+                fail(
+                    &mut out,
+                    "assertion failed: missing resume(id) argv subsequence",
+                );
+            }
+
+            write_line(&mut out, &format!("{init}\n"))?;
+        }
+        "fork_last_not_found" => {
+            let expected_prompt = require("FAKE_CLAUDE_EXPECT_PROMPT");
+            if args.last() != Some(&expected_prompt) {
+                fail(
+                    &mut out,
+                    "assertion failed: prompt must be final argv token",
+                );
+            }
+            if !has_flag(&args, "--verbose") {
+                fail(&mut out, "assertion failed: missing --verbose");
+            }
+            if !contains_ordered_subsequence(&args, &["--continue", "--fork-session"]) {
+                fail(
+                    &mut out,
+                    "assertion failed: missing --continue --fork-session",
+                );
+            }
+
+            write_line(&mut out, &format!("{init}\n"))?;
+            write_result_error_with_message(&mut out, "no session found")?;
+            std::process::exit(1);
+        }
+        "fork_id_not_found" => {
+            let expected_prompt = require("FAKE_CLAUDE_EXPECT_PROMPT");
+            let expected_id = require("FAKE_CLAUDE_EXPECT_RESUME_ID");
+            if args.last() != Some(&expected_prompt) {
+                fail(
+                    &mut out,
+                    "assertion failed: prompt must be final argv token",
+                );
+            }
+            if !has_flag(&args, "--verbose") {
+                fail(&mut out, "assertion failed: missing --verbose");
+            }
+            if !contains_ordered_subsequence(&args, &["--fork-session", "--resume", &expected_id]) {
+                fail(
+                    &mut out,
+                    "assertion failed: missing --fork-session --resume <ID>",
+                );
+            }
+
+            write_line(&mut out, &format!("{init}\n"))?;
+            write_result_error_with_message(&mut out, "session not found")?;
+            std::process::exit(1);
+        }
+        "fork_last_generic_error" => {
+            let expected_prompt = require("FAKE_CLAUDE_EXPECT_PROMPT");
+            if args.last() != Some(&expected_prompt) {
+                fail(
+                    &mut out,
+                    "assertion failed: prompt must be final argv token",
+                );
+            }
+            if !has_flag(&args, "--verbose") {
+                fail(&mut out, "assertion failed: missing --verbose");
+            }
+            if !contains_ordered_subsequence(&args, &["--continue", "--fork-session"]) {
+                fail(
+                    &mut out,
+                    "assertion failed: missing --continue --fork-session",
+                );
+            }
+
+            write_line(&mut out, &format!("{init}\n"))?;
+            write_result_error_with_message(&mut out, "permission denied")?;
+            std::process::exit(1);
+        }
+        "fork_id_generic_error" => {
+            let expected_prompt = require("FAKE_CLAUDE_EXPECT_PROMPT");
+            let expected_id = require("FAKE_CLAUDE_EXPECT_RESUME_ID");
+            if args.last() != Some(&expected_prompt) {
+                fail(
+                    &mut out,
+                    "assertion failed: prompt must be final argv token",
+                );
+            }
+            if !has_flag(&args, "--verbose") {
+                fail(&mut out, "assertion failed: missing --verbose");
+            }
+            if !contains_ordered_subsequence(&args, &["--fork-session", "--resume", &expected_id]) {
+                fail(
+                    &mut out,
+                    "assertion failed: missing --fork-session --resume <ID>",
+                );
+            }
+
+            write_line(&mut out, &format!("{init}\n"))?;
+            write_result_error_with_message(&mut out, "permission denied")?;
+            std::process::exit(1);
+        }
+        "resume_last_not_found" => {
+            let expected_prompt = require("FAKE_CLAUDE_EXPECT_PROMPT");
+            if args.last() != Some(&expected_prompt) {
+                fail(
+                    &mut out,
+                    "assertion failed: prompt must be final argv token",
+                );
+            }
+            if !has_flag(&args, "--verbose") {
+                fail(&mut out, "assertion failed: missing --verbose");
+            }
+            if !contains_ordered_subsequence(&args, &["--continue"]) {
+                fail(&mut out, "assertion failed: missing --continue");
+            }
+
+            write_line(&mut out, &format!("{init}\n"))?;
+            write_result_error_with_message(&mut out, "no session found")?;
+            std::process::exit(1);
+        }
+        "resume_id_not_found" => {
+            let expected_prompt = require("FAKE_CLAUDE_EXPECT_PROMPT");
+            let expected_id = require("FAKE_CLAUDE_EXPECT_RESUME_ID");
+            if args.last() != Some(&expected_prompt) {
+                fail(
+                    &mut out,
+                    "assertion failed: prompt must be final argv token",
+                );
+            }
+            if !has_flag(&args, "--verbose") {
+                fail(&mut out, "assertion failed: missing --verbose");
+            }
+            if !contains_ordered_subsequence(&args, &["--resume", &expected_id]) {
+                fail(&mut out, "assertion failed: missing --resume <ID>");
+            }
+
+            write_line(&mut out, &format!("{init}\n"))?;
+            write_result_error_with_message(&mut out, "session not found")?;
+            std::process::exit(1);
+        }
+        "resume_last_generic_error" => {
+            let expected_prompt = require("FAKE_CLAUDE_EXPECT_PROMPT");
+            if args.last() != Some(&expected_prompt) {
+                fail(
+                    &mut out,
+                    "assertion failed: prompt must be final argv token",
+                );
+            }
+            if !has_flag(&args, "--verbose") {
+                fail(&mut out, "assertion failed: missing --verbose");
+            }
+            if !contains_ordered_subsequence(&args, &["--continue"]) {
+                fail(&mut out, "assertion failed: missing --continue");
+            }
+
+            write_line(&mut out, &format!("{init}\n"))?;
+            write_result_error_with_message(&mut out, "permission denied")?;
+            std::process::exit(1);
+        }
+        "resume_id_generic_error" => {
+            let expected_prompt = require("FAKE_CLAUDE_EXPECT_PROMPT");
+            let expected_id = require("FAKE_CLAUDE_EXPECT_RESUME_ID");
+            if args.last() != Some(&expected_prompt) {
+                fail(
+                    &mut out,
+                    "assertion failed: prompt must be final argv token",
+                );
+            }
+            if !has_flag(&args, "--verbose") {
+                fail(&mut out, "assertion failed: missing --verbose");
+            }
+            if !contains_ordered_subsequence(&args, &["--resume", &expected_id]) {
+                fail(&mut out, "assertion failed: missing --resume <ID>");
+            }
+
+            write_line(&mut out, &format!("{init}\n"))?;
+            write_result_error_with_message(&mut out, "permission denied")?;
+            std::process::exit(1);
+        }
+        "resume_id_file_not_found_trap" => {
+            let expected_prompt = require("FAKE_CLAUDE_EXPECT_PROMPT");
+            let expected_id = require("FAKE_CLAUDE_EXPECT_RESUME_ID");
+            if args.last() != Some(&expected_prompt) {
+                fail(
+                    &mut out,
+                    "assertion failed: prompt must be final argv token",
+                );
+            }
+            if !has_flag(&args, "--verbose") {
+                fail(&mut out, "assertion failed: missing --verbose");
+            }
+            if !contains_ordered_subsequence(&args, &["--resume", &expected_id]) {
+                fail(&mut out, "assertion failed: missing --resume <ID>");
+            }
+
+            write_line(&mut out, &format!("{init}\n"))?;
+            write_result_error_with_message(&mut out, "file not found")?;
+            std::process::exit(1);
+        }
         "block_until_killed" => {
             write_line(&mut out, &format!("{init}\n"))?;
             loop {

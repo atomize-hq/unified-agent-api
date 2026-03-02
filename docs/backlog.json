@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at_utc": "2026-02-28T16:13:52Z",
+  "updated_at_utc": "2026-03-02T03:16:29Z",
   "items": [
     {
       "id": "uaa-0013",
@@ -153,7 +153,7 @@
     {
       "id": "uaa-0017",
       "title": "Add typed session/thread id accessors (codex + claude_code)",
-      "status": "todo",
+      "status": "done",
       "bucket": "agent_api.session",
       "type": "task",
       "kickoff": {
@@ -186,7 +186,7 @@
     {
       "id": "uaa-0015",
       "title": "Session/thread id surfacing (for resume-by-id UX)",
-      "status": "todo",
+      "status": "done",
       "bucket": "agent_api.session",
       "type": "task",
       "kickoff": {
@@ -239,6 +239,110 @@
           ]
         }
       }
+    },
+    {
+      "id": "uaa-0018",
+      "title": "P1: Restrict selection-failure translation to actual not-found errors",
+      "status": "todo",
+      "bucket": "agent_api.session",
+      "type": "task",
+      "kickoff": {
+        "prompt": [
+          "Work item: uaa-0018 — P1: Restrict selection-failure translation to actual not-found errors.",
+          "Goal: ensure resume/fork selection failures map to pinned safe messages only when the backend truly indicates a not-found condition; do not mislabel unrelated backend failures as \"no session found\" / \"session not found\".",
+          "Primary impact: Claude Code backend (agent_api) currently infers selection failure from non-success exit + no assistant output and suppresses ResultError events, masking real failure causes.",
+          "Steps:",
+          "1) Adjust Claude backend selection-failure detection to rely on explicit not-found signals (e.g., structured ResultError payload or stable not-found indicator), not absence-of-output.",
+          "2) Ensure non-not-found failures surface as AgentWrapperError::Backend with a safe/redacted message and emit a single terminal Error event when events are available.",
+          "3) Add regression tests: generic resume/fork failure with no assistant output must NOT translate to the pinned selection-failure messages.",
+          "Output: correct error classification + pinned selection failures + tests; no backend secrets leak."
+        ],
+        "files_to_read": [
+          "docs/specs/universal-agent-api/extensions-spec.md",
+          "docs/specs/claude-code-session-mapping-contract.md",
+          "crates/agent_api/src/backends/claude_code.rs",
+          "crates/agent_api/src/bin/fake_claude_stream_json_agent_api.rs",
+          "crates/agent_api/tests/c2_claude_session_resume_v1.rs",
+          "crates/agent_api/tests/c4_claude_session_fork_v1.rs"
+        ],
+        "deliverables": [
+          "Selection-failure translation restricted to actual not-found signals (Claude Code)",
+          "Regression tests preventing false-positive \"session not found\" translations"
+        ]
+      },
+      "notes": [
+        "Do not infer selection failure solely from non-zero exit + no assistant output (false positives).",
+        "If ResultError events are suppressed for safety, still use their typed/raw payload for classification, and surface a generic safe error for non-not-found failures."
+      ]
+    },
+    {
+      "id": "uaa-0019",
+      "title": "Beware: Claude stream-json result subtype drift when promoting versions",
+      "status": "todo",
+      "bucket": "agent_api.session",
+      "type": "task",
+      "kickoff": {
+        "prompt": [
+          "Work item: uaa-0019 — Beware: Claude stream-json result subtype drift when promoting versions.",
+          "Context: A newer local Claude CLI (e.g., 2.1.63) emitted `type:\"result\"` with a non-v1 `subtype` (e.g., \"error_during_execution\") for resume-by-id not-found. This does not parse as `ClaudeStreamJsonEvent::ResultError` under the current v1 parser contract (success/error only), which can break downstream selection-failure translation that relies on ResultError.raw classification.",
+          "Goal: when raising Claude Code coverage and/or promoting `cli_manifests/claude_code/latest_validated.txt`, validate stream-json result taxonomy against the candidate binary and update the parser contract + fixtures as needed before promotion.",
+          "Steps:",
+          "1) Run stream-json spot checks against the candidate `claude` binary (not whatever happens to be on PATH) for: resume id not-found, resume last empty, generic failure.",
+          "2) If result subtypes differ from v1 (success/error), update `crates/claude_code` stream-json parser + the normative parser specs/fixtures to accept the new subtype(s) (while keeping safety/redaction posture).",
+          "3) Re-validate `agent_api` selection-failure translation against the candidate binary once the parser emits typed ResultError events again.",
+          "Output: promotion-safe parser contract updates (specs + fixtures + code) that keep higher Claude versions from silently regressing session error translation."
+        ],
+        "files_to_read": [
+          "cli_manifests/claude_code/latest_validated.txt",
+          "cli_manifests/claude_code/OPS_PLAYBOOK.md",
+          "docs/specs/claude-stream-json-parser-contract.md",
+          "docs/specs/claude-stream-json-parser-scenarios-v1.md",
+          "crates/claude_code/src/stream_json.rs",
+          "crates/agent_api/src/backends/claude_code.rs"
+        ],
+        "deliverables": [
+          "Updated Claude stream-json parser contract/fixtures for new result subtype(s)",
+          "Evidence the candidate Claude version preserves typed ResultError emission for agent_api"
+        ]
+      },
+      "notes": [
+        "Avoid validating against an arbitrary local `claude` on PATH; use the binary under promotion and compare to cli_manifests pointers.",
+        "If new result subtypes appear, treat it as a promotion gate: update parser contract + fixtures before bumping latest_validated/min_supported."
+      ]
+    },
+    {
+      "id": "uaa-0020",
+      "title": "P2: Enforce 1024-byte handle id bound for Codex fork thread IDs",
+      "status": "todo",
+      "bucket": "agent_api.session",
+      "type": "task",
+      "kickoff": {
+        "prompt": [
+          "Work item: uaa-0020 — P2: Enforce 1024-byte handle id bound for Codex fork thread IDs.",
+          "Goal: ensure the Codex fork path treats oversize thread ids (>1024 bytes) as unknown (omit session handle facet; SHOULD warn) per the session handle facet contract.",
+          "Context: Codex exec/resume path enforces the bound before storing thread_id, but the fork path stores any non-empty id, allowing oversize ids to leak into handle facets via app-server notifications and completion data.",
+          "Steps:",
+          "1) Update `crates/agent_api/src/backends/codex/fork.rs` to enforce the 1024-byte bound before storing the forked thread id (and treat oversize as unknown).",
+          "2) Emit a safe `Status` warning once per run when an oversize id is observed (align with the exec/resume warning marker in `crates/agent_api/src/backends/codex.rs`).",
+          "3) Add regression tests by extending the fake codex app-server test binary to return an oversize forked thread id, and assert the handle facet is omitted in both events and completion (and warning emitted if implemented).",
+          "Output: consistent bound enforcement across Codex exec + fork paths; no contract violations."
+        ],
+        "files_to_read": [
+          "docs/specs/universal-agent-api/event-envelope-schema-spec.md",
+          "crates/agent_api/src/backends/codex.rs",
+          "crates/agent_api/src/backends/codex/fork.rs",
+          "crates/agent_api/src/bin/fake_codex_app_server_jsonrpc_agent_api.rs",
+          "crates/agent_api/tests/c4_session_fork_v1_codex.rs"
+        ],
+        "deliverables": [
+          "Bound enforcement for forked thread ids (<=1024 bytes)",
+          "Regression tests for oversize forked thread ids"
+        ]
+      },
+      "notes": [
+        "Contract: ids over 1024 bytes must be treated as unknown (omit facet; MUST NOT truncate); SHOULD warn.",
+        "Keep behavior consistent across Codex exec/resume and Codex fork flows."
+      ]
     },
     {
       "id": "uaa-0001",
@@ -309,7 +413,7 @@
     {
       "id": "uaa-0004",
       "title": "Universal resume: selector=last",
-      "status": "todo",
+      "status": "done",
       "bucket": "agent_api.session",
       "type": "extension_key",
       "proposed_capability_id": "agent_api.session.resume.v1",
@@ -331,7 +435,7 @@
     {
       "id": "uaa-0005",
       "title": "Universal resume: selector=id",
-      "status": "todo",
+      "status": "done",
       "bucket": "agent_api.session",
       "type": "extension_key",
       "proposed_capability_id": "agent_api.session.resume.v1",
@@ -378,7 +482,7 @@
     {
       "id": "uaa-0007",
       "title": "Universal fork session",
-      "status": "todo",
+      "status": "done",
       "bucket": "agent_api.session",
       "type": "extension_key",
       "proposed_capability_id": "agent_api.session.fork.v1",
@@ -425,7 +529,7 @@
     {
       "id": "uaa-0009",
       "title": "Obs: trace context propagation",
-      "status": "todo",
+      "status": "on_hold",
       "bucket": "agent_api.obs",
       "type": "extension_key",
       "proposed_capability_id": "agent_api.obs.trace_context.v1",
@@ -449,7 +553,7 @@
     {
       "id": "uaa-0010",
       "title": "Obs: tags / key-value annotations",
-      "status": "todo",
+      "status": "on_hold",
       "bucket": "agent_api.obs",
       "type": "extension_key",
       "proposed_capability_id": "agent_api.obs.tags.v1",

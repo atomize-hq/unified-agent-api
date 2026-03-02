@@ -37,6 +37,22 @@ pub enum ThreadEvent {
     Error(EventError),
 }
 
+impl ThreadEvent {
+    pub fn thread_id(&self) -> Option<&str> {
+        match self {
+            ThreadEvent::ThreadStarted(event) => Some(event.thread_id.as_str()),
+            ThreadEvent::TurnStarted(event) => Some(event.thread_id.as_str()),
+            ThreadEvent::TurnCompleted(event) => Some(event.thread_id.as_str()),
+            ThreadEvent::TurnFailed(event) => Some(event.thread_id.as_str()),
+            ThreadEvent::ItemStarted(event) => Some(event.thread_id.as_str()),
+            ThreadEvent::ItemDelta(event) => Some(event.thread_id.as_str()),
+            ThreadEvent::ItemCompleted(event) => Some(event.thread_id.as_str()),
+            ThreadEvent::ItemFailed(event) => Some(event.thread_id.as_str()),
+            ThreadEvent::Error(_) => None,
+        }
+    }
+}
+
 /// Marks the start of a new thread.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ThreadStarted {

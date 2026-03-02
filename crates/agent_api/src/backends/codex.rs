@@ -4,14 +4,17 @@ use std::{
     path::PathBuf,
     pin::Pin,
     process::ExitStatus,
-    sync::Arc,
+    sync::{Arc, Mutex},
     time::Duration,
 };
 
-use codex::{CodexError, ExecStreamError, ExecStreamRequest, ThreadEvent};
-use futures_util::future::poll_fn;
+use codex::{CodexError, ExecStreamError, ThreadEvent};
 use serde_json::Value;
-use tokio::sync::oneshot;
+
+use super::session_selectors::{
+    parse_session_resume_v1, validate_resume_fork_mutual_exclusion, SessionSelectorV1,
+    EXT_SESSION_FORK_V1, EXT_SESSION_RESUME_V1,
+};
 
 use crate::{
     backend_harness::{
@@ -19,8 +22,8 @@ use crate::{
         NormalizedRequest,
     },
     AgentWrapperBackend, AgentWrapperCapabilities, AgentWrapperCompletion, AgentWrapperError,
-    AgentWrapperEvent, AgentWrapperKind, AgentWrapperRunControl, AgentWrapperRunHandle,
-    AgentWrapperRunRequest,
+    AgentWrapperEvent, AgentWrapperEventKind, AgentWrapperKind, AgentWrapperRunControl,
+    AgentWrapperRunHandle, AgentWrapperRunRequest,
 };
 
 impl super::termination::TerminationHandle for codex::ExecTerminationHandle {
@@ -51,6 +54,29 @@ impl CodexBackend {
 const EXT_NON_INTERACTIVE: &str = "agent_api.exec.non_interactive";
 const EXT_CODEX_APPROVAL_POLICY: &str = "backend.codex.exec.approval_policy";
 const EXT_CODEX_SANDBOX_MODE: &str = "backend.codex.exec.sandbox_mode";
+
+const PINNED_APPROVAL_REQUIRED: &str = "approval required";
+const PINNED_NO_SESSION_FOUND: &str = "no session found";
+const PINNED_SESSION_NOT_FOUND: &str = "session not found";
+
+fn pinned_selection_failure_message(selector: &SessionSelectorV1) -> &'static str {
+    match selector {
+        SessionSelectorV1::Last => PINNED_NO_SESSION_FOUND,
+        SessionSelectorV1::Id { .. } => PINNED_SESSION_NOT_FOUND,
+    }
+}
+
+fn is_not_found_signal(text: &str) -> bool {
+    let text = text.to_ascii_lowercase();
+
+    (text.contains("not found") && (text.contains("session") || text.contains("thread")))
+        || text.contains("no session")
+        || text.contains("no sessions")
+        || text.contains("unknown session")
+        || text.contains("no thread")
+        || text.contains("no threads")
+        || text.contains("unknown thread")
+}
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 enum CodexApprovalPolicy {
@@ -117,6 +143,8 @@ struct CodexExecPolicy {
     non_interactive: bool,
     approval_policy: Option<CodexApprovalPolicy>,
     sandbox_mode: CodexSandboxMode,
+    resume: Option<SessionSelectorV1>,
+    fork: Option<SessionSelectorV1>,
 }
 
 fn validate_and_extract_exec_policy(
@@ -159,19 +187,60 @@ fn validate_and_extract_exec_policy(
         non_interactive,
         approval_policy,
         sandbox_mode,
+        resume: None,
+        fork: None,
     })
 }
 
 const CAP_TOOLS_STRUCTURED_V1: &str = "agent_api.tools.structured.v1";
 const CAP_TOOLS_RESULTS_V1: &str = "agent_api.tools.results.v1";
 const CAP_ARTIFACTS_FINAL_TEXT_V1: &str = "agent_api.artifacts.final_text.v1";
+const CAP_SESSION_HANDLE_V1: &str = "agent_api.session.handle.v1";
 
 const TOOLS_FACET_SCHEMA: &str = "agent_api.tools.structured.v1";
+
+const SESSION_HANDLE_ID_BOUND_BYTES: usize = 1024;
+const SESSION_HANDLE_OVERSIZE_WARNING_MARKER: &str = "session handle id oversize";
 
 #[path = "codex/mapping.rs"]
 mod mapping;
 
+#[path = "codex/exec.rs"]
+mod exec;
+
+#[path = "codex/fork.rs"]
+mod fork;
+
 use mapping::{error_event, map_thread_event};
+
+enum CodexTerminationHandle {
+    Exec(codex::ExecTerminationHandle),
+    AppServerTurn(fork::AppServerTurnCancelHandle),
+}
+
+impl std::fmt::Debug for CodexTerminationHandle {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            CodexTerminationHandle::Exec(_) => f.debug_tuple("Exec").field(&"<handle>").finish(),
+            CodexTerminationHandle::AppServerTurn(_) => {
+                f.debug_tuple("AppServerTurn").field(&"<handle>").finish()
+            }
+        }
+    }
+}
+
+impl super::termination::TerminationHandle for CodexTerminationHandle {
+    fn request_termination(&self) {
+        match self {
+            CodexTerminationHandle::Exec(handle) => {
+                codex::ExecTerminationHandle::request_termination(handle);
+            }
+            CodexTerminationHandle::AppServerTurn(handle) => {
+                super::termination::TerminationHandle::request_termination(handle);
+            }
+        }
+    }
+}
 
 fn codex_error_kind(err: &CodexError) -> &'static str {
     match err {
@@ -237,26 +306,48 @@ struct CodexHarnessAdapter {
     config: CodexBackendConfig,
     run_start_cwd: Option<PathBuf>,
     termination:
-        Option<std::sync::Arc<super::termination::TerminationState<codex::ExecTerminationHandle>>>,
+        Option<std::sync::Arc<super::termination::TerminationState<CodexTerminationHandle>>>,
+    handle_state: Arc<Mutex<CodexHandleFacetState>>,
+}
+
+#[derive(Debug, Default)]
+struct CodexHandleFacetState {
+    thread_id: Option<String>,
+    handle_facet_emitted: bool,
+    oversize_warning_emitted: bool,
+    oversize_warning_len_bytes: Option<usize>,
 }
 
 #[derive(Debug)]
 enum CodexBackendEvent {
     Thread(Box<ThreadEvent>),
+    AppServerNotification(codex::mcp::AppNotification),
     NonZeroExit { status: ExitStatus },
+    TerminalError { message: String },
 }
 
-#[derive(Debug)]
-enum CodexBackendCompletion {
-    Ok(codex::ExecCompletion),
-    NonZeroExit { status: ExitStatus },
+#[derive(Clone, Debug)]
+struct CodexBackendCompletion {
+    status: ExitStatus,
+    final_text: Option<String>,
+    selection_failure_message: Option<String>,
 }
 
 #[derive(Debug)]
 enum CodexBackendError {
     Exec(ExecStreamError),
+    AppServer(codex::mcp::McpError),
+    ForkSelectionEmpty,
+    ForkSessionNotFound,
     CompletionTaskDropped,
     WorkingDirectoryUnresolved,
+}
+
+fn session_handle_facet(thread_id: &str) -> serde_json::Value {
+    serde_json::json!({
+        "schema": CAP_SESSION_HANDLE_V1,
+        "session": { "id": thread_id },
+    })
 }
 
 impl BackendHarnessAdapter for CodexHarnessAdapter {
@@ -269,6 +360,8 @@ impl BackendHarnessAdapter for CodexHarnessAdapter {
             EXT_NON_INTERACTIVE,
             EXT_CODEX_APPROVAL_POLICY,
             EXT_CODEX_SANDBOX_MODE,
+            EXT_SESSION_RESUME_V1,
+            EXT_SESSION_FORK_V1,
         ]
     }
 
@@ -278,7 +371,23 @@ impl BackendHarnessAdapter for CodexHarnessAdapter {
         &self,
         request: &AgentWrapperRunRequest,
     ) -> Result<Self::Policy, AgentWrapperError> {
-        validate_and_extract_exec_policy(request)
+        let exec_policy = validate_and_extract_exec_policy(request)?;
+
+        let resume = request
+            .extensions
+            .get(EXT_SESSION_RESUME_V1)
+            .map(parse_session_resume_v1)
+            .transpose()?;
+
+        let fork = fork::extract_fork_selector_v1(request)?;
+
+        validate_resume_fork_mutual_exclusion(&request.extensions)?;
+
+        Ok(CodexExecPolicy {
+            resume,
+            fork,
+            ..exec_policy
+        })
     }
 
     type BackendEvent = CodexBackendEvent;
@@ -306,157 +415,197 @@ impl BackendHarnessAdapter for CodexHarnessAdapter {
         let config = self.config.clone();
         let run_start_cwd = self.run_start_cwd.clone();
         let termination = self.termination.clone();
-        let policy = req.policy;
+        let handle_state = self.handle_state.clone();
+        let CodexExecPolicy {
+            non_interactive,
+            approval_policy,
+            sandbox_mode,
+            resume,
+            fork,
+        } = req.policy;
         let prompt = req.prompt;
         let working_dir = req.working_dir;
         let effective_timeout = req.effective_timeout;
         let env = req.env;
 
         Box::pin(async move {
-            fn map_approval_policy(policy: &CodexApprovalPolicy) -> codex::ApprovalPolicy {
-                match policy {
-                    CodexApprovalPolicy::Untrusted => codex::ApprovalPolicy::Untrusted,
-                    CodexApprovalPolicy::OnFailure => codex::ApprovalPolicy::OnFailure,
-                    CodexApprovalPolicy::OnRequest => codex::ApprovalPolicy::OnRequest,
-                    CodexApprovalPolicy::Never => codex::ApprovalPolicy::Never,
-                }
+            if let Some(selector) = fork {
+                return fork::spawn_fork_v1_flow(fork::ForkFlowRequest {
+                    selector,
+                    prompt,
+                    working_dir,
+                    env,
+                    config,
+                    run_start_cwd,
+                    termination,
+                    non_interactive,
+                    approval_policy,
+                    sandbox_mode,
+                    handle_state,
+                })
+                .await;
             }
 
-            fn map_sandbox_mode(mode: &CodexSandboxMode) -> codex::SandboxMode {
-                match mode {
-                    CodexSandboxMode::ReadOnly => codex::SandboxMode::ReadOnly,
-                    CodexSandboxMode::WorkspaceWrite => codex::SandboxMode::WorkspaceWrite,
-                    CodexSandboxMode::DangerFullAccess => codex::SandboxMode::DangerFullAccess,
-                }
-            }
-
-            let mut builder = codex::CodexClient::builder()
-                .json(true)
-                .mirror_stdout(false)
-                .quiet(true)
-                .color_mode(codex::ColorMode::Never)
-                .sandbox_mode(map_sandbox_mode(&policy.sandbox_mode));
-
-            if policy.non_interactive {
-                builder = builder.approval_policy(codex::ApprovalPolicy::Never);
-            } else if let Some(value) = policy.approval_policy.as_ref() {
-                builder = builder.approval_policy(map_approval_policy(value));
-            }
-
-            if let Some(binary) = config.binary.as_ref() {
-                builder = builder.binary(binary.clone());
-            }
-
-            if let Some(codex_home) = config.codex_home.as_ref() {
-                builder = builder.codex_home(codex_home.clone());
-            }
-
-            let working_dir = working_dir
-                .or_else(|| config.default_working_dir.clone())
-                .or(run_start_cwd)
-                .ok_or(CodexBackendError::WorkingDirectoryUnresolved)?;
-            builder = builder.working_dir(working_dir);
-
-            // Codex wrapper treats `Duration::ZERO` as “no timeout”.
-            builder = builder.timeout(effective_timeout.unwrap_or(Duration::ZERO));
-
-            let client = builder.build();
-
-            let handle = client
-                .stream_exec_with_env_overrides_control(
-                    ExecStreamRequest {
-                        prompt,
-                        idle_timeout: None,
-                        output_last_message: None,
-                        output_schema: None,
-                        json_event_log: None,
-                    },
-                    &env,
-                )
-                .await
-                .map_err(CodexBackendError::Exec)?;
-
-            let codex::ExecStreamControl {
-                events,
-                completion,
-                termination: termination_handle,
-            } = handle;
-
-            if let Some(state) = termination.as_ref() {
-                state.set_handle(termination_handle);
-            }
-
-            let (completion_tx, completion_rx) =
-                oneshot::channel::<Result<CodexBackendCompletion, CodexBackendError>>();
-            let (tail_tx, tail_rx) = oneshot::channel::<Option<ExitStatus>>();
-
-            tokio::spawn(async move {
-                let outcome = completion.await;
-                match outcome {
-                    Ok(exec_completion) => {
-                        let _ = completion_tx.send(Ok(CodexBackendCompletion::Ok(exec_completion)));
-                        let _ = tail_tx.send(None);
-                    }
-                    Err(ExecStreamError::Codex(CodexError::NonZeroExit { status, .. })) => {
-                        let _ =
-                            completion_tx.send(Ok(CodexBackendCompletion::NonZeroExit { status }));
-                        let _ = tail_tx.send(Some(status));
-                    }
-                    Err(err) => {
-                        let _ = completion_tx.send(Err(CodexBackendError::Exec(err)));
-                        let _ = tail_tx.send(None);
-                    }
-                }
-            });
-
-            let events = Box::pin(futures_util::stream::unfold(
-                (events, Some(tail_rx), false),
-                |(mut events, mut tail_rx, tail_emitted)| async move {
-                    let item = poll_fn(|cx| events.as_mut().poll_next(cx)).await;
-                    match item {
-                        Some(Ok(thread_ev)) => Some((
-                            Ok(CodexBackendEvent::Thread(Box::new(thread_ev))),
-                            (events, tail_rx, tail_emitted),
-                        )),
-                        Some(Err(err)) => Some((
-                            Err(CodexBackendError::Exec(err)),
-                            (events, tail_rx, tail_emitted),
-                        )),
-                        None => {
-                            if tail_emitted {
-                                return None;
-                            }
-
-                            let status = match tail_rx.take() {
-                                Some(rx) => rx.await.ok().flatten(),
-                                None => None,
-                            }?;
-
-                            Some((
-                                Ok(CodexBackendEvent::NonZeroExit { status }),
-                                (events, tail_rx, true),
-                            ))
-                        }
-                    }
-                },
-            ));
-
-            let completion = Box::pin(async move {
-                completion_rx
-                    .await
-                    .unwrap_or(Err(CodexBackendError::CompletionTaskDropped))
-            });
-
-            Ok(BackendSpawn { events, completion })
+            exec::spawn_exec_or_resume_flow(exec::ExecFlowRequest {
+                config,
+                run_start_cwd,
+                termination,
+                non_interactive,
+                approval_policy,
+                sandbox_mode,
+                resume,
+                prompt,
+                working_dir,
+                effective_timeout,
+                env,
+            })
+            .await
         })
     }
 
     fn map_event(&self, event: Self::BackendEvent) -> Vec<AgentWrapperEvent> {
         match event {
-            CodexBackendEvent::Thread(ev) => vec![map_thread_event(&ev)],
-            CodexBackendEvent::NonZeroExit { status } => vec![error_event(format!(
-                "codex exited non-zero: {status:?} (stderr redacted)"
-            ))],
+            CodexBackendEvent::Thread(ev) => {
+                let mut emit_oversize_warning_len: Option<usize> = None;
+
+                if let Ok(mut state) = self.handle_state.lock() {
+                    if state.thread_id.is_none() {
+                        if let Some(thread_id) = ev.thread_id() {
+                            if !thread_id.trim().is_empty() {
+                                let len = thread_id.len();
+                                if len <= SESSION_HANDLE_ID_BOUND_BYTES {
+                                    state.thread_id = Some(thread_id.to_string());
+                                } else if !state.oversize_warning_emitted {
+                                    state.oversize_warning_emitted = true;
+                                    emit_oversize_warning_len = Some(len);
+                                }
+                            }
+                        }
+                    }
+                }
+
+                let mut mapped = vec![map_thread_event(&ev)];
+
+                let emit_handle_facet: Option<String> =
+                    self.handle_state.lock().ok().and_then(|mut state| {
+                        if state.handle_facet_emitted {
+                            return None;
+                        }
+                        let thread_id = state.thread_id.clone()?;
+                        state.handle_facet_emitted = true;
+                        Some(thread_id)
+                    });
+
+                if let Some(thread_id) = emit_handle_facet.as_deref() {
+                    let mut attached = false;
+                    for event in mapped.iter_mut() {
+                        if event.kind == AgentWrapperEventKind::Status && event.data.is_none() {
+                            event.data = Some(session_handle_facet(thread_id));
+                            attached = true;
+                            break;
+                        }
+                    }
+
+                    if !attached {
+                        let mut event = mapping::status_event(None);
+                        event.data = Some(session_handle_facet(thread_id));
+                        mapped.push(event);
+                    }
+                }
+
+                if let Some(len) = emit_oversize_warning_len {
+                    mapped.push(mapping::status_event(Some(format!(
+                        "{SESSION_HANDLE_OVERSIZE_WARNING_MARKER}: len_bytes={len}"
+                    ))));
+                }
+
+                mapped
+            }
+            CodexBackendEvent::AppServerNotification(notification) => {
+                let mut mapped = match notification {
+                    codex::mcp::AppNotification::Raw { method, params } => {
+                        fork::map_app_server_notification(&method, &params)
+                            .into_iter()
+                            .collect()
+                    }
+                    codex::mcp::AppNotification::Error { message, .. } => {
+                        vec![error_event(message)]
+                    }
+                    _ => Vec::new(),
+                };
+
+                let emit_handle_facet: Option<String> =
+                    self.handle_state.lock().ok().and_then(|mut state| {
+                        if state.handle_facet_emitted {
+                            return None;
+                        }
+                        let thread_id = state.thread_id.clone()?;
+                        state.handle_facet_emitted = true;
+                        Some(thread_id)
+                    });
+
+                if let Some(thread_id) = emit_handle_facet.as_deref() {
+                    let mut attached = false;
+                    for event in mapped.iter_mut() {
+                        if event.kind == AgentWrapperEventKind::Status && event.data.is_none() {
+                            event.data = Some(session_handle_facet(thread_id));
+                            attached = true;
+                            break;
+                        }
+                    }
+
+                    if !attached {
+                        let mut event = mapping::status_event(None);
+                        event.data = Some(session_handle_facet(thread_id));
+                        mapped.push(event);
+                    }
+                }
+
+                let emit_oversize_warning_len: Option<usize> =
+                    self.handle_state.lock().ok().and_then(|mut state| {
+                        state.oversize_warning_len_bytes.take()
+                    });
+
+                if let Some(len) = emit_oversize_warning_len {
+                    mapped.push(mapping::status_event(Some(format!(
+                        "{SESSION_HANDLE_OVERSIZE_WARNING_MARKER}: len_bytes={len}"
+                    ))));
+                }
+
+                mapped
+            }
+            CodexBackendEvent::NonZeroExit { status } => {
+                let mut mapped = Vec::new();
+                if let Some(len) = self
+                    .handle_state
+                    .lock()
+                    .ok()
+                    .and_then(|mut state| state.oversize_warning_len_bytes.take())
+                {
+                    mapped.push(mapping::status_event(Some(format!(
+                        "{SESSION_HANDLE_OVERSIZE_WARNING_MARKER}: len_bytes={len}"
+                    ))));
+                }
+                mapped.push(error_event(format!(
+                    "codex exited non-zero: {status:?} (stderr redacted)"
+                )));
+                mapped
+            }
+            CodexBackendEvent::TerminalError { message } => {
+                let mut mapped = Vec::new();
+                if let Some(len) = self
+                    .handle_state
+                    .lock()
+                    .ok()
+                    .and_then(|mut state| state.oversize_warning_len_bytes.take())
+                {
+                    mapped.push(mapping::status_event(Some(format!(
+                        "{SESSION_HANDLE_OVERSIZE_WARNING_MARKER}: len_bytes={len}"
+                    ))));
+                }
+                mapped.push(error_event(message));
+                mapped
+            }
         }
     }
 
@@ -464,23 +613,39 @@ impl BackendHarnessAdapter for CodexHarnessAdapter {
         &self,
         completion: Self::BackendCompletion,
     ) -> Result<AgentWrapperCompletion, AgentWrapperError> {
-        match completion {
-            CodexBackendCompletion::Ok(completion) => Ok(AgentWrapperCompletion {
-                status: completion.status,
-                final_text: crate::bounds::enforce_final_text_bound(completion.last_message),
-                data: None,
-            }),
-            CodexBackendCompletion::NonZeroExit { status } => Ok(AgentWrapperCompletion {
-                status,
-                final_text: None,
-                data: None,
-            }),
+        let CodexBackendCompletion {
+            status,
+            final_text,
+            selection_failure_message,
+        } = completion;
+
+        if let Some(message) = selection_failure_message {
+            return Err(AgentWrapperError::Backend { message });
         }
+
+        let handle_facet = self
+            .handle_state
+            .lock()
+            .ok()
+            .and_then(|state| state.thread_id.clone())
+            .map(|thread_id| session_handle_facet(&thread_id));
+
+        Ok(AgentWrapperCompletion {
+            status,
+            final_text: crate::bounds::enforce_final_text_bound(final_text),
+            data: handle_facet,
+        })
     }
 
     fn redact_error(&self, _phase: BackendHarnessErrorPhase, err: &Self::BackendError) -> String {
         match err {
             CodexBackendError::Exec(err) => redact_exec_stream_error(err),
+            CodexBackendError::AppServer(codex::mcp::McpError::Handshake(_)) => {
+                "codex app-server handshake failed".to_string()
+            }
+            CodexBackendError::AppServer(_) => "codex app-server rpc error".to_string(),
+            CodexBackendError::ForkSelectionEmpty => PINNED_NO_SESSION_FOUND.to_string(),
+            CodexBackendError::ForkSessionNotFound => PINNED_SESSION_NOT_FOUND.to_string(),
             CodexBackendError::CompletionTaskDropped => "codex completion task dropped".to_string(),
             CodexBackendError::WorkingDirectoryUnresolved => {
                 "codex backend failed to resolve working directory".to_string()
@@ -503,10 +668,13 @@ impl AgentWrapperBackend for CodexBackend {
         ids.insert(CAP_TOOLS_STRUCTURED_V1.to_string());
         ids.insert(CAP_TOOLS_RESULTS_V1.to_string());
         ids.insert(CAP_ARTIFACTS_FINAL_TEXT_V1.to_string());
+        ids.insert(CAP_SESSION_HANDLE_V1.to_string());
         ids.insert("backend.codex.exec_stream".to_string());
         ids.insert(EXT_NON_INTERACTIVE.to_string());
         ids.insert(EXT_CODEX_APPROVAL_POLICY.to_string());
         ids.insert(EXT_CODEX_SANDBOX_MODE.to_string());
+        ids.insert(EXT_SESSION_RESUME_V1.to_string());
+        ids.insert(EXT_SESSION_FORK_V1.to_string());
         AgentWrapperCapabilities { ids }
     }
 
@@ -522,6 +690,7 @@ impl AgentWrapperBackend for CodexBackend {
                 config: config.clone(),
                 run_start_cwd,
                 termination: None,
+                handle_state: Arc::new(Mutex::new(CodexHandleFacetState::default())),
             });
 
             let defaults = BackendDefaults {
@@ -553,7 +722,9 @@ impl AgentWrapperBackend for CodexBackend {
 
         let config = self.config.clone();
         Box::pin(async move {
-            let termination_state = Arc::new(super::termination::TerminationState::new());
+            let termination_state: Arc<
+                super::termination::TerminationState<CodexTerminationHandle>,
+            > = Arc::new(super::termination::TerminationState::new());
             let request_termination: Option<Arc<dyn Fn() + Send + Sync + 'static>> = Some({
                 let termination_state = Arc::clone(&termination_state);
                 Arc::new(move || termination_state.request())
@@ -564,6 +735,7 @@ impl AgentWrapperBackend for CodexBackend {
                 config: config.clone(),
                 run_start_cwd,
                 termination: Some(termination_state),
+                handle_state: Arc::new(Mutex::new(CodexHandleFacetState::default())),
             });
 
             let defaults = BackendDefaults {
