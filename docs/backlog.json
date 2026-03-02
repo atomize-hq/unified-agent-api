@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at_utc": "2026-03-02T00:49:01Z",
+  "updated_at_utc": "2026-03-02T03:05:23Z",
   "items": [
     {
       "id": "uaa-0013",
@@ -273,6 +273,41 @@
       "notes": [
         "Do not infer selection failure solely from non-zero exit + no assistant output (false positives).",
         "If ResultError events are suppressed for safety, still use their typed/raw payload for classification, and surface a generic safe error for non-not-found failures."
+      ]
+    },
+    {
+      "id": "uaa-0019",
+      "title": "Beware: Claude stream-json result subtype drift when promoting versions",
+      "status": "todo",
+      "bucket": "agent_api.session",
+      "type": "task",
+      "kickoff": {
+        "prompt": [
+          "Work item: uaa-0019 — Beware: Claude stream-json result subtype drift when promoting versions.",
+          "Context: A newer local Claude CLI (e.g., 2.1.63) emitted `type:\"result\"` with a non-v1 `subtype` (e.g., \"error_during_execution\") for resume-by-id not-found. This does not parse as `ClaudeStreamJsonEvent::ResultError` under the current v1 parser contract (success/error only), which can break downstream selection-failure translation that relies on ResultError.raw classification.",
+          "Goal: when raising Claude Code coverage and/or promoting `cli_manifests/claude_code/latest_validated.txt`, validate stream-json result taxonomy against the candidate binary and update the parser contract + fixtures as needed before promotion.",
+          "Steps:",
+          "1) Run stream-json spot checks against the candidate `claude` binary (not whatever happens to be on PATH) for: resume id not-found, resume last empty, generic failure.",
+          "2) If result subtypes differ from v1 (success/error), update `crates/claude_code` stream-json parser + the normative parser specs/fixtures to accept the new subtype(s) (while keeping safety/redaction posture).",
+          "3) Re-validate `agent_api` selection-failure translation against the candidate binary once the parser emits typed ResultError events again.",
+          "Output: promotion-safe parser contract updates (specs + fixtures + code) that keep higher Claude versions from silently regressing session error translation."
+        ],
+        "files_to_read": [
+          "cli_manifests/claude_code/latest_validated.txt",
+          "cli_manifests/claude_code/OPS_PLAYBOOK.md",
+          "docs/specs/claude-stream-json-parser-contract.md",
+          "docs/specs/claude-stream-json-parser-scenarios-v1.md",
+          "crates/claude_code/src/stream_json.rs",
+          "crates/agent_api/src/backends/claude_code.rs"
+        ],
+        "deliverables": [
+          "Updated Claude stream-json parser contract/fixtures for new result subtype(s)",
+          "Evidence the candidate Claude version preserves typed ResultError emission for agent_api"
+        ]
+      },
+      "notes": [
+        "Avoid validating against an arbitrary local `claude` on PATH; use the binary under promotion and compare to cli_manifests pointers.",
+        "If new result subtypes appear, treat it as a promotion gate: update parser contract + fixtures before bumping latest_validated/min_supported."
       ]
     },
     {
