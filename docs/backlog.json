@@ -1,0 +1,602 @@
+{
+  "schema_version": 1,
+  "updated_at_utc": "2026-03-02T03:16:29Z",
+  "items": [
+    {
+      "id": "uaa-0013",
+      "title": "Tooling/spec updates for agent_api.session bucket",
+      "status": "done",
+      "bucket": "agent_api.session",
+      "type": "task",
+      "kickoff": {
+        "prompt": [
+          "Work item: uaa-0013 — Tooling/spec updates for agent_api.session bucket.",
+          "Goal: introduce agent_api.session.* as a first-class capability bucket (rubric + tooling) so onboarding and audits can bucket session capabilities mechanically.",
+          "Steps:",
+          "1) Update docs/specs/universal-agent-api/capabilities-schema-spec.md to include agent_api.session.* in the bucket rubric list (near agent_api.exec.*).",
+          "2) Update crates/xtask/src/capability_matrix.rs: bucket_for(...) should recognize agent_api.session.* and bucket_order(...) should include agent_api.session in the canonical bucket ordering.",
+          "3) Run the generators/audits: `cargo run -p xtask -- capability-matrix` and `cargo run -p xtask -- capability-matrix-audit`.",
+          "Output: PR-ready spec + tooling changes; no backend behavior changes."
+        ],
+        "files_to_read": [
+          "docs/specs/universal-agent-api/capabilities-schema-spec.md",
+          "crates/xtask/src/capability_matrix.rs",
+          "crates/xtask/src/capability_matrix_audit.rs",
+          "docs/specs/universal-agent-api/capability-matrix.md"
+        ],
+        "suggested_commands": [
+          "cargo run -p xtask -- capability-matrix",
+          "cargo run -p xtask -- capability-matrix-audit"
+        ],
+        "deliverables": [
+          "Updated bucket rubric + xtask bucketing for agent_api.session.*"
+        ]
+      },
+      "notes": [
+        "Update docs/specs/universal-agent-api/capabilities-schema-spec.md rubric to include agent_api.session.*.",
+        "Update crates/xtask/src/capability_matrix.rs bucket_for(...) and bucket_order(...) to recognize agent_api.session.* so the generated matrix groups session capabilities correctly.",
+        "Confirm crates/xtask/src/capability_matrix_audit.rs behavior once any agent_api.session.* capabilities are added (audit requires new agent_api.* capabilities to be supported by >=2 built-in backends unless allowlisted)."
+      ]
+    },
+    {
+      "id": "uaa-0014",
+      "title": "Obs facet schema (events + completion)",
+      "status": "on_hold",
+      "bucket": "agent_api.obs",
+      "type": "spec",
+      "proposed_capability_id": "agent_api.obs.v1",
+      "kickoff": {
+        "prompt": [
+          "Work item: uaa-0014 — Obs facet schema (events + completion).",
+          "Goal: define a stable, bounded obs metadata schema that can carry run_id / trace_context / tags across AgentWrapperEvent.data and AgentWrapperCompletion.data.",
+          "Key constraint: ToolCall/ToolResult events already use `data.schema = agent_api.tools.structured.v1`; obs metadata must coexist without breaking the tools facet contract (likely via an optional nested `obs` object in `data`, not a competing top-level schema for tool events).",
+          "Steps:",
+          "1) Specify the obs object shape + strict bounds (identifiers + small maps only; no raw backend lines).",
+          "2) Specify where the obs data MAY appear (which event kinds, completion.data) and merge/precedence rules when both caller and backend supply context.",
+          "3) Specify how this schema relates to upcoming surfaces: agent_api.obs.run_id.v1, agent_api.obs.trace_context.v1, agent_api.obs.tags.v1.",
+          "Output: spec text updates ready for implementation (keep it conservative and backward-compatible with existing tools facet rules)."
+        ],
+        "files_to_read": [
+          "docs/specs/universal-agent-api/contract.md",
+          "docs/specs/universal-agent-api/event-envelope-schema-spec.md",
+          "docs/specs/universal-agent-api/capabilities-schema-spec.md",
+          "docs/specs/universal-agent-api/extensions-spec.md",
+          "crates/agent_api/src/bounds.rs",
+          "crates/agent_api/src/backends/claude_code.rs",
+          "crates/agent_api/src/backends/codex/mapping.rs",
+          "crates/agent_api/src/backends/codex.rs",
+          "docs/backlog/uaa-0014-obs-facet-schema-v1.md"
+        ],
+        "deliverables": [
+          "A concrete obs facet schema (v1) + placement rules + bounds, suitable to unblock run_id/trace_context/tags work"
+        ]
+      },
+      "notes": [
+        "Define a single bounded obs facet schema carried in AgentWrapperEvent.data and/or AgentWrapperCompletion.data (AgentWrapperEvent has no top-level run/session/trace fields).",
+        "This facet should be the foundation for: agent_api.obs.run_id.v1, agent_api.obs.trace_context.v1, agent_api.obs.tags.v1.",
+        "Decide emission model: always emit vs gated by explicit capabilities and/or an extension key; define precedence + merge rules when both backend and caller supply context.",
+        "Draft spec text (backlog-only): docs/backlog/uaa-0014-obs-facet-schema-v1.md",
+        "On hold. This is not a priority right now."
+      ]
+    },
+    {
+      "id": "uaa-0012",
+      "title": "Research/plan: backend config pass-through (bounded)",
+      "status": "todo",
+      "bucket": "agent_api.config",
+      "type": "research",
+      "kickoff": {
+        "prompt": [
+          "Work item: uaa-0012 — Research/plan: backend config pass-through (bounded).",
+          "Goal: do a final sweep of codex + claude_code flags/settings/config surfaces and decide what becomes universal (`agent_api.config.*` or other agent_api.* keys) vs what stays backend-specific (bounded pass-through under backend.<agent_kind>.*).",
+          "Steps:",
+          "1) Inventory: extract global flags + exec/print flags + key=value config mechanisms from cli_manifests/*/current.json and wrapper_coverage manifests.",
+          "2) Normalize by semantics: model selection, context roots, safety/permissions, tool allow/deny, output/artifacts, session selectors, MCP, etc.",
+          "3) Promote only backend-neutral semantics into agent_api.*; everything else becomes one or more bounded backend pass-through keys with strict validation/bounds.",
+          "Output: a concrete proposed key list (universal keys + backend pass-through keys), including JSON schema sketches, defaults, bounds, and validation rules."
+        ],
+        "files_to_read": [
+          "cli_manifests/codex/current.json",
+          "cli_manifests/claude_code/current.json",
+          "cli_manifests/codex/wrapper_coverage.json",
+          "cli_manifests/claude_code/wrapper_coverage.json",
+          "crates/codex/src/wrapper_coverage_manifest.rs",
+          "crates/claude_code/src/wrapper_coverage_manifest.rs",
+          "crates/codex/src/builder/mod.rs",
+          "crates/codex/src/builder/cli_overrides.rs",
+          "crates/claude_code/src/commands/print.rs",
+          "docs/specs/universal-agent-api/extensions-spec.md",
+          "docs/specs/universal-agent-api/capabilities-schema-spec.md"
+        ],
+        "suggested_commands": [
+          "jq -r '.commands[] | select(.path==[]) | .flags[].key' cli_manifests/codex/current.json | sort -u",
+          "jq -r '.commands[] | select(.path==[]) | .flags[].key' cli_manifests/claude_code/current.json | sort -u",
+          "jq -r '.commands[].flags[]?.key' cli_manifests/codex/current.json | sort -u",
+          "jq -r '.commands[].flags[]?.key' cli_manifests/claude_code/current.json | sort -u"
+        ],
+        "deliverables": [
+          "Concrete list of proposed universal config keys (agent_api.config.*)",
+          "Concrete list of bounded backend pass-through keys (backend.codex.* / backend.claude_code.*) with schema/bounds"
+        ]
+      },
+      "notes": [
+        "Final pass before implementation: inventory codex + claude_code global flags, key=value config surfaces, and settings inputs (via cli_manifests/*/current.json and wrapper coverage manifests).",
+        "Promote only backend-neutral semantics into agent_api.config.* (and/or other universal buckets); keep backend-specific knobs under backend.<agent_kind>.* even if they are 'config'.",
+        "Produce a concrete list of bounded backend pass-through keys we want to support (e.g. backend.codex.cli_overrides.v1, backend.claude_code.settings.v1), including schema, defaults, bounds, and validation rules."
+      ]
+    },
+    {
+      "id": "uaa-0016",
+      "title": "Universal: external sandbox execution policy (dangerous)",
+      "status": "todo",
+      "bucket": "agent_api.exec",
+      "type": "extension_key",
+      "proposed_capability_id": "agent_api.exec.external_sandbox.v1",
+      "notes": [
+        "Expose an explicit, capability-gated core key for hosts (e.g. Substrate) that provide isolation externally and need the CLI backend to relax internal guardrails.",
+        "Owned by docs/specs/universal-agent-api/extensions-spec.md (core key); implement + capability-gate in both codex and claude_code backends.",
+        "When true, the backend MUST remain non-interactive (MUST NOT hang on prompts); if agent_api.exec.non_interactive is explicitly false, the backend SHOULD fail closed as contradictory intent.",
+        "This key is explicitly dangerous and SHOULD NOT be advertised by default in built-in backends (only enabled for externally sandboxed hosts).",
+        "Value MUST be boolean and validated before spawn; unknown keys must continue to fail-closed."
+      ],
+      "backend_mapping": {
+        "codex": {
+          "cli": "codex --dangerously-bypass-approvals-and-sandbox exec ...",
+          "impl_hint": "crates/agent_api/src/backends/codex.rs: when true, configure CodexClientBuilder::dangerously_bypass_approvals_and_sandbox(true) (or equivalent never-prompt + danger-full-access policy)."
+        },
+        "claude_code": {
+          "cli": "claude --print --dangerously-skip-permissions [--allow-dangerously-skip-permissions] ...",
+          "impl_hint": "crates/agent_api/src/backends/claude_code.rs: when true, map to ClaudePrintRequest::dangerously_skip_permissions(true) (and enable allow_dangerously_skip_permissions when required by the CLI version)."
+        }
+      }
+    },
+    {
+      "id": "uaa-0017",
+      "title": "Add typed session/thread id accessors (codex + claude_code)",
+      "status": "done",
+      "bucket": "agent_api.session",
+      "type": "task",
+      "kickoff": {
+        "prompt": [
+          "Work item: uaa-0017 — Add typed session/thread id accessors (codex + claude_code).",
+          "Goal: add small helper accessors on the typed backend event models so downstream crates can extract a stable session/thread identifier without duplicating match logic.",
+          "Steps:",
+          "1) Codex: add `codex::ThreadEvent::thread_id() -> Option<&str>` (or equivalent) to return the best-effort thread id when the variant contains one.",
+          "2) Claude Code: add `claude_code::ClaudeStreamJsonEvent::session_id() -> Option<&str>` to return the best-effort session id (including the Unknown variant when present).",
+          "3) Use these helpers in both `wrapper_events` and `agent_api` (uaa-0015) so session handle extraction is implemented once per backend type.",
+          "Output: ergonomic, test-covered accessors; no contract/spec changes."
+        ],
+        "files_to_read": [
+          "crates/codex/src/events.rs",
+          "crates/claude_code/src/stream_json.rs",
+          "crates/wrapper_events/src/codex_adapter.rs",
+          "crates/wrapper_events/src/claude_code_adapter.rs",
+          "crates/agent_api/src/backends/codex.rs",
+          "crates/agent_api/src/backends/claude_code.rs"
+        ],
+        "deliverables": [
+          "Typed accessor helpers for session/thread ids, reused by wrapper_events and agent_api"
+        ]
+      },
+      "notes": [
+        "This is a small reuse seam: avoid duplicating per-backend match logic in multiple crates.",
+        "Intended as a prerequisite for uaa-0015 (session handle facet emission)."
+      ]
+    },
+    {
+      "id": "uaa-0015",
+      "title": "Session/thread id surfacing (for resume-by-id UX)",
+      "status": "done",
+      "bucket": "agent_api.session",
+      "type": "task",
+      "kickoff": {
+        "prompt": [
+          "Work item: uaa-0015 — Session/thread id surfacing (for resume-by-id UX).",
+          "Goal: expose the backend’s session/thread identifier to the caller as stable, bounded metadata so resume-by-id is ergonomic (see ADR-0017).",
+          "Inputs already exist via streaming/log parsing:",
+          "- Codex: ThreadEvent::ThreadStarted.thread_id (thread.started/thread.resumed).",
+          "- Claude: stream-json session_id (SystemInit and other events).",
+          "Steps:",
+          "1) Decision: capability id `agent_api.session.handle.v1`; emit a bounded facet in both an early Status event `data` payload and in `AgentWrapperCompletion.data` (schema pinned in ADR-0017).",
+          "2) Update canonical specs to register the capability + facet schema/emission rules:",
+          "   - docs/specs/universal-agent-api/capabilities-schema-spec.md",
+          "   - docs/specs/universal-agent-api/event-envelope-schema-spec.md",
+          "3) Prerequisite: land uaa-0017 typed accessors and use them for extraction (`codex::ThreadEvent::thread_id()`, `claude_code::ClaudeStreamJsonEvent::session_id()`).",
+          "4) Implement extraction + run-local storage in both agent_api backends (Claude: capture session_id from stream-json; Codex: capture thread_id from JSONL ThreadStarted).",
+          "5) Advertise `agent_api.session.handle.v1` only once extraction + bounds/redaction posture is implemented + tested.",
+          "Output: cross-backend consistent session/thread id surfacing + tests (fake-binary where appropriate)."
+        ],
+        "files_to_read": [
+          "docs/adr/0017-universal-agent-api-session-thread-id-surfacing.md",
+          "docs/specs/claude-stream-json-parser-contract.md",
+          "docs/specs/codex-thread-event-jsonl-parser-contract.md",
+          "docs/specs/universal-agent-api/contract.md",
+          "docs/specs/universal-agent-api/event-envelope-schema-spec.md",
+          "crates/agent_api/src/backends/claude_code.rs",
+          "crates/agent_api/src/backends/codex/mapping.rs",
+          "crates/agent_api/src/backends/codex.rs",
+          "crates/codex/src/events.rs"
+        ],
+        "deliverables": [
+          "Stable session/thread id payload surfaced to callers (schema + implementation + tests)"
+        ]
+      },
+      "notes": [
+        "Make session/thread identifiers discoverable to callers as a stable, bounded payload (so resume-by-id can be ergonomic).",
+        "Leverage existing streaming/log parsing: Codex exposes thread_id in thread.started/thread.resumed events; Claude exposes session_id in stream-json events.",
+        "Decision: when capability `agent_api.session.handle.v1` is advertised, emit the handle facet once in an early Status event `data` payload and attach it to `AgentWrapperCompletion.data` when a completion is produced and the id is known.",
+        "Prerequisite: uaa-0017 adds typed id accessors so extraction logic is not duplicated across crates."
+      ],
+      "backend_mapping": {
+        "claude_code": {
+          "notes": [
+            "Use stream-json parsing to extract session_id (per docs/specs/claude-stream-json-parser-contract.md) and surface it in a stable payload."
+          ]
+        },
+        "codex": {
+          "notes": [
+            "Use JSONL parsing to extract ThreadEvent::ThreadStarted.thread_id (thread.started/thread.resumed) and surface it in a stable payload."
+          ]
+        }
+      }
+    },
+    {
+      "id": "uaa-0018",
+      "title": "P1: Restrict selection-failure translation to actual not-found errors",
+      "status": "todo",
+      "bucket": "agent_api.session",
+      "type": "task",
+      "kickoff": {
+        "prompt": [
+          "Work item: uaa-0018 — P1: Restrict selection-failure translation to actual not-found errors.",
+          "Goal: ensure resume/fork selection failures map to pinned safe messages only when the backend truly indicates a not-found condition; do not mislabel unrelated backend failures as \"no session found\" / \"session not found\".",
+          "Primary impact: Claude Code backend (agent_api) currently infers selection failure from non-success exit + no assistant output and suppresses ResultError events, masking real failure causes.",
+          "Steps:",
+          "1) Adjust Claude backend selection-failure detection to rely on explicit not-found signals (e.g., structured ResultError payload or stable not-found indicator), not absence-of-output.",
+          "2) Ensure non-not-found failures surface as AgentWrapperError::Backend with a safe/redacted message and emit a single terminal Error event when events are available.",
+          "3) Add regression tests: generic resume/fork failure with no assistant output must NOT translate to the pinned selection-failure messages.",
+          "Output: correct error classification + pinned selection failures + tests; no backend secrets leak."
+        ],
+        "files_to_read": [
+          "docs/specs/universal-agent-api/extensions-spec.md",
+          "docs/specs/claude-code-session-mapping-contract.md",
+          "crates/agent_api/src/backends/claude_code.rs",
+          "crates/agent_api/src/bin/fake_claude_stream_json_agent_api.rs",
+          "crates/agent_api/tests/c2_claude_session_resume_v1.rs",
+          "crates/agent_api/tests/c4_claude_session_fork_v1.rs"
+        ],
+        "deliverables": [
+          "Selection-failure translation restricted to actual not-found signals (Claude Code)",
+          "Regression tests preventing false-positive \"session not found\" translations"
+        ]
+      },
+      "notes": [
+        "Do not infer selection failure solely from non-zero exit + no assistant output (false positives).",
+        "If ResultError events are suppressed for safety, still use their typed/raw payload for classification, and surface a generic safe error for non-not-found failures."
+      ]
+    },
+    {
+      "id": "uaa-0019",
+      "title": "Beware: Claude stream-json result subtype drift when promoting versions",
+      "status": "todo",
+      "bucket": "agent_api.session",
+      "type": "task",
+      "kickoff": {
+        "prompt": [
+          "Work item: uaa-0019 — Beware: Claude stream-json result subtype drift when promoting versions.",
+          "Context: A newer local Claude CLI (e.g., 2.1.63) emitted `type:\"result\"` with a non-v1 `subtype` (e.g., \"error_during_execution\") for resume-by-id not-found. This does not parse as `ClaudeStreamJsonEvent::ResultError` under the current v1 parser contract (success/error only), which can break downstream selection-failure translation that relies on ResultError.raw classification.",
+          "Goal: when raising Claude Code coverage and/or promoting `cli_manifests/claude_code/latest_validated.txt`, validate stream-json result taxonomy against the candidate binary and update the parser contract + fixtures as needed before promotion.",
+          "Steps:",
+          "1) Run stream-json spot checks against the candidate `claude` binary (not whatever happens to be on PATH) for: resume id not-found, resume last empty, generic failure.",
+          "2) If result subtypes differ from v1 (success/error), update `crates/claude_code` stream-json parser + the normative parser specs/fixtures to accept the new subtype(s) (while keeping safety/redaction posture).",
+          "3) Re-validate `agent_api` selection-failure translation against the candidate binary once the parser emits typed ResultError events again.",
+          "Output: promotion-safe parser contract updates (specs + fixtures + code) that keep higher Claude versions from silently regressing session error translation."
+        ],
+        "files_to_read": [
+          "cli_manifests/claude_code/latest_validated.txt",
+          "cli_manifests/claude_code/OPS_PLAYBOOK.md",
+          "docs/specs/claude-stream-json-parser-contract.md",
+          "docs/specs/claude-stream-json-parser-scenarios-v1.md",
+          "crates/claude_code/src/stream_json.rs",
+          "crates/agent_api/src/backends/claude_code.rs"
+        ],
+        "deliverables": [
+          "Updated Claude stream-json parser contract/fixtures for new result subtype(s)",
+          "Evidence the candidate Claude version preserves typed ResultError emission for agent_api"
+        ]
+      },
+      "notes": [
+        "Avoid validating against an arbitrary local `claude` on PATH; use the binary under promotion and compare to cli_manifests pointers.",
+        "If new result subtypes appear, treat it as a promotion gate: update parser contract + fixtures before bumping latest_validated/min_supported."
+      ]
+    },
+    {
+      "id": "uaa-0020",
+      "title": "P2: Enforce 1024-byte handle id bound for Codex fork thread IDs",
+      "status": "todo",
+      "bucket": "agent_api.session",
+      "type": "task",
+      "kickoff": {
+        "prompt": [
+          "Work item: uaa-0020 — P2: Enforce 1024-byte handle id bound for Codex fork thread IDs.",
+          "Goal: ensure the Codex fork path treats oversize thread ids (>1024 bytes) as unknown (omit session handle facet; SHOULD warn) per the session handle facet contract.",
+          "Context: Codex exec/resume path enforces the bound before storing thread_id, but the fork path stores any non-empty id, allowing oversize ids to leak into handle facets via app-server notifications and completion data.",
+          "Steps:",
+          "1) Update `crates/agent_api/src/backends/codex/fork.rs` to enforce the 1024-byte bound before storing the forked thread id (and treat oversize as unknown).",
+          "2) Emit a safe `Status` warning once per run when an oversize id is observed (align with the exec/resume warning marker in `crates/agent_api/src/backends/codex.rs`).",
+          "3) Add regression tests by extending the fake codex app-server test binary to return an oversize forked thread id, and assert the handle facet is omitted in both events and completion (and warning emitted if implemented).",
+          "Output: consistent bound enforcement across Codex exec + fork paths; no contract violations."
+        ],
+        "files_to_read": [
+          "docs/specs/universal-agent-api/event-envelope-schema-spec.md",
+          "crates/agent_api/src/backends/codex.rs",
+          "crates/agent_api/src/backends/codex/fork.rs",
+          "crates/agent_api/src/bin/fake_codex_app_server_jsonrpc_agent_api.rs",
+          "crates/agent_api/tests/session_fork_v1_codex.rs"
+        ],
+        "deliverables": [
+          "Bound enforcement for forked thread ids (<=1024 bytes)",
+          "Regression tests for oversize forked thread ids"
+        ]
+      },
+      "notes": [
+        "Contract: ids over 1024 bytes must be treated as unknown (omit facet; MUST NOT truncate); SHOULD warn.",
+        "Keep behavior consistent across Codex exec/resume and Codex fork flows."
+      ]
+    },
+    {
+      "id": "uaa-0001",
+      "title": "Non-interactive execution policy",
+      "status": "done",
+      "bucket": "agent_api.exec",
+      "capability_id": "agent_api.exec.non_interactive",
+      "type": "extension_key",
+      "notes": [
+        "Intent: do not hang on interactive permission/approval prompts in headless automation.",
+        "Owned by docs/specs/universal-agent-api/extensions-spec.md."
+      ],
+      "backend_mapping": {
+        "claude_code": {
+          "cli": "claude --print --permission-mode bypassPermissions ...",
+          "impl": "crates/agent_api/src/backends/claude_code.rs maps to ClaudePrintRequest.permission_mode(\"bypassPermissions\")"
+        },
+        "codex": {
+          "cli": "codex exec --ask-for-approval never ...",
+          "impl": "crates/agent_api/src/backends/codex.rs forces ApprovalPolicy::Never when agent_api.exec.non_interactive=true"
+        }
+      }
+    },
+    {
+      "id": "uaa-0002",
+      "title": "Universal model selection",
+      "status": "todo",
+      "bucket": "agent_api.config",
+      "type": "extension_key",
+      "proposed_capability_id": "agent_api.config.model.v1",
+      "notes": [
+        "Expose model selection behind a core key shared by codex and claude_code.",
+        "Define schema/defaults in docs/specs/universal-agent-api/extensions-spec.md, then implement + gate in both backends."
+      ],
+      "backend_mapping": {
+        "claude_code": {
+          "cli": "claude --print --model <id> ...",
+          "impl_hint": "crates/claude_code: ClaudePrintRequest::model(...)"
+        },
+        "codex": {
+          "cli": "codex --model/-m <id> exec ...",
+          "impl_hint": "crates/codex: CodexClientBuilder::model(...)"
+        }
+      }
+    },
+    {
+      "id": "uaa-0003",
+      "title": "Universal add-dir / extra context roots",
+      "status": "todo",
+      "bucket": "agent_api.exec",
+      "type": "extension_key",
+      "proposed_capability_id": "agent_api.exec.add_dirs.v1",
+      "notes": [
+        "Provide a single cross-agent way to add extra context directories for tool access / indexing / file reads.",
+        "Value should be a bounded list of paths; decide absolute vs relative semantics in the core spec."
+      ],
+      "backend_mapping": {
+        "claude_code": {
+          "cli": "claude --print --add-dir <dir...> ...",
+          "impl_hint": "crates/claude_code: ClaudePrintRequest::add_dirs(...)"
+        },
+        "codex": {
+          "cli": "codex --add-dir <DIR> exec ... (repeatable)",
+          "impl_hint": "crates/codex: CodexClientBuilder::{add_dir,add_dirs}(...)"
+        }
+      }
+    },
+    {
+      "id": "uaa-0004",
+      "title": "Universal resume: selector=last",
+      "status": "done",
+      "bucket": "agent_api.session",
+      "type": "extension_key",
+      "proposed_capability_id": "agent_api.session.resume.v1",
+      "notes": [
+        "Resume the most recent session/thread in the working dir (backend-defined persistence store).",
+        "Keep agent_api.run prompt non-empty; this is 'resume + send follow-up prompt', not 'resume with no new prompt'."
+      ],
+      "backend_mapping": {
+        "claude_code": {
+          "cli": "claude --print --continue <PROMPT>",
+          "impl_hint": "crates/claude_code: ClaudePrintRequest::continue_session(true)"
+        },
+        "codex": {
+          "cli": "codex exec resume --last [-|PROMPT]",
+          "impl_hint": "crates/codex: CodexClient::stream_resume(ResumeRequest::last().prompt(...))"
+        }
+      }
+    },
+    {
+      "id": "uaa-0005",
+      "title": "Universal resume: selector=id",
+      "status": "done",
+      "bucket": "agent_api.session",
+      "type": "extension_key",
+      "proposed_capability_id": "agent_api.session.resume.v1",
+      "notes": [
+        "Resume a specific session/thread by identifier.",
+        "Claude uses UUID session ids; Codex accepts UUID or thread name (UUID wins if it parses)."
+      ],
+      "backend_mapping": {
+        "claude_code": {
+          "cli": "claude --print --resume <uuid> <PROMPT>",
+          "impl_hint": "crates/claude_code: ClaudePrintRequest::{resume_value,session_id}(...)"
+        },
+        "codex": {
+          "cli": "codex exec resume <SESSION_ID> [-|PROMPT]",
+          "impl_hint": "crates/codex: CodexClient::stream_resume(ResumeRequest::with_id(...).prompt(...))"
+        }
+      }
+    },
+    {
+      "id": "uaa-0006",
+      "title": "Universal MCP management commands",
+      "status": "todo",
+      "bucket": "agent_api.tools",
+      "type": "api_surface",
+      "notes": [
+        "Unify a minimal MCP management surface (add/get/list/remove) across backends.",
+        "May require a non-run API (not AgentWrapperRunRequest.extensions), since these are CLI subcommands."
+      ],
+      "backend_mapping": {
+        "claude_code": {
+          "cli": "claude mcp {add,get,list,remove}",
+          "notes": [
+            "Claude also has mcp add-json, add-from-claude-desktop, serve, reset-project-choices (backend-specific)."
+          ]
+        },
+        "codex": {
+          "cli": "codex mcp {add,get,list,remove,login,logout}",
+          "notes": [
+            "Codex add supports --url vs -- <COMMAND...>; Claude add uses <commandOrUrl> [args...] with different flag shapes."
+          ]
+        }
+      }
+    },
+    {
+      "id": "uaa-0007",
+      "title": "Universal fork session",
+      "status": "done",
+      "bucket": "agent_api.session",
+      "type": "extension_key",
+      "proposed_capability_id": "agent_api.session.fork.v1",
+      "notes": [
+        "Expose a cross-agent 'fork conversation' operation when both CLIs support it in headless mode.",
+        "Codex mapping MUST use a headless surface; prefer `codex app-server` JSON-RPC (`thread/fork` + `turn/start`) over any interactive/TUI `codex fork` flow."
+      ],
+      "backend_mapping": {
+        "claude_code": {
+          "cli": "claude --print --resume <uuid> --fork-session <PROMPT>",
+          "impl_hint": "crates/claude_code: ClaudePrintRequest::fork_session(true)"
+        },
+        "codex": {
+          "cli": "codex app-server --stdio (JSON-RPC): thread/list (optional) -> thread/fork -> turn/start",
+          "impl_hint": "crates/codex::mcp: launch app-server + call thread/fork + turn/start (or equivalent typed client)"
+        }
+      }
+    },
+    {
+      "id": "uaa-0008",
+      "title": "Obs: stable run_id emission",
+      "status": "todo",
+      "bucket": "agent_api.obs",
+      "type": "capability",
+      "proposed_capability_id": "agent_api.obs.run_id.v1",
+      "notes": [
+        "Expose a stable per-run id for correlation across events + completion.",
+        "Contract constraint: AgentWrapperEvent has no run_id field, so this must be expressed via AgentWrapperEvent.data (facet schema) and/or completion.data.",
+        "Decide whether run_id is always generated (recommended) vs only present when explicitly requested via an extension key."
+      ],
+      "backend_mapping": {
+        "claude_code": {
+          "notes": [
+            "No upstream CLI flag; wrapper/agent_api would generate and attach metadata."
+          ]
+        },
+        "codex": {
+          "notes": [
+            "No upstream CLI flag; wrapper/agent_api would generate and attach metadata."
+          ]
+        }
+      }
+    },
+    {
+      "id": "uaa-0009",
+      "title": "Obs: trace context propagation",
+      "status": "on_hold",
+      "bucket": "agent_api.obs",
+      "type": "extension_key",
+      "proposed_capability_id": "agent_api.obs.trace_context.v1",
+      "notes": [
+        "Allow callers to provide trace context that is attached to events and (when possible) propagated to the underlying backend process.",
+        "Define a concrete schema (e.g. {traceparent,tracestate,baggage} or a single opaque string) and explicit bounds in the core extensions spec."
+      ],
+      "backend_mapping": {
+        "claude_code": {
+          "notes": [
+            "Potential mapping: env var injection for subprocess + event facets (no known upstream flag)."
+          ]
+        },
+        "codex": {
+          "notes": [
+            "Potential mapping: env var injection for subprocess + event facets (no known upstream flag)."
+          ]
+        }
+      }
+    },
+    {
+      "id": "uaa-0010",
+      "title": "Obs: tags / key-value annotations",
+      "status": "on_hold",
+      "bucket": "agent_api.obs",
+      "type": "extension_key",
+      "proposed_capability_id": "agent_api.obs.tags.v1",
+      "notes": [
+        "Allow callers to attach bounded tags (e.g., workflow ids, customer ids, repo ids) to every event and completion.",
+        "Prefer a small bounded string map {k: v} with strict limits on count and bytes."
+      ],
+      "backend_mapping": {
+        "claude_code": {
+          "notes": [
+            "No upstream CLI flag; wrapper/agent_api would attach metadata; optional propagation via env."
+          ]
+        },
+        "codex": {
+          "notes": [
+            "No upstream CLI flag; wrapper/agent_api would attach metadata; optional propagation via env."
+          ]
+        }
+      }
+    },
+    {
+      "id": "uaa-0011",
+      "title": "Session: consolidate universal session controls",
+      "status": "done",
+      "bucket": "agent_api.session",
+      "type": "design",
+      "notes": [
+        "Introduce `agent_api.session.*` as a first-class bucket for conversation/thread semantics (orthogonal to execution policy).",
+        "Decision: keep separate core extension keys (`agent_api.session.resume.v1`, `agent_api.session.fork.v1`) rather than a single consolidated `agent_api.session.v1` object; see ADR-0015 and the canonical `extensions-spec.md` registry.",
+        "Bucket + tooling support for `agent_api.session.*` is tracked in uaa-0013 (now done)."
+      ],
+      "backend_mapping": {
+        "claude_code": {
+          "notes": [
+            "Session-related flags live on the headless --print surface: --continue, --resume, --session-id, --fork-session."
+          ]
+        },
+        "codex": {
+          "notes": [
+            "Session-related commands exist as non-interactive subcommands: codex exec resume, codex resume, codex fork."
+          ]
+        }
+      }
+    }
+  ]
+}

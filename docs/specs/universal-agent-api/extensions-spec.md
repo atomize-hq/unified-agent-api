@@ -33,6 +33,8 @@ Normative language: RFC 2119 requirement keywords (`MUST`, `MUST NOT`, `SHOULD`)
   - defaults and absence semantics,
   - validation rules and contradiction rules, and
   - mapping to any underlying CLI flags/config.
+- **Effective working directory**: the run’s resolved working directory, as defined in
+  `docs/specs/universal-agent-api/contract.md` ("Working directory resolution (effective working directory)").
 
 ## Global rules (normative)
 
@@ -49,6 +51,18 @@ For every run, backends MUST validate `request.extensions` before spawning any b
 
 This rule is the universal mechanism that makes extension onboarding scalable: extension keys are
 declared in capabilities and validated deterministically per backend.
+
+Extension validation precedence (normative):
+
+- When validating `request.extensions` (after prompt non-empty validation per
+  `run-protocol-spec.md`), the backend MUST apply the R0 key gate before extension value validation
+  or cross-key extension contradiction rules.
+- If any extension key in `request.extensions` is unsupported, the backend MUST fail the run with
+  `AgentWrapperError::UnsupportedCapability` (per R0) and MUST NOT attempt to return
+  `AgentWrapperError::InvalidRequest` for extension value validation or cross-key extension
+  contradiction rules for that request.
+- Cross-key extension contradiction rules (e.g., mutual exclusivity) apply only after all extension
+  keys in the request have passed R0 (i.e., are supported).
 
 ### R1 — Ownership (single source of truth)
 
@@ -86,7 +100,137 @@ Backend mapping requirements:
 - Each backend that advertises this capability MUST document its concrete mapping in its backend
   contract/spec docs (examples):
   - Codex: map to an explicit approval policy that never prompts.
-  - Claude Code: map to `--permission-mode bypassPermissions` (or equivalent).
+  - Claude Code: map to `--permission-mode bypassPermissions` (see
+    `docs/specs/claude-code-session-mapping-contract.md`).
+
+### `agent_api.session.resume.v1` (object)
+
+Owner: this spec (`extensions-spec.md`).
+
+Schema:
+- Type: object
+- Required keys:
+  - `selector` (string): `"last"` | `"id"`
+- Conditional keys:
+  - If `selector == "id"`, `id` (string) MUST be present and MUST be non-empty (after trimming).
+  - If `selector == "last"`, `id` MUST be absent.
+- Default when absent: no session resume behavior (backend starts a new session per its defaults).
+
+Meaning:
+- When present, the backend MUST resume the targeted prior session/thread and treat
+  `AgentWrapperRunRequest.prompt` as a follow-up prompt for that resumed session (i.e., this is
+  “resume + send prompt”, not “resume with no new prompt”).
+- `selector == "last"`:
+  - Resume the backend’s most recent session/thread in the run’s effective working directory
+    (see `contract.md`; backend-defined persistence store).
+- `selector == "id"`:
+  - Resume the session/thread identified by `id` (identifier format is backend-defined).
+
+Note:
+- Callers that need to discover a usable backend-defined session/thread id SHOULD observe the
+  session handle facet when capability id `agent_api.session.handle.v1` is advertised (see
+  `event-envelope-schema-spec.md`).
+- Callers that use `selector == "last"` SHOULD provide a stable `AgentWrapperRunRequest.working_dir`.
+  If `working_dir` is absent, `"last"` is scoped to the backend’s default effective working directory
+  (which may be ephemeral, e.g. a temp dir).
+
+Validation rules:
+- Value MUST be an object; otherwise the backend MUST fail before spawn with
+  `AgentWrapperError::InvalidRequest`.
+- The request MUST NOT also include `agent_api.session.fork.v1`; if both are present and both keys
+  are supported by the backend (per R0), the backend MUST fail before spawn with
+  `AgentWrapperError::InvalidRequest`.
+- Unknown object keys MUST cause `AgentWrapperError::InvalidRequest` (closed schema for `.v1`).
+
+Selection failure behavior (v1, normative):
+
+- If `selector == "last"` and no prior session/thread exists in the effective working directory,
+  the backend MUST fail the run (MUST NOT start a new session implicitly).
+- If `selector == "id"` and the id is unknown/unresumable, the backend MUST fail the run (MUST NOT
+  fall back to `"last"` or start a new session).
+- The failure MUST be surfaced as:
+  - `AgentWrapperError::Backend { message }`
+  - with `message` pinned as:
+    - `"no session found"` for `selector == "last"` (empty scope),
+    - `"session not found"` for `selector == "id"` (unknown/unresumable id).
+- The error `message` MUST be safe-by-default and MUST NOT embed raw backend output.
+- Translation guardrails:
+  - The pinned messages above MUST be used only when the backend indicates an actual “not found”
+    outcome for the requested selector.
+  - Backends MUST NOT infer selection failure solely from non-success exit status and/or absence of
+    assistant output.
+- Timing:
+  - Backends SHOULD validate selection before spawning any long-lived backend process when the
+    backend can check cheaply/deterministically (e.g., local store lookup).
+  - If a backend cannot determine selection failure pre-spawn, it MUST still translate the
+    backend’s “not found” outcome into the pinned `AgentWrapperError::Backend` message above and
+    MUST NOT surface backend-specific stderr content.
+- Event emission when an events stream exists:
+  - If selection failure occurs after the backend has already returned an `AgentWrapperRunHandle`,
+    the backend MUST emit exactly one terminal `AgentWrapperEventKind::Error` event with
+    `event.message == <pinned message>` before closing the consumer-visible stream.
+
+Backend mapping requirements:
+- Each backend that advertises this key MUST document its concrete mapping in its backend
+  contract/spec docs (examples):
+  - Codex: map to `codex exec --json resume --last -` / `codex exec --json resume <id> -` (prompt on
+    stdin; see `docs/specs/codex-wrapper-coverage-scenarios-v1.md`, Scenario 3).
+  - Claude Code: map per `docs/specs/claude-code-session-mapping-contract.md`.
+
+### `agent_api.session.fork.v1` (object)
+
+Owner: this spec (`extensions-spec.md`).
+
+Schema:
+- Type: object
+- Required keys:
+  - `selector` (string): `"last"` | `"id"`
+- Conditional keys:
+  - If `selector == "id"`, `id` (string) MUST be present and MUST be non-empty (after trimming).
+  - If `selector == "last"`, `id` MUST be absent.
+- Default when absent: no fork behavior (backend starts a new session per its defaults).
+
+Meaning:
+- When present, the backend MUST fork a new session/thread from the targeted prior session/thread
+  and treat `AgentWrapperRunRequest.prompt` as a follow-up prompt for the forked session.
+- `selector == "last"`:
+  - Fork from the backend’s most recent session/thread in the run’s effective working directory
+    (see `contract.md`; backend-defined persistence store).
+- `selector == "id"`:
+  - Fork from the session/thread identified by `id` (identifier format is backend-defined).
+
+Note:
+- Callers that need to discover a usable backend-defined session/thread id SHOULD observe the
+  session handle facet when capability id `agent_api.session.handle.v1` is advertised (see
+  `event-envelope-schema-spec.md`).
+- Callers that use `selector == "last"` SHOULD provide a stable `AgentWrapperRunRequest.working_dir`.
+  If `working_dir` is absent, `"last"` is scoped to the backend’s default effective working directory
+  (which may be ephemeral, e.g. a temp dir).
+
+Validation rules:
+- Value MUST be an object; otherwise the backend MUST fail before spawn with
+  `AgentWrapperError::InvalidRequest`.
+- The request MUST NOT also include `agent_api.session.resume.v1`; if both are present and both keys
+  are supported by the backend (per R0), the backend MUST fail before spawn with
+  `AgentWrapperError::InvalidRequest`.
+- Unknown object keys MUST cause `AgentWrapperError::InvalidRequest` (closed schema for `.v1`).
+
+Selection failure behavior (v1, normative):
+
+The fork key MUST follow the same selection-failure behavior as `agent_api.session.resume.v1`
+(including pinned `AgentWrapperError::Backend` messages and the terminal `Error` event emission rule
+when a stream exists).
+
+Backend mapping requirements:
+- Each backend that advertises this key MUST document its concrete mapping in its backend
+  contract/spec docs (examples):
+  - Codex: map to the `codex app-server` JSON-RPC surface:
+    - resolve the fork source thread (for `selector == "last"`, via `thread/list` filtered by the
+      effective working directory; see `contract.md`),
+    - fork via `thread/fork`, and
+    - send the follow-up prompt via `turn/start` on the forked thread.
+  - Claude Code: map to `--fork-session` together with `--continue` / `--resume <id>` (see
+    `docs/specs/claude-code-session-mapping-contract.md`).
 
 ## Adding new extension keys (process rules)
 

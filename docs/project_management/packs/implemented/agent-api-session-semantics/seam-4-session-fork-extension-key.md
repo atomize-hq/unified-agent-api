@@ -1,0 +1,95 @@
+# SEAM-4 — Session fork extension key (`agent_api.session.fork.v1`) (uaa-0007)
+
+- **Name**: Universal fork semantics (“fork from last or by id”) via `AgentWrapperRunRequest.extensions`
+- **Type**: risk (capability seam with a high-risk Codex mapping)
+- **Goal / user value**: Allow callers to fork a new session/thread from an existing one in a backend-neutral way, enabling workflows like “branch the conversation and explore a new approach” while keeping a deterministic headless orchestration surface.
+- **Scope**
+  - In:
+    - Implement `agent_api.session.fork.v1` for built-in backends that can support it:
+      - Add to `supported_extension_keys()` allowlist (fail-closed gate).
+      - Add to `AgentWrapperCapabilities.ids` (runtime discovery).
+      - Validate the JSON value per `docs/specs/universal-agent-api/extensions-spec.md` (closed schema) and reject contradictory presence of `agent_api.session.resume.v1` as `InvalidRequest` when both keys are supported.
+    - Backend mappings (pinned intent):
+      - Claude Code:
+        - Canonical mapping owner: `docs/specs/claude-code-session-mapping-contract.md`.
+        - selector `"last"` → `claude --print --output-format stream-json --continue --fork-session <PROMPT>`
+        - selector `"id"` → `claude --print --output-format stream-json --fork-session --resume <ID> <PROMPT>`
+        - Note: `crates/claude_code` also injects `--verbose` when `--output-format stream-json` is used (upstream requirement).
+      - Codex (ADR-0015 recommended headless surface):
+        - Implement via `codex app-server` stdio JSON-RPC per `docs/specs/codex-app-server-jsonrpc-contract.md`:
+          - selector `"last"`:
+            - MUST resolve the fork source thread via `thread/list` filtered by the **effective working directory** (per `docs/specs/universal-agent-api/contract.md`) using the pinned selection algorithm in the app-server contract.
+          - selector `"id"`:
+            - MUST treat the selector `id` as the source thread id (after trimming for validation per `extensions-spec.md`).
+          - MUST fork via `thread/fork` and MUST send the follow-up prompt via `turn/start` on the forked thread using the pinned request shapes in the app-server contract.
+        - Do not rely on `codex fork` if it is interactive/TUI or cannot provide safe bounded streaming semantics.
+    - Add tests:
+      - Claude: argv mapping + validation failures (fake-binary).
+      - Codex:
+        - protocol-level tests for app-server request/response flows (fake JSON-RPC server):
+          - `thread/list` paging + deterministic “last” selection,
+          - `thread/fork` response parsing (`result.thread.id`),
+          - `turn/start` prompt mapping, and
+          - `$/cancelRequest` cancellation behavior.
+        - `agent_api` integration tests proving:
+          - bounded notification → `AgentWrapperEvent` mapping (no raw backend payloads in `data`),
+          - pinned cancellation precedence (`run-protocol-spec.md`),
+          - pinned selection-failure behavior (`extensions-spec.md`), and
+          - non-interactive safety (no approval-request hangs).
+      - extension-validation precedence during staged rollout (per `docs/specs/universal-agent-api/extensions-spec.md` R0):
+        - only fork supported + both keys present → `UnsupportedCapability` (unsupported resume key),
+        - both supported + both present → `InvalidRequest` (mutual exclusivity).
+      - selector/id validation includes whitespace-only ids:
+        - `selector == "id"` with `id = "   "` MUST fail pre-spawn as `InvalidRequest` (trim-to-empty).
+  - Out:
+    - A universal session listing API (any listing used for selector `"last"` remains backend-owned implementation detail).
+    - Guaranteeing the same fork semantics or id formats across backends beyond the spec’s “opaque id” posture.
+- **Primary interfaces (contracts)**
+  - Inputs:
+    - `AgentWrapperRunRequest.extensions["agent_api.session.fork.v1"]` (object value)
+    - Backend-specific fork capabilities (Codex app-server, Claude flags)
+  - Outputs:
+    - A forked session/thread is created and the universal prompt is executed as the first follow-up message.
+    - Capability advertisement (extension key string present in `AgentWrapperCapabilities.ids`).
+- **Key invariants / rules**:
+  - Must be headless and deterministic for orchestrators (no interactive prompts; `agent_api.exec.non_interactive` applies to session flows; see below).
+  - Must keep Universal Agent API safety posture: bounded/redacted events; no raw backend line embedding in `data`.
+  - Mutual exclusivity with resume is enforced pre-spawn when both keys are supported.
+  - Non-interactive policy application is pinned per backend (default is `true` when the key is absent):
+    - Claude Code: when `agent_api.exec.non_interactive == true`, the fork path MUST include `--permission-mode bypassPermissions` (see `docs/specs/claude-code-session-mapping-contract.md`) so the process cannot hang on permission prompts.
+    - Codex app-server: when `agent_api.exec.non_interactive == true`, the fork path MUST set `approvalPolicy = "never"` on both `thread/fork` and `turn/start` requests (per `docs/specs/codex-app-server-jsonrpc-contract.md`) and MUST fail fast (safe backend error) if the server attempts an approval-request roundtrip instead of hanging.
+- **Dependencies**
+  - Blocks:
+    - None.
+  - Blocked by:
+    - Codex contract-definition + wrappers: use `docs/specs/codex-app-server-jsonrpc-contract.md` as the pinned wire contract, then implement/extend typed wrappers in `crates/codex` for the required methods (`thread/list`, `thread/fork`, `turn/start`) and cancellation (`$/cancelRequest`).
+    - (Recommended) Implementing resume first for a backend so mutual-exclusivity errors can be pinned as `InvalidRequest` rather than “unsupported key” ordering artifacts.
+- **Touch surface**:
+  - `crates/agent_api/src/backends/claude_code.rs`
+  - `crates/agent_api/src/backends/codex.rs` (new fork path; isolate adapter logic in a dedicated module to minimize churn)
+  - Codex app-server client/protocol:
+    - `crates/codex/src/mcp/protocol.rs`
+    - `crates/codex/src/mcp/client.rs`
+    - `crates/codex/src/mcp/tests_core/**` (protocol flow tests)
+  - `crates/agent_api/tests/**` (new fork semantics tests)
+- **Verification**:
+  - For each backend that advertises `agent_api.session.fork.v1`:
+    - selector `"last"` and `"id"` both create a forked session and execute the prompt,
+    - invalid schemas fail before spawn with `InvalidRequest`,
+    - mutual exclusivity is enforced when both session keys are supported.
+    - staged-rollout precedence is pinned (per `extensions-spec.md` R0):
+      - only fork supported + both keys present → `UnsupportedCapability`,
+      - both supported + both present → `InvalidRequest`.
+- **Risks / unknowns**
+  - Risk: Codex app-server protocol drift or missing fork/list methods in the wrapper.
+  - De-risk plan: treat Codex fork as “contract-first”:
+    - add typed protocol wrappers + tests in `crates/codex` first,
+    - then integrate into `agent_api` with bounded mapping and cancellation/termination wiring.
+- **Rollout / safety**:
+  - Stage by backend:
+    - Claude fork can ship earlier once Claude mapping + tests land.
+    - Codex fork ships once app-server protocol + bounded mapping + tests exist.
+
+## Downstream decomposition prompt
+
+Decompose into: (1) shared parser for the fork selector object (closed schema), (2) Claude fork mapping + tests, (3) Codex app-server contract-definition + typed client support, (4) Codex `agent_api` integration + bounded event mapping + tests, (5) capability advertisement gating.

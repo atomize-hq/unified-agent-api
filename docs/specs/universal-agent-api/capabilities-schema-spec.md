@@ -17,6 +17,7 @@ This document is normative and uses RFC 2119 keywords (MUST/SHOULD/MUST NOT).
 - be stable identifiers, not display names
 
 Reserved ids (v1):
+
 - `codex`
 - `claude_code`
 
@@ -43,11 +44,11 @@ Bucket prefixes (v1 rubric):
 
 - `agent_api.events.*` — event stream shape/fidelity (live, delta fidelity, etc.)
 - `agent_api.exec.*` — execution policy (non-interactive, approval/sandbox bridging, etc.)
+- `agent_api.session.*` — conversation/thread semantics (resume/fork, session handles, etc.; orthogonal to execution policy)
 - `agent_api.tools.*` — tool visibility/fidelity (calls vs results vs structured metadata)
 - `agent_api.artifacts.*` — file/patch/change summaries (bounded, safe artifacts)
 - `agent_api.control.*` — cancel/pause semantics and best-effort levels
 - `agent_api.config.*` — cross-agent config knobs (only when truly universal)
-- `agent_api.obs.*` — observability hooks (run ids, trace hooks, etc.)
 - `backend.<agent_kind>.*` — everything agent-specific or not yet universal
 
 Notes:
@@ -65,10 +66,12 @@ Notes:
 ## Capability matrix (generated artifact)
 
 The repository capability matrix is a generated artifact:
+
 - Location: `docs/specs/universal-agent-api/capability-matrix.md`
 - Generator: `cargo run -p xtask -- capability-matrix`
 
 Semantics (pinned):
+
 - The matrix lists only capability ids advertised by at least one built-in backend at generation time (it is a union of
   `AgentWrapperBackend::capabilities().ids` across built-in backends).
 - The matrix is **not** an exhaustive registry of standard `agent_api.*` capability ids.
@@ -113,6 +116,13 @@ This section defines stable universal capability ids and their minimum semantics
   - The backend can deterministically populate `AgentWrapperCompletion.final_text` when full
     assistant message text blocks are observed in the supported flow; `final_text=None` is valid
     otherwise.
+- `agent_api.session.handle.v1`:
+  - When a backend advertises this capability, it MUST surface the current run’s backend-defined
+    session/thread identifier as a bounded JSON facet in:
+    - exactly one early `AgentWrapperEventKind::Status` event `data` payload, and
+    - `AgentWrapperCompletion.data` whenever a completion is produced and the id is known,
+    per `event-envelope-schema-spec.md` ("Session handle facet (handle.v1)").
+  - A backend that does not implement this MUST NOT advertise the capability.
 
 ## Extension keys (v1, normative)
 

@@ -21,7 +21,10 @@ If the wrapper adds a new public API that spawns `codex`, this catalog MUST be u
 
 - **Command path** is shown as tokens, e.g. `["features","list"]`.
 - **Flag key** is the canonical string emitted in argv, e.g. `--profile`.
-- **Arg name** is the upstream help-derived positional name, e.g. `PROMPT`. The generator MUST emit positional args only for arg names listed in this catalog.
+- **Arg name** is the upstream help-derived name of a required *input unit*, e.g. `PROMPT`.
+  - For some command paths, the wrapper supplies `PROMPT` via **stdin** instead of argv; this
+    catalog pins the exact argv/stdin plumbing per scenario below.
+  - The generator MUST emit arg names only for the arg names listed in this catalog.
 - Global override flags are recorded on the `path=[]` entry and reflect wrapper support for upstream-global surfaces.
 
 ## Exactness (v1, normative)
@@ -83,7 +86,13 @@ Wrapper API family:
 ### Required positional args
 
 - Arg: `PROMPT` (level: `explicit`)  
-  The wrapper requires a prompt string and forwards it either as a positional argument or via stdin depending on JSON mode; v1 claims parity for the `PROMPT` unit.
+  The wrapper requires a non-empty prompt string. Prompt forwarding is pinned as:
+  - Non-JSON `exec` (`CodexClientBuilder::json(false)` / default): the wrapper MUST pass `PROMPT` as the
+    final positional argv token.
+  - JSON `exec` (`codex exec --json ...`): the wrapper MUST NOT pass `PROMPT` as an argv token; it
+    MUST write `PROMPT` to stdin, append exactly one `\n`, and then close stdin.
+  - Tests MUST assert the pinned *argv subsequence* for the chosen mode (not full argv equality),
+    because additional wrapper-default flags may be present (see Scenarios 0–2).
 
 ## Scenario 2: `codex exec --json` (streaming)
 
@@ -105,6 +114,9 @@ Wrapper API family:
 ### Required positional args
 
 - Arg: `PROMPT` (level: `explicit`)
+  - In JSON streaming mode, the wrapper MUST provide `PROMPT` via stdin (newline-terminated) and
+    MUST close stdin after writing.
+  - Tests MUST NOT require that `PROMPT` appear in argv for `--json` streaming invocations.
 
 ## Scenario 3: `codex exec --json resume` (streaming resume)
 
@@ -129,7 +141,14 @@ Notes:
 ### Required positional args
 
 - Arg: `PROMPT` (level: `explicit`)  
-  This positional arg is represented in wrapper request types and is forwarded when present.
+  For streaming resume, the follow-up prompt is stdin-based:
+  - If `PROMPT` is present, the wrapper MUST append a trailing `-` argv token and MUST write `PROMPT`
+    to stdin, append exactly one `\n`, and then close stdin.
+  - If `PROMPT` is absent, the wrapper MUST NOT append `-` and MUST NOT write to stdin.
+  - Tests MUST assert the pinned resume argv subsequence (e.g. `exec --json resume --last -`) but
+    MUST NOT treat it as the complete argv: wrapper-default flags (e.g. `--color <MODE>`,
+    `--skip-git-repo-check`, `--output-last-message <PATH>`, and capability-guarded flags like
+    `--output-schema <PATH>`) may be present per Scenarios 0–2.
 - Arg: `SESSION_ID` (level: `explicit`)  
   Emitted only for `ResumeSelector::Id(...)`.
 

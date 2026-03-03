@@ -121,6 +121,11 @@ provides an explicit cancellation signal that is orthogonal to drop semantics.
 
 Rules (v1, normative):
 
+- Pre-spawn validation (prompt):
+  - Backends MUST validate `AgentWrapperRunRequest.prompt` is non-empty (after trimming) before
+    spawning any backend process.
+  - If the prompt is empty, the backend MUST fail the run with `AgentWrapperError::InvalidRequest`.
+
 - Pre-spawn validation (capabilities):
   - Backends MUST validate required capability ids for the requested operation before spawning any backend process.
   - If validation fails, the operation MUST return the appropriate `AgentWrapperError` and MUST NOT spawn any backend
