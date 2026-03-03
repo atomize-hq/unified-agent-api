@@ -23,7 +23,7 @@ use super::{
     mapping::{error_event, status_event},
     CodexApprovalPolicy, CodexBackendCompletion, CodexBackendConfig, CodexBackendError,
     CodexBackendEvent, CodexHandleFacetState, CodexSandboxMode, CodexTerminationHandle,
-    PINNED_APPROVAL_REQUIRED,
+    PINNED_APPROVAL_REQUIRED, PINNED_TIMEOUT,
 };
 
 use super::super::{
@@ -36,6 +36,7 @@ pub(super) struct ForkFlowRequest {
     pub(super) selector: SessionSelectorV1,
     pub(super) prompt: String,
     pub(super) working_dir: Option<PathBuf>,
+    pub(super) effective_timeout: Option<Duration>,
     pub(super) env: BTreeMap<String, String>,
     pub(super) config: CodexBackendConfig,
     pub(super) run_start_cwd: Option<PathBuf>,
@@ -278,6 +279,7 @@ pub(super) async fn spawn_fork_v1_flow(
         selector,
         prompt,
         working_dir,
+        effective_timeout,
         env,
         config,
         run_start_cwd,
@@ -287,6 +289,11 @@ pub(super) async fn spawn_fork_v1_flow(
         sandbox_mode,
         handle_state,
     } = req;
+
+    let timeout_for_turn: Option<Duration> = match effective_timeout {
+        Some(timeout) if timeout == Duration::ZERO => None,
+        other => other,
+    };
 
     let effective_cwd = working_dir
         .or_else(|| config.default_working_dir.clone())
@@ -371,6 +378,7 @@ pub(super) async fn spawn_fork_v1_flow(
     }
 
     let approval_required = Arc::new(AtomicBool::new(false));
+    let stop_forwarding = Arc::new(AtomicBool::new(false));
     let (approval_signal_tx, mut approval_signal_rx) = oneshot::channel::<()>();
 
     let (event_tx, event_rx) = mpsc::unbounded_channel::<CodexBackendEvent>();
@@ -385,6 +393,7 @@ pub(super) async fn spawn_fork_v1_flow(
 
     let event_tx_for_notifications = event_tx.clone();
     let approval_required_for_notifications = Arc::clone(&approval_required);
+    let stop_forwarding_for_notifications = Arc::clone(&stop_forwarding);
 
     tokio::spawn(async move {
         let mut approval_signal_tx = Some(approval_signal_tx);
@@ -401,6 +410,10 @@ pub(super) async fn spawn_fork_v1_flow(
                 }
             }
 
+            if stop_forwarding_for_notifications.load(Ordering::SeqCst) {
+                return;
+            }
+
             let _ = event_tx_for_notifications
                 .send(CodexBackendEvent::AppServerNotification(notification));
         }
@@ -409,44 +422,100 @@ pub(super) async fn spawn_fork_v1_flow(
     tokio::spawn({
         let server = Arc::clone(&server);
         let approval_required = Arc::clone(&approval_required);
+        let stop_forwarding = Arc::clone(&stop_forwarding);
         async move {
             let mut cancel_sent = false;
             tokio::pin!(turn_response);
 
-            loop {
-                tokio::select! {
-                    biased;
-                    _ = &mut approval_signal_rx, if !cancel_sent => {
-                        cancel_sent = true;
-                        if approval_required.load(Ordering::SeqCst) {
-                            let _ = server.cancel(turn_request_id);
+            match timeout_for_turn {
+                None => loop {
+                    tokio::select! {
+                        biased;
+                        _ = &mut approval_signal_rx, if !cancel_sent => {
+                            cancel_sent = true;
+                            if approval_required.load(Ordering::SeqCst) {
+                                let _ = server.cancel(turn_request_id);
+                            }
                         }
-                    }
-                    response_outcome = &mut turn_response => {
-                        let response_outcome = match response_outcome {
-                            Ok(outcome) => outcome,
-                            Err(_) => Err(codex::mcp::McpError::ChannelClosed),
-                        };
+                        response_outcome = &mut turn_response => {
+                            let response_outcome = match response_outcome {
+                                Ok(outcome) => outcome,
+                                Err(_) => Err(codex::mcp::McpError::ChannelClosed),
+                            };
 
-                        let mut selection_failure_message = None;
-                        if approval_required.load(Ordering::SeqCst) {
-                            selection_failure_message = Some(PINNED_APPROVAL_REQUIRED.to_string());
-                            let _ = event_tx.send(CodexBackendEvent::TerminalError {
-                                message: PINNED_APPROVAL_REQUIRED.to_string(),
-                            });
-                        } else if let Err(err) = response_outcome {
-                            let _ = completion_tx.send(Err(CodexBackendError::AppServer(err)));
+                            let mut selection_failure_message = None;
+                            if approval_required.load(Ordering::SeqCst) {
+                                stop_forwarding.store(true, Ordering::SeqCst);
+                                selection_failure_message = Some(PINNED_APPROVAL_REQUIRED.to_string());
+                                let _ = event_tx.send(CodexBackendEvent::TerminalError {
+                                    message: PINNED_APPROVAL_REQUIRED.to_string(),
+                                });
+                            } else if let Err(err) = response_outcome {
+                                let _ = completion_tx.send(Err(CodexBackendError::AppServer(err)));
+                                let _ = server.shutdown().await;
+                                return;
+                            }
+
                             let _ = server.shutdown().await;
+                            let _ = completion_tx.send(Ok(CodexBackendCompletion {
+                                status: synthetic_success_exit_status(),
+                                final_text: None,
+                                selection_failure_message,
+                            }));
                             return;
                         }
+                    }
+                },
+                Some(timeout) => {
+                    let deadline = tokio::time::sleep(timeout);
+                    tokio::pin!(deadline);
 
-                        let _ = server.shutdown().await;
-                        let _ = completion_tx.send(Ok(CodexBackendCompletion {
-                            status: synthetic_success_exit_status(),
-                            final_text: None,
-                            selection_failure_message,
-                        }));
-                        return;
+                    loop {
+                        tokio::select! {
+                            biased;
+                            _ = &mut approval_signal_rx, if !cancel_sent => {
+                                cancel_sent = true;
+                                if approval_required.load(Ordering::SeqCst) {
+                                    let _ = server.cancel(turn_request_id);
+                                }
+                            }
+                            _ = &mut deadline => {
+                                stop_forwarding.store(true, Ordering::SeqCst);
+                                let _ = event_tx.send(CodexBackendEvent::TerminalError {
+                                    message: PINNED_TIMEOUT.to_string(),
+                                });
+                                let _ = server.cancel(turn_request_id);
+                                let _ = server.shutdown().await;
+                                let _ = completion_tx.send(Err(CodexBackendError::Timeout { timeout }));
+                                return;
+                            }
+                            response_outcome = &mut turn_response => {
+                                let response_outcome = match response_outcome {
+                                    Ok(outcome) => outcome,
+                                    Err(_) => Err(codex::mcp::McpError::ChannelClosed),
+                                };
+
+                                let mut selection_failure_message = None;
+                                if approval_required.load(Ordering::SeqCst) {
+                                    selection_failure_message = Some(PINNED_APPROVAL_REQUIRED.to_string());
+                                    let _ = event_tx.send(CodexBackendEvent::TerminalError {
+                                        message: PINNED_APPROVAL_REQUIRED.to_string(),
+                                    });
+                                } else if let Err(err) = response_outcome {
+                                    let _ = completion_tx.send(Err(CodexBackendError::AppServer(err)));
+                                    let _ = server.shutdown().await;
+                                    return;
+                                }
+
+                                let _ = server.shutdown().await;
+                                let _ = completion_tx.send(Ok(CodexBackendCompletion {
+                                    status: synthetic_success_exit_status(),
+                                    final_text: None,
+                                    selection_failure_message,
+                                }));
+                                return;
+                            }
+                        }
                     }
                 }
             }

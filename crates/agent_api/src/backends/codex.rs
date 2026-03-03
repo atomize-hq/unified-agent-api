@@ -56,6 +56,7 @@ const EXT_CODEX_APPROVAL_POLICY: &str = "backend.codex.exec.approval_policy";
 const EXT_CODEX_SANDBOX_MODE: &str = "backend.codex.exec.sandbox_mode";
 
 const PINNED_APPROVAL_REQUIRED: &str = "approval required";
+const PINNED_TIMEOUT: &str = "codex backend error: timeout (details redacted when unsafe)";
 const PINNED_NO_SESSION_FOUND: &str = "no session found";
 const PINNED_SESSION_NOT_FOUND: &str = "session not found";
 
@@ -337,6 +338,7 @@ struct CodexBackendCompletion {
 enum CodexBackendError {
     Exec(ExecStreamError),
     AppServer(codex::mcp::McpError),
+    Timeout { timeout: Duration },
     ForkSelectionEmpty,
     ForkSessionNotFound,
     CompletionTaskDropped,
@@ -434,6 +436,7 @@ impl BackendHarnessAdapter for CodexHarnessAdapter {
                     selector,
                     prompt,
                     working_dir,
+                    effective_timeout,
                     env,
                     config,
                     run_start_cwd,
@@ -561,10 +564,11 @@ impl BackendHarnessAdapter for CodexHarnessAdapter {
                     }
                 }
 
-                let emit_oversize_warning_len: Option<usize> =
-                    self.handle_state.lock().ok().and_then(|mut state| {
-                        state.oversize_warning_len_bytes.take()
-                    });
+                let emit_oversize_warning_len: Option<usize> = self
+                    .handle_state
+                    .lock()
+                    .ok()
+                    .and_then(|mut state| state.oversize_warning_len_bytes.take());
 
                 if let Some(len) = emit_oversize_warning_len {
                     mapped.push(mapping::status_event(Some(format!(
@@ -644,6 +648,7 @@ impl BackendHarnessAdapter for CodexHarnessAdapter {
                 "codex app-server handshake failed".to_string()
             }
             CodexBackendError::AppServer(_) => "codex app-server rpc error".to_string(),
+            CodexBackendError::Timeout { timeout: _timeout } => PINNED_TIMEOUT.to_string(),
             CodexBackendError::ForkSelectionEmpty => PINNED_NO_SESSION_FOUND.to_string(),
             CodexBackendError::ForkSessionNotFound => PINNED_SESSION_NOT_FOUND.to_string(),
             CodexBackendError::CompletionTaskDropped => "codex completion task dropped".to_string(),

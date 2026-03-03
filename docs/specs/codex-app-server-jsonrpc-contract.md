@@ -258,6 +258,38 @@ Universal cancellation semantics (event + completion precedence) are owned by
 `docs/specs/universal-agent-api/run-protocol-spec.md` and MUST be enforced by `agent_api` when
 exposing `run_control`.
 
+## Timeout enforcement (pinned)
+
+Codex fork flows (`agent_api.session.fork.v1`) MUST enforce the Universal Agent API timeout budget
+for the in-flight `turn/start` request.
+
+Timeout input (pinned):
+- The effective timeout is defined by `docs/specs/universal-agent-api/contract.md`:
+  - if `AgentWrapperRunRequest.timeout` is present, it applies,
+  - otherwise the backend default timeout applies.
+- `Some(Duration::ZERO)` is an explicit “no timeout” request and MUST disable timeout enforcement.
+
+Countdown semantics (pinned):
+- When a non-zero effective timeout is configured, the timeout countdown MUST start no later than
+  the moment the backend returns a consumer-visible run handle.
+- Timeout enforcement MUST NOT depend on the consumer polling/awaiting `completion`.
+
+Timeout handling (pinned):
+- If the timeout triggers while a `turn/start` request with JSON-RPC id `N` is in-flight, the
+  client MUST send `$/cancelRequest` for id `N`:
+
+```json
+{ "jsonrpc": "2.0", "method": "$/cancelRequest", "params": { "id": N } }
+```
+
+Pinned translation into Universal Agent API failure:
+- Safe error message (pinned): `"codex backend error: timeout (details redacted when unsafe)"`
+- Event/completion ordering (pinned):
+  1) If the consumer-visible events stream exists and is still open, emit exactly one terminal
+     `AgentWrapperEventKind::Error` event with `event.message == <pinned message>` (bounded).
+  2) Close the events stream.
+  3) Resolve `completion` with `Err(AgentWrapperError::Backend { message: <pinned message> })`.
+
 ## Graceful shutdown (pinned)
 
 - The app-server protocol does not expose a `shutdown` request in the generated schema.

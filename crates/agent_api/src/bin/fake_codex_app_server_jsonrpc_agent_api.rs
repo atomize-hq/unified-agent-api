@@ -266,11 +266,7 @@ fn main() -> io::Result<()> {
                     _ => "forked-1".to_string(),
                 };
                 forked_thread_id = Some(new_thread_id.clone());
-                write_result(
-                    &mut out,
-                    &id,
-                    json!({"thread": {"id": new_thread_id}}),
-                )?;
+                write_result(&mut out, &id, json!({"thread": {"id": new_thread_id}}))?;
             }
             "turn/start" => {
                 let expected_prompt = expect_prompt
