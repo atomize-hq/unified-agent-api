@@ -19,7 +19,7 @@
       `codex::CodexClientBuilder::dangerously_bypass_approvals_and_sandbox(true)`.
     - Codex fork flow (app-server JSON-RPC): set:
       - `thread/fork`: `approvalPolicy="never"` + `sandbox="danger-full-access"`
-      - `turn/start`: `approvalPolicy="never"`
+      - `turn/start`: `approvalPolicy="never"` (no `sandbox` param; sandbox override applies via `thread/fork`)
       (no spawn+retry loop).
   - Ensure mapping applies consistently across every Codex run entrypoint:
     - exec (`spawn_exec_or_resume_flow` with `resume=None`)
@@ -46,8 +46,8 @@
 - Equivalent mapping definition (pinned; used by tests):
   - Exec/resume: argv MUST contain exactly one `--dangerously-bypass-approvals-and-sandbox`, and
     MUST NOT contain any of: `--full-auto`, `--ask-for-approval`, `--sandbox`.
-  - Fork (app-server): `approvalPolicy` MUST resolve to `"never"` for the fork + turn-start
-    surfaces, and `sandbox` MUST resolve to `"danger-full-access"` for the fork surface.
+  - Fork (app-server): `thread/fork` MUST set `approvalPolicy="never"` + `sandbox="danger-full-access"`;
+    `turn/start` MUST set `approvalPolicy="never"` (no `sandbox` param).
 - Unavailable mapping primitive behavior (pinned):
   - The backend MUST NOT attempt a fallback mapping (no spawn then retry with different flags).
   - If the installed Codex binary rejects the pinned flag or the app-server rejects the pinned
@@ -79,8 +79,8 @@
     - argv includes `--dangerously-bypass-approvals-and-sandbox`
     - argv excludes `--full-auto`, `--ask-for-approval`, `--sandbox`
   - fork mapping:
-    - app-server RPC uses `approvalPolicy="never"` and `sandbox="danger-full-access"` (per
-      `docs/specs/codex-external-sandbox-mapping-contract.md`).
+    - `thread/fork` uses `approvalPolicy="never"` + `sandbox="danger-full-access"`, and `turn/start`
+      uses `approvalPolicy="never"` (per `docs/specs/codex-external-sandbox-mapping-contract.md`).
 
 ## Risks / unknowns
 

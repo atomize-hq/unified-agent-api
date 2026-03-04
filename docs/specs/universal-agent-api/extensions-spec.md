@@ -138,8 +138,17 @@ Observability / audit signal (v1, pinned):
   - `channel="status"`
   - `message="DANGEROUS: external sandbox exec policy enabled (agent_api.exec.external_sandbox.v1=true)"`
   - `data=None`
-- Emission timing: the warning MUST be emitted before any `TextOutput` / `ToolCall` / `ToolResult`
-  events for that run.
+- Emission ordering (pinned):
+  - The warning MUST be emitted before any `TextOutput` / `ToolCall` / `ToolResult` events for that
+    run.
+  - If the backend also advertises `agent_api.session.handle.v1`, the warning MUST be emitted
+    before the session handle facet `Status` event.
+  - The backend MUST preserve this ordering even if it buffers events for post-hoc emission (i.e.,
+    the warning must still appear earlier in the consumer-visible stream).
+- Non-emission cases (pinned):
+  - If the key is absent or `false`, the backend MUST NOT emit this warning.
+  - If the key is present but unsupported (fails R0) or invalid/contradictory (fails validation),
+    the backend MUST NOT emit this warning.
 
 Backend mapping requirements:
 - Backends that advertise this key MUST:
