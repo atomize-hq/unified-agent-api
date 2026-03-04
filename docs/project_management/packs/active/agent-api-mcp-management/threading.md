@@ -80,11 +80,11 @@ This section makes coupling explicit: contracts/interfaces, dependency edges, an
   - **Consumers**: SEAM-5
   - **Definition**: map universal operations to `claude mcp ...` (see `cli_manifests/claude_code/current.json`):
     - `list` → `claude mcp list`
-    - `get` → `claude mcp get <name>`
-    - `add`:
-      - `Stdio` → `claude mcp add <name> <command> [args...]` (+ server env mapping where supported)
-      - `Url` → `claude mcp add <name> <url>` (+ auth/header mapping pinned in SEAM-4)
-    - `remove` → `claude mcp remove <name>`
+    - `get/add/remove` are **win32-x64 only** in the pinned Claude Code CLI manifest snapshot.
+      - On unsupported targets, the Claude backend MUST NOT advertise `agent_api.tools.mcp.{get,add,remove}.v1` and MUST
+        fail-closed with `UnsupportedCapability` when invoked.
+      - `add/remove` are additionally gated by write enablement (SEAM-2).
+      - Argv shape + flag mapping (transport/env/header/scope) is pinned in SEAM-4 (single source of truth).
 
 ## Dependency graph (text)
 

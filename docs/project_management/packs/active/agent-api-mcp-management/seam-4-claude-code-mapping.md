@@ -12,11 +12,11 @@
 - Implement `AgentWrapperBackend::{mcp_list,mcp_get,mcp_add,mcp_remove}` for the Claude Code backend.
 - Map universal requests to Claude CLI semantics (pinned by CLI manifest snapshot):
   - `list` → `claude mcp list`
-  - `get` → `claude mcp get <name>`
-  - `remove` → `claude mcp remove <name>`
-  - `add`:
-    - `Stdio` → `claude mcp add --transport stdio [--env KEY=value]* <name> <command> [args...]`
-    - `Url` → `claude mcp add --transport http [--header ...]* <name> <url>` (auth/header mapping pinned below)
+  - `get` → `claude mcp get <name>` (**win32-x64 only** in the pinned Claude Code CLI manifest)
+  - `remove` → `claude mcp remove <name>` (**win32-x64 only**; also gated by write enablement in SEAM-2)
+  - `add` (**win32-x64 only**; gated by write enablement in SEAM-2):
+    - `Stdio` → `claude mcp add [--transport stdio] [--env KEY=value]* <name> <command> [args...]`
+    - `Url` → `claude mcp add [--transport http] [--header ...]* <name> <url>` (auth/header mapping pinned below)
 - Ensure command execution honors `context.{working_dir,timeout,env}` and output bounds.
 
 ### Out
@@ -58,6 +58,8 @@
 
 - Unit tests for request validation and correct argv construction (especially `add` mapping).
 - Integration tests (opt-in if needed) that run against an isolated home and assert add/remove changes are localized.
+  - Note: for the pinned Claude Code CLI manifest, `mcp add/get/remove` are **win32-x64 only**; tests should be
+    target-aware (or skip on unsupported targets).
 
 ## Risks / unknowns
 
@@ -67,9 +69,9 @@
   - reject `bearer_token_env_var` as `InvalidRequest` for Claude until upstream supports it directly.
   - **De-risk plan**: resolve in SEAM-4 before SEAM-5 integration tests land.
 
-- **Manifest omissions**: the CLI manifest snapshot indicates `mcp add/get/remove` only on a subset of targets, but the wrapper
-  crate already models these commands; confirm this is a snapshot artifact (not a real product constraint) and avoid assuming
-  platform asymmetry in `agent_api` behavior.
+- **Platform availability**: the pinned Claude Code CLI manifest snapshot shows `mcp add/get/remove` only on `win32-x64`.
+  Treat this as authoritative for v1: on unsupported targets, the Claude backend MUST NOT advertise
+  `agent_api.tools.mcp.{get,add,remove}.v1` and MUST fail-closed with `UnsupportedCapability` when invoked.
 
 ## Rollout / safety
 

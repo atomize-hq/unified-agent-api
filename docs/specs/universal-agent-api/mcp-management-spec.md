@@ -34,8 +34,13 @@ Each operation is gated by a distinct capability id:
 
 Backends:
 
+- Capability advertising is **per backend instance** and MAY vary based on environment and configuration.
+- For purposes of this spec, a backend **implements** an operation iff it is both:
+  - supported in the current environment (e.g., the upstream CLI exposes the required subcommand on this target), and
+  - enabled to expose (e.g., write enablement for `add/remove`).
 - A backend that implements an operation MUST advertise the corresponding capability id.
-- A backend that does not implement an operation MUST NOT advertise the corresponding capability id.
+- A backend that does not implement an operation (including because it is disabled by configuration) MUST NOT advertise the
+  corresponding capability id.
 - If a caller invokes an operation that is not advertised, the backend MUST fail-closed with:
   `AgentWrapperError::UnsupportedCapability { agent_kind, capability }`.
 
