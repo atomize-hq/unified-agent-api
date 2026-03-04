@@ -23,7 +23,7 @@ This section makes coupling explicit: contracts/interfaces, dependency edges, an
 
 - **ES-C03 — Safe default advertising**
   - **Type**: permission
-  - **Definition**: Built-in backends SHOULD NOT advertise `agent_api.exec.external_sandbox.v1` by
+  - **Definition**: Built-in backends MUST NOT advertise `agent_api.exec.external_sandbox.v1` by
     default; externally sandboxed hosts opt-in explicitly via backend configuration
     (`allow_external_sandbox_exec`; see `docs/specs/universal-agent-api/contract.md`).
   - **Owner seam**: SEAM-2
@@ -31,8 +31,10 @@ This section makes coupling explicit: contracts/interfaces, dependency edges, an
 
 - **ES-C04 — Codex mapping contract**
   - **Type**: config
-  - **Definition**: When enabled + requested, Codex backend maps the key to
-    `codex --dangerously-bypass-approvals-and-sandbox ...` (or equivalent builder override).
+  - **Definition**: When enabled + requested, Codex backend mapping is pinned (SEAM-3):
+    - exec/resume: apply `CodexClientBuilder::dangerously_bypass_approvals_and_sandbox(true)`
+      (argv includes `--dangerously-bypass-approvals-and-sandbox` and excludes other safety flags).
+    - fork/app-server: RPC uses `approval_policy="never"` + `sandbox="danger-full-access"`.
   - **Owner seam**: SEAM-3
 
 - **ES-C05 — Claude mapping contract**

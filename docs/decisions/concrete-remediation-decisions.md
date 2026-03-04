@@ -1,10 +1,11 @@
 # Concrete remediation decisions
 
-Dates (UTC): 2026-02-24, 2026-02-28
+Dates (UTC): 2026-02-24, 2026-02-28, 2026-03-04
 
 Scope: Documentation-only remediation for `agent_api` concrete-audit gaps, based on:
 - `docs/project_management/packs/active/agent-api-explicit-cancellation/audit-reports/concrete-audit.report.json`
 - `concrete-audit.report.json` (session semantics pack + UAA specs)
+- `docs/project_management/packs/active/agent-api-external-sandbox-exec-policy/logs/concrete-audit.report.json`
 
 This document records concrete decisions introduced where the audit required an explicit choice and
 no single authoritative source fully pinned the behavior.
@@ -330,3 +331,75 @@ Pinned in `docs/specs/codex-app-server-jsonrpc-contract.md` under:
 **Implications**
 
 - Tests MUST assert the exact string `"approval required"` when exercising this failure mode.
+
+## CRD-0011 — External sandbox requests emit a safe Status warning
+
+**Decision**
+
+When `extensions["agent_api.exec.external_sandbox.v1"] == true` is accepted (capability advertised
+and request passes validation), the backend MUST emit exactly one safe
+`AgentWrapperEventKind::Status` warning event with:
+- `channel="status"`
+- `message="DANGEROUS: external sandbox exec policy enabled (agent_api.exec.external_sandbox.v1=true)"`
+- `data=None`
+
+Emission timing is pinned:
+- the warning MUST be emitted before any `TextOutput` / `ToolCall` / `ToolResult` events for that
+  run.
+
+**Context**
+
+Concrete audit CA-0005 required deciding whether this dangerous key has an operator-visible signal
+and, if so, pinning its minimal schema/fields and emission point.
+
+**Chosen spec**
+
+Pinned in:
+- `docs/project_management/packs/active/agent-api-external-sandbox-exec-policy/seam-1-external-sandbox-extension-key.md`
+
+**Rationale**
+
+- This key explicitly requests relaxation of safety guardrails; a stable warning makes that posture
+  change visible to orchestrators without requiring new facets/schemas.
+- `Status` is already a bounded, safe surface per `event-envelope-schema-spec.md`.
+
+**Implications**
+
+- Implementations must inject/forward exactly one stable warning per accepted run and keep it free
+  of raw backend output.
+- Tests should pin both presence (when requested + accepted) and absence (when absent/false).
+
+## CRD-0012 — External sandbox v1 does not require live CLI e2e tests; opt-in is env-gated
+
+**Decision**
+
+Live CLI end-to-end tests are **not required** for v1 acceptance of
+`agent_api.exec.external_sandbox.v1`.
+
+If e2e tests are added later, they MUST be opt-in via env gating:
+- enable by setting `AGENT_API_E2E_LIVE=1` (truthy),
+- select binaries via `CODEX_E2E_BINARY` (Codex) and `CLAUDE_BINARY` (Claude),
+- default CI lanes MUST NOT set `AGENT_API_E2E_LIVE`; only a dedicated lane may set it.
+
+**Context**
+
+Concrete audit CA-0002 required removing “best-effort” ambiguity from the mapping test plan and
+pinning an explicit decision about whether e2e tests are required, plus the opt-in mechanism if
+deferred.
+
+**Chosen spec**
+
+Pinned in:
+- `docs/project_management/packs/active/agent-api-external-sandbox-exec-policy/seam-5-tests.md`
+
+**Rationale**
+
+- The repo already uses env-gated live tests to avoid flake and missing-binary failures in default
+  runs (e.g., Codex CLI e2e).
+- Unit/integration tests can pin argv/RPC mapping deterministically using fake binaries and pure
+  help-parser seams.
+
+**Implications**
+
+- When/if live e2e tests are introduced, they must include early “skip with a note” behavior when
+  `AGENT_API_E2E_LIVE` is unset or binaries are unavailable.

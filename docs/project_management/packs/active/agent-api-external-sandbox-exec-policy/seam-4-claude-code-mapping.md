@@ -44,7 +44,7 @@
 
 - `crates/agent_api/src/backends/claude_code.rs`
 - `crates/agent_api/src/backends/claude_code/tests.rs`
-- Potential shared helper for CLI flag detection/caching (location TBD).
+- v1 decision: keep allow-flag detection + caching **local** to the Claude backend (no shared helper).
 - `crates/claude_code/src/commands/print.rs` already supports
   `dangerously_skip_permissions(...)` + `allow_dangerously_skip_permissions(...)`.
 

@@ -40,9 +40,18 @@
 ## Key invariants / rules
 
 - This key is explicitly dangerous:
-  - built-in backends SHOULD NOT advertise it by default,
+  - built-in backends MUST NOT advertise it by default,
   - it MUST remain capability-gated,
   - and it MUST remain non-interactive (no hangs on prompts).
+- Observability / audit signal (v1, pinned):
+  - When `extensions["agent_api.exec.external_sandbox.v1"] == true` is accepted (capability is
+    advertised and the request passes validation), the backend MUST emit exactly one safe
+    `AgentWrapperEventKind::Status` warning event with:
+    - `channel="status"`
+    - `message="DANGEROUS: external sandbox exec policy enabled (agent_api.exec.external_sandbox.v1=true)"`
+    - `data=None`
+  - Emission timing: the warning MUST be emitted before any `TextOutput` / `ToolCall` / `ToolResult`
+    events for that run.
 
 ## Dependencies
 
@@ -56,7 +65,11 @@
 ## Verification
 
 - Spec review: confirm schema, defaults, and contradiction rules are unambiguous.
-- Local validation: run the relevant `xtask` spec validation (as applicable for spec changes).
+- Local validation (pinned commands + pass criteria):
+  - Capability matrix (required once any backend capability advertisement changes land):
+    - `cargo run -p xtask -- capability-matrix` (must exit 0; output is deterministic)
+    - `cargo run -p xtask -- capability-matrix-audit` (must exit 0)
+  - Integration gate (WS-INT): `make preflight` must pass before merge.
 
 ## Risks / unknowns
 

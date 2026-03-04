@@ -2,8 +2,8 @@
 
 - **Name**: regression coverage for `agent_api.exec.external_sandbox.v1`
 - **Type**: integration (contract conformance)
-- **Goal / user value**: prevent regressions that would accidentally advertise or accept the
-  dangerous key by default, or that would allow interactive hangs/unsafe spawn behavior.
+- **Goal / user value**: prevent regressions that accidentally advertise or accept the dangerous
+  key by default, or that allow interactive hangs/unsafe spawn behavior.
 
 ## Scope
 
@@ -16,11 +16,25 @@
     - contradiction handling with `agent_api.exec.non_interactive`,
     - exec-policy combination rule: `external_sandbox=true` rejects any `backend.*.exec.*` keys,
     - no spawn when invalid / contradictory.
-  - Mapping tests (best-effort, unit-level):
-    - Codex argv/builder contains dangerous bypass override when enabled + requested.
-    - Claude argv contains dangerous permission bypass flag(s) when enabled + requested.
+  - Mapping tests (required; pinned):
+    - Codex (exec + resume): argv MUST contain `--dangerously-bypass-approvals-and-sandbox` and MUST
+      NOT contain any of: `--full-auto`, `--ask-for-approval`, `--sandbox`.
+    - Codex (fork/app-server): RPC MUST use `approval_policy="never"` and
+      `sandbox="danger-full-access"`.
+    - Claude Code: argv MUST contain `--dangerously-skip-permissions`, and MUST include/exclude
+      `--allow-dangerously-skip-permissions` exactly per the pinned help-preflight strategy in
+      `docs/specs/claude-code-session-mapping-contract.md`:
+      - allow-flag supported → argv includes `--allow-dangerously-skip-permissions`
+      - allow-flag not supported → argv excludes `--allow-dangerously-skip-permissions`
+      - preflight failure → fail before spawn as `AgentWrapperError::Backend { .. }`
 - Out:
-  - End-to-end live CLI integration tests (can be added later behind an opt-in if needed).
+  - End-to-end live CLI integration tests are **not required** for v1 acceptance.
+    - Trigger to add e2e tests (objective): once CI provides real `codex` + `claude` binaries and a
+      dedicated lane sets `AGENT_API_E2E_LIVE=1`, add e2e coverage and wire that lane to run it.
+    - Opt-in mechanism (pinned): environment-variable gated.
+      - Local: set `AGENT_API_E2E_LIVE=1` and point binaries via `CODEX_E2E_BINARY` (Codex) and
+        `CLAUDE_BINARY` (Claude).
+      - CI: keep `AGENT_API_E2E_LIVE` unset in default lanes; only the dedicated lane sets it.
 
 ## Primary interfaces (contracts)
 
