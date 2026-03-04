@@ -1,7 +1,7 @@
 {
   "meta": {
     "tool": "contradictions-audit",
-    "generated_at": "2026-03-03T02:22:28Z",
+    "generated_at": "2026-03-04T14:51:54Z",
     "files": [
       "docs/adr/0001-codex-cli-parity-maintenance.md",
       "docs/adr/0002-codex-cli-parity-coverage-mapping.md",
@@ -20,6 +20,8 @@
       "docs/adr/0015-universal-agent-api-session-extensions.md",
       "docs/adr/0016-universal-agent-api-bounded-backend-config-pass-through.md",
       "docs/adr/0017-universal-agent-api-session-thread-id-surfacing.md",
+      "docs/adr/0018-universal-mcp-management-commands.md",
+      "docs/adr/0019-universal-agent-api-external-sandbox-exec-policy.md",
       "docs/project_management/packs/active/agent-api-external-sandbox-exec-policy/README.md",
       "docs/project_management/packs/active/agent-api-external-sandbox-exec-policy/scope_brief.md",
       "docs/project_management/packs/active/agent-api-external-sandbox-exec-policy/seam-1-external-sandbox-extension-key.md",
@@ -44,16 +46,16 @@
       "docs/specs/universal-agent-api/contract.md",
       "docs/specs/universal-agent-api/event-envelope-schema-spec.md",
       "docs/specs/universal-agent-api/extensions-spec.md",
+      "docs/specs/universal-agent-api/mcp-management-spec.md",
       "docs/specs/universal-agent-api/run-protocol-spec.md",
       "docs/specs/wrapper-events-ingestion-contract.md"
     ],
     "scan": {
       "used": true,
-      "output": "/tmp/contradictions-audit.scan.json"
+      "output": "contradictions-audit.scan.json"
     },
     "notes": [
-      "Audit target set: planning pack docs/project_management/packs/active/agent-api-external-sandbox-exec-policy plus canonical docs/specs/** and docs/adr/**.",
-      "Planning-pack docs are explicitly non-normative, but contradictions with canonical specs/ADRs are still flagged because they can mislead implementation."
+      "Audit scope focused on contradictions involving `agent_api.exec.external_sandbox.v1` and its gating/validation/advertising semantics. The scan output includes other key/value candidates (e.g., ADR_BODY_SHA256) that are not contradictions-class defects for this feature."
     ]
   },
   "issues": [
@@ -61,34 +63,35 @@
       "id": "CX-0001",
       "severity": "major",
       "confidence": "high",
-      "type": "terminology",
-      "subject": "`agent_api.exec.external_sandbox.v1` intended host isolation boundary (internal vs external sandboxing)",
+      "type": "strength_mismatch",
+      "subject": "`agent_api.exec.external_sandbox.v1` contradiction rule with `agent_api.exec.non_interactive`",
       "scope": {
         "environment": "all",
         "version": "v1",
-        "feature_flag": "unknown",
-        "timeline": "planned"
+        "feature_flag": "none",
+        "timeline": "current"
       },
       "statement_a": {
-        "file": "docs/adr/0016-universal-agent-api-bounded-backend-config-pass-through.md",
-        "line_start": 100,
-        "line_end": 102,
-        "excerpt": "…allowing internally sandboxed hosts (e.g. Substrate) to opt into explicitly dangerous exec policy via `agent_api.exec.external_sandbox.v1`."
+        "file": "docs/project_management/packs/active/agent-api-external-sandbox-exec-policy/seam-1-external-sandbox-extension-key.md",
+        "line_start": 33,
+        "line_end": 36,
+        "excerpt": "If `agent_api.exec.non_interactive == false` is explicitly requested alongside external sandbox mode (and both keys are supported), the backend SHOULD fail closed with `AgentWrapperError::InvalidRequest`."
       },
       "statement_b": {
-        "file": "docs/project_management/packs/active/agent-api-external-sandbox-exec-policy/scope_brief.md",
-        "line_start": 9,
-        "line_end": 10,
-        "excerpt": "…to let externally sandboxed hosts (e.g., Substrate) explicitly request that a built-in backend relax internal approvals/sandbox/permissions guardrails…"
+        "file": "docs/specs/universal-agent-api/extensions-spec.md",
+        "line_start": 125,
+        "line_end": 127,
+        "excerpt": "If external sandbox is `true` and `agent_api.exec.non_interactive` is explicitly set to `false` (and both keys are supported per R0), the backend MUST fail before spawn with `AgentWrapperError::InvalidRequest`."
       },
       "analysis": {
-        "why_conflict": "The docs describe the same dangerous key as being intended for both “internally sandboxed” and “externally sandboxed” hosts. These phrases imply opposite trust boundaries (where the isolation lives), which affects when it is safe to relax internal guardrails. Without a single consistent term/definition, implementers and integrators can infer incompatible safety assumptions.",
+        "why_conflict": "The planning pack describes the contradiction handling as a `SHOULD` (optional / best-effort), while the canonical extensions registry makes it a `MUST` (required) pre-spawn failure. This is a normative-strength mismatch that can lead readers to implement (or test) the contradiction rule as discretionary, violating the approved contract.",
         "possible_reconciliations": [
-          "If “internally sandboxed hosts” was meant to describe a host-provided sandbox that is external to the backend process, replace it with “externally sandboxed hosts” and/or add a short definition of “external sandbox” in the owner-doc spec entry.",
-          "If “internally sandboxed hosts” is actually intended (i.e., the backend itself provides the isolation), then the key name/description should not be `external_sandbox`, and the planning pack should be updated to match the intended trust boundary."
+          "Align the planning pack language to `MUST fail before spawn with AgentWrapperError::InvalidRequest` to mirror the canonical spec.",
+          "If any per-backend discretion is intended, explicitly scope it and update the canonical spec accordingly (e.g., downgrade to `SHOULD`, or define an allowed override behavior), rather than leaving the mismatch implicit."
         ],
         "what_must_be_true": [
-          "Define the single intended trust boundary for `agent_api.exec.external_sandbox.v1`: the sandbox/isolation is provided by the host environment external to the backend process (or explicitly state a different boundary and align naming/wording across docs)."
+          "Whether the `external_sandbox=true` + `non_interactive=false` combination is universally invalid (hard error) for all backends that support both keys, or merely discouraged.",
+          "If it is universally invalid, all planning artifacts and tests should consistently state `MUST fail pre-spawn` (not `SHOULD`)."
         ]
       },
       "suggested_evidence_order": [
@@ -100,7 +103,57 @@
         "external",
         "decision"
       ],
-      "related_issues": []
+      "related_issues": [
+        "CX-0002"
+      ]
+    },
+    {
+      "id": "CX-0002",
+      "severity": "minor",
+      "confidence": "high",
+      "type": "strength_mismatch",
+      "subject": "Default advertising posture for `agent_api.exec.external_sandbox.v1` (built-in backends)",
+      "scope": {
+        "environment": "all",
+        "version": "v1",
+        "feature_flag": "none",
+        "timeline": "current"
+      },
+      "statement_a": {
+        "file": "docs/project_management/packs/active/agent-api-external-sandbox-exec-policy/threading.md",
+        "line_start": 25,
+        "line_end": 26,
+        "excerpt": "Built-in backends MUST NOT advertise `agent_api.exec.external_sandbox.v1` by default; externally sandboxed hosts opt-in explicitly via backend configuration."
+      },
+      "statement_b": {
+        "file": "docs/specs/universal-agent-api/extensions-spec.md",
+        "line_start": 134,
+        "line_end": 135,
+        "excerpt": "Built-in backends SHOULD NOT advertise this capability by default; it is intended for explicitly externally sandboxed hosts."
+      },
+      "analysis": {
+        "why_conflict": "The contract-level spec describes default advertising as `SHOULD NOT` (strong recommendation), but the planning pack's contract registry states `MUST NOT` (hard prohibition). Even though \"MUST NOT\" satisfies \"SHOULD NOT\" in practice, the mismatch in normative strength is contradictions-class drift that makes it unclear whether default advertising is merely discouraged or strictly forbidden for built-in backends.",
+        "possible_reconciliations": [
+          "Downgrade the planning pack's ES-C03 language to `SHOULD NOT` to match the canonical spec.",
+          "If the repo intends a stricter posture for its built-in backends, encode that scope explicitly (e.g., \"In this workspace's built-in backends (codex/claude_code), MUST NOT advertise by default\") without changing the universal spec, or tighten the universal spec if that is intended."
+        ],
+        "what_must_be_true": [
+          "Whether any built-in backend is allowed (under any default configuration) to advertise `agent_api.exec.external_sandbox.v1` without explicit host enablement.",
+          "If the universal contract remains `SHOULD NOT`, planning docs should avoid strengthening it to `MUST NOT` unless a scoped rationale is stated."
+        ]
+      },
+      "suggested_evidence_order": [
+        "codebase",
+        "tests",
+        "runtime-config",
+        "git-history",
+        "other-docs",
+        "external",
+        "decision"
+      ],
+      "related_issues": [
+        "CX-0001"
+      ]
     }
   ]
 }
