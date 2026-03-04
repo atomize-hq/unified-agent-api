@@ -103,6 +103,42 @@ Backend mapping requirements:
   - Claude Code: map to `--permission-mode bypassPermissions` (see
     `docs/specs/claude-code-session-mapping-contract.md`).
 
+### `agent_api.exec.external_sandbox.v1` (boolean; dangerous)
+
+Owner: this spec (`extensions-spec.md`).
+
+Schema:
+- Type: boolean
+- Default when absent: `false`
+
+Meaning:
+- When `true`, the host asserts it provides an external isolation boundary and requests that the
+  backend relax/disable internal approvals/sandbox/permissions guardrails that would otherwise
+  block unattended automation.
+- This key is explicitly dangerous and MUST NOT be implied by `agent_api.exec.non_interactive` or
+  any other benign key.
+- When `true`, the backend MUST remain non-interactive (MUST NOT hang on prompts).
+
+Validation rules:
+- Value MUST be a boolean; otherwise the backend MUST fail before spawn with
+  `AgentWrapperError::InvalidRequest`.
+- If this key is `true` and `agent_api.exec.non_interactive` is explicitly set to `false` in the
+  same request (and both keys are supported per R0), the backend MUST fail before spawn with
+  `AgentWrapperError::InvalidRequest` (contradictory intent).
+
+Backend mapping requirements:
+- Backends that advertise this key MUST:
+  - ensure the underlying CLI/wrapper will not prompt (approvals/permissions prompts),
+  - ensure any “internal sandbox required” checks are bypassed/disabled as required by that backend,
+  - and remain deterministic (no “spawn then retry with different flags”).
+- Built-in backends SHOULD NOT advertise this capability by default; it is intended for explicitly
+  externally sandboxed hosts.
+- Example mappings (non-normative):
+  - Codex: map to `--dangerously-bypass-approvals-and-sandbox` (or an equivalent non-interactive
+    combination of overrides).
+  - Claude Code: map to `--dangerously-skip-permissions` (and, if required by the installed CLI
+    version, also pass `--allow-dangerously-skip-permissions`).
+
 ### `agent_api.session.resume.v1` (object)
 
 Owner: this spec (`extensions-spec.md`).
