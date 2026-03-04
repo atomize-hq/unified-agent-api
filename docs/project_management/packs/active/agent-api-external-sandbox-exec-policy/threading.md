@@ -15,14 +15,15 @@ This section makes coupling explicit: contracts/interfaces, dependency edges, an
 - **ES-C02 — Non-interactive invariant (external sandbox mode)**
   - **Type**: policy
   - **Definition**: When `agent_api.exec.external_sandbox.v1 == true`, the backend MUST remain
-    non-interactive. If `agent_api.exec.non_interactive == false` is explicitly requested, the
-    backend SHOULD fail closed as contradictory intent.
+    non-interactive. If `agent_api.exec.non_interactive == false` is explicitly requested (and both
+    keys are supported), the backend MUST fail before spawn with `AgentWrapperError::InvalidRequest`
+    (contradictory intent).
   - **Owner seam**: SEAM-1
   - **Consumers**: SEAM-3/4/5
 
 - **ES-C03 — Safe default advertising**
   - **Type**: permission
-  - **Definition**: Built-in backends MUST NOT advertise `agent_api.exec.external_sandbox.v1` by
+  - **Definition**: Built-in backends SHOULD NOT advertise `agent_api.exec.external_sandbox.v1` by
     default; externally sandboxed hosts opt-in explicitly via backend configuration.
   - **Owner seam**: SEAM-2
   - **Consumers**: SEAM-3/4/5
@@ -70,4 +71,3 @@ This section makes coupling explicit: contracts/interfaces, dependency edges, an
    `agent_api.exec.external_sandbox.v1 == true`:
    - overrides other exec-policy keys (Codex sandbox/approval keys), or
    - fails closed when combined (preferred if ambiguity/footguns exist).
-

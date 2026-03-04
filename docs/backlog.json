@@ -135,7 +135,7 @@
       "notes": [
         "Expose an explicit, capability-gated core key for hosts (e.g. Substrate) that provide isolation externally and need the CLI backend to relax internal guardrails.",
         "Owned by docs/specs/universal-agent-api/extensions-spec.md (core key); implement + capability-gate in both codex and claude_code backends.",
-        "When true, the backend MUST remain non-interactive (MUST NOT hang on prompts); if agent_api.exec.non_interactive is explicitly false, the backend SHOULD fail closed as contradictory intent.",
+        "When true, the backend MUST remain non-interactive (MUST NOT hang on prompts); if agent_api.exec.non_interactive is explicitly false, the backend MUST fail before spawn with AgentWrapperError::InvalidRequest (contradictory intent).",
         "This key is explicitly dangerous and SHOULD NOT be advertised by default in built-in backends (only enabled for externally sandboxed hosts).",
         "Value MUST be boolean and validated before spawn; unknown keys must continue to fail-closed."
       ],

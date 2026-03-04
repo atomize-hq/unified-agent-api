@@ -33,7 +33,8 @@
 - **Cross-key contradiction rule**:
   - When `agent_api.exec.external_sandbox.v1 == true`, the backend MUST remain non-interactive.
   - If `agent_api.exec.non_interactive == false` is explicitly requested alongside it (and both
-    keys are supported), the backend SHOULD fail closed with `AgentWrapperError::InvalidRequest`.
+    keys are supported), the backend MUST fail before spawn with `AgentWrapperError::InvalidRequest`
+    (contradictory intent).
 
 ## Key invariants / rules
 
@@ -64,4 +65,3 @@
 
 - Default posture: not advertised by built-in backends.
 - Hosts must opt in explicitly (backend config + per-run extension key).
-

@@ -55,8 +55,8 @@ internal prompting/guardrails that conflict with unattended automation.
 - **No interactive hangs**: when `agent_api.exec.external_sandbox.v1 == true`, the backend MUST NOT
   hang on approvals/permissions prompts.
 - **Contradictory intent fails closed**: when `agent_api.exec.external_sandbox.v1 == true` and
-  `agent_api.exec.non_interactive == false` is explicitly requested, the backend SHOULD fail closed
-  as contradictory intent (exact error pinned in SEAM-1).
+  `agent_api.exec.non_interactive == false` is explicitly requested, the backend MUST fail before
+  spawn with `AgentWrapperError::InvalidRequest` as contradictory intent (exact error pinned in SEAM-1).
 
 ## Success criteria
 

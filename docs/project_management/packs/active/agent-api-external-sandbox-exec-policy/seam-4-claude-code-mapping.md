@@ -27,7 +27,8 @@
 
 - MUST NOT hang on prompts.
 - MUST be validated before spawn.
-- SHOULD fail closed on explicit contradiction with `agent_api.exec.non_interactive == false`.
+- MUST fail before spawn with `AgentWrapperError::InvalidRequest` on explicit contradiction with
+  `agent_api.exec.non_interactive == false`.
 - Mapping must be deterministic across CLI versions (no "spawn then retry with different flags").
 
 ## Dependencies
@@ -58,4 +59,3 @@
 ## Rollout / safety
 
 - Only reachable behind explicit host opt-in (SEAM-2).
-
