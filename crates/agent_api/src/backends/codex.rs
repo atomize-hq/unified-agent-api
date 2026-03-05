@@ -497,6 +497,7 @@ impl BackendHarnessAdapter for CodexHarnessAdapter {
                     run_start_cwd,
                     termination,
                     non_interactive,
+                    external_sandbox,
                     approval_policy,
                     sandbox_mode,
                     handle_state,
