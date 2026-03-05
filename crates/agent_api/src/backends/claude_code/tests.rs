@@ -1,5 +1,5 @@
 use super::*;
-use crate::{AgentWrapperBackend, AgentWrapperEventKind};
+use crate::{AgentWrapperBackend, AgentWrapperError, AgentWrapperEventKind};
 use claude_code::{ClaudeStreamJsonEvent, ClaudeStreamJsonParser};
 
 const SYSTEM_INIT: &str =
@@ -79,6 +79,14 @@ fn new_adapter() -> ClaudeHarnessAdapter {
     }
 }
 
+fn new_adapter_with_config(config: ClaudeCodeBackendConfig) -> ClaudeHarnessAdapter {
+    ClaudeHarnessAdapter {
+        config,
+        termination: None,
+        handle_state: std::sync::Arc::new(std::sync::Mutex::new(ClaudeHandleFacetState::default())),
+    }
+}
+
 fn parse_single_line(line: &str) -> ClaudeStreamJsonEvent {
     let mut parser = ClaudeStreamJsonParser::new();
     parser
@@ -109,6 +117,60 @@ fn claude_backend_reports_required_capabilities() {
     assert!(capabilities.contains(CAP_SESSION_HANDLE_V1));
     assert!(capabilities.contains(EXT_SESSION_RESUME_V1));
     assert!(capabilities.contains(EXT_SESSION_FORK_V1));
+}
+
+#[test]
+fn claude_backend_does_not_advertise_external_sandbox_exec_by_default() {
+    let backend = ClaudeCodeBackend::new(ClaudeCodeBackendConfig::default());
+    let capabilities = backend.capabilities();
+    assert!(!capabilities.contains(EXT_EXTERNAL_SANDBOX_V1));
+}
+
+#[test]
+fn claude_backend_opt_in_advertises_external_sandbox_exec_and_allowlist_accepts_key() {
+    let mut config = ClaudeCodeBackendConfig::default();
+    config.allow_external_sandbox_exec = true;
+
+    let backend = ClaudeCodeBackend::new(config.clone());
+    let capabilities = backend.capabilities();
+    assert!(capabilities.contains(EXT_EXTERNAL_SANDBOX_V1));
+
+    let adapter = new_adapter_with_config(config);
+    let defaults = crate::backend_harness::BackendDefaults::default();
+    let request = AgentWrapperRunRequest {
+        prompt: "hello".to_string(),
+        extensions: [(EXT_EXTERNAL_SANDBOX_V1.to_string(), Value::Bool(true))]
+            .into_iter()
+            .collect(),
+        ..Default::default()
+    };
+
+    crate::backend_harness::normalize_request(&adapter, &defaults, request)
+        .expect("external sandbox extension key should be allowlisted when opted-in");
+}
+
+#[test]
+fn claude_backend_fails_closed_for_external_sandbox_extension_when_opt_in_disabled() {
+    let adapter = new_adapter();
+    let defaults = crate::backend_harness::BackendDefaults::default();
+    let request = AgentWrapperRunRequest {
+        prompt: "hello".to_string(),
+        extensions: [(EXT_EXTERNAL_SANDBOX_V1.to_string(), Value::Bool(true))]
+            .into_iter()
+            .collect(),
+        ..Default::default()
+    };
+
+    let err = match crate::backend_harness::normalize_request(&adapter, &defaults, request) {
+        Ok(_) => panic!("expected normalize_request to reject unsupported extension key"),
+        Err(err) => err,
+    };
+    match err {
+        AgentWrapperError::UnsupportedCapability { capability, .. } => {
+            assert_eq!(capability, EXT_EXTERNAL_SANDBOX_V1);
+        }
+        other => panic!("expected UnsupportedCapability, got: {other:?}"),
+    }
 }
 
 #[test]

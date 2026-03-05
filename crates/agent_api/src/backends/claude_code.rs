@@ -39,6 +39,17 @@ const CHANNEL_ASSISTANT: &str = "assistant";
 const CHANNEL_TOOL: &str = "tool";
 
 const EXT_NON_INTERACTIVE: &str = "agent_api.exec.non_interactive";
+const EXT_EXTERNAL_SANDBOX_V1: &str = "agent_api.exec.external_sandbox.v1";
+
+const SUPPORTED_EXTENSION_KEYS_DEFAULT: &[&str] =
+    &[EXT_NON_INTERACTIVE, EXT_SESSION_RESUME_V1, EXT_SESSION_FORK_V1];
+
+const SUPPORTED_EXTENSION_KEYS_EXTERNAL_SANDBOX_OPT_IN: &[&str] = &[
+    EXT_NON_INTERACTIVE,
+    EXT_SESSION_RESUME_V1,
+    EXT_SESSION_FORK_V1,
+    EXT_EXTERNAL_SANDBOX_V1,
+];
 
 const CAP_TOOLS_STRUCTURED_V1: &str = "agent_api.tools.structured.v1";
 const CAP_TOOLS_RESULTS_V1: &str = "agent_api.tools.results.v1";
@@ -121,6 +132,7 @@ pub struct ClaudeCodeBackendConfig {
     pub default_timeout: Option<Duration>,
     pub default_working_dir: Option<PathBuf>,
     pub env: BTreeMap<String, String>,
+    pub allow_external_sandbox_exec: bool,
 }
 
 pub struct ClaudeCodeBackend {
@@ -190,12 +202,11 @@ impl BackendHarnessAdapter for ClaudeHarnessAdapter {
     }
 
     fn supported_extension_keys(&self) -> &'static [&'static str] {
-        const SUPPORTED: [&str; 3] = [
-            EXT_NON_INTERACTIVE,
-            EXT_SESSION_RESUME_V1,
-            EXT_SESSION_FORK_V1,
-        ];
-        &SUPPORTED
+        if self.config.allow_external_sandbox_exec {
+            SUPPORTED_EXTENSION_KEYS_EXTERNAL_SANDBOX_OPT_IN
+        } else {
+            SUPPORTED_EXTENSION_KEYS_DEFAULT
+        }
     }
 
     type Policy = ClaudeExecPolicy;
@@ -623,6 +634,9 @@ impl AgentWrapperBackend for ClaudeCodeBackend {
         ids.insert(EXT_NON_INTERACTIVE.to_string());
         ids.insert(EXT_SESSION_RESUME_V1.to_string());
         ids.insert(EXT_SESSION_FORK_V1.to_string());
+        if self.config.allow_external_sandbox_exec {
+            ids.insert(EXT_EXTERNAL_SANDBOX_V1.to_string());
+        }
         AgentWrapperCapabilities { ids }
     }
 

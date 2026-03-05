@@ -37,6 +37,7 @@ fn claude_gateway_block_until_killed() -> (AgentWrapperGateway, AgentWrapperKind
         )]
         .into_iter()
         .collect(),
+        allow_external_sandbox_exec: false,
     }));
 
     let mut gateway = AgentWrapperGateway::new();
