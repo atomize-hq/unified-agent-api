@@ -405,3 +405,137 @@ Pinned in:
 
 - When/if live e2e tests are introduced, they must include early “skip with a note” behavior when
   `AGENT_API_E2E_LIVE` is unset or binaries are unavailable.
+
+## CRD-0013 — MCP management execution returns `Ok(output)` for non-zero exit status
+
+**Decision**
+
+For MCP management operations (`mcp_list/get/add/remove`):
+
+- If the upstream CLI process is spawned and an `ExitStatus` is observed, the operation MUST return
+  `Ok(AgentWrapperMcpCommandOutput { status, ... })` regardless of whether `status.success() == true`.
+- Execution failures (spawn/binary missing, wait/IO errors, timeout/kill cleanup, stdout/stderr capture failures) MUST be
+  surfaced as `Err(AgentWrapperError::Backend { message })`.
+- On `Err(AgentWrapperError::Backend { .. })`, partial stdout/stderr MUST NOT be surfaced (no output type is returned).
+
+**Context**
+
+Concrete audit CA-0001 required pinning the boundary between “command completed” (with an exit status, possibly non-zero)
+and “command execution failed” (spawn/timeout/IO), plus clarifying whether partial output is returned on timeouts.
+
+**Chosen spec**
+
+Pinned in:
+- `docs/specs/universal-agent-api/mcp-management-spec.md` → “Command execution semantics (pinned)”
+
+**Rationale**
+
+- The MCP output type explicitly includes `status: ExitStatus`; returning `Ok(output)` on non-zero exit is the only
+  contract that makes `status` consistently observable and testable.
+- Keeps `AgentWrapperError::Backend` reserved for true execution faults, aligning with the contract’s safe error taxonomy.
+
+**Implications**
+
+- Implementations must avoid wrapper helpers that convert non-zero exit statuses into errors.
+- Tests can treat `Ok(output.status != 0)` as a valid, bounded “command completed” outcome.
+
+## CRD-0014 — MCP capability advertising + target availability are pinned by CLI manifest snapshots
+
+**Decision**
+
+For built-in backends, MCP capability advertising and target availability gating MUST be derived from the pinned CLI
+manifest snapshots:
+- Codex: `cli_manifests/codex/current.json`
+- Claude Code: `cli_manifests/claude_code/current.json`
+
+If the manifest snapshot conflicts with observed upstream CLI behavior at runtime:
+- the backend MUST NOT silently change its advertised capabilities, and
+- the operation MUST fail with `AgentWrapperError::Backend` (backend fault).
+
+The required remediation is to update the pinned manifest snapshots and mapping logic in a subsequent repo update.
+
+**Context**
+
+Concrete audit CA-0006 required choosing an authoritative availability source for Claude MCP subcommands in v1 and defining
+what happens when that source conflicts with observed CLI behavior.
+
+**Chosen spec**
+
+Pinned in:
+- `docs/specs/universal-agent-api/mcp-management-spec.md` → “Built-in backend behavior (v1, normative)” → “Target availability source of truth (pinned)”
+
+**Rationale**
+
+- This repo already treats CLI manifests as the diff-reviewed inventory of upstream surfaces; using them for availability
+  gating makes capability advertising deterministic and testable.
+- Avoids runtime probing (flake, performance, platform differences) and keeps v1 behavior stable.
+
+**Implications**
+
+- Backends must implement capability advertising as a pure function of (manifest snapshot, build target, backend config).
+- Drift is handled via the existing manifest update workflow, not via runtime heuristics.
+
+## CRD-0015 — MCP transport validation and argv composition are pinned in the spec
+
+**Decision**
+
+For MCP add transports:
+
+- `Stdio` final argv MUST be: `argv = command + args` (concatenation), and all items MUST be trimmed and non-empty.
+- `Url.url` MUST be an absolute `http`/`https` URL (trimmed, non-empty; parsing required).
+- `Url.bearer_token_env_var`, when present, MUST be a trimmed, non-empty environment variable name matching:
+  `^[A-Za-z_][A-Za-z0-9_]*$`.
+
+**Context**
+
+Concrete audit CA-0002 and CA-0009 required removing ambiguity around:
+- what inputs are considered valid for `Url` transport fields, and
+- how `Stdio { command, args }` constructs the final argv passed to backend CLIs.
+
+**Chosen spec**
+
+Pinned in:
+- `docs/specs/universal-agent-api/mcp-management-spec.md` → “Transport field validation (pinned)”
+
+**Rationale**
+
+- Makes request validation testable and avoids accepting inputs that are likely to be interpreted differently across
+  platforms/backends.
+- Provides an unambiguous mapping from typed request fields to argv construction.
+
+**Implications**
+
+- Implementations must validate and reject invalid transport fields before spawning any backend process.
+- Backend mapping code can treat `argv` as the canonical representation for `Stdio` and derive backend-specific forms from it.
+
+## CRD-0016 — MCP integration tests are hermetic by default; live smoke is env-gated
+
+**Decision**
+
+MCP integration coverage MUST be deterministic and offline by default:
+
+- Default test mode (CI + local) uses hermetic fake binaries and runs under normal `make test` / `cargo test`.
+- Optional live smoke tests against real upstream binaries are permitted, but MUST be opt-in:
+  - tests are marked `#[ignore]`, and
+  - enabled only when `AGENT_API_MCP_LIVE=1` is set (truthy) and the targeted backend binary is configured.
+
+**Context**
+
+Concrete audit CA-0008 required pinning whether MCP integration tests use real binaries vs fake binaries, how they are
+gated, and how “no network required” is enforced for the test suite.
+
+**Chosen spec**
+
+Pinned in:
+- `docs/specs/universal-agent-api/mcp-management-spec.md` → “Verification policy (this repo; v1, pinned)” → “Integration coverage + gating (pinned)”
+
+**Rationale**
+
+- Fake binaries can deterministically assert argv + env injection + isolated-home behavior without flake or missing-binary
+  failures in CI.
+- Mirrors existing repo posture: live/credentialed probes are explicit opt-ins.
+
+**Implications**
+
+- Live tests must be written to skip with a note when `AGENT_API_MCP_LIVE` is unset or binaries are unavailable.
+- Default CI lanes must not set `AGENT_API_MCP_LIVE`.

@@ -52,7 +52,7 @@ This section makes coupling explicit: contracts/interfaces, dependency edges, an
   - **Type**: permission
   - **Definition**: built-in backends MUST NOT advertise write capabilities (`add/remove`) unless explicitly enabled via backend
     configuration (`allow_mcp_write`, pinned in SEAM-2 and the canonical contract spec). Read operations (`list/get`) are
-    advertised by default when supported on the current target (pinned table in SEAM-2).
+    advertised by default when supported on the current target (pinned table in the MCP management spec).
   - **Owner seam**: SEAM-2
   - **Consumers**: SEAM-3/4/5
 
@@ -69,26 +69,23 @@ This section makes coupling explicit: contracts/interfaces, dependency edges, an
   - **Type**: integration
   - **Owner seam**: SEAM-3
   - **Consumers**: SEAM-5
-  - **Definition**: map universal operations to `codex mcp ...` (see `cli_manifests/codex/current.json`):
-    - `list` → `codex mcp list --json` (pinned in SEAM-3)
-    - `get` → `codex mcp get --json <name>` (pinned in SEAM-3)
-    - `add`:
-      - `Stdio` → `codex mcp add <name> [--env KEY=VALUE]* -- <command...>`
-      - `Url` → `codex mcp add <name> --url <url> [--bearer-token-env-var ENV_VAR]`
-    - `remove` → `codex mcp remove <name>`
+  - **Definition**: built-in Codex mapping is pinned in the canonical MCP management spec:
+    - `docs/specs/universal-agent-api/mcp-management-spec.md` → “Built-in backend behavior” → “Built-in backend mappings (pinned)”
+    - (target availability is pinned by `cli_manifests/codex/current.json`)
 
 - **MM-C09 — Claude MCP mapping contract**
   - **Type**: integration
   - **Owner seam**: SEAM-4
   - **Consumers**: SEAM-5
-  - **Definition**: map universal operations to `claude mcp ...` (see `cli_manifests/claude_code/current.json`):
+  - **Definition**: built-in Claude Code mapping is pinned in the canonical MCP management spec:
+    - `docs/specs/universal-agent-api/mcp-management-spec.md` → “Built-in backend behavior” → “Built-in backend mappings (pinned)”
+    - (target availability is pinned by `cli_manifests/claude_code/current.json`)
     - `list` → `claude mcp list`
     - `get/add/remove` are **win32-x64 only** in the pinned Claude Code CLI manifest snapshot.
       - On unsupported targets, the Claude backend MUST NOT advertise `agent_api.tools.mcp.{get,add,remove}.v1` and MUST
         fail-closed with `UnsupportedCapability` when invoked.
       - `add/remove` are additionally gated by write enablement (SEAM-2).
-      - Argv shape + flag mapping (transport/env/header/scope) is pinned in SEAM-4 (single source of truth).
-      - `Url.bearer_token_env_var` is rejected as `InvalidRequest` for Claude (pinned in SEAM-4).
+      - `Url.bearer_token_env_var` is rejected as `InvalidRequest` for Claude (fail closed; pinned in the canonical spec).
 
 ## Dependency graph (text)
 

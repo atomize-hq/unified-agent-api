@@ -43,7 +43,7 @@ This ADR explicitly covers **non-run** operations: these are CLI subcommands, no
 
 ## Executive Summary (Operator)
 
-ADR_BODY_SHA256: c72d2c876b607a7c0667b189bc9ca53105cb4b3fb37015092c3dd3fd2f02ab01
+ADR_BODY_SHA256: d8047107a5b0ac46eabb1e34bd2761e0b521a6823dc1eedb2867daaab88f6105
 
 ### Decision (draft)
 
@@ -149,8 +149,8 @@ Universal operations map to backend subcommands as follows:
 
 | Universal op | Claude Code | Codex |
 | --- | --- | --- |
-| list | `claude mcp list` | `codex mcp list [--json]` |
-| get | `claude mcp get <name>` | `codex mcp get [--json] <name>` |
+| list | `claude mcp list` | `codex mcp list --json` |
+| get | `claude mcp get <name>` | `codex mcp get --json <name>` |
 | add | `claude mcp add <name> <commandOrUrl> [args...]` | `codex mcp add <name> (--url <url> | -- <command>...)` |
 | remove | `claude mcp remove <name>` | `codex mcp remove <name>` |
 
@@ -159,6 +159,9 @@ Notes:
 - The universal surface standardizes only request *intent* (add/get/list/remove), not every flag.
 - Where upstream CLIs differ (e.g., transport flags, scope flags, JSON output), v1 does not force a
   least-common-denominator schema; backend-specific enhancements remain backend-scoped.
+- The pinned argv construction contract for built-in backends (including Codex `--json` usage and Claude `--transport`
+  usage) lives in the canonical MCP spec:
+  - `docs/specs/universal-agent-api/mcp-management-spec.md` → “Built-in backend behavior” → “Built-in backend mappings (pinned)”
 
 ## Alternatives Considered
 
@@ -180,4 +183,3 @@ Notes:
 - Add backend harness integration tests (real binary optional / opt-in) that:
   - run MCP list/get/add/remove against an isolated home directory,
   - do not require network access.
-

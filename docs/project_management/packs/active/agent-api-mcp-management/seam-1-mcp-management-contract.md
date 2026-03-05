@@ -41,6 +41,8 @@
   - `AgentWrapperError::UnknownBackend`
   - `AgentWrapperError::UnsupportedCapability { agent_kind, capability }`
   - `AgentWrapperError::InvalidRequest` (validation)
+  - `AgentWrapperError::Backend` (spawn/timeout/IO faults; non-zero exit status is **not** an error — it is returned in
+    `AgentWrapperMcpCommandOutput.status`)
 
 ## Key invariants / rules
 

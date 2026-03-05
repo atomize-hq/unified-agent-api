@@ -123,7 +123,7 @@ pub enum AgentWrapperMcpAddTransport {
     Stdio {
         /// Command argv (MUST be non-empty).
         command: Vec<String>,
-        /// Additional argv items after `command[0]`.
+        /// Additional argv items appended after `command`.
         args: Vec<String>,
         /// Env vars injected into the MCP server process.
         env: BTreeMap<String, String>,
@@ -156,6 +156,12 @@ The universal surface MUST be bounded and typed:
 
 - resolve a backend (else `UnknownBackend`), and
 - invoke the corresponding backend operation (else `UnsupportedCapability`).
+
+To make error ordering deterministic, gateway entrypoints MUST:
+
+1) resolve the backend (else `AgentWrapperError::UnknownBackend`), then
+2) check the backend-advertised capability id for the operation (else `AgentWrapperError::UnsupportedCapability`), then
+3) invoke the backend hook.
 
 Suggested signatures:
 
@@ -213,6 +219,26 @@ For all operations that accept a server name:
 - The provided `name` MUST be trimmed.
 - Empty names MUST be rejected as `AgentWrapperError::InvalidRequest`.
 
+#### Transport field validation (pinned)
+
+All transport field validation MUST occur before spawning any backend process. Violations MUST be rejected as
+`AgentWrapperError::InvalidRequest` with a safe message that does not echo raw user-provided values.
+
+##### `Stdio` transport (`AgentWrapperMcpAddTransport::Stdio`)
+
+- `command` MUST be non-empty.
+- Every item in `command` and `args` MUST be trimmed and MUST be non-empty.
+- Final argv used for backend mapping MUST be constructed as:
+  - `argv = command + args` (concatenation)
+
+##### `Url` transport (`AgentWrapperMcpAddTransport::Url`)
+
+- `url` MUST be trimmed and MUST be non-empty.
+- `url` MUST be an absolute URL with scheme `http` or `https` (parsing is required).
+- If `bearer_token_env_var` is `Some(s)`:
+  - `s` MUST be trimmed and MUST be non-empty.
+  - `s` MUST match regex: `^[A-Za-z_][A-Za-z0-9_]*$`
+
 #### Process context
 
 The universal request types MUST support:
@@ -224,6 +250,53 @@ The universal request types MUST support:
 This preserves Universal Agent API posture:
 
 - Backends MUST NOT mutate the parent process environment.
+
+#### Context precedence and absence semantics (pinned)
+
+Backends MUST determine an effective process context before spawning any backend process. The precedence rules MUST mirror
+`docs/specs/universal-agent-api/contract.md` ("Config and request precedence" + "Absence semantics"):
+
+- Effective working directory:
+  1) If `request.context.working_dir` is present, it MUST be used.
+  2) Else, if backend config provides `default_working_dir`, it MUST be used.
+  3) Else, the backend MAY use an internal default (including inheriting the parent process working directory or using a
+     temporary directory).
+  - If the selected working directory path is relative, it MUST be interpreted as relative to the backend wrapper process’
+    current working directory at invocation time.
+
+- Effective timeout:
+  1) If `request.context.timeout` is present, it MUST be used.
+  2) Else, if backend config provides `default_timeout`, it MUST be used.
+  3) Else, the backend MAY use an internal default (or no timeout).
+  - If `timeout` is absent, the universal API MUST NOT invent a global default.
+
+- Effective environment:
+  - `request.context.env` applies only to the spawned backend process (never to the parent process).
+  - When keys collide, `request.context.env` MUST win over any backend-provided environment, including isolated-home
+    injection (e.g., `CODEX_HOME`, `CLAUDE_HOME`, `HOME`, `XDG_*`, and Windows equivalents).
+  - If a caller explicitly overrides isolation-related keys via `request.context.env`, that override is honored (caller
+    assumes responsibility for defeating isolation).
+
+Note: `AgentWrapperMcpAddTransport::Stdio.env` configures environment variables for the *MCP server process* (as persisted
+by the upstream CLI). It is distinct from `request.context.env`, which configures the environment for the *upstream CLI
+process* invoked to perform the management command.
+
+#### Command execution semantics (pinned)
+
+Gateway/backend MCP methods return:
+- `Result<AgentWrapperMcpCommandOutput, AgentWrapperError>`
+
+Pinned rules (v1):
+
+- If the upstream CLI process is spawned and an `ExitStatus` is observed, the operation MUST return
+  `Ok(AgentWrapperMcpCommandOutput { status, ... })` **regardless of whether the exit status is success**.
+- The following failure modes MUST be surfaced as `Err(AgentWrapperError::Backend { message })`:
+  - binary not found / spawn failure,
+  - wait/IO errors while running the command,
+  - timeout expiration (best-effort kill/cleanup),
+  - failures to capture stdout/stderr streams (including join/task failures in async implementations).
+- For any `Err(AgentWrapperError::Backend { .. })`, implementations MUST NOT surface partial stdout/stderr in the error
+  message and MUST NOT attempt to return `AgentWrapperMcpCommandOutput` (output is available only in the `Ok(...)` case).
 
 #### Output bounds
 
@@ -245,6 +318,35 @@ If truncation occurs, the output MUST remain valid UTF-8.
 
 These budgets intentionally match the Universal Agent API text bounds used for run events (see
 `docs/specs/universal-agent-api/event-envelope-schema-spec.md` and `docs/specs/universal-agent-api/contract.md`).
+
+##### Output capture + truncation algorithm (pinned)
+
+Budgets are measured in **UTF-8 bytes** of the returned `stdout` / `stderr` strings.
+
+Implementations MUST capture stdout/stderr in a bounded fashion and MUST NOT buffer unbounded output in memory.
+
+For each stream (`stdout`, `stderr`), the backend MUST enforce the following deterministic algorithm:
+
+1) Capture bytes from the subprocess stream in a bounded/streaming manner:
+   - The backend MUST retain at most `bound_bytes + 1` bytes (or equivalently: retain `bound_bytes` bytes plus a
+     "saw more bytes" flag).
+   - Any additional bytes beyond the retained bound MUST be discarded (never buffer unbounded output in memory).
+2) Decode captured bytes as UTF-8:
+   - If decoding fails, the backend MUST use lossy decoding (replace invalid byte sequences with U+FFFD) so the final
+     output is valid UTF-8.
+3) Enforce the byte bound using the same truncation behavior as `event-envelope-schema-spec.md` ("Enforcement behavior"):
+   - Let `bound_bytes` be the pinned budget (65,536).
+   - Let `suffix = "…(truncated)"`.
+   - If the stream output exceeds `bound_bytes` (either because the backend observed additional bytes past the bound, or
+     because the decoded output exceeds the bound), set `<stream>_truncated = true` and:
+     - if `bound_bytes > len(suffix_bytes)`: truncate to `bound_bytes - len(suffix_bytes)` bytes (UTF-8 safe) and append
+       `suffix`;
+     - else: set the output to `"…"` truncated to `bound_bytes` bytes.
+   - If the stream output does not exceed the bound, set `<stream>_truncated = false` and return the decoded output as-is.
+
+The intent of this algorithm is:
+- deterministic output for tests, and
+- bounded memory posture (never buffer beyond the fixed budgets).
 
 ## Safety posture (v1, normative)
 
@@ -269,6 +371,110 @@ Requirements:
     - `agent_api::backends::codex::CodexBackendConfig.allow_mcp_write: bool` (default `false`)
     - `agent_api::backends::claude_code::ClaudeCodeBackendConfig.allow_mcp_write: bool` (default `false`)
     (see `docs/specs/universal-agent-api/contract.md`).
+
+## Built-in backend behavior (v1, normative)
+
+This section pins behavior for the built-in backends shipped by `agent_api` (Codex + Claude Code).
+
+### Target availability source of truth (pinned)
+
+For built-in backends, upstream MCP subcommand availability MUST be determined from the pinned CLI manifest snapshots:
+
+- Codex: `cli_manifests/codex/current.json`
+- Claude Code: `cli_manifests/claude_code/current.json`
+
+The manifest snapshots are the authoritative source of truth for v1 capability advertising and MUST be treated as
+normative for built-in backends.
+
+If the manifest snapshot conflicts with the observed upstream CLI behavior at runtime:
+- the backend MUST NOT silently change its advertised capabilities, and
+- the operation MUST fail with `AgentWrapperError::Backend` (backend fault).
+
+The required remediation is to update the pinned manifest snapshot and mapping logic in a subsequent repo update.
+
+### Default capability advertising posture (built-in backends, pinned)
+
+Legend:
+- ✅ = advertised by default (when the upstream CLI subcommand is available on this target)
+- ❌ = not advertised by default
+
+| Backend | Target availability (pinned) | `list` | `get` | `add` | `remove` |
+| --- | --- | --- | --- | --- | --- |
+| Codex (`codex`) | `cli_manifests/codex/current.json` | ✅ | ✅ | ❌ (requires `allow_mcp_write=true`) | ❌ (requires `allow_mcp_write=true`) |
+| Claude Code (`claude_code`) | `cli_manifests/claude_code/current.json` | ✅ | ✅ on `win32-x64` only | ❌ (requires `win32-x64` **and** `allow_mcp_write=true`) | ❌ (requires `win32-x64` **and** `allow_mcp_write=true`) |
+
+Notes:
+- Read operations (`list/get`) have no additional enablement knob in v1. If the upstream CLI exposes the subcommand on
+  this target, the backend advertises the capability by default.
+- Write operations (`add/remove`) are *always* gated behind explicit backend config opt-in (safe-by-default), even when the
+  upstream CLI supports the subcommand.
+
+### Built-in backend mappings (pinned)
+
+This section pins argv construction for built-in backends. It does not imply cross-backend stdout/stderr parity.
+
+#### Codex backend mapping (`agent_kind == "codex"`)
+
+- `mcp_list` MUST invoke: `codex mcp list --json`
+- `mcp_get` MUST invoke: `codex mcp get --json <name>`
+- `mcp_remove` MUST invoke: `codex mcp remove <name>`
+- `mcp_add`:
+  - `Stdio` MUST invoke:
+    - `codex mcp add <name> [--env KEY=VALUE]* -- <argv...>`
+    - where `<argv...>` is the concatenated `command + args` from the request.
+  - `Url` MUST invoke:
+    - `codex mcp add <name> --url <url> [--bearer-token-env-var <ENV_VAR>]`
+
+#### Claude Code backend mapping (`agent_kind == "claude_code"`)
+
+- `mcp_list` MUST invoke: `claude mcp list`
+- `mcp_get` MUST invoke: `claude mcp get <name>` (only when available on this target per the pinned manifest)
+- `mcp_remove` MUST invoke: `claude mcp remove <name>` (only when available on this target per the pinned manifest)
+- `mcp_add` (only when available on this target per the pinned manifest):
+  - `Stdio` MUST invoke:
+    - `claude mcp add --transport stdio [--env KEY=VALUE]* <name> <commandOrUrl> [args...]`
+    - where `<commandOrUrl>` is `argv[0]` and `[args...]` is the remaining items from `argv[1..]`.
+  - `Url` MUST invoke:
+    - if `bearer_token_env_var == None`:
+      - `claude mcp add --transport http <name> <url>`
+    - if `bearer_token_env_var == Some(_)`:
+      - reject as `AgentWrapperError::InvalidRequest` (no deterministic/safe mapping to `--header` in v1; fail closed).
+
+## Verification policy (this repo; v1, pinned)
+
+This section pins how this repository verifies conformance to this spec for MCP management.
+
+### Unit coverage (pinned)
+
+Unit tests MUST pin:
+- capability gating (`UnsupportedCapability` for unadvertised operations),
+- request validation (trimmed/non-empty server names),
+- transport validation + argv composition (see “Transport field validation (pinned)”),
+- process context precedence + absence semantics (see “Context precedence and absence semantics (pinned)”),
+- command execution semantics (`Ok(output)` for non-zero exit status; execution faults are `Err(Backend)`),
+- output bounds + truncation algorithm (see “Output capture + truncation algorithm (pinned)”),
+- built-in backend advertising + mapping behavior (see “Built-in backend behavior (v1, normative)”).
+
+### Integration coverage + gating (pinned)
+
+To keep CI deterministic and offline:
+
+- Default integration coverage (CI + local) MUST use **hermetic fake binaries** for MCP operations.
+  - Tests MUST generate a fake `codex` / `claude` executable that:
+    - records received argv + relevant environment variables, and
+    - performs any “state mutation” by writing sentinel files beneath the injected isolated home directory.
+  - These tests MUST run under the normal `cargo test` / `make test` flow (no opt-in).
+  - “No network required” is enforced by construction (no real upstream binaries are executed).
+
+- Optional live smoke tests MAY target real installed upstream binaries, but MUST be opt-in and MUST NOT run in CI by
+  default.
+  - Gating mechanism (pinned):
+    - mark live tests as `#[ignore]`, and
+    - require an explicit environment opt-in: `AGENT_API_MCP_LIVE=1`, plus a configured binary path for the targeted
+      backend (backend config `binary`, or environment selection that the wrapper honors such as `CODEX_BINARY` / `CLAUDE_BINARY`).
+  - Live smoke tests MUST still:
+    - run against isolated homes, and
+    - avoid requiring network access to pass (use only `list/get/add/remove`; no networked MCP servers).
 
 ## `Url.bearer_token_env_var` semantics (v1, normative)
 

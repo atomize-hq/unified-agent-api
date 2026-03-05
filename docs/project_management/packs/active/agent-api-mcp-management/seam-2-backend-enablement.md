@@ -40,7 +40,10 @@
 
 ## Pinned defaults (capability advertising)
 
-This table is the **single source of truth** for default MCP capability advertising posture in v1.
+This table is **derived guidance** for implementation and tests.
+
+Canonical source of truth (normative once approved):
+- `docs/specs/universal-agent-api/mcp-management-spec.md` → “Built-in backend behavior” → “Default capability advertising posture”
 
 Legend:
 - ✅ = advertised by default (when the upstream CLI subcommand is available on this target)

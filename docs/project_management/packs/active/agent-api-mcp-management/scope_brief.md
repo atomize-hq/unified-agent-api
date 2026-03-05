@@ -95,8 +95,10 @@ Treating this as `AgentWrapperRunRequest.extensions` is a category error: MCP ma
 
 - **Claude URL auth mapping (resolved)**: pinned behavior is to reject `Url.bearer_token_env_var` as `InvalidRequest` for
   Claude (no deterministic/safe mapping to `claude mcp add --header` in v1; see SEAM-4).
-- **Claude subcommand availability variance**: the CLI manifest snapshot appears to omit some MCP subcommands on non-Windows
-  targets; confirm real-world CLI parity and avoid relying on snapshot artifacts.
+- **Claude subcommand availability variance (pinned for v1)**: the pinned CLI manifest snapshot shows `mcp get/add/remove`
+  only on `win32-x64`. Treat the manifest snapshots as the authoritative source of truth for v1 capability advertising and
+  target availability gating. If observed upstream CLI behavior differs at runtime, treat it as drift/bug and update the
+  pinned manifests + mapping in a follow-up (do not silently change advertised capabilities at runtime).
 - **Isolated home wiring (resolved)**: pinned backend config fields and wrapper mapping live in SEAM-2 (`codex_home` /
   `claude_home`; no parent env mutation).
 

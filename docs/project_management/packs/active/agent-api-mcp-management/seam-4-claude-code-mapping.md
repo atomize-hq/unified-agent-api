@@ -10,12 +10,14 @@
 ### In
 
 - Implement `AgentWrapperBackend::{mcp_list,mcp_get,mcp_add,mcp_remove}` for the Claude Code backend.
-- Map universal requests to Claude CLI semantics (pinned by CLI manifest snapshot):
+- Map universal requests to Claude CLI semantics as pinned in the canonical MCP management spec:
+  - `docs/specs/universal-agent-api/mcp-management-spec.md` → “Built-in backend behavior” → “Built-in backend mappings (pinned)”
+  - (target availability is still pinned by the CLI manifest snapshot)
   - `list` → `claude mcp list`
   - `get` → `claude mcp get <name>` (**win32-x64 only** in the pinned Claude Code CLI manifest)
   - `remove` → `claude mcp remove <name>` (**win32-x64 only**; also gated by write enablement in SEAM-2)
   - `add` (**win32-x64 only**; gated by write enablement in SEAM-2):
-    - `Stdio` → `claude mcp add [--transport stdio] [--env KEY=value]* <name> <command> [args...]`
+    - `Stdio` → `claude mcp add --transport stdio [--env KEY=value]* <name> <command> [args...]`
     - `Url`:
       - when `bearer_token_env_var == None` → `claude mcp add --transport http <name> <url>`
       - when `bearer_token_env_var == Some(_)` → reject as `InvalidRequest` (pinned; no deterministic/safe mapping to `--header` in v1)
