@@ -108,6 +108,107 @@ fn bh_c02_unknown_extension_key_is_rejected_via_normalize_request() {
 }
 
 #[test]
+fn bh_r0_external_sandbox_key_is_rejected_before_policy_validation_via_normalize_request() {
+    struct PanicOnPolicyAdapter;
+
+    impl BackendHarnessAdapter for PanicOnPolicyAdapter {
+        fn kind(&self) -> crate::AgentWrapperKind {
+            toy_kind()
+        }
+
+        fn supported_extension_keys(&self) -> &'static [&'static str] {
+            &["agent_api.exec.non_interactive"]
+        }
+
+        type Policy = ToyPolicy;
+
+        fn validate_and_extract_policy(
+            &self,
+            _request: &AgentWrapperRunRequest,
+        ) -> Result<Self::Policy, crate::AgentWrapperError> {
+            panic!("validate_and_extract_policy must not be called for unsupported keys");
+        }
+
+        type BackendEvent = ToyEvent;
+        type BackendCompletion = ToyCompletion;
+        type BackendError = ToyBackendError;
+
+        fn spawn(
+            &self,
+            _req: NormalizedRequest<Self::Policy>,
+        ) -> std::pin::Pin<
+            Box<
+                dyn std::future::Future<
+                        Output = Result<
+                            super::super::contract::BackendSpawn<
+                                Self::BackendEvent,
+                                Self::BackendCompletion,
+                                Self::BackendError,
+                            >,
+                            Self::BackendError,
+                        >,
+                    > + Send
+                    + 'static,
+            >,
+        > {
+            panic!("spawn must not be called from normalize_request");
+        }
+
+        fn map_event(&self, _event: Self::BackendEvent) -> Vec<crate::AgentWrapperEvent> {
+            panic!("map_event must not be called from normalize_request");
+        }
+
+        fn map_completion(
+            &self,
+            _completion: Self::BackendCompletion,
+        ) -> Result<AgentWrapperCompletion, crate::AgentWrapperError> {
+            panic!("map_completion must not be called from normalize_request");
+        }
+
+        fn redact_error(
+            &self,
+            _phase: BackendHarnessErrorPhase,
+            _err: &Self::BackendError,
+        ) -> String {
+            panic!("redact_error must not be called from normalize_request");
+        }
+    }
+
+    let adapter = PanicOnPolicyAdapter;
+    let defaults = BackendDefaults::default();
+    let secret = "SECRET_SHOULD_NOT_LEAK";
+
+    let mut request = AgentWrapperRunRequest {
+        prompt: "hello".to_string(),
+        ..Default::default()
+    };
+    request.extensions.insert(
+        "agent_api.exec.external_sandbox.v1".to_string(),
+        Value::String(secret.to_string()),
+    );
+    request.extensions.insert(
+        "agent_api.exec.non_interactive".to_string(),
+        Value::Bool(false),
+    );
+
+    let err = match normalize_request(&adapter, &defaults, request) {
+        Ok(_) => panic!("unsupported key must fail closed"),
+        Err(err) => err,
+    };
+    match &err {
+        AgentWrapperError::UnsupportedCapability {
+            agent_kind,
+            capability,
+        } => {
+            assert_eq!(agent_kind, "toy");
+            assert_eq!(capability, "agent_api.exec.external_sandbox.v1");
+        }
+        other => panic!("expected UnsupportedCapability, got: {other:?}"),
+    }
+    assert!(!err.to_string().contains(secret));
+}
+
+#[test]
 fn bh_r0_unsupported_capability_beats_contradiction_rules_for_resume_fork_via_normalize_request() {
     struct PanicOnPolicyAdapter;
 
