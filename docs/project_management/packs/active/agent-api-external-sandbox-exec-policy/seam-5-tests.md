@@ -19,10 +19,19 @@
   - Mapping tests (required; pinned):
     - Codex (exec + resume): argv MUST contain `--dangerously-bypass-approvals-and-sandbox` and MUST
       NOT contain any of: `--full-auto`, `--ask-for-approval`, `--sandbox`.
+    - Codex (exec + resume, rejected override): if the installed Codex binary rejects
+      `--dangerously-bypass-approvals-and-sandbox`, the backend MUST fail closed as
+      `AgentWrapperError::Backend { .. }` with a safe/redacted message, and MUST NOT retry with
+      alternate flags.
     - Codex (fork/app-server): RPC MUST use:
       - `approvalPolicy="never"` (thread/fork + turn/start)
       - `sandbox="danger-full-access"` (thread/fork)
       per `docs/specs/codex-external-sandbox-mapping-contract.md`.
+    - Codex (fork/app-server, rejected mapping primitive): if the app-server rejects the pinned
+      `approvalPolicy` / `sandbox` values, the backend MUST fail closed as
+      `AgentWrapperError::Backend { .. }` with a safe/redacted message, MUST NOT retry with
+      alternate params, and MUST emit the pinned terminal error event when the events stream
+      remains open.
     - Claude Code: argv MUST contain `--dangerously-skip-permissions`, and MUST include/exclude
       `--allow-dangerously-skip-permissions` exactly per the pinned help-preflight strategy in
       `docs/specs/claude-code-session-mapping-contract.md`:
@@ -41,7 +50,8 @@
 ## Primary interfaces (contracts)
 
 - **Inputs**: `AgentWrapperRunRequest.extensions` combinations
-- **Outputs**: `UnsupportedCapability` / `InvalidRequest` errors, and deterministic argv/mapping behavior
+- **Outputs**: `UnsupportedCapability` / `InvalidRequest` / backend fail-closed errors, and
+  deterministic argv/mapping behavior
 
 ## Dependencies
 

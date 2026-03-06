@@ -26,9 +26,17 @@
     - Mapping tests (required; pinned):
       - Codex (exec + resume): argv MUST contain `--dangerously-bypass-approvals-and-sandbox` and
         MUST NOT contain any of: `--full-auto`, `--ask-for-approval`, `--sandbox` (ES-C04).
+      - Codex (exec + resume, rejected override): if the installed Codex binary rejects
+        `--dangerously-bypass-approvals-and-sandbox`, the backend returns
+        `AgentWrapperError::Backend { .. }` with a safe/redacted message and performs no fallback
+        retry (ES-C04).
       - Codex (fork/app-server): RPC MUST use `approvalPolicy="never"` and
         `sandbox="danger-full-access"` on `thread/fork`, and `approvalPolicy="never"` on
         `turn/start` (ES-C04).
+      - Codex (fork/app-server, rejected mapping primitive): if the app-server rejects the pinned
+        `approvalPolicy` / `sandbox` values, the backend returns `AgentWrapperError::Backend { .. }`
+        with a safe/redacted message, performs no fallback retry, and emits the pinned terminal
+        error event when the stream remains open (ES-C04).
       - Claude Code: argv MUST contain `--dangerously-skip-permissions`, and MUST include/exclude
         `--allow-dangerously-skip-permissions` exactly per the pinned help-preflight strategy
         (ES-C05/ES-C07).
@@ -66,7 +74,8 @@
 - `S2` → `slice-2-validation-contradictions.md`: pin backend validation + contradiction behavior
   (type checks, ES-C02/ES-C06), proving failure before spawn.
 - `S3` → `slice-3-mapping-conformance.md`: pin the backend-owned mapping contracts (Codex argv + RPC,
-  Claude argv + allow-flag preflight) and the required warning event ordering.
+  Codex rejection-path fail-closed behavior, Claude argv + allow-flag preflight, and the required
+  warning event ordering.
 
 ## Threading Alignment (mandatory)
 
@@ -80,7 +89,8 @@
   - `ES-C03` (SEAM-2): safe default advertising + opt-in gate (`allow_external_sandbox_exec`).
     - Consumed by: `S1` (capabilities/advertising tests) + `S1` (unsupported-key ordering tests).
   - `ES-C04` (SEAM-3): Codex mapping contract (exec/resume argv; fork/app-server RPC).
-    - Consumed by: `S3.T1` (exec/resume argv tests) + `S3.T2` (fork/app-server param tests).
+    - Consumed by: `S3.T1` (exec/resume argv exactness + rejected-override fail-closed tests) +
+      `S3.T2` (fork/app-server param exactness + rejected-mapping fail-closed tests).
   - `ES-C05` (SEAM-4): Claude mapping contract (`--dangerously-skip-permissions`).
     - Consumed by: `S3.T3` (argv tests).
   - `ES-C06` (SEAM-1): exec-policy combination rule (`backend.<agent_kind>.exec.*` keys forbidden in
@@ -97,4 +107,3 @@
   - What can proceed now: `S1` can land once SEAM-1/SEAM-2 are stable.
   - What must wait: `S3` mapping tests must wait for SEAM-3/SEAM-4 implementations; `S2` validation
     tests that require the key to be supported depend on SEAM-2 opt-in gating.
-
