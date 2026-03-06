@@ -10,7 +10,6 @@ use std::{
 
 use codex::{CodexError, ExecStreamError, ThreadEvent};
 use futures_util::StreamExt;
-use serde_json::Value;
 
 use super::session_selectors::{
     parse_session_resume_v1, validate_resume_fork_mutual_exclusion, SessionSelectorV1,
@@ -53,28 +52,6 @@ impl CodexBackend {
     }
 }
 
-const EXT_NON_INTERACTIVE: &str = "agent_api.exec.non_interactive";
-const EXT_EXTERNAL_SANDBOX_V1: &str = "agent_api.exec.external_sandbox.v1";
-const EXT_CODEX_APPROVAL_POLICY: &str = "backend.codex.exec.approval_policy";
-const EXT_CODEX_SANDBOX_MODE: &str = "backend.codex.exec.sandbox_mode";
-
-const SUPPORTED_EXTENSION_KEYS_DEFAULT: &[&str] = &[
-    EXT_NON_INTERACTIVE,
-    EXT_CODEX_APPROVAL_POLICY,
-    EXT_CODEX_SANDBOX_MODE,
-    EXT_SESSION_RESUME_V1,
-    EXT_SESSION_FORK_V1,
-];
-
-const SUPPORTED_EXTENSION_KEYS_EXTERNAL_SANDBOX_OPT_IN: &[&str] = &[
-    EXT_NON_INTERACTIVE,
-    EXT_CODEX_APPROVAL_POLICY,
-    EXT_CODEX_SANDBOX_MODE,
-    EXT_SESSION_RESUME_V1,
-    EXT_SESSION_FORK_V1,
-    EXT_EXTERNAL_SANDBOX_V1,
-];
-
 const PINNED_APPROVAL_REQUIRED: &str = "approval required";
 const PINNED_TIMEOUT: &str = "codex backend error: timeout (details redacted when unsafe)";
 const PINNED_NO_SESSION_FOUND: &str = "no session found";
@@ -103,151 +80,6 @@ fn is_not_found_signal(text: &str) -> bool {
         || text.contains("unknown thread")
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
-enum CodexApprovalPolicy {
-    Untrusted,
-    OnFailure,
-    OnRequest,
-    Never,
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-enum CodexSandboxMode {
-    ReadOnly,
-    WorkspaceWrite,
-    DangerFullAccess,
-}
-
-fn parse_bool(value: &Value, key: &str) -> Result<bool, AgentWrapperError> {
-    value
-        .as_bool()
-        .ok_or_else(|| AgentWrapperError::InvalidRequest {
-            message: format!("{key} must be a boolean"),
-        })
-}
-
-fn parse_string<'a>(value: &'a Value, key: &str) -> Result<&'a str, AgentWrapperError> {
-    value
-        .as_str()
-        .ok_or_else(|| AgentWrapperError::InvalidRequest {
-            message: format!("{key} must be a string"),
-        })
-}
-
-fn parse_codex_approval_policy(value: &Value) -> Result<CodexApprovalPolicy, AgentWrapperError> {
-    let raw = parse_string(value, EXT_CODEX_APPROVAL_POLICY)?;
-    match raw {
-        "untrusted" => Ok(CodexApprovalPolicy::Untrusted),
-        "on-failure" => Ok(CodexApprovalPolicy::OnFailure),
-        "on-request" => Ok(CodexApprovalPolicy::OnRequest),
-        "never" => Ok(CodexApprovalPolicy::Never),
-        other => Err(AgentWrapperError::InvalidRequest {
-            message: format!(
-                "{EXT_CODEX_APPROVAL_POLICY} must be one of: untrusted | on-failure | on-request | never (got {other:?})"
-            ),
-        }),
-    }
-}
-
-fn parse_codex_sandbox_mode(value: &Value) -> Result<CodexSandboxMode, AgentWrapperError> {
-    let raw = parse_string(value, EXT_CODEX_SANDBOX_MODE)?;
-    match raw {
-        "read-only" => Ok(CodexSandboxMode::ReadOnly),
-        "workspace-write" => Ok(CodexSandboxMode::WorkspaceWrite),
-        "danger-full-access" => Ok(CodexSandboxMode::DangerFullAccess),
-        other => Err(AgentWrapperError::InvalidRequest {
-            message: format!(
-                "{EXT_CODEX_SANDBOX_MODE} must be one of: read-only | workspace-write | danger-full-access (got {other:?})"
-            ),
-        }),
-    }
-}
-
-#[derive(Clone, Debug)]
-struct CodexExecPolicy {
-    non_interactive: bool,
-    external_sandbox: bool,
-    approval_policy: Option<CodexApprovalPolicy>,
-    sandbox_mode: CodexSandboxMode,
-    resume: Option<SessionSelectorV1>,
-    fork: Option<SessionSelectorV1>,
-}
-
-fn validate_and_extract_exec_policy(
-    request: &AgentWrapperRunRequest,
-) -> Result<CodexExecPolicy, AgentWrapperError> {
-    let non_interactive_requested: Option<bool> = request
-        .extensions
-        .get(EXT_NON_INTERACTIVE)
-        .map(|value| parse_bool(value, EXT_NON_INTERACTIVE))
-        .transpose()?;
-    let non_interactive = non_interactive_requested.unwrap_or(true);
-
-    let external_sandbox = request
-        .extensions
-        .get(EXT_EXTERNAL_SANDBOX_V1)
-        .map(|value| parse_bool(value, EXT_EXTERNAL_SANDBOX_V1))
-        .transpose()?
-        .unwrap_or(false);
-
-    if external_sandbox {
-        if non_interactive_requested == Some(false) {
-            return Err(AgentWrapperError::InvalidRequest {
-                message: format!(
-                    "{EXT_EXTERNAL_SANDBOX_V1}=true must not be combined with {EXT_NON_INTERACTIVE}=false"
-                ),
-            });
-        }
-
-        if request
-            .extensions
-            .keys()
-            .any(|key| key.starts_with("backend.codex.exec."))
-        {
-            return Err(AgentWrapperError::InvalidRequest {
-                message: format!(
-                    "{EXT_EXTERNAL_SANDBOX_V1}=true must not be combined with backend.codex.exec.* keys"
-                ),
-            });
-        }
-    }
-
-    let approval_policy = request
-        .extensions
-        .get(EXT_CODEX_APPROVAL_POLICY)
-        .map(parse_codex_approval_policy)
-        .transpose()?;
-
-    let sandbox_mode = request
-        .extensions
-        .get(EXT_CODEX_SANDBOX_MODE)
-        .map(parse_codex_sandbox_mode)
-        .transpose()?
-        .unwrap_or(CodexSandboxMode::WorkspaceWrite);
-
-    if non_interactive
-        && matches!(
-            approval_policy,
-            Some(ref policy) if policy != &CodexApprovalPolicy::Never
-        )
-    {
-        return Err(AgentWrapperError::InvalidRequest {
-            message: format!(
-                "{EXT_CODEX_APPROVAL_POLICY} must be \"never\" when {EXT_NON_INTERACTIVE} is true"
-            ),
-        });
-    }
-
-    Ok(CodexExecPolicy {
-        non_interactive,
-        external_sandbox,
-        approval_policy,
-        sandbox_mode,
-        resume: None,
-        fork: None,
-    })
-}
-
 const CAP_TOOLS_STRUCTURED_V1: &str = "agent_api.tools.structured.v1";
 const CAP_TOOLS_RESULTS_V1: &str = "agent_api.tools.results.v1";
 const CAP_ARTIFACTS_FINAL_TEXT_V1: &str = "agent_api.artifacts.final_text.v1";
@@ -266,6 +98,16 @@ mod exec;
 
 #[path = "codex/fork.rs"]
 mod fork;
+
+#[path = "codex/policy.rs"]
+mod policy;
+
+use policy::{
+    validate_and_extract_exec_policy, CodexApprovalPolicy, CodexExecPolicy, CodexSandboxMode,
+    SUPPORTED_EXTENSION_KEYS_DEFAULT, SUPPORTED_EXTENSION_KEYS_EXTERNAL_SANDBOX_OPT_IN,
+    EXT_CODEX_APPROVAL_POLICY, EXT_CODEX_SANDBOX_MODE, EXT_EXTERNAL_SANDBOX_V1,
+    EXT_NON_INTERACTIVE,
+};
 
 use mapping::{error_event, map_thread_event};
 
