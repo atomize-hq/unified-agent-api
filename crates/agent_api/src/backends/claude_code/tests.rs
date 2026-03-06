@@ -71,6 +71,19 @@ fn success_exit_status() -> std::process::ExitStatus {
     }
 }
 
+fn exit_status_with_code(code: i32) -> std::process::ExitStatus {
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::ExitStatusExt;
+        std::process::ExitStatus::from_raw(code << 8)
+    }
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::ExitStatusExt;
+        std::process::ExitStatus::from_raw(code as u32)
+    }
+}
+
 fn new_adapter() -> ClaudeHarnessAdapter {
     ClaudeHarnessAdapter {
         config: ClaudeCodeBackendConfig::default(),
@@ -175,6 +188,62 @@ fn claude_backend_fails_closed_for_external_sandbox_extension_when_opt_in_disabl
         }
         other => panic!("expected UnsupportedCapability, got: {other:?}"),
     }
+}
+
+#[tokio::test]
+async fn allow_flag_preflight_retries_after_failure() {
+    let cell = OnceCell::new();
+
+    let result = preflight_allow_flag_support(&cell, || async {
+        Ok::<_, claude_code::ClaudeCodeError>(claude_code::CommandOutput {
+            status: exit_status_with_code(1),
+            stdout: Vec::new(),
+            stderr: Vec::new(),
+        })
+    })
+    .await;
+
+    assert!(result.is_err(), "preflight should surface the failure");
+    assert!(
+        cell.get().is_none(),
+        "failed preflight should not initialize the OnceCell"
+    );
+
+    let supported = preflight_allow_flag_support(&cell, || async {
+        Ok::<_, claude_code::ClaudeCodeError>(claude_code::CommandOutput {
+            status: success_exit_status(),
+            stdout: b"--allow-dangerously-skip-permissions".to_vec(),
+            stderr: Vec::new(),
+        })
+    })
+    .await
+    .expect("preflight should succeed");
+
+    assert!(supported);
+    assert_eq!(cell.get().copied(), Some(true));
+
+    let called = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let called_clone = std::sync::Arc::clone(&called);
+    let supported = preflight_allow_flag_support(&cell, move || {
+        let called = std::sync::Arc::clone(&called_clone);
+        async move {
+            called.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            Ok::<_, claude_code::ClaudeCodeError>(claude_code::CommandOutput {
+                status: success_exit_status(),
+                stdout: Vec::new(),
+                stderr: Vec::new(),
+            })
+        }
+    })
+    .await
+    .expect("cached preflight should succeed");
+
+    assert!(supported);
+    assert_eq!(
+        called.load(std::sync::atomic::Ordering::SeqCst),
+        0,
+        "cached preflight should not re-run help()"
+    );
 }
 
 #[test]

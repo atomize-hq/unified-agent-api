@@ -117,6 +117,39 @@ fn help_supports_allow_flag(stdout: &str) -> bool {
     stdout.contains("--allow-dangerously-skip-permissions")
 }
 
+async fn preflight_allow_flag_support<F, Fut>(
+    cell: &OnceCell<bool>,
+    help: F,
+) -> Result<bool, String>
+where
+    F: FnOnce() -> Fut,
+    Fut: Future<Output = Result<claude_code::CommandOutput, claude_code::ClaudeCodeError>>,
+{
+    let supported = cell
+        .get_or_try_init(move || async move {
+            let output = match help().await {
+                Ok(output) => output,
+                Err(err) => return Err(format!("claude --help preflight failed: {err}")),
+            };
+
+            if !output.status.success() {
+                let message = match output.status.code() {
+                    Some(code) => {
+                        format!("claude --help exited non-zero: code={code} (output redacted)")
+                    }
+                    None => "claude --help exited non-zero (output redacted)".to_string(),
+                };
+                return Err(message);
+            }
+
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            Ok(help_supports_allow_flag(&stdout))
+        })
+        .await?;
+
+    Ok(*supported)
+}
+
 #[path = "claude_code/mapping.rs"]
 mod mapping;
 
@@ -147,7 +180,7 @@ pub struct ClaudeCodeBackendConfig {
 
 pub struct ClaudeCodeBackend {
     config: ClaudeCodeBackendConfig,
-    allow_flag_preflight: Arc<OnceCell<Result<bool, String>>>,
+    allow_flag_preflight: Arc<OnceCell<bool>>,
 }
 
 impl ClaudeCodeBackend {
@@ -166,7 +199,7 @@ struct ClaudeHarnessAdapter {
         std::sync::Arc<super::termination::TerminationState<claude_code::ClaudeTerminationHandle>>,
     >,
     handle_state: Arc<Mutex<ClaudeHandleFacetState>>,
-    allow_flag_preflight: Arc<OnceCell<Result<bool, String>>>,
+    allow_flag_preflight: Arc<OnceCell<bool>>,
 }
 
 #[derive(Clone, Debug)]
@@ -344,38 +377,12 @@ impl BackendHarnessAdapter for ClaudeHarnessAdapter {
 
             let mut allow_dangerously_skip_permissions = false;
             if req.policy.external_sandbox {
-                let cached = allow_flag_preflight
-                    .get_or_init(|| async {
-                        let output = match client.help().await {
-                            Ok(output) => output,
-                            Err(err) => {
-                                return Err(format!("claude --help preflight failed: {err}"))
-                            }
-                        };
-
-                        if !output.status.success() {
-                            let message = match output.status.code() {
-                                Some(code) => format!(
-                                    "claude --help exited non-zero: code={code} (output redacted)"
-                                ),
-                                None => "claude --help exited non-zero (output redacted)".to_string(),
-                            };
-                            return Err(message);
-                        }
-
-                        let stdout = String::from_utf8_lossy(&output.stdout);
-                        Ok(help_supports_allow_flag(&stdout))
-                    })
-                    .await;
-
-                match cached {
-                    Ok(supported) => allow_dangerously_skip_permissions = *supported,
-                    Err(message) => {
-                        return Err(ClaudeBackendError::ExternalSandboxPreflight {
-                            message: message.clone(),
-                        });
-                    }
-                }
+                allow_dangerously_skip_permissions =
+                    preflight_allow_flag_support(allow_flag_preflight.as_ref(), || client.help())
+                        .await
+                        .map_err(|message| ClaudeBackendError::ExternalSandboxPreflight {
+                            message,
+                        })?;
             }
 
             let mut print_req = ClaudePrintRequest::new(req.prompt)
