@@ -13,10 +13,11 @@
           - when `bearer_token_env_var == None` → `claude mcp add --transport http <name> <url>`
           - when `bearer_token_env_var == Some(_)` → reject as `InvalidRequest` (pinned; fail closed).
     - Enforce fail-closed write gating:
-      - if `agent_api.tools.mcp.{add,remove}.v1` is not advertised (including `allow_mcp_write=false`), return `UnsupportedCapability`.
+      - if `agent_api.tools.mcp.{add,remove}.v1` is not advertised (including
+        `ClaudeCodeBackendConfig.allow_mcp_write=false`), return `UnsupportedCapability`.
     - Reuse S1 runner for context precedence + bounded output + timeout behavior.
   - Out:
-    - Capability advertising + `allow_mcp_write` enablement (SEAM-2).
+    - Capability advertising + `ClaudeCodeBackendConfig.allow_mcp_write` enablement (SEAM-2).
     - Cross-backend hermetic fake-binary integration tests (SEAM-5).
 - **Acceptance criteria**:
   - `mcp_remove` invokes `claude mcp remove <name>` and returns bounded `AgentWrapperMcpCommandOutput` on supported targets.
@@ -31,13 +32,15 @@
     - return `Err(Backend)` only on spawn/wait/timeout/capture failures or manifest/runtime conflicts (pinned).
 - **Dependencies**:
   - SEAM-1: typed add transport + transport validation helper + output enforcement helper (MM-C05/MM-C04).
-  - SEAM-2: `allow_mcp_write` gating + isolated homes (`claude_home`) + write capability advertising (MM-C06/MM-C07) and
-    pinned `win32-x64` availability for `get/add/remove` (MM-C09).
+  - SEAM-2: `ClaudeCodeBackendConfig.allow_mcp_write` gating + isolated homes (`claude_home`) +
+    write capability advertising (MM-C06/MM-C07) and pinned `win32-x64` availability for
+    `get/add/remove` (MM-C09).
   - S1: bounded runner and capture primitive.
 - **Verification**:
   - `cargo test -p agent_api --features claude_code` (unit tests for argv composition + gating + bearer-token rejection)
 - **Rollout/safety**:
-  - Safe-by-default: write ops remain unreachable unless enabled via backend config (SEAM-2).
+  - Safe-by-default: write ops remain unreachable while
+    `ClaudeCodeBackendConfig.allow_mcp_write == false` (the default) (SEAM-2).
   - Isolated homes reduce user-state mutation risk; request env overrides can defeat isolation by design (pinned).
 
 ## Atomic Tasks
@@ -76,7 +79,8 @@ Checklist:
 
 - **Outcome**: Claude backend supports MCP write operations with pinned gating + execution semantics.
 - **Inputs/outputs**:
-  - Input: SEAM-2 write advertising (`allow_mcp_write`) + SEAM-1 hook signatures + validation helper
+  - Input: SEAM-2 write advertising (`ClaudeCodeBackendConfig.allow_mcp_write`) + SEAM-1 hook
+    signatures + validation helper
   - Output:
     - `crates/agent_api/src/backends/claude_code.rs`: add MCP hook methods and forward to Claude MCP helper module
     - `crates/agent_api/src/backends/claude_code/mcp_management.rs`: hook implementations using the S1 runner
@@ -88,10 +92,13 @@ Checklist:
     - `Stdio.env` maps to repeated `--env KEY=VALUE` args (persisted by the upstream CLI),
     - `request.context.env` maps to the *CLI process environment* only.
 - **Acceptance criteria**:
-  - When `allow_mcp_write=false` (default), `mcp_add/remove` are fail-closed (`UnsupportedCapability`) even if invoked directly.
+  - When `ClaudeCodeBackendConfig.allow_mcp_write=false` (default), `mcp_add/remove` are
+    fail-closed (`UnsupportedCapability`) even if invoked directly.
   - When enabled + advertised on `win32-x64`, hooks spawn the pinned argv and return bounded `Ok(output)` regardless of exit status.
   - `Url.bearer_token_env_var == Some(_)` returns `InvalidRequest` before spawning any subprocess (pinned).
 - **Test notes**:
+  - Assert write-capability presence/absence via backend `capabilities().ids`, not the generated
+    capability matrix.
   - Unit tests can assert gating + argv composition + invalid-request behavior; hermetic fake binary execution is owned by SEAM-5.
 - **Risk/rollback notes**:
   - Behavior is gated behind explicit enablement; rollback is removing/disable the hooks.
@@ -129,4 +136,3 @@ Checklist:
 
 - SEAM-5 will pin end-to-end behavior with a fake `claude` binary that records argv + env and writes state beneath the
   injected isolated home directory to assert writes are localized and gating is respected.
-
