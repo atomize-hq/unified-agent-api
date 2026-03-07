@@ -91,6 +91,9 @@ use util::{
 #[path = "claude_code/mapping.rs"]
 mod mapping;
 
+#[path = "claude_code/mcp_management.rs"]
+mod mcp_management;
+
 use mapping::{
     error_event, extract_assistant_message_final_text, map_stream_json_event, session_handle_facet,
     status_event,
