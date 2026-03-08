@@ -54,6 +54,14 @@ fn main() -> io::Result<()> {
             std::process::exit(7);
         }
         "sleep_for_timeout" => {
+            write_payload(
+                &mut io::stdout().lock(),
+                b"fake_codex_mcp timeout stdout sentinel\n",
+            )?;
+            write_payload(
+                &mut io::stderr().lock(),
+                b"fake_codex_mcp timeout stderr sentinel\n",
+            )?;
             thread::sleep(Duration::from_millis(SLEEP_FOR_TIMEOUT_MS));
             Ok(())
         }

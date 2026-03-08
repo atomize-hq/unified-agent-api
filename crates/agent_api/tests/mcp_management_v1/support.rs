@@ -84,6 +84,32 @@ impl McpTestSandbox {
         let text = fs::read_to_string(&self.record_path)?;
         parse_records(&text)
     }
+
+    pub(crate) fn read_single_record(&self) -> io::Result<FakeInvocationRecord> {
+        let mut records = self.read_records()?;
+        match records.len() {
+            1 => Ok(records.remove(0)),
+            0 => Err(invalid_data(
+                "expected exactly one invocation record, found none".into(),
+            )),
+            count => Err(invalid_data(format!(
+                "expected exactly one invocation record, found {count}"
+            ))),
+        }
+    }
+}
+
+pub(crate) fn fake_mcp_sentinel(home_root: &Path, operation: &str) -> PathBuf {
+    home_root
+        .join(".agent_api_fake_mcp")
+        .join(format!("{operation}.sentinel"))
+}
+
+pub(crate) fn collect_fake_mcp_sentinels(root: &Path) -> io::Result<Vec<PathBuf>> {
+    let mut sentinels = Vec::new();
+    collect_fake_mcp_sentinels_from(root, &mut sentinels)?;
+    sentinels.sort();
+    Ok(sentinels)
 }
 
 fn install_fake_binary(source: &Path, destination: &Path) -> io::Result<PathBuf> {
@@ -102,6 +128,33 @@ fn install_fake_binary(source: &Path, destination: &Path) -> io::Result<PathBuf>
             Ok(destination.to_path_buf())
         }
     }
+}
+
+fn collect_fake_mcp_sentinels_from(root: &Path, sentinels: &mut Vec<PathBuf>) -> io::Result<()> {
+    if !root.exists() {
+        return Ok(());
+    }
+
+    for entry in fs::read_dir(root)? {
+        let entry = entry?;
+        let path = entry.path();
+        let file_type = entry.file_type()?;
+        if file_type.is_dir() {
+            collect_fake_mcp_sentinels_from(&path, sentinels)?;
+            continue;
+        }
+
+        if path
+            .parent()
+            .and_then(Path::file_name)
+            .is_some_and(|name| name == ".agent_api_fake_mcp")
+            && path.extension().is_some_and(|ext| ext == "sentinel")
+        {
+            sentinels.push(path);
+        }
+    }
+
+    Ok(())
 }
 
 fn parse_records(text: &str) -> io::Result<Vec<FakeInvocationRecord>> {
