@@ -178,6 +178,57 @@ fn claude_backend_mcp_write_capabilities_require_opt_in_and_target_support() {
     );
 }
 
+#[tokio::test]
+async fn claude_backend_mcp_list_fails_closed_when_read_capability_is_unavailable() {
+    if claude_mcp_list_supported_on_target() {
+        return;
+    }
+
+    let backend = ClaudeCodeBackend::new(ClaudeCodeBackendConfig::default());
+    let err = backend
+        .mcp_list(crate::mcp::AgentWrapperMcpListRequest::default())
+        .await
+        .expect_err("unsupported target should fail closed");
+
+    match err {
+        AgentWrapperError::UnsupportedCapability {
+            agent_kind,
+            capability,
+        } => {
+            assert_eq!(agent_kind, "claude_code");
+            assert_eq!(capability, CAPABILITY_MCP_LIST_V1);
+        }
+        other => panic!("expected UnsupportedCapability, got: {other:?}"),
+    }
+}
+
+#[tokio::test]
+async fn claude_backend_mcp_get_fails_closed_when_read_capability_is_unavailable() {
+    if claude_mcp_get_supported_on_target() {
+        return;
+    }
+
+    let backend = ClaudeCodeBackend::new(ClaudeCodeBackendConfig::default());
+    let err = backend
+        .mcp_get(crate::mcp::AgentWrapperMcpGetRequest {
+            name: "demo".to_string(),
+            context: Default::default(),
+        })
+        .await
+        .expect_err("unsupported target should fail closed");
+
+    match err {
+        AgentWrapperError::UnsupportedCapability {
+            agent_kind,
+            capability,
+        } => {
+            assert_eq!(agent_kind, "claude_code");
+            assert_eq!(capability, CAPABILITY_MCP_GET_V1);
+        }
+        other => panic!("expected UnsupportedCapability, got: {other:?}"),
+    }
+}
+
 #[test]
 fn claude_backend_does_not_advertise_external_sandbox_exec_by_default() {
     let backend = ClaudeCodeBackend::new(ClaudeCodeBackendConfig::default());

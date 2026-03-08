@@ -39,6 +39,8 @@ const LOCALAPPDATA_ENV: &str = "LOCALAPPDATA";
 
 const PINNED_CAPTURE_FAILURE: &str =
     "claude_code backend error: capture (details redacted when unsafe)";
+const PINNED_MCP_RUNTIME_CONFLICT: &str =
+    "claude_code backend error: installed claude does not support pinned mcp management command shape (details redacted)";
 const PINNED_PREPARE_CLAUDE_HOME_FAILURE: &str =
     "claude_code backend error: prepare CLAUDE_HOME (details redacted when unsafe)";
 const PINNED_SPAWN_FAILURE: &str =
@@ -86,25 +88,7 @@ pub(super) async fn run_claude_mcp(
 ) -> Result<AgentWrapperMcpCommandOutput, AgentWrapperError> {
     let resolved = resolve_claude_mcp_command(&config, &context);
     let captured = capture_claude_mcp_output(&resolved, &argv).await?;
-
-    let (stdout, stdout_truncated) = enforce_mcp_output_bound(
-        &captured.stdout_bytes,
-        captured.stdout_saw_more,
-        MCP_STDOUT_BOUND_BYTES,
-    );
-    let (stderr, stderr_truncated) = enforce_mcp_output_bound(
-        &captured.stderr_bytes,
-        captured.stderr_saw_more,
-        MCP_STDERR_BOUND_BYTES,
-    );
-
-    Ok(AgentWrapperMcpCommandOutput {
-        status: captured.status,
-        stdout,
-        stderr,
-        stdout_truncated,
-        stderr_truncated,
-    })
+    finalize_claude_mcp_output(&argv, captured)
 }
 
 fn resolve_claude_mcp_command(
@@ -245,6 +229,81 @@ async fn capture_claude_mcp_output(
     })
 }
 
+fn finalize_claude_mcp_output(
+    argv: &[OsString],
+    captured: CapturedClaudeMcpCommandOutput,
+) -> Result<AgentWrapperMcpCommandOutput, AgentWrapperError> {
+    if !captured.status.success()
+        && is_manifest_runtime_conflict(argv, &captured.stdout_bytes, &captured.stderr_bytes)
+    {
+        return Err(backend_error(PINNED_MCP_RUNTIME_CONFLICT));
+    }
+
+    let (stdout, stdout_truncated) = enforce_mcp_output_bound(
+        &captured.stdout_bytes,
+        captured.stdout_saw_more,
+        MCP_STDOUT_BOUND_BYTES,
+    );
+    let (stderr, stderr_truncated) = enforce_mcp_output_bound(
+        &captured.stderr_bytes,
+        captured.stderr_saw_more,
+        MCP_STDERR_BOUND_BYTES,
+    );
+
+    Ok(AgentWrapperMcpCommandOutput {
+        status: captured.status,
+        stdout,
+        stderr,
+        stdout_truncated,
+        stderr_truncated,
+    })
+}
+
+fn is_manifest_runtime_conflict(argv: &[OsString], stdout: &[u8], stderr: &[u8]) -> bool {
+    let stderr = String::from_utf8_lossy(stderr);
+    let stdout = String::from_utf8_lossy(stdout);
+    classify_manifest_runtime_conflict_text(argv, &format!("{stderr}\n{stdout}"))
+}
+
+fn classify_manifest_runtime_conflict_text(argv: &[OsString], text: &str) -> bool {
+    let text = text.to_ascii_lowercase();
+
+    let unknown_signal = [
+        "unknown",
+        "unrecognized",
+        "unexpected",
+        "invalid",
+        "no such",
+        "not recognized",
+    ]
+    .iter()
+    .any(|signal| text.contains(signal));
+    if !unknown_signal {
+        return false;
+    }
+
+    let syntax_context = ["command", "subcommand", "argument", "option", "flag"]
+        .iter()
+        .any(|signal| text.contains(signal));
+    if !syntax_context {
+        return false;
+    }
+
+    manifest_conflict_tokens(argv)
+        .into_iter()
+        .any(|token| text.contains(token))
+}
+
+fn manifest_conflict_tokens(argv: &[OsString]) -> Vec<&'static str> {
+    let mut tokens = vec!["mcp"];
+    match argv.get(1).and_then(|arg| arg.to_str()) {
+        Some("list") => tokens.push("list"),
+        Some("get") => tokens.push("get"),
+        _ => {}
+    }
+    tokens
+}
+
 fn effective_timeout_for_wait(timeout: Option<Duration>) -> Option<Duration> {
     match timeout {
         Some(timeout) if timeout == Duration::ZERO => None,
@@ -334,6 +393,32 @@ mod tests {
     use super::*;
 
     use tokio::io::{duplex, AsyncWriteExt, DuplexStream};
+
+    fn success_exit_status() -> ExitStatus {
+        #[cfg(unix)]
+        {
+            use std::os::unix::process::ExitStatusExt;
+            ExitStatus::from_raw(0)
+        }
+        #[cfg(windows)]
+        {
+            use std::os::windows::process::ExitStatusExt;
+            ExitStatus::from_raw(0)
+        }
+    }
+
+    fn exit_status_with_code(code: i32) -> ExitStatus {
+        #[cfg(unix)]
+        {
+            use std::os::unix::process::ExitStatusExt;
+            ExitStatus::from_raw(code << 8)
+        }
+        #[cfg(windows)]
+        {
+            use std::os::windows::process::ExitStatusExt;
+            ExitStatus::from_raw(code as u32)
+        }
+    }
 
     fn sample_config() -> super::super::ClaudeCodeBackendConfig {
         super::super::ClaudeCodeBackendConfig {
@@ -585,5 +670,133 @@ mod tests {
 
         assert!(captured.is_empty());
         assert!(saw_more);
+    }
+
+    #[test]
+    fn classify_manifest_runtime_conflict_detects_unknown_mcp_command() {
+        assert!(classify_manifest_runtime_conflict_text(
+            &claude_mcp_list_argv(),
+            "error: unrecognized subcommand 'mcp'"
+        ));
+    }
+
+    #[test]
+    fn classify_manifest_runtime_conflict_detects_unknown_get_subcommand() {
+        assert!(classify_manifest_runtime_conflict_text(
+            &claude_mcp_get_argv("demo"),
+            "error: no such subcommand 'get'"
+        ));
+    }
+
+    #[test]
+    fn classify_manifest_runtime_conflict_detects_unknown_list_subcommand() {
+        assert!(classify_manifest_runtime_conflict_text(
+            &claude_mcp_list_argv(),
+            "error: unknown subcommand 'list'"
+        ));
+    }
+
+    #[test]
+    fn classify_manifest_runtime_conflict_ignores_domain_failures() {
+        assert!(!classify_manifest_runtime_conflict_text(
+            &claude_mcp_get_argv("demo"),
+            "server demo not found"
+        ));
+        assert!(!classify_manifest_runtime_conflict_text(
+            &claude_mcp_get_argv("demo"),
+            "unknown server demo"
+        ));
+        assert!(!classify_manifest_runtime_conflict_text(
+            &claude_mcp_get_argv("demo"),
+            "permission denied while contacting remote service"
+        ));
+        assert!(!classify_manifest_runtime_conflict_text(
+            &claude_mcp_get_argv("demo"),
+            "network error: failed to connect"
+        ));
+    }
+
+    #[test]
+    fn finalize_claude_mcp_output_returns_backend_error_for_drift() {
+        let err = finalize_claude_mcp_output(
+            &claude_mcp_get_argv("demo"),
+            CapturedClaudeMcpCommandOutput {
+                status: exit_status_with_code(2),
+                stdout_bytes: b"raw stdout should not leak".to_vec(),
+                stdout_saw_more: false,
+                stderr_bytes: b"error: no such subcommand 'get'".to_vec(),
+                stderr_saw_more: false,
+            },
+        )
+        .expect_err("drift should fail closed");
+
+        match err {
+            AgentWrapperError::Backend { message } => {
+                assert_eq!(message, PINNED_MCP_RUNTIME_CONFLICT);
+            }
+            other => panic!("expected Backend error, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn finalize_claude_mcp_output_keeps_normal_non_zero_exits_as_ok() {
+        let output = finalize_claude_mcp_output(
+            &claude_mcp_get_argv("demo"),
+            CapturedClaudeMcpCommandOutput {
+                status: exit_status_with_code(3),
+                stdout_bytes: b"listed output".to_vec(),
+                stdout_saw_more: false,
+                stderr_bytes: b"server demo not found".to_vec(),
+                stderr_saw_more: false,
+            },
+        )
+        .expect("normal failures should remain Ok(output)");
+
+        assert_eq!(output.status, exit_status_with_code(3));
+        assert_eq!(output.stdout, "listed output");
+        assert_eq!(output.stderr, "server demo not found");
+        assert!(!output.stdout_truncated);
+        assert!(!output.stderr_truncated);
+    }
+
+    #[test]
+    fn finalize_claude_mcp_output_detects_drift_in_stdout_too() {
+        let err = finalize_claude_mcp_output(
+            &claude_mcp_list_argv(),
+            CapturedClaudeMcpCommandOutput {
+                status: exit_status_with_code(4),
+                stdout_bytes: b"error: unknown subcommand 'list'".to_vec(),
+                stdout_saw_more: false,
+                stderr_bytes: Vec::new(),
+                stderr_saw_more: false,
+            },
+        )
+        .expect_err("stdout drift should fail closed");
+
+        match err {
+            AgentWrapperError::Backend { message } => {
+                assert_eq!(message, PINNED_MCP_RUNTIME_CONFLICT);
+            }
+            other => panic!("expected Backend error, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn success_exit_skips_drift_classification() {
+        let output = finalize_claude_mcp_output(
+            &claude_mcp_get_argv("demo"),
+            CapturedClaudeMcpCommandOutput {
+                status: success_exit_status(),
+                stdout_bytes: b"error: no such subcommand 'get'".to_vec(),
+                stdout_saw_more: false,
+                stderr_bytes: Vec::new(),
+                stderr_saw_more: false,
+            },
+        )
+        .expect("successful exits should remain Ok(output)");
+
+        assert_eq!(output.status, success_exit_status());
+        assert_eq!(output.stdout, "error: no such subcommand 'get'");
+        assert!(output.stderr.is_empty());
     }
 }
