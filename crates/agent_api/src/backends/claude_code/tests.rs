@@ -379,6 +379,32 @@ fn claude_backend_routes_through_harness_and_does_not_reintroduce_orchestration_
 }
 
 #[test]
+fn claude_backend_mcp_write_hooks_route_through_shared_mcp_runner() {
+    const SOURCE: &str = include_str!("../claude_code.rs");
+
+    assert!(
+        SOURCE.contains("fn mcp_add("),
+        "expected Claude backend to implement mcp_add"
+    );
+    assert!(
+        SOURCE.contains("mcp_management::claude_mcp_add_argv"),
+        "expected mcp_add to build pinned argv via the shared helper module"
+    );
+    assert!(
+        SOURCE.contains("fn mcp_remove("),
+        "expected Claude backend to implement mcp_remove"
+    );
+    assert!(
+        SOURCE.contains("mcp_management::claude_mcp_remove_argv"),
+        "expected mcp_remove to build pinned argv via the shared helper module"
+    );
+    assert!(
+        SOURCE.matches("mcp_management::run_claude_mcp(").count() >= 4,
+        "expected list/get/add/remove hooks to reuse the shared Claude MCP runner"
+    );
+}
+
+#[test]
 fn claude_backend_registers_under_claude_code_kind_id() {
     let backend = ClaudeCodeBackend::new(ClaudeCodeBackendConfig::default());
     assert_eq!(backend.kind().as_str(), "claude_code");

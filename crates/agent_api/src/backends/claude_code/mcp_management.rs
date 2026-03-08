@@ -347,6 +347,8 @@ fn manifest_conflict_tokens(argv: &[OsString]) -> Vec<&'static str> {
     match argv.get(1).and_then(|arg| arg.to_str()) {
         Some("list") => tokens.push("list"),
         Some("get") => tokens.push("get"),
+        Some("add") => tokens.push("add"),
+        Some("remove") => tokens.push("remove"),
         _ => {}
     }
     tokens
@@ -835,10 +837,33 @@ mod tests {
     }
 
     #[test]
+    fn classify_manifest_runtime_conflict_detects_unknown_add_subcommand() {
+        let transport = AgentWrapperMcpAddTransport::Stdio {
+            command: vec!["node".to_string()],
+            args: vec!["server.js".to_string()],
+            env: BTreeMap::new(),
+        };
+        let argv = claude_mcp_add_argv("demo", &transport).expect("stdio transport should map");
+
+        assert!(classify_manifest_runtime_conflict_text(
+            &argv,
+            "error: unknown subcommand 'add'"
+        ));
+    }
+
+    #[test]
     fn classify_manifest_runtime_conflict_detects_unknown_list_subcommand() {
         assert!(classify_manifest_runtime_conflict_text(
             &claude_mcp_list_argv(),
             "error: unknown subcommand 'list'"
+        ));
+    }
+
+    #[test]
+    fn classify_manifest_runtime_conflict_detects_unknown_remove_subcommand() {
+        assert!(classify_manifest_runtime_conflict_text(
+            &claude_mcp_remove_argv("demo"),
+            "error: unrecognized subcommand 'remove'"
         ));
     }
 
