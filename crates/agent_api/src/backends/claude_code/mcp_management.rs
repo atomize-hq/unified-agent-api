@@ -19,7 +19,9 @@ use tokio::{
 
 use crate::{
     bounds::{enforce_mcp_output_bound, MCP_STDERR_BOUND_BYTES, MCP_STDOUT_BOUND_BYTES},
-    mcp::{AgentWrapperMcpCommandContext, AgentWrapperMcpCommandOutput},
+    mcp::{
+        AgentWrapperMcpAddTransport, AgentWrapperMcpCommandContext, AgentWrapperMcpCommandOutput,
+    },
     AgentWrapperError,
 };
 
@@ -48,6 +50,8 @@ const PINNED_SPAWN_FAILURE: &str =
 const PINNED_TIMEOUT_FAILURE: &str =
     "claude_code backend error: timeout (details redacted when unsafe)";
 const PINNED_WAIT_FAILURE: &str = "claude_code backend error: wait (details redacted when unsafe)";
+const PINNED_URL_BEARER_TOKEN_ENV_VAR_UNSUPPORTED: &str =
+    "claude mcp add url transport does not support bearer_token_env_var";
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct ResolvedClaudeMcpCommand {
@@ -79,6 +83,50 @@ pub(super) fn claude_mcp_get_argv(name: &str) -> Vec<OsString> {
         OsString::from("get"),
         OsString::from(name),
     ]
+}
+
+pub(super) fn claude_mcp_remove_argv(name: &str) -> Vec<OsString> {
+    vec![
+        OsString::from("mcp"),
+        OsString::from("remove"),
+        OsString::from(name),
+    ]
+}
+
+pub(super) fn claude_mcp_add_argv(
+    name: &str,
+    transport: &AgentWrapperMcpAddTransport,
+) -> Result<Vec<OsString>, AgentWrapperError> {
+    let mut argv = vec![OsString::from("mcp"), OsString::from("add")];
+
+    match transport {
+        AgentWrapperMcpAddTransport::Stdio { command, args, env } => {
+            argv.push(OsString::from("--transport"));
+            argv.push(OsString::from("stdio"));
+            for (key, value) in env {
+                argv.push(OsString::from("--env"));
+                argv.push(OsString::from(format!("{key}={value}")));
+            }
+            argv.push(OsString::from(name));
+            argv.extend(command.iter().map(OsString::from));
+            argv.extend(args.iter().map(OsString::from));
+            Ok(argv)
+        }
+        AgentWrapperMcpAddTransport::Url {
+            url,
+            bearer_token_env_var,
+        } => {
+            if bearer_token_env_var.is_some() {
+                return Err(invalid_request(PINNED_URL_BEARER_TOKEN_ENV_VAR_UNSUPPORTED));
+            }
+
+            argv.push(OsString::from("--transport"));
+            argv.push(OsString::from("http"));
+            argv.push(OsString::from(name));
+            argv.push(OsString::from(url));
+            Ok(argv)
+        }
+    }
 }
 
 pub(super) async fn run_claude_mcp(
@@ -388,6 +436,12 @@ fn backend_error(message: &'static str) -> AgentWrapperError {
     }
 }
 
+fn invalid_request(message: &'static str) -> AgentWrapperError {
+    AgentWrapperError::InvalidRequest {
+        message: message.to_string(),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -468,6 +522,98 @@ mod tests {
                 OsString::from("demo"),
             ]
         );
+    }
+
+    #[test]
+    fn claude_mcp_remove_argv_is_pinned() {
+        assert_eq!(
+            claude_mcp_remove_argv("demo"),
+            vec![
+                OsString::from("mcp"),
+                OsString::from("remove"),
+                OsString::from("demo"),
+            ]
+        );
+    }
+
+    #[test]
+    fn claude_mcp_remove_argv_preserves_name_as_single_item() {
+        assert_eq!(
+            claude_mcp_remove_argv("demo server"),
+            vec![
+                OsString::from("mcp"),
+                OsString::from("remove"),
+                OsString::from("demo server"),
+            ]
+        );
+    }
+
+    #[test]
+    fn claude_mcp_add_argv_maps_stdio_transport_with_sorted_env_and_no_separator() {
+        let transport = AgentWrapperMcpAddTransport::Stdio {
+            command: vec!["node".to_string()],
+            args: vec!["server.js".to_string(), "--flag".to_string()],
+            env: BTreeMap::from([
+                ("BETA".to_string(), "two".to_string()),
+                ("ALPHA".to_string(), "one".to_string()),
+            ]),
+        };
+
+        assert_eq!(
+            claude_mcp_add_argv("demo", &transport).expect("stdio transport should map"),
+            vec![
+                OsString::from("mcp"),
+                OsString::from("add"),
+                OsString::from("--transport"),
+                OsString::from("stdio"),
+                OsString::from("--env"),
+                OsString::from("ALPHA=one"),
+                OsString::from("--env"),
+                OsString::from("BETA=two"),
+                OsString::from("demo"),
+                OsString::from("node"),
+                OsString::from("server.js"),
+                OsString::from("--flag"),
+            ]
+        );
+    }
+
+    #[test]
+    fn claude_mcp_add_argv_maps_url_transport_without_bearer_env() {
+        let transport = AgentWrapperMcpAddTransport::Url {
+            url: "https://example.test/mcp".to_string(),
+            bearer_token_env_var: None,
+        };
+
+        assert_eq!(
+            claude_mcp_add_argv("demo", &transport).expect("url transport should map"),
+            vec![
+                OsString::from("mcp"),
+                OsString::from("add"),
+                OsString::from("--transport"),
+                OsString::from("http"),
+                OsString::from("demo"),
+                OsString::from("https://example.test/mcp"),
+            ]
+        );
+    }
+
+    #[test]
+    fn claude_mcp_add_argv_rejects_url_transport_with_bearer_env_var() {
+        let transport = AgentWrapperMcpAddTransport::Url {
+            url: "https://example.test/mcp".to_string(),
+            bearer_token_env_var: Some("TOKEN_ENV".to_string()),
+        };
+
+        let err = claude_mcp_add_argv("demo", &transport)
+            .expect_err("url bearer token env var should be rejected");
+
+        match err {
+            AgentWrapperError::InvalidRequest { message } => {
+                assert_eq!(message, PINNED_URL_BEARER_TOKEN_ENV_VAR_UNSUPPORTED);
+            }
+            other => panic!("expected InvalidRequest, got: {other:?}"),
+        }
     }
 
     #[test]
