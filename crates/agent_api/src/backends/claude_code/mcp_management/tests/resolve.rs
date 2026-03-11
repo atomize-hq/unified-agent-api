@@ -11,7 +11,7 @@ use super::super::{
 };
 use super::support::{
     assert_backend_spawn_failure, sample_config, sample_config_without_home, sample_context,
-    test_env_lock, EnvGuard,
+    test_env_lock, CurrentDirGuard, EnvGuard,
 };
 
 #[cfg(unix)]
@@ -224,6 +224,36 @@ fn resolve_claude_mcp_command_uses_backend_defaults_when_request_values_absent()
 
     assert_eq!(resolved.working_dir, Some(PathBuf::from("default/workdir")));
     assert_eq!(resolved.timeout, Some(Duration::from_secs(30)));
+}
+
+#[cfg(unix)]
+#[test]
+fn resolve_claude_mcp_command_canonicalizes_relative_binary_before_working_dir() {
+    let _env_lock = test_env_lock().lock().expect("lock test env");
+    let wrapper_dir = temp_test_dir("relative-wrapper");
+    let binary_dir = wrapper_dir.join("bin");
+    let working_dir = temp_test_dir("relative-working-dir");
+    let binary_path = write_fake_claude(&binary_dir, "#!/usr/bin/env bash\nexit 0\n");
+    let cwd_guard = CurrentDirGuard::set(&wrapper_dir);
+
+    let mut config = sample_config_without_home();
+    config.binary = Some(PathBuf::from("bin/claude"));
+    let mut context = AgentWrapperMcpCommandContext::default();
+    context.working_dir = Some(working_dir.clone());
+
+    let resolved =
+        resolve_claude_mcp_command_with_env(&config, &context, None, None).expect("resolve");
+
+    assert_eq!(
+        resolved.binary_path,
+        fs::canonicalize(&binary_path).expect("canonicalize fake claude")
+    );
+    assert!(resolved.binary_path.is_absolute());
+    assert_eq!(resolved.working_dir, Some(working_dir.clone()));
+
+    drop(cwd_guard);
+    fs::remove_dir_all(wrapper_dir).expect("wrapper dir should be removed");
+    fs::remove_dir_all(working_dir).expect("working dir should be removed");
 }
 
 #[cfg(unix)]

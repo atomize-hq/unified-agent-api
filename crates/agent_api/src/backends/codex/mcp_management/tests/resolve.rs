@@ -7,7 +7,8 @@ use super::super::{
     CODEX_BINARY_ENV, CODEX_HOME_ENV, PATH_ENV,
 };
 use super::support::{
-    assert_backend_spawn_failure, sample_config, sample_context, test_env_lock, EnvGuard,
+    assert_backend_spawn_failure, sample_config, sample_context, test_env_lock, CurrentDirGuard,
+    EnvGuard,
 };
 
 #[test]
@@ -70,6 +71,36 @@ fn resolve_codex_mcp_command_uses_backend_defaults_when_request_values_absent() 
 
     assert_eq!(resolved.working_dir, Some(PathBuf::from("default/workdir")));
     assert_eq!(resolved.timeout, Some(Duration::from_secs(30)));
+}
+
+#[cfg(unix)]
+#[test]
+fn resolve_codex_mcp_command_canonicalizes_relative_binary_before_working_dir() {
+    let _env_lock = test_env_lock().lock().expect("lock test env");
+    let wrapper_dir = super::support::temp_test_dir("relative-wrapper");
+    let binary_dir = wrapper_dir.join("bin");
+    let working_dir = super::support::temp_test_dir("relative-working-dir");
+    let binary_path =
+        super::support::write_fake_codex(&binary_dir, "#!/usr/bin/env bash\nexit 0\n");
+    let cwd_guard = CurrentDirGuard::set(&wrapper_dir);
+
+    let mut config = sample_config();
+    config.binary = Some(PathBuf::from("bin/codex"));
+    config.default_working_dir = Some(working_dir.clone());
+
+    let resolved = resolve_codex_mcp_command(&config, &AgentWrapperMcpCommandContext::default())
+        .expect("resolve");
+
+    assert_eq!(
+        resolved.binary_path,
+        std::fs::canonicalize(&binary_path).expect("canonicalize fake codex")
+    );
+    assert!(resolved.binary_path.is_absolute());
+    assert_eq!(resolved.working_dir, Some(working_dir.clone()));
+
+    drop(cwd_guard);
+    std::fs::remove_dir_all(wrapper_dir).expect("wrapper dir should be removed");
+    std::fs::remove_dir_all(working_dir).expect("working dir should be removed");
 }
 
 #[cfg(unix)]

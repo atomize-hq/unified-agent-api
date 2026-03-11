@@ -2,7 +2,7 @@ use std::{
     collections::BTreeMap,
     env,
     ffi::OsString,
-    path::PathBuf,
+    path::{Path, PathBuf},
     process::ExitStatus,
     sync::{Mutex, OnceLock},
     time::Duration,
@@ -120,6 +120,24 @@ impl Drop for EnvGuard {
     }
 }
 
+pub(super) struct CurrentDirGuard {
+    previous: PathBuf,
+}
+
+impl CurrentDirGuard {
+    pub(super) fn set(path: &Path) -> Self {
+        let previous = env::current_dir().expect("current dir should be readable");
+        env::set_current_dir(path).expect("current dir should be set");
+        Self { previous }
+    }
+}
+
+impl Drop for CurrentDirGuard {
+    fn drop(&mut self) {
+        env::set_current_dir(&self.previous).expect("current dir should be restored");
+    }
+}
+
 pub(super) fn assert_backend_spawn_failure(err: AgentWrapperError) {
     match err {
         AgentWrapperError::Backend { message } => {
@@ -150,6 +168,7 @@ pub(super) fn temp_test_dir(label: &str) -> PathBuf {
 
 #[cfg(unix)]
 pub(super) fn write_fake_claude(dir: &std::path::Path, script: &str) -> PathBuf {
+    fs::create_dir_all(dir).expect("script directory should be created");
     let path = dir.join("claude");
     fs::write(&path, script).expect("script should be written");
     let mut permissions = fs::metadata(&path)

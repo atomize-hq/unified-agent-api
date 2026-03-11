@@ -1,11 +1,4 @@
-use std::{
-    collections::BTreeMap,
-    env,
-    ffi::OsString,
-    fs,
-    path::{Path, PathBuf},
-    time::Duration,
-};
+use std::{collections::BTreeMap, env, ffi::OsString, path::PathBuf, time::Duration};
 
 use claude_code::ClaudeHomeLayout;
 
@@ -114,68 +107,14 @@ pub(super) fn resolve_claude_binary_path(
         })
         .unwrap_or_else(|| PathBuf::from("claude"));
 
-    resolve_path_for_spawn(binary_path, effective_path_env, ambient_path_env)
-        .ok_or_else(|| super::backend_error(super::PINNED_SPAWN_FAILURE))
-}
-
-fn resolve_path_for_spawn(
-    binary_path: PathBuf,
-    effective_path_env: Option<&str>,
-    ambient_path_env: Option<OsString>,
-) -> Option<PathBuf> {
-    if is_path_qualified(&binary_path) {
-        return Some(binary_path);
-    }
-
-    if let Some(path_env) = effective_path_env {
-        return find_binary_on_path(&binary_path, Some(OsString::from(path_env)));
-    }
-
-    find_binary_on_path(&binary_path, ambient_path_env)
-}
-
-fn is_path_qualified(path: &Path) -> bool {
-    path.is_absolute()
-        || path
-            .parent()
-            .is_some_and(|parent| !parent.as_os_str().is_empty())
-}
-
-fn find_binary_on_path(binary_name: &Path, path_env: Option<OsString>) -> Option<PathBuf> {
-    let path_env = path_env?;
-    env::split_paths(&path_env)
-        .find_map(|directory| candidate_binary_path(&directory, binary_name))
-        .map(|candidate| fs::canonicalize(&candidate).unwrap_or(candidate))
-}
-
-fn candidate_binary_path(directory: &Path, binary_name: &Path) -> Option<PathBuf> {
-    let candidate = directory.join(binary_name);
-    if candidate.is_file() {
-        return Some(candidate);
-    }
-
-    #[cfg(windows)]
-    {
-        if candidate.extension().is_some() {
-            return None;
-        }
-
-        let pathext =
-            env::var_os("PATHEXT").unwrap_or_else(|| OsString::from(".COM;.EXE;.BAT;.CMD"));
-        for extension in pathext.to_string_lossy().split(';') {
-            let extension = extension.trim();
-            if extension.is_empty() {
-                continue;
-            }
-
-            let suffixed = candidate.with_extension(extension.trim_start_matches('.'));
-            if suffixed.is_file() {
-                return Some(suffixed);
-            }
-        }
-    }
-
-    None
+    let current_dir = env::current_dir().ok();
+    crate::backends::spawn_path::resolve_binary_path_for_spawn(
+        binary_path,
+        effective_path_env,
+        ambient_path_env,
+        current_dir.as_deref(),
+    )
+    .ok_or_else(|| super::backend_error(super::PINNED_SPAWN_FAILURE))
 }
 
 fn resolve_claude_home_layout(
