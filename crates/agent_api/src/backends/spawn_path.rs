@@ -16,10 +16,10 @@ pub(super) fn resolve_binary_path_for_spawn(
     }
 
     if let Some(path_env) = effective_path_env {
-        return find_binary_on_path(&binary_path, Some(OsString::from(path_env)));
+        return find_binary_on_path(&binary_path, Some(OsString::from(path_env)), current_dir);
     }
 
-    find_binary_on_path(&binary_path, ambient_path_env)
+    find_binary_on_path(&binary_path, ambient_path_env, current_dir)
 }
 
 fn resolve_path_qualified_binary(binary_path: PathBuf, current_dir: Option<&Path>) -> PathBuf {
@@ -27,9 +27,7 @@ fn resolve_path_qualified_binary(binary_path: PathBuf, current_dir: Option<&Path
         return binary_path;
     }
 
-    let joined = current_dir
-        .map(Path::to_path_buf)
-        .or_else(|| env::current_dir().ok())
+    let joined = effective_current_dir(current_dir)
         .map(|cwd| cwd.join(&binary_path))
         .unwrap_or(binary_path);
 
@@ -43,10 +41,32 @@ fn is_path_qualified(path: &Path) -> bool {
             .is_some_and(|parent| !parent.as_os_str().is_empty())
 }
 
-fn find_binary_on_path(binary_name: &Path, path_env: Option<OsString>) -> Option<PathBuf> {
+fn effective_current_dir(current_dir: Option<&Path>) -> Option<PathBuf> {
+    match current_dir {
+        Some(path) if path.is_absolute() => Some(path.to_path_buf()),
+        Some(path) => env::current_dir().ok().map(|cwd| cwd.join(path)),
+        None => env::current_dir().ok(),
+    }
+}
+
+fn find_binary_on_path(
+    binary_name: &Path,
+    path_env: Option<OsString>,
+    current_dir: Option<&Path>,
+) -> Option<PathBuf> {
     let path_env = path_env?;
+    let effective_current_dir = effective_current_dir(current_dir);
     env::split_paths(&path_env)
-        .find_map(|directory| candidate_binary_path(&directory, binary_name))
+        .find_map(|directory| {
+            let search_dir = if directory.is_absolute() {
+                directory
+            } else if let Some(cwd) = effective_current_dir.as_deref() {
+                cwd.join(directory)
+            } else {
+                directory
+            };
+            candidate_binary_path(&search_dir, binary_name)
+        })
         .map(|candidate| fs::canonicalize(&candidate).unwrap_or(candidate))
 }
 
@@ -82,11 +102,32 @@ fn candidate_binary_path(directory: &Path, binary_name: &Path) -> Option<PathBuf
 
 #[cfg(test)]
 mod tests {
-    use std::{env, path::PathBuf};
+    use std::{
+        env,
+        path::{Path, PathBuf},
+    };
 
     use tempfile::TempDir;
 
     use super::resolve_binary_path_for_spawn;
+
+    struct CurrentDirGuard {
+        previous: PathBuf,
+    }
+
+    impl CurrentDirGuard {
+        fn set(path: &Path) -> Self {
+            let previous = env::current_dir().expect("current dir");
+            env::set_current_dir(path).expect("set current dir");
+            Self { previous }
+        }
+    }
+
+    impl Drop for CurrentDirGuard {
+        fn drop(&mut self) {
+            env::set_current_dir(&self.previous).expect("restore current dir");
+        }
+    }
 
     #[test]
     fn resolves_relative_path_qualified_binary_against_supplied_current_dir() {
@@ -129,6 +170,60 @@ mod tests {
         assert_eq!(
             resolved,
             std::fs::canonicalize(&binary_path).expect("canonicalize binary")
+        );
+    }
+
+    #[test]
+    fn resolves_relative_path_entry_against_absolute_current_dir() {
+        let cwd_dir = TempDir::new().expect("cwd dir");
+        let binary_dir = cwd_dir.path().join("bin");
+        let binary_path = binary_dir.join("codex");
+        std::fs::create_dir_all(&binary_dir).expect("create binary dir");
+        std::fs::write(&binary_path, "binary").expect("write fake binary");
+
+        let resolved = resolve_binary_path_for_spawn(
+            PathBuf::from("codex"),
+            Some("bin"),
+            env::var_os("PATH"),
+            Some(cwd_dir.path()),
+        )
+        .expect("PATH lookup should resolve");
+
+        assert_eq!(
+            resolved,
+            std::fs::canonicalize(&binary_path).expect("canonicalize binary")
+        );
+    }
+
+    #[test]
+    fn resolves_relative_path_entry_against_relative_current_dir() {
+        let parent_dir = TempDir::new().expect("parent dir");
+        let wrapper_dir = parent_dir.path().join("wrapper");
+        let working_dir = parent_dir.path().join("repo");
+        let binary_dir = working_dir.join("bin");
+        let binary_path = binary_dir.join("codex");
+        std::fs::create_dir_all(&wrapper_dir).expect("create wrapper dir");
+        std::fs::create_dir_all(&binary_dir).expect("create binary dir");
+        std::fs::write(&binary_path, "binary").expect("write fake binary");
+        let _cwd_guard = CurrentDirGuard::set(parent_dir.path());
+
+        let resolved = resolve_binary_path_for_spawn(
+            PathBuf::from("codex"),
+            Some("bin"),
+            env::var_os("PATH"),
+            Some(Path::new("repo")),
+        )
+        .expect("PATH lookup should resolve");
+
+        assert_eq!(
+            resolved,
+            std::fs::canonicalize(&binary_path).expect("canonicalize binary")
+        );
+
+        let wrapper_candidate = wrapper_dir.join("bin").join("codex");
+        assert!(
+            !wrapper_candidate.exists(),
+            "resolution must not use an unrelated wrapper cwd"
         );
     }
 }

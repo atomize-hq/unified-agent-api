@@ -1,4 +1,10 @@
-use std::{collections::BTreeMap, env, ffi::OsString, path::PathBuf, time::Duration};
+use std::{
+    collections::BTreeMap,
+    env,
+    ffi::OsString,
+    path::{Path, PathBuf},
+    time::Duration,
+};
 
 use claude_code::ClaudeHomeLayout;
 
@@ -38,11 +44,16 @@ pub(super) fn resolve_claude_mcp_command_with_env(
 ) -> Result<ResolvedClaudeMcpCommand, AgentWrapperError> {
     let ambient_path_env = env::var_os(PATH_ENV);
     let effective_path_env = effective_path_env(config, context, ambient_path_env.as_ref());
+    let working_dir = context
+        .working_dir
+        .clone()
+        .or_else(|| config.default_working_dir.clone());
     let binary_path = resolve_claude_binary_path(
         config.binary.as_ref(),
         claude_binary_env,
         effective_path_env.as_deref(),
         ambient_path_env,
+        working_dir.as_deref(),
     )?;
     let mut env = config.env.clone();
     env.entry(DISABLE_AUTOUPDATER_ENV.to_string())
@@ -65,10 +76,7 @@ pub(super) fn resolve_claude_mcp_command_with_env(
 
     Ok(ResolvedClaudeMcpCommand {
         binary_path,
-        working_dir: context
-            .working_dir
-            .clone()
-            .or_else(|| config.default_working_dir.clone()),
+        working_dir,
         timeout: context.timeout.or(config.default_timeout),
         env,
         materialize_claude_home,
@@ -93,6 +101,7 @@ pub(super) fn resolve_claude_binary_path(
     claude_binary_env: Option<OsString>,
     effective_path_env: Option<&str>,
     ambient_path_env: Option<OsString>,
+    current_dir: Option<&Path>,
 ) -> Result<PathBuf, AgentWrapperError> {
     let binary_path = config_binary
         .cloned()
@@ -107,12 +116,11 @@ pub(super) fn resolve_claude_binary_path(
         })
         .unwrap_or_else(|| PathBuf::from("claude"));
 
-    let current_dir = env::current_dir().ok();
     crate::backends::spawn_path::resolve_binary_path_for_spawn(
         binary_path,
         effective_path_env,
         ambient_path_env,
-        current_dir.as_deref(),
+        current_dir,
     )
     .ok_or_else(|| super::backend_error(super::PINNED_SPAWN_FAILURE))
 }

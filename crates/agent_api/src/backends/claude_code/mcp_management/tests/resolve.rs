@@ -27,6 +27,7 @@ fn resolve_claude_binary_path_prefers_config_over_env() {
         Some(OsString::from("/tmp/from-env")),
         None,
         None,
+        None,
     )
     .expect("config path should resolve");
 
@@ -35,16 +36,21 @@ fn resolve_claude_binary_path_prefers_config_over_env() {
 
 #[test]
 fn resolve_claude_binary_path_uses_env_when_config_absent() {
-    let resolved =
-        resolve_claude_binary_path(None, Some(OsString::from("/tmp/from-env")), None, None)
-            .expect("env path should resolve");
+    let resolved = resolve_claude_binary_path(
+        None,
+        Some(OsString::from("/tmp/from-env")),
+        None,
+        None,
+        None,
+    )
+    .expect("env path should resolve");
 
     assert_eq!(resolved, PathBuf::from("/tmp/from-env"));
 }
 
 #[test]
 fn resolve_claude_binary_path_rejects_blank_env_without_a_resolvable_path() {
-    let err = resolve_claude_binary_path(None, Some(OsString::from("")), None, None)
+    let err = resolve_claude_binary_path(None, Some(OsString::from("")), None, None, None)
         .expect_err("blank env should fail resolution");
 
     assert_backend_spawn_failure(err);
@@ -60,6 +66,7 @@ fn resolve_claude_binary_path_uses_effective_path_env_for_unqualified_binary() {
         None,
         Some(OsString::from("claude")),
         Some(temp_dir.to_string_lossy().as_ref()),
+        None,
         None,
     )
     .expect("effective PATH should resolve claude");
@@ -95,6 +102,7 @@ fn resolve_claude_binary_path_prefers_request_path_over_config_and_ambient_path(
                 .as_ref(),
         ),
         env::var_os(PATH_ENV),
+        None,
     )
     .expect("request PATH should resolve claude");
 
@@ -124,6 +132,7 @@ fn resolve_claude_binary_path_prefers_config_path_over_ambient_path() {
         Some(OsString::from("claude")),
         Some(config_dir.to_string_lossy().as_ref()),
         env::var_os(PATH_ENV),
+        None,
     )
     .expect("config PATH should resolve claude");
 
@@ -145,7 +154,7 @@ fn resolve_claude_binary_path_uses_ambient_path_when_effective_path_is_absent() 
     let _ambient_path = EnvGuard::set(PATH_ENV, ambient_dir.as_os_str().to_os_string());
     let _claude_binary = EnvGuard::unset(CLAUDE_BINARY_ENV);
 
-    let resolved = resolve_claude_binary_path(None, None, None, env::var_os(PATH_ENV))
+    let resolved = resolve_claude_binary_path(None, None, None, env::var_os(PATH_ENV), None)
         .expect("ambient PATH should resolve claude");
 
     assert_eq!(
@@ -154,6 +163,70 @@ fn resolve_claude_binary_path_uses_ambient_path_when_effective_path_is_absent() 
     );
 
     fs::remove_dir_all(ambient_dir).expect("ambient dir should be removed");
+}
+
+#[cfg(unix)]
+#[test]
+fn resolve_claude_mcp_command_resolves_relative_request_path_from_request_working_dir() {
+    let _env_lock = test_env_lock().lock().expect("lock test env");
+    let request_dir = temp_test_dir("request-working-dir");
+    let default_dir = temp_test_dir("default-working-dir");
+    let request_binary =
+        write_fake_claude(&request_dir.join("bin"), "#!/usr/bin/env bash\nexit 0\n");
+    let _default_binary =
+        write_fake_claude(&default_dir.join("bin"), "#!/usr/bin/env bash\nexit 0\n");
+    let _claude_binary = EnvGuard::unset(CLAUDE_BINARY_ENV);
+
+    let mut config = sample_config_without_home();
+    config.binary = None;
+    config.default_working_dir = Some(default_dir.clone());
+
+    let mut context = AgentWrapperMcpCommandContext::default();
+    context.working_dir = Some(request_dir.clone());
+    context.env.insert(PATH_ENV.to_string(), "bin".to_string());
+
+    let resolved =
+        resolve_claude_mcp_command_with_env(&config, &context, None, None).expect("resolve");
+
+    assert_eq!(
+        resolved.binary_path,
+        fs::canonicalize(&request_binary).expect("canonicalize request binary")
+    );
+    assert_eq!(resolved.working_dir, Some(request_dir.clone()));
+
+    fs::remove_dir_all(request_dir).expect("request dir should be removed");
+    fs::remove_dir_all(default_dir).expect("default dir should be removed");
+}
+
+#[cfg(unix)]
+#[test]
+fn resolve_claude_mcp_command_resolves_relative_config_path_from_default_working_dir() {
+    let _env_lock = test_env_lock().lock().expect("lock test env");
+    let default_dir = temp_test_dir("config-default-working-dir");
+    let default_binary =
+        write_fake_claude(&default_dir.join("bin"), "#!/usr/bin/env bash\nexit 0\n");
+    let _claude_binary = EnvGuard::unset(CLAUDE_BINARY_ENV);
+
+    let mut config = sample_config_without_home();
+    config.binary = None;
+    config.default_working_dir = Some(default_dir.clone());
+    config.env.insert(PATH_ENV.to_string(), "bin".to_string());
+
+    let resolved = resolve_claude_mcp_command_with_env(
+        &config,
+        &AgentWrapperMcpCommandContext::default(),
+        None,
+        None,
+    )
+    .expect("resolve");
+
+    assert_eq!(
+        resolved.binary_path,
+        fs::canonicalize(&default_binary).expect("canonicalize default binary")
+    );
+    assert_eq!(resolved.working_dir, Some(default_dir.clone()));
+
+    fs::remove_dir_all(default_dir).expect("default dir should be removed");
 }
 
 #[test]

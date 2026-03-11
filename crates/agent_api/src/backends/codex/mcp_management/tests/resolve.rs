@@ -176,6 +176,7 @@ fn resolve_codex_binary_path_uses_effective_path_env_for_unqualified_binary() {
         Some(OsString::from("codex")),
         Some(temp_dir.to_string_lossy().as_ref()),
         None,
+        None,
     )
     .expect("effective PATH should resolve codex");
 
@@ -204,6 +205,7 @@ fn resolve_codex_binary_path_prefers_request_path_over_ambient_path() {
         Some(OsString::from("codex")),
         Some(request_dir.to_string_lossy().as_ref()),
         env::var_os(PATH_ENV),
+        None,
     )
     .expect("request PATH should resolve codex");
 
@@ -226,7 +228,7 @@ fn resolve_codex_binary_path_uses_ambient_path_when_effective_path_is_absent() {
     let _ambient_path = EnvGuard::set(PATH_ENV, ambient_dir.as_os_str().to_os_string());
     let _codex_binary = EnvGuard::unset(CODEX_BINARY_ENV);
 
-    let resolved = resolve_codex_binary_path(None, None, None, env::var_os(PATH_ENV))
+    let resolved = resolve_codex_binary_path(None, None, None, env::var_os(PATH_ENV), None)
         .expect("ambient PATH should resolve codex");
 
     assert_eq!(
@@ -239,8 +241,66 @@ fn resolve_codex_binary_path_uses_ambient_path_when_effective_path_is_absent() {
 
 #[test]
 fn resolve_codex_binary_path_rejects_unresolved_default_binary() {
-    let err = resolve_codex_binary_path(None, None, None, None)
+    let err = resolve_codex_binary_path(None, None, None, None, None)
         .expect_err("default bare codex should fail when PATH cannot resolve it");
 
     assert_backend_spawn_failure(err);
+}
+
+#[cfg(unix)]
+#[test]
+fn resolve_codex_mcp_command_resolves_relative_request_path_from_request_working_dir() {
+    let _env_lock = test_env_lock().lock().expect("lock test env");
+    let request_dir = super::support::temp_test_dir("request-working-dir");
+    let default_dir = super::support::temp_test_dir("default-working-dir");
+    let request_binary =
+        super::support::write_fake_codex(&request_dir.join("bin"), "#!/usr/bin/env bash\nexit 0\n");
+    let _default_binary =
+        super::support::write_fake_codex(&default_dir.join("bin"), "#!/usr/bin/env bash\nexit 0\n");
+    let _codex_binary = EnvGuard::unset(CODEX_BINARY_ENV);
+
+    let mut config = sample_config();
+    config.binary = None;
+    config.default_working_dir = Some(default_dir.clone());
+
+    let mut context = AgentWrapperMcpCommandContext::default();
+    context.working_dir = Some(request_dir.clone());
+    context.env.insert(PATH_ENV.to_string(), "bin".to_string());
+
+    let resolved = resolve_codex_mcp_command(&config, &context).expect("resolve");
+
+    assert_eq!(
+        resolved.binary_path,
+        std::fs::canonicalize(&request_binary).expect("canonicalize request binary")
+    );
+    assert_eq!(resolved.working_dir, Some(request_dir.clone()));
+
+    std::fs::remove_dir_all(request_dir).expect("request dir should be removed");
+    std::fs::remove_dir_all(default_dir).expect("default dir should be removed");
+}
+
+#[cfg(unix)]
+#[test]
+fn resolve_codex_mcp_command_resolves_relative_config_path_from_default_working_dir() {
+    let _env_lock = test_env_lock().lock().expect("lock test env");
+    let default_dir = super::support::temp_test_dir("config-default-working-dir");
+    let default_binary =
+        super::support::write_fake_codex(&default_dir.join("bin"), "#!/usr/bin/env bash\nexit 0\n");
+    let _codex_binary = EnvGuard::unset(CODEX_BINARY_ENV);
+
+    let mut config = sample_config();
+    config.binary = None;
+    config.default_working_dir = Some(default_dir.clone());
+    config.env.insert(PATH_ENV.to_string(), "bin".to_string());
+
+    let resolved = resolve_codex_mcp_command(&config, &AgentWrapperMcpCommandContext::default())
+        .expect("resolve");
+
+    assert_eq!(
+        resolved.binary_path,
+        std::fs::canonicalize(&default_binary).expect("canonicalize default binary")
+    );
+    assert_eq!(resolved.working_dir, Some(default_dir.clone()));
+
+    std::fs::remove_dir_all(default_dir).expect("default dir should be removed");
 }
