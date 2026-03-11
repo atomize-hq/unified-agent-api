@@ -11,14 +11,6 @@ mod argv;
 mod resolve;
 mod runner;
 
-#[cfg(test)]
-use resolve::{resolve_claude_binary_path, resolve_claude_mcp_command_with_env};
-#[cfg(test)]
-use runner::{
-    capture_bounded, classify_manifest_runtime_conflict_text, finalize_claude_mcp_output,
-    CapturedClaudeMcpCommandOutput,
-};
-
 const CLAUDE_BINARY_ENV: &str = "CLAUDE_BINARY";
 const CLAUDE_HOME_ENV: &str = "CLAUDE_HOME";
 const DISABLE_AUTOUPDATER_ENV: &str = "DISABLE_AUTOUPDATER";
