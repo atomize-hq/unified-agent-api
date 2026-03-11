@@ -445,21 +445,24 @@ fn classify_manifest_runtime_conflict_text(argv: &[OsString], text: &str) -> boo
         return false;
     }
 
+    if is_add_shape_conflict(argv, &text) {
+        return true;
+    }
+
     let subcommand_conflict = manifest_conflict_tokens(argv)
         .into_iter()
         .any(|token| text.contains(token));
     let json_flag_conflict = text.contains("--json")
         && (text.contains("flag") || text.contains("option") || text.contains("argument"));
-    let add_usage_conflict = text.contains("mcp add")
-        && text.contains("usage:")
-        && (text.contains("unexpected argument")
-            || text.contains("unexpected arguments")
-            || text.contains("missing required argument")
-            || text.contains("requires")
-            || text.contains("found argument")
-            || text.contains("unexpected value"));
 
-    subcommand_conflict || json_flag_conflict || add_usage_conflict
+    subcommand_conflict || json_flag_conflict
+}
+
+fn is_add_shape_conflict(argv: &[OsString], text: &str) -> bool {
+    matches!(argv.get(1).and_then(|arg| arg.to_str()), Some("add"))
+        && ["--env", "--url", "--bearer-token-env-var"]
+            .iter()
+            .any(|token| text.contains(token))
 }
 
 fn manifest_conflict_tokens(argv: &[OsString]) -> Vec<&'static str> {
@@ -989,6 +992,32 @@ printf "CODEX_HOME=%s\n" "${CODEX_HOME-unset}" 1>&2
     }
 
     #[test]
+    fn classify_manifest_runtime_conflict_detects_url_add_flag_drift_without_usage() {
+        let transport = AgentWrapperMcpAddTransport::Url {
+            url: "https://example.test/mcp".to_string(),
+            bearer_token_env_var: None,
+        };
+
+        assert!(classify_manifest_runtime_conflict_text(
+            &codex_mcp_add_argv("demo", &transport),
+            "error: unexpected argument '--url' found"
+        ));
+    }
+
+    #[test]
+    fn classify_manifest_runtime_conflict_detects_bearer_env_add_flag_drift_without_usage() {
+        let transport = AgentWrapperMcpAddTransport::Url {
+            url: "https://example.test/mcp".to_string(),
+            bearer_token_env_var: Some("TOKEN_ENV".to_string()),
+        };
+
+        assert!(classify_manifest_runtime_conflict_text(
+            &codex_mcp_add_argv("demo", &transport),
+            "error: unexpected argument '--bearer-token-env-var' found"
+        ));
+    }
+
+    #[test]
     fn classify_manifest_runtime_conflict_ignores_normal_domain_failures() {
         assert!(!classify_manifest_runtime_conflict_text(
             &codex_mcp_get_argv("demo"),
@@ -1007,7 +1036,7 @@ printf "CODEX_HOME=%s\n" "${CODEX_HOME-unset}" 1>&2
 
         assert!(!classify_manifest_runtime_conflict_text(
             &codex_mcp_add_argv("demo", &transport),
-            "error: unexpected argument '--env' found"
+            "error: unexpected argument '--foo' found"
         ));
     }
 
@@ -1020,6 +1049,33 @@ printf "CODEX_HOME=%s\n" "${CODEX_HOME-unset}" 1>&2
                 stdout_bytes: b"raw stdout should not leak".to_vec(),
                 stdout_saw_more: false,
                 stderr_bytes: b"error: no such subcommand 'get'".to_vec(),
+                stderr_saw_more: false,
+            },
+        )
+        .expect_err("drift should fail closed");
+
+        match err {
+            AgentWrapperError::Backend { message } => {
+                assert_eq!(message, PINNED_MCP_RUNTIME_CONFLICT);
+            }
+            other => panic!("expected Backend error, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn codex_add_flag_drift_maps_to_pinned_backend_error() {
+        let transport = AgentWrapperMcpAddTransport::Url {
+            url: "https://example.test/mcp".to_string(),
+            bearer_token_env_var: Some("TOKEN_ENV".to_string()),
+        };
+
+        let err = finalize_codex_mcp_output(
+            &codex_mcp_add_argv("demo", &transport),
+            CapturedCodexMcpCommandOutput {
+                status: exit_status_with_code(2),
+                stdout_bytes: b"raw stdout should not leak".to_vec(),
+                stdout_saw_more: false,
+                stderr_bytes: b"error: unexpected argument '--url' found".to_vec(),
                 stderr_saw_more: false,
             },
         )

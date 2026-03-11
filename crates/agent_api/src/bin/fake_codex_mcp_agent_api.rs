@@ -21,7 +21,7 @@ const SLEEP_FOR_TIMEOUT_MS: u64 = 500;
 // - Required env: FAKE_CODEX_MCP_RECORD_PATH
 // - Optional env: FAKE_CODEX_MCP_RECORD_ENV_KEYS (comma-separated), FAKE_CODEX_MCP_SCENARIO
 // - Scenarios: ok, oversized_output, nonzero_exit, sleep_for_timeout, drift,
-//   operation_subcommand_drift, legacy_add_drift
+//   operation_subcommand_drift, legacy_add_drift, url_add_drift
 
 fn main() -> io::Result<()> {
     let record_path = match required_path_env(RECORD_PATH_ENV) {
@@ -84,6 +84,15 @@ fn main() -> io::Result<()> {
         "legacy_add_drift" => {
             let message =
                 "error: unexpected argument '--env' found\n\nusage: codex mcp add <name> --url <url>\n";
+            write_payload(&mut io::stderr().lock(), message.as_bytes())?;
+            std::process::exit(2);
+        }
+        "url_add_drift" => {
+            let message = if args.iter().any(|arg| arg == "--bearer-token-env-var") {
+                "error: unexpected argument '--bearer-token-env-var' found\n"
+            } else {
+                "error: unexpected argument '--url' found\n"
+            };
             write_payload(&mut io::stderr().lock(), message.as_bytes())?;
             std::process::exit(2);
         }
@@ -184,7 +193,8 @@ fn scenario_name() -> String {
             | "sleep_for_timeout"
             | "drift"
             | "operation_subcommand_drift"
-            | "legacy_add_drift" => value,
+            | "legacy_add_drift"
+            | "url_add_drift" => value,
             _ => "ok".to_string(),
         },
         Err(_) => "ok".to_string(),

@@ -385,6 +385,51 @@ async fn codex_mcp_add_legacy_usage_drift_returns_backend_error_without_mutating
 }
 
 #[tokio::test]
+async fn codex_mcp_add_url_flag_drift_returns_backend_error_without_mutating_capabilities() {
+    if !codex_mcp_supported() {
+        return;
+    }
+
+    let sandbox = McpTestSandbox::new("codex_mcp_add_url_flag_drift").expect("sandbox");
+    let (backend, gateway, kind) = codex_gateway(
+        &sandbox,
+        true,
+        codex_config_env(
+            &sandbox,
+            [(FAKE_CODEX_SCENARIO_ENV.to_string(), "url_add_drift".to_string())],
+        ),
+        None,
+    );
+    let before = backend.capabilities().ids.clone();
+
+    let err = gateway
+        .mcp_add(
+            &kind,
+            AgentWrapperMcpAddRequest {
+                name: "demo".to_string(),
+                transport: AgentWrapperMcpAddTransport::Url {
+                    url: "https://example.test/mcp".to_string(),
+                    bearer_token_env_var: Some("MY_TOKEN".to_string()),
+                },
+                context: AgentWrapperMcpCommandContext::default(),
+            },
+        )
+        .await
+        .expect_err("url add flag drift must fail closed");
+
+    let message = backend_error_message(err);
+    assert!(
+        !message.contains("unexpected argument '--url'"),
+        "drift error leaked subprocess stderr: {message}"
+    );
+    assert!(
+        !message.contains("unexpected argument '--bearer-token-env-var'"),
+        "drift error leaked subprocess stderr: {message}"
+    );
+    assert_eq!(backend.capabilities().ids, before);
+}
+
+#[tokio::test]
 async fn codex_mcp_missing_binary_returns_backend_error_without_writing_record() {
     if !codex_mcp_supported() {
         return;
