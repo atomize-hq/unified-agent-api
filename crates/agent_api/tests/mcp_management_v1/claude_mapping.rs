@@ -1,9 +1,17 @@
-use std::{collections::BTreeMap, fs, time::Duration};
+use std::{
+    collections::BTreeMap,
+    ffi::OsString,
+    fs,
+    sync::{Arc, Mutex, OnceLock},
+    time::Duration,
+};
 
+use agent_api::backends::claude_code::{ClaudeCodeBackend, ClaudeCodeBackendConfig};
 use agent_api::mcp::{
     AgentWrapperMcpAddRequest, AgentWrapperMcpAddTransport, AgentWrapperMcpCommandContext,
     AgentWrapperMcpGetRequest, AgentWrapperMcpListRequest, AgentWrapperMcpRemoveRequest,
 };
+use agent_api::{AgentWrapperBackend, AgentWrapperGateway};
 
 use super::{
     claude_support::{
@@ -15,6 +23,27 @@ use super::{
 
 const MCP_OUTPUT_BOUND_BYTES: usize = 65_536;
 const TRUNCATION_SUFFIX: &str = "…(truncated)";
+const CLAUDE_HOME_ENV: &str = "CLAUDE_HOME";
+
+fn claude_home_env_lock() -> &'static Mutex<()> {
+    static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+    LOCK.get_or_init(|| Mutex::new(()))
+}
+
+struct EnvGuard {
+    key: &'static str,
+    previous: Option<OsString>,
+}
+
+impl Drop for EnvGuard {
+    fn drop(&mut self) {
+        if let Some(value) = self.previous.take() {
+            std::env::set_var(self.key, value);
+        } else {
+            std::env::remove_var(self.key);
+        }
+    }
+}
 
 #[tokio::test]
 async fn claude_mcp_list_records_pinned_argv_and_request_context_on_supported_targets() {
@@ -195,6 +224,107 @@ async fn claude_mcp_list_request_env_overrides_injected_home_and_xdg_values() {
     assert!(
         fresh_claude_home.join(".cache").is_dir(),
         "configured xdg cache dir should exist"
+    );
+}
+
+#[tokio::test]
+async fn claude_mcp_list_uses_ambient_claude_home_when_config_home_is_absent() {
+    if !claude_list_supported() {
+        return;
+    }
+
+    let _env_lock = claude_home_env_lock()
+        .lock()
+        .expect("lock ambient claude home env");
+    let sandbox = McpTestSandbox::new("claude_mcp_list_uses_ambient_claude_home").expect("sandbox");
+    let binary = sandbox.install_fake_claude().expect("install fake claude");
+    let ambient_claude_home = sandbox.root().join("ambient-claude-home");
+    assert!(
+        !ambient_claude_home.exists(),
+        "test requires an unmaterialized ambient claude home"
+    );
+
+    let previous = std::env::var_os(CLAUDE_HOME_ENV);
+    std::env::set_var(CLAUDE_HOME_ENV, &ambient_claude_home);
+    let _guard = EnvGuard {
+        key: CLAUDE_HOME_ENV,
+        previous,
+    };
+
+    let backend = ClaudeCodeBackend::new(ClaudeCodeBackendConfig {
+        binary: Some(binary),
+        claude_home: None,
+        env: claude_config_env(&sandbox, std::iter::empty()),
+        ..Default::default()
+    });
+
+    let kind = backend.kind();
+    let mut gateway = AgentWrapperGateway::new();
+    gateway
+        .register(Arc::new(backend))
+        .expect("register claude backend");
+
+    let output = gateway
+        .mcp_list(&kind, AgentWrapperMcpListRequest::default())
+        .await
+        .expect("supported list should succeed");
+
+    assert!(output.status.success(), "expected success status");
+
+    let record = sandbox
+        .read_single_record()
+        .expect("single invocation record");
+    assert_eq!(
+        record.env.get("CLAUDE_HOME").map(String::as_str),
+        Some(ambient_claude_home.to_string_lossy().as_ref())
+    );
+    assert_eq!(
+        record.env.get("HOME").map(String::as_str),
+        Some(ambient_claude_home.to_string_lossy().as_ref())
+    );
+    assert_eq!(
+        record.env.get("XDG_CONFIG_HOME").map(String::as_str),
+        Some(
+            ambient_claude_home
+                .join(".config")
+                .to_string_lossy()
+                .as_ref()
+        )
+    );
+    assert_eq!(
+        record.env.get("XDG_DATA_HOME").map(String::as_str),
+        Some(
+            ambient_claude_home
+                .join(".local")
+                .join("share")
+                .to_string_lossy()
+                .as_ref()
+        )
+    );
+    assert_eq!(
+        record.env.get("XDG_CACHE_HOME").map(String::as_str),
+        Some(
+            ambient_claude_home
+                .join(".cache")
+                .to_string_lossy()
+                .as_ref()
+        )
+    );
+    assert!(
+        ambient_claude_home.is_dir(),
+        "ambient claude home should exist"
+    );
+    assert!(
+        ambient_claude_home.join(".config").is_dir(),
+        "ambient xdg config dir should exist"
+    );
+    assert!(
+        ambient_claude_home.join(".local").join("share").is_dir(),
+        "ambient xdg data dir should exist"
+    );
+    assert!(
+        ambient_claude_home.join(".cache").is_dir(),
+        "ambient xdg cache dir should exist"
     );
 }
 

@@ -48,6 +48,20 @@ fn sample_config() -> super::super::ClaudeCodeBackendConfig {
     }
 }
 
+fn sample_config_without_home() -> super::super::ClaudeCodeBackendConfig {
+    super::super::ClaudeCodeBackendConfig {
+        binary: Some(PathBuf::from("/tmp/fake-claude")),
+        claude_home: None,
+        default_timeout: Some(Duration::from_secs(30)),
+        default_working_dir: Some(PathBuf::from("default/workdir")),
+        env: BTreeMap::from([
+            ("CONFIG_ONLY".to_string(), "config-only".to_string()),
+            ("OVERRIDE_ME".to_string(), "config".to_string()),
+        ]),
+        ..Default::default()
+    }
+}
+
 fn sample_context() -> AgentWrapperMcpCommandContext {
     AgentWrapperMcpCommandContext {
         working_dir: Some(PathBuf::from("request/workdir")),
@@ -206,6 +220,7 @@ fn resolve_claude_mcp_command_applies_precedence_and_home_injection() {
         &sample_config(),
         &sample_context(),
         Some("/tmp/from-env".to_string()),
+        Some(PathBuf::from("/tmp/from-ambient-home")),
     );
     let layout = ClaudeHomeLayout::new("/tmp/claude-home");
 
@@ -260,6 +275,7 @@ fn resolve_claude_mcp_command_uses_backend_defaults_when_request_values_absent()
         &sample_config(),
         &AgentWrapperMcpCommandContext::default(),
         None,
+        None,
     );
 
     assert_eq!(resolved.working_dir, Some(PathBuf::from("default/workdir")));
@@ -276,6 +292,7 @@ fn disable_autoupdater_default_does_not_override_explicit_values() {
         &config,
         &AgentWrapperMcpCommandContext::default(),
         None,
+        None,
     );
     assert_eq!(
         resolved
@@ -289,7 +306,7 @@ fn disable_autoupdater_default_does_not_override_explicit_values() {
     context
         .env
         .insert(DISABLE_AUTOUPDATER_ENV.to_string(), "2".to_string());
-    let resolved = resolve_claude_mcp_command_with_env(&config, &context, None);
+    let resolved = resolve_claude_mcp_command_with_env(&config, &context, None, None);
     assert_eq!(
         resolved
             .env
@@ -311,7 +328,7 @@ fn request_env_overrides_injected_home_keys() {
         "/tmp/request-xdg-config".to_string(),
     );
 
-    let resolved = resolve_claude_mcp_command_with_env(&sample_config(), &context, None);
+    let resolved = resolve_claude_mcp_command_with_env(&sample_config(), &context, None, None);
 
     assert_eq!(
         resolved.env.get(HOME_ENV).map(String::as_str),
@@ -337,7 +354,7 @@ fn request_env_override_of_claude_home_keeps_materialization() {
         "/tmp/request-claude-home".to_string(),
     );
 
-    let resolved = resolve_claude_mcp_command_with_env(&sample_config(), &context, None);
+    let resolved = resolve_claude_mcp_command_with_env(&sample_config(), &context, None, None);
 
     assert_eq!(
         resolved.env.get(CLAUDE_HOME_ENV).map(String::as_str),
@@ -369,9 +386,112 @@ fn request_env_with_same_injected_home_values_keeps_materialization() {
         layout.xdg_cache_home().to_string_lossy().into_owned(),
     );
 
-    let resolved = resolve_claude_mcp_command_with_env(&sample_config(), &context, None);
+    let resolved = resolve_claude_mcp_command_with_env(&sample_config(), &context, None, None);
 
     assert_eq!(resolved.materialize_claude_home, Some(layout));
+}
+
+#[test]
+fn ambient_claude_home_is_used_when_config_home_is_absent() {
+    let ambient_home = PathBuf::from("/tmp/ambient-claude-home");
+    let layout = ClaudeHomeLayout::new(ambient_home.clone());
+    let resolved = resolve_claude_mcp_command_with_env(
+        &sample_config_without_home(),
+        &AgentWrapperMcpCommandContext::default(),
+        None,
+        Some(ambient_home.clone()),
+    );
+
+    assert_eq!(
+        resolved.env.get(CLAUDE_HOME_ENV).map(String::as_str),
+        Some(ambient_home.to_string_lossy().as_ref())
+    );
+    assert_eq!(
+        resolved.env.get(HOME_ENV).map(String::as_str),
+        Some(ambient_home.to_string_lossy().as_ref())
+    );
+    assert_eq!(
+        resolved.env.get(XDG_CONFIG_HOME_ENV).map(String::as_str),
+        Some(layout.xdg_config_home().to_string_lossy().as_ref())
+    );
+    assert_eq!(resolved.materialize_claude_home, Some(layout));
+}
+
+#[test]
+fn blank_ambient_claude_home_is_ignored_when_config_home_is_absent() {
+    let resolved = resolve_claude_mcp_command_with_env(
+        &sample_config_without_home(),
+        &AgentWrapperMcpCommandContext::default(),
+        None,
+        Some(PathBuf::new()),
+    );
+
+    assert_eq!(resolved.env.get(CLAUDE_HOME_ENV), None);
+    assert_eq!(resolved.env.get(HOME_ENV), None);
+    assert_eq!(resolved.materialize_claude_home, None);
+}
+
+#[test]
+fn configured_claude_home_beats_ambient_claude_home() {
+    let layout = ClaudeHomeLayout::new("/tmp/claude-home");
+    let resolved = resolve_claude_mcp_command_with_env(
+        &sample_config(),
+        &AgentWrapperMcpCommandContext::default(),
+        None,
+        Some(PathBuf::from("/tmp/ambient-claude-home")),
+    );
+
+    assert_eq!(
+        resolved.env.get(CLAUDE_HOME_ENV).map(String::as_str),
+        Some("/tmp/claude-home")
+    );
+    assert_eq!(resolved.materialize_claude_home, Some(layout));
+}
+
+#[test]
+fn request_env_override_of_ambient_claude_home_keeps_materialization() {
+    let ambient_home = PathBuf::from("/tmp/ambient-claude-home");
+    let layout = ClaudeHomeLayout::new(ambient_home.clone());
+    let mut context = AgentWrapperMcpCommandContext::default();
+    context.env.insert(
+        CLAUDE_HOME_ENV.to_string(),
+        "/tmp/request-claude-home".to_string(),
+    );
+    context.env.insert(
+        XDG_CONFIG_HOME_ENV.to_string(),
+        "/tmp/request-xdg-config".to_string(),
+    );
+
+    let resolved = resolve_claude_mcp_command_with_env(
+        &sample_config_without_home(),
+        &context,
+        None,
+        Some(ambient_home.clone()),
+    );
+
+    assert_eq!(
+        resolved.env.get(CLAUDE_HOME_ENV).map(String::as_str),
+        Some("/tmp/request-claude-home")
+    );
+    assert_eq!(
+        resolved.env.get(XDG_CONFIG_HOME_ENV).map(String::as_str),
+        Some("/tmp/request-xdg-config")
+    );
+    assert_eq!(resolved.materialize_claude_home, Some(layout));
+}
+
+#[test]
+fn no_claude_home_is_materialized_without_config_or_ambient_home() {
+    let resolved = resolve_claude_mcp_command_with_env(
+        &sample_config_without_home(),
+        &AgentWrapperMcpCommandContext::default(),
+        None,
+        None,
+    );
+
+    assert_eq!(resolved.env.get(CLAUDE_HOME_ENV), None);
+    assert_eq!(resolved.env.get(HOME_ENV), None);
+    assert_eq!(resolved.materialize_claude_home, None);
 }
 
 #[test]

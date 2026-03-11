@@ -22,23 +22,27 @@ pub(super) fn resolve_claude_mcp_command(
     config: &super::super::ClaudeCodeBackendConfig,
     context: &AgentWrapperMcpCommandContext,
 ) -> ResolvedClaudeMcpCommand {
-    resolve_claude_mcp_command_with_env(config, context, env::var(CLAUDE_BINARY_ENV).ok())
+    resolve_claude_mcp_command_with_env(
+        config,
+        context,
+        env::var(CLAUDE_BINARY_ENV).ok(),
+        env::var_os(CLAUDE_HOME_ENV).map(PathBuf::from),
+    )
 }
 
 pub(super) fn resolve_claude_mcp_command_with_env(
     config: &super::super::ClaudeCodeBackendConfig,
     context: &AgentWrapperMcpCommandContext,
     claude_binary_env: Option<String>,
+    claude_home_env: Option<PathBuf>,
 ) -> ResolvedClaudeMcpCommand {
     let binary_path = resolve_claude_binary_path(config.binary.as_ref(), claude_binary_env);
     let mut env = config.env.clone();
     env.entry(DISABLE_AUTOUPDATER_ENV.to_string())
         .or_insert_with(|| "1".to_string());
 
-    let claude_home_layout = config
-        .claude_home
-        .as_ref()
-        .map(|path| ClaudeHomeLayout::new(path.clone()));
+    let claude_home_layout =
+        resolve_claude_home_layout(config.claude_home.as_ref(), claude_home_env);
     if let Some(layout) = claude_home_layout.as_ref() {
         inject_claude_home_env(&mut env, layout);
     }
@@ -70,6 +74,16 @@ pub(super) fn resolve_claude_binary_path(
         }
     }
     PathBuf::from("claude")
+}
+
+fn resolve_claude_home_layout(
+    config_claude_home: Option<&PathBuf>,
+    claude_home_env: Option<PathBuf>,
+) -> Option<ClaudeHomeLayout> {
+    config_claude_home
+        .cloned()
+        .or_else(|| claude_home_env.filter(|path| !path.as_os_str().is_empty()))
+        .map(ClaudeHomeLayout::new)
 }
 
 fn inject_claude_home_env(env: &mut BTreeMap<String, String>, layout: &ClaudeHomeLayout) {
