@@ -265,7 +265,10 @@ async fn codex_mcp_add_legacy_usage_drift_returns_backend_error_without_mutating
         true,
         codex_config_env(
             &sandbox,
-            [(FAKE_CODEX_SCENARIO_ENV.to_string(), "legacy_add_drift".to_string())],
+            [(
+                FAKE_CODEX_SCENARIO_ENV.to_string(),
+                "legacy_add_drift".to_string(),
+            )],
         ),
         None,
     );

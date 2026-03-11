@@ -11,7 +11,7 @@ use agent_api::{
 
 use super::{
     claude_support::{
-        claude_config_env, claude_get_supported, assert_unsupported_capability,
+        assert_unsupported_capability, claude_config_env, claude_get_supported,
         CAPABILITY_MCP_ADD_V1,
     },
     support::McpTestSandbox,

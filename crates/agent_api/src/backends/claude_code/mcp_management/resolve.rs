@@ -44,8 +44,6 @@ pub(super) fn resolve_claude_mcp_command_with_env(
     }
 
     env.extend(context.env.clone());
-    let materialize_claude_home = claude_home_layout
-        .filter(|layout| should_materialize_claude_home(&env, layout));
 
     ResolvedClaudeMcpCommand {
         binary_path,
@@ -55,7 +53,7 @@ pub(super) fn resolve_claude_mcp_command_with_env(
             .or_else(|| config.default_working_dir.clone()),
         timeout: context.timeout.or(config.default_timeout),
         env,
-        materialize_claude_home,
+        materialize_claude_home: claude_home_layout,
     }
 }
 
@@ -96,62 +94,4 @@ fn inject_claude_home_env(env: &mut BTreeMap<String, String>, layout: &ClaudeHom
         env.entry(super::LOCALAPPDATA_ENV.to_string())
             .or_insert_with(|| layout.localappdata_dir().to_string_lossy().into_owned());
     }
-}
-
-fn should_materialize_claude_home(
-    env: &BTreeMap<String, String>,
-    layout: &ClaudeHomeLayout,
-) -> bool {
-    let root = layout.root().to_string_lossy().into_owned();
-
-    key_matches(env, CLAUDE_HOME_ENV, &root)
-        && key_matches(env, HOME_ENV, &root)
-        && key_matches(
-            env,
-            XDG_CONFIG_HOME_ENV,
-            layout.xdg_config_home().to_string_lossy().as_ref(),
-        )
-        && key_matches(
-            env,
-            XDG_DATA_HOME_ENV,
-            layout.xdg_data_home().to_string_lossy().as_ref(),
-        )
-        && key_matches(
-            env,
-            XDG_CACHE_HOME_ENV,
-            layout.xdg_cache_home().to_string_lossy().as_ref(),
-        )
-        && windows_layout_keys_match(env, layout, &root)
-}
-
-fn key_matches(env: &BTreeMap<String, String>, key: &str, expected: &str) -> bool {
-    env.get(key).is_some_and(|value| value == expected)
-}
-
-#[cfg(not(windows))]
-fn windows_layout_keys_match(
-    _env: &BTreeMap<String, String>,
-    _layout: &ClaudeHomeLayout,
-    _root: &str,
-) -> bool {
-    true
-}
-
-#[cfg(windows)]
-fn windows_layout_keys_match(
-    env: &BTreeMap<String, String>,
-    layout: &ClaudeHomeLayout,
-    root: &str,
-) -> bool {
-    key_matches(env, super::USERPROFILE_ENV, root)
-        && key_matches(
-            env,
-            super::APPDATA_ENV,
-            layout.appdata_dir().to_string_lossy().as_ref(),
-        )
-        && key_matches(
-            env,
-            super::LOCALAPPDATA_ENV,
-            layout.localappdata_dir().to_string_lossy().as_ref(),
-        )
 }

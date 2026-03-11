@@ -301,6 +301,7 @@ fn disable_autoupdater_default_does_not_override_explicit_values() {
 
 #[test]
 fn request_env_overrides_injected_home_keys() {
+    let layout = ClaudeHomeLayout::new("/tmp/claude-home");
     let mut context = AgentWrapperMcpCommandContext::default();
     context
         .env
@@ -324,11 +325,12 @@ fn request_env_overrides_injected_home_keys() {
         resolved.env.get(CLAUDE_HOME_ENV).map(String::as_str),
         Some("/tmp/claude-home")
     );
-    assert_eq!(resolved.materialize_claude_home, None);
+    assert_eq!(resolved.materialize_claude_home, Some(layout));
 }
 
 #[test]
-fn request_env_override_of_claude_home_suppresses_materialization() {
+fn request_env_override_of_claude_home_keeps_materialization() {
+    let layout = ClaudeHomeLayout::new("/tmp/claude-home");
     let mut context = AgentWrapperMcpCommandContext::default();
     context.env.insert(
         CLAUDE_HOME_ENV.to_string(),
@@ -341,7 +343,7 @@ fn request_env_override_of_claude_home_suppresses_materialization() {
         resolved.env.get(CLAUDE_HOME_ENV).map(String::as_str),
         Some("/tmp/request-claude-home")
     );
-    assert_eq!(resolved.materialize_claude_home, None);
+    assert_eq!(resolved.materialize_claude_home, Some(layout));
 }
 
 #[test]

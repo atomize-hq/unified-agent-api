@@ -7,8 +7,8 @@ use agent_api::mcp::{
 
 use super::{
     claude_support::{
-        claude_config_env, claude_gateway, claude_get_supported, claude_list_supported,
-        FAKE_CLAUDE_SCENARIO_ENV,
+        claude_config_env, claude_gateway, claude_gateway_with_home, claude_get_supported,
+        claude_list_supported, FAKE_CLAUDE_SCENARIO_ENV,
     },
     support::{collect_fake_mcp_sentinels, fake_mcp_sentinel, McpTestSandbox},
 };
@@ -97,6 +97,7 @@ async fn claude_mcp_list_request_env_overrides_injected_home_and_xdg_values() {
     }
 
     let sandbox = McpTestSandbox::new("claude_mcp_list_env_override").expect("sandbox");
+    let fresh_claude_home = sandbox.root().join("fresh-claude-home");
     let override_home = sandbox.root().join("override-home");
     let override_xdg_config = sandbox.root().join("override-xdg-config");
     let override_xdg_data = sandbox.root().join("override-xdg-data");
@@ -109,9 +110,14 @@ async fn claude_mcp_list_request_env_overrides_injected_home_and_xdg_values() {
     ] {
         fs::create_dir_all(dir).expect("create override dir");
     }
+    assert!(
+        !fresh_claude_home.exists(),
+        "test requires an unmaterialized configured claude_home"
+    );
 
-    let (_backend, gateway, kind) = claude_gateway(
+    let (_backend, gateway, kind) = claude_gateway_with_home(
         &sandbox,
+        fresh_claude_home.clone(),
         false,
         claude_config_env(&sandbox, std::iter::empty()),
         None,
@@ -156,7 +162,7 @@ async fn claude_mcp_list_request_env_overrides_injected_home_and_xdg_values() {
     assert_eq!(record.args, vec!["mcp", "list"]);
     assert_eq!(
         record.env.get("CLAUDE_HOME").map(String::as_str),
-        Some(sandbox.claude_home().to_string_lossy().as_ref())
+        Some(fresh_claude_home.to_string_lossy().as_ref())
     );
     assert_eq!(
         record.env.get("HOME").map(String::as_str),
@@ -173,6 +179,22 @@ async fn claude_mcp_list_request_env_overrides_injected_home_and_xdg_values() {
     assert_eq!(
         record.env.get("XDG_CACHE_HOME").map(String::as_str),
         Some(override_xdg_cache.to_string_lossy().as_ref())
+    );
+    assert!(
+        fresh_claude_home.is_dir(),
+        "configured claude_home should exist"
+    );
+    assert!(
+        fresh_claude_home.join(".config").is_dir(),
+        "configured xdg config dir should exist"
+    );
+    assert!(
+        fresh_claude_home.join(".local").join("share").is_dir(),
+        "configured xdg data dir should exist"
+    );
+    assert!(
+        fresh_claude_home.join(".cache").is_dir(),
+        "configured xdg cache dir should exist"
     );
 }
 
