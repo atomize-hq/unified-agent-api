@@ -382,9 +382,5 @@ fn assert_unsupported_capability(err: AgentWrapperError, expected_capability: &s
 }
 
 fn codex_mcp_supported() -> bool {
-    cfg!(all(
-        target_os = "linux",
-        target_arch = "x86_64",
-        target_env = "musl"
-    ))
+    cfg!(all(target_os = "linux", target_arch = "x86_64"))
 }

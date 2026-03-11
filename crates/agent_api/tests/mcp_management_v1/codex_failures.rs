@@ -611,11 +611,7 @@ fn backend_error_message(err: AgentWrapperError) -> String {
 }
 
 fn codex_mcp_supported() -> bool {
-    cfg!(all(
-        target_os = "linux",
-        target_arch = "x86_64",
-        target_env = "musl"
-    ))
+    cfg!(all(target_os = "linux", target_arch = "x86_64"))
 }
 
 fn platform_binary_name(base: &str) -> String {

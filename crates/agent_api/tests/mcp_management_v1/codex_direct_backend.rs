@@ -199,11 +199,7 @@ fn codex_config_env(sandbox: &McpTestSandbox) -> BTreeMap<String, String> {
 }
 
 fn codex_mcp_supported() -> bool {
-    cfg!(all(
-        target_os = "linux",
-        target_arch = "x86_64",
-        target_env = "musl"
-    ))
+    cfg!(all(target_os = "linux", target_arch = "x86_64"))
 }
 
 fn assert_invalid_request(
