@@ -1,6 +1,7 @@
 use std::{
     collections::BTreeMap,
     path::{Path, PathBuf},
+    time::Duration,
 };
 
 use crate::{mcp::AgentWrapperMcpAddTransport, AgentWrapperError};
@@ -22,7 +23,7 @@ use super::support::{
 use std::{fs, os::unix::fs::PermissionsExt};
 
 #[cfg(unix)]
-use super::support::temp_test_dir;
+use super::support::{temp_test_dir, write_fake_claude};
 
 const PATH_ENV: &str = "PATH";
 const UNIX_TEST_PATH: &str = "/usr/bin:/bin";
@@ -52,6 +53,64 @@ fn assert_runtime_conflict(err: AgentWrapperError) {
         }
         other => panic!("expected Backend error, got {other:?}"),
     }
+}
+
+fn assert_timeout_error(err: AgentWrapperError) {
+    match err {
+        AgentWrapperError::Backend { message } => {
+            assert_eq!(message, super::super::PINNED_TIMEOUT_FAILURE);
+        }
+        other => panic!("expected Backend error, got {other:?}"),
+    }
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn run_claude_mcp_zero_timeout_fails_before_materializing_or_spawning() {
+    let temp_dir = temp_test_dir("zero-timeout");
+    let script_dir = temp_dir.join("bin");
+    let script_path = write_fake_claude(
+        &script_dir,
+        r#"#!/usr/bin/env bash
+touch "$MARKER_PATH"
+"#,
+    );
+    let marker_path = temp_dir.join("spawned.marker");
+    let isolated_home = temp_dir.join("isolated-claude-home");
+
+    let err = run_claude_mcp(
+        super::super::super::ClaudeCodeBackendConfig {
+            binary: Some(script_path),
+            claude_home: Some(isolated_home.clone()),
+            ..Default::default()
+        },
+        claude_mcp_list_argv(),
+        crate::mcp::AgentWrapperMcpCommandContext {
+            timeout: Some(Duration::ZERO),
+            env: BTreeMap::from([
+                (PATH_ENV.to_string(), UNIX_TEST_PATH.to_string()),
+                (
+                    "MARKER_PATH".to_string(),
+                    marker_path.to_string_lossy().into_owned(),
+                ),
+            ]),
+            ..Default::default()
+        },
+    )
+    .await
+    .expect_err("zero timeout should fail before spawn");
+
+    assert_timeout_error(err);
+    assert!(
+        !marker_path.exists(),
+        "zero-timeout runner path must not spawn the claude process"
+    );
+    assert!(
+        !isolated_home.exists(),
+        "zero-timeout runner path must not materialize CLAUDE_HOME"
+    );
+
+    fs::remove_dir_all(temp_dir).expect("temp dir should be removed");
 }
 
 #[cfg(unix)]

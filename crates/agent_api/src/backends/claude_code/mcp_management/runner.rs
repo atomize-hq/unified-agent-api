@@ -38,6 +38,10 @@ pub(super) async fn capture_claude_mcp_output(
     resolved: &super::resolve::ResolvedClaudeMcpCommand,
     argv: &[OsString],
 ) -> Result<CapturedClaudeMcpCommandOutput, AgentWrapperError> {
+    if resolved.timeout == Some(Duration::ZERO) {
+        return Err(backend_error(PINNED_TIMEOUT_FAILURE));
+    }
+
     if let Some(layout) = resolved.materialize_claude_home.as_ref() {
         layout
             .materialize(true)
@@ -188,18 +192,17 @@ async fn wait_for_exit(
     timeout: Option<Duration>,
 ) -> Result<ExitStatus, AgentWrapperError> {
     match timeout {
-        Some(timeout) if timeout == Duration::ZERO => {
-            cleanup_child(child).await;
-            Err(backend_error(PINNED_TIMEOUT_FAILURE))
-        }
-        Some(timeout) => match tokio::time::timeout(timeout, child.wait()).await {
-            Ok(Ok(status)) => Ok(status),
-            Ok(Err(_)) => Err(backend_error(PINNED_WAIT_FAILURE)),
-            Err(_) => {
-                cleanup_child(child).await;
-                Err(backend_error(PINNED_TIMEOUT_FAILURE))
+        Some(timeout) => {
+            debug_assert_ne!(timeout, Duration::ZERO);
+            match tokio::time::timeout(timeout, child.wait()).await {
+                Ok(Ok(status)) => Ok(status),
+                Ok(Err(_)) => Err(backend_error(PINNED_WAIT_FAILURE)),
+                Err(_) => {
+                    cleanup_child(child).await;
+                    Err(backend_error(PINNED_TIMEOUT_FAILURE))
+                }
             }
-        },
+        }
         None => child
             .wait()
             .await

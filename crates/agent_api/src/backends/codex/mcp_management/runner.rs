@@ -35,6 +35,10 @@ pub(super) async fn capture_codex_mcp_output(
     resolved: &super::resolve::ResolvedCodexMcpCommand,
     argv: &[OsString],
 ) -> Result<CapturedCodexMcpCommandOutput, AgentWrapperError> {
+    if resolved.timeout == Some(Duration::ZERO) {
+        return Err(backend_error(super::super::PINNED_TIMEOUT));
+    }
+
     if let Some(codex_home) = resolved.materialize_codex_home.as_ref() {
         CodexHomeLayout::new(codex_home.clone())
             .materialize(true)
@@ -190,18 +194,17 @@ async fn wait_for_exit(
     timeout: Option<Duration>,
 ) -> Result<ExitStatus, AgentWrapperError> {
     match timeout {
-        Some(timeout) if timeout == Duration::ZERO => {
-            cleanup_child(child).await;
-            Err(backend_error(super::super::PINNED_TIMEOUT))
-        }
-        Some(timeout) => match tokio::time::timeout(timeout, child.wait()).await {
-            Ok(Ok(status)) => Ok(status),
-            Ok(Err(_)) => Err(backend_error(PINNED_WAIT_FAILURE)),
-            Err(_) => {
-                cleanup_child(child).await;
-                Err(backend_error(super::super::PINNED_TIMEOUT))
+        Some(timeout) => {
+            debug_assert_ne!(timeout, Duration::ZERO);
+            match tokio::time::timeout(timeout, child.wait()).await {
+                Ok(Ok(status)) => Ok(status),
+                Ok(Err(_)) => Err(backend_error(PINNED_WAIT_FAILURE)),
+                Err(_) => {
+                    cleanup_child(child).await;
+                    Err(backend_error(super::super::PINNED_TIMEOUT))
+                }
             }
-        },
+        }
         None => child
             .wait()
             .await

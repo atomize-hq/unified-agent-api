@@ -188,6 +188,10 @@ async fn codex_mcp_zero_timeout_returns_backend_error_without_leaking_partial_ou
         message.contains("timeout"),
         "zero-timeout failures should stay redacted but mention timeout: {message}"
     );
+    assert!(
+        !sandbox.record_path().exists(),
+        "zero-timeout path must fail before spawning the fake codex binary"
+    );
 }
 
 #[tokio::test]
@@ -235,6 +239,10 @@ async fn codex_mcp_zero_timeout_fast_exit_still_returns_timeout_error() {
     assert!(
         message.contains("timeout"),
         "zero-timeout fast-exit failures should stay redacted but mention timeout: {message}"
+    );
+    assert!(
+        !sandbox.record_path().exists(),
+        "zero-timeout fast-exit path must fail before spawning the fake codex binary"
     );
 }
 

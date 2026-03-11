@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, sync::Arc};
+use std::{collections::BTreeMap, sync::Arc, time::Duration};
 
 use agent_api::{
     backends::codex::{CodexBackend, CodexBackendConfig},
@@ -325,6 +325,107 @@ async fn codex_mcp_remove_records_pinned_argv_and_writes_sentinel() {
     assert_eq!(
         collect_fake_mcp_sentinels(sandbox.root()).expect("collect sentinels"),
         vec![expected]
+    );
+}
+
+#[tokio::test]
+async fn codex_mcp_add_zero_timeout_fails_before_spawn_or_write() {
+    if !codex_mcp_supported() {
+        return;
+    }
+
+    let sandbox = McpTestSandbox::new("codex_mcp_add_zero_timeout").expect("sandbox");
+    let (_backend, gateway, kind) = codex_gateway(
+        &sandbox,
+        true,
+        codex_config_env(&sandbox, std::iter::empty()),
+    );
+
+    let err = gateway
+        .mcp_add(
+            &kind,
+            AgentWrapperMcpAddRequest {
+                name: "demo".to_string(),
+                transport: AgentWrapperMcpAddTransport::Stdio {
+                    command: vec!["node".to_string()],
+                    args: vec!["server.js".to_string()],
+                    env: BTreeMap::from([("MCP_SERVER_ENV".to_string(), "1".to_string())]),
+                },
+                context: AgentWrapperMcpCommandContext {
+                    timeout: Some(Duration::ZERO),
+                    ..Default::default()
+                },
+            },
+        )
+        .await
+        .expect_err("zero-timeout add should fail before spawning");
+
+    match err {
+        AgentWrapperError::Backend { message } => {
+            assert!(
+                message.contains("timeout"),
+                "zero-timeout add should return a timeout backend error: {message}"
+            );
+        }
+        other => panic!("expected Backend error, got {other:?}"),
+    }
+    assert!(
+        !sandbox.record_path().exists(),
+        "zero-timeout add must not create an invocation record"
+    );
+    assert!(
+        collect_fake_mcp_sentinels(sandbox.root())
+            .expect("collect sentinels")
+            .is_empty(),
+        "zero-timeout add must not write MCP sentinels"
+    );
+}
+
+#[tokio::test]
+async fn codex_mcp_remove_zero_timeout_fails_before_spawn_or_write() {
+    if !codex_mcp_supported() {
+        return;
+    }
+
+    let sandbox = McpTestSandbox::new("codex_mcp_remove_zero_timeout").expect("sandbox");
+    let (_backend, gateway, kind) = codex_gateway(
+        &sandbox,
+        true,
+        codex_config_env(&sandbox, std::iter::empty()),
+    );
+
+    let err = gateway
+        .mcp_remove(
+            &kind,
+            AgentWrapperMcpRemoveRequest {
+                name: "demo".to_string(),
+                context: AgentWrapperMcpCommandContext {
+                    timeout: Some(Duration::ZERO),
+                    ..Default::default()
+                },
+            },
+        )
+        .await
+        .expect_err("zero-timeout remove should fail before spawning");
+
+    match err {
+        AgentWrapperError::Backend { message } => {
+            assert!(
+                message.contains("timeout"),
+                "zero-timeout remove should return a timeout backend error: {message}"
+            );
+        }
+        other => panic!("expected Backend error, got {other:?}"),
+    }
+    assert!(
+        !sandbox.record_path().exists(),
+        "zero-timeout remove must not create an invocation record"
+    );
+    assert!(
+        collect_fake_mcp_sentinels(sandbox.root())
+            .expect("collect sentinels")
+            .is_empty(),
+        "zero-timeout remove must not write MCP sentinels"
     );
 }
 

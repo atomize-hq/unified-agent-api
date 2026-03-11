@@ -631,6 +631,105 @@ async fn claude_mcp_remove_records_pinned_argv_and_writes_sentinel_on_win32_x64(
 }
 
 #[tokio::test]
+async fn claude_mcp_add_zero_timeout_fails_before_spawn_or_write() {
+    if !claude_get_supported() {
+        return;
+    }
+
+    let _env_lock = process_env_lock().lock().expect("lock process env");
+    let sandbox = McpTestSandbox::new("claude_mcp_add_zero_timeout").expect("sandbox");
+    let (_backend, gateway, kind) = claude_gateway(
+        &sandbox,
+        true,
+        claude_config_env(&sandbox, std::iter::empty()),
+        None,
+        None,
+    );
+
+    let err = gateway
+        .mcp_add(
+            &kind,
+            AgentWrapperMcpAddRequest {
+                name: "demo".to_string(),
+                transport: AgentWrapperMcpAddTransport::Stdio {
+                    command: vec!["node".to_string()],
+                    args: vec!["server.js".to_string()],
+                    env: BTreeMap::new(),
+                },
+                context: AgentWrapperMcpCommandContext {
+                    timeout: Some(Duration::ZERO),
+                    ..Default::default()
+                },
+            },
+        )
+        .await
+        .expect_err("zero-timeout add should fail before spawning");
+
+    let message = super::claude_support::backend_error_message(err);
+    assert!(
+        message.contains("timeout"),
+        "zero-timeout add should return a timeout backend error: {message}"
+    );
+    assert!(
+        !sandbox.record_path().exists(),
+        "zero-timeout add must not create an invocation record"
+    );
+    assert!(
+        collect_fake_mcp_sentinels(sandbox.root())
+            .expect("collect sentinels")
+            .is_empty(),
+        "zero-timeout add must not write MCP sentinels"
+    );
+}
+
+#[tokio::test]
+async fn claude_mcp_remove_zero_timeout_fails_before_spawn_or_write() {
+    if !claude_get_supported() {
+        return;
+    }
+
+    let _env_lock = process_env_lock().lock().expect("lock process env");
+    let sandbox = McpTestSandbox::new("claude_mcp_remove_zero_timeout").expect("sandbox");
+    let (_backend, gateway, kind) = claude_gateway(
+        &sandbox,
+        true,
+        claude_config_env(&sandbox, std::iter::empty()),
+        None,
+        None,
+    );
+
+    let err = gateway
+        .mcp_remove(
+            &kind,
+            AgentWrapperMcpRemoveRequest {
+                name: "demo".to_string(),
+                context: AgentWrapperMcpCommandContext {
+                    timeout: Some(Duration::ZERO),
+                    ..Default::default()
+                },
+            },
+        )
+        .await
+        .expect_err("zero-timeout remove should fail before spawning");
+
+    let message = super::claude_support::backend_error_message(err);
+    assert!(
+        message.contains("timeout"),
+        "zero-timeout remove should return a timeout backend error: {message}"
+    );
+    assert!(
+        !sandbox.record_path().exists(),
+        "zero-timeout remove must not create an invocation record"
+    );
+    assert!(
+        collect_fake_mcp_sentinels(sandbox.root())
+            .expect("collect sentinels")
+            .is_empty(),
+        "zero-timeout remove must not write MCP sentinels"
+    );
+}
+
+#[tokio::test]
 async fn claude_mcp_oversized_output_is_truncated_and_flagged_on_supported_targets() {
     if !claude_list_supported() {
         return;

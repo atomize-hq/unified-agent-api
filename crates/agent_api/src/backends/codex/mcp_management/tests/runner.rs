@@ -1,6 +1,7 @@
 use std::{
     collections::BTreeMap,
     path::{Path, PathBuf},
+    time::Duration,
 };
 
 use crate::{
@@ -34,6 +35,15 @@ use std::os::unix::fs::PermissionsExt;
 const PATH_ENV: &str = "PATH";
 const UNIX_TEST_PATH: &str = "/usr/bin:/bin";
 
+fn assert_timeout_error(err: AgentWrapperError) {
+    match err {
+        AgentWrapperError::Backend { message } => {
+            assert_eq!(message, super::super::super::PINNED_TIMEOUT);
+        }
+        other => panic!("expected Backend error, got {other:?}"),
+    }
+}
+
 #[cfg(unix)]
 fn write_test_executable(path: &Path, script: &str) {
     fs::write(path, script).expect("script should be written");
@@ -42,6 +52,55 @@ fn write_test_executable(path: &Path, script: &str) {
         .permissions();
     permissions.set_mode(0o755);
     fs::set_permissions(path, permissions).expect("script should be executable");
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn run_codex_mcp_zero_timeout_fails_before_materializing_or_spawning() {
+    let temp_dir = temp_test_dir("zero-timeout");
+    let script_dir = temp_dir.join("bin");
+    let script_path = write_fake_codex(
+        &script_dir,
+        r#"#!/usr/bin/env bash
+touch "$MARKER_PATH"
+"#,
+    );
+    let marker_path = temp_dir.join("spawned.marker");
+    let isolated_home = temp_dir.join("isolated-codex-home");
+
+    let err = run_codex_mcp(
+        super::super::super::CodexBackendConfig {
+            binary: Some(script_path),
+            codex_home: Some(isolated_home.clone()),
+            ..Default::default()
+        },
+        codex_mcp_list_argv(),
+        AgentWrapperMcpCommandContext {
+            timeout: Some(Duration::ZERO),
+            env: BTreeMap::from([
+                (PATH_ENV.to_string(), UNIX_TEST_PATH.to_string()),
+                (
+                    "MARKER_PATH".to_string(),
+                    marker_path.to_string_lossy().into_owned(),
+                ),
+            ]),
+            ..Default::default()
+        },
+    )
+    .await
+    .expect_err("zero timeout should fail before spawn");
+
+    assert_timeout_error(err);
+    assert!(
+        !marker_path.exists(),
+        "zero-timeout runner path must not spawn the codex process"
+    );
+    assert!(
+        !isolated_home.exists(),
+        "zero-timeout runner path must not materialize CODEX_HOME"
+    );
+
+    fs::remove_dir_all(temp_dir).expect("temp dir should be removed");
 }
 
 #[cfg(unix)]
