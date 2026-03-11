@@ -5,6 +5,9 @@ use std::{
     path::{Path, PathBuf},
 };
 
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
+
 pub(super) fn resolve_binary_path_for_spawn(
     binary_path: PathBuf,
     effective_path_env: Option<&str>,
@@ -72,7 +75,7 @@ fn find_binary_on_path(
 
 fn candidate_binary_path(directory: &Path, binary_name: &Path) -> Option<PathBuf> {
     let candidate = directory.join(binary_name);
-    if candidate.is_file() {
+    if is_runnable_path_candidate(&candidate) {
         return Some(candidate);
     }
 
@@ -91,7 +94,7 @@ fn candidate_binary_path(directory: &Path, binary_name: &Path) -> Option<PathBuf
             }
 
             let suffixed = candidate.with_extension(extension.trim_start_matches('.'));
-            if suffixed.is_file() {
+            if is_runnable_path_candidate(&suffixed) {
                 return Some(suffixed);
             }
         }
@@ -100,16 +103,39 @@ fn candidate_binary_path(directory: &Path, binary_name: &Path) -> Option<PathBuf
     None
 }
 
+fn is_runnable_path_candidate(candidate: &Path) -> bool {
+    let Ok(metadata) = fs::metadata(candidate) else {
+        return false;
+    };
+
+    if !metadata.is_file() {
+        return false;
+    }
+
+    #[cfg(unix)]
+    {
+        metadata.permissions().mode() & 0o111 != 0
+    }
+
+    #[cfg(not(unix))]
+    {
+        true
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::{
-        env,
+        env, fs,
         path::{Path, PathBuf},
     };
 
     use tempfile::TempDir;
 
     use super::resolve_binary_path_for_spawn;
+
+    #[cfg(unix)]
+    use std::os::unix::fs::PermissionsExt;
 
     struct CurrentDirGuard {
         previous: PathBuf,
@@ -129,13 +155,24 @@ mod tests {
         }
     }
 
+    fn write_test_binary(path: &Path) {
+        fs::write(path, "binary").expect("write fake binary");
+
+        #[cfg(unix)]
+        {
+            let mut permissions = fs::metadata(path).expect("binary metadata").permissions();
+            permissions.set_mode(0o755);
+            fs::set_permissions(path, permissions).expect("binary should be executable");
+        }
+    }
+
     #[test]
     fn resolves_relative_path_qualified_binary_against_supplied_current_dir() {
         let temp_dir = TempDir::new().expect("temp dir");
         let binary_dir = temp_dir.path().join("bin");
         let binary_path = binary_dir.join("codex");
         std::fs::create_dir_all(&binary_dir).expect("create binary dir");
-        std::fs::write(&binary_path, "binary").expect("write fake binary");
+        write_test_binary(&binary_path);
 
         let resolved = resolve_binary_path_for_spawn(
             PathBuf::from("bin/codex"),
@@ -157,7 +194,7 @@ mod tests {
         let path_dir = TempDir::new().expect("path dir");
         let cwd_dir = TempDir::new().expect("cwd dir");
         let binary_path = path_dir.path().join("codex");
-        std::fs::write(&binary_path, "binary").expect("write fake binary");
+        write_test_binary(&binary_path);
 
         let resolved = resolve_binary_path_for_spawn(
             PathBuf::from("codex"),
@@ -179,7 +216,7 @@ mod tests {
         let binary_dir = cwd_dir.path().join("bin");
         let binary_path = binary_dir.join("codex");
         std::fs::create_dir_all(&binary_dir).expect("create binary dir");
-        std::fs::write(&binary_path, "binary").expect("write fake binary");
+        write_test_binary(&binary_path);
 
         let resolved = resolve_binary_path_for_spawn(
             PathBuf::from("codex"),
@@ -204,7 +241,7 @@ mod tests {
         let binary_path = binary_dir.join("codex");
         std::fs::create_dir_all(&wrapper_dir).expect("create wrapper dir");
         std::fs::create_dir_all(&binary_dir).expect("create binary dir");
-        std::fs::write(&binary_path, "binary").expect("write fake binary");
+        write_test_binary(&binary_path);
         let _cwd_guard = CurrentDirGuard::set(parent_dir.path());
 
         let resolved = resolve_binary_path_for_spawn(
@@ -224,6 +261,32 @@ mod tests {
         assert!(
             !wrapper_candidate.exists(),
             "resolution must not use an unrelated wrapper cwd"
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn skips_non_executable_shadow_file_during_path_lookup() {
+        let shadow_dir = TempDir::new().expect("shadow dir");
+        let executable_dir = TempDir::new().expect("executable dir");
+        let shadow_path = shadow_dir.path().join("codex");
+        let executable_path = executable_dir.path().join("codex");
+        fs::write(&shadow_path, "shadow").expect("write shadow file");
+        write_test_binary(&executable_path);
+
+        let joined_path =
+            env::join_paths([shadow_dir.path(), executable_dir.path()]).expect("join PATH entries");
+        let resolved = resolve_binary_path_for_spawn(
+            PathBuf::from("codex"),
+            Some(joined_path.to_string_lossy().as_ref()),
+            None,
+            None,
+        )
+        .expect("PATH lookup should skip non-executable shadow");
+
+        assert_eq!(
+            resolved,
+            fs::canonicalize(&executable_path).expect("canonicalize executable")
         );
     }
 }

@@ -167,6 +167,35 @@ fn resolve_claude_binary_path_uses_ambient_path_when_effective_path_is_absent() 
 
 #[cfg(unix)]
 #[test]
+fn resolve_claude_binary_path_skips_non_executable_shadow_file_on_path() {
+    let shadow_dir = temp_test_dir("shadow-path");
+    let executable_dir = temp_test_dir("executable-path");
+    let shadow_path = shadow_dir.join("claude");
+    let executable_path = write_fake_claude(&executable_dir, "#!/usr/bin/env bash\nexit 0\n");
+    fs::write(&shadow_path, "shadow").expect("shadow file should be written");
+
+    let joined_path = env::join_paths([shadow_dir.as_path(), executable_dir.as_path()])
+        .expect("join PATH entries");
+    let resolved = resolve_claude_binary_path(
+        None,
+        Some(OsString::from("claude")),
+        Some(joined_path.to_string_lossy().as_ref()),
+        None,
+        None,
+    )
+    .expect("effective PATH should skip non-executable shadow");
+
+    assert_eq!(
+        resolved,
+        fs::canonicalize(&executable_path).expect("canonicalize executable path")
+    );
+
+    fs::remove_dir_all(shadow_dir).expect("shadow dir should be removed");
+    fs::remove_dir_all(executable_dir).expect("executable dir should be removed");
+}
+
+#[cfg(unix)]
+#[test]
 fn resolve_claude_mcp_command_resolves_relative_request_path_from_request_working_dir() {
     let _env_lock = test_env_lock().lock().expect("lock test env");
     let request_dir = temp_test_dir("request-working-dir");
