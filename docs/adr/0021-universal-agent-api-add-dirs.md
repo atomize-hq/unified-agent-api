@@ -38,7 +38,7 @@ This ADR corresponds to backlog item `uaa-0003` (`bucket=agent_api.exec`, `type=
 
 ## Executive Summary (Operator)
 
-ADR_BODY_SHA256: 9c8d8b22607bf175ea62a919454792ebacefc761cc04058ae35f0ee2a112a615
+ADR_BODY_SHA256: f9cbd67176f8073b836cce2ab77b9b635236ac181b8ae685838951b7f88597d9
 
 ### Decision (draft)
 
@@ -55,19 +55,29 @@ ADR_BODY_SHA256: 9c8d8b22607bf175ea62a919454792ebacefc761cc04058ae35f0ee2a112a61
 - Bounds:
   - `dirs` is required
   - `dirs` length: `1..=16`
-  - each raw entry: trimmed, non-empty, UTF-8 length `1..=1024` bytes
+  - each entry is trimmed before validation/mapping
+  - each trimmed entry: non-empty, UTF-8 length `1..=1024` bytes
+- Default when absent:
+  - no extra context directories are requested
+  - the backend MUST NOT emit `--add-dir`
 - Path semantics:
   - entries MAY be absolute or relative
   - relative entries resolve against the run’s effective working directory
   - there is no containment requirement that keeps paths under the effective working directory
   - after resolution, each path MUST exist and MUST be a directory before spawn
 - Normalization:
-  - backends MUST resolve relative paths before spawn and de-duplicate the resulting paths while
-    preserving first occurrence order
-  - the normalized resolved paths are what get mapped into repeated `--add-dir <dir>` flags
+  - backends MUST trim each entry, resolve relative paths before spawn, and lexically normalize the
+    resulting paths
+  - normalization is lexical only for v1; shell-style `~`/env expansion, filesystem
+    canonicalization, and symlink resolution are not required
+  - de-duplicate normalized resolved paths while preserving first occurrence order
+  - the normalized unique paths are what get mapped into backend argv
 - Backend mapping:
   - Codex: repeat `--add-dir <DIR>`
-  - Claude Code: repeat `--add-dir <DIR>`
+  - Claude Code: one variadic `--add-dir <DIR...>` group in normalized order
+- Session compatibility:
+  - the key is valid for new-session, resume, and fork flows
+  - accepted add-dir inputs MUST NOT be silently ignored for resume/fork
 
 ### Why
 
@@ -132,17 +142,27 @@ Schema (closed):
 
 Bounds:
 - `dirs` length MUST be `>= 1` and `<= 16`
-- each entry, after trimming, MUST be non-empty
-- each raw string entry MUST be `<= 1024` bytes (UTF-8)
+- the backend MUST trim leading/trailing Unicode whitespace before validation and mapping
+- after trimming, each entry MUST be non-empty
+- after trimming, each entry MUST be `<= 1024` bytes (UTF-8)
+
+Absence semantics:
+- When absent, no extra directories are requested.
+- The backend MUST NOT emit `--add-dir` or any equivalent backend-specific override on behalf of
+  this key.
 
 ### Path resolution semantics
 
 For each `dirs[i]` entry:
 
-1. If the value is relative, resolve it against the run’s effective working directory.
-2. If the value is absolute, keep it absolute.
-3. Normalize the resolved path using the platform path rules used by the backend process launcher.
-4. Validate that the resolved path exists and is a directory before spawn.
+1. Trim leading/trailing Unicode whitespace. The trimmed value is the effective entry.
+2. If the value is relative, resolve it against the run’s effective working directory.
+3. If the value is absolute, keep it absolute.
+4. Lexically normalize the resolved path using platform path rules sufficient to fold redundant
+   separators and `.` / `..` segments.
+5. Do not apply shell-style `~` expansion or environment-variable expansion.
+6. Do not require filesystem canonicalization or symlink resolution in v1.
+7. Validate that the resolved path exists and is a directory before spawn.
 
 Notes:
 - There is intentionally no “must stay under working_dir” rule.
@@ -157,7 +177,8 @@ Notes:
 
 ### Mapping into backend argv
 
-The backend MUST emit one `--add-dir <dir>` pair for each normalized unique directory, in order.
+The backend MUST pass the normalized unique directory list, in order, to its underlying
+CLI/backend mapping.
 
 #### Codex
 
@@ -168,9 +189,17 @@ The backend MUST emit one `--add-dir <dir>` pair for each normalized unique dire
 
 #### Claude Code
 
-- CLI form: `claude --print --add-dir <DIR> ...`
+- CLI form: `claude --print --add-dir <DIR...>`
 - Implementation seam:
   - `crates/claude_code/src/commands/print.rs` (`ClaudePrintRequest::add_dirs(...)`)
+
+### Capability advertising
+
+- A backend MUST advertise `agent_api.exec.add_dirs.v1` only when it can deterministically map the
+  key to its underlying CLI/backend surface.
+- For the current built-in backends, advertising is expected to be unconditional once
+  implementation lands.
+- Capability advertising is about support for the request surface, not per-run path contents.
 
 ### Validation and failure model
 
@@ -179,9 +208,16 @@ Before spawn:
 - If the value is not an object, if `dirs` is missing, if unknown keys are present, if bounds are
   violated, or if any resolved path does not exist / is not a directory, fail with
   `AgentWrapperError::InvalidRequest`.
+- InvalidRequest messages for this key SHOULD be stable/testable and MUST NOT echo raw path values.
 
 After spawn:
-- v1 does not require any special backend error translation beyond normal backend failure handling.
+- If the key passed R0 capability gating and pre-spawn validation, but the backend later determines
+  that the requested directories cannot be honored by the installed CLI/runtime/selected flow, the
+  backend MUST fail as `AgentWrapperError::Backend` with a safe/redacted message.
+- This includes resume/fork flows that cannot deterministically apply the accepted add-dir set.
+- If this occurs after an event stream has been returned and the stream is still open, the backend
+  MUST emit exactly one terminal `AgentWrapperEventKind::Error` event with the same safe/redacted
+  message before closing the stream.
 
 ## Alternatives Considered
 
@@ -204,7 +240,8 @@ After spawn:
 - Additive only.
 - Existing backend wrapper support lowers the implementation risk; the main remaining work is
   universal validation, capability advertising, and test coverage.
-- For Codex specifically, advertising remains subject to the existing `--add-dir` feature guard.
+- The key is intended to remain usable with resume/fork flows; backends must either honor it there
+  or fail safely, but must not silently drop it.
 
 ## Validation Plan (Authoritative for this ADR once Accepted)
 
@@ -213,10 +250,14 @@ After spawn:
 - Add backend tests proving:
   - unsupported key fails before spawn,
   - invalid shape / bounds fail before spawn,
+  - absent key does not emit `--add-dir`,
   - relative paths resolve against the effective working directory,
   - absolute paths outside the working directory are accepted when valid,
   - non-directory / missing paths fail before spawn, and
-  - argv mapping emits one `--add-dir` per normalized unique directory in order.
+  - lexical normalization/dedup behaves deterministically without requiring canonicalization,
+  - Codex emits repeated `--add-dir <dir>` pairs in order,
+  - Claude Code emits one variadic `--add-dir <dir...>` group in order, and
+  - accepted add-dir inputs are honored or safely rejected for resume/fork flows.
 
 ## Decision Summary
 

@@ -37,7 +37,7 @@ This ADR corresponds to backlog item `uaa-0002` (`bucket=agent_api.config`, `typ
 
 ## Executive Summary (Operator)
 
-ADR_BODY_SHA256: a14a9e4ef2ee503e11b832a5a31e2ce20f5defa8c5122b21915d1be3c6faa856
+ADR_BODY_SHA256: 9c3a16d3cce9862fc38672b1061f5481c84354689d9c8e9cc6490140cabf6aaf
 
 ### Decision (draft)
 
@@ -45,8 +45,9 @@ ADR_BODY_SHA256: a14a9e4ef2ee503e11b832a5a31e2ce20f5defa8c5122b21915d1be3c6faa85
   - `agent_api.config.model.v1`
 - Schema:
   - JSON string
-  - trimmed, non-empty
-  - length `1..=128` bytes (UTF-8)
+  - trim leading/trailing Unicode whitespace before validation and mapping
+  - effective trimmed value is non-empty
+  - trimmed length `1..=128` bytes (UTF-8)
 - Default when absent:
   - no explicit model override; the backend MUST NOT emit `--model`, and the underlying CLI keeps
     its default model-selection behavior.
@@ -62,7 +63,7 @@ ADR_BODY_SHA256: a14a9e4ef2ee503e11b832a5a31e2ce20f5defa8c5122b21915d1be3c6faa85
   - v1 performs syntax/bounds validation before spawn, but does not require wrappers to ship or
     maintain an authoritative local model catalog.
   - If the provided identifier is syntactically valid but unknown/unavailable to the backend CLI,
-    the backend MAY fail after spawn with a safe `AgentWrapperError::Backend` translation.
+    the backend MUST fail as a safe `AgentWrapperError::Backend` translation.
 
 ### Why
 
@@ -127,8 +128,9 @@ Owner:
 Schema:
 - Type: string
 - Bounds:
+  - the backend MUST trim leading/trailing Unicode whitespace before validation and mapping
   - after trimming, value MUST be non-empty
-  - UTF-8 length MUST be `<= 128` bytes
+  - the trimmed value MUST be `<= 128` bytes (UTF-8)
 
 Absence semantics:
 - When absent, no model override is requested.
@@ -137,6 +139,10 @@ Absence semantics:
 Meaning:
 - The caller requests that the backend invoke its underlying CLI with the supplied model id.
 - The string is opaque to the Universal Agent API. It is interpreted by the target backend only.
+- The trimmed value is the effective model id for all v1 semantics.
+- This key standardizes only model selection. By itself, it MUST NOT imply any additional
+  cross-backend semantics such as fallback-model selection, reasoning tuning, summary/verbosity
+  changes, permission-policy changes, or other secondary routing behavior.
 
 ### Validation and error model
 
@@ -144,10 +150,18 @@ Before spawn:
 - If the capability id is unsupported, fail per R0 with `AgentWrapperError::UnsupportedCapability`.
 - If the JSON value is not a string, or the trimmed string is empty, or the bound is exceeded, fail
   with `AgentWrapperError::InvalidRequest`.
+- The backend MUST pass the trimmed value, not the raw untrimmed value, to the underlying CLI
+  mapping.
 
 After spawn / backend-owned validation:
 - If the string is syntactically valid but the backend CLI rejects it as unknown, unavailable, or
-  unauthorized, the backend MAY surface that as a safe `AgentWrapperError::Backend`.
+  unauthorized, the backend MUST surface that as `AgentWrapperError::Backend` with a
+  safe/redacted `message`.
+- The backend MUST NOT embed raw backend stdout/stderr in that message.
+- If this failure occurs after the backend has already returned an `AgentWrapperRunHandle` and the
+  consumer-visible events stream is still open, the backend MUST emit exactly one terminal
+  `AgentWrapperEventKind::Error` event with the same safe/redacted message before closing the
+  stream.
 - v1 does not require a pinned “unknown model” universal message because the wrappers do not own a
   stable, authoritative model registry.
 
@@ -161,12 +175,20 @@ runtime model availability.
 - CLI form: `codex exec --model <id> ...`
 - Implementation seam:
   - `crates/codex/src/builder/mod.rs` (`CodexClientBuilder::model(...)`)
+- Normative scope:
+  - `agent_api.config.model.v1` MUST map the effective model id to `--model <id>`.
+  - This key MUST NOT, by itself, authorize additional Universal Agent API behavior beyond model
+    selection itself.
 
 #### Claude Code
 
 - CLI form: `claude --print --model <id> ...`
 - Implementation seam:
   - `crates/claude_code/src/commands/print.rs` (`ClaudePrintRequest::model(...)`)
+- Normative scope:
+  - `agent_api.config.model.v1` MUST map the effective model id to `--model <id>`.
+  - This key MUST NOT, by itself, authorize `--fallback-model` or any other additional print-mode
+    override unless requested through a separate explicit key.
 
 ### Capability advertising
 
@@ -201,9 +223,12 @@ runtime model availability.
 - Add backend tests proving:
   - unsupported key fails before spawn,
   - non-string / empty / oversize values fail before spawn,
+  - surrounding whitespace is trimmed before validation and argv/builder mapping,
   - supported valid requests emit the expected `--model <id>` argv/builder mapping for Codex and
     Claude Code, and
-  - absent key does not emit `--model`.
+  - absent key does not emit `--model`, and
+  - backend runtime rejection of an accepted model id resolves as `AgentWrapperError::Backend`
+    (with terminal `Error` event emission when a stream is open).
 
 ## Decision Summary
 

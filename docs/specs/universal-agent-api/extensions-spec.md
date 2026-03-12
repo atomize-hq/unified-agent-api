@@ -162,6 +162,155 @@ Backend mapping requirements:
   - Codex: `docs/specs/codex-external-sandbox-mapping-contract.md`
   - Claude Code: `docs/specs/claude-code-session-mapping-contract.md`
 
+### `agent_api.config.model.v1` (string)
+
+Owner: this spec (`extensions-spec.md`).
+
+Schema:
+- Type: string
+- Default when absent: no explicit model override
+
+Meaning:
+- When present, the backend MUST request that its underlying CLI/backend select the supplied
+  backend-defined model identifier.
+- The backend MUST normalize the supplied value by trimming leading and trailing Unicode whitespace
+  before validation and mapping.
+- The trimmed value is the effective model id for all v1 semantics.
+- This key standardizes only model selection. It MUST NOT, by itself, imply additional
+  cross-backend semantics such as:
+  - fallback-model selection,
+  - reasoning-effort / summary / verbosity changes,
+  - permission / policy changes, or
+  - any other secondary routing or tuning behavior.
+- When absent, the backend MUST preserve its existing default model-selection behavior and MUST NOT
+  synthesize or infer a model id.
+
+Validation rules:
+- Value MUST be a string; otherwise the backend MUST fail before spawn with
+  `AgentWrapperError::InvalidRequest`.
+- After trimming, the value MUST be non-empty; otherwise the backend MUST fail before spawn with
+  `AgentWrapperError::InvalidRequest`.
+- The trimmed value MUST be no more than 128 UTF-8 bytes; otherwise the backend MUST fail before
+  spawn with `AgentWrapperError::InvalidRequest`.
+
+Mapping requirements:
+- The backend MUST pass the trimmed value, not the raw untrimmed value, to its underlying
+  CLI/backend mapping.
+- Built-in backends that advertise this key MUST map it as follows:
+  - Codex: emit `--model <trimmed-id>`
+  - Claude Code: emit `--model <trimmed-id>`
+- Built-in backends MUST NOT treat this key, by itself, as authorizing additional backend-specific
+  knobs outside model selection.
+  - Codex: MUST NOT rely on this key as authorization for additional Universal Agent API semantics
+    beyond model selection itself.
+  - Claude Code: MUST NOT map this key to `--fallback-model` or any other additional print-mode
+    override unless another explicit key defines that behavior.
+
+Runtime rejection behavior (v1, normative):
+- If this key passed R0 capability gating and pre-spawn validation, but the selected backend later
+  determines that the requested model id cannot be honored at runtime, the backend MUST fail the
+  run as:
+  - `AgentWrapperError::Backend { message }`
+- This includes backend outcomes such as:
+  - unknown model id,
+  - unavailable model id for the current backend/runtime/account/provider state, or
+  - unauthorized access to the requested model id.
+- The `message` MUST be safe/redacted and MUST NOT embed raw backend stdout/stderr.
+- v1 does not pin a universal message string for model-selection failure.
+- If such failure occurs after the backend has already returned an `AgentWrapperRunHandle` and the
+  consumer-visible events stream is still open, the backend MUST emit exactly one terminal
+  `AgentWrapperEventKind::Error` event with the same safe/redacted message before closing the
+  stream.
+
+### `agent_api.exec.add_dirs.v1` (object)
+
+Owner: this spec (`extensions-spec.md`).
+
+Schema:
+- Type: object
+- Required keys:
+  - `dirs` (array of string)
+- Default when absent: no extra context directories are requested
+
+Meaning:
+- When present, the backend MUST request that its underlying CLI/backend include the supplied
+  directory roots as additional context/file-access roots for that run.
+- The backend MUST normalize each supplied entry by trimming leading and trailing Unicode
+  whitespace before validation and mapping.
+- The trimmed value is the effective directory entry for all v1 semantics.
+- Entries MAY be absolute or relative.
+- Relative entries MUST resolve against the run's effective working directory (see `contract.md`).
+- There is intentionally no containment requirement that keeps resolved directories under the
+  effective working directory.
+- This key is orthogonal to `agent_api.session.resume.v1` and `agent_api.session.fork.v1`.
+  Backends MUST honor the same effective add-dir set for new-session, resume, and forked runs, and
+  MUST NOT silently ignore an accepted add-dir request for session-based flows.
+- When absent, the backend MUST NOT synthesize any additional directories and MUST NOT emit any
+  `--add-dir` flag or equivalent backend-specific override on behalf of this key.
+
+Validation rules:
+- Value MUST be an object; otherwise the backend MUST fail before spawn with
+  `AgentWrapperError::InvalidRequest`.
+- Unknown object keys MUST cause `AgentWrapperError::InvalidRequest` (closed schema for `.v1`).
+- `dirs` MUST be present; otherwise the backend MUST fail before spawn with
+  `AgentWrapperError::InvalidRequest`.
+- `dirs` MUST be an array; otherwise the backend MUST fail before spawn with
+  `AgentWrapperError::InvalidRequest`.
+- `dirs` MUST contain at least 1 and at most 16 entries; otherwise the backend MUST fail before
+  spawn with `AgentWrapperError::InvalidRequest`.
+- Each `dirs[i]` entry MUST be a string; otherwise the backend MUST fail before spawn with
+  `AgentWrapperError::InvalidRequest`.
+- After trimming, each `dirs[i]` entry MUST be non-empty; otherwise the backend MUST fail before
+  spawn with `AgentWrapperError::InvalidRequest`.
+- After trimming, each `dirs[i]` entry MUST be no more than 1024 UTF-8 bytes; otherwise the
+  backend MUST fail before spawn with `AgentWrapperError::InvalidRequest`.
+- Resolution/normalization algorithm (pinned):
+  - If the trimmed entry is absolute, keep it absolute.
+  - If the trimmed entry is relative, resolve it against the effective working directory.
+  - Normalize the resulting path lexically using platform path rules sufficient to fold redundant
+    separators and `.` / `..` segments.
+  - The backend MUST NOT perform shell-style `~` expansion or environment-variable expansion for
+    this key.
+  - v1 does not require filesystem canonicalization or symlink resolution for this key.
+- After resolution and lexical normalization, each effective path MUST exist and MUST be a
+  directory before spawn; otherwise the backend MUST fail before spawn with
+  `AgentWrapperError::InvalidRequest`.
+- After resolution and lexical normalization, duplicate directories MUST be removed while
+  preserving first-occurrence order.
+
+Error message posture (v1, pinned):
+- InvalidRequest messages for this key MUST be safe-by-default and MUST NOT echo raw path values.
+- Backends SHOULD use stable, testable messages that identify the failing field/index without
+  embedding the original path text.
+
+Mapping requirements:
+- The backend MUST pass the normalized unique directory list, in order, to its underlying
+  CLI/backend mapping.
+- Built-in backends that advertise this key MUST map it as follows:
+  - Codex: emit one repeated `--add-dir <dir>` pair per normalized unique directory.
+  - Claude Code: emit one variadic `--add-dir <dir...>` argument group containing the normalized
+    unique directories in order.
+- A backend MUST advertise `agent_api.exec.add_dirs.v1` only when it can deterministically map the
+  key to its underlying CLI/backend surface.
+- For the current built-in backends, this capability is expected to be advertised unconditionally
+  once implementation lands; support MUST NOT depend on per-run path contents.
+
+Runtime rejection behavior (v1, normative):
+- If this key passed R0 capability gating and pre-spawn validation, but the selected backend later
+  determines that the requested directories cannot be honored by the installed CLI/runtime for that
+  run, the backend MUST fail the run as:
+  - `AgentWrapperError::Backend { message }`
+- This includes runtime/backend-owned failures such as:
+  - an installed CLI that rejects the required add-dir surface,
+  - a backend flow that cannot apply accepted add-dir inputs to the targeted session transport, or
+  - any other backend-owned inability to honor the accepted effective directory set.
+- The `message` MUST be safe/redacted and MUST NOT embed raw backend stdout/stderr.
+- v1 does not pin a universal runtime-rejection message string for add-dir failures.
+- If such failure occurs after the backend has already returned an `AgentWrapperRunHandle` and the
+  consumer-visible events stream is still open, the backend MUST emit exactly one terminal
+  `AgentWrapperEventKind::Error` event with the same safe/redacted message before closing the
+  stream.
+
 ### `agent_api.session.resume.v1` (object)
 
 Owner: this spec (`extensions-spec.md`).
