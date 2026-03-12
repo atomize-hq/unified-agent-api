@@ -61,7 +61,7 @@ async fn run_codex_mcp_zero_timeout_fails_before_materializing_or_spawning() {
     let script_dir = temp_dir.join("bin");
     let script_path = write_fake_codex(
         &script_dir,
-        r#"#!/usr/bin/env bash
+        r#"#!/bin/sh
 touch "$MARKER_PATH"
 "#,
     );
@@ -109,7 +109,7 @@ async fn run_codex_mcp_uses_context_env_without_leaking_stdio_transport_env() {
     let temp_dir = temp_test_dir("write-env");
     let script_path = write_fake_codex(
         &temp_dir,
-        r#"#!/usr/bin/env bash
+        r#"#!/bin/sh
 printf "%s\n" "$@"
 printf "CLI_ONLY=%s\n" "${CLI_ONLY-unset}" 1>&2
 printf "SERVER_ONLY=%s\n" "${SERVER_ONLY-unset}" 1>&2
@@ -170,7 +170,7 @@ async fn run_codex_mcp_clears_ambient_env_before_spawn() {
     let temp_dir = temp_test_dir("ambient-env");
     let script_path = write_fake_codex(
         &temp_dir,
-        r#"#!/usr/bin/env bash
+        r#"#!/bin/sh
 printf "AMBIENT_ONLY=%s\n" "${AMBIENT_ONLY-unset}" 1>&2
 printf "CODEX_HOME=%s\n" "${CODEX_HOME-unset}" 1>&2
 printf "PATH=%s\n" "${PATH-unset}" 1>&2
@@ -216,8 +216,8 @@ async fn run_codex_mcp_preserves_path_for_launcher_script_helpers() {
     let script_path = temp_dir.join("codex");
     let effective_path = format!("{}:{UNIX_TEST_PATH}", temp_dir.to_string_lossy());
 
-    write_test_executable(&helper_path, "#!/usr/bin/env bash\nprintf 'helper-ran\\n'");
-    write_test_executable(&script_path, "#!/usr/bin/env bash\nhelper-bin\n");
+    write_test_executable(&helper_path, "#!/bin/sh\nprintf 'helper-ran\\n'");
+    write_test_executable(&script_path, "#!/bin/sh\nhelper-bin\n");
 
     let result = run_codex_mcp(
         super::super::super::CodexBackendConfig {
