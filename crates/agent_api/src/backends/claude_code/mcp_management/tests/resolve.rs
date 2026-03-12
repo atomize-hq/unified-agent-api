@@ -28,6 +28,7 @@ fn resolve_claude_binary_path_prefers_config_over_env() {
         None,
         None,
         None,
+        None,
     )
     .expect("config path should resolve");
 
@@ -42,6 +43,7 @@ fn resolve_claude_binary_path_uses_env_when_config_absent() {
         None,
         None,
         None,
+        None,
     )
     .expect("env path should resolve");
 
@@ -50,7 +52,7 @@ fn resolve_claude_binary_path_uses_env_when_config_absent() {
 
 #[test]
 fn resolve_claude_binary_path_rejects_blank_env_without_a_resolvable_path() {
-    let err = resolve_claude_binary_path(None, Some(OsString::from("")), None, None, None)
+    let err = resolve_claude_binary_path(None, Some(OsString::from("")), None, None, None, None)
         .expect_err("blank env should fail resolution");
 
     assert_backend_spawn_failure(err);
@@ -66,6 +68,7 @@ fn resolve_claude_binary_path_uses_effective_path_env_for_unqualified_binary() {
         None,
         Some(OsString::from("claude")),
         Some(temp_dir.to_string_lossy().as_ref()),
+        None,
         None,
         None,
     )
@@ -103,6 +106,7 @@ fn resolve_claude_binary_path_prefers_request_path_over_config_and_ambient_path(
         ),
         env::var_os(PATH_ENV),
         None,
+        None,
     )
     .expect("request PATH should resolve claude");
 
@@ -133,6 +137,7 @@ fn resolve_claude_binary_path_prefers_config_path_over_ambient_path() {
         Some(config_dir.to_string_lossy().as_ref()),
         env::var_os(PATH_ENV),
         None,
+        None,
     )
     .expect("config PATH should resolve claude");
 
@@ -154,7 +159,7 @@ fn resolve_claude_binary_path_uses_ambient_path_when_effective_path_is_absent() 
     let _ambient_path = EnvGuard::set(PATH_ENV, ambient_dir.as_os_str().to_os_string());
     let _claude_binary = EnvGuard::unset(CLAUDE_BINARY_ENV);
 
-    let resolved = resolve_claude_binary_path(None, None, None, env::var_os(PATH_ENV), None)
+    let resolved = resolve_claude_binary_path(None, None, None, env::var_os(PATH_ENV), None, None)
         .expect("ambient PATH should resolve claude");
 
     assert_eq!(
@@ -180,6 +185,7 @@ fn resolve_claude_binary_path_skips_non_executable_shadow_file_on_path() {
         None,
         Some(OsString::from("claude")),
         Some(joined_path.to_string_lossy().as_ref()),
+        None,
         None,
         None,
     )

@@ -12,25 +12,30 @@ pub(super) fn resolve_binary_path_for_spawn(
     binary_path: PathBuf,
     effective_path_env: Option<&str>,
     ambient_path_env: Option<OsString>,
-    current_dir: Option<&Path>,
+    invocation_cwd: Option<&Path>,
+    effective_working_dir: Option<&Path>,
 ) -> Option<PathBuf> {
     if is_path_qualified(&binary_path) {
-        return Some(resolve_path_qualified_binary(binary_path, current_dir));
+        return Some(resolve_path_qualified_binary(binary_path, invocation_cwd));
     }
 
     if let Some(path_env) = effective_path_env {
-        return find_binary_on_path(&binary_path, Some(OsString::from(path_env)), current_dir);
+        return find_binary_on_path(
+            &binary_path,
+            Some(OsString::from(path_env)),
+            effective_working_dir,
+        );
     }
 
-    find_binary_on_path(&binary_path, ambient_path_env, current_dir)
+    find_binary_on_path(&binary_path, ambient_path_env, effective_working_dir)
 }
 
-fn resolve_path_qualified_binary(binary_path: PathBuf, current_dir: Option<&Path>) -> PathBuf {
+fn resolve_path_qualified_binary(binary_path: PathBuf, invocation_cwd: Option<&Path>) -> PathBuf {
     if binary_path.is_absolute() {
         return binary_path;
     }
 
-    let joined = effective_current_dir(current_dir)
+    let joined = effective_base_dir(invocation_cwd)
         .map(|cwd| cwd.join(&binary_path))
         .unwrap_or(binary_path);
 
@@ -44,8 +49,8 @@ fn is_path_qualified(path: &Path) -> bool {
             .is_some_and(|parent| !parent.as_os_str().is_empty())
 }
 
-fn effective_current_dir(current_dir: Option<&Path>) -> Option<PathBuf> {
-    match current_dir {
+fn effective_base_dir(base_dir: Option<&Path>) -> Option<PathBuf> {
+    match base_dir {
         Some(path) if path.is_absolute() => Some(path.to_path_buf()),
         Some(path) => env::current_dir().ok().map(|cwd| cwd.join(path)),
         None => env::current_dir().ok(),
@@ -55,15 +60,15 @@ fn effective_current_dir(current_dir: Option<&Path>) -> Option<PathBuf> {
 fn find_binary_on_path(
     binary_name: &Path,
     path_env: Option<OsString>,
-    current_dir: Option<&Path>,
+    effective_working_dir: Option<&Path>,
 ) -> Option<PathBuf> {
     let path_env = path_env?;
-    let effective_current_dir = effective_current_dir(current_dir);
+    let effective_working_dir = effective_base_dir(effective_working_dir);
     env::split_paths(&path_env)
         .find_map(|directory| {
             let search_dir = if directory.is_absolute() {
                 directory
-            } else if let Some(cwd) = effective_current_dir.as_deref() {
+            } else if let Some(cwd) = effective_working_dir.as_deref() {
                 cwd.join(directory)
             } else {
                 directory
@@ -179,6 +184,7 @@ mod tests {
             None,
             None,
             Some(temp_dir.path()),
+            None,
         )
         .expect("relative qualified path should resolve");
 
@@ -200,6 +206,7 @@ mod tests {
             PathBuf::from("codex"),
             Some(path_dir.path().to_string_lossy().as_ref()),
             env::var_os("PATH"),
+            None,
             Some(cwd_dir.path()),
         )
         .expect("PATH lookup should resolve");
@@ -222,6 +229,7 @@ mod tests {
             PathBuf::from("codex"),
             Some("bin"),
             env::var_os("PATH"),
+            None,
             Some(cwd_dir.path()),
         )
         .expect("PATH lookup should resolve");
@@ -248,6 +256,7 @@ mod tests {
             PathBuf::from("codex"),
             Some("bin"),
             env::var_os("PATH"),
+            None,
             Some(Path::new("repo")),
         )
         .expect("PATH lookup should resolve");
@@ -279,6 +288,7 @@ mod tests {
         let resolved = resolve_binary_path_for_spawn(
             PathBuf::from("codex"),
             Some(joined_path.to_string_lossy().as_ref()),
+            None,
             None,
             None,
         )

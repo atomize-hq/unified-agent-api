@@ -42,6 +42,7 @@ pub(super) fn resolve_claude_mcp_command_with_env(
     claude_binary_env: Option<OsString>,
     claude_home_env: Option<PathBuf>,
 ) -> Result<ResolvedClaudeMcpCommand, AgentWrapperError> {
+    let invocation_cwd = env::current_dir().ok();
     let ambient_path_env = env::var_os(PATH_ENV);
     let effective_path_env = effective_path_env(config, context, ambient_path_env.as_ref());
     let working_dir = context
@@ -53,6 +54,7 @@ pub(super) fn resolve_claude_mcp_command_with_env(
         claude_binary_env,
         effective_path_env.as_deref(),
         ambient_path_env,
+        invocation_cwd.as_deref(),
         working_dir.as_deref(),
     )?;
     let mut env = config.env.clone();
@@ -101,7 +103,8 @@ pub(super) fn resolve_claude_binary_path(
     claude_binary_env: Option<OsString>,
     effective_path_env: Option<&str>,
     ambient_path_env: Option<OsString>,
-    current_dir: Option<&Path>,
+    invocation_cwd: Option<&Path>,
+    effective_working_dir: Option<&Path>,
 ) -> Result<PathBuf, AgentWrapperError> {
     let binary_path = config_binary
         .cloned()
@@ -120,7 +123,8 @@ pub(super) fn resolve_claude_binary_path(
         binary_path,
         effective_path_env,
         ambient_path_env,
-        current_dir,
+        invocation_cwd,
+        effective_working_dir,
     )
     .ok_or_else(|| super::backend_error(super::PINNED_SPAWN_FAILURE))
 }

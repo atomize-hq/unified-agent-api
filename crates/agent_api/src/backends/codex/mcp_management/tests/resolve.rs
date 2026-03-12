@@ -180,6 +180,7 @@ fn resolve_codex_binary_path_uses_effective_path_env_for_unqualified_binary() {
         Some(temp_dir.to_string_lossy().as_ref()),
         None,
         None,
+        None,
     )
     .expect("effective PATH should resolve codex");
 
@@ -209,6 +210,7 @@ fn resolve_codex_binary_path_prefers_request_path_over_ambient_path() {
         Some(request_dir.to_string_lossy().as_ref()),
         env::var_os(PATH_ENV),
         None,
+        None,
     )
     .expect("request PATH should resolve codex");
 
@@ -231,7 +233,7 @@ fn resolve_codex_binary_path_uses_ambient_path_when_effective_path_is_absent() {
     let _ambient_path = EnvGuard::set(PATH_ENV, ambient_dir.as_os_str().to_os_string());
     let _codex_binary = EnvGuard::unset(CODEX_BINARY_ENV);
 
-    let resolved = resolve_codex_binary_path(None, None, None, env::var_os(PATH_ENV), None)
+    let resolved = resolve_codex_binary_path(None, None, None, env::var_os(PATH_ENV), None, None)
         .expect("ambient PATH should resolve codex");
 
     assert_eq!(
@@ -260,6 +262,7 @@ fn resolve_codex_binary_path_skips_non_executable_shadow_file_on_path() {
         Some(joined_path.to_string_lossy().as_ref()),
         None,
         None,
+        None,
     )
     .expect("effective PATH should skip non-executable shadow");
 
@@ -274,7 +277,7 @@ fn resolve_codex_binary_path_skips_non_executable_shadow_file_on_path() {
 
 #[test]
 fn resolve_codex_binary_path_rejects_unresolved_default_binary() {
-    let err = resolve_codex_binary_path(None, None, None, None, None)
+    let err = resolve_codex_binary_path(None, None, None, None, None, None)
         .expect_err("default bare codex should fail when PATH cannot resolve it");
 
     assert_backend_spawn_failure(err);
