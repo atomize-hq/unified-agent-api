@@ -1,0 +1,213 @@
+# ADR-0020 — Universal model selection (`agent_api.config.model.v1`)
+#
+# Note: Run `make adr-fix ADR=docs/adr/0020-universal-agent-api-model-selection.md`
+# after editing to update the ADR_BODY_SHA256 drift guard.
+
+## Status
+- Status: Draft (implementation plan; normative semantics are pinned in the Universal Agent API specs)
+- Date (UTC): 2026-03-12
+- Owner(s): spensermcconnell
+
+## Scope
+
+- Define a single core extension key for backend-neutral model selection:
+  - `agent_api.config.model.v1`
+- Pin:
+  - schema and absence semantics,
+  - validation timing and bounds,
+  - backend mapping for Codex and Claude Code, and
+  - the v1 error/portability posture for backend-defined model identifiers.
+
+This ADR corresponds to backlog item `uaa-0002` (`bucket=agent_api.config`, `type=extension_key`).
+
+## Related Docs
+
+- Backlog:
+  - `docs/backlog.json` (`uaa-0002`)
+- Prior bounded pass-through decision:
+  - `docs/adr/0016-universal-agent-api-bounded-backend-config-pass-through.md`
+- Universal Agent API baselines:
+  - `docs/specs/universal-agent-api/contract.md`
+  - `docs/specs/universal-agent-api/run-protocol-spec.md`
+  - `docs/specs/universal-agent-api/capabilities-schema-spec.md`
+  - `docs/specs/universal-agent-api/extensions-spec.md` (owner doc for the core key)
+- Backend mapping seams:
+  - `crates/codex/src/builder/mod.rs`
+  - `crates/claude_code/src/commands/print.rs`
+
+## Executive Summary (Operator)
+
+ADR_BODY_SHA256: a14a9e4ef2ee503e11b832a5a31e2ce20f5defa8c5122b21915d1be3c6faa856
+
+### Decision (draft)
+
+- Introduce a new core extension key:
+  - `agent_api.config.model.v1`
+- Schema:
+  - JSON string
+  - trimmed, non-empty
+  - length `1..=128` bytes (UTF-8)
+- Default when absent:
+  - no explicit model override; the backend MUST NOT emit `--model`, and the underlying CLI keeps
+    its default model-selection behavior.
+- Meaning:
+  - the value is an opaque backend-consumable model identifier supplied through a universal key.
+  - the Universal Agent API standardizes the request surface, not a shared cross-backend model
+    catalog.
+- Backend mapping:
+  - Codex: `codex ... --model <id> ...`
+  - Claude Code: `claude --print --model <id> ...`
+- Validation posture:
+  - R0 capability gating applies first.
+  - v1 performs syntax/bounds validation before spawn, but does not require wrappers to ship or
+    maintain an authoritative local model catalog.
+  - If the provided identifier is syntactically valid but unknown/unavailable to the backend CLI,
+    the backend MAY fail after spawn with a safe `AgentWrapperError::Backend` translation.
+
+### Why
+
+- Both built-in backends already expose materially identical `--model <id>` semantics.
+- Model choice is a stable, high-value orchestration knob that does not need backend-specific
+  branching.
+- Treating the identifier as opaque keeps the universal contract durable while avoiding fragile
+  wrapper-owned model registries.
+
+## Problem / Context
+
+Codex and Claude Code both support explicit model selection, and the wrapper crates already expose
+it at the builder/request layer:
+
+- Codex: `CodexClientBuilder::model(...)`
+- Claude Code: `ClaudePrintRequest::model(...)`
+
+Without a core extension key, callers must either:
+
+- branch on `agent_kind` and construct backend-specific requests, or
+- wait for future backend-specific pass-through keys that add unnecessary divergence for a clearly
+  shared capability.
+
+ADR-0016 already identified model selection as one of the few near-term knobs that satisfies the
+promotion rubric for `agent_api.*`:
+
+- shared semantic meaning across backends,
+- small, stable schema,
+- safe default when absent, and
+- deterministic request-shape validation before spawn.
+
+The remaining design question is how much semantic validation v1 should attempt. A universal enum
+or wrapper-owned model registry would be brittle because:
+
+- backend model catalogs evolve independently,
+- availability can depend on backend version/account/provider state, and
+- the wrapper repo should not need constant catalog churn just to preserve a stable request field.
+
+## Goals
+
+- Provide one capability-gated, backend-neutral key for selecting a model.
+- Keep the schema minimal and stable.
+- Preserve safe absence semantics by treating the key as optional.
+- Avoid inventing a fake “universal model namespace” that the backends do not actually share.
+
+## Non-Goals
+
+- Defining a universal catalog of model names or aliases.
+- Guaranteeing that the same model id is valid across different backends.
+- Standardizing secondary routing knobs such as Claude Code `--fallback-model`.
+- Requiring wrappers to proactively query remote APIs to validate model availability.
+
+## Proposed Design (Draft)
+
+### Core extension key
+
+`agent_api.config.model.v1`
+
+Owner:
+- `docs/specs/universal-agent-api/extensions-spec.md`
+
+Schema:
+- Type: string
+- Bounds:
+  - after trimming, value MUST be non-empty
+  - UTF-8 length MUST be `<= 128` bytes
+
+Absence semantics:
+- When absent, no model override is requested.
+- The backend MUST preserve its existing default model behavior and MUST NOT synthesize a model id.
+
+Meaning:
+- The caller requests that the backend invoke its underlying CLI with the supplied model id.
+- The string is opaque to the Universal Agent API. It is interpreted by the target backend only.
+
+### Validation and error model
+
+Before spawn:
+- If the capability id is unsupported, fail per R0 with `AgentWrapperError::UnsupportedCapability`.
+- If the JSON value is not a string, or the trimmed string is empty, or the bound is exceeded, fail
+  with `AgentWrapperError::InvalidRequest`.
+
+After spawn / backend-owned validation:
+- If the string is syntactically valid but the backend CLI rejects it as unknown, unavailable, or
+  unauthorized, the backend MAY surface that as a safe `AgentWrapperError::Backend`.
+- v1 does not require a pinned “unknown model” universal message because the wrappers do not own a
+  stable, authoritative model registry.
+
+This split preserves deterministic validation of request shape while avoiding false precision about
+runtime model availability.
+
+### Backend mapping
+
+#### Codex
+
+- CLI form: `codex exec --model <id> ...`
+- Implementation seam:
+  - `crates/codex/src/builder/mod.rs` (`CodexClientBuilder::model(...)`)
+
+#### Claude Code
+
+- CLI form: `claude --print --model <id> ...`
+- Implementation seam:
+  - `crates/claude_code/src/commands/print.rs` (`ClaudePrintRequest::model(...)`)
+
+### Capability advertising
+
+- A backend MUST advertise `agent_api.config.model.v1` only when it can deterministically map the
+  key to its underlying CLI surface.
+- For the current built-in backends, this is expected to be unconditional once implementation lands,
+  because both wrappers already have explicit `--model` support.
+
+## Alternatives Considered
+
+1. Backend-specific keys only
+   - Rejected: both backends already share the same user-facing meaning, so separate keys add
+     needless branching and undermine the promotion rubric from ADR-0016.
+
+2. A universal enum or shared model catalog
+   - Rejected: model inventories and access rules churn independently of the wrapper contract.
+
+3. Unbounded raw argv/config pass-through
+   - Rejected: a dedicated, typed key is simpler, capability-gated, and consistent with the
+     Universal Agent API fail-closed posture.
+
+## Rollout / Compatibility
+
+- Additive only. Callers that do not send the key are unchanged.
+- Existing builder-level support in both backend crates lowers implementation risk; the primary
+  remaining work is `agent_api` request validation, capability advertising, and mapping tests.
+
+## Validation Plan (Authoritative for this ADR once Accepted)
+
+- `make adr-check ADR=docs/adr/0020-universal-agent-api-model-selection.md`
+- Land the owner-doc semantics in `docs/specs/universal-agent-api/extensions-spec.md`.
+- Add backend tests proving:
+  - unsupported key fails before spawn,
+  - non-string / empty / oversize values fail before spawn,
+  - supported valid requests emit the expected `--model <id>` argv/builder mapping for Codex and
+    Claude Code, and
+  - absent key does not emit `--model`.
+
+## Decision Summary
+
+`agent_api.config.model.v1` is promoted as a first-class core key because the semantics are
+genuinely shared across Codex and Claude Code. The universal contract standardizes the request
+surface and validation bounds, while treating the model identifier itself as an opaque backend-owned
+string.
