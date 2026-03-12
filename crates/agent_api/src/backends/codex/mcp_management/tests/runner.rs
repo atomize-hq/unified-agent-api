@@ -1,5 +1,6 @@
 use std::{
     collections::BTreeMap,
+    ffi::OsString,
     path::{Path, PathBuf},
     time::Duration,
 };
@@ -106,22 +107,22 @@ touch "$MARKER_PATH"
 #[cfg(unix)]
 #[tokio::test]
 async fn run_codex_mcp_uses_context_env_without_leaking_stdio_transport_env() {
-    let temp_dir = temp_test_dir("write-env");
-    let script_path = write_fake_codex(
-        &temp_dir,
-        r#"#!/bin/sh
-printf "%s\n" "$@"
-printf "CLI_ONLY=%s\n" "${CLI_ONLY-unset}" 1>&2
-printf "SERVER_ONLY=%s\n" "${SERVER_ONLY-unset}" 1>&2
-"#,
-    );
-
     let transport = AgentWrapperMcpAddTransport::Stdio {
         command: vec!["node".to_string()],
         args: vec!["server.js".to_string()],
         env: BTreeMap::from([("SERVER_ONLY".to_string(), "server-value".to_string())]),
     };
-    let argv = codex_mcp_add_argv("demo", &transport);
+    let mut argv = vec![
+        OsString::from("-c"),
+        OsString::from(
+            r#"printf "%s\n" "$@"
+printf "CLI_ONLY=%s\n" "${CLI_ONLY-unset}" 1>&2
+printf "SERVER_ONLY=%s\n" "${SERVER_ONLY-unset}" 1>&2
+"#,
+        ),
+        OsString::from("codex-shim"),
+    ];
+    argv.extend(codex_mcp_add_argv("demo", &transport));
     let context = AgentWrapperMcpCommandContext {
         env: BTreeMap::from([
             ("CLI_ONLY".to_string(), "cli-value".to_string()),
@@ -132,7 +133,7 @@ printf "SERVER_ONLY=%s\n" "${SERVER_ONLY-unset}" 1>&2
 
     let result = run_codex_mcp(
         super::super::super::CodexBackendConfig {
-            binary: Some(script_path),
+            binary: Some(PathBuf::from("/bin/sh")),
             ..Default::default()
         },
         argv,
@@ -158,8 +159,6 @@ printf "SERVER_ONLY=%s\n" "${SERVER_ONLY-unset}" 1>&2
         result.stderr.lines().collect::<Vec<_>>(),
         vec!["CLI_ONLY=cli-value", "SERVER_ONLY=unset"]
     );
-
-    fs::remove_dir_all(temp_dir).expect("temp dir should be removed");
 }
 
 #[cfg(unix)]
