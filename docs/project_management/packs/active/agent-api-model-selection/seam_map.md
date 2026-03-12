@@ -29,6 +29,8 @@ and backend-owned runtime rejection.
      translation when the selected model cannot be honored.
    - Outputs:
      - `docs/project_management/packs/active/agent-api-model-selection/seam-3-codex-mapping.md`
+     - updates to `docs/specs/codex-streaming-exec-contract.md`
+     - updates to `docs/specs/codex-app-server-jsonrpc-contract.md`
      - updates to `crates/agent_api/src/backends/codex/harness.rs`
      - updates to `crates/agent_api/src/backends/codex/exec.rs`, `fork.rs`, or related Codex request mapping code as needed
 
@@ -37,6 +39,7 @@ and backend-owned runtime rejection.
      excluding `--fallback-model` and preserving safe runtime error translation.
    - Outputs:
      - `docs/project_management/packs/active/agent-api-model-selection/seam-4-claude-code-mapping.md`
+     - updates to `docs/specs/claude-code-session-mapping-contract.md`
      - updates to `crates/agent_api/src/backends/claude_code/harness.rs`
      - updates to `crates/agent_api/src/backends/claude_code/mapping.rs` or related request mapping code as needed
 
@@ -45,5 +48,6 @@ and backend-owned runtime rejection.
      backend runtime rejection translation, and terminal error-event behavior.
    - Outputs:
      - `docs/project_management/packs/active/agent-api-model-selection/seam-5-tests.md`
+     - regenerated `docs/specs/universal-agent-api/capability-matrix.md`
      - updates/additions to tests under `crates/agent_api/src/backend_harness/**`
      - updates/additions to tests under `crates/agent_api/src/backends/{codex,claude_code}/tests/**`

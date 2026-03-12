@@ -31,7 +31,9 @@ shape, validation posture, capability advertising, and backend mapping so orches
   - model id remains backend-owned and opaque.
 - Built-in backend capability advertising for Codex and Claude Code once deterministic mapping is wired.
 - Built-in backend mappings:
-  - Codex `--model <trimmed-id>`
+  - Codex exec/resume `--model <trimmed-id>`
+  - Codex fork pinned safe rejection:
+    `AgentWrapperError::Backend { message: "model override unsupported for codex fork" }`
   - Claude Code `--model <trimmed-id>`
 - Error posture:
   - unsupported capability fails per R0 before spawn,
@@ -62,6 +64,8 @@ shape, validation posture, capability advertising, and backend mapping so orches
   - the key alone cannot authorize fallback-model or any other side-effectful tuning knobs.
 - Runtime failure handling:
   - backend-owned “unknown/unavailable/unauthorized model” outcomes remain runtime/backend errors,
+  - backend/session transports that cannot apply the accepted model id take a pinned safe backend
+    rejection path,
   - error messages are safe/redacted,
   - if the run stream is already open, the backend emits exactly one terminal `Error` event with the same safe message.
 
@@ -76,6 +80,8 @@ shape, validation posture, capability advertising, and backend mapping so orches
 - **Opaque identifier posture**: wrappers MUST NOT pretend to own a universal model namespace or local authoritative catalog.
 - **Safe runtime rejection**: backend-owned rejection of an accepted model id resolves as `AgentWrapperError::Backend`
   with safe/redacted messaging, plus one terminal `Error` event when an already-open stream must close in error.
+- **No silent session drift**: accepted model-selection inputs either survive into resume/fork flows unchanged or take
+  a pinned safe backend-rejection path owned by the backend contract docs.
 
 ## Success criteria
 
@@ -83,8 +89,12 @@ shape, validation posture, capability advertising, and backend mapping so orches
 - The backend capability set advertises `agent_api.config.model.v1` exactly when that backend deterministically supports
   the v1 mapping.
 - Valid requests trim and map to the expected CLI/wrapper `--model <id>` behavior for both built-in backends.
+- Codex fork rejects accepted model-selection inputs before any app-server request with the pinned safe backend
+  message.
 - Invalid requests fail before spawn with stable `InvalidRequest` behavior.
 - Absent requests preserve current backend defaults with no emitted `--model`.
+- Capability publication includes regenerating `docs/specs/universal-agent-api/capability-matrix.md` via
+  `cargo run -p xtask -- capability-matrix` in the same change.
 - Runtime backend rejection stays backend-owned and safe, without introducing raw stderr leakage or fake universal errors.
 
 ## Constraints
@@ -105,6 +115,10 @@ shape, validation posture, capability advertising, and backend mapping so orches
   - `docs/specs/universal-agent-api/extensions-spec.md`
   - `docs/specs/universal-agent-api/contract.md`
   - `docs/specs/universal-agent-api/run-protocol-spec.md`
+- Canonical backend mapping contracts:
+  - `docs/specs/codex-streaming-exec-contract.md`
+  - `docs/specs/codex-app-server-jsonrpc-contract.md`
+  - `docs/specs/claude-code-session-mapping-contract.md`
 
 ## Known unknowns / risks
 
@@ -114,12 +128,15 @@ shape, validation posture, capability advertising, and backend mapping so orches
   semantics without duplicating drift-prone logic.
 - **Advertising timing**: if capability ids are advertised before the mapping is fully wired, callers can observe false
   positives; advertising must land alongside working normalization + mapping.
+- **Codex fork transport gap**: the current app-server fork subset exposes no model field, so fork support depends on
+  keeping the pinned pre-handle rejection contract aligned with the universal capability semantics.
 
 ## Assumptions (explicit)
 
 - `docs/specs/universal-agent-api/extensions-spec.md` remains the canonical owner document for
   `agent_api.config.model.v1`, with ADR-0020 providing rationale and rollout framing.
 - Built-in Codex and Claude Code backends will advertise `agent_api.config.model.v1` unconditionally once the
-  implementation lands, because both already have deterministic local `--model` mapping surfaces.
+  implementation lands, because Claude Code can honor the key across its print/session argv flows and Codex has an
+  explicit exec/resume mapping plus a pinned safe fork-rejection path.
 - No additional backend-specific opt-in config is needed for this key because model selection is not a dangerous or
   state-mutating capability.

@@ -7,9 +7,10 @@
 - **Scope**
   - In:
     - consume the normalized effective model id from SEAM-2
-    - map present valid value to Codex `--model <trimmed-id>`
+    - map present valid value to Codex exec/resume `--model <trimmed-id>`
     - preserve absence behavior by omitting `--model`
     - translate runtime model rejection into safe `AgentWrapperError::Backend`
+    - pin the current Codex fork rejection path for accepted model-selection inputs
     - ensure already-open streams emit one terminal `Error` event with the safe message before closing
   - Out:
     - capability advertising / parser ownership
@@ -21,7 +22,9 @@
     - Codex builder support in `crates/codex/src/builder/mod.rs`
     - run/event lifecycle guarantees from the backend harness
   - Outputs:
-    - Codex exec/fork/request mapping emits `--model <trimmed-id>` when requested
+    - Codex exec/resume mapping emits `--model <trimmed-id>` when requested
+    - Codex fork rejects accepted model-selection inputs before any app-server request with
+      `AgentWrapperError::Backend { message: "model override unsupported for codex fork" }`
     - safe/redacted backend error translation for runtime rejection
 - **Key invariants / rules**:
   - exactly one `--model` mapping when the key is present and valid
@@ -40,9 +43,13 @@
   - `crates/agent_api/src/backends/codex/fork.rs`
   - `crates/codex/src/builder/mod.rs`
   - `crates/agent_api/src/backend_harness/runtime.rs`
+  - `docs/specs/codex-streaming-exec-contract.md`
+  - `docs/specs/codex-app-server-jsonrpc-contract.md`
 - **Verification**:
   - argv/builder tests prove trimmed valid input maps to Codex `--model`
   - absence tests prove no `--model` is emitted
+  - fork tests prove accepted model-selection inputs are rejected before `thread/list` / `thread/fork` /
+    `turn/start` with the pinned safe backend message
   - runtime rejection tests prove completion resolves as safe `Backend` error and event stream closes with one terminal
     `Error` event when applicable
 - **Risks / unknowns**

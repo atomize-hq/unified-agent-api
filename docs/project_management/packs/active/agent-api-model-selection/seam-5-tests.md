@@ -22,6 +22,7 @@
   - Outputs:
     - regression suite covering the pinned v1 behavior
     - stable failure cases for unsupported, invalid, and runtime-rejected model ids
+    - regenerated `docs/specs/universal-agent-api/capability-matrix.md` when built-in advertising changes
 - **Key invariants / rules**:
   - unsupported key must fail before `InvalidRequest`
   - trimming must happen before emptiness and byte-length validation
@@ -41,8 +42,11 @@
   - `crates/agent_api/src/backends/codex/tests/**`
   - `crates/agent_api/src/backends/claude_code/tests/**`
   - any shared runtime/error translation tests under `crates/agent_api/src/backend_harness/runtime/tests/**`
+  - `docs/specs/universal-agent-api/capability-matrix.md`
 - **Verification**:
   - targeted `cargo test` runs cover all new cases
+  - `cargo run -p xtask -- capability-matrix` refreshes the published capability artifact when the built-in
+    capability sets change
   - `make test` passes for the workspace
   - no existing extension-key tests regress in ordering or error type
 - **Risks / unknowns**

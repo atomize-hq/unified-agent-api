@@ -41,9 +41,12 @@
   - `crates/agent_api/src/backends/claude_code/mapping.rs`
   - `crates/claude_code/src/commands/print.rs`
   - `crates/agent_api/src/backend_harness/runtime.rs`
+  - `docs/specs/claude-code-session-mapping-contract.md`
 - **Verification**:
   - argv/request tests prove trimmed valid input maps to Claude `--model`
   - absence tests prove no `--model` is emitted
+  - session argv tests prove `--model <trimmed-id>` appears before any `--add-dir` group,
+    `--continue` / `--fork-session` / `--resume`, and `--fallback-model`
   - regression tests prove the universal key never emits `--fallback-model`
   - runtime rejection tests prove completion resolves as safe `Backend` error and event stream closes with one terminal
     `Error` event when applicable

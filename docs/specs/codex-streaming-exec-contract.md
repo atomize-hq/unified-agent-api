@@ -20,6 +20,33 @@ This contract is intentionally scoped to the `codex` crate’s streaming runtime
 not define cross-backend universal semantics; see `docs/specs/universal-agent-api/run-protocol-spec.md`
 for the `agent_api` run lifecycle rules.
 
+## `agent_api.config.model.v1` mapping (pinned)
+
+The model-selection extension key is owned by:
+
+- `docs/specs/universal-agent-api/extensions-spec.md`
+
+When `extensions["agent_api.config.model.v1"]` is accepted for a Codex exec/resume run, the Codex
+streaming wrapper MUST:
+
+- emit exactly one `--model <trimmed-id>` pair,
+- use the effective trimmed model id from the universal extension contract, and
+- omit `--model` entirely when the key is absent.
+
+Placement rules (pinned):
+
+- The pair MUST appear after any wrapper-owned CLI overrides have been applied.
+- The pair MUST appear before capability-guarded `--add-dir` emission.
+- Resume runs MUST preserve the same effective model id that a fresh exec run would emit; the
+  wrapper MUST NOT silently drop an accepted model id on `stream_resume`.
+
+Exclusion rules (pinned):
+
+- This key MUST NOT, by itself, authorize any additional Codex CLI override beyond `--model`.
+- Runtime rejection of the accepted model id remains backend-owned and MUST follow the safe
+  `AgentWrapperError::Backend` translation requirements from
+  `docs/specs/universal-agent-api/extensions-spec.md`.
+
 ## Runtime semantics (v1, pinned)
 
 ### Spawn + driver start (pinned)
@@ -70,4 +97,3 @@ For streaming entrypoints that expose a termination handle (e.g., `ExecStreamCon
   drained by the consumer.
 - This contract does not supersede the universal `agent_api` completion gating rules (DR-0012);
   `agent_api` is responsible for enforcing those semantics at the universal boundary.
-

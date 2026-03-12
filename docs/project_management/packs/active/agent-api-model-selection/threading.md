@@ -47,17 +47,20 @@ This section makes coupling explicit: contracts/interfaces, dependency edges, an
 
 - **MS-C06 — Codex mapping contract**
   - **Type**: integration
-  - **Definition**: Codex mapping consumes the effective trimmed model id and emits exactly one `--model <trimmed-id>`
-    through the existing Codex builder/argv path. This key MUST NOT authorize any additional Universal Agent API
-    behavior beyond model selection itself.
+  - **Definition**: Codex exec/resume mapping consumes the effective trimmed model id and emits exactly one
+    `--model <trimmed-id>` through the existing Codex builder/argv path. Codex fork currently has no app-server model
+    transport field, so accepted model-selection inputs on fork flows take the pinned pre-handle backend rejection path
+    from `docs/specs/codex-app-server-jsonrpc-contract.md`. This key MUST NOT authorize any additional Universal Agent
+    API behavior beyond model selection itself.
   - **Owner seam**: SEAM-3
   - **Consumers**: SEAM-5
 
 - **MS-C07 — Claude mapping contract**
   - **Type**: integration
   - **Definition**: Claude Code mapping consumes the effective trimmed model id and emits exactly one
-    `--model <trimmed-id>` through the print request / argv path. This key MUST NOT map to `--fallback-model` or any
-    other secondary print-mode override unless a separate explicit key exists.
+    `--model <trimmed-id>` through the print request / argv path, before any `--add-dir` group, session-selector
+    flags, or `--fallback-model`. This key MUST NOT map to `--fallback-model` or any other secondary print-mode
+    override unless a separate explicit key exists.
   - **Owner seam**: SEAM-4
   - **Consumers**: SEAM-5
 
@@ -83,7 +86,8 @@ This section makes coupling explicit: contracts/interfaces, dependency edges, an
 - **WS-CODEX**: SEAM-3 Codex request mapping and runtime error translation.
 - **WS-CLAUDE**: SEAM-4 Claude Code request mapping and runtime error translation.
 - **WS-TESTS**: SEAM-5 regression coverage; can start with R0 + schema-validation harness tests once SEAM-1 is stable.
-- **WS-INT (Integration)**: run `make test` / `make preflight`, validate advertised capabilities, and confirm no raw stderr leakage in backend failures.
+- **WS-INT (Integration)**: run `cargo run -p xtask -- capability-matrix`, `make test`, and `make preflight`;
+  validate advertised capabilities, and confirm no raw stderr leakage in backend failures.
 
 ## Pinned decisions / resolved threads
 

@@ -37,7 +37,7 @@ This ADR corresponds to backlog item `uaa-0002` (`bucket=agent_api.config`, `typ
 
 ## Executive Summary (Operator)
 
-ADR_BODY_SHA256: 9c3a16d3cce9862fc38672b1061f5481c84354689d9c8e9cc6490140cabf6aaf
+ADR_BODY_SHA256: 160b19d018ea0b8b4ddef87d382e197f5fea82b8beefc6efe0c4c56e602f5c49
 
 ### Decision (draft)
 
@@ -56,7 +56,9 @@ ADR_BODY_SHA256: 9c3a16d3cce9862fc38672b1061f5481c84354689d9c8e9cc6490140cabf6aa
   - the Universal Agent API standardizes the request surface, not a shared cross-backend model
     catalog.
 - Backend mapping:
-  - Codex: `codex ... --model <id> ...`
+  - Codex exec/resume: `codex ... --model <id> ...`
+  - Codex fork: current app-server fork flows take the pinned safe backend rejection path because
+    the app-server fork subset exposes no model transport field
   - Claude Code: `claude --print --model <id> ...`
 - Validation posture:
   - R0 capability gating applies first.
@@ -172,11 +174,18 @@ runtime model availability.
 
 #### Codex
 
-- CLI form: `codex exec --model <id> ...`
+- CLI form:
+  - exec/resume: `codex exec --model <id> ...`
+  - fork: current app-server fork subset has no model transport field
 - Implementation seam:
   - `crates/codex/src/builder/mod.rs` (`CodexClientBuilder::model(...)`)
 - Normative scope:
-  - `agent_api.config.model.v1` MUST map the effective model id to `--model <id>`.
+  - `agent_api.config.model.v1` MUST map the effective model id to `--model <id>` for Codex
+    exec/resume flows.
+  - If a run selects `agent_api.session.fork.v1` and also includes an accepted
+    `agent_api.config.model.v1` payload, the Codex backend MUST fail the run before any
+    `thread/list` / `thread/fork` / `turn/start` request with
+    `AgentWrapperError::Backend { message: "model override unsupported for codex fork" }`.
   - This key MUST NOT, by itself, authorize additional Universal Agent API behavior beyond model
     selection itself.
 
@@ -193,9 +202,10 @@ runtime model availability.
 ### Capability advertising
 
 - A backend MUST advertise `agent_api.config.model.v1` only when it can deterministically map the
-  key to its underlying CLI surface.
+  key to its underlying CLI/session surface.
 - For the current built-in backends, this is expected to be unconditional once implementation lands,
-  because both wrappers already have explicit `--model` support.
+  because Claude Code can honor the key across its print/session argv flows and Codex has an
+  explicit exec/resume mapping plus a pinned safe fork-rejection path.
 
 ## Alternatives Considered
 
@@ -214,7 +224,8 @@ runtime model availability.
 
 - Additive only. Callers that do not send the key are unchanged.
 - Existing builder-level support in both backend crates lowers implementation risk; the primary
-  remaining work is `agent_api` request validation, capability advertising, and mapping tests.
+  remaining work is `agent_api` request validation, capability advertising, backend-owned session
+  mapping docs, and mapping tests.
 
 ## Validation Plan (Authoritative for this ADR once Accepted)
 
@@ -224,9 +235,11 @@ runtime model availability.
   - unsupported key fails before spawn,
   - non-string / empty / oversize values fail before spawn,
   - surrounding whitespace is trimmed before validation and argv/builder mapping,
-  - supported valid requests emit the expected `--model <id>` argv/builder mapping for Codex and
-    Claude Code, and
+  - supported valid requests emit the expected `--model <id>` argv/builder mapping for Codex
+    exec/resume and Claude Code session flows, and
   - absent key does not emit `--model`, and
+  - Codex fork rejects accepted model-selection inputs before any app-server request with the
+    pinned safe backend message, and
   - backend runtime rejection of an accepted model id resolves as `AgentWrapperError::Backend`
     (with terminal `Error` event emission when a stream is open).
 

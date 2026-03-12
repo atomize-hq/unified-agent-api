@@ -176,6 +176,11 @@ Meaning:
 - The backend MUST normalize the supplied value by trimming leading and trailing Unicode whitespace
   before validation and mapping.
 - The trimmed value is the effective model id for all v1 semantics.
+- This key is orthogonal to `agent_api.session.resume.v1` and `agent_api.session.fork.v1`.
+  Backends MUST preserve the same accepted effective model id across new-session, resume, and
+  fork decision-making. A selected session flow MUST either apply that model id unchanged or take
+  a pinned safe backend-rejection path owned by its backend contract; it MUST NOT silently ignore
+  an accepted model-selection request for session-based flows.
 - This key standardizes only model selection. It MUST NOT, by itself, imply additional
   cross-backend semantics such as:
   - fallback-model selection,
@@ -197,8 +202,14 @@ Mapping requirements:
 - The backend MUST pass the trimmed value, not the raw untrimmed value, to its underlying
   CLI/backend mapping.
 - Built-in backends that advertise this key MUST map it as follows:
-  - Codex: emit `--model <trimmed-id>`
-  - Claude Code: emit `--model <trimmed-id>`
+  - Codex exec/resume: emit `--model <trimmed-id>`.
+  - Codex fork: the current pinned app-server v1 subset has no model-selection transport field on
+    `thread/fork` or `turn/start`; the backend contract in
+    `docs/specs/codex-app-server-jsonrpc-contract.md` therefore owns a deterministic pre-handle
+    safe rejection path for accepted model-selection inputs on fork flows.
+  - Claude Code: emit exactly one `--model <trimmed-id>` pair in the root-flags region, before any
+    `--add-dir` group, session-selector flags, `--fallback-model`, and the final prompt token per
+    `docs/specs/claude-code-session-mapping-contract.md`.
 - Built-in backends MUST NOT treat this key, by itself, as authorizing additional backend-specific
   knobs outside model selection.
   - Codex: MUST NOT rely on this key as authorization for additional Universal Agent API semantics
@@ -214,7 +225,8 @@ Runtime rejection behavior (v1, normative):
 - This includes backend outcomes such as:
   - unknown model id,
   - unavailable model id for the current backend/runtime/account/provider state, or
-  - unauthorized access to the requested model id.
+  - unauthorized access to the requested model id, or
+  - a backend/session transport that cannot apply an accepted model id to the targeted run flow.
 - The `message` MUST be safe/redacted and MUST NOT embed raw backend stdout/stderr.
 - v1 does not pin a universal message string for model-selection failure.
 - If such failure occurs after the backend has already returned an `AgentWrapperRunHandle` and the

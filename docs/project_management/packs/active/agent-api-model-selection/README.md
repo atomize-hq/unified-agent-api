@@ -20,5 +20,10 @@ then reflected here.
 - Model-selection key semantics: `docs/specs/universal-agent-api/extensions-spec.md`
 - Capability gating + error taxonomy: `docs/specs/universal-agent-api/contract.md`
 - Run/event semantics for backend failures: `docs/specs/universal-agent-api/run-protocol-spec.md`
+- Codex exec/resume model mapping + fork-rejection contract:
+  - `docs/specs/codex-streaming-exec-contract.md`
+  - `docs/specs/codex-app-server-jsonrpc-contract.md`
+- Claude Code model/session argv mapping:
+  - `docs/specs/claude-code-session-mapping-contract.md`
 - Capability naming + schema posture: `docs/specs/universal-agent-api/capabilities-schema-spec.md`
 - Prior promotion posture / pass-through boundaries: `docs/adr/0016-universal-agent-api-bounded-backend-config-pass-through.md`
