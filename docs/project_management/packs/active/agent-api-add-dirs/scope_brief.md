@@ -101,9 +101,21 @@ set through `agent_api`, Codex, and Claude Code without backend drift or session
   placement.
 - Codex fork rejects accepted add-dir inputs before app-server requests with the pinned safe
   backend message.
-- The capability inventory change is published by regenerating
-  `docs/specs/universal-agent-api/capability-matrix.md` via
-  `cargo run -p xtask -- capability-matrix` in the same change.
+- The capability inventory change is published by:
+  - Updating the canonical registry in
+    `docs/specs/universal-agent-api/capabilities-schema-spec.md` for
+    `agent_api.exec.add_dirs.v1`, and
+  - Regenerating `docs/specs/universal-agent-api/capability-matrix.md` via
+    `cargo run -p xtask -- capability-matrix` in the same change, with the
+    `agent_api.exec.add_dirs.v1` row showing ✅ for both `claude_code` and `codex`.
+
+## Ownership + verification
+
+- Canonical capability id registry: `docs/specs/universal-agent-api/capabilities-schema-spec.md`
+  (owned by universal-agent-api spec maintainers).
+- Generated overview: `docs/specs/universal-agent-api/capability-matrix.md` (regen required).
+- Reviewers MUST verify that `agent_api.exec.add_dirs.v1` appears in the canonical registry and the
+  regenerated matrix for the same change.
 
 ## Constraints
 

@@ -29,7 +29,8 @@ This ADR corresponds to backlog item `uaa-0003` (`bucket=agent_api.exec`, `type=
 - Universal Agent API baselines:
   - `docs/specs/universal-agent-api/contract.md`
   - `docs/specs/universal-agent-api/run-protocol-spec.md`
-  - `docs/specs/universal-agent-api/capabilities-schema-spec.md`
+  - `docs/specs/universal-agent-api/capabilities-schema-spec.md` (Standard capability ids:
+    `agent_api.exec.add_dirs.v1`)
   - `docs/specs/universal-agent-api/extensions-spec.md` (owner doc for the core key)
 - Backend mapping contracts:
   - `docs/specs/codex-streaming-exec-contract.md` (Codex exec/resume mapping)
@@ -42,12 +43,14 @@ This ADR corresponds to backlog item `uaa-0003` (`bucket=agent_api.exec`, `type=
 
 ## Executive Summary (Operator)
 
-ADR_BODY_SHA256: c8f8a80b37a6d068861dfbd3e4b49b1dd46bf1c299a81b5eacf617a076081585
+ADR_BODY_SHA256: 1e7523363bc9cbb625710f85c233132c29a7117569063507ee8f33daa8e21048
 
 ### Decision (draft)
 
 - Introduce a new core extension key:
   - `agent_api.exec.add_dirs.v1`
+- Capability advertisement follows the standard capability id entry in
+  `docs/specs/universal-agent-api/capabilities-schema-spec.md`.
 - Schema (closed):
 
 ```json
