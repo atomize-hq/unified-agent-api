@@ -4,6 +4,7 @@
 - **Type**: capability
 - **Goal / user value**: Make `agent_api.config.model.v1` reliably drive Claude Code print-mode model selection through
   the existing request/argv path without conflating it with Claude-specific fallback-model behavior.
+- **Contract registry cross-refs**: MS-C02, MS-C04, MS-C07, MS-C09 (see `threading.md`)
 - **Scope**
   - In:
     - consume the normalized effective model id from SEAM-2

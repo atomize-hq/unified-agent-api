@@ -4,6 +4,7 @@
 - **Type**: capability
 - **Goal / user value**: Make `agent_api.config.model.v1` reliably drive Codex model selection through the existing
   Codex builder/argv path while preserving safe error behavior when Codex rejects the requested model at runtime.
+- **Contract registry cross-refs**: MS-C02, MS-C04, MS-C06, MS-C09 (see `threading.md`)
 - **Scope**
   - In:
     - consume the normalized effective model id from SEAM-2

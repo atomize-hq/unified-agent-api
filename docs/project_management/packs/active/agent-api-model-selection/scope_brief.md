@@ -111,7 +111,7 @@ shape, validation posture, capability advertising, and backend mapping so orches
 
 - Public semantics must stay within the existing universal extension framework and error taxonomy.
 - No wrapper-owned model registry or dynamic remote validation is allowed in v1.
-- Existing builder/request APIs in `crates/codex` and `crates/claude_code` should be reused rather than bypassed.
+- Existing builder/request APIs in `crates/codex` and `crates/claude_code` MUST be reused rather than bypassed.
 - The implementation must preserve existing run/event lifecycle guarantees when backend rejection happens after stream open.
 
 ## External systems / dependencies
@@ -158,8 +158,8 @@ shape, validation posture, capability advertising, and backend mapping so orches
   advertising. SEAM-5 consumes that artifact for regression assertions, and WS-INT reruns
   `cargo run -p xtask -- capability-matrix`; a stale diff is merge-blocking.
 - **Single-parser enforcement**:
-  - SEAM-2 MUST land shared helper tests in `backend_harness/normalize.rs` for absence, non-string, whitespace-only,
-    oversize-after-trim, and trimmed-success cases.
+  - SEAM-2 MUST land shared helper tests in `crates/agent_api/src/backend_harness/normalize.rs` for absence, non-string,
+    whitespace-only, oversize-after-trim, and trimmed-success cases.
   - SEAM-3/4 tests MUST prove the backend wiring consumes the helper output unchanged and emits `--model` through the
     existing builder/argv order documented by the canonical backend specs.
   - Code review for SEAM-2/3/4 is incomplete until the diff shows no new direct parsing of

@@ -4,6 +4,7 @@
 - **Type**: integration
 - **Goal / user value**: Ensure both built-in backends expose the capability consistently and consume one effective
   trimmed model id contract instead of duplicating drift-prone raw extension parsing.
+- **Contract registry cross-refs**: MS-C05, MS-C08, MS-C09 (see `threading.md`)
 - **Scope**
   - In:
     - add `agent_api.config.model.v1` to built-in backend capability sets once deterministic support exists
@@ -67,7 +68,12 @@
   - `crates/agent_api/src/backend_harness/normalize.rs`
   - any new shared helper under `crates/agent_api/src/backends/` if extracted
 - **Verification**:
-  - both built-in capability sets advertise the key once implementation is present
+  - built-in capability sets advertise `agent_api.config.model.v1` only when the backend can deterministically honor
+    the owner-doc semantics for every exposed run flow after R0 gating and pre-spawn validation: either apply the
+    accepted effective trimmed model id unchanged to the backend transport for that flow, or take a pinned
+    backend-owned safe rejection path (a flow that silently drops, rewrites, or conditionally ignores an accepted model
+    id is not deterministic support). Because `AgentWrapperCapabilities.ids` is backend-global, built-in advertising
+    can be unconditional only when every exposed flow has one of those pinned outcomes.
   - R0 ordering tests prove unsupported key fails before model parsing
   - parser tests prove absent / non-string / empty / oversize cases fail or succeed deterministically
   - parser tests prove all invalid cases use the exact safe template `invalid agent_api.config.model.v1`

@@ -50,7 +50,7 @@ This ADR corresponds to backlog item `uaa-0002` (`bucket=agent_api.config`, `typ
 
 ## Executive Summary (Operator)
 
-ADR_BODY_SHA256: 322fec918477662219b319497611b0c8348d911d977cba626ed896ccb3149ef7
+ADR_BODY_SHA256: 7c90cd711621e2c3676fc01a5f4b37c0f1e1db0e6f776c0619a425b8ad6f3a0d
 
 ### Decision (draft)
 
@@ -256,7 +256,7 @@ runtime model availability.
   - non-string / empty / oversize values fail before spawn with the exact safe template
     `invalid agent_api.config.model.v1`,
   - surrounding whitespace is trimmed before validation and argv/builder mapping,
-  - supported valid requests emit the expected `--model <id>` argv/builder mapping for Codex
+  - accepted (pre-spawn-valid) requests emit the expected `--model <id>` argv/builder mapping for Codex
     exec/resume and Claude Code session flows, and
   - absent key does not emit `--model`, and
   - Codex fork rejects accepted model-selection inputs before any app-server request with the

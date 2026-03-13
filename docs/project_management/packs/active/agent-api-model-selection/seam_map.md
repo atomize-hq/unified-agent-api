@@ -39,7 +39,11 @@ and backend-owned runtime rejection.
      - updates to `docs/specs/codex-streaming-exec-contract.md`
      - updates to `docs/specs/codex-app-server-jsonrpc-contract.md`
      - updates to `crates/agent_api/src/backends/codex/harness.rs`
-     - updates to `crates/agent_api/src/backends/codex/exec.rs`, `fork.rs`, or related Codex request mapping code as needed
+     - updates to `crates/agent_api/src/backends/codex/exec.rs` and `crates/agent_api/src/backends/codex/fork.rs` to
+       plumb the normalized `Option<String>` into the existing Codex builder/argv emission and enforce the pinned fork
+       rejection path for accepted model-selection inputs
+     - if Codex mapping does not live in those modules in the current tree, the SEAM-3 owner MUST update this seam map
+       in the same change that wires the mapping so the touched-file set remains explicit and reviewable
 
 4) **SEAM-4 — Claude Code backend mapping**
    - Owns: mapping the normalized universal key to Claude Code print-mode builder / argv behavior while explicitly
@@ -48,7 +52,10 @@ and backend-owned runtime rejection.
      - `docs/project_management/packs/active/agent-api-model-selection/seam-4-claude-code-mapping.md`
      - updates to `docs/specs/claude-code-session-mapping-contract.md`
      - updates to `crates/agent_api/src/backends/claude_code/harness.rs`
-     - updates to `crates/agent_api/src/backends/claude_code/mapping.rs` or related request mapping code as needed
+     - updates to `crates/agent_api/src/backends/claude_code/mapping.rs` to plumb the normalized `Option<String>` into
+       the existing Claude Code print/session argv emission while explicitly excluding `--fallback-model`
+     - if Claude Code mapping does not live in that module in the current tree, the SEAM-4 owner MUST update this seam
+       map in the same change that wires the mapping so the touched-file set remains explicit and reviewable
 
 5) **SEAM-5 — Tests**
    - Owns: regression coverage for R0 gating, schema/bounds validation, trim-before-map semantics, absence semantics,

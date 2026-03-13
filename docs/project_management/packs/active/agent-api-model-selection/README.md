@@ -32,9 +32,12 @@ model-selection design decision.
 - `no unresolved canonical-doc delta` means those sources agree on the capability id + bucket, trim/bounds semantics,
   absence behavior, exact InvalidRequest template, backend mapping boundaries, and advertising posture. Any mismatch
   reopens the gate until the canonical specs are updated first and the ADR + pack are synchronized in the same change.
-- Recording rule: the passing run is recorded in `seam-1-core-extension-contract.md` under `Verification record`,
-  including the comparison scope, pass/fail result, and the commit/PR reference downstream seams must cite before they
-  start or merge work that depends on SEAM-1.
+- Recording rule: the passing run is recorded in `seam-1-core-extension-contract.md` under `## Verification record`,
+  including the comparison scope, pass/fail result, and the synchronization reference downstream seams must cite before
+  they start or merge work that depends on SEAM-1.
+  Before the synchronized change set is committed or opened as a PR, that reference may be the recorded `git HEAD`
+  plus an explicit working-tree delta note; once a commit or PR exists, the verification record MUST be updated to cite
+  that commit/PR instead.
 
 - Start here: `scope_brief.md`
 - Seam overview: `seam_map.md`

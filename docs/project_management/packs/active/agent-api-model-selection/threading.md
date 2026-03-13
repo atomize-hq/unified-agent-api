@@ -32,10 +32,12 @@ This section makes coupling explicit: contracts/interfaces, dependency edges, an
 
 - **MS-C04 — Backend-owned runtime rejection contract**
   - **Type**: integration
-  - **Definition**: if a syntactically valid, supported model id is later rejected by the backend runtime as unknown,
-    unavailable, or unauthorized, the run MUST resolve as `AgentWrapperError::Backend { message }`, where `message` is
-    safe/redacted and does not embed raw stdout/stderr. If the stream is already open, exactly one terminal
-    `AgentWrapperEventKind::Error` event with the same safe message is emitted before closure.
+  - **Definition**: if the key passed R0 capability gating and pre-spawn validation (MS-C03), but the backend later
+    determines that the requested model id cannot be honored at runtime (unknown, unavailable, unauthorized, or the
+    targeted run flow cannot apply an accepted model id), the run MUST resolve as
+    `AgentWrapperError::Backend { message }`, where `message` is safe/redacted and does not embed raw stdout/stderr. If
+    the stream is already open, exactly one terminal `AgentWrapperEventKind::Error` event with the same safe message
+    is emitted before closure.
   - **Owner seam**: SEAM-1
   - **Consumers**: SEAM-3/4/5
 
@@ -56,7 +58,7 @@ This section makes coupling explicit: contracts/interfaces, dependency edges, an
 
 - **MS-C09 — Shared model-normalizer handoff**
   - **Type**: integration
-  - **Definition**: SEAM-2 owns one shared helper in `backend_harness::normalize.rs` that reads
+  - **Definition**: SEAM-2 owns one shared helper in `crates/agent_api/src/backend_harness/normalize.rs` that reads
     `request.extensions["agent_api.config.model.v1"]` only after R0 gating and exports
     `Result<Option<String>, AgentWrapperError>`, where `None` means absent, `Some(trimmed_model_id)` means valid, and
     `InvalidRequest { message: "invalid agent_api.config.model.v1" }` covers every invalid input shape/bounds case.
@@ -104,7 +106,11 @@ This section makes coupling explicit: contracts/interfaces, dependency edges, an
 
 ## Critical path
 
+Implementation critical path:
 `SEAM-1 (verification/sync)` → `SEAM-2 (advertising + normalization + matrix publication)` → `SEAM-3/SEAM-4 (backend mapping)` → `SEAM-5B (backend/runtime tests)`
+
+Parallel test path (may proceed after SEAM-1):
+`SEAM-1 (verification/sync)` → `SEAM-5A (R0 + schema validation harness tests)`
 
 ## Integration points
 
@@ -118,7 +124,7 @@ This section makes coupling explicit: contracts/interfaces, dependency edges, an
   manually.
 - **Single-parser enforcement**: SEAM-2/3/4 verification is incomplete until shared-helper unit tests, backend argv
   tests, and diff review all confirm there is no new direct parse of `agent_api.config.model.v1` outside
-  `backend_harness::normalize.rs`.
+  `crates/agent_api/src/backend_harness/normalize.rs`.
 
 ## Parallelization notes / conflict-safe workstreams
 

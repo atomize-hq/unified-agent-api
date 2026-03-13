@@ -4,6 +4,7 @@
 - **Type**: risk
 - **Goal / user value**: Lock the universal model-selection behavior in place so future backend or spec churn cannot
   silently regress validation ordering, trimmed mapping, or backend-error safety.
+- **Contract registry cross-refs**: MS-C03, MS-C04, MS-C05, MS-C06, MS-C07, MS-C08, MS-C09 (see `threading.md`)
 - **Scope**
   - In:
     - SEAM-5A: R0 unsupported-capability ordering tests plus schema/bounds/InvalidRequest tests

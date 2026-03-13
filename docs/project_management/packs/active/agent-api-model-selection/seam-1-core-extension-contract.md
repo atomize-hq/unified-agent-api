@@ -8,6 +8,7 @@
   - canonical owner-spec text is already landed in `docs/specs/universal-agent-api/extensions-spec.md`
   - remaining work is limited to ADR-0020 sync, drift verification across related universal specs, and any resulting
     canonical-doc clarification patches
+- **Contract registry cross-refs**: MS-C01, MS-C02, MS-C03, MS-C04 (see `threading.md`)
 - **Scope**
   - In:
     - normative definition of `agent_api.config.model.v1`
@@ -78,13 +79,16 @@
   - downstream implementation seams can reference a single canonical contract registry only after the latest recorded
     pass is `pass: no unresolved canonical-doc delta`
 - **Verification record**:
-  - the latest pass/fail result for this seam MUST be appended under `Rollout / safety` in this file
+  - the latest pass/fail result for this seam MUST be appended under `## Verification record` in this file
   - each record MUST include:
     - verification date
     - verifier name/role
     - compared sources
     - result (`pass: no unresolved canonical-doc delta` or `fail: canonical-doc delta opened`)
-    - commit or PR reference for the synchronized change set
+    - synchronization reference for the verified change set:
+      - before the synchronized change set is committed or opened as a PR, record the base `git HEAD` plus an explicit
+        note that the verification applies to the current working-tree delta
+      - once a commit or PR exists, replace the provisional working-tree reference with that commit/PR reference
 - **Risks / unknowns**
   - Risk:
     - drift between ADR rationale and owner-spec normative wording
@@ -93,5 +97,23 @@
 - **Rollout / safety**:
   - land contract text before enabling backend advertising
   - downstream seams may proceed once the SEAM-1 verification pass records `pass: no unresolved canonical-doc delta`
-  - verification record:
-    - append the most recent SEAM-1 pass/fail entry here so SEAM-2/3/4/5 owners can cite one bounded source of truth
+  - downstream seams MUST cite the latest passing entry in `## Verification record` when claiming the gate is
+    satisfied, using the recorded synchronization reference exactly as written
+
+## Verification record
+
+- 2026-03-13 (UTC) — `pass: no unresolved canonical-doc delta`
+  - Verifier: concrete-remediator (packet run directory `.codex/audit-trio-remediator/20260313T144946-514966Z/`)
+  - Compared sources:
+    - `docs/specs/universal-agent-api/extensions-spec.md` (`### agent_api.config.model.v1`)
+    - `docs/specs/universal-agent-api/capabilities-schema-spec.md` (`agent_api.config.model.v1`)
+    - `docs/specs/universal-agent-api/contract.md` (`AgentWrapperError`, `AgentWrapperBackend::run`, and
+      `AgentWrapperEventKind::Error` / `AgentWrapperEvent.message`)
+    - `docs/specs/universal-agent-api/run-protocol-spec.md` (`Capability validation timing` and the terminal
+      `AgentWrapperEventKind::Error` rule for post-spawn failures)
+    - `docs/adr/0020-universal-agent-api-model-selection.md` sections `Canonical authority + sync workflow`,
+      `Decision (draft)`, `Validation and error model`, `Backend mapping`, and `Capability advertising`
+    - this pack's `README.md`, `scope_brief.md`, and `threading.md` restatements for SEAM-1-owned rules
+  - Synchronization reference: provisional local reference `git HEAD=aeeda8b` with the working-tree delta from this
+    uncommitted doc-sync change set; replace this line with the commit/PR reference when the synchronized change is
+    published
