@@ -11,7 +11,8 @@
   - Introduce shared code that:
     - parses `agent_api.exec.add_dirs.v1`,
     - enforces the closed schema and bounds,
-    - resolves relative paths from the effective working directory,
+    - resolves relative paths from the effective working directory (per
+      `docs/specs/universal-agent-api/contract.md` "Working directory resolution (effective working directory)"),
     - lexically normalizes,
     - validates `exists && is_dir`,
     - deduplicates while preserving order,
@@ -30,7 +31,7 @@
 - **Normalizer input contract**
   - **Inputs**:
     - raw extension value
-    - effective working directory
+    - effective working directory (per `docs/specs/universal-agent-api/contract.md` "Working directory resolution (effective working directory)")
   - **Outputs**:
     - normalized unique directory list or `InvalidRequest`
 
@@ -44,7 +45,7 @@
 - **Shared helper entrypoint**
   - **Inputs**:
     - `extensions["agent_api.exec.add_dirs.v1"]`
-    - effective working directory selected for the run
+    - effective working directory selected for the run (selected by the backend adapter layer per `contract.md`)
   - **Outputs**:
     - `Result<Vec<PathBuf>, AgentWrapperError>` from
       `backend_harness::normalize::normalize_add_dirs_v1(...)`
@@ -58,6 +59,7 @@
 - Errors identify the failing field or index using the exact templates
   `invalid agent_api.exec.add_dirs.v1`, `invalid agent_api.exec.add_dirs.v1.dirs`, or
   `invalid agent_api.exec.add_dirs.v1.dirs[<i>]`, and never the raw path text.
+- Backends MUST NOT invent any other `InvalidRequest` message shape for this key.
 - The helper must not create a new working-directory precedence ladder that diverges from actual
   backend execution behavior.
 

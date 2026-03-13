@@ -45,8 +45,9 @@
 - Capability support is not conditional on path contents once the backend supports the key.
 - When the key is absent, Claude emits no `--add-dir`.
 - Resume and fork must not silently ignore accepted directories.
-- Resume and fork for accepted add-dir inputs are honor-only flows for v1; this seam does not own
-  any safe-rejection branch.
+- If the installed CLI/runtime cannot honor accepted add-dir inputs for a supported run surface,
+  the backend MUST take the owner-doc runtime rejection path (`AgentWrapperError::Backend { message }`)
+  with a safe/redacted message.
 - The backend must emit one variadic group, not repeated `--add-dir` flags.
 - The variadic group must appear after any accepted `--model` pair and before `--continue`,
   `--fork-session`, `--resume`, the final `--verbose` token, and the final prompt token.
@@ -81,9 +82,11 @@
 
 - **Risk**: Claude’s session-oriented print flags may accept add-dir differently for resume/fork
   than for a fresh run.
-- **De-risk plan**: pin resume/fork CLI behavior in fake-stream tests before broad refactoring; if
-  the installed CLI cannot honor the accepted list, the backend must not advertise
-  `agent_api.exec.add_dirs.v1` until the canonical contract is revised.
+- **De-risk plan**: pin resume/fork CLI behavior in fake-stream tests before broad refactoring. If
+  the installed CLI/runtime cannot honor the accepted list for a supported run surface, the backend
+  MUST take the owner-doc runtime rejection path (`AgentWrapperError::Backend { message }`) with a
+  safe/redacted message (it MUST NOT implement per-environment capability gating unless the
+  canonical Universal Agent API specs explicitly introduce that behavior).
 
 ## Rollout / safety
 

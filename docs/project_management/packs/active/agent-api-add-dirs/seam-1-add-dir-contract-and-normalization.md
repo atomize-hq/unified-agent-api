@@ -32,7 +32,7 @@
 - **Normalization contract**:
   - **Inputs**:
     - raw `dirs` entries
-    - effective working directory
+    - effective working directory (per `docs/specs/universal-agent-api/contract.md` "Working directory resolution (effective working directory)")
   - **Outputs**:
     - trimmed, resolved, lexically normalized, deduplicated directory list
 
@@ -46,7 +46,8 @@
 ## Key invariants / rules
 
 - `dirs` is required and the schema is closed in v1.
-- Relative paths resolve against the effective working directory.
+- Relative paths resolve against the effective working directory (per
+  `docs/specs/universal-agent-api/contract.md` "Working directory resolution (effective working directory)").
 - There is intentionally no “must stay under working_dir” containment rule.
 - v1 requires lexical normalization only.
 - Invalid messages for this key must not echo raw path values.

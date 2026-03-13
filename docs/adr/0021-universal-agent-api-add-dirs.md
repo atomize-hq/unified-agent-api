@@ -43,7 +43,7 @@ This ADR corresponds to backlog item `uaa-0003` (`bucket=agent_api.exec`, `type=
 
 ## Executive Summary (Operator)
 
-ADR_BODY_SHA256: 1e7523363bc9cbb625710f85c233132c29a7117569063507ee8f33daa8e21048
+ADR_BODY_SHA256: 5c67a5c423ac5db29e4bcd925c7cd6dcf5ce22b1eb02728eac884f0091d841c1
 
 ### Decision (draft)
 
@@ -51,7 +51,7 @@ ADR_BODY_SHA256: 1e7523363bc9cbb625710f85c233132c29a7117569063507ee8f33daa8e2104
   - `agent_api.exec.add_dirs.v1`
 - Capability advertisement follows the standard capability id entry in
   `docs/specs/universal-agent-api/capabilities-schema-spec.md`.
-- Schema (closed):
+- Schema (closed) (illustrative shape; not fixed-length):
 
 ```json
 {
@@ -59,6 +59,8 @@ ADR_BODY_SHA256: 1e7523363bc9cbb625710f85c233132c29a7117569063507ee8f33daa8e2104
 }
 ```
 
+- Note: the snippet above shows an array-of-strings shape only; `dirs` length is `1..=16` (not
+  fixed-length).
 - Bounds:
   - `dirs` is required
   - `dirs` length: `1..=16`
@@ -69,7 +71,8 @@ ADR_BODY_SHA256: 1e7523363bc9cbb625710f85c233132c29a7117569063507ee8f33daa8e2104
   - the backend MUST NOT emit `--add-dir`
 - Path semantics:
   - entries MAY be absolute or relative
-  - relative entries resolve against the run’s effective working directory
+  - relative entries resolve against the run’s effective working directory (defined in
+    `docs/specs/universal-agent-api/contract.md` "Working directory resolution (effective working directory)")
   - there is no containment requirement that keeps paths under the effective working directory
   - after resolution, each path MUST exist and MUST be a directory before spawn
 - Normalization:
@@ -236,6 +239,7 @@ Before spawn:
   - `invalid agent_api.exec.add_dirs.v1.dirs`
   - `invalid agent_api.exec.add_dirs.v1.dirs[<i>]`
 - `<i>` is the zero-based decimal index of the failing `dirs[i]` entry.
+- Backends MUST NOT invent any other InvalidRequest message shape for this key.
 
 After spawn:
 - If the key passed R0 capability gating and pre-spawn validation, but the backend later determines
@@ -273,10 +277,21 @@ After spawn:
   accepted list directly, while the current Codex fork contract fails before app-server requests
   with the pinned safe backend message instead of silently dropping the list.
 
+## Canonical authority + sync workflow
+
+- Normative semantics for `agent_api.exec.add_dirs.v1` are owned by
+  `docs/specs/universal-agent-api/extensions-spec.md`.
+- Foundational terms used by the key (including effective working directory) are owned by
+  `docs/specs/universal-agent-api/contract.md`.
+- This ADR is rationale + an implementation plan. If any ADR wording conflicts with the normative
+  specs, resolve conflicts by updating this ADR (and the implementation pack) to match the specs.
+
 ## Validation Plan (Authoritative for this ADR once Accepted)
 
 - `make adr-check ADR=docs/adr/0021-universal-agent-api-add-dirs.md`
-- Land the owner-doc semantics in `docs/specs/universal-agent-api/extensions-spec.md`.
+- Verify the canonical owner-doc semantics already exist and remain synchronized:
+  - `docs/specs/universal-agent-api/extensions-spec.md` (`agent_api.exec.add_dirs.v1`)
+  - `docs/specs/universal-agent-api/capabilities-schema-spec.md` (`agent_api.exec.add_dirs.v1`)
 - Regenerate the canonical capability artifact with:
   - `cargo run -p xtask -- capability-matrix`
 - Add backend tests proving:

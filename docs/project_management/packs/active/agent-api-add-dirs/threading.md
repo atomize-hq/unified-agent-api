@@ -4,42 +4,60 @@ This section makes coupling explicit: contracts/interfaces, dependency edges, an
 
 ## Contract registry
 
+Ownership note: within this pack, **Owner seam** refers to workstream ownership for implementing
+and validating behavior. Normative ownership for `agent_api.*` extension-key semantics is always
+`docs/specs/universal-agent-api/extensions-spec.md` (and foundational contract terms live in
+`docs/specs/universal-agent-api/contract.md`). If any pack text conflicts with the normative specs,
+the specs win.
+
 - **AD-C01 — Core add-dir extension key**
   - **Type**: schema
-  - **Owner seam**: SEAM-1
+  - **Owner seam (pack)**: SEAM-1
+  - **Normative owner doc**: `docs/specs/universal-agent-api/extensions-spec.md`
   - **Consumers**: SEAM-2/3/4/5
   - **Definition**: `agent_api.exec.add_dirs.v1` is a closed object schema with required
-    `dirs: string[]`, `dirs.len()` in `1..=16`, and per-entry trimmed byte bound `<= 1024`.
+    `dirs: string[]`, `dirs.len()` in `1..=16`, and per-entry trimmed byte bound `<= 1024`. Trimming
+    is leading/trailing Unicode whitespace per the owner doc.
 
 - **AD-C02 — Effective add-dir set algorithm**
   - **Type**: config
-  - **Owner seam**: SEAM-2
+  - **Owner seam (pack)**: SEAM-2
   - **Consumers**: SEAM-3/4/5
-  - **Definition**: the wrapper computes one effective directory list by trimming entries,
-    resolving relatives against the effective working directory, lexically normalizing,
+  - **Definition**: the wrapper computes one effective directory list by trimming leading/trailing
+    Unicode whitespace (per the owner doc),
+    resolving relatives against the run's effective working directory (per
+    `docs/specs/universal-agent-api/contract.md` "Working directory resolution (effective working directory)"),
+    lexically normalizing,
     verifying `exists && is_dir`, and deduplicating while preserving first occurrence order. This
     list is exported as `Vec<PathBuf>` from
     `backend_harness::normalize::normalize_add_dirs_v1(...)`.
+    The backend adapter layer MUST determine the effective working directory per `contract.md` and
+    pass it into `normalize_add_dirs_v1(...)` unchanged.
 
 - **AD-C03 — Safe error posture**
   - **Type**: policy
-  - **Owner seam**: SEAM-1
+  - **Owner seam (pack)**: SEAM-1
   - **Consumers**: SEAM-2/3/4/5
   - **Definition**: `InvalidRequest` messages for this key MUST use one of the exact safe
     templates `invalid agent_api.exec.add_dirs.v1`,
     `invalid agent_api.exec.add_dirs.v1.dirs`, or
     `invalid agent_api.exec.add_dirs.v1.dirs[<i>]`, where `<i>` is the zero-based failing entry
-    index. Runtime failures surface as safe/redacted backend errors.
+    index. Backends MUST NOT invent any other `InvalidRequest` message shape for this key.
+    Runtime failures surface as safe/redacted backend errors (and MUST NOT embed raw backend
+    stdout/stderr) per the owner doc.
 
 - **AD-C04 — Session-flow parity**
   - **Type**: integration
-  - **Owner seam**: SEAM-1
+  - **Owner seam (pack)**: SEAM-1
   - **Consumers**: SEAM-3/4/5
-  - **Definition**: accepted add-dir inputs are valid for new-session, resume, and fork flows.
-    Claude applies the same effective add-dir set on fork flows. The current Codex fork contract
-    uses the pinned pre-handle backend rejection path from
-    `docs/specs/codex-app-server-jsonrpc-contract.md`. No session-based flow may silently ignore
-    accepted inputs.
+  - **Definition**: `agent_api.exec.add_dirs.v1` is orthogonal to the session selector keys
+    `agent_api.session.resume.v1` and `agent_api.session.fork.v1`; session flows are selected via
+    `AgentWrapperRunRequest.extensions` (not separate request fields). Backends MUST preserve the
+    same accepted effective add-dir set across new-session, resume, and fork decision-making, and
+    MUST NOT silently ignore accepted inputs. Claude applies the accepted set on fork flows. The
+    current Codex fork contract uses the pinned pre-handle backend rejection path from
+    `docs/specs/codex-app-server-jsonrpc-contract.md`. (Normative: see
+    `docs/specs/universal-agent-api/extensions-spec.md` `agent_api.exec.add_dirs.v1`.)
 
 - **AD-C05 — Codex argv mapping**
   - **Type**: integration
@@ -89,7 +107,9 @@ This section makes coupling explicit: contracts/interfaces, dependency edges, an
 - **Run extension gate**: `backend_harness::normalize_request()` must fail closed on unsupported
   keys before any add-dir value parsing happens.
 - **Effective working directory handoff**: the shared normalizer and each backend’s spawn path
-  must agree on the same working directory source.
+  must agree on the same working directory source. Effective working directory is defined in
+  `docs/specs/universal-agent-api/contract.md` ("Working directory resolution (effective working directory)"),
+  and backend adapters MUST pass that selected value into `normalize_add_dirs_v1(...)` unchanged.
 - **Session selectors**: resume/fork parsing stays orthogonal, but accepted add-dir inputs must
   survive into those flows. The one pinned exception is Codex fork, which rejects before any
   app-server request using the backend-owned safe message.
@@ -117,6 +137,7 @@ This section makes coupling explicit: contracts/interfaces, dependency edges, an
 
 ## Pinned decisions / resolved threads
 
+- **Trimming is leading/trailing Unicode whitespace** (per the owner doc).
 - **Relative paths are allowed** and resolve against the effective working directory.
 - **No containment rule** is imposed for v1.
 - **Lexical normalization only**: no shell expansion, env expansion, canonicalization, or symlink

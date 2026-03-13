@@ -7,8 +7,10 @@ request additional filesystem roots without depending on backend-specific flags.
 
 ## Why now
 
-ADR-0021 pins the contract, but the implementation still has to thread the same normalized add-dir
-set through `agent_api`, Codex, and Claude Code without backend drift or session-flow gaps.
+The Universal Agent API owner docs pin the v1 contract (`extensions-spec.md` for key semantics and
+`contract.md` for effective working directory). ADR-0021 is rationale + an implementation plan; the
+remaining work is threading one normalized add-dir set through `agent_api`, Codex, and Claude Code
+without backend drift or session-flow gaps.
 
 ## Primary users + JTBD
 
@@ -19,9 +21,11 @@ set through `agent_api`, Codex, and Claude Code without backend drift or session
 ## In-scope
 
 - Implement `agent_api.exec.add_dirs.v1` as a supported run extension for built-in backends.
-- Enforce the pinned v1 contract from:
-  - `docs/adr/0021-universal-agent-api-add-dirs.md`
-  - `docs/specs/universal-agent-api/extensions-spec.md`
+- Enforce the pinned v1 contract as defined by:
+  - `docs/specs/universal-agent-api/extensions-spec.md` (normative owner doc for the key)
+  - `docs/specs/universal-agent-api/contract.md` ("Working directory resolution (effective working directory)")
+- ADR-0021 is non-normative rationale/plan; treat it as derived-from-spec checklist only. If any
+  ADR text conflicts with the owner doc, resolve conflicts in favor of the owner doc.
 - Add deterministic validation and normalization:
   - closed object schema,
   - `dirs` bounds,
@@ -87,7 +91,9 @@ set through `agent_api`, Codex, and Claude Code without backend drift or session
   set before backend argv mapping.
 - **Session parity**: accepted add-dir inputs are not silently dropped for resume or fork flows;
   the only allowed exception path is the pinned Codex fork rejection contract.
-- **Safe errors**: `InvalidRequest` and runtime backend errors do not echo raw path values.
+- **Safe errors**:
+  - `InvalidRequest` messages MUST NOT echo raw path values and MUST use the pinned safe templates.
+  - runtime backend errors MUST be safe/redacted and MUST NOT embed raw backend stdout/stderr.
 
 ## Success criteria
 
@@ -102,9 +108,8 @@ set through `agent_api`, Codex, and Claude Code without backend drift or session
 - Codex fork rejects accepted add-dir inputs before app-server requests with the pinned safe
   backend message.
 - The capability inventory change is published by:
-  - Updating the canonical registry in
-    `docs/specs/universal-agent-api/capabilities-schema-spec.md` for
-    `agent_api.exec.add_dirs.v1`, and
+  - Confirming `agent_api.exec.add_dirs.v1` is present in the canonical capability id registry
+    `docs/specs/universal-agent-api/capabilities-schema-spec.md` (expected to already be present),
   - Regenerating `docs/specs/universal-agent-api/capability-matrix.md` via
     `cargo run -p xtask -- capability-matrix` in the same change, with the
     `agent_api.exec.add_dirs.v1` row showing ✅ for both `claude_code` and `codex`.
