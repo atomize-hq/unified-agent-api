@@ -33,9 +33,11 @@ set through `agent_api`, Codex, and Claude Code without backend drift or session
   - resume flows,
   - fork flows.
 - Map the normalized directories into both built-in backends:
-  - Codex: repeated `--add-dir <DIR>`
-  - Claude Code: one variadic `--add-dir <DIR...>` group
+  - Codex exec/resume: repeated `--add-dir <DIR>` pairs after any `--model` pair
+  - Claude Code: one variadic `--add-dir <DIR...>` group after any `--model` pair and before
+    `--continue` / `--fork-session` / `--resume` and the final `--verbose` token
 - Pin the backend-owned contract docs that make session behavior testable:
+  - `docs/specs/codex-streaming-exec-contract.md`
   - `docs/specs/codex-app-server-jsonrpc-contract.md`
   - `docs/specs/claude-code-session-mapping-contract.md`
 
@@ -121,6 +123,7 @@ set through `agent_api`, Codex, and Claude Code without backend drift or session
   - `crates/agent_api/src/backends/codex/**`
   - `crates/agent_api/src/backends/claude_code/**`
 - Canonical backend mapping docs:
+  - `docs/specs/codex-streaming-exec-contract.md`
   - `docs/specs/codex-app-server-jsonrpc-contract.md`
   - `docs/specs/claude-code-session-mapping-contract.md`
   - `docs/specs/universal-agent-api/capability-matrix.md`
@@ -142,5 +145,10 @@ set through `agent_api`, Codex, and Claude Code without backend drift or session
 - The current wrapper crates already expose sufficient backend primitives for add-dir argv
   emission, so most implementation risk is in `agent_api` validation/plumbing, Codex fork
   rejection wiring, and keeping the backend contract docs aligned.
-- Built-in backends should advertise `agent_api.exec.add_dirs.v1` unconditionally once the
+
+## Pinned implementation decisions
+
+- Built-in backends MUST advertise `agent_api.exec.add_dirs.v1` unconditionally once the
   implementation is landed, independent of the per-run path contents.
+- SEAM-2 owns a shared `backend_harness::normalize::normalize_add_dirs_v1(...)` helper that
+  returns the backend-consumed `Vec<PathBuf>` normalized directory list.

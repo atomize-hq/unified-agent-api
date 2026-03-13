@@ -13,7 +13,7 @@
   - Thread the normalized directory list through Claude policy/spawn structures.
   - Map the list to one `--add-dir <DIR...>` argv group using existing wrapper support.
   - Pin the argv placement in the backend-owned Claude session mapping contract doc.
-  - Preserve or safely reject the same directory set for resume/fork flows.
+  - Preserve the same accepted directory set for resume and fork flows.
 - Out:
   - Shared normalization rules.
   - Codex behavior.
@@ -31,23 +31,25 @@
   - **Inputs**:
     - normalized unique directory list
   - **Outputs**:
-    - one `--add-dir <DIR...>` argv group in normalized order, before session-selector flags and
-      before the final prompt token
+    - one `--add-dir <DIR...>` argv group in normalized order, after any accepted `--model` pair,
+      before session-selector flags, and before the final `--verbose` token and prompt token
 
 - **Claude session-flow contract**
   - **Inputs**:
     - accepted add-dir list on new run, resume, or fork
   - **Outputs**:
-    - same effective set is honored, or a safe backend error is emitted
+    - the same effective set is honored on new run, resume, and fork
 
 ## Key invariants / rules
 
 - Capability support is not conditional on path contents once the backend supports the key.
 - When the key is absent, Claude emits no `--add-dir`.
 - Resume and fork must not silently ignore accepted directories.
+- Resume and fork for accepted add-dir inputs are honor-only flows for v1; this seam does not own
+  any safe-rejection branch.
 - The backend must emit one variadic group, not repeated `--add-dir` flags.
-- The variadic group must appear before `--continue`, `--fork-session`, `--resume`, and the final
-  prompt token.
+- The variadic group must appear after any accepted `--model` pair and before `--continue`,
+  `--fork-session`, `--resume`, the final `--verbose` token, and the final prompt token.
 
 ## Dependencies
 
@@ -69,17 +71,19 @@
 - Mapping tests prove:
   - absent key emits no `--add-dir`
   - present key emits exactly one `--add-dir <DIR...>` group in order
-  - the add-dir group appears before `--continue`, `--fork-session`, `--resume`, and the final
-    prompt token
+  - the add-dir group appears after any accepted `--model` pair and before `--continue`,
+    `--fork-session`, `--resume`, the final `--verbose` token, and the final prompt token
   - relative paths resolve against the effective working directory actually used by Claude Code
-- Resume/fork tests prove accepted add-dir inputs are honored or safely rejected.
+- Resume/fork tests prove accepted add-dir inputs are honored with the same effective directory set
+  used for a fresh run.
 
 ## Risks / unknowns
 
 - **Risk**: Claude’s session-oriented print flags may accept add-dir differently for resume/fork
   than for a fresh run.
-- **De-risk plan**: pin resume/fork CLI behavior in fake-stream tests before broad refactoring so
-  backend error handling stays deterministic if the CLI surface rejects the accepted list.
+- **De-risk plan**: pin resume/fork CLI behavior in fake-stream tests before broad refactoring; if
+  the installed CLI cannot honor the accepted list, the backend must not advertise
+  `agent_api.exec.add_dirs.v1` until the canonical contract is revised.
 
 ## Rollout / safety
 

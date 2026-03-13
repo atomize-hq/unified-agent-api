@@ -17,7 +17,9 @@ This section makes coupling explicit: contracts/interfaces, dependency edges, an
   - **Consumers**: SEAM-3/4/5
   - **Definition**: the wrapper computes one effective directory list by trimming entries,
     resolving relatives against the effective working directory, lexically normalizing,
-    verifying `exists && is_dir`, and deduplicating while preserving first occurrence order.
+    verifying `exists && is_dir`, and deduplicating while preserving first occurrence order. This
+    list is exported as `Vec<PathBuf>` from
+    `backend_harness::normalize::normalize_add_dirs_v1(...)`.
 
 - **AD-C03 — Safe error posture**
   - **Type**: policy
@@ -44,14 +46,16 @@ This section makes coupling explicit: contracts/interfaces, dependency edges, an
   - **Owner seam**: SEAM-3
   - **Consumers**: SEAM-5
   - **Definition**: Codex receives one repeated `--add-dir <DIR>` pair per normalized unique
-    directory, in order.
+    directory, in order, on exec/resume flows. Any accepted `--model` pair stays earlier in argv per
+    `docs/specs/codex-streaming-exec-contract.md`.
 
 - **AD-C06 — Claude Code argv mapping**
   - **Type**: integration
   - **Owner seam**: SEAM-4
   - **Consumers**: SEAM-5
   - **Definition**: Claude Code receives one variadic `--add-dir <DIR...>` group containing the
-    normalized unique directories, in order.
+    normalized unique directories, in order, after any accepted `--model` pair and before
+    `--continue` / `--fork-session` / `--resume` and the final `--verbose` token.
 
 - **AD-C07 — Absence semantics**
   - **Type**: policy
@@ -65,9 +69,11 @@ This section makes coupling explicit: contracts/interfaces, dependency edges, an
 - `SEAM-1 blocks SEAM-2` because: the shared normalizer must implement the already-pinned v1
   schema, normalization, and safe-error rules.
 - `SEAM-2 blocks SEAM-3` because: Codex support should consume the shared normalized directory set
-  and the pinned Codex fork rejection contract instead of inventing backend-local path semantics.
+  exported from `backend_harness::normalize::normalize_add_dirs_v1(...)` and the pinned Codex fork
+  rejection contract instead of inventing backend-local path semantics.
 - `SEAM-2 blocks SEAM-4` because: Claude Code support should consume the same shared normalized
-  directory set instead of inventing backend-local path semantics.
+  `Vec<PathBuf>` output from `backend_harness::normalize::normalize_add_dirs_v1(...)` instead of
+  inventing backend-local path semantics.
 - `SEAM-3 blocks SEAM-5` because: tests must pin Codex capability advertising, argv order, and
   session-flow behavior, including the fork rejection boundary.
 - `SEAM-4 blocks SEAM-5` because: tests must pin Claude Code capability advertising, argv order,
@@ -89,7 +95,10 @@ This section makes coupling explicit: contracts/interfaces, dependency edges, an
   app-server request using the backend-owned safe message.
 - **Wrapper crate parity**: `codex::CodexClientBuilder` and `claude_code::ClaudePrintRequest`
   already expose add-dir surfaces; backend seams wire the normalized list into them.
+- **Shared normalizer anchor**: SEAM-2 owns `backend_harness::normalize::normalize_add_dirs_v1(...)`
+  and the `Vec<PathBuf>` output consumed by both backend policy layers.
 - **Canonical backend docs**: SEAM-3 and SEAM-4 are not done until
+  `docs/specs/codex-streaming-exec-contract.md`,
   `docs/specs/codex-app-server-jsonrpc-contract.md` and
   `docs/specs/claude-code-session-mapping-contract.md` reflect the exact mapping/rejection truth.
 - **Capability publication**: SEAM-5 must regenerate

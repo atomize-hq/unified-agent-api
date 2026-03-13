@@ -31,6 +31,10 @@ This ADR corresponds to backlog item `uaa-0003` (`bucket=agent_api.exec`, `type=
   - `docs/specs/universal-agent-api/run-protocol-spec.md`
   - `docs/specs/universal-agent-api/capabilities-schema-spec.md`
   - `docs/specs/universal-agent-api/extensions-spec.md` (owner doc for the core key)
+- Backend mapping contracts:
+  - `docs/specs/codex-streaming-exec-contract.md` (Codex exec/resume mapping)
+  - `docs/specs/codex-app-server-jsonrpc-contract.md` (Codex fork rejection boundary)
+  - `docs/specs/claude-code-session-mapping-contract.md`
 - Backend mapping seams:
   - `crates/codex/src/builder/mod.rs`
   - `crates/codex/src/capabilities/guard.rs`
@@ -38,7 +42,7 @@ This ADR corresponds to backlog item `uaa-0003` (`bucket=agent_api.exec`, `type=
 
 ## Executive Summary (Operator)
 
-ADR_BODY_SHA256: 0a933dc79d13633c29671844a7c8ada8bcfd1e0182cf396aa32196ffa5281856
+ADR_BODY_SHA256: c8f8a80b37a6d068861dfbd3e4b49b1dd46bf1c299a81b5eacf617a076081585
 
 ### Decision (draft)
 
@@ -187,6 +191,9 @@ CLI/backend mapping.
 - Implementation seams:
   - `crates/codex/src/builder/mod.rs` (`CodexClientBuilder::{add_dir,...}`)
   - `crates/codex/src/capabilities/guard.rs` (`guard_add_dir`)
+- Exec/resume argv contract:
+  - `docs/specs/codex-streaming-exec-contract.md`
+  - pinned placement: repeated `--add-dir <DIR>` pairs stay after any accepted `--model` pair
 - Fork-flow contract:
   - `docs/specs/codex-app-server-jsonrpc-contract.md`
   - current pinned truth: Codex fork has no add-dir transport field on `thread/fork` or
@@ -200,8 +207,9 @@ CLI/backend mapping.
   - `crates/claude_code/src/commands/print.rs` (`ClaudePrintRequest::add_dirs(...)`)
 - Resume/fork argv contract:
   - `docs/specs/claude-code-session-mapping-contract.md`
-  - pinned placement: one variadic add-dir group before `--continue` / `--fork-session` /
-    `--resume`, and before the final prompt token
+  - pinned placement: one variadic add-dir group after any accepted `--model` pair and before
+    `--continue` / `--fork-session` / `--resume`, the final `--verbose` token, and the final
+    prompt token
 
 ### Capability advertising
 
@@ -276,10 +284,10 @@ After spawn:
   - absolute paths outside the working directory are accepted when valid,
   - non-directory / missing paths fail before spawn, and
   - lexical normalization/dedup behaves deterministically without requiring canonicalization,
-  - Codex emits repeated `--add-dir <dir>` pairs in order,
+  - Codex emits repeated `--add-dir <dir>` pairs in order after any accepted `--model` pair,
   - Claude Code emits one variadic `--add-dir <dir...>` group in order, and
-  - Claude resume/fork place that variadic group before session-selector flags and before the final
-    prompt token,
+  - Claude resume/fork place that variadic group after any accepted `--model` pair and before
+    session-selector flags, the final `--verbose` token, and the final prompt token,
   - Codex fork rejects accepted add-dir inputs before `thread/list` / `thread/fork` /
     `turn/start` with `AgentWrapperError::Backend { message: "add_dirs unsupported for codex fork" }`, and
   - `docs/specs/universal-agent-api/capability-matrix.md` gains the

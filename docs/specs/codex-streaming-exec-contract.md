@@ -47,6 +47,34 @@ Exclusion rules (pinned):
   `AgentWrapperError::Backend` translation requirements from
   `docs/specs/universal-agent-api/extensions-spec.md`.
 
+## `agent_api.exec.add_dirs.v1` mapping (pinned)
+
+The add-dir extension key is owned by:
+
+- `docs/specs/universal-agent-api/extensions-spec.md`
+
+When `extensions["agent_api.exec.add_dirs.v1"]` is accepted for a Codex exec/resume run, the Codex
+streaming wrapper MUST:
+
+- emit one repeated `--add-dir <dir>` pair per normalized unique directory,
+- preserve the normalized unique directory order from the universal extension contract, and
+- omit `--add-dir` entirely when the key is absent.
+
+Placement rules (pinned):
+
+- Any accepted `--model <trimmed-id>` pair MUST appear before the first emitted `--add-dir`.
+- The wrapper MUST NOT reorder the normalized directory list while emitting the repeated pairs.
+- Resume runs MUST preserve the same effective add-dir list that a fresh exec run would emit; the
+  wrapper MUST NOT silently drop accepted directories on `stream_resume`.
+
+Exclusion rules (pinned):
+
+- This key MUST NOT, by itself, authorize any additional Codex CLI override beyond the repeated
+  `--add-dir` pairs.
+- Runtime rejection of the accepted directory list remains backend-owned and MUST follow the safe
+  `AgentWrapperError::Backend` translation requirements from
+  `docs/specs/universal-agent-api/extensions-spec.md`.
+
 ## Runtime semantics (v1, pinned)
 
 ### Spawn + driver start (pinned)

@@ -13,10 +13,13 @@
   - Add the key to Codex supported-extension allowlists.
   - Thread the normalized directory list through Codex policy/spawn structures.
   - Map the list to repeated `--add-dir <DIR>` pairs using existing wrapper support for exec and
-    resume.
+    resume, after any accepted `--model` pair.
   - Enforce the pinned Codex fork rejection path before any app-server request when add_dirs and
     `agent_api.session.fork.v1` are combined.
-  - Update the backend-owned Codex app-server contract doc alongside the code seam.
+  - Update the backend-owned Codex exec/resume contract doc alongside the code seam:
+    `docs/specs/codex-streaming-exec-contract.md`.
+  - Update the fork-only Codex app-server contract doc alongside the fork-rejection wiring:
+    `docs/specs/codex-app-server-jsonrpc-contract.md`.
 - Out:
   - Shared normalization rules.
   - Claude Code behavior.
@@ -48,6 +51,8 @@
 
 - Capability support is not conditional on path contents once the backend supports the key.
 - When the key is absent, Codex emits no `--add-dir`.
+- Exec/resume keep any accepted `--model` pair earlier in argv than the repeated `--add-dir`
+  emission.
 - Resume must not silently ignore accepted directories.
 - Fork must not silently ignore accepted directories; the only allowed behavior in the current
   contract is the pinned pre-handle backend rejection path.
@@ -65,6 +70,7 @@
 - `crates/agent_api/src/backends/codex/policy.rs`
 - `crates/agent_api/src/backends/codex/exec.rs`
 - `crates/agent_api/src/backends/codex/fork.rs`
+- `docs/specs/codex-streaming-exec-contract.md`
 - `docs/specs/codex-app-server-jsonrpc-contract.md`
 - Existing wrapper dependency surface:
   - `crates/codex/src/builder/mod.rs`
@@ -75,6 +81,7 @@
 - Mapping tests prove:
   - absent key emits no `--add-dir`
   - present key emits repeated `--add-dir <DIR>` pairs in order for exec/resume
+  - exec/resume keep any accepted `--model` pair before the first emitted `--add-dir`
   - relative paths resolve against the effective working directory actually used by Codex
 - Fork tests prove accepted add-dir inputs are rejected before `thread/list` / `thread/fork` /
   `turn/start` with the pinned safe backend message.

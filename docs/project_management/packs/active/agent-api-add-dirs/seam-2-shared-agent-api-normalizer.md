@@ -16,7 +16,11 @@
     - validates `exists && is_dir`,
     - deduplicates while preserving order,
     - returns safe/testable errors without path leaks.
-  - Define the shared output shape consumed by backend seams, for example `Vec<PathBuf>`.
+  - Define one shared normalizer entrypoint in
+    `crates/agent_api/src/backend_harness/normalize.rs`:
+    `normalize_add_dirs_v1(...) -> Result<Vec<PathBuf>, AgentWrapperError>`.
+  - Export exactly `Vec<PathBuf>` as the normalized unique directory list consumed by backend
+    policy extraction and spawn layers.
 - Out:
   - Backend capability advertising.
   - Backend-specific CLI argv emission.
@@ -34,12 +38,23 @@
   - **Inputs**:
     - normalized directory list
   - **Outputs**:
-    - backend policy/spawn layers can map it without re-validating semantics
+    - backend policy/spawn layers receive `Vec<PathBuf>` and map it without re-validating
+      schema/path semantics
+
+- **Shared helper entrypoint**
+  - **Inputs**:
+    - `extensions["agent_api.exec.add_dirs.v1"]`
+    - effective working directory selected for the run
+  - **Outputs**:
+    - `Result<Vec<PathBuf>, AgentWrapperError>` from
+      `backend_harness::normalize::normalize_add_dirs_v1(...)`
 
 ## Key invariants / rules
 
 - The shared helper is the only place that decides trimming, path resolution, normalization, and
   dedup behavior.
+- Backend-specific policy structs may carry the resulting `Vec<PathBuf>`, but they MUST treat it as
+  an already-normalized value and MUST NOT duplicate schema or filesystem validation.
 - Errors identify the failing field or index using the exact templates
   `invalid agent_api.exec.add_dirs.v1`, `invalid agent_api.exec.add_dirs.v1.dirs`, or
   `invalid agent_api.exec.add_dirs.v1.dirs[<i>]`, and never the raw path text.
@@ -54,9 +69,9 @@
 ## Touch surface
 
 - `crates/agent_api/src/backend_harness/normalize.rs`
-- `crates/agent_api/src/backends/session_selectors.rs` or a new sibling helper module under
-  `crates/agent_api/src/backends/`
 - `crates/agent_api/src/backend_harness/contract.rs`
+- `crates/agent_api/src/backends/codex/policy.rs`
+- `crates/agent_api/src/backends/claude_code/backend.rs`
 
 ## Verification
 
@@ -83,4 +98,5 @@
 
 ## Rollout / safety
 
-- Shared helper should be introduced first so backend seams can consume one pinned implementation.
+- Land the shared helper in `backend_harness/normalize.rs` first so backend seams consume one pinned
+  `Vec<PathBuf>` contract.

@@ -31,6 +31,9 @@
     - accepted normalized add-dir list
   - **Outputs**:
     - Codex repeated-pair argv and Claude single-group argv are both pinned
+    - Codex proves any accepted `--model` pair stays before emitted `--add-dir`
+    - Claude proves any accepted `--model` pair stays before the `--add-dir` group and that the
+      group stays before the final `--verbose` token
 
 - **Session parity coverage contract**
   - **Inputs**:
@@ -68,7 +71,8 @@
 ## Verification
 
 - Targeted runs while iterating:
-  - `cargo test -p agent_api`
+  - `cargo test -p agent_api` for shared normalizer-only coverage
+  - `cargo test -p agent_api --all-features` for backend mapping + session-flow coverage
 - Full gate before merge:
   - `cargo run -p xtask -- capability-matrix`
   - `make test`

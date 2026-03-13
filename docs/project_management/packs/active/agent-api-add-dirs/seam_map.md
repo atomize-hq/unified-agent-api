@@ -17,8 +17,8 @@ and per-backend session-safe mapping.
      into one normalized unique directory list that backend seams can consume.
    - Outputs:
      - `docs/project_management/packs/active/agent-api-add-dirs/seam-2-shared-agent-api-normalizer.md`
-     - shared normalization code under `crates/agent_api/src/backends/` or
-       `crates/agent_api/src/backend_harness/`
+     - `crates/agent_api/src/backend_harness/normalize.rs`
+     - exported normalized list contract: `Vec<PathBuf>`
 
 3) **SEAM-3 — Codex backend support**
    - Owns: Codex capability advertising, policy extraction, and mapping of the normalized add-dir
