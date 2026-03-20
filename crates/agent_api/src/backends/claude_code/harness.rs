@@ -19,9 +19,10 @@ use super::{
         generic_non_zero_exit_message, json_contains_not_found_signal, parse_bool,
         preflight_allow_flag_support,
     },
-    ClaudeCodeBackendConfig, AGENT_KIND, CLAUDE_EXEC_POLICY_PREFIX, EXT_EXTERNAL_SANDBOX_V1,
-    EXT_NON_INTERACTIVE, PINNED_EXTERNAL_SANDBOX_WARNING, SESSION_HANDLE_ID_BOUND_BYTES,
-    SESSION_HANDLE_OVERSIZE_WARNING, SUPPORTED_EXTENSION_KEYS_DEFAULT,
+    ClaudeCodeBackendConfig, AGENT_KIND, CLAUDE_EXEC_POLICY_PREFIX, EXT_ADD_DIRS_V1,
+    EXT_EXTERNAL_SANDBOX_V1, EXT_NON_INTERACTIVE, PINNED_EXTERNAL_SANDBOX_WARNING,
+    SESSION_HANDLE_ID_BOUND_BYTES, SESSION_HANDLE_OVERSIZE_WARNING,
+    SUPPORTED_EXTENSION_KEYS_DEFAULT,
     SUPPORTED_EXTENSION_KEYS_EXTERNAL_SANDBOX_OPT_IN,
 };
 use crate::{
@@ -224,7 +225,7 @@ impl BackendHarnessAdapter for ClaudeHarnessAdapter {
 
         validate_resume_fork_mutual_exclusion(&request.extensions)?;
 
-        let add_dirs = match request.extensions.get("agent_api.exec.add_dirs.v1") {
+        let add_dirs = match request.extensions.get(EXT_ADD_DIRS_V1) {
             Some(raw) => {
                 let effective_working_dir = request
                     .working_dir

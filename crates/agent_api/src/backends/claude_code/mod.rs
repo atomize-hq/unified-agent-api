@@ -12,17 +12,20 @@ const AGENT_KIND: &str = "claude_code";
 const CHANNEL_ASSISTANT: &str = "assistant";
 const CHANNEL_TOOL: &str = "tool";
 
+const EXT_ADD_DIRS_V1: &str = "agent_api.exec.add_dirs.v1";
 const EXT_NON_INTERACTIVE: &str = "agent_api.exec.non_interactive";
 const EXT_EXTERNAL_SANDBOX_V1: &str = "agent_api.exec.external_sandbox.v1";
 const CLAUDE_EXEC_POLICY_PREFIX: &str = "backend.claude_code.exec.";
 
 const SUPPORTED_EXTENSION_KEYS_DEFAULT: &[&str] = &[
+    EXT_ADD_DIRS_V1,
     EXT_NON_INTERACTIVE,
     EXT_SESSION_RESUME_V1,
     EXT_SESSION_FORK_V1,
 ];
 
 const SUPPORTED_EXTENSION_KEYS_EXTERNAL_SANDBOX_OPT_IN: &[&str] = &[
+    EXT_ADD_DIRS_V1,
     EXT_NON_INTERACTIVE,
     EXT_SESSION_RESUME_V1,
     EXT_SESSION_FORK_V1,

@@ -3,7 +3,7 @@ use std::{collections::BTreeSet, future::Future, pin::Pin, sync::Arc};
 use super::{
     harness::new_harness_adapter, mcp_management, ClaudeCodeBackend, AGENT_KIND,
     CAP_ARTIFACTS_FINAL_TEXT_V1, CAP_SESSION_HANDLE_V1, CAP_TOOLS_RESULTS_V1,
-    CAP_TOOLS_STRUCTURED_V1, EXT_EXTERNAL_SANDBOX_V1, EXT_NON_INTERACTIVE,
+    CAP_TOOLS_STRUCTURED_V1, EXT_ADD_DIRS_V1, EXT_EXTERNAL_SANDBOX_V1, EXT_NON_INTERACTIVE,
 };
 use crate::{
     backend_harness::BackendDefaults,
@@ -47,6 +47,7 @@ impl AgentWrapperBackend for ClaudeCodeBackend {
         ids.insert(CAP_ARTIFACTS_FINAL_TEXT_V1.to_string());
         ids.insert(CAP_SESSION_HANDLE_V1.to_string());
         ids.insert("backend.claude_code.print_stream_json".to_string());
+        ids.insert(EXT_ADD_DIRS_V1.to_string());
         ids.insert(EXT_NON_INTERACTIVE.to_string());
         ids.insert(EXT_SESSION_RESUME_V1.to_string());
         ids.insert(EXT_SESSION_FORK_V1.to_string());
