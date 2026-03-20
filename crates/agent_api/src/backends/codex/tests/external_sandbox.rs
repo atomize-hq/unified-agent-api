@@ -83,6 +83,7 @@ async fn external_sandbox_spawn_failure_emits_warning_before_terminal_error() {
             effective_timeout: None,
             env: std::collections::BTreeMap::new(),
             policy: CodexExecPolicy {
+                add_dirs: Vec::new(),
                 non_interactive: true,
                 external_sandbox: true,
                 approval_policy: None,

@@ -12,15 +12,15 @@ use futures_util::{stream, StreamExt};
 
 use super::{
     mapping::{error_event, map_thread_event, status_event},
-    validate_and_extract_exec_policy, CodexBackendConfig, CAP_SESSION_HANDLE_V1,
+    validate_and_extract_exec_policy, CodexBackendConfig, CAP_SESSION_HANDLE_V1, EXT_ADD_DIRS_V1,
     PINNED_EXTERNAL_SANDBOX_WARNING, PINNED_NO_SESSION_FOUND, PINNED_SESSION_NOT_FOUND,
     PINNED_TIMEOUT, SESSION_HANDLE_ID_BOUND_BYTES, SESSION_HANDLE_OVERSIZE_WARNING_MARKER,
     SUPPORTED_EXTENSION_KEYS_DEFAULT, SUPPORTED_EXTENSION_KEYS_EXTERNAL_SANDBOX_OPT_IN,
 };
 use crate::{
     backend_harness::{
-        BackendHarnessAdapter, BackendHarnessErrorPhase, BackendSpawn, DynBackendEventStream,
-        NormalizedRequest,
+        normalize_add_dirs_v1, BackendHarnessAdapter, BackendHarnessErrorPhase, BackendSpawn,
+        DynBackendEventStream, NormalizedRequest,
     },
     AgentWrapperCompletion, AgentWrapperError, AgentWrapperEvent, AgentWrapperEventKind,
     AgentWrapperKind, AgentWrapperRunRequest,
@@ -242,7 +242,25 @@ impl BackendHarnessAdapter for CodexHarnessAdapter {
         &self,
         request: &AgentWrapperRunRequest,
     ) -> Result<Self::Policy, AgentWrapperError> {
-        let exec_policy = validate_and_extract_exec_policy(request)?;
+        let mut exec_policy = validate_and_extract_exec_policy(request)?;
+
+        let effective_working_dir = request
+            .working_dir
+            .as_ref()
+            .or(self.config.default_working_dir.as_ref())
+            .or(self.run_start_cwd.as_ref())
+            .cloned();
+        exec_policy.add_dirs = if let Some(effective_working_dir) = effective_working_dir {
+            normalize_add_dirs_v1(
+                request.extensions.get(EXT_ADD_DIRS_V1),
+                effective_working_dir.as_path(),
+            )?
+        } else {
+            normalize_add_dirs_v1(
+                request.extensions.get(EXT_ADD_DIRS_V1),
+                std::path::Path::new("."),
+            )?
+        };
 
         let resume = request
             .extensions
@@ -288,6 +306,7 @@ impl BackendHarnessAdapter for CodexHarnessAdapter {
         let termination = self.termination.clone();
         let handle_state = Arc::clone(&self.handle_state);
         let super::CodexExecPolicy {
+            add_dirs,
             non_interactive,
             external_sandbox,
             approval_policy,
@@ -323,6 +342,7 @@ impl BackendHarnessAdapter for CodexHarnessAdapter {
                     config,
                     run_start_cwd,
                     termination,
+                    add_dirs,
                     non_interactive,
                     external_sandbox,
                     approval_policy,

@@ -12,8 +12,8 @@ use super::super::{
 use super::{normalize_request, parse_ext_bool, parse_ext_string_enum};
 use crate::{AgentWrapperCompletion, AgentWrapperError, AgentWrapperRunRequest};
 
-mod c03_timeout;
 mod add_dirs;
+mod c03_timeout;
 
 #[test]
 fn bh_c02_unknown_extension_key_is_rejected_via_normalize_request() {

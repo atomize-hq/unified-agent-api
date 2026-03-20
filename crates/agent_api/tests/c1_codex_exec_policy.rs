@@ -1,12 +1,14 @@
 #![cfg(feature = "codex")]
 
-use std::{collections::BTreeMap, path::PathBuf, pin::Pin, time::Duration};
+use std::{collections::BTreeMap, fs, path::PathBuf, pin::Pin, time::Duration};
 
 use agent_api::{
     backends::codex::{CodexBackend, CodexBackendConfig},
     AgentWrapperBackend, AgentWrapperEvent, AgentWrapperEventKind, AgentWrapperRunRequest,
 };
 use futures_core::Stream;
+use serde_json::json;
+use tempfile::tempdir;
 
 async fn drain_to_none(
     mut stream: Pin<&mut (dyn Stream<Item = AgentWrapperEvent> + Send)>,
@@ -50,6 +52,20 @@ fn base_env() -> BTreeMap<String, String> {
     ]
     .into_iter()
     .collect()
+}
+
+fn add_dir_expectations(dirs: &[PathBuf]) -> BTreeMap<String, String> {
+    let mut env = BTreeMap::from([(
+        "FAKE_CODEX_EXPECT_ADD_DIR_COUNT".to_string(),
+        dirs.len().to_string(),
+    )]);
+    for (index, dir) in dirs.iter().enumerate() {
+        env.insert(
+            format!("FAKE_CODEX_EXPECT_ADD_DIR_{index}"),
+            dir.display().to_string(),
+        );
+    }
+    env
 }
 
 const EXTERNAL_SANDBOX_WARNING: &str =
@@ -256,6 +272,79 @@ async fn codex_external_sandbox_exec_maps_to_dangerous_bypass_argv_and_emits_war
         warning_idx < handle_idx,
         "expected warning to be emitted before the session handle facet Status event"
     );
+
+    let completion = tokio::time::timeout(Duration::from_secs(2), completion)
+        .await
+        .expect("completion resolves")
+        .unwrap();
+    assert!(completion.status.success());
+}
+
+#[tokio::test]
+async fn codex_exec_without_add_dirs_emits_no_add_dir_flags() {
+    let backend = CodexBackend::new(CodexBackendConfig {
+        binary: Some(fake_codex_binary()),
+        env: base_env()
+            .into_iter()
+            .chain(add_dir_expectations(&[]))
+            .collect(),
+        ..Default::default()
+    });
+
+    let handle = backend
+        .run(AgentWrapperRunRequest {
+            prompt: "hello".to_string(),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+
+    let mut events = handle.events;
+    let completion = handle.completion;
+    let _ = drain_to_none(events.as_mut(), Duration::from_secs(2)).await;
+
+    let completion = tokio::time::timeout(Duration::from_secs(2), completion)
+        .await
+        .expect("completion resolves")
+        .unwrap();
+    assert!(completion.status.success());
+}
+
+#[tokio::test]
+async fn codex_exec_with_add_dirs_emits_repeated_flags_in_order() {
+    let temp = tempdir().expect("tempdir");
+    let dir_a = temp.path().join("alpha");
+    let dir_b = temp.path().join("beta");
+    fs::create_dir_all(&dir_a).expect("alpha dir");
+    fs::create_dir_all(&dir_b).expect("beta dir");
+    let add_dirs = vec![dir_a, dir_b];
+
+    let backend = CodexBackend::new(CodexBackendConfig {
+        binary: Some(fake_codex_binary()),
+        env: base_env()
+            .into_iter()
+            .chain(add_dir_expectations(&add_dirs))
+            .collect(),
+        ..Default::default()
+    });
+
+    let handle = backend
+        .run(AgentWrapperRunRequest {
+            prompt: "hello".to_string(),
+            extensions: [(
+                "agent_api.exec.add_dirs.v1".to_string(),
+                json!({"dirs": add_dirs.iter().map(|dir| dir.display().to_string()).collect::<Vec<_>>() }),
+            )]
+            .into_iter()
+            .collect(),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+
+    let mut events = handle.events;
+    let completion = handle.completion;
+    let _ = drain_to_none(events.as_mut(), Duration::from_secs(2)).await;
 
     let completion = tokio::time::timeout(Duration::from_secs(2), completion)
         .await

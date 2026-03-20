@@ -86,6 +86,69 @@ fn assert_env_overrides(out: &mut impl Write) -> io::Result<bool> {
     Ok(true)
 }
 
+fn assert_add_dirs(out: &mut impl Write, args: &[String]) -> io::Result<bool> {
+    let Ok(expected_count_raw) = env::var("FAKE_CODEX_EXPECT_ADD_DIR_COUNT") else {
+        return Ok(true);
+    };
+    let expected_count = match expected_count_raw.parse::<usize>() {
+        Ok(value) => value,
+        Err(err) => {
+            emit_jsonl(
+                out,
+                &format!(
+                    r#"{{"type":"error","message":"invalid FAKE_CODEX_EXPECT_ADD_DIR_COUNT: {err}"}}"#
+                ),
+            )?;
+            return Ok(false);
+        }
+    };
+
+    let mut actual = Vec::new();
+    let mut idx = 0usize;
+    while idx < args.len() {
+        if args[idx] == "--add-dir" {
+            let Some(value) = args.get(idx + 1) else {
+                emit_jsonl(
+                    out,
+                    r#"{"type":"error","message":"--add-dir missing required value"}"#,
+                )?;
+                return Ok(false);
+            };
+            actual.push(value.clone());
+            idx += 2;
+            continue;
+        }
+        idx += 1;
+    }
+
+    if actual.len() != expected_count {
+        emit_jsonl(
+            out,
+            &format!(
+                r#"{{"type":"error","message":"expected {expected_count} --add-dir values, got {}"}}"#,
+                actual.len()
+            ),
+        )?;
+        return Ok(false);
+    }
+
+    for (index, got) in actual.iter().enumerate() {
+        let key = format!("FAKE_CODEX_EXPECT_ADD_DIR_{index}");
+        let expected = require_env_var(out, &key)?;
+        if got != &expected {
+            emit_jsonl(
+                out,
+                &format!(
+                    r#"{{"type":"error","message":"expected add-dir[{index}]={expected:?}, got {got:?}"}}"#
+                ),
+            )?;
+            return Ok(false);
+        }
+    }
+
+    Ok(true)
+}
+
 fn require_env_var(out: &mut impl Write, key: &str) -> io::Result<String> {
     match env::var(key) {
         Ok(value) if !value.trim().is_empty() => Ok(value),
@@ -166,6 +229,26 @@ fn main() -> io::Result<()> {
     let args: Vec<String> = env::args().collect();
     let mut out = io::stdout().lock();
 
+    if args.get(1).is_some_and(|arg| arg == "--version") {
+        write_line(&mut out, "codex 1.2.3\n")?;
+        return Ok(());
+    }
+
+    if args.len() >= 3 && args[1] == "features" && args[2] == "list" {
+        if args.get(3).is_some_and(|arg| arg == "--json") {
+            write_line(&mut out, r#"{"features":["add_dir"]}"#)?;
+            write_line(&mut out, "\n")?;
+        } else {
+            write_line(&mut out, "add_dir\n")?;
+        }
+        return Ok(());
+    }
+
+    if args.get(1).is_some_and(|arg| arg == "--help") {
+        write_line(&mut out, "Usage: codex --add-dir\n")?;
+        return Ok(());
+    }
+
     if !args.get(1).is_some_and(|arg| arg == "exec") {
         emit_jsonl(
             &mut out,
@@ -178,6 +261,9 @@ fn main() -> io::Result<()> {
         std::process::exit(1);
     }
     if !require_flag_present(&mut out, &args, "--skip-git-repo-check")? {
+        std::process::exit(1);
+    }
+    if !assert_add_dirs(&mut out, &args)? {
         std::process::exit(1);
     }
 

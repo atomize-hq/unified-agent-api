@@ -17,6 +17,7 @@ pub(super) struct ExecFlowRequest {
     pub(super) run_start_cwd: Option<PathBuf>,
     pub(super) termination:
         Option<Arc<super::super::termination::TerminationState<super::CodexTerminationHandle>>>,
+    pub(super) add_dirs: Vec<PathBuf>,
     pub(super) non_interactive: bool,
     pub(super) external_sandbox: bool,
     pub(super) approval_policy: Option<super::CodexApprovalPolicy>,
@@ -92,6 +93,7 @@ pub(super) async fn spawn_exec_or_resume_flow(
         config,
         run_start_cwd,
         termination,
+        add_dirs,
         non_interactive,
         external_sandbox,
         approval_policy,
@@ -136,6 +138,7 @@ pub(super) async fn spawn_exec_or_resume_flow(
 
     // Codex wrapper treats `Duration::ZERO` as “no timeout”.
     builder = builder.timeout(effective_timeout.unwrap_or(Duration::ZERO));
+    builder = builder.add_dirs(add_dirs);
 
     let client = builder.build();
 

@@ -155,7 +155,9 @@ fn normalize_add_dir_entry(
     index: usize,
     effective_working_dir: &Path,
 ) -> Result<PathBuf, AgentWrapperError> {
-    let raw = value.as_str().ok_or_else(|| invalid_add_dirs_entry(index))?;
+    let raw = value
+        .as_str()
+        .ok_or_else(|| invalid_add_dirs_entry(index))?;
     let trimmed = raw.trim();
     if trimmed.is_empty() || trimmed.len() > ADD_DIRS_MAX_ENTRY_BYTES {
         return Err(invalid_add_dirs_entry(index));

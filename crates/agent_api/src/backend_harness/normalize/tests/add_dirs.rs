@@ -1,7 +1,4 @@
-use std::{
-    fs,
-    path::Path,
-};
+use std::{fs, path::Path};
 
 use serde_json::{json, Value};
 use tempfile::tempdir;
