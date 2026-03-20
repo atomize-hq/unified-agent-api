@@ -2,11 +2,29 @@ use std::{path::PathBuf, pin::Pin, time::Duration};
 
 use agent_api::AgentWrapperEvent;
 use futures_core::Stream;
+use serde_json::{json, Value};
 
 pub(super) fn fake_codex_app_server_binary() -> PathBuf {
     PathBuf::from(env!(
         "CARGO_BIN_EXE_fake_codex_app_server_jsonrpc_agent_api"
     ))
+}
+
+pub(super) fn definitely_missing_binary() -> PathBuf {
+    std::env::temp_dir().join(format!(
+        "missing-codex-binary-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos()
+    ))
+}
+
+pub(super) fn add_dirs_payload(dirs: &[impl AsRef<str>]) -> Value {
+    json!({
+        "dirs": dirs.iter().map(|dir| dir.as_ref()).collect::<Vec<_>>()
+    })
 }
 
 pub(super) async fn drain_to_none(

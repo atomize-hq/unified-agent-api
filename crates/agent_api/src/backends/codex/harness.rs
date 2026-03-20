@@ -13,9 +13,10 @@ use futures_util::{stream, StreamExt};
 use super::{
     mapping::{error_event, map_thread_event, status_event},
     validate_and_extract_exec_policy, CodexBackendConfig, CAP_SESSION_HANDLE_V1, EXT_ADD_DIRS_V1,
-    PINNED_EXTERNAL_SANDBOX_WARNING, PINNED_NO_SESSION_FOUND, PINNED_SESSION_NOT_FOUND,
-    PINNED_TIMEOUT, SESSION_HANDLE_ID_BOUND_BYTES, SESSION_HANDLE_OVERSIZE_WARNING_MARKER,
-    SUPPORTED_EXTENSION_KEYS_DEFAULT, SUPPORTED_EXTENSION_KEYS_EXTERNAL_SANDBOX_OPT_IN,
+    PINNED_ADD_DIRS_UNSUPPORTED_FOR_FORK, PINNED_EXTERNAL_SANDBOX_WARNING, PINNED_NO_SESSION_FOUND,
+    PINNED_SESSION_NOT_FOUND, PINNED_TIMEOUT, SESSION_HANDLE_ID_BOUND_BYTES,
+    SESSION_HANDLE_OVERSIZE_WARNING_MARKER, SUPPORTED_EXTENSION_KEYS_DEFAULT,
+    SUPPORTED_EXTENSION_KEYS_EXTERNAL_SANDBOX_OPT_IN,
 };
 use crate::{
     backend_harness::{
@@ -294,6 +295,12 @@ impl BackendHarnessAdapter for CodexHarnessAdapter {
         let fork = super::fork::extract_fork_selector_v1(request)?;
 
         validate_resume_fork_mutual_exclusion(&request.extensions)?;
+
+        if fork.is_some() && !exec_policy.add_dirs.is_empty() {
+            return Err(AgentWrapperError::Backend {
+                message: PINNED_ADD_DIRS_UNSUPPORTED_FOR_FORK.to_string(),
+            });
+        }
 
         Ok(super::CodexExecPolicy {
             resume,

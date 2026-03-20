@@ -10,8 +10,11 @@ use agent_api::{
     AgentWrapperBackend, AgentWrapperError, AgentWrapperEventKind, AgentWrapperRunRequest,
 };
 use serde_json::json;
+use tempfile::tempdir;
 
-use crate::support::{drain_to_none, fake_codex_app_server_binary};
+use crate::support::{
+    add_dirs_payload, definitely_missing_binary, drain_to_none, fake_codex_app_server_binary,
+};
 
 fn make_temp_working_dir() -> PathBuf {
     let mut path = std::env::temp_dir();
@@ -148,5 +151,84 @@ async fn fork_last_empty_list_translates_to_no_session_found_and_emits_terminal_
     match err {
         AgentWrapperError::Backend { message } => assert_eq!(message, "no session found"),
         other => panic!("expected Backend error, got: {other:?}"),
+    }
+}
+
+#[tokio::test]
+async fn fork_last_with_accepted_add_dirs_rejects_before_app_server_startup() {
+    let temp = tempdir().expect("tempdir");
+    let working_dir = temp.path().join("working-dir");
+    let extra_dir = working_dir.join("docs");
+    std::fs::create_dir_all(&extra_dir).expect("create add-dir target");
+
+    let backend = CodexBackend::new(CodexBackendConfig {
+        binary: Some(definitely_missing_binary()),
+        ..Default::default()
+    });
+
+    let err = backend
+        .run(AgentWrapperRunRequest {
+            prompt: "hello world".to_string(),
+            working_dir: Some(working_dir),
+            extensions: [
+                (
+                    "agent_api.session.fork.v1".to_string(),
+                    json!({"selector":"last"}),
+                ),
+                (
+                    "agent_api.exec.add_dirs.v1".to_string(),
+                    add_dirs_payload(&["docs"]),
+                ),
+            ]
+            .into_iter()
+            .collect(),
+            ..Default::default()
+        })
+        .await
+        .expect_err("accepted add-dirs on fork should reject before startup");
+
+    match err {
+        AgentWrapperError::Backend { message } => {
+            assert_eq!(message, "add_dirs unsupported for codex fork")
+        }
+        other => panic!("expected Backend error, got: {other:?}"),
+    }
+}
+
+#[tokio::test]
+async fn fork_last_invalid_add_dirs_beats_fork_rejection() {
+    let temp = tempdir().expect("tempdir");
+    let working_dir = temp.path().join("working-dir");
+    std::fs::create_dir_all(&working_dir).expect("create working dir");
+
+    let err = CodexBackend::new(CodexBackendConfig {
+        binary: Some(definitely_missing_binary()),
+        ..Default::default()
+    })
+    .run(AgentWrapperRunRequest {
+        prompt: "hello world".to_string(),
+        working_dir: Some(working_dir),
+        extensions: [
+            (
+                "agent_api.session.fork.v1".to_string(),
+                json!({"selector":"last"}),
+            ),
+            (
+                "agent_api.exec.add_dirs.v1".to_string(),
+                json!({"dirs":"not-an-array"}),
+            ),
+        ]
+        .into_iter()
+        .collect(),
+        ..Default::default()
+    })
+    .await
+    .expect_err("invalid add-dirs should fail during validation");
+
+    match err {
+        AgentWrapperError::InvalidRequest { message } => {
+            assert_eq!(message, "invalid agent_api.exec.add_dirs.v1.dirs")
+        }
+        other => panic!("expected InvalidRequest, got: {other:?}"),
     }
 }
