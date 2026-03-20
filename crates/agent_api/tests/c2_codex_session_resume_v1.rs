@@ -49,6 +49,12 @@ fn add_dir_expectations(dirs: &[PathBuf]) -> BTreeMap<String, String> {
     env
 }
 
+fn model_expectations(model: &str) -> BTreeMap<String, String> {
+    [("FAKE_CODEX_EXPECT_MODEL".to_string(), model.to_string())]
+        .into_iter()
+        .collect()
+}
+
 async fn drain_to_none(
     mut stream: Pin<&mut (dyn Stream<Item = AgentWrapperEvent> + Send)>,
     timeout: Duration,
@@ -550,6 +556,127 @@ async fn resume_id_preserves_add_dir_flags_in_order() {
 
     let backend = CodexBackend::new(CodexBackendConfig {
         binary: Some(fake_codex_binary()),
+        env,
+        ..Default::default()
+    });
+
+    let handle = backend
+        .run(AgentWrapperRunRequest {
+            prompt: prompt.to_string(),
+            extensions: [
+                (
+                    "agent_api.exec.add_dirs.v1".to_string(),
+                    json!({"dirs": add_dirs.iter().map(|dir| dir.display().to_string()).collect::<Vec<_>>() }),
+                ),
+                (
+                    "agent_api.session.resume.v1".to_string(),
+                    json!({"selector": "id", "id": resume_id}),
+                ),
+            ]
+            .into_iter()
+            .collect(),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+
+    let mut events = handle.events;
+    let completion = handle.completion;
+    let _ = drain_to_none(events.as_mut(), Duration::from_secs(2)).await;
+
+    let completion = tokio::time::timeout(Duration::from_secs(2), completion)
+        .await
+        .expect("completion resolves")
+        .unwrap();
+    assert!(completion.status.success());
+}
+
+#[tokio::test]
+async fn resume_last_with_model_preserves_add_dir_flags_in_order() {
+    let model = "gpt-5-codex";
+    let prompt = "hello world";
+    let temp = tempdir().expect("tempdir");
+    let dir_a = temp.path().join("alpha");
+    let dir_b = temp.path().join("beta");
+    fs::create_dir_all(&dir_a).expect("alpha dir");
+    fs::create_dir_all(&dir_b).expect("beta dir");
+    let add_dirs = vec![dir_a, dir_b];
+
+    let mut env = base_env();
+    env.insert(
+        "FAKE_CODEX_SCENARIO".to_string(),
+        "resume_last_assert".to_string(),
+    );
+    env.insert("FAKE_CODEX_EXPECT_PROMPT".to_string(), prompt.to_string());
+    env.extend(add_dir_expectations(&add_dirs));
+    env.extend(model_expectations(model));
+
+    let backend = CodexBackend::new(CodexBackendConfig {
+        binary: Some(fake_codex_binary()),
+        model: Some(model.to_string()),
+        env,
+        ..Default::default()
+    });
+
+    let handle = backend
+        .run(AgentWrapperRunRequest {
+            prompt: prompt.to_string(),
+            extensions: [
+                (
+                    "agent_api.exec.add_dirs.v1".to_string(),
+                    json!({"dirs": add_dirs.iter().map(|dir| dir.display().to_string()).collect::<Vec<_>>() }),
+                ),
+                (
+                    "agent_api.session.resume.v1".to_string(),
+                    json!({"selector": "last"}),
+                ),
+            ]
+            .into_iter()
+            .collect(),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+
+    let mut events = handle.events;
+    let completion = handle.completion;
+    let _ = drain_to_none(events.as_mut(), Duration::from_secs(2)).await;
+
+    let completion = tokio::time::timeout(Duration::from_secs(2), completion)
+        .await
+        .expect("completion resolves")
+        .unwrap();
+    assert!(completion.status.success());
+}
+
+#[tokio::test]
+async fn resume_id_with_model_preserves_add_dir_flags_in_order() {
+    let model = "gpt-5-codex";
+    let prompt = "hello world";
+    let resume_id = "thread-123";
+    let temp = tempdir().expect("tempdir");
+    let dir_a = temp.path().join("alpha");
+    let dir_b = temp.path().join("beta");
+    fs::create_dir_all(&dir_a).expect("alpha dir");
+    fs::create_dir_all(&dir_b).expect("beta dir");
+    let add_dirs = vec![dir_a, dir_b];
+
+    let mut env = base_env();
+    env.insert(
+        "FAKE_CODEX_SCENARIO".to_string(),
+        "resume_id_assert".to_string(),
+    );
+    env.insert("FAKE_CODEX_EXPECT_PROMPT".to_string(), prompt.to_string());
+    env.insert(
+        "FAKE_CODEX_EXPECT_RESUME_ID".to_string(),
+        resume_id.to_string(),
+    );
+    env.extend(add_dir_expectations(&add_dirs));
+    env.extend(model_expectations(model));
+
+    let backend = CodexBackend::new(CodexBackendConfig {
+        binary: Some(fake_codex_binary()),
+        model: Some(model.to_string()),
         env,
         ..Default::default()
     });

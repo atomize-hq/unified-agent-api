@@ -68,6 +68,12 @@ fn add_dir_expectations(dirs: &[PathBuf]) -> BTreeMap<String, String> {
     env
 }
 
+fn model_expectations(model: &str) -> BTreeMap<String, String> {
+    [("FAKE_CODEX_EXPECT_MODEL".to_string(), model.to_string())]
+        .into_iter()
+        .collect()
+}
+
 const EXTERNAL_SANDBOX_WARNING: &str =
     "DANGEROUS: external sandbox exec policy enabled (agent_api.exec.external_sandbox.v1=true)";
 
@@ -324,6 +330,52 @@ async fn codex_exec_with_add_dirs_emits_repeated_flags_in_order() {
         env: base_env()
             .into_iter()
             .chain(add_dir_expectations(&add_dirs))
+            .collect(),
+        ..Default::default()
+    });
+
+    let handle = backend
+        .run(AgentWrapperRunRequest {
+            prompt: "hello".to_string(),
+            extensions: [(
+                "agent_api.exec.add_dirs.v1".to_string(),
+                json!({"dirs": add_dirs.iter().map(|dir| dir.display().to_string()).collect::<Vec<_>>() }),
+            )]
+            .into_iter()
+            .collect(),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+
+    let mut events = handle.events;
+    let completion = handle.completion;
+    let _ = drain_to_none(events.as_mut(), Duration::from_secs(2)).await;
+
+    let completion = tokio::time::timeout(Duration::from_secs(2), completion)
+        .await
+        .expect("completion resolves")
+        .unwrap();
+    assert!(completion.status.success());
+}
+
+#[tokio::test]
+async fn codex_exec_with_model_emits_model_before_add_dirs() {
+    let model = "gpt-5-codex";
+    let temp = tempdir().expect("tempdir");
+    let dir_a = temp.path().join("alpha");
+    let dir_b = temp.path().join("beta");
+    fs::create_dir_all(&dir_a).expect("alpha dir");
+    fs::create_dir_all(&dir_b).expect("beta dir");
+    let add_dirs = vec![dir_a, dir_b];
+
+    let backend = CodexBackend::new(CodexBackendConfig {
+        binary: Some(fake_codex_binary()),
+        model: Some(model.to_string()),
+        env: base_env()
+            .into_iter()
+            .chain(add_dir_expectations(&add_dirs))
+            .chain(model_expectations(model))
             .collect(),
         ..Default::default()
     });

@@ -10,6 +10,7 @@ impl super::termination::TerminationHandle for codex::ExecTerminationHandle {
 pub struct CodexBackendConfig {
     pub binary: Option<PathBuf>,
     pub codex_home: Option<PathBuf>,
+    pub model: Option<String>,
     pub default_timeout: Option<Duration>,
     pub default_working_dir: Option<PathBuf>,
     pub env: BTreeMap<String, String>,

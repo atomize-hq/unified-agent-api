@@ -130,6 +130,10 @@ pub(super) async fn spawn_exec_or_resume_flow(
         builder = builder.codex_home(codex_home.clone());
     }
 
+    if let Some(model) = config.model.as_ref() {
+        builder = builder.model(model.clone());
+    }
+
     let working_dir = working_dir
         .or_else(|| config.default_working_dir.clone())
         .or(run_start_cwd)

@@ -149,6 +149,60 @@ fn assert_add_dirs(out: &mut impl Write, args: &[String]) -> io::Result<bool> {
     Ok(true)
 }
 
+fn assert_model(out: &mut impl Write, args: &[String]) -> io::Result<bool> {
+    let Ok(expected_model) = env::var("FAKE_CODEX_EXPECT_MODEL") else {
+        return Ok(true);
+    };
+
+    let positions: Vec<_> = args
+        .iter()
+        .enumerate()
+        .filter_map(|(index, arg)| (arg == "--model").then_some(index))
+        .collect();
+
+    if positions.len() != 1 {
+        emit_jsonl(
+            out,
+            &format!(
+                r#"{{"type":"error","message":"expected exactly one --model flag, got {}"}}"#,
+                positions.len()
+            ),
+        )?;
+        return Ok(false);
+    }
+
+    let model_index = positions[0];
+    let Some(got_model) = args.get(model_index + 1) else {
+        emit_jsonl(
+            out,
+            r#"{"type":"error","message":"--model missing required value"}"#,
+        )?;
+        return Ok(false);
+    };
+
+    if got_model != &expected_model {
+        emit_jsonl(
+            out,
+            &format!(
+                r#"{{"type":"error","message":"expected --model={expected_model:?}, got {got_model:?}"}}"#
+            ),
+        )?;
+        return Ok(false);
+    }
+
+    if let Some(add_dir_index) = args.iter().position(|arg| arg == "--add-dir") {
+        if model_index > add_dir_index {
+            emit_jsonl(
+                out,
+                r#"{"type":"error","message":"expected --model before first --add-dir"}"#,
+            )?;
+            return Ok(false);
+        }
+    }
+
+    Ok(true)
+}
+
 fn require_env_var(out: &mut impl Write, key: &str) -> io::Result<String> {
     match env::var(key) {
         Ok(value) if !value.trim().is_empty() => Ok(value),
@@ -264,6 +318,9 @@ fn main() -> io::Result<()> {
         std::process::exit(1);
     }
     if !assert_add_dirs(&mut out, &args)? {
+        std::process::exit(1);
+    }
+    if !assert_model(&mut out, &args)? {
         std::process::exit(1);
     }
 
