@@ -3,7 +3,7 @@ use std::{collections::BTreeSet, future::Future, pin::Pin, sync::Arc};
 use super::{
     harness::{new_harness_adapter, CodexTerminationHandle},
     mcp_management, CodexBackend, CAP_ARTIFACTS_FINAL_TEXT_V1, CAP_SESSION_HANDLE_V1,
-    CAP_TOOLS_RESULTS_V1, CAP_TOOLS_STRUCTURED_V1, EXT_CODEX_APPROVAL_POLICY,
+    CAP_TOOLS_RESULTS_V1, CAP_TOOLS_STRUCTURED_V1, EXT_ADD_DIRS_V1, EXT_CODEX_APPROVAL_POLICY,
     EXT_CODEX_SANDBOX_MODE, EXT_EXTERNAL_SANDBOX_V1, EXT_NON_INTERACTIVE,
 };
 use crate::{
@@ -48,6 +48,7 @@ impl AgentWrapperBackend for CodexBackend {
         ids.insert(CAP_ARTIFACTS_FINAL_TEXT_V1.to_string());
         ids.insert(CAP_SESSION_HANDLE_V1.to_string());
         ids.insert("backend.codex.exec_stream".to_string());
+        ids.insert(EXT_ADD_DIRS_V1.to_string());
         ids.insert(EXT_NON_INTERACTIVE.to_string());
         ids.insert(EXT_CODEX_APPROVAL_POLICY.to_string());
         ids.insert(EXT_CODEX_SANDBOX_MODE.to_string());

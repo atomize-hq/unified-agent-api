@@ -23,6 +23,49 @@ fn codex_policy_add_dirs_absent_key_returns_empty_vec() {
 }
 
 #[test]
+fn codex_policy_add_dirs_supported_extension_allowlist_admits_key() {
+    let adapter = test_adapter();
+
+    assert!(adapter
+        .supported_extension_keys()
+        .contains(&EXT_ADD_DIRS_V1));
+}
+
+#[test]
+fn codex_policy_add_dirs_normalizes_absolute_and_relative_entries_with_stable_order() {
+    let temp = tempdir().expect("tempdir");
+    let request_root = temp.path().join("request-root");
+    let relative_target = request_root.join("docs");
+    let absolute_target = temp.path().join("shared-docs");
+    let absolute_target_text = absolute_target.to_string_lossy().into_owned();
+    fs::create_dir_all(&relative_target).expect("create relative target");
+    fs::create_dir_all(&absolute_target).expect("create absolute target");
+
+    let request = AgentWrapperRunRequest {
+        prompt: "hello".to_string(),
+        working_dir: Some(request_root),
+        extensions: [(
+            EXT_ADD_DIRS_V1.to_string(),
+            add_dirs_payload(&[
+                "docs",
+                absolute_target_text.as_str(),
+                "./docs",
+                absolute_target_text.as_str(),
+            ]),
+        )]
+        .into_iter()
+        .collect(),
+        ..Default::default()
+    };
+
+    let policy = test_adapter()
+        .validate_and_extract_policy(&request)
+        .expect("policy extraction should succeed");
+
+    assert_eq!(policy.add_dirs, vec![relative_target, absolute_target]);
+}
+
+#[test]
 fn codex_policy_add_dirs_request_working_dir_beats_default_and_run_start_cwd() {
     let temp = tempdir().expect("tempdir");
     let request_root = temp.path().join("request_root");
@@ -45,9 +88,12 @@ fn codex_policy_add_dirs_request_working_dir_beats_default_and_run_start_cwd() {
     let request = AgentWrapperRunRequest {
         prompt: "hello".to_string(),
         working_dir: Some(request_root),
-        extensions: [(EXT_ADD_DIRS_V1.to_string(), add_dirs_payload(&["rel-target"]))]
-            .into_iter()
-            .collect(),
+        extensions: [(
+            EXT_ADD_DIRS_V1.to_string(),
+            add_dirs_payload(&["rel-target"]),
+        )]
+        .into_iter()
+        .collect(),
         ..Default::default()
     };
 
@@ -77,9 +123,12 @@ fn codex_policy_add_dirs_default_working_dir_beats_run_start_cwd() {
     );
     let request = AgentWrapperRunRequest {
         prompt: "hello".to_string(),
-        extensions: [(EXT_ADD_DIRS_V1.to_string(), add_dirs_payload(&["rel-target"]))]
-            .into_iter()
-            .collect(),
+        extensions: [(
+            EXT_ADD_DIRS_V1.to_string(),
+            add_dirs_payload(&["rel-target"]),
+        )]
+        .into_iter()
+        .collect(),
         ..Default::default()
     };
 
@@ -88,6 +137,32 @@ fn codex_policy_add_dirs_default_working_dir_beats_run_start_cwd() {
         .expect("policy extraction should succeed");
 
     assert_eq!(policy.add_dirs, vec![default_target]);
+}
+
+#[test]
+fn codex_policy_add_dirs_run_start_cwd_is_final_fallback() {
+    let temp = tempdir().expect("tempdir");
+    let run_start_root = temp.path().join("run_start_root");
+    let run_start_target = run_start_root.join("rel-target");
+    fs::create_dir_all(&run_start_target).expect("create run-start target");
+
+    let adapter = test_adapter_with_run_start_cwd(Some(run_start_root));
+    let request = AgentWrapperRunRequest {
+        prompt: "hello".to_string(),
+        extensions: [(
+            EXT_ADD_DIRS_V1.to_string(),
+            add_dirs_payload(&["rel-target"]),
+        )]
+        .into_iter()
+        .collect(),
+        ..Default::default()
+    };
+
+    let policy = adapter
+        .validate_and_extract_policy(&request)
+        .expect("policy extraction should succeed");
+
+    assert_eq!(policy.add_dirs, vec![run_start_target]);
 }
 
 #[test]
