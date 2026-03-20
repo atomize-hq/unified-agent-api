@@ -93,7 +93,10 @@ use policy::{
 };
 
 #[cfg(test)]
-use harness::{new_test_adapter, redact_exec_stream_error, CodexHarnessAdapter};
+use harness::{
+    new_test_adapter, new_test_adapter_with_run_start_cwd, redact_exec_stream_error,
+    CodexHarnessAdapter,
+};
 #[cfg(test)]
 use mapping::map_thread_event;
 

@@ -53,6 +53,27 @@ fn codex_backend_mcp_write_hooks_route_through_shared_mcp_runner() {
 }
 
 #[test]
+fn codex_downstream_mapping_surfaces_do_not_reopen_raw_add_dirs_parsing() {
+    const RAW_KEY: &str = "agent_api.exec.add_dirs.v1";
+    const EXEC_SOURCE: &str = include_str!("../exec.rs");
+    const FORK_SOURCE: &str = include_str!("../fork.rs");
+    const MAPPING_SOURCE: &str = include_str!("../mapping.rs");
+
+    assert!(
+        !EXEC_SOURCE.contains(RAW_KEY),
+        "expected exec.rs to consume policy.add_dirs without raw add-dir key parsing"
+    );
+    assert!(
+        !FORK_SOURCE.contains(RAW_KEY),
+        "expected fork.rs to avoid reopening raw add-dir payload parsing"
+    );
+    assert!(
+        !MAPPING_SOURCE.contains(RAW_KEY),
+        "expected mapping.rs to avoid reopening raw add-dir payload parsing"
+    );
+}
+
+#[test]
 fn redact_exec_stream_error_does_not_leak_raw_jsonl_line() {
     let secret = "RAW-LINE-SECRET-DO-NOT-LEAK";
     let err = ExecStreamError::Normalize {

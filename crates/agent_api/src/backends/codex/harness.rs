@@ -120,6 +120,14 @@ pub(super) fn new_test_adapter(config: CodexBackendConfig) -> CodexHarnessAdapte
     new_harness_adapter(config, None, None)
 }
 
+#[cfg(test)]
+pub(super) fn new_test_adapter_with_run_start_cwd(
+    config: CodexBackendConfig,
+    run_start_cwd: Option<PathBuf>,
+) -> CodexHarnessAdapter {
+    new_harness_adapter(config, run_start_cwd, None)
+}
+
 fn codex_error_kind(err: &CodexError) -> &'static str {
     match err {
         CodexError::Spawn { .. } => "spawn",
