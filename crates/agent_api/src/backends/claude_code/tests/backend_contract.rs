@@ -1,4 +1,5 @@
 use super::support::*;
+use serde_json::json;
 
 fn idx(argv: &[String], needle: &str) -> usize {
     argv.iter()
@@ -174,5 +175,83 @@ fn claude_fresh_run_print_request_omits_add_dir_flag_when_policy_list_is_empty()
     assert!(
         idx(&argv, "--verbose") < idx(&argv, "hello"),
         "expected prompt to remain final even when add dirs are absent"
+    );
+}
+
+#[test]
+fn claude_add_dirs_runtime_rejection_classifier_requires_exact_safe_message_match() {
+    let payload = json!({
+        "type": "result",
+        "subtype": "error",
+        "message": super::super::util::ADD_DIRS_RUNTIME_REJECTION_MESSAGE,
+        "details": {
+            "stderr": "backend-private sentinel",
+        }
+    });
+
+    assert!(super::super::util::json_contains_add_dirs_runtime_rejection_signal(&payload));
+}
+
+#[test]
+fn claude_add_dirs_runtime_rejection_classifier_does_not_match_generic_or_selector_failures() {
+    let generic_payload = json!({
+        "type": "result",
+        "subtype": "error",
+        "message": "claude generic failure",
+    });
+    let selector_payload = json!({
+        "type": "result",
+        "subtype": "error",
+        "message": "session not found",
+    });
+    let almost_payload = json!({
+        "type": "result",
+        "subtype": "error",
+        "message": "prefix add_dirs rejected by runtime",
+    });
+
+    assert!(!super::super::util::json_contains_add_dirs_runtime_rejection_signal(&generic_payload));
+    assert!(
+        !super::super::util::json_contains_add_dirs_runtime_rejection_signal(&selector_payload)
+    );
+    assert!(!super::super::util::json_contains_add_dirs_runtime_rejection_signal(&almost_payload));
+}
+
+#[test]
+fn claude_completion_returns_backend_error_when_backend_error_message_is_present() {
+    let adapter = new_adapter();
+
+    let err = adapter
+        .map_completion(super::super::harness::ClaudeBackendCompletion {
+            status: exit_status_with_code(1),
+            final_text: None,
+            backend_error_message: Some(
+                super::super::util::ADD_DIRS_RUNTIME_REJECTION_MESSAGE.to_string(),
+            ),
+        })
+        .expect_err("completion should surface a backend error");
+
+    match err {
+        AgentWrapperError::Backend { message } => assert_eq!(
+            message,
+            super::super::util::ADD_DIRS_RUNTIME_REJECTION_MESSAGE
+        ),
+        other => panic!("expected Backend error, got: {other:?}"),
+    }
+}
+
+#[test]
+fn claude_terminal_error_backend_event_maps_to_one_error_wrapper_event() {
+    let adapter = new_adapter();
+
+    let mapped = adapter.map_event(ClaudeBackendEvent::TerminalError {
+        message: super::super::util::ADD_DIRS_RUNTIME_REJECTION_MESSAGE.to_string(),
+    });
+
+    assert_eq!(mapped.len(), 1);
+    assert_eq!(mapped[0].kind, AgentWrapperEventKind::Error);
+    assert_eq!(
+        mapped[0].message.as_deref(),
+        Some(super::super::util::ADD_DIRS_RUNTIME_REJECTION_MESSAGE)
     );
 }
