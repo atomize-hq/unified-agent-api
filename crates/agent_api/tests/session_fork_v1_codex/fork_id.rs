@@ -13,8 +13,8 @@ use serde_json::json;
 use tempfile::tempdir;
 
 use crate::support::{
-    add_dirs_payload, any_event_contains, definitely_missing_binary, drain_to_none,
-    fake_codex_app_server_binary,
+    add_dirs_payload, any_event_contains, drain_to_none, fake_codex_app_server_binary,
+    read_logged_request_methods, request_log_file,
 };
 
 #[tokio::test]
@@ -370,9 +370,22 @@ async fn fork_id_with_accepted_add_dirs_rejects_before_app_server_startup() {
     let working_dir = temp.path().join("working-dir");
     let extra_dir = working_dir.join("docs");
     std::fs::create_dir_all(&extra_dir).expect("create add-dir target");
+    let request_log = request_log_file();
 
     let err = CodexBackend::new(CodexBackendConfig {
-        binary: Some(definitely_missing_binary()),
+        binary: Some(fake_codex_app_server_binary()),
+        env: [
+            (
+                "FAKE_CODEX_APP_SERVER_SCENARIO".to_string(),
+                "fork_id_not_found".to_string(),
+            ),
+            (
+                "FAKE_CODEX_APP_SERVER_REQUEST_LOG".to_string(),
+                request_log.path().display().to_string(),
+            ),
+        ]
+        .into_iter()
+        .collect(),
         ..Default::default()
     })
     .run(AgentWrapperRunRequest {
@@ -401,6 +414,11 @@ async fn fork_id_with_accepted_add_dirs_rejects_before_app_server_startup() {
         }
         other => panic!("expected Backend error, got: {other:?}"),
     }
+
+    assert!(
+        read_logged_request_methods(&request_log).is_empty(),
+        "expected no app-server JSON-RPC traffic on accepted-input rejection path"
+    );
 }
 
 #[tokio::test]
@@ -410,9 +428,22 @@ async fn fork_id_non_directory_add_dirs_beats_fork_rejection() {
     let non_directory = working_dir.join("not-a-dir.txt");
     std::fs::create_dir_all(&working_dir).expect("create working dir");
     std::fs::write(&non_directory, "hello").expect("create file target");
+    let request_log = request_log_file();
 
     let err = CodexBackend::new(CodexBackendConfig {
-        binary: Some(definitely_missing_binary()),
+        binary: Some(fake_codex_app_server_binary()),
+        env: [
+            (
+                "FAKE_CODEX_APP_SERVER_SCENARIO".to_string(),
+                "fork_id_not_found".to_string(),
+            ),
+            (
+                "FAKE_CODEX_APP_SERVER_REQUEST_LOG".to_string(),
+                request_log.path().display().to_string(),
+            ),
+        ]
+        .into_iter()
+        .collect(),
         ..Default::default()
     })
     .run(AgentWrapperRunRequest {
@@ -435,10 +466,19 @@ async fn fork_id_non_directory_add_dirs_beats_fork_rejection() {
     .await
     .expect_err("non-directory add-dirs should fail during validation");
 
-    match err {
+    match &err {
         AgentWrapperError::InvalidRequest { message } => {
             assert_eq!(message, "invalid agent_api.exec.add_dirs.v1.dirs[0]")
         }
         other => panic!("expected InvalidRequest, got: {other:?}"),
     }
+    assert!(
+        !err.to_string()
+            .contains(&non_directory.to_string_lossy().to_string()),
+        "expected invalid-input path to stay redacted"
+    );
+    assert!(
+        read_logged_request_methods(&request_log).is_empty(),
+        "expected no app-server JSON-RPC traffic on invalid-input path"
+    );
 }
