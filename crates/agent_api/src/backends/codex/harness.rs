@@ -141,15 +141,11 @@ fn effective_working_dir_for_add_dirs(
         return Ok(None);
     }
 
-    resolve_effective_working_dir(
+    Ok(resolve_effective_working_dir(
         request.working_dir.as_deref(),
         config.default_working_dir.as_deref(),
         run_start_cwd.map(PathBuf::as_path),
-    )
-    .map(Some)
-    .ok_or_else(|| AgentWrapperError::InvalidRequest {
-        message: "working_dir must be provided or configured".to_string(),
-    })
+    ))
 }
 
 fn codex_error_kind(err: &CodexError) -> &'static str {
@@ -279,17 +275,15 @@ impl BackendHarnessAdapter for CodexHarnessAdapter {
     ) -> Result<Self::Policy, AgentWrapperError> {
         let mut exec_policy = validate_and_extract_exec_policy(request)?;
 
-        exec_policy.add_dirs = match effective_working_dir_for_add_dirs(
+        let effective_working_dir = effective_working_dir_for_add_dirs(
             &self.config,
             self.run_start_cwd.as_ref(),
             request,
-        )? {
-            Some(effective_working_dir) => normalize_add_dirs_v1(
-                request.extensions.get(EXT_ADD_DIRS_V1),
-                Some(effective_working_dir.as_path()),
-            )?,
-            None => Vec::new(),
-        };
+        )?;
+        exec_policy.add_dirs = normalize_add_dirs_v1(
+            request.extensions.get(EXT_ADD_DIRS_V1),
+            effective_working_dir.as_deref(),
+        )?;
 
         let resume = request
             .extensions

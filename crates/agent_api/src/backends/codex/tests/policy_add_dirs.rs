@@ -166,6 +166,49 @@ fn codex_policy_add_dirs_run_start_cwd_is_final_fallback() {
 }
 
 #[test]
+fn codex_policy_add_dirs_accepts_absolute_entries_without_effective_working_dir() {
+    let temp = tempdir().expect("tempdir");
+    let absolute_docs = temp.path().join("shared-context");
+    fs::create_dir_all(&absolute_docs).expect("create absolute add-dir");
+    let absolute_docs_text = absolute_docs.to_string_lossy().into_owned();
+    let request = AgentWrapperRunRequest {
+        prompt: "hello".to_string(),
+        extensions: [(
+            EXT_ADD_DIRS_V1.to_string(),
+            add_dirs_payload(&[absolute_docs_text.as_str()]),
+        )]
+        .into_iter()
+        .collect(),
+        ..Default::default()
+    };
+
+    let policy = test_adapter()
+        .validate_and_extract_policy(&request)
+        .expect("policy extraction should succeed");
+
+    assert_eq!(policy.add_dirs, vec![absolute_docs]);
+}
+
+#[test]
+fn codex_policy_add_dirs_relative_entries_without_effective_working_dir_fail_safely() {
+    let request = AgentWrapperRunRequest {
+        prompt: "hello".to_string(),
+        extensions: [(EXT_ADD_DIRS_V1.to_string(), add_dirs_payload(&["docs"]))]
+            .into_iter()
+            .collect(),
+        ..Default::default()
+    };
+
+    let err = adapter_error(test_adapter().validate_and_extract_policy(&request));
+    match &err {
+        AgentWrapperError::InvalidRequest { message } => {
+            assert_eq!(message, "invalid agent_api.exec.add_dirs.v1.dirs[0]");
+        }
+        other => panic!("expected InvalidRequest, got: {other:?}"),
+    }
+}
+
+#[test]
 fn codex_policy_add_dirs_invalid_input_beats_fork_handling_and_stays_redacted() {
     let temp = tempdir().expect("tempdir");
     let request_root = temp.path().join("request_root");
