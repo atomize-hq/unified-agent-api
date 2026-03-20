@@ -1,8 +1,11 @@
+use std::path::PathBuf;
+
 use codex::ThreadEvent;
 
 pub(super) use super::super::*;
 pub(super) use crate::{
     backend_harness::{BackendDefaults, BackendHarnessAdapter},
+    backends::test_support::{test_env_lock, CurrentDirGuard},
     mcp::{
         AgentWrapperMcpAddRequest, AgentWrapperMcpAddTransport, AgentWrapperMcpGetRequest,
         AgentWrapperMcpListRequest, AgentWrapperMcpRemoveRequest, CAPABILITY_MCP_ADD_V1,
@@ -89,14 +92,14 @@ pub(super) fn test_adapter_with_config(config: CodexBackendConfig) -> CodexHarne
 }
 
 pub(super) fn test_adapter_with_run_start_cwd(
-    run_start_cwd: Option<std::path::PathBuf>,
+    run_start_cwd: Option<PathBuf>,
 ) -> CodexHarnessAdapter {
     new_test_adapter_with_run_start_cwd(CodexBackendConfig::default(), run_start_cwd)
 }
 
 pub(super) fn test_adapter_with_config_and_run_start_cwd(
     config: CodexBackendConfig,
-    run_start_cwd: Option<std::path::PathBuf>,
+    run_start_cwd: Option<PathBuf>,
 ) -> CodexHarnessAdapter {
     new_test_adapter_with_run_start_cwd(config, run_start_cwd)
 }

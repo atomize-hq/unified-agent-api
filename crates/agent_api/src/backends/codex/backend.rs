@@ -174,8 +174,8 @@ impl AgentWrapperBackend for CodexBackend {
     ) -> Pin<Box<dyn Future<Output = Result<AgentWrapperRunHandle, AgentWrapperError>> + Send + '_>>
     {
         let config = self.config.clone();
+        let run_start_cwd = std::env::current_dir().ok();
         Box::pin(async move {
-            let run_start_cwd = std::env::current_dir().ok();
             let adapter = Arc::new(new_harness_adapter(config.clone(), run_start_cwd, None));
 
             let defaults = BackendDefaults {
@@ -203,6 +203,7 @@ impl AgentWrapperBackend for CodexBackend {
         }
 
         let config = self.config.clone();
+        let run_start_cwd = std::env::current_dir().ok();
         Box::pin(async move {
             let termination_state: Arc<
                 super::super::termination::TerminationState<CodexTerminationHandle>,
@@ -212,7 +213,6 @@ impl AgentWrapperBackend for CodexBackend {
                 Arc::new(move || termination_state.request())
             });
 
-            let run_start_cwd = std::env::current_dir().ok();
             let adapter = Arc::new(new_harness_adapter(
                 config.clone(),
                 run_start_cwd,

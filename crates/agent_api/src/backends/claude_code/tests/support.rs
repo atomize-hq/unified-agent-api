@@ -14,6 +14,7 @@ pub(super) use super::super::harness::ClaudeBackendEvent;
 pub(super) use super::super::*;
 pub(super) use crate::{
     backend_harness::BackendHarnessAdapter,
+    backends::test_support::{test_env_lock, CurrentDirGuard},
     mcp::{AgentWrapperMcpAddRequest, AgentWrapperMcpAddTransport, AgentWrapperMcpRemoveRequest},
     mcp::{
         CAPABILITY_MCP_ADD_V1, CAPABILITY_MCP_GET_V1, CAPABILITY_MCP_LIST_V1,

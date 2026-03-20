@@ -4,6 +4,7 @@ mod capabilities;
 mod external_sandbox;
 mod mapping;
 mod policy_add_dirs;
+mod run_start_cwd_capture;
 mod session_handle;
 mod support;
 mod working_dir_resolution;

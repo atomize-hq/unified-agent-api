@@ -177,8 +177,8 @@ impl AgentWrapperBackend for ClaudeCodeBackend {
     {
         let config = self.config.clone();
         let allow_flag_preflight = Arc::clone(&self.allow_flag_preflight);
+        let run_start_cwd = std::env::current_dir().ok();
         Box::pin(async move {
-            let run_start_cwd = std::env::current_dir().ok();
             let adapter = Arc::new(new_harness_adapter(
                 config.clone(),
                 run_start_cwd,
@@ -211,13 +211,13 @@ impl AgentWrapperBackend for ClaudeCodeBackend {
 
         let config = self.config.clone();
         let allow_flag_preflight = Arc::clone(&self.allow_flag_preflight);
+        let run_start_cwd = std::env::current_dir().ok();
         Box::pin(async move {
             let termination_state = Arc::new(super::super::termination::TerminationState::new());
             let request_termination: Option<Arc<dyn Fn() + Send + Sync + 'static>> = Some({
                 let termination_state = Arc::clone(&termination_state);
                 Arc::new(move || termination_state.request())
             });
-            let run_start_cwd = std::env::current_dir().ok();
 
             let adapter = Arc::new(new_harness_adapter(
                 config.clone(),
