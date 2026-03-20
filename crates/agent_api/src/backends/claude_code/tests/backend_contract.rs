@@ -1,5 +1,11 @@
 use super::support::*;
 
+fn idx(argv: &[String], needle: &str) -> usize {
+    argv.iter()
+        .position(|arg| arg == needle)
+        .unwrap_or_else(|| panic!("missing argv token: {needle}"))
+}
+
 #[test]
 fn claude_adapter_implements_backend_harness_adapter_contract() {
     fn assert_impl<T: crate::backend_harness::BackendHarnessAdapter>() {}
@@ -87,7 +93,9 @@ fn claude_harness_extracts_add_dirs_exactly_once_and_carries_policy_state_forwar
     const SOURCE: &str = include_str!("../harness.rs");
 
     assert_eq!(
-        SOURCE.matches("request.extensions.get(EXT_ADD_DIRS_V1)").count(),
+        SOURCE
+            .matches("request.extensions.get(EXT_ADD_DIRS_V1)")
+            .count(),
         1,
         "expected Claude harness to read the raw add-dir extension exactly once"
     );
@@ -103,7 +111,68 @@ fn claude_harness_extracts_add_dirs_exactly_once_and_carries_policy_state_forwar
         "expected ClaudeExecPolicy to carry normalized add-dir policy state"
     );
     assert!(
-        SOURCE.contains("add_dirs: _add_dirs"),
-        "expected spawn-time Claude wiring to consume add dirs only through policy state"
+        SOURCE.contains("build_fresh_run_print_request("),
+        "expected spawn-time Claude wiring to route root-flags assembly through the focused helper"
+    );
+}
+
+#[test]
+fn claude_fresh_run_print_request_emits_one_variadic_add_dir_group_in_order() {
+    let argv = super::super::harness::build_fresh_run_print_request(
+        "hello".to_string(),
+        true,
+        false,
+        false,
+        &[
+            std::path::PathBuf::from("/tmp/alpha"),
+            std::path::PathBuf::from("/tmp/beta"),
+        ],
+    )
+    .argv();
+
+    let add_dir_idx = idx(&argv, "--add-dir");
+    let verbose_idx = idx(&argv, "--verbose");
+    let prompt_idx = idx(&argv, "hello");
+
+    assert_eq!(
+        argv.iter()
+            .filter(|arg| arg.as_str() == "--add-dir")
+            .count(),
+        1,
+        "expected exactly one variadic add-dir group"
+    );
+    assert_eq!(
+        &argv[(add_dir_idx + 1)..(add_dir_idx + 3)],
+        ["/tmp/alpha".to_string(), "/tmp/beta".to_string()],
+        "expected normalized add-dir values to follow the single flag in order"
+    );
+    assert!(
+        add_dir_idx < verbose_idx,
+        "expected add-dir group to stay before the final verbose flag"
+    );
+    assert!(
+        verbose_idx < prompt_idx,
+        "expected verbose to stay before the final prompt token"
+    );
+}
+
+#[test]
+fn claude_fresh_run_print_request_omits_add_dir_flag_when_policy_list_is_empty() {
+    let argv = super::super::harness::build_fresh_run_print_request(
+        "hello".to_string(),
+        true,
+        false,
+        false,
+        &[],
+    )
+    .argv();
+
+    assert!(
+        !argv.iter().any(|arg| arg == "--add-dir"),
+        "expected no add-dir flag when the normalized policy list is empty"
+    );
+    assert!(
+        idx(&argv, "--verbose") < idx(&argv, "hello"),
+        "expected prompt to remain final even when add dirs are absent"
     );
 }

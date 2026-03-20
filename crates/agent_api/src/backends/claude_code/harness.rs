@@ -22,8 +22,7 @@ use super::{
     ClaudeCodeBackendConfig, AGENT_KIND, CLAUDE_EXEC_POLICY_PREFIX, EXT_ADD_DIRS_V1,
     EXT_EXTERNAL_SANDBOX_V1, EXT_NON_INTERACTIVE, PINNED_EXTERNAL_SANDBOX_WARNING,
     SESSION_HANDLE_ID_BOUND_BYTES, SESSION_HANDLE_OVERSIZE_WARNING,
-    SUPPORTED_EXTENSION_KEYS_DEFAULT,
-    SUPPORTED_EXTENSION_KEYS_EXTERNAL_SANDBOX_OPT_IN,
+    SUPPORTED_EXTENSION_KEYS_DEFAULT, SUPPORTED_EXTENSION_KEYS_EXTERNAL_SANDBOX_OPT_IN,
 };
 use crate::{
     backend_harness::{
@@ -156,6 +155,36 @@ pub(super) fn startup_failure_spawn(
     BackendSpawn { events, completion }
 }
 
+pub(super) fn build_fresh_run_print_request(
+    prompt: String,
+    non_interactive: bool,
+    external_sandbox: bool,
+    allow_dangerously_skip_permissions: bool,
+    add_dirs: &[PathBuf],
+) -> ClaudePrintRequest {
+    let mut print_req = ClaudePrintRequest::new(prompt)
+        .output_format(ClaudeOutputFormat::StreamJson)
+        .include_partial_messages(true);
+    if non_interactive {
+        print_req = print_req.permission_mode("bypassPermissions");
+    }
+    if external_sandbox {
+        print_req = print_req.dangerously_skip_permissions(true);
+        if allow_dangerously_skip_permissions {
+            print_req = print_req.allow_dangerously_skip_permissions(true);
+        }
+    }
+    if !add_dirs.is_empty() {
+        print_req = print_req.add_dirs(
+            add_dirs
+                .iter()
+                .map(|dir| dir.as_os_str().to_string_lossy().into_owned()),
+        );
+    }
+
+    print_req
+}
+
 impl BackendHarnessAdapter for ClaudeHarnessAdapter {
     fn kind(&self) -> AgentWrapperKind {
         AgentWrapperKind(AGENT_KIND.to_string())
@@ -279,7 +308,7 @@ impl BackendHarnessAdapter for ClaudeHarnessAdapter {
             external_sandbox,
             resume,
             fork,
-            add_dirs: _add_dirs,
+            add_dirs,
         } = req.policy;
         Box::pin(async move {
             let mut builder = claude_code::ClaudeClient::builder();
@@ -328,18 +357,13 @@ impl BackendHarnessAdapter for ClaudeHarnessAdapter {
                     };
             }
 
-            let mut print_req = ClaudePrintRequest::new(req.prompt)
-                .output_format(ClaudeOutputFormat::StreamJson)
-                .include_partial_messages(true);
-            if non_interactive {
-                print_req = print_req.permission_mode("bypassPermissions");
-            }
-            if external_sandbox {
-                print_req = print_req.dangerously_skip_permissions(true);
-                if allow_dangerously_skip_permissions {
-                    print_req = print_req.allow_dangerously_skip_permissions(true);
-                }
-            }
+            let mut print_req = build_fresh_run_print_request(
+                req.prompt,
+                non_interactive,
+                external_sandbox,
+                allow_dangerously_skip_permissions,
+                &add_dirs,
+            );
 
             if let Some(resume) = resume.as_ref() {
                 match resume {

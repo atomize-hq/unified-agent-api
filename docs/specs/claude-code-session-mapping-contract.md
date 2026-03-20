@@ -92,6 +92,10 @@ When `extensions["agent_api.exec.add_dirs.v1"]` is accepted, the Claude backend 
 
 Placement rules (pinned):
 
+- Fresh run argv MUST contain the following ordered subsequence:
+
+`--print --output-format stream-json [--permission-mode bypassPermissions] [--dangerously-skip-permissions] [--allow-dangerously-skip-permissions] [--add-dir <DIR...>] --verbose PROMPT`
+
 - The group MUST appear before `--continue`, `--fork-session`, and `--resume`.
 - The group MUST appear before the final `--verbose` token that precedes the prompt.
 - The backend MUST NOT emit repeated `--add-dir` flags for this key.
