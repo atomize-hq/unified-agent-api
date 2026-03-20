@@ -157,21 +157,24 @@ pub(super) async fn spawn_exec_or_resume_flow(
     .ok_or(super::CodexBackendError::WorkingDirectoryUnresolved)?;
     builder = builder.working_dir(working_dir);
 
-    // Codex wrapper treats `Duration::ZERO` as “no timeout”.
-    builder = builder.timeout(effective_timeout.unwrap_or(Duration::ZERO));
     let has_add_dirs = !add_dirs.is_empty();
-    builder = builder.add_dirs(add_dirs);
-
-    let client = builder.build();
-    if has_add_dirs
-        && !client
+    if has_add_dirs {
+        let probe_client = builder.clone().build();
+        if !probe_client
             .probe_capabilities()
             .await
             .guard_add_dir()
             .is_supported()
-    {
-        return Err(super::CodexBackendError::AddDirsRejectedByRuntime);
+        {
+            return Err(super::CodexBackendError::AddDirsRejectedByRuntime);
+        }
     }
+
+    // Codex wrapper treats `Duration::ZERO` as “no timeout”.
+    builder = builder.timeout(effective_timeout.unwrap_or(Duration::ZERO));
+    builder = builder.add_dirs(add_dirs);
+
+    let client = builder.build();
 
     let resume_selector = resume.clone();
     let suppress_transport_errors = resume_selector.is_some();

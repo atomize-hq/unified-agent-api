@@ -28,10 +28,12 @@ pub(super) struct AddDirsFixture {
 }
 
 #[cfg(unix)]
+#[allow(dead_code)]
 #[derive(Copy, Clone)]
 pub(super) enum AddDirProbeMode {
     Unsupported,
     Unknown,
+    SlowSupported,
 }
 
 #[cfg(unix)]
@@ -286,6 +288,11 @@ fn write_probe_only_codex(
             r#"echo "feature list unavailable" >&2; exit 1"#,
             r#"echo "feature list unavailable" >&2; exit 1"#,
             r#"echo "Usage: codex exec""#,
+        ),
+        AddDirProbeMode::SlowSupported => (
+            r#"sleep 0.2; echo '{"features":["add_dir"]}'"#,
+            r#"sleep 0.2; echo "add_dir""#,
+            r#"sleep 0.2; echo "Usage: codex --add-dir""#,
         ),
     };
     let script = format!(

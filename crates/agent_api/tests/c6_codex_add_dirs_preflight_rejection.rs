@@ -94,3 +94,46 @@ async fn exec_add_dirs_preflight_rejection_surfaces_via_handle() {
 async fn exec_add_dirs_preflight_rejection_beats_external_sandbox_startup_stream() {
     assert_preflight_rejection_case(true).await;
 }
+
+#[cfg(unix)]
+#[tokio::test]
+async fn exec_add_dirs_slow_supported_probe_is_not_limited_by_run_timeout() {
+    let fixture = add_dirs_fixture();
+    let fixture_backend =
+        build_probe_only_backend(AddDirProbeMode::SlowSupported, base_env(), None, false);
+    let mut request = run_request("hello world", [add_dirs_extension(&fixture.dirs)]);
+    request.timeout = Some(std::time::Duration::from_millis(50));
+
+    let handle = tokio::time::timeout(
+        std::time::Duration::from_secs(1),
+        fixture_backend.backend.run(request),
+    )
+    .await
+    .expect("slow probe should still let backend.run return a handle")
+    .expect("slow supported probe should not preflight-reject add-dirs");
+
+    let mut events = handle.events;
+    let seen = drain_to_none(events.as_mut(), STREAM_TIMEOUT).await;
+    assert!(
+        !seen
+            .iter()
+            .any(|event| { event.message.as_deref() == Some(ADD_DIRS_RUNTIME_REJECTION_MESSAGE) }),
+        "slow supported probes must not be misclassified as add-dir runtime rejection"
+    );
+
+    let completion = tokio::time::timeout(STREAM_TIMEOUT, handle.completion)
+        .await
+        .expect("completion resolves")
+        .expect("spawned exec path should still produce a completion");
+    assert!(
+        !completion.status.success(),
+        "fake exec path exits non-zero so the regression proves spawn happened"
+    );
+
+    let exec_log = std::fs::read_to_string(&fixture_backend.exec_log)
+        .expect("spawned exec path should be recorded");
+    assert!(
+        exec_log.contains("exec"),
+        "expected fake codex exec path to run after successful probe"
+    );
+}
