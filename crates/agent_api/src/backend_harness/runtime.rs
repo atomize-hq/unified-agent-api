@@ -105,6 +105,51 @@ async fn surface_spawn_failure(
     let _ = completion_tx.send(Err(AgentWrapperError::Backend { message }));
 }
 
+async fn surface_control_startup_failure(
+    agent_kind: crate::AgentWrapperKind,
+    message: String,
+    cancel_signal: HarnessCancelSignal,
+    request_termination: Option<RequestTerminationHook>,
+    tx: mpsc::Sender<AgentWrapperEvent>,
+    completion_tx: oneshot::Sender<Result<AgentWrapperCompletion, AgentWrapperError>>,
+) {
+    if cancel_signal.is_cancelled() {
+        request_termination_best_effort(request_termination.as_ref());
+        drop(tx);
+        let _ = completion_tx.send(Err(cancelled_completion_error()));
+        return;
+    }
+
+    for bounded in
+        crate::bounds::enforce_event_bounds(pump_error_event(agent_kind, message.clone()))
+    {
+        tokio::select! {
+            biased;
+            _ = cancel_signal.cancelled() => {
+                request_termination_best_effort(request_termination.as_ref());
+                drop(tx);
+                let _ = completion_tx.send(Err(cancelled_completion_error()));
+                return;
+            }
+            send_outcome = tx.send(bounded) => {
+                if send_outcome.is_err() {
+                    break;
+                }
+            }
+        }
+    }
+
+    if cancel_signal.is_cancelled() {
+        request_termination_best_effort(request_termination.as_ref());
+        drop(tx);
+        let _ = completion_tx.send(Err(cancelled_completion_error()));
+        return;
+    }
+
+    drop(tx);
+    let _ = completion_tx.send(Err(AgentWrapperError::Backend { message }));
+}
+
 async fn drive_control_backend_startup<A: BackendHarnessAdapter>(
     adapter: Arc<A>,
     normalized: NormalizedRequest<A::Policy>,
@@ -131,7 +176,15 @@ async fn drive_control_backend_startup<A: BackendHarnessAdapter>(
                 Ok(spawned) => spawned,
                 Err(err) => {
                     let message = adapter.redact_error(BackendHarnessErrorPhase::Spawn, &err);
-                    surface_spawn_failure(agent_kind, message, tx, completion_tx).await;
+                    surface_control_startup_failure(
+                        agent_kind,
+                        message,
+                        cancel_signal,
+                        request_termination,
+                        tx,
+                        completion_tx,
+                    )
+                    .await;
                     return;
                 }
             };
