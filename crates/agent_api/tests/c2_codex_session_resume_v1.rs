@@ -13,6 +13,12 @@ use tempfile::tempdir;
 
 const EXTERNAL_SANDBOX_WARNING: &str =
     "DANGEROUS: external sandbox exec policy enabled (agent_api.exec.external_sandbox.v1=true)";
+const ADD_DIRS_RUNTIME_REJECTION_MESSAGE: &str = "add_dirs rejected by runtime";
+const ADD_DIR_LEAK_SENTINELS: [&str; 3] = [
+    "ADD_DIR_RAW_PATH_SECRET",
+    "ADD_DIR_STDOUT_SECRET",
+    "ADD_DIR_STDERR_SECRET",
+];
 
 fn fake_codex_binary() -> PathBuf {
     PathBuf::from(env!(
@@ -78,6 +84,20 @@ async fn drain_to_none(
     out
 }
 
+fn any_event_contains(events: &[AgentWrapperEvent], needle: &str) -> bool {
+    events.iter().any(|ev| {
+        ev.message
+            .as_deref()
+            .is_some_and(|message| message.contains(needle))
+            || ev.text.as_deref().is_some_and(|text| text.contains(needle))
+            || ev
+                .data
+                .as_ref()
+                .and_then(|data| serde_json::to_string(data).ok())
+                .is_some_and(|data| data.contains(needle))
+    })
+}
+
 fn assert_external_sandbox_warning_before_session_handle_facet(seen: &[AgentWrapperEvent]) {
     let mut warning_idx: Option<usize> = None;
     for (idx, event) in seen.iter().enumerate() {
@@ -126,6 +146,15 @@ fn handle_facet_index(events: &[AgentWrapperEvent]) -> Option<usize> {
                 .and_then(serde_json::Value::as_str)
                 == Some("agent_api.session.handle.v1")
     })
+}
+
+fn assert_no_add_dir_sentinel_leaks_in_events(events: &[AgentWrapperEvent]) {
+    for sentinel in ADD_DIR_LEAK_SENTINELS {
+        assert!(
+            !any_event_contains(events, sentinel),
+            "expected add-dir runtime rejection sentinel {sentinel} to stay backend-private"
+        );
+    }
 }
 
 #[tokio::test]
@@ -773,18 +802,27 @@ async fn resume_last_add_dirs_runtime_rejection_emits_handle_before_backend_erro
 
     let seen = drain_to_none(events.as_mut(), Duration::from_secs(2)).await;
     let handle_idx = handle_facet_index(&seen).expect("expected session handle facet");
-    let error_idx = seen
+    let error_indices: Vec<_> = seen
         .iter()
-        .position(|event| event.kind == AgentWrapperEventKind::Error)
-        .expect("expected backend error event");
+        .enumerate()
+        .filter_map(|(idx, event)| (event.kind == AgentWrapperEventKind::Error).then_some(idx))
+        .collect();
+    assert_eq!(error_indices.len(), 1, "expected exactly one Error event");
+    let error_idx = error_indices[0];
     assert!(
         handle_idx < error_idx,
-        "expected handle facet status event before backend error"
+        "expected thread.resumed-derived handle facet before backend error"
+    );
+    assert_eq!(
+        seen.last().map(|event| event.kind.clone()),
+        Some(AgentWrapperEventKind::Error),
+        "expected Error event to be terminal"
     );
     assert_eq!(
         seen[error_idx].message.as_deref(),
-        Some("add_dirs rejected by runtime")
+        Some(ADD_DIRS_RUNTIME_REJECTION_MESSAGE)
     );
+    assert_no_add_dir_sentinel_leaks_in_events(&seen);
 
     let err = tokio::time::timeout(Duration::from_secs(2), completion)
         .await
@@ -792,7 +830,13 @@ async fn resume_last_add_dirs_runtime_rejection_emits_handle_before_backend_erro
         .unwrap_err();
     match err {
         AgentWrapperError::Backend { message } => {
-            assert_eq!(message, "add_dirs rejected by runtime");
+            assert_eq!(message, ADD_DIRS_RUNTIME_REJECTION_MESSAGE);
+            for sentinel in ADD_DIR_LEAK_SENTINELS {
+                assert!(
+                    !message.contains(sentinel),
+                    "expected add-dir runtime rejection sentinel {sentinel} to stay out of completion error"
+                );
+            }
         }
         other => panic!("expected Backend error, got: {other:?}"),
     }
@@ -852,18 +896,27 @@ async fn resume_id_add_dirs_runtime_rejection_emits_handle_before_backend_error(
 
     let seen = drain_to_none(events.as_mut(), Duration::from_secs(2)).await;
     let handle_idx = handle_facet_index(&seen).expect("expected session handle facet");
-    let error_idx = seen
+    let error_indices: Vec<_> = seen
         .iter()
-        .position(|event| event.kind == AgentWrapperEventKind::Error)
-        .expect("expected backend error event");
+        .enumerate()
+        .filter_map(|(idx, event)| (event.kind == AgentWrapperEventKind::Error).then_some(idx))
+        .collect();
+    assert_eq!(error_indices.len(), 1, "expected exactly one Error event");
+    let error_idx = error_indices[0];
     assert!(
         handle_idx < error_idx,
-        "expected handle facet status event before backend error"
+        "expected thread.resumed-derived handle facet before backend error"
+    );
+    assert_eq!(
+        seen.last().map(|event| event.kind.clone()),
+        Some(AgentWrapperEventKind::Error),
+        "expected Error event to be terminal"
     );
     assert_eq!(
         seen[error_idx].message.as_deref(),
-        Some("add_dirs rejected by runtime")
+        Some(ADD_DIRS_RUNTIME_REJECTION_MESSAGE)
     );
+    assert_no_add_dir_sentinel_leaks_in_events(&seen);
 
     let err = tokio::time::timeout(Duration::from_secs(2), completion)
         .await
@@ -871,7 +924,13 @@ async fn resume_id_add_dirs_runtime_rejection_emits_handle_before_backend_error(
         .unwrap_err();
     match err {
         AgentWrapperError::Backend { message } => {
-            assert_eq!(message, "add_dirs rejected by runtime");
+            assert_eq!(message, ADD_DIRS_RUNTIME_REJECTION_MESSAGE);
+            for sentinel in ADD_DIR_LEAK_SENTINELS {
+                assert!(
+                    !message.contains(sentinel),
+                    "expected add-dir runtime rejection sentinel {sentinel} to stay out of completion error"
+                );
+            }
         }
         other => panic!("expected Backend error, got: {other:?}"),
     }
