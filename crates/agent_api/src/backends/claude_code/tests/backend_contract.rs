@@ -116,14 +116,22 @@ fn claude_harness_extracts_add_dirs_exactly_once_and_carries_policy_state_forwar
     );
     assert_eq!(
         SOURCE
-            .matches("normalize_add_dirs_v1(Some(raw), effective_working_dir.as_path())")
+            .matches("normalize_add_dirs_v1(Some(raw), effective_working_dir)")
             .count(),
         1,
         "expected Claude harness to normalize add-dir payloads exactly once"
     );
     assert!(
+        SOURCE.contains("resolve_claude_effective_working_dir("),
+        "expected Claude harness to resolve effective working dir through the shared helper"
+    );
+    assert!(
         SOURCE.contains("pub(super) add_dirs: Vec<PathBuf>"),
         "expected ClaudeExecPolicy to carry normalized add-dir policy state"
+    );
+    assert!(
+        SOURCE.contains("pub(super) resolved_working_dir: Option<PathBuf>"),
+        "expected ClaudeExecPolicy to carry the resolved working dir used at spawn time"
     );
     assert!(
         SOURCE.contains("build_fresh_run_print_request("),

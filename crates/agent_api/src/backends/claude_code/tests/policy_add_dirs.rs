@@ -238,6 +238,26 @@ fn claude_policy_add_dirs_resolves_relative_default_working_dir_from_run_start_c
     assert_eq!(policy.add_dirs, vec![default_docs]);
 }
 
+#[test]
+fn claude_policy_relative_working_dir_without_run_start_cwd_fails_safely() {
+    let request = AgentWrapperRunRequest {
+        prompt: "hello".to_string(),
+        working_dir: Some(std::path::PathBuf::from("repo")),
+        ..Default::default()
+    };
+
+    let err = adapter_error(new_adapter().validate_and_extract_policy(&request));
+    match &err {
+        AgentWrapperError::Backend { message } => {
+            assert_eq!(
+                message,
+                super::super::harness::PINNED_WORKING_DIR_RESOLUTION_FAILURE
+            );
+        }
+        other => panic!("expected Backend, got: {other:?}"),
+    }
+}
+
 fn adapter_error(
     result: Result<super::super::harness::ClaudeExecPolicy, AgentWrapperError>,
 ) -> AgentWrapperError {

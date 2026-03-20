@@ -1,5 +1,6 @@
 use std::{
     future::Future,
+    path::Path,
     path::PathBuf,
     pin::Pin,
     sync::{Arc, Mutex},
@@ -57,6 +58,7 @@ pub(super) struct ClaudeExecPolicy {
     pub(super) external_sandbox: bool,
     pub(super) resume: Option<SessionSelectorV1>,
     pub(super) fork: Option<SessionSelectorV1>,
+    pub(super) resolved_working_dir: Option<PathBuf>,
     pub(super) add_dirs: Vec<PathBuf>,
 }
 
@@ -158,6 +160,30 @@ pub(super) fn startup_failure_spawn(
     BackendSpawn { events, completion }
 }
 
+pub(super) const PINNED_WORKING_DIR_RESOLUTION_FAILURE: &str =
+    "claude backend failed to resolve working directory";
+
+fn resolve_claude_effective_working_dir(
+    config: &ClaudeCodeBackendConfig,
+    run_start_cwd: Option<&Path>,
+    request_working_dir: Option<&Path>,
+) -> Result<Option<PathBuf>, AgentWrapperError> {
+    let selected_working_dir = request_working_dir.or(config.default_working_dir.as_deref());
+    let resolved_working_dir = resolve_effective_working_dir(
+        request_working_dir,
+        config.default_working_dir.as_deref(),
+        run_start_cwd,
+    );
+
+    if selected_working_dir.is_some_and(Path::is_relative) && resolved_working_dir.is_none() {
+        return Err(AgentWrapperError::Backend {
+            message: PINNED_WORKING_DIR_RESOLUTION_FAILURE.to_string(),
+        });
+    }
+
+    Ok(resolved_working_dir)
+}
+
 pub(super) fn build_fresh_run_print_request(
     prompt: String,
     non_interactive: bool,
@@ -255,19 +281,22 @@ impl BackendHarnessAdapter for ClaudeHarnessAdapter {
             .map(parse_session_fork_v1)
             .transpose()?;
 
+        let resolved_working_dir = resolve_claude_effective_working_dir(
+            &self.config,
+            self.run_start_cwd.as_deref(),
+            request.working_dir.as_deref(),
+        )?;
+
         validate_resume_fork_mutual_exclusion(&request.extensions)?;
 
         let add_dirs = match request.extensions.get(EXT_ADD_DIRS_V1) {
             Some(raw) => {
-                let effective_working_dir = resolve_effective_working_dir(
-                    request.working_dir.as_deref(),
-                    self.config.default_working_dir.as_deref(),
-                    self.run_start_cwd.as_deref(),
-                )
-                .ok_or_else(|| AgentWrapperError::InvalidRequest {
-                    message: "working_dir must be provided or configured".to_string(),
+                let effective_working_dir = resolved_working_dir.as_deref().ok_or_else(|| {
+                    AgentWrapperError::InvalidRequest {
+                        message: "working_dir must be provided or configured".to_string(),
+                    }
                 })?;
-                normalize_add_dirs_v1(Some(raw), effective_working_dir.as_path())?
+                normalize_add_dirs_v1(Some(raw), effective_working_dir)?
             }
             None => Vec::new(),
         };
@@ -277,6 +306,7 @@ impl BackendHarnessAdapter for ClaudeHarnessAdapter {
             external_sandbox,
             resume,
             fork,
+            resolved_working_dir,
             add_dirs,
         })
     }
@@ -304,16 +334,24 @@ impl BackendHarnessAdapter for ClaudeHarnessAdapter {
         >,
     > {
         let config = self.config.clone();
-        let run_start_cwd = self.run_start_cwd.clone();
         let termination = self.termination.clone();
         let allow_flag_preflight = Arc::clone(&self.allow_flag_preflight);
+        let NormalizedRequest {
+            prompt,
+            working_dir: _raw_working_dir,
+            effective_timeout,
+            env,
+            policy,
+            ..
+        } = req;
         let ClaudeExecPolicy {
             non_interactive,
             external_sandbox,
             resume,
             fork,
+            resolved_working_dir,
             add_dirs,
-        } = req.policy;
+        } = policy;
         Box::pin(async move {
             let mut builder = claude_code::ClaudeClient::builder();
             if let Some(binary) = config.binary.as_ref() {
@@ -323,22 +361,17 @@ impl BackendHarnessAdapter for ClaudeHarnessAdapter {
                 builder = builder.claude_home(claude_home.clone());
             }
 
-            let working_dir = resolve_effective_working_dir(
-                req.working_dir.as_deref(),
-                config.default_working_dir.as_deref(),
-                run_start_cwd.as_deref(),
-            );
-            if let Some(dir) = working_dir {
+            if let Some(dir) = resolved_working_dir {
                 builder = builder.working_dir(dir);
             }
 
-            let timeout = match req.effective_timeout {
+            let timeout = match effective_timeout {
                 Some(t) if t == Duration::ZERO => None,
                 other => other,
             };
             builder = builder.timeout(timeout);
 
-            for (k, v) in &req.env {
+            for (k, v) in &env {
                 builder = builder.env(k.clone(), v.clone());
             }
 
@@ -363,7 +396,7 @@ impl BackendHarnessAdapter for ClaudeHarnessAdapter {
             }
 
             let mut print_req = build_fresh_run_print_request(
-                req.prompt,
+                prompt,
                 non_interactive,
                 external_sandbox,
                 allow_dangerously_skip_permissions,
