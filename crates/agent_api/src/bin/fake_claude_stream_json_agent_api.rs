@@ -93,6 +93,76 @@ fn contains_ordered_subsequence(args: &[String], subseq: &[&str]) -> bool {
     false
 }
 
+fn require_env_var(key: &str) -> String {
+    env::var(key).unwrap_or_else(|_| panic!("missing required env var {key}"))
+}
+
+fn expected_add_dirs() -> Option<Vec<String>> {
+    let expected_count_raw = env::var("FAKE_CLAUDE_EXPECT_ADD_DIR_COUNT").ok()?;
+    let expected_count = expected_count_raw
+        .parse::<usize>()
+        .unwrap_or_else(|err| panic!("invalid FAKE_CLAUDE_EXPECT_ADD_DIR_COUNT: {err}"));
+    Some(
+        (0..expected_count)
+            .map(|index| require_env_var(&format!("FAKE_CLAUDE_EXPECT_ADD_DIR_{index}")))
+            .collect(),
+    )
+}
+
+fn assert_add_dirs(args: &[String], out: &mut dyn Write) {
+    let Some(expected) = expected_add_dirs() else {
+        return;
+    };
+
+    let Some(add_dir_idx) = args.iter().position(|arg| arg == "--add-dir") else {
+        fail(out, "assertion failed: missing --add-dir");
+    };
+
+    let actual: Vec<String> = args
+        .iter()
+        .skip(add_dir_idx + 1)
+        .take_while(|arg| !arg.starts_with("--"))
+        .cloned()
+        .collect();
+
+    if actual.len() != expected.len() {
+        fail(
+            out,
+            &format!(
+                "assertion failed: expected {} add-dir values, got {}",
+                expected.len(),
+                actual.len()
+            ),
+        );
+    }
+
+    if actual != expected {
+        fail(
+            out,
+            &format!(
+                "assertion failed: expected add-dir values {:?}, got {:?}",
+                expected, actual
+            ),
+        );
+    }
+}
+
+fn selector_assertion_subsequence(tail: &[&str]) -> Vec<String> {
+    let mut subseq = vec![
+        "--print".to_string(),
+        "--output-format".to_string(),
+        "stream-json".to_string(),
+        "--permission-mode".to_string(),
+        "bypassPermissions".to_string(),
+    ];
+    if let Some(add_dirs) = expected_add_dirs() {
+        subseq.push("--add-dir".to_string());
+        subseq.extend(add_dirs);
+    }
+    subseq.extend(tail.iter().map(|item| (*item).to_string()));
+    subseq
+}
+
 fn require(env_key: &str) -> String {
     env::var(env_key).unwrap_or_else(|_| panic!("missing required env var {env_key}"))
 }
@@ -218,6 +288,7 @@ fn main() -> io::Result<()> {
             "--allow-dangerously-skip-permissions",
             &mut out,
         );
+        assert_add_dirs(&args, &mut out);
     }
 
     let scenario = env::var("FAKE_CLAUDE_SCENARIO").unwrap_or_else(|_| "two_events_delayed".into());
@@ -238,19 +309,15 @@ fn main() -> io::Result<()> {
                 fail(&mut out, "assertion failed: missing --verbose");
             }
 
+            let subseq = selector_assertion_subsequence(&[
+                "--continue",
+                "--fork-session",
+                "--verbose",
+                &expected_prompt,
+            ]);
             let ok = contains_ordered_subsequence(
                 &args,
-                &[
-                    "--print",
-                    "--output-format",
-                    "stream-json",
-                    "--permission-mode",
-                    "bypassPermissions",
-                    "--continue",
-                    "--fork-session",
-                    "--verbose",
-                    &expected_prompt,
-                ],
+                &subseq.iter().map(String::as_str).collect::<Vec<_>>(),
             );
             if !ok {
                 fail(
@@ -274,20 +341,16 @@ fn main() -> io::Result<()> {
                 fail(&mut out, "assertion failed: missing --verbose");
             }
 
+            let subseq = selector_assertion_subsequence(&[
+                "--fork-session",
+                "--resume",
+                &expected_id,
+                "--verbose",
+                &expected_prompt,
+            ]);
             let ok = contains_ordered_subsequence(
                 &args,
-                &[
-                    "--print",
-                    "--output-format",
-                    "stream-json",
-                    "--permission-mode",
-                    "bypassPermissions",
-                    "--fork-session",
-                    "--resume",
-                    &expected_id,
-                    "--verbose",
-                    &expected_prompt,
-                ],
+                &subseq.iter().map(String::as_str).collect::<Vec<_>>(),
             );
             if !ok {
                 fail(
@@ -310,18 +373,11 @@ fn main() -> io::Result<()> {
                 fail(&mut out, "assertion failed: missing --verbose");
             }
 
+            let subseq =
+                selector_assertion_subsequence(&["--continue", "--verbose", &expected_prompt]);
             let ok = contains_ordered_subsequence(
                 &args,
-                &[
-                    "--print",
-                    "--output-format",
-                    "stream-json",
-                    "--permission-mode",
-                    "bypassPermissions",
-                    "--continue",
-                    "--verbose",
-                    &expected_prompt,
-                ],
+                &subseq.iter().map(String::as_str).collect::<Vec<_>>(),
             );
             if !ok {
                 fail(
@@ -345,19 +401,15 @@ fn main() -> io::Result<()> {
                 fail(&mut out, "assertion failed: missing --verbose");
             }
 
+            let subseq = selector_assertion_subsequence(&[
+                "--resume",
+                &expected_id,
+                "--verbose",
+                &expected_prompt,
+            ]);
             let ok = contains_ordered_subsequence(
                 &args,
-                &[
-                    "--print",
-                    "--output-format",
-                    "stream-json",
-                    "--permission-mode",
-                    "bypassPermissions",
-                    "--resume",
-                    &expected_id,
-                    "--verbose",
-                    &expected_prompt,
-                ],
+                &subseq.iter().map(String::as_str).collect::<Vec<_>>(),
             );
             if !ok {
                 fail(
