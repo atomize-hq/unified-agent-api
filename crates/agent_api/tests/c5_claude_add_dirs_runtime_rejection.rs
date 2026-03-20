@@ -75,6 +75,7 @@ async fn assert_runtime_rejection_parity(
     scenario: &str,
     session_extension: Option<(&str, Value)>,
     resume_id: Option<&str>,
+    extra_env: impl IntoIterator<Item = (String, String)>,
 ) {
     let temp = tempdir().expect("tempdir");
     let dir_a = temp.path().join("alpha");
@@ -94,6 +95,7 @@ async fn assert_runtime_rejection_parity(
             resume_id.to_string(),
         );
     }
+    env.extend(extra_env);
 
     let backend = ClaudeCodeBackend::new(ClaudeCodeBackendConfig {
         binary: Some(fake_claude_binary()),
@@ -193,6 +195,7 @@ async fn fresh_add_dirs_runtime_rejection_emits_handle_before_backend_error() {
         "add_dirs_runtime_rejection_fresh",
         None,
         None,
+        std::iter::empty(),
     )
     .await;
 }
@@ -205,6 +208,7 @@ async fn resume_last_add_dirs_runtime_rejection_emits_handle_before_backend_erro
         "add_dirs_runtime_rejection_resume_last",
         Some(("agent_api.session.resume.v1", json!({"selector": "last"}))),
         None,
+        std::iter::empty(),
     )
     .await;
 }
@@ -221,6 +225,7 @@ async fn resume_id_add_dirs_runtime_rejection_emits_handle_before_backend_error(
             json!({"selector": "id", "id": resume_id}),
         )),
         Some(resume_id),
+        std::iter::empty(),
     )
     .await;
 }
@@ -233,6 +238,7 @@ async fn fork_last_add_dirs_runtime_rejection_emits_handle_before_backend_error(
         "add_dirs_runtime_rejection_fork_last",
         Some(("agent_api.session.fork.v1", json!({"selector": "last"}))),
         None,
+        std::iter::empty(),
     )
     .await;
 }
@@ -249,6 +255,23 @@ async fn fork_id_add_dirs_runtime_rejection_emits_handle_before_backend_error() 
             json!({"selector": "id", "id": fork_id}),
         )),
         Some(fork_id),
+        std::iter::empty(),
+    )
+    .await;
+}
+
+#[tokio::test]
+async fn fresh_add_dirs_runtime_rejection_is_fatal_even_on_zero_exit() {
+    assert_runtime_rejection_parity(
+        "fresh_add_dirs_runtime_rejection_is_fatal_even_on_zero_exit",
+        "hello world",
+        "add_dirs_runtime_rejection_fresh",
+        None,
+        None,
+        [(
+            "FAKE_CLAUDE_RUNTIME_REJECTION_EXIT_CODE".to_string(),
+            "0".to_string(),
+        )],
     )
     .await;
 }

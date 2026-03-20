@@ -69,7 +69,17 @@ pub(crate) fn write_add_dirs_runtime_rejection(out: &mut (impl Write + ?Sized)) 
 pub(crate) fn exit_add_dirs_runtime_rejection(out: &mut (impl Write + ?Sized)) -> ! {
     write_add_dirs_runtime_rejection(out).expect("write add_dirs runtime rejection");
     eprintln!("{ADD_DIR_STDERR_SECRET}");
-    std::process::exit(1);
+    std::process::exit(add_dirs_runtime_rejection_exit_code());
+}
+
+fn add_dirs_runtime_rejection_exit_code() -> i32 {
+    match env::var("FAKE_CLAUDE_RUNTIME_REJECTION_EXIT_CODE") {
+        Ok(raw) => raw
+            .parse::<i32>()
+            .unwrap_or_else(|err| panic!("invalid FAKE_CLAUDE_RUNTIME_REJECTION_EXIT_CODE: {err}")),
+        Err(env::VarError::NotPresent) => 1,
+        Err(err) => panic!("failed to read FAKE_CLAUDE_RUNTIME_REJECTION_EXIT_CODE: {err}"),
+    }
 }
 
 pub(crate) fn has_flag_value(args: &[String], flag: &str, expected: &str) -> bool {

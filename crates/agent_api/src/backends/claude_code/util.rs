@@ -13,6 +13,7 @@ use crate::{
     AgentWrapperError,
 };
 
+use super::super::session_selectors::SessionSelectorV1;
 use super::{
     harness::{ClaudeBackendCompletion, ClaudeBackendError, ClaudeBackendEvent},
     ClaudeCodeBackendConfig,
@@ -107,6 +108,41 @@ pub(super) fn generic_non_zero_exit_message(status: &std::process::ExitStatus) -
         Some(code) => format!("claude_code exited non-zero: code={code} (output redacted)"),
         None => "claude_code exited non-zero (output redacted)".to_string(),
     }
+}
+
+pub(super) fn resolve_completion_messages(
+    status: &std::process::ExitStatus,
+    selection_selector: Option<&SessionSelectorV1>,
+    saw_stream_error: bool,
+    saw_not_found_signal: bool,
+    runtime_backend_error_message: Option<String>,
+) -> (Option<String>, Option<String>) {
+    if saw_stream_error {
+        return (None, None);
+    }
+
+    let backend_error_message =
+        if selection_selector.is_some() && !status.success() && saw_not_found_signal {
+            match selection_selector {
+                Some(SessionSelectorV1::Last) => Some("no session found".to_string()),
+                Some(SessionSelectorV1::Id { .. }) => Some("session not found".to_string()),
+                None => None,
+            }
+        } else {
+            runtime_backend_error_message
+        };
+
+    let terminal_error_event_message = backend_error_message.clone().or_else(|| {
+        if !status.success() {
+            selection_selector
+                .as_ref()
+                .map(|_| generic_non_zero_exit_message(status))
+        } else {
+            None
+        }
+    });
+
+    (backend_error_message, terminal_error_event_message)
 }
 
 pub(super) fn render_backend_error_message(err: &ClaudeBackendError) -> String {

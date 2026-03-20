@@ -15,11 +15,10 @@ use super::{
         session_handle_facet, status_event,
     },
     util::{
-        build_fresh_run_print_request, generic_non_zero_exit_message,
-        json_contains_add_dirs_runtime_rejection_signal, json_contains_not_found_signal,
-        parse_bool, preflight_allow_flag_support, render_backend_error_message,
-        resolve_claude_effective_working_dir, startup_failure_spawn,
-        ADD_DIRS_RUNTIME_REJECTION_MESSAGE,
+        build_fresh_run_print_request, json_contains_add_dirs_runtime_rejection_signal,
+        json_contains_not_found_signal, parse_bool, preflight_allow_flag_support,
+        render_backend_error_message, resolve_claude_effective_working_dir,
+        resolve_completion_messages, startup_failure_spawn, ADD_DIRS_RUNTIME_REJECTION_MESSAGE,
     },
     ClaudeCodeBackendConfig, AGENT_KIND, CLAUDE_EXEC_POLICY_PREFIX, EXT_ADD_DIRS_V1,
     EXT_EXTERNAL_SANDBOX_V1, EXT_NON_INTERACTIVE, PINNED_EXTERNAL_SANDBOX_WARNING,
@@ -546,31 +545,14 @@ impl BackendHarnessAdapter for ClaudeHarnessAdapter {
                     })
                     .unwrap_or((None, true, false, None));
 
-                let backend_error_message = if selection_selector.is_some()
-                    && !status.success()
-                    && !saw_stream_error
-                    && saw_not_found_signal
-                {
-                    match selection_selector {
-                        Some(SessionSelectorV1::Last) => Some("no session found".to_string()),
-                        Some(SessionSelectorV1::Id { .. }) => Some("session not found".to_string()),
-                        None => None,
-                    }
-                } else if !status.success() && !saw_stream_error {
-                    runtime_backend_error_message
-                } else {
-                    None
-                };
-
-                let terminal_error_event_message = if !status.success() && !saw_stream_error {
-                    backend_error_message.clone().or_else(|| {
-                        selection_selector
-                            .as_ref()
-                            .map(|_| generic_non_zero_exit_message(&status))
-                    })
-                } else {
-                    None
-                };
+                let (backend_error_message, terminal_error_event_message) =
+                    resolve_completion_messages(
+                        &status,
+                        selection_selector.as_ref(),
+                        saw_stream_error,
+                        saw_not_found_signal,
+                        runtime_backend_error_message,
+                    );
 
                 if let Some(tx) = tail_tx {
                     let _ = tx.send(terminal_error_event_message.clone());

@@ -354,6 +354,52 @@ fn claude_completion_returns_backend_error_when_backend_error_message_is_present
 }
 
 #[test]
+fn claude_completion_message_resolution_promotes_runtime_backend_error_on_zero_exit() {
+    let (backend_error_message, terminal_error_event_message) =
+        super::super::util::resolve_completion_messages(
+            &success_exit_status(),
+            None,
+            false,
+            false,
+            Some(super::super::util::ADD_DIRS_RUNTIME_REJECTION_MESSAGE.to_string()),
+        );
+
+    assert_eq!(
+        backend_error_message.as_deref(),
+        Some(super::super::util::ADD_DIRS_RUNTIME_REJECTION_MESSAGE)
+    );
+    assert_eq!(
+        terminal_error_event_message.as_deref(),
+        Some(super::super::util::ADD_DIRS_RUNTIME_REJECTION_MESSAGE)
+    );
+}
+
+#[test]
+fn claude_completion_message_resolution_keeps_selector_not_found_non_zero_only() {
+    let (zero_exit_backend_error, zero_exit_terminal_error) =
+        super::super::util::resolve_completion_messages(
+            &success_exit_status(),
+            Some(&super::super::super::session_selectors::SessionSelectorV1::Last),
+            false,
+            true,
+            None,
+        );
+    assert_eq!(zero_exit_backend_error, None);
+    assert_eq!(zero_exit_terminal_error, None);
+
+    let (non_zero_backend_error, non_zero_terminal_error) =
+        super::super::util::resolve_completion_messages(
+            &exit_status_with_code(1),
+            Some(&super::super::super::session_selectors::SessionSelectorV1::Last),
+            false,
+            true,
+            None,
+        );
+    assert_eq!(non_zero_backend_error.as_deref(), Some("no session found"));
+    assert_eq!(non_zero_terminal_error.as_deref(), Some("no session found"));
+}
+
+#[test]
 fn claude_terminal_error_backend_event_maps_to_one_error_wrapper_event() {
     let adapter = new_adapter();
 
