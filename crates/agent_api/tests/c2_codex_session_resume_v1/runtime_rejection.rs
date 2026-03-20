@@ -87,28 +87,14 @@ async fn assert_preflight_rejection_case(
     env.extend(extra_env);
 
     let fixture_backend = build_probe_only_backend(mode, env, None, false);
-    let handle = fixture_backend
+    let err = fixture_backend
         .backend
         .run(run_request(
             "hello world",
             [add_dirs_extension(&fixture.dirs), resume_extension],
         ))
         .await
-        .expect("preflight rejection still returns a terminal handle");
-
-    let mut events = handle.events;
-    let seen = drain_to_none(events.as_mut(), STREAM_TIMEOUT).await;
-    assert_eq!(seen.len(), 1, "expected exactly one terminal error event");
-    assert_eq!(seen[0].kind, AgentWrapperEventKind::Error);
-    assert_eq!(
-        seen[0].message.as_deref(),
-        Some(ADD_DIRS_RUNTIME_REJECTION_MESSAGE)
-    );
-
-    let err = tokio::time::timeout(STREAM_TIMEOUT, handle.completion)
-        .await
-        .expect("completion resolves")
-        .unwrap_err();
+        .expect_err("preflight rejection should fail backend.run directly");
     match err {
         AgentWrapperError::Backend { message } => {
             assert_eq!(message, ADD_DIRS_RUNTIME_REJECTION_MESSAGE);

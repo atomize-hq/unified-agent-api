@@ -125,6 +125,7 @@ async fn control_entrypoint_exposes_cancel_handle_wired_to_driver() {
 
     let crate::AgentWrapperRunControl { mut handle, cancel } =
         run_harnessed_backend_control(adapter, BackendDefaults::default(), request, None)
+            .await
             .expect("control entrypoint succeeds");
 
     let first = handle.events.next().await.expect("first event forwarded");

@@ -9,7 +9,7 @@ use tokio::sync::{mpsc, oneshot, Notify};
 use super::normalize_request;
 use super::{
     BackendDefaults, BackendHarnessAdapter, BackendHarnessErrorPhase, BackendSpawn,
-    DynBackendCompletionFuture, DynBackendEventStream,
+    DynBackendCompletionFuture, DynBackendEventStream, SpawnErrorDisposition,
 };
 use crate::{
     AgentWrapperCancelHandle, AgentWrapperCompletion, AgentWrapperError, AgentWrapperEvent,
@@ -238,7 +238,7 @@ async fn send_completion_with_cancel<A: BackendHarnessAdapter>(
 }
 
 #[allow(dead_code)]
-pub(crate) fn run_harnessed_backend_control<A: BackendHarnessAdapter>(
+pub(crate) async fn run_harnessed_backend_control<A: BackendHarnessAdapter>(
     adapter: Arc<A>,
     defaults: BackendDefaults,
     request: AgentWrapperRunRequest,
@@ -253,58 +253,53 @@ pub(crate) fn run_harnessed_backend_control<A: BackendHarnessAdapter>(
         move || cancel_signal.cancel()
     });
 
+    let spawned = match adapter.spawn(normalized).await {
+        Ok(spawned) => spawned,
+        Err(err) => {
+            let message = adapter.redact_error(BackendHarnessErrorPhase::Spawn, &err);
+            if adapter.spawn_error_disposition(&err) == SpawnErrorDisposition::ReturnDirectly {
+                return Err(AgentWrapperError::Backend { message });
+            }
+
+            let (tx, rx) =
+                mpsc::channel::<AgentWrapperEvent>(super::DEFAULT_EVENT_CHANNEL_CAPACITY);
+            let (completion_tx, completion_rx) =
+                oneshot::channel::<Result<AgentWrapperCompletion, AgentWrapperError>>();
+
+            for bounded in
+                crate::bounds::enforce_event_bounds(pump_error_event(agent_kind, message.clone()))
+            {
+                let _ = tx.send(bounded).await;
+            }
+            drop(tx);
+            let _ = completion_tx.send(Err(AgentWrapperError::Backend { message }));
+
+            return Ok(AgentWrapperRunControl {
+                handle: crate::run_handle_gate::build_gated_run_handle(rx, completion_rx),
+                cancel,
+            });
+        }
+    };
+
     let (tx, rx) = mpsc::channel::<AgentWrapperEvent>(super::DEFAULT_EVENT_CHANNEL_CAPACITY);
     let (completion_tx, completion_rx) =
         oneshot::channel::<Result<AgentWrapperCompletion, AgentWrapperError>>();
+    let BackendSpawn { events, completion } = spawned;
 
-    tokio::spawn({
-        let cancel_signal = cancel_signal.clone();
-        async move {
-            let spawned = match adapter.spawn(normalized).await {
-                Ok(spawned) => spawned,
-                Err(err) => {
-                    let message = adapter.redact_error(BackendHarnessErrorPhase::Spawn, &err);
+    tokio::spawn(send_completion_with_cancel(
+        adapter.clone(),
+        completion,
+        cancel_signal.clone(),
+        request_termination,
+        completion_tx,
+    ));
 
-                    if !cancel_signal.is_cancelled() {
-                        for bounded in crate::bounds::enforce_event_bounds(pump_error_event(
-                            agent_kind,
-                            message.clone(),
-                        )) {
-                            let _ = tx.send(bounded).await;
-                        }
-                    }
-
-                    // Finality signal: there is no stream to drain; drop sender immediately.
-                    drop(tx);
-
-                    let completion_outcome = if cancel_signal.is_cancelled() {
-                        Err(cancelled_completion_error())
-                    } else {
-                        Err(AgentWrapperError::Backend { message })
-                    };
-                    let _ = completion_tx.send(completion_outcome);
-                    return;
-                }
-            };
-
-            let BackendSpawn { events, completion } = spawned;
-
-            tokio::spawn(send_completion_with_cancel(
-                adapter.clone(),
-                completion,
-                cancel_signal.clone(),
-                request_termination,
-                completion_tx,
-            ));
-
-            tokio::spawn(pump_backend_events_with_cancel(
-                adapter,
-                events,
-                tx,
-                cancel_signal,
-            ));
-        }
-    });
+    tokio::spawn(pump_backend_events_with_cancel(
+        adapter,
+        events,
+        tx,
+        cancel_signal,
+    ));
 
     Ok(AgentWrapperRunControl {
         handle: crate::run_handle_gate::build_gated_run_handle(rx, completion_rx),
@@ -312,7 +307,7 @@ pub(crate) fn run_harnessed_backend_control<A: BackendHarnessAdapter>(
     })
 }
 
-pub(crate) fn run_harnessed_backend<A: BackendHarnessAdapter>(
+pub(crate) async fn run_harnessed_backend<A: BackendHarnessAdapter>(
     adapter: Arc<A>,
     defaults: BackendDefaults,
     request: AgentWrapperRunRequest,
@@ -320,52 +315,58 @@ pub(crate) fn run_harnessed_backend<A: BackendHarnessAdapter>(
     let normalized = normalize_request(adapter.as_ref(), &defaults, request)?;
     let agent_kind = normalized.agent_kind.clone();
 
+    let spawn_outcome = adapter.spawn(normalized).await;
+    let spawned = match spawn_outcome {
+        Ok(spawned) => spawned,
+        Err(err) => {
+            let message = adapter.redact_error(BackendHarnessErrorPhase::Spawn, &err);
+            if adapter.spawn_error_disposition(&err) == SpawnErrorDisposition::ReturnDirectly {
+                return Err(AgentWrapperError::Backend { message });
+            }
+
+            let (tx, rx) =
+                mpsc::channel::<AgentWrapperEvent>(super::DEFAULT_EVENT_CHANNEL_CAPACITY);
+            let (completion_tx, completion_rx) =
+                oneshot::channel::<Result<AgentWrapperCompletion, AgentWrapperError>>();
+
+            for bounded in
+                crate::bounds::enforce_event_bounds(pump_error_event(agent_kind, message.clone()))
+            {
+                let _ = tx.send(bounded).await;
+            }
+            drop(tx);
+            let _ = completion_tx.send(Err(AgentWrapperError::Backend { message }));
+
+            return Ok(crate::run_handle_gate::build_gated_run_handle(
+                rx,
+                completion_rx,
+            ));
+        }
+    };
+
     let (tx, rx) = mpsc::channel::<AgentWrapperEvent>(super::DEFAULT_EVENT_CHANNEL_CAPACITY);
     let (completion_tx, completion_rx) =
         oneshot::channel::<Result<AgentWrapperCompletion, AgentWrapperError>>();
+    let BackendSpawn { events, completion } = spawned;
 
-    tokio::spawn(async move {
-        let spawned = match adapter.spawn(normalized).await {
-            Ok(spawned) => spawned,
-            Err(err) => {
-                let message = adapter.redact_error(BackendHarnessErrorPhase::Spawn, &err);
-                for bounded in crate::bounds::enforce_event_bounds(pump_error_event(
-                    agent_kind,
-                    message.clone(),
-                )) {
-                    let _ = tx.send(bounded).await;
+    tokio::spawn({
+        let adapter = adapter.clone();
+        async move {
+            let completion_outcome = completion.await;
+            let completion_outcome: Result<AgentWrapperCompletion, AgentWrapperError> =
+                match completion_outcome {
+                    Ok(typed) => adapter.map_completion(typed),
+                    Err(err) => Err(AgentWrapperError::Backend {
+                        message: adapter.redact_error(BackendHarnessErrorPhase::Completion, &err),
+                    }),
                 }
+                .map(crate::bounds::enforce_completion_bounds);
 
-                // Finality signal: there is no stream to drain; drop sender immediately.
-                drop(tx);
-
-                let _ = completion_tx.send(Err(AgentWrapperError::Backend { message }));
-                return;
-            }
-        };
-
-        let BackendSpawn { events, completion } = spawned;
-
-        tokio::spawn({
-            let adapter = adapter.clone();
-            async move {
-                let completion_outcome = completion.await;
-                let completion_outcome: Result<AgentWrapperCompletion, AgentWrapperError> =
-                    match completion_outcome {
-                        Ok(typed) => adapter.map_completion(typed),
-                        Err(err) => Err(AgentWrapperError::Backend {
-                            message: adapter
-                                .redact_error(BackendHarnessErrorPhase::Completion, &err),
-                        }),
-                    }
-                    .map(crate::bounds::enforce_completion_bounds);
-
-                let _ = completion_tx.send(completion_outcome);
-            }
-        });
-
-        tokio::spawn(pump_backend_events(adapter, events, tx));
+            let _ = completion_tx.send(completion_outcome);
+        }
     });
+
+    tokio::spawn(pump_backend_events(adapter, events, tx));
 
     Ok(crate::run_handle_gate::build_gated_run_handle(
         rx,

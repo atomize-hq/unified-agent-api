@@ -78,6 +78,7 @@ async fn assert_exec_add_dirs_case(
             ..Default::default()
         },
     )
+    .await
     .expect("run should start");
 
     let mut events = handle.events;

@@ -4,7 +4,10 @@ use super::support::ControlledEndStream;
 
 #[tokio::test]
 async fn cancellation_closes_events_but_does_not_accelerate_completion() {
-    let adapter = std::sync::Arc::new(ToyAdapter { fail_spawn: false });
+    let adapter = std::sync::Arc::new(ToyAdapter {
+        fail_spawn: false,
+        spawn_error_disposition: contract::SpawnErrorDisposition::SurfaceViaHandle,
+    });
     let cancel = HarnessCancelSignal::new();
 
     let (backend_done_tx, backend_done_rx) = oneshot::channel::<()>();

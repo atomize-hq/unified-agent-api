@@ -3,6 +3,7 @@ use std::pin::Pin;
 
 use super::contract::{
     BackendHarnessAdapter, BackendHarnessErrorPhase, BackendSpawn, NormalizedRequest,
+    SpawnErrorDisposition,
 };
 use crate::{
     AgentWrapperCompletion, AgentWrapperError, AgentWrapperEvent, AgentWrapperEventKind,
@@ -28,6 +29,7 @@ pub(super) fn toy_kind() -> AgentWrapperKind {
 
 pub(super) struct ToyAdapter {
     pub(super) fail_spawn: bool,
+    pub(super) spawn_error_disposition: SpawnErrorDisposition,
 }
 
 pub(super) struct ToyPolicy;
@@ -101,6 +103,10 @@ impl BackendHarnessAdapter for ToyAdapter {
                 completion: Box::pin(async move { Ok(ToyCompletion) }),
             })
         })
+    }
+
+    fn spawn_error_disposition(&self, _err: &Self::BackendError) -> SpawnErrorDisposition {
+        self.spawn_error_disposition
     }
 
     fn map_event(&self, event: Self::BackendEvent) -> Vec<AgentWrapperEvent> {

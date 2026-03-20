@@ -10,6 +10,7 @@ use super::super::{
     BackendDefaults, BackendHarnessAdapter, BackendHarnessErrorPhase, NormalizedRequest,
 };
 use super::{normalize_request, parse_ext_bool, parse_ext_string_enum};
+use crate::backend_harness::SpawnErrorDisposition;
 use crate::{AgentWrapperCompletion, AgentWrapperError, AgentWrapperRunRequest};
 
 mod c02_add_dirs;
@@ -521,7 +522,10 @@ fn bh_r0_resume_fork_contradiction_applies_only_after_all_keys_are_supported_via
 #[test]
 fn bh_c02_multiple_unknown_extension_keys_report_lexicographically_smallest_via_normalize_request()
 {
-    let adapter = ToyAdapter { fail_spawn: false };
+    let adapter = ToyAdapter {
+        fail_spawn: false,
+        spawn_error_disposition: SpawnErrorDisposition::SurfaceViaHandle,
+    };
     let defaults = BackendDefaults::default();
     let mut request = AgentWrapperRunRequest {
         prompt: "hello".to_string(),
@@ -548,7 +552,10 @@ fn bh_c02_multiple_unknown_extension_keys_report_lexicographically_smallest_via_
 
 #[test]
 fn bh_c02_all_keys_allowed_passes_via_normalize_request() {
-    let adapter = ToyAdapter { fail_spawn: false };
+    let adapter = ToyAdapter {
+        fail_spawn: false,
+        spawn_error_disposition: SpawnErrorDisposition::SurfaceViaHandle,
+    };
     let defaults = BackendDefaults::default();
     let mut request = AgentWrapperRunRequest {
         prompt: "hello".to_string(),
@@ -569,7 +576,10 @@ fn bh_c02_all_keys_allowed_passes_via_normalize_request() {
 
 #[test]
 fn bh_c03_env_merge_precedence_via_normalize_request() {
-    let adapter = ToyAdapter { fail_spawn: false };
+    let adapter = ToyAdapter {
+        fail_spawn: false,
+        spawn_error_disposition: SpawnErrorDisposition::SurfaceViaHandle,
+    };
     let defaults = BackendDefaults {
         env: BTreeMap::from([
             ("A".to_string(), "1".to_string()),
@@ -591,7 +601,10 @@ fn bh_c03_env_merge_precedence_via_normalize_request() {
 
 #[test]
 fn bh_c03_env_merge_empty_cases_via_normalize_request() {
-    let adapter = ToyAdapter { fail_spawn: false };
+    let adapter = ToyAdapter {
+        fail_spawn: false,
+        spawn_error_disposition: SpawnErrorDisposition::SurfaceViaHandle,
+    };
 
     let defaults = BackendDefaults {
         env: BTreeMap::new(),

@@ -83,6 +83,7 @@ async fn run_claude_assertion_with_adapter(
             ..Default::default()
         },
     )
+    .await
     .expect("Claude run should start");
 
     let mut events = handle.events;

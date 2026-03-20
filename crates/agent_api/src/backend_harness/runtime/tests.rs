@@ -25,4 +25,5 @@ mod completion_sender;
 mod control_entrypoint;
 mod pump_backend_events;
 mod pump_backend_events_with_cancel;
+mod spawn_error_disposition;
 mod support;

@@ -2,7 +2,10 @@ use super::*;
 
 #[tokio::test]
 async fn completion_sender_selects_cancelled_error_but_waits_for_backend_exit() {
-    let adapter = std::sync::Arc::new(ToyAdapter { fail_spawn: false });
+    let adapter = std::sync::Arc::new(ToyAdapter {
+        fail_spawn: false,
+        spawn_error_disposition: contract::SpawnErrorDisposition::SurfaceViaHandle,
+    });
     let cancel = HarnessCancelSignal::new();
 
     let term_calls = std::sync::Arc::new(AtomicUsize::new(0));
@@ -55,7 +58,10 @@ async fn completion_sender_selects_cancelled_error_but_waits_for_backend_exit() 
 
 #[tokio::test]
 async fn completion_sender_preserves_backend_outcome_when_completion_wins() {
-    let adapter = std::sync::Arc::new(ToyAdapter { fail_spawn: false });
+    let adapter = std::sync::Arc::new(ToyAdapter {
+        fail_spawn: false,
+        spawn_error_disposition: contract::SpawnErrorDisposition::SurfaceViaHandle,
+    });
     let cancel = HarnessCancelSignal::new();
 
     let term_calls = std::sync::Arc::new(AtomicUsize::new(0));

@@ -9,7 +9,10 @@ use super::super::test_support::{success_exit_status, ToyAdapter, ToyPolicy};
 
 #[tokio::test]
 async fn toy_adapter_success_smoke() {
-    let adapter = ToyAdapter { fail_spawn: false };
+    let adapter = ToyAdapter {
+        fail_spawn: false,
+        spawn_error_disposition: SpawnErrorDisposition::SurfaceViaHandle,
+    };
 
     let request = AgentWrapperRunRequest {
         prompt: "hello".to_string(),
@@ -55,7 +58,10 @@ async fn toy_adapter_success_smoke() {
 
 #[tokio::test]
 async fn toy_adapter_spawn_failure_is_redacted() {
-    let adapter = ToyAdapter { fail_spawn: true };
+    let adapter = ToyAdapter {
+        fail_spawn: true,
+        spawn_error_disposition: SpawnErrorDisposition::SurfaceViaHandle,
+    };
     let req = NormalizedRequest {
         agent_kind: adapter.kind(),
         prompt: "hello".to_string(),

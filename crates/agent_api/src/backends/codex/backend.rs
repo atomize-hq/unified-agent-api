@@ -183,7 +183,7 @@ impl AgentWrapperBackend for CodexBackend {
                 default_timeout: config.default_timeout,
             };
 
-            crate::backend_harness::run_harnessed_backend(adapter, defaults, request)
+            crate::backend_harness::run_harnessed_backend(adapter, defaults, request).await
         })
     }
 
@@ -230,6 +230,7 @@ impl AgentWrapperBackend for CodexBackend {
                 request,
                 request_termination,
             )
+            .await
         })
     }
 }

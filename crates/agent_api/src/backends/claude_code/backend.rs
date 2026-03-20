@@ -190,7 +190,7 @@ impl AgentWrapperBackend for ClaudeCodeBackend {
                 default_timeout: config.default_timeout,
             };
 
-            crate::backend_harness::run_harnessed_backend(adapter, defaults, request)
+            crate::backend_harness::run_harnessed_backend(adapter, defaults, request).await
         })
     }
 
@@ -236,6 +236,7 @@ impl AgentWrapperBackend for ClaudeCodeBackend {
                 request,
                 request_termination,
             )
+            .await
         })
     }
 }

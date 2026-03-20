@@ -1,8 +1,12 @@
 use super::*;
+use crate::backend_harness::SpawnErrorDisposition;
 
 #[test]
 fn bh_c03_timeout_derivation_matrix_via_normalize_request() {
-    let adapter = ToyAdapter { fail_spawn: false };
+    let adapter = ToyAdapter {
+        fail_spawn: false,
+        spawn_error_disposition: SpawnErrorDisposition::SurfaceViaHandle,
+    };
 
     struct Case {
         request: Option<Duration>,
@@ -50,7 +54,10 @@ fn bh_c03_timeout_derivation_matrix_via_normalize_request() {
 
 #[test]
 fn bh_c03_timeout_duration_zero_is_preserved_via_normalize_request() {
-    let adapter = ToyAdapter { fail_spawn: false };
+    let adapter = ToyAdapter {
+        fail_spawn: false,
+        spawn_error_disposition: SpawnErrorDisposition::SurfaceViaHandle,
+    };
     let defaults = BackendDefaults {
         env: BTreeMap::new(),
         default_timeout: Some(Duration::from_secs(7)),

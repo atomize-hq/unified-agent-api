@@ -4,7 +4,10 @@ use super::support::{ControlledEndStream, CountingStream};
 
 #[tokio::test]
 async fn pump_backend_events_smoke_forwards_in_order() {
-    let adapter = std::sync::Arc::new(ToyAdapter { fail_spawn: false });
+    let adapter = std::sync::Arc::new(ToyAdapter {
+        fail_spawn: false,
+        spawn_error_disposition: contract::SpawnErrorDisposition::SurfaceViaHandle,
+    });
     let events = futures_util::stream::iter([
         Ok::<ToyEvent, ToyBackendError>(ToyEvent::Text("one".to_string())),
         Ok::<ToyEvent, ToyBackendError>(ToyEvent::Text("two".to_string())),
@@ -161,7 +164,10 @@ async fn pump_stops_forwarding_after_receiver_drop_but_drains_to_end() {
     };
     let events: DynBackendEventStream<_, _> = Box::pin(events);
 
-    let adapter = std::sync::Arc::new(ToyAdapter { fail_spawn: false });
+    let adapter = std::sync::Arc::new(ToyAdapter {
+        fail_spawn: false,
+        spawn_error_disposition: contract::SpawnErrorDisposition::SurfaceViaHandle,
+    });
     let (tx, mut rx) = mpsc::channel::<crate::AgentWrapperEvent>(1);
     let handle = tokio::spawn(pump_backend_events(adapter, events, tx));
 
@@ -278,7 +284,10 @@ async fn pump_finality_sender_dropped_only_after_backend_stream_ends() {
     };
     let events: DynBackendEventStream<_, _> = Box::pin(events);
 
-    let adapter = std::sync::Arc::new(ToyAdapter { fail_spawn: false });
+    let adapter = std::sync::Arc::new(ToyAdapter {
+        fail_spawn: false,
+        spawn_error_disposition: contract::SpawnErrorDisposition::SurfaceViaHandle,
+    });
     let (tx, mut rx) = mpsc::channel::<crate::AgentWrapperEvent>(8);
     let handle = tokio::spawn(pump_backend_events(adapter, events, tx));
 

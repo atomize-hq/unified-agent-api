@@ -21,7 +21,7 @@ use super::{
 use crate::{
     backend_harness::{
         normalize_add_dirs_v1, BackendHarnessAdapter, BackendHarnessErrorPhase, BackendSpawn,
-        DynBackendEventStream, NormalizedRequest,
+        DynBackendEventStream, NormalizedRequest, SpawnErrorDisposition,
     },
     backends::spawn_path::resolve_effective_working_dir,
     AgentWrapperCompletion, AgentWrapperError, AgentWrapperEvent, AgentWrapperEventKind,
@@ -391,7 +391,12 @@ impl BackendHarnessAdapter for CodexHarnessAdapter {
                 .await
             } {
                 Ok(spawned) => spawned,
-                Err(err) if external_sandbox => return Ok(startup_failure_spawn(err, true)),
+                Err(err)
+                    if external_sandbox
+                        && !matches!(err, CodexBackendError::AddDirsRejectedByRuntime) =>
+                {
+                    return Ok(startup_failure_spawn(err, true));
+                }
                 Err(err) => return Err(err),
             };
 
@@ -407,6 +412,13 @@ impl BackendHarnessAdapter for CodexHarnessAdapter {
 
             Ok(BackendSpawn { events, completion })
         })
+    }
+
+    fn spawn_error_disposition(&self, err: &Self::BackendError) -> SpawnErrorDisposition {
+        match err {
+            CodexBackendError::AddDirsRejectedByRuntime => SpawnErrorDisposition::ReturnDirectly,
+            _ => SpawnErrorDisposition::SurfaceViaHandle,
+        }
     }
 
     fn map_event(&self, event: Self::BackendEvent) -> Vec<AgentWrapperEvent> {
