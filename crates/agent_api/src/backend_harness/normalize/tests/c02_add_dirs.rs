@@ -8,6 +8,8 @@ use tempfile::{tempdir, TempDir};
 
 use super::super::normalize_add_dirs_v1;
 use crate::AgentWrapperError;
+#[cfg(windows)]
+use std::path::Component;
 
 // Top-level shape
 
@@ -231,6 +233,22 @@ fn ad_c02_resolves_relative_entries_from_effective_working_dir_only() {
     assert_ne!(normalized, vec![decoy_root]);
 }
 
+#[cfg(windows)]
+#[test]
+fn ad_c02_resolves_drive_relative_entries_from_effective_working_dir_only() {
+    let fixtures = AddDirFixtures::new();
+    let docs = fixtures.create_effective_dir("docs");
+    let drive_relative_docs = windows_drive_relative("docs", fixtures.effective_working_dir());
+    let payload = add_dirs_payload(vec![json!(drive_relative_docs
+        .to_string_lossy()
+        .to_string())]);
+
+    let normalized =
+        normalize_add_dirs_v1(Some(&payload), fixtures.effective_working_dir()).expect("normalize");
+
+    assert_eq!(normalized, vec![docs]);
+}
+
 #[test]
 fn ad_c02_lexically_normalizes_and_deduplicates_while_preserving_first_order() {
     let fixtures = AddDirFixtures::new();
@@ -262,6 +280,18 @@ fn ad_c02_allows_resolved_directories_outside_effective_working_dir() {
 
 fn add_dirs_payload(dirs: Vec<Value>) -> Value {
     json!({ "dirs": dirs })
+}
+
+#[cfg(windows)]
+fn windows_drive_relative(relative: &str, absolute_path: &Path) -> PathBuf {
+    let prefix = absolute_path
+        .components()
+        .find_map(|component| match component {
+            Component::Prefix(value) => Some(value.as_os_str().to_string_lossy().into_owned()),
+            _ => None,
+        })
+        .expect("absolute windows path should include a prefix");
+    PathBuf::from(format!("{prefix}{relative}"))
 }
 
 fn assert_invalid_message(

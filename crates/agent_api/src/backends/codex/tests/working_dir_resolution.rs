@@ -1,5 +1,7 @@
 use std::{collections::BTreeMap, path::PathBuf, sync::Arc, time::Duration};
 
+#[cfg(windows)]
+use std::path::{Component, Path};
 use tempfile::tempdir;
 
 use super::support::*;
@@ -142,4 +144,48 @@ async fn codex_exec_resolves_relative_default_working_dir_before_add_dirs_and_sp
     };
 
     assert_exec_add_dirs_case(config, run_start_cwd, None).await;
+}
+
+#[cfg(windows)]
+#[tokio::test]
+async fn codex_exec_resolves_drive_relative_request_working_dir_before_add_dirs_and_spawn() {
+    let temp = tempdir().expect("tempdir");
+    let run_start_cwd = temp.path().join("run-start");
+    let expected_cwd = run_start_cwd.join("repo");
+    let expected_add_dir = expected_cwd.join("docs");
+    std::fs::create_dir_all(&expected_add_dir).expect("create add-dir target");
+
+    let config = CodexBackendConfig {
+        binary: Some(fake_codex_binary()),
+        env: base_env()
+            .into_iter()
+            .chain(add_dir_expectations(std::slice::from_ref(
+                &expected_add_dir,
+            )))
+            .chain([(
+                "FAKE_CODEX_EXPECT_CWD".to_string(),
+                expected_cwd.display().to_string(),
+            )])
+            .collect(),
+        ..Default::default()
+    };
+
+    assert_exec_add_dirs_case(
+        config,
+        run_start_cwd.clone(),
+        Some(windows_drive_relative("repo", &run_start_cwd)),
+    )
+    .await;
+}
+
+#[cfg(windows)]
+fn windows_drive_relative(relative: &str, absolute_path: &Path) -> PathBuf {
+    let prefix = absolute_path
+        .components()
+        .find_map(|component| match component {
+            Component::Prefix(value) => Some(value.as_os_str().to_string_lossy().into_owned()),
+            _ => None,
+        })
+        .expect("absolute windows path should include a prefix");
+    PathBuf::from(format!("{prefix}{relative}"))
 }

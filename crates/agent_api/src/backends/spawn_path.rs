@@ -7,6 +7,8 @@ use std::{
 
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
+#[cfg(windows)]
+use std::path::{Component, Prefix};
 
 pub(super) fn resolve_binary_path_for_spawn(
     binary_path: PathBuf,
@@ -40,9 +42,22 @@ pub(crate) fn resolve_effective_working_dir(
 
     match selected {
         Some(path) if path.is_absolute() => Some(path.to_path_buf()),
-        Some(path) => run_start_cwd.map(|base| base.join(path)),
+        Some(path) => run_start_cwd.map(|base| resolve_relative_path_from_base(&base, path)),
         None => run_start_cwd,
     }
+}
+
+pub(crate) fn resolve_relative_path_from_base(base: &Path, path: &Path) -> PathBuf {
+    if path.is_absolute() {
+        return path.to_path_buf();
+    }
+
+    #[cfg(windows)]
+    if let Some(relative_tail) = windows_drive_relative_tail(path) {
+        return base.join(relative_tail);
+    }
+
+    base.join(path)
 }
 
 fn resolve_path_qualified_binary(binary_path: PathBuf, invocation_cwd: Option<&Path>) -> PathBuf {
@@ -75,9 +90,33 @@ fn effective_base_dir(base_dir: Option<&Path>) -> Option<PathBuf> {
 fn resolve_run_start_cwd(run_start_cwd: Option<&Path>) -> Option<PathBuf> {
     match run_start_cwd {
         Some(path) if path.is_absolute() => Some(path.to_path_buf()),
-        Some(path) => env::current_dir().ok().map(|cwd| cwd.join(path)),
+        Some(path) => env::current_dir()
+            .ok()
+            .map(|cwd| resolve_relative_path_from_base(&cwd, path)),
         None => None,
     }
+}
+
+#[cfg(windows)]
+fn windows_drive_relative_tail(path: &Path) -> Option<PathBuf> {
+    let mut components = path.components();
+    let Component::Prefix(prefix) = components.next()? else {
+        return None;
+    };
+
+    if !matches!(prefix.kind(), Prefix::Disk(_) | Prefix::VerbatimDisk(_)) {
+        return None;
+    }
+
+    let mut relative_tail = PathBuf::new();
+    for component in components {
+        if matches!(component, Component::RootDir) {
+            return None;
+        }
+        relative_tail.push(component.as_os_str());
+    }
+
+    Some(relative_tail)
 }
 
 fn find_binary_on_path(
@@ -162,6 +201,8 @@ mod tests {
 
     use super::resolve_binary_path_for_spawn;
     use super::resolve_effective_working_dir;
+    #[cfg(windows)]
+    use std::path::Component;
 
     #[cfg(unix)]
     use std::os::unix::fs::PermissionsExt;
@@ -296,6 +337,32 @@ mod tests {
         );
     }
 
+    #[cfg(windows)]
+    #[test]
+    fn resolves_drive_relative_request_working_dir_against_run_start_cwd() {
+        let run_start = TempDir::new().expect("run start dir");
+        let relative = windows_drive_relative("repo", run_start.path());
+
+        let resolved =
+            resolve_effective_working_dir(Some(relative.as_path()), None, Some(run_start.path()))
+                .expect("working dir should resolve");
+
+        assert_eq!(resolved, run_start.path().join("repo"));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn resolves_drive_relative_default_working_dir_against_run_start_cwd() {
+        let run_start = TempDir::new().expect("run start dir");
+        let relative = windows_drive_relative("repo", run_start.path());
+
+        let resolved =
+            resolve_effective_working_dir(None, Some(relative.as_path()), Some(run_start.path()))
+                .expect("working dir should resolve");
+
+        assert_eq!(resolved, run_start.path().join("repo"));
+    }
+
     #[test]
     fn falls_back_to_run_start_cwd_when_request_and_default_are_absent() {
         let run_start = TempDir::new().expect("run start dir");
@@ -337,6 +404,18 @@ mod tests {
             !wrapper_candidate.exists(),
             "resolution must not use an unrelated wrapper cwd"
         );
+    }
+
+    #[cfg(windows)]
+    fn windows_drive_relative(relative: &str, absolute_path: &Path) -> PathBuf {
+        let prefix = absolute_path
+            .components()
+            .find_map(|component| match component {
+                Component::Prefix(value) => Some(value.as_os_str().to_string_lossy().into_owned()),
+                _ => None,
+            })
+            .expect("absolute windows path should include a prefix");
+        PathBuf::from(format!("{prefix}{relative}"))
     }
 
     #[cfg(unix)]

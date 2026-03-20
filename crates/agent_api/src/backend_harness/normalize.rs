@@ -8,6 +8,7 @@ use std::{
 use serde_json::Value;
 
 use super::{BackendDefaults, BackendHarnessAdapter, NormalizedRequest};
+use crate::backends::spawn_path::resolve_relative_path_from_base;
 use crate::{AgentWrapperError, AgentWrapperRunRequest};
 
 const ADD_DIRS_KEY: &str = "dirs";
@@ -164,11 +165,7 @@ fn normalize_add_dir_entry(
     }
 
     let candidate = Path::new(trimmed);
-    let resolved = if candidate.is_absolute() {
-        candidate.to_path_buf()
-    } else {
-        effective_working_dir.join(candidate)
-    };
+    let resolved = resolve_relative_path_from_base(effective_working_dir, candidate);
     let normalized = lexical_normalize_path(&resolved);
 
     if !normalized.exists() || !normalized.is_dir() {
