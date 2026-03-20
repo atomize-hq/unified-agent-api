@@ -67,6 +67,7 @@ fn claude_backend_mcp_write_hooks_route_through_shared_mcp_runner() {
 fn claude_downstream_mapping_surfaces_do_not_reopen_raw_add_dirs_parsing() {
     const RAW_KEY: &str = "agent_api.exec.add_dirs.v1";
     const BACKEND_SOURCE: &str = include_str!("../backend.rs");
+    const HARNESS_SOURCE: &str = include_str!("../harness.rs");
     const MAPPING_SOURCE: &str = include_str!("../mapping.rs");
     const MCP_ARGV_SOURCE: &str = include_str!("../mcp_management/argv.rs");
     const MCP_RESOLVE_SOURCE: &str = include_str!("../mcp_management/resolve.rs");
@@ -91,6 +92,14 @@ fn claude_downstream_mapping_surfaces_do_not_reopen_raw_add_dirs_parsing() {
     assert!(
         !MCP_RUNNER_SOURCE.contains(RAW_KEY),
         "expected mcp runner helpers to avoid raw add-dir payload parsing"
+    );
+    assert!(
+        HARNESS_SOURCE.contains("normalize_add_dirs_v1"),
+        "expected harness.rs to keep add-dir normalization on the shared helper path"
+    );
+    assert!(
+        HARNESS_SOURCE.contains(".add_dirs("),
+        "expected harness.rs to map normalized add dirs into ClaudePrintRequest"
     );
 }
 

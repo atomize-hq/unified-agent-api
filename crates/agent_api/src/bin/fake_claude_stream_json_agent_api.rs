@@ -110,11 +110,33 @@ fn expected_add_dirs() -> Option<Vec<String>> {
 }
 
 fn assert_add_dirs(args: &[String], out: &mut dyn Write) {
+    if env_is_true("FAKE_CLAUDE_EXPECT_NO_ADD_DIR") {
+        if has_flag(args, "--add-dir") {
+            fail(out, "assertion failed: expected --add-dir to be absent");
+        }
+        return;
+    }
+
     let Some(expected) = expected_add_dirs() else {
         return;
     };
 
-    let Some(add_dir_idx) = args.iter().position(|arg| arg == "--add-dir") else {
+    let add_dir_indices: Vec<usize> = args
+        .iter()
+        .enumerate()
+        .filter_map(|(idx, arg)| (arg == "--add-dir").then_some(idx))
+        .collect();
+    if add_dir_indices.len() != 1 {
+        fail(
+            out,
+            &format!(
+                "assertion failed: expected exactly one --add-dir flag, got {}",
+                add_dir_indices.len()
+            ),
+        );
+    }
+
+    let Some(add_dir_idx) = add_dir_indices.into_iter().next() else {
         fail(out, "assertion failed: missing --add-dir");
     };
 
@@ -297,6 +319,29 @@ fn main() -> io::Result<()> {
     let user = first_nonempty_line(USER_MESSAGE);
 
     match scenario.as_str() {
+        "fresh_assert" => {
+            let expected_prompt = require("FAKE_CLAUDE_EXPECT_PROMPT");
+            if args.last() != Some(&expected_prompt) {
+                fail(
+                    &mut out,
+                    "assertion failed: prompt must be final argv token",
+                );
+            }
+            if !has_flag(&args, "--verbose") {
+                fail(&mut out, "assertion failed: missing --verbose");
+            }
+
+            let subseq = selector_assertion_subsequence(&["--verbose", &expected_prompt]);
+            let ok = contains_ordered_subsequence(
+                &args,
+                &subseq.iter().map(String::as_str).collect::<Vec<_>>(),
+            );
+            if !ok {
+                fail(&mut out, "assertion failed: missing fresh argv subsequence");
+            }
+
+            write_line(&mut out, &format!("{init}\n"))?;
+        }
         "fork_last_assert" => {
             let expected_prompt = require("FAKE_CLAUDE_EXPECT_PROMPT");
             if args.last() != Some(&expected_prompt) {

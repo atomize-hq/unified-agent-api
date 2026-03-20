@@ -22,6 +22,32 @@ fn claude_policy_add_dirs_absent_key_returns_empty_vec() {
 }
 
 #[test]
+fn claude_policy_add_dirs_supported_extension_allowlist_admits_key() {
+    let adapter = new_adapter();
+    assert!(adapter
+        .supported_extension_keys()
+        .contains(&EXT_ADD_DIRS_V1));
+
+    let temp = tempdir().expect("tempdir");
+    let request_root = temp.path().join("request-root");
+    let request_docs = request_root.join("docs");
+    fs::create_dir_all(&request_docs).expect("create request docs");
+
+    let defaults = crate::backend_harness::BackendDefaults::default();
+    let request = AgentWrapperRunRequest {
+        prompt: "hello".to_string(),
+        working_dir: Some(request_root),
+        extensions: [(EXT_ADD_DIRS_V1.to_string(), add_dirs_payload(&["docs"]))]
+            .into_iter()
+            .collect(),
+        ..Default::default()
+    };
+
+    crate::backend_harness::normalize_request(&adapter, &defaults, request)
+        .expect("add-dir extension key should pass Claude allowlist gating");
+}
+
+#[test]
 fn claude_policy_add_dirs_request_working_dir_beats_default_and_run_start_cwd() {
     let temp = tempdir().expect("tempdir");
     let request_root = temp.path().join("request-root");

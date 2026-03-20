@@ -27,7 +27,9 @@ fn claude_add_dirs_capability_and_supported_key_surfaces_stay_aligned() {
     assert!(backend.capabilities().contains(EXT_ADD_DIRS_V1));
 
     let default_adapter = new_adapter();
-    assert!(default_adapter.supported_extension_keys().contains(&EXT_ADD_DIRS_V1));
+    assert!(default_adapter
+        .supported_extension_keys()
+        .contains(&EXT_ADD_DIRS_V1));
 
     let external_sandbox_adapter = new_adapter_with_config(ClaudeCodeBackendConfig {
         allow_external_sandbox_exec: true,

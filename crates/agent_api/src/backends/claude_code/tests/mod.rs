@@ -1,3 +1,4 @@
+mod add_dirs_argv;
 mod backend_contract;
 mod capabilities;
 mod external_sandbox;

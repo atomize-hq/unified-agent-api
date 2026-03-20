@@ -1,6 +1,7 @@
 use claude_code::{ClaudeStreamJsonEvent, ClaudeStreamJsonParser};
+use futures_core::Stream;
 use serde_json::json;
-use std::path::PathBuf;
+use std::{collections::BTreeMap, path::PathBuf, pin::Pin, time::Duration};
 
 pub(super) use super::super::harness::ClaudeBackendEvent;
 pub(super) use super::super::*;
@@ -142,6 +143,41 @@ pub(super) fn new_adapter_with_config_and_run_start_cwd(
     new_test_adapter_with_run_start_cwd(config, run_start_cwd)
 }
 
+pub(super) fn fake_claude_binary() -> PathBuf {
+    if let Some(path) = std::env::var_os("CARGO_BIN_EXE_fake_claude_stream_json_agent_api") {
+        return PathBuf::from(path);
+    }
+
+    let current_exe = std::env::current_exe().expect("resolve current test binary path");
+    let target_dir = current_exe
+        .parent()
+        .and_then(|dir| dir.parent())
+        .expect("resolve target dir from current test binary");
+    let mut binary = target_dir.join("fake_claude_stream_json_agent_api");
+    if cfg!(windows) {
+        binary.set_extension("exe");
+    }
+    binary
+}
+
+pub(super) fn expected_add_dirs_env(dirs: &[PathBuf]) -> BTreeMap<String, String> {
+    let mut env = BTreeMap::from([(
+        "FAKE_CLAUDE_EXPECT_ADD_DIR_COUNT".to_string(),
+        dirs.len().to_string(),
+    )]);
+    for (index, dir) in dirs.iter().enumerate() {
+        env.insert(
+            format!("FAKE_CLAUDE_EXPECT_ADD_DIR_{index}"),
+            dir.display().to_string(),
+        );
+    }
+    env
+}
+
+pub(super) fn expect_no_add_dir_env() -> BTreeMap<String, String> {
+    BTreeMap::from([("FAKE_CLAUDE_EXPECT_NO_ADD_DIR".to_string(), "1".to_string())])
+}
+
 pub(super) fn add_dirs_payload(dirs: &[impl AsRef<str>]) -> JsonValue {
     json!({
         "dirs": dirs.iter().map(|dir| dir.as_ref()).collect::<Vec<_>>()
@@ -162,4 +198,27 @@ pub(super) fn handle_facet_schema(event: &crate::AgentWrapperEvent) -> Option<&s
         .as_ref()
         .and_then(|v| v.get("schema"))
         .and_then(|v| v.as_str())
+}
+
+pub(super) async fn drain_to_none(
+    mut stream: Pin<&mut (dyn Stream<Item = AgentWrapperEvent> + Send)>,
+    timeout: Duration,
+) -> Vec<AgentWrapperEvent> {
+    let mut out = Vec::new();
+    let deadline = tokio::time::sleep(timeout);
+    tokio::pin!(deadline);
+
+    loop {
+        tokio::select! {
+            _ = &mut deadline => break,
+            item = std::future::poll_fn(|cx| stream.as_mut().poll_next(cx)) => {
+                match item {
+                    Some(ev) => out.push(ev),
+                    None => break,
+                }
+            }
+        }
+    }
+
+    out
 }
