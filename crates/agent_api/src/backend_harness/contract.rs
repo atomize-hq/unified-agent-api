@@ -14,12 +14,6 @@ pub(crate) type DynBackendCompletionFuture<C, BE> =
     Pin<Box<dyn Future<Output = Result<C, BE>> + Send + 'static>>;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum SpawnErrorDisposition {
-    SurfaceViaHandle,
-    ReturnDirectly,
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum BackendHarnessErrorPhase {
     Spawn,
     Stream,
@@ -107,10 +101,6 @@ pub(crate) trait BackendHarnessAdapter: Send + Sync + 'static {
                 + 'static,
         >,
     >;
-
-    fn spawn_error_disposition(&self, _err: &Self::BackendError) -> SpawnErrorDisposition {
-        SpawnErrorDisposition::SurfaceViaHandle
-    }
 
     /// Maps one typed backend event into 0..N universal events.
     ///

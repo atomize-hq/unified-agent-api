@@ -9,7 +9,7 @@ use tokio::sync::{mpsc, oneshot, Notify};
 use super::normalize_request;
 use super::{
     BackendDefaults, BackendHarnessAdapter, BackendHarnessErrorPhase, BackendSpawn,
-    DynBackendCompletionFuture, DynBackendEventStream, NormalizedRequest, SpawnErrorDisposition,
+    DynBackendCompletionFuture, DynBackendEventStream, NormalizedRequest,
 };
 use crate::{
     AgentWrapperCancelHandle, AgentWrapperCompletion, AgentWrapperError, AgentWrapperEvent,
@@ -154,6 +154,34 @@ async fn drive_control_backend_startup<A: BackendHarnessAdapter>(
             ));
         }
     }
+}
+
+fn start_backend_runtime<A: BackendHarnessAdapter>(
+    adapter: Arc<A>,
+    spawned: BackendSpawn<A::BackendEvent, A::BackendCompletion, A::BackendError>,
+    tx: mpsc::Sender<AgentWrapperEvent>,
+    completion_tx: oneshot::Sender<Result<AgentWrapperCompletion, AgentWrapperError>>,
+) {
+    let BackendSpawn { events, completion } = spawned;
+
+    tokio::spawn({
+        let adapter = adapter.clone();
+        async move {
+            let completion_outcome = completion.await;
+            let completion_outcome: Result<AgentWrapperCompletion, AgentWrapperError> =
+                match completion_outcome {
+                    Ok(typed) => adapter.map_completion(typed),
+                    Err(err) => Err(AgentWrapperError::Backend {
+                        message: adapter.redact_error(BackendHarnessErrorPhase::Completion, &err),
+                    }),
+                }
+                .map(crate::bounds::enforce_completion_bounds);
+
+            let _ = completion_tx.send(completion_outcome);
+        }
+    });
+
+    tokio::spawn(pump_backend_events(adapter, events, tx));
 }
 
 async fn pump_backend_events<A: BackendHarnessAdapter>(
@@ -351,53 +379,23 @@ pub(crate) async fn run_harnessed_backend<A: BackendHarnessAdapter>(
 ) -> Result<AgentWrapperRunHandle, AgentWrapperError> {
     let normalized = normalize_request(adapter.as_ref(), &defaults, request)?;
     let agent_kind = normalized.agent_kind.clone();
-
-    let spawn_outcome = adapter.spawn(normalized).await;
-    let spawned = match spawn_outcome {
-        Ok(spawned) => spawned,
-        Err(err) => {
-            let message = adapter.redact_error(BackendHarnessErrorPhase::Spawn, &err);
-            if adapter.spawn_error_disposition(&err) == SpawnErrorDisposition::ReturnDirectly {
-                return Err(AgentWrapperError::Backend { message });
-            }
-
-            let (tx, rx) =
-                mpsc::channel::<AgentWrapperEvent>(super::DEFAULT_EVENT_CHANNEL_CAPACITY);
-            let (completion_tx, completion_rx) =
-                oneshot::channel::<Result<AgentWrapperCompletion, AgentWrapperError>>();
-
-            surface_spawn_failure(agent_kind, message, tx, completion_tx).await;
-
-            return Ok(crate::run_handle_gate::build_gated_run_handle(
-                rx,
-                completion_rx,
-            ));
-        }
-    };
-
     let (tx, rx) = mpsc::channel::<AgentWrapperEvent>(super::DEFAULT_EVENT_CHANNEL_CAPACITY);
     let (completion_tx, completion_rx) =
         oneshot::channel::<Result<AgentWrapperCompletion, AgentWrapperError>>();
-    let BackendSpawn { events, completion } = spawned;
 
-    tokio::spawn({
-        let adapter = adapter.clone();
-        async move {
-            let completion_outcome = completion.await;
-            let completion_outcome: Result<AgentWrapperCompletion, AgentWrapperError> =
-                match completion_outcome {
-                    Ok(typed) => adapter.map_completion(typed),
-                    Err(err) => Err(AgentWrapperError::Backend {
-                        message: adapter.redact_error(BackendHarnessErrorPhase::Completion, &err),
-                    }),
-                }
-                .map(crate::bounds::enforce_completion_bounds);
+    tokio::spawn(async move {
+        let spawn_outcome = adapter.spawn(normalized).await;
+        let spawned = match spawn_outcome {
+            Ok(spawned) => spawned,
+            Err(err) => {
+                let message = adapter.redact_error(BackendHarnessErrorPhase::Spawn, &err);
+                surface_spawn_failure(agent_kind, message, tx, completion_tx).await;
+                return;
+            }
+        };
 
-            let _ = completion_tx.send(completion_outcome);
-        }
+        start_backend_runtime(adapter, spawned, tx, completion_tx);
     });
-
-    tokio::spawn(pump_backend_events(adapter, events, tx));
 
     Ok(crate::run_handle_gate::build_gated_run_handle(
         rx,

@@ -19,7 +19,7 @@ mod test_support;
 pub(crate) use contract::DynBackendCompletionFuture;
 pub(crate) use contract::{
     BackendDefaults, BackendHarnessAdapter, BackendHarnessErrorPhase, BackendSpawn,
-    DynBackendEventStream, NormalizedRequest, SpawnErrorDisposition,
+    DynBackendEventStream, NormalizedRequest,
 };
 #[allow(unused_imports)]
 pub(crate) use normalize::{normalize_add_dirs_v1, normalize_request};

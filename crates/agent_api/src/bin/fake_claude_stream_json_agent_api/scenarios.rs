@@ -51,6 +51,13 @@ pub(crate) fn run(args: Vec<String>) -> io::Result<()> {
 fn handle_help() -> io::Result<()> {
     maybe_log_invocation("help");
 
+    if let Ok(delay_ms) = env::var("FAKE_CLAUDE_HELP_DELAY_MS") {
+        let delay_ms = delay_ms
+            .parse::<u64>()
+            .unwrap_or_else(|_| panic!("invalid FAKE_CLAUDE_HELP_DELAY_MS={delay_ms}"));
+        thread::sleep(Duration::from_millis(delay_ms));
+    }
+
     if env_is_true("FAKE_CLAUDE_HELP_FAIL") {
         let secret = env::var("FAKE_CLAUDE_HELP_FAIL_SECRET")
             .unwrap_or_else(|_| panic!("missing required env var FAKE_CLAUDE_HELP_FAIL_SECRET"));

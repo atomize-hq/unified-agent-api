@@ -20,10 +20,7 @@ async fn pump_with_cancel_closes_universal_stream_but_still_drains_typed_stream(
     };
     let events: DynBackendEventStream<_, _> = Box::pin(stream);
 
-    let adapter = std::sync::Arc::new(ToyAdapter {
-        fail_spawn: false,
-        spawn_error_disposition: contract::SpawnErrorDisposition::SurfaceViaHandle,
-    });
+    let adapter = std::sync::Arc::new(ToyAdapter { fail_spawn: false });
     let (tx, mut rx) = mpsc::channel::<crate::AgentWrapperEvent>(8);
     let cancel = HarnessCancelSignal::new();
     let handle = tokio::spawn(pump_backend_events_with_cancel(
@@ -69,10 +66,7 @@ async fn pump_with_cancel_preserves_drain_on_drop_posture() {
     };
     let events: DynBackendEventStream<_, _> = Box::pin(events);
 
-    let adapter = std::sync::Arc::new(ToyAdapter {
-        fail_spawn: false,
-        spawn_error_disposition: contract::SpawnErrorDisposition::SurfaceViaHandle,
-    });
+    let adapter = std::sync::Arc::new(ToyAdapter { fail_spawn: false });
     let (tx, mut rx) = mpsc::channel::<crate::AgentWrapperEvent>(1);
     let cancel = HarnessCancelSignal::new();
     let handle = tokio::spawn(pump_backend_events_with_cancel(adapter, events, tx, cancel));

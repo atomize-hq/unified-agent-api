@@ -347,8 +347,15 @@ Runtime rejection behavior (v1, normative):
   considered.
 - The `message` MUST be safe/redacted and MUST NOT embed raw backend stdout/stderr.
 - v1 does not pin a universal runtime-rejection message string for add-dir failures.
-- If the backend can determine that inability before spawning its backend surface, it MUST return
-  `AgentWrapperError::Backend { message }` without returning an `AgentWrapperRunHandle`.
+- If the backend can determine that inability before returning an `AgentWrapperRunHandle`, it MUST
+  return `AgentWrapperError::Backend { message }` directly.
+- If the backend discovers that inability during asynchronous startup/preflight after it has
+  already returned an `AgentWrapperRunHandle`, it MUST surface the failure through that handle even
+  if the backend surface was never spawned:
+  - `completion` MUST resolve as `Err(AgentWrapperError::Backend { message })`, and
+  - if the consumer-visible events stream is still open, the backend MUST emit exactly one
+    terminal `AgentWrapperEventKind::Error` event with the same safe/redacted `message` before
+    closing the stream.
 - If such failure occurs after the backend has already returned an `AgentWrapperRunHandle` and the
   consumer-visible events stream is still open, the backend MUST emit exactly one terminal
   `AgentWrapperEventKind::Error` event with the same safe/redacted message before closing the

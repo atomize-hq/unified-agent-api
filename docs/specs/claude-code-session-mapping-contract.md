@@ -73,8 +73,14 @@ Deterministic allow-flag preflight requirement (pinned):
   - parse stdout for the literal token `--allow-dangerously-skip-permissions`, and
   - cache the resulting boolean for subsequent runs.
 - If the preflight cannot be performed deterministically (non-zero exit, timeout, missing binary,
-  etc.) and the key is requested, the backend MUST fail the run **before spawning** as
-  `AgentWrapperError::Backend { message }` with a safe/redacted `message`.
+  etc.) and the key is requested, the backend MUST fail the run with
+  `AgentWrapperError::Backend { message }` using a safe/redacted `message`.
+- If that preflight failure is discovered before the backend returns a run handle, it MUST be
+  returned directly.
+- If that preflight failure is discovered during asynchronous startup after the backend has already
+  returned a run handle, it MUST be surfaced through the handle as a terminal
+  `AgentWrapperEventKind::Error` event plus the matching completion error, and Claude MUST still
+  not spawn a session.
 
 Implementation note (non-normative): keep the `--help` parser a pure function so unit tests can pin
 both the allow-flag-supported and allow-flag-not-supported cases without spawning Claude.

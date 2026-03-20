@@ -87,14 +87,41 @@ async fn assert_preflight_rejection_case(
     env.extend(extra_env);
 
     let fixture_backend = build_probe_only_backend(mode, env, None, false);
-    let err = fixture_backend
-        .backend
-        .run(run_request(
+    let handle = tokio::time::timeout(
+        std::time::Duration::from_millis(100),
+        fixture_backend.backend.run(run_request(
             "hello world",
             [add_dirs_extension(&fixture.dirs), resume_extension],
-        ))
+        )),
+    )
+    .await
+    .expect("preflight rejection should not block backend.run")
+    .expect("preflight rejection should surface through the returned handle");
+
+    let mut events = handle.events;
+    let seen = drain_to_none(events.as_mut(), STREAM_TIMEOUT).await;
+    let error_indices: Vec<_> = seen
+        .iter()
+        .enumerate()
+        .filter_map(|(idx, event)| (event.kind == AgentWrapperEventKind::Error).then_some(idx))
+        .collect();
+    assert_eq!(error_indices.len(), 1, "expected exactly one Error event");
+    let error_idx = error_indices[0];
+    assert_eq!(
+        seen[error_idx].message.as_deref(),
+        Some(ADD_DIRS_RUNTIME_REJECTION_MESSAGE)
+    );
+    assert_eq!(
+        seen.last().map(|event| event.kind.clone()),
+        Some(AgentWrapperEventKind::Error),
+        "expected Error event to be terminal"
+    );
+    assert_no_add_dir_sentinel_leaks_in_events(&seen);
+
+    let err = tokio::time::timeout(STREAM_TIMEOUT, handle.completion)
         .await
-        .expect_err("preflight rejection should fail backend.run directly");
+        .expect("completion resolves")
+        .unwrap_err();
     match err {
         AgentWrapperError::Backend { message } => {
             assert_eq!(message, ADD_DIRS_RUNTIME_REJECTION_MESSAGE);
