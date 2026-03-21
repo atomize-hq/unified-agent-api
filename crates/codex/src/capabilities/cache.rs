@@ -49,8 +49,26 @@ pub(crate) fn capability_cache() -> &'static Mutex<HashMap<CapabilityCacheKey, C
     CACHE.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
+pub(crate) fn resolve_binary_path(binary: &Path, current_dir: Option<&Path>) -> PathBuf {
+    if binary.is_absolute() {
+        return binary.to_path_buf();
+    }
+
+    current_dir
+        .map(|dir| dir.join(binary))
+        .unwrap_or_else(|| binary.to_path_buf())
+}
+
 pub(crate) fn capability_cache_key(binary: &Path) -> CapabilityCacheKey {
-    let canonical = std_fs::canonicalize(binary).unwrap_or_else(|_| binary.to_path_buf());
+    capability_cache_key_for_current_dir(binary, None)
+}
+
+pub(crate) fn capability_cache_key_for_current_dir(
+    binary: &Path,
+    current_dir: Option<&Path>,
+) -> CapabilityCacheKey {
+    let resolved = resolve_binary_path(binary, current_dir);
+    let canonical = std_fs::canonicalize(&resolved).unwrap_or(resolved);
     CapabilityCacheKey {
         binary_path: canonical,
     }

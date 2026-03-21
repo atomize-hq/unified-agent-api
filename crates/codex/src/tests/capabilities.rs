@@ -105,5 +105,6 @@ mod exec_and_login;
 mod feature_parsing_and_guards;
 mod overrides_and_probe;
 mod probe_cache_policy;
+mod probe_working_dir;
 mod snapshots_and_cache;
 mod version_and_advisory;

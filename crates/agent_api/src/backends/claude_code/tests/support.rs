@@ -3,6 +3,7 @@ use futures_core::Stream;
 use serde_json::json;
 use std::{
     collections::BTreeMap,
+    fs as std_fs,
     path::{Path, PathBuf},
     pin::Pin,
     process::Command,
@@ -179,6 +180,35 @@ fn build_fake_claude_binary(repo_root: &Path, binary: &Path) -> Result<(), Strin
     Ok(())
 }
 
+fn find_existing_fake_claude_binary(target_dir: &Path) -> Option<PathBuf> {
+    let binary_name = if cfg!(windows) {
+        "fake_claude_stream_json_agent_api.exe"
+    } else {
+        "fake_claude_stream_json_agent_api"
+    };
+    let direct_binary = target_dir.join(binary_name);
+    if direct_binary.exists() {
+        return Some(direct_binary);
+    }
+
+    let deps_dir = target_dir.join("deps");
+    let prefix = "fake_claude_stream_json_agent_api-";
+    std_fs::read_dir(&deps_dir)
+        .ok()?
+        .filter_map(Result::ok)
+        .map(|entry| entry.path())
+        .find(|path| {
+            let Some(file_name) = path.file_name().and_then(|name| name.to_str()) else {
+                return false;
+            };
+            if cfg!(windows) {
+                file_name.starts_with(prefix) && file_name.ends_with(".exe")
+            } else {
+                file_name.starts_with(prefix) && !file_name.contains('.')
+            }
+        })
+}
+
 pub(super) fn fake_claude_binary() -> PathBuf {
     static BUILT_BINARY: OnceLock<Result<PathBuf, String>> = OnceLock::new();
 
@@ -194,12 +224,13 @@ pub(super) fn fake_claude_binary() -> PathBuf {
         .parent()
         .and_then(|dir| dir.parent())
         .expect("resolve target dir from current test binary");
+    if let Some(binary) = find_existing_fake_claude_binary(target_dir) {
+        return binary;
+    }
+
     let mut binary = target_dir.join("fake_claude_stream_json_agent_api");
     if cfg!(windows) {
         binary.set_extension("exe");
-    }
-    if binary.exists() {
-        return binary;
     }
     let repo_root = target_dir
         .parent()
@@ -210,6 +241,25 @@ pub(super) fn fake_claude_binary() -> PathBuf {
     built
         .clone()
         .unwrap_or_else(|err| panic!("resolve fake Claude binary from {target_dir:?}: {err}"))
+}
+
+#[test]
+fn fake_claude_binary_finds_deps_executable_when_top_level_binary_is_absent() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let target_dir = temp.path().join("debug");
+    let deps_dir = target_dir.join("deps");
+    std_fs::create_dir_all(&deps_dir).expect("create deps dir");
+
+    let deps_binary = deps_dir.join(if cfg!(windows) {
+        "fake_claude_stream_json_agent_api-deadbeef.exe"
+    } else {
+        "fake_claude_stream_json_agent_api-deadbeef"
+    });
+    std_fs::write(&deps_binary, b"test").expect("write deps binary");
+
+    let discovered =
+        find_existing_fake_claude_binary(&target_dir).expect("deps binary should be discovered");
+    assert_eq!(discovered, deps_binary);
 }
 
 pub(super) fn expected_add_dirs_env(dirs: &[PathBuf]) -> BTreeMap<String, String> {

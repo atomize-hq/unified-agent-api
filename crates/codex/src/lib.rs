@@ -142,16 +142,13 @@ pub use rollout_jsonl::{
 
 use std::{
     collections::BTreeMap,
-    path::PathBuf,
+    path::{Path, PathBuf},
     time::{Duration, SystemTime},
 };
 
 use home::CommandEnvironment;
 use process::command_output_text;
 use tracing::warn;
-
-#[cfg(test)]
-use std::path::Path;
 
 #[cfg(test)]
 use tokio::time;
@@ -268,7 +265,7 @@ impl CodexClient {
     /// the builder (see [`CodexClientBuilder::capability_cache_policy`]).
     /// Failures are logged and return conservative defaults so callers can gate optional flags.
     pub async fn probe_capabilities(&self) -> CodexCapabilities {
-        self.probe_capabilities_internal(self.capability_cache_policy, &[])
+        self.probe_capabilities_internal(self.capability_cache_policy, &[], None)
             .await
     }
 
@@ -291,7 +288,7 @@ impl CodexClient {
             .map(|(key, value)| (key.clone(), value.clone()))
             .collect();
 
-        self.probe_capabilities_internal(CapabilityCachePolicy::Bypass, &env_overrides)
+        self.probe_capabilities_internal(CapabilityCachePolicy::Bypass, &env_overrides, None)
             .await
     }
 
@@ -300,15 +297,48 @@ impl CodexClient {
         &self,
         cache_policy: CapabilityCachePolicy,
     ) -> CodexCapabilities {
-        self.probe_capabilities_internal(cache_policy, &[]).await
+        self.probe_capabilities_internal(cache_policy, &[], None)
+            .await
+    }
+
+    pub(crate) async fn probe_capabilities_for_current_dir(
+        &self,
+        current_dir: &Path,
+    ) -> CodexCapabilities {
+        self.probe_capabilities_internal(self.capability_cache_policy, &[], Some(current_dir))
+            .await
+    }
+
+    pub(crate) async fn probe_capabilities_with_env_overrides_for_current_dir(
+        &self,
+        env_overrides: &BTreeMap<String, String>,
+        current_dir: &Path,
+    ) -> CodexCapabilities {
+        if env_overrides.is_empty() {
+            return self.probe_capabilities_for_current_dir(current_dir).await;
+        }
+
+        let env_overrides: Vec<(String, String)> = env_overrides
+            .iter()
+            .map(|(key, value)| (key.clone(), value.clone()))
+            .collect();
+
+        self.probe_capabilities_internal(
+            CapabilityCachePolicy::Bypass,
+            &env_overrides,
+            Some(current_dir),
+        )
+        .await
     }
 
     async fn probe_capabilities_internal(
         &self,
         cache_policy: CapabilityCachePolicy,
         env_overrides: &[(String, String)],
+        current_dir: Option<&Path>,
     ) -> CodexCapabilities {
-        let cache_key = capability_cache_key(self.command_env.binary_path());
+        let cache_key =
+            capability_cache_key_for_current_dir(self.command_env.binary_path(), current_dir);
         let fingerprint = current_fingerprint(&cache_key);
         let overrides = &self.capability_overrides;
 
@@ -351,7 +381,12 @@ impl CodexClient {
         }
 
         let probed = self
-            .probe_capabilities_uncached(&cache_key, fingerprint.clone(), env_overrides)
+            .probe_capabilities_uncached(
+                &cache_key,
+                fingerprint.clone(),
+                env_overrides,
+                current_dir,
+            )
             .await;
 
         let capabilities =
@@ -369,6 +404,7 @@ impl CodexClient {
         cache_key: &CapabilityCacheKey,
         fingerprint: Option<BinaryFingerprint>,
         env_overrides: &[(String, String)],
+        current_dir: Option<&Path>,
     ) -> CodexCapabilities {
         let mut plan = CapabilityProbePlan::default();
         let mut features = CodexFeatureFlags::default();
@@ -376,7 +412,11 @@ impl CodexClient {
 
         plan.steps.push(CapabilityProbeStep::VersionFlag);
         match self
-            .run_basic_command_with_env_overrides(["--version"], env_overrides)
+            .run_basic_command_with_env_overrides_and_current_dir(
+                ["--version"],
+                env_overrides,
+                current_dir,
+            )
             .await
         {
             Ok(output) => {
@@ -403,7 +443,11 @@ impl CodexClient {
 
         plan.steps.push(CapabilityProbeStep::FeaturesListJson);
         match self
-            .run_basic_command_with_env_overrides(["features", "list", "--json"], env_overrides)
+            .run_basic_command_with_env_overrides_and_current_dir(
+                ["features", "list", "--json"],
+                env_overrides,
+                current_dir,
+            )
             .await
         {
             Ok(output) => {
@@ -437,7 +481,11 @@ impl CodexClient {
         if !parsed_features {
             plan.steps.push(CapabilityProbeStep::FeaturesListText);
             match self
-                .run_basic_command_with_env_overrides(["features", "list"], env_overrides)
+                .run_basic_command_with_env_overrides_and_current_dir(
+                    ["features", "list"],
+                    env_overrides,
+                    current_dir,
+                )
                 .await
             {
                 Ok(output) => {
@@ -466,7 +514,11 @@ impl CodexClient {
         if version::should_run_help_fallback(&features) {
             plan.steps.push(CapabilityProbeStep::HelpFallback);
             match self
-                .run_basic_command_with_env_overrides(["--help"], env_overrides)
+                .run_basic_command_with_env_overrides_and_current_dir(
+                    ["--help"],
+                    env_overrides,
+                    current_dir,
+                )
                 .await
             {
                 Ok(output) => {

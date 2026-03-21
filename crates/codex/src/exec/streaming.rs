@@ -94,13 +94,16 @@ pub(super) async fn stream_exec_with_overrides_and_env_overrides_control(
     let needs_capabilities = output_schema.is_some() || !client.add_dirs.is_empty();
     let capabilities = if needs_capabilities {
         if env_overrides.is_empty() {
-            Some(client.probe_capabilities().await)
+            Some(client.probe_capabilities_for_current_dir(&dir_path).await)
         } else {
             let env_overrides_map: BTreeMap<String, String> =
                 env_overrides.iter().cloned().collect();
             Some(
                 client
-                    .probe_capabilities_with_env_overrides(&env_overrides_map)
+                    .probe_capabilities_with_env_overrides_for_current_dir(
+                        &env_overrides_map,
+                        &dir_path,
+                    )
                     .await,
             )
         }
@@ -304,13 +307,16 @@ pub(super) async fn stream_resume_with_env_overrides_control(
     let needs_capabilities = output_schema.is_some() || !client.add_dirs.is_empty();
     let capabilities = if needs_capabilities {
         if env_overrides.is_empty() {
-            Some(client.probe_capabilities().await)
+            Some(client.probe_capabilities_for_current_dir(&dir_path).await)
         } else {
             let env_overrides_map: BTreeMap<String, String> =
                 env_overrides.iter().cloned().collect();
             Some(
                 client
-                    .probe_capabilities_with_env_overrides(&env_overrides_map)
+                    .probe_capabilities_with_env_overrides_for_current_dir(
+                        &env_overrides_map,
+                        &dir_path,
+                    )
                     .await,
             )
         }
