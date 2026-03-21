@@ -1,5 +1,7 @@
 use super::*;
 
+#[cfg(windows)]
+use std::collections::BTreeMap;
 use std::{env, ffi::OsString, path::Path, path::PathBuf, time::Duration};
 
 struct RestoreCurrentDir {
@@ -114,6 +116,112 @@ fi
             log = log_path.display()
         ),
     );
+}
+
+#[cfg(windows)]
+fn write_windows_path_probe_codex(root: &Path, log_path: &Path, supports_add_dir: bool) -> PathBuf {
+    let bin_dir = root.join("bin");
+    std_fs::create_dir_all(&bin_dir).unwrap();
+    let path = bin_dir.join("codex.cmd");
+    let script = if supports_add_dir {
+        format!(
+            r#"@echo off
+if "%~1"=="--version" (
+  echo codex 1.2.3
+  exit /b 0
+)
+if "%~1"=="features" if "%~2"=="list" if "%~3"=="--json" (
+  echo {{"features":["add_dir"]}}
+  exit /b 0
+)
+if "%~1"=="features" if "%~2"=="list" (
+  echo add_dir
+  exit /b 0
+)
+if "%~1"=="--help" (
+  echo Usage: codex --add-dir
+  exit /b 0
+)
+if "%~1"=="exec" (
+  echo %*>>"{log}"
+  set "has_add_dir=0"
+  set "out="
+  set "prev="
+  for %%A in (%*) do (
+    if /I "!prev!"=="--add-dir" set "has_add_dir=1"
+    if /I "!prev!"=="--output-last-message" set "out=%%~A"
+    set "prev=%%~A"
+  )
+
+  if "!has_add_dir!" NEQ "1" (
+    echo missing --add-dir 1>&2
+    exit /b 9
+  )
+
+  if defined out (
+    for %%F in ("!out!") do set "out_dir=%%~dpF"
+    if defined out_dir mkdir "!out_dir!" >nul 2>&1
+    >"!out!" echo final message
+    echo {{"type":"thread.started","thread_id":"thread-1"}}
+  ) else (
+    echo ok
+  )
+  exit /b 0
+)
+echo unexpected args: %*
+exit /b 10
+"#,
+            log = log_path.display()
+        )
+    } else {
+        format!(
+            r#"@echo off
+if "%~1"=="--version" (
+  echo codex 1.2.3
+  exit /b 0
+)
+if "%~1"=="features" if "%~2"=="list" if "%~3"=="--json" (
+  echo {{"features":[]}}
+  exit /b 0
+)
+if "%~1"=="features" if "%~2"=="list" (
+  exit /b 0
+)
+if "%~1"=="--help" (
+  echo Usage: codex exec
+  exit /b 0
+)
+if "%~1"=="exec" (
+  echo ambient %*>>"{log}"
+  set "out="
+  set "prev="
+  for %%A in (%*) do (
+    if /I "!prev!"=="--output-last-message" set "out=%%~A"
+    set "prev=%%~A"
+  )
+  if defined out (
+    for %%F in ("!out!") do set "out_dir=%%~dpF"
+    if defined out_dir mkdir "!out_dir!" >nul 2>&1
+    >"!out!" echo final message
+    echo {{"type":"thread.started","thread_id":"thread-1"}}
+  ) else (
+    echo ok
+  )
+  exit /b 0
+)
+echo unexpected args: %*
+exit /b 10
+"#,
+            log = log_path.display()
+        )
+    };
+
+    std_fs::write(
+        &path,
+        format!("@echo off\r\nsetlocal EnableDelayedExpansion\r\n{script}"),
+    )
+    .unwrap();
+    path
 }
 
 fn relative_binary_client(working_dir: &Path) -> CodexClient {
@@ -325,4 +433,62 @@ async fn stream_resume_probes_default_bare_binary_from_path() {
     assert!(logged.contains("--add-dir"));
     assert!(logged.contains("src"));
     assert!(logged.contains("resume"));
+}
+
+#[cfg(windows)]
+#[tokio::test]
+async fn stream_exec_with_env_overrides_uses_path_case_insensitively_for_add_dir_guards() {
+    let _guard = env_guard_async().await;
+    clear_capability_cache();
+
+    let working = tempfile::tempdir().unwrap();
+    let ambient = tempfile::tempdir().unwrap();
+    let override_root = tempfile::tempdir().unwrap();
+    let path_restore = RestoreEnvVar::capture("PATH");
+    let binary_restore = RestoreEnvVar::capture("CODEX_BINARY");
+
+    let ambient_log = ambient.path().join("ambient.log");
+    let override_log = override_root.path().join("override.log");
+    let _ambient_binary = write_windows_path_probe_codex(ambient.path(), &ambient_log, false);
+    let _override_binary =
+        write_windows_path_probe_codex(override_root.path(), &override_log, true);
+    std_fs::create_dir_all(working.path().join("src")).unwrap();
+
+    binary_restore.clear();
+    path_restore.set(ambient.path().join("bin").as_os_str().to_os_string());
+
+    let client = default_binary_client(working.path());
+    let env_overrides = BTreeMap::from([(
+        "Path".to_string(),
+        override_root
+            .path()
+            .join("bin")
+            .to_string_lossy()
+            .to_string(),
+    )]);
+
+    let stream = client
+        .stream_exec_with_env_overrides(
+            ExecStreamRequest {
+                prompt: "hello".to_string(),
+                idle_timeout: None,
+                output_last_message: None,
+                output_schema: None,
+                json_event_log: None,
+            },
+            &env_overrides,
+        )
+        .await
+        .unwrap();
+
+    let completion = stream.completion.await.unwrap();
+    assert_eq!(
+        completion.last_message.as_deref(),
+        Some("final message\r\n")
+    );
+
+    let logged = std_fs::read_to_string(&override_log).unwrap();
+    assert!(logged.contains("--add-dir"));
+    assert!(logged.contains("src"));
+    assert!(!ambient_log.exists());
 }

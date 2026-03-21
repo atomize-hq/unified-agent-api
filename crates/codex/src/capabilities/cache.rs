@@ -60,8 +60,18 @@ pub(crate) fn effective_path_env(env_overrides: &[(String, String)]) -> Option<O
     env_overrides
         .iter()
         .rev()
-        .find_map(|(key, value)| (key == PATH_ENV).then(|| OsString::from(value)))
+        .find_map(|(key, value)| path_env_key_matches(key).then(|| OsString::from(value)))
         .or_else(|| env::var_os(PATH_ENV))
+}
+
+#[cfg(windows)]
+fn path_env_key_matches(key: &str) -> bool {
+    key.eq_ignore_ascii_case(PATH_ENV)
+}
+
+#[cfg(not(windows))]
+fn path_env_key_matches(key: &str) -> bool {
+    key == PATH_ENV
 }
 
 pub(crate) fn resolve_binary_path(
