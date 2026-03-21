@@ -15,7 +15,7 @@ pub(crate) struct CurrentDirGuard {
 
 impl CurrentDirGuard {
     pub(crate) fn set(path: &Path) -> Self {
-        let previous = env::current_dir().expect("current dir should be readable");
+        let previous = env::current_dir().unwrap_or_else(|_| env::temp_dir());
         env::set_current_dir(path).expect("current dir should be set");
         Self { previous }
     }
@@ -23,6 +23,8 @@ impl CurrentDirGuard {
 
 impl Drop for CurrentDirGuard {
     fn drop(&mut self) {
-        env::set_current_dir(&self.previous).expect("current dir should be restored");
+        if env::set_current_dir(&self.previous).is_err() {
+            env::set_current_dir(env::temp_dir()).expect("fallback current dir should be restored");
+        }
     }
 }
