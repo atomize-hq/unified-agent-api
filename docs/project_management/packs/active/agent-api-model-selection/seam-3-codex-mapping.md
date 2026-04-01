@@ -1,4 +1,37 @@
-# SEAM-3 — Codex backend mapping
+---
+seam_id: SEAM-3
+seam_slug: codex-mapping
+type: capability
+status: proposed
+execution_horizon: future
+plan_version: v1
+basis:
+  currentness: provisional
+  source_scope_ref: scope_brief.md
+  source_scope_version: v1
+  upstream_closeouts: []
+  required_threads:
+    - THR-01
+    - THR-02
+  stale_triggers:
+    - Codex builder/argv ordering contract changes
+    - Codex fork transport gains model selection support
+gates:
+  pre_exec:
+    review: pending
+    contract: pending
+    revalidation: pending
+  post_exec:
+    landing: pending
+    closeout: pending
+seam_exit_gate:
+  required: true
+  planned_location: reserved_final_slice
+  status: pending
+open_remediations: []
+---
+
+# SEAM-3 - Codex backend mapping
 
 - **Name**: Codex backend mapping
 - **Type**: capability

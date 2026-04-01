@@ -1,4 +1,14 @@
-# Scope brief — Universal model selection (`agent_api.config.model.v1`)
+---
+pack_id: agent-api-model-selection
+pack_version: v1
+pack_status: extracted
+source_ref: docs/adr/0020-universal-agent-api-model-selection.md
+execution_horizon:
+  active_seam: SEAM-1
+  next_seam: SEAM-2
+---
+
+# Scope Brief - Universal model selection (`agent_api.config.model.v1`)
 
 ## Goal
 
@@ -13,10 +23,8 @@ shape, validation posture, capability advertising, and backend mapping so orches
 
 ## Primary users + JTBD
 
-- **Host integrators / orchestrators**: “Select a backend-specific model through one universal request field without
-  importing backend crates or inventing backend-specific branching.”
-- **Backend maintainers**: “Map one shared extension key to each CLI’s existing `--model` surface while keeping
-  validation deterministic and runtime failures safe.”
+- **Host integrators / orchestrators**: "Select a backend-specific model through one universal request field without importing backend crates or inventing backend-specific branching."
+- **Backend maintainers**: "Map one shared extension key to each CLI's existing `--model` surface while keeping validation deterministic and runtime failures safe."
 
 ## In-scope
 
@@ -69,7 +77,7 @@ shape, validation posture, capability advertising, and backend mapping so orches
   - present valid key emits exactly one `--model <trimmed-id>` mapping,
   - the key alone cannot authorize fallback-model or any other side-effectful tuning knobs.
 - Runtime failure handling:
-  - backend-owned “unknown/unavailable/unauthorized model” outcomes remain runtime/backend errors,
+  - backend-owned "unknown/unavailable/unauthorized model" outcomes remain runtime/backend errors,
   - backend/session transports that cannot apply the accepted model id take a pinned safe backend
     rejection path,
   - error messages are safe/redacted,

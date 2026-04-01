@@ -1,4 +1,35 @@
-# SEAM-1 — Core extension key contract
+---
+seam_id: SEAM-1
+seam_slug: core-extension-contract
+type: integration
+status: proposed
+execution_horizon: active
+plan_version: v1
+basis:
+  currentness: current
+  source_scope_ref: scope_brief.md
+  source_scope_version: v1
+  upstream_closeouts: []
+  required_threads:
+    - THR-01
+  stale_triggers:
+    - canonical owner spec or registry entry changes for agent_api.config.model.v1
+gates:
+  pre_exec:
+    review: pending
+    contract: pending
+    revalidation: pending
+  post_exec:
+    landing: pending
+    closeout: pending
+seam_exit_gate:
+  required: true
+  planned_location: reserved_final_slice
+  status: pending
+open_remediations: []
+---
+
+# SEAM-1 - Core extension key contract
 
 - **Name**: Core extension key contract
 - **Type**: integration
@@ -35,7 +66,7 @@
   - pre-spawn `InvalidRequest` failures use the exact safe template `invalid agent_api.config.model.v1`
     and MUST NOT echo the raw model id.
   - Absence preserves backend default behavior.
-  - Runtime “unknown/unavailable/unauthorized model” outcomes remain backend-owned errors.
+  - Runtime "unknown/unavailable/unauthorized model" outcomes remain backend-owned errors.
 - **Dependencies**
   - Blocks:
     - SEAM-2
@@ -102,7 +133,7 @@
 
 ## Verification record
 
-- 2026-03-13 (UTC) — `pass: no unresolved canonical-doc delta`
+- 2026-03-13 (UTC) - `pass: no unresolved canonical-doc delta`
   - Verifier: concrete-remediator (packet run directory `.codex/audit-trio-remediator/20260313T144946-514966Z/`)
   - Compared sources:
     - `docs/specs/universal-agent-api/extensions-spec.md` (`### agent_api.config.model.v1`)

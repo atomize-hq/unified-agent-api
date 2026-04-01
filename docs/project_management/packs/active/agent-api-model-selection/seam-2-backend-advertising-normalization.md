@@ -1,4 +1,35 @@
-# SEAM-2 — Backend advertising + normalization hook
+---
+seam_id: SEAM-2
+seam_slug: backend-advertising-normalization
+type: integration
+status: proposed
+execution_horizon: next
+plan_version: v1
+basis:
+  currentness: provisional
+  source_scope_ref: scope_brief.md
+  source_scope_version: v1
+  upstream_closeouts: []
+  required_threads:
+    - THR-01
+  stale_triggers:
+    - shared helper signature or validation rules change after SEAM-3/4 implementation starts
+gates:
+  pre_exec:
+    review: pending
+    contract: pending
+    revalidation: pending
+  post_exec:
+    landing: pending
+    closeout: pending
+seam_exit_gate:
+  required: true
+  planned_location: reserved_final_slice
+  status: pending
+open_remediations: []
+---
+
+# SEAM-2 - Backend advertising + normalization hook
 
 - **Name**: Backend advertising + normalization hook
 - **Type**: integration

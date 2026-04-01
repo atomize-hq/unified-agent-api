@@ -1,4 +1,39 @@
-# SEAM-5 — Tests
+---
+seam_id: SEAM-5
+seam_slug: tests
+type: risk
+status: proposed
+execution_horizon: future
+plan_version: v1
+basis:
+  currentness: provisional
+  source_scope_ref: scope_brief.md
+  source_scope_version: v1
+  upstream_closeouts: []
+  required_threads:
+    - THR-01
+    - THR-02
+    - THR-03
+    - THR-04
+    - THR-05
+  stale_triggers:
+    - capability matrix regeneration is deferred from advertising changes
+gates:
+  pre_exec:
+    review: pending
+    contract: pending
+    revalidation: pending
+  post_exec:
+    landing: pending
+    closeout: pending
+seam_exit_gate:
+  required: true
+  planned_location: reserved_final_slice
+  status: pending
+open_remediations: []
+---
+
+# SEAM-5 - Tests
 
 - **Name**: Tests
 - **Type**: risk

@@ -1,11 +1,31 @@
-# Universal model selection (`agent_api.config.model.v1`) — seam extraction (ADR-0020)
+# Universal model selection (`agent_api.config.model.v1`) - seam extraction
 
-Source ADR: `docs/adr/0020-universal-agent-api-model-selection.md`  
-Canonical owner spec: `docs/specs/universal-agent-api/extensions-spec.md`  
-Backlog: `uaa-0002` (`bucket=agent_api.config`, `type=extension_key`)
+Source: `docs/adr/0020-universal-agent-api-model-selection.md`
 
-This directory contains **seam** artifacts extracted to make the work owner-assignable and parallelizable without hiding coupling.
-These files are planning aids; they are not normative contracts (authoritative contracts remain in `docs/specs/**`).
+This pack captures seam briefs, authoritative threading, pack-level review surfaces, seam-exit intent, and governance scaffolds. It defaults to seam-brief depth; seam-local decomposition exists only for the active and next seams under `threaded-seams/`.
+
+- Start here: `scope_brief.md`
+- Seam overview: `seam_map.md`
+- Threading: `threading.md`
+- Pack review surfaces: `review_surfaces.md`
+- Governance: `governance/remediation-log.md`
+
+Execution horizon (inferred):
+
+- Active seam: `SEAM-1`
+- Next seam: `SEAM-2`
+
+Policy:
+
+- only the active seam is eligible for authoritative downstream sub-slices by default
+- the next seam may later receive seam-local review + slices, and only provisional candidate-subslice hints
+- active and next seams must eventually terminate in a dedicated final `seam-exit-gate` slice once seam-local planning begins
+- future seams remain seam briefs
+
+Migration note:
+
+- pre-v2.3 seam-local planning has been archived under `threaded-seams/_archive_pre_v2_3/`
+- v2.3 seam-local planning exists only for the active and next seams
 
 ## Canonical authority + sync workflow
 
@@ -42,6 +62,7 @@ model-selection design decision.
 - Start here: `scope_brief.md`
 - Seam overview: `seam_map.md`
 - Threading (contracts + dependencies + workstreams): `threading.md`
+ - Pack review surfaces (orientation only): `review_surfaces.md`
 
 ## Canonical contracts (source of truth)
 
