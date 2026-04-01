@@ -24,6 +24,7 @@ pub(super) struct ExecFlowRequest {
     pub(super) sandbox_mode: super::CodexSandboxMode,
     pub(super) resume: Option<super::SessionSelectorV1>,
     pub(super) prompt: String,
+    pub(super) model_id: Option<String>,
     pub(super) working_dir: Option<PathBuf>,
     pub(super) effective_timeout: Option<Duration>,
     pub(super) env: BTreeMap<String, String>,
@@ -115,6 +116,7 @@ pub(super) async fn spawn_exec_or_resume_flow(
         sandbox_mode,
         resume,
         prompt,
+        model_id,
         working_dir,
         effective_timeout,
         env,
@@ -145,7 +147,9 @@ pub(super) async fn spawn_exec_or_resume_flow(
         builder = builder.codex_home(codex_home.clone());
     }
 
-    if let Some(model) = config.model.as_ref() {
+    if let Some(model) = model_id {
+        builder = builder.model(model);
+    } else if let Some(model) = config.model.as_ref() {
         builder = builder.model(model.clone());
     }
 

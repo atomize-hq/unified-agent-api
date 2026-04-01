@@ -341,7 +341,7 @@ impl BackendHarnessAdapter for CodexHarnessAdapter {
             fork,
         } = req.policy;
         let prompt = req.prompt;
-        let _model_id = req.model_id;
+        let model_id = req.model_id;
         let working_dir = req.working_dir;
         let effective_timeout = req.effective_timeout;
         let env = req.env;
@@ -376,6 +376,7 @@ impl BackendHarnessAdapter for CodexHarnessAdapter {
                     sandbox_mode,
                     resume,
                     prompt,
+                    model_id,
                     working_dir,
                     effective_timeout,
                     env,

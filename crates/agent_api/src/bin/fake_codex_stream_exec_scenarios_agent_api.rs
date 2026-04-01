@@ -186,6 +186,20 @@ fn assert_model(out: &mut impl Write, args: &[String]) -> io::Result<bool> {
         .filter_map(|(index, arg)| (arg == "--model").then_some(index))
         .collect();
 
+    if expected_model == "<absent>" {
+        if positions.is_empty() {
+            return Ok(true);
+        }
+        emit_jsonl(
+            out,
+            &format!(
+                r#"{{"type":"error","message":"did not expect --model flag, got {}"}}"#,
+                positions.len()
+            ),
+        )?;
+        return Ok(false);
+    }
+
     if positions.len() != 1 {
         emit_jsonl(
             out,
