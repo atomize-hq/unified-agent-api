@@ -143,9 +143,9 @@ This document is authoritative for:
   - **Consumer seam(s)**: `SEAM-5`
   - **Carried contract IDs**: `C-02`, `C-04`, `C-07`, `C-09`
   - **Purpose**: make Claude Code mapping deterministic (exactly-one `--model`, correct ordering, fallback exclusion, safe runtime rejection).
-  - **State**: identified
+  - **State**: published
   - **Revalidation trigger**: Claude argv layout changes; new universal keys are introduced that touch `--fallback-model`.
-  - **Satisfied by**: Claude mapping tests for print/session flows plus runtime rejection scenario coverage.
+  - **Satisfied by**: Claude Code mapping + conformance tests (commits `09f7a69`, `7ac3af1`, `982e014`) including `cargo test -p agent_api --features claude_code "model_mapping::"` and runtime rejection parity coverage.
   - **Notes**: SEAM-4 must not map the universal key to fallback behavior.
 
 ## Dependency graph
