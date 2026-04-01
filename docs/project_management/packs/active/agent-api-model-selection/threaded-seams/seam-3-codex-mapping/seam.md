@@ -1,7 +1,7 @@
 ---
 seam_id: SEAM-3
 seam_slug: codex-mapping
-status: proposed
+status: decomposed
 execution_horizon: active
 plan_version: v1
 basis:
@@ -43,4 +43,4 @@ open_remediations: []
 
 ## Next planning step
 
-- Decompose this seam into `review.md` + `slice-*.md` via the v2.3 threaded seam decomposer.
+- Execute `slice-*.md` sequentially (S1..S4), then complete the dedicated `seam-exit-gate` slice.
