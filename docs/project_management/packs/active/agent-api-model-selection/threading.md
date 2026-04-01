@@ -9,9 +9,9 @@ This document is authoritative for:
 
 ## Execution horizon summary
 
-- Active seam: `SEAM-3`
-- Next seam: `SEAM-4`
-- Future seams: `SEAM-5`
+- Active seam: `SEAM-4`
+- Next seam: `SEAM-5`
+- Future seams: none
 
 ## Contract registry
 
