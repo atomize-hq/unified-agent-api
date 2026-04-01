@@ -15,16 +15,16 @@ basis:
     - shared helper signature or validation rules change after downstream mapping starts
 gates:
   pre_exec:
-    review: pending
-    contract: pending
+    review: passed
+    contract: passed
     revalidation: passed
   post_exec:
-    landing: pending
-    closeout: pending
+    landing: passed
+    closeout: passed
 seam_exit_gate:
   required: true
   planned_location: S4
-  status: pending
+  status: passed
 open_remediations: []
 ---
 # SEAM-2 - Backend advertising + normalization hook
