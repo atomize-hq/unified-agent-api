@@ -47,8 +47,7 @@ flowchart TB
 - Revalidation: canonical sources and ADR/pack restatements still align on v1 semantics (trim-before-validate, UTF-8
   byte bound `1..=128`, absence behavior, exact InvalidRequest template, and terminal error-event rule) as of
   2026-04-01 local working tree.
-- Note: SEAM-1 verification record still cites a provisional local `git HEAD` reference; a published commit/PR
-  reference is preferred for downstream citation, but canonical alignment is the approval criterion for this pack.
+- Note: SEAM-1 verification record now cites stable commit references (4255d85, 34b0ee9) for downstream citation.
 
 ## Pre-exec gate disposition
 

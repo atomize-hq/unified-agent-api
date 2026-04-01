@@ -145,11 +145,8 @@ open_remediations: []
     - `docs/adr/0020-universal-agent-api-model-selection.md` sections `Canonical authority + sync workflow`,
       `Decision (draft)`, `Validation and error model`, `Backend mapping`, and `Capability advertising`
     - this pack's `README.md`, `scope_brief.md`, and `threading.md` restatements for SEAM-1-owned rules
-  - Synchronization reference: provisional local reference `git HEAD=aeeda8b` with the working-tree delta from this
-    uncommitted doc-sync change set; replace this line with the commit/PR reference when the synchronized change is
-    published
-  - Publication note: a commit/PR reference is preferred for downstream citation, but canonical alignment is the
-    normative approval criterion for this pack; replace the provisional reference once a published ref exists.
+  - Synchronization reference: commit 4255d85.
+  - Publication note: canonical alignment is the normative approval criterion for this pack.
 
 - 2026-04-01 (UTC) - `pass: no unresolved canonical-doc delta`
   - Verifier: Codex seam-execution
@@ -163,4 +160,4 @@ open_remediations: []
       - `README.md` (`## Canonical authority + sync workflow` and `## Canonical contracts (source of truth)`)
       - `scope_brief.md` (`## Required invariants (must not regress)` and `## Pinned execution decisions`)
       - `threading.md` (`## Contract registry` and `## Pinned decisions / resolved threads`)
-  - Synchronization reference: provisional local reference `git HEAD=4255d85f7d0e`; S2 will replace this line with the commit/PR reference when the synchronized change is published.
+  - Synchronization reference: commit 34b0ee9.
