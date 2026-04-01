@@ -20,6 +20,8 @@ use super::{
 };
 
 pub(super) const ADD_DIRS_RUNTIME_REJECTION_MESSAGE: &str = "add_dirs rejected by runtime";
+pub(super) const PINNED_MODEL_RUNTIME_REJECTION: &str =
+    "claude_code backend error: model rejected by runtime (details redacted)";
 pub(super) const PINNED_WORKING_DIR_RESOLUTION_FAILURE: &str =
     "claude backend failed to resolve working directory";
 
@@ -78,6 +80,10 @@ pub(super) fn json_contains_not_found_signal(raw: &serde_json::Value) -> bool {
 pub(super) fn json_contains_add_dirs_runtime_rejection_signal(raw: &serde_json::Value) -> bool {
     raw.get("message").and_then(serde_json::Value::as_str)
         == Some(ADD_DIRS_RUNTIME_REJECTION_MESSAGE)
+}
+
+pub(super) fn json_contains_model_runtime_rejection_signal(raw: &serde_json::Value) -> bool {
+    raw.get("message").and_then(serde_json::Value::as_str) == Some("model rejected by runtime")
 }
 
 pub(super) fn generic_non_zero_exit_message(status: &std::process::ExitStatus) -> String {

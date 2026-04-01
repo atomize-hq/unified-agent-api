@@ -22,6 +22,10 @@ enum ScenarioKind {
         tail: Vec<String>,
         missing_subsequence_message: &'static str,
     },
+    ModelRuntimeRejectionAfterInit {
+        tail: Vec<String>,
+        missing_subsequence_message: &'static str,
+    },
     RuntimeRejection {
         tail: Vec<String>,
         missing_subsequence_message: &'static str,
@@ -121,6 +125,10 @@ fn dispatch_scenario(scenario: &str, args: &[String], out: &mut dyn Write) -> io
             tail,
             missing_subsequence_message,
         } => handle_assert(out, args, init, &tail, missing_subsequence_message),
+        ScenarioKind::ModelRuntimeRejectionAfterInit {
+            tail,
+            missing_subsequence_message,
+        } => handle_model_runtime_rejection(out, args, init, &tail, missing_subsequence_message),
         ScenarioKind::RuntimeRejection {
             tail,
             missing_subsequence_message,
@@ -164,6 +172,13 @@ fn dispatch_scenario(scenario: &str, args: &[String], out: &mut dyn Write) -> io
 fn scenario_kind(scenario: &str) -> ScenarioKind {
     match scenario {
         "fresh_assert" => ScenarioKind::Assert {
+            tail: vec![
+                "--verbose".to_string(),
+                require("FAKE_CLAUDE_EXPECT_PROMPT"),
+            ],
+            missing_subsequence_message: "assertion failed: missing fresh argv subsequence",
+        },
+        "model_runtime_rejection_after_init" => ScenarioKind::ModelRuntimeRejectionAfterInit {
             tail: vec![
                 "--verbose".to_string(),
                 require("FAKE_CLAUDE_EXPECT_PROMPT"),
@@ -373,6 +388,27 @@ fn handle_runtime_rejection(
 ) -> io::Result<()> {
     handle_assert(out, args, init, tail, missing_subsequence_message)?;
     exit_add_dirs_runtime_rejection(out);
+}
+
+fn handle_model_runtime_rejection(
+    out: &mut dyn Write,
+    args: &[String],
+    init: &str,
+    tail: &[String],
+    missing_subsequence_message: &str,
+) -> io::Result<()> {
+    handle_assert(out, args, init, tail, missing_subsequence_message)?;
+
+    let mut detail = require("FAKE_CLAUDE_MODEL_RUNTIME_REJECTION_SECRET");
+    if let Ok(model) = env::var("FAKE_CLAUDE_EXPECT_MODEL") {
+        if !model.is_empty() {
+            detail.push(' ');
+            detail.push_str(&model);
+        }
+    }
+
+    write_result_error_with_stderr_detail(out, "model rejected by runtime", &detail)?;
+    std::process::exit(1);
 }
 
 fn handle_detailed_result_error(
