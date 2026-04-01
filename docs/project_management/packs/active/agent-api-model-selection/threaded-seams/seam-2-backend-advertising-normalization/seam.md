@@ -2,10 +2,10 @@
 seam_id: SEAM-2
 seam_slug: backend-advertising-normalization
 status: decomposed
-execution_horizon: next
+execution_horizon: active
 plan_version: v1
 basis:
-  currentness: provisional
+  currentness: current
   source_seam_brief: ../../seam-2-backend-advertising-normalization.md
   source_scope_ref: ../../scope_brief.md
   upstream_closeouts: []
@@ -17,7 +17,7 @@ gates:
   pre_exec:
     review: pending
     contract: pending
-    revalidation: pending
+    revalidation: passed
   post_exec:
     landing: pending
     closeout: pending
@@ -65,7 +65,7 @@ open_remediations: []
 ## Review bundle
 
 - `review.md` is the authoritative artifact for `gates.pre_exec.review`
-- For `execution_horizon: next`, keep `gates.pre_exec.revalidation: pending` until the SEAM-1 verification record is published with a commit/PR reference (THR-01).
+- Revalidation: SEAM-1's gate record is now published with stable commit references (THR-01); `gates.pre_exec.revalidation` has passed.
 
 ## Seam-exit gate plan
 

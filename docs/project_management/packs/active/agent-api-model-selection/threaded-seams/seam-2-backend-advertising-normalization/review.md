@@ -1,7 +1,7 @@
 ---
 seam_id: SEAM-2
 review_phase: pre_exec
-execution_horizon: next
+execution_horizon: active
 basis_ref: seam.md#basis
 ---
 # Review Bundle - SEAM-2 Backend advertising + normalization hook
@@ -50,7 +50,7 @@ None yet.
 
 - **Review gate**: pending
 - **Contract gate concerns**: ensure C-09 defines exactly-one parse site and a typed handoff; ensure advertising rules (C-05) are crisp enough to audit.
-- **Revalidation prerequisites**: confirm SEAM-1's published gate record (THR-01).
+- **Revalidation prerequisites**: satisfied by SEAM-1 closeout + published THR-01 gate record.
 - **Opened remediations**: none
 
 ## Planned seam-exit gate focus

@@ -2,8 +2,8 @@
 seam_id: SEAM-1
 seam_slug: core-extension-contract
 type: integration
-status: exec-ready
-execution_horizon: active
+status: closed
+execution_horizon: future
 plan_version: v1
 basis:
   currentness: current
@@ -20,12 +20,12 @@ gates:
     contract: passed
     revalidation: passed
   post_exec:
-    landing: pending
-    closeout: pending
+    landing: passed
+    closeout: passed
 seam_exit_gate:
   required: true
-  planned_location: reserved_final_slice
-  status: pending
+  planned_location: S3
+  status: passed
 open_remediations: []
 ---
 

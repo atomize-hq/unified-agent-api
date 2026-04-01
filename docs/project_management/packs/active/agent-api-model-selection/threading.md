@@ -9,9 +9,9 @@ This document is authoritative for:
 
 ## Execution horizon summary
 
-- Active seam: `SEAM-1`
-- Next seam: `SEAM-2`
-- Future seams: `SEAM-3`, `SEAM-4`, `SEAM-5`
+- Active seam: `SEAM-2`
+- Next seam: `SEAM-3`
+- Future seams: `SEAM-4`, `SEAM-5`
 
 ## Contract registry
 
@@ -103,7 +103,7 @@ This document is authoritative for:
   - **Consumer seam(s)**: `SEAM-2`, `SEAM-3`, `SEAM-4`, `SEAM-5`
   - **Carried contract IDs**: `C-01`, `C-02`, `C-03`, `C-04`
   - **Purpose**: publish a downstream-citable verification record that confirms no unresolved canonical-doc delta exists for v1 semantics.
-  - **State**: defined
+  - **State**: published
   - **Revalidation trigger**: any edit under `docs/specs/universal-agent-api/` that touches `agent_api.config.model.v1` semantics or any ADR/pack restatement of those semantics.
   - **Satisfied by**: the latest `pass: no unresolved canonical-doc delta` entry recorded by SEAM-1.
   - **Notes**: a published commit/PR reference is preferred for downstream citation, but canonical alignment is sufficient for SEAM-1 promotion when the pack owner explicitly approves proceeding.

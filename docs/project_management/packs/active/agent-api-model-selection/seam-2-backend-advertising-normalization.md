@@ -2,11 +2,11 @@
 seam_id: SEAM-2
 seam_slug: backend-advertising-normalization
 type: integration
-status: proposed
-execution_horizon: next
+status: decomposed
+execution_horizon: active
 plan_version: v1
 basis:
-  currentness: provisional
+  currentness: current
   source_scope_ref: scope_brief.md
   source_scope_version: v1
   upstream_closeouts: []
@@ -18,13 +18,13 @@ gates:
   pre_exec:
     review: pending
     contract: pending
-    revalidation: pending
+    revalidation: passed
   post_exec:
     landing: pending
     closeout: pending
 seam_exit_gate:
   required: true
-  planned_location: reserved_final_slice
+  planned_location: S4
   status: pending
 open_remediations: []
 ---

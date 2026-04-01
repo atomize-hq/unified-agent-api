@@ -2,11 +2,11 @@
 slice_id: S2
 seam_id: SEAM-2
 slice_kind: delivery
-execution_horizon: next
+execution_horizon: active
 status: decomposed
 plan_version: v1
 basis:
-  currentness: provisional
+  currentness: current
   basis_ref: seam.md#basis
   stale_triggers: []
 gates:
