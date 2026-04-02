@@ -45,9 +45,7 @@ enum CodexTailEvent {
     TerminalError { message: String },
 }
 
-fn snapshot_backend_error_message(
-    stream_state: &Arc<Mutex<CodexStreamState>>,
-) -> Option<String> {
+fn snapshot_backend_error_message(stream_state: &Arc<Mutex<CodexStreamState>>) -> Option<String> {
     stream_state
         .lock()
         .ok()

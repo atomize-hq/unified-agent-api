@@ -751,8 +751,7 @@ fn main() -> io::Result<()> {
             std::process::exit(runtime_rejection_exit_code()?);
         }
         "model_runtime_rejection_after_thread_started" => {
-            let secret =
-                require_env_var(&mut out, "FAKE_CODEX_MODEL_RUNTIME_REJECTION_SECRET")?;
+            let secret = require_env_var(&mut out, "FAKE_CODEX_MODEL_RUNTIME_REJECTION_SECRET")?;
             let model = flag_value(&args, "--model").unwrap_or("<missing>");
 
             emit_jsonl(

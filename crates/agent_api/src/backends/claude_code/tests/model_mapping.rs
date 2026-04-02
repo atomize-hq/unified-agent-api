@@ -1,13 +1,10 @@
-use std::{
-    collections::BTreeMap,
-    time::Duration,
-};
+use std::{collections::BTreeMap, time::Duration};
 
 use futures_util::StreamExt;
 use tempfile::tempdir;
 
-use super::support::*;
 use super::super::super::session_selectors::SessionSelectorV1;
+use super::support::*;
 
 async fn spawn_and_drain(
     model_id: Option<String>,
@@ -73,7 +70,10 @@ fn base_env(scenario: &str, prompt: &str, expect_model: Option<&str>) -> BTreeMa
     if let Some(model) = expect_model {
         env.insert("FAKE_CLAUDE_EXPECT_MODEL".to_string(), model.to_string());
     } else {
-        env.insert("FAKE_CLAUDE_EXPECT_NO_MODEL".to_string(), "true".to_string());
+        env.insert(
+            "FAKE_CLAUDE_EXPECT_NO_MODEL".to_string(),
+            "true".to_string(),
+        );
     }
     env
 }

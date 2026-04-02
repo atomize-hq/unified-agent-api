@@ -115,13 +115,18 @@ async fn codex_exec_model_id_beats_backend_config_model_and_orders_before_add_di
 
     let env = base_env()
         .into_iter()
-        .chain(add_dir_expectations(std::slice::from_ref(&expected_add_dir)))
+        .chain(add_dir_expectations(std::slice::from_ref(
+            &expected_add_dir,
+        )))
         .chain([
             (
                 "FAKE_CODEX_EXPECT_CWD".to_string(),
                 expected_cwd.display().to_string(),
             ),
-            ("FAKE_CODEX_EXPECT_MODEL".to_string(), "request-model".to_string()),
+            (
+                "FAKE_CODEX_EXPECT_MODEL".to_string(),
+                "request-model".to_string(),
+            ),
         ])
         .collect();
 
@@ -147,13 +152,18 @@ async fn codex_exec_without_model_id_emits_no_model_flag_when_config_model_absen
 
     let env = base_env()
         .into_iter()
-        .chain(add_dir_expectations(std::slice::from_ref(&expected_add_dir)))
+        .chain(add_dir_expectations(std::slice::from_ref(
+            &expected_add_dir,
+        )))
         .chain([
             (
                 "FAKE_CODEX_EXPECT_CWD".to_string(),
                 expected_cwd.display().to_string(),
             ),
-            ("FAKE_CODEX_EXPECT_MODEL".to_string(), "<absent>".to_string()),
+            (
+                "FAKE_CODEX_EXPECT_MODEL".to_string(),
+                "<absent>".to_string(),
+            ),
         ])
         .collect();
 
@@ -179,7 +189,9 @@ async fn codex_exec_without_model_id_uses_backend_config_model() {
 
     let env = base_env()
         .into_iter()
-        .chain(add_dir_expectations(std::slice::from_ref(&expected_add_dir)))
+        .chain(add_dir_expectations(std::slice::from_ref(
+            &expected_add_dir,
+        )))
         .chain([
             (
                 "FAKE_CODEX_EXPECT_CWD".to_string(),
@@ -214,15 +226,26 @@ async fn codex_resume_emits_model_id_and_orders_before_add_dir() {
 
     let env = base_env()
         .into_iter()
-        .chain(add_dir_expectations(std::slice::from_ref(&expected_add_dir)))
+        .chain(add_dir_expectations(std::slice::from_ref(
+            &expected_add_dir,
+        )))
         .chain([
             (
                 "FAKE_CODEX_EXPECT_CWD".to_string(),
                 expected_cwd.display().to_string(),
             ),
-            ("FAKE_CODEX_SCENARIO".to_string(), "resume_last_assert".to_string()),
-            ("FAKE_CODEX_EXPECT_PROMPT".to_string(), "resume me".to_string()),
-            ("FAKE_CODEX_EXPECT_MODEL".to_string(), "request-model".to_string()),
+            (
+                "FAKE_CODEX_SCENARIO".to_string(),
+                "resume_last_assert".to_string(),
+            ),
+            (
+                "FAKE_CODEX_EXPECT_PROMPT".to_string(),
+                "resume me".to_string(),
+            ),
+            (
+                "FAKE_CODEX_EXPECT_MODEL".to_string(),
+                "request-model".to_string(),
+            ),
         ])
         .collect();
 

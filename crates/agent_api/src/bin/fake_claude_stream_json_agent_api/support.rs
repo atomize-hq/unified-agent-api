@@ -235,7 +235,10 @@ pub(crate) fn maybe_assert_model_mapping(args: &[String], out: &mut dyn Write) {
     }
 
     if expect_no_fallback_model && has_flag(args, "--fallback-model") {
-        fail(out, "assertion failed: expected --fallback-model to be absent");
+        fail(
+            out,
+            "assertion failed: expected --fallback-model to be absent",
+        );
     }
 
     if expect_no_model {

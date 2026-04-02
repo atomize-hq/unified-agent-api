@@ -58,7 +58,10 @@ async fn codex_runtime_model_rejection_is_safely_redacted_and_parity_is_preserve
                 "FAKE_CODEX_SCENARIO".to_string(),
                 "model_runtime_rejection_after_thread_started".to_string(),
             ),
-            ("FAKE_CODEX_EXPECT_MODEL".to_string(), requested_model.to_string()),
+            (
+                "FAKE_CODEX_EXPECT_MODEL".to_string(),
+                requested_model.to_string(),
+            ),
             (
                 "FAKE_CODEX_MODEL_RUNTIME_REJECTION_SECRET".to_string(),
                 secret.to_string(),
@@ -123,7 +126,10 @@ async fn codex_runtime_model_rejection_is_safely_redacted_and_parity_is_preserve
         let Some(message) = event.message.as_deref() else {
             continue;
         };
-        assert!(!message.contains(secret), "leaked secret in event: {event:?}");
+        assert!(
+            !message.contains(secret),
+            "leaked secret in event: {event:?}"
+        );
         assert!(
             !message.contains(requested_model),
             "leaked model id in event: {event:?}"
@@ -149,4 +155,3 @@ async fn codex_runtime_model_rejection_is_safely_redacted_and_parity_is_preserve
         other => panic!("expected Backend error, got: {other:?}"),
     }
 }
-

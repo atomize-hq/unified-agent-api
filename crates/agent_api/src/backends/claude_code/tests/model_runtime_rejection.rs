@@ -88,7 +88,10 @@ async fn claude_runtime_model_rejection_is_safely_redacted_and_parity_is_preserv
         .collect();
 
     assert_eq!(error_messages.len(), 1, "events: {mapped_events:?}");
-    assert_eq!(error_messages[0], super::super::util::PINNED_MODEL_RUNTIME_REJECTION);
+    assert_eq!(
+        error_messages[0],
+        super::super::util::PINNED_MODEL_RUNTIME_REJECTION
+    );
     assert!(!error_messages[0].contains(secret));
     assert!(!error_messages[0].contains(requested_model));
 
@@ -96,7 +99,10 @@ async fn claude_runtime_model_rejection_is_safely_redacted_and_parity_is_preserv
         let Some(message) = event.message.as_deref() else {
             continue;
         };
-        assert!(!message.contains(secret), "leaked secret in event: {event:?}");
+        assert!(
+            !message.contains(secret),
+            "leaked secret in event: {event:?}"
+        );
         assert!(
             !message.contains(requested_model),
             "leaked model id in event: {event:?}"
@@ -115,4 +121,3 @@ async fn claude_runtime_model_rejection_is_safely_redacted_and_parity_is_preserv
         other => panic!("expected Backend error, got: {other:?}"),
     }
 }
-

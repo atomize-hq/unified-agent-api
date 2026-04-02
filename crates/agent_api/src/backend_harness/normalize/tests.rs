@@ -13,9 +13,7 @@ use super::super::test_support::{
 use super::super::{
     BackendDefaults, BackendHarnessAdapter, BackendHarnessErrorPhase, NormalizedRequest,
 };
-use super::{
-    normalize_model_id_v1, normalize_request, parse_ext_bool, parse_ext_string_enum,
-};
+use super::{normalize_model_id_v1, normalize_request, parse_ext_bool, parse_ext_string_enum};
 use crate::{AgentWrapperCompletion, AgentWrapperError, AgentWrapperRunRequest};
 
 mod c02_add_dirs;
@@ -790,8 +788,8 @@ fn normalize_model_id_v1_rejects_whitespace_only_after_trim() {
 #[test]
 fn normalize_model_id_v1_rejects_oversize_after_trim_without_echoing_value() {
     let raw = format!("  {}  ", "a".repeat(129));
-    let err = normalize_model_id_v1(Some(&json!(raw.clone())))
-        .expect_err("expected oversize failure");
+    let err =
+        normalize_model_id_v1(Some(&json!(raw.clone()))).expect_err("expected oversize failure");
     match err {
         AgentWrapperError::InvalidRequest { message } => {
             assert_eq!(message, "invalid agent_api.config.model.v1");
@@ -803,8 +801,8 @@ fn normalize_model_id_v1_rejects_oversize_after_trim_without_echoing_value() {
 
 #[test]
 fn normalize_model_id_v1_trims_and_returns_success() {
-    let normalized = normalize_model_id_v1(Some(&json!("  agent-model-1  ")))
-        .expect("expected trimmed success");
+    let normalized =
+        normalize_model_id_v1(Some(&json!("  agent-model-1  "))).expect("expected trimmed success");
     assert_eq!(normalized, Some("agent-model-1".to_string()));
 }
 
@@ -1000,10 +998,9 @@ fn bh_c03_agent_api_config_model_v1_trims_before_mapping_via_normalize_request()
         prompt: "hello".to_string(),
         ..Default::default()
     };
-    request.extensions.insert(
-        MODEL_ID_KEY.to_string(),
-        json!("  agent-model-1  "),
-    );
+    request
+        .extensions
+        .insert(MODEL_ID_KEY.to_string(), json!("  agent-model-1  "));
 
     let normalized =
         normalize_request(&adapter, &defaults, request).expect("expected normalized request");
