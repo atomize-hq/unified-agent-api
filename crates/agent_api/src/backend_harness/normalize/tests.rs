@@ -809,6 +809,208 @@ fn normalize_model_id_v1_trims_and_returns_success() {
 }
 
 #[test]
+fn bh_c03_agent_api_config_model_v1_invalid_values_use_safe_template_via_normalize_request() {
+    struct SupportsModelIdAdapter;
+
+    impl BackendHarnessAdapter for SupportsModelIdAdapter {
+        fn kind(&self) -> crate::AgentWrapperKind {
+            toy_kind()
+        }
+
+        fn supported_extension_keys(&self) -> &'static [&'static str] {
+            &[MODEL_ID_KEY]
+        }
+
+        type Policy = ToyPolicy;
+
+        fn validate_and_extract_policy(
+            &self,
+            _request: &AgentWrapperRunRequest,
+        ) -> Result<Self::Policy, crate::AgentWrapperError> {
+            panic!("validate_and_extract_policy must not be called for invalid model ids");
+        }
+
+        type BackendEvent = ToyEvent;
+        type BackendCompletion = ToyCompletion;
+        type BackendError = ToyBackendError;
+
+        fn spawn(
+            &self,
+            _req: NormalizedRequest<Self::Policy>,
+        ) -> std::pin::Pin<
+            Box<
+                dyn std::future::Future<
+                        Output = Result<
+                            super::super::contract::BackendSpawn<
+                                Self::BackendEvent,
+                                Self::BackendCompletion,
+                                Self::BackendError,
+                            >,
+                            Self::BackendError,
+                        >,
+                    > + Send
+                    + 'static,
+            >,
+        > {
+            panic!("spawn must not be called from normalize_request");
+        }
+
+        fn map_event(&self, _event: Self::BackendEvent) -> Vec<crate::AgentWrapperEvent> {
+            panic!("map_event must not be called from normalize_request");
+        }
+
+        fn map_completion(
+            &self,
+            _completion: Self::BackendCompletion,
+        ) -> Result<crate::AgentWrapperCompletion, crate::AgentWrapperError> {
+            panic!("map_completion must not be called from normalize_request");
+        }
+
+        fn redact_error(
+            &self,
+            _phase: BackendHarnessErrorPhase,
+            _err: &Self::BackendError,
+        ) -> String {
+            panic!("redact_error must not be called from normalize_request");
+        }
+    }
+
+    let adapter = SupportsModelIdAdapter;
+    let defaults = BackendDefaults::default();
+    let secret = "SECRET_MODEL_ID_SHOULD_NOT_LEAK";
+    let invalid_cases = vec![
+        ("null", json!(null), Some("null".to_string())),
+        ("bool", json!(false), Some("false".to_string())),
+        ("number", json!(123), Some("123".to_string())),
+        (
+            "object",
+            json!({ "model": secret }),
+            Some(secret.to_string()),
+        ),
+        (
+            "array",
+            json!(["agent-model", secret]),
+            Some(secret.to_string()),
+        ),
+        ("whitespace_only", json!("  \t \n  "), None),
+        (
+            "oversize_after_trim",
+            json!(format!("  {}  ", "x".repeat(129))),
+            Some("x".repeat(129)),
+        ),
+    ];
+
+    for (name, raw, leak_probe) in invalid_cases {
+        let mut request = AgentWrapperRunRequest {
+            prompt: "hello".to_string(),
+            ..Default::default()
+        };
+        request.extensions.insert(MODEL_ID_KEY.to_string(), raw);
+
+        let err = match normalize_request(&adapter, &defaults, request) {
+            Ok(_) => panic!("expected invalid model id for case {name}"),
+            Err(err) => err,
+        };
+
+        match err {
+            AgentWrapperError::InvalidRequest { message } => {
+                assert_eq!(message, "invalid agent_api.config.model.v1");
+                if let Some(leak_probe) = leak_probe {
+                    assert!(
+                        !message.contains(&leak_probe),
+                        "case {name} leaked raw value into InvalidRequest message"
+                    );
+                }
+            }
+            other => panic!("expected InvalidRequest for case {name}, got: {other:?}"),
+        }
+    }
+}
+
+#[test]
+fn bh_c03_agent_api_config_model_v1_trims_before_mapping_via_normalize_request() {
+    struct SupportsModelIdAdapter;
+
+    impl BackendHarnessAdapter for SupportsModelIdAdapter {
+        fn kind(&self) -> crate::AgentWrapperKind {
+            toy_kind()
+        }
+
+        fn supported_extension_keys(&self) -> &'static [&'static str] {
+            &[MODEL_ID_KEY]
+        }
+
+        type Policy = ToyPolicy;
+
+        fn validate_and_extract_policy(
+            &self,
+            _request: &AgentWrapperRunRequest,
+        ) -> Result<Self::Policy, crate::AgentWrapperError> {
+            Ok(ToyPolicy)
+        }
+
+        type BackendEvent = ToyEvent;
+        type BackendCompletion = ToyCompletion;
+        type BackendError = ToyBackendError;
+
+        fn spawn(
+            &self,
+            _req: NormalizedRequest<Self::Policy>,
+        ) -> std::pin::Pin<
+            Box<
+                dyn std::future::Future<
+                        Output = Result<
+                            super::super::contract::BackendSpawn<
+                                Self::BackendEvent,
+                                Self::BackendCompletion,
+                                Self::BackendError,
+                            >,
+                            Self::BackendError,
+                        >,
+                    > + Send
+                    + 'static,
+            >,
+        > {
+            panic!("spawn must not be called from normalize_request");
+        }
+
+        fn map_event(&self, _event: Self::BackendEvent) -> Vec<crate::AgentWrapperEvent> {
+            panic!("map_event must not be called from normalize_request");
+        }
+
+        fn map_completion(
+            &self,
+            _completion: Self::BackendCompletion,
+        ) -> Result<crate::AgentWrapperCompletion, crate::AgentWrapperError> {
+            panic!("map_completion must not be called from normalize_request");
+        }
+
+        fn redact_error(
+            &self,
+            _phase: BackendHarnessErrorPhase,
+            _err: &Self::BackendError,
+        ) -> String {
+            panic!("redact_error must not be called from normalize_request");
+        }
+    }
+
+    let adapter = SupportsModelIdAdapter;
+    let defaults = BackendDefaults::default();
+    let mut request = AgentWrapperRunRequest {
+        prompt: "hello".to_string(),
+        ..Default::default()
+    };
+    request.extensions.insert(
+        MODEL_ID_KEY.to_string(),
+        json!("  agent-model-1  "),
+    );
+
+    let normalized =
+        normalize_request(&adapter, &defaults, request).expect("expected normalized request");
+    assert_eq!(normalized.model_id, Some("agent-model-1".to_string()));
+}
+
+#[test]
 fn bh_r0_agent_api_config_model_v1_is_rejected_before_value_shape_validation_via_normalize_request()
 {
     struct PanicOnPolicyAdapter;
@@ -879,7 +1081,7 @@ fn bh_r0_agent_api_config_model_v1_is_rejected_before_value_shape_validation_via
     let adapter = PanicOnPolicyAdapter;
     let defaults = BackendDefaults::default();
 
-    for raw in [json!(false), json!("x".repeat(256))] {
+    for raw in [json!(false), json!("  \t \n  "), json!("x".repeat(256))] {
         let mut request = AgentWrapperRunRequest {
             prompt: "hello".to_string(),
             ..Default::default()
