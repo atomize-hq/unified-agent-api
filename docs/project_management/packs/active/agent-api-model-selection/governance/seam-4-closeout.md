@@ -46,7 +46,7 @@ open_remediations: []
 
 ## Post-exec gate disposition
 
-- **Landing gate**: pending | passed | failed
-- **Closeout gate**: pending | passed | failed
-- **Unresolved remediations**:
-- **Carried-forward remediations**:
+- **Landing gate**: passed
+- **Closeout gate**: passed
+- **Unresolved remediations**: none
+- **Carried-forward remediations**: none
