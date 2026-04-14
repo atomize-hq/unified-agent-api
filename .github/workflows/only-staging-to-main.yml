@@ -32,13 +32,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # Enforce a simple explicit "why" label to control main-branch CI intensity and ensure
-          # staging->main PRs are intentional.
+          # Enforce exactly one explicit staging -> main purpose label so main-branch CI intensity
+          # stays intentional and repo releases are distinct from generic ops changes.
           #
           # Allowed labels:
-          # - purpose=codex_release
-          # - purpose=claude_code_release
-          # - purpose=ops
+          # - repo_release
+          # - ops
+          # - codex_release
+          # - claude_code_release
           mapfile -t labels < <(jq -r '.pull_request.labels[].name' "$GITHUB_EVENT_PATH" || true)
           if ((${#labels[@]} == 0)); then
             echo "Labels: <none>"
@@ -49,35 +50,24 @@ jobs:
 
           allowed_count=0
           allowed_value=""
-          unknown_purpose=0
           for l in "${labels[@]}"; do
             case "$l" in
-              purpose=codex_release|purpose=claude_code_release|purpose=ops)
+              repo_release|ops|codex_release|claude_code_release)
                 allowed_count=$((allowed_count+1))
                 allowed_value="$l"
-                ;;
-              purpose=*)
-                unknown_purpose=$((unknown_purpose+1))
                 ;;
               *)
                 ;;
             esac
           done
 
-          if (( unknown_purpose > 0 )); then
-            echo "Found unknown purpose=... label(s). Only these are allowed:"
-            echo "  - purpose=codex_release"
-            echo "  - purpose=claude_code_release"
-            echo "  - purpose=ops"
-            exit 1
-          fi
-
           if (( allowed_count != 1 )); then
             echo "staging -> main PRs must have exactly one purpose label."
             echo "Add exactly one of:"
-            echo "  - purpose=codex_release"
-            echo "  - purpose=claude_code_release"
-            echo "  - purpose=ops"
+            echo "  - repo_release"
+            echo "  - ops"
+            echo "  - codex_release"
+            echo "  - claude_code_release"
             exit 1
           fi
 

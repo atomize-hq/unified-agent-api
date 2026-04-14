@@ -22,7 +22,7 @@ jobs:
     outputs:
       purpose: ${{ steps.purpose.outputs.purpose }}
     steps:
-      - name: Determine purpose label
+      - name: Determine staging -> main labels
         id: purpose
         shell: bash
         run: |
@@ -38,23 +38,108 @@ jobs:
             exit 0
           fi
 
-          labels="$(jq -r '.pull_request.labels[].name' "$GITHUB_EVENT_PATH" || true)"
+          mapfile -t labels < <(jq -r '.pull_request.labels[].name' "$GITHUB_EVENT_PATH" || true)
           purpose=""
-          for l in $labels; do
+          for l in "${labels[@]}"; do
             case "$l" in
-              purpose=codex_release) purpose="codex_release" ;;
-              purpose=claude_code_release) purpose="claude_code_release" ;;
-              purpose=ops) purpose="ops" ;;
+              repo_release|ops|codex_release|claude_code_release)
+                if [ -n "$purpose" ] && [ "$purpose" != "$l" ]; then
+                  echo "purpose=invalid" >> "$GITHUB_OUTPUT"
+                  echo "staging -> main PRs must choose exactly one allowed label." >&2
+                  echo "Allowed labels:" >&2
+                  echo "  - repo_release" >&2
+                  echo "  - ops" >&2
+                  echo "  - codex_release" >&2
+                  echo "  - claude_code_release" >&2
+                  exit 1
+                fi
+                purpose="$l"
+                ;;
               *) ;;
             esac
           done
 
           if [ -z "$purpose" ]; then
             echo "purpose=missing" >> "$GITHUB_OUTPUT"
-            echo "Missing required purpose label (should be enforced by only-staging-to-main.yml)." >&2
+            echo "Missing required staging -> main label. Add exactly one of:" >&2
+            echo "  - repo_release" >&2
+            echo "  - ops" >&2
+            echo "  - codex_release" >&2
+            echo "  - claude_code_release" >&2
             exit 1
           fi
+
           echo "purpose=$purpose" >> "$GITHUB_OUTPUT"
+
+  repo-version-guards:
+    name: Repo version guards
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Guard VERSION matches workspace version
+        shell: bash
+        run: |
+          set -euo pipefail
+          version_file="$(tr -d '[:space:]' < VERSION)"
+          cargo_version="$(python3 - <<'PY'
+          import tomllib
+
+          with open("Cargo.toml", "rb") as fh:
+              data = tomllib.load(fh)
+
+          print(data["workspace"]["package"]["version"])
+          PY
+          )"
+
+          echo "VERSION file: $version_file"
+          echo "Cargo workspace version: $cargo_version"
+
+          if [ "$version_file" != "$cargo_version" ]; then
+            echo "Root VERSION must match Cargo.toml [workspace.package].version." >&2
+            exit 1
+          fi
+
+      - name: Guard CHANGELOG.md updates when VERSION changes
+        if: ${{ github.event_name == 'pull_request' || github.event_name == 'push' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            base_sha="${{ github.event.pull_request.base.sha }}"
+            head_sha="${{ github.event.pull_request.head.sha }}"
+          else
+            base_sha="${{ github.event.before }}"
+            head_sha="${{ github.sha }}"
+          fi
+
+          if [ -z "$base_sha" ] || [ "$base_sha" = "0000000000000000000000000000000000000000" ]; then
+            echo "No comparable base commit is available; skipping VERSION/CHANGELOG diff guard."
+            exit 0
+          fi
+
+          version_changed=0
+          changelog_changed=0
+
+          if ! git diff --quiet "$base_sha" "$head_sha" -- VERSION; then
+            version_changed=1
+          fi
+
+          if ! git diff --quiet "$base_sha" "$head_sha" -- CHANGELOG.md; then
+            changelog_changed=1
+          fi
+
+          if (( version_changed == 1 && changelog_changed == 0 )); then
+            echo "Root VERSION changed between $base_sha and $head_sha, but CHANGELOG.md did not." >&2
+            echo "Update CHANGELOG.md whenever the root VERSION file changes." >&2
+            exit 1
+          fi
+
+          echo "VERSION changed: $version_changed"
+          echo "CHANGELOG.md changed: $changelog_changed"
 
   rust-tests:
     name: Rust tests (workspace)
