@@ -9,11 +9,11 @@ Feature directory: `docs/project_management/packs/active/agent-api-codex-stream-
 - ADR: `docs/adr/0011-agent-api-codex-stream-exec.md`
 - Spec manifest: `docs/project_management/packs/active/agent-api-codex-stream-exec/spec_manifest.md`
 - Baselines (referenced; not duplicated):
-  - `docs/adr/0009-universal-agent-api.md`
-  - `docs/project_management/next/universal-agent-api/contract.md`
-  - `docs/project_management/next/universal-agent-api/run-protocol-spec.md`
-  - `docs/project_management/next/universal-agent-api/event-envelope-schema-spec.md`
-  - `docs/project_management/next/universal-agent-api/capabilities-schema-spec.md`
+  - `docs/adr/0009-unified-agent-api.md`
+  - `docs/project_management/next/unified-agent-api/contract.md`
+  - `docs/project_management/next/unified-agent-api/run-protocol-spec.md`
+  - `docs/project_management/next/unified-agent-api/event-envelope-schema-spec.md`
+  - `docs/project_management/next/unified-agent-api/capabilities-schema-spec.md`
   - `docs/specs/codex-thread-event-jsonl-parser-contract.md`
 
 ## Touch set (explicit)
@@ -139,15 +139,15 @@ Feature directory: `docs/project_management/packs/active/agent-api-codex-stream-
     after the event stream is final) without introducing deadlocks when the consumer is slow or
     drops the stream.
 - Contradiction risks:
-  - The Codex wrapper streaming path uses its own channel and tasks; if `agent_api` stops polling
-    the upstream stream after its downstream receiver drops, the codex wrapper may block and/or
+  - The Codex crate streaming path uses its own channel and tasks; if `agent_api` stops polling
+    the upstream stream after its downstream receiver drops, the codex crate may block and/or
     the child may be cancelled unexpectedly.
 
 ## Cross-queue scan (ADRs + Planning Packs)
 
 ### ADRs (`docs/adr/*.md`)
 
-- `docs/adr/0009-universal-agent-api.md`
+- `docs/adr/0009-unified-agent-api.md`
   - Overlap: run protocol + event envelope + capability model.
   - Conflict risk: none if this feature remains an implementation refactor and does not change the
     universal envelope or capability naming.
@@ -157,7 +157,7 @@ Feature directory: `docs/project_management/packs/active/agent-api-codex-stream-
     or leaks raw JSONL lines via `ExecStreamError`.
 - `docs/adr/0007-wrapper-events-ingestion-contract.md`
   - Overlap: repo-wide ingestion safety posture and bounded parsing patterns.
-  - Conflict risk: the Codex wrapper uses `BufReader(...).lines()` for streaming ingestion, which is
+  - Conflict risk: the Codex crate uses `BufReader(...).lines()` for streaming ingestion, which is
     not bounded in the same way as `wrapper_events`; if the universal API needs hard bounds before
     mapping, this should be tracked as a follow-up decision (not silently assumed).
 - `docs/adr/0010-claude-code-live-stream-json.md`
@@ -167,7 +167,7 @@ Feature directory: `docs/project_management/packs/active/agent-api-codex-stream-
 
 ### Planning packs (`docs/project_management/next/*`)
 
-- `docs/project_management/next/universal-agent-api/`
+- `docs/project_management/next/unified-agent-api/`
   - Overlap: authoritative specs for universal envelope/protocol/capabilities.
   - Conflict risk: none if this feature references those docs as baselines and does not redefine.
 - `docs/project_management/next/claude-code-live-stream-json/`

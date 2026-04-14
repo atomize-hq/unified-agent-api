@@ -5,7 +5,7 @@ Pack: `docs/project_management/packs/active/agent-api-mcp-management/`
 Inputs:
 - Seam brief: `docs/project_management/packs/active/agent-api-mcp-management/seam-1-mcp-management-contract.md`
 - Threading (authoritative): `docs/project_management/packs/active/agent-api-mcp-management/threading.md`
-- Canonical spec (normative once approved): `docs/specs/universal-agent-api/mcp-management-spec.md`
+- Canonical spec (normative once approved): `docs/specs/unified-agent-api/mcp-management-spec.md`
 
 ## Seam Brief (Restated)
 
@@ -15,7 +15,7 @@ Inputs:
 - **Type**: integration (contract-definition)
 - **Scope**
   - In:
-    - Implement public `agent_api::mcp` module + pinned type shapes from `docs/specs/universal-agent-api/mcp-management-spec.md`.
+    - Implement public `agent_api::mcp` module + pinned type shapes from `docs/specs/unified-agent-api/mcp-management-spec.md`.
     - Add gateway entrypoints: `AgentWrapperGateway::{mcp_list,mcp_get,mcp_add,mcp_remove}` with deterministic error ordering.
     - Add default backend hooks: `AgentWrapperBackend::{mcp_list,mcp_get,mcp_add,mcp_remove}` (default: `UnsupportedCapability`).
     - Provide SEAM-1–owned helpers for:
@@ -27,7 +27,7 @@ Inputs:
     - Built-in backend argv mappings + process execution wiring (SEAM-3/4).
     - Cross-backend mapping tests + conformance harness (SEAM-5).
 - **Touch surface**
-  - `docs/specs/universal-agent-api/mcp-management-spec.md` (canonical contract)
+  - `docs/specs/unified-agent-api/mcp-management-spec.md` (canonical contract)
   - `crates/agent_api/src/lib.rs` (gateway + trait surface)
   - `crates/agent_api/src/mcp.rs` (new public module)
   - `crates/agent_api/src/bounds.rs` (reuse/extend for MCP output bounds, if needed)

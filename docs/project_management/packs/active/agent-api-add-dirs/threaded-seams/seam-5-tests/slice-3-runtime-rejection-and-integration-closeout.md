@@ -38,11 +38,11 @@
   - `S3b`: add dedicated `add_dirs_runtime_rejection_*` scenarios to the fake Claude binary for
     fresh, resume, and fork selector branches.
 - `slice-3-runtime-rejection-and-integration-closeout/subslice-3-codex-runtime-rejection-parity.md`
-  - `S3c`: add Codex wrapper-level parity tests proving one terminal error event, completion
+  - `S3c`: add Codex crate-level parity tests proving one terminal error event, completion
     message equality, and no sentinel leakage for exec/resume flows.
 - `slice-3-runtime-rejection-and-integration-closeout/subslice-4-claude-runtime-rejection-parity.md`
   - `S3d`: add Claude wrapper-level parity tests proving one terminal error event, completion
     message equality, and no sentinel leakage for fresh/resume/fork flows.
 - `slice-3-runtime-rejection-and-integration-closeout/subslice-5-capability-matrix-and-final-gate.md`
-  - `S3e`: regenerate `docs/specs/universal-agent-api/capability-matrix.md` and run the required
+  - `S3e`: regenerate `docs/specs/unified-agent-api/capability-matrix.md` and run the required
     closeout commands after `S2`, `S3c`, and `S3d` are complete.

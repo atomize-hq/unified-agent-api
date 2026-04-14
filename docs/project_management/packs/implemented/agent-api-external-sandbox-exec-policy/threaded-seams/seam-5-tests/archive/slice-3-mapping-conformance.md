@@ -30,10 +30,10 @@
     exactly.
   - Claude argv + allow-flag behavior matches `docs/specs/claude-code-session-mapping-contract.md`
     exactly.
-  - Warning event message and ordering match `docs/specs/universal-agent-api/extensions-spec.md`
+  - Warning event message and ordering match `docs/specs/unified-agent-api/extensions-spec.md`
     exactly.
 - **Dependencies**:
-  - `docs/specs/universal-agent-api/extensions-spec.md` (warning contract).
+  - `docs/specs/unified-agent-api/extensions-spec.md` (warning contract).
   - `docs/specs/codex-external-sandbox-mapping-contract.md` (Codex mapping).
   - `docs/specs/claude-code-session-mapping-contract.md` (Claude mapping + preflight).
   - SEAM-2 opt-in gate (key must be supported to reach mapping).
@@ -120,7 +120,7 @@ Checklist:
 - **Inputs/outputs**:
   - Input:
     - `docs/specs/claude-code-session-mapping-contract.md` (danger flags + allow-flag preflight),
-    - `docs/specs/universal-agent-api/extensions-spec.md` (warning contract).
+    - `docs/specs/unified-agent-api/extensions-spec.md` (warning contract).
   - Output:
     - integration tests under `crates/agent_api/tests/` that assert:
       - `--dangerously-skip-permissions` is present when `external_sandbox=true`,

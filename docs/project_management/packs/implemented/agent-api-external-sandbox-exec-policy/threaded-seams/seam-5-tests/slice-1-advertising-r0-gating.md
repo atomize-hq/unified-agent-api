@@ -22,7 +22,7 @@
     `AgentWrapperError::UnsupportedCapability` with `capability="agent_api.exec.external_sandbox.v1"`
     and does not leak the provided value.
 - **Dependencies**:
-  - `docs/specs/universal-agent-api/extensions-spec.md` (key id; warning non-emission when
+  - `docs/specs/unified-agent-api/extensions-spec.md` (key id; warning non-emission when
     unsupported).
   - SEAM-2 enablement (`allow_external_sandbox_exec`) for the opt-in advertising tests.
 - **Verification**:
@@ -37,7 +37,7 @@
 - **Outcome**: Codex + Claude Code backend capability sets are pinned to ES-C03 (safe default
   advertising).
 - **Inputs/outputs**:
-  - Input: ES-C03 in `docs/specs/universal-agent-api/extensions-spec.md` + `threading.md`.
+  - Input: ES-C03 in `docs/specs/unified-agent-api/extensions-spec.md` + `threading.md`.
   - Output: unit test updates in:
     - `crates/agent_api/src/backends/codex/tests.rs`
     - `crates/agent_api/src/backends/claude_code/tests.rs`
@@ -65,7 +65,7 @@ Checklist:
 - **Outcome**: the harness normalize path is pinned to reject unsupported keys before calling
   `validate_and_extract_policy`, preventing accidental value parsing or secret leakage.
 - **Inputs/outputs**:
-  - Input: harness contract (R0) and `docs/specs/universal-agent-api/extensions-spec.md` key id.
+  - Input: harness contract (R0) and `docs/specs/unified-agent-api/extensions-spec.md` key id.
   - Output: new test(s) in `crates/agent_api/src/backend_harness/normalize/tests.rs` that:
     - create an adapter that would panic if `validate_and_extract_policy` is called,
     - submit a request with `extensions["agent_api.exec.external_sandbox.v1"]=<secret string>`,

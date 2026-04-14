@@ -1,7 +1,7 @@
 [
   {
     "id": "C0-code",
-    "name": "C0: Codex wrapper per-run env override API (code)",
+    "name": "C0: Codex crate per-run env override API (code)",
     "type": "code",
     "phase": "C0",
     "status": "completed",
@@ -52,7 +52,7 @@
   },
   {
     "id": "C0-test",
-    "name": "C0: Codex wrapper per-run env override API (test)",
+    "name": "C0: Codex crate per-run env override API (test)",
     "type": "test",
     "phase": "C0",
     "status": "completed",
@@ -101,7 +101,7 @@
   },
   {
     "id": "C0-integ",
-    "name": "C0: Codex wrapper per-run env override API (integration)",
+    "name": "C0: Codex crate per-run env override API (integration)",
     "type": "integration",
     "phase": "C0",
     "status": "completed",

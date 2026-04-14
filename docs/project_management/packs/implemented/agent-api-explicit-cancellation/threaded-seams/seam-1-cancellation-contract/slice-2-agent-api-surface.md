@@ -55,7 +55,7 @@ Checklist:
 - Implement: add type + crate-private constructor + idempotence guard.
 - Test: add a small unit test for idempotence (if it fits without SEAM-2 wiring).
 - Validate: `make check` and `make clippy`.
-- Cleanup: ensure rustdoc matches `docs/specs/universal-agent-api/contract.md`.
+- Cleanup: ensure rustdoc matches `docs/specs/unified-agent-api/contract.md`.
 
 #### S2.T2 — Add `AgentWrapperRunControl` public type
 
@@ -99,7 +99,7 @@ Checklist:
 - Implement: add method with default impl.
 - Test: cover default fail-closed behavior via a dummy backend in `c0_core_contract`.
 - Validate: `make check` and `make clippy`.
-- Cleanup: keep doc comment consistent with `docs/specs/universal-agent-api/contract.md`.
+- Cleanup: keep doc comment consistent with `docs/specs/unified-agent-api/contract.md`.
 
 #### S2.T4 — Add `AgentWrapperGateway::run_control(...)` convenience entrypoint
 

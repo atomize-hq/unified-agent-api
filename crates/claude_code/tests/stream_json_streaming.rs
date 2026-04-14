@@ -1,22 +1,24 @@
 use std::time::Duration;
 
+mod support_paths;
+
 use claude_code::{ClaudeClient, ClaudePrintRequest, ClaudeStreamJsonEvent};
 use futures_util::StreamExt;
 
 fn make_fake_client(scenario: &str) -> ClaudeClient {
     ClaudeClient::builder()
-        .binary(std::path::PathBuf::from(env!(
-            "CARGO_BIN_EXE_fake_claude_stream_json"
-        )))
+        .binary(support_paths::target_debug_binary(
+            "fake_claude_stream_json",
+        ))
         .env("FAKE_CLAUDE_SCENARIO", scenario)
         .build()
 }
 
 fn make_fake_client_mirroring_stdout(scenario: &str) -> ClaudeClient {
     ClaudeClient::builder()
-        .binary(std::path::PathBuf::from(env!(
-            "CARGO_BIN_EXE_fake_claude_stream_json"
-        )))
+        .binary(support_paths::target_debug_binary(
+            "fake_claude_stream_json",
+        ))
         .env("FAKE_CLAUDE_SCENARIO", scenario)
         .mirror_stdout(true)
         .build()

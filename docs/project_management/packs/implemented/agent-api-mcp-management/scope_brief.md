@@ -25,7 +25,7 @@ Treating this as `AgentWrapperRunRequest.extensions` is a category error: MCP ma
 ## In-scope
 
 - Implement the public `agent_api::mcp` module and pinned type shapes from:
-  - `docs/specs/universal-agent-api/mcp-management-spec.md`
+  - `docs/specs/unified-agent-api/mcp-management-spec.md`
 - Capability-gated gateway entrypoints:
   - `AgentWrapperGateway::{mcp_list,mcp_get,mcp_add,mcp_remove}`
 - Backend hooks:
@@ -80,7 +80,7 @@ Treating this as `AgentWrapperRunRequest.extensions` is a category error: MCP ma
 - By default, built-in backends advertise read operations (`list/get`) when supported on this target and do **not** advertise
   write operations (`add/remove`) unless explicitly enabled via the public built-in config fields
   (`CodexBackendConfig.allow_mcp_write=true` / `ClaudeCodeBackendConfig.allow_mcp_write=true`;
-  pinned in SEAM-2 and `docs/specs/universal-agent-api/contract.md`).
+  pinned in SEAM-2 and `docs/specs/unified-agent-api/contract.md`).
 - All operations enforce request validation and output bounds.
 - Automation can run against an isolated home to avoid mutating user state.
 - The generated default capability matrix may omit `agent_api.tools.mcp.add.v1` /
@@ -90,7 +90,7 @@ Treating this as `AgentWrapperRunRequest.extensions` is a category error: MCP ma
 ## Constraints
 
 - Public API uses std + serde-friendly types only (no `codex::*` / `claude_code::*` in public types). Canonical definition:
-  `docs/specs/universal-agent-api/contract.md#serde-friendly-types`.
+  `docs/specs/unified-agent-api/contract.md#serde-friendly-types`.
 - The API is typed/bounded (no generic argv pass-through; no “extra args” escape hatch).
 - No network access is required for tests.
 
@@ -122,5 +122,5 @@ Treating this as `AgentWrapperRunRequest.extensions` is a category error: MCP ma
   and advertise capabilities accordingly. The canonical v1 fields are
   `agent_api::backends::codex::CodexBackendConfig.allow_mcp_write` and
   `agent_api::backends::claude_code::ClaudeCodeBackendConfig.allow_mcp_write` (pinned in SEAM-2
-  and `docs/specs/universal-agent-api/contract.md`).
+  and `docs/specs/unified-agent-api/contract.md`).
 - For v1, `agent_api` returns bounded stdout/stderr as-is and does not attempt to normalize or redact backend-specific formats.

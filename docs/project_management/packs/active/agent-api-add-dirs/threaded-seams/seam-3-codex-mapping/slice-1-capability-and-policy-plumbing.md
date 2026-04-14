@@ -47,7 +47,7 @@
   the backend declares supported run extensions.
 - **Inputs/outputs**:
   - Input: AD-C01/AD-C07 from `threading.md` and
-    `docs/specs/universal-agent-api/extensions-spec.md`.
+    `docs/specs/unified-agent-api/extensions-spec.md`.
   - Output:
     - `crates/agent_api/src/backends/codex/backend.rs`
     - `crates/agent_api/src/backends/codex/policy.rs`
@@ -84,7 +84,7 @@ Checklist:
   exec/resume/fork decisions.
 - **Inputs/outputs**:
   - Input: AD-C02 from `threading.md`; effective working directory rules from
-    `docs/specs/universal-agent-api/contract.md`.
+    `docs/specs/unified-agent-api/contract.md`.
   - Output:
     - `crates/agent_api/src/backends/codex/harness.rs`
     - `crates/agent_api/src/backends/codex/policy.rs`

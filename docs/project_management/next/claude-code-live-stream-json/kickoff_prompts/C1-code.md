@@ -17,7 +17,7 @@
 ## Requirements
 - Wire the Claude backend to the streaming API and emit events live.
 - Advertise `agent_api.events.live`.
-- Preserve Universal Agent API DR-0012 completion gating and safety posture (no raw backend lines).
+- Preserve Unified Agent API DR-0012 completion gating and safety posture (no raw backend lines).
 
 ## Commands (required)
 - `cargo fmt`

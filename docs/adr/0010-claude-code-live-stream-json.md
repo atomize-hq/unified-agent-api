@@ -17,8 +17,8 @@
   - `docs/project_management/prompt_templates/adr-to-triad-feature-scaffold.md`
 
 ## Related Docs
-- Prior ADR (universal contract baseline): `docs/adr/0009-universal-agent-api.md`
-- Prior planning pack (baseline): `docs/project_management/next/universal-agent-api/`
+- Prior ADR (universal contract baseline): `docs/adr/0009-unified-agent-api.md`
+- Prior planning pack (baseline): `docs/project_management/next/unified-agent-api/`
 - Spec manifest: `docs/project_management/next/claude-code-live-stream-json/spec_manifest.md`
 - Decision Register: `docs/project_management/next/claude-code-live-stream-json/decision_register.md`
 - Plan: `docs/project_management/next/claude-code-live-stream-json/plan.md`
@@ -39,19 +39,19 @@
 ADR_BODY_SHA256: dcbef68108e3c20f1b3b2f981bfe0a6e5513b6283b015d92e8d6a3b997c006a7
 
 ### Changes (operator-facing)
-- Enable live event streaming for Claude Code in the Universal Agent API
+- Enable live event streaming for Claude Code in the Unified Agent API
   - Existing: `agent_api`’s Claude Code backend emits events only after the `claude` process exits because it buffers stdout before parsing.
   - New: `crates/claude_code` exposes a streaming `--print --output-format stream-json` API that yields parsed JSONL events as they arrive; `agent_api`’s Claude backend forwards these events live and advertises `agent_api.events.live`.
-  - Why: Unlocks real-time UX/progress for Claude runs, aligns Claude backend behavior with operator expectations, and preserves Universal Agent API DR-0012 completion safety guarantees (completion resolves only after the event stream is final).
+  - Why: Unlocks real-time UX/progress for Claude runs, aligns Claude backend behavior with operator expectations, and preserves Unified Agent API DR-0012 completion safety guarantees (completion resolves only after the event stream is final).
   - Links:
     - Current buffered parsing (to be replaced in `agent_api`): `crates/agent_api/src/backends/claude_code.rs`
     - Current buffered stdout collection in Claude wrapper: `crates/claude_code/src/process.rs`
     - Claude wrapper print entrypoint (will gain streaming alternative): `crates/claude_code/src/client/mod.rs`
-    - Run protocol semantics reference (completion vs stream finality): `docs/specs/universal-agent-api/run-protocol-spec.md`
+    - Run protocol semantics reference (completion vs stream finality): `docs/specs/unified-agent-api/run-protocol-spec.md`
 
 ## Problem / Context
 
-- The Universal Agent API (`crates/agent_api`) intentionally provides a unified run contract: an event stream plus a completion future.
+- The Unified Agent API (`crates/agent_api`) intentionally provides a unified run contract: an event stream plus a completion future.
 - Today, the Claude Code backend in `agent_api` calls `claude_code::ClaudeClient::print(...)`, which buffers all stdout before parsing stream-json lines. This prevents callers from receiving events until the process exits, even if the upstream `claude` CLI is producing JSONL incrementally.
 - Downstream orchestrators that rely on event streaming for progress, cancellation UX, or partial outputs cannot treat Claude as a “live” backend under `agent_api`.
 
@@ -59,7 +59,7 @@ ADR_BODY_SHA256: dcbef68108e3c20f1b3b2f981bfe0a6e5513b6283b015d92e8d6a3b997c006a
 
 - Add a first-class streaming API in `crates/claude_code` for `--print --output-format stream-json` that yields parsed stream-json events as they arrive.
 - Wire `agent_api`’s Claude backend to use that streaming API and advertise `agent_api.events.live`.
-- Preserve Universal Agent API DR-0012 semantics in `agent_api`: `completion` MUST NOT resolve until the event stream is final (or explicitly dropped by the consumer).
+- Preserve Unified Agent API DR-0012 semantics in `agent_api`: `completion` MUST NOT resolve until the event stream is final (or explicitly dropped by the consumer).
 - Keep tests fixture/synthetic; no requirement for a real `claude` binary on CI runners.
 - Preserve safety posture:
   - `agent_api` MUST NOT emit raw backend lines in events (`AgentWrapperEvent.data` remains bounded and safe-by-default).
@@ -129,7 +129,7 @@ impl claude_code::ClaudeClient {
 Update the built-in Claude backend (`feature = "claude_code"`) so that:
 - It uses the new `claude_code` streaming API to emit `AgentWrapperEvent`s as events arrive.
 - It advertises `agent_api.events.live` in `AgentWrapperCapabilities.ids`.
-- It continues to enforce Universal Agent API DR-0012 completion gating semantics via the shared run-handle gate.
+- It continues to enforce Unified Agent API DR-0012 completion gating semantics via the shared run-handle gate.
 
 ### Config
 - No new config files are introduced.
@@ -158,7 +158,7 @@ Update the built-in Claude backend (`feature = "claude_code"`) so that:
     - call `ClaudeClient::print_stream_json(...)`
     - map streamed Claude events to `AgentWrapperEvent` immediately
     - advertise `agent_api.events.live`
-    - preserve Universal Agent API DR-0012 via `run_handle_gate::build_gated_run_handle`
+    - preserve Unified Agent API DR-0012 via `run_handle_gate::build_gated_run_handle`
 
 ### End-to-end flow
 - Inputs:
@@ -169,7 +169,7 @@ Update the built-in Claude backend (`feature = "claude_code"`) so that:
   - spawn `claude --print --output-format stream-json ...`
   - incrementally parse stdout JSONL → typed Claude events
   - map typed events → `AgentWrapperEvent` and forward on the universal event stream
-  - wait for process exit and resolve completion only after the universal stream is final (Universal Agent API DR-0012)
+  - wait for process exit and resolve completion only after the universal stream is final (Unified Agent API DR-0012)
 - Outputs:
   - `AgentWrapperRunHandle` with live `events` + gated `completion`
 
@@ -212,7 +212,7 @@ Update the built-in Claude backend (`feature = "claude_code"`) so that:
 - Manual playbook (required): `docs/project_management/next/claude-code-live-stream-json/manual_testing_playbook.md`
   - Run a real `claude` print stream-json session and confirm:
     - at least one event arrives before process exit
-    - `completion` resolves only after events stream finality (Universal Agent API DR-0012)
+    - `completion` resolves only after events stream finality (Unified Agent API DR-0012)
 
 ### Smoke scripts
 - A dedicated feature-local smoke set MUST exist under:

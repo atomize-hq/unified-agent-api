@@ -238,6 +238,10 @@ pub(super) fn fake_claude_binary() -> PathBuf {
             return Ok(binary.clone());
         }
 
+        if let Some(existing) = find_existing_fake_claude_binary(target_dir) {
+            return Ok(existing);
+        }
+
         build_fake_claude_binary(repo_root, &binary).map(|_| binary.clone())
     });
     built

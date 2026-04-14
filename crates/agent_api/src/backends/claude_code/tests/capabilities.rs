@@ -5,6 +5,14 @@ use tempfile::tempdir;
 use super::support::*;
 
 #[test]
+fn claude_backend_advertises_agent_api_config_model_v1() {
+    let backend = ClaudeCodeBackend::new(ClaudeCodeBackendConfig::default());
+    assert!(backend
+        .capabilities()
+        .contains(crate::EXT_AGENT_API_CONFIG_MODEL_V1));
+}
+
+#[test]
 fn claude_backend_reports_required_capabilities() {
     let backend = ClaudeCodeBackend::new(ClaudeCodeBackendConfig::default());
     let capabilities = backend.capabilities();
@@ -16,6 +24,7 @@ fn claude_backend_reports_required_capabilities() {
     assert!(capabilities.contains(CAP_TOOLS_RESULTS_V1));
     assert!(capabilities.contains(CAP_ARTIFACTS_FINAL_TEXT_V1));
     assert!(capabilities.contains(CAP_SESSION_HANDLE_V1));
+    assert!(capabilities.contains(crate::EXT_AGENT_API_CONFIG_MODEL_V1));
     assert!(capabilities.contains(EXT_ADD_DIRS_V1));
     assert!(capabilities.contains(EXT_SESSION_RESUME_V1));
     assert!(capabilities.contains(EXT_SESSION_FORK_V1));

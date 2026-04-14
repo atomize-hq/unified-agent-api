@@ -110,7 +110,7 @@
   the installed CLI/runtime cannot honor the accepted list for a supported run surface, the backend
   MUST take the owner-doc runtime rejection path (`AgentWrapperError::Backend { message }`) with a
   safe/redacted message (it MUST NOT implement per-environment capability gating unless the
-  canonical Universal Agent API specs explicitly introduce that behavior).
+  canonical Unified Agent API specs explicitly introduce that behavior).
 
 ## Rollout / safety
 

@@ -1,4 +1,43 @@
-# SEAM-5 — Tests
+---
+seam_id: SEAM-5
+seam_slug: tests
+type: risk
+status: closed
+execution_horizon: future
+plan_version: v1
+basis:
+  currentness: current
+  source_scope_ref: scope_brief.md
+  source_scope_version: v1
+  upstream_closeouts:
+    - governance/seam-1-closeout.md
+    - governance/seam-2-closeout.md
+    - governance/seam-3-closeout.md
+    - governance/seam-4-closeout.md
+  required_threads:
+    - THR-01
+    - THR-02
+    - THR-03
+    - THR-04
+    - THR-05
+  stale_triggers:
+    - capability matrix regeneration is deferred from advertising changes
+gates:
+  pre_exec:
+    review: passed
+    contract: passed
+    revalidation: passed
+  post_exec:
+    landing: passed
+    closeout: passed
+seam_exit_gate:
+  required: true
+  planned_location: S3
+  status: passed
+open_remediations: []
+---
+
+# SEAM-5 - Tests
 
 - **Name**: Tests
 - **Type**: risk
@@ -23,7 +62,7 @@
   - Outputs:
     - regression suite covering the pinned v1 behavior, split into SEAM-5A and SEAM-5B entry criteria
     - stable failure cases for unsupported, invalid, and runtime-rejected model ids
-    - assertions that the SEAM-2-owned regenerated `docs/specs/universal-agent-api/capability-matrix.md` matches the
+    - assertions that the SEAM-2-owned regenerated `docs/specs/unified-agent-api/capability-matrix.md` matches the
       landed advertising change
 - **Key invariants / rules**:
   - unsupported key must fail before `InvalidRequest`
@@ -45,7 +84,7 @@
   - `crates/agent_api/src/backends/codex/tests/**`
   - `crates/agent_api/src/backends/claude_code/tests/**`
   - any shared runtime/error translation tests under `crates/agent_api/src/backend_harness/runtime/tests/**`
-  - `docs/specs/universal-agent-api/capability-matrix.md`
+  - `docs/specs/unified-agent-api/capability-matrix.md`
 - **Verification**:
   - targeted `cargo test` runs cover all new cases
   - SEAM-5A asserts unsupported-before-InvalidRequest ordering and the exact safe InvalidRequest template

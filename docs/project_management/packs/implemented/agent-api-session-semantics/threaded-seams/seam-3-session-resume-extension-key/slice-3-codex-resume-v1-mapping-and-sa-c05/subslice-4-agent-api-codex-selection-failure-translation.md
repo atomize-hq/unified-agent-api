@@ -16,7 +16,7 @@
   - When a stream exists, exactly one terminal `Error` event is emitted and the completion error matches its message.
 - **Dependencies**:
   - `S3c` (resume selector is plumbed into Codex spawn wiring).
-  - Normative: `docs/specs/universal-agent-api/extensions-spec.md` (pinned messages + terminal `Error` event rule).
+  - Normative: `docs/specs/unified-agent-api/extensions-spec.md` (pinned messages + terminal `Error` event rule).
 - **Verification**:
   - `cargo test -p agent_api --features codex`
 - **Rollout/safety**:
@@ -26,7 +26,7 @@
 
 - **Outcome**: Selection failures for resume surface as pinned safe `Backend` errors and emit exactly one terminal `Error` event when a stream exists.
 - **Inputs/outputs**:
-  - Inputs: resume selector (`last` vs `id`) and the Codex wrapper’s typed outcomes.
+  - Inputs: resume selector (`last` vs `id`) and the Codex crate’s typed outcomes.
   - Outputs:
     - Completion resolves to `Err(AgentWrapperError::Backend { message: <pinned> })` for selection failures.
     - Event stream emits exactly one terminal `Error` event with `message == <pinned>` before closing.

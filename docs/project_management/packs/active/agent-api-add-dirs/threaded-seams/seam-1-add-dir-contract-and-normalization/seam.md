@@ -7,7 +7,7 @@
 - **Slicing strategy**: Contract-first. This seam blocks every other seam in the pack, so the first slice publishes the core contract that SEAM-2 must implement, and the second slice pins the session-flow and drift-conformance rules needed by SEAM-3/4/5.
 - **Scope**
   - In:
-    - Confirm the normative owner-doc text in `docs/specs/universal-agent-api/extensions-spec.md`.
+    - Confirm the normative owner-doc text in `docs/specs/unified-agent-api/extensions-spec.md`.
     - Pin the closed schema, bounds, normalization rules, safe `InvalidRequest` posture, absence semantics, and session-flow compatibility language for `agent_api.exec.add_dirs.v1`.
     - Keep ADR-0021 aligned with the normative owner doc and maintain its drift guard.
   - Out:
@@ -15,11 +15,11 @@
     - Backend capability advertising or argv wiring.
     - Backend contract-doc edits owned by SEAM-3/4/5.
 - **Touch surface**:
-  - `docs/specs/universal-agent-api/extensions-spec.md`
-  - `docs/adr/0021-universal-agent-api-add-dirs.md`
+  - `docs/specs/unified-agent-api/extensions-spec.md`
+  - `docs/adr/0021-unified-agent-api-add-dirs.md`
 - **Verification**:
   - Spec review against `docs/project_management/packs/active/agent-api-add-dirs/threading.md`
-  - `make adr-check ADR=docs/adr/0021-universal-agent-api-add-dirs.md`
+  - `make adr-check ADR=docs/adr/0021-unified-agent-api-add-dirs.md`
   - `make preflight` only after downstream implementation seams land
 - **Threading constraints**
   - Upstream blockers:
@@ -35,7 +35,7 @@
     - `AD-C04`
     - `AD-C07`
   - Contracts consumed:
-    - None from sibling seams; this seam only references external normative baselines such as `docs/specs/universal-agent-api/contract.md`.
+    - None from sibling seams; this seam only references external normative baselines such as `docs/specs/unified-agent-api/contract.md`.
 
 ### Slice index
 
@@ -45,14 +45,14 @@
 ### Threading Alignment (mandatory)
 
 - **Contracts produced (owned)**:
-  - `AD-C01`: closed `agent_api.exec.add_dirs.v1` schema, bounds, trim/resolve/lexical-normalize/dedup semantics, and owner-doc location in `docs/specs/universal-agent-api/extensions-spec.md`; produced by `S1`.
-  - `AD-C03`: safe `InvalidRequest` message templates for the key, owned by `docs/specs/universal-agent-api/extensions-spec.md`; produced by `S1`.
+  - `AD-C01`: closed `agent_api.exec.add_dirs.v1` schema, bounds, trim/resolve/lexical-normalize/dedup semantics, and owner-doc location in `docs/specs/unified-agent-api/extensions-spec.md`; produced by `S1`.
+  - `AD-C03`: safe `InvalidRequest` message templates for the key, owned by `docs/specs/unified-agent-api/extensions-spec.md`; produced by `S1`.
   - `AD-C04`: session-flow parity contract, including orthogonality to `agent_api.session.resume.v1` and `agent_api.session.fork.v1`, Claude apply-on-fork behavior, and the pinned Codex fork rejection boundary; produced by `S2`.
   - `AD-C07`: absence semantics stating no backend synthesizes directories or emits `--add-dir` when the key is absent; produced by `S1`.
 - **Contracts consumed**:
   - None from sibling seams.
   - External evidence only:
-    - `docs/specs/universal-agent-api/contract.md`: effective working directory definition referenced by `S1`.
+    - `docs/specs/unified-agent-api/contract.md`: effective working directory definition referenced by `S1`.
     - `docs/specs/codex-app-server-jsonrpc-contract.md`: evidence for the pinned Codex fork rejection boundary referenced by `S2`.
     - `docs/specs/claude-code-session-mapping-contract.md`: evidence for Claude session-flow parity referenced by `S2`.
 - **Dependency edges honored**:

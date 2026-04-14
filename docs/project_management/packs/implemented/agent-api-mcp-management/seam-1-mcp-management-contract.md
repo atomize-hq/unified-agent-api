@@ -10,12 +10,12 @@
 ### In
 
 - Implement the public `agent_api::mcp` module as pinned in:
-  - `docs/specs/universal-agent-api/mcp-management-spec.md`
+  - `docs/specs/unified-agent-api/mcp-management-spec.md`
 - Add `AgentWrapperGateway` convenience methods:
   - `mcp_list`, `mcp_get`, `mcp_add`, `mcp_remove`
 - Add `AgentWrapperBackend` default hooks (non-breaking additive trait evolution) mirroring the `run_control` pattern:
   - `mcp_list`, `mcp_get`, `mcp_add`, `mcp_remove` (default: `UnsupportedCapability`)
-- Implement request validation rules (pinned in `docs/specs/universal-agent-api/mcp-management-spec.md`):
+- Implement request validation rules (pinned in `docs/specs/unified-agent-api/mcp-management-spec.md`):
   - Server names: trimmed; empty is `AgentWrapperError::InvalidRequest`.
   - Transport field validation (MUST occur before spawning any backend process; violations are `InvalidRequest` with a
     safe/redacted message that does not echo raw user-provided values):
@@ -68,7 +68,7 @@
 
 ## Touch surface
 
-- `docs/specs/universal-agent-api/mcp-management-spec.md` (contract source of truth; may need clarifications)
+- `docs/specs/unified-agent-api/mcp-management-spec.md` (contract source of truth; may need clarifications)
 - `crates/agent_api/src/lib.rs` (public exports / module wiring)
 - `crates/agent_api/src/bounds.rs` (likely reuse for stdout/stderr truncation)
 - `crates/agent_api/src/backends/*` (trait surface + gateway wiring)

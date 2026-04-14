@@ -21,7 +21,7 @@
   - None (critical-path start).
 - **Verification**:
   - Grep-based consistency check (strings + capability id).
-  - Review that `docs/specs/universal-agent-api/*` documents agree with the pack contract.
+  - Review that `docs/specs/unified-agent-api/*` documents agree with the pack contract.
 - **Rollout/safety**:
   - Purely doc-level; no runtime behavior changes.
 
@@ -48,9 +48,9 @@ Checklist:
 
 #### S1.T2 — Align canonical contract surface (`contract.md`) with CA-C01
 
-- **Outcome**: `docs/specs/universal-agent-api/contract.md` is the canonical, concrete Rust surface for `run_control(...)`, `AgentWrapperRunControl`, and `AgentWrapperCancelHandle`.
+- **Outcome**: `docs/specs/unified-agent-api/contract.md` is the canonical, concrete Rust surface for `run_control(...)`, `AgentWrapperRunControl`, and `AgentWrapperCancelHandle`.
 - **Inputs/outputs**:
-  - Input: `docs/specs/universal-agent-api/contract.md`
+  - Input: `docs/specs/unified-agent-api/contract.md`
   - Output: updated canonical contract (if needed) matching CA-C01.
 - **Implementation notes**:
   - Keep `AgentWrapperCancelHandle` representation private (opaque), but public API concrete.
@@ -69,9 +69,9 @@ Checklist:
 
 #### S1.T3 — Align run protocol semantics (`run-protocol-spec.md`) with CA-C01
 
-- **Outcome**: `docs/specs/universal-agent-api/run-protocol-spec.md` contains the normative explicit cancellation semantics (capability gating, idempotence, pinned completion error outcome).
+- **Outcome**: `docs/specs/unified-agent-api/run-protocol-spec.md` contains the normative explicit cancellation semantics (capability gating, idempotence, pinned completion error outcome).
 - **Inputs/outputs**:
-  - Input: `docs/specs/universal-agent-api/run-protocol-spec.md`
+  - Input: `docs/specs/unified-agent-api/run-protocol-spec.md`
   - Output: updated protocol spec (if needed) matching CA-C01.
 - **Implementation notes**:
   - Ensure “no late events after completion” and drain-on-drop invariants are explicitly preserved.
@@ -90,9 +90,9 @@ Checklist:
 
 #### S1.T4 — Align capability meaning (`capabilities-schema-spec.md`) with CA-C01
 
-- **Outcome**: `docs/specs/universal-agent-api/capabilities-schema-spec.md` defines `agent_api.control.cancel.v1` and its minimum semantics without ambiguity.
+- **Outcome**: `docs/specs/unified-agent-api/capabilities-schema-spec.md` defines `agent_api.control.cancel.v1` and its minimum semantics without ambiguity.
 - **Inputs/outputs**:
-  - Input: `docs/specs/universal-agent-api/capabilities-schema-spec.md`
+  - Input: `docs/specs/unified-agent-api/capabilities-schema-spec.md`
   - Output: updated capability spec (if needed) matching CA-C01.
 - **Implementation notes**:
   - Explicitly tie the capability meaning to `run_control(...)` + `cancel()` per `run-protocol-spec.md`.

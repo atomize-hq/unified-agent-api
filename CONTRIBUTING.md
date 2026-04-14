@@ -2,10 +2,14 @@
 
 ## Repo map (where things live)
 
-- Wrapper library: `crates/codex/`
+- Unified API surface: `crates/agent_api/`
+  - Normative contract index: `docs/specs/unified-agent-api/README.md`
+- Codex backend library: `crates/codex/`
   - Main guide: `crates/codex/README.md`
   - Examples index: `crates/codex/EXAMPLES.md`
   - Normative JSONL normalization notes: `crates/codex/JSONL_COMPAT.md`
+- Claude Code backend library: `crates/claude_code/`
+  - Main guide: `crates/claude_code/README.md`
 - Decisions/specs:
   - ADRs: `docs/adr/`
   - Normative contracts: `docs/specs/`

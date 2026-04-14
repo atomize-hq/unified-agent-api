@@ -19,7 +19,7 @@
 - **Acceptance criteria**:
   - Defaults are safe:
     - both built-in backends advertise `mcp add/remove` capability ids only when `allow_mcp_write == true`.
-  - Advertising follows the pinned default posture in `docs/specs/universal-agent-api/mcp-management-spec.md`:
+  - Advertising follows the pinned default posture in `docs/specs/unified-agent-api/mcp-management-spec.md`:
     - Codex: `list/get` advertised by default when available on this target; `add/remove` gated by `allow_mcp_write`.
     - Claude: `list` advertised by default when available on this target; `get/add/remove` are `win32-x64` only and
       `add/remove` are additionally gated by `allow_mcp_write`.
@@ -40,8 +40,8 @@
 
 - **Outcome**: Both built-in backends expose an explicit, host-controlled enablement knob that defaults safe.
 - **Inputs/outputs**:
-  - Input: `docs/specs/universal-agent-api/mcp-management-spec.md` (“Safety posture” + “Default capability advertising posture”)
-  - Input: `docs/specs/universal-agent-api/contract.md` (“MCP management write enablement (v1, normative)”)
+  - Input: `docs/specs/unified-agent-api/mcp-management-spec.md` (“Safety posture” + “Default capability advertising posture”)
+  - Input: `docs/specs/unified-agent-api/contract.md` (“MCP management write enablement (v1, normative)”)
   - Output:
     - `crates/agent_api/src/backends/codex.rs`: `CodexBackendConfig.allow_mcp_write: bool`
     - `crates/agent_api/src/backends/claude_code.rs`: `ClaudeCodeBackendConfig.allow_mcp_write: bool`
@@ -118,7 +118,7 @@ Checklist:
 
 - **Outcome**: Deterministic unit tests that fail if advertising posture regresses.
 - **Inputs/outputs**:
-  - Input: `docs/specs/universal-agent-api/mcp-management-spec.md` (“Default capability advertising posture (pinned)”)
+  - Input: `docs/specs/unified-agent-api/mcp-management-spec.md` (“Default capability advertising posture (pinned)”)
   - Output: unit tests under `crates/agent_api/src/backends/*` or a shared test module.
 - **Implementation notes**:
   - Pin at minimum:

@@ -560,5 +560,9 @@ pub(super) async fn spawn_fork_v1_flow(
                 .unwrap_or(Err(CodexBackendError::CompletionTaskDropped))
         });
 
-    Ok(BackendSpawn { events, completion })
+    Ok(BackendSpawn {
+        events,
+        completion,
+        events_observability: None,
+    })
 }

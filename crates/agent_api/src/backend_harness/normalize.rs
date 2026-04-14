@@ -11,13 +11,15 @@ use std::path::Prefix;
 
 use super::{BackendDefaults, BackendHarnessAdapter, NormalizedRequest};
 use crate::backends::spawn_path::resolve_relative_path_from_base;
-use crate::{AgentWrapperError, AgentWrapperRunRequest};
+use crate::{AgentWrapperError, AgentWrapperRunRequest, EXT_AGENT_API_CONFIG_MODEL_V1};
 
 const ADD_DIRS_KEY: &str = "dirs";
 const ADD_DIRS_ROOT_INVALID: &str = "invalid agent_api.exec.add_dirs.v1";
 const ADD_DIRS_CONTAINER_INVALID: &str = "invalid agent_api.exec.add_dirs.v1.dirs";
 const ADD_DIRS_MAX_COUNT: usize = 16;
 const ADD_DIRS_MAX_ENTRY_BYTES: usize = 1024;
+const MODEL_ID_INVALID: &str = "invalid agent_api.config.model.v1";
+const MODEL_ID_MAX_BYTES: usize = 128;
 
 #[cfg(windows)]
 type AddDirDedupeKey = String;
@@ -54,6 +56,26 @@ fn derive_effective_timeout(
     default_timeout: Option<Duration>,
 ) -> Option<Duration> {
     request_timeout.or(default_timeout)
+}
+
+fn normalize_model_id_v1(raw: Option<&Value>) -> Result<Option<String>, AgentWrapperError> {
+    let Some(raw) = raw else {
+        return Ok(None);
+    };
+
+    let raw = raw.as_str().ok_or_else(invalid_model_id)?;
+    let trimmed = raw.trim();
+    if trimmed.is_empty() || trimmed.len() > MODEL_ID_MAX_BYTES {
+        return Err(invalid_model_id());
+    }
+
+    Ok(Some(trimmed.to_string()))
+}
+
+pub(crate) fn accepted_model_override_v1(
+    request: &AgentWrapperRunRequest,
+) -> Result<bool, AgentWrapperError> {
+    Ok(normalize_model_id_v1(request.extensions.get(EXT_AGENT_API_CONFIG_MODEL_V1))?.is_some())
 }
 
 pub(crate) fn normalize_add_dirs_v1(
@@ -104,6 +126,7 @@ pub(crate) fn normalize_request<A: BackendHarnessAdapter>(
     }
 
     validate_extension_keys_fail_closed(adapter, &request)?;
+    let model_id = normalize_model_id_v1(request.extensions.get(EXT_AGENT_API_CONFIG_MODEL_V1))?;
     let policy = adapter.validate_and_extract_policy(&request)?;
 
     let env = merge_env_backend_defaults_then_request(&defaults.env, &request.env);
@@ -116,6 +139,7 @@ pub(crate) fn normalize_request<A: BackendHarnessAdapter>(
     Ok(NormalizedRequest {
         agent_kind,
         prompt,
+        model_id,
         working_dir,
         effective_timeout,
         env,
@@ -199,6 +223,12 @@ fn add_dir_dedupe_key(path: &Path) -> AddDirDedupeKey {
     #[cfg(not(windows))]
     {
         path.to_path_buf()
+    }
+}
+
+fn invalid_model_id() -> AgentWrapperError {
+    AgentWrapperError::InvalidRequest {
+        message: MODEL_ID_INVALID.to_string(),
     }
 }
 

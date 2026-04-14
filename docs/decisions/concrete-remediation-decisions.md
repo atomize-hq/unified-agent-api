@@ -25,7 +25,7 @@ rule, and how cancellation interacts with the “no late events after completion
 
 **Chosen spec**
 
-Pinned in `docs/specs/universal-agent-api/run-protocol-spec.md` under:
+Pinned in `docs/specs/unified-agent-api/run-protocol-spec.md` under:
 - “Relationship between `completion` and the event stream (DR-0012 / v1, normative)”
 - “Explicit cancellation semantics (v1, normative)” → “Completion gating”
 
@@ -59,7 +59,7 @@ CA-0001 required pinning consumer-visible event-stream behavior and buffered-eve
 
 **Chosen spec**
 
-Pinned in `docs/specs/universal-agent-api/run-protocol-spec.md` under:
+Pinned in `docs/specs/unified-agent-api/run-protocol-spec.md` under:
 - “Explicit cancellation semantics (v1, normative)” → “Consumer-visible event stream behavior after `cancel()`”
 
 **Rationale**
@@ -98,7 +98,7 @@ tie-breaking for simultaneous readiness.
 **Chosen spec**
 
 Pinned in:
-- `docs/specs/universal-agent-api/run-protocol-spec.md` → “Explicit cancellation semantics” → “Completion outcome and precedence (pinned)”
+- `docs/specs/unified-agent-api/run-protocol-spec.md` → “Explicit cancellation semantics” → “Completion outcome and precedence (pinned)”
 - `docs/project_management/packs/active/agent-api-explicit-cancellation/seam-1-cancellation-contract.md` → “Completion outcome and precedence (pinned)”
 
 **Rationale**
@@ -159,7 +159,7 @@ deterministic tests and built-in backends don’t diverge.
 
 **Chosen spec**
 
-Pinned in `docs/specs/universal-agent-api/extensions-spec.md` under:
+Pinned in `docs/specs/unified-agent-api/extensions-spec.md` under:
 - `agent_api.session.resume.v1` → “Selection failure behavior (v1, normative)”
 - `agent_api.session.fork.v1` → “Selection failure behavior (v1, normative)”
 
@@ -194,7 +194,7 @@ requirements when an events stream exists.
 
 **Chosen spec**
 
-Pinned in `docs/specs/universal-agent-api/extensions-spec.md` (same section as CRD-0005).
+Pinned in `docs/specs/unified-agent-api/extensions-spec.md` (same section as CRD-0005).
 
 **Rationale**
 
@@ -282,12 +282,12 @@ Raw backend payloads MUST NOT be embedded in `AgentWrapperEvent.data`.
 **Context**
 
 CA-0001 required enumerating which app-server notifications must be mapped and defining the exact
-mapping into universal event kinds/fields while preserving the Universal Agent API safety posture.
+mapping into universal event kinds/fields while preserving the Unified Agent API safety posture.
 
 **Chosen spec**
 
 Pinned in `docs/specs/codex-app-server-jsonrpc-contract.md` under:
-- “Notifications → Universal Agent API events (pinned minimum)”
+- “Notifications → Unified Agent API events (pinned minimum)”
 
 **Rationale**
 
@@ -355,7 +355,7 @@ and, if so, pinning its minimal schema/fields and emission point.
 **Chosen spec**
 
 Pinned in:
-- `docs/specs/universal-agent-api/extensions-spec.md` under:
+- `docs/specs/unified-agent-api/extensions-spec.md` under:
   - `agent_api.exec.external_sandbox.v1` → “Observability / audit signal (v1, pinned)”
 - (Planning summary copy): `docs/project_management/packs/active/agent-api-external-sandbox-exec-policy/seam-1-external-sandbox-extension-key.md`
 
@@ -426,7 +426,7 @@ and “command execution failed” (spawn/timeout/IO), plus clarifying whether p
 **Chosen spec**
 
 Pinned in:
-- `docs/specs/universal-agent-api/mcp-management-spec.md` → “Command execution semantics (pinned)”
+- `docs/specs/unified-agent-api/mcp-management-spec.md` → “Command execution semantics (pinned)”
 
 **Rationale**
 
@@ -462,7 +462,7 @@ what happens when that source conflicts with observed CLI behavior.
 **Chosen spec**
 
 Pinned in:
-- `docs/specs/universal-agent-api/mcp-management-spec.md` → “Built-in backend behavior (v1, normative)” → “Target availability source of truth (pinned)”
+- `docs/specs/unified-agent-api/mcp-management-spec.md` → “Built-in backend behavior (v1, normative)” → “Target availability source of truth (pinned)”
 
 **Rationale**
 
@@ -495,7 +495,7 @@ Concrete audit CA-0002 and CA-0009 required removing ambiguity around:
 **Chosen spec**
 
 Pinned in:
-- `docs/specs/universal-agent-api/mcp-management-spec.md` → “Transport field validation (pinned)”
+- `docs/specs/unified-agent-api/mcp-management-spec.md` → “Transport field validation (pinned)”
 
 **Rationale**
 
@@ -527,7 +527,7 @@ gated, and how “no network required” is enforced for the test suite.
 **Chosen spec**
 
 Pinned in:
-- `docs/specs/universal-agent-api/mcp-management-spec.md` → “Verification policy (this repo; v1, pinned)” → “Integration coverage + gating (pinned)”
+- `docs/specs/unified-agent-api/mcp-management-spec.md` → “Verification policy (this repo; v1, pinned)” → “Integration coverage + gating (pinned)”
 
 **Rationale**
 

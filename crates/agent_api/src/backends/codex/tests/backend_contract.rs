@@ -102,3 +102,18 @@ fn codex_add_dirs_runtime_rejection_classifier_does_not_match_generic_or_prefixe
         "prefix add_dirs rejected by runtime"
     ));
 }
+
+#[test]
+fn codex_model_runtime_rejection_classifier_requires_explicit_code() {
+    assert!(super::super::exec::is_model_runtime_rejection_signal(Some(
+        "model_runtime_rejection"
+    )));
+}
+
+#[test]
+fn codex_model_runtime_rejection_classifier_does_not_match_short_model_substrings() {
+    assert!(!super::super::exec::is_model_runtime_rejection_signal(None));
+    assert!(!super::super::exec::is_model_runtime_rejection_signal(
+        Some("transport_error")
+    ));
+}

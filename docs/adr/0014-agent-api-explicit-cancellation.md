@@ -4,7 +4,7 @@
 # the ADR_BODY_SHA256 drift guard.
 
 ## Status
-- Status: Draft (implementation plan; normative semantics are already pinned in the Universal Agent API specs)
+- Status: Draft (implementation plan; normative semantics are already pinned in the Unified Agent API specs)
 - Date (UTC): 2026-02-24
 - Owner(s): spensermcconnell
 
@@ -18,10 +18,10 @@
 
 ## Related Docs
 
-- Universal Agent API baseline:
-  - `docs/adr/0009-universal-agent-api.md`
-  - `docs/specs/universal-agent-api/contract.md`
-  - `docs/specs/universal-agent-api/run-protocol-spec.md`
+- Unified Agent API baseline:
+  - `docs/adr/0009-unified-agent-api.md`
+  - `docs/specs/unified-agent-api/contract.md`
+  - `docs/specs/unified-agent-api/run-protocol-spec.md`
 - Cancellation feature pack (planning spine; this ADR’s execution home):
   - `docs/project_management/packs/active/agent-api-explicit-cancellation/README.md`
   - `docs/project_management/packs/active/agent-api-explicit-cancellation/scope_brief.md`
@@ -46,9 +46,9 @@ ADR_BODY_SHA256: 2f21a08280b6a4d3bb36e31a099cfa78a880015ede03e7fa1b5a07f318144bd
   - Why: orchestrators (e.g., Substrate) need a deterministic “stop” primitive independent of
     timeout budgets and independent of drop semantics.
   - Links:
-    - `docs/specs/universal-agent-api/run-protocol-spec.md`
-    - `docs/specs/universal-agent-api/contract.md`
-    - `docs/specs/universal-agent-api/capability-matrix.md` (current backend support; generated)
+    - `docs/specs/unified-agent-api/run-protocol-spec.md`
+    - `docs/specs/unified-agent-api/contract.md`
+    - `docs/specs/unified-agent-api/capability-matrix.md` (current backend support; generated)
     - `docs/project_management/packs/active/agent-api-explicit-cancellation/seam-1-cancellation-contract.md`
 
 ## Problem / Context
@@ -113,7 +113,7 @@ the base run handle shape stable while enabling orchestrator-grade cancellation.
   - Backends MUST advertise `agent_api.control.cancel.v1` if and only if they support explicit cancellation.
   - If a backend does not support explicit cancellation, `run_control(...)` fails-closed as `UnsupportedCapability`.
   - Runtime availability checks MUST use backend-advertised capabilities (`AgentWrapperCapabilities.ids`);
-    `docs/specs/universal-agent-api/capability-matrix.md` is a non-exhaustive repo artifact.
+    `docs/specs/unified-agent-api/capability-matrix.md` is a non-exhaustive repo artifact.
 - Completion outcome and precedence (pinned):
   - If cancellation is requested before `completion` resolves (i.e., before it would resolve as `Ok(...)` or `Err(...)`),
     `completion` MUST resolve to:
@@ -128,11 +128,11 @@ the base run handle shape stable while enabling orchestrator-grade cancellation.
     - the underlying backend process has exited, and
     - the consumer-visible `events` stream has reached finality (unless the consumer opts out by dropping `events`,
       in which case completion MAY resolve after process exit without waiting for stream finality).
-  - Canonical: `docs/specs/universal-agent-api/run-protocol-spec.md` (DR-0012 + explicit cancellation completion gating).
+  - Canonical: `docs/specs/unified-agent-api/run-protocol-spec.md` (DR-0012 + explicit cancellation completion gating).
 - Consumer-visible event stream behavior after `cancel()` (pinned):
   - After cancellation is requested, the backend MUST stop forwarding any additional `AgentWrapperEvent` items and MUST
     close the consumer-visible `events` stream.
-  - Canonical: `docs/specs/universal-agent-api/run-protocol-spec.md` (explicit cancellation event stream rules).
+  - Canonical: `docs/specs/unified-agent-api/run-protocol-spec.md` (explicit cancellation event stream rules).
 
 ## Architecture Shape
 
@@ -162,7 +162,7 @@ the base run handle shape stable while enabling orchestrator-grade cancellation.
 
 ## Semantics (pinned; canonical spec)
 
-- Canonical: `docs/specs/universal-agent-api/run-protocol-spec.md` (explicit cancellation semantics +
+- Canonical: `docs/specs/unified-agent-api/run-protocol-spec.md` (explicit cancellation semantics +
   DR-0012 completion gating). This section is a restatement for implementers.
 - Explicit cancellation is invoked only via the explicit cancellation handle.
 - Drop semantics remain “best-effort cancellation” as currently specified by the run protocol, but

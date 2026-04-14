@@ -12,7 +12,7 @@
     - parses `agent_api.exec.add_dirs.v1`,
     - enforces the closed schema and bounds,
     - resolves relative paths from the effective working directory (per
-      `docs/specs/universal-agent-api/contract.md` "Working directory resolution (effective working directory)"),
+      `docs/specs/unified-agent-api/contract.md` "Working directory resolution (effective working directory)"),
     - lexically normalizes,
     - validates `exists && is_dir`,
     - deduplicates while preserving order,
@@ -41,7 +41,7 @@
   - **Inputs**:
     - `request.extensions.get("agent_api.exec.add_dirs.v1")` as `Option<&serde_json::Value>`
     - the already-resolved effective working directory (per
-      `docs/specs/universal-agent-api/contract.md` "Working directory resolution (effective
+      `docs/specs/unified-agent-api/contract.md` "Working directory resolution (effective
       working directory)")
   - **Outputs**:
     - `Ok(Vec::new())` when the key is absent

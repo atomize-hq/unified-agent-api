@@ -9,7 +9,7 @@ This document uses RFC 2119-style requirement keywords (`MUST`, `MUST NOT`, `SHO
 
 ## Purpose
 
-Define a **zero-ambiguity** contract for the Codex wrapper crate’s *live streaming* APIs,
+Define a **zero-ambiguity** contract for the Codex crate’s *live streaming* APIs,
 specifically around:
 
 - when runtime driver tasks begin executing
@@ -17,14 +17,14 @@ specifically around:
 - how termination is requested and observed
 
 This contract is intentionally scoped to the `codex` crate’s streaming runtime behavior. It does
-not define cross-backend universal semantics; see `docs/specs/universal-agent-api/run-protocol-spec.md`
+not define cross-backend universal semantics; see `docs/specs/unified-agent-api/run-protocol-spec.md`
 for the `agent_api` run lifecycle rules.
 
 ## `agent_api.config.model.v1` mapping (pinned)
 
 The model-selection extension key is owned by:
 
-- `docs/specs/universal-agent-api/extensions-spec.md`
+- `docs/specs/unified-agent-api/extensions-spec.md`
 
 When `extensions["agent_api.config.model.v1"]` is accepted for a Codex exec/resume run, the Codex
 streaming wrapper MUST:
@@ -54,7 +54,7 @@ Exclusion rules (pinned):
 - This key MUST NOT, by itself, authorize any additional Codex CLI override beyond `--model`.
 - Runtime rejection of the accepted model id remains backend-owned and MUST follow the safe
   `AgentWrapperError::Backend` translation requirements from
-  `docs/specs/universal-agent-api/extensions-spec.md`.
+  `docs/specs/unified-agent-api/extensions-spec.md`.
 
 Runtime rejection parity (pinned):
 
@@ -67,14 +67,14 @@ Runtime rejection parity (pinned):
   identical safe/redacted text for the rejection so downstream orchestrators can compare them
   deterministically.
 - This event/completion parity requirement is owned by
-  `docs/specs/universal-agent-api/extensions-spec.md`
+  `docs/specs/unified-agent-api/extensions-spec.md`
   (`agent_api.config.model.v1`, "Runtime rejection behavior (v1, normative)").
 
 ## `agent_api.exec.add_dirs.v1` mapping (pinned)
 
 The add-dir extension key is owned by:
 
-- `docs/specs/universal-agent-api/extensions-spec.md`
+- `docs/specs/unified-agent-api/extensions-spec.md`
 
 When `extensions["agent_api.exec.add_dirs.v1"]` is accepted for a Codex exec/resume run, the Codex
 streaming wrapper MUST:
@@ -100,7 +100,7 @@ Exclusion rules (pinned):
   `--add-dir` pairs.
 - Runtime rejection of the accepted directory list remains backend-owned and MUST follow the safe
   `AgentWrapperError::Backend` translation requirements from
-  `docs/specs/universal-agent-api/extensions-spec.md`.
+  `docs/specs/unified-agent-api/extensions-spec.md`.
 
 ## Runtime semantics (v1, pinned)
 
@@ -120,6 +120,21 @@ returned `completion` future.
 Rationale: downstream orchestrators (e.g. Substrate) commonly drain `events` first and only await
 `completion` later. Streaming timeouts and explicit termination must still take effect in that
 pattern.
+
+### Internal handoff backpressure (pinned)
+
+If the streaming wrapper inserts an internal task or channel between the Codex event source and the
+returned `events` stream, that handoff MUST preserve downstream backpressure.
+
+Concretely:
+
+- the wrapper MUST NOT eagerly drain Codex events into an unbounded in-memory queue ahead of
+  consumer polling, and
+- slow or absent polling of the returned `events` stream MUST eventually stall upstream event
+  forwarding once the bounded handoff is full.
+
+Rationale: live-driver startup is required, but it must remain compatible with the repo’s
+bounded-memory posture and the pull-sensitive semantics expected by downstream consumers.
 
 ### Timeout semantics (pinned)
 

@@ -5,9 +5,9 @@ Pack: `docs/project_management/packs/active/agent-api-mcp-management/`
 Inputs:
 - Seam brief: `docs/project_management/packs/active/agent-api-mcp-management/seam-5-tests.md`
 - Threading (authoritative): `docs/project_management/packs/active/agent-api-mcp-management/threading.md`
-- Canonical spec (normative once approved): `docs/specs/universal-agent-api/mcp-management-spec.md`
-- Canonical core contract (normative): `docs/specs/universal-agent-api/contract.md`
-- Capabilities semantics + matrix caveat: `docs/specs/universal-agent-api/capabilities-schema-spec.md`
+- Canonical spec (normative once approved): `docs/specs/unified-agent-api/mcp-management-spec.md`
+- Canonical core contract (normative): `docs/specs/unified-agent-api/contract.md`
+- Capabilities semantics + matrix caveat: `docs/specs/unified-agent-api/capabilities-schema-spec.md`
 
 ## Seam Brief (Restated)
 

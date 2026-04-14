@@ -19,7 +19,7 @@ Date (UTC): 2026-02-24
   - Bucket: **B. Cross-doc canonicalization** + **F. Reference integrity**
 - CH-0005 (major) — **verification gap**: cancel-handle lifetime rule is not traced to SEAM-4 coverage  
   - Bucket: **E. Traceability repair**
-- CH-0006 (major) — **canonicalization**: ADRs cite `docs/project_management/next/universal-agent-api/*` as “authoritative”  
+- CH-0006 (major) — **canonicalization**: ADRs cite `docs/project_management/next/unified-agent-api/*` as “authoritative”  
   - Bucket: **B. Cross-doc canonicalization** + **F. Reference integrity**
 
 ## Resolutions
@@ -35,9 +35,9 @@ misread “cancel wins” as allowing completion to resolve before backend proce
 **Evidence (authoritative)**
 
 - DR-0012 completion gating and consumer opt-out semantics:
-  - `docs/specs/universal-agent-api/run-protocol-spec.md:35-49`
+  - `docs/specs/unified-agent-api/run-protocol-spec.md:35-49`
 - Explicit cancellation completion gating is explicitly pinned (cancellation does not accelerate completion timing):
-  - `docs/specs/universal-agent-api/run-protocol-spec.md:113-118`
+  - `docs/specs/unified-agent-api/run-protocol-spec.md:113-118`
 
 **Remediation pattern**
 
@@ -72,10 +72,10 @@ planned” (Draft ADR/pack), and the capability matrix did not show any `agent_a
 **Evidence**
 
 - Canonical specs are Approved and define explicit cancellation + DR-0012 gating:
-  - `docs/specs/universal-agent-api/run-protocol-spec.md:72-118`
+  - `docs/specs/unified-agent-api/run-protocol-spec.md:72-118`
 - The generated capability matrix reflects current backend-advertised capabilities and contains no
   `agent_api.control.*` section:
-  - `docs/specs/universal-agent-api/capability-matrix.md:6-54`
+  - `docs/specs/unified-agent-api/capability-matrix.md:6-54`
 - Current `agent_api` crate does not yet expose `run_control(...)`:
   - `crates/agent_api/src/lib.rs:138-199`
 
@@ -117,7 +117,7 @@ linked to canonical sources, weakening seam continuity and traceability.
   - `docs/adr/0013-agent-api-backend-harness.md:37-45`
   - `docs/adr/0013-agent-api-backend-harness.md:61-74`
 - DR-0012 defines completion gating and consumer opt-out:
-  - `docs/specs/universal-agent-api/run-protocol-spec.md:35-49`
+  - `docs/specs/unified-agent-api/run-protocol-spec.md:35-49`
 
 **Remediation pattern**
 
@@ -180,7 +180,7 @@ the run handle, but SEAM-4’s verification plan didn’t include an explicit �
 **Evidence**
 
 - Cancel handle lifetime (orthogonal) is pinned:
-  - `docs/specs/universal-agent-api/run-protocol-spec.md:87-91`
+  - `docs/specs/unified-agent-api/run-protocol-spec.md:87-91`
 
 **Remediation pattern**
 
@@ -203,37 +203,37 @@ the run handle, but SEAM-4’s verification plan didn’t include an explicit �
 
 ---
 
-### CH-0006 — Multiple ADRs cite `docs/project_management/next/universal-agent-api/*` as authoritative specs, while the canonical spec set lives under `docs/specs/universal-agent-api/` (Fixed)
+### CH-0006 — Multiple ADRs cite `docs/project_management/next/unified-agent-api/*` as authoritative specs, while the canonical spec set lives under `docs/specs/unified-agent-api/` (Fixed)
 
 **Restated cohesion break**
 
-ADRs pointed to `docs/project_management/next/universal-agent-api/*` as “authoritative”, even though
-the canonical spec set lives under `docs/specs/universal-agent-api/` (and the `next/` files are
+ADRs pointed to `docs/project_management/next/unified-agent-api/*` as “authoritative”, even though
+the canonical spec set lives under `docs/specs/unified-agent-api/` (and the `next/` files are
 planning-pack pointers).
 
 **Evidence**
 
 - Canonical spec set location is explicitly documented:
-  - `docs/specs/universal-agent-api/README.md:1-13`
-  - `docs/specs/universal-agent-api/contract.md:3-6`
+  - `docs/specs/unified-agent-api/README.md:1-13`
+  - `docs/specs/unified-agent-api/contract.md:3-6`
 
 **Remediation pattern**
 
-- **Canonicalize references**: update ADRs to point to `docs/specs/universal-agent-api/*` for normative
+- **Canonicalize references**: update ADRs to point to `docs/specs/unified-agent-api/*` for normative
   specs; keep `docs/project_management/next/` for planning/execution artifacts only.
 
 **Doc changes applied**
 
-- Updated ADRs to reference canonical specs under `docs/specs/universal-agent-api/`:
-  - `docs/adr/0009-universal-agent-api.md`
+- Updated ADRs to reference canonical specs under `docs/specs/unified-agent-api/`:
+  - `docs/adr/0009-unified-agent-api.md`
   - `docs/adr/0010-claude-code-live-stream-json.md`
   - `docs/adr/0011-agent-api-codex-stream-exec.md`
-  - `docs/adr/0012-universal-agent-api-extensions-registry-and-cli-agent-onboarding-charter.md`
+  - `docs/adr/0012-unified-agent-api-extensions-registry-and-cli-agent-onboarding-charter.md`
 - Updated ADR drift guards:
-  - `make adr-fix ADR=docs/adr/0009-universal-agent-api.md`
+  - `make adr-fix ADR=docs/adr/0009-unified-agent-api.md`
   - `make adr-fix ADR=docs/adr/0010-claude-code-live-stream-json.md`
   - `make adr-fix ADR=docs/adr/0011-agent-api-codex-stream-exec.md`
-  - `make adr-fix ADR=docs/adr/0012-universal-agent-api-extensions-registry-and-cli-agent-onboarding-charter.md`
+  - `make adr-fix ADR=docs/adr/0012-unified-agent-api-extensions-registry-and-cli-agent-onboarding-charter.md`
 
 **Decisions introduced**
 

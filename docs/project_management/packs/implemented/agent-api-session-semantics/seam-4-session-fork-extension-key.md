@@ -8,7 +8,7 @@
     - Implement `agent_api.session.fork.v1` for built-in backends that can support it:
       - Add to `supported_extension_keys()` allowlist (fail-closed gate).
       - Add to `AgentWrapperCapabilities.ids` (runtime discovery).
-      - Validate the JSON value per `docs/specs/universal-agent-api/extensions-spec.md` (closed schema) and reject contradictory presence of `agent_api.session.resume.v1` as `InvalidRequest` when both keys are supported.
+      - Validate the JSON value per `docs/specs/unified-agent-api/extensions-spec.md` (closed schema) and reject contradictory presence of `agent_api.session.resume.v1` as `InvalidRequest` when both keys are supported.
     - Backend mappings (pinned intent):
       - Claude Code:
         - Canonical mapping owner: `docs/specs/claude-code-session-mapping-contract.md`.
@@ -18,7 +18,7 @@
       - Codex (ADR-0015 recommended headless surface):
         - Implement via `codex app-server` stdio JSON-RPC per `docs/specs/codex-app-server-jsonrpc-contract.md`:
           - selector `"last"`:
-            - MUST resolve the fork source thread via `thread/list` filtered by the **effective working directory** (per `docs/specs/universal-agent-api/contract.md`) using the pinned selection algorithm in the app-server contract.
+            - MUST resolve the fork source thread via `thread/list` filtered by the **effective working directory** (per `docs/specs/unified-agent-api/contract.md`) using the pinned selection algorithm in the app-server contract.
           - selector `"id"`:
             - MUST treat the selector `id` as the source thread id (after trimming for validation per `extensions-spec.md`).
           - MUST fork via `thread/fork` and MUST send the follow-up prompt via `turn/start` on the forked thread using the pinned request shapes in the app-server contract.
@@ -36,7 +36,7 @@
           - pinned cancellation precedence (`run-protocol-spec.md`),
           - pinned selection-failure behavior (`extensions-spec.md`), and
           - non-interactive safety (no approval-request hangs).
-      - extension-validation precedence during staged rollout (per `docs/specs/universal-agent-api/extensions-spec.md` R0):
+      - extension-validation precedence during staged rollout (per `docs/specs/unified-agent-api/extensions-spec.md` R0):
         - only fork supported + both keys present → `UnsupportedCapability` (unsupported resume key),
         - both supported + both present → `InvalidRequest` (mutual exclusivity).
       - selector/id validation includes whitespace-only ids:
@@ -53,7 +53,7 @@
     - Capability advertisement (extension key string present in `AgentWrapperCapabilities.ids`).
 - **Key invariants / rules**:
   - Must be headless and deterministic for orchestrators (no interactive prompts; `agent_api.exec.non_interactive` applies to session flows; see below).
-  - Must keep Universal Agent API safety posture: bounded/redacted events; no raw backend line embedding in `data`.
+  - Must keep Unified Agent API safety posture: bounded/redacted events; no raw backend line embedding in `data`.
   - Mutual exclusivity with resume is enforced pre-spawn when both keys are supported.
   - Non-interactive policy application is pinned per backend (default is `true` when the key is absent):
     - Claude Code: when `agent_api.exec.non_interactive == true`, the fork path MUST include `--permission-mode bypassPermissions` (see `docs/specs/claude-code-session-mapping-contract.md`) so the process cannot hang on permission prompts.

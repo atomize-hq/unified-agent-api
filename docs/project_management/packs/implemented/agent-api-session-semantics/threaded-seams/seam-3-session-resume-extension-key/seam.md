@@ -9,11 +9,11 @@
 - **Scope**
   - In:
     - Implement `agent_api.session.resume.v1` (SA-C03) end-to-end for built-in backends that can support it:
-      - closed-schema JSON validation and mutual exclusivity with `agent_api.session.fork.v1` (per `docs/specs/universal-agent-api/extensions-spec.md`),
+      - closed-schema JSON validation and mutual exclusivity with `agent_api.session.fork.v1` (per `docs/specs/unified-agent-api/extensions-spec.md`),
       - deterministic CLI spawn mapping per backend-owned mapping contracts,
       - selection-failure translation to pinned safe messages (`"no session found"` / `"session not found"`),
       - capability advertisement only after behavior + tests land.
-    - Implement SA-C05 (Codex wrapper): a control-capable, env-override-capable streaming resume entrypoint used by `agent_api`:
+    - Implement SA-C05 (Codex crate): a control-capable, env-override-capable streaming resume entrypoint used by `agent_api`:
       - `codex::CodexClient::stream_resume_with_env_overrides_control(...) -> ExecStreamControl`
       - `ExecStreamControl.termination` is always present for this entrypoint.
     - Pin regression tests for:
@@ -46,18 +46,18 @@
     - `SA-C03 resume extension key (resume.v1)`
     - `SA-C05 codex streaming resume (control + env overrides)`
   - Contracts consumed:
-    - Normative: `docs/specs/universal-agent-api/extensions-spec.md` (schema + precedence + failure semantics)
+    - Normative: `docs/specs/unified-agent-api/extensions-spec.md` (schema + precedence + failure semantics)
     - Normative: `docs/specs/claude-code-session-mapping-contract.md` (Claude argv mapping + safe error translation)
     - Normative: `docs/specs/codex-wrapper-coverage-scenarios-v1.md` (Scenario 3: argv + stdin plumbing)
     - Normative: `docs/specs/codex-streaming-exec-contract.md` (termination + timeout semantics)
-    - Normative: `docs/specs/universal-agent-api/contract.md` (env merge precedence + effective working dir)
-    - Normative: `docs/specs/universal-agent-api/run-protocol-spec.md` (validation timing and fail-closed rules)
+    - Normative: `docs/specs/unified-agent-api/contract.md` (env merge precedence + effective working dir)
+    - Normative: `docs/specs/unified-agent-api/run-protocol-spec.md` (validation timing and fail-closed rules)
 
 ## Slice index
 
 - `S1` → `slice-1-resume-v1-validation-and-precedence.md`: Shared resume selector parser + closed-schema validation + precedence pinning tests.
 - `S2` → `slice-2-claude-resume-v1-mapping.md`: Claude Code backend mapping + selection-failure translation + tests + capability advertisement.
-- `S3` → `slice-3-codex-resume-v1-mapping-and-sa-c05.md`: Codex wrapper SA-C05 + Codex backend mapping + selection-failure translation + tests + capability advertisement.
+- `S3` → `slice-3-codex-resume-v1-mapping-and-sa-c05.md`: Codex crate SA-C05 + Codex backend mapping + selection-failure translation + tests + capability advertisement.
 
 ## Threading Alignment (mandatory)
 
@@ -80,7 +80,7 @@
     - Produced by:
       - `S3` (lands before advertising Codex support for `agent_api.session.resume.v1` in `agent_api`).
 - **Contracts consumed**:
-  - `docs/specs/universal-agent-api/extensions-spec.md`:
+  - `docs/specs/unified-agent-api/extensions-spec.md`:
     - Resume schema + closed-schema rule.
     - R0 precedence: unsupported keys fail with `UnsupportedCapability` before value validation or mutual exclusivity.
     - Pinned selection-failure messages and terminal `Error` event rule when a stream exists.
@@ -90,7 +90,7 @@
   - `docs/specs/codex-wrapper-coverage-scenarios-v1.md` (Scenario 3) + `docs/specs/codex-streaming-exec-contract.md`:
     - Pinned Codex argv subsequence and stdin prompt plumbing.
     - Termination/timeout semantics for streaming control entrypoints.
-  - `docs/specs/universal-agent-api/contract.md`:
+  - `docs/specs/unified-agent-api/contract.md`:
     - Env override merge rule (request keys win).
     - Effective working directory scoping for selector `"last"`.
 - **Dependency edges honored**:
@@ -99,7 +99,7 @@
   - What can proceed now:
     - `S1` immediately (shared helper + tests; low conflict surface).
     - `S2` in WS-B (Claude backend + fake Claude harness + tests).
-    - `S3` in WS-C (Codex wrapper SA-C05 + Codex backend + fake Codex harness + tests).
+    - `S3` in WS-C (Codex crate SA-C05 + Codex backend + fake Codex harness + tests).
   - What must wait:
     - Advertising Codex `agent_api.session.resume.v1` in `agent_api` must wait until SA-C05 is merged and tested (pinned by `threading.md`).
     - Full end-to-end “discover id then resume-by-id” UX tests can land later in WS-INT once SEAM-2 is merged (out-of-scope for this seam’s task list).

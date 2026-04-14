@@ -46,7 +46,7 @@
 
 - **Outcome**: Deterministic argv composition functions for Codex write ops (no subprocess spawning).
 - **Inputs/outputs**:
-  - Input: `docs/specs/universal-agent-api/mcp-management-spec.md` (“Codex backend mapping (pinned)”)
+  - Input: `docs/specs/unified-agent-api/mcp-management-spec.md` (“Codex backend mapping (pinned)”)
   - Output (suggested):
     - `crates/agent_api/src/backends/codex/mcp_management.rs`: `fn codex_mcp_remove_argv(name: &str) -> Vec<OsString>`
     - `crates/agent_api/src/backends/codex/mcp_management.rs`: `fn codex_mcp_add_argv(name: &str, transport: ...) -> Vec<OsString>`
@@ -104,7 +104,7 @@ Checklist:
 
 - **Outcome**: Deterministic regression tests that prevent drift in `add/remove` argv mapping and write gating behavior.
 - **Inputs/outputs**:
-  - Input: `docs/specs/universal-agent-api/mcp-management-spec.md` (mapping + gating rules)
+  - Input: `docs/specs/unified-agent-api/mcp-management-spec.md` (mapping + gating rules)
   - Output: unit tests under `crates/agent_api/src/backends/codex/mcp_management.rs` (or adjacent test module).
 - **Implementation notes**:
   - Pin that `mcp_add/remove` return `UnsupportedCapability` when write capability ids are absent.

@@ -31,6 +31,7 @@ async fn cancellation_closes_events_but_does_not_accelerate_completion() {
         events,
         tx,
         cancel.clone(),
+        None,
     ));
     let completion_task = tokio::spawn(send_completion_with_cancel(
         adapter,

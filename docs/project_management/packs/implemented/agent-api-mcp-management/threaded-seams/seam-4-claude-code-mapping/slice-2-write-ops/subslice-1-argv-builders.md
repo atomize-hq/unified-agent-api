@@ -17,7 +17,7 @@
     - `Url { bearer_token_env_var: Some(_) }` to `Err(InvalidRequest)` before any subprocess work.
   - `Stdio.env` iteration order is deterministic by key, not map insertion order.
 - **Dependencies**:
-  - `docs/specs/universal-agent-api/mcp-management-spec.md` (MM-C05/MM-C09 pinned mapping).
+  - `docs/specs/unified-agent-api/mcp-management-spec.md` (MM-C05/MM-C09 pinned mapping).
   - SEAM-1 validation helper for normalized server names and typed add transport inputs.
 - **Verification**:
   - `cargo test -p agent_api --features claude_code`

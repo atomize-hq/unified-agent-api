@@ -1,6 +1,6 @@
 use serde_json::Value;
 
-use crate::{AgentWrapperError, AgentWrapperRunRequest};
+use crate::{AgentWrapperError, AgentWrapperRunRequest, EXT_AGENT_API_CONFIG_MODEL_V1};
 
 pub(super) const EXT_ADD_DIRS_V1: &str = "agent_api.exec.add_dirs.v1";
 pub(super) const EXT_NON_INTERACTIVE: &str = "agent_api.exec.non_interactive";
@@ -11,6 +11,7 @@ pub(super) const EXT_CODEX_SANDBOX_MODE: &str = "backend.codex.exec.sandbox_mode
 pub(super) const SUPPORTED_EXTENSION_KEYS_DEFAULT: &[&str] = &[
     EXT_ADD_DIRS_V1,
     EXT_NON_INTERACTIVE,
+    EXT_AGENT_API_CONFIG_MODEL_V1,
     EXT_CODEX_APPROVAL_POLICY,
     EXT_CODEX_SANDBOX_MODE,
     super::EXT_SESSION_RESUME_V1,
@@ -20,6 +21,7 @@ pub(super) const SUPPORTED_EXTENSION_KEYS_DEFAULT: &[&str] = &[
 pub(super) const SUPPORTED_EXTENSION_KEYS_EXTERNAL_SANDBOX_OPT_IN: &[&str] = &[
     EXT_ADD_DIRS_V1,
     EXT_NON_INTERACTIVE,
+    EXT_AGENT_API_CONFIG_MODEL_V1,
     EXT_CODEX_APPROVAL_POLICY,
     EXT_CODEX_SANDBOX_MODE,
     super::EXT_SESSION_RESUME_V1,

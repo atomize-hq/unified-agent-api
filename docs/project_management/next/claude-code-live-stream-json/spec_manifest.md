@@ -8,10 +8,10 @@ Feature directory: `docs/project_management/next/claude-code-live-stream-json/`
 
 - ADR: `docs/adr/0010-claude-code-live-stream-json.md`
 - Baseline (referenced; not duplicated):
-  - `docs/adr/0009-universal-agent-api.md`
-  - `docs/project_management/next/universal-agent-api/run-protocol-spec.md`
-  - `docs/project_management/next/universal-agent-api/capabilities-schema-spec.md`
-  - `docs/project_management/next/universal-agent-api/event-envelope-schema-spec.md`
+  - `docs/adr/0009-unified-agent-api.md`
+  - `docs/project_management/next/unified-agent-api/run-protocol-spec.md`
+  - `docs/project_management/next/unified-agent-api/capabilities-schema-spec.md`
+  - `docs/project_management/next/unified-agent-api/event-envelope-schema-spec.md`
 
 ## Required planning artifacts (always)
 
@@ -81,9 +81,9 @@ Trigger: cross-platform validation is required and this feature changes process 
 | `crates/claude_code` streaming error model + redaction rules | `contract.md` |
 | `crates/claude_code` streaming framing/ordering/backpressure/timeout/cancel semantics | `stream-json-print-protocol-spec.md` |
 | `agent_api` Claude backend capability advertisement (`agent_api.events.live`) | `contract.md` |
-| `agent_api` completion vs stream finality (Universal Agent API DR-0012) | `docs/project_management/next/universal-agent-api/run-protocol-spec.md` + `docs/project_management/next/universal-agent-api/decision_register.md` |
-| `agent_api` event envelope bounds + raw-line prohibition | `docs/project_management/next/universal-agent-api/event-envelope-schema-spec.md` |
-| Capability id naming/stability rules (`agent_api.events.live`, `backend.claude_code.*`) | `docs/project_management/next/universal-agent-api/capabilities-schema-spec.md` |
+| `agent_api` completion vs stream finality (Unified Agent API DR-0012) | `docs/project_management/next/unified-agent-api/run-protocol-spec.md` + `docs/project_management/next/unified-agent-api/decision_register.md` |
+| `agent_api` event envelope bounds + raw-line prohibition | `docs/project_management/next/unified-agent-api/event-envelope-schema-spec.md` |
+| Capability id naming/stability rules (`agent_api.events.live`, `backend.claude_code.*`) | `docs/project_management/next/unified-agent-api/capabilities-schema-spec.md` |
 | Platform guarantees/divergences for streaming stdout | `platform-parity-spec.md` |
 | Slice-specific deliverables/acceptance/out-of-scope | `C0-spec.md` / `C1-spec.md` |
 | CI checkpoint grouping + CI gate commands | `ci_checkpoint_plan.md` |

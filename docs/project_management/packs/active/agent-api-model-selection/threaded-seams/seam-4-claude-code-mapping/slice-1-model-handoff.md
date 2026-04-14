@@ -1,52 +1,54 @@
-### S1 — Model handoff into Claude policy/spawn wiring
+---
+slice_id: S1
+seam_id: SEAM-4
+slice_kind: delivery
+execution_horizon: active
+status: decomposed
+plan_version: v1
+basis:
+  currentness: current
+  basis_ref: seam.md#basis
+  stale_triggers: []
+gates:
+  pre_exec:
+    review: inherited
+    contract: inherited
+    revalidation: inherited
+  post_exec:
+    landing: pending
+    closeout: pending
+threads:
+  - THR-05
+contracts_produced:
+  - C-07
+contracts_consumed:
+  - C-02
+  - C-09
+open_remediations: []
+candidate_subslices: []
+---
+### S1 - Claude model handoff and argv mapping
 
-- **User/system value**: gives Claude Code the minimal deterministic scaffold for v1 quickly: accepted model-selection requests reach Claude-specific wiring as typed state, and absent requests preserve current defaults without adding a second parser.
+- **User/system value**: makes model selection work for the Claude Code print/session flows via the existing request/argv path, with deterministic ordering and without any new raw parsing.
 - **Scope (in/out)**:
   - In:
-    - consume the SEAM-2 helper output instead of reading `request.extensions["agent_api.config.model.v1"]` in Claude-specific code
-    - add a Claude policy/request field for the effective trimmed model id
-    - thread that value through backend/harness spawn paths into `ClaudePrintRequest` construction
+    - consume typed `Option<String>` from SEAM-2 (`C-09`)
+    - thread it into Claude Code request/build mapping
+    - prove exactly one `--model <trimmed-id>` emission and correct ordering
+    - explicitly exclude `--fallback-model` from this universal key
   - Out:
-    - actual `.model(...)` argv mapping and ordering assertions (S2)
-    - runtime model rejection translation after the stream has opened (S3)
-    - capability advertising and matrix publication (SEAM-2)
+    - capability advertising / matrix publication (SEAM-2)
 - **Acceptance criteria**:
-  - SEAM-4 consumes only SEAM-2's typed helper result for this key; no new raw parse sites appear outside `crates/agent_api/src/backend_harness/normalize.rs`.
-  - When `agent_api.config.model.v1` is absent, Claude policy/spawn wiring carries `None` and leaves later mapping logic free to omit `.model(...)`.
-  - When the key is present and valid, Claude policy/spawn wiring carries `Some(trimmed_model_id)` unchanged into the print/session construction path.
-- **Dependencies**:
-  - `SEAM-2` / `MS-C09` shared model-normalizer handoff
-  - `SEAM-1` / `MS-C02` absence semantics
-  - `MS-C07` Claude mapping contract
-- **Verification**:
-  - targeted Claude backend/unit tests for policy extraction or spawn-request construction
-  - regression check that no second parser for `agent_api.config.model.v1` exists outside `normalize.rs`
-- **Rollout/safety**:
-  - additive and deterministic: only requests carrying the new key change behavior
-  - safest first slice because it leaves argv ordering and runtime-rejection behavior unchanged until later slices pin them
+  - `Some(id)` emits exactly one `--model <id>` pair
+  - `None` emits no `--model`
+  - ordering follows `docs/specs/claude-code-session-mapping-contract.md`
+  - no raw parse sites exist outside SEAM-2's helper
+- **Dependencies**: `THR-02` (typed helper), `C-09`, `C-02`
+- **Verification**: targeted argv tests for print/session ordering + fallback exclusion
 
-#### S1.T1 — Adopt SEAM-2's normalized helper output in Claude policy extraction
+#### S1.T1 - Plumb typed model selection into Claude request/argv calls
 
-- **Outcome**: Claude policy extraction carries `Option<String>` for the effective model id without re-reading raw extension payloads.
-- **Inputs/outputs**:
-  - Input: `MS-C09` helper from `crates/agent_api/src/backend_harness/normalize.rs`
-  - Output: updates in `crates/agent_api/src/backends/claude_code/harness.rs`, `crates/agent_api/src/backends/claude_code/backend.rs`, and any shared policy/request types so Claude receives `model: Option<String>` alongside existing non-interactive and session-selector state
-- **Implementation notes**:
-  - keep ownership of trimming, bounds checks, and `InvalidRequest { message: "invalid agent_api.config.model.v1" }` in SEAM-2
-  - preserve current session resume/fork mutual-exclusion validation and external-sandbox behavior
-  - treat `None` as the only legal "no override" representation
-- **Acceptance criteria**:
-  - Claude code compiles against the shared helper output
-  - no Claude module parses or trims `agent_api.config.model.v1` directly
-  - the typed handoff reaches the spawn/request construction path unchanged
-- **Test notes**:
-  - add or extend policy/harness tests to show helper output reaches Claude wiring unchanged
-  - validate with `rg -n "agent_api\\.config\\.model\\.v1" crates/agent_api/src/backends/claude_code crates/agent_api/src/backend_harness/normalize.rs`
-- **Risk/rollback notes**:
-  - low risk if kept as a typed-policy handoff only; rollback is localized to policy plumbing
+- **Outcome**: Claude request/build path consumes `Option<String>` and emits `--model <trimmed-id>` only when `Some`.
+- **Thread/contract refs**: `THR-05`, `C-09`, `C-07`
+- **Acceptance criteria**: mapping code never inspects raw `request.extensions`.
 
-Checklist:
-- Implement: add `model: Option<String>` to the Claude policy/request path and source it from the shared helper output.
-- Test: run targeted Claude backend/policy tests.
-- Validate: confirm `normalize.rs` remains the only raw parse site for `agent_api.config.model.v1`.
-- Cleanup: remove any temporary duplicate plumbing or dead helper code.

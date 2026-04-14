@@ -1,6 +1,5 @@
 # S2 — Write ops (`add/remove`) mapping + typed transports + write gating (decomposed)
 
-<<<<<<<< HEAD:docs/project_management/packs/implemented/agent-api-mcp-management/threaded-seams/seam-4-claude-code-mapping/archive/slice-2-write-ops.md
 - **User/system value**: Enables universal MCP management write operations for the Claude Code backend when explicitly enabled,
   with pinned typed transport mapping (MM-C05), isolation support (MM-C07), and bounded outputs (MM-C04), while remaining
   safe-by-default (MM-C06).
@@ -51,7 +50,7 @@
 - **Outcome**: Deterministic argv composition functions for Claude write ops (no subprocess spawning), including pinned
   rejection behavior for `Url.bearer_token_env_var`.
 - **Inputs/outputs**:
-  - Input: `docs/specs/universal-agent-api/mcp-management-spec.md` (“Claude Code backend mapping (pinned)”)
+  - Input: `docs/specs/unified-agent-api/mcp-management-spec.md` (“Claude Code backend mapping (pinned)”)
   - Output (suggested):
     - `crates/agent_api/src/backends/claude_code/mcp_management.rs`: `fn claude_mcp_remove_argv(name: &str) -> Vec<OsString>`
     - `crates/agent_api/src/backends/claude_code/mcp_management.rs`: `fn claude_mcp_add_argv(name: &str, transport: ...) -> Result<Vec<OsString>, AgentWrapperError>`
@@ -115,7 +114,7 @@ Checklist:
 - **Outcome**: Deterministic regression tests that prevent drift in `add/remove` argv mapping, write gating, and the pinned
   bearer-token rejection rule.
 - **Inputs/outputs**:
-  - Input: `docs/specs/universal-agent-api/mcp-management-spec.md` (mapping + gating + bearer-token semantics)
+  - Input: `docs/specs/unified-agent-api/mcp-management-spec.md` (mapping + gating + bearer-token semantics)
   - Output: unit tests under `crates/agent_api/src/backends/claude_code/mcp_management.rs` (or adjacent test module).
 - **Implementation notes**:
   - Pin that `mcp_add/remove` return `UnsupportedCapability` when write capability ids are absent.
@@ -137,14 +136,3 @@ Checklist:
 
 - SEAM-5 will pin end-to-end behavior with a fake `claude` binary that records argv + env and writes state beneath the
   injected isolated home directory to assert writes are localized and gating is respected.
-========
-- Archived original: `archive/slice-2-write-ops.md`
-- Sub-slices live in: `slice-2-write-ops/`
-- Recommended order: S2a -> S2b -> S2c
-
-#### Sub-slices
-
-- `slice-2-write-ops/subslice-1-argv-builders.md` — S2a: pinned `add/remove` argv builders + deterministic `--env` ordering + bearer-token rejection
-- `slice-2-write-ops/subslice-2-hooks-and-gating.md` — S2b: Claude write-hook wiring + fail-closed capability gating + runner reuse
-- `slice-2-write-ops/subslice-3-regression-tests.md` — S2c: unit tests pinning argv mapping, gating, and `InvalidRequest` behavior
->>>>>>>> origin/main:docs/project_management/packs/active/agent-api-mcp-management/threaded-seams/seam-4-claude-code-mapping/slice-2-write-ops.md

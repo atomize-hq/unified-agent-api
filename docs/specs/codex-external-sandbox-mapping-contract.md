@@ -10,10 +10,10 @@ This document uses RFC 2119-style requirement keywords (`MUST`, `MUST NOT`, `SHO
 
 ## Purpose
 
-The Universal Agent API extensions registry owns the schema, defaults, and cross-key validation for
+The Unified Agent API extensions registry owns the schema, defaults, and cross-key validation for
 `agent_api.exec.external_sandbox.v1`:
 
-- `docs/specs/universal-agent-api/extensions-spec.md`
+- `docs/specs/unified-agent-api/extensions-spec.md`
 
 This document defines the **Codex backend-owned**, testable mapping from an accepted
 `agent_api.exec.external_sandbox.v1 == true` request into:
@@ -24,10 +24,10 @@ This document defines the **Codex backend-owned**, testable mapping from an acce
 ## Baselines (referenced; not duplicated)
 
 - Key semantics + validation + required warning event:
-  - `docs/specs/universal-agent-api/extensions-spec.md`
+  - `docs/specs/unified-agent-api/extensions-spec.md`
 - Codex app-server JSON-RPC field names and allowed values:
   - `docs/specs/codex-app-server-jsonrpc-contract.md`
-- Codex wrapper canonical flag spelling (`--dangerously-bypass-approvals-and-sandbox`):
+- Codex crate canonical flag spelling (`--dangerously-bypass-approvals-and-sandbox`):
   - `docs/specs/codex-wrapper-coverage-scenarios-v1.md` (Scenario 0: root flags)
 
 ## Preconditions (normative)
@@ -101,5 +101,5 @@ Unavailable mapping primitive behavior (pinned):
   `message` (MUST NOT embed raw server output).
 - If (and only if) the consumer-visible `events` stream is still open, the backend MUST emit
   exactly one terminal `AgentWrapperEventKind::Error` event (with the same safe/redacted message)
-  before closing the stream (per `docs/specs/universal-agent-api/run-protocol-spec.md`, "Error event
+  before closing the stream (per `docs/specs/unified-agent-api/run-protocol-spec.md`, "Error event
   emission for post-spawn unsupported operations (backend fault)").

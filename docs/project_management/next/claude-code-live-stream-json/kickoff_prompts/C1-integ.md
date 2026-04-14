@@ -16,7 +16,7 @@
 ## Requirements
 - Merge `ccsj-c1-agent-api-wiring-code` + `ccsj-c1-agent-api-wiring-test` into the integration worktree.
 - Reconcile implementation to `C1-spec.md` and ADR-0010.
-- Ensure Universal Agent API DR-0012 completion semantics are preserved and raw-line safety rules hold.
+- Ensure Unified Agent API DR-0012 completion semantics are preserved and raw-line safety rules hold.
 
 ## Commands (required)
 - `cargo fmt`

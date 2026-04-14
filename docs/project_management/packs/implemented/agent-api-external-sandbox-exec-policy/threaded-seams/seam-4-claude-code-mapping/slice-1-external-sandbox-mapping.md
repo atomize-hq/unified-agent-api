@@ -11,7 +11,7 @@
       - reject `agent_api.exec.non_interactive=false` (ES-C02),
       - reject any `backend.claude_code.exec.*` keys (ES-C06).
     - Emit the pinned warning `Status` event when `external_sandbox=true` is accepted (exact
-      message + ordering per `docs/specs/universal-agent-api/extensions-spec.md`).
+      message + ordering per `docs/specs/unified-agent-api/extensions-spec.md`).
     - Apply the pinned Claude mapping contract (ES-C05):
       - include `--dangerously-skip-permissions` in argv when `external_sandbox=true`.
     - Apply deterministic allow-flag preflight behavior (ES-C07):
@@ -39,14 +39,14 @@
     - `channel="status"`,
     - `message="DANGEROUS: external sandbox exec policy enabled (agent_api.exec.external_sandbox.v1=true)"`,
     - `data=None`,
-    - and emission ordering pinned by `docs/specs/universal-agent-api/extensions-spec.md`.
+    - and emission ordering pinned by `docs/specs/unified-agent-api/extensions-spec.md`.
   - Deterministic behavior:
     - no spawn+retry loops to discover allow-flag support,
     - allow-flag preflight is cached (per backend instance) and re-used across runs.
 - **Dependencies**:
   - `SEAM-2` opt-in gating: the key must be supported/advertised only when enabled (ES-C03).
   - Canonical mapping contract: `docs/specs/claude-code-session-mapping-contract.md` (ES-C05/ES-C07).
-  - Core key semantics + warning contract: `docs/specs/universal-agent-api/extensions-spec.md`.
+  - Core key semantics + warning contract: `docs/specs/unified-agent-api/extensions-spec.md`.
 - **Verification**:
   - Compile + existing tests: `cargo test -p agent_api claude_code`
   - SEAM-5 adds pinned tests for argv shape, contradictions, warning ordering, and allow-flag
@@ -61,7 +61,7 @@
 - **Outcome**: the Claude backend extracts `agent_api.exec.external_sandbox.v1` into the run policy
   and enforces ES-C02/ES-C06 contradictions before spawn.
 - **Inputs/outputs**:
-  - Input: `docs/specs/universal-agent-api/extensions-spec.md` validation + contradiction rules.
+  - Input: `docs/specs/unified-agent-api/extensions-spec.md` validation + contradiction rules.
   - Output: code changes in `crates/agent_api/src/backends/claude_code.rs`:
     - add `EXT_EXTERNAL_SANDBOX_V1: &str = "agent_api.exec.external_sandbox.v1"`,
     - extend `ClaudeExecPolicy` with `external_sandbox: bool` (default `false`),
@@ -93,9 +93,9 @@ Checklist:
 
 - **Outcome**: when `external_sandbox=true` is accepted, the backend emits exactly one pinned
   warning `Status` event before any other user-visible events, satisfying the observability/audit
-  requirement in `docs/specs/universal-agent-api/extensions-spec.md`.
+  requirement in `docs/specs/unified-agent-api/extensions-spec.md`.
 - **Inputs/outputs**:
-  - Input: `docs/specs/universal-agent-api/extensions-spec.md` (“Observability / audit signal”).
+  - Input: `docs/specs/unified-agent-api/extensions-spec.md` (“Observability / audit signal”).
   - Output: code changes in `crates/agent_api/src/backends/claude_code.rs` (and/or
     `crates/agent_api/src/backends/claude_code/mapping.rs`) that synthesize the warning event.
 - **Implementation notes**:

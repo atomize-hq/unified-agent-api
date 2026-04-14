@@ -1,11 +1,47 @@
-# SEAM-5 — Tests (threaded decomposition)
+---
+seam_id: SEAM-5
+seam_slug: tests
+status: closed
+execution_horizon: future
+plan_version: v1
+basis:
+  currentness: current
+  source_seam_brief: ../../seam-5-tests.md
+  source_scope_ref: ../../scope_brief.md
+  upstream_closeouts:
+    - ../../governance/seam-1-closeout.md
+    - ../../governance/seam-2-closeout.md
+    - ../../governance/seam-3-closeout.md
+    - ../../governance/seam-4-closeout.md
+  required_threads:
+    - THR-01
+    - THR-02
+    - THR-03
+    - THR-04
+    - THR-05
+  stale_triggers:
+    - capability matrix regeneration is deferred from advertising changes
+gates:
+  pre_exec:
+    review: passed
+    contract: passed
+    revalidation: passed
+  post_exec:
+    landing: passed
+    closeout: passed
+seam_exit_gate:
+  required: true
+  planned_location: S3
+  status: passed
+open_remediations: []
+---
+# SEAM-5 - Tests (Activated)
 
-> Pack: `docs/project_management/packs/active/agent-api-model-selection/`
-> Seam brief: `seam-5-tests.md`
-> Threading source of truth: `threading.md`
+## Seam brief (source of truth)
 
-## Seam Brief (Restated)
+- See `../../seam-5-tests.md`.
 
+## Promotion basis
 - **Seam ID**: SEAM-5
 - **Name**: regression coverage for `agent_api.config.model.v1`
 - **Goal / value**: lock the universal model-selection contract in place so backend or spec churn
@@ -35,7 +71,7 @@
   - `crates/agent_api/src/backends/claude_code/tests/capabilities.rs`
   - `crates/agent_api/src/backends/claude_code/tests/mapping.rs`
   - `crates/agent_api/src/backends/claude_code/tests/backend_contract.rs`
-  - `docs/specs/universal-agent-api/capability-matrix.md`
+  - `docs/specs/unified-agent-api/capability-matrix.md`
 - **Verification**:
   - `cargo test -p agent_api backend_harness::normalize`
   - `cargo test -p agent_api codex`
@@ -56,60 +92,9 @@
   - Contracts consumed:
     - `MS-C03`, `MS-C04`, `MS-C05`, `MS-C06`, `MS-C07`, `MS-C08`, `MS-C09`
 
-## Seam-local slicing strategy
+- Upstream seam exit: `../../governance/seam-4-closeout.md` (seam-exit gate passed; promotion readiness ready).
+- Required threads: `THR-01..THR-05` are published per `../../threading.md`.
 
-- **Strategy**: dependency-first.
-- **Why**: the seam already has an explicit `SEAM-5A` / `SEAM-5B` split in the brief and
-  `threading.md`. Land the pre-spawn ordering guardrails first, then layer backend-specific mapping
-  and runtime/publication conformance once SEAM-2/3/4 have stabilized.
+## Next planning step
 
-## Slice index
-
-- `S1` → `slice-1-pre-spawn-validation-ordering.md`: land the early `SEAM-5A` guardrails for R0
-  ordering, trim-first validation, and the exact safe `InvalidRequest` template.
-- `S2` → `slice-2-backend-mapping-and-absence.md`: pin deterministic backend mapping, absence
-  semantics, fork/fallback exclusions, and the no-second-parser handoff.
-- `S3` → `slice-3-runtime-rejection-and-publication-guardrails.md`: pin safe runtime rejection,
-  terminal `Error` event behavior, and capability-matrix freshness after advertising flips.
-
-## Threading Alignment (mandatory)
-
-- **Contracts produced (owned)**:
-  - None. SEAM-5 contributes regression tests only; it does not own new contracts.
-- **Contracts consumed**:
-  - `MS-C03` (SEAM-1): pre-spawn validation schema, trim-first semantics, and exact safe
-    `InvalidRequest` template.
-    - Consumed by: `S1.T1` and `S1.T2`.
-  - `MS-C09` (SEAM-2): shared `Result<Option<String>, AgentWrapperError>` normalizer handoff with
-    no backend-local raw parsing.
-    - Consumed by: `S2.T1`, `S2.T2`, and `S2.T3`.
-  - `MS-C05` (SEAM-2): built-in advertising is allowed only when every exposed flow is
-    deterministic, and matrix publication must move with that advertising change.
-    - Consumed by: `S2.T1`, `S2.T2`, and `S3.T3`.
-  - `MS-C06` (SEAM-3): Codex exec/resume emit exactly one `--model <trimmed-id>` and fork uses
-    the pinned safe pre-handle rejection path.
-    - Consumed by: `S2.T1` and `S3.T1`.
-  - `MS-C07` (SEAM-4): Claude emits exactly one `--model <trimmed-id>` before add-dir, session,
-    and fallback flags; the universal key never drives `--fallback-model`.
-    - Consumed by: `S2.T2` and `S3.T2`.
-  - `MS-C04` (SEAM-1): syntactically valid but backend-rejected model ids surface as safe
-    `Backend` errors; if the stream is already open, emit exactly one terminal
-    `AgentWrapperEventKind::Error` with the same safe message.
-    - Consumed by: `S3.T1` and `S3.T2`.
-  - `MS-C08` (SEAM-2): capability-matrix regeneration happens in the same change that changes
-    advertising, and stale matrix diffs block merge.
-    - Consumed by: `S3.T3`.
-- **Dependency edges honored**:
-  - `SEAM-1 blocks SEAM-5A`: `S1` contains only the early ordering/template coverage that should
-    land first.
-  - `SEAM-2 blocks SEAM-5B`: `S2` and `S3` assume the shared normalizer and advertising handoff
-    already exist.
-  - `SEAM-3 blocks SEAM-5B`: Codex mapping/runtime tasks stay isolated to `S2.T1` and `S3.T1`.
-  - `SEAM-4 blocks SEAM-5B`: Claude mapping/runtime tasks stay isolated to `S2.T2` and `S3.T2`.
-- **Parallelization notes**:
-  - What can proceed now:
-    - `S1` once SEAM-1 verification is complete.
-  - What must wait:
-    - `S2` waits on SEAM-2 plus the relevant backend mapping seam (`SEAM-3` or `SEAM-4`).
-    - `S3` waits on SEAM-2/3/4 because it verifies the final backend-owned runtime behavior and
-      published matrix artifact.
+- Execute `slice-*.md` sequentially (S1..S3), then complete the dedicated `seam-exit-gate` slice.

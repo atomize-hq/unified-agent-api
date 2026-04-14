@@ -27,7 +27,7 @@
   - No test leaks a raw path sentinel through a user-visible error string.
 - **Dependencies**:
   - SEAM-2 shared normalizer implementation (`AD-C02`).
-  - `docs/specs/universal-agent-api/extensions-spec.md` and `threading.md` for the exact safe
+  - `docs/specs/unified-agent-api/extensions-spec.md` and `threading.md` for the exact safe
     message and normalization rules (`AD-C03`, `AD-C07`).
 - **Verification**:
   - `cargo test -p agent_api`

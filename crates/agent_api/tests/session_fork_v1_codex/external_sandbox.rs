@@ -2,7 +2,7 @@
 //!
 //! Normative sources:
 //! - `docs/specs/codex-external-sandbox-mapping-contract.md` (ES-C04)
-//! - `docs/specs/universal-agent-api/extensions-spec.md` (pinned warning + ordering)
+//! - `docs/specs/unified-agent-api/extensions-spec.md` (pinned warning + ordering)
 
 use std::time::Duration;
 

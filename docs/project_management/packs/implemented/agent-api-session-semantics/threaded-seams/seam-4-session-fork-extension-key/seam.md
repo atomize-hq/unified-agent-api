@@ -30,7 +30,7 @@
       - fork selector schema validation (closed schema + trim-to-empty id),
       - staged-rollout precedence (R0): only fork supported + both keys present → `UnsupportedCapability` (resume key); both supported + both present → `InvalidRequest`,
       - Claude: argv mapping + selection failures (fake-binary),
-      - Codex wrapper: protocol flow tests for `thread/list` paging + selection, `thread/fork` response parsing, `turn/start` prompt mapping, and `$ /cancelRequest`,
+      - Codex crate: protocol flow tests for `thread/list` paging + selection, `thread/fork` response parsing, `turn/start` prompt mapping, and `$ /cancelRequest`,
       - `agent_api` integration tests for Codex fork: bounded notifications mapping, pinned cancellation precedence (`run-protocol-spec.md`), pinned selection failures, and non-interactive safety.
     - Capability advertisement: only advertise `agent_api.session.fork.v1` per backend after behavior + tests land.
   - Out:
@@ -58,12 +58,12 @@
     - `SA-C04 fork extension key (fork.v1)`
     - `SA-C06 codex app-server fork RPC surface`
   - Contracts consumed:
-    - Normative: `docs/specs/universal-agent-api/extensions-spec.md` (fork schema, selection failures, R0 precedence, mutual exclusivity)
+    - Normative: `docs/specs/unified-agent-api/extensions-spec.md` (fork schema, selection failures, R0 precedence, mutual exclusivity)
     - Normative: `docs/specs/claude-code-session-mapping-contract.md` (Claude argv mapping + safe error translation)
     - Normative: `docs/specs/codex-app-server-jsonrpc-contract.md` (app-server method shapes + selection algorithm + non-interactive + approval fail-fast + notifications)
-    - Normative: `docs/specs/universal-agent-api/run-protocol-spec.md` (validation timing, cancellation semantics + precedence)
-    - Normative: `docs/specs/universal-agent-api/contract.md` (effective working directory resolution)
-    - Normative: `docs/specs/universal-agent-api/event-envelope-schema-spec.md` (bounds + redaction rules for event/completion envelopes)
+    - Normative: `docs/specs/unified-agent-api/run-protocol-spec.md` (validation timing, cancellation semantics + precedence)
+    - Normative: `docs/specs/unified-agent-api/contract.md` (effective working directory resolution)
+    - Normative: `docs/specs/unified-agent-api/event-envelope-schema-spec.md` (bounds + redaction rules for event/completion envelopes)
 
 ## Slice index
 
@@ -98,7 +98,7 @@
     - Produced by:
       - `S3` (lands before advertising Codex support for `agent_api.session.fork.v1` in `agent_api`).
 - **Contracts consumed**:
-  - `docs/specs/universal-agent-api/extensions-spec.md`:
+  - `docs/specs/unified-agent-api/extensions-spec.md`:
     - Fork schema + closed-schema rule.
     - R0 precedence: unsupported keys fail with `UnsupportedCapability` before contradiction rules.
     - Selection-failure pinned messages and terminal `Error` event rule when a stream exists.
@@ -107,12 +107,12 @@
   - `docs/specs/codex-app-server-jsonrpc-contract.md`:
     - Pinned method shapes + selection algorithm for `thread/list` + fork/turn request shapes.
     - Non-interactive fail-fast rules, including the `"approval required"` pinned message and `$ /cancelRequest` behavior.
-  - `docs/specs/universal-agent-api/run-protocol-spec.md`:
+  - `docs/specs/unified-agent-api/run-protocol-spec.md`:
     - Pre-spawn validation timing.
     - Explicit cancellation semantics and precedence (`"cancelled"` wins).
-  - `docs/specs/universal-agent-api/contract.md`:
+  - `docs/specs/unified-agent-api/contract.md`:
     - Effective working directory resolution used to scope selector `"last"`.
-  - `docs/specs/universal-agent-api/event-envelope-schema-spec.md`:
+  - `docs/specs/unified-agent-api/event-envelope-schema-spec.md`:
     - Event/completion envelope bounds and redaction rules (no raw backend payload embedding in `data`).
 - **Dependency edges honored**:
   - `SEAM-4 (Codex fork) is blocked by SA-C06`: `S3` lands typed RPC support + tests before `S4` integrates fork in `agent_api`.

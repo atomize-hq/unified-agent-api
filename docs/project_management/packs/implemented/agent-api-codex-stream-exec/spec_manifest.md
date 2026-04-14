@@ -10,12 +10,12 @@ Feature directory: `docs/project_management/packs/active/agent-api-codex-stream-
 
 ## Baselines (referenced; not duplicated)
 
-- Universal Agent API (authoritative contracts/specs):
-  - `docs/adr/0009-universal-agent-api.md`
-  - `docs/project_management/next/universal-agent-api/contract.md`
-  - `docs/project_management/next/universal-agent-api/run-protocol-spec.md`
-  - `docs/project_management/next/universal-agent-api/event-envelope-schema-spec.md`
-  - `docs/project_management/next/universal-agent-api/capabilities-schema-spec.md`
+- Unified Agent API (authoritative contracts/specs):
+  - `docs/adr/0009-unified-agent-api.md`
+  - `docs/project_management/next/unified-agent-api/contract.md`
+  - `docs/project_management/next/unified-agent-api/run-protocol-spec.md`
+  - `docs/project_management/next/unified-agent-api/event-envelope-schema-spec.md`
+  - `docs/project_management/next/unified-agent-api/capabilities-schema-spec.md`
 - Codex streaming + JSONL parsing (authoritative for Codex typed events + normalization):
   - `docs/adr/0005-codex-jsonl-log-parser-api.md`
   - `docs/specs/codex-thread-event-jsonl-parser-contract.md`
@@ -48,7 +48,7 @@ Feature directory: `docs/project_management/packs/active/agent-api-codex-stream-
 
 ### Slice specs (triads)
 
-- `docs/project_management/packs/active/agent-api-codex-stream-exec/C0-spec.md` — Codex wrapper: add the minimum additive API required so `agent_api` can apply per-run environment overrides (while still using `CodexClient::stream_exec`).
+- `docs/project_management/packs/active/agent-api-codex-stream-exec/C0-spec.md` — Codex crate: add the minimum additive API required so `agent_api` can apply per-run environment overrides (while still using `CodexClient::stream_exec`).
 - `docs/project_management/packs/active/agent-api-codex-stream-exec/C1-spec.md` — `agent_api` Codex backend: refactor to consume `codex::CodexClient::stream_exec` and map typed events to `AgentWrapperEvent` live (preserving DR-0012 finality).
 - `docs/project_management/packs/active/agent-api-codex-stream-exec/C2-spec.md` — validation hardening: add fake-binary fixtures and integration tests proving (a) at least one event is emitted before completion resolves, (b) env precedence is preserved, and (c) redaction rules prevent raw JSONL lines from leaking through universal errors/events.
 
@@ -88,14 +88,14 @@ Trigger: ADR affects cross-platform process I/O and must remain correct on GitHu
 
 | Surface | Owner doc |
 |---|---|
-| `agent_api` run handle finality (completion waits for stream termination) | `docs/project_management/next/universal-agent-api/run-protocol-spec.md` |
-| `agent_api` event envelope bounds + raw-line prohibition | `docs/project_management/next/universal-agent-api/event-envelope-schema-spec.md` |
-| Capability id naming/stability rules | `docs/project_management/next/universal-agent-api/capabilities-schema-spec.md` |
+| `agent_api` run handle finality (completion waits for stream termination) | `docs/project_management/next/unified-agent-api/run-protocol-spec.md` |
+| `agent_api` event envelope bounds + raw-line prohibition | `docs/project_management/next/unified-agent-api/event-envelope-schema-spec.md` |
+| Capability id naming/stability rules | `docs/project_management/next/unified-agent-api/capabilities-schema-spec.md` |
 | Codex backend capability advertisement (`agent_api.events.live`) | `contract.md` |
 | Codex typed event source-of-truth (what `ThreadEvent` means) | `docs/specs/codex-thread-event-jsonl-parser-contract.md` |
 | Codex → universal event kind mapping rules | `contract.md` |
 | `AgentWrapperRunRequest` absence semantics (unset timeout/working_dir/env/extensions) for Codex backend | `contract.md` |
-| Core exec-policy key schema + defaults (`agent_api.exec.non_interactive`) | `docs/project_management/next/universal-agent-api/extensions-spec.md` |
+| Core exec-policy key schema + defaults (`agent_api.exec.non_interactive`) | `docs/project_management/next/unified-agent-api/extensions-spec.md` |
 | Codex exec-policy backend keys (`backend.codex.exec.*`) | `contract.md` |
 | Config/env precedence rules (backend defaults vs per-run overrides) | `contract.md` |
 | Per-run env override mechanism (how `AgentWrapperRunRequest.env` affects spawned process when using `CodexClient`) | `contract.md` |
@@ -138,7 +138,7 @@ Trigger: ADR affects cross-platform process I/O and must remain correct on GitHu
 - Defines exact adaptation semantics:
   - mapping of `codex::ThreadEvent` values to `AgentWrapperEvent` (kind/channel/text/message rules)
   - how `codex::ExecStream.completion` maps to `AgentWrapperCompletion` (including exit status)
-  - what happens on `ExecStreamError` from the Codex wrapper stream
+  - what happens on `ExecStreamError` from the Codex crate stream
 - Defines redaction rules (normative):
   - emitted error messages MUST NOT include raw JSONL lines from `ExecStreamError::{Parse,Normalize}`
   - emitted error messages MUST be bounded per `event-envelope-schema-spec.md`

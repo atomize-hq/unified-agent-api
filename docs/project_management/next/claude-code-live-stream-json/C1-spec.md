@@ -14,7 +14,7 @@ In-scope:
   - call `ClaudeClient::print_stream_json(...)`
   - map typed Claude events to `AgentWrapperEvent` as they arrive
   - advertise `agent_api.events.live` in `AgentWrapperCapabilities.ids`
-- Preserve Universal Agent API DR-0012 completion gating: completion must not resolve until the event stream is final (or dropped).
+- Preserve Unified Agent API DR-0012 completion gating: completion must not resolve until the event stream is final (or dropped).
 - Enforce safety posture:
   - do not emit raw backend lines into `AgentWrapperEvent.data`
   - keep parse errors redacted and bounded
@@ -23,7 +23,7 @@ In-scope:
 
 - Claude backend capabilities include `agent_api.events.live`.
 - A fixture/synthetic test proves events can be observed before process exit (no real `claude` binary required).
-- Completion semantics remain Universal Agent API DR-0012 compliant (completion waits for stream finality or drop).
+- Completion semantics remain Unified Agent API DR-0012 compliant (completion waits for stream finality or drop).
 - Workspace gates pass at integration:
   - `cargo fmt`
   - `cargo clippy --workspace --all-targets --all-features -- -D warnings`

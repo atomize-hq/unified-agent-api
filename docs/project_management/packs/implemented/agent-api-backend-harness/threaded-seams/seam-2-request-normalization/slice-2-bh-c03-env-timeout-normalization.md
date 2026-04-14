@@ -65,7 +65,7 @@ Checklist:
   - The helper MUST be pure (no tokio timeouts here); enforcement is backend-owned:
     - The harness passes `effective_timeout` into the adapter’s `spawn(...)` via `NormalizedRequest`.
     - The adapter maps that timeout into its wrapper runtime:
-      - Codex wrapper (`codex::CodexClient`): map with `effective_timeout.unwrap_or(Duration::ZERO)`
+      - Codex crate (`codex::CodexClient`): map with `effective_timeout.unwrap_or(Duration::ZERO)`
         because `Duration::ZERO` means “no timeout” in `crates/codex/src/client_core.rs`.
       - Claude Code wrapper (`claude_code::ClaudeClient`): pass the `Option<Duration>` directly.
         - If any adapter layer uses `tokio::time::timeout(...)` (current behavior in

@@ -36,7 +36,7 @@
   - `crates/agent_api/src/backends/claude_code/tests/**`
   - `crates/agent_api/src/bin/fake_codex_stream_exec_scenarios_agent_api.rs`
   - `crates/agent_api/src/bin/fake_claude_stream_json_agent_api.rs`
-  - `docs/specs/universal-agent-api/capability-matrix.md`
+  - `docs/specs/unified-agent-api/capability-matrix.md`
 - **Verification**:
   - Targeted runs while iterating:
     - `cargo test -p agent_api` for shared normalizer-only coverage

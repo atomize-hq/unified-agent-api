@@ -11,7 +11,7 @@ local macOS development environment.
 
 This playbook validates two independent properties:
 1) `crates/claude_code` streaming handle yields events before process exit.
-2) `crates/agent_api` Universal Agent API DR-0012 completion gating holds: completion does not resolve until the event
+2) `crates/agent_api` Unified Agent API DR-0012 completion gating holds: completion does not resolve until the event
    stream is final (or explicitly dropped by the consumer).
 
 ## Preconditions
@@ -134,11 +134,11 @@ RS
 Expected result:
 - Program prints `OK: observed first streamed event before completion`.
 
-## Step 3 — Validate `agent_api` Universal Agent API DR-0012 completion gating (real `claude` binary)
+## Step 3 — Validate `agent_api` Unified Agent API DR-0012 completion gating (real `claude` binary)
 
 This check asserts:
 - `agent_api` completion does **not** resolve while the event stream is neither drained to finality nor dropped.
-- Dropping the event stream allows completion to resolve (consumer opt-out), per Universal Agent API DR-0012.
+- Dropping the event stream allows completion to resolve (consumer opt-out), per Unified Agent API DR-0012.
 
 1) Update the same scratch project’s `Cargo.toml` to include `agent_api` (feature `claude_code`):
 
@@ -158,7 +158,7 @@ futures-util = "0.3"
 TOML
 ```
 
-2) Replace `src/main.rs` with a Universal Agent API DR-0012 gating check:
+2) Replace `src/main.rs` with a Unified Agent API DR-0012 gating check:
 
 ```bash
 cat > "$SCRATCH/src/main.rs" <<'RS'
@@ -197,7 +197,7 @@ async fn main() {
 
     let handle = gw.run(&kind, req).await.expect("run failed");
 
-    // --- Universal Agent API DR-0012 gating check (deterministic) ---
+    // --- Unified Agent API DR-0012 gating check (deterministic) ---
     //
     // If we do not drain the event stream AND do not drop it, completion MUST NOT resolve.
     // (Finality is signaled only when the stream is exhausted via polling, or dropped.)
@@ -235,7 +235,7 @@ async fn main() {
         "FAIL: completion did not resolve within 10s after dropping the events stream"
     );
 
-    println!("OK: completion was gated until stream was dropped (Universal Agent API DR-0012)");
+    println!("OK: completion was gated until stream was dropped (Unified Agent API DR-0012)");
 }
 RS
 ```
@@ -247,7 +247,7 @@ RS
 ```
 
 Expected result:
-- Program prints `OK: completion was gated until stream was dropped (Universal Agent API DR-0012)`.
+- Program prints `OK: completion was gated until stream was dropped (Unified Agent API DR-0012)`.
 
 ## Record
 

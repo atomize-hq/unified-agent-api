@@ -57,7 +57,7 @@ All of the following are internal-only and live in `crates/agent_api/src/backend
 
 ### Extension key matching rules (exact)
 
-Extension keys are capability ids (per `docs/specs/universal-agent-api/capabilities-schema-spec.md`):
+Extension keys are capability ids (per `docs/specs/unified-agent-api/capabilities-schema-spec.md`):
 
 - Comparison is **exact string match** (case-sensitive).
 - No trimming or Unicode normalization is applied.
@@ -68,7 +68,7 @@ Extension keys are capability ids (per `docs/specs/universal-agent-api/capabilit
 
 Namespaces:
 
-- Core keys: `agent_api.*` (schema + defaults owned by `docs/specs/universal-agent-api/extensions-spec.md`).
+- Core keys: `agent_api.*` (schema + defaults owned by `docs/specs/unified-agent-api/extensions-spec.md`).
 - Backend keys: `backend.<agent_kind>.*` (schema + defaults owned by the backend’s authoritative docs).
 
 ### Backend config defaults included in normalization (v1)

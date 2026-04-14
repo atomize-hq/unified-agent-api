@@ -1,17 +1,38 @@
-### S2 — Print/session argv conformance and `--fallback-model` exclusion
+---
+slice_id: S2
+seam_id: SEAM-4
+slice_kind: delivery
+execution_horizon: active
+status: decomposed
+plan_version: v1
+basis:
+  currentness: current
+  basis_ref: seam.md#basis
+  stale_triggers: []
+gates:
+  pre_exec:
+    review: inherited
+    contract: inherited
+    revalidation: inherited
+  post_exec:
+    landing: pending
+    closeout: pending
+threads:
+  - THR-05
+contracts_produced:
+  - C-07
+contracts_consumed:
+  - C-02
+  - C-07
+  - C-09
+open_remediations: []
+candidate_subslices: []
+---
+### S2 - Print/session argv conformance (ordering + fallback exclusion)
 
-- Status: decomposed because the original slice spans `crates/agent_api`, `crates/claude_code`, and canonical spec/test surfaces, which is too broad for one Codex session.
-- Archived original: `archive/slice-2-print-session-argv-conformance.md`
-- Sub-slice directory: `slice-2-print-session-argv-conformance/`
+- **User/system value**: prevents drift by pinning argv ordering and explicitly proving that the universal key does not map to `--fallback-model`.
+- **Acceptance criteria**:
+  - `--model <trimmed-id>` appears in the root-flags region, before any `--add-dir` group, session-selector flags, `--fallback-model`, and the final prompt token
+  - the universal key never maps to `--fallback-model`
+- **Verification**: focused tests that inspect the emitted argv shape for both print + session flows.
 
-#### Sub-slices
-
-- `subslice-1-agent-api-request-plumbing.md` (`S2a`): thread `model: Option<String>` through Claude backend/harness request construction in `crates/agent_api` and preserve omission semantics without re-parsing or hand-writing argv.
-- `subslice-2-claude-print-argv-ordering.md` (`S2b`): pin `ClaudePrintRequest` / root-flags argv behavior in `crates/claude_code` so fresh, resume, and fork flows emit exactly one `--model <trimmed-id>` pair in the required position.
-- `subslice-3-fallback-exclusion-and-contract.md` (`S2c`): publish the negative `--fallback-model` contract and align focused docs/tests so the universal key never gains fallback semantics.
-
-#### Audit result
-
-- `slice-1-model-handoff.md`: OK, remains a single bounded plumbing slice.
-- `slice-2-print-session-argv-conformance.md`: oversized and decomposed here.
-- `slice-3-runtime-rejection-conformance.md`: helper audit also flags this as oversized, but it is outside this requested decomposition pass.

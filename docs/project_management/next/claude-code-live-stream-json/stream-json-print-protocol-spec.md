@@ -62,7 +62,7 @@ Normative rules:
 - Cancellation behavior MUST be deterministic:
   - Dropping the `events` stream is treated as cancellation for the streaming handle and MUST terminate the child process
     by dropping the `Child` handle spawned with `kill_on_drop(true)`.
-- Completion signaling MUST respect Universal Agent API DR-0012 when used via `agent_api`:
+- Completion signaling MUST respect Unified Agent API DR-0012 when used via `agent_api`:
   - `agent_api` completion must not resolve until the universal event stream is final (or dropped).
 
 ## Stderr handling (deadlock avoidance)

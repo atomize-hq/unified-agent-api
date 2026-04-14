@@ -28,6 +28,7 @@ async fn pump_with_cancel_closes_universal_stream_but_still_drains_typed_stream(
         events,
         tx,
         cancel.clone(),
+        None,
     ));
 
     let first = rx.recv().await.expect("at least one forwarded event");
@@ -69,7 +70,9 @@ async fn pump_with_cancel_preserves_drain_on_drop_posture() {
     let adapter = std::sync::Arc::new(ToyAdapter { fail_spawn: false });
     let (tx, mut rx) = mpsc::channel::<crate::AgentWrapperEvent>(1);
     let cancel = HarnessCancelSignal::new();
-    let handle = tokio::spawn(pump_backend_events_with_cancel(adapter, events, tx, cancel));
+    let handle = tokio::spawn(pump_backend_events_with_cancel(
+        adapter, events, tx, cancel, None,
+    ));
 
     let first = rx.recv().await.expect("at least one forwarded event");
     assert_eq!(first.kind, AgentWrapperEventKind::TextOutput);

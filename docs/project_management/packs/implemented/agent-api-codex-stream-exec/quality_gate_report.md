@@ -32,9 +32,9 @@ RECOMMENDATION: FLAG FOR HUMAN REVIEW
 
 - [ ] This pack does not contradict ADR-0011: `docs/adr/0011-agent-api-codex-stream-exec.md`
 - [ ] This pack aligns with baseline universal specs (referenced, not duplicated):
-  - `docs/project_management/next/universal-agent-api/contract.md`
-  - `docs/project_management/next/universal-agent-api/run-protocol-spec.md`
-  - `docs/project_management/next/universal-agent-api/event-envelope-schema-spec.md`
+  - `docs/project_management/next/unified-agent-api/contract.md`
+  - `docs/project_management/next/unified-agent-api/run-protocol-spec.md`
+  - `docs/project_management/next/unified-agent-api/event-envelope-schema-spec.md`
 - [ ] Safety posture is pinned (no raw JSONL line / stderr leakage) and testable via the planned C2 slice.
 
 ## What remains to reach ACCEPT (non-exhaustive)

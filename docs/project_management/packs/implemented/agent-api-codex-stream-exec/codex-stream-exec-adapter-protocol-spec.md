@@ -12,10 +12,10 @@ Normative language: RFC 2119 requirement keywords (`MUST`, `MUST NOT`, `SHOULD`)
 ## Baselines (referenced; not duplicated)
 
 - Universal run finality semantics (DR-0012):
-  - `docs/project_management/next/universal-agent-api/run-protocol-spec.md`
-  - `docs/project_management/next/universal-agent-api/decision_register.md` (DR-0012)
+  - `docs/project_management/next/unified-agent-api/run-protocol-spec.md`
+  - `docs/project_management/next/unified-agent-api/decision_register.md` (DR-0012)
 - Universal envelope bounds + raw-line prohibition:
-  - `docs/project_management/next/universal-agent-api/event-envelope-schema-spec.md`
+  - `docs/project_management/next/unified-agent-api/event-envelope-schema-spec.md`
 - Codex typed event semantics:
   - `docs/specs/codex-thread-event-jsonl-parser-contract.md`
 - Ingestion safety posture reference:
@@ -47,9 +47,9 @@ The adapter MUST configure Codex streaming so that universal safety invariants a
 - JSON mode MUST be enabled (`--json`), and the adapter MUST consume typed events.
 - Non-interactive mode MUST be deterministic by default (DR-0009):
   - when `agent_api.exec.non_interactive` is absent or `true`, the adapter MUST configure the
-    Codex wrapper to pass `--ask-for-approval never`.
+    Codex crate to pass `--ask-for-approval never`.
 - Sandbox mode MUST be deterministic by default (DR-0009):
-  - when `backend.codex.exec.sandbox_mode` is absent, the adapter MUST configure the Codex wrapper
+  - when `backend.codex.exec.sandbox_mode` is absent, the adapter MUST configure the Codex crate
     to pass `--sandbox workspace-write`.
 - Git repo checks MUST be disabled:
   - the spawned CLI MUST include `--skip-git-repo-check` so runs do not depend on being inside a
@@ -57,13 +57,13 @@ The adapter MUST configure Codex streaming so that universal safety invariants a
 - The adapter MUST NOT use Codex “danger” safety overrides:
   - MUST NOT pass `--dangerously-bypass-approvals-and-sandbox` (or yolo equivalents).
 - Raw JSONL lines MUST NOT be mirrored to the parent stdout:
-  - Codex wrapper `mirror_stdout` MUST be `false` for this backend.
+  - Codex crate `mirror_stdout` MUST be `false` for this backend.
 - Codex stderr MUST NOT be mirrored to the parent stderr (to avoid secret leakage):
-  - Codex wrapper `quiet` MUST be `true` for this backend.
+  - Codex crate `quiet` MUST be `true` for this backend.
 - The adapter MUST NOT request raw JSONL tee-to-disk logging (no `json_event_log`) in v1.
 
 Working directory and timeout mapping (normative; removes ambiguity):
-- The adapter MUST map the derived universal working directory to the Codex wrapper by setting:
+- The adapter MUST map the derived universal working directory to the Codex crate by setting:
   - `codex::CodexClientBuilder::working_dir(<derived_dir>)`
 - The adapter MUST NOT use `codex::CodexClientBuilder::cd(...)` for universal `working_dir` mapping in v1.
 - The adapter MUST map timeouts exactly as pinned in `contract.md`:
@@ -72,7 +72,7 @@ Working directory and timeout mapping (normative; removes ambiguity):
 
 Exec policy mapping (normative; removes ambiguity):
 - If `agent_api.exec.non_interactive=true`:
-  - the adapter MUST set the Codex wrapper approval policy to `never`.
+  - the adapter MUST set the Codex crate approval policy to `never`.
 - If `agent_api.exec.non_interactive=false`:
   - if `backend.codex.exec.approval_policy` is present, the adapter MUST set
     `--ask-for-approval <value>`.
@@ -87,9 +87,9 @@ The adapter MUST implement env precedence/isolation exactly as defined by:
 - `docs/project_management/packs/active/agent-api-codex-stream-exec/contract.md`
 
 Additionally, the adapter MUST ensure the merged env is applied to the spawned Codex process even
-though spawning is performed inside the Codex wrapper crate.
+though spawning is performed inside the Codex crate.
 
-This requires a Codex wrapper API that supports per-invocation env injection while using
+This requires a Codex crate API that supports per-invocation env injection while using
 `CodexClient::stream_exec` (C0 deliverable).
 
 ### R3 — Live streaming and ordering
@@ -122,7 +122,7 @@ If the downstream event receiver is dropped (consumer stops reading events), the
 - Continue draining the upstream `ExecStream.events` stream until it terminates.
 - Stop forwarding mapped events after the first failed send, but MUST NOT stop polling upstream.
 
-This prevents deadlocks on bounded channels inside the Codex wrapper (and preserves the ability for
+This prevents deadlocks on bounded channels inside the Codex crate (and preserves the ability for
 the upstream completion to resolve).
 
 ## Redaction mapping (normative)
@@ -190,7 +190,7 @@ Let `codex_error_kind(err: &codex::CodexError) -> &'static str` be:
   - `CodexError::CaptureIo { .. }` → `io`
   - `CodexError::StdinWrite { .. }` → `io`
   - `CodexError::ResponsesApiProxyInfoRead { .. }` → `io`
-- Any other Codex wrapper/internal failure:
+- Any other Codex crate/internal failure:
   - `CodexError::InvalidUtf8 { .. }` → `other`
   - `CodexError::JsonParse { .. }` → `other`
   - `CodexError::ExecPolicyParse { .. }` → `other`
@@ -270,7 +270,7 @@ are illustrative; semantics are normative):
    1. Builds a `codex::CodexClient` from backend config + request (working dir, timeout, binary,
       codex_home), with `json=true`, `mirror_stdout=false`, `quiet=true`.
    2. Computes `merged_env` (config env + request env, request wins).
-   3. Calls the Codex wrapper streaming API using `merged_env` (C0) via:
+   3. Calls the Codex crate streaming API using `merged_env` (C0) via:
       - `codex::CodexClient::stream_exec_with_env_overrides(exec_request, &merged_env)`
    4. Drains `ExecStream.events`:
       - Maintain `forward = true`.

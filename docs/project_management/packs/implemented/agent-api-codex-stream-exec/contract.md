@@ -11,11 +11,11 @@ Normative language: RFC 2119 requirement keywords (`MUST`, `MUST NOT`, `SHOULD`)
 
 ## Baselines (referenced; not duplicated)
 
-- Universal Agent API (authoritative):
-  - `docs/project_management/next/universal-agent-api/contract.md`
-  - `docs/project_management/next/universal-agent-api/run-protocol-spec.md`
-  - `docs/project_management/next/universal-agent-api/event-envelope-schema-spec.md`
-  - `docs/project_management/next/universal-agent-api/capabilities-schema-spec.md`
+- Unified Agent API (authoritative):
+  - `docs/project_management/next/unified-agent-api/contract.md`
+  - `docs/project_management/next/unified-agent-api/run-protocol-spec.md`
+  - `docs/project_management/next/unified-agent-api/event-envelope-schema-spec.md`
+  - `docs/project_management/next/unified-agent-api/capabilities-schema-spec.md`
 - Codex typed event semantics + normalization (authoritative for `ThreadEvent`):
   - `docs/specs/codex-thread-event-jsonl-parser-contract.md`
 - Safety posture reference (raw line retention off-by-default):
@@ -40,7 +40,7 @@ This contract pins:
 
 Out of scope:
 
-- Changing the Universal Agent API public surface (types/fields) beyond what baselines already define.
+- Changing the Unified Agent API public surface (types/fields) beyond what baselines already define.
 - Opt-in “raw backend line capture” in the universal envelope (forbidden in v1 by baseline).
 - Any `AgentWrapperRunRequest.extensions` keys beyond those explicitly pinned in this contract.
 
@@ -55,7 +55,7 @@ Out of scope:
   - `backend.codex.exec.sandbox_mode`
   - `backend.codex.exec.approval_policy`
 - `AgentWrapperCapabilities.ids` MUST include `agent_api.exec.non_interactive` as defined by:
-  - `docs/project_management/next/universal-agent-api/extensions-spec.md`
+  - `docs/project_management/next/unified-agent-api/extensions-spec.md`
 
 ## Safety / approvals policy (normative)
 
@@ -82,7 +82,7 @@ exec-policy knobs in a way that remains orthogonal as additional CLI agents are 
 
 - `agent_api.exec.non_interactive`:
   - Defined by the universal extensions registry:
-    - `docs/project_management/next/universal-agent-api/extensions-spec.md`
+    - `docs/project_management/next/unified-agent-api/extensions-spec.md`
   - This backend MUST support and honor it (and MUST advertise it in capabilities).
 - `backend.codex.exec.sandbox_mode` (string enum):
   - allowed values: `read-only` | `workspace-write` | `danger-full-access`
@@ -129,8 +129,8 @@ The Codex backend MUST derive the spawned process working directory as:
 If `std::env::current_dir()` fails, the backend MUST fail the run before spawning with
 `AgentWrapperError::Backend` and a redacted message.
 
-Codex wrapper mapping (normative; removes ambiguity):
-- The backend MUST pass the derived directory to the Codex wrapper via
+Codex crate mapping (normative; removes ambiguity):
+- The backend MUST pass the derived directory to the Codex crate via
   `codex::CodexClientBuilder::working_dir(<dir>)` (so the spawned process uses that directory as
   its cwd).
 - The backend MUST NOT use `codex::CodexClientBuilder::cd(...)` in v1 for `AgentWrapperRunRequest.working_dir`
@@ -138,19 +138,19 @@ Codex wrapper mapping (normative; removes ambiguity):
 
 ## Timeout semantics (normative)
 
-The Codex backend MUST implement `AgentWrapperRunRequest.timeout` using the Codex wrapper timeout:
+The Codex backend MUST implement `AgentWrapperRunRequest.timeout` using the Codex crate timeout:
 
 - Let `effective_timeout = request.timeout.or(config.default_timeout)`.
 - If `effective_timeout.is_some()`:
   - the backend MUST enforce that timeout as an overall run timeout.
 - If `effective_timeout.is_none()`:
-  - the backend MUST disable the Codex wrapper’s default timeout (i.e., MUST NOT silently fall back
-    to the Codex wrapper’s internal “120s default”).
+  - the backend MUST disable the Codex crate’s default timeout (i.e., MUST NOT silently fall back
+    to the Codex crate’s internal “120s default”).
 
 Timeout failures MUST surface as `AgentWrapperError::Backend` with a **redacted** message that does
 not include raw backend stdout/stderr or JSONL lines.
 
-Codex wrapper mapping (normative; removes ambiguity):
+Codex crate mapping (normative; removes ambiguity):
 - If `effective_timeout.is_some()`:
   - the backend MUST set `codex::CodexClientBuilder::timeout(effective_timeout.unwrap())`.
 - If `effective_timeout.is_none()`:
@@ -175,16 +175,16 @@ Let `merged_env` be:
 1. Start with `config.env`.
 2. For each `(k, v)` in `request.env`, set/override `merged_env[k] = v`.
 
-The backend MUST ensure `merged_env` is applied to the spawned Codex process **after** Codex wrapper
+The backend MUST ensure `merged_env` is applied to the spawned Codex process **after** Codex crate
 internal environment injection (e.g., `CODEX_HOME`, `CODEX_BINARY`, default `RUST_LOG`) so that:
 
 - if `merged_env` contains `CODEX_HOME`, it overrides any `config.codex_home` injection.
 - if `merged_env` contains `RUST_LOG`, it overrides any wrapper-provided default.
 
-### Required Codex wrapper API (normative; C0 dependency)
+### Required Codex crate API (normative; C0 dependency)
 
 To satisfy per-run env semantics while still executing via typed streaming, the Codex backend MUST
-use the additive Codex wrapper API defined by `C0-spec.md`:
+use the additive Codex crate API defined by `C0-spec.md`:
 
 - `codex::CodexClient::stream_exec_with_env_overrides(exec_request, &merged_env)`
 
@@ -263,7 +263,7 @@ On successful Codex process exit (including non-zero exit codes), the backend MU
 
 #### `final_text` policy (normative; pinned)
 
-The Codex backend MUST populate `AgentWrapperCompletion.final_text` using the Codex wrapper’s
+The Codex backend MUST populate `AgentWrapperCompletion.final_text` using the Codex crate’s
 completion artifact (`ExecCompletion.last_message`) with the following deterministic rule:
 
 - `final_text = Some(s)` iff the upstream completion returns `Ok(ExecCompletion { last_message: Some(s), .. })`.

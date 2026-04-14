@@ -11,16 +11,16 @@
     - Pin the public Rust API surface for explicit cancellation (`run_control(...)`, `AgentWrapperRunControl`, `AgentWrapperCancelHandle`).
     - Pin exact capability gating semantics for explicit cancellation (`agent_api.control.cancel.v1`).
     - Pin exact completion outcome semantics for explicit cancellation (pinned error shape and message).
-    - Update canonical contracts/specs under `docs/specs/universal-agent-api/**` to match the pack contract.
+    - Update canonical contracts/specs under `docs/specs/unified-agent-api/**` to match the pack contract.
   - Out:
     - Harness cancellation signal propagation and drain-on-drop preservation (SEAM-2 / CA-C02).
     - Backend process termination behavior for built-in backends (SEAM-3 / CA-C03).
     - Harness-level/integration tests pinning runtime behavior (SEAM-4).
 - **Touch surface**:
   - `crates/agent_api/src/lib.rs` (public Rust API + trait/gateway surface)
-  - `docs/specs/universal-agent-api/contract.md` (canonical Rust surface)
-  - `docs/specs/universal-agent-api/run-protocol-spec.md` (normative cancellation semantics)
-  - `docs/specs/universal-agent-api/capabilities-schema-spec.md` (capability id meaning)
+  - `docs/specs/unified-agent-api/contract.md` (canonical Rust surface)
+  - `docs/specs/unified-agent-api/run-protocol-spec.md` (normative cancellation semantics)
+  - `docs/specs/unified-agent-api/capabilities-schema-spec.md` (capability id meaning)
   - `docs/project_management/packs/active/agent-api-explicit-cancellation/seam-1-cancellation-contract.md` (pack-local contract)
 - **Verification**:
   - Specs: all normative docs agree on capability id, error shape, and pinned strings.
@@ -48,7 +48,7 @@
   - `CA-C01` (SEAM-1): public cancellation surface + semantics
     - Lives in:
       - Pack: `docs/project_management/packs/active/agent-api-explicit-cancellation/seam-1-cancellation-contract.md`
-      - Canon: `docs/specs/universal-agent-api/contract.md`, `docs/specs/universal-agent-api/run-protocol-spec.md`, `docs/specs/universal-agent-api/capabilities-schema-spec.md`
+      - Canon: `docs/specs/unified-agent-api/contract.md`, `docs/specs/unified-agent-api/run-protocol-spec.md`, `docs/specs/unified-agent-api/capabilities-schema-spec.md`
     - Produced by: `S1` (docs) and `S2` (code surface)
 - **Contracts consumed**:
   - (none)

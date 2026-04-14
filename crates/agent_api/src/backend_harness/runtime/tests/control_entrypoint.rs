@@ -75,6 +75,7 @@ async fn control_entrypoint_exposes_cancel_handle_wired_to_driver() {
                 Ok(BackendSpawn {
                     events: Box::pin(events),
                     completion,
+                    events_observability: None,
                 })
             })
         }
@@ -231,6 +232,7 @@ async fn control_entrypoint_returns_before_spawn_finishes() {
                 Ok(BackendSpawn {
                     events: Box::pin(futures_util::stream::empty()),
                     completion: Box::pin(async { Ok::<(), ()>(()) }),
+                    events_observability: None,
                 })
             })
         }
@@ -374,6 +376,7 @@ async fn run_entrypoint_returns_before_spawn_finishes() {
                 Ok(BackendSpawn {
                     events: Box::pin(futures_util::stream::empty()),
                     completion: Box::pin(async { Ok::<(), ()>(()) }),
+                    events_observability: None,
                 })
             })
         }

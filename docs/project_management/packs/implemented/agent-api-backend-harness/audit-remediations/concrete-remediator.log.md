@@ -70,8 +70,8 @@ Restated requirement: Define the internal normalized request schema (field list 
 
 Evidence used:
 - Public request fields available today: `crates/agent_api/src/lib.rs:90-98`.
-- Extensions gating rule: `docs/specs/universal-agent-api/extensions-spec.md:39-52`.
-- Agent kind naming rules: `docs/specs/universal-agent-api/capabilities-schema-spec.md:11-22`.
+- Extensions gating rule: `docs/specs/unified-agent-api/extensions-spec.md:39-52`.
+- Agent kind naming rules: `docs/specs/unified-agent-api/capabilities-schema-spec.md:11-22`.
 
 Doc changes:
 - Defined:
@@ -94,7 +94,7 @@ Restated requirement: Pin what happens when the typed stream yields errors, when
 Evidence used:
 - Current Codex drain/forward loop (forward-flag + continue draining after receiver drop): `crates/agent_api/src/backends/codex.rs:429-469`.
 - Current Claude drain/forward loop (same pattern): `crates/agent_api/src/backends/claude_code.rs:210-237`.
-- DR-0012 completion finality rule: `docs/specs/universal-agent-api/run-protocol-spec.md:35-43`.
+- DR-0012 completion finality rule: `docs/specs/unified-agent-api/run-protocol-spec.md:35-43`.
 
 Doc changes:
 - Pinned per-boundary behavior + “winner” rule in:
@@ -112,7 +112,7 @@ Decisions introduced:
 Restated requirement: Pin the error mapping API + phase enum, per-phase rules, redaction requirements, and bounds behavior.
 
 Evidence used:
-- Event envelope bounds + raw-line prohibition: `docs/specs/universal-agent-api/event-envelope-schema-spec.md:23-131`.
+- Event envelope bounds + raw-line prohibition: `docs/specs/unified-agent-api/event-envelope-schema-spec.md:23-131`.
 - Concrete bounds enforcement algorithms: `crates/agent_api/src/bounds.rs:1-99`.
 
 Doc changes:
@@ -149,7 +149,7 @@ Restated requirement: Pin the internal timeout type, what is timed, what error s
 
 Evidence used:
 - `AgentWrapperRunRequest.timeout: Option<Duration>`: `crates/agent_api/src/lib.rs:90-98`.
-- Codex wrapper treats `Duration::ZERO` as “no timeout”: `crates/codex/src/client_core.rs:84-112`.
+- Codex crate treats `Duration::ZERO` as “no timeout”: `crates/codex/src/client_core.rs:84-112`.
 - Existing timeout/drain regression in Codex backend: `crates/agent_api/src/backends/codex/tests.rs:220-292`.
 
 Doc changes:
@@ -202,7 +202,7 @@ Decisions introduced:
 Restated requirement: Pin who owns tasks, cancellation behavior on handle drop vs events drop, and require tests that fail if tasks are dropped prematurely.
 
 Evidence used:
-- Minimum cancellation semantics (best-effort) in protocol: `docs/specs/universal-agent-api/run-protocol-spec.md:49-54`.
+- Minimum cancellation semantics (best-effort) in protocol: `docs/specs/unified-agent-api/run-protocol-spec.md:49-54`.
 - Existing gating implementation anchor: `crates/agent_api/src/run_handle_gate.rs` (referenced by DR-0012 tests).
 
 Doc changes:
@@ -232,8 +232,8 @@ Doc changes:
 Restated requirement: Pin extension key comparison rules and namespace rules.
 
 Evidence used:
-- Extension keys must be capability ids (same string): `docs/specs/universal-agent-api/capabilities-schema-spec.md:93-97`.
-- Ownership + fail-closed validation: `docs/specs/universal-agent-api/extensions-spec.md:39-59`.
+- Extension keys must be capability ids (same string): `docs/specs/unified-agent-api/capabilities-schema-spec.md:93-97`.
+- Ownership + fail-closed validation: `docs/specs/unified-agent-api/extensions-spec.md:39-59`.
 
 Doc changes:
 - Pinned exact-match, case-sensitive, no-alias rules and namespace ownership in:
@@ -247,7 +247,7 @@ Restated requirement: Choose and use a single canonical type for agent identity 
 
 Evidence used:
 - Canonical type: `AgentWrapperKind` in `crates/agent_api/src/lib.rs:37-54`.
-- Naming constraints + reserved ids: `docs/specs/universal-agent-api/capabilities-schema-spec.md:11-22`.
+- Naming constraints + reserved ids: `docs/specs/unified-agent-api/capabilities-schema-spec.md:11-22`.
 
 Doc changes:
 - Made `agent_kind: AgentWrapperKind` canonical in normalization inputs and pinned `.as_str()` rendering rule for errors in:
@@ -300,7 +300,7 @@ Restated requirement: Add concrete anchors for ADR/spec dependencies and restate
 Evidence used:
 - ADR harness “User Contract (Authoritative)” lists the preserved invariants: `docs/adr/0013-agent-api-backend-harness.md:71-90`.
 - Specs define the actual normative contracts:
-  - `docs/specs/universal-agent-api/*`.
+  - `docs/specs/unified-agent-api/*`.
 
 Doc changes:
 - Added explicit dependency anchors and a pinned “specs win on drift” rule in:
@@ -315,7 +315,7 @@ Restated requirement: Enumerate Codex extension allowlist keys and define source
 Evidence used:
 - Current Codex backend allowlist constants:
   - `crates/agent_api/src/backends/codex.rs` (`EXT_NON_INTERACTIVE`, `EXT_CODEX_APPROVAL_POLICY`, `EXT_CODEX_SANDBOX_MODE`).
-- Core key schema + default: `docs/specs/universal-agent-api/extensions-spec.md:67-90`.
+- Core key schema + default: `docs/specs/unified-agent-api/extensions-spec.md:67-90`.
 
 Doc changes:
 - Enumerated allowlisted keys and pinned “capabilities is the single source of truth” in:
@@ -329,7 +329,7 @@ Restated requirement: Pin exactly what is bounded, ordering, single-layer enforc
 
 Evidence used:
 - Bounds algorithms and constants: `crates/agent_api/src/bounds.rs:1-99`.
-- Envelope bounds contract: `docs/specs/universal-agent-api/event-envelope-schema-spec.md:23-112`.
+- Envelope bounds contract: `docs/specs/unified-agent-api/event-envelope-schema-spec.md:23-112`.
 
 Doc changes:
 - Pinned bounds scope + ordering and “exactly once in harness” rule in:

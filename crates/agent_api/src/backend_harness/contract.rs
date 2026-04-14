@@ -1,6 +1,16 @@
-use std::{collections::BTreeMap, future::Future, pin::Pin, time::Duration};
+use std::{
+    collections::BTreeMap,
+    future::Future,
+    pin::Pin,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
+    time::Duration,
+};
 
 use futures_core::Stream;
+use tokio::sync::Notify;
 
 use crate::{
     AgentWrapperCompletion, AgentWrapperError, AgentWrapperEvent, AgentWrapperKind,
@@ -13,6 +23,31 @@ pub(crate) type DynBackendEventStream<E, BE> =
 pub(crate) type DynBackendCompletionFuture<C, BE> =
     Pin<Box<dyn Future<Output = Result<C, BE>> + Send + 'static>>;
 
+#[derive(Clone, Debug, Default)]
+pub(crate) struct EventObservabilitySignal {
+    inner: Arc<EventObservabilitySignalInner>,
+}
+
+#[derive(Debug, Default)]
+struct EventObservabilitySignalInner {
+    done: AtomicBool,
+    notify: Notify,
+}
+
+impl EventObservabilitySignal {
+    pub(crate) fn new() -> Self {
+        Self::default()
+    }
+
+    pub(crate) fn signal(&self) {
+        if self.inner.done.swap(true, Ordering::SeqCst) {
+            return;
+        }
+
+        self.inner.notify.notify_waiters();
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum BackendHarnessErrorPhase {
     Spawn,
@@ -23,6 +58,7 @@ pub(crate) enum BackendHarnessErrorPhase {
 pub(crate) struct BackendSpawn<E, C, BE> {
     pub events: DynBackendEventStream<E, BE>,
     pub completion: DynBackendCompletionFuture<C, BE>,
+    pub events_observability: Option<EventObservabilitySignal>,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -37,6 +73,9 @@ pub(crate) struct NormalizedRequest<P> {
 
     /// Preserved from `AgentWrapperRunRequest` (must be non-empty after trimming).
     pub prompt: String,
+
+    /// Typed handoff for the shared model-selection field after normalization.
+    pub model_id: Option<String>,
 
     /// Preserved from `AgentWrapperRunRequest` (no harness defaulting in v1).
     pub working_dir: Option<std::path::PathBuf>,

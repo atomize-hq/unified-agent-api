@@ -1,4 +1,6 @@
-use std::{collections::BTreeMap, fs, path::PathBuf};
+mod support_paths;
+
+use std::{collections::BTreeMap, fs};
 
 use serde::Deserialize;
 
@@ -14,22 +16,10 @@ struct PrintFlowEntry {
     examples: Vec<String>,
 }
 
-fn repo_root() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .expect("crates/claude_code has repo root parent")
-        .parent()
-        .expect("repo root exists")
-        .to_path_buf()
-}
-
 #[test]
 fn print_flows_manifest_covers_required_flows() {
-    let manifest_path = repo_root()
-        .join("crates")
-        .join("claude_code")
-        .join("examples")
-        .join("print_flows_manifest.json");
+    let examples_dir = support_paths::claude_code_examples_dir();
+    let manifest_path = examples_dir.join("print_flows_manifest.json");
     let bytes = fs::read(&manifest_path)
         .unwrap_or_else(|e| panic!("read {}: {e}", manifest_path.display()));
     let manifest: PrintFlowsManifest = serde_json::from_slice(&bytes)
@@ -67,10 +57,6 @@ fn print_flows_manifest_covers_required_flows() {
         "missing required print-flow examples: {missing:?}"
     );
 
-    let examples_dir = repo_root()
-        .join("crates")
-        .join("claude_code")
-        .join("examples");
     for (id, examples) in map {
         for example in examples {
             let file = examples_dir.join(format!("{example}.rs"));

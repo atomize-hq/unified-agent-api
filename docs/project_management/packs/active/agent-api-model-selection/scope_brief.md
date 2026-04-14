@@ -1,4 +1,14 @@
-# Scope brief — Universal model selection (`agent_api.config.model.v1`)
+---
+pack_id: agent-api-model-selection
+pack_version: v1
+pack_status: extracted
+source_ref: docs/adr/0020-universal-agent-api-model-selection.md
+execution_horizon:
+  active_seam: null
+  next_seam: null
+---
+
+# Scope Brief - Universal model selection (`agent_api.config.model.v1`)
 
 ## Goal
 
@@ -13,10 +23,8 @@ shape, validation posture, capability advertising, and backend mapping so orches
 
 ## Primary users + JTBD
 
-- **Host integrators / orchestrators**: “Select a backend-specific model through one universal request field without
-  importing backend crates or inventing backend-specific branching.”
-- **Backend maintainers**: “Map one shared extension key to each CLI’s existing `--model` surface while keeping
-  validation deterministic and runtime failures safe.”
+- **Host integrators / orchestrators**: "Select a backend-specific model through one universal request field without importing backend crates or inventing backend-specific branching."
+- **Backend maintainers**: "Map one shared extension key to each CLI's existing `--model` surface while keeping validation deterministic and runtime failures safe."
 
 ## In-scope
 
@@ -55,9 +63,9 @@ shape, validation posture, capability advertising, and backend mapping so orches
 - Capability id:
   - `agent_api.config.model.v1`
   - canonical registry entry:
-    `docs/specs/universal-agent-api/capabilities-schema-spec.md` (`agent_api.config.*` bucket; stable capability id)
+    `docs/specs/unified-agent-api/capabilities-schema-spec.md` (`agent_api.config.*` bucket; stable capability id)
   - canonical owner doc for schema/defaults/mapping:
-    `docs/specs/universal-agent-api/extensions-spec.md`
+    `docs/specs/unified-agent-api/extensions-spec.md`
 - Validation responsibilities:
   - R0 allowlist/capability gate occurs before backend-specific parsing,
   - value must be JSON string,
@@ -69,7 +77,7 @@ shape, validation posture, capability advertising, and backend mapping so orches
   - present valid key emits exactly one `--model <trimmed-id>` mapping,
   - the key alone cannot authorize fallback-model or any other side-effectful tuning knobs.
 - Runtime failure handling:
-  - backend-owned “unknown/unavailable/unauthorized model” outcomes remain runtime/backend errors,
+  - backend-owned "unknown/unavailable/unauthorized model" outcomes remain runtime/backend errors,
   - backend/session transports that cannot apply the accepted model id take a pinned safe backend
     rejection path,
   - error messages are safe/redacted,
@@ -100,10 +108,10 @@ shape, validation posture, capability advertising, and backend mapping so orches
 - Invalid requests fail before spawn with stable `InvalidRequest` behavior.
 - Absent requests preserve current backend defaults with no emitted `--model`.
 - Capability publication is owned by SEAM-2: any change that flips built-in advertising for
-  `agent_api.config.model.v1` MUST regenerate `docs/specs/universal-agent-api/capability-matrix.md` via
+  `agent_api.config.model.v1` MUST regenerate `docs/specs/unified-agent-api/capability-matrix.md` via
   `cargo run -p xtask -- capability-matrix` in the same change. Until that implementation change lands, the
   generated matrix may legitimately have no `agent_api.config.model.v1` row; reviewers MUST treat
-  `docs/specs/universal-agent-api/capabilities-schema-spec.md` as the canonical registry anchor and only expect a
+  `docs/specs/unified-agent-api/capabilities-schema-spec.md` as the canonical registry anchor and only expect a
   matrix row in the change set that actually enables built-in advertising.
 - Runtime backend rejection stays backend-owned and safe, without introducing raw stderr leakage or fake universal errors.
 
@@ -122,9 +130,9 @@ shape, validation posture, capability advertising, and backend mapping so orches
   - `crates/codex/src/builder/mod.rs`
   - `crates/claude_code/src/commands/print.rs`
 - Canonical universal contracts:
-  - `docs/specs/universal-agent-api/extensions-spec.md`
-  - `docs/specs/universal-agent-api/contract.md`
-  - `docs/specs/universal-agent-api/run-protocol-spec.md`
+  - `docs/specs/unified-agent-api/extensions-spec.md`
+  - `docs/specs/unified-agent-api/contract.md`
+  - `docs/specs/unified-agent-api/run-protocol-spec.md`
 - Canonical backend mapping contracts:
   - `docs/specs/codex-streaming-exec-contract.md`
   - `docs/specs/codex-app-server-jsonrpc-contract.md`
@@ -183,7 +191,7 @@ shape, validation posture, capability advertising, and backend mapping so orches
 
 ## Assumptions (explicit)
 
-- `docs/specs/universal-agent-api/extensions-spec.md` remains the canonical owner document for
+- `docs/specs/unified-agent-api/extensions-spec.md` remains the canonical owner document for
   `agent_api.config.model.v1`, with ADR-0020 providing rationale and rollout framing.
 - Built-in Codex and Claude Code backends will advertise `agent_api.config.model.v1` unconditionally once the
   implementation lands, because Claude Code can honor the key across its print/session argv flows and Codex has an

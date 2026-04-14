@@ -25,7 +25,7 @@
   - `S1` shared fork selector parser.
   - `S3` SA-C06 typed Codex app-server RPC support.
   - Normative: `docs/specs/codex-app-server-jsonrpc-contract.md` (method shapes + selection algorithm + prompt mapping).
-  - Normative: `docs/specs/universal-agent-api/contract.md` (effective working directory).
+  - Normative: `docs/specs/unified-agent-api/contract.md` (effective working directory).
 - **Verification**:
   - `cargo test -p agent_api --features codex`
 - **Rollout/safety**:

@@ -71,5 +71,5 @@ These cannot both be true without a pinned, concrete definition of the early-sto
 
 ## Notes / follow-ups (out of scope for this remediation)
 
-- The normative run-protocol spec in `docs/specs/universal-agent-api/run-protocol-spec.md` does not explicitly spell out the consumer-drop escape hatch that `run_handle_gate` implements. If you want, I can run a broader contradictions audit against `docs/specs/**` and `docs/adr/**` to verify DR-0012 is consistently specified.
+- The normative run-protocol spec in `docs/specs/unified-agent-api/run-protocol-spec.md` does not explicitly spell out the consumer-drop escape hatch that `run_handle_gate` implements. If you want, I can run a broader contradictions audit against `docs/specs/**` and `docs/adr/**` to verify DR-0012 is consistently specified.
 

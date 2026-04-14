@@ -24,7 +24,7 @@
   - Validation failures occur before spawn (validated by using a nonexistent backend binary path and
     observing `InvalidRequest`, not `Backend` spawn failures).
 - **Dependencies**:
-  - Key schema + contradiction rules: `docs/specs/universal-agent-api/extensions-spec.md` (ES-C01/02/06).
+  - Key schema + contradiction rules: `docs/specs/unified-agent-api/extensions-spec.md` (ES-C01/02/06).
   - Opt-in enablement: SEAM-2 (`allow_external_sandbox_exec`) so the key is supported and validation
     is reachable.
 - **Verification**:
@@ -38,7 +38,7 @@
 - **Outcome**: Codex backend validation is pinned to ES-C01/ES-C02/ES-C06 and proven to fail before
   spawn.
 - **Inputs/outputs**:
-  - Input: `docs/specs/universal-agent-api/extensions-spec.md` (validation rules) + `threading.md`.
+  - Input: `docs/specs/unified-agent-api/extensions-spec.md` (validation rules) + `threading.md`.
   - Output: new integration tests (recommended) under `crates/agent_api/tests/` that exercise
     `CodexBackend::run(...)` and assert:
     - wrong type for `agent_api.exec.external_sandbox.v1` → `InvalidRequest` (pre-spawn),
@@ -69,7 +69,7 @@ Checklist:
 - **Outcome**: Claude Code backend validation is pinned to ES-C01/ES-C02 and proven to fail before
   spawning `claude --print`.
 - **Inputs/outputs**:
-  - Input: `docs/specs/universal-agent-api/extensions-spec.md` (validation rules) + `threading.md`.
+  - Input: `docs/specs/unified-agent-api/extensions-spec.md` (validation rules) + `threading.md`.
   - Output: new integration tests (recommended) under `crates/agent_api/tests/` that exercise
     `ClaudeCodeBackend::run(...)` and assert:
     - wrong type for `agent_api.exec.external_sandbox.v1` → `InvalidRequest` (pre-spawn),

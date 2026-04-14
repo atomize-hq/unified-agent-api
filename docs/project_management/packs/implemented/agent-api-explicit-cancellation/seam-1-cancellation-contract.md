@@ -81,7 +81,7 @@ The existing `AgentWrapperGateway::run(...) -> AgentWrapperRunHandle` remains un
     - the consumer-visible `events` stream has reached finality (unless the consumer opts out by
       dropping `events`, in which case completion MAY resolve after process exit without waiting for
       stream finality).
-  - Canonical: `docs/specs/universal-agent-api/run-protocol-spec.md` (DR-0012 + explicit cancellation
+  - Canonical: `docs/specs/unified-agent-api/run-protocol-spec.md` (DR-0012 + explicit cancellation
     completion gating).
 
 ## Relationship to drop semantics

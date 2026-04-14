@@ -11,7 +11,7 @@
     - preflight failure behavior: fail as `AgentWrapperError::Backend { .. }` before spawning
       `--print` (ES-C07).
     - warning `Status` event message + ordering per
-      `docs/specs/universal-agent-api/extensions-spec.md`.
+      `docs/specs/unified-agent-api/extensions-spec.md`.
   - Out:
     - Codex argv mapping (covered by `S3a`).
     - Codex fork/app-server JSON-RPC mapping (covered by `S3b`).
@@ -26,7 +26,7 @@
   - Warning is emitted before the session handle facet `Status` event.
 - **Dependencies**:
   - `docs/specs/claude-code-session-mapping-contract.md` (ES-C05/ES-C07).
-  - `docs/specs/universal-agent-api/extensions-spec.md` (warning contract).
+  - `docs/specs/unified-agent-api/extensions-spec.md` (warning contract).
   - SEAM-2 opt-in gate (`allow_external_sandbox_exec`) + SEAM-4 Claude mapping implementation.
 - **Verification**:
   - `cargo test -p agent_api claude_code`

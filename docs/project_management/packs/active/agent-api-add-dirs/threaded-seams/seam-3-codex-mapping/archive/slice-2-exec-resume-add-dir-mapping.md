@@ -5,7 +5,7 @@
 - **Scope (in/out)**:
   - In:
     - Thread `policy.add_dirs` into `ExecFlowRequest`.
-    - Use the existing Codex wrapper builder support to emit one repeated `--add-dir <DIR>` pair
+    - Use the existing Codex crate builder support to emit one repeated `--add-dir <DIR>` pair
       per normalized unique directory on fresh exec and resume flows.
     - Preserve order and absence semantics.
     - Keep any accepted `--model <trimmed-id>` pair earlier in argv than the first emitted

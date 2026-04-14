@@ -34,8 +34,8 @@ Buckets (fix strategy):
 - `docs/project_management/packs/active/agent-api-explicit-cancellation/threaded-seams/seam-2-harness-cancel-propagation/slice-1-driver-semantics.md`
 - `docs/project_management/packs/active/agent-api-explicit-cancellation/threaded-seams/seam-4-tests/slice-1-explicit-cancel-integration.md`
 - `docs/project_management/packs/active/agent-api-explicit-cancellation/threaded-seams/seam-4-tests/slice-2-drop-regression.md`
-- `docs/specs/universal-agent-api/capabilities-schema-spec.md`
-- `docs/specs/universal-agent-api/run-protocol-spec.md`
+- `docs/specs/unified-agent-api/capabilities-schema-spec.md`
+- `docs/specs/unified-agent-api/run-protocol-spec.md`
 
 ## Issue-by-issue remediation
 
@@ -48,7 +48,7 @@ Restated requirement:
 
 Evidence used:
 - Canonical explicit cancellation semantics + DR-0012 completion gating:
-  - `docs/specs/universal-agent-api/run-protocol-spec.md` L64-L118
+  - `docs/specs/unified-agent-api/run-protocol-spec.md` L64-L118
 - SEAM-2 driver model and slice acceptance criteria are the pinned pack-level driver contract:
   - `docs/project_management/packs/active/agent-api-explicit-cancellation/seam-2-harness-cancel-propagation.md` L41-L59
   - `docs/project_management/packs/active/agent-api-explicit-cancellation/threaded-seams/seam-2-harness-cancel-propagation/slice-1-driver-semantics.md` L1-L35
@@ -77,7 +77,7 @@ Restated requirement:
 
 Evidence used:
 - DR-0012 defines completion gating in terms of backend process exit + stream finality, making `completion` resolution a usable termination signal for this test contract:
-  - `docs/specs/universal-agent-api/run-protocol-spec.md` L35-L49
+  - `docs/specs/unified-agent-api/run-protocol-spec.md` L35-L49
 - CI currently runs on `ubuntu-latest`:
   - `.github/workflows/ci.yml` L18-L22
 - Existing pinned timeouts already live in the threaded SEAM-4 slice docs:
@@ -109,10 +109,10 @@ Evidence used:
 - Capability matrix generator includes only capability ids advertised by at least one built-in backend (union across built-in backends):
   - `crates/xtask/src/capability_matrix.rs` L26-L43, L53-L60
 - Standard capability ids (including explicit cancellation) are defined canonically in:
-  - `docs/specs/universal-agent-api/capabilities-schema-spec.md` (standard ids registry)
+  - `docs/specs/unified-agent-api/capabilities-schema-spec.md` (standard ids registry)
 
 Changes made:
-- Updated `docs/specs/universal-agent-api/capabilities-schema-spec.md` to add a pinned “Capability matrix (generated artifact)” section that defines:
+- Updated `docs/specs/unified-agent-api/capabilities-schema-spec.md` to add a pinned “Capability matrix (generated artifact)” section that defines:
   - matrix non-exhaustiveness,
   - absence semantics (“absent => no built-in backend currently advertises it”), and
   - the requirement to use `AgentWrapperCapabilities.ids` for runtime availability checks.
@@ -132,10 +132,10 @@ Restated requirement:
 
 Evidence used:
 - The run protocol spec is normative and already pins pre-spawn validation for extensions:
-  - `docs/specs/universal-agent-api/run-protocol-spec.md` (capability validation timing section)
+  - `docs/specs/unified-agent-api/run-protocol-spec.md` (capability validation timing section)
 
 Changes made:
-- Updated `docs/specs/universal-agent-api/run-protocol-spec.md` to define concrete rules:
+- Updated `docs/specs/unified-agent-api/run-protocol-spec.md` to define concrete rules:
   - required capability validation occurs before spawning any backend process (no “where possible”),
   - extension key/value validation occurs before spawn, and
   - post-spawn “unsupported operation” faults require exactly one `Error` event if (and only if) the consumer-visible
@@ -154,7 +154,7 @@ Restated requirement:
 Evidence used:
 - Pinned cancellation message is defined in:
   - `docs/project_management/packs/active/agent-api-explicit-cancellation/seam-1-cancellation-contract.md` L70-L85
-  - `docs/specs/universal-agent-api/run-protocol-spec.md` L104-L118
+  - `docs/specs/unified-agent-api/run-protocol-spec.md` L104-L118
 
 Changes made:
 - Updated `docs/project_management/packs/active/agent-api-explicit-cancellation/decision_register.md` DR-CA-0002 to:
