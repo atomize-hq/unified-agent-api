@@ -35,7 +35,7 @@
   - `crates/agent_api/src/backends/claude_code/tests/capabilities.rs`
   - `crates/agent_api/src/backends/claude_code/tests/mapping.rs`
   - `crates/agent_api/src/backends/claude_code/tests/backend_contract.rs`
-  - `docs/specs/universal-agent-api/capability-matrix.md`
+  - `docs/specs/unified-agent-api/capability-matrix.md`
 - **Verification**:
   - `cargo test -p agent_api backend_harness::normalize`
   - `cargo test -p agent_api codex`

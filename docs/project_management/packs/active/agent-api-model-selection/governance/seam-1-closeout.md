@@ -24,7 +24,7 @@ open_remediations: []
 
 - **Source artifact**: `threaded-seams/seam-1-core-extension-contract/slice-3-seam-exit-gate.md`; verification record: `seam-1-core-extension-contract.md#Verification record`
 - **Landed evidence**: commits `34b0ee9`, `fb2c17d`
-- **Contracts published or changed**: `C-01..C-04` (canonical sources: `docs/specs/universal-agent-api/extensions-spec.md`, `docs/specs/universal-agent-api/capabilities-schema-spec.md`, `docs/specs/universal-agent-api/contract.md`, `docs/specs/universal-agent-api/run-protocol-spec.md`)
+- **Contracts published or changed**: `C-01..C-04` (canonical sources: `docs/specs/unified-agent-api/extensions-spec.md`, `docs/specs/unified-agent-api/capabilities-schema-spec.md`, `docs/specs/unified-agent-api/contract.md`, `docs/specs/unified-agent-api/run-protocol-spec.md`)
 - **Threads published / advanced**: `THR-01` (verification record published with stable refs; cites commits `4255d85` and `34b0ee9`)
 - **Review-surface delta**:
 - **Planned-vs-landed delta**:

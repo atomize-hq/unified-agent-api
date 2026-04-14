@@ -7,9 +7,9 @@ Inputs:
 - Threading (authoritative): `docs/project_management/packs/active/agent-api-model-selection/threading.md`
 - Scope brief: `docs/project_management/packs/active/agent-api-model-selection/scope_brief.md`
 - Canonical specs:
-  - `docs/specs/universal-agent-api/extensions-spec.md`
-  - `docs/specs/universal-agent-api/capabilities-schema-spec.md`
-  - `docs/specs/universal-agent-api/capability-matrix.md`
+  - `docs/specs/unified-agent-api/extensions-spec.md`
+  - `docs/specs/unified-agent-api/capabilities-schema-spec.md`
+  - `docs/specs/unified-agent-api/capability-matrix.md`
 
 ## Seam Brief (Restated)
 
@@ -23,7 +23,7 @@ Inputs:
     - keep R0 allowlist gating ahead of model parsing and preserve the pinned safe InvalidRequest message
     - carry the normalized `Option<String>` through `NormalizedRequest` so backend mapping seams consume typed output only
     - couple built-in backend `supported_extension_keys()` and `capabilities()` posture for `agent_api.config.model.v1`
-    - regenerate `docs/specs/universal-agent-api/capability-matrix.md` in the same change that flips built-in advertising
+    - regenerate `docs/specs/unified-agent-api/capability-matrix.md` in the same change that flips built-in advertising
   - Out:
     - Codex `--model <trimmed-id>` argv wiring and fork runtime rejection behavior
     - Claude Code `--model <trimmed-id>` argv wiring and runtime rejection behavior
@@ -52,7 +52,7 @@ Inputs:
   - `crates/agent_api/src/backends/claude_code/backend.rs`
   - `crates/agent_api/src/backends/claude_code/mod.rs`
   - `crates/agent_api/src/backends/claude_code/harness.rs`
-  - `docs/specs/universal-agent-api/capability-matrix.md`
+  - `docs/specs/unified-agent-api/capability-matrix.md`
 - **Verification**
   - harness unit tests prove absent / non-string / empty-after-trim / oversize-after-trim / trimmed-success cases and preserve the exact safe message `invalid agent_api.config.model.v1`
   - backend capability tests prove `supported_extension_keys()` and `capabilities()` do not drift for the model key
@@ -81,7 +81,7 @@ Inputs:
 - **Contracts produced (owned)**:
   - `MS-C09 — Shared model-normalizer handoff`: produced by S1 in `crates/agent_api/src/backend_harness/normalize.rs` and `crates/agent_api/src/backend_harness/contract.rs`, yielding one typed `Option<String>` handoff on `NormalizedRequest`.
   - `MS-C05 — Built-in advertising contract`: wired by S2 across `supported_extension_keys()` and `capabilities()` so built-in backends expose `agent_api.config.model.v1` only when the flow set has one deterministic v1 outcome.
-  - `MS-C08 — Capability-matrix publication handoff`: completed by S3 via `docs/specs/universal-agent-api/capability-matrix.md` regeneration in the same change as the advertising flip.
+  - `MS-C08 — Capability-matrix publication handoff`: completed by S3 via `docs/specs/unified-agent-api/capability-matrix.md` regeneration in the same change as the advertising flip.
 - **Contracts consumed**:
   - `MS-C01`: S1 uses the canonical key id and trim-first semantics.
   - `MS-C02`: S1 preserves `Ok(None)` absence behavior so downstream mapping omits `--model`.

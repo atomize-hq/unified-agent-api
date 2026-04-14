@@ -36,7 +36,7 @@
 - **Outcome**: One crate-local key constant and one helper implement the pinned v1 trim/bounds/error contract in the harness.
 - **Inputs/outputs**:
   - Input:
-    - `docs/specs/universal-agent-api/extensions-spec.md`
+    - `docs/specs/unified-agent-api/extensions-spec.md`
     - `docs/project_management/packs/active/agent-api-model-selection/threading.md`
   - Output:
     - `crates/agent_api/src/lib.rs` or another single crate-local constant home for `agent_api.config.model.v1`

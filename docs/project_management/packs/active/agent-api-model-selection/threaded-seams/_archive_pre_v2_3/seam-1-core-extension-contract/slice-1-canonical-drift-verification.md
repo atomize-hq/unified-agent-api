@@ -51,7 +51,7 @@ Checklist:
 - **Outcome**: Canonical universal spec files reflect one consistent truth for model-selection semantics before any non-normative sync work proceeds.
 - **Inputs/outputs**:
   - Inputs: mismatch list from S1.T1
-  - Outputs: patches to the affected files in `docs/specs/universal-agent-api/` and, only if required by the mismatch, the inherited baseline docs that define the error/run-lifecycle behavior
+  - Outputs: patches to the affected files in `docs/specs/unified-agent-api/` and, only if required by the mismatch, the inherited baseline docs that define the error/run-lifecycle behavior
 - **Implementation notes**:
   - patch the owner spec first, then the inherited baseline doc only when the mismatch actually lives there
   - do not edit ADR-0020 or pack files in this task; those belong to S2 after canonical truth is settled

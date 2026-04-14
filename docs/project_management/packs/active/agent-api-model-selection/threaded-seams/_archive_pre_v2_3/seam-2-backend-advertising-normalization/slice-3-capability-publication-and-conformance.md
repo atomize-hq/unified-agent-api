@@ -10,7 +10,7 @@
     - backend runtime rejection fixtures and backend-error event assertions
     - argv-order tests for `--model`, `--add-dir`, session selectors, or `--fallback-model`
 - **Acceptance criteria**:
-  - `docs/specs/universal-agent-api/capability-matrix.md` is regenerated in the same change that flips `agent_api.config.model.v1` advertising.
+  - `docs/specs/unified-agent-api/capability-matrix.md` is regenerated in the same change that flips `agent_api.config.model.v1` advertising.
   - The generated matrix posture matches the final built-in `capabilities()` posture for Codex and Claude Code.
   - Merge validation includes a focused review that raw parsing of `agent_api.config.model.v1` still exists only in `crates/agent_api/src/backend_harness/normalize.rs`.
   - SEAM-5 can consume the published matrix and the final capability posture without special-case interpretation.
@@ -33,11 +33,11 @@
 - **Outcome**: The generated matrix publishes the final built-in model-selection posture without drift from runtime capability code.
 - **Inputs/outputs**:
   - Input:
-    - `docs/specs/universal-agent-api/capability-matrix.md`
+    - `docs/specs/unified-agent-api/capability-matrix.md`
     - `crates/agent_api/src/backends/codex/backend.rs`
     - `crates/agent_api/src/backends/claude_code/backend.rs`
   - Output:
-    - `docs/specs/universal-agent-api/capability-matrix.md`
+    - `docs/specs/unified-agent-api/capability-matrix.md`
 - **Implementation notes**:
   - Run `cargo run -p xtask -- capability-matrix` in the same branch/PR that flips built-in advertising.
   - Review the diff specifically for the `agent_api.config.*` bucket and the `agent_api.config.model.v1` row.
@@ -80,7 +80,7 @@ Checklist:
   - Public advertising is enabled only when the downstream mapping evidence is already in the same integration stack.
 - **Test notes**:
   - Suggested validation command:
-    - `rg -n "agent_api\\.config\\.model\\.v1" crates/agent_api/src docs/specs/universal-agent-api`
+    - `rg -n "agent_api\\.config\\.model\\.v1" crates/agent_api/src docs/specs/unified-agent-api`
 - **Risk/rollback notes**:
   - High if skipped: a second parser or early advertising flip would create spec-visible drift.
 

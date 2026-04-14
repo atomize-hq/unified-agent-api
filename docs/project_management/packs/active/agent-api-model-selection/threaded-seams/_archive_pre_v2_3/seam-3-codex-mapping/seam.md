@@ -71,7 +71,7 @@ Implementation note: treat `threading.md` plus the Codex contract docs as author
   - `MS-C09`: shared model-normalizer handoff owned by SEAM-2.
     - Consumed by: `S1.T1` and `S2.T1`; SEAM-3 must consume only the typed `Option<String>` output and must not re-parse raw extensions.
 - **Dependency edges honored**:
-  - `SEAM-1 gates SEAM-3`: this plan assumes the canonical semantics in `docs/specs/universal-agent-api/extensions-spec.md` are already pinned and only implements Codex-side conformance.
+  - `SEAM-1 gates SEAM-3`: this plan assumes the canonical semantics in `docs/specs/unified-agent-api/extensions-spec.md` are already pinned and only implements Codex-side conformance.
   - `SEAM-2 blocks SEAM-3`: `S1` and `S2` explicitly depend on the shared helper output from `crates/agent_api/src/backend_harness/normalize.rs`; no task in this seam adds a second parser.
   - `SEAM-3 blocks SEAM-5B`: `S1`/`S2`/`S3` together provide the final Codex mapping and safe runtime-error behavior that SEAM-5B must assert.
 - **Parallelization notes**:

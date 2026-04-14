@@ -151,11 +151,11 @@ open_remediations: []
 - 2026-04-01 (UTC) - `pass: no unresolved canonical-doc delta`
   - Verifier: Codex seam-execution
   - Compared sources:
-    - `docs/specs/universal-agent-api/extensions-spec.md` (`### agent_api.config.model.v1 (string)`)
-    - `docs/specs/universal-agent-api/capabilities-schema-spec.md` (`- agent_api.config.model.v1:`)
-    - `docs/specs/universal-agent-api/contract.md` (`AgentWrapperError` and `Stable payload rules for core event kinds (v1, normative)`)
-    - `docs/specs/universal-agent-api/run-protocol-spec.md` (`## Capability validation timing` and `Error event emission for post-spawn unsupported operations (backend fault)`)
-    - `docs/adr/0020-universal-agent-api-model-selection.md` (`## Canonical authority + sync workflow`, `### Decision (draft)`, `### Validation and error model`, `### Backend mapping`, and `### Capability advertising`)
+    - `docs/specs/unified-agent-api/extensions-spec.md` (`### agent_api.config.model.v1 (string)`)
+    - `docs/specs/unified-agent-api/capabilities-schema-spec.md` (`- agent_api.config.model.v1:`)
+    - `docs/specs/unified-agent-api/contract.md` (`AgentWrapperError` and `Stable payload rules for core event kinds (v1, normative)`)
+    - `docs/specs/unified-agent-api/run-protocol-spec.md` (`## Capability validation timing` and `Error event emission for post-spawn unsupported operations (backend fault)`)
+    - `docs/adr/0020-unified-agent-api-model-selection.md` (`## Canonical authority + sync workflow`, `### Decision (draft)`, `### Validation and error model`, `### Backend mapping`, and `### Capability advertising`)
     - this pack:
       - `README.md` (`## Canonical authority + sync workflow` and `## Canonical contracts (source of truth)`)
       - `scope_brief.md` (`## Required invariants (must not regress)` and `## Pinned execution decisions`)

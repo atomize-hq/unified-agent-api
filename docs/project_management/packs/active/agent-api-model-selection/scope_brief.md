@@ -2,7 +2,7 @@
 pack_id: agent-api-model-selection
 pack_version: v1
 pack_status: extracted
-source_ref: docs/adr/0020-universal-agent-api-model-selection.md
+source_ref: docs/adr/0020-unified-agent-api-model-selection.md
 execution_horizon:
   active_seam: null
   next_seam: null
@@ -117,7 +117,7 @@ shape, validation posture, capability advertising, and backend mapping so orches
 
 ## Constraints
 
-- Public semantics must stay within the existing universal extension framework and error taxonomy.
+- Public semantics must stay within the existing unified extension framework and error taxonomy.
 - No wrapper-owned model registry or dynamic remote validation is allowed in v1.
 - Existing builder/request APIs in `crates/codex` and `crates/claude_code` MUST be reused rather than bypassed.
 - The implementation must preserve existing run/event lifecycle guarantees when backend rejection happens after stream open.

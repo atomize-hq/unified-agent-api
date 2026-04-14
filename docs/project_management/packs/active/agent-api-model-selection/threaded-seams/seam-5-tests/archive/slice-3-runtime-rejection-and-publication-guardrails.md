@@ -113,7 +113,7 @@ Checklist:
   `agent_api.config.model.v1` advertising changes.
 - **Inputs/outputs**:
   - Input: `MS-C05`, `MS-C08`, the generated artifact
-    `docs/specs/universal-agent-api/capability-matrix.md`, and `cargo run -p xtask -- capability-matrix`.
+    `docs/specs/unified-agent-api/capability-matrix.md`, and `cargo run -p xtask -- capability-matrix`.
   - Output: test or validation coverage that:
     - reruns the generator in the same change that flips advertising,
     - asserts the resulting matrix matches the committed file,
