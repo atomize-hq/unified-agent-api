@@ -419,8 +419,9 @@ async fn short_model_ids_do_not_reclassify_transport_failures_as_runtime_rejecti
 
 #[tokio::test]
 async fn dropping_events_unblocks_buffered_model_runtime_rejection_completion() {
-    let requested_model = "gpt-5-codex";
+    let requested_model = Some("gpt-5-codex");
     let secret = "MODEL_RUNTIME_REJECTION_SECRET_DO_NOT_LEAK";
+    let effective_model = requested_model.unwrap_or("gpt-5-codex-from-config");
 
     let backend = CodexBackend::new(CodexBackendConfig {
         binary: Some(fake_codex_binary()),
@@ -439,7 +440,7 @@ async fn dropping_events_unblocks_buffered_model_runtime_rejection_completion() 
             ),
             (
                 "FAKE_CODEX_EXPECT_MODEL".to_string(),
-                requested_model.to_string(),
+                effective_model.to_string(),
             ),
             (
                 "FAKE_CODEX_MODEL_RUNTIME_REJECTION_SECRET".to_string(),
@@ -466,12 +467,16 @@ async fn dropping_events_unblocks_buffered_model_runtime_rejection_completion() 
     let handle = backend
         .run(AgentWrapperRunRequest {
             prompt: "hello".to_string(),
-            extensions: [(
-                "agent_api.config.model.v1".to_string(),
-                Value::String(requested_model.to_string()),
-            )]
-            .into_iter()
-            .collect(),
+            extensions: requested_model
+                .map(|model| {
+                    [(
+                        "agent_api.config.model.v1".to_string(),
+                        Value::String(model.to_string()),
+                    )]
+                    .into_iter()
+                    .collect()
+                })
+                .unwrap_or_default(),
             ..Default::default()
         })
         .await
@@ -511,7 +516,113 @@ async fn dropping_events_unblocks_buffered_model_runtime_rejection_completion() 
                 "codex backend error: model rejected by runtime (details redacted)"
             );
             assert!(!message.contains(secret));
-            assert!(!message.contains(requested_model));
+            assert!(!message.contains(effective_model));
+        }
+        other => panic!("expected Backend error, got: {other:?}"),
+    }
+}
+
+#[tokio::test]
+async fn dropping_events_unblocks_buffered_config_model_runtime_rejection_completion() {
+    let requested_model = None;
+    let secret = "MODEL_RUNTIME_REJECTION_SECRET_DO_NOT_LEAK";
+    let effective_model = requested_model.unwrap_or("gpt-5-codex-from-config");
+
+    let backend = CodexBackend::new(CodexBackendConfig {
+        binary: Some(fake_codex_binary()),
+        model: Some(effective_model.to_string()),
+        env: [
+            (
+                "FAKE_CODEX_SCENARIO".to_string(),
+                "model_runtime_rejection_after_buffered_events".to_string(),
+            ),
+            (
+                "FAKE_CODEX_EXPECT_SANDBOX".to_string(),
+                "workspace-write".to_string(),
+            ),
+            (
+                "FAKE_CODEX_EXPECT_APPROVAL".to_string(),
+                "never".to_string(),
+            ),
+            (
+                "FAKE_CODEX_EXPECT_MODEL".to_string(),
+                effective_model.to_string(),
+            ),
+            (
+                "FAKE_CODEX_MODEL_RUNTIME_REJECTION_SECRET".to_string(),
+                secret.to_string(),
+            ),
+            (
+                "FAKE_CODEX_BUFFERED_EVENT_COUNT".to_string(),
+                "1024".to_string(),
+            ),
+            (
+                "FAKE_CODEX_BUFFERED_EVENT_PADDING_BYTES".to_string(),
+                "1024".to_string(),
+            ),
+            (
+                "FAKE_CODEX_RUNTIME_REJECTION_EXIT_CODE".to_string(),
+                "0".to_string(),
+            ),
+        ]
+        .into_iter()
+        .collect(),
+        ..Default::default()
+    });
+
+    let handle = backend
+        .run(AgentWrapperRunRequest {
+            prompt: "hello".to_string(),
+            extensions: requested_model
+                .map(|model| {
+                    [(
+                        "agent_api.config.model.v1".to_string(),
+                        Value::String(model.to_string()),
+                    )]
+                    .into_iter()
+                    .collect()
+                })
+                .unwrap_or_default(),
+            ..Default::default()
+        })
+        .await
+        .expect("spawn succeeds");
+
+    let mut events = handle.events;
+    let mut completion = handle.completion;
+
+    let first = tokio::time::timeout(
+        Duration::from_secs(1),
+        std::future::poll_fn(|cx| events.as_mut().poll_next(cx)),
+    )
+    .await
+    .expect("first event arrives");
+    assert!(
+        first.is_some(),
+        "expected at least one live event before drop"
+    );
+
+    assert!(
+        tokio::time::timeout(BACKPRESSURE_ASSERT_TIMEOUT, &mut completion)
+            .await
+            .is_err(),
+        "completion should remain pending while events are still attached"
+    );
+
+    drop(events);
+
+    let err = tokio::time::timeout(Duration::from_secs(2), completion)
+        .await
+        .expect("completion resolves after dropping events")
+        .unwrap_err();
+    match err {
+        AgentWrapperError::Backend { message } => {
+            assert_eq!(
+                message,
+                "codex backend error: model rejected by runtime (details redacted)"
+            );
+            assert!(!message.contains(secret));
+            assert!(!message.contains(effective_model));
         }
         other => panic!("expected Backend error, got: {other:?}"),
     }

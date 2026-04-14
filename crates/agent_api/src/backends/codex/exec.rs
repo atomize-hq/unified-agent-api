@@ -195,7 +195,7 @@ pub(super) async fn spawn_exec_or_resume_flow(
         env,
     } = req;
 
-    let requested_model_id = model_id.clone();
+    let effective_model_id = model_id.clone().or_else(|| config.model.clone());
 
     let mut builder = codex::CodexClient::builder()
         .json(true)
@@ -222,9 +222,7 @@ pub(super) async fn spawn_exec_or_resume_flow(
         builder = builder.codex_home(codex_home.clone());
     }
 
-    if let Some(model) = model_id {
-        builder = builder.model(model);
-    } else if let Some(model) = config.model.as_ref() {
+    if let Some(model) = effective_model_id.as_ref() {
         builder = builder.model(model.clone());
     }
 
@@ -310,9 +308,9 @@ pub(super) async fn spawn_exec_or_resume_flow(
     let (tail_tx, tail_rx) = oneshot::channel::<Option<CodexTailEvent>>();
     let (events_done_tx, events_done_rx) = oneshot::channel::<()>();
     let stream_state_for_completion = Arc::clone(&stream_state);
-    let has_requested_model_id = requested_model_id.is_some();
+    let has_effective_model_id = effective_model_id.is_some();
     let waits_on_event_classification =
-        resume_selector.is_some() || has_add_dirs || has_requested_model_id;
+        resume_selector.is_some() || has_add_dirs || has_effective_model_id;
     let events_observability = waits_on_event_classification.then(EventObservabilitySignal::new);
     let events_observability_for_completion = events_observability.clone();
 
@@ -448,7 +446,7 @@ pub(super) async fn spawn_exec_or_resume_flow(
                         );
 
                     let suppress_model_runtime_rejection =
-                        requested_model_id.as_deref().is_some_and(|_| {
+                        effective_model_id.as_deref().is_some_and(|_| {
                             matches!(
                                 &thread_ev,
                                 ThreadEvent::Error(err)
