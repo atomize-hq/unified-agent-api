@@ -1,49 +1,64 @@
-### S1 — Canonical Drift Verification
+---
+slice_id: S1
+seam_id: SEAM-1
+slice_kind: delivery
+execution_horizon: active
+status: exec-ready
+plan_version: v1
+basis:
+  currentness: current
+  basis_ref: seam.md#basis
+  stale_triggers: []
+gates:
+  pre_exec:
+    review: inherited
+    contract: inherited
+    revalidation: inherited
+  post_exec:
+    landing: pending
+    closeout: pending
+threads:
+  - THR-01
+contracts_produced:
+  - C-01
+  - C-02
+  - C-03
+  - C-04
+contracts_consumed: []
+open_remediations: []
+candidate_subslices: []
+---
+### S1 - Canonical drift verification (C-01..C-04)
 
-- **User/system value**: Prove that the authoritative universal docs still pin one coherent model-selection contract before backend seams build on it.
+- **User/system value**: ensures downstream seams implement against one canonical truth and do not inherit ambiguous or contradictory doc guidance.
 - **Scope (in/out)**:
   - In:
-    - compare canonical docs and inherited baselines against MS-C01 through MS-C04
-    - resolve any mismatch in canonical spec files before touching ADR or pack restatements
-    - rerun the comparison until the result is either a clean pass or an explicitly documented blocking delta
+    - compare canonical owner spec + registry entry + inherited run lifecycle/error baselines
+    - detect any mismatch against ADR/pack restatements
+    - if mismatch exists, update canonical specs first, then sync ADR + pack
   - Out:
-    - updating ADR-0020 or pack files except as evidence inputs
-    - backend code or test changes
+    - backend code changes
 - **Acceptance criteria**:
-  - the comparison covers `extensions-spec.md`, `capabilities-schema-spec.md`, `contract.md`, `run-protocol-spec.md`, ADR-0020 sections named by the seam brief, and the pack restatements
-  - MS-C01 through MS-C04 each resolve to exactly one canonical meaning with no unresolved cross-doc mismatch
-  - if canonical-doc drift exists, the fix lands in the canonical doc set first and the comparison is rerun against the updated text
-- **Dependencies**:
-  - Cross-seam: none
-  - Contracts: owns MS-C01, MS-C02, MS-C03, MS-C04
+  - mismatch-free alignment across the compared sources for v1 semantics (trim/bounds/absence, invalid template, runtime rejection posture)
+  - any drift is resolved with canonical-first edits
+- **Dependencies**: none
 - **Verification**:
-  - manual drift checklist covering capability id/bucket placement, trim-before-validate semantics, trimmed byte bound, absence semantics, exact `invalid agent_api.config.model.v1` template, and backend-owned runtime rejection posture
-  - rerun the checklist after any canonical patch and confirm the final result is ready for publication by S2
-- **Rollout/safety**:
-  - fail closed: do not let downstream seams cite SEAM-1 as satisfied until this slice reaches a clean pass
-  - keep changes doc-scoped inside canonical specs; do not introduce backend implementation decisions here
+  - record a repeatable comparison scope (files + headings)
+  - append a pass/fail entry under `../../seam-1-core-extension-contract.md`
+- **Rollout/safety**: treat unresolved drift as blocking for SEAM-2 and beyond.
 
-#### S1.T1 — Execute the canonical drift checklist
+#### S1.T1 - Run and record the drift comparison
 
-- **Outcome**: A complete comparison matrix for MS-C01 through MS-C04 across the canonical universal docs, ADR, and pack restatements.
-- **Inputs/outputs**:
-  - Inputs: `threading.md`, `seam-1-core-extension-contract.md`, `scope_brief.md`, `README.md`, ADR-0020, and the canonical universal spec files
-  - Outputs: a written verdict for each contract subject stating either "aligned" or the exact mismatch that must be reconciled
-- **Implementation notes**:
-  - treat `docs/specs/**` as authoritative and use ADR/pack text only to detect drift
-  - check the inherited runtime-error/event language in `contract.md` and `run-protocol-spec.md`, not just the extension owner doc
-- **Acceptance criteria**:
-  - every required comparison point from the seam brief verification section has an explicit result
-  - any mismatch is concrete enough to patch without reopening interpretation debates
-- **Test notes**:
-  - verify the comparison includes the exact `InvalidRequest` template and the post-spawn terminal `Error` event rule
-- **Risk/rollback notes**:
-  - if a mismatch cannot be resolved from existing canonical docs, stop this slice as blocked rather than guessing
+- **Outcome**: a clear pass/fail result plus the exact compared sources list.
+- **Thread/contract refs**: `THR-01`, `C-01..C-04`
+- **Acceptance criteria**: record includes date, verifier, compared sources, and pass/fail.
 
 Checklist:
 - Implement: enumerate the comparison points for MS-C01 through MS-C04 and record the alignment result for each source.
 - Test: re-read every cited section to confirm the checklist did not miss capability bucket placement, byte bounds, or runtime rejection wording.
 - Validate: confirm the checklist produces either "no unresolved canonical-doc delta" or a concrete patch list limited to canonical docs.
+- Validate: compared sources list matches the seam brief.
+- Validate: result is recorded under the pack seam brief (`../../seam-1-core-extension-contract.md`).
 - Cleanup: remove any provisional notes that duplicate authoritative text once the final verdict is captured.
 
 #### S1.T2 — Reconcile canonical universal docs if drift is found
@@ -51,7 +66,7 @@ Checklist:
 - **Outcome**: Canonical universal spec files reflect one consistent truth for model-selection semantics before any non-normative sync work proceeds.
 - **Inputs/outputs**:
   - Inputs: mismatch list from S1.T1
-  - Outputs: patches to the affected files in `docs/specs/universal-agent-api/` and, only if required by the mismatch, the inherited baseline docs that define the error/run-lifecycle behavior
+  - Outputs: patches to the affected files in `docs/specs/unified-agent-api/` and, only if required by the mismatch, the inherited baseline docs that define the error/run-lifecycle behavior
 - **Implementation notes**:
   - patch the owner spec first, then the inherited baseline doc only when the mismatch actually lives there
   - do not edit ADR-0020 or pack files in this task; those belong to S2 after canonical truth is settled

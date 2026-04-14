@@ -25,7 +25,7 @@
   - `cargo test -p agent_api claude_code`
 - **Rollout/safety**:
   - Keep this subslice limited to Claude-owned conformance surfaces.
-  - Do not regenerate `docs/specs/universal-agent-api/capability-matrix.md` here.
+  - Do not regenerate `docs/specs/unified-agent-api/capability-matrix.md` here.
 
 #### S2.T3 — Finalize Claude-owned conformance docs and seam-local regression hooks
 

@@ -51,7 +51,7 @@
   - Output (suggested):
     - `crates/agent_api/tests/mcp_management_v1/claude_capabilities.rs`
   - Inputs:
-    - spec: `docs/specs/universal-agent-api/mcp-management-spec.md` (advertising posture table, pinned)
+    - spec: `docs/specs/unified-agent-api/mcp-management-spec.md` (advertising posture table, pinned)
 - **Implementation notes**:
   - Pin the `win32-x64` check as:
     - `cfg!(target_os = "windows") && cfg!(target_arch = "x86_64")`
@@ -90,7 +90,7 @@ Checklist:
     - `crates/agent_api/tests/mcp_management_v1/claude_mapping.rs`
   - Inputs:
     - fake binary: `CARGO_BIN_EXE_fake_claude_mcp_agent_api`
-    - spec: `docs/specs/universal-agent-api/mcp-management-spec.md` (“Claude Code backend mapping (pinned)”)
+    - spec: `docs/specs/unified-agent-api/mcp-management-spec.md` (“Claude Code backend mapping (pinned)”)
 - **Implementation notes**:
   - Always run `mcp_list` mapping assertion (all targets).
   - Gate `mcp_get/add/remove` mapping assertions behind the pinned target check (`win32-x64` only).
@@ -144,7 +144,7 @@ Checklist:
 - **Inputs/outputs**:
   - Output (suggested):
     - `crates/agent_api/tests/mcp_management_v1/live_smoke.rs`
-  - Input: `docs/specs/universal-agent-api/mcp-management-spec.md` (“Integration coverage + gating (pinned)”)
+  - Input: `docs/specs/unified-agent-api/mcp-management-spec.md` (“Integration coverage + gating (pinned)”)
 - **Implementation notes**:
   - Keep smoke tests extremely small:
     - prefer `list/get/add/remove` only,

@@ -46,7 +46,7 @@
 
 - **Outcome**: Deterministic argv composition functions for Claude read ops that do not spawn processes.
 - **Inputs/outputs**:
-  - Input: `docs/specs/universal-agent-api/mcp-management-spec.md` (“Claude Code backend mapping (pinned)”)
+  - Input: `docs/specs/unified-agent-api/mcp-management-spec.md` (“Claude Code backend mapping (pinned)”)
   - Output (suggested):
     - `crates/agent_api/src/backends/claude_code/mcp_management.rs`: `fn claude_mcp_list_argv() -> Vec<OsString>`
     - `crates/agent_api/src/backends/claude_code/mcp_management.rs`: `fn claude_mcp_get_argv(name: &str) -> Vec<OsString>`
@@ -70,7 +70,7 @@ Checklist:
 
 - **Outcome**: A bounded capture helper that retains at most `bound_bytes + 1` bytes (or `bound_bytes` + `saw_more`) per stream.
 - **Inputs/outputs**:
-  - Input: `docs/specs/universal-agent-api/mcp-management-spec.md` (“Output capture + truncation algorithm (pinned)”)
+  - Input: `docs/specs/unified-agent-api/mcp-management-spec.md` (“Output capture + truncation algorithm (pinned)”)
   - Output (suggested):
     - `crates/agent_api/src/backends/claude_code/mcp_management.rs`: `async fn capture_bounded<R: AsyncRead + Unpin>(...) -> ...`
 - **Implementation notes**:
@@ -125,7 +125,7 @@ Checklist:
 - **Outcome**: When a Claude MCP op is invoked but the runtime CLI rejects the pinned argv shape as unsupported on this target
   (manifest drift), return `Err(Backend)` and do not mutate advertised capabilities.
 - **Inputs/outputs**:
-  - Input: `docs/specs/universal-agent-api/mcp-management-spec.md` (“Target availability source of truth (pinned)”)
+  - Input: `docs/specs/unified-agent-api/mcp-management-spec.md` (“Target availability source of truth (pinned)”)
   - Output: a small classifier (location flexible) used by the runner before returning `Ok(output)`.
 - **Implementation notes**:
   - Keep messages safe and non-echoing (do not include raw stderr/stdout in the error).
@@ -175,7 +175,7 @@ Checklist:
 
 - **Outcome**: Deterministic regression tests that prevent drift in `list/get` argv mapping and fail-closed gating behavior.
 - **Inputs/outputs**:
-  - Input: `docs/specs/universal-agent-api/mcp-management-spec.md` (mapping + gating rules)
+  - Input: `docs/specs/unified-agent-api/mcp-management-spec.md` (mapping + gating rules)
   - Output: unit tests under `crates/agent_api/src/backends/claude_code/mcp_management.rs` (or adjacent test module).
 - **Implementation notes**:
   - Pin representative argv for both `list` and `get`.

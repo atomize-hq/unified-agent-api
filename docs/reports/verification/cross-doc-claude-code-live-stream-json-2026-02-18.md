@@ -6,7 +6,7 @@
 
 ## Executive Summary
 
-The planning pack is internally consistent and aligns with ADR-0010 and the Universal Agent API specs, with all referenced artifacts present and cross-references resolving.
+The planning pack is internally consistent and aligns with ADR-0010 and the Unified Agent API specs, with all referenced artifacts present and cross-references resolving.
 
 ## Consistency Score: 100/100
 
@@ -39,9 +39,9 @@ None.
   - `stream-json-print-protocol-spec.md`
   - `platform-parity-spec.md`
   - `C0-spec.md` / `C1-spec.md`
-- ✅ Universal Agent API contract invariants are consistently referenced:
+- ✅ Unified Agent API contract invariants are consistently referenced:
   - capability advertisement (`agent_api.events.live`)
-  - completion gating vs event stream finality (Universal Agent API DR-0012)
+  - completion gating vs event stream finality (Unified Agent API DR-0012)
   - raw backend line prohibition + envelope bounds
 - ✅ CI checkpoint wiring is coherent across `ci_checkpoint_plan.md`, `tasks.json`, and `.github/workflows/claude-code-live-stream-json-smoke.yml`.
 

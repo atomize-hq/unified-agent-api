@@ -1,4 +1,4 @@
-# Kickoff Prompt — C0-code (Codex wrapper per-run env override API)
+# Kickoff Prompt — C0-code (Codex crate per-run env override API)
 
 ## Scope
 - Implement C0 production code only (no tests) per:

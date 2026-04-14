@@ -29,7 +29,7 @@ jobs:
       ASSET: claude
       BIN: ./claude-linux-x64
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
           ref: staging
@@ -117,7 +117,7 @@ jobs:
 
       - name: Create promotion PR
         if: ${{ env.DRY_RUN != 'true' }}
-        uses: peter-evans/create-pull-request@v6
+        uses: peter-evans/create-pull-request@v8
         with:
           token: ${{ secrets.AUTOMATION_TOKEN || secrets.GITHUB_TOKEN }}
           base: staging

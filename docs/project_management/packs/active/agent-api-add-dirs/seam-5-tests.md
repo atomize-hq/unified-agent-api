@@ -69,7 +69,7 @@
   - **Inputs**:
     - built-in backend capability ids after implementation
   - **Outputs**:
-    - `docs/specs/universal-agent-api/capability-matrix.md` is regenerated and includes
+    - `docs/specs/unified-agent-api/capability-matrix.md` is regenerated and includes
       `agent_api.exec.add_dirs.v1` for both built-in backends
 
 ## Key invariants / rules

@@ -17,7 +17,7 @@
         - treat `id` as the source thread id (validated pre-spawn; whitespace-only fails).
         - unknown id → selection-failure pinned error (`"session not found"`), translated safely.
       - fork via `thread/fork` and send the prompt via `turn/start` on the forked thread.
-    - Map app-server notifications into Universal Agent API events (pinned minimum, no raw payloads in `data`):
+    - Map app-server notifications into Unified Agent API events (pinned minimum, no raw payloads in `data`):
       - `agentMessage/delta` and `reasoning/text/delta` → `TextOutput`,
       - `item/started` → `ToolCall` (metadata-only),
       - `item/completed` → `ToolResult` (metadata-only),
@@ -48,10 +48,10 @@
 - **Dependencies**:
   - `S1` shared fork selector parser.
   - `S3` SA-C06 typed Codex app-server RPC support.
-  - Normative: `docs/specs/universal-agent-api/extensions-spec.md` (schema + selection failures + R0 precedence + contradiction rules).
+  - Normative: `docs/specs/unified-agent-api/extensions-spec.md` (schema + selection failures + R0 precedence + contradiction rules).
   - Normative: `docs/specs/codex-app-server-jsonrpc-contract.md` (RPC shapes + selection algorithm + non-interactive fail-fast + notification mapping).
-  - Normative: `docs/specs/universal-agent-api/run-protocol-spec.md` (validation timing + cancellation semantics/precedence).
-  - Normative: `docs/specs/universal-agent-api/event-envelope-schema-spec.md` (bounds + redaction rules).
+  - Normative: `docs/specs/unified-agent-api/run-protocol-spec.md` (validation timing + cancellation semantics/precedence).
+  - Normative: `docs/specs/unified-agent-api/event-envelope-schema-spec.md` (bounds + redaction rules).
 - **Verification**:
   - `cargo test -p agent_api --features codex`
 - **Rollout/safety**:
@@ -106,7 +106,7 @@ Checklist:
 
 #### S4.T3 — Implement bounded notification → `AgentWrapperEvent` mapping (no raw payloads in `data`)
 
-- **Outcome**: App-server notifications are surfaced to callers as bounded Universal Agent API events without leaking raw backend payloads.
+- **Outcome**: App-server notifications are surfaced to callers as bounded Unified Agent API events without leaking raw backend payloads.
 - **Inputs/outputs**:
   - Inputs: JSON-RPC notification method + params.
   - Outputs: `AgentWrapperEvent` stream items:
@@ -150,7 +150,7 @@ Checklist:
 
 #### S4.T5 — Selection-failure translation (pinned messages + terminal `Error` event rule)
 
-- **Outcome**: Fork selection failures are translated into pinned safe Universal Agent API errors.
+- **Outcome**: Fork selection failures are translated into pinned safe Unified Agent API errors.
 - **Inputs/outputs**:
   - Inputs: selector `"last"`/`"id"`, thread/list result, app-server errors.
   - Outputs:

@@ -22,7 +22,7 @@
   - The harness allowlist (`supported_extension_keys()`) and capability advertising remain aligned.
 - **Dependencies**:
   - Contracts: `ES-C01` (key id) from SEAM-1; `ES-C03` (safe default advertising) owned by this seam.
-  - Docs: `docs/specs/universal-agent-api/contract.md` “Dangerous capability opt-in ...” section.
+  - Docs: `docs/specs/unified-agent-api/contract.md` “Dangerous capability opt-in ...” section.
 - **Verification**:
   - Unit tests in `crates/agent_api/src/backends/claude_code/tests.rs`.
   - Optional integration check: run `cargo run -p xtask -- capability-matrix` and confirm the
@@ -37,7 +37,7 @@
   fail-closed behavior is preserved by default.
 - **Inputs/outputs**:
   - Input: SEAM-2 brief + threading ES-C03; canonical config contract in
-    `docs/specs/universal-agent-api/contract.md`.
+    `docs/specs/unified-agent-api/contract.md`.
   - Output: code changes in `crates/agent_api/src/backends/claude_code.rs`:
     - add `allow_external_sandbox_exec: bool` to `ClaudeCodeBackendConfig`,
     - gate `capabilities().ids` insertion of `agent_api.exec.external_sandbox.v1`,

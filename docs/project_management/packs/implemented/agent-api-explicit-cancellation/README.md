@@ -7,9 +7,9 @@ API to `agent_api` runs without undermining the existing drain-on-drop safety po
 
 ## Canonical contracts (source of truth)
 
-- Universal Agent API contract (public Rust surface): `docs/specs/universal-agent-api/contract.md`
-- Run protocol semantics (DR-0012 + explicit cancellation): `docs/specs/universal-agent-api/run-protocol-spec.md`
-- Capability id definition (`agent_api.control.cancel.v1`): `docs/specs/universal-agent-api/capabilities-schema-spec.md`
+- Unified Agent API contract (public Rust surface): `docs/specs/unified-agent-api/contract.md`
+- Run protocol semantics (DR-0012 + explicit cancellation): `docs/specs/unified-agent-api/run-protocol-spec.md`
+- Capability id definition (`agent_api.control.cancel.v1`): `docs/specs/unified-agent-api/capabilities-schema-spec.md`
 
 ## Rollout / current support
 
@@ -26,5 +26,5 @@ As of **2026-02-24** (this pack’s start date):
   - built-in backend adoption + termination hooks + verification coverage.
 
 **Source of truth for per-backend support**:
-- `docs/specs/universal-agent-api/capability-matrix.md` (generated). If a capability id is absent,
+- `docs/specs/unified-agent-api/capability-matrix.md` (generated). If a capability id is absent,
   it is not advertised by any built-in backend.

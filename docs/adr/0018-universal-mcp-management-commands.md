@@ -25,11 +25,11 @@ This ADR explicitly covers **non-run** operations: these are CLI subcommands, no
 
 - Backlog:
   - `docs/backlog.json` (`uaa-0006`)
-- Universal Agent API baselines:
-  - `docs/adr/0009-universal-agent-api.md`
-  - `docs/specs/universal-agent-api/contract.md`
-  - `docs/specs/universal-agent-api/capabilities-schema-spec.md`
-  - `docs/specs/universal-agent-api/extensions-spec.md` (non-goal: do not model this via run extensions)
+- Unified Agent API baselines:
+  - `docs/adr/0009-unified-agent-api.md`
+  - `docs/specs/unified-agent-api/contract.md`
+  - `docs/specs/unified-agent-api/capabilities-schema-spec.md`
+  - `docs/specs/unified-agent-api/extensions-spec.md` (non-goal: do not model this via run extensions)
 - CLI inventory inputs:
   - `cli_manifests/codex/current.json` (`codex mcp ...`)
   - `cli_manifests/claude_code/current.json` (`claude mcp ...`)
@@ -82,7 +82,7 @@ Both primary backends expose MCP management subcommands:
 - Codex: `codex mcp {add,get,list,remove,login,logout}`
 
 Our wrapper crates (`crates/codex`, `crates/claude_code`) already expose these subcommands, but
-consumers of the **Universal Agent API** currently have no unified way to:
+consumers of the **Unified Agent API** currently have no unified way to:
 
 1) list configured MCP servers,
 2) inspect a server config,
@@ -98,7 +98,7 @@ without writing backend-specific glue code.
 - Preserve backend autonomy:
   - universalize only what is truly common,
   - keep backend-specific MCP features behind backend-scoped capabilities and APIs.
-- Maintain Universal Agent API posture:
+- Maintain Unified Agent API posture:
   - fail-closed on unsupported operations,
   - explicit dangerous operations,
   - bounded outputs (avoid unbounded memory use).
@@ -122,7 +122,7 @@ Define a dedicated MCP management API surface in `crates/agent_api` that is **se
   `UnsupportedCapability`), mirroring the `run_control` pattern.
 
 The API is pinned in:
-- `docs/specs/universal-agent-api/mcp-management-spec.md` (draft, normative language)
+- `docs/specs/unified-agent-api/mcp-management-spec.md` (draft, normative language)
 
 ## Capability Gating (draft)
 
@@ -167,7 +167,7 @@ Notes:
   least-common-denominator schema; backend-specific enhancements remain backend-scoped.
 - The pinned argv construction contract for built-in backends (including Codex `--json` usage and Claude `--transport`
   usage) lives in the canonical MCP spec:
-  - `docs/specs/universal-agent-api/mcp-management-spec.md` → “Built-in backend behavior” → “Built-in backend mappings (pinned)”
+  - `docs/specs/unified-agent-api/mcp-management-spec.md` → “Built-in backend behavior” → “Built-in backend mappings (pinned)”
 - For v1, Claude URL `bearer_token_env_var` mapping is rejected (fail closed); see the pinned MCP spec.
 
 ## Alternatives Considered

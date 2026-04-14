@@ -11,7 +11,7 @@
     - Backend-specific argv mapping tests (S2/S3).
     - Any tests requiring a real networked MCP server.
 - **Acceptance criteria**:
-  - Advertising assertions match `docs/specs/universal-agent-api/mcp-management-spec.md` table:
+  - Advertising assertions match `docs/specs/unified-agent-api/mcp-management-spec.md` table:
     - Codex: `list/get` by default; `add/remove` only with `CodexBackendConfig.allow_mcp_write=true`.
     - Claude: `list` by default; `get` only on `win32-x64`; `add/remove` only on `win32-x64`
       and with `ClaudeCodeBackendConfig.allow_mcp_write=true`.
@@ -23,7 +23,7 @@
 - **Dependencies**:
   - SEAM-1 capability ids + gateway error type (`UnsupportedCapability`) (MM-C01/MM-C02).
   - SEAM-2 advertising + `allow_mcp_write` + isolated-home fields (MM-C06/MM-C07).
-  - Canonical spec: `docs/specs/universal-agent-api/mcp-management-spec.md`.
+  - Canonical spec: `docs/specs/unified-agent-api/mcp-management-spec.md`.
 - **Verification**:
   - `cargo test -p agent_api --all-features --test c5_mcp_management_v1 -- --nocapture`
 - **Rollout/safety**:

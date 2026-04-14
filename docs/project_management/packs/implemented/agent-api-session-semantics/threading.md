@@ -1,4 +1,4 @@
-# Threading — Universal Agent API session semantics (ADR-0015 + ADR-0017)
+# Threading — Unified Agent API session semantics (ADR-0015 + ADR-0017)
 
 This section makes coupling explicit: contracts/interfaces, dependency edges, critical paths, and conflict-safe workstreams.
 
@@ -20,7 +20,7 @@ This section makes coupling explicit: contracts/interfaces, dependency edges, cr
   - **Definition**: When a backend advertises `agent_api.session.handle.v1`, it emits:
     - exactly one early `Status` event whose `data` is the handle facet, and
     - `completion.data` containing the handle facet when a completion is produced and the id is known,
-    per `docs/specs/universal-agent-api/event-envelope-schema-spec.md`.
+    per `docs/specs/unified-agent-api/event-envelope-schema-spec.md`.
   - **Additional pinned rules** (restated for pack/test determinism):
     - `session.id` MUST be non-empty after trimming (whitespace-only ids are treated as “not known” and MUST NOT be emitted).
     - Oversize ids (`len(session.id) > 1024` bytes) MUST be omitted (MUST NOT truncate).
@@ -30,22 +30,22 @@ This section makes coupling explicit: contracts/interfaces, dependency edges, cr
   - **Type**: config/schema (core extension key)
   - **Owner seam**: SEAM-3
   - **Consumers (seams)**: external orchestrators
-  - **Definition**: `agent_api.session.resume.v1` object with selector `"last"` or `"id"` (closed schema), validated pre-spawn and mapped to backend resume surfaces per `docs/specs/universal-agent-api/extensions-spec.md`.
+  - **Definition**: `agent_api.session.resume.v1` object with selector `"last"` or `"id"` (closed schema), validated pre-spawn and mapped to backend resume surfaces per `docs/specs/unified-agent-api/extensions-spec.md`.
   - **Versioning/compat**: closed `.v1` schema; new semantics require a new versioned key.
 
 - **Contract ID**: `SA-C04 fork extension key (fork.v1)`
   - **Type**: config/schema (core extension key)
   - **Owner seam**: SEAM-4
   - **Consumers (seams)**: external orchestrators
-  - **Definition**: `agent_api.session.fork.v1` object with selector `"last"` or `"id"` (closed schema), validated pre-spawn and mapped to backend fork surfaces per `docs/specs/universal-agent-api/extensions-spec.md`.
+  - **Definition**: `agent_api.session.fork.v1` object with selector `"last"` or `"id"` (closed schema), validated pre-spawn and mapped to backend fork surfaces per `docs/specs/unified-agent-api/extensions-spec.md`.
   - **Versioning/compat**: closed `.v1` schema; new semantics require a new versioned key.
 
 - **Contract ID**: `SA-C05 codex streaming resume (control + env overrides)`
   - **Type**: API (wrapper/library surface)
   - **Owner seam**: SEAM-3
   - **Consumers (seams)**: SEAM-3 (Codex `agent_api` backend mapping)
-  - **Definition**: `agent_api` MUST use a pinned, control-capable Codex wrapper entrypoint for
-    `codex exec resume` that preserves the invariants needed by the Universal Agent API:
+  - **Definition**: `agent_api` MUST use a pinned, control-capable Codex crate entrypoint for
+    `codex exec resume` that preserves the invariants needed by the Unified Agent API:
     - API shape (pinned):
       - `codex::CodexClient::stream_resume_with_env_overrides_control(request: codex::ResumeRequest, env_overrides: &BTreeMap<String, String>) -> Result<codex::ExecStreamControl, codex::ExecStreamError>`
       - `ExecStreamControl.termination` MUST always be present for this entrypoint.
@@ -56,9 +56,9 @@ This section makes coupling explicit: contracts/interfaces, dependency edges, cr
       - Wrapper streaming/default flags (e.g., `--skip-git-repo-check`, `--color <MODE>`, `--output-last-message <PATH>`) MUST be present for streaming resume; tests MUST NOT treat the forms above as the complete argv (see `docs/specs/codex-wrapper-coverage-scenarios-v1.md`, Scenarios 2–3).
       - stdin MUST receive the follow-up prompt (newline-terminated) and then be closed.
     - Env overrides (pinned):
-      - `AgentWrapperRunRequest.env` MUST be applied as per-run env overrides on top of backend config env (request keys win; owned by `docs/specs/universal-agent-api/contract.md`).
+      - `AgentWrapperRunRequest.env` MUST be applied as per-run env overrides on top of backend config env (request keys win; owned by `docs/specs/unified-agent-api/contract.md`).
     - Termination + timeout semantics (pinned):
-      - MUST satisfy `docs/specs/codex-streaming-exec-contract.md` and the universal cancellation semantics in `docs/specs/universal-agent-api/run-protocol-spec.md`.
+      - MUST satisfy `docs/specs/codex-streaming-exec-contract.md` and the universal cancellation semantics in `docs/specs/unified-agent-api/run-protocol-spec.md`.
   - **Versioning/compat**: internal; keep behavior parity with exec where possible.
 
 - **Contract ID**: `SA-C06 codex app-server fork RPC surface`
@@ -72,7 +72,7 @@ This section makes coupling explicit: contracts/interfaces, dependency edges, cr
       - `thread/fork` (fork source thread → new thread id).
       - `turn/start` (follow-up prompt on the forked thread) using the pinned prompt → `input[]` mapping.
     - Notifications (pinned minimum):
-      - MUST be mapped into `AgentWrapperEvent` kinds/fields per the app-server contract while preserving Universal Agent API safety/bounds posture (no raw backend payload embedding in `data`).
+      - MUST be mapped into `AgentWrapperEvent` kinds/fields per the app-server contract while preserving Unified Agent API safety/bounds posture (no raw backend payload embedding in `data`).
     - Cancellation (pinned):
       - MUST use `$/cancelRequest` for in-flight `turn/start` requests and enforce universal cancellation precedence (`run-protocol-spec.md`).
   - **Versioning/compat**: pinned to the app-server wire schema emitted by the Codex CLI under test; this repo’s tests treat the contract doc as authoritative.
@@ -115,4 +115,4 @@ Because SEAM-2/3/4 all touch `crates/agent_api/src/backends/{codex,claude_code}.
   - `crates/codex/src/mcp/tests_core/**`
   - `crates/agent_api/src/backends/codex.rs` (minimal wiring preferred; isolate logic in a new module if possible)
   - `crates/agent_api/tests/**`
-- **WS-INT (Integration)**: lands WS-A, then merges WS-B/WS-C, then WS-D; runs the full suite and verifies behavior matches the canonical specs. After advertising new session capability ids, regenerate and commit the capability matrix (`cargo run -p xtask -- capability-matrix` → `docs/specs/universal-agent-api/capability-matrix.md`).
+- **WS-INT (Integration)**: lands WS-A, then merges WS-B/WS-C, then WS-D; runs the full suite and verifies behavior matches the canonical specs. After advertising new session capability ids, regenerate and commit the capability matrix (`cargo run -p xtask -- capability-matrix` → `docs/specs/unified-agent-api/capability-matrix.md`).

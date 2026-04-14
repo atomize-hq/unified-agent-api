@@ -238,7 +238,7 @@ Use START/END entries only. Include UTC timestamp, agent role, task ID, commands
 - Commits: `3c1dc03` (`fix(ci): clippy hygiene + rg fallback`)
 - Commands run:
   - `make preflight` (PASS, local)
-  - `gh workflow run .github/workflows/claude-code-live-stream-json-smoke.yml --ref feat/claude-code-live-stream-json` → run `22159285860` (PASS) `https://github.com/atomize-hq/agent-wrappers/actions/runs/22159285860`
+  - `gh workflow run .github/workflows/claude-code-live-stream-json-smoke.yml --ref feat/claude-code-live-stream-json` → run `22159285860` (PASS) `https://github.com/atomize-hq/unified-agent-api/actions/runs/22159285860`
     - Public API guard (ubuntu): PASS
     - Smoke: ubuntu PASS, macOS PASS, windows PASS
     - Preflight (ubuntu): PASS

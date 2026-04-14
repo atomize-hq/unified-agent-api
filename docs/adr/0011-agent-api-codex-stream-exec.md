@@ -35,12 +35,12 @@
     - `docs/project_management/packs/active/agent-api-codex-stream-exec/smoke/windows-smoke.ps1`
   - Quality gate report: `docs/project_management/packs/active/agent-api-codex-stream-exec/quality_gate_report.md`
 - Baseline universal contract:
-  - `docs/adr/0009-universal-agent-api.md`
-  - `docs/specs/universal-agent-api/contract.md`
-  - `docs/specs/universal-agent-api/run-protocol-spec.md`
-  - `docs/specs/universal-agent-api/event-envelope-schema-spec.md`
-  - `docs/specs/universal-agent-api/capabilities-schema-spec.md`
-  - `docs/specs/universal-agent-api/extensions-spec.md`
+  - `docs/adr/0009-unified-agent-api.md`
+  - `docs/specs/unified-agent-api/contract.md`
+  - `docs/specs/unified-agent-api/run-protocol-spec.md`
+  - `docs/specs/unified-agent-api/event-envelope-schema-spec.md`
+  - `docs/specs/unified-agent-api/capabilities-schema-spec.md`
+  - `docs/specs/unified-agent-api/extensions-spec.md`
 - Codex JSONL parsing contract (offline parsing; reused by streaming):
   - `docs/adr/0005-codex-jsonl-log-parser-api.md`
   - `docs/specs/codex-thread-event-jsonl-parser-contract.md`
@@ -51,7 +51,7 @@
   - `docs/adr/0010-claude-code-live-stream-json.md`
 - Current Codex universal backend implementation (to be refactored):
   - `crates/agent_api/src/backends/codex.rs#L221`
-- Codex wrapper streaming API (to be used by `agent_api`):
+- Codex crate streaming API (to be used by `agent_api`):
   - `crates/codex/src/exec.rs#L63`
 
 ## Executive Summary (Operator)
@@ -62,7 +62,7 @@ ADR_BODY_SHA256: 16d5a34efc82f12f49584da22bd4a8544afe795ac7cf5514fcfc922bcfb3f8c
 - Codex backend streaming parity in `agent_api`
   - Existing: `agent_api`’s Codex backend spawns `codex exec --json` directly and performs its own
     stdout ingestion loop using `tokio` + `BufReader(...).lines()` and `codex::JsonlThreadEventParser`.
-  - New: `agent_api`’s Codex backend uses the Codex wrapper crate’s streaming API
+  - New: `agent_api`’s Codex backend uses the Codex crate’s streaming API
     (`codex::CodexClient::stream_exec`) to obtain a typed event stream (`ThreadEvent`) plus a
     completion future, and then maps those typed events into the universal event envelope
     (`AgentWrapperEvent`) live.
@@ -72,9 +72,9 @@ ADR_BODY_SHA256: 16d5a34efc82f12f49584da22bd4a8544afe795ac7cf5514fcfc922bcfb3f8c
     maps typed events into the universal envelope.
   - Links:
     - Current manual spawn + ingestion: `crates/agent_api/src/backends/codex.rs#L221`
-    - Codex wrapper streaming API: `crates/codex/src/exec.rs#L63`
+    - Codex crate streaming API: `crates/codex/src/exec.rs#L63`
     - Claude wrapper streaming API (parity reference): `crates/claude_code/src/client/mod.rs#L156`
-    - Universal run/stream finality rule (DR-0012): `docs/specs/universal-agent-api/run-protocol-spec.md`
+    - Universal run/stream finality rule (DR-0012): `docs/specs/unified-agent-api/run-protocol-spec.md`
 
 ## Problem / Context
 
@@ -86,7 +86,7 @@ ADR_BODY_SHA256: 16d5a34efc82f12f49584da22bd4a8544afe795ac7cf5514fcfc922bcfb3f8c
 - This shape mismatch undermines the “orthogonal wrapper onboarding” goal:
   - Adding a future agent is slower if `agent_api` must reimplement process management and
     per-line parsing logic per backend rather than consuming a wrapper-provided streaming handle.
-- The Codex wrapper crate already defines the intended streaming surface (`CodexClient::stream_exec`)
+- The Codex crate already defines the intended streaming surface (`CodexClient::stream_exec`)
   that produces typed events and a completion future, but `agent_api` is not using it.
 
 ## Goals
@@ -137,7 +137,7 @@ This ADR changes implementation shape but preserves the public Rust contract of 
   - failures to start/stream MUST surface as `AgentWrapperError::Backend { message }` with
     redacted, bounded error messages.
 - Redaction requirement (normative):
-  - When the Codex wrapper reports parsing/normalization errors, `agent_api` MUST NOT embed the raw
+  - When the Codex crate reports parsing/normalization errors, `agent_api` MUST NOT embed the raw
     JSONL line in `AgentWrapperEvent.message` or `AgentWrapperError::Backend.message`.
 
 ### Config (`agent_api::backends::codex::CodexBackendConfig`)
@@ -149,7 +149,7 @@ This ADR changes implementation shape but preserves the public Rust contract of 
 
 ### Platform guarantees
 - Linux/macOS/Windows MUST be supported (GitHub-hosted runner parity is required; see ADR 0009’s
-  platform parity planning under `docs/project_management/next/universal-agent-api/platform-parity-spec.md`).
+  platform parity planning under `docs/project_management/next/unified-agent-api/platform-parity-spec.md`).
 - Tests MUST NOT require a real Codex binary on CI runners (fixture/fake-binary strategy only).
 
 ## Architecture Shape
@@ -178,7 +178,7 @@ This ADR changes implementation shape but preserves the public Rust contract of 
   - merged working_dir/timeout/env (request overrides config)
   - a per-run `CodexClient` configured for JSON streaming
 - Actions:
-  - spawn `codex exec --json ...` via the Codex wrapper crate
+  - spawn `codex exec --json ...` via the Codex crate
   - stream typed `ThreadEvent` values
   - map → bound → emit `AgentWrapperEvent`s
   - await wrapper completion; resolve universal completion only after event stream termination
@@ -188,7 +188,7 @@ This ADR changes implementation shape but preserves the public Rust contract of 
 ## Dependencies
 
 Prerequisites:
-  - `docs/adr/0009-universal-agent-api.md` implemented (baseline universal contract exists).
+  - `docs/adr/0009-unified-agent-api.md` implemented (baseline universal contract exists).
   - `crates/codex` streaming API exists (`CodexClient::stream_exec`).
 Integration dependency notes:
   - If `crates/codex` requires additive API to support per-run env overrides, that change MUST land
@@ -235,7 +235,7 @@ Integration dependency notes:
 
 ## Decision Summary
 - This ADR records a single mandated architectural direction: the universal Codex backend MUST
-  consume the Codex wrapper crate’s streaming surface (`CodexClient::stream_exec`) rather than
+  consume the Codex crate’s streaming surface (`CodexClient::stream_exec`) rather than
   reimplement process + ingestion logic directly in `agent_api`.
 - Execution-readiness A/B decisions (exec policy, redaction mapping, env override strategy, and
   `final_text` policy) are tracked in the feature pack’s decision register:

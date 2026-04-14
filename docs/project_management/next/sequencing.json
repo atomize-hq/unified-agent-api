@@ -185,22 +185,22 @@
     {
       "id": "universal_agent_api",
       "name": "UNIVERSAL_AGENT_API",
-      "source": "docs/adr/0009-universal-agent-api.md",
+      "source": "docs/adr/0009-unified-agent-api.md",
       "phases": [
         {
           "id": "C0",
           "name": "Core universal API crate",
-          "spec": "docs/project_management/next/universal-agent-api/C0-spec.md"
+          "spec": "docs/project_management/next/unified-agent-api/C0-spec.md"
         },
         {
           "id": "C1",
           "name": "Codex backend adapter",
-          "spec": "docs/project_management/next/universal-agent-api/C1-spec.md"
+          "spec": "docs/project_management/next/unified-agent-api/C1-spec.md"
         },
         {
           "id": "C2",
           "name": "Claude Code backend adapter",
-          "spec": "docs/project_management/next/universal-agent-api/C2-spec.md"
+          "spec": "docs/project_management/next/unified-agent-api/C2-spec.md"
         }
       ]
     },

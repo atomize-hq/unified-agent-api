@@ -8,7 +8,7 @@
 ## Scope
 
 - In:
-  - Add the key to the normative core registry in `docs/specs/universal-agent-api/extensions-spec.md`.
+  - Add the key to the normative core registry in `docs/specs/unified-agent-api/extensions-spec.md`.
   - Define:
     - schema (boolean),
     - default/absence semantics,
@@ -23,7 +23,7 @@
 
 - **Extension key**: `agent_api.exec.external_sandbox.v1`
   - **Type**: boolean
-  - **Default when absent**: `false` (per `docs/specs/universal-agent-api/extensions-spec.md`)
+  - **Default when absent**: `false` (per `docs/specs/unified-agent-api/extensions-spec.md`)
   - **Meaning**: when `true`, the host asserts it provides isolation externally and requests the
     backend relax internal guardrails accordingly.
   - **Validation**: MUST be validated before spawn; non-boolean values fail with
@@ -44,7 +44,7 @@
   - it MUST remain capability-gated,
   - and it MUST remain non-interactive (no hangs on prompts).
 - Observability / audit signal (v1, pinned; canonical):
-  - See `docs/specs/universal-agent-api/extensions-spec.md` under
+  - See `docs/specs/unified-agent-api/extensions-spec.md` under
     `agent_api.exec.external_sandbox.v1` for the required `Status` warning event and emission timing.
 
 ## Dependencies
@@ -54,7 +54,7 @@
 
 ## Touch surface
 
-- `docs/specs/universal-agent-api/extensions-spec.md`
+- `docs/specs/unified-agent-api/extensions-spec.md`
 
 ## Verification
 

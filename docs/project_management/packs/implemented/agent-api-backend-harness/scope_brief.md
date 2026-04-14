@@ -23,27 +23,27 @@
   - Must keep safety posture: fail-closed unknown extension keys; bounds enforcement; avoid raw backend line leakage in errors/events.
 - **Canonical dependencies (authoritative anchors)**:
   - Universal contract (public API + core type shapes):
-    - `docs/specs/universal-agent-api/contract.md` (“Public API (v1, normative)”)
+    - `docs/specs/unified-agent-api/contract.md` (“Public API (v1, normative)”)
   - DR-0012 completion finality:
-    - `docs/specs/universal-agent-api/run-protocol-spec.md` (“Relationship between `completion` and the event stream (v1, normative)”)
+    - `docs/specs/unified-agent-api/run-protocol-spec.md` (“Relationship between `completion` and the event stream (v1, normative)”)
     - Implementation anchor (existing): `crates/agent_api/src/run_handle_gate.rs`
   - Fail-closed extension key validation timing + error shape:
-    - `docs/specs/universal-agent-api/extensions-spec.md` (“R0 — Fail-closed capability gating”)
+    - `docs/specs/unified-agent-api/extensions-spec.md` (“R0 — Fail-closed capability gating”)
   - Event envelope bounds + raw-line prohibition:
-    - `docs/specs/universal-agent-api/event-envelope-schema-spec.md` (“Constraints” + “Enforcement behavior (v1, normative)”)
+    - `docs/specs/unified-agent-api/event-envelope-schema-spec.md` (“Constraints” + “Enforcement behavior (v1, normative)”)
     - Implementation anchor (existing): `crates/agent_api/src/bounds.rs`
   - Agent kind naming rules (lower_snake_case ids):
-    - `docs/specs/universal-agent-api/capabilities-schema-spec.md` (“Agent kind naming (normative)”)
+    - `docs/specs/unified-agent-api/capabilities-schema-spec.md` (“Agent kind naming (normative)”)
   - Harness intent / “no behavior change” guardrail:
     - `docs/adr/0013-agent-api-backend-harness.md` (“User Contract (Authoritative)” + “Validation Plan (Authoritative)”)
 
 - **Conflict resolution rule (pinned)**:
-  - If this pack drifts from a document under `docs/specs/universal-agent-api/`, the spec wins.
+  - If this pack drifts from a document under `docs/specs/unified-agent-api/`, the spec wins.
   - This pack MUST be updated to match the spec before implementation proceeds.
 - **External systems / dependencies**:
   - Wrapper crates: `crates/codex`, `crates/claude_code`.
   - Runtime: Tokio + async stream plumbing already used in backends.
-  - Normative docs: `docs/specs/universal-agent-api/*`.
+  - Normative docs: `docs/specs/unified-agent-api/*`.
 - **Known unknowns / risks**:
   - The exact internal harness interface that best fits both Codex and Claude adapters (trait vs struct + closures; ownership/lifetimes).
   - The safest generic shape for “drain backend stream while forwarding bounded events” without accidentally changing cancellation semantics.

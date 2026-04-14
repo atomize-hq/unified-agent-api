@@ -199,7 +199,7 @@
     "type": "test",
     "phase": "C1",
     "status": "completed",
-    "description": "Add tests validating `agent_api.events.live` capability + Universal Agent API DR-0012 completion gating (tests only).",
+    "description": "Add tests validating `agent_api.events.live` capability + Unified Agent API DR-0012 completion gating (tests only).",
     "references": [
       "docs/adr/0010-claude-code-live-stream-json.md",
       "docs/project_management/next/claude-code-live-stream-json/plan.md",

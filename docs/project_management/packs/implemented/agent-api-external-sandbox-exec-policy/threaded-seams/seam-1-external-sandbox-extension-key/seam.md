@@ -13,7 +13,7 @@
 - **Type**: risk + integration
 - **Scope**
   - In:
-    - Define the core extension key contract in `docs/specs/universal-agent-api/extensions-spec.md`:
+    - Define the core extension key contract in `docs/specs/unified-agent-api/extensions-spec.md`:
       - schema (boolean) and default/absence semantics,
       - validation timing (before spawn) + R0 precedence alignment,
       - contradiction rules with `agent_api.exec.non_interactive` and `backend.<agent_kind>.exec.*`,
@@ -23,7 +23,7 @@
     - Backend enablement / capability advertising posture (SEAM-2).
     - Backend-specific CLI flag mapping details (SEAM-3, SEAM-4).
     - Regression tests (SEAM-5).
-- **Touch surface**: `docs/specs/universal-agent-api/extensions-spec.md`
+- **Touch surface**: `docs/specs/unified-agent-api/extensions-spec.md`
 - **Verification**:
   - Spec review: confirm schema/defaults and contradiction rules are unambiguous.
   - Cross-doc check: referenced mapping contracts and opt-in contract section exist and are correctly
@@ -35,7 +35,7 @@
   - Contracts consumed: none (relies on R0 gating and `agent_api.exec.non_interactive` defined in
     the same owner doc)
 
-Implementation note: `docs/specs/universal-agent-api/extensions-spec.md` already contains a
+Implementation note: `docs/specs/unified-agent-api/extensions-spec.md` already contains a
 normative entry for `agent_api.exec.external_sandbox.v1`. Treat the slices below as a conformance
 checklist unless the spec needs edits.
 
@@ -51,7 +51,7 @@ checklist unless the spec needs edits.
 - **Contracts produced (owned)**:
   - `ES-C01`: External sandbox execution policy extension key — defined as
     `agent_api.exec.external_sandbox.v1` (boolean; validated before spawn) in
-    `docs/specs/universal-agent-api/extensions-spec.md`.
+    `docs/specs/unified-agent-api/extensions-spec.md`.
     - Produced by: `S1` (schema/default/meaning) + `S2` (mapping requirements + warning event).
   - `ES-C02`: Non-interactive invariant (external sandbox mode) — contradiction rule with
     `agent_api.exec.non_interactive=false` (fail before spawn with `AgentWrapperError::InvalidRequest`).

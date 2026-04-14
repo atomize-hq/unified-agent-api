@@ -11,7 +11,7 @@
 
 - Implement `AgentWrapperBackend::{mcp_list,mcp_get,mcp_add,mcp_remove}` for the Claude Code backend.
 - Map universal requests to Claude CLI semantics as pinned in the canonical MCP management spec:
-  - `docs/specs/universal-agent-api/mcp-management-spec.md` → “Built-in backend behavior” → “Built-in backend mappings (pinned)”
+  - `docs/specs/unified-agent-api/mcp-management-spec.md` → “Built-in backend behavior” → “Built-in backend mappings (pinned)”
   - (target availability is still pinned by the CLI manifest snapshot)
   - `list` → `claude mcp list`
   - `get` → `claude mcp get <name>` (**win32-x64 only** in the pinned Claude Code CLI manifest)

@@ -1,4 +1,35 @@
-# SEAM-2 — Backend advertising + normalization hook
+---
+seam_id: SEAM-2
+seam_slug: backend-advertising-normalization
+type: integration
+status: closed
+execution_horizon: future
+plan_version: v1
+basis:
+  currentness: current
+  source_scope_ref: scope_brief.md
+  source_scope_version: v1
+  upstream_closeouts: []
+  required_threads:
+    - THR-01
+  stale_triggers:
+    - shared helper signature or validation rules change after SEAM-3/4 implementation starts
+gates:
+  pre_exec:
+    review: passed
+    contract: passed
+    revalidation: passed
+  post_exec:
+    landing: passed
+    closeout: passed
+seam_exit_gate:
+  required: true
+  planned_location: S4
+  status: passed
+open_remediations: []
+---
+
+# SEAM-2 - Backend advertising + normalization hook
 
 - **Name**: Backend advertising + normalization hook
 - **Type**: integration
@@ -11,7 +42,7 @@
     - implement the normalization locus for extracting the effective trimmed model id before spawn
     - keep R0 gating ahead of model parsing/validation
     - make the normalized result available to backend mapping seams
-    - regenerate `docs/specs/universal-agent-api/capability-matrix.md` in the same change that flips advertising
+    - regenerate `docs/specs/unified-agent-api/capability-matrix.md` in the same change that flips advertising
   - Out:
     - actual Codex/Claude argv insertion details
     - backend-specific runtime rejection translation

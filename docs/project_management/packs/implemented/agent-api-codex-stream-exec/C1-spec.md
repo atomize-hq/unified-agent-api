@@ -26,7 +26,7 @@ Refactor the `agent_api` Codex backend to:
 - Implement the exec-policy extension surface pinned in DR-0010:
   - validate supported keys + types before spawning
   - apply defaults deterministically (non-interactive by default; `workspace-write` sandbox by default)
-  - map overrides into the Codex wrapper spawn configuration
+  - map overrides into the Codex crate spawn configuration
 
 ### Out of scope (explicit)
 

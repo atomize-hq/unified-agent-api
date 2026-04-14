@@ -22,7 +22,7 @@ jobs:
     outputs:
       purpose: ${{ steps.purpose.outputs.purpose }}
     steps:
-      - name: Determine purpose label
+      - name: Determine staging -> main labels
         id: purpose
         shell: bash
         run: |
@@ -38,29 +38,116 @@ jobs:
             exit 0
           fi
 
-          labels="$(jq -r '.pull_request.labels[].name' "$GITHUB_EVENT_PATH" || true)"
+          mapfile -t labels < <(jq -r '.pull_request.labels[].name' "$GITHUB_EVENT_PATH" || true)
           purpose=""
-          for l in $labels; do
+          for l in "${labels[@]}"; do
             case "$l" in
-              purpose=codex_release) purpose="codex_release" ;;
-              purpose=claude_code_release) purpose="claude_code_release" ;;
-              purpose=ops) purpose="ops" ;;
+              repo_release|ops|codex_release|claude_code_release)
+                if [ -n "$purpose" ] && [ "$purpose" != "$l" ]; then
+                  echo "purpose=invalid" >> "$GITHUB_OUTPUT"
+                  echo "staging -> main PRs must choose exactly one allowed label." >&2
+                  echo "Allowed labels:" >&2
+                  echo "  - repo_release" >&2
+                  echo "  - ops" >&2
+                  echo "  - codex_release" >&2
+                  echo "  - claude_code_release" >&2
+                  exit 1
+                fi
+                purpose="$l"
+                ;;
               *) ;;
             esac
           done
 
           if [ -z "$purpose" ]; then
             echo "purpose=missing" >> "$GITHUB_OUTPUT"
-            echo "Missing required purpose label (should be enforced by only-staging-to-main.yml)." >&2
+            echo "Missing required staging -> main label. Add exactly one of:" >&2
+            echo "  - repo_release" >&2
+            echo "  - ops" >&2
+            echo "  - codex_release" >&2
+            echo "  - claude_code_release" >&2
             exit 1
           fi
+
           echo "purpose=$purpose" >> "$GITHUB_OUTPUT"
+
+  repo-version-guards:
+    name: Repo version guards
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Guard VERSION matches workspace version
+        shell: bash
+        run: |
+          set -euo pipefail
+          version_file="$(tr -d '[:space:]' < VERSION)"
+          cargo_version="$(python3 - <<'PY'
+          import tomllib
+
+          with open("Cargo.toml", "rb") as fh:
+              data = tomllib.load(fh)
+
+          print(data["workspace"]["package"]["version"])
+          PY
+          )"
+
+          echo "VERSION file: $version_file"
+          echo "Cargo workspace version: $cargo_version"
+
+          if [ "$version_file" != "$cargo_version" ]; then
+            echo "Root VERSION must match Cargo.toml [workspace.package].version." >&2
+            exit 1
+          fi
+
+      - name: Guard CHANGELOG.md updates when VERSION changes
+        if: ${{ github.event_name == 'pull_request' || github.event_name == 'push' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            base_sha="${{ github.event.pull_request.base.sha }}"
+            head_sha="${{ github.event.pull_request.head.sha }}"
+            compare_sha="$(git merge-base "$base_sha" "$head_sha")"
+          else
+            base_sha="${{ github.event.before }}"
+            head_sha="${{ github.sha }}"
+            compare_sha="$base_sha"
+          fi
+
+          if [ -z "$compare_sha" ] || [ "$compare_sha" = "0000000000000000000000000000000000000000" ]; then
+            echo "No comparable base commit is available; skipping VERSION/CHANGELOG diff guard."
+            exit 0
+          fi
+
+          version_changed=0
+          changelog_changed=0
+
+          if ! git diff --quiet "$compare_sha" "$head_sha" -- VERSION; then
+            version_changed=1
+          fi
+
+          if ! git diff --quiet "$compare_sha" "$head_sha" -- CHANGELOG.md; then
+            changelog_changed=1
+          fi
+
+          if (( version_changed == 1 && changelog_changed == 0 )); then
+            echo "Root VERSION changed between $compare_sha and $head_sha, but CHANGELOG.md did not." >&2
+            echo "Update CHANGELOG.md whenever the root VERSION file changes." >&2
+            exit 1
+          fi
+
+          echo "VERSION changed: $version_changed"
+          echo "CHANGELOG.md changed: $changelog_changed"
 
   rust-tests:
     name: Rust tests (workspace)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - name: cargo test --workspace
@@ -73,7 +160,7 @@ jobs:
     name: Agent API tests (all features)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - name: cargo test -p agent_api --all-features
@@ -86,7 +173,7 @@ jobs:
     name: LOC cap (Rust files)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - name: make loc-check
@@ -99,7 +186,7 @@ jobs:
     name: Agent API backend type leak guard
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: "Guard: no backend types in pub API"
         shell: bash
         run: |
@@ -120,7 +207,7 @@ jobs:
     name: Capability matrix (fresh + audit)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
 
@@ -134,7 +221,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          git diff --exit-code -- docs/specs/universal-agent-api/capability-matrix.md
+          git diff --exit-code -- docs/specs/unified-agent-api/capability-matrix.md
 
       - name: xtask capability-matrix-audit
         shell: bash
@@ -146,7 +233,7 @@ jobs:
     name: Validate Codex committed artifacts
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - id: codex-artifacts
         name: Detect Codex committed artifacts
         shell: bash
@@ -179,7 +266,7 @@ jobs:
     name: Validate Claude Code committed artifacts
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
 
@@ -196,7 +283,7 @@ jobs:
       latest_validated: ${{ steps.versions.outputs.latest_validated }}
       min_supported: ${{ steps.versions.outputs.min_supported }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - id: versions
         shell: bash
         run: |
@@ -210,7 +297,7 @@ jobs:
     outputs:
       latest_validated: ${{ steps.versions.outputs.latest_validated }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - id: versions
         shell: bash
         run: |
@@ -223,7 +310,7 @@ jobs:
     needs: [versions, pr-purpose]
     if: ${{ !(github.event_name == 'push' && github.ref_name == 'main') && (github.event_name != 'pull_request' || github.base_ref != 'main' || needs.pr-purpose.outputs.purpose == 'codex_release') }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
 
       - name: Acquire Codex CLI
@@ -272,7 +359,7 @@ jobs:
     needs: [versions, pr-purpose]
     if: ${{ !(github.event_name == 'push' && github.ref_name == 'main') && (needs.versions.outputs.min_supported != needs.versions.outputs.latest_validated) && (github.event_name != 'pull_request' || github.base_ref != 'main' || needs.pr-purpose.outputs.purpose == 'codex_release') }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
 
       - name: Acquire Codex CLI
@@ -321,7 +408,7 @@ jobs:
     needs: [claude-versions, pr-purpose]
     if: ${{ !(github.event_name == 'push' && github.ref_name == 'main') && needs.claude-versions.outputs.latest_validated != 'none' && (github.event_name != 'pull_request' || github.base_ref != 'main' || needs.pr-purpose.outputs.purpose == 'claude_code_release') }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
 

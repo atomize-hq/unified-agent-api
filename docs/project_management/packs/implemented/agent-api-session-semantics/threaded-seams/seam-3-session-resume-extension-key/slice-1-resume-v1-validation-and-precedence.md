@@ -26,9 +26,9 @@
     - `selector == "id"` with missing/empty/whitespace-only `id`,
     - `selector == "last"` with any `id` present.
   - Parser returns a typed selector (`Last` | `Id(String)`), preserving the raw `id` string (no normalization beyond trim-to-empty validation).
-  - Tests pin the precedence rules named in `seam-3-session-resume-extension-key.md` and `docs/specs/universal-agent-api/extensions-spec.md`.
+  - Tests pin the precedence rules named in `seam-3-session-resume-extension-key.md` and `docs/specs/unified-agent-api/extensions-spec.md`.
 - **Dependencies**:
-  - Normative: `docs/specs/universal-agent-api/extensions-spec.md` (`resume.v1` schema + R0 precedence + contradiction rules).
+  - Normative: `docs/specs/unified-agent-api/extensions-spec.md` (`resume.v1` schema + R0 precedence + contradiction rules).
 - **Verification**:
   - `cargo test -p agent_api --all-features` (or `make test`).
 - **Rollout/safety**:
@@ -116,5 +116,5 @@ Checklist:
 - Test:
   - `cargo test -p agent_api --all-features`
 - Validate:
-  - Error variants and precedence match `docs/specs/universal-agent-api/extensions-spec.md` R0.
+  - Error variants and precedence match `docs/specs/unified-agent-api/extensions-spec.md` R0.
 

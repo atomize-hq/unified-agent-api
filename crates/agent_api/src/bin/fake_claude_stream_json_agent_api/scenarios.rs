@@ -12,12 +12,17 @@ use crate::fixtures::{
 use crate::support::{
     assert_add_dirs, contains_ordered_subsequence, env_is_true, exit_add_dirs_runtime_rejection,
     fail, has_flag, has_flag_value, maybe_assert_cwd, maybe_assert_flag_presence,
-    maybe_log_invocation, maybe_write_env_snapshot, require, selector_assertion_subsequence,
-    write_line, write_result_error_with_message, write_result_error_with_stderr_detail,
+    maybe_assert_model_mapping, maybe_log_invocation, maybe_write_env_snapshot, require,
+    selector_assertion_subsequence, write_line, write_result_error_with_message,
+    write_result_error_with_stderr_detail,
 };
 
 enum ScenarioKind {
     Assert {
+        tail: Vec<String>,
+        missing_subsequence_message: &'static str,
+    },
+    ModelRuntimeRejectionAfterInit {
         tail: Vec<String>,
         missing_subsequence_message: &'static str,
     },
@@ -93,6 +98,8 @@ fn prepare_print_invocation(args: &[String], out: &mut dyn Write) {
         );
     }
 
+    maybe_assert_model_mapping(args, out);
+
     maybe_assert_flag_presence(
         args,
         "FAKE_CLAUDE_EXPECT_DANGEROUS_SKIP_PERMISSIONS",
@@ -118,6 +125,10 @@ fn dispatch_scenario(scenario: &str, args: &[String], out: &mut dyn Write) -> io
             tail,
             missing_subsequence_message,
         } => handle_assert(out, args, init, &tail, missing_subsequence_message),
+        ScenarioKind::ModelRuntimeRejectionAfterInit {
+            tail,
+            missing_subsequence_message,
+        } => handle_model_runtime_rejection(out, args, init, &tail, missing_subsequence_message),
         ScenarioKind::RuntimeRejection {
             tail,
             missing_subsequence_message,
@@ -161,6 +172,13 @@ fn dispatch_scenario(scenario: &str, args: &[String], out: &mut dyn Write) -> io
 fn scenario_kind(scenario: &str) -> ScenarioKind {
     match scenario {
         "fresh_assert" => ScenarioKind::Assert {
+            tail: vec![
+                "--verbose".to_string(),
+                require("FAKE_CLAUDE_EXPECT_PROMPT"),
+            ],
+            missing_subsequence_message: "assertion failed: missing fresh argv subsequence",
+        },
+        "model_runtime_rejection_after_init" => ScenarioKind::ModelRuntimeRejectionAfterInit {
             tail: vec![
                 "--verbose".to_string(),
                 require("FAKE_CLAUDE_EXPECT_PROMPT"),
@@ -370,6 +388,27 @@ fn handle_runtime_rejection(
 ) -> io::Result<()> {
     handle_assert(out, args, init, tail, missing_subsequence_message)?;
     exit_add_dirs_runtime_rejection(out);
+}
+
+fn handle_model_runtime_rejection(
+    out: &mut dyn Write,
+    args: &[String],
+    init: &str,
+    tail: &[String],
+    missing_subsequence_message: &str,
+) -> io::Result<()> {
+    handle_assert(out, args, init, tail, missing_subsequence_message)?;
+
+    let mut detail = require("FAKE_CLAUDE_MODEL_RUNTIME_REJECTION_SECRET");
+    if let Ok(model) = env::var("FAKE_CLAUDE_EXPECT_MODEL") {
+        if !model.is_empty() {
+            detail.push(' ');
+            detail.push_str(&model);
+        }
+    }
+
+    write_result_error_with_stderr_detail(out, "model rejected by runtime", &detail)?;
+    std::process::exit(1);
 }
 
 fn handle_detailed_result_error(

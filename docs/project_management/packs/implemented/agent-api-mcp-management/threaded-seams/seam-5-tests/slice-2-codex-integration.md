@@ -7,7 +7,7 @@
   - In:
     - Hermetic integration tests for Codex `list/get/add/remove` that:
       - invoke the Codex backend with `binary = <fake codex>` and `codex_home = <tempdir>`,
-      - assert argv mapping matches `docs/specs/universal-agent-api/mcp-management-spec.md` exactly,
+      - assert argv mapping matches `docs/specs/unified-agent-api/mcp-management-spec.md` exactly,
       - assert request context precedence (working_dir/timeout/env) is applied to the spawned management command,
       - assert output bounds + truncation marker + flags end-to-end,
       - assert command execution semantics:
@@ -56,7 +56,7 @@
     - `crates/agent_api/tests/mcp_management_v1/codex_read_ops.rs`
   - Inputs:
     - fake binary: `CARGO_BIN_EXE_fake_codex_mcp_agent_api`
-    - spec: `docs/specs/universal-agent-api/mcp-management-spec.md` (“Codex backend mapping (pinned)” + “Process context”)
+    - spec: `docs/specs/unified-agent-api/mcp-management-spec.md` (“Codex backend mapping (pinned)” + “Process context”)
 - **Implementation notes**:
   - Use per-test:
     - temp record file (JSONL),
@@ -88,8 +88,8 @@ Checklist:
   - Output (suggested):
     - `crates/agent_api/tests/mcp_management_v1/codex_write_ops.rs`
   - Inputs:
-    - spec: `docs/specs/universal-agent-api/mcp-management-spec.md` (“Add transport typing” + “Codex mapping (pinned)”)
-    - contract: `docs/specs/universal-agent-api/contract.md` (`CodexBackendConfig.allow_mcp_write`, default `false`)
+    - spec: `docs/specs/unified-agent-api/mcp-management-spec.md` (“Add transport typing” + “Codex mapping (pinned)”)
+    - contract: `docs/specs/unified-agent-api/contract.md` (`CodexBackendConfig.allow_mcp_write`, default `false`)
 - **Implementation notes**:
   - Split into two cases:
     1) `CodexBackendConfig.allow_mcp_write=false` → `mcp_add/remove` return `UnsupportedCapability` without spawning.

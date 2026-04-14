@@ -13,7 +13,7 @@
     "status": "completed",
     "type": "docs",
     "workstream_id": "WS-DOC",
-    "kickoff_prompt": "Verify `docs/project_management/next/universal-agent-api/*` docs are mutually consistent (contract/run-protocol/event-envelope/capabilities/extensions/spec_manifest/impact_map). Pay special attention to extension key ownership, defaults, and capability gating rules."
+    "kickoff_prompt": "Verify `docs/project_management/next/unified-agent-api/*` docs are mutually consistent (contract/run-protocol/event-envelope/capabilities/extensions/spec_manifest/impact_map). Pay special attention to extension key ownership, defaults, and capability gating rules."
   },
   {
     "id": "V-PACK",

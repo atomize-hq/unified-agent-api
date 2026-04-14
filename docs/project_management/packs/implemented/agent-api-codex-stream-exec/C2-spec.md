@@ -73,7 +73,7 @@ Exec policy expectations (normative; removes ambiguity):
      completion is still pending.
 
 2) `emit_normalize_error_with_rawline_secret`
-   - MUST emit a line that parses as JSON but is missing required context so the Codex wrapper
+   - MUST emit a line that parses as JSON but is missing required context so the Codex crate
      produces `ExecStreamError::Normalize { line, message }`.
    - The emitted JSON line MUST include a unique sentinel string:
      - `RAWLINE_SECRET_DO_NOT_LEAK`

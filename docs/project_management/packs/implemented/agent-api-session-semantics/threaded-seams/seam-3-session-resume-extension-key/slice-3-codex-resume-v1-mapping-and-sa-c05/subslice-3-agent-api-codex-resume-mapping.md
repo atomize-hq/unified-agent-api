@@ -18,7 +18,7 @@
 - **Dependencies**:
   - `S1` shared resume selector parser.
   - `S3a` SA-C05 entrypoint in `crates/codex`.
-  - Normative: `docs/specs/universal-agent-api/extensions-spec.md` (schema + staged-rollout precedence).
+  - Normative: `docs/specs/unified-agent-api/extensions-spec.md` (schema + staged-rollout precedence).
   - Normative: `docs/specs/codex-wrapper-coverage-scenarios-v1.md` (Scenario 3: argv + stdin prompt plumbing).
 - **Verification**:
   - `cargo test -p agent_api --features codex`

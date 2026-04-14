@@ -1,4 +1,39 @@
-# SEAM-4 — Claude Code backend mapping
+---
+seam_id: SEAM-4
+seam_slug: claude-code-mapping
+type: capability
+status: closed
+execution_horizon: future
+plan_version: v1
+basis:
+  currentness: current
+  source_scope_ref: scope_brief.md
+  source_scope_version: v1
+  upstream_closeouts:
+    - governance/seam-2-closeout.md
+    - governance/seam-3-closeout.md
+  required_threads:
+    - THR-01
+    - THR-02
+  stale_triggers:
+    - Claude argv ordering contract changes
+    - new universal keys touch fallback-model semantics
+gates:
+  pre_exec:
+    review: passed
+    contract: passed
+    revalidation: passed
+  post_exec:
+    landing: passed
+    closeout: passed
+seam_exit_gate:
+  required: true
+  planned_location: S4
+  status: passed
+open_remediations: []
+---
+
+# SEAM-4 - Claude Code backend mapping
 
 - **Name**: Claude Code backend mapping
 - **Type**: capability

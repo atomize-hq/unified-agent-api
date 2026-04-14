@@ -22,7 +22,7 @@
   - `extensions-spec.md` links to:
     - `docs/specs/codex-external-sandbox-mapping-contract.md`
     - `docs/specs/claude-code-session-mapping-contract.md`
-    - `docs/specs/universal-agent-api/contract.md` ("Dangerous capability opt-in ...")
+    - `docs/specs/unified-agent-api/contract.md` ("Dangerous capability opt-in ...")
 - **Dependencies**:
   - `S1` (the key and its validation rules exist).
   - Canonical mapping contracts exist (owned by SEAM-3 and SEAM-4).
@@ -38,7 +38,7 @@
   `agent_api.exec.external_sandbox.v1=true` is accepted.
 - **Inputs/outputs**:
   - Input: SEAM-1 brief (observability requirement) + `threading.md`
-  - Output: updates to `docs/specs/universal-agent-api/extensions-spec.md`
+  - Output: updates to `docs/specs/unified-agent-api/extensions-spec.md`
 - **Implementation notes**:
   - Pin the exact `message` string and channel.
   - Pin emission ordering so it appears before other consumer-visible output/events.
@@ -53,7 +53,7 @@
 Checklist:
 - Implement: write the event requirement under the key’s registry entry.
 - Test: N/A.
-- Validate: `rg -n "DANGEROUS: external sandbox exec policy enabled" docs/specs/universal-agent-api/extensions-spec.md` and confirm it’s gated on “accepted” (post-R0 + post-validation).
+- Validate: `rg -n "DANGEROUS: external sandbox exec policy enabled" docs/specs/unified-agent-api/extensions-spec.md` and confirm it’s gated on “accepted” (post-R0 + post-validation).
 - Cleanup: keep warning wording stable and safe.
 
 #### S2.T2 — Pin mapping requirements and canonical references
@@ -62,7 +62,7 @@ Checklist:
   that downstream seams must follow.
 - **Inputs/outputs**:
   - Input: contract registry references in `threading.md` (ES-C04/05/07 context; not owned here)
-  - Output: updates to `docs/specs/universal-agent-api/extensions-spec.md`
+  - Output: updates to `docs/specs/unified-agent-api/extensions-spec.md`
 - **Implementation notes**:
   - Avoid duplicating backend-specific details; point at mapping contracts instead.
   - Include the explicit “not advertised by default; opt-in required” reference (owned by SEAM-2)
@@ -79,5 +79,5 @@ Checklist:
 Checklist:
 - Implement: update mapping requirements bullets and doc references.
 - Test: N/A.
-- Validate: confirm this seam only touches `docs/specs/universal-agent-api/extensions-spec.md`; verify referenced docs exist (`test -f docs/specs/codex-external-sandbox-mapping-contract.md` etc.).
+- Validate: confirm this seam only touches `docs/specs/unified-agent-api/extensions-spec.md`; verify referenced docs exist (`test -f docs/specs/codex-external-sandbox-mapping-contract.md` etc.).
 - Cleanup: keep the section concise and consistent with the rest of the registry.

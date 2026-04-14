@@ -57,9 +57,11 @@ fn c4_spec_update_snapshot_workflow_runs_full_pipeline_and_uploads_artifacts() {
         yml.contains("cli_manifests/codex/raw_help/"),
         "workflow must capture/upload raw help under cli_manifests/codex/raw_help/<version>/<target_triple>/"
     );
+    let upload_artifact_invocation =
+        Regex::new(r"actions/upload-artifact@v[0-9]+").expect("valid regex");
     assert!(
-        yml.contains("actions/upload-artifact@v4"),
-        "workflow must upload raw help and artifact bundles via actions/upload-artifact@v4"
+        upload_artifact_invocation.is_match(&yml),
+        "workflow must upload raw help and artifact bundles via actions/upload-artifact"
     );
 
     // C4-spec: on Linux, run union → wrapper-coverage → report → version-metadata → validate.

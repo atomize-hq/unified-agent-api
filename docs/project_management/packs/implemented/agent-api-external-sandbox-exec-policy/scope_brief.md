@@ -21,7 +21,7 @@ internal prompting/guardrails that conflict with unattended automation.
 
 ## In-scope
 
-- Define `agent_api.exec.external_sandbox.v1` in `docs/specs/universal-agent-api/extensions-spec.md`
+- Define `agent_api.exec.external_sandbox.v1` in `docs/specs/unified-agent-api/extensions-spec.md`
   (schema + defaults + validation + contradiction rules + mapping requirements).
 - Implement capability-gated support in:
   - `crates/agent_api/src/backends/codex.rs`
@@ -91,7 +91,7 @@ internal prompting/guardrails that conflict with unattended automation.
   `docs/specs/claude-code-session-mapping-contract.md`.)
 - **Exec-policy interactions / precedence**: pinned to “reject `backend.<agent_kind>.exec.*` keys
   when `agent_api.exec.external_sandbox.v1 == true`” to avoid ambiguous precedence in a dangerous
-  surface. (Canonical: `docs/specs/universal-agent-api/extensions-spec.md`.)
+  surface. (Canonical: `docs/specs/unified-agent-api/extensions-spec.md`.)
 - **Footgun risk**: ensuring the opt-in path is explicit enough that this does not become a default
   escape hatch for non-sandboxed hosts.
 

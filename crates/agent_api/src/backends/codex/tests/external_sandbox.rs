@@ -5,6 +5,33 @@ use serde_json::json;
 use std::path::{Component, Path, Prefix};
 
 #[test]
+fn codex_harness_supported_extension_keys_include_agent_api_config_model_v1() {
+    let adapter = test_adapter();
+    assert!(adapter
+        .supported_extension_keys()
+        .contains(&crate::EXT_AGENT_API_CONFIG_MODEL_V1));
+}
+
+#[test]
+fn codex_normalize_request_accepts_agent_api_config_model_v1_and_trims_it() {
+    let adapter = test_adapter();
+    let defaults = BackendDefaults::default();
+    let mut request = AgentWrapperRunRequest {
+        prompt: "hello".to_string(),
+        ..Default::default()
+    };
+    request.extensions.insert(
+        crate::EXT_AGENT_API_CONFIG_MODEL_V1.to_string(),
+        json!("  gpt-5-codex  "),
+    );
+
+    let normalized = crate::backend_harness::normalize_request(&adapter, &defaults, request)
+        .expect("model-selection key should be accepted for codex");
+
+    assert_eq!(normalized.model_id.as_deref(), Some("gpt-5-codex"));
+}
+
+#[test]
 fn codex_backend_does_not_advertise_external_sandbox_exec_by_default() {
     assert!(!CodexBackendConfig::default().allow_external_sandbox_exec);
 
@@ -82,6 +109,7 @@ async fn external_sandbox_spawn_failure_emits_warning_before_terminal_error() {
         .spawn(crate::backend_harness::NormalizedRequest {
             agent_kind: adapter.kind(),
             prompt: "hello".to_string(),
+            model_id: None,
             working_dir: None,
             effective_timeout: None,
             env: std::collections::BTreeMap::new(),
@@ -147,6 +175,7 @@ async fn exec_cross_drive_drive_relative_working_dir_fails_before_spawn() {
         .spawn(crate::backend_harness::NormalizedRequest {
             agent_kind: adapter.kind(),
             prompt: "hello".to_string(),
+            model_id: None,
             working_dir: Some(windows_drive_relative_on_other_drive(
                 "repo",
                 &run_start_cwd,
@@ -195,6 +224,7 @@ async fn fork_cross_drive_drive_relative_working_dir_fails_before_app_server_sta
         .spawn(crate::backend_harness::NormalizedRequest {
             agent_kind: adapter.kind(),
             prompt: "hello".to_string(),
+            model_id: None,
             working_dir: Some(windows_drive_relative_on_other_drive(
                 "repo",
                 &run_start_cwd,

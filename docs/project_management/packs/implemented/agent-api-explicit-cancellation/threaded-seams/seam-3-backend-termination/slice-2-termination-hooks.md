@@ -32,7 +32,7 @@
     - (Optional) `crates/codex/src/exec/streaming.rs` (wrapper cancellation support)
   - Output: a termination hook used by `run_control(...)` that triggers process termination best-effort.
 - **Implementation notes**:
-  - Codex wrapper uses `kill_on_drop(true)` for the spawned `Command`, but the `Child` is owned by the wrapper’s completion future.
+  - Codex crate uses `kill_on_drop(true)` for the spawned `Command`, but the `Child` is owned by the wrapper’s completion future.
   - One viable strategy:
     - In the agent_api Codex backend control path, spawn the wrapper completion future on a task and keep a `JoinHandle`.
     - The termination hook aborts that task (dropping the future and thus the `Child`), causing best-effort kill via `kill_on_drop(true)`.

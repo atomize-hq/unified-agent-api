@@ -75,7 +75,7 @@ This section makes coupling explicit: contracts/interfaces, dependency edges, an
   - **Owner seam**: SEAM-3
   - **Consumers**: SEAM-5
   - **Definition**: built-in Codex mapping is pinned in the canonical MCP management spec:
-    - `docs/specs/universal-agent-api/mcp-management-spec.md` → “Built-in backend behavior” → “Built-in backend mappings (pinned)”
+    - `docs/specs/unified-agent-api/mcp-management-spec.md` → “Built-in backend behavior” → “Built-in backend mappings (pinned)”
     - (target availability is pinned by `cli_manifests/codex/current.json`)
 
 - **MM-C09 — Claude MCP mapping contract**
@@ -83,7 +83,7 @@ This section makes coupling explicit: contracts/interfaces, dependency edges, an
   - **Owner seam**: SEAM-4
   - **Consumers**: SEAM-5
   - **Definition**: built-in Claude Code mapping is pinned in the canonical MCP management spec:
-    - `docs/specs/universal-agent-api/mcp-management-spec.md` → “Built-in backend behavior” → “Built-in backend mappings (pinned)”
+    - `docs/specs/unified-agent-api/mcp-management-spec.md` → “Built-in backend behavior” → “Built-in backend mappings (pinned)”
     - (target availability is pinned by `cli_manifests/claude_code/current.json`)
     - `list` → `claude mcp list`
     - `get/add/remove` are **win32-x64 only** in the pinned Claude Code CLI manifest snapshot.

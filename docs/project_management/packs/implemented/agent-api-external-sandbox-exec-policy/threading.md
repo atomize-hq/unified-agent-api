@@ -25,7 +25,7 @@ This section makes coupling explicit: contracts/interfaces, dependency edges, an
   - **Type**: permission
   - **Definition**: Built-in backends MUST NOT advertise `agent_api.exec.external_sandbox.v1` by
     default; externally sandboxed hosts opt-in explicitly via backend configuration
-    (`allow_external_sandbox_exec`; see `docs/specs/universal-agent-api/contract.md`).
+    (`allow_external_sandbox_exec`; see `docs/specs/unified-agent-api/contract.md`).
   - **Owner seam**: SEAM-2
   - **Consumers**: SEAM-3/4/5
 
@@ -56,7 +56,7 @@ This section makes coupling explicit: contracts/interfaces, dependency edges, an
     fail before spawn with `AgentWrapperError::InvalidRequest`. If such a key is present but is not
     supported, the backend MUST fail-closed as `AgentWrapperError::UnsupportedCapability` per R0
     and MUST NOT evaluate this contradiction rule. (Canonical:
-    `docs/specs/universal-agent-api/extensions-spec.md`.)
+    `docs/specs/unified-agent-api/extensions-spec.md`.)
   - **Owner seam**: SEAM-1
   - **Consumers**: SEAM-3/4/5
 
@@ -82,7 +82,7 @@ This section makes coupling explicit: contracts/interfaces, dependency edges, an
 
 ## Parallelization notes / conflict-safe workstreams
 
-- **WS-SPEC**: SEAM-1 docs-only edits under `docs/specs/universal-agent-api/`.
+- **WS-SPEC**: SEAM-1 docs-only edits under `docs/specs/unified-agent-api/`.
 - **WS-ENABLEMENT**: SEAM-2 backend config + capability advertising (Codex + Claude Code backends).
 - **WS-CODEX**: SEAM-3 Codex mapping + validations.
 - **WS-CLAUDE**: SEAM-4 Claude mapping + validations.

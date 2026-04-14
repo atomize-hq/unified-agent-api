@@ -18,16 +18,16 @@ Date (UTC): 2026-02-20
 ## ADRs
 
 - `docs/adr/0011-agent-api-codex-stream-exec.md`
-- `docs/adr/0012-universal-agent-api-extensions-registry-and-cli-agent-onboarding-charter.md`
+- `docs/adr/0012-unified-agent-api-extensions-registry-and-cli-agent-onboarding-charter.md`
 
-## Universal Agent API docs (next/)
+## Unified Agent API docs (next/)
 
 - `docs/project_management/next/cli-agent-onboarding-charter.md`
-- `docs/project_management/next/universal-agent-api/capabilities-schema-spec.md`
-- `docs/project_management/next/universal-agent-api/contract.md`
-- `docs/project_management/next/universal-agent-api/extensions-spec.md`
-- `docs/project_management/next/universal-agent-api/impact_map.md`
-- `docs/project_management/next/universal-agent-api/spec_manifest.md`
+- `docs/project_management/next/unified-agent-api/capabilities-schema-spec.md`
+- `docs/project_management/next/unified-agent-api/contract.md`
+- `docs/project_management/next/unified-agent-api/extensions-spec.md`
+- `docs/project_management/next/unified-agent-api/impact_map.md`
+- `docs/project_management/next/unified-agent-api/spec_manifest.md`
 
 ## Planning pack docs (packs/active/agent-api-codex-stream-exec)
 

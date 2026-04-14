@@ -13,16 +13,16 @@
           "Work item: uaa-0013 — Tooling/spec updates for agent_api.session bucket.",
           "Goal: introduce agent_api.session.* as a first-class capability bucket (rubric + tooling) so onboarding and audits can bucket session capabilities mechanically.",
           "Steps:",
-          "1) Update docs/specs/universal-agent-api/capabilities-schema-spec.md to include agent_api.session.* in the bucket rubric list (near agent_api.exec.*).",
+          "1) Update docs/specs/unified-agent-api/capabilities-schema-spec.md to include agent_api.session.* in the bucket rubric list (near agent_api.exec.*).",
           "2) Update crates/xtask/src/capability_matrix.rs: bucket_for(...) should recognize agent_api.session.* and bucket_order(...) should include agent_api.session in the canonical bucket ordering.",
           "3) Run the generators/audits: `cargo run -p xtask -- capability-matrix` and `cargo run -p xtask -- capability-matrix-audit`.",
           "Output: PR-ready spec + tooling changes; no backend behavior changes."
         ],
         "files_to_read": [
-          "docs/specs/universal-agent-api/capabilities-schema-spec.md",
+          "docs/specs/unified-agent-api/capabilities-schema-spec.md",
           "crates/xtask/src/capability_matrix.rs",
           "crates/xtask/src/capability_matrix_audit.rs",
-          "docs/specs/universal-agent-api/capability-matrix.md"
+          "docs/specs/unified-agent-api/capability-matrix.md"
         ],
         "suggested_commands": [
           "cargo run -p xtask -- capability-matrix",
@@ -33,7 +33,7 @@
         ]
       },
       "notes": [
-        "Update docs/specs/universal-agent-api/capabilities-schema-spec.md rubric to include agent_api.session.*.",
+        "Update docs/specs/unified-agent-api/capabilities-schema-spec.md rubric to include agent_api.session.*.",
         "Update crates/xtask/src/capability_matrix.rs bucket_for(...) and bucket_order(...) to recognize agent_api.session.* so the generated matrix groups session capabilities correctly.",
         "Confirm crates/xtask/src/capability_matrix_audit.rs behavior once any agent_api.session.* capabilities are added (audit requires new agent_api.* capabilities to be supported by >=2 built-in backends unless allowlisted)."
       ]
@@ -57,10 +57,10 @@
           "Output: spec text updates ready for implementation (keep it conservative and backward-compatible with existing tools facet rules)."
         ],
         "files_to_read": [
-          "docs/specs/universal-agent-api/contract.md",
-          "docs/specs/universal-agent-api/event-envelope-schema-spec.md",
-          "docs/specs/universal-agent-api/capabilities-schema-spec.md",
-          "docs/specs/universal-agent-api/extensions-spec.md",
+          "docs/specs/unified-agent-api/contract.md",
+          "docs/specs/unified-agent-api/event-envelope-schema-spec.md",
+          "docs/specs/unified-agent-api/capabilities-schema-spec.md",
+          "docs/specs/unified-agent-api/extensions-spec.md",
           "crates/agent_api/src/bounds.rs",
           "crates/agent_api/src/backends/claude_code.rs",
           "crates/agent_api/src/backends/codex/mapping.rs",
@@ -105,8 +105,8 @@
           "crates/codex/src/builder/mod.rs",
           "crates/codex/src/builder/cli_overrides.rs",
           "crates/claude_code/src/commands/print.rs",
-          "docs/specs/universal-agent-api/extensions-spec.md",
-          "docs/specs/universal-agent-api/capabilities-schema-spec.md"
+          "docs/specs/unified-agent-api/extensions-spec.md",
+          "docs/specs/unified-agent-api/capabilities-schema-spec.md"
         ],
         "suggested_commands": [
           "jq -r '.commands[] | select(.path==[]) | .flags[].key' cli_manifests/codex/current.json | sort -u",
@@ -134,7 +134,7 @@
       "proposed_capability_id": "agent_api.exec.external_sandbox.v1",
       "notes": [
         "Expose an explicit, capability-gated core key for hosts (e.g. Substrate) that provide isolation externally and need the CLI backend to relax internal guardrails.",
-        "Owned by docs/specs/universal-agent-api/extensions-spec.md (core key); implement + capability-gate in both codex and claude_code backends.",
+        "Owned by docs/specs/unified-agent-api/extensions-spec.md (core key); implement + capability-gate in both codex and claude_code backends.",
         "When true, the backend MUST remain non-interactive (MUST NOT hang on prompts); if agent_api.exec.non_interactive is explicitly false, the backend MUST fail before spawn with AgentWrapperError::InvalidRequest (contradictory intent).",
         "This key is explicitly dangerous and SHOULD NOT be advertised by default in built-in backends (only enabled for externally sandboxed hosts).",
         "Value MUST be boolean and validated before spawn; unknown keys must continue to fail-closed."
@@ -199,19 +199,19 @@
           "Steps:",
           "1) Decision: capability id `agent_api.session.handle.v1`; emit a bounded facet in both an early Status event `data` payload and in `AgentWrapperCompletion.data` (schema pinned in ADR-0017).",
           "2) Update canonical specs to register the capability + facet schema/emission rules:",
-          "   - docs/specs/universal-agent-api/capabilities-schema-spec.md",
-          "   - docs/specs/universal-agent-api/event-envelope-schema-spec.md",
+          "   - docs/specs/unified-agent-api/capabilities-schema-spec.md",
+          "   - docs/specs/unified-agent-api/event-envelope-schema-spec.md",
           "3) Prerequisite: land uaa-0017 typed accessors and use them for extraction (`codex::ThreadEvent::thread_id()`, `claude_code::ClaudeStreamJsonEvent::session_id()`).",
           "4) Implement extraction + run-local storage in both agent_api backends (Claude: capture session_id from stream-json; Codex: capture thread_id from JSONL ThreadStarted).",
           "5) Advertise `agent_api.session.handle.v1` only once extraction + bounds/redaction posture is implemented + tested.",
           "Output: cross-backend consistent session/thread id surfacing + tests (fake-binary where appropriate)."
         ],
         "files_to_read": [
-          "docs/adr/0017-universal-agent-api-session-thread-id-surfacing.md",
+          "docs/adr/0017-unified-agent-api-session-thread-id-surfacing.md",
           "docs/specs/claude-stream-json-parser-contract.md",
           "docs/specs/codex-thread-event-jsonl-parser-contract.md",
-          "docs/specs/universal-agent-api/contract.md",
-          "docs/specs/universal-agent-api/event-envelope-schema-spec.md",
+          "docs/specs/unified-agent-api/contract.md",
+          "docs/specs/unified-agent-api/event-envelope-schema-spec.md",
           "crates/agent_api/src/backends/claude_code.rs",
           "crates/agent_api/src/backends/codex/mapping.rs",
           "crates/agent_api/src/backends/codex.rs",
@@ -258,7 +258,7 @@
           "Output: correct error classification + pinned selection failures + tests; no backend secrets leak."
         ],
         "files_to_read": [
-          "docs/specs/universal-agent-api/extensions-spec.md",
+          "docs/specs/unified-agent-api/extensions-spec.md",
           "docs/specs/claude-code-session-mapping-contract.md",
           "crates/agent_api/src/backends/claude_code.rs",
           "crates/agent_api/src/bin/fake_claude_stream_json_agent_api.rs",
@@ -328,7 +328,7 @@
           "Output: consistent bound enforcement across Codex exec + fork paths; no contract violations."
         ],
         "files_to_read": [
-          "docs/specs/universal-agent-api/event-envelope-schema-spec.md",
+          "docs/specs/unified-agent-api/event-envelope-schema-spec.md",
           "crates/agent_api/src/backends/codex.rs",
           "crates/agent_api/src/backends/codex/fork.rs",
           "crates/agent_api/src/bin/fake_codex_app_server_jsonrpc_agent_api.rs",
@@ -370,8 +370,8 @@
           "crates/claude_code/src/home.rs",
           "crates/claude_code/src/commands/print.rs",
           "crates/agent_api/src/backends/claude_code.rs",
-          "docs/specs/universal-agent-api/contract.md",
-          "docs/specs/universal-agent-api/mcp-management-spec.md",
+          "docs/specs/unified-agent-api/contract.md",
+          "docs/specs/unified-agent-api/mcp-management-spec.md",
           "crates/codex/src/home.rs"
         ],
         "deliverables": [
@@ -408,7 +408,7 @@
       "type": "extension_key",
       "notes": [
         "Intent: do not hang on interactive permission/approval prompts in headless automation.",
-        "Owned by docs/specs/universal-agent-api/extensions-spec.md."
+        "Owned by docs/specs/unified-agent-api/extensions-spec.md."
       ],
       "backend_mapping": {
         "claude_code": {
@@ -430,7 +430,7 @@
       "proposed_capability_id": "agent_api.config.model.v1",
       "notes": [
         "Expose model selection behind a core key shared by codex and claude_code.",
-        "Define schema/defaults in docs/specs/universal-agent-api/extensions-spec.md, then implement + gate in both backends."
+        "Define schema/defaults in docs/specs/unified-agent-api/extensions-spec.md, then implement + gate in both backends."
       ],
       "backend_mapping": {
         "claude_code": {

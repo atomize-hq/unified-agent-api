@@ -6,7 +6,7 @@
     - Add `CodexClient::stream_resume_with_env_overrides_control(request: ResumeRequest, env_overrides: &BTreeMap<String, String>) -> ExecStreamControl`.
     - Wire streaming spawn for `codex exec --json resume ...` with pinned argv + stdin prompt plumbing (Scenario 3).
     - Ensure `ExecStreamControl.termination` is always present for this entrypoint.
-    - Apply env overrides per `docs/specs/universal-agent-api/contract.md` (request keys win over backend defaults).
+    - Apply env overrides per `docs/specs/unified-agent-api/contract.md` (request keys win over backend defaults).
   - Out:
     - Codex crate regression tests (see `S3b`).
     - `agent_api` Codex backend wiring (see `S3c`/`S3d`).
@@ -19,7 +19,7 @@
 - **Dependencies**:
   - Normative: `docs/specs/codex-wrapper-coverage-scenarios-v1.md` (Scenario 3: argv + stdin prompt plumbing).
   - Normative: `docs/specs/codex-streaming-exec-contract.md` (termination + timeout semantics).
-  - Normative: `docs/specs/universal-agent-api/contract.md` (env merge precedence).
+  - Normative: `docs/specs/unified-agent-api/contract.md` (env merge precedence).
 - **Verification**:
   - `cargo test -p codex`
 - **Rollout/safety**:

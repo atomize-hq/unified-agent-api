@@ -18,7 +18,7 @@
 - Add synthetic tests proving:
   - Claude backend capabilities include `agent_api.events.live`
   - events can be observed before process exit
-  - completion is gated per Universal Agent API DR-0012 (waits for stream finality or drop)
+  - completion is gated per Unified Agent API DR-0012 (waits for stream finality or drop)
 - Do not require a real `claude` binary.
 
 ## Commands (required)

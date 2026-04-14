@@ -1,4 +1,6 @@
-use std::{collections::BTreeMap, fs, path::PathBuf};
+mod support_paths;
+
+use std::{collections::BTreeMap, fs};
 
 use claude_code::wrapper_coverage_manifest::{wrapper_coverage_manifest, CoverageLevel};
 use serde::Deserialize;
@@ -15,22 +17,10 @@ struct PrintFlagEntry {
     examples: Vec<String>,
 }
 
-fn repo_root() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .expect("crates/claude_code has repo root parent")
-        .parent()
-        .expect("repo root exists")
-        .to_path_buf()
-}
-
 #[test]
 fn print_flags_manifest_covers_all_explicit_root_flags() {
-    let manifest_path = repo_root()
-        .join("crates")
-        .join("claude_code")
-        .join("examples")
-        .join("print_flags_manifest.json");
+    let examples_dir = support_paths::claude_code_examples_dir();
+    let manifest_path = examples_dir.join("print_flags_manifest.json");
     let bytes = fs::read(&manifest_path)
         .unwrap_or_else(|e| panic!("read {}: {e}", manifest_path.display()));
     let manifest: PrintFlagsManifest = serde_json::from_slice(&bytes)
@@ -89,10 +79,6 @@ fn print_flags_manifest_covers_all_explicit_root_flags() {
         "print flags manifest contains unknown keys (not explicit root flags): {unknown:?}"
     );
 
-    let examples_dir = repo_root()
-        .join("crates")
-        .join("claude_code")
-        .join("examples");
     for (key, examples) in map {
         for example in examples {
             let file = examples_dir.join(format!("{example}.rs"));

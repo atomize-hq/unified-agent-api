@@ -11,7 +11,7 @@
 
 - Unit tests for:
   - pin the requirements in the canonical MCP management spec:
-    - `docs/specs/universal-agent-api/mcp-management-spec.md` → transport validation, context precedence, execution semantics,
+    - `docs/specs/unified-agent-api/mcp-management-spec.md` → transport validation, context precedence, execution semantics,
       output truncation algorithm, built-in backend behavior, and verification policy.
 - Integration tests:
   - run `list/get/add/remove` against an isolated home directory,
@@ -44,10 +44,10 @@
 
 ## Canonical sources (for tests)
 
-- Spec + mapping truth: `docs/specs/universal-agent-api/mcp-management-spec.md`
-- Capability gating + error taxonomy: `docs/specs/universal-agent-api/contract.md`
+- Spec + mapping truth: `docs/specs/unified-agent-api/mcp-management-spec.md`
+- Capability gating + error taxonomy: `docs/specs/unified-agent-api/contract.md`
 - Advertising assertions MUST use the backend instance's `AgentWrapperCapabilities.ids`; the
-  generated `docs/specs/universal-agent-api/capability-matrix.md` may omit default-off write
+  generated `docs/specs/unified-agent-api/capability-matrix.md` may omit default-off write
   capabilities because it is built from default configs.
 
 ## Dependencies
@@ -65,7 +65,7 @@
 ## Verification (definition of done)
 
 - `make test` passes with new unit coverage.
-- Integration tests follow the canonical verification policy in `docs/specs/universal-agent-api/mcp-management-spec.md`.
+- Integration tests follow the canonical verification policy in `docs/specs/unified-agent-api/mcp-management-spec.md`.
 - `make preflight` passes once implementation lands.
 
 ## Risks / unknowns

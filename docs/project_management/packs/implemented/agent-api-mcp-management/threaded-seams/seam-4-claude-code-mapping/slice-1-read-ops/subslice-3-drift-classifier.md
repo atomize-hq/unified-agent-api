@@ -14,7 +14,7 @@
   - “Normal” non-zero exits remain `Ok(output)` (i.e., drift classification is conservative).
   - Error messages are safe and non-echoing (do not include raw stdout/stderr).
 - **Dependencies**:
-  - `docs/specs/universal-agent-api/mcp-management-spec.md` (target availability + fail-closed behavior).
+  - `docs/specs/unified-agent-api/mcp-management-spec.md` (target availability + fail-closed behavior).
   - S1b runner.
 - **Verification**:
   - `cargo test -p agent_api --features claude_code`

@@ -1,43 +1,68 @@
-# S3 — Capability publication + conformance gate
+---
+slice_id: S3
+seam_id: SEAM-2
+slice_kind: delivery
+execution_horizon: active
+status: decomposed
+plan_version: v1
+basis:
+  currentness: current
+  basis_ref: seam.md#basis
+  stale_triggers: []
+gates:
+  pre_exec:
+    review: inherited
+    contract: inherited
+    revalidation: inherited
+  post_exec:
+    landing: pending
+    closeout: pending
+threads:
+  - THR-03
+contracts_produced:
+  - C-08
+contracts_consumed:
+  - C-05
+open_remediations: []
+candidate_subslices: []
+---
+### S3 - Capability publication + conformance gate
 
-- **User/system value**: Makes the public capability inventory truthful and reviewable once model-selection support is real, so hosts, reviewers, and SEAM-5 all consume the same published backend posture without stale matrix drift.
+- **User/system value**: makes the public capability inventory truthful and reviewable by regenerating the capability matrix in lockstep with advertising changes.
 - **Scope (in/out)**:
   - In:
-    - regenerate the generated capability matrix in the same change as the built-in advertising flip
-    - treat matrix drift and second-parser drift as merge-blocking conformance failures
-    - pin the integration validation steps that WS-INT and SEAM-5 consume
+    - regenerate `docs/specs/unified-agent-api/capability-matrix.md` in the same change as advertising flips
+    - treat stale matrix diffs and second-parser drift as merge blockers
   - Out:
-    - backend runtime rejection fixtures and backend-error event assertions
-    - argv-order tests for `--model`, `--add-dir`, session selectors, or `--fallback-model`
+    - backend runtime rejection fixtures and argv-order tests (SEAM-3/4/5)
 - **Acceptance criteria**:
-  - `docs/specs/universal-agent-api/capability-matrix.md` is regenerated in the same change that flips `agent_api.config.model.v1` advertising.
+  - `docs/specs/unified-agent-api/capability-matrix.md` is regenerated in the same change that flips `agent_api.config.model.v1` advertising.
   - The generated matrix posture matches the final built-in `capabilities()` posture for Codex and Claude Code.
   - Merge validation includes a focused review that raw parsing of `agent_api.config.model.v1` still exists only in `crates/agent_api/src/backend_harness/normalize.rs`.
   - SEAM-5 can consume the published matrix and the final capability posture without special-case interpretation.
 - **Dependencies**:
   - S2
+  - `THR-03`
+  - `C-08`
   - `MS-C08`
   - the deterministic mapping outputs from `MS-C06` and `MS-C07` must already be present in the integration change that lands this slice
 - **Verification**:
   - `cargo run -p xtask -- capability-matrix`
-  - `cargo test -p agent_api --features codex,claude_code`
-  - focused repo search for `agent_api.config.model.v1` under `crates/agent_api/src`
-- **Rollout/safety**:
-  - Do not hand-edit `capability-matrix.md`.
-  - Treat stale matrix diffs and new raw parser sites as merge blockers, not follow-up chores.
+  - `rg -n "agent_api\\.config\\.model\\.v1" crates/agent_api/src` classification
+- **Rollout/safety**: never hand-edit the matrix; commit the xtask output with the advertising flip.
+- **Review surface refs**: `../../review_surfaces.md` (R3)
 
-## Atomic Tasks
-
-#### S3.T1 — Regenerate and review the capability matrix in the same advertising-flip change
+#### S3.T1 - Regenerate and review the capability matrix in the same advertising-flip change
 
 - **Outcome**: The generated matrix publishes the final built-in model-selection posture without drift from runtime capability code.
+- **Thread/contract refs**: `THR-03`, `C-08`, `C-05`
 - **Inputs/outputs**:
   - Input:
-    - `docs/specs/universal-agent-api/capability-matrix.md`
+    - `docs/specs/unified-agent-api/capability-matrix.md`
     - `crates/agent_api/src/backends/codex/backend.rs`
     - `crates/agent_api/src/backends/claude_code/backend.rs`
   - Output:
-    - `docs/specs/universal-agent-api/capability-matrix.md`
+    - `docs/specs/unified-agent-api/capability-matrix.md`
 - **Implementation notes**:
   - Run `cargo run -p xtask -- capability-matrix` in the same branch/PR that flips built-in advertising.
   - Review the diff specifically for the `agent_api.config.*` bucket and the `agent_api.config.model.v1` row.
@@ -51,14 +76,14 @@
   - Low: generated artifact only, but required for truthful publication.
 
 Checklist:
-- Implement: run `cargo run -p xtask -- capability-matrix`.
-- Test: `cargo test -p agent_api --features codex,claude_code`.
-- Validate: review the generated `agent_api.config.model.v1` row against backend `capabilities()` code.
-- Cleanup: commit the regenerated matrix with the advertising change.
+- Implement: run `cargo run -p xtask -- capability-matrix`
+- Validate: review diff for the `agent_api.config.*` bucket
+- Cleanup: commit generated changes with advertising flip
 
-#### S3.T2 — Enforce the single-parser and truthful-publication merge gate
+#### S3.T2 - Capture conformance evidence (single-parser + truthful advertising)
 
 - **Outcome**: The final integration review has explicit, repeatable checks for the two seam-critical invariants: one raw parser and one truthful published capability posture.
+- **Thread/contract refs**: `THR-03`, `THR-02`, `C-09`
 - **Inputs/outputs**:
   - Input:
     - `crates/agent_api/src/backend_harness/normalize.rs`
@@ -80,12 +105,10 @@ Checklist:
   - Public advertising is enabled only when the downstream mapping evidence is already in the same integration stack.
 - **Test notes**:
   - Suggested validation command:
-    - `rg -n "agent_api\\.config\\.model\\.v1" crates/agent_api/src docs/specs/universal-agent-api`
+    - `rg -n "agent_api\\.config\\.model\\.v1" crates/agent_api/src docs/specs/unified-agent-api`
 - **Risk/rollback notes**:
   - High if skipped: a second parser or early advertising flip would create spec-visible drift.
 
 Checklist:
-- Implement: run the repo search and classify every match in review.
-- Test: rerun targeted backend and harness tests if any parser/advertising fix is needed.
-- Validate: confirm no mapping module reads raw `request.extensions["agent_api.config.model.v1"]`.
-- Cleanup: keep the final diff small enough that the single-parser rule is easy to audit.
+- Validate: `rg` and classify every match
+- Validate: confirm deterministic support across run flows

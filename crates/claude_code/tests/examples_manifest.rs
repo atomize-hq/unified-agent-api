@@ -1,4 +1,6 @@
-use std::{collections::BTreeMap, fs, path::PathBuf};
+mod support_paths;
+
+use std::{collections::BTreeMap, fs};
 
 use claude_code::wrapper_coverage_manifest::{wrapper_coverage_manifest, CoverageLevel};
 use serde::Deserialize;
@@ -15,22 +17,10 @@ struct ExamplesManifestEntry {
     examples: Vec<String>,
 }
 
-fn repo_root() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .expect("crates/claude_code has repo root parent")
-        .parent()
-        .expect("repo root exists")
-        .to_path_buf()
-}
-
 #[test]
 fn examples_manifest_covers_all_explicit_wrapper_commands() {
-    let manifest_path = repo_root()
-        .join("crates")
-        .join("claude_code")
-        .join("examples")
-        .join("examples_manifest.json");
+    let examples_dir = support_paths::claude_code_examples_dir();
+    let manifest_path = examples_dir.join("examples_manifest.json");
     let bytes = fs::read(&manifest_path)
         .unwrap_or_else(|e| panic!("read {}: {e}", manifest_path.display()));
     let manifest: ExamplesManifest = serde_json::from_slice(&bytes)
@@ -50,11 +40,6 @@ fn examples_manifest_covers_all_explicit_wrapper_commands() {
         );
         map.insert(entry.path, entry.examples);
     }
-
-    let examples_dir = repo_root()
-        .join("crates")
-        .join("claude_code")
-        .join("examples");
 
     let wrapper = wrapper_coverage_manifest();
     let mut missing = Vec::new();

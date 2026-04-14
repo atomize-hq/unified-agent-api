@@ -9,7 +9,7 @@ evidence. It is additive to the universal platform parity baseline.
 
 ## Baseline (referenced; not duplicated)
 
-- `docs/project_management/next/universal-agent-api/platform-parity-spec.md`
+- `docs/project_management/next/unified-agent-api/platform-parity-spec.md`
 
 ## CI parity platforms (required)
 

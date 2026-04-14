@@ -30,7 +30,7 @@ Selection: **A** (v1)
 Pinned message:
 - `"cancelled"` is defined canonically in:
   - `docs/project_management/packs/active/agent-api-explicit-cancellation/seam-1-cancellation-contract.md`, and
-  - `docs/specs/universal-agent-api/run-protocol-spec.md`.
+  - `docs/specs/unified-agent-api/run-protocol-spec.md`.
 
 ## DR-CA-0003 — Capability gating for explicit cancellation
 

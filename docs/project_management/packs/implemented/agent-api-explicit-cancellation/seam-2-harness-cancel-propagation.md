@@ -23,7 +23,7 @@ MUST NOT regress.
     `events` stream is final (`None`).
   - if the consumer opts out by dropping `events`, `completion` MAY resolve after process exit
     without waiting for stream finality.
-- Canonical: `docs/specs/universal-agent-api/run-protocol-spec.md` (DR-0012).
+- Canonical: `docs/specs/unified-agent-api/run-protocol-spec.md` (DR-0012).
 
 ## Requirements
 
@@ -32,7 +32,7 @@ MUST NOT regress.
 - Explicit cancellation must be orthogonal:
   - it must not depend on receiver drop, and
   - it must not depend on consumer-side timeout wrappers.
-  - it must satisfy the cancel-handle lifetime guarantee in `docs/specs/universal-agent-api/run-protocol-spec.md`
+  - it must satisfy the cancel-handle lifetime guarantee in `docs/specs/unified-agent-api/run-protocol-spec.md`
     (“Cancel handle lifetime (orthogonal)”), i.e. `cancel()` must still function even if the caller
     drops `events` and/or drops the run handle.
 - Cancellation MUST NOT violate completion gating (BH-C05 / DR-0012):

@@ -48,7 +48,7 @@ proceed with triads `C1 → C2`.
 
 ## Positive Findings
 
-- ✅ Core extension ownership rules are centralized in `docs/project_management/next/universal-agent-api/extensions-spec.md`.
+- ✅ Core extension ownership rules are centralized in `docs/project_management/next/unified-agent-api/extensions-spec.md`.
 - ✅ `.github/workflows/ci.yml` now includes `cargo test -p agent_api --all-features` (ubuntu-latest) as required by the decision register.
 - ✅ `.github/workflows/agent-api-codex-stream-exec-smoke.yml` matches the pack’s platform parity spec (OS matrix + public API guard + Linux preflight).
 

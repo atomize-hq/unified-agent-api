@@ -1,6 +1,6 @@
 # Claude Code CLI Parity Ops Playbook
 
-This is the maintainer runbook for keeping `crates/claude_code` in parity with upstream **Claude Code CLI** releases using the same parity framework used by the Codex wrapper.
+This is the maintainer runbook for keeping `crates/claude_code` in parity with upstream **Claude Code CLI** releases using the same parity framework used by the Codex crate.
 
 Key references:
 - Parity framework ADRs: `docs/adr/0001-codex-cli-parity-maintenance.md`, `docs/adr/0003-wrapper-coverage-auto-generation.md`, `docs/adr/0004-wrapper-coverage-iu-subtree-inheritance.md`

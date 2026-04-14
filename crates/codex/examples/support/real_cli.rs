@@ -1,7 +1,7 @@
 //! Small helper for examples that need a real Codex CLI binary + CODEX_HOME.
 //!
 //! Conventions:
-//! - The Codex wrapper already honors `CODEX_BINARY` / `CODEX_HOME` via the builder defaults, but
+//! - The Codex crate already honors `CODEX_BINARY` / `CODEX_HOME` via the builder defaults, but
 //!   examples can opt into an isolated home under `target/` to avoid mutating a user's real home.
 //! - When isolated, you may optionally seed auth (`auth.json` + `.credentials.json`) from an
 //!   existing home so cloud commands can run without re-login.

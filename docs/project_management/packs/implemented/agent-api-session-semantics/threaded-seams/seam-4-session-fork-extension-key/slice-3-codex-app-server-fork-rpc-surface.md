@@ -15,7 +15,7 @@
       - cancellation (`$ /cancelRequest`) request shape + cancellation response handling.
     - Ensure `initialize` can be sent with `capabilities.experimentalApi=true` for deterministic method availability (per contract).
   - Out:
-    - `agent_api` Codex backend fork integration and Universal Agent API event mapping (`S4`).
+    - `agent_api` Codex backend fork integration and Unified Agent API event mapping (`S4`).
     - Any capability advertisement in `agent_api` (this slice is wrapper-only).
 - **Acceptance criteria**:
   - Wrapper can call:
@@ -35,7 +35,7 @@
 
 #### S3.T1 — Add typed protocol models for `thread/list`, `thread/fork`, and fork-oriented `turn/start` params
 
-- **Outcome**: The codex wrapper has concrete, serde-backed Rust types matching the pinned app-server wire contract, making request construction and response parsing deterministic.
+- **Outcome**: The codex crate has concrete, serde-backed Rust types matching the pinned app-server wire contract, making request construction and response parsing deterministic.
 - **Inputs/outputs**:
   - Inputs: pinned wire shapes in `docs/specs/codex-app-server-jsonrpc-contract.md`.
   - Outputs: new/extended protocol structs/enums with serde renames matching wire fields.

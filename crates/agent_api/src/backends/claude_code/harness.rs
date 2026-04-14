@@ -16,9 +16,10 @@ use super::{
     },
     util::{
         build_fresh_run_print_request, json_contains_add_dirs_runtime_rejection_signal,
-        json_contains_not_found_signal, parse_bool, preflight_allow_flag_support,
-        render_backend_error_message, resolve_claude_effective_working_dir,
-        resolve_completion_messages, startup_failure_spawn, ADD_DIRS_RUNTIME_REJECTION_MESSAGE,
+        json_contains_model_runtime_rejection_signal, json_contains_not_found_signal, parse_bool,
+        preflight_allow_flag_support, render_backend_error_message,
+        resolve_claude_effective_working_dir, resolve_completion_messages, startup_failure_spawn,
+        ADD_DIRS_RUNTIME_REJECTION_MESSAGE, PINNED_MODEL_RUNTIME_REJECTION,
     },
     ClaudeCodeBackendConfig, AGENT_KIND, CLAUDE_EXEC_POLICY_PREFIX, EXT_ADD_DIRS_V1,
     EXT_EXTERNAL_SANDBOX_V1, EXT_NON_INTERACTIVE, PINNED_EXTERNAL_SANDBOX_WARNING,
@@ -245,6 +246,7 @@ impl BackendHarnessAdapter for ClaudeHarnessAdapter {
         let allow_flag_preflight = Arc::clone(&self.allow_flag_preflight);
         let NormalizedRequest {
             prompt,
+            model_id,
             working_dir: _raw_working_dir,
             effective_timeout,
             env,
@@ -310,6 +312,11 @@ impl BackendHarnessAdapter for ClaudeHarnessAdapter {
                 &add_dirs,
             );
 
+            let has_model_id = model_id.is_some();
+            if let Some(model_id) = model_id {
+                print_req = print_req.model(model_id);
+            }
+
             if let Some(resume) = resume.as_ref() {
                 match resume {
                     SessionSelectorV1::Last => {
@@ -351,7 +358,8 @@ impl BackendHarnessAdapter for ClaudeHarnessAdapter {
                 Arc::new(Mutex::new(ClaudeStreamState::default()));
             let (events_done_tx, events_done_rx) = oneshot::channel::<()>();
 
-            let monitor_backend_error_tail = selection_selector.is_some() || has_add_dirs;
+            let monitor_backend_error_tail =
+                selection_selector.is_some() || has_add_dirs || has_model_id;
             let (tail_tx, tail_rx) = if monitor_backend_error_tail {
                 let (tx, rx) = oneshot::channel::<Option<String>>();
                 (Some(tx), Some(rx))
@@ -368,6 +376,7 @@ impl BackendHarnessAdapter for ClaudeHarnessAdapter {
                         tail_rx,
                         selection_selector.clone(),
                         has_add_dirs,
+                        has_model_id,
                         false,
                     ),
                     |(
@@ -377,6 +386,7 @@ impl BackendHarnessAdapter for ClaudeHarnessAdapter {
                         mut tail_rx,
                         selection_selector,
                         has_add_dirs,
+                        has_model_id,
                         tail_emitted,
                     )| async move {
                         loop {
@@ -414,6 +424,28 @@ impl BackendHarnessAdapter for ClaudeHarnessAdapter {
                                                     state.backend_error_message = Some(
                                                         ADD_DIRS_RUNTIME_REJECTION_MESSAGE
                                                             .to_string(),
+                                                    );
+                                                }
+                                                continue;
+                                            }
+                                        }
+                                    }
+
+                                    if has_model_id
+                                        && matches!(
+                                            ev,
+                                            claude_code::ClaudeStreamJsonEvent::ResultError { .. }
+                                        )
+                                    {
+                                        if let claude_code::ClaudeStreamJsonEvent::ResultError {
+                                            raw,
+                                            ..
+                                        } = &ev
+                                        {
+                                            if json_contains_model_runtime_rejection_signal(raw) {
+                                                if let Ok(mut state) = stream_state.lock() {
+                                                    state.backend_error_message = Some(
+                                                        PINNED_MODEL_RUNTIME_REJECTION.to_string(),
                                                     );
                                                 }
                                                 continue;
@@ -459,6 +491,7 @@ impl BackendHarnessAdapter for ClaudeHarnessAdapter {
                                             tail_rx,
                                             selection_selector,
                                             has_add_dirs,
+                                            has_model_id,
                                             tail_emitted,
                                         ),
                                     ));
@@ -477,6 +510,7 @@ impl BackendHarnessAdapter for ClaudeHarnessAdapter {
                                             tail_rx,
                                             selection_selector,
                                             has_add_dirs,
+                                            has_model_id,
                                             tail_emitted,
                                         ),
                                     ));
@@ -502,6 +536,7 @@ impl BackendHarnessAdapter for ClaudeHarnessAdapter {
                                             tail_rx,
                                             selection_selector,
                                             has_add_dirs,
+                                            has_model_id,
                                             true,
                                         ),
                                     ));
@@ -565,7 +600,11 @@ impl BackendHarnessAdapter for ClaudeHarnessAdapter {
                 })
             });
 
-            Ok(BackendSpawn { events, completion })
+            Ok(BackendSpawn {
+                events,
+                completion,
+                events_observability: None,
+            })
         })
     }
 

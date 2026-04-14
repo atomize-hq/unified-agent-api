@@ -27,7 +27,7 @@ protocol. Without scoping what “cancel” means, these read as contradictory.
 
 - Normative spec defines drop as a *best-effort cancellation signal* and requires explicit cancellation
   for deterministic “stop” control:
-  - `docs/specs/universal-agent-api/run-protocol-spec.md:64-70`
+  - `docs/specs/unified-agent-api/run-protocol-spec.md:64-70`
 - Backend harness design explicitly preserves drain-on-drop behavior to avoid deadlocks/cancellation hazards:
   - `docs/adr/0013-agent-api-backend-harness.md:37-45`
   - `docs/adr/0013-agent-api-backend-harness.md:61-74`

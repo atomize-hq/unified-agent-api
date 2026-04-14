@@ -7,11 +7,11 @@ Owner: agent-api-codex-stream-exec triad (C0)
 ## Scope (required)
 
 Enable `agent_api` to apply per-run environment overrides while still executing Codex via the
-Codex wrapper streaming surface (`codex::CodexClient::stream_exec`).
+Codex crate streaming surface (`codex::CodexClient::stream_exec`).
 
 ### In-scope deliverables
 
-- Additive Codex wrapper API that allows **per-invocation** environment variable injection for the
+- Additive Codex crate API that allows **per-invocation** environment variable injection for the
   `stream_exec` spawn path (without mutating the parent env).
 - The API MUST allow `agent_api` to enforce env precedence:
   - request env overrides backend env keys (request keys win).
@@ -23,13 +23,13 @@ Codex wrapper streaming surface (`codex::CodexClient::stream_exec`).
 - Any `agent_api` refactor (C1).
 - Any new universal API surface or extension keys.
 - Replacing Codex JSONL parsing/normalization contracts.
-- Bounded ingestion refactors inside the Codex wrapper (ADR 0007 is a reference posture only).
+- Bounded ingestion refactors inside the Codex crate (ADR 0007 is a reference posture only).
 
 ## Requirements (normative)
 
 ### R0 — No parent env mutation
 
-The Codex wrapper changes in C0 MUST NOT call `std::env::set_var`, `std::env::remove_var`, or any
+The Codex crate changes in C0 MUST NOT call `std::env::set_var`, `std::env::remove_var`, or any
 equivalent global mutation. Env overrides MUST apply only to the spawned `tokio::process::Command`.
 
 ### R1 — Precedence

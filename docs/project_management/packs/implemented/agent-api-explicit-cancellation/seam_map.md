@@ -6,8 +6,8 @@
    - Owns: the cancellation API surface and its exact behavior.
    - Outputs:
      - `docs/project_management/packs/active/agent-api-explicit-cancellation/seam-1-cancellation-contract.md`
-     - updates to `docs/specs/universal-agent-api/contract.md`
-     - updates to `docs/specs/universal-agent-api/run-protocol-spec.md`
+     - updates to `docs/specs/unified-agent-api/contract.md`
+     - updates to `docs/specs/unified-agent-api/run-protocol-spec.md`
 
 2) **SEAM-2 — Harness cancellation propagation**
    - Owns: how cancellation is wired into the backend harness driver tasks without breaking

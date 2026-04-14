@@ -9,9 +9,9 @@
     - Editing backend-owned session mapping docs.
     - Writing or changing backend tests.
 - **Acceptance criteria**:
-  - `docs/specs/universal-agent-api/extensions-spec.md` states that accepted add-dir inputs are orthogonal to session selector keys and must survive new-session, resume, and fork decision-making unless a pinned backend rejection contract applies.
+  - `docs/specs/unified-agent-api/extensions-spec.md` states that accepted add-dir inputs are orthogonal to session selector keys and must survive new-session, resume, and fork decision-making unless a pinned backend rejection contract applies.
   - ADR-0021 reflects the same fork/resume truth, including the pinned Codex fork rejection boundary and Claude fork applicability.
-  - `make adr-check ADR=docs/adr/0021-universal-agent-api-add-dirs.md` passes after any ADR edits.
+  - `make adr-check ADR=docs/adr/0021-unified-agent-api-add-dirs.md` passes after any ADR edits.
 - **Dependencies**:
   - Requires `S1` to establish the base add-dir contract.
   - Evidence-only references:
@@ -20,21 +20,21 @@
     - `docs/project_management/packs/active/agent-api-add-dirs/threading.md`
 - **Verification**:
   - Spec review against `AD-C04`.
-  - `make adr-check ADR=docs/adr/0021-universal-agent-api-add-dirs.md`
+  - `make adr-check ADR=docs/adr/0021-unified-agent-api-add-dirs.md`
 - **Rollout/safety**:
   - Doc-only and additive.
   - Backend doc updates remain owned by later seams; use them here only as evidence.
 
 #### S2.T1 — Publish the session-flow parity contract in the owner doc
 
-- **Outcome**: `docs/specs/universal-agent-api/extensions-spec.md` unambiguously describes how accepted add-dir inputs interact with resume and fork flows.
+- **Outcome**: `docs/specs/unified-agent-api/extensions-spec.md` unambiguously describes how accepted add-dir inputs interact with resume and fork flows.
 - **Inputs/outputs**:
   - Inputs:
     - `docs/project_management/packs/active/agent-api-add-dirs/threading.md`
     - `docs/specs/codex-app-server-jsonrpc-contract.md`
     - `docs/specs/claude-code-session-mapping-contract.md`
   - Outputs:
-    - Updated `docs/specs/universal-agent-api/extensions-spec.md`
+    - Updated `docs/specs/unified-agent-api/extensions-spec.md`
 - **Implementation notes**:
   - Keep the owner doc focused on the universal rule: accepted add-dir inputs must survive session selection unless a pinned backend-owned rejection contract applies.
   - Name the pinned Codex fork exception without trying to redefine the backend contract inside this seam.
@@ -49,7 +49,7 @@
 
 Checklist:
 - Implement:
-  - Tighten the session-compatibility paragraphs in `docs/specs/universal-agent-api/extensions-spec.md`.
+  - Tighten the session-compatibility paragraphs in `docs/specs/unified-agent-api/extensions-spec.md`.
   - Cross-check the language against the pinned Codex and Claude evidence docs without editing them.
 - Test:
   - Confirm the resulting text covers new-session, resume selector behavior, and fork behavior.
@@ -63,20 +63,20 @@ Checklist:
 - **Outcome**: ADR-0021 remains a rationale/plan document that derives from the owner doc and passes the repo’s ADR drift check.
 - **Inputs/outputs**:
   - Inputs:
-    - Updated `docs/specs/universal-agent-api/extensions-spec.md`
-    - `docs/adr/0021-universal-agent-api-add-dirs.md`
+    - Updated `docs/specs/unified-agent-api/extensions-spec.md`
+    - `docs/adr/0021-unified-agent-api-add-dirs.md`
   - Outputs:
-    - Updated `docs/adr/0021-universal-agent-api-add-dirs.md`
+    - Updated `docs/adr/0021-unified-agent-api-add-dirs.md`
     - Refreshed ADR drift hash if the ADR body changed
 - **Implementation notes**:
   - Keep the ADR non-normative.
   - If the ADR body changes, run the repo-prescribed fix/check sequence rather than hand-editing the guard hash.
 - **Acceptance criteria**:
   - ADR session-flow text matches the owner doc on orthogonality, Claude fork applicability, and the pinned Codex fork rejection path.
-  - `make adr-check ADR=docs/adr/0021-universal-agent-api-add-dirs.md` passes.
+  - `make adr-check ADR=docs/adr/0021-unified-agent-api-add-dirs.md` passes.
 - **Test notes**:
-  - Run `make adr-fix ADR=docs/adr/0021-universal-agent-api-add-dirs.md` only if the ADR changed.
-  - Then run `make adr-check ADR=docs/adr/0021-universal-agent-api-add-dirs.md`.
+  - Run `make adr-fix ADR=docs/adr/0021-unified-agent-api-add-dirs.md` only if the ADR changed.
+  - Then run `make adr-check ADR=docs/adr/0021-unified-agent-api-add-dirs.md`.
 - **Risk/rollback notes**:
   - Main risk is leaving the ADR_BODY_SHA256 stale after a content update.
 
@@ -84,8 +84,8 @@ Checklist:
 - Implement:
   - Edit ADR-0021 so it mirrors the owner-doc session-flow truth and clearly defers normative ownership to `extensions-spec.md`.
 - Test:
-  - Run `make adr-fix ADR=docs/adr/0021-universal-agent-api-add-dirs.md` if needed.
-  - Run `make adr-check ADR=docs/adr/0021-universal-agent-api-add-dirs.md`.
+  - Run `make adr-fix ADR=docs/adr/0021-unified-agent-api-add-dirs.md` if needed.
+  - Run `make adr-check ADR=docs/adr/0021-unified-agent-api-add-dirs.md`.
 - Validate:
   - Confirm ADR-0021 still reads as rationale plus implementation plan, not as a competing contract.
 - Cleanup:

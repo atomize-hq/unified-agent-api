@@ -51,7 +51,7 @@
 - **Outcome**: Deterministic argv composition functions for Claude write ops (no subprocess spawning), including pinned
   rejection behavior for `Url.bearer_token_env_var`.
 - **Inputs/outputs**:
-  - Input: `docs/specs/universal-agent-api/mcp-management-spec.md` (“Claude Code backend mapping (pinned)”)
+  - Input: `docs/specs/unified-agent-api/mcp-management-spec.md` (“Claude Code backend mapping (pinned)”)
   - Output (suggested):
     - `crates/agent_api/src/backends/claude_code/mcp_management.rs`: `fn claude_mcp_remove_argv(name: &str) -> Vec<OsString>`
     - `crates/agent_api/src/backends/claude_code/mcp_management.rs`: `fn claude_mcp_add_argv(name: &str, transport: ...) -> Result<Vec<OsString>, AgentWrapperError>`
@@ -115,7 +115,7 @@ Checklist:
 - **Outcome**: Deterministic regression tests that prevent drift in `add/remove` argv mapping, write gating, and the pinned
   bearer-token rejection rule.
 - **Inputs/outputs**:
-  - Input: `docs/specs/universal-agent-api/mcp-management-spec.md` (mapping + gating + bearer-token semantics)
+  - Input: `docs/specs/unified-agent-api/mcp-management-spec.md` (mapping + gating + bearer-token semantics)
   - Output: unit tests under `crates/agent_api/src/backends/claude_code/mcp_management.rs` (or adjacent test module).
 - **Implementation notes**:
   - Pin that `mcp_add/remove` return `UnsupportedCapability` when write capability ids are absent.

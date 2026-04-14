@@ -24,7 +24,7 @@
     - `agent_api::backends::codex::CodexBackendConfig`
     - `agent_api::backends::claude_code::ClaudeCodeBackendConfig`
   - Canonical contract location for the host-facing config surface:
-    - `docs/specs/universal-agent-api/contract.md`
+    - `docs/specs/unified-agent-api/contract.md`
   - When `false`:
     - capability id `agent_api.exec.external_sandbox.v1` is absent from `capabilities()`, and
     - attempts to send the extension key fail closed as `UnsupportedCapability`.

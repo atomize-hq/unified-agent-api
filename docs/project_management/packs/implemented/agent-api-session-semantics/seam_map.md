@@ -1,6 +1,6 @@
-# Seam Map — Universal Agent API session semantics (ADR-0015 + ADR-0017)
+# Seam Map — Unified Agent API session semantics (ADR-0015 + ADR-0017)
 
-Primary extraction axis: **integration-first (risk-first)** — the initiative spans multiple crates and two built-in backends; the value is unlocked by pinning explicit contracts (extension keys + facets) and then mapping them safely into each backend without violating Universal Agent API bounds/redaction rules.
+Primary extraction axis: **integration-first (risk-first)** — the initiative spans multiple crates and two built-in backends; the value is unlocked by pinning explicit contracts (extension keys + facets) and then mapping them safely into each backend without violating Unified Agent API bounds/redaction rules.
 
 ## Seams (pruned)
 

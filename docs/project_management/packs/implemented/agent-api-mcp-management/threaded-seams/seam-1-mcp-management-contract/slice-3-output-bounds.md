@@ -3,7 +3,7 @@
 - **User/system value**: Pins deterministic, UTF-8-safe stdout/stderr bounds behavior (MM-C04) as shared code so built-in backend mappings (SEAM-3/4) can reuse it without re-implementing truncation semantics.
 - **Scope (in/out)**:
   - In:
-    - Add SEAM-1-owned helpers that implement the pinned output bounds + truncation algorithm from `docs/specs/universal-agent-api/mcp-management-spec.md`:
+    - Add SEAM-1-owned helpers that implement the pinned output bounds + truncation algorithm from `docs/specs/unified-agent-api/mcp-management-spec.md`:
       - `stdout` bound: 65,536 bytes
       - `stderr` bound: 65,536 bytes
       - suffix: `…(truncated)`
@@ -49,7 +49,7 @@ touch surface should be made more concrete than the current optional wording.
 
 1. Canonicalize the shared truncation primitives in `bounds.rs`.
    - Use one shared truncation suffix constant (`…(truncated)`) and one shared UTF-8-safe truncate helper so MCP bounds do
-     not drift from existing Universal Agent API bounds behavior.
+     not drift from existing Unified Agent API bounds behavior.
 2. Add a single MCP-focused helper in `bounds.rs`.
    - Preferred signature:
      `pub(crate) fn enforce_mcp_output_bound(bytes: &[u8], saw_more_bytes: bool, bound_bytes: usize) -> (String, bool)`
@@ -84,7 +84,7 @@ decode. This is the easiest place for SEAM-3/4 to drift if the helper is undersp
 
 - **Outcome**: A crate-visible helper that converts captured bytes + “saw more” flag into bounded UTF-8 strings + truncation flags.
 - **Inputs/outputs**:
-  - Input: `docs/specs/universal-agent-api/mcp-management-spec.md` (“Output capture + truncation algorithm (pinned)”)
+  - Input: `docs/specs/unified-agent-api/mcp-management-spec.md` (“Output capture + truncation algorithm (pinned)”)
   - Output: helper(s) in `crates/agent_api/src/bounds.rs`, optionally wrapped/discoverable from `crates/agent_api/src/mcp.rs`, such as:
     - `enforce_mcp_output_bound(bytes: &[u8], saw_more: bool, bound_bytes: usize) -> (String, bool)`
     - (optional) `enforce_mcp_output(stdout: Captured, stderr: Captured) -> (stdout, stderr, flags)`
@@ -139,7 +139,7 @@ Checklist:
 
 - **Outcome**: A short comment/doc note pointing SEAM-3/4 at the helper so they do not reimplement bounds logic.
 - **Inputs/outputs**:
-  - Output: doc comment in `crates/agent_api/src/mcp.rs` (or a brief note in `docs/specs/universal-agent-api/mcp-management-spec.md` if clarification is needed while the spec is Draft).
+  - Output: doc comment in `crates/agent_api/src/mcp.rs` (or a brief note in `docs/specs/unified-agent-api/mcp-management-spec.md` if clarification is needed while the spec is Draft).
 - **Implementation notes**:
   - Keep guidance non-normative; the normative algorithm remains in the spec.
   - Prefer a short doc comment on the helper itself and, if needed, a one-line reference near

@@ -1,24 +1,54 @@
-### S3 — Runtime rejection conformance and contract publication
+---
+slice_id: S3
+seam_id: SEAM-3
+slice_kind: delivery
+execution_horizon: active
+status: decomposed
+plan_version: v1
+basis:
+  currentness: current
+  basis_ref: seam.md#basis
+  stale_triggers: []
+gates:
+  pre_exec:
+    review: inherited
+    contract: inherited
+    revalidation: inherited
+  post_exec:
+    landing: pending
+    closeout: pending
+threads:
+  - THR-04
+contracts_produced:
+  - C-06
+contracts_consumed:
+  - C-04
+  - C-09
+open_remediations: []
+candidate_subslices: []
+---
+### S3 - Runtime rejection conformance
 
-- **Status**: decomposed into sub-slices sized for a single Codex session.
-- **Why decomposed**:
-  - touches runtime classification code plus a dedicated fake scenario binary
-  - spans multiple verification layers across backend runtime tests and focused Codex contract tests
-  - includes two normative spec updates in addition to code/test work
-- **Archived original**: `archive/slice-3-runtime-rejection-conformance.md`
-- **Sub-slice directory**: `slice-3-runtime-rejection-conformance/`
+- **User/system value**: ensures syntactically-valid but runtime-rejected model ids fail safely and consistently (completion + terminal Error event parity) even when the stream is already open.
+- **Scope (in/out)**:
+  - In:
+    - runtime rejection classification + safe message translation
+    - scenario coverage for "stream already open then reject"
+  - Out:
+    - capability advertising ownership (SEAM-2)
+- **Acceptance criteria**:
+  - completion error message and terminal Error event message match
+  - no raw model ids or stderr leaks into consumer-visible errors
+- **Dependencies**: S1/S2, `C-04`
+- **Verification**: use the fake-codex "midstream runtime rejection" scenario and assert parity.
+- **Rollout/safety**: treat unsafe translation as a merge blocker.
 
-#### Sub-slices
+#### S3.T1 - Implement/validate runtime rejection translation and parity
 
-- `subslice-1-runtime-rejection-translation.md`
-  - Covers the implementation core of original `S3.T1`: fake-scenario support plus the narrowed runtime-rejection translation path and event/completion parity.
-- `subslice-2-runtime-rejection-backend-tests.md`
-  - Covers the backend regression layer extracted from original `S3` verification work: focused Codex tests that pin runtime translation, mapping, and fork posture without changing normative docs.
-- `subslice-3-codex-contract-publication.md`
-  - Covers the normative publication portion extracted from original `S3.T2`: update the two Codex spec contracts after S1/S2/S3a behavior is stable.
+- **Outcome**: safe `Backend` translation is used for runtime model rejection, with event/completion parity.
+- **Thread/contract refs**: `THR-04`, `C-04`
 
-#### Sequencing
+#### S3.T2 - Add focused regression tests for stream-open failure
 
-- Start with `subslice-1-runtime-rejection-translation.md`.
-- Follow with `subslice-2-runtime-rejection-backend-tests.md`.
-- Finish with `subslice-3-codex-contract-publication.md` once the code and focused tests are settled.
+- **Outcome**: tests lock parity and redaction posture.
+- **Thread/contract refs**: `THR-04`, `C-04`

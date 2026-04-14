@@ -16,6 +16,7 @@ use crate::{
     },
     AgentWrapperBackend, AgentWrapperCapabilities, AgentWrapperError, AgentWrapperKind,
     AgentWrapperRunControl, AgentWrapperRunHandle, AgentWrapperRunRequest,
+    EXT_AGENT_API_CONFIG_MODEL_V1,
 };
 
 use super::super::session_selectors::{EXT_SESSION_FORK_V1, EXT_SESSION_RESUME_V1};
@@ -47,6 +48,7 @@ impl AgentWrapperBackend for CodexBackend {
         ids.insert(CAP_TOOLS_RESULTS_V1.to_string());
         ids.insert(CAP_ARTIFACTS_FINAL_TEXT_V1.to_string());
         ids.insert(CAP_SESSION_HANDLE_V1.to_string());
+        ids.insert(EXT_AGENT_API_CONFIG_MODEL_V1.to_string());
         ids.insert("backend.codex.exec_stream".to_string());
         ids.insert(EXT_ADD_DIRS_V1.to_string());
         ids.insert(EXT_NON_INTERACTIVE.to_string());

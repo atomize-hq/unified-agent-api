@@ -19,7 +19,7 @@
       - `external_sandbox=true` + `agent_api.exec.non_interactive=false` → `AgentWrapperError::InvalidRequest`
       - `external_sandbox=true` + any `backend.codex.exec.*` key present → `AgentWrapperError::InvalidRequest`
     - Emit the pinned warning `Status` event when `external_sandbox=true` is accepted (exact
-      message + ordering per `docs/specs/universal-agent-api/extensions-spec.md`).
+      message + ordering per `docs/specs/unified-agent-api/extensions-spec.md`).
     - Apply the pinned mapping contract (ES-C04) across all Codex entrypoints:
       - Exec/resume: configure
         `codex::CodexClientBuilder::dangerously_bypass_approvals_and_sandbox(true)`.
@@ -66,13 +66,13 @@ Normative source of truth for ES-C04. Treat the slices below as a code conforman
 - **Contracts consumed**:
   - `ES-C01`: External sandbox execution policy extension key — the key id
     `agent_api.exec.external_sandbox.v1` (boolean; validated before spawn) owned by SEAM-1
-    (`docs/specs/universal-agent-api/extensions-spec.md`).
+    (`docs/specs/unified-agent-api/extensions-spec.md`).
     - Consumed by: `S1.T1` (value validation + extraction) and `S1.T2` (warning event gating).
   - `ES-C02`: Non-interactive invariant — `external_sandbox=true` MUST NOT be combined with
     `agent_api.exec.non_interactive=false` (InvalidRequest) owned by SEAM-1.
     - Consumed by: `S1.T1` (contradiction validation).
   - `ES-C03`: Safe default advertising — Codex MUST NOT advertise the key by default; host opt-in
-    via backend config `allow_external_sandbox_exec` (canonical: `docs/specs/universal-agent-api/contract.md`).
+    via backend config `allow_external_sandbox_exec` (canonical: `docs/specs/unified-agent-api/contract.md`).
     - Consumed by: `S1`/`S2` (assumption: runs only reach mapping when opt-in is enabled).
   - `ES-C06`: Exec-policy combination rule — forbid any `backend.<agent_kind>.exec.*` keys when
     `external_sandbox=true` (InvalidRequest) owned by SEAM-1.

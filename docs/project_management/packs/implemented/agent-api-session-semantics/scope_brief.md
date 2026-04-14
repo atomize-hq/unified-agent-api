@@ -1,7 +1,7 @@
-# Scope Brief — Universal Agent API session semantics (ADR-0015 + ADR-0017)
+# Scope Brief — Unified Agent API session semantics (ADR-0015 + ADR-0017)
 
-- **Goal (1 sentence)**: Ship universal, capability-gated session/thread semantics for `agent_api` (resume/fork + discoverable session ids) so orchestration code can implement “resume last / resume by id / fork” without per-backend parsing and without breaking Universal Agent API safety/bounds rules.
-- **Why now**: The core spec contracts for session extension keys and session-handle emission are already pinned under `docs/specs/universal-agent-api/**`; remaining work is to implement and advertise them across built-in backends so the features become usable in real orchestrators.
+- **Goal (1 sentence)**: Ship universal, capability-gated session/thread semantics for `agent_api` (resume/fork + discoverable session ids) so orchestration code can implement “resume last / resume by id / fork” without per-backend parsing and without breaking Unified Agent API safety/bounds rules.
+- **Why now**: The core spec contracts for session extension keys and session-handle emission are already pinned under `docs/specs/unified-agent-api/**`; remaining work is to implement and advertise them across built-in backends so the features become usable in real orchestrators.
 - **Primary user(s) + JTBD**:
   - Orchestrators/hosts using `crates/agent_api`: “Resume or fork a conversation deterministically across Codex and Claude Code.”
   - Maintainers onboarding new backends: “Implement session semantics once via stable keys + facets, not bespoke glue per backend.”
@@ -42,7 +42,7 @@
   - Codex resume mapping: `crates/codex` streaming resume currently lacks a termination handle and per-run env overrides; `agent_api` requires the control + env-override entrypoint pinned in SA-C05 to preserve cancellation + env semantics parity with `exec`.
   - Ensuring the handle facet is emitted **exactly once** per run and attached to completion when known, without violating bounds (omit-on-oversize + safe warning).
 - **Assumptions**:
-  - Canonical specs under `docs/specs/universal-agent-api/**` already register:
+  - Canonical specs under `docs/specs/unified-agent-api/**` already register:
     - the session extension keys (`agent_api.session.resume.v1`, `agent_api.session.fork.v1`), and
     - the session handle capability/facet (`agent_api.session.handle.v1`),
     and this pack is purely the execution plan for implementations/tests.
@@ -52,13 +52,13 @@
 
 From `docs/backlog.json` (in dependency/order-to-ship sequence, with current status) and the ADR that defines it:
 
-- `uaa-0013` (done) → ADR-0015 `docs/adr/0015-universal-agent-api-session-extensions.md`
-- `uaa-0011` (done; redundant design item) → ADR-0015 `docs/adr/0015-universal-agent-api-session-extensions.md`
-- `uaa-0004` (todo) → ADR-0015 `docs/adr/0015-universal-agent-api-session-extensions.md`
-- `uaa-0005` (todo) → ADR-0015 `docs/adr/0015-universal-agent-api-session-extensions.md`
-- `uaa-0007` (todo) → ADR-0015 `docs/adr/0015-universal-agent-api-session-extensions.md`
-- `uaa-0017` (todo; prerequisite for uaa-0015) → ADR-0017 `docs/adr/0017-universal-agent-api-session-thread-id-surfacing.md`
-- `uaa-0015` (todo) → ADR-0017 `docs/adr/0017-universal-agent-api-session-thread-id-surfacing.md`
+- `uaa-0013` (done) → ADR-0015 `docs/adr/0015-unified-agent-api-session-extensions.md`
+- `uaa-0011` (done; redundant design item) → ADR-0015 `docs/adr/0015-unified-agent-api-session-extensions.md`
+- `uaa-0004` (todo) → ADR-0015 `docs/adr/0015-unified-agent-api-session-extensions.md`
+- `uaa-0005` (todo) → ADR-0015 `docs/adr/0015-unified-agent-api-session-extensions.md`
+- `uaa-0007` (todo) → ADR-0015 `docs/adr/0015-unified-agent-api-session-extensions.md`
+- `uaa-0017` (todo; prerequisite for uaa-0015) → ADR-0017 `docs/adr/0017-unified-agent-api-session-thread-id-surfacing.md`
+- `uaa-0015` (todo) → ADR-0017 `docs/adr/0017-unified-agent-api-session-thread-id-surfacing.md`
 
 ## Capability inventory (implied by scope; no seams yet)
 
@@ -71,7 +71,7 @@ From `docs/backlog.json` (in dependency/order-to-ship sequence, with current sta
   - Claude session id (`ClaudeStreamJsonEvent::SystemInit.session_id` and friends).
 - Session handle facet emission (event + completion) behind capability id `agent_api.session.handle.v1`.
 - Capability advertisement updates (only advertise once implemented and tested).
-- Capability matrix documentation handoff: after advertising new session capability ids, regenerate and commit `docs/specs/universal-agent-api/capability-matrix.md` via `cargo run -p xtask -- capability-matrix`.
+- Capability matrix documentation handoff: after advertising new session capability ids, regenerate and commit `docs/specs/unified-agent-api/capability-matrix.md` via `cargo run -p xtask -- capability-matrix`.
 - Tests:
   - request validation failures (type errors, unknown keys, selector/id rules, mutual exclusivity),
   - per-backend spawn mapping (argv / command shape),
@@ -80,14 +80,14 @@ From `docs/backlog.json` (in dependency/order-to-ship sequence, with current sta
 ## Canonical dependencies (authoritative anchors)
 
 - Extension key registry + validation rules (normative):
-  - `docs/specs/universal-agent-api/extensions-spec.md`
+  - `docs/specs/unified-agent-api/extensions-spec.md`
 - Capability ids + bucketing rules (normative):
-  - `docs/specs/universal-agent-api/capabilities-schema-spec.md`
+  - `docs/specs/unified-agent-api/capabilities-schema-spec.md`
 - Event + completion envelope + handle facet schema/emission (normative):
-  - `docs/specs/universal-agent-api/event-envelope-schema-spec.md`
+  - `docs/specs/unified-agent-api/event-envelope-schema-spec.md`
 - Run protocol validation timing + fail-closed rules (normative):
-  - `docs/specs/universal-agent-api/run-protocol-spec.md`
+  - `docs/specs/unified-agent-api/run-protocol-spec.md`
 
 Conflict resolution rule (pinned):
-- If this pack drifts from a document under `docs/specs/universal-agent-api/`, the spec wins.
+- If this pack drifts from a document under `docs/specs/unified-agent-api/`, the spec wins.
 - This pack MUST be updated to match the spec before implementation proceeds.

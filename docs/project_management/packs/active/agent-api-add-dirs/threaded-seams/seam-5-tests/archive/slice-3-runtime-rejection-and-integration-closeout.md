@@ -10,7 +10,7 @@
       - exactly one terminal `AgentWrapperEventKind::Error` event,
       - event message equals the completion backend error message exactly,
       - no raw path/stdout/stderr sentinel leaks.
-    - Regenerated `docs/specs/universal-agent-api/capability-matrix.md`.
+    - Regenerated `docs/specs/unified-agent-api/capability-matrix.md`.
     - Same-change verification for `cargo run -p xtask -- capability-matrix`, `make test`, and
       `make preflight`.
   - Out:
@@ -107,7 +107,7 @@ Checklist:
 - **Inputs/outputs**:
   - Input: completed backend capability publication and regression tests from `S2`.
   - Output:
-    - regenerated `docs/specs/universal-agent-api/capability-matrix.md`
+    - regenerated `docs/specs/unified-agent-api/capability-matrix.md`
     - same-change verification evidence for:
       - `cargo run -p xtask -- capability-matrix`
       - `make test`
@@ -125,7 +125,7 @@ Checklist:
   - If the matrix or full gate fails, the seam is not complete.
 
 Checklist:
-- Implement: regenerate `docs/specs/universal-agent-api/capability-matrix.md`.
+- Implement: regenerate `docs/specs/unified-agent-api/capability-matrix.md`.
 - Test: run `cargo run -p xtask -- capability-matrix`, `make test`, and `make preflight`.
 - Validate: confirm the generated matrix row shows both `claude_code` and `codex` as supported.
 - Cleanup: ensure no scratch artifacts or stale generated diffs remain in the change.
