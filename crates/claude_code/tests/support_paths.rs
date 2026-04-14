@@ -47,3 +47,16 @@ pub(crate) fn claude_code_stream_json_fixtures_dir() -> PathBuf {
         .join("stream_json")
         .join("v1")
 }
+
+#[allow(dead_code)]
+pub(crate) fn target_debug_binary(name: &str) -> PathBuf {
+    if let Some(path) = std::env::var_os(format!("CARGO_BIN_EXE_{name}")) {
+        return PathBuf::from(path);
+    }
+
+    let mut binary = repo_root().join("target").join("debug").join(name);
+    if cfg!(windows) {
+        binary.set_extension("exe");
+    }
+    binary
+}
