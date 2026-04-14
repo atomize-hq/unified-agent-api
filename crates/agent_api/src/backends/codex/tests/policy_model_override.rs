@@ -1,7 +1,7 @@
 use super::support::*;
 use serde_json::json;
 
-const MODEL_ID_KEY: &str = "agent_api.config.model.v1";
+const MODEL_ID_KEY: &str = crate::EXT_AGENT_API_CONFIG_MODEL_V1;
 
 #[test]
 fn codex_policy_fork_model_override_is_rejected_pre_spawn() {

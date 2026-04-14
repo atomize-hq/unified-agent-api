@@ -56,6 +56,12 @@ Do not edit by hand.
 |---|---|---|
 | `agent_api.control.cancel.v1` | ✅ | ✅ |
 
+## `agent_api.config`
+
+| capability id | `claude_code` | `codex` |
+|---|---|---|
+| `agent_api.config.model.v1` | ✅ | ✅ |
+
 ## `backend.claude_code`
 
 | capability id | `claude_code` | `codex` |

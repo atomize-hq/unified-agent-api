@@ -11,14 +11,13 @@ use std::path::Prefix;
 
 use super::{BackendDefaults, BackendHarnessAdapter, NormalizedRequest};
 use crate::backends::spawn_path::resolve_relative_path_from_base;
-use crate::{AgentWrapperError, AgentWrapperRunRequest};
+use crate::{AgentWrapperError, AgentWrapperRunRequest, EXT_AGENT_API_CONFIG_MODEL_V1};
 
 const ADD_DIRS_KEY: &str = "dirs";
 const ADD_DIRS_ROOT_INVALID: &str = "invalid agent_api.exec.add_dirs.v1";
 const ADD_DIRS_CONTAINER_INVALID: &str = "invalid agent_api.exec.add_dirs.v1.dirs";
 const ADD_DIRS_MAX_COUNT: usize = 16;
 const ADD_DIRS_MAX_ENTRY_BYTES: usize = 1024;
-const MODEL_ID_KEY: &str = "agent_api.config.model.v1";
 const MODEL_ID_INVALID: &str = "invalid agent_api.config.model.v1";
 const MODEL_ID_MAX_BYTES: usize = 128;
 
@@ -76,7 +75,7 @@ fn normalize_model_id_v1(raw: Option<&Value>) -> Result<Option<String>, AgentWra
 pub(crate) fn accepted_model_override_v1(
     request: &AgentWrapperRunRequest,
 ) -> Result<bool, AgentWrapperError> {
-    Ok(normalize_model_id_v1(request.extensions.get(MODEL_ID_KEY))?.is_some())
+    Ok(normalize_model_id_v1(request.extensions.get(EXT_AGENT_API_CONFIG_MODEL_V1))?.is_some())
 }
 
 pub(crate) fn normalize_add_dirs_v1(
@@ -127,7 +126,7 @@ pub(crate) fn normalize_request<A: BackendHarnessAdapter>(
     }
 
     validate_extension_keys_fail_closed(adapter, &request)?;
-    let model_id = normalize_model_id_v1(request.extensions.get(MODEL_ID_KEY))?;
+    let model_id = normalize_model_id_v1(request.extensions.get(EXT_AGENT_API_CONFIG_MODEL_V1))?;
     let policy = adapter.validate_and_extract_policy(&request)?;
 
     let env = merge_env_backend_defaults_then_request(&defaults.env, &request.env);
@@ -352,3 +351,5 @@ fn invalid_add_dirs_entry(index: usize) -> AgentWrapperError {
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+pub(crate) const MODEL_ID_KEY: &str = EXT_AGENT_API_CONFIG_MODEL_V1;

@@ -31,6 +31,9 @@ pub mod backends;
 pub mod mcp;
 
 const CAPABILITY_CONTROL_CANCEL_V1: &str = "agent_api.control.cancel.v1";
+#[allow(dead_code)]
+#[cfg(any(feature = "codex", feature = "claude_code", test))]
+pub(crate) const EXT_AGENT_API_CONFIG_MODEL_V1: &str = "agent_api.config.model.v1";
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct AgentWrapperKind(String);

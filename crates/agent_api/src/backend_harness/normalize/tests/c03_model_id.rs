@@ -5,10 +5,10 @@ use std::{
 
 use serde_json::json;
 
-use super::super::{normalize_model_id_v1, normalize_request, MODEL_ID_KEY};
+use super::super::{normalize_model_id_v1, normalize_request};
 use super::support::PolicyFnAdapter;
 use crate::backend_harness::BackendDefaults;
-use crate::{AgentWrapperError, AgentWrapperRunRequest};
+use crate::{AgentWrapperError, AgentWrapperRunRequest, EXT_AGENT_API_CONFIG_MODEL_V1};
 
 fn collect_rs_files(dir: &Path, files: &mut Vec<PathBuf>) {
     for entry in fs::read_dir(dir).expect("read source directory") {
@@ -76,7 +76,7 @@ fn normalize_model_id_v1_trims_and_returns_success() {
 
 #[test]
 fn bh_c03_agent_api_config_model_v1_invalid_values_use_safe_template_via_normalize_request() {
-    const SUPPORTED: [&str; 1] = [MODEL_ID_KEY];
+    const SUPPORTED: [&str; 1] = [EXT_AGENT_API_CONFIG_MODEL_V1];
     let adapter = PolicyFnAdapter::panic_on_policy(&SUPPORTED);
     let defaults = BackendDefaults::default();
     let secret = "SECRET_MODEL_ID_SHOULD_NOT_LEAK";
@@ -107,7 +107,9 @@ fn bh_c03_agent_api_config_model_v1_invalid_values_use_safe_template_via_normali
             prompt: "hello".to_string(),
             ..Default::default()
         };
-        request.extensions.insert(MODEL_ID_KEY.to_string(), raw);
+        request
+            .extensions
+            .insert(EXT_AGENT_API_CONFIG_MODEL_V1.to_string(), raw);
 
         let err = match normalize_request(&adapter, &defaults, request) {
             Ok(_) => panic!("expected invalid model id for case {name}"),
@@ -131,16 +133,17 @@ fn bh_c03_agent_api_config_model_v1_invalid_values_use_safe_template_via_normali
 
 #[test]
 fn bh_c03_agent_api_config_model_v1_trims_before_mapping_via_normalize_request() {
-    const SUPPORTED: [&str; 1] = [MODEL_ID_KEY];
+    const SUPPORTED: [&str; 1] = [EXT_AGENT_API_CONFIG_MODEL_V1];
     let adapter = PolicyFnAdapter::ok_policy(&SUPPORTED);
     let defaults = BackendDefaults::default();
     let mut request = AgentWrapperRunRequest {
         prompt: "hello".to_string(),
         ..Default::default()
     };
-    request
-        .extensions
-        .insert(MODEL_ID_KEY.to_string(), json!("  agent-model-1  "));
+    request.extensions.insert(
+        EXT_AGENT_API_CONFIG_MODEL_V1.to_string(),
+        json!("  agent-model-1  "),
+    );
 
     let normalized =
         normalize_request(&adapter, &defaults, request).expect("expected normalized request");
@@ -161,7 +164,7 @@ fn bh_r0_agent_api_config_model_v1_is_rejected_before_value_shape_validation_via
         };
         request
             .extensions
-            .insert(MODEL_ID_KEY.to_string(), raw.clone());
+            .insert(EXT_AGENT_API_CONFIG_MODEL_V1.to_string(), raw.clone());
 
         let err = match normalize_request(&adapter, &defaults, request) {
             Ok(_) => panic!("unsupported model key must fail closed"),
@@ -173,7 +176,7 @@ fn bh_r0_agent_api_config_model_v1_is_rejected_before_value_shape_validation_via
                 capability,
             } => {
                 assert_eq!(agent_kind, "toy");
-                assert_eq!(capability, MODEL_ID_KEY);
+                assert_eq!(capability, EXT_AGENT_API_CONFIG_MODEL_V1);
             }
             other => panic!("expected UnsupportedCapability, got: {other:?}"),
         }
@@ -184,24 +187,46 @@ fn bh_r0_agent_api_config_model_v1_is_rejected_before_value_shape_validation_via
 fn bh_r0_agent_api_config_model_v1_is_confined_to_normalize_rs_in_production_code() {
     let src_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
     let allowed_normalize = src_root.join("backend_harness/normalize.rs");
+    let allowed_constant_home = src_root.join("lib.rs");
 
     let mut files = Vec::new();
     collect_rs_files(&src_root, &mut files);
 
-    let mut offenders = Vec::new();
+    let mut literal_offenders = Vec::new();
+    let mut raw_access_offenders = Vec::new();
     for path in files {
         let is_test_source = path
             .components()
             .any(|component| component.as_os_str() == "tests")
             || path.file_name().and_then(|name| name.to_str()) == Some("tests.rs");
 
-        if is_test_source || path == allowed_normalize {
+        if is_test_source {
             continue;
         }
 
         let contents = fs::read_to_string(&path).expect("read source file");
-        if contents.contains(MODEL_ID_KEY) {
-            offenders.push(
+        if path != allowed_normalize
+            && path != allowed_constant_home
+            && contents.contains(EXT_AGENT_API_CONFIG_MODEL_V1)
+        {
+            literal_offenders.push(
+                path.strip_prefix(&src_root)
+                    .unwrap_or(&path)
+                    .display()
+                    .to_string(),
+            );
+        }
+
+        if path != allowed_normalize
+            && (contents.contains("extensions.get(EXT_AGENT_API_CONFIG_MODEL_V1)")
+                || contents.contains("extensions.get(crate::EXT_AGENT_API_CONFIG_MODEL_V1)")
+                || contents.contains("extensions.contains_key(EXT_AGENT_API_CONFIG_MODEL_V1)")
+                || contents
+                    .contains("extensions.contains_key(crate::EXT_AGENT_API_CONFIG_MODEL_V1)")
+                || contents.contains("[EXT_AGENT_API_CONFIG_MODEL_V1]")
+                || contents.contains("[crate::EXT_AGENT_API_CONFIG_MODEL_V1]"))
+        {
+            raw_access_offenders.push(
                 path.strip_prefix(&src_root)
                     .unwrap_or(&path)
                     .display()
@@ -211,7 +236,11 @@ fn bh_r0_agent_api_config_model_v1_is_confined_to_normalize_rs_in_production_cod
     }
 
     assert!(
-        offenders.is_empty(),
-        "agent_api.config.model.v1 leaked outside backend_harness/normalize.rs and its tests: {offenders:?}"
+        literal_offenders.is_empty(),
+        "agent_api.config.model.v1 literal leaked outside normalize.rs/lib.rs and tests: {literal_offenders:?}"
+    );
+    assert!(
+        raw_access_offenders.is_empty(),
+        "raw model-selection extension access escaped normalize.rs: {raw_access_offenders:?}"
     );
 }

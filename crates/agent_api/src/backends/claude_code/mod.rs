@@ -2,6 +2,8 @@ use std::{collections::BTreeMap, path::PathBuf, sync::Arc, time::Duration};
 
 use tokio::sync::OnceCell;
 
+use crate::EXT_AGENT_API_CONFIG_MODEL_V1;
+
 impl super::termination::TerminationHandle for claude_code::ClaudeTerminationHandle {
     fn request_termination(&self) {
         claude_code::ClaudeTerminationHandle::request_termination(self);
@@ -20,6 +22,7 @@ const CLAUDE_EXEC_POLICY_PREFIX: &str = "backend.claude_code.exec.";
 const SUPPORTED_EXTENSION_KEYS_DEFAULT: &[&str] = &[
     EXT_ADD_DIRS_V1,
     EXT_NON_INTERACTIVE,
+    EXT_AGENT_API_CONFIG_MODEL_V1,
     EXT_SESSION_RESUME_V1,
     EXT_SESSION_FORK_V1,
 ];
@@ -27,6 +30,7 @@ const SUPPORTED_EXTENSION_KEYS_DEFAULT: &[&str] = &[
 const SUPPORTED_EXTENSION_KEYS_EXTERNAL_SANDBOX_OPT_IN: &[&str] = &[
     EXT_ADD_DIRS_V1,
     EXT_NON_INTERACTIVE,
+    EXT_AGENT_API_CONFIG_MODEL_V1,
     EXT_SESSION_RESUME_V1,
     EXT_SESSION_FORK_V1,
     EXT_EXTERNAL_SANDBOX_V1,

@@ -1,9 +1,11 @@
 use super::support::*;
 
 #[test]
-fn codex_backend_does_not_advertise_agent_api_config_model_v1() {
+fn codex_backend_advertises_agent_api_config_model_v1() {
     let backend = CodexBackend::new(CodexBackendConfig::default());
-    assert!(!backend.capabilities().contains("agent_api.config.model.v1"));
+    assert!(backend
+        .capabilities()
+        .contains(crate::EXT_AGENT_API_CONFIG_MODEL_V1));
 }
 
 #[test]
@@ -18,6 +20,7 @@ fn codex_backend_reports_required_capabilities() {
     assert!(capabilities.contains(CAP_TOOLS_RESULTS_V1));
     assert!(capabilities.contains(CAP_ARTIFACTS_FINAL_TEXT_V1));
     assert!(capabilities.contains(CAP_SESSION_HANDLE_V1));
+    assert!(capabilities.contains(crate::EXT_AGENT_API_CONFIG_MODEL_V1));
     assert!(capabilities.contains("backend.codex.exec_stream"));
     assert!(capabilities.contains(EXT_ADD_DIRS_V1));
     assert!(capabilities.contains(EXT_NON_INTERACTIVE));

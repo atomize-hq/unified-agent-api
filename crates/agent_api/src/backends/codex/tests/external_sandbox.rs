@@ -5,11 +5,30 @@ use serde_json::json;
 use std::path::{Component, Path, Prefix};
 
 #[test]
-fn codex_harness_supported_extension_keys_do_not_include_agent_api_config_model_v1() {
+fn codex_harness_supported_extension_keys_include_agent_api_config_model_v1() {
     let adapter = test_adapter();
-    assert!(!adapter
+    assert!(adapter
         .supported_extension_keys()
-        .contains(&"agent_api.config.model.v1"));
+        .contains(&crate::EXT_AGENT_API_CONFIG_MODEL_V1));
+}
+
+#[test]
+fn codex_normalize_request_accepts_agent_api_config_model_v1_and_trims_it() {
+    let adapter = test_adapter();
+    let defaults = BackendDefaults::default();
+    let mut request = AgentWrapperRunRequest {
+        prompt: "hello".to_string(),
+        ..Default::default()
+    };
+    request.extensions.insert(
+        crate::EXT_AGENT_API_CONFIG_MODEL_V1.to_string(),
+        json!("  gpt-5-codex  "),
+    );
+
+    let normalized = crate::backend_harness::normalize_request(&adapter, &defaults, request)
+        .expect("model-selection key should be accepted for codex");
+
+    assert_eq!(normalized.model_id.as_deref(), Some("gpt-5-codex"));
 }
 
 #[test]
