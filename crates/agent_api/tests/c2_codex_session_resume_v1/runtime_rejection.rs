@@ -32,10 +32,30 @@ async fn assert_runtime_rejection_case(
         ))
         .await
         .unwrap();
-
     let mut events = handle.events;
     let seen = drain_to_none(events.as_mut(), STREAM_TIMEOUT).await;
-    let handle_idx = handle_facet_index(&seen).expect("expected session handle facet");
+    assert_runtime_rejection_events(&seen);
+
+    let err = tokio::time::timeout(STREAM_TIMEOUT, handle.completion)
+        .await
+        .expect("completion resolves")
+        .unwrap_err();
+    match err {
+        AgentWrapperError::Backend { message } => {
+            assert_eq!(message, ADD_DIRS_RUNTIME_REJECTION_MESSAGE);
+            for sentinel in ADD_DIR_LEAK_SENTINELS {
+                assert!(
+                    !message.contains(sentinel),
+                    "expected add-dir runtime rejection sentinel {sentinel} to stay out of completion error"
+                );
+            }
+        }
+        other => panic!("expected Backend error, got: {other:?}"),
+    }
+}
+
+fn assert_runtime_rejection_events(seen: &[agent_api::AgentWrapperEvent]) {
+    let handle_idx = handle_facet_index(seen).expect("expected session handle facet");
     let error_indices: Vec<_> = seen
         .iter()
         .enumerate()
@@ -56,24 +76,7 @@ async fn assert_runtime_rejection_case(
         seen[error_idx].message.as_deref(),
         Some(ADD_DIRS_RUNTIME_REJECTION_MESSAGE)
     );
-    assert_no_add_dir_sentinel_leaks_in_events(&seen);
-
-    let err = tokio::time::timeout(STREAM_TIMEOUT, handle.completion)
-        .await
-        .expect("completion resolves")
-        .unwrap_err();
-    match err {
-        AgentWrapperError::Backend { message } => {
-            assert_eq!(message, ADD_DIRS_RUNTIME_REJECTION_MESSAGE);
-            for sentinel in ADD_DIR_LEAK_SENTINELS {
-                assert!(
-                    !message.contains(sentinel),
-                    "expected add-dir runtime rejection sentinel {sentinel} to stay out of completion error"
-                );
-            }
-        }
-        other => panic!("expected Backend error, got: {other:?}"),
-    }
+    assert_no_add_dir_sentinel_leaks_in_events(seen);
 }
 
 #[cfg(unix)]

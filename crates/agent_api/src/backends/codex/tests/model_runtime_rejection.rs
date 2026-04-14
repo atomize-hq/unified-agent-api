@@ -38,6 +38,7 @@ fn base_env() -> BTreeMap<String, String> {
 }
 
 async fn assert_codex_runtime_model_rejection(
+    scenario: &str,
     extra_env: impl IntoIterator<Item = (String, String)>,
     await_completion_before_events: bool,
 ) {
@@ -56,10 +57,7 @@ async fn assert_codex_runtime_model_rejection(
                 "FAKE_CODEX_EXPECT_CWD".to_string(),
                 expected_cwd.display().to_string(),
             ),
-            (
-                "FAKE_CODEX_SCENARIO".to_string(),
-                "model_runtime_rejection_after_thread_started".to_string(),
-            ),
+            ("FAKE_CODEX_SCENARIO".to_string(), scenario.to_string()),
             (
                 "FAKE_CODEX_EXPECT_MODEL".to_string(),
                 requested_model.to_string(),
@@ -198,16 +196,45 @@ async fn assert_codex_runtime_model_rejection(
 
 #[tokio::test]
 async fn codex_runtime_model_rejection_is_safely_redacted_and_parity_is_preserved() {
-    assert_codex_runtime_model_rejection(std::iter::empty(), false).await;
+    assert_codex_runtime_model_rejection(
+        "model_runtime_rejection_after_thread_started",
+        std::iter::empty(),
+        false,
+    )
+    .await;
 }
 
 #[tokio::test]
 async fn codex_runtime_model_rejection_remains_fatal_even_on_zero_exit() {
     assert_codex_runtime_model_rejection(
+        "model_runtime_rejection_after_thread_started",
         [(
             "FAKE_CODEX_RUNTIME_REJECTION_EXIT_CODE".to_string(),
             "0".to_string(),
         )],
+        true,
+    )
+    .await;
+}
+
+#[tokio::test]
+async fn codex_runtime_model_rejection_waits_for_buffered_terminal_error_before_completion() {
+    assert_codex_runtime_model_rejection(
+        "model_runtime_rejection_after_buffered_events",
+        [
+            (
+                "FAKE_CODEX_BUFFERED_EVENT_COUNT".to_string(),
+                "1024".to_string(),
+            ),
+            (
+                "FAKE_CODEX_BUFFERED_EVENT_PADDING_BYTES".to_string(),
+                "1024".to_string(),
+            ),
+            (
+                "FAKE_CODEX_RUNTIME_REJECTION_EXIT_CODE".to_string(),
+                "0".to_string(),
+            ),
+        ],
         true,
     )
     .await;

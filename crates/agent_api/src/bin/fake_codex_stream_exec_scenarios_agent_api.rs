@@ -341,6 +341,75 @@ fn runtime_rejection_exit_code() -> io::Result<i32> {
     }
 }
 
+fn read_buffered_event_count() -> io::Result<usize> {
+    match env::var("FAKE_CODEX_BUFFERED_EVENT_COUNT") {
+        Ok(raw) => raw.parse::<usize>().map_err(|err| {
+            io::Error::new(
+                io::ErrorKind::InvalidInput,
+                format!("invalid FAKE_CODEX_BUFFERED_EVENT_COUNT: {err}"),
+            )
+        }),
+        Err(env::VarError::NotPresent) => Ok(4096),
+        Err(err) => Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            format!("failed to read FAKE_CODEX_BUFFERED_EVENT_COUNT: {err}"),
+        )),
+    }
+}
+
+fn read_buffered_event_padding_bytes() -> io::Result<usize> {
+    match env::var("FAKE_CODEX_BUFFERED_EVENT_PADDING_BYTES") {
+        Ok(raw) => raw.parse::<usize>().map_err(|err| {
+            io::Error::new(
+                io::ErrorKind::InvalidInput,
+                format!("invalid FAKE_CODEX_BUFFERED_EVENT_PADDING_BYTES: {err}"),
+            )
+        }),
+        Err(env::VarError::NotPresent) => Ok(2048),
+        Err(err) => Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            format!("failed to read FAKE_CODEX_BUFFERED_EVENT_PADDING_BYTES: {err}"),
+        )),
+    }
+}
+
+fn emit_buffered_turn_events(out: &mut impl Write, thread_id: &str) -> io::Result<()> {
+    let count = read_buffered_event_count()?;
+    let padding = "x".repeat(read_buffered_event_padding_bytes()?);
+
+    for idx in 0..count {
+        emit_jsonl(
+            out,
+            &format!(
+                r#"{{"type":"turn.started","thread_id":"{thread_id}","turn_id":"buffered-turn-{idx}","padding":"{padding}"}}"#
+            ),
+        )?;
+    }
+
+    Ok(())
+}
+
+fn emit_buffered_transport_errors(out: &mut impl Write, final_message: &str) -> io::Result<()> {
+    let count = read_buffered_event_count()?;
+    let padding = "x".repeat(read_buffered_event_padding_bytes()?);
+
+    for idx in 0..count {
+        emit_jsonl(
+            out,
+            &format!(
+                r#"{{"type":"error","message":"transient transport failure {idx}","code":"transport_error","padding":"{padding}"}}"#
+            ),
+        )?;
+    }
+
+    emit_jsonl(
+        out,
+        &format!(r#"{{"type":"error","message":"{final_message}"}}"#),
+    )?;
+
+    Ok(())
+}
+
 fn main() -> io::Result<()> {
     // Cross-platform test binary used by `agent_api` tests.
     //
@@ -509,6 +578,31 @@ fn main() -> io::Result<()> {
             emit_add_dirs_runtime_rejection(&mut out)?;
             std::process::exit(1);
         }
+        "add_dirs_runtime_rejection_resume_last_buffered_tail" => {
+            let expected_prompt = require_env_var(&mut out, "FAKE_CODEX_EXPECT_PROMPT")?;
+
+            let ok =
+                contains_ordered_subsequence(&args, &["exec", "--json", "resume", "--last", "-"]);
+            if !ok {
+                emit_jsonl(
+                    &mut out,
+                    r#"{"type":"error","message":"missing argv subsequence: exec --json resume --last -"}"#,
+                )?;
+                std::process::exit(1);
+            }
+
+            if !assert_stdin_prompt(&mut out, &expected_prompt, Duration::from_secs(1))? {
+                std::process::exit(1);
+            }
+
+            emit_jsonl(
+                &mut out,
+                r#"{"type":"thread.resumed","thread_id":"thread-1"}"#,
+            )?;
+            emit_buffered_turn_events(&mut out, "thread-1")?;
+            emit_add_dirs_runtime_rejection(&mut out)?;
+            std::process::exit(1);
+        }
         "resume_id_assert" => {
             let expected_prompt = require_env_var(&mut out, "FAKE_CODEX_EXPECT_PROMPT")?;
             let expected_id = require_env_var(&mut out, "FAKE_CODEX_EXPECT_RESUME_ID")?;
@@ -561,6 +655,34 @@ fn main() -> io::Result<()> {
             emit_add_dirs_runtime_rejection(&mut out)?;
             std::process::exit(1);
         }
+        "add_dirs_runtime_rejection_resume_id_buffered_tail" => {
+            let expected_prompt = require_env_var(&mut out, "FAKE_CODEX_EXPECT_PROMPT")?;
+            let expected_id = require_env_var(&mut out, "FAKE_CODEX_EXPECT_RESUME_ID")?;
+
+            let ok = contains_ordered_subsequence(
+                &args,
+                &["exec", "--json", "resume", expected_id.as_str(), "-"],
+            );
+            if !ok {
+                emit_jsonl(
+                    &mut out,
+                    r#"{"type":"error","message":"missing argv subsequence: exec --json resume <ID> -"}"#,
+                )?;
+                std::process::exit(1);
+            }
+
+            if !assert_stdin_prompt(&mut out, &expected_prompt, Duration::from_secs(1))? {
+                std::process::exit(1);
+            }
+
+            emit_jsonl(
+                &mut out,
+                r#"{"type":"thread.resumed","thread_id":"thread-1"}"#,
+            )?;
+            emit_buffered_turn_events(&mut out, "thread-1")?;
+            emit_add_dirs_runtime_rejection(&mut out)?;
+            std::process::exit(1);
+        }
         "resume_last_not_found" => {
             let expected_prompt = require_env_var(&mut out, "FAKE_CODEX_EXPECT_PROMPT")?;
 
@@ -579,6 +701,26 @@ fn main() -> io::Result<()> {
             }
 
             eprintln!("no session found");
+            std::process::exit(1);
+        }
+        "resume_last_not_found_buffered_transport_errors" => {
+            let expected_prompt = require_env_var(&mut out, "FAKE_CODEX_EXPECT_PROMPT")?;
+
+            let ok =
+                contains_ordered_subsequence(&args, &["exec", "--json", "resume", "--last", "-"]);
+            if !ok {
+                emit_jsonl(
+                    &mut out,
+                    r#"{"type":"error","message":"missing argv subsequence: exec --json resume --last -"}"#,
+                )?;
+                std::process::exit(1);
+            }
+
+            if !assert_stdin_prompt(&mut out, &expected_prompt, Duration::from_secs(1))? {
+                std::process::exit(1);
+            }
+
+            emit_buffered_transport_errors(&mut out, "no session found")?;
             std::process::exit(1);
         }
         "resume_id_not_found" => {
@@ -602,6 +744,29 @@ fn main() -> io::Result<()> {
             }
 
             eprintln!("session not found");
+            std::process::exit(1);
+        }
+        "resume_id_not_found_buffered_transport_errors" => {
+            let expected_prompt = require_env_var(&mut out, "FAKE_CODEX_EXPECT_PROMPT")?;
+            let expected_id = require_env_var(&mut out, "FAKE_CODEX_EXPECT_RESUME_ID")?;
+
+            let ok = contains_ordered_subsequence(
+                &args,
+                &["exec", "--json", "resume", expected_id.as_str(), "-"],
+            );
+            if !ok {
+                emit_jsonl(
+                    &mut out,
+                    r#"{"type":"error","message":"missing argv subsequence: exec --json resume <ID> -"}"#,
+                )?;
+                std::process::exit(1);
+            }
+
+            if !assert_stdin_prompt(&mut out, &expected_prompt, Duration::from_secs(1))? {
+                std::process::exit(1);
+            }
+
+            emit_buffered_transport_errors(&mut out, "session not found")?;
             std::process::exit(1);
         }
         // Stable scenario name used by SEAM-4 explicit cancellation integration tests.
@@ -758,6 +923,23 @@ fn main() -> io::Result<()> {
                 &mut out,
                 r#"{"type":"thread.started","thread_id":"thread-1"}"#,
             )?;
+            emit_jsonl(
+                &mut out,
+                &format!(
+                    r#"{{"type":"error","message":"unknown model: {model} ({secret})","code":"model_runtime_rejection"}}"#
+                ),
+            )?;
+            std::process::exit(runtime_rejection_exit_code()?);
+        }
+        "model_runtime_rejection_after_buffered_events" => {
+            let secret = require_env_var(&mut out, "FAKE_CODEX_MODEL_RUNTIME_REJECTION_SECRET")?;
+            let model = flag_value(&args, "--model").unwrap_or("<missing>");
+
+            emit_jsonl(
+                &mut out,
+                r#"{"type":"thread.started","thread_id":"thread-1"}"#,
+            )?;
+            emit_buffered_turn_events(&mut out, "thread-1")?;
             emit_jsonl(
                 &mut out,
                 &format!(

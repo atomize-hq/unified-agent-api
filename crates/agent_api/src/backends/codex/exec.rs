@@ -58,7 +58,7 @@ async fn wait_for_event_processing(
 ) {
     if should_wait {
         if let Some(rx) = events_done_rx.take() {
-            let _ = tokio::time::timeout(Duration::from_millis(50), rx).await;
+            let _ = rx.await;
         }
     }
 }
@@ -246,6 +246,8 @@ pub(super) async fn spawn_exec_or_resume_flow(
     let (events_done_tx, events_done_rx) = oneshot::channel::<()>();
     let stream_state_for_completion = Arc::clone(&stream_state);
     let has_requested_model_id = requested_model_id.is_some();
+    let waits_on_event_classification =
+        resume_selector.is_some() || has_add_dirs || has_requested_model_id;
 
     tokio::spawn(async move {
         let mut events_done_rx = Some(events_done_rx);
@@ -253,11 +255,10 @@ pub(super) async fn spawn_exec_or_resume_flow(
 
         match outcome {
             Ok(exec_completion) => {
-                wait_for_event_processing(
-                    &mut events_done_rx,
-                    has_add_dirs || has_requested_model_id,
-                )
-                .await;
+                // Completion classification depends on the event task when a suppressed terminal
+                // `ThreadEvent::Error` can set backend-owned failure state, so this wait is a
+                // correctness boundary rather than a latency optimization.
+                wait_for_event_processing(&mut events_done_rx, waits_on_event_classification).await;
                 let status = exec_completion.status;
                 let backend_error_message =
                     snapshot_backend_error_message(&stream_state_for_completion);
@@ -278,15 +279,7 @@ pub(super) async fn spawn_exec_or_resume_flow(
                 let _ = tail_tx.send(tail);
             }
             Err(ExecStreamError::Codex(CodexError::NonZeroExit { status, stderr })) => {
-                // Some exit-classification logic depends on observing (and potentially suppressing)
-                // streamed `ThreadEvent::Error` frames first. In tests and in most real flows the
-                // caller drains events, but the completion future can resolve first.
-                //
-                // Avoid flaking parity expectations by giving the event stream a brief window to
-                // finish when we have signal-dependent suppression logic.
-                let needs_event_processing_wait =
-                    resume_selector.is_some() || has_add_dirs || has_requested_model_id;
-                wait_for_event_processing(&mut events_done_rx, needs_event_processing_wait).await;
+                wait_for_event_processing(&mut events_done_rx, waits_on_event_classification).await;
 
                 let backend_error_message =
                     snapshot_backend_error_message(&stream_state_for_completion);

@@ -11,6 +11,46 @@ use super::support::{
     STREAM_TIMEOUT,
 };
 
+async fn assert_selection_failure_case(
+    scenario: &str,
+    resume_extension: (String, serde_json::Value),
+    prompt: &str,
+    expected_message: &str,
+    extra_env: impl IntoIterator<Item = (String, String)>,
+) {
+    let mut env = base_env();
+    env.insert("FAKE_CODEX_SCENARIO".to_string(), scenario.to_string());
+    env.insert("FAKE_CODEX_EXPECT_PROMPT".to_string(), prompt.to_string());
+    env.extend(extra_env);
+
+    let backend = build_backend(env, None, false);
+    let handle = backend
+        .run(run_request(prompt, [resume_extension]))
+        .await
+        .unwrap();
+    let mut events = handle.events;
+    let seen = drain_to_none(events.as_mut(), STREAM_TIMEOUT).await;
+    assert_selection_failure_events(&seen, expected_message);
+    assert_backend_error_message(handle.completion, expected_message).await;
+}
+
+fn assert_selection_failure_events(seen: &[agent_api::AgentWrapperEvent], expected_message: &str) {
+    let error_events: Vec<_> = seen
+        .iter()
+        .filter(|event| event.kind == AgentWrapperEventKind::Error)
+        .collect();
+    assert_eq!(error_events.len(), 1, "expected exactly one Error event");
+    assert_eq!(
+        seen.last().map(|event| event.kind.clone()),
+        Some(AgentWrapperEventKind::Error),
+        "expected Error event to be terminal"
+    );
+    assert_eq!(
+        seen.last().and_then(|event| event.message.as_deref()),
+        Some(expected_message)
+    );
+}
+
 #[tokio::test]
 async fn invalid_resume_schema_is_rejected_pre_spawn() {
     let backend = agent_api::backends::codex::CodexBackend::new(CodexBackendConfig {
@@ -34,90 +74,34 @@ async fn invalid_resume_schema_is_rejected_pre_spawn() {
 
 #[tokio::test]
 async fn resume_last_selection_failure_is_translated_and_emits_one_terminal_error_event() {
-    let prompt = "hello world";
-    let mut env = base_env();
-    env.insert(
-        "FAKE_CODEX_SCENARIO".to_string(),
-        "resume_last_not_found".to_string(),
-    );
-    env.insert("FAKE_CODEX_EXPECT_PROMPT".to_string(), prompt.to_string());
-
-    let backend = build_backend(env, None, false);
-    let handle = backend
-        .run(run_request(
-            prompt,
-            [(
-                "agent_api.session.resume.v1".to_string(),
-                json!({"selector": "last"}),
-            )],
-        ))
-        .await
-        .unwrap();
-
-    let mut events = handle.events;
-    let seen = drain_to_none(events.as_mut(), STREAM_TIMEOUT).await;
-    let error_events: Vec<_> = seen
-        .iter()
-        .filter(|event| event.kind == AgentWrapperEventKind::Error)
-        .collect();
-    assert_eq!(error_events.len(), 1, "expected exactly one Error event");
-    assert_eq!(
-        seen.last().map(|event| event.kind.clone()),
-        Some(AgentWrapperEventKind::Error),
-        "expected Error event to be terminal"
-    );
-    assert_eq!(
-        seen.last().and_then(|event| event.message.as_deref()),
-        Some("no session found")
-    );
-
-    assert_backend_error_message(handle.completion, "no session found").await;
+    assert_selection_failure_case(
+        "resume_last_not_found",
+        (
+            "agent_api.session.resume.v1".to_string(),
+            json!({"selector": "last"}),
+        ),
+        "hello world",
+        "no session found",
+        std::iter::empty(),
+    )
+    .await;
 }
 
 #[tokio::test]
 async fn resume_id_selection_failure_is_translated_and_emits_one_terminal_error_event() {
-    let prompt = "hello world";
     let resume_id = "thread-123";
-
-    let mut env = base_env();
-    env.insert(
-        "FAKE_CODEX_SCENARIO".to_string(),
-        "resume_id_not_found".to_string(),
-    );
-    env.insert("FAKE_CODEX_EXPECT_PROMPT".to_string(), prompt.to_string());
-    env.insert(
-        "FAKE_CODEX_EXPECT_RESUME_ID".to_string(),
-        resume_id.to_string(),
-    );
-
-    let backend = build_backend(env, None, false);
-    let handle = backend
-        .run(run_request(
-            prompt,
-            [(
-                "agent_api.session.resume.v1".to_string(),
-                json!({"selector": "id", "id": resume_id}),
-            )],
-        ))
-        .await
-        .unwrap();
-
-    let mut events = handle.events;
-    let seen = drain_to_none(events.as_mut(), STREAM_TIMEOUT).await;
-    let error_events: Vec<_> = seen
-        .iter()
-        .filter(|event| event.kind == AgentWrapperEventKind::Error)
-        .collect();
-    assert_eq!(error_events.len(), 1, "expected exactly one Error event");
-    assert_eq!(
-        seen.last().map(|event| event.kind.clone()),
-        Some(AgentWrapperEventKind::Error),
-        "expected Error event to be terminal"
-    );
-    assert_eq!(
-        seen.last().and_then(|event| event.message.as_deref()),
-        Some("session not found")
-    );
-
-    assert_backend_error_message(handle.completion, "session not found").await;
+    assert_selection_failure_case(
+        "resume_id_not_found",
+        (
+            "agent_api.session.resume.v1".to_string(),
+            json!({"selector": "id", "id": resume_id}),
+        ),
+        "hello world",
+        "session not found",
+        [(
+            "FAKE_CODEX_EXPECT_RESUME_ID".to_string(),
+            resume_id.to_string(),
+        )],
+    )
+    .await;
 }

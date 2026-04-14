@@ -1,6 +1,7 @@
 mod app_server;
 mod backend_contract;
 mod capabilities;
+mod completion_classification_race;
 mod external_sandbox;
 mod mapping;
 mod model_mapping;
