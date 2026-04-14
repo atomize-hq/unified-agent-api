@@ -1,7 +1,6 @@
 #![cfg(feature = "codex")]
 
 use std::{
-    collections::BTreeMap,
     path::PathBuf,
     pin::Pin,
     time::{Duration, SystemTime, UNIX_EPOCH},
@@ -117,6 +116,11 @@ fn tool_field<'a>(event: &'a AgentWrapperEvent, field: &str) -> Option<&'a Value
         .and_then(|data| data.get("tool"))
         .and_then(|tool| tool.get(field))
 }
+
+#[path = "c1_codex_stream_exec_adapter/env_tests.rs"]
+mod env_tests;
+#[path = "c1_codex_stream_exec_adapter/tool_lifecycle_tests.rs"]
+mod tool_lifecycle_tests;
 
 #[tokio::test]
 async fn empty_prompt_is_rejected_before_spawning() {
@@ -422,7 +426,7 @@ async fn short_model_ids_do_not_reclassify_transport_failures_as_runtime_rejecti
 async fn dropping_events_unblocks_buffered_model_runtime_rejection_completion() {
     let requested_model = Some("gpt-5-codex");
     let secret = "MODEL_RUNTIME_REJECTION_SECRET_DO_NOT_LEAK";
-    let effective_model = requested_model.unwrap_or("gpt-5-codex-from-config");
+    let effective_model = "gpt-5-codex";
 
     let backend = CodexBackend::new(CodexBackendConfig {
         binary: Some(fake_codex_binary()),
@@ -532,9 +536,9 @@ async fn dropping_events_unblocks_buffered_model_runtime_rejection_completion() 
 
 #[tokio::test]
 async fn dropping_events_unblocks_buffered_config_model_runtime_rejection_completion() {
-    let requested_model = None;
+    let requested_model: Option<&str> = None;
     let secret = "MODEL_RUNTIME_REJECTION_SECRET_DO_NOT_LEAK";
-    let effective_model = requested_model.unwrap_or("gpt-5-codex-from-config");
+    let effective_model = "gpt-5-codex-from-config";
 
     let backend = CodexBackend::new(CodexBackendConfig {
         binary: Some(fake_codex_binary()),
@@ -724,293 +728,4 @@ async fn exec_add_dirs_runtime_rejection_emits_single_terminal_error_and_no_leak
         }
         other => panic!("expected Backend error, got: {other:?}"),
     }
-}
-
-#[tokio::test]
-async fn request_env_overrides_config_env_and_parent_env_is_unchanged() {
-    struct EnvGuard {
-        key: &'static str,
-        previous: Option<String>,
-    }
-
-    impl Drop for EnvGuard {
-        fn drop(&mut self) {
-            if let Some(value) = self.previous.as_ref() {
-                std::env::set_var(self.key, value);
-            } else {
-                std::env::remove_var(self.key);
-            }
-        }
-    }
-
-    let key = "C1_PARENT_ENV_SENTINEL";
-    let previous = std::env::var(key).ok();
-    std::env::set_var(key, "original");
-    let _guard = EnvGuard { key, previous };
-
-    let backend = CodexBackend::new(CodexBackendConfig {
-        binary: Some(fake_codex_binary()),
-        env: [
-            ("FAKE_CODEX_SCENARIO".to_string(), "env_assert".to_string()),
-            ("C1_TEST_KEY".to_string(), "config".to_string()),
-            ("C1_ONLY_CONFIG".to_string(), "config-only".to_string()),
-            (
-                "FAKE_CODEX_ASSERT_ENV_C1_TEST_KEY".to_string(),
-                "request".to_string(),
-            ),
-            (
-                "FAKE_CODEX_ASSERT_ENV_C1_ONLY_CONFIG".to_string(),
-                "config-only".to_string(),
-            ),
-        ]
-        .into_iter()
-        .collect(),
-        ..Default::default()
-    });
-
-    let handle = backend
-        .run(AgentWrapperRunRequest {
-            prompt: "hello".to_string(),
-            env: [("C1_TEST_KEY".to_string(), "request".to_string())]
-                .into_iter()
-                .collect::<BTreeMap<_, _>>(),
-            ..Default::default()
-        })
-        .await
-        .unwrap();
-
-    let mut events = handle.events;
-    let completion = handle.completion;
-    let _ = drain_to_none(events.as_mut(), Duration::from_secs(2)).await;
-
-    let completion = tokio::time::timeout(Duration::from_secs(2), completion)
-        .await
-        .expect("completion resolves")
-        .unwrap();
-    assert!(completion.status.success());
-
-    assert_eq!(
-        std::env::var(key).ok().as_deref(),
-        Some("original"),
-        "expected backend to not mutate parent process environment"
-    );
-}
-
-#[tokio::test]
-async fn request_env_override_wins_over_codex_home_injection_and_parent_codex_home_is_unchanged() {
-    let original_codex_home = std::env::var_os("CODEX_HOME");
-
-    let injected_home = unique_missing_dir_path("codex_home_injected_root");
-    let override_home = unique_missing_dir_path("codex_home_override_root");
-
-    let backend = CodexBackend::new(CodexBackendConfig {
-        binary: Some(fake_codex_binary()),
-        codex_home: Some(injected_home),
-        env: [
-            ("FAKE_CODEX_SCENARIO".to_string(), "env_assert".to_string()),
-            ("C1_ISOLATED_KEY".to_string(), "config".to_string()),
-            (
-                "C1_ISOLATED_CONFIG_ONLY".to_string(),
-                "config-only".to_string(),
-            ),
-            (
-                "FAKE_CODEX_ASSERT_ENV_CODEX_HOME".to_string(),
-                override_home.to_string_lossy().to_string(),
-            ),
-            (
-                "FAKE_CODEX_ASSERT_ENV_C1_ISOLATED_KEY".to_string(),
-                "request".to_string(),
-            ),
-            (
-                "FAKE_CODEX_ASSERT_ENV_C1_ISOLATED_CONFIG_ONLY".to_string(),
-                "config-only".to_string(),
-            ),
-        ]
-        .into_iter()
-        .collect(),
-        ..Default::default()
-    });
-
-    let handle = backend
-        .run(AgentWrapperRunRequest {
-            prompt: "hello".to_string(),
-            env: [
-                (
-                    "CODEX_HOME".to_string(),
-                    override_home.to_string_lossy().to_string(),
-                ),
-                ("C1_ISOLATED_KEY".to_string(), "request".to_string()),
-            ]
-            .into_iter()
-            .collect::<BTreeMap<_, _>>(),
-            ..Default::default()
-        })
-        .await
-        .unwrap();
-
-    let mut events = handle.events;
-    let completion = handle.completion;
-    let _ = drain_to_none(events.as_mut(), Duration::from_secs(2)).await;
-
-    let completion = tokio::time::timeout(Duration::from_secs(2), completion)
-        .await
-        .expect("completion resolves")
-        .unwrap();
-    assert!(completion.status.success());
-
-    assert_eq!(
-        std::env::var_os("CODEX_HOME"),
-        original_codex_home,
-        "expected backend to not mutate parent CODEX_HOME"
-    );
-}
-
-#[tokio::test]
-async fn tool_lifecycle_ok() {
-    let backend = CodexBackend::new(CodexBackendConfig {
-        binary: Some(fake_codex_binary()),
-        env: [(
-            "FAKE_CODEX_SCENARIO".to_string(),
-            "tool_lifecycle_ok".to_string(),
-        )]
-        .into_iter()
-        .collect(),
-        ..Default::default()
-    });
-
-    let handle = backend
-        .run(AgentWrapperRunRequest {
-            prompt: "hello".to_string(),
-            ..Default::default()
-        })
-        .await
-        .unwrap();
-
-    let mut events = handle.events;
-    let completion = handle.completion;
-
-    let seen = drain_to_none(events.as_mut(), Duration::from_secs(2)).await;
-
-    let first_tool_call =
-        find_first_kind(&seen, AgentWrapperEventKind::ToolCall).expect("expected a ToolCall event");
-    let first_tool_result = find_first_kind(&seen, AgentWrapperEventKind::ToolResult)
-        .expect("expected a ToolResult event");
-    assert!(
-        first_tool_call < first_tool_result,
-        "expected ToolCall to occur before ToolResult"
-    );
-
-    for ev in seen.iter() {
-        if matches!(
-            ev.kind,
-            AgentWrapperEventKind::ToolCall | AgentWrapperEventKind::ToolResult
-        ) {
-            assert_eq!(
-                tool_schema(ev),
-                Some("agent_api.tools.structured.v1"),
-                "expected tools facet schema on every ToolCall/ToolResult"
-            );
-        }
-    }
-
-    assert!(
-        !any_event_contains(&seen, "STDOUT-SENTINEL-DO-NOT-LEAK"),
-        "expected tool output sentinel to not appear in text/message/data"
-    );
-    assert!(
-        !any_event_contains(&seen, "STDERR-SENTINEL-DO-NOT-LEAK"),
-        "expected tool output sentinel to not appear in text/message/data"
-    );
-
-    let completion = tokio::time::timeout(Duration::from_secs(2), completion)
-        .await
-        .expect("completion resolves")
-        .unwrap();
-    assert!(completion.status.success());
-}
-
-#[tokio::test]
-async fn tool_lifecycle_fail_unknown_type() {
-    let backend = CodexBackend::new(CodexBackendConfig {
-        binary: Some(fake_codex_binary()),
-        env: [(
-            "FAKE_CODEX_SCENARIO".to_string(),
-            "tool_lifecycle_fail_unknown_type".to_string(),
-        )]
-        .into_iter()
-        .collect(),
-        ..Default::default()
-    });
-
-    let handle = backend
-        .run(AgentWrapperRunRequest {
-            prompt: "hello".to_string(),
-            ..Default::default()
-        })
-        .await
-        .unwrap();
-
-    let mut events = handle.events;
-    let completion = handle.completion;
-
-    let seen = drain_to_none(events.as_mut(), Duration::from_secs(2)).await;
-    assert!(
-        find_first_kind(&seen, AgentWrapperEventKind::Error).is_some(),
-        "expected an Error event when item.failed has no deterministically-attributable item_type"
-    );
-    assert!(
-        !seen.iter().any(|ev| {
-            ev.kind == AgentWrapperEventKind::ToolResult
-                && tool_field(ev, "phase").and_then(Value::as_str) == Some("fail")
-        }),
-        "expected no failure ToolResult when item_type is absent"
-    );
-
-    let completion = tokio::time::timeout(Duration::from_secs(2), completion)
-        .await
-        .expect("completion resolves")
-        .unwrap();
-    assert!(completion.status.success());
-}
-
-#[tokio::test]
-async fn tool_lifecycle_fail_known_type() {
-    let backend = CodexBackend::new(CodexBackendConfig {
-        binary: Some(fake_codex_binary()),
-        env: [(
-            "FAKE_CODEX_SCENARIO".to_string(),
-            "tool_lifecycle_fail_known_type".to_string(),
-        )]
-        .into_iter()
-        .collect(),
-        ..Default::default()
-    });
-
-    let handle = backend
-        .run(AgentWrapperRunRequest {
-            prompt: "hello".to_string(),
-            ..Default::default()
-        })
-        .await
-        .unwrap();
-
-    let mut events = handle.events;
-    let completion = handle.completion;
-
-    let seen = drain_to_none(events.as_mut(), Duration::from_secs(2)).await;
-    assert!(
-        seen.iter().any(|ev| {
-            ev.kind == AgentWrapperEventKind::ToolResult
-                && tool_field(ev, "phase").and_then(Value::as_str) == Some("fail")
-                && tool_field(ev, "status").and_then(Value::as_str) == Some("failed")
-                && tool_field(ev, "kind").and_then(Value::as_str) == Some("command_execution")
-        }),
-        "expected failure ToolResult when item.failed has deterministically-attributable item_type"
-    );
-
-    let completion = tokio::time::timeout(Duration::from_secs(2), completion)
-        .await
-        .expect("completion resolves")
-        .unwrap();
-    assert!(completion.status.success());
 }
