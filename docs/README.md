@@ -2,10 +2,11 @@
 
 ## Most-used docs
 
-- `crates/codex/README.md` — main wrapper API guide (library consumer view)
+- `docs/specs/unified-agent-api/README.md` — normative unified API contract index
+- `crates/codex/README.md` — Codex backend API guide
 - `crates/codex/EXAMPLES.md` — examples ↔ native CLI mapping
-- `crates/claude_code/README.md` — Claude Code wrapper API guide
-- `docs/integrations/substrate.md` — using this wrapper from Substrate
+- `crates/claude_code/README.md` — Claude Code backend API guide
+- `docs/integrations/substrate.md` — using the unified API from Substrate
 
 ## Decisions and specs
 

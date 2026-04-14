@@ -17,6 +17,7 @@ Claude Code backend highlights (v1):
 
 ## Start here
 
+- Unified Agent API contracts: `docs/specs/unified-agent-api/README.md`
 - Codex API docs: `crates/codex/README.md`
 - Examples index: `crates/codex/EXAMPLES.md`
 - Documentation index: `docs/README.md`
@@ -24,6 +25,7 @@ Claude Code backend highlights (v1):
 
 ## Repo map
 
+- `crates/agent_api/` — unified API surface and backend harness
 - `crates/codex/` — Codex backend crate
 - `crates/claude_code/` — Claude Code backend crate
 - `docs/` — ADRs, specs, integration notes, project management
