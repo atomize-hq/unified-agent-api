@@ -10,8 +10,8 @@
 //!
 //! Example:
 //! ```bash
-//! cargo run -p codex --example stream_events -- "Summarize repo status"
-//! cargo run -p codex --example stream_events -- --sample
+//! cargo run -p unified-agent-api-codex --example stream_events -- "Summarize repo status"
+//! cargo run -p unified-agent-api-codex --example stream_events -- --sample
 //! ```
 
 use std::{env, error::Error, path::Path, path::PathBuf, time::Duration};

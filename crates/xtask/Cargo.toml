@@ -11,10 +11,10 @@ name = "xtask"
 path = "src/main.rs"
 
 [dependencies]
-agent_api = { path = "../agent_api", features = ["codex", "claude_code"] }
+agent_api = { package = "unified-agent-api", path = "../agent_api", features = ["codex", "claude_code"] }
 clap = { version = "4.5", features = ["derive"] }
-codex = { path = "../codex" }
-claude_code = { path = "../claude_code" }
+codex = { package = "unified-agent-api-codex", path = "../codex" }
+claude_code = { package = "unified-agent-api-claude-code", path = "../claude_code" }
 hex = "0.4"
 jsonschema = { version = "0.18", features = ["draft202012"] }
 regex = "1.10"

@@ -1,7 +1,7 @@
 //! Demonstrates resuming a session with `--fork-session` to create a new session ID.
 //!
 //! Usage:
-//! - `CLAUDE_EXAMPLE_LIVE=1 cargo run -p claude_code --example multi_turn_fork`
+//! - `CLAUDE_EXAMPLE_LIVE=1 cargo run -p unified-agent-api-claude-code --example multi_turn_fork`
 
 use std::{error::Error, time::SystemTime};
 

@@ -5,13 +5,14 @@ Approved (UTC): 2026-02-21
 Date (UTC): 2026-02-16  
 Canonical location: `docs/specs/unified-agent-api/`
 
-This document is the authoritative contract for the new `agent_api` crate’s public Rust API surface.
+This document is the authoritative contract for the `agent_api` Rust library crate’s public API surface.
 
 Normative language: this contract uses RFC 2119 requirement keywords (`MUST`, `MUST NOT`, `SHOULD`).
 
 ## Crate
 
-- Crate: `agent_api` (new workspace member under `crates/agent_api`)
+- Cargo package: `unified-agent-api`
+- Rust library crate: `agent_api` (workspace member under `crates/agent_api`)
 - The crate MUST compile with default features (no backends) enabled.
 - The crate MUST NOT publicly re-export any `codex` or `claude_code` types in v1.
 
@@ -21,9 +22,9 @@ Normative language: this contract uses RFC 2119 requirement keywords (`MUST`, `M
 - `claude_code`: enable Claude Code backend support (depends on `crates/claude_code`)
 
 Consumers must enable features using Cargo’s standard syntax, e.g.:
-- `cargo test -p agent_api --features codex`
-- `cargo test -p agent_api --features claude_code`
-- `cargo test -p agent_api --all-features`
+- `cargo test -p unified-agent-api --features codex`
+- `cargo test -p unified-agent-api --features claude_code`
+- `cargo test -p unified-agent-api --all-features`
 
 ## Terminology (v1, normative)
 

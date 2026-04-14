@@ -1,7 +1,7 @@
 //! Demonstrates `--include-partial-messages` with `--output-format stream-json`.
 //!
 //! Usage:
-//! - `CLAUDE_EXAMPLE_LIVE=1 cargo run -p claude_code --example print_include_partial_messages -- "hello"`
+//! - `CLAUDE_EXAMPLE_LIVE=1 cargo run -p unified-agent-api-claude-code --example print_include_partial_messages -- "hello"`
 
 use std::{collections::BTreeMap, error::Error};
 

@@ -1,7 +1,7 @@
 //! Demonstrates `claude --print --output-format stream-json` parsing.
 //!
 //! Usage:
-//! - `CLAUDE_EXAMPLE_LIVE=1 cargo run -p claude_code --example print_stream_json -- "Hello"`
+//! - `CLAUDE_EXAMPLE_LIVE=1 cargo run -p unified-agent-api-claude-code --example print_stream_json -- "Hello"`
 //! - Optional isolation: `CLAUDE_EXAMPLE_ISOLATED_HOME=1`
 
 use std::{env, error::Error};

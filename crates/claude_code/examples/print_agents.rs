@@ -1,8 +1,8 @@
 //! Demonstrates `--agent` / `--agents` (opt-in).
 //!
 //! Usage:
-//! - `CLAUDE_EXAMPLE_LIVE=1 CLAUDE_EXAMPLE_AGENT=reviewer cargo run -p claude_code --example print_agents -- \"hello\"`
-//! - `CLAUDE_EXAMPLE_LIVE=1 CLAUDE_EXAMPLE_AGENTS_JSON='{\"reviewer\": {\"description\": \"Reviews code\", \"prompt\": \"You are a code reviewer\"}}' cargo run -p claude_code --example print_agents -- \"hello\"`
+//! - `CLAUDE_EXAMPLE_LIVE=1 CLAUDE_EXAMPLE_AGENT=reviewer cargo run -p unified-agent-api-claude-code --example print_agents -- \"hello\"`
+//! - `CLAUDE_EXAMPLE_LIVE=1 CLAUDE_EXAMPLE_AGENTS_JSON='{\"reviewer\": {\"description\": \"Reviews code\", \"prompt\": \"You are a code reviewer\"}}' cargo run -p unified-agent-api-claude-code --example print_agents -- \"hello\"`
 
 use std::error::Error;
 

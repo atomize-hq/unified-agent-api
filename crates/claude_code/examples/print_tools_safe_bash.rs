@@ -1,7 +1,7 @@
 //! Demonstrates tool usage in a safe sandboxed working directory.
 //!
 //! Usage:
-//! - `CLAUDE_EXAMPLE_LIVE=1 cargo run -p claude_code --example print_tools_safe_bash`
+//! - `CLAUDE_EXAMPLE_LIVE=1 cargo run -p unified-agent-api-claude-code --example print_tools_safe_bash`
 //!
 //! Notes:
 //! - Uses a temp working directory and restricts tool access to it with `--add-dir`.

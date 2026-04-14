@@ -4,7 +4,7 @@
 //! - Provide stream-json input via env:
 //!   - `export CLAUDE_EXAMPLE_STREAM_JSON_INPUT='{"type":"user","session_id":"...","message":{"content":[{"type":"text","text":"hi"}]}}'`
 //! - Then run:
-//!   - `CLAUDE_EXAMPLE_LIVE=1 cargo run -p claude_code --example print_stream_json_replay_user_messages`
+//!   - `CLAUDE_EXAMPLE_LIVE=1 cargo run -p unified-agent-api-claude-code --example print_stream_json_replay_user_messages`
 //!
 //! Notes:
 //! - The stream-json input schema is CLI/version dependent; this example is opt-in.

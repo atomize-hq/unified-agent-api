@@ -1,7 +1,7 @@
 //! Demonstrates `--betas <betas...>` (opt-in).
 //!
 //! Usage:
-//! - `CLAUDE_EXAMPLE_LIVE=1 CLAUDE_EXAMPLE_BETAS=\"beta1 beta2\" cargo run -p claude_code --example print_betas -- \"hello\"`
+//! - `CLAUDE_EXAMPLE_LIVE=1 CLAUDE_EXAMPLE_BETAS=\"beta1 beta2\" cargo run -p unified-agent-api-claude-code --example print_betas -- \"hello\"`
 
 use std::error::Error;
 

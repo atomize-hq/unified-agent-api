@@ -1,7 +1,7 @@
 //! Demonstrates the multi-step `claude setup-token` flow via `ClaudeSetupTokenSession`.
 //!
 //! Usage:
-//! - `CLAUDE_EXAMPLE_LIVE=1 cargo run -p claude_code --example setup_token_flow`
+//! - `CLAUDE_EXAMPLE_LIVE=1 cargo run -p unified-agent-api-claude-code --example setup_token_flow`
 //! - Provide the code via env: `CLAUDE_SETUP_TOKEN_CODE=...`
 //! - Or paste the code when prompted.
 //!

@@ -1,7 +1,7 @@
 //! Demonstrates `claude doctor` via the wrapper (real CLI only).
 //!
 //! Usage:
-//! - `cargo run -p claude_code --example doctor`
+//! - `cargo run -p unified-agent-api-claude-code --example doctor`
 //! - Optional isolation: `CLAUDE_EXAMPLE_ISOLATED_HOME=1`
 
 use std::error::Error;

@@ -1,7 +1,7 @@
 //! Demonstrates plugin management commands that are upstream-gated to Windows (`win32-x64`).
 //!
 //! Usage (Windows only):
-//! - `cargo run -p claude_code --example plugin_manage -- list`
+//! - `cargo run -p unified-agent-api-claude-code --example plugin_manage -- list`
 //! - Mutating commands require: `CLAUDE_EXAMPLE_ALLOW_MUTATION=1`
 //!   - `... -- enable <PLUGIN>`
 //!   - `... -- disable`

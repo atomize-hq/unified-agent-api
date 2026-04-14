@@ -1,7 +1,7 @@
 //! Demonstrates MCP management commands that are upstream-gated to Windows (`win32-x64`).
 //!
 //! Usage (Windows only):
-//! - `cargo run -p claude_code --example mcp_manage -- list`
+//! - `cargo run -p unified-agent-api-claude-code --example mcp_manage -- list`
 //! - Mutating commands require: `CLAUDE_EXAMPLE_ALLOW_MUTATION=1`
 //!   - `... -- add <NAME> <COMMAND_OR_URL>`
 //!   - `... -- remove <NAME>`

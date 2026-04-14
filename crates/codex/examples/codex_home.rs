@@ -3,7 +3,7 @@
 //! Set `CODEX_HOME` to a writable directory (or pass nothing to use a temp dir):
 //! ```bash
 //! CODEX_HOME=/tmp/codex-demo \
-//!   cargo run -p codex --example codex_home -- "List tmp files"
+//!   cargo run -p unified-agent-api-codex --example codex_home -- "List tmp files"
 //! ```
 //!
 //! Codex will read/write under `CODEX_HOME` (config.toml, auth.json, .credentials.json,

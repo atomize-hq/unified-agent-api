@@ -4,8 +4,8 @@
 //! requested.
 //!
 //! Usage:
-//! - Show help (default): `cargo run -p codex --example review_commands`
-//! - Run (requires repo + auth): `CODEX_EXAMPLE_LIVE=1 cargo run -p codex --example review_commands -- run --prompt "Review this diff"`
+//! - Show help (default): `cargo run -p unified-agent-api-codex --example review_commands`
+//! - Run (requires repo + auth): `CODEX_EXAMPLE_LIVE=1 cargo run -p unified-agent-api-codex --example review_commands -- run --prompt "Review this diff"`
 //!
 //! Environment:
 //! - `CODEX_BINARY` (optional): path to the `codex` CLI binary (defaults to `codex` in PATH).

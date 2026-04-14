@@ -22,7 +22,7 @@ fn parse_platform(raw: &OsString) -> Option<SandboxPlatform> {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Usage: cargo run -p codex --example run_sandbox -- [platform] [--full-auto] [--log-denials] -- <command...>
+    // Usage: cargo run -p unified-agent-api-codex --example run_sandbox -- [platform] [--full-auto] [--log-denials] -- <command...>
     // Defaults platform from the host OS when omitted. macOS-only `--log-denials` is ignored on other platforms.
     // Maps to: codex sandbox <platform> [--full-auto] [--log-denials] [--config/--enable/--disable] -- <command...>
     let args: Vec<OsString> = env::args_os().skip(1).collect();

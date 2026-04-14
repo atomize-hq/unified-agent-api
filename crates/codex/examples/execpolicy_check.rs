@@ -4,7 +4,7 @@
 //! this example prints a short skip message.
 //!
 //! Usage:
-//! - `cargo run -p codex --example execpolicy_check`
+//! - `cargo run -p unified-agent-api-codex --example execpolicy_check`
 //!
 //! Environment:
 //! - `CODEX_BINARY` (optional): path to the `codex` CLI binary (defaults to `codex` in PATH).

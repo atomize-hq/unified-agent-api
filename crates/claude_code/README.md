@@ -2,6 +2,9 @@
 
 Async wrapper around the Claude Code CLI (`claude`) focused on the headless `--print` flow.
 
+- crates.io package: `unified-agent-api-claude-code`
+- Rust library crate: `claude_code`
+
 Design goals:
 - Non-interactive first: all supported prompting APIs run with `--print`.
 - No automatic downloads: this crate never installs Claude Code and never auto-updates it; update only runs when explicitly invoked.

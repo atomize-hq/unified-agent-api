@@ -8,7 +8,7 @@ use codex::{
 /// Demonstrates disk snapshot reuse with fingerprint checks and cache policies.
 ///
 /// Usage:
-/// `cargo run -p codex --example capability_snapshot -- [binary_path] [snapshot_path] [auto|refresh|bypass]`
+/// `cargo run -p unified-agent-api-codex --example capability_snapshot -- [binary_path] [snapshot_path] [auto|refresh|bypass]`
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut args = env::args().skip(1);

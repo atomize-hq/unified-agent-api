@@ -1,7 +1,7 @@
 //! Demonstrates `codex features` and `codex features list` via the wrapper.
 //!
 //! Usage:
-//! - `cargo run -p codex --example features_cmd`
+//! - `cargo run -p unified-agent-api-codex --example features_cmd`
 //!
 //! Environment:
 //! - `CODEX_BINARY` (optional): path to the `codex` CLI binary (defaults to `codex` in PATH).

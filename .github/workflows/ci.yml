@@ -102,6 +102,12 @@ jobs:
             exit 1
           fi
 
+      - name: Guard publishable crate versions and pins
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/validate_publish_versions.py
+
       - name: Guard CHANGELOG.md updates when VERSION changes
         if: ${{ github.event_name == 'pull_request' || github.event_name == 'push' }}
         shell: bash
@@ -163,11 +169,11 @@ jobs:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-      - name: cargo test -p agent_api --all-features
+      - name: cargo test -p unified-agent-api --all-features
         shell: bash
         run: |
           set -euo pipefail
-          cargo test -p agent_api --all-features
+          cargo test -p unified-agent-api --all-features
 
   loc-check:
     name: LOC cap (Rust files)
@@ -347,11 +353,11 @@ jobs:
           export CODEX_E2E_HOME="$(mktemp -d)"
           export CODEX_HOME="$CODEX_E2E_HOME"
           export CODEX_BINARY=./codex-x86_64-unknown-linux-musl
-          cargo test -p codex
-          cargo test -p codex --examples
-          cargo run -p codex --example feature_detection
-          cargo run -p codex --example capability_snapshot -- "$CODEX_BINARY" "$CODEX_E2E_HOME/capabilities.json" auto
-          CODEX_E2E_BINARY=./codex-x86_64-unknown-linux-musl cargo test -p codex --test cli_e2e -- --nocapture
+          cargo test -p unified-agent-api-codex
+          cargo test -p unified-agent-api-codex --examples
+          cargo run -p unified-agent-api-codex --example feature_detection
+          cargo run -p unified-agent-api-codex --example capability_snapshot -- "$CODEX_BINARY" "$CODEX_E2E_HOME/capabilities.json" auto
+          CODEX_E2E_BINARY=./codex-x86_64-unknown-linux-musl cargo test -p unified-agent-api-codex --test cli_e2e -- --nocapture
 
   linux-min-supported:
     name: Linux (min supported)
@@ -396,11 +402,11 @@ jobs:
           export CODEX_E2E_HOME="$(mktemp -d)"
           export CODEX_HOME="$CODEX_E2E_HOME"
           export CODEX_BINARY=./codex-x86_64-unknown-linux-musl
-          cargo test -p codex
-          cargo test -p codex --examples
-          cargo run -p codex --example feature_detection
-          cargo run -p codex --example capability_snapshot -- "$CODEX_BINARY" "$CODEX_E2E_HOME/capabilities.json" auto
-          CODEX_E2E_BINARY=./codex-x86_64-unknown-linux-musl cargo test -p codex --test cli_e2e -- --nocapture
+          cargo test -p unified-agent-api-codex
+          cargo test -p unified-agent-api-codex --examples
+          cargo run -p unified-agent-api-codex --example feature_detection
+          cargo run -p unified-agent-api-codex --example capability_snapshot -- "$CODEX_BINARY" "$CODEX_E2E_HOME/capabilities.json" auto
+          CODEX_E2E_BINARY=./codex-x86_64-unknown-linux-musl cargo test -p unified-agent-api-codex --test cli_e2e -- --nocapture
 
   linux-claude-latest-validated:
     name: Claude Code Linux (latest validated)
@@ -438,10 +444,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cargo test -p claude_code
+          cargo test -p unified-agent-api-claude-code
 
       - name: Wrapper examples compile gate
         shell: bash
         run: |
           set -euo pipefail
-          cargo test -p claude_code --examples
+          cargo test -p unified-agent-api-claude-code --examples

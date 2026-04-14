@@ -1,7 +1,7 @@
 //! Demonstrates disabling stdout mirroring while still capturing Codex output.
 //! Usage:
 //! ```powershell
-//! cargo run -p codex --example no_stdout_mirror -- "Stream quietly"
+//! cargo run -p unified-agent-api-codex --example no_stdout_mirror -- "Stream quietly"
 //! ```
 
 use codex::CodexClient;

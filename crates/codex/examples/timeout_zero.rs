@@ -1,7 +1,7 @@
 //! Demonstrates disabling the Codex timeout entirely (`timeout = 0`).
 //! Usage:
 //! ```powershell
-//! cargo run -p codex --example timeout_zero -- "Stream until completion"
+//! cargo run -p unified-agent-api-codex --example timeout_zero -- "Stream until completion"
 //! ```
 
 use codex::CodexClient;

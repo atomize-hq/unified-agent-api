@@ -1,13 +1,17 @@
 [package]
-name = "claude_code"
-version = "0.2.0"
+name = "unified-agent-api-claude-code"
+version.workspace = true
 edition = "2021"
 rust-version = "1.78"
 description = "Async wrapper around the Claude Code CLI for non-interactive prompting"
 license = "MIT OR Apache-2.0"
+repository = "https://github.com/atomize-hq/unified-agent-api"
 keywords = ["claude", "cli", "wrapper", "agent"]
 categories = ["api-bindings", "command-line-interface"]
 readme = "README.md"
+
+[lib]
+name = "claude_code"
 
 [dependencies]
 futures-core = "0.3"

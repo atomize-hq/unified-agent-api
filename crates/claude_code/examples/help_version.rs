@@ -1,7 +1,7 @@
 //! Demonstrates `claude --help` and `claude --version` via the wrapper (real CLI only).
 //!
 //! Usage:
-//! - `cargo run -p claude_code --example help_version`
+//! - `cargo run -p unified-agent-api-claude-code --example help_version`
 //! - Optional isolation: `CLAUDE_EXAMPLE_ISOLATED_HOME=1`
 
 use std::error::Error;

@@ -217,6 +217,7 @@ fn read_codex_wrapper_version() -> String {
         .unwrap_or_else(|e| panic!("read {}: {e}", cargo_toml.display()));
 
     let mut in_package = false;
+    let mut uses_workspace_version = false;
     for raw_line in text.lines() {
         let line = raw_line.trim();
         if line.starts_with('[') && line.ends_with(']') {
@@ -224,6 +225,10 @@ fn read_codex_wrapper_version() -> String {
             continue;
         }
         if !in_package {
+            continue;
+        }
+        if line == "version.workspace = true" {
+            uses_workspace_version = true;
             continue;
         }
         let Some(rest) = line.strip_prefix("version") else {
@@ -238,8 +243,41 @@ fn read_codex_wrapper_version() -> String {
         }
     }
 
+    if uses_workspace_version {
+        let workspace_cargo_toml = repo_root().join("Cargo.toml");
+        let workspace_text = fs::read_to_string(&workspace_cargo_toml)
+            .unwrap_or_else(|e| panic!("read {}: {e}", workspace_cargo_toml.display()));
+
+        let mut in_workspace_package = false;
+        for raw_line in workspace_text.lines() {
+            let line = raw_line.trim();
+            if line.starts_with('[') && line.ends_with(']') {
+                in_workspace_package = line == "[workspace.package]";
+                continue;
+            }
+            if !in_workspace_package {
+                continue;
+            }
+            let Some(rest) = line.strip_prefix("version") else {
+                continue;
+            };
+            let Some(rest) = rest.trim_start().strip_prefix('=') else {
+                continue;
+            };
+            let val = rest.trim();
+            if let Some(stripped) = val.strip_prefix('"').and_then(|v| v.strip_suffix('"')) {
+                return stripped.to_string();
+            }
+        }
+
+        panic!(
+            "failed to locate [workspace.package].version in {}",
+            workspace_cargo_toml.display()
+        );
+    }
+
     panic!(
-        "failed to locate [package].version in {}",
+        "failed to locate [package].version or version.workspace = true in {}",
         cargo_toml.display()
     );
 }
@@ -319,7 +357,7 @@ fn c2_wrapper_coverage_generation_is_deterministic_and_includes_wrapper_version(
             .and_then(Value::as_str)
             .map(|s| s.to_string()),
         Some(expected_version),
-        "wrapper_version must match crates/codex/Cargo.toml [package].version"
+        "wrapper_version must match the codex crate package version"
     );
 }
 

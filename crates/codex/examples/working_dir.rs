@@ -1,7 +1,7 @@
 //! Demonstrates running Codex inside a specific working directory.
 //! Usage:
 //! ```powershell
-//! cargo run -p codex --example working_dir -- "C:\path\to\repo" "List files here"
+//! cargo run -p unified-agent-api-codex --example working_dir -- "C:\path\to\repo" "List files here"
 //! ```
 
 use codex::CodexClient;

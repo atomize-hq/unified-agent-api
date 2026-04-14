@@ -1,7 +1,7 @@
 //! Demonstrates `--no-session-persistence`.
 //!
 //! Usage:
-//! - `CLAUDE_EXAMPLE_LIVE=1 cargo run -p claude_code --example multi_turn_no_session_persistence`
+//! - `CLAUDE_EXAMPLE_LIVE=1 cargo run -p unified-agent-api-claude-code --example multi_turn_no_session_persistence`
 //!
 //! Notes:
 //! - Runs in a temp working directory.

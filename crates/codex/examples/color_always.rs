@@ -1,7 +1,7 @@
 //! Demonstrates forcing ANSI colors in Codex output.
 //! Usage:
 //! ```powershell
-//! cargo run -p codex --example color_always -- "Show colorful output"
+//! cargo run -p unified-agent-api-codex --example color_always -- "Show colorful output"
 //! ```
 
 use codex::{CodexClient, ColorMode};

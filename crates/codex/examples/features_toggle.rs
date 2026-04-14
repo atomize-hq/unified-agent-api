@@ -1,8 +1,8 @@
 //! Demonstrates `codex features enable` and `codex features disable` via the wrapper.
 //!
 //! Usage:
-//! - `cargo run -p codex --example features_toggle -- enable unified_exec`
-//! - `cargo run -p codex --example features_toggle -- disable unified_exec`
+//! - `cargo run -p unified-agent-api-codex --example features_toggle -- enable unified_exec`
+//! - `cargo run -p unified-agent-api-codex --example features_toggle -- disable unified_exec`
 //!
 //! Environment:
 //! - `CODEX_BINARY` (optional): path to the `codex` CLI binary (defaults to `codex` in PATH).

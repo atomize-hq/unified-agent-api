@@ -1,7 +1,7 @@
 //! Demonstrates `--debug` and `--debug-file`.
 //!
 //! Usage:
-//! - `CLAUDE_EXAMPLE_LIVE=1 cargo run -p claude_code --example print_debug_file -- "hello"`
+//! - `CLAUDE_EXAMPLE_LIVE=1 cargo run -p unified-agent-api-claude-code --example print_debug_file -- "hello"`
 
 use std::{env, error::Error, fs};
 

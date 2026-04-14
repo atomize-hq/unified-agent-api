@@ -1,7 +1,7 @@
 //! Demonstrates `--ide` (opt-in).
 //!
 //! Usage:
-//! - `CLAUDE_EXAMPLE_LIVE=1 CLAUDE_EXAMPLE_ALLOW_IDE=1 cargo run -p claude_code --example print_ide -- "hello"`
+//! - `CLAUDE_EXAMPLE_LIVE=1 CLAUDE_EXAMPLE_ALLOW_IDE=1 cargo run -p unified-agent-api-claude-code --example print_ide -- "hello"`
 
 use std::{env, error::Error};
 

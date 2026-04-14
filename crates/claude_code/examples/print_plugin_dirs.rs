@@ -1,7 +1,7 @@
 //! Demonstrates `--plugin-dir <paths...>` (opt-in).
 //!
 //! Usage:
-//! - `CLAUDE_EXAMPLE_LIVE=1 CLAUDE_EXAMPLE_PLUGIN_DIRS=\"/path/to/plugins\" cargo run -p claude_code --example print_plugin_dirs -- \"hello\"`
+//! - `CLAUDE_EXAMPLE_LIVE=1 CLAUDE_EXAMPLE_PLUGIN_DIRS=\"/path/to/plugins\" cargo run -p unified-agent-api-claude-code --example print_plugin_dirs -- \"hello\"`
 //!
 //! Notes:
 //! - This does not install plugins. It only shows how to pass plugin search paths for a session.

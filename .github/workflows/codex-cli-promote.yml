@@ -73,11 +73,11 @@ jobs:
           export CODEX_HOME="$CODEX_E2E_HOME"
           export CODEX_BINARY="$BIN"
           export CODEX_E2E_BINARY="$BIN"
-          cargo test -p codex
-          cargo test -p codex --examples
-          cargo run -p codex --example feature_detection
-          cargo run -p codex --example capability_snapshot -- "$CODEX_BINARY" "$CODEX_E2E_HOME/capabilities.json" auto
-          cargo test -p codex --test cli_e2e -- --nocapture
+          cargo test -p unified-agent-api-codex
+          cargo test -p unified-agent-api-codex --examples
+          cargo run -p unified-agent-api-codex --example feature_detection
+          cargo run -p unified-agent-api-codex --example capability_snapshot -- "$CODEX_BINARY" "$CODEX_E2E_HOME/capabilities.json" auto
+          cargo test -p unified-agent-api-codex --test cli_e2e -- --nocapture
 
       - name: Promote pointers and metadata
         shell: bash

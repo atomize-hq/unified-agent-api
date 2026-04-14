@@ -1,8 +1,8 @@
 //! Demonstrates `codex exec resume` (streaming) and `codex apply` via the wrapper.
 //!
 //! Usage:
-//! - `CODEX_TASK_ID=... cargo run -p codex --example exec_resume_apply_wrapper -- --last --prompt \"continue\"`
-//! - `cargo run -p codex --example exec_resume_apply_wrapper -- --resume-id <SESSION_ID> --prompt \"continue\"`
+//! - `CODEX_TASK_ID=... cargo run -p unified-agent-api-codex --example exec_resume_apply_wrapper -- --last --prompt \"continue\"`
+//! - `cargo run -p unified-agent-api-codex --example exec_resume_apply_wrapper -- --resume-id <SESSION_ID> --prompt \"continue\"`
 //!
 //! Environment:
 //! - `CODEX_BINARY` (optional): path to the `codex` CLI binary (defaults to `codex` in PATH).

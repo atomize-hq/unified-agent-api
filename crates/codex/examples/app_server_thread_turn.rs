@@ -7,8 +7,8 @@
 //!
 //! Example:
 //! ```bash
-//! cargo run -p codex --example app_server_thread_turn -- "Draft a release note"
-//! cargo run -p codex --example app_server_thread_turn -- --sample
+//! cargo run -p unified-agent-api-codex --example app_server_thread_turn -- "Draft a release note"
+//! cargo run -p unified-agent-api-codex --example app_server_thread_turn -- --sample
 //! ```
 
 use std::{env, error::Error, path::Path, path::PathBuf};

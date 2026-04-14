@@ -1,7 +1,7 @@
 //! Demonstrates `--allow-dangerously-skip-permissions`.
 //!
 //! Usage:
-//! - `CLAUDE_EXAMPLE_LIVE=1 cargo run -p claude_code --example print_allow_dangerously_skip_permissions -- "hello"`
+//! - `CLAUDE_EXAMPLE_LIVE=1 cargo run -p unified-agent-api-claude-code --example print_allow_dangerously_skip_permissions -- "hello"`
 
 use std::{env, error::Error};
 

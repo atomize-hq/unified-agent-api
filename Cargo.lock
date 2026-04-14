@@ -3,21 +3,6 @@
 version = 3
 
 [[package]]
-name = "agent_api"
-version = "0.2.0"
-dependencies = [
- "claude_code",
- "codex",
- "futures-core",
- "futures-util",
- "serde_json",
- "tempfile",
- "thiserror",
- "tokio",
- "url",
-]
-
-[[package]]
 name = "ahash"
 version = "0.8.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -219,37 +204,6 @@ name = "clap_lex"
 version = "0.7.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c3e64b0cc0439b12df2fa678eae89a1c56a529fd067a9115f7827f1fffd22b32"
-
-[[package]]
-name = "claude_code"
-version = "0.2.0"
-dependencies = [
- "futures-core",
- "futures-util",
- "portable-pty",
- "serde",
- "serde_json",
- "tempfile",
- "thiserror",
- "tokio",
- "tracing",
-]
-
-[[package]]
-name = "codex"
-version = "0.2.0"
-dependencies = [
- "futures-core",
- "futures-util",
- "semver",
- "serde",
- "serde_json",
- "tempfile",
- "thiserror",
- "tokio",
- "toml",
- "tracing",
-]
 
 [[package]]
 name = "colorchoice"
@@ -1564,6 +1518,64 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9312f7c4f6ff9069b165498234ce8be658059c6728633667c526e27dc2cf1df5"
 
 [[package]]
+name = "unified-agent-api"
+version = "0.2.0"
+dependencies = [
+ "futures-core",
+ "futures-util",
+ "serde_json",
+ "tempfile",
+ "thiserror",
+ "tokio",
+ "unified-agent-api-claude-code",
+ "unified-agent-api-codex",
+ "url",
+]
+
+[[package]]
+name = "unified-agent-api-claude-code"
+version = "0.2.0"
+dependencies = [
+ "futures-core",
+ "futures-util",
+ "portable-pty",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "unified-agent-api-codex"
+version = "0.2.0"
+dependencies = [
+ "futures-core",
+ "futures-util",
+ "semver",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror",
+ "tokio",
+ "toml",
+ "tracing",
+]
+
+[[package]]
+name = "unified-agent-api-wrapper-events"
+version = "0.2.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "unified-agent-api-claude-code",
+ "unified-agent-api-codex",
+]
+
+[[package]]
 name = "url"
 version = "2.5.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1841,18 +1853,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f17a85883d4e6d00e8a97c586de764dabcc06133f7f1d55dce5cdc070ad7fe59"
 
 [[package]]
-name = "wrapper_events"
-version = "0.2.0"
-dependencies = [
- "claude_code",
- "codex",
- "serde",
- "serde_json",
- "thiserror",
- "tokio",
-]
-
-[[package]]
 name = "writeable"
 version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1862,10 +1862,7 @@ checksum = "9edde0db4769d2dc68579893f2306b26c6ecfbe0ef499b013d731b7b9247e0b9"
 name = "xtask"
 version = "0.2.0"
 dependencies = [
- "agent_api",
  "clap",
- "claude_code",
- "codex",
  "hex",
  "jsonschema",
  "regex",
@@ -1875,6 +1872,9 @@ dependencies = [
  "sha2",
  "thiserror",
  "time",
+ "unified-agent-api",
+ "unified-agent-api-claude-code",
+ "unified-agent-api-codex",
  "wait-timeout",
 ]
 

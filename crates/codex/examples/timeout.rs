@@ -1,7 +1,7 @@
 //! Demonstrates overriding the Codex timeout (30 seconds here).
 //! Usage:
 //! ```powershell
-//! cargo run -p codex --example timeout -- "List long-running tasks"
+//! cargo run -p unified-agent-api-codex --example timeout -- "List long-running tasks"
 //! ```
 
 use codex::CodexClient;

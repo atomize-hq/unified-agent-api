@@ -4,7 +4,7 @@ use codex::CodexClient;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Usage: cargo run -p codex --example send_prompt -- <prompt> [model]
+    // Usage: cargo run -p unified-agent-api-codex --example send_prompt -- <prompt> [model]
     let mut args = env::args().skip(1);
     let prompt = args
         .next()

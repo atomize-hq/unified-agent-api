@@ -1,7 +1,7 @@
 //! Demonstrates non-mutating MCP queries (`mcp list` + `mcp reset-project-choices`).
 //!
 //! Usage:
-//! - `cargo run -p claude_code --example mcp_list`
+//! - `cargo run -p unified-agent-api-claude-code --example mcp_list`
 //! - Optional isolation: `CLAUDE_EXAMPLE_ISOLATED_HOME=1`
 
 use std::error::Error;

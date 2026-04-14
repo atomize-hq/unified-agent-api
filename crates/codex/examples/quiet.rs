@@ -1,7 +1,7 @@
 //! Demonstrates suppressing Codex stderr mirroring (`quiet(true)`).
 //! Usage:
 //! ```powershell
-//! cargo run -p codex --example quiet -- "Run without tool noise"
+//! cargo run -p unified-agent-api-codex --example quiet -- "Run without tool noise"
 //! ```
 
 use codex::CodexClient;

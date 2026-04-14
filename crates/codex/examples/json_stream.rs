@@ -1,7 +1,7 @@
 //! Streams Codex JSONL output in real time and reports where the last message is saved.
 //! Usage:
 //! ```powershell
-//! cargo run -p codex --example json_stream -- --output-last-message ./last_message.txt --log-events ./events.log -- "Summarize repo status"
+//! cargo run -p unified-agent-api-codex --example json_stream -- --output-last-message ./last_message.txt --log-events ./events.log -- "Summarize repo status"
 //! ```
 
 use codex::{CodexClient, ExecStreamRequest, ItemDeltaPayload, ItemPayload, ThreadEvent};
