@@ -26,7 +26,7 @@ jobs:
       source_date_epoch: ${{ steps.manifest.outputs.source_date_epoch }}
       snapshot_matrix: ${{ steps.matrix.outputs.snapshot_matrix }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: staging
 
@@ -135,7 +135,7 @@ jobs:
           mv artifacts.lock.json.tmp cli_manifests/claude_code/artifacts.lock.json
 
       - name: Upload pins + downloads
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: "claude-code-pins-${{ inputs.version }}"
           if-no-files-found: error
@@ -152,14 +152,14 @@ jobs:
       fail-fast: false
       matrix: ${{ fromJSON(needs.prepare.outputs.snapshot_matrix) }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: staging
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
 
       - name: Download pins + downloads
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: "claude-code-pins-${{ inputs.version }}"
           path: .
@@ -213,7 +213,7 @@ jobs:
             --supplement cli_manifests/claude_code/supplement/commands.json
 
       - name: Upload snapshot JSON
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: "claude-code-snapshot-${{ inputs.version }}-${{ matrix.target_triple }}"
           if-no-files-found: error
@@ -221,7 +221,7 @@ jobs:
             cli_manifests/claude_code/snapshots/${{ inputs.version }}/
 
       - name: Upload raw help capture (not committed)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: "claude-code-raw-help-${{ inputs.version }}-${{ matrix.target_triple }}"
           if-no-files-found: error
@@ -234,20 +234,20 @@ jobs:
     needs: [prepare, snapshot]
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: staging
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
 
       - name: Download pins + downloads
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: "claude-code-pins-${{ inputs.version }}"
           path: .
 
       - name: Download required Linux snapshot
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: "claude-code-snapshot-${{ inputs.version }}-linux-x64"
           path: .
@@ -255,7 +255,7 @@ jobs:
 
       - name: Download macOS snapshot (best effort)
         continue-on-error: true
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: "claude-code-snapshot-${{ inputs.version }}-darwin-arm64"
           path: .
@@ -263,7 +263,7 @@ jobs:
 
       - name: Download Windows snapshot (best effort)
         continue-on-error: true
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: "claude-code-snapshot-${{ inputs.version }}-win32-x64"
           path: .
@@ -337,7 +337,7 @@ jobs:
           cargo run -p xtask -- parity-triad-scaffold --root cli_manifests/claude_code --version "$VERSION" --out "$OUT"
 
       - name: Create update PR
-        uses: peter-evans/create-pull-request@v6
+        uses: peter-evans/create-pull-request@v8
         with:
           token: ${{ secrets.AUTOMATION_TOKEN || secrets.GITHUB_TOKEN }}
           base: staging

@@ -75,7 +75,7 @@ jobs:
     name: Repo version guards
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
@@ -145,7 +145,7 @@ jobs:
     name: Rust tests (workspace)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - name: cargo test --workspace
@@ -158,7 +158,7 @@ jobs:
     name: Agent API tests (all features)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - name: cargo test -p agent_api --all-features
@@ -171,7 +171,7 @@ jobs:
     name: LOC cap (Rust files)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - name: make loc-check
@@ -184,7 +184,7 @@ jobs:
     name: Agent API backend type leak guard
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: "Guard: no backend types in pub API"
         shell: bash
         run: |
@@ -205,7 +205,7 @@ jobs:
     name: Capability matrix (fresh + audit)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
 
@@ -231,7 +231,7 @@ jobs:
     name: Validate Codex committed artifacts
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - id: codex-artifacts
         name: Detect Codex committed artifacts
         shell: bash
@@ -264,7 +264,7 @@ jobs:
     name: Validate Claude Code committed artifacts
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
 
@@ -281,7 +281,7 @@ jobs:
       latest_validated: ${{ steps.versions.outputs.latest_validated }}
       min_supported: ${{ steps.versions.outputs.min_supported }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - id: versions
         shell: bash
         run: |
@@ -295,7 +295,7 @@ jobs:
     outputs:
       latest_validated: ${{ steps.versions.outputs.latest_validated }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - id: versions
         shell: bash
         run: |
@@ -308,7 +308,7 @@ jobs:
     needs: [versions, pr-purpose]
     if: ${{ !(github.event_name == 'push' && github.ref_name == 'main') && (github.event_name != 'pull_request' || github.base_ref != 'main' || needs.pr-purpose.outputs.purpose == 'codex_release') }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
 
       - name: Acquire Codex CLI
@@ -357,7 +357,7 @@ jobs:
     needs: [versions, pr-purpose]
     if: ${{ !(github.event_name == 'push' && github.ref_name == 'main') && (needs.versions.outputs.min_supported != needs.versions.outputs.latest_validated) && (github.event_name != 'pull_request' || github.base_ref != 'main' || needs.pr-purpose.outputs.purpose == 'codex_release') }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
 
       - name: Acquire Codex CLI
@@ -406,7 +406,7 @@ jobs:
     needs: [claude-versions, pr-purpose]
     if: ${{ !(github.event_name == 'push' && github.ref_name == 'main') && needs.claude-versions.outputs.latest_validated != 'none' && (github.event_name != 'pull_request' || github.base_ref != 'main' || needs.pr-purpose.outputs.purpose == 'claude_code_release') }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
 

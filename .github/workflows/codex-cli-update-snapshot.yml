@@ -31,7 +31,7 @@ jobs:
       source_date_epoch: ${{ steps.upstream.outputs.source_date_epoch }}
       snapshot_matrix: ${{ steps.matrix.outputs.snapshot_matrix }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: staging
 
@@ -145,7 +145,7 @@ jobs:
           mv artifacts.lock.json.tmp cli_manifests/codex/artifacts.lock.json
 
       - name: Upload pins + downloads
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: "codex-cli-pins-${{ inputs.version }}"
           if-no-files-found: error
@@ -161,13 +161,13 @@ jobs:
       fail-fast: false
       matrix: ${{ fromJSON(needs.prepare.outputs.snapshot_matrix) }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: staging
       - uses: dtolnay/rust-toolchain@stable
 
       - name: Download pins + downloads
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: "codex-cli-pins-${{ inputs.version }}"
           path: .
@@ -227,7 +227,7 @@ jobs:
             --supplement cli_manifests/codex/supplement/commands.json
 
       - name: Upload snapshot JSON
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: "codex-cli-snapshot-${{ inputs.version }}-${{ matrix.target_triple }}"
           if-no-files-found: error
@@ -235,7 +235,7 @@ jobs:
             cli_manifests/codex/snapshots/${{ inputs.version }}/${{ matrix.target_triple }}.json
 
       - name: Upload raw help capture (not committed)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: "codex-cli-raw-help-${{ inputs.version }}-${{ matrix.target_triple }}"
           if-no-files-found: error
@@ -247,33 +247,33 @@ jobs:
     runs-on: ubuntu-latest
     needs: [prepare, snapshot]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: staging
       - uses: dtolnay/rust-toolchain@stable
 
       - name: Download pins + downloads
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: "codex-cli-pins-${{ inputs.version }}"
           path: .
 
       - name: Download required Linux snapshot
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: "codex-cli-snapshot-${{ inputs.version }}-x86_64-unknown-linux-musl"
           path: .
 
       - name: Download macOS snapshot (best effort)
         continue-on-error: true
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: "codex-cli-snapshot-${{ inputs.version }}-aarch64-apple-darwin"
           path: .
 
       - name: Download Windows snapshot (best effort)
         continue-on-error: true
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: "codex-cli-snapshot-${{ inputs.version }}-x86_64-pc-windows-msvc"
           path: .
@@ -510,7 +510,7 @@ jobs:
           cat "$WORK_QUEUE" >> "$PR_BODY"
 
       - name: Upload CI PR-body (debug)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: "codex-cli-pr-body-${{ inputs.version }}"
           if-no-files-found: error
@@ -519,7 +519,7 @@ jobs:
             _ci_tmp/codex_cli_work_queue.md
 
       - name: Upload committed artifact bundle (PR fallback)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: "codex-cli-artifacts-${{ inputs.version }}"
           if-no-files-found: error
@@ -538,7 +538,7 @@ jobs:
 
       - name: Create PR (best effort)
         continue-on-error: true
-        uses: peter-evans/create-pull-request@v6
+        uses: peter-evans/create-pull-request@v8
         with:
           token: ${{ secrets.AUTOMATION_TOKEN || github.token }}
           base: staging
