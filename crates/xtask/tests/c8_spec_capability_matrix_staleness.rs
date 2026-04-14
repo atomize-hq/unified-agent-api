@@ -30,7 +30,7 @@ fn c8_spec_capability_matrix_matches_checked_in_file() {
     let checked_in = repo_root()
         .join("docs")
         .join("specs")
-        .join("universal-agent-api")
+        .join("unified-agent-api")
         .join("capability-matrix.md");
 
     let output = Command::new(&xtask_bin)

@@ -351,5 +351,3 @@ fn invalid_add_dirs_entry(index: usize) -> AgentWrapperError {
 
 #[cfg(test)]
 mod tests;
-#[cfg(test)]
-pub(crate) const MODEL_ID_KEY: &str = EXT_AGENT_API_CONFIG_MODEL_V1;
