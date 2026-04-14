@@ -33,6 +33,11 @@
 - LOC cap: `make loc-check` (must pass; Rust files must stay under 700 code LOC)
 - Preflight (integration gate): `make preflight`
 
+### Release metadata
+
+- Root release version: `VERSION` (bare semver, currently aligned with `[workspace.package].version`)
+- Root release notes: `CHANGELOG.md`
+
 ## Repository hygiene rules
 
 This repo intentionally does not commit:

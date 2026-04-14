@@ -21,6 +21,7 @@ Claude Code backend highlights (v1):
 - Codex API docs: `crates/codex/README.md`
 - Examples index: `crates/codex/EXAMPLES.md`
 - Documentation index: `docs/README.md`
+- Release metadata: `VERSION`, `CHANGELOG.md`
 - Contributing: `CONTRIBUTING.md`
 
 ## Repo map
