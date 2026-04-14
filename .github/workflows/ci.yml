@@ -111,12 +111,14 @@ jobs:
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             base_sha="${{ github.event.pull_request.base.sha }}"
             head_sha="${{ github.event.pull_request.head.sha }}"
+            compare_sha="$(git merge-base "$base_sha" "$head_sha")"
           else
             base_sha="${{ github.event.before }}"
             head_sha="${{ github.sha }}"
+            compare_sha="$base_sha"
           fi
 
-          if [ -z "$base_sha" ] || [ "$base_sha" = "0000000000000000000000000000000000000000" ]; then
+          if [ -z "$compare_sha" ] || [ "$compare_sha" = "0000000000000000000000000000000000000000" ]; then
             echo "No comparable base commit is available; skipping VERSION/CHANGELOG diff guard."
             exit 0
           fi
@@ -124,16 +126,16 @@ jobs:
           version_changed=0
           changelog_changed=0
 
-          if ! git diff --quiet "$base_sha" "$head_sha" -- VERSION; then
+          if ! git diff --quiet "$compare_sha" "$head_sha" -- VERSION; then
             version_changed=1
           fi
 
-          if ! git diff --quiet "$base_sha" "$head_sha" -- CHANGELOG.md; then
+          if ! git diff --quiet "$compare_sha" "$head_sha" -- CHANGELOG.md; then
             changelog_changed=1
           fi
 
           if (( version_changed == 1 && changelog_changed == 0 )); then
-            echo "Root VERSION changed between $base_sha and $head_sha, but CHANGELOG.md did not." >&2
+            echo "Root VERSION changed between $compare_sha and $head_sha, but CHANGELOG.md did not." >&2
             echo "Update CHANGELOG.md whenever the root VERSION file changes." >&2
             exit 1
           fi
