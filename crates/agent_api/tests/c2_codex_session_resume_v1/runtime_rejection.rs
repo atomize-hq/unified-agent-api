@@ -11,6 +11,8 @@ use super::support::{
 #[cfg(unix)]
 use super::support::{build_probe_only_backend, AddDirProbeMode};
 
+const BACKPRESSURE_ASSERT_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(200);
+
 async fn assert_runtime_rejection_case(
     scenario: &str,
     resume_extension: (String, serde_json::Value),
@@ -50,6 +52,63 @@ async fn assert_runtime_rejection_case(
                 );
             }
         }
+        other => panic!("expected Backend error, got: {other:?}"),
+    }
+}
+
+async fn assert_dropped_events_unblock_completion(
+    scenario: &str,
+    prompt: &str,
+    extensions: impl IntoIterator<Item = (String, serde_json::Value)>,
+    extra_env: impl IntoIterator<Item = (String, String)>,
+    expected_message: &'static str,
+) {
+    let mut env = base_env();
+    env.insert("FAKE_CODEX_SCENARIO".to_string(), scenario.to_string());
+    env.insert("FAKE_CODEX_EXPECT_PROMPT".to_string(), prompt.to_string());
+    env.extend([
+        (
+            "FAKE_CODEX_BUFFERED_EVENT_COUNT".to_string(),
+            "1024".to_string(),
+        ),
+        (
+            "FAKE_CODEX_BUFFERED_EVENT_PADDING_BYTES".to_string(),
+            "1024".to_string(),
+        ),
+    ]);
+    env.extend(extra_env);
+
+    let backend = build_backend(env, None, false);
+    let handle = backend.run(run_request(prompt, extensions)).await.unwrap();
+    let mut events = handle.events;
+    let mut completion = handle.completion;
+
+    let first = tokio::time::timeout(
+        STREAM_TIMEOUT,
+        std::future::poll_fn(|cx| events.as_mut().poll_next(cx)),
+    )
+    .await
+    .expect("first event arrives");
+    assert!(
+        first.is_some(),
+        "expected at least one live event before drop"
+    );
+
+    assert!(
+        tokio::time::timeout(BACKPRESSURE_ASSERT_TIMEOUT, &mut completion)
+            .await
+            .is_err(),
+        "completion should remain pending while events are still attached"
+    );
+
+    drop(events);
+
+    let err = tokio::time::timeout(STREAM_TIMEOUT, completion)
+        .await
+        .expect("completion resolves after dropping events")
+        .unwrap_err();
+    match err {
+        AgentWrapperError::Backend { message } => assert_eq!(message, expected_message),
         other => panic!("expected Backend error, got: {other:?}"),
     }
 }
@@ -165,6 +224,41 @@ async fn resume_id_add_dirs_runtime_rejection_emits_handle_before_backend_error(
             "FAKE_CODEX_EXPECT_RESUME_ID".to_string(),
             resume_id.to_string(),
         )],
+    )
+    .await;
+}
+
+#[tokio::test]
+async fn resume_last_selection_failure_completion_unblocks_after_dropping_events() {
+    assert_dropped_events_unblock_completion(
+        "resume_last_not_found_buffered_transport_errors",
+        "hello world",
+        [(
+            "agent_api.session.resume.v1".to_string(),
+            json!({"selector": "last"}),
+        )],
+        std::iter::empty(),
+        "no session found",
+    )
+    .await;
+}
+
+#[tokio::test]
+async fn resume_last_add_dirs_runtime_rejection_completion_unblocks_after_dropping_events() {
+    let fixture = add_dirs_fixture();
+
+    assert_dropped_events_unblock_completion(
+        "add_dirs_runtime_rejection_resume_last_buffered_tail",
+        "hello world",
+        [
+            add_dirs_extension(&fixture.dirs),
+            (
+                "agent_api.session.resume.v1".to_string(),
+                json!({"selector": "last"}),
+            ),
+        ],
+        add_dir_expectations(&fixture.dirs),
+        ADD_DIRS_RUNTIME_REJECTION_MESSAGE,
     )
     .await;
 }

@@ -155,7 +155,11 @@ pub(super) fn startup_failure_spawn(
             }))
         };
     let completion = Box::pin(async move { Err(err) });
-    BackendSpawn { events, completion }
+    BackendSpawn {
+        events,
+        completion,
+        events_observability: None,
+    }
 }
 
 pub(super) fn resolve_claude_effective_working_dir(

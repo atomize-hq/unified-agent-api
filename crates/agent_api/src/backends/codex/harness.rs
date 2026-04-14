@@ -244,7 +244,11 @@ pub(super) fn startup_failure_spawn(
             }))
         };
     let completion = Box::pin(async move { Err(err) });
-    BackendSpawn { events, completion }
+    BackendSpawn {
+        events,
+        completion,
+        events_observability: None,
+    }
 }
 
 fn session_handle_facet(thread_id: &str) -> serde_json::Value {
@@ -399,7 +403,11 @@ impl BackendHarnessAdapter for CodexHarnessAdapter {
                 Err(err) => return Err(err),
             };
 
-            let BackendSpawn { events, completion } = spawned;
+            let BackendSpawn {
+                events,
+                completion,
+                events_observability,
+            } = spawned;
             let events = if external_sandbox {
                 Box::pin(
                     stream::once(async move { Ok(CodexBackendEvent::ExternalSandboxWarning) })
@@ -409,7 +417,11 @@ impl BackendHarnessAdapter for CodexHarnessAdapter {
                 events
             };
 
-            Ok(BackendSpawn { events, completion })
+            Ok(BackendSpawn {
+                events,
+                completion,
+                events_observability,
+            })
         })
     }
     fn map_event(&self, event: Self::BackendEvent) -> Vec<AgentWrapperEvent> {

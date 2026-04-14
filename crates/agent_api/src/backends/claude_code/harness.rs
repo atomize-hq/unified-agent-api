@@ -600,7 +600,11 @@ impl BackendHarnessAdapter for ClaudeHarnessAdapter {
                 })
             });
 
-            Ok(BackendSpawn { events, completion })
+            Ok(BackendSpawn {
+                events,
+                completion,
+                events_observability: None,
+            })
         })
     }
 

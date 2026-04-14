@@ -12,7 +12,7 @@ async fn pump_backend_events_smoke_forwards_in_order() {
     let events: DynBackendEventStream<_, _> = Box::pin(events);
 
     let (tx, mut rx) = mpsc::channel::<AgentWrapperEvent>(DEFAULT_EVENT_CHANNEL_CAPACITY);
-    let handle = tokio::spawn(pump_backend_events(adapter, events, tx));
+    let handle = tokio::spawn(pump_backend_events(adapter, events, tx, None));
 
     let mut texts = Vec::<String>::new();
     while let Some(ev) = rx.recv().await {
@@ -125,7 +125,7 @@ async fn pump_blocks_under_backpressure_until_receiver_polls() {
     let events: DynBackendEventStream<_, _> = Box::pin(events);
 
     let (tx, mut rx) = mpsc::channel::<crate::AgentWrapperEvent>(1);
-    let handle = tokio::spawn(pump_backend_events(adapter, events, tx));
+    let handle = tokio::spawn(pump_backend_events(adapter, events, tx, None));
 
     second_mapped_rx.await.expect("second event mapped");
     tokio::task::yield_now().await;
@@ -163,7 +163,7 @@ async fn pump_stops_forwarding_after_receiver_drop_but_drains_to_end() {
 
     let adapter = std::sync::Arc::new(ToyAdapter { fail_spawn: false });
     let (tx, mut rx) = mpsc::channel::<crate::AgentWrapperEvent>(1);
-    let handle = tokio::spawn(pump_backend_events(adapter, events, tx));
+    let handle = tokio::spawn(pump_backend_events(adapter, events, tx, None));
 
     let first = rx.recv().await.expect("at least one forwarded event");
     assert_eq!(first.kind, AgentWrapperEventKind::TextOutput);
@@ -256,7 +256,7 @@ async fn pump_enforces_bounds_before_forwarding() {
 
     let adapter = std::sync::Arc::new(BoundsAdapter);
     let (tx, mut rx) = mpsc::channel::<crate::AgentWrapperEvent>(8);
-    let handle = tokio::spawn(pump_backend_events(adapter, events, tx));
+    let handle = tokio::spawn(pump_backend_events(adapter, events, tx, None));
 
     let ev = rx.recv().await.expect("one event forwarded");
     let message = ev.message.as_deref().expect("message present");
@@ -280,7 +280,7 @@ async fn pump_finality_sender_dropped_only_after_backend_stream_ends() {
 
     let adapter = std::sync::Arc::new(ToyAdapter { fail_spawn: false });
     let (tx, mut rx) = mpsc::channel::<crate::AgentWrapperEvent>(8);
-    let handle = tokio::spawn(pump_backend_events(adapter, events, tx));
+    let handle = tokio::spawn(pump_backend_events(adapter, events, tx, None));
 
     let ev = rx.recv().await.expect("first event forwarded");
     assert_eq!(ev.kind, AgentWrapperEventKind::TextOutput);

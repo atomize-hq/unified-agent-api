@@ -1,17 +1,20 @@
 use std::{
     collections::BTreeMap,
     path::PathBuf,
+    pin::Pin,
     process::ExitStatus,
     sync::{Arc, Mutex},
+    task::{Context, Poll},
     time::Duration,
 };
 
 use codex::{CodexError, ExecStreamError, ExecStreamRequest, ThreadEvent};
+use futures_core::Stream;
 use futures_util::StreamExt;
 use tokio::sync::{mpsc, oneshot};
 
 use crate::{
-    backend_harness::{BackendSpawn, DEFAULT_EVENT_CHANNEL_CAPACITY},
+    backend_harness::{BackendSpawn, EventObservabilitySignal, DEFAULT_EVENT_CHANNEL_CAPACITY},
     backends::spawn_path::resolve_effective_working_dir,
 };
 
@@ -71,12 +74,57 @@ async fn forward_backend_event(
 
 async fn wait_for_event_processing(
     events_done_rx: &mut Option<oneshot::Receiver<()>>,
+    events_observability: Option<EventObservabilitySignal>,
     should_wait: bool,
 ) {
-    if should_wait {
-        if let Some(rx) = events_done_rx.take() {
-            let _ = rx.await;
+    if !should_wait {
+        return;
+    }
+
+    let Some(rx) = events_done_rx.take() else {
+        return;
+    };
+
+    if let Some(events_observability) = events_observability {
+        tokio::select! {
+            _ = async {
+                let _ = rx.await;
+            } => {}
+            _ = events_observability.wait() => {}
         }
+    } else {
+        let _ = rx.await;
+    }
+}
+
+struct ObservabilityEventStream {
+    rx: mpsc::Receiver<Result<super::CodexBackendEvent, super::CodexBackendError>>,
+    events_observability: Option<EventObservabilitySignal>,
+}
+
+impl ObservabilityEventStream {
+    fn signal_observability(&self) {
+        if let Some(signal) = self.events_observability.as_ref() {
+            signal.signal();
+        }
+    }
+}
+
+impl Stream for ObservabilityEventStream {
+    type Item = Result<super::CodexBackendEvent, super::CodexBackendError>;
+
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let poll = Pin::new(&mut self.rx).poll_recv(cx);
+        if matches!(poll, Poll::Ready(None)) {
+            self.signal_observability();
+        }
+        poll
+    }
+}
+
+impl Drop for ObservabilityEventStream {
+    fn drop(&mut self) {
+        self.signal_observability();
     }
 }
 
@@ -265,6 +313,8 @@ pub(super) async fn spawn_exec_or_resume_flow(
     let has_requested_model_id = requested_model_id.is_some();
     let waits_on_event_classification =
         resume_selector.is_some() || has_add_dirs || has_requested_model_id;
+    let events_observability = waits_on_event_classification.then(EventObservabilitySignal::new);
+    let events_observability_for_completion = events_observability.clone();
 
     tokio::spawn(async move {
         let mut events_done_rx = Some(events_done_rx);
@@ -275,7 +325,12 @@ pub(super) async fn spawn_exec_or_resume_flow(
                 // Completion classification depends on the event task when a suppressed terminal
                 // `ThreadEvent::Error` can set backend-owned failure state, so this wait is a
                 // correctness boundary rather than a latency optimization.
-                wait_for_event_processing(&mut events_done_rx, waits_on_event_classification).await;
+                wait_for_event_processing(
+                    &mut events_done_rx,
+                    events_observability_for_completion.clone(),
+                    waits_on_event_classification,
+                )
+                .await;
                 let status = exec_completion.status;
                 let backend_error_message =
                     snapshot_backend_error_message(&stream_state_for_completion);
@@ -296,7 +351,12 @@ pub(super) async fn spawn_exec_or_resume_flow(
                 let _ = tail_tx.send(tail);
             }
             Err(ExecStreamError::Codex(CodexError::NonZeroExit { status, stderr })) => {
-                wait_for_event_processing(&mut events_done_rx, waits_on_event_classification).await;
+                wait_for_event_processing(
+                    &mut events_done_rx,
+                    events_observability_for_completion,
+                    waits_on_event_classification,
+                )
+                .await;
 
                 let backend_error_message =
                     snapshot_backend_error_message(&stream_state_for_completion);
@@ -472,10 +532,10 @@ pub(super) async fn spawn_exec_or_resume_flow(
         }
     });
 
-    let events = Box::pin(futures_util::stream::unfold(
-        event_rx,
-        |mut rx| async move { rx.recv().await.map(|event| (event, rx)) },
-    ));
+    let events = Box::pin(ObservabilityEventStream {
+        rx: event_rx,
+        events_observability: events_observability.clone(),
+    });
 
     let completion = Box::pin(async move {
         completion_rx
@@ -483,5 +543,9 @@ pub(super) async fn spawn_exec_or_resume_flow(
             .unwrap_or(Err(super::CodexBackendError::CompletionTaskDropped))
     });
 
-    Ok(BackendSpawn { events, completion })
+    Ok(BackendSpawn {
+        events,
+        completion,
+        events_observability,
+    })
 }

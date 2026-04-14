@@ -189,7 +189,11 @@ async fn drive_control_backend_startup<A: BackendHarnessAdapter>(
                 }
             };
 
-            let BackendSpawn { events, completion } = spawned;
+            let BackendSpawn {
+                events,
+                completion,
+                events_observability,
+            } = spawned;
 
             tokio::spawn(send_completion_with_cancel(
                 adapter.clone(),
@@ -204,6 +208,7 @@ async fn drive_control_backend_startup<A: BackendHarnessAdapter>(
                 events,
                 tx,
                 cancel_signal,
+                events_observability,
             ));
         }
     }
@@ -215,7 +220,11 @@ fn start_backend_runtime<A: BackendHarnessAdapter>(
     tx: mpsc::Sender<AgentWrapperEvent>,
     completion_tx: oneshot::Sender<Result<AgentWrapperCompletion, AgentWrapperError>>,
 ) {
-    let BackendSpawn { events, completion } = spawned;
+    let BackendSpawn {
+        events,
+        completion,
+        events_observability,
+    } = spawned;
 
     tokio::spawn({
         let adapter = adapter.clone();
@@ -234,13 +243,19 @@ fn start_backend_runtime<A: BackendHarnessAdapter>(
         }
     });
 
-    tokio::spawn(pump_backend_events(adapter, events, tx));
+    tokio::spawn(pump_backend_events(
+        adapter,
+        events,
+        tx,
+        events_observability,
+    ));
 }
 
 async fn pump_backend_events<A: BackendHarnessAdapter>(
     adapter: Arc<A>,
     mut events: DynBackendEventStream<A::BackendEvent, A::BackendError>,
     tx: mpsc::Sender<AgentWrapperEvent>,
+    events_observability: Option<super::EventObservabilitySignal>,
 ) {
     // BH-C04 (SEAM-3) pinned semantics:
     // - Forward mapped + bounds-enforced universal events while the receiver is alive.
@@ -267,6 +282,9 @@ async fn pump_backend_events<A: BackendHarnessAdapter>(
             for bounded in crate::bounds::enforce_event_bounds(event) {
                 if tx.send(bounded).await.is_err() {
                     forward = false;
+                    if let Some(signal) = events_observability.as_ref() {
+                        signal.signal();
+                    }
                     break;
                 }
             }
@@ -286,6 +304,7 @@ async fn pump_backend_events_with_cancel<A: BackendHarnessAdapter>(
     mut events: DynBackendEventStream<A::BackendEvent, A::BackendError>,
     tx: mpsc::Sender<AgentWrapperEvent>,
     cancel: HarnessCancelSignal,
+    events_observability: Option<super::EventObservabilitySignal>,
 ) {
     // CA-C02 (SEAM-2) semantics:
     // - Explicit cancellation is orthogonal to receiver drop.
@@ -304,6 +323,9 @@ async fn pump_backend_events_with_cancel<A: BackendHarnessAdapter>(
                 cancelled = true;
                 forward = false;
                 // Close the universal stream (consumer sees `None`) without affecting drain.
+                if let Some(signal) = events_observability.as_ref() {
+                    signal.signal();
+                }
                 drop(tx.take());
             }
             maybe_outcome = events.next() => {
@@ -332,12 +354,18 @@ async fn pump_backend_events_with_cancel<A: BackendHarnessAdapter>(
                             _ = cancel.cancelled(), if !cancelled => {
                                 cancelled = true;
                                 forward = false;
+                                if let Some(signal) = events_observability.as_ref() {
+                                    signal.signal();
+                                }
                                 drop(tx.take());
                                 break 'mapped;
                             }
                             send_outcome = sender.send(bounded) => {
                                 if send_outcome.is_err() {
                                     forward = false;
+                                    if let Some(signal) = events_observability.as_ref() {
+                                        signal.signal();
+                                    }
                                     break 'mapped;
                                 }
                             }

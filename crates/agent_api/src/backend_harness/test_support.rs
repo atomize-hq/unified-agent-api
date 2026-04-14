@@ -99,6 +99,7 @@ impl BackendHarnessAdapter for ToyAdapter {
             Ok(BackendSpawn {
                 events: Box::pin(events),
                 completion: Box::pin(async move { Ok(ToyCompletion) }),
+                events_observability: None,
             })
         })
     }
