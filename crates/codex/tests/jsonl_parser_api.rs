@@ -3,6 +3,7 @@ use codex::{
     ThreadEvent, ThreadEventJsonlRecord,
 };
 use serde_json::Value;
+mod support_paths;
 use std::{
     fs,
     io::{self, BufRead},
@@ -12,8 +13,7 @@ use std::{
 const VERSIONS: &[&str] = &["0.61.0", "0.77.0"];
 
 fn fixture_path(version: &str, name: &str) -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("examples")
+    support_paths::codex_examples_dir()
         .join("fixtures")
         .join("versioned")
         .join(version)
