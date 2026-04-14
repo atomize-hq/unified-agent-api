@@ -74,7 +74,6 @@ async fn forward_backend_event(
 
 async fn wait_for_event_processing(
     events_done_rx: &mut Option<oneshot::Receiver<()>>,
-    events_observability: Option<EventObservabilitySignal>,
     should_wait: bool,
 ) {
     if !should_wait {
@@ -85,16 +84,9 @@ async fn wait_for_event_processing(
         return;
     };
 
-    if let Some(events_observability) = events_observability {
-        tokio::select! {
-            _ = async {
-                let _ = rx.await;
-            } => {}
-            _ = events_observability.wait() => {}
-        }
-    } else {
-        let _ = rx.await;
-    }
+    // Consumer observability can end before the event task drains a buffered tail of suppressed
+    // terminal errors. Only `events_done_rx` proves the drainer finished classification.
+    let _ = rx.await;
 }
 
 struct ObservabilityEventStream {
@@ -312,8 +304,6 @@ pub(super) async fn spawn_exec_or_resume_flow(
     let waits_on_event_classification =
         resume_selector.is_some() || has_add_dirs || has_effective_model_id;
     let events_observability = waits_on_event_classification.then(EventObservabilitySignal::new);
-    let events_observability_for_completion = events_observability.clone();
-
     tokio::spawn(async move {
         let mut events_done_rx = Some(events_done_rx);
         let outcome = completion.await;
@@ -323,12 +313,7 @@ pub(super) async fn spawn_exec_or_resume_flow(
                 // Completion classification depends on the event task when a suppressed terminal
                 // `ThreadEvent::Error` can set backend-owned failure state, so this wait is a
                 // correctness boundary rather than a latency optimization.
-                wait_for_event_processing(
-                    &mut events_done_rx,
-                    events_observability_for_completion.clone(),
-                    waits_on_event_classification,
-                )
-                .await;
+                wait_for_event_processing(&mut events_done_rx, waits_on_event_classification).await;
                 let status = exec_completion.status;
                 let backend_error_message =
                     snapshot_backend_error_message(&stream_state_for_completion);
@@ -349,12 +334,7 @@ pub(super) async fn spawn_exec_or_resume_flow(
                 let _ = tail_tx.send(tail);
             }
             Err(ExecStreamError::Codex(CodexError::NonZeroExit { status, stderr })) => {
-                wait_for_event_processing(
-                    &mut events_done_rx,
-                    events_observability_for_completion,
-                    waits_on_event_classification,
-                )
-                .await;
+                wait_for_event_processing(&mut events_done_rx, waits_on_event_classification).await;
 
                 let backend_error_message =
                     snapshot_backend_error_message(&stream_state_for_completion);

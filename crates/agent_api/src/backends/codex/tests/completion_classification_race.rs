@@ -6,6 +6,7 @@ use super::support::*;
 
 const BUFFERED_COMPLETION_TIMEOUT: Duration = Duration::from_secs(5);
 const BACKPRESSURE_ASSERT_TIMEOUT: Duration = Duration::from_millis(200);
+const POST_DROP_PENDING_TIMEOUT: Duration = Duration::from_millis(50);
 
 fn fake_codex_binary() -> PathBuf {
     if let Some(path) = std::env::var_os("CARGO_BIN_EXE_fake_codex_stream_exec_scenarios_agent_api")
@@ -34,6 +35,19 @@ fn buffered_env() -> [(String, String); 2] {
         (
             "FAKE_CODEX_BUFFERED_EVENT_PADDING_BYTES".to_string(),
             "1024".to_string(),
+        ),
+    ]
+}
+
+fn slow_drain_buffered_env() -> [(String, String); 2] {
+    [
+        (
+            "FAKE_CODEX_BUFFERED_EVENT_COUNT".to_string(),
+            "4096".to_string(),
+        ),
+        (
+            "FAKE_CODEX_BUFFERED_EVENT_PADDING_BYTES".to_string(),
+            "2048".to_string(),
         ),
     ]
 }
@@ -247,6 +261,98 @@ async fn assert_buffered_selection_failure(
     );
 }
 
+async fn assert_dropping_events_waits_for_add_dirs_classification(
+    scenario: &str,
+    selector: SessionSelectorV1,
+    expected_message: &'static str,
+    extra_env: impl IntoIterator<Item = (String, String)>,
+) {
+    let run_start = tempdir().expect("tempdir");
+    let (_temp, add_dirs) = add_dirs_fixture();
+    let env = add_dir_env(&add_dirs)
+        .into_iter()
+        .chain([
+            ("FAKE_CODEX_SCENARIO".to_string(), scenario.to_string()),
+            (
+                "FAKE_CODEX_EXPECT_PROMPT".to_string(),
+                "hello world".to_string(),
+            ),
+        ])
+        .chain(slow_drain_buffered_env())
+        .chain(extra_env)
+        .collect::<BTreeMap<_, _>>();
+
+    let adapter = test_adapter_with_config_and_run_start_cwd(
+        CodexBackendConfig {
+            binary: Some(fake_codex_binary()),
+            ..Default::default()
+        },
+        Some(run_start.path().to_path_buf()),
+    );
+
+    let spawned = adapter
+        .spawn(crate::backend_harness::NormalizedRequest {
+            agent_kind: adapter.kind(),
+            prompt: "hello world".to_string(),
+            model_id: None,
+            working_dir: Some(PathBuf::from(".")),
+            effective_timeout: None,
+            env,
+            policy: CodexExecPolicy {
+                add_dirs,
+                non_interactive: true,
+                external_sandbox: false,
+                approval_policy: None,
+                sandbox_mode: CodexSandboxMode::WorkspaceWrite,
+                resume: Some(selector),
+                fork: None,
+            },
+        })
+        .await
+        .expect("spawn succeeds");
+
+    let mut events = spawned.events;
+    let mut completion = spawned.completion;
+
+    let first = tokio::time::timeout(
+        BUFFERED_COMPLETION_TIMEOUT,
+        std::future::poll_fn(|cx| events.as_mut().poll_next(cx)),
+    )
+    .await
+    .expect("first event arrives")
+    .expect("expected a live event before drop")
+    .expect("backend event stream is infallible for fake codex");
+    let _ = first;
+
+    assert!(
+        tokio::time::timeout(BACKPRESSURE_ASSERT_TIMEOUT, &mut completion)
+            .await
+            .is_err(),
+        "completion should remain pending while buffered events are still attached"
+    );
+
+    drop(events);
+
+    assert!(
+        tokio::time::timeout(POST_DROP_PENDING_TIMEOUT, &mut completion)
+            .await
+            .is_err(),
+        "completion should remain pending until the event task drains buffered suppressed errors"
+    );
+
+    let completion = tokio::time::timeout(BUFFERED_COMPLETION_TIMEOUT, completion)
+        .await
+        .expect("completion resolves")
+        .expect("completion is Ok for fake codex");
+    let err = adapter
+        .map_completion(completion)
+        .expect_err("selection failure must map to Backend error");
+    match err {
+        AgentWrapperError::Backend { message } => assert_eq!(message, expected_message),
+        other => panic!("expected Backend error, got: {other:?}"),
+    }
+}
+
 #[tokio::test]
 async fn buffered_resume_last_add_dirs_runtime_rejection_stays_pinned_before_events_are_drained() {
     assert_buffered_add_dirs_runtime_rejection(
@@ -301,6 +407,17 @@ async fn buffered_resume_id_selection_failure_stays_pinned_before_events_are_dra
             "FAKE_CODEX_EXPECT_RESUME_ID".to_string(),
             resume_id.to_string(),
         )],
+    )
+    .await;
+}
+
+#[tokio::test]
+async fn dropping_events_does_not_bypass_buffered_resume_add_dirs_classification() {
+    assert_dropping_events_waits_for_add_dirs_classification(
+        "add_dirs_runtime_rejection_resume_last_buffered_tail",
+        SessionSelectorV1::Last,
+        PINNED_ADD_DIRS_RUNTIME_REJECTION,
+        std::iter::empty(),
     )
     .await;
 }

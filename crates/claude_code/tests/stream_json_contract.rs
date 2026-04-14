@@ -1,17 +1,9 @@
-use std::path::PathBuf;
+mod support_paths;
 
 use claude_code::{ClaudeStreamJsonErrorCode, ClaudeStreamJsonEvent, ClaudeStreamJsonParser};
 
-fn fixtures_root() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("tests")
-        .join("fixtures")
-        .join("stream_json")
-        .join("v1")
-}
-
 fn read_fixture(name: &str) -> String {
-    let path = fixtures_root().join(name);
+    let path = support_paths::claude_code_stream_json_fixtures_dir().join(name);
     std::fs::read_to_string(path).expect("read fixture")
 }
 

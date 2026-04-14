@@ -46,14 +46,6 @@ impl EventObservabilitySignal {
 
         self.inner.notify.notify_waiters();
     }
-
-    pub(crate) async fn wait(&self) {
-        if self.inner.done.load(Ordering::SeqCst) {
-            return;
-        }
-
-        self.inner.notify.notified().await;
-    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

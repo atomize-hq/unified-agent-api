@@ -23,6 +23,7 @@ const ADD_DIR_LEAK_SENTINELS: [&str; 3] = [
     "ADD_DIR_STDERR_SECRET",
 ];
 const BACKPRESSURE_ASSERT_TIMEOUT: Duration = Duration::from_millis(200);
+const POST_DROP_PENDING_TIMEOUT: Duration = Duration::from_millis(50);
 
 async fn drain_to_none(
     mut stream: Pin<&mut (dyn Stream<Item = AgentWrapperEvent> + Send)>,
@@ -448,11 +449,11 @@ async fn dropping_events_unblocks_buffered_model_runtime_rejection_completion() 
             ),
             (
                 "FAKE_CODEX_BUFFERED_EVENT_COUNT".to_string(),
-                "1024".to_string(),
+                "4096".to_string(),
             ),
             (
                 "FAKE_CODEX_BUFFERED_EVENT_PADDING_BYTES".to_string(),
-                "1024".to_string(),
+                "2048".to_string(),
             ),
             (
                 "FAKE_CODEX_RUNTIME_REJECTION_EXIT_CODE".to_string(),
@@ -504,6 +505,13 @@ async fn dropping_events_unblocks_buffered_model_runtime_rejection_completion() 
     );
 
     drop(events);
+
+    assert!(
+        tokio::time::timeout(POST_DROP_PENDING_TIMEOUT, &mut completion)
+            .await
+            .is_err(),
+        "completion should remain pending until buffered suppressed model errors are classified"
+    );
 
     let err = tokio::time::timeout(Duration::from_secs(2), completion)
         .await
@@ -554,11 +562,11 @@ async fn dropping_events_unblocks_buffered_config_model_runtime_rejection_comple
             ),
             (
                 "FAKE_CODEX_BUFFERED_EVENT_COUNT".to_string(),
-                "1024".to_string(),
+                "4096".to_string(),
             ),
             (
                 "FAKE_CODEX_BUFFERED_EVENT_PADDING_BYTES".to_string(),
-                "1024".to_string(),
+                "2048".to_string(),
             ),
             (
                 "FAKE_CODEX_RUNTIME_REJECTION_EXIT_CODE".to_string(),
@@ -610,6 +618,13 @@ async fn dropping_events_unblocks_buffered_config_model_runtime_rejection_comple
     );
 
     drop(events);
+
+    assert!(
+        tokio::time::timeout(POST_DROP_PENDING_TIMEOUT, &mut completion)
+            .await
+            .is_err(),
+        "completion should remain pending until buffered suppressed model errors are classified"
+    );
 
     let err = tokio::time::timeout(Duration::from_secs(2), completion)
         .await

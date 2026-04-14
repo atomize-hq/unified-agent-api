@@ -12,6 +12,7 @@ use super::support::{
 use super::support::{build_probe_only_backend, AddDirProbeMode};
 
 const BACKPRESSURE_ASSERT_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(200);
+const POST_DROP_PENDING_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(50);
 
 async fn assert_runtime_rejection_case(
     scenario: &str,
@@ -62,6 +63,7 @@ async fn assert_dropped_events_unblock_completion(
     extensions: impl IntoIterator<Item = (String, serde_json::Value)>,
     extra_env: impl IntoIterator<Item = (String, String)>,
     expected_message: &'static str,
+    assert_pending_after_drop: bool,
 ) {
     let mut env = base_env();
     env.insert("FAKE_CODEX_SCENARIO".to_string(), scenario.to_string());
@@ -69,11 +71,11 @@ async fn assert_dropped_events_unblock_completion(
     env.extend([
         (
             "FAKE_CODEX_BUFFERED_EVENT_COUNT".to_string(),
-            "1024".to_string(),
+            "4096".to_string(),
         ),
         (
             "FAKE_CODEX_BUFFERED_EVENT_PADDING_BYTES".to_string(),
-            "1024".to_string(),
+            "2048".to_string(),
         ),
     ]);
     env.extend(extra_env);
@@ -102,6 +104,15 @@ async fn assert_dropped_events_unblock_completion(
     );
 
     drop(events);
+
+    if assert_pending_after_drop {
+        assert!(
+            tokio::time::timeout(POST_DROP_PENDING_TIMEOUT, &mut completion)
+                .await
+                .is_err(),
+            "completion should remain pending until buffered suppressed errors are classified"
+        );
+    }
 
     let err = tokio::time::timeout(STREAM_TIMEOUT, completion)
         .await
@@ -239,6 +250,7 @@ async fn resume_last_selection_failure_completion_unblocks_after_dropping_events
         )],
         std::iter::empty(),
         "no session found",
+        false,
     )
     .await;
 }
@@ -259,6 +271,7 @@ async fn resume_last_add_dirs_runtime_rejection_completion_unblocks_after_droppi
         ],
         add_dir_expectations(&fixture.dirs),
         ADD_DIRS_RUNTIME_REJECTION_MESSAGE,
+        true,
     )
     .await;
 }
