@@ -121,6 +121,21 @@ Rationale: downstream orchestrators (e.g. Substrate) commonly drain `events` fir
 `completion` later. Streaming timeouts and explicit termination must still take effect in that
 pattern.
 
+### Internal handoff backpressure (pinned)
+
+If the streaming wrapper inserts an internal task or channel between the Codex event source and the
+returned `events` stream, that handoff MUST preserve downstream backpressure.
+
+Concretely:
+
+- the wrapper MUST NOT eagerly drain Codex events into an unbounded in-memory queue ahead of
+  consumer polling, and
+- slow or absent polling of the returned `events` stream MUST eventually stall upstream event
+  forwarding once the bounded handoff is full.
+
+Rationale: live-driver startup is required, but it must remain compatible with the repo’s
+bounded-memory posture and the pull-sensitive semantics expected by downstream consumers.
+
 ### Timeout semantics (pinned)
 
 `CodexClientBuilder::timeout(...)` MUST be interpreted as a wall-clock bound on the streaming run

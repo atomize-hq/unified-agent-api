@@ -10,7 +10,10 @@ use codex::{CodexError, ExecStreamError, ExecStreamRequest, ThreadEvent};
 use futures_util::StreamExt;
 use tokio::sync::{mpsc, oneshot};
 
-use crate::{backend_harness::BackendSpawn, backends::spawn_path::resolve_effective_working_dir};
+use crate::{
+    backend_harness::{BackendSpawn, DEFAULT_EVENT_CHANNEL_CAPACITY},
+    backends::spawn_path::resolve_effective_working_dir,
+};
 
 pub(super) struct ExecFlowRequest {
     pub(super) config: super::CodexBackendConfig,
@@ -50,6 +53,20 @@ fn snapshot_backend_error_message(stream_state: &Arc<Mutex<CodexStreamState>>) -
         .lock()
         .ok()
         .and_then(|snapshot| snapshot.backend_error_message.clone())
+}
+
+async fn forward_backend_event(
+    event_tx: &mpsc::Sender<Result<super::CodexBackendEvent, super::CodexBackendError>>,
+    forward: &mut bool,
+    event: Result<super::CodexBackendEvent, super::CodexBackendError>,
+) {
+    if !*forward {
+        return;
+    }
+
+    if event_tx.send(event).await.is_err() {
+        *forward = false;
+    }
 }
 
 async fn wait_for_event_processing(
@@ -348,13 +365,15 @@ pub(super) async fn spawn_exec_or_resume_flow(
         }
     });
 
-    let (event_tx, event_rx) =
-        mpsc::unbounded_channel::<Result<super::CodexBackendEvent, super::CodexBackendError>>();
+    let (event_tx, event_rx) = mpsc::channel::<
+        Result<super::CodexBackendEvent, super::CodexBackendError>,
+    >(DEFAULT_EVENT_CHANNEL_CAPACITY);
 
     tokio::spawn(async move {
         let mut events = events;
         let mut events_done_tx = Some(events_done_tx);
         let mut tail_rx = Some(tail_rx);
+        let mut forward = true;
 
         while let Some(item) = events.next().await {
             match item {
@@ -409,15 +428,24 @@ pub(super) async fn spawn_exec_or_resume_flow(
                         continue;
                     }
 
-                    let _ =
-                        event_tx.send(Ok(super::CodexBackendEvent::Thread(Box::new(thread_ev))));
+                    forward_backend_event(
+                        &event_tx,
+                        &mut forward,
+                        Ok(super::CodexBackendEvent::Thread(Box::new(thread_ev))),
+                    )
+                    .await;
                 }
                 Err(err) => {
                     if let Ok(mut snapshot) = stream_state.lock() {
                         snapshot.saw_stream_error = true;
                     }
 
-                    let _ = event_tx.send(Err(super::CodexBackendError::Exec(err)));
+                    forward_backend_event(
+                        &event_tx,
+                        &mut forward,
+                        Err(super::CodexBackendError::Exec(err)),
+                    )
+                    .await;
                 }
             }
         }
@@ -440,7 +468,7 @@ pub(super) async fn spawn_exec_or_resume_flow(
                     super::CodexBackendEvent::TerminalError { message }
                 }
             };
-            let _ = event_tx.send(Ok(event));
+            forward_backend_event(&event_tx, &mut forward, Ok(event)).await;
         }
     });
 

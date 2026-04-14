@@ -1,8 +1,10 @@
-use std::{collections::BTreeMap, path::PathBuf};
+use std::{collections::BTreeMap, path::PathBuf, time::Duration};
 
 use tempfile::tempdir;
 
 use super::support::*;
+
+const BACKPRESSURE_ASSERT_TIMEOUT: Duration = Duration::from_millis(200);
 
 fn fake_codex_binary() -> PathBuf {
     if let Some(path) = std::env::var_os("CARGO_BIN_EXE_fake_codex_stream_exec_scenarios_agent_api")
@@ -41,6 +43,7 @@ async fn assert_codex_runtime_model_rejection(
     scenario: &str,
     extra_env: impl IntoIterator<Item = (String, String)>,
     await_completion_before_events: bool,
+    expect_backpressure_before_drain: bool,
 ) {
     let temp = tempdir().expect("tempdir");
     let run_start_cwd = temp.path().join("run-start");
@@ -103,13 +106,31 @@ async fn assert_codex_runtime_model_rejection(
     let mut completion = Some(spawned.completion);
 
     let completion_message = if await_completion_before_events {
-        let completion = tokio::time::timeout(
-            std::time::Duration::from_secs(2),
-            completion.take().expect("completion future available"),
-        )
-        .await
-        .expect("completion resolves")
-        .expect("completion is Ok for fake codex");
+        let mut completion_future = completion.take().expect("completion future available");
+        if expect_backpressure_before_drain {
+            assert!(
+                tokio::time::timeout(BACKPRESSURE_ASSERT_TIMEOUT, &mut completion_future)
+                    .await
+                    .is_err(),
+                "completion should remain pending while buffered events are not drained"
+            );
+        }
+
+        let backend_events: Vec<_> = events
+            .take()
+            .expect("events stream available")
+            .map(|result| result.expect("backend event stream is infallible for fake codex"))
+            .collect()
+            .await;
+        let mapped_events: Vec<_> = backend_events
+            .into_iter()
+            .flat_map(|event| adapter.map_event(event))
+            .collect();
+
+        let completion = tokio::time::timeout(Duration::from_secs(2), completion_future)
+            .await
+            .expect("completion resolves")
+            .expect("completion is Ok for fake codex");
         let err = adapter
             .map_completion(completion)
             .expect_err("runtime rejection must map to Backend error");
@@ -121,7 +142,15 @@ async fn assert_codex_runtime_model_rejection(
                 );
                 assert!(!message.contains(secret));
                 assert!(!message.contains(requested_model));
-                Some(message)
+                assert_eq!(
+                    mapped_events
+                        .iter()
+                        .filter(|event| event.kind == AgentWrapperEventKind::Error)
+                        .filter_map(|event| event.message.as_deref())
+                        .collect::<Vec<_>>(),
+                    vec!["codex backend error: model rejected by runtime (details redacted)"]
+                );
+                Some((message, mapped_events))
             }
             other => panic!("expected Backend error, got: {other:?}"),
         }
@@ -129,16 +158,22 @@ async fn assert_codex_runtime_model_rejection(
         None
     };
 
-    let backend_events: Vec<_> = events
-        .take()
-        .expect("events stream available")
-        .map(|result| result.expect("backend event stream is infallible for fake codex"))
-        .collect()
-        .await;
-    let mapped_events: Vec<_> = backend_events
-        .into_iter()
-        .flat_map(|event| adapter.map_event(event))
-        .collect();
+    let (completion_message, mapped_events) =
+        if let Some((message, mapped_events)) = completion_message {
+            (Some(message), mapped_events)
+        } else {
+            let backend_events: Vec<_> = events
+                .take()
+                .expect("events stream available")
+                .map(|result| result.expect("backend event stream is infallible for fake codex"))
+                .collect()
+                .await;
+            let mapped_events: Vec<_> = backend_events
+                .into_iter()
+                .flat_map(|event| adapter.map_event(event))
+                .collect();
+            (None, mapped_events)
+        };
 
     let error_messages: Vec<_> = mapped_events
         .iter()
@@ -200,6 +235,7 @@ async fn codex_runtime_model_rejection_is_safely_redacted_and_parity_is_preserve
         "model_runtime_rejection_after_thread_started",
         std::iter::empty(),
         false,
+        false,
     )
     .await;
 }
@@ -213,6 +249,7 @@ async fn codex_runtime_model_rejection_remains_fatal_even_on_zero_exit() {
             "0".to_string(),
         )],
         true,
+        false,
     )
     .await;
 }
@@ -235,6 +272,7 @@ async fn codex_runtime_model_rejection_waits_for_buffered_terminal_error_before_
                 "0".to_string(),
             ),
         ],
+        true,
         true,
     )
     .await;

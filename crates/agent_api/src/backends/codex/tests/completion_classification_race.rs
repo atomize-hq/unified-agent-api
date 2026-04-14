@@ -5,6 +5,7 @@ use tempfile::tempdir;
 use super::support::*;
 
 const BUFFERED_COMPLETION_TIMEOUT: Duration = Duration::from_secs(5);
+const BACKPRESSURE_ASSERT_TIMEOUT: Duration = Duration::from_millis(200);
 
 fn fake_codex_binary() -> PathBuf {
     if let Some(path) = std::env::var_os("CARGO_BIN_EXE_fake_codex_stream_exec_scenarios_agent_api")
@@ -110,7 +111,21 @@ async fn assert_buffered_add_dirs_runtime_rejection(
         .await
         .expect("spawn succeeds");
 
-    let completion = tokio::time::timeout(BUFFERED_COMPLETION_TIMEOUT, spawned.completion)
+    let mut completion = spawned.completion;
+    assert!(
+        tokio::time::timeout(BACKPRESSURE_ASSERT_TIMEOUT, &mut completion)
+            .await
+            .is_err(),
+        "completion should remain pending while buffered events are not drained"
+    );
+
+    let backend_events: Vec<_> = spawned
+        .events
+        .map(|result| result.expect("backend event stream is infallible for fake codex"))
+        .collect()
+        .await;
+
+    let completion = tokio::time::timeout(BUFFERED_COMPLETION_TIMEOUT, completion)
         .await
         .expect("completion resolves")
         .expect("completion is Ok for fake codex");
@@ -122,11 +137,6 @@ async fn assert_buffered_add_dirs_runtime_rejection(
         other => panic!("expected Backend error, got: {other:?}"),
     }
 
-    let backend_events: Vec<_> = spawned
-        .events
-        .map(|result| result.expect("backend event stream is infallible for fake codex"))
-        .collect()
-        .await;
     let mapped_events: Vec<_> = backend_events
         .into_iter()
         .flat_map(|event| adapter.map_event(event))
@@ -202,6 +212,12 @@ async fn assert_buffered_selection_failure(
         .await
         .expect("spawn succeeds");
 
+    let backend_events: Vec<_> = spawned
+        .events
+        .map(|result| result.expect("backend event stream is infallible for fake codex"))
+        .collect()
+        .await;
+
     let completion = tokio::time::timeout(BUFFERED_COMPLETION_TIMEOUT, spawned.completion)
         .await
         .expect("completion resolves")
@@ -214,11 +230,6 @@ async fn assert_buffered_selection_failure(
         other => panic!("expected Backend error, got: {other:?}"),
     }
 
-    let backend_events: Vec<_> = spawned
-        .events
-        .map(|result| result.expect("backend event stream is infallible for fake codex"))
-        .collect()
-        .await;
     let mapped_events: Vec<_> = backend_events
         .into_iter()
         .flat_map(|event| adapter.map_event(event))
