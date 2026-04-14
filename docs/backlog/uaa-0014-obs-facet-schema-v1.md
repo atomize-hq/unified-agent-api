@@ -1,6 +1,6 @@
 # uaa-0014 — Obs facet schema (events + completion)
 
-Status: Draft (backlog-only; not part of canonical Universal Agent API specs)
+Status: Draft (backlog-only; not part of canonical Unified Agent API specs)
 
 This document captures draft spec text for an `agent_api.obs.v1` facet that was intentionally
 removed from the canonical specs because it may never ship. If/when we decide to implement obs,
@@ -13,12 +13,12 @@ Why backlog-only:
 ## Proposed canonical edits (if revived)
 
 Target docs:
-- `docs/specs/universal-agent-api/event-envelope-schema-spec.md`
-- `docs/specs/universal-agent-api/capabilities-schema-spec.md`
+- `docs/specs/unified-agent-api/event-envelope-schema-spec.md`
+- `docs/specs/unified-agent-api/capabilities-schema-spec.md`
 
 ### Capabilities — add `agent_api.obs.v1`
 
-Add to `docs/specs/universal-agent-api/capabilities-schema-spec.md` under "Standard capability ids":
+Add to `docs/specs/unified-agent-api/capabilities-schema-spec.md` under "Standard capability ids":
 
 - `agent_api.obs.v1`:
   - The backend may emit the bounded observability facet (`data.obs`) on `AgentWrapperEvent.data`
@@ -29,7 +29,7 @@ Add to `docs/specs/universal-agent-api/capabilities-schema-spec.md` under "Stand
 
 ### Event envelope — tools facet coexistence tweak
 
-In `docs/specs/universal-agent-api/event-envelope-schema-spec.md` under "Tools facet (structured.v1)":
+In `docs/specs/unified-agent-api/event-envelope-schema-spec.md` under "Tools facet (structured.v1)":
 
 - Tighten wording to require that `ToolCall` / `ToolResult` `data` is a JSON object containing at minimum:
   `{ "schema": "agent_api.tools.structured.v1", "tool": { ... } }`.
@@ -47,7 +47,7 @@ In `docs/specs/universal-agent-api/event-envelope-schema-spec.md` under "Tools f
 ## Draft spec text — Obs facet (v1)
 
 The following is the draft normative text for insertion into
-`docs/specs/universal-agent-api/event-envelope-schema-spec.md`.
+`docs/specs/unified-agent-api/event-envelope-schema-spec.md`.
 
 ---
 

@@ -1,6 +1,8 @@
 # Universal model selection (`agent_api.config.model.v1`) - seam extraction
 
-Source: `docs/adr/0020-universal-agent-api-model-selection.md`
+Source ADR: `docs/adr/0020-unified-agent-api-model-selection.md`  
+Canonical owner spec: `docs/specs/unified-agent-api/extensions-spec.md`  
+Backlog: `uaa-0002` (`bucket=agent_api.config`, `type=extension_key`)
 
 This pack captures seam briefs, authoritative threading, pack-level review surfaces, seam-exit intent, and governance scaffolds. It defaults to seam-brief depth; seam-local decomposition exists only for the active and next seams under `threaded-seams/`.
 
@@ -29,24 +31,24 @@ Migration note:
 
 ## Canonical authority + sync workflow
 
-- `docs/specs/universal-agent-api/extensions-spec.md` is the canonical owner doc for `agent_api.config.model.v1` semantics.
-- `docs/specs/universal-agent-api/capabilities-schema-spec.md` is the canonical registry entry for the same capability id, including its `agent_api.config.*` bucket placement and capability-advertising posture.
-- `docs/adr/0020-universal-agent-api-model-selection.md` remains a **Draft** rationale/rollout ADR until implementation acceptance; it is contextual support for this pack, not the normative source of truth.
-- When model-selection semantics or advertising rules change, edit the canonical specs first, then update ADR-0020 and this pack in the same change. Finish by running `make adr-fix ADR=docs/adr/0020-universal-agent-api-model-selection.md` so the ADR drift guard matches the synchronized text.
+- `docs/specs/unified-agent-api/extensions-spec.md` is the canonical owner doc for `agent_api.config.model.v1` semantics.
+- `docs/specs/unified-agent-api/capabilities-schema-spec.md` is the canonical registry entry for the same capability id, including its `agent_api.config.*` bucket placement and capability-advertising posture.
+- `docs/adr/0020-unified-agent-api-model-selection.md` remains a **Draft** rationale/rollout ADR until implementation acceptance; it is contextual support for this pack, not the normative source of truth.
+- When model-selection semantics or advertising rules change, edit the canonical specs first, then update ADR-0020 and this pack in the same change. Finish by running `make adr-fix ADR=docs/adr/0020-unified-agent-api-model-selection.md` so the ADR drift guard matches the synchronized text.
 - Sync ownership stays with the ADR owner(s) named in ADR-0020; this pack should only restate what the canonical specs already pin.
 
 SEAM-1 status: the canonical owner-spec semantics are already landed in
-`docs/specs/universal-agent-api/extensions-spec.md`. Remaining SEAM-1 work in this pack is limited to
+`docs/specs/unified-agent-api/extensions-spec.md`. Remaining SEAM-1 work in this pack is limited to
 ADR-0020 sync, drift verification against `extensions-spec.md` plus
-`docs/specs/universal-agent-api/capabilities-schema-spec.md`, and pack updates if a canonical-doc delta is opened.
+`docs/specs/unified-agent-api/capabilities-schema-spec.md`, and pack updates if a canonical-doc delta is opened.
 SEAM-2 through SEAM-5 may begin once the SEAM-1 verification pass in
 `seam-1-core-extension-contract.md` records `pass: no unresolved canonical-doc delta`; they are not waiting on a new
 model-selection design decision.
 
 - Verification pass owner: the ADR-0020 owner(s), or an explicitly delegated SEAM-1 assignee acting on their behalf.
 - Verification scope: compare the canonical owner-doc section
-  `docs/specs/universal-agent-api/extensions-spec.md` (`### agent_api.config.model.v1`), the canonical registry entry
-  `docs/specs/universal-agent-api/capabilities-schema-spec.md` (`agent_api.config.model.v1`), ADR-0020 sections
+  `docs/specs/unified-agent-api/extensions-spec.md` (`### agent_api.config.model.v1`), the canonical registry entry
+  `docs/specs/unified-agent-api/capabilities-schema-spec.md` (`agent_api.config.model.v1`), ADR-0020 sections
   `Canonical authority + sync workflow`, `Decision (draft)`, `Validation and error model`, `Backend mapping`, and
   `Capability advertising`, plus this pack's SEAM-1/threading restatements.
 - `no unresolved canonical-doc delta` means those sources agree on the capability id + bucket, trim/bounds semantics,
@@ -59,23 +61,18 @@ model-selection design decision.
   plus an explicit working-tree delta note; once a commit or PR exists, the verification record MUST be updated to cite
   that commit/PR instead.
 
-- Start here: `scope_brief.md`
-- Seam overview: `seam_map.md`
-- Threading (contracts + dependencies + workstreams): `threading.md`
- - Pack review surfaces (orientation only): `review_surfaces.md`
-
 ## Canonical contracts (source of truth)
 
-- Model-selection owner doc: `docs/specs/universal-agent-api/extensions-spec.md`
-- Capability registry entry for `agent_api.config.model.v1`: `docs/specs/universal-agent-api/capabilities-schema-spec.md`
+- Model-selection owner doc: `docs/specs/unified-agent-api/extensions-spec.md`
+- Capability registry entry for `agent_api.config.model.v1`: `docs/specs/unified-agent-api/capabilities-schema-spec.md`
 - Generic inherited baselines used by this key:
-  - `docs/specs/universal-agent-api/contract.md` for the crate-level `AgentWrapperError` / `AgentWrapperBackend`
+  - `docs/specs/unified-agent-api/contract.md` for the crate-level `AgentWrapperError` / `AgentWrapperBackend`
     surface that model-selection failures flow through
-  - `docs/specs/universal-agent-api/run-protocol-spec.md` for general capability-validation ordering and the
+  - `docs/specs/unified-agent-api/run-protocol-spec.md` for general capability-validation ordering and the
     post-spawn terminal `AgentWrapperEventKind::Error` rule
 - Codex exec/resume model mapping + fork-rejection contract:
   - `docs/specs/codex-streaming-exec-contract.md`
   - `docs/specs/codex-app-server-jsonrpc-contract.md`
 - Claude Code model/session argv mapping:
   - `docs/specs/claude-code-session-mapping-contract.md`
-- Prior promotion posture / pass-through boundaries: `docs/adr/0016-universal-agent-api-bounded-backend-config-pass-through.md`
+- Prior promotion posture / pass-through boundaries: `docs/adr/0016-unified-agent-api-bounded-backend-config-pass-through.md`

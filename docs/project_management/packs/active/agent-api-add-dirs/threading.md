@@ -6,14 +6,14 @@ This section makes coupling explicit: contracts/interfaces, dependency edges, an
 
 Ownership note: within this pack, **Owner seam** refers to workstream ownership for implementing
 and validating behavior. Normative ownership for `agent_api.*` extension-key semantics is always
-`docs/specs/universal-agent-api/extensions-spec.md` (and foundational contract terms live in
-`docs/specs/universal-agent-api/contract.md`). If any pack text conflicts with the normative specs,
+`docs/specs/unified-agent-api/extensions-spec.md` (and foundational contract terms live in
+`docs/specs/unified-agent-api/contract.md`). If any pack text conflicts with the normative specs,
 the specs win.
 
 - **AD-C01 — Core add-dir extension key**
   - **Type**: schema
   - **Owner seam (pack)**: SEAM-1
-  - **Normative owner doc**: `docs/specs/universal-agent-api/extensions-spec.md`
+  - **Normative owner doc**: `docs/specs/unified-agent-api/extensions-spec.md`
   - **Consumers**: SEAM-2/3/4/5
   - **Definition**: `agent_api.exec.add_dirs.v1` is a closed object schema with required
     `dirs: string[]`, `dirs.len()` in `1..=16`, and per-entry trimmed byte bound `<= 1024`. Trimming
@@ -36,7 +36,7 @@ the specs win.
     before calling the helper. The helper MUST return `Ok(Vec::new())` when the key is absent;
     otherwise it trims leading/trailing Unicode whitespace (per the owner doc), resolves relatives
     against the run's effective working directory (per
-    `docs/specs/universal-agent-api/contract.md` "Working directory resolution (effective working directory)"),
+    `docs/specs/unified-agent-api/contract.md` "Working directory resolution (effective working directory)"),
     lexically normalizes, verifies `exists && is_dir`, and deduplicates while preserving first
     occurrence order. This list is exported as `Vec<PathBuf>` and attached to the backend policy
     consumed by SEAM-3/4. No downstream code may reread the raw extension payload.
@@ -68,7 +68,7 @@ the specs win.
     and Claude fork selector `"id"` each get their own argv-placement assertion; Codex fork
     selector `"last"` and selector `"id"` each prove the same pre-request rejection boundary for
     accepted add-dir inputs. (Normative: see
-    `docs/specs/universal-agent-api/extensions-spec.md` `agent_api.exec.add_dirs.v1`.)
+    `docs/specs/unified-agent-api/extensions-spec.md` `agent_api.exec.add_dirs.v1`.)
 
 - **AD-C05 — Codex argv mapping**
   - **Type**: integration
@@ -132,7 +132,7 @@ the specs win.
   keys before any add-dir value parsing happens.
 - **Effective working directory handoff**: the shared normalizer and each backend’s spawn path
   must agree on the same working directory source. Effective working directory is defined in
-  `docs/specs/universal-agent-api/contract.md` ("Working directory resolution (effective working directory)"),
+  `docs/specs/unified-agent-api/contract.md` ("Working directory resolution (effective working directory)"),
   and the concrete add-dir resolution locus is backend policy extraction, not spawn:
   `CodexHarnessAdapter::validate_and_extract_policy(...)` and
   `ClaudeHarnessAdapter::validate_and_extract_policy(...)` MUST compute the effective working
@@ -169,7 +169,7 @@ the specs win.
   `docs/specs/codex-app-server-jsonrpc-contract.md` and
   `docs/specs/claude-code-session-mapping-contract.md` reflect the exact mapping/rejection truth.
 - **Capability publication**: SEAM-5 must regenerate
-  `docs/specs/universal-agent-api/capability-matrix.md` with
+  `docs/specs/unified-agent-api/capability-matrix.md` with
   `cargo run -p xtask -- capability-matrix` once the backend capability ids change.
 
 ## Parallelization notes / conflict-safe workstreams

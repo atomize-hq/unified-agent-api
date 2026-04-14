@@ -5,7 +5,7 @@
 - **Scope (in/out)**:
   - In:
     - generator-driven freshness validation for
-      `docs/specs/universal-agent-api/capability-matrix.md`
+      `docs/specs/unified-agent-api/capability-matrix.md`
     - pre-advertising versus post-advertising expectations tied to actual backend capability state
     - wiring the freshness check into the validation path used for this feature
   - Out:
@@ -29,7 +29,7 @@
 - **Outcome**: capability publication is validated by regeneration, not by hand-maintained textual
   expectations.
 - **Files**:
-  - `docs/specs/universal-agent-api/capability-matrix.md`
+  - `docs/specs/unified-agent-api/capability-matrix.md`
   - `crates/xtask/src/**`
   - existing validation hooks used by this feature's test path
 

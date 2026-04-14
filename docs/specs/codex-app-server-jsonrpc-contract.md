@@ -4,7 +4,7 @@ Status: **Normative**
 Scope: `codex app-server` stdio JSON-RPC (fork flow primitives + streaming notifications)
 
 This document pins a **testable, zero-ambiguity** contract for the subset of the Codex app-server
-protocol that is required to implement Universal Agent API session fork semantics for the Codex
+protocol that is required to implement Unified Agent API session fork semantics for the Codex
 backend (`agent_api.session.fork.v1`).
 
 This is a wrapper-facing contract (what `crates/codex` + `crates/agent_api` must implement and
@@ -89,7 +89,7 @@ Response shape (see generated `ThreadListResponse`):
 
 Selection algorithm (pinned, deterministic):
 
-- The effective working directory is defined by `docs/specs/universal-agent-api/contract.md`.
+- The effective working directory is defined by `docs/specs/unified-agent-api/contract.md`.
 - For `selector == "last"`, the client MUST:
   1) call `thread/list` with:
      - `cwd = <effective working directory>`,
@@ -99,8 +99,8 @@ Selection algorithm (pinned, deterministic):
   2) follow pagination by repeating the call with `cursor = nextCursor` until `nextCursor == null`.
   3) choose the fork source thread as the thread with the maximum tuple:
      - `(updatedAt, createdAt, id)` using lexicographic ordering (largest wins).
-- If the aggregated thread list is empty, selection fails and the Universal Agent API selection
-  failure error model applies (see `docs/specs/universal-agent-api/extensions-spec.md`).
+- If the aggregated thread list is empty, selection fails and the Unified Agent API selection
+  failure error model applies (see `docs/specs/unified-agent-api/extensions-spec.md`).
 
 ### `thread/fork` (v2)
 
@@ -137,7 +137,7 @@ Request params (see generated `TurnStartParams`):
 
 Prompt mapping (pinned):
 
-- The Universal Agent API prompt is always required and non-empty after trimming.
+- The Unified Agent API prompt is always required and non-empty after trimming.
 - The client MUST map `AgentWrapperRunRequest.prompt` into:
 
 ```json
@@ -151,7 +151,7 @@ Prompt mapping (pinned):
 
 The add-dir extension key is owned by:
 
-- `docs/specs/universal-agent-api/extensions-spec.md`
+- `docs/specs/unified-agent-api/extensions-spec.md`
 
 Current wire truth for the pinned fork subset:
 
@@ -181,7 +181,7 @@ Required backend behavior (pinned):
 
 The model-selection extension key is owned by:
 
-- `docs/specs/universal-agent-api/extensions-spec.md`
+- `docs/specs/unified-agent-api/extensions-spec.md`
 
 Current wire truth for the pinned fork subset:
 
@@ -201,7 +201,7 @@ Required backend behavior (pinned):
 - Future support for model-selection-on-fork requires a new pinned contract revision that names
   the exact wire field(s) carrying the effective trimmed model id.
 
-## Notifications → Universal Agent API events (pinned minimum)
+## Notifications → Unified Agent API events (pinned minimum)
 
 During the `turn/start` lifecycle the server emits JSON-RPC notifications. For `agent_api` fork
 integration tests to be deterministic, the Codex backend MUST map (at minimum) the following
@@ -228,7 +228,7 @@ All other notification methods:
 
 ## Non-interactive safety (`agent_api.exec.non_interactive`) (pinned)
 
-Default policy is owned by `docs/specs/universal-agent-api/extensions-spec.md`:
+Default policy is owned by `docs/specs/unified-agent-api/extensions-spec.md`:
 `agent_api.exec.non_interactive` defaults to `true`.
 
 For app-server fork flows:
@@ -255,14 +255,14 @@ Required payload fields (pinned):
 - `kind: string` (alias: `approval_kind`)
 
 All other fields are server-defined and MAY be ignored by clients. Clients MUST NOT embed the raw
-payload into Universal Agent API event/completion `data`.
+payload into Unified Agent API event/completion `data`.
 
 ### Fail-fast handling (non-interactive, pinned)
 
 If the server still emits an approval request despite non-interactive configuration, the backend
 MUST fail the run as a backend error (safe message) rather than hanging.
 
-Pinned translation into Universal Agent API failure:
+Pinned translation into Unified Agent API failure:
 
 - Safe error message (pinned): `"approval required"`
 - Event/completion ordering (pinned):
@@ -309,16 +309,16 @@ For app-server-backed runs, explicit cancellation MUST be implemented using JSON
 ```
 
 Universal cancellation semantics (event + completion precedence) are owned by
-`docs/specs/universal-agent-api/run-protocol-spec.md` and MUST be enforced by `agent_api` when
+`docs/specs/unified-agent-api/run-protocol-spec.md` and MUST be enforced by `agent_api` when
 exposing `run_control`.
 
 ## Timeout enforcement (pinned)
 
-Codex fork flows (`agent_api.session.fork.v1`) MUST enforce the Universal Agent API timeout budget
+Codex fork flows (`agent_api.session.fork.v1`) MUST enforce the Unified Agent API timeout budget
 for the in-flight `turn/start` request.
 
 Timeout input (pinned):
-- The effective timeout is defined by `docs/specs/universal-agent-api/contract.md`:
+- The effective timeout is defined by `docs/specs/unified-agent-api/contract.md`:
   - if `AgentWrapperRunRequest.timeout` is present, it applies,
   - otherwise the backend default timeout applies.
 - `Some(Duration::ZERO)` is an explicit “no timeout” request and MUST disable timeout enforcement.
@@ -336,7 +336,7 @@ Timeout handling (pinned):
 { "jsonrpc": "2.0", "method": "$/cancelRequest", "params": { "id": N } }
 ```
 
-Pinned translation into Universal Agent API failure:
+Pinned translation into Unified Agent API failure:
 - Safe error message (pinned): `"codex backend error: timeout (details redacted when unsafe)"`
 - Event/completion ordering (pinned):
   1) If the consumer-visible events stream exists and is still open, emit exactly one terminal

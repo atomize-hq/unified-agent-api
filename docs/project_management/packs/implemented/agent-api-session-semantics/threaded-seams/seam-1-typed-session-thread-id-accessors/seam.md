@@ -13,7 +13,7 @@
     - Unit tests proving pinned variant coverage and that accessors return borrowed `&str` (no allocation required).
     - Adopt the accessors in `crates/wrapper_events` so id extraction match logic is not duplicated.
   - Out:
-    - Any Universal Agent API spec changes (code-only ergonomics).
+    - Any Unified Agent API spec changes (code-only ergonomics).
     - Any new public session handle surfaces in `crates/agent_api` (SEAM-2 owns that work).
 - **Touch surface**:
   - `crates/codex/src/events.rs`

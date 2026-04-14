@@ -12,12 +12,12 @@ to be safe-by-default, while preserving the existing “explicit disable” beha
 sets `timeout = Some(Duration::ZERO)`.
 
 This work item intentionally does **not** introduce a universal/global default timeout in the
-Universal Agent API spec. It makes a backend-specific default explicit and consistent across the
+Unified Agent API spec. It makes a backend-specific default explicit and consistent across the
 built-in backends.
 
 ## Motivation / Context
 
-- The Universal Agent API contract pins that when `AgentWrapperRunRequest.timeout` is absent, a
+- The Unified Agent API contract pins that when `AgentWrapperRunRequest.timeout` is absent, a
   backend-specific default applies (the universal API MUST NOT invent a global default).
 - Today, the built-in `agent_api` backends effectively default to “no timeout” when
   `default_timeout` is unset in backend config, because:
@@ -49,7 +49,7 @@ In:
 
 Out:
 - Adding a new universal/core extension key for timeouts.
-- Changing the Universal Agent API spec to define a global default timeout.
+- Changing the Unified Agent API spec to define a global default timeout.
 - Adding an explicit cancellation API (tracked by ADR-0014).
 
 ## Acceptance criteria

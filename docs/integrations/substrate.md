@@ -1,6 +1,6 @@
-# Substrate Integration Guide (Agent Wrappers)
+# Substrate Integration Guide (Unified Agent API)
 
-This guide describes a recommended integration pattern for using wrappers in this repo from
+This guide describes a recommended integration pattern for using the Unified Agent API stack in this repo from
 Substrate’s async shell/orchestrator. It is intentionally **not** a Substrate envelope contract:
 Substrate remains the source of truth for its own `AgentEvent` bus and correlation fields.
 
@@ -31,7 +31,7 @@ interpretation, ingest them through `crates/wrapper_events`:
 - per-line error isolation (bad lines do not stop iteration)
 - adapter opt-in (Codex / Claude Code)
 
-This keeps `agent-wrappers` orthogonal: it does not invent Substrate correlation fields and does
+This keeps `UAA` orthogonal: it does not invent Substrate correlation fields and does
 not define Substrate’s envelope. Substrate attaches correlation and routing context explicitly.
 
 ### 1) Live run (primary UX)

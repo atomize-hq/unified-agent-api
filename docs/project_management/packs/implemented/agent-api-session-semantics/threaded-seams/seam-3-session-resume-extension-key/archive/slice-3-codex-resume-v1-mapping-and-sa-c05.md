@@ -1,6 +1,6 @@
 ### S3 — Codex `agent_api.session.resume.v1` mapping + SA-C05 (control + env overrides)
 
-- **User/system value**: Codex resume-by-last / resume-by-id is implemented with the Universal Agent API’s pinned invariants: closed-schema validation, deterministic CLI mapping, per-run env overrides, and a best-effort termination handle required for `run_control` cancellation semantics.
+- **User/system value**: Codex resume-by-last / resume-by-id is implemented with the Unified Agent API’s pinned invariants: closed-schema validation, deterministic CLI mapping, per-run env overrides, and a best-effort termination handle required for `run_control` cancellation semantics.
 - **Scope (in/out)**:
   - In:
     - Implement SA-C05 in `crates/codex`:
@@ -28,10 +28,10 @@
     - selection failures surface as `Backend("no session found")` / `Backend("session not found")` and emit exactly one terminal `Error` event when a stream exists.
 - **Dependencies**:
   - `S1` shared resume selector parser.
-  - Normative: `docs/specs/universal-agent-api/extensions-spec.md` (schema + selection failure + contradiction rules).
+  - Normative: `docs/specs/unified-agent-api/extensions-spec.md` (schema + selection failure + contradiction rules).
   - Normative: `docs/specs/codex-wrapper-coverage-scenarios-v1.md` (Scenario 3: argv + stdin prompt plumbing).
   - Normative: `docs/specs/codex-streaming-exec-contract.md` (termination + timeout semantics).
-  - Normative: `docs/specs/universal-agent-api/contract.md` (env merge precedence + effective working dir).
+  - Normative: `docs/specs/unified-agent-api/contract.md` (env merge precedence + effective working dir).
 - **Verification**:
   - `cargo test -p codex`
   - `cargo test -p agent_api --features codex`
@@ -122,7 +122,7 @@ Checklist:
 
 - **Outcome**: Selection failures for resume surface as pinned safe `Backend` errors and emit exactly one terminal `Error` event when a stream exists.
 - **Inputs/outputs**:
-  - Inputs: resume selector (`last` vs `id`) and the Codex wrapper’s typed outcomes.
+  - Inputs: resume selector (`last` vs `id`) and the Codex crate’s typed outcomes.
   - Outputs:
     - Completion resolves to `Err(AgentWrapperError::Backend { message: <pinned> })` for selection failures.
     - Event stream emits exactly one terminal `Error` event with `message == <pinned>` before closing.

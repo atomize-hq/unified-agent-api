@@ -42,7 +42,7 @@ open_remediations: []
     - implement the normalization locus for extracting the effective trimmed model id before spawn
     - keep R0 gating ahead of model parsing/validation
     - make the normalized result available to backend mapping seams
-    - regenerate `docs/specs/universal-agent-api/capability-matrix.md` in the same change that flips advertising
+    - regenerate `docs/specs/unified-agent-api/capability-matrix.md` in the same change that flips advertising
   - Out:
     - actual Codex/Claude argv insertion details
     - backend-specific runtime rejection translation

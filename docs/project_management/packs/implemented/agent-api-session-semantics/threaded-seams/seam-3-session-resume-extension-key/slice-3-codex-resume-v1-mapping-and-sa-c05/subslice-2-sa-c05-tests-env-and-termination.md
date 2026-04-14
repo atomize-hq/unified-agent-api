@@ -15,7 +15,7 @@
 - **Dependencies**:
   - `S3a` (SA-C05 entrypoint exists).
   - Normative: `docs/specs/codex-streaming-exec-contract.md` (termination semantics).
-  - Normative: `docs/specs/universal-agent-api/contract.md` (env merge precedence).
+  - Normative: `docs/specs/unified-agent-api/contract.md` (env merge precedence).
 - **Verification**:
   - `cargo test -p codex`
 - **Rollout/safety**:

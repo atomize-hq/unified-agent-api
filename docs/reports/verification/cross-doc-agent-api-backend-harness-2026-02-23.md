@@ -2,7 +2,7 @@
 
 **Target**: `docs/project_management/packs/active/agent-api-backend-harness/` (execution pack)  
 **Date**: 2026-02-23  
-**Documents Checked**: ADR-0013 + execution pack seams/slices + relevant Universal Agent API specs
+**Documents Checked**: ADR-0013 + execution pack seams/slices + relevant Unified Agent API specs
 
 ## Executive Summary
 
@@ -35,17 +35,17 @@ Recommendation: **PROCEED**
 - Execution pack (threaded seams / slices):
   - `docs/project_management/packs/active/agent-api-backend-harness/threaded-seams/`
 - Normative anchors (specs):
-  - `docs/specs/universal-agent-api/contract.md`
-  - `docs/specs/universal-agent-api/run-protocol-spec.md`
-  - `docs/specs/universal-agent-api/event-envelope-schema-spec.md`
-  - `docs/specs/universal-agent-api/extensions-spec.md`
+  - `docs/specs/unified-agent-api/contract.md`
+  - `docs/specs/unified-agent-api/run-protocol-spec.md`
+  - `docs/specs/unified-agent-api/event-envelope-schema-spec.md`
+  - `docs/specs/unified-agent-api/extensions-spec.md`
 
 ## Positive Findings
 
 - The pack’s scope brief mirrors ADR-0013 “Goals” and “Non-Goals” and explicitly prohibits:
   - public `agent_api` API changes,
   - capability ID / extension key changes, and
-  - changes to normative Universal Agent API semantics.
+  - changes to normative Unified Agent API semantics.
 - The seam decomposition preserves the intended layering:
   - wrapper crates remain responsible for spawn + parsing,
   - `agent_api` harness owns invariant enforcement + gating.

@@ -17,8 +17,8 @@
 - **Dependencies**:
   - `S4b` core fork flow and `S4c` mapping/safety behaviors.
   - Normative: `docs/specs/codex-app-server-jsonrpc-contract.md` (request/response shapes, cancellation error `-32800`).
-  - Normative: `docs/specs/universal-agent-api/extensions-spec.md` (selection failure messages + terminal `Error` rule).
-  - Normative: `docs/specs/universal-agent-api/run-protocol-spec.md` (cancellation semantics/precedence).
+  - Normative: `docs/specs/unified-agent-api/extensions-spec.md` (selection failure messages + terminal `Error` rule).
+  - Normative: `docs/specs/unified-agent-api/run-protocol-spec.md` (cancellation semantics/precedence).
 - **Verification**:
   - `cargo test -p agent_api --features codex`
 - **Rollout/safety**:

@@ -9,7 +9,7 @@ Primary axis: **integration-first (risk-first)** — dangerous execution policy 
      with `agent_api.exec.non_interactive`.
    - Outputs:
      - `docs/project_management/packs/active/agent-api-external-sandbox-exec-policy/seam-1-external-sandbox-extension-key.md`
-     - updates to `docs/specs/universal-agent-api/extensions-spec.md`
+     - updates to `docs/specs/unified-agent-api/extensions-spec.md`
 
 2) **SEAM-2 — Backend enablement + capability advertising**
    - Owns: host opt-in mechanism for built-in backends, and ensuring the capability is not

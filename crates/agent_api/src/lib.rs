@@ -151,7 +151,7 @@ impl AgentWrapperCancelHandle {
     /// If cancellation is requested before `AgentWrapperRunHandle.completion` resolves, the completion
     /// MUST resolve to `Err(AgentWrapperError::Backend { message: "cancelled" })`.
     ///
-    /// Canonical semantics: `docs/specs/universal-agent-api/run-protocol-spec.md` ("Explicit
+    /// Canonical semantics: `docs/specs/unified-agent-api/run-protocol-spec.md` ("Explicit
     /// cancellation semantics").
     pub fn cancel(&self) {
         if self.inner.called.swap(true, Ordering::SeqCst) {
@@ -392,7 +392,7 @@ impl AgentWrapperGateway {
     /// where `agent_kind == <requested AgentWrapperKind>.as_str().to_string()`.
     ///
     /// Cancellation is best-effort and is defined by
-    /// `docs/specs/universal-agent-api/run-protocol-spec.md`, including the pinned `"cancelled"`
+    /// `docs/specs/unified-agent-api/run-protocol-spec.md`, including the pinned `"cancelled"`
     /// completion outcome.
     pub fn run_control(
         &self,

@@ -26,7 +26,7 @@
     - resume (`spawn_exec_or_resume_flow` with `resume=Some(...)`)
     - fork (`spawn_fork_v1_flow`)
 - Out:
-  - Changes to Codex wrapper crate unless required (assumed already supported).
+  - Changes to Codex crate unless required (assumed already supported).
 
 ## Primary interfaces (contracts)
 
@@ -42,7 +42,7 @@
 - MUST reject ambiguous exec-policy combinations:
   - when `agent_api.exec.external_sandbox.v1 == true`, the request MUST NOT include any
     `backend.*.exec.*` keys (including `backend.codex.exec.approval_policy` and
-    `backend.codex.exec.sandbox_mode`) per `docs/specs/universal-agent-api/extensions-spec.md`.
+    `backend.codex.exec.sandbox_mode`) per `docs/specs/unified-agent-api/extensions-spec.md`.
 - Equivalent mapping definition (pinned; used by tests):
   - Exec/resume: argv MUST contain exactly one `--dangerously-bypass-approvals-and-sandbox`, and
     MUST NOT contain any of: `--full-auto`, `--ask-for-approval`, `--sandbox`.

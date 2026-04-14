@@ -19,7 +19,7 @@
   - Contracts: republishes owned contracts MS-C01 through MS-C04 for planning purposes; does not redefine them
 - **Verification**:
   - compare every updated ADR/pack restatement against the final S1 verdict package
-  - run `make adr-fix ADR=docs/adr/0020-universal-agent-api-model-selection.md` if ADR text changed
+  - run `make adr-fix ADR=docs/adr/0020-unified-agent-api-model-selection.md` if ADR text changed
   - confirm the published verification record matches the exact synchronization reference currently in effect
 - **Rollout/safety**:
   - only publish a pass when S1 produced a clean pass
@@ -30,7 +30,7 @@
 - **Outcome**: ADR-0020 reflects the final canonical truth and continues to serve as rationale rather than a competing contract source.
 - **Inputs/outputs**:
   - Inputs: S1 final verdict, canonical docs, current ADR text
-  - Outputs: updated `docs/adr/0020-universal-agent-api-model-selection.md` plus any required ADR drift-fix output
+  - Outputs: updated `docs/adr/0020-unified-agent-api-model-selection.md` plus any required ADR drift-fix output
 - **Implementation notes**:
   - sync only the sections named in the seam brief verification scope
   - preserve the ADR's rationale/rollout role; do not move normative ownership out of `docs/specs/**`
@@ -38,13 +38,13 @@
   - every ADR section that restates model-selection semantics matches the canonical docs after S1
   - any ADR drift guard or formatting requirements are satisfied
 - **Test notes**:
-  - run `make adr-fix ADR=docs/adr/0020-universal-agent-api-model-selection.md` when the ADR changes
+  - run `make adr-fix ADR=docs/adr/0020-unified-agent-api-model-selection.md` when the ADR changes
 - **Risk/rollback notes**:
   - if the ADR contains rationale that no longer fits the canonical contract, rewrite the rationale to point at the spec instead of softening the spec text
 
 Checklist:
 - Implement: update only the ADR sections covered by the seam verification scope to match the final canonical wording.
-- Test: run `make adr-fix ADR=docs/adr/0020-universal-agent-api-model-selection.md` when needed and inspect the resulting diff.
+- Test: run `make adr-fix ADR=docs/adr/0020-unified-agent-api-model-selection.md` when needed and inspect the resulting diff.
 - Validate: confirm the ADR now reads as rationale and rollout guidance, not as a second source of normative truth.
 - Cleanup: remove any stale wording that could reopen ambiguity about ownership, validation, or advertising posture.
 

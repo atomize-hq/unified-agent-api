@@ -9,7 +9,7 @@
     - Enforce facet-level bounds (trim-to-empty invalid; `<= 1024` bytes; omit not truncate; safe warning).
     - Advertise `agent_api.session.handle.v1` in Claude backend capabilities only once behavior + tests land.
   - Out:
-    - Any spec changes (implementation MUST follow `docs/specs/universal-agent-api/event-envelope-schema-spec.md`).
+    - Any spec changes (implementation MUST follow `docs/specs/unified-agent-api/event-envelope-schema-spec.md`).
     - Any raw stdout/stderr parsing to derive ids.
 - **Acceptance criteria**:
   - When the Claude backend advertises `agent_api.session.handle.v1`:
@@ -23,7 +23,7 @@
   - Id source is typed-only: `ClaudeStreamJsonEvent::session_id()`; no raw-line parsing.
 - **Dependencies**:
   - `SA-C01 typed id accessor helpers` (SEAM-1) — Claude `session_id()` accessor.
-  - Normative: `docs/specs/universal-agent-api/event-envelope-schema-spec.md` (handle.v1 rules).
+  - Normative: `docs/specs/unified-agent-api/event-envelope-schema-spec.md` (handle.v1 rules).
 - **Verification**:
   - `cargo test -p agent_api` (plus targeted backend tests as added in `S1.T5`).
 - **Rollout/safety**:

@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Make Claude Code runs “live” under the Universal Agent API by adding a streaming `--print
+Make Claude Code runs “live” under the Unified Agent API by adding a streaming `--print
 --output-format stream-json` API to `crates/claude_code`, then wiring that API into `crates/agent_api`
 so callers receive `AgentWrapperEvent`s before the process exits.
 
@@ -33,7 +33,7 @@ so callers receive `AgentWrapperEvent`s before the process exits.
 - **C0 — `claude_code` streaming API:** Add a first-class streaming API to `crates/claude_code` for
   `--print --output-format stream-json`, yielding parsed events incrementally and supporting CRLF.
 - **C1 — `agent_api` Claude live events:** Wire `agent_api` Claude backend to use the streaming API,
-  emit events live, advertise `agent_api.events.live`, and preserve Universal Agent API DR-0012 completion gating.
+  emit events live, advertise `agent_api.events.live`, and preserve Unified Agent API DR-0012 completion gating.
 
 ## CI Checkpoints
 

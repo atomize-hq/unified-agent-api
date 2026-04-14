@@ -112,7 +112,7 @@ Checklist:
     assertions that guard against accidental drift
 - **Implementation notes**:
   - Keep this slice focused on Claude-owned conformance surfaces only.
-  - Do not regenerate `docs/specs/universal-agent-api/capability-matrix.md` here; that belongs to
+  - Do not regenerate `docs/specs/unified-agent-api/capability-matrix.md` here; that belongs to
     SEAM-5 when both built-in backends advertise the key.
   - If a backend-contract assertion is added, keep it scoped to Claude routing/ordering and avoid
     duplicating cross-backend checks.

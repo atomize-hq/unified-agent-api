@@ -1,4 +1,4 @@
-# Kickoff Prompt — C0-integ (Codex wrapper per-run env override API)
+# Kickoff Prompt — C0-integ (Codex crate per-run env override API)
 
 ## Scope
 - Merge `C0-code` + `C0-test`, resolve drift against `C0-spec.md` and the contract. Integration owns aligning code/tests to the spec.

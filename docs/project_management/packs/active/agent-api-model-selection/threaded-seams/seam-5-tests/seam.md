@@ -42,6 +42,55 @@ open_remediations: []
 - See `../../seam-5-tests.md`.
 
 ## Promotion basis
+- **Seam ID**: SEAM-5
+- **Name**: regression coverage for `agent_api.config.model.v1`
+- **Goal / value**: lock the universal model-selection contract in place so backend or spec churn
+  cannot silently regress R0 ordering, trim-before-map semantics, absence behavior, backend argv
+  placement, safe runtime rejection, or capability publication.
+- **Type**: risk (contract conformance + regression)
+- **Scope**
+  - In:
+    - `SEAM-5A` coverage for unsupported-before-`InvalidRequest` ordering and the pinned safe
+      invalid template `invalid agent_api.config.model.v1`.
+    - `SEAM-5B` coverage for trim-before-map semantics, absence/default preservation, Codex and
+      Claude backend mapping, runtime rejection translation, terminal `Error` event emission, and
+      capability-matrix freshness after advertising changes.
+    - Regression checks that backend seams consume the shared normalized value rather than
+      re-reading the raw extension payload.
+  - Out:
+    - live upstream catalog/e2e compatibility tests against real model availability.
+    - speculative tests for future universal keys such as `fallback-model`.
+- **Touch surface**:
+  - `crates/agent_api/src/backend_harness/normalize/tests.rs`
+  - `crates/agent_api/src/backend_harness/runtime/tests.rs`
+  - `crates/agent_api/src/backend_harness/runtime/tests/**`
+  - `crates/agent_api/src/backends/codex/tests/capabilities.rs`
+  - `crates/agent_api/src/backends/codex/tests/mapping.rs`
+  - `crates/agent_api/src/backends/codex/tests/app_server.rs`
+  - `crates/agent_api/src/backends/codex/tests/backend_contract.rs`
+  - `crates/agent_api/src/backends/claude_code/tests/capabilities.rs`
+  - `crates/agent_api/src/backends/claude_code/tests/mapping.rs`
+  - `crates/agent_api/src/backends/claude_code/tests/backend_contract.rs`
+  - `docs/specs/unified-agent-api/capability-matrix.md`
+- **Verification**:
+  - `cargo test -p agent_api backend_harness::normalize`
+  - `cargo test -p agent_api codex`
+  - `cargo test -p agent_api claude_code`
+  - `cargo run -p xtask -- capability-matrix`
+  - `make test`
+- **Threading constraints**
+  - Upstream blockers:
+    - `SEAM-1` unlocks the early `SEAM-5A` ordering and invalid-template tests.
+    - `SEAM-2` unlocks shared-normalizer handoff coverage and capability-matrix freshness
+      assertions.
+    - `SEAM-3` unlocks Codex mapping and Codex runtime-rejection coverage.
+    - `SEAM-4` unlocks Claude mapping and Claude runtime-rejection coverage.
+  - Downstream blocked seams:
+    - none; this seam is the terminal regression gate for the feature.
+  - Contracts produced (owned):
+    - none. SEAM-5 only pins conformance to contracts owned by SEAM-1 through SEAM-4.
+  - Contracts consumed:
+    - `MS-C03`, `MS-C04`, `MS-C05`, `MS-C06`, `MS-C07`, `MS-C08`, `MS-C09`
 
 - Upstream seam exit: `../../governance/seam-4-closeout.md` (seam-exit gate passed; promotion readiness ready).
 - Required threads: `THR-01..THR-05` are published per `../../threading.md`.

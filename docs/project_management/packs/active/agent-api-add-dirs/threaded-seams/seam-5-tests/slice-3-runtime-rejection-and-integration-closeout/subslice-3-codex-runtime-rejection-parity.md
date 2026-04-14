@@ -1,6 +1,6 @@
 ### S3c — Codex runtime-rejection parity tests
 
-- **User/system value**: Codex wrapper behavior stays pinned when add-dir rejection happens after a
+- **User/system value**: Codex crate behavior stays pinned when add-dir rejection happens after a
   run handle exists, so hosts see one deterministic terminal error event and one completion message
   with no secret leakage.
 - **Scope (in/out)**:
@@ -34,7 +34,7 @@
   - Keep the helper bounded to Codex tests unless both backends can share it without coupling.
     Land before `S3e`.
 
-#### S3c.T1 — Add Codex wrapper parity coverage for post-handle rejections
+#### S3c.T1 — Add Codex crate parity coverage for post-handle rejections
 
 - **Outcome**: Codex exec/resume flows have deterministic wrapper-level tests for the post-handle
   runtime rejection contract.

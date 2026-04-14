@@ -16,7 +16,7 @@
     - Backend config precedence + environment merging policy implementation (SEAM-2/3/4).
     - Cross-backend conformance tests beyond validation unit coverage (SEAM-5).
 - **Acceptance criteria**:
-  - Validation behavior matches the canonical spec (`docs/specs/universal-agent-api/mcp-management-spec.md`) for:
+  - Validation behavior matches the canonical spec (`docs/specs/unified-agent-api/mcp-management-spec.md`) for:
     - trimmed/non-empty names,
     - `Stdio` and `Url` transport field validation rules,
     - `bearer_token_env_var` regex `^[A-Za-z_][A-Za-z0-9_]*$`.
@@ -37,7 +37,7 @@
   - SEAM-3/4 backend hook implementations (before spawn),
   to prevent semantic drift.
 - **Inputs/outputs**:
-  - Input: `docs/specs/universal-agent-api/mcp-management-spec.md` (“Server name validation” + “Transport field validation”)
+  - Input: `docs/specs/unified-agent-api/mcp-management-spec.md` (“Server name validation” + “Transport field validation”)
   - Output: `crates/agent_api/src/mcp.rs` (or a `mcp::validation` submodule) with `pub(crate)` helper fns, such as:
     - `normalize_server_name(...) -> Result<String, AgentWrapperError>`
     - `normalize_add_transport(...) -> Result<AgentWrapperMcpAddTransport, AgentWrapperError>`

@@ -5,7 +5,7 @@ Pack: `docs/project_management/packs/active/agent-api-mcp-management/`
 Inputs:
 - Seam brief: `docs/project_management/packs/active/agent-api-mcp-management/seam-3-codex-mapping.md`
 - Threading (authoritative): `docs/project_management/packs/active/agent-api-mcp-management/threading.md`
-- Canonical spec (normative once approved): `docs/specs/universal-agent-api/mcp-management-spec.md`
+- Canonical spec (normative once approved): `docs/specs/unified-agent-api/mcp-management-spec.md`
 
 ## Seam Brief (Restated)
 
@@ -21,7 +21,7 @@ Inputs:
 - **Scope**
   - In:
     - Implement `AgentWrapperBackend::{mcp_list,mcp_get,mcp_add,mcp_remove}` for `CodexBackend`.
-    - Pin argv construction to `docs/specs/universal-agent-api/mcp-management-spec.md` (“Built-in backend mappings (pinned)”):
+    - Pin argv construction to `docs/specs/unified-agent-api/mcp-management-spec.md` (“Built-in backend mappings (pinned)”):
       - `list` → `codex mcp list --json`
       - `get` → `codex mcp get --json <name>`
       - `remove` → `codex mcp remove <name>`
@@ -71,7 +71,7 @@ Inputs:
 
 - **Contracts produced (owned)**:
   - `MM-C08 — Codex MCP mapping contract`:
-    - Definition: pinned argv mapping for Codex in `docs/specs/universal-agent-api/mcp-management-spec.md` (“Built-in backend mappings (pinned)”).
+    - Definition: pinned argv mapping for Codex in `docs/specs/unified-agent-api/mcp-management-spec.md` (“Built-in backend mappings (pinned)”).
     - Where it lives: implemented in `crates/agent_api/src/backends/codex.rs` (+ a Codex-only helper module).
     - Produced by: S1 (list/get) + S2 (add/remove) complete the mapping.
 - **Contracts consumed**:

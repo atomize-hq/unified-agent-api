@@ -38,7 +38,7 @@ This feature’s planning pack is canonical under:
 
 ## Triad Overview (aligned to `spec_manifest.md`)
 
-- **C0 — Codex wrapper per-run env override API:** Add the minimum additive `crates/codex` API needed so `agent_api` can apply per-run environment overrides while still executing via `CodexClient::stream_exec`.
+- **C0 — Codex crate per-run env override API:** Add the minimum additive `crates/codex` API needed so `agent_api` can apply per-run environment overrides while still executing via `CodexClient::stream_exec`.
 - **C1 — `agent_api` Codex backend refactor to `stream_exec`:** Consume `codex::CodexClient::stream_exec` and map typed Codex events (`ThreadEvent`) to `AgentWrapperEvent` live, preserving DR-0012 finality semantics.
 - **C2 — Validation hardening (fixtures + safety):** Add fake-binary fixtures and integration tests proving (a) at least one event is emitted before completion resolves, (b) env precedence is preserved, (c) redaction rules prevent raw JSONL lines from leaking through universal errors/events, and (d) exec-policy defaults/overrides are honored deterministically.
 

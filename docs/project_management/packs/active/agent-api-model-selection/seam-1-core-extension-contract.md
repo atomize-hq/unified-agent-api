@@ -36,7 +36,7 @@ open_remediations: []
 - **Goal / user value**: Pin one stable universal request contract for model selection so callers can rely on a single
   key without wrapper-defined model registries or backend-specific branching.
 - **Status**:
-  - canonical owner-spec text is already landed in `docs/specs/universal-agent-api/extensions-spec.md`
+  - canonical owner-spec text is already landed in `docs/specs/unified-agent-api/extensions-spec.md`
   - remaining work is limited to ADR-0020 sync, drift verification across related universal specs, and any resulting
     canonical-doc clarification patches
 - **Contract registry cross-refs**: MS-C01, MS-C02, MS-C03, MS-C04 (see `threading.md`)
@@ -54,9 +54,9 @@ open_remediations: []
 - **Primary interfaces (contracts)**
   - Inputs:
     - `AgentWrapperRunRequest.extensions["agent_api.config.model.v1"]`
-    - canonical spec docs under `docs/specs/universal-agent-api/`
+    - canonical spec docs under `docs/specs/unified-agent-api/`
   - Outputs:
-    - verification that the pinned schema and semantics in `docs/specs/universal-agent-api/extensions-spec.md` remain
+    - verification that the pinned schema and semantics in `docs/specs/unified-agent-api/extensions-spec.md` remain
       the source of truth
     - clarified error/run-lifecycle language in related universal specs only if the verification pass finds drift
 - **Key invariants / rules**:
@@ -76,21 +76,21 @@ open_remediations: []
   - Blocked by:
     - none
 - **Touch surface**:
-  - `docs/specs/universal-agent-api/extensions-spec.md`
-  - `docs/specs/universal-agent-api/capabilities-schema-spec.md`
-  - `docs/specs/universal-agent-api/contract.md`
-  - `docs/specs/universal-agent-api/run-protocol-spec.md`
-  - `docs/adr/0020-universal-agent-api-model-selection.md`
+  - `docs/specs/unified-agent-api/extensions-spec.md`
+  - `docs/specs/unified-agent-api/capabilities-schema-spec.md`
+  - `docs/specs/unified-agent-api/contract.md`
+  - `docs/specs/unified-agent-api/run-protocol-spec.md`
+  - `docs/adr/0020-unified-agent-api-model-selection.md`
 - **Verification**:
   - the SEAM-1 owner MUST run a repeatable drift check across:
-    - `docs/specs/universal-agent-api/extensions-spec.md` (`### agent_api.config.model.v1`)
-    - `docs/specs/universal-agent-api/capabilities-schema-spec.md` (`agent_api.config.model.v1`)
+    - `docs/specs/unified-agent-api/extensions-spec.md` (`### agent_api.config.model.v1`)
+    - `docs/specs/unified-agent-api/capabilities-schema-spec.md` (`agent_api.config.model.v1`)
     - generic inherited baselines from:
-      - `docs/specs/universal-agent-api/contract.md` (`AgentWrapperError`, `AgentWrapperBackend::run`, and
+      - `docs/specs/unified-agent-api/contract.md` (`AgentWrapperError`, `AgentWrapperBackend::run`, and
         `AgentWrapperEventKind::Error` / `AgentWrapperEvent.message`)
-      - `docs/specs/universal-agent-api/run-protocol-spec.md` (`Capability validation timing` and
+      - `docs/specs/unified-agent-api/run-protocol-spec.md` (`Capability validation timing` and
         `Error event emission for post-spawn unsupported operations (backend fault)`)
-    - `docs/adr/0020-universal-agent-api-model-selection.md` sections
+    - `docs/adr/0020-unified-agent-api-model-selection.md` sections
       `Canonical authority + sync workflow`, `Decision (draft)`, `Validation and error model`,
       `Backend mapping`, and `Capability advertising`
     - this pack's `README.md`, `scope_brief.md`, and `threading.md` restatements for SEAM-1-owned rules
@@ -136,13 +136,13 @@ open_remediations: []
 - 2026-03-13 (UTC) - `pass: no unresolved canonical-doc delta`
   - Verifier: concrete-remediator (packet run directory `.codex/audit-trio-remediator/20260313T144946-514966Z/`)
   - Compared sources:
-    - `docs/specs/universal-agent-api/extensions-spec.md` (`### agent_api.config.model.v1`)
-    - `docs/specs/universal-agent-api/capabilities-schema-spec.md` (`agent_api.config.model.v1`)
-    - `docs/specs/universal-agent-api/contract.md` (`AgentWrapperError`, `AgentWrapperBackend::run`, and
+    - `docs/specs/unified-agent-api/extensions-spec.md` (`### agent_api.config.model.v1`)
+    - `docs/specs/unified-agent-api/capabilities-schema-spec.md` (`agent_api.config.model.v1`)
+    - `docs/specs/unified-agent-api/contract.md` (`AgentWrapperError`, `AgentWrapperBackend::run`, and
       `AgentWrapperEventKind::Error` / `AgentWrapperEvent.message`)
-    - `docs/specs/universal-agent-api/run-protocol-spec.md` (`Capability validation timing` and the terminal
+    - `docs/specs/unified-agent-api/run-protocol-spec.md` (`Capability validation timing` and the terminal
       `AgentWrapperEventKind::Error` rule for post-spawn failures)
-    - `docs/adr/0020-universal-agent-api-model-selection.md` sections `Canonical authority + sync workflow`,
+    - `docs/adr/0020-unified-agent-api-model-selection.md` sections `Canonical authority + sync workflow`,
       `Decision (draft)`, `Validation and error model`, `Backend mapping`, and `Capability advertising`
     - this pack's `README.md`, `scope_brief.md`, and `threading.md` restatements for SEAM-1-owned rules
   - Synchronization reference: commit 4255d85.

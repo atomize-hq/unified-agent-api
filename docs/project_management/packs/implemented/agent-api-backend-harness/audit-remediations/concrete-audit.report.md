@@ -252,7 +252,7 @@ Generated at: 2026-02-22T20:59:03-05:00
 - Category: dependency
 - Location: `docs/project_management/packs/active/agent-api-backend-harness/scope_brief.md` L21-L27
 - Excerpt: “MUST NOT change universal contract/spec semantics (see ADR-0013 “User Contract (Authoritative)”).”
-- Problem: The pack repeatedly relies on external normative sources for semantics (ADR-0013, DR-0012, `docs/specs/universal-agent-api/*`), but does not pin exact sections/anchors or restate the required invariants in-place. This forces implementers to interpret external docs and increases the risk of implementing the wrong semantics while still “following the pack.”
+- Problem: The pack repeatedly relies on external normative sources for semantics (ADR-0013, DR-0012, `docs/specs/unified-agent-api/*`), but does not pin exact sections/anchors or restate the required invariants in-place. This forces implementers to interpret external docs and increases the risk of implementing the wrong semantics while still “following the pack.”
 - Required to be concrete:
   - Add concrete references (file + section headings or anchors) for ADR-0013 and DR-0012 semantics that this pack must preserve
   - Restate (briefly) the specific invariants that are relied on by BH-C02/BH-C03/BH-C04/BH-C05 (not just “see ADR”)

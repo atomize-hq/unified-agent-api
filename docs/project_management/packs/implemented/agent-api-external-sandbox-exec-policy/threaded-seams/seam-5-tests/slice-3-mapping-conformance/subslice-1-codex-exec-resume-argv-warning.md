@@ -11,7 +11,7 @@
     - rejected-override tests for the pinned "no fallback" branch when the installed Codex binary
       refuses `--dangerously-bypass-approvals-and-sandbox`.
     - warning `Status` event message + ordering per
-      `docs/specs/universal-agent-api/extensions-spec.md`.
+      `docs/specs/unified-agent-api/extensions-spec.md`.
   - Out:
     - Codex fork/app-server JSON-RPC params (covered by `S3b`).
     - Claude argv + allow-flag preflight (covered by `S3c`).
@@ -26,7 +26,7 @@
   - Warning is emitted before the session handle facet `Status` event.
 - **Dependencies**:
   - `docs/specs/codex-external-sandbox-mapping-contract.md` (ES-C04).
-  - `docs/specs/universal-agent-api/extensions-spec.md` (warning contract).
+  - `docs/specs/unified-agent-api/extensions-spec.md` (warning contract).
   - SEAM-2 opt-in gate (`allow_external_sandbox_exec`) + SEAM-3 Codex mapping implementation.
 - **Verification**:
   - `cargo test -p agent_api codex`

@@ -13,12 +13,12 @@
 ## Issue index
 | ID | Severity | Confidence | Type | Subject | Files |
 |---|---|---|---|---|---|
-| CH-0001 | major | high | scope_disconnect | Explicit cancellation appears as both Draft (ADR/pack) and Approved (canonical specs); current support/rollout state is unclear | docs/adr/0014-agent-api-explicit-cancellation.md; docs/specs/universal-agent-api/contract.md; docs/specs/universal-agent-api/capability-matrix.md |
-| CH-0002 | critical | high | missing_bridge_step | Cancellation completion outcome selection is not clearly bridged to DR-0012 completion gating (must wait for backend process exit) | docs/specs/universal-agent-api/run-protocol-spec.md; docs/project_management/packs/active/agent-api-explicit-cancellation/threaded-seams/seam-2-harness-cancel-propagation/slice-1-driver-semantics.md; docs/project_management/packs/active/agent-api-explicit-cancellation/seam-1-cancellation-contract.md |
-| CH-0003 | major | high | definition_missing | BH-C04/BH-C05 shorthand appears in the cancellation plan without definitions or canonical links | docs/project_management/packs/active/agent-api-explicit-cancellation/seam-2-harness-cancel-propagation.md; docs/project_management/packs/active/agent-api-explicit-cancellation/threaded-seams/seam-4-tests/slice-2-drop-regression.md; docs/specs/universal-agent-api/run-protocol-spec.md |
+| CH-0001 | major | high | scope_disconnect | Explicit cancellation appears as both Draft (ADR/pack) and Approved (canonical specs); current support/rollout state is unclear | docs/adr/0014-agent-api-explicit-cancellation.md; docs/specs/unified-agent-api/contract.md; docs/specs/unified-agent-api/capability-matrix.md |
+| CH-0002 | critical | high | missing_bridge_step | Cancellation completion outcome selection is not clearly bridged to DR-0012 completion gating (must wait for backend process exit) | docs/specs/unified-agent-api/run-protocol-spec.md; docs/project_management/packs/active/agent-api-explicit-cancellation/threaded-seams/seam-2-harness-cancel-propagation/slice-1-driver-semantics.md; docs/project_management/packs/active/agent-api-explicit-cancellation/seam-1-cancellation-contract.md |
+| CH-0003 | major | high | definition_missing | BH-C04/BH-C05 shorthand appears in the cancellation plan without definitions or canonical links | docs/project_management/packs/active/agent-api-explicit-cancellation/seam-2-harness-cancel-propagation.md; docs/project_management/packs/active/agent-api-explicit-cancellation/threaded-seams/seam-4-tests/slice-2-drop-regression.md; docs/specs/unified-agent-api/run-protocol-spec.md |
 | CH-0004 | major | high | canonicalization_needed | SEAM-3 depends on SEAM-4 “pinned timeouts”, but the pack-level SEAM-4 doc does not surface them; canonical source is ambiguous | docs/project_management/packs/active/agent-api-explicit-cancellation/seam-3-backend-termination.md; docs/project_management/packs/active/agent-api-explicit-cancellation/seam-4-tests.md; docs/project_management/packs/active/agent-api-explicit-cancellation/threaded-seams/seam-4-tests/slice-1-explicit-cancel-integration.md |
-| CH-0005 | major | high | verification_gap | Cancel-handle lifetime/orthogonality requirement is pinned in the run protocol but not traced to SEAM-2/SEAM-4 verification coverage | docs/specs/universal-agent-api/run-protocol-spec.md; docs/project_management/packs/active/agent-api-explicit-cancellation/seam-2-harness-cancel-propagation.md; docs/project_management/packs/active/agent-api-explicit-cancellation/threaded-seams/seam-4-tests/slice-1-explicit-cancel-integration.md |
-| CH-0006 | major | high | canonicalization_needed | Multiple ADRs cite `docs/project_management/next/universal-agent-api/*` as authoritative specs, while the canonical spec set lives under `docs/specs/universal-agent-api/` | docs/specs/universal-agent-api/README.md; docs/adr/0009-universal-agent-api.md; docs/adr/0011-agent-api-codex-stream-exec.md |
+| CH-0005 | major | high | verification_gap | Cancel-handle lifetime/orthogonality requirement is pinned in the run protocol but not traced to SEAM-2/SEAM-4 verification coverage | docs/specs/unified-agent-api/run-protocol-spec.md; docs/project_management/packs/active/agent-api-explicit-cancellation/seam-2-harness-cancel-propagation.md; docs/project_management/packs/active/agent-api-explicit-cancellation/threaded-seams/seam-4-tests/slice-1-explicit-cancel-integration.md |
+| CH-0006 | major | high | canonicalization_needed | Multiple ADRs cite `docs/project_management/next/unified-agent-api/*` as authoritative specs, while the canonical spec set lives under `docs/specs/unified-agent-api/` | docs/specs/unified-agent-api/README.md; docs/adr/0009-unified-agent-api.md; docs/adr/0011-agent-api-codex-stream-exec.md |
 
 ## Issues
 
@@ -30,10 +30,10 @@
 - Locations:
   - `docs/adr/0014-agent-api-explicit-cancellation.md:6-9` (primary) — “Status: Draft”
   - `docs/adr/0014-agent-api-explicit-cancellation.md:140-148` (dependent) — “Semantics (to be pinned before implementation)”
-  - `docs/specs/universal-agent-api/contract.md:3-6` (dependent) — “Status: Approved” / “Canonical location: `docs/specs/universal-agent-api/`”
-  - `docs/specs/universal-agent-api/run-protocol-spec.md:72-86` (dependent) — “Explicit cancellation semantics (v1, normative)”
-  - `docs/specs/universal-agent-api/capabilities-schema-spec.md:80-84` (reference) — `agent_api.control.cancel.v1`
-  - `docs/specs/universal-agent-api/capability-matrix.md:9-40` (reference) — generated capability sections (no `agent_api.control.*` section shown)
+  - `docs/specs/unified-agent-api/contract.md:3-6` (dependent) — “Status: Approved” / “Canonical location: `docs/specs/unified-agent-api/`”
+  - `docs/specs/unified-agent-api/run-protocol-spec.md:72-86` (dependent) — “Explicit cancellation semantics (v1, normative)”
+  - `docs/specs/unified-agent-api/capabilities-schema-spec.md:80-84` (reference) — `agent_api.control.cancel.v1`
+  - `docs/specs/unified-agent-api/capability-matrix.md:9-40` (reference) — generated capability sections (no `agent_api.control.*` section shown)
 - What breaks: The docset sends incompatible lifecycle signals: explicit cancellation is “Draft” and “to be pinned before implementation” in ADR-0014, while the canonical spec set is “Approved” and already defines explicit cancellation semantics and surface types. Readers cannot tell whether cancellation is already part of the plan-of-record (shipped/stable) or a planned change, and whether the capability is expected to appear in the capability matrix today.
 - Missing links:
   - A single canonical statement describing the current rollout/support state for `agent_api.control.cancel.v1` (planned vs shipped; per-backend support).
@@ -51,8 +51,8 @@
 - Type: missing_bridge_step
 - Subject: Cancellation completion outcome selection is not clearly bridged to DR-0012 completion gating (must wait for backend process exit)
 - Locations:
-  - `docs/specs/universal-agent-api/run-protocol-spec.md:35-49` (definition) — DR-0012 completion gating (“completion MUST NOT resolve until … process has exited … stream finality”)
-  - `docs/specs/universal-agent-api/run-protocol-spec.md:113-118` (definition) — explicit cancellation gating (“NOT an exception … MUST NOT resolve until … process has exited”)
+  - `docs/specs/unified-agent-api/run-protocol-spec.md:35-49` (definition) — DR-0012 completion gating (“completion MUST NOT resolve until … process has exited … stream finality”)
+  - `docs/specs/unified-agent-api/run-protocol-spec.md:113-118` (definition) — explicit cancellation gating (“NOT an exception … MUST NOT resolve until … process has exited”)
   - `docs/project_management/packs/active/agent-api-explicit-cancellation/seam-1-cancellation-contract.md:70-76` (primary) — cancellation outcome/precedence pinned
   - `docs/project_management/packs/active/agent-api-explicit-cancellation/seam-2-harness-cancel-propagation.md:22-27` (primary) — completion sender resolves to pinned error “if the backend does not complete first”
   - `docs/project_management/packs/active/agent-api-explicit-cancellation/threaded-seams/seam-2-harness-cancel-propagation/slice-1-driver-semantics.md:9-14` (dependent) — “resolve completion … when cancel wins the race”
@@ -76,7 +76,7 @@
   - `docs/project_management/packs/active/agent-api-explicit-cancellation/seam-2-harness-cancel-propagation.md:7-11` (primary) — “receiver (BH-C04 posture)” / “Explicit cancellation must be orthogonal”
   - `docs/project_management/packs/active/agent-api-explicit-cancellation/threaded-seams/seam-2-harness-cancel-propagation/slice-1-driver-semantics.md:10-14` (dependent) — “keep draining … (BH-C04)”
   - `docs/project_management/packs/active/agent-api-explicit-cancellation/threaded-seams/seam-4-tests/slice-2-drop-regression.md:11-13` (dependent) — “DR-0012/BH-C05 opt-out behavior”
-  - `docs/specs/universal-agent-api/run-protocol-spec.md:35-49` (reference) — DR-0012 completion gating definitions/rules
+  - `docs/specs/unified-agent-api/run-protocol-spec.md:35-49` (reference) — DR-0012 completion gating definitions/rules
 - What breaks: SEAM-2/SEAM-4 rely on BH-C04/BH-C05 as if they are shared contract IDs, but the explicit cancellation docset does not define them or link to canonical definitions. This breaks navigation and traceability for implementers trying to understand the drain-on-drop posture and completion gating assumptions the cancellation plan depends on.
 - Missing links:
   - Definitions for BH-C04 and BH-C05 within the explicit cancellation pack (or resolvable links to canonical definitions elsewhere).
@@ -112,7 +112,7 @@
 - Type: verification_gap
 - Subject: Cancel-handle lifetime/orthogonality requirement is pinned in the run protocol but not traced to SEAM-2/SEAM-4 verification coverage
 - Locations:
-  - `docs/specs/universal-agent-api/run-protocol-spec.md:87-91` (definition) — cancel must work even after dropping `events` and/or dropping the run handle
+  - `docs/specs/unified-agent-api/run-protocol-spec.md:87-91` (definition) — cancel must work even after dropping `events` and/or dropping the run handle
   - `docs/project_management/packs/active/agent-api-explicit-cancellation/seam-2-harness-cancel-propagation.md:9-11` (primary) — “Explicit cancellation must be orthogonal”
   - `docs/project_management/packs/active/agent-api-explicit-cancellation/threaded-seams/seam-4-tests/slice-1-explicit-cancel-integration.md:15-20` (dependent) — integration test plan calls `cancel()` but does not pin drop-then-cancel coverage
 - What breaks: The run protocol defines a concrete cancel-handle lifetime guarantee, but the execution pack’s verification coverage does not explicitly prove it. This breaks traceability from normative requirement → test plan and leaves a gap that could allow regressions (cancel handle accidentally tied to event receiver lifetime).
@@ -124,23 +124,23 @@
   - Link SEAM-2/SEAM-4 docs directly to the run-protocol lifetime section.
 - Suggested evidence order: docs → codebase → git history → external → decision
 
-### CH-0006 — Universal Agent API spec canonicalization is split between `next/` and `docs/specs/`
+### CH-0006 — Unified Agent API spec canonicalization is split between `next/` and `docs/specs/`
 - Severity: major
 - Confidence: high
 - Type: canonicalization_needed
-- Subject: Multiple ADRs cite `docs/project_management/next/universal-agent-api/*` as authoritative specs, while the canonical spec set lives under `docs/specs/universal-agent-api/`
+- Subject: Multiple ADRs cite `docs/project_management/next/unified-agent-api/*` as authoritative specs, while the canonical spec set lives under `docs/specs/unified-agent-api/`
 - Locations:
-  - `docs/specs/universal-agent-api/README.md:1-13` (definition) — canonical spec directory under `docs/specs/universal-agent-api/`
-  - `docs/specs/universal-agent-api/contract.md:3-6` (definition) — “Canonical location: `docs/specs/universal-agent-api/`”
-  - `docs/adr/0009-universal-agent-api.md:25-30` (primary) — “Contract/spec docs (authoritative)” under `docs/project_management/next/universal-agent-api/`
-  - `docs/adr/0011-agent-api-codex-stream-exec.md:37-43` (dependent) — baseline universal contract references `docs/project_management/next/universal-agent-api/*`
-- What breaks: Readers encounter two competing “authoritative” spec trees for the Universal Agent API. Without an explicit mapping, this risks drift and breaks narrative cohesion when one tree updates independently.
+  - `docs/specs/unified-agent-api/README.md:1-13` (definition) — canonical spec directory under `docs/specs/unified-agent-api/`
+  - `docs/specs/unified-agent-api/contract.md:3-6` (definition) — “Canonical location: `docs/specs/unified-agent-api/`”
+  - `docs/adr/0009-unified-agent-api.md:25-30` (primary) — “Contract/spec docs (authoritative)” under `docs/project_management/next/unified-agent-api/`
+  - `docs/adr/0011-agent-api-codex-stream-exec.md:37-43` (dependent) — baseline universal contract references `docs/project_management/next/unified-agent-api/*`
+- What breaks: Readers encounter two competing “authoritative” spec trees for the Unified Agent API. Without an explicit mapping, this risks drift and breaks narrative cohesion when one tree updates independently.
 - Missing links:
   - An explicit statement of the relationship between the `next/` spec tree and the `docs/specs/` canonical spec tree.
   - Consistent ADR references to the canonical location for normative contracts.
 - Required to be cohesive:
-  - Choose and document exactly one canonical location for normative Universal Agent API specs and reference it consistently from ADRs.
-  - If `docs/project_management/next/universal-agent-api/*` remains, scope it as planning/execution artifacts and state how it is synchronized (or that it is not).
+  - Choose and document exactly one canonical location for normative Unified Agent API specs and reference it consistently from ADRs.
+  - If `docs/project_management/next/unified-agent-api/*` remains, scope it as planning/execution artifacts and state how it is synchronized (or that it is not).
   - Add cross-links so readers can navigate ADR → canonical spec → planning artifacts without ambiguity.
 - Suggested evidence order: docs → codebase → git history → external → decision
 
@@ -171,13 +171,13 @@
 - docs/adr/0003-wrapper-coverage-auto-generation.md
 - docs/adr/0004-wrapper-coverage-iu-subtree-inheritance.md
 - docs/adr/0005-codex-jsonl-log-parser-api.md
-- docs/adr/0006-agent-wrappers-workspace.md
+- docs/adr/0006-unified-agent-api-workspace.md
 - docs/adr/0007-wrapper-events-ingestion-contract.md
 - docs/adr/0008-claude-stream-json-parser-api.md
-- docs/adr/0009-universal-agent-api.md
+- docs/adr/0009-unified-agent-api.md
 - docs/adr/0010-claude-code-live-stream-json.md
 - docs/adr/0011-agent-api-codex-stream-exec.md
-- docs/adr/0012-universal-agent-api-extensions-registry-and-cli-agent-onboarding-charter.md
+- docs/adr/0012-unified-agent-api-extensions-registry-and-cli-agent-onboarding-charter.md
 - docs/adr/0013-agent-api-backend-harness.md
 - docs/adr/0014-agent-api-explicit-cancellation.md
 - docs/specs/claude-stream-json-parser-contract.md
@@ -186,11 +186,11 @@
 - docs/specs/codex-thread-event-jsonl-parser-scenarios-v1.md
 - docs/specs/codex-wrapper-coverage-generator-contract.md
 - docs/specs/codex-wrapper-coverage-scenarios-v1.md
-- docs/specs/universal-agent-api/README.md
-- docs/specs/universal-agent-api/capabilities-schema-spec.md
-- docs/specs/universal-agent-api/capability-matrix.md
-- docs/specs/universal-agent-api/contract.md
-- docs/specs/universal-agent-api/event-envelope-schema-spec.md
-- docs/specs/universal-agent-api/extensions-spec.md
-- docs/specs/universal-agent-api/run-protocol-spec.md
+- docs/specs/unified-agent-api/README.md
+- docs/specs/unified-agent-api/capabilities-schema-spec.md
+- docs/specs/unified-agent-api/capability-matrix.md
+- docs/specs/unified-agent-api/contract.md
+- docs/specs/unified-agent-api/event-envelope-schema-spec.md
+- docs/specs/unified-agent-api/extensions-spec.md
+- docs/specs/unified-agent-api/run-protocol-spec.md
 - docs/specs/wrapper-events-ingestion-contract.md

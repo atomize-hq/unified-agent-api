@@ -12,11 +12,11 @@ Inputs:
 - Spec manifest: `docs/project_management/packs/active/agent-api-codex-stream-exec/spec_manifest.md`
 - Impact map: `docs/project_management/packs/active/agent-api-codex-stream-exec/impact_map.md`
 - Baselines:
-  - `docs/project_management/next/universal-agent-api/contract.md`
-  - `docs/project_management/next/universal-agent-api/run-protocol-spec.md`
-  - `docs/project_management/next/universal-agent-api/event-envelope-schema-spec.md`
+  - `docs/project_management/next/unified-agent-api/contract.md`
+  - `docs/project_management/next/unified-agent-api/run-protocol-spec.md`
+  - `docs/project_management/next/unified-agent-api/event-envelope-schema-spec.md`
 
-## DR-0002 — Per-run environment override strategy (Codex wrapper → spawned process)
+## DR-0002 — Per-run environment override strategy (Codex crate → spawned process)
 
 **A) Rely on global process env mutation (`std::env::set_var`) to “override per run”**
 - Pros: minimal API work in `crates/codex`.
@@ -73,7 +73,7 @@ Pinned rule (normative for this feature’s contract docs):
 - Otherwise `final_text = None`.
 - Bounds: if `final_text` exceeds `65536` bytes UTF-8, it MUST be truncated UTF-8-safely and suffixed with `…(truncated)`.
 
-## DR-0005 — Non-zero exit behavior (Codex wrapper completion → universal completion)
+## DR-0005 — Non-zero exit behavior (Codex crate completion → universal completion)
 
 **A) Treat non-zero exit as a universal error (`completion = Err(AgentWrapperError::Backend)`)**
 - Pros: makes failures obvious; matches the “errors are errors” mental model.
@@ -97,7 +97,7 @@ Pinned rule (normative for this feature’s protocol + contract docs):
 - The adapter MUST emit a best-effort `AgentWrapperEventKind::Error` message:
   - `message = "codex exited non-zero: {status:?} (stderr redacted)"`
 
-## DR-0006 — C0 Codex wrapper per-invocation env override API (exact public surface)
+## DR-0006 — C0 Codex crate per-invocation env override API (exact public surface)
 
 **A) Add fields to `ExecStreamRequest` / `ResumeRequest` to carry env overrides**
 - Pros: keeps all inputs in a single request struct.
@@ -129,7 +129,7 @@ Explicit v1 scope boundary:
 
 **B) Add a dedicated feature smoke workflow that runs the feature-local smoke scripts (Selected)**
 - Pros: matches existing repo patterns (`claude-code-live-stream-json-smoke.yml`,
-  `universal-agent-api-smoke.yml`); produces deterministic cross-platform evidence on GitHub-hosted
+  `unified-agent-api-smoke.yml`); produces deterministic cross-platform evidence on GitHub-hosted
   runners; does not slow down baseline `ci.yml` for all PRs.
 - Cons: adds another workflow file to maintain.
 
@@ -200,7 +200,7 @@ Pinned requirements (normative for `contract.md` + adapter protocol):
 Pinned extension keys (normative; authoritative text also appears in `contract.md`):
 - Core:
   - `agent_api.exec.non_interactive` (core key; schema + defaults are owned by):
-    - `docs/project_management/next/universal-agent-api/extensions-spec.md`
+    - `docs/project_management/next/unified-agent-api/extensions-spec.md`
 - Codex-specific:
   - `backend.codex.exec.sandbox_mode`: string enum:
     - `read-only` | `workspace-write` | `danger-full-access`

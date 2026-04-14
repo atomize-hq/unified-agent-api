@@ -42,7 +42,7 @@
 - **Inputs/outputs**:
   - Output: `crates/agent_api/src/backends/codex.rs`
   - Input: existing Codex mapping module (`crates/agent_api/src/backends/codex/mapping.rs`)
-  - Input: existing Codex wrapper types (`codex::{ExecStreamRequest, ThreadEvent, ExecCompletion, ...}`)
+  - Input: existing Codex crate types (`codex::{ExecStreamRequest, ThreadEvent, ExecCompletion, ...}`)
 - **Implementation notes**:
   - Keep `validate_and_extract_exec_policy` (or rename) focused on parsing/validation of known keys only; do not duplicate allowlist behavior (`BH-C02` is harness-owned).
   - Preserve current redaction rules by exposing a Codex-specific error-to-event mapping hook (as supported by `BH-C01`).

@@ -34,7 +34,7 @@ This section makes coupling explicit: contracts/interfaces, dependency edges, cr
     - Explicit “no timeout” (`Duration::ZERO`) semantics:
       - If `effective_timeout == Some(Duration::ZERO)`, adapters MUST treat it as “disable timeout”
         (i.e., MUST NOT enforce an immediate timeout due to `0`).
-      - This preserves Codex wrapper behavior where `Duration::ZERO` is “no timeout” and avoids
+      - This preserves Codex crate behavior where `Duration::ZERO` is “no timeout” and avoids
         accidental `tokio::time::timeout(Duration::ZERO, ...)` immediate-failure behavior.
 
 - **Contract ID**: `BH-C04 stream forwarding + drain-on-drop`

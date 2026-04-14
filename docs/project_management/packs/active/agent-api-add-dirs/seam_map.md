@@ -12,12 +12,12 @@ that is folded into SEAM-5 rather than tracked as a standalone orphan workstream
 
 1) **SEAM-1 — Add-dir contract + normalization semantics**
    - Owns (pack/workstream): implementing the pinned v1 meaning of `agent_api.exec.add_dirs.v1`
-     as specified by the canonical owner doc `docs/specs/universal-agent-api/extensions-spec.md`.
+     as specified by the canonical owner doc `docs/specs/unified-agent-api/extensions-spec.md`.
    - Scope includes: schema, bounds, path-resolution rules, safe error posture, and session-flow
      compatibility requirements.
    - Outputs:
      - `docs/project_management/packs/active/agent-api-add-dirs/seam-1-add-dir-contract-and-normalization.md`
-     - contract confirmation in `docs/specs/universal-agent-api/extensions-spec.md`
+     - contract confirmation in `docs/specs/unified-agent-api/extensions-spec.md`
 
 2) **SEAM-2 — Shared `agent_api` add-dir normalizer**
    - Owns: reusable request parsing/validation/resolution logic that turns the extension payload
@@ -68,7 +68,7 @@ that is folded into SEAM-5 rather than tracked as a standalone orphan workstream
    - Outputs:
      - `docs/project_management/packs/active/agent-api-add-dirs/seam-5-tests.md`
      - updates/additions to tests under `crates/agent_api/src/**`
-     - regenerated `docs/specs/universal-agent-api/capability-matrix.md`
+     - regenerated `docs/specs/unified-agent-api/capability-matrix.md`
      - same-change integration evidence for `cargo run -p xtask -- capability-matrix`,
        `make test`, and final `make preflight`
    - Done when:

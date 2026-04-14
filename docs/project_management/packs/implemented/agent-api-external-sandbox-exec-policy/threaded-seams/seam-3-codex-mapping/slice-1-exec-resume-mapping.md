@@ -10,7 +10,7 @@
       - reject `agent_api.exec.non_interactive=false` (ES-C02),
       - reject any `backend.codex.exec.*` keys (ES-C06).
     - Emit the pinned warning `Status` event when `external_sandbox=true` is accepted (exact
-      message + ordering per `docs/specs/universal-agent-api/extensions-spec.md`).
+      message + ordering per `docs/specs/unified-agent-api/extensions-spec.md`).
     - Apply the pinned exec/resume mapping: configure
       `codex::CodexClientBuilder::dangerously_bypass_approvals_and_sandbox(true)`.
     - Fail closed when the installed Codex binary rejects the pinned flag (no spawn+retry loop);
@@ -38,7 +38,7 @@
 - **Dependencies**:
   - `SEAM-2` opt-in gating: the key must be supported/advertised only when enabled (ES-C03).
   - Canonical mapping contract: `docs/specs/codex-external-sandbox-mapping-contract.md` (ES-C04).
-  - Key semantics + warning contract: `docs/specs/universal-agent-api/extensions-spec.md`.
+  - Key semantics + warning contract: `docs/specs/unified-agent-api/extensions-spec.md`.
 - **Verification**:
   - Compile + existing tests: `cargo test -p agent_api codex`
   - SEAM-5 adds pinned tests for argv shape, contradictions, and warning ordering.
@@ -52,7 +52,7 @@
 - **Outcome**: the Codex backend extracts `agent_api.exec.external_sandbox.v1` into the run policy
   and enforces ES-C02/ES-C06 contradictions before spawn.
 - **Inputs/outputs**:
-  - Input: SEAM-3 brief + `docs/specs/universal-agent-api/extensions-spec.md` validation rules.
+  - Input: SEAM-3 brief + `docs/specs/unified-agent-api/extensions-spec.md` validation rules.
   - Output: code changes in `crates/agent_api/src/backends/codex.rs`:
     - add `EXT_EXTERNAL_SANDBOX_V1: &str = "agent_api.exec.external_sandbox.v1"`,
     - extend `CodexExecPolicy` with `external_sandbox: bool` (default `false`),
@@ -86,7 +86,7 @@ Checklist:
   warning `Status` event before any other user-visible output/events.
 - **Inputs/outputs**:
   - Input: pinned warning requirements and ordering rules in
-    `docs/specs/universal-agent-api/extensions-spec.md`.
+    `docs/specs/unified-agent-api/extensions-spec.md`.
   - Output: code changes in `crates/agent_api/src/backends/codex.rs` (and/or small helper module):
     - add a pinned warning message constant:
       `DANGEROUS: external sandbox exec policy enabled (agent_api.exec.external_sandbox.v1=true)`

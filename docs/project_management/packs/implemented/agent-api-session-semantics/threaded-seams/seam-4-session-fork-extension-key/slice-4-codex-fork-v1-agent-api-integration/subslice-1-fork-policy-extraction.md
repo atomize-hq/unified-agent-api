@@ -14,7 +14,7 @@
   - Codex backend policy extraction can represent an optional fork selector (`None` / `"last"` / `"id"`) using the shared `S1` selector type.
   - No behavior change occurs for production users: requests containing `agent_api.session.fork.v1` are still rejected as `UnsupportedCapability` until `S4b` enables support.
 - **Dependencies**:
-  - `S1` shared fork selector parser (`docs/specs/universal-agent-api/extensions-spec.md` schema).
+  - `S1` shared fork selector parser (`docs/specs/unified-agent-api/extensions-spec.md` schema).
 - **Verification**:
   - `cargo test -p agent_api --features codex`
 - **Rollout/safety**:

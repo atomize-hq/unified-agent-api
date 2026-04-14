@@ -3,7 +3,7 @@
 - **User/system value**: Unblocks downstream seams by freezing the universal MCP management surface (`agent_api::mcp`) and the capability-gated gateway/hooks, without touching any backend mappings yet.
 - **Scope (in/out)**:
   - In:
-    - Add public `agent_api::mcp` module and pinned type shapes from `docs/specs/universal-agent-api/mcp-management-spec.md`.
+    - Add public `agent_api::mcp` module and pinned type shapes from `docs/specs/unified-agent-api/mcp-management-spec.md`.
     - Add `AgentWrapperGateway::{mcp_list,mcp_get,mcp_add,mcp_remove}` entrypoints with deterministic error ordering:
       - resolve backend → capability check → (validation in S2) → invoke hook.
     - Add default `AgentWrapperBackend::{mcp_list,mcp_get,mcp_add,mcp_remove}` hooks (non-breaking additive evolution; default fail-closed).
@@ -35,7 +35,7 @@
 
 - **Outcome**: A new public module providing the pinned request/response types and transport enum, using std + serde-friendly types only.
 - **Inputs/outputs**:
-  - Input: `docs/specs/universal-agent-api/mcp-management-spec.md` (“Pinned type shapes (v1)”)
+  - Input: `docs/specs/unified-agent-api/mcp-management-spec.md` (“Pinned type shapes (v1)”)
   - Output: `crates/agent_api/src/mcp.rs` + `pub mod mcp;` export from `crates/agent_api/src/lib.rs`
 - **Implementation notes**:
   - Keep the types layout aligned with the spec to minimize drift (derive sets + field names).
@@ -60,7 +60,7 @@ Checklist:
   - `agent_api.tools.mcp.add.v1`
   - `agent_api.tools.mcp.remove.v1`
 - **Inputs/outputs**:
-  - Input: `docs/specs/universal-agent-api/mcp-management-spec.md` (“Capability ids (v1, normative)”)
+  - Input: `docs/specs/unified-agent-api/mcp-management-spec.md` (“Capability ids (v1, normative)”)
   - Output: `crates/agent_api/src/mcp.rs` (or `crates/agent_api/src/lib.rs`) with `pub(crate)` consts used by gateway + backends
 - **Implementation notes**:
   - Keep these `pub(crate)` (not public API) unless/until the canonical spec requires exporting them.

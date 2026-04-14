@@ -1,7 +1,7 @@
 # Claude Code Session Mapping Contract (v1)
 
 Status: **Normative**  
-Scope: concrete `claude --print` spawn/mapping rules for Universal Agent API session semantics
+Scope: concrete `claude --print` spawn/mapping rules for Unified Agent API session semantics
 (`agent_api.session.resume.v1`, `agent_api.session.fork.v1`) and non-interactive policy
 (`agent_api.exec.non_interactive`).
 
@@ -11,7 +11,7 @@ This document uses RFC 2119-style requirement keywords (`MUST`, `MUST NOT`, `SHO
 
 ## Purpose
 
-The Universal Agent API specs define the **backend-neutral** semantics and validation rules for:
+The Unified Agent API specs define the **backend-neutral** semantics and validation rules for:
 
 - `agent_api.exec.non_interactive` (boolean)
 - `agent_api.session.resume.v1` (object)
@@ -22,7 +22,7 @@ keys into a headless Claude CLI invocation, including the pinned non-interactive
 error translation requirements.
 
 Canonical schemas + selection-failure rules are owned by:
-- `docs/specs/universal-agent-api/extensions-spec.md`
+- `docs/specs/unified-agent-api/extensions-spec.md`
 
 ## CLI surface (pinned)
 
@@ -38,7 +38,7 @@ Stream-json verbose requirement (pinned):
 
 ## `agent_api.exec.non_interactive` mapping (pinned)
 
-Default policy is owned by `docs/specs/universal-agent-api/extensions-spec.md`:
+Default policy is owned by `docs/specs/unified-agent-api/extensions-spec.md`:
 `agent_api.exec.non_interactive` defaults to `true`.
 
 When `agent_api.exec.non_interactive == true`, the Claude backend MUST:
@@ -53,7 +53,7 @@ embed raw backend output).
 ## `agent_api.exec.external_sandbox.v1` mapping (dangerous; pinned)
 
 The external sandbox extension key (`agent_api.exec.external_sandbox.v1`) is owned by the universal
-extensions registry (`docs/specs/universal-agent-api/extensions-spec.md`). This section pins the
+extensions registry (`docs/specs/unified-agent-api/extensions-spec.md`). This section pins the
 Claude Code backend-owned CLI mapping when the Claude backend advertises and accepts the key.
 
 When `extensions["agent_api.exec.external_sandbox.v1"] == true`, the Claude backend MUST:
@@ -87,7 +87,7 @@ both the allow-flag-supported and allow-flag-not-supported cases without spawnin
 
 ## `agent_api.exec.add_dirs.v1` mapping (pinned)
 
-The add-dir extension key is owned by `docs/specs/universal-agent-api/extensions-spec.md`. This
+The add-dir extension key is owned by `docs/specs/unified-agent-api/extensions-spec.md`. This
 section pins the Claude CLI mapping when the Claude backend advertises and accepts the key.
 
 When `extensions["agent_api.exec.add_dirs.v1"]` is accepted, the Claude backend MUST:
@@ -133,7 +133,7 @@ Runtime rejection parity (pinned):
 
 ## `agent_api.config.model.v1` mapping (pinned)
 
-The model-selection extension key is owned by `docs/specs/universal-agent-api/extensions-spec.md`.
+The model-selection extension key is owned by `docs/specs/unified-agent-api/extensions-spec.md`.
 This section pins the Claude CLI mapping when the Claude backend advertises and accepts the key.
 
 When `extensions["agent_api.config.model.v1"]` is accepted, the Claude backend MUST:
@@ -168,7 +168,7 @@ Runtime rejection parity (pinned):
   `message` surfaced through the completion error so downstream consumers can compare them
   deterministically.
 - This event/completion parity requirement is owned by
-  `docs/specs/universal-agent-api/extensions-spec.md`
+  `docs/specs/unified-agent-api/extensions-spec.md`
   (`agent_api.config.model.v1`, "Runtime rejection behavior (v1, normative)").
 
 Implementation note (non-normative): the active verification plan for this contract clause lives in
@@ -176,11 +176,11 @@ Implementation note (non-normative): the active verification plan for this contr
 
 ## `agent_api.session.resume.v1` mapping (pinned)
 
-The resume extension key is owned by `docs/specs/universal-agent-api/extensions-spec.md`. This
+The resume extension key is owned by `docs/specs/unified-agent-api/extensions-spec.md`. This
 section pins the Claude CLI mapping.
 
 Let `PROMPT == AgentWrapperRunRequest.prompt` (non-empty after trimming; validated pre-spawn by the
-Universal Agent API run protocol).
+Unified Agent API run protocol).
 
 ### selector `"last"`
 
@@ -198,7 +198,7 @@ The backend MUST spawn an argv containing the following **ordered subsequence**:
 
 ## `agent_api.session.fork.v1` mapping (pinned)
 
-The fork extension key is owned by `docs/specs/universal-agent-api/extensions-spec.md`. This
+The fork extension key is owned by `docs/specs/unified-agent-api/extensions-spec.md`. This
 section pins the Claude CLI mapping.
 
 Let `PROMPT == AgentWrapperRunRequest.prompt` (non-empty after trimming; validated pre-spawn).
@@ -225,7 +225,7 @@ translation requirements the Claude backend MUST satisfy.
 ### Selection failures (resume/fork)
 
 For `agent_api.session.resume.v1` and `agent_api.session.fork.v1`, selection-failure behavior and
-pinned safe messages are owned by `docs/specs/universal-agent-api/extensions-spec.md`.
+pinned safe messages are owned by `docs/specs/unified-agent-api/extensions-spec.md`.
 
 The Claude backend MUST:
 

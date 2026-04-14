@@ -12,7 +12,7 @@
       - `crates/wrapper_events/src/codex_adapter.rs`
       - `crates/wrapper_events/src/claude_code_adapter.rs`
   - Out:
-    - Any Universal Agent API spec changes (this seam is code-only ergonomics).
+    - Any Unified Agent API spec changes (this seam is code-only ergonomics).
     - Any new public “session handle” surfaces in `agent_api` (that is SEAM-2).
 - **Primary interfaces (contracts)**
   - Inputs:

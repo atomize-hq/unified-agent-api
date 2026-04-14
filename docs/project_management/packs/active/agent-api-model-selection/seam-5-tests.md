@@ -62,7 +62,7 @@ open_remediations: []
   - Outputs:
     - regression suite covering the pinned v1 behavior, split into SEAM-5A and SEAM-5B entry criteria
     - stable failure cases for unsupported, invalid, and runtime-rejected model ids
-    - assertions that the SEAM-2-owned regenerated `docs/specs/universal-agent-api/capability-matrix.md` matches the
+    - assertions that the SEAM-2-owned regenerated `docs/specs/unified-agent-api/capability-matrix.md` matches the
       landed advertising change
 - **Key invariants / rules**:
   - unsupported key must fail before `InvalidRequest`
@@ -84,7 +84,7 @@ open_remediations: []
   - `crates/agent_api/src/backends/codex/tests/**`
   - `crates/agent_api/src/backends/claude_code/tests/**`
   - any shared runtime/error translation tests under `crates/agent_api/src/backend_harness/runtime/tests/**`
-  - `docs/specs/universal-agent-api/capability-matrix.md`
+  - `docs/specs/unified-agent-api/capability-matrix.md`
 - **Verification**:
   - targeted `cargo test` runs cover all new cases
   - SEAM-5A asserts unsupported-before-InvalidRequest ordering and the exact safe InvalidRequest template

@@ -5,7 +5,7 @@
   change.
 - **Scope (in/out)**:
   - In:
-    - Regenerate `docs/specs/universal-agent-api/capability-matrix.md`.
+    - Regenerate `docs/specs/unified-agent-api/capability-matrix.md`.
     - Run `cargo run -p xtask -- capability-matrix`.
     - Run `make test`.
     - Run `make preflight`.
@@ -24,7 +24,7 @@
   - `S2`
   - `S3c`
   - `S3d`
-  - `docs/specs/universal-agent-api/capability-matrix.md`
+  - `docs/specs/unified-agent-api/capability-matrix.md`
 - **Verification**:
   - `cargo run -p xtask -- capability-matrix`
   - `make test`
@@ -38,11 +38,11 @@
 - **Outcome**: the seam ends with the canonical matrix and repo-level gate evidence aligned to the
   final built-in backend behavior.
 - **Files**:
-  - `docs/specs/universal-agent-api/capability-matrix.md`
+  - `docs/specs/unified-agent-api/capability-matrix.md`
 
 Checklist:
 - Implement:
-  - regenerate `docs/specs/universal-agent-api/capability-matrix.md` after backend tests are green
+  - regenerate `docs/specs/unified-agent-api/capability-matrix.md` after backend tests are green
   - keep the generated diff in the same change as the runtime-rejection coverage
 - Test:
   - run `cargo run -p xtask -- capability-matrix`

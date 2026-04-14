@@ -5,7 +5,7 @@ Pack: `docs/project_management/packs/active/agent-api-mcp-management/`
 Inputs:
 - Seam brief: `docs/project_management/packs/active/agent-api-mcp-management/seam-4-claude-code-mapping.md`
 - Threading (authoritative): `docs/project_management/packs/active/agent-api-mcp-management/threading.md`
-- Canonical spec (normative once approved): `docs/specs/universal-agent-api/mcp-management-spec.md`
+- Canonical spec (normative once approved): `docs/specs/unified-agent-api/mcp-management-spec.md`
 
 ## Seam Brief (Restated)
 
@@ -23,7 +23,7 @@ Inputs:
 - **Scope**
   - In:
     - Implement `AgentWrapperBackend::{mcp_list,mcp_get,mcp_add,mcp_remove}` for `ClaudeCodeBackend`.
-    - Pin argv construction to `docs/specs/universal-agent-api/mcp-management-spec.md`
+    - Pin argv construction to `docs/specs/unified-agent-api/mcp-management-spec.md`
       (“Built-in backend mappings (pinned)”):
       - `list` → `claude mcp list`
       - `get` → `claude mcp get <name>` (**win32-x64 only** per `cli_manifests/claude_code/current.json`)
@@ -83,7 +83,7 @@ Inputs:
 - **Contracts produced (owned)**:
   - `MM-C09 — Claude MCP mapping contract`:
     - Definition: pinned argv mapping + target availability rules for Claude in
-      `docs/specs/universal-agent-api/mcp-management-spec.md` (“Built-in backend behavior”).
+      `docs/specs/unified-agent-api/mcp-management-spec.md` (“Built-in backend behavior”).
     - Where it lives: implemented in `crates/agent_api/src/backends/claude_code.rs`
       (+ a Claude-only helper module such as `crates/agent_api/src/backends/claude_code/mcp_management.rs`).
     - Produced by: S1 (list/get) + S2 (add/remove + bearer-token rejection) complete the mapping.

@@ -69,7 +69,7 @@ Normative requirements:
   - For any successful run that reaches the point where Claude produces at least one stdout stream-json line,
     the `AgentWrapperRunHandle.events` stream MUST yield at least one `AgentWrapperEvent` before the child
     process exits.
-- Completion MUST obey Universal Agent API DR-0012 semantics (completion waits for stream finality or stream drop).
+- Completion MUST obey Unified Agent API DR-0012 semantics (completion waits for stream finality or stream drop).
 
 ## Error taxonomy (high level)
 

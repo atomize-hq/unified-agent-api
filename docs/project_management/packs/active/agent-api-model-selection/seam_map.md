@@ -20,14 +20,14 @@ here to preserve the "exactly one active + one next" default horizon policy.
      `agent_api.config.model.v1`, including schema, trimmed-value semantics, absence semantics, and the split between
      pre-spawn validation and backend-owned runtime rejection.
    - Status:
-     - canonical owner-spec semantics are already landed in `docs/specs/universal-agent-api/extensions-spec.md`
+     - canonical owner-spec semantics are already landed in `docs/specs/unified-agent-api/extensions-spec.md`
      - this seam remains open only for ADR/pack sync and any canonical-doc drift fixes discovered during verification
    - Outputs:
      - `docs/project_management/packs/active/agent-api-model-selection/seam-1-core-extension-contract.md`
-     - updates to `docs/specs/universal-agent-api/extensions-spec.md` only if the verification pass finds unresolved
+     - updates to `docs/specs/unified-agent-api/extensions-spec.md` only if the verification pass finds unresolved
        drift
-     - any required clarifications in `docs/specs/universal-agent-api/run-protocol-spec.md` or
-       `docs/specs/universal-agent-api/contract.md`
+     - any required clarifications in `docs/specs/unified-agent-api/run-protocol-spec.md` or
+       `docs/specs/unified-agent-api/contract.md`
 
 2) **SEAM-2 -- Backend advertising + normalization hook**
    - Execution horizon: next
@@ -36,7 +36,7 @@ here to preserve the "exactly one active + one next" default horizon policy.
      publication when advertising changes.
    - Outputs:
      - `docs/project_management/packs/active/agent-api-model-selection/seam-2-backend-advertising-normalization.md`
-     - regenerated `docs/specs/universal-agent-api/capability-matrix.md` in the same change that updates built-in
+     - regenerated `docs/specs/unified-agent-api/capability-matrix.md` in the same change that updates built-in
        advertising
      - updates to `crates/agent_api/src/backends/codex/backend.rs`
      - updates to `crates/agent_api/src/backends/claude_code/backend.rs`

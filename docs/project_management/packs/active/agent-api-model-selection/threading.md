@@ -1,4 +1,4 @@
-# Threading - Universal model selection (`agent_api.config.model.v1`)
+# Threading - Unified model selection (`agent_api.config.model.v1`)
 
 This document is authoritative for:
 
@@ -84,7 +84,7 @@ This document is authoritative for:
   - **Direct consumers**: `SEAM-5`
   - **Derived consumers**: WS-INT
   - **Thread IDs**: `THR-03`
-  - **Definition**: SEAM-2 owns regenerating `docs/specs/universal-agent-api/capability-matrix.md` in the same change that updates built-in advertising for `agent_api.config.model.v1`. Any stale matrix diff blocks merge.
+  - **Definition**: SEAM-2 owns regenerating `docs/specs/unified-agent-api/capability-matrix.md` in the same change that updates built-in advertising for `agent_api.config.model.v1`. Any stale matrix diff blocks merge.
   - **Versioning / compat**: v1
 
 - **Contract ID**: `C-09` (legacy: `MS-C09`)
@@ -104,7 +104,7 @@ This document is authoritative for:
   - **Carried contract IDs**: `C-01`, `C-02`, `C-03`, `C-04`
   - **Purpose**: publish a downstream-citable verification record that confirms no unresolved canonical-doc delta exists for v1 semantics.
   - **State**: published
-  - **Revalidation trigger**: any edit under `docs/specs/universal-agent-api/` that touches `agent_api.config.model.v1` semantics or any ADR/pack restatement of those semantics.
+  - **Revalidation trigger**: any edit under `docs/specs/unified-agent-api/` that touches `agent_api.config.model.v1` semantics or any ADR/pack restatement of those semantics.
   - **Satisfied by**: the latest `pass: no unresolved canonical-doc delta` entry recorded by SEAM-1.
   - **Notes**: a published commit/PR reference is preferred for downstream citation, but canonical alignment is sufficient for SEAM-1 promotion when the pack owner explicitly approves proceeding.
 
@@ -160,6 +160,16 @@ flowchart TB
   S4 -->|"THR-05"| S5
 ```
 
+## Dependency edges (plain language)
+
+- `SEAM-1 gates SEAM-2/3/4` because: backend work starts after the SEAM-1 verification pass confirms there is no unresolved canonical-doc delta. The normative schema itself is already pinned in `docs/specs/unified-agent-api/extensions-spec.md`.
+- `SEAM-2 blocks SEAM-3` because: Codex run wiring must consume the shared `Result<Option<String>, AgentWrapperError>` output, not ad hoc raw extension parsing.
+- `SEAM-2 blocks SEAM-4` because: Claude run wiring must consume the shared `Result<Option<String>, AgentWrapperError>` output, not ad hoc raw extension parsing.
+- `SEAM-1 blocks SEAM-5A` because: pre-mapping validation tests need the pinned InvalidRequest and runtime-rejection posture.
+- `SEAM-2 blocks SEAM-5B` because: backend/matrix tests must verify the shared normalization helper, the no-second-parser rule, and capability publication handoff.
+- `SEAM-3 blocks SEAM-5B` because: Codex tests must verify the final mapping and backend-error translation behavior.
+- `SEAM-4 blocks SEAM-5B` because: Claude tests must verify the final mapping and exclusion of `--fallback-model`.
+
 ## Critical path
 
 Implementation critical path:
@@ -174,8 +184,9 @@ Implementation critical path:
 
 ## Parallelization notes / conflict-safe workstreams
 
-- **WS-SPEC**: SEAM-1 docs-first contract alignment under `docs/specs/universal-agent-api/`.
-- **WS-NORMALIZE**: SEAM-2 capability advertising plus the shared normalization helper in `crates/agent_api/src/backend_harness/normalize.rs`, with backend adapters consuming that helper.
+- **WS-SPEC**: SEAM-1 docs-first contract alignment under `docs/specs/unified-agent-api/`.
+- **WS-NORMALIZE**: SEAM-2 capability advertising plus the shared normalization helper in
+  `crates/agent_api/src/backend_harness/normalize.rs`, with backend adapters consuming that helper.
 - **WS-CODEX**: SEAM-3 Codex request mapping and runtime error translation.
 - **WS-CLAUDE**: SEAM-4 Claude Code request mapping and runtime error translation.
 - **WS-TESTS**: SEAM-5 coverage for validation ordering, mapping conformance, runtime rejection, and capability-matrix freshness.

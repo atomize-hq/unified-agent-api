@@ -13,13 +13,13 @@
       - Emit **exactly one** early `AgentWrapperEventKind::Status` event carrying:
         - `data = { "schema": "agent_api.session.handle.v1", "session": { "id": "<opaque>" } }`
       - Attach the same facet to `AgentWrapperCompletion.data` whenever a completion is produced and the id is known and within bounds.
-    - Enforce facet-level id bounds (per `docs/specs/universal-agent-api/event-envelope-schema-spec.md`):
+    - Enforce facet-level id bounds (per `docs/specs/unified-agent-api/event-envelope-schema-spec.md`):
       - `session.id` MUST be non-empty after trimming (whitespace-only ids are treated as “not known”).
       - `len(session.id) <= 1024` bytes (UTF-8) or else omit (MUST NOT truncate) and SHOULD emit a safe warning `Status`.
     - Advertise `agent_api.session.handle.v1` in `AgentWrapperCapabilities.ids` only once the above is implemented and tested per backend.
     - Tests pinning: “exactly once” placement, completion attachment, and bounds behavior for both backends.
   - Out:
-    - Any spec changes (rules are authoritative in `docs/specs/universal-agent-api/event-envelope-schema-spec.md`).
+    - Any spec changes (rules are authoritative in `docs/specs/unified-agent-api/event-envelope-schema-spec.md`).
     - Any new required fields on `AgentWrapperEvent` or `AgentWrapperCompletion`.
 - **Touch surface**:
   - `crates/agent_api/src/backends/codex.rs`
@@ -61,7 +61,7 @@
   - `SA-C01 typed id accessor helpers` (SEAM-1):
     - Claude id source MUST be `claude_code::ClaudeStreamJsonEvent::session_id() -> Option<&str>`.
     - Codex id source MUST be `codex::ThreadEvent::thread_id() -> Option<&str>`.
-  - `docs/specs/universal-agent-api/event-envelope-schema-spec.md`:
+  - `docs/specs/unified-agent-api/event-envelope-schema-spec.md`:
     - Handle facet schema, “exactly once” event rule, completion attachment, and facet-level bounds are normative.
 - **Dependency edges honored**:
   - `SEAM-1 blocks SEAM-2`: both `S1` and `S2` depend on `SA-C01` being present for their backend before implementing extraction.
@@ -73,5 +73,5 @@
   - Shared touch surfaces:
     - Both slices may touch `crates/agent_api/tests/**`; prefer backend-scoped tests (or separate files) to reduce merge conflicts.
   - Integration follow-up (WS-INT, out-of-scope for this seam decomposition):
-    - After new capability ids ship, regenerate and commit `docs/specs/universal-agent-api/capability-matrix.md` via `cargo run -p xtask -- capability-matrix`.
+    - After new capability ids ship, regenerate and commit `docs/specs/unified-agent-api/capability-matrix.md` via `cargo run -p xtask -- capability-matrix`.
 

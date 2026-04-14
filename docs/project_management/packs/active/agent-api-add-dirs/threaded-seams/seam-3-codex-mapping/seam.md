@@ -90,7 +90,7 @@ constraints already fixed by the pack.
     - Produced by: `S3` with policy inputs prepared by `S1`.
 - **Contracts consumed**:
   - `AD-C01`: Core add-dir extension key schema and bounds, owned by SEAM-1
-    (`docs/specs/universal-agent-api/extensions-spec.md`).
+    (`docs/specs/unified-agent-api/extensions-spec.md`).
     - Consumed by: `S1.T1` and `S1.T2` when advertising the key and attaching the shared helper.
   - `AD-C02`: Effective add-dir set algorithm, owned by SEAM-2.
     - Consumed by: `S1.T2` when Codex computes the effective working directory, calls

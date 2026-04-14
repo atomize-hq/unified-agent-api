@@ -51,7 +51,7 @@ Feature directory: `docs/project_management/next/claude-code-live-stream-json/`
   - `crates/claude_code/src/stream_json.rs` (parser remains the source of truth; edits only if streaming reveals missing invariants)
 - Universal API crate (`crates/agent_api`) Claude backend behavior change:
   - `crates/agent_api/src/backends/claude_code.rs` (switch to streaming API; emit events live; advertise `agent_api.events.live`)
-  - `crates/agent_api/src/run_handle_gate.rs` (no semantic change expected; verify integration remains Universal Agent API DR-0012 compliant)
+  - `crates/agent_api/src/run_handle_gate.rs` (no semantic change expected; verify integration remains Unified Agent API DR-0012 compliant)
   - `crates/agent_api/tests/dr0012_completion_gating.rs` (if assumptions about buffering are encoded in tests)
   - `crates/agent_api/src/backends/mod.rs` (only if module wiring changes)
 - Repo docs + sequencing:
@@ -62,12 +62,12 @@ Feature directory: `docs/project_management/next/claude-code-live-stream-json/`
 
 ### Possible edits (dependent on pinned spec choices)
 
-- Universal Agent API planning pack docs may become stale once Claude advertises live events:
-  - `docs/project_management/next/universal-agent-api/plan.md` (Claude described as buffered today)
-  - `docs/project_management/next/universal-agent-api/C2-spec.md` (capability expectations and narrative)
-  - `docs/project_management/next/universal-agent-api/contract.md` (only if it currently states Claude must not be live; otherwise no change)
+- Unified Agent API planning pack docs may become stale once Claude advertises live events:
+  - `docs/project_management/next/unified-agent-api/plan.md` (Claude described as buffered today)
+  - `docs/project_management/next/unified-agent-api/C2-spec.md` (capability expectations and narrative)
+  - `docs/project_management/next/unified-agent-api/contract.md` (only if it currently states Claude must not be live; otherwise no change)
 - CI workflow reuse vs duplication:
-  - `.github/workflows/universal-agent-api-smoke.yml` (if reused or extended for this feature’s checkpoint)
+  - `.github/workflows/unified-agent-api-smoke.yml` (if reused or extended for this feature’s checkpoint)
   - `.github/workflows/ci.yml` (if adding a dedicated multi-OS gate instead of a feature-local smoke workflow)
 
 ## Cascading implications (behavior/UX) + contradiction risks
@@ -87,7 +87,7 @@ Feature directory: `docs/project_management/next/claude-code-live-stream-json/`
   - `AgentWrapperCapabilities` for Claude will include `agent_api.events.live`, changing consumer behavior for UIs that gate on this capability.
   - Consumers will observe events earlier in the run lifecycle (before process exit) rather than post-hoc.
 - Second-order impact:
-  - Completion safety semantics remain mandatory (Universal Agent API DR-0012): `completion` MUST still wait for stream finality (or stream drop).
+  - Completion safety semantics remain mandatory (Unified Agent API DR-0012): `completion` MUST still wait for stream finality (or stream drop).
 - Contradiction risks:
   - Any docs/tests that currently assume “Claude is buffered” will drift and must be updated as part of the integration reconciliation.
 
@@ -115,11 +115,11 @@ Feature directory: `docs/project_management/next/claude-code-live-stream-json/`
 - `docs/adr/0008-claude-stream-json-parser-api.md`
   - Overlap: this feature depends on the typed `ClaudeStreamJsonParser`/`ClaudeStreamJsonEvent` model and extends usage from “parse captured logs” to “parse live stdout”.
   - Conflict: none if the parser remains the source of truth and streaming does not introduce a second, divergent parser.
-- `docs/adr/0009-universal-agent-api.md`
+- `docs/adr/0009-unified-agent-api.md`
   - Overlap: `agent_api` Claude backend behavior and capability advertisement.
-  - Conflict risk: documentation drift if `universal-agent-api` planning pack asserts Claude is buffered.
-  - Resolution: update the universal-agent-api planning pack docs/tests as needed during integration reconciliation, or explicitly annotate “superseded by ADR-0010” where appropriate.
-- `docs/adr/0006-agent-wrappers-workspace.md`
+  - Conflict risk: documentation drift if `unified-agent-api` planning pack asserts Claude is buffered.
+  - Resolution: update the unified-agent-api planning pack docs/tests as needed during integration reconciliation, or explicitly annotate “superseded by ADR-0010” where appropriate.
+- `docs/adr/0006-unified-agent-api-workspace.md`
   - Overlap: Claude wrapper crate remains a stable library surface; this feature adds a new headless capability rather than changing workspace shape.
   - Conflict: none.
 
@@ -127,10 +127,10 @@ Note: this repo does not currently store ADR drafts/queued items under `docs/pro
 
 ### Planning Packs (`docs/project_management/next/*`)
 
-- `docs/project_management/next/universal-agent-api/`
+- `docs/project_management/next/unified-agent-api/`
   - Overlap: `crates/agent_api/src/backends/claude_code.rs` and capability semantics (`agent_api.events.live`).
   - Conflict risk: tests/docs that currently assert Claude is not live will fail or become incorrect.
-  - Resolution: treat this feature as an incremental follow-on to universal-agent-api; reconcile and keep the universal pack accurate.
+  - Resolution: treat this feature as an incremental follow-on to unified-agent-api; reconcile and keep the universal pack accurate.
 - `docs/project_management/next/claude-code-cli-parity-2.1.29/`
   - Overlap: touches `crates/claude_code` and may land concurrently; likely merge conflicts in `crates/claude_code/src/client/mod.rs` or process helpers.
   - Resolution: sequence merges to avoid long-lived divergence; prefer rebasing parity work onto the streaming API changes once this feature lands.

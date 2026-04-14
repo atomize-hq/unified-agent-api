@@ -26,7 +26,7 @@
     - create sentinel files under the injected home root for write operations.
   - Test support can create per-test isolated homes and per-test fake executables, so parallel `cargo test` runs have no
     shared mutable state.
-  - Capability tests pin the advertising table in `docs/specs/universal-agent-api/mcp-management-spec.md`
+  - Capability tests pin the advertising table in `docs/specs/unified-agent-api/mcp-management-spec.md`
     (“Default capability advertising posture (built-in backends, pinned)”).
   - Non-run boundary test pins:
     - passing `agent_api.tools.mcp.list.v1` as a run extension key fails as `UnsupportedCapability` (fail closed),
@@ -132,7 +132,7 @@ Checklist:
       `UnsupportedCapability` (do not spawn; proves it is not modeled as a run extension key).
 - **Acceptance criteria**:
   - Tests are deterministic and do not spawn real upstream binaries.
-  - All assertions are consistent with `docs/specs/universal-agent-api/mcp-management-spec.md`.
+  - All assertions are consistent with `docs/specs/unified-agent-api/mcp-management-spec.md`.
 - **Test notes**:
   - Run: `cargo test -p agent_api --all-features --test c5_mcp_management_v1 -- --nocapture`
 - **Risk/rollback notes**: tests-only; low risk.

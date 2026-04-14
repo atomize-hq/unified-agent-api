@@ -19,7 +19,7 @@
 - **Dependencies**:
   - `S3a`/`S3b` (SA-C05 exists and is tested in `crates/codex`).
   - `S3c`/`S3d` (mapping + failure translation are implemented in `agent_api`).
-  - Normative: `docs/specs/universal-agent-api/extensions-spec.md` (pinned messages + terminal error event rule).
+  - Normative: `docs/specs/unified-agent-api/extensions-spec.md` (pinned messages + terminal error event rule).
   - Normative: `docs/specs/codex-wrapper-coverage-scenarios-v1.md` (Scenario 3: argv + stdin prompt plumbing).
 - **Verification**:
   - `cargo test -p agent_api --features codex`

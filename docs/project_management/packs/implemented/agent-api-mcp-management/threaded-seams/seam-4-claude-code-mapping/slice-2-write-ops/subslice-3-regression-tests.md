@@ -17,7 +17,7 @@
 - **Dependencies**:
   - S2a argv builders.
   - S2b hook implementations and gating behavior.
-  - `docs/specs/universal-agent-api/mcp-management-spec.md` and `threading.md` (MM-C05/MM-C06/MM-C09).
+  - `docs/specs/unified-agent-api/mcp-management-spec.md` and `threading.md` (MM-C05/MM-C06/MM-C09).
 - **Verification**:
   - `cargo test -p agent_api --features claude_code`
 - **Rollout/safety**:

@@ -61,7 +61,7 @@ Each decision is exactly two options (A/B) with explicit tradeoffs and one selec
 - Pros: deterministic cross-platform evidence on GitHub-hosted runners; no coupling to unrelated feature workflows; easiest to run while feature is in-flight on its own branch.
 - Cons: workflow duplication (another smoke workflow) unless later consolidated.
 
-**B) Reuse/extend an existing workflow (e.g., `universal-agent-api-smoke.yml` or `ci.yml`)**
+**B) Reuse/extend an existing workflow (e.g., `unified-agent-api-smoke.yml` or `ci.yml`)**
 - Pros: fewer workflows; avoids duplicating “fmt/clippy/test” logic.
 - Cons: coupling across features; `workflow_dispatch` limitations when the workflow is not on the default branch; increases churn in unrelated workflows.
 
@@ -110,7 +110,7 @@ Clarification (normative for this feature):
 ## DR-0009 — Backpressure behavior when streaming JSONL events
 
 **A) Apply backpressure (block on bounded channel send) (Selected)**
-- Pros: deterministic “no drops” behavior; bounded memory; keeps ordering; aligns with safety posture and Universal Agent API DR-0012 completion gating (if you want completion, drain the stream or drop it).
+- Pros: deterministic “no drops” behavior; bounded memory; keeps ordering; aligns with safety posture and Unified Agent API DR-0012 completion gating (if you want completion, drain the stream or drop it).
 - Cons: a slow/paused consumer can cause the reader task to stop draining stdout, which can in turn cause the child process to block on a full pipe (expected).
 
 **B) Drop events under load (best-effort streaming)**
@@ -163,6 +163,6 @@ Clarification (normative for this feature):
 
 **B) Require an explicit `cancel()` API and keep streaming alive when receiver is dropped**
 - Pros: explicit semantics; avoids surprising cancellation on receiver drop.
-- Cons: adds new public API surface; complicates `agent_api` Universal Agent API DR-0012 gating and consumer ergonomics.
+- Cons: adds new public API surface; complicates `agent_api` Unified Agent API DR-0012 gating and consumer ergonomics.
 
 **Selected:** A

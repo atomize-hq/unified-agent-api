@@ -6,7 +6,7 @@
 > - It **may be stale** if any file under `docs/project_management/packs/active/agent-api-backend-harness/`
 >   has changed since the “Generated at” timestamp in the Meta section below.
 > - Do not treat this report as normative. The normative sources of truth are the current pack docs
->   in this directory and the universal specs under `docs/specs/universal-agent-api/`.
+>   in this directory and the universal specs under `docs/specs/unified-agent-api/`.
 > - Sync rule (lightweight): when changing any file in this pack, regenerate and update **all**
 >   cohesion artifacts together:
 >   - `cohesion-audit.report.md`

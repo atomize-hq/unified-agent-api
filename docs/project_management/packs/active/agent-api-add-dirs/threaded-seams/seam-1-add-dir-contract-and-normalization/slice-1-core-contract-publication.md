@@ -9,16 +9,16 @@
     - Shared helper implementation in `crates/agent_api/src/backend_harness/normalize.rs`.
     - Codex or Claude argv mapping docs.
 - **Acceptance criteria**:
-  - `docs/specs/universal-agent-api/extensions-spec.md` explicitly covers `AD-C01`, `AD-C03`, and `AD-C07`.
+  - `docs/specs/unified-agent-api/extensions-spec.md` explicitly covers `AD-C01`, `AD-C03`, and `AD-C07`.
   - The add-dir section is concrete enough that SEAM-2 can implement validation without inventing extra rules.
   - ADR-0021 no longer introduces weaker or conflicting language for the same semantics.
 - **Dependencies**:
   - None inside the pack.
   - Evidence-only references:
-    - `docs/specs/universal-agent-api/contract.md`
+    - `docs/specs/unified-agent-api/contract.md`
     - `docs/project_management/packs/active/agent-api-add-dirs/threading.md`
 - **Verification**:
-  - Review the `agent_api.exec.add_dirs.v1` section in `docs/specs/universal-agent-api/extensions-spec.md` against `AD-C01`, `AD-C03`, and `AD-C07`.
+  - Review the `agent_api.exec.add_dirs.v1` section in `docs/specs/unified-agent-api/extensions-spec.md` against `AD-C01`, `AD-C03`, and `AD-C07`.
   - Review ADR-0021 for parity with the owner doc on schema, safe errors, and absence semantics.
 - **Rollout/safety**:
   - Doc-only and additive.
@@ -26,14 +26,14 @@
 
 #### S1.T1 — Publish the normative owner-doc contract for schema and normalization
 
-- **Outcome**: `docs/specs/universal-agent-api/extensions-spec.md` states the full v1 meaning for the add-dir key without placeholders.
+- **Outcome**: `docs/specs/unified-agent-api/extensions-spec.md` states the full v1 meaning for the add-dir key without placeholders.
 - **Inputs/outputs**:
   - Inputs:
     - `docs/project_management/packs/active/agent-api-add-dirs/threading.md`
     - `docs/project_management/packs/active/agent-api-add-dirs/seam-1-add-dir-contract-and-normalization.md`
-    - `docs/specs/universal-agent-api/contract.md`
+    - `docs/specs/unified-agent-api/contract.md`
   - Outputs:
-    - Updated `docs/specs/universal-agent-api/extensions-spec.md`
+    - Updated `docs/specs/unified-agent-api/extensions-spec.md`
 - **Implementation notes**:
   - Keep the schema closed.
   - State `dirs` bounds, per-entry trimming, relative-path resolution against the effective working directory, lexical normalization only, pre-spawn `exists && is_dir`, and order-preserving deduplication.
@@ -48,7 +48,7 @@
 
 Checklist:
 - Implement:
-  - Update the `agent_api.exec.add_dirs.v1` owner-doc section in `docs/specs/universal-agent-api/extensions-spec.md`.
+  - Update the `agent_api.exec.add_dirs.v1` owner-doc section in `docs/specs/unified-agent-api/extensions-spec.md`.
   - Tighten wording until the contract is directly implementable by SEAM-2.
 - Test:
   - Compare the resulting text against `AD-C01` in `threading.md`.
@@ -63,11 +63,11 @@ Checklist:
 - **Inputs/outputs**:
   - Inputs:
     - `docs/project_management/packs/active/agent-api-add-dirs/threading.md`
-    - `docs/specs/universal-agent-api/extensions-spec.md`
-    - `docs/adr/0021-universal-agent-api-add-dirs.md`
+    - `docs/specs/unified-agent-api/extensions-spec.md`
+    - `docs/adr/0021-unified-agent-api-add-dirs.md`
   - Outputs:
-    - Updated `docs/specs/universal-agent-api/extensions-spec.md`
-    - Updated `docs/adr/0021-universal-agent-api-add-dirs.md`
+    - Updated `docs/specs/unified-agent-api/extensions-spec.md`
+    - Updated `docs/adr/0021-unified-agent-api-add-dirs.md`
 - **Implementation notes**:
   - Reuse the exact safe templates from `AD-C03`.
   - Keep the ADR as rationale and derived plan only; any conflict resolves toward `extensions-spec.md`.
@@ -83,7 +83,7 @@ Checklist:
 
 Checklist:
 - Implement:
-  - Tighten the safe-error and absence-semantics text in `docs/specs/universal-agent-api/extensions-spec.md`.
+  - Tighten the safe-error and absence-semantics text in `docs/specs/unified-agent-api/extensions-spec.md`.
   - Align ADR-0021 text that summarizes those rules.
 - Test:
   - Verify the three safe-message templates match `threading.md` exactly.

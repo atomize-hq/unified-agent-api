@@ -24,7 +24,7 @@ Minimum termination behavior (testable):
 
 Observable behavior constraints:
 - Termination MUST NOT change the pinned cancellation completion outcome (`"cancelled"`) defined by:
-  - `docs/specs/universal-agent-api/run-protocol-spec.md`, and
+  - `docs/specs/unified-agent-api/run-protocol-spec.md`, and
   - `SEAM-1` / `CA-C01` in this pack.
 - Termination MUST NOT cause raw backend stdout/stderr (or raw JSONL lines) to appear in:
   - `AgentWrapperEvent.message`, `AgentWrapperEvent.text`, or `AgentWrapperEvent.data`, or
@@ -46,6 +46,6 @@ Time bounds:
 
 ## Backend notes (informative)
 
-- Codex wrapper uses `kill_on_drop(true)` on spawned commands. One implementation approach for
+- Codex crate uses `kill_on_drop(true)` on spawned commands. One implementation approach for
   best-effort termination is to ensure the child handle is dropped when cancellation is requested.
 - Claude Code wrapper similarly kills on drop for spawned commands in its process runner.

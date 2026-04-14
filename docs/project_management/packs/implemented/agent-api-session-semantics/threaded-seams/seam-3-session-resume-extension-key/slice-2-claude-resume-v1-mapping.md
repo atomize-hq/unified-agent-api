@@ -27,7 +27,7 @@
     - Selection failures surface as `AgentWrapperError::Backend` with pinned messages and satisfy the terminal `Error` event rule.
 - **Dependencies**:
   - `S1` shared resume selector parser.
-  - Normative: `docs/specs/universal-agent-api/extensions-spec.md` (schema + selection failure + contradiction rules).
+  - Normative: `docs/specs/unified-agent-api/extensions-spec.md` (schema + selection failure + contradiction rules).
   - Normative: `docs/specs/claude-code-session-mapping-contract.md` (argv subsequences + safe error translation).
 - **Verification**:
   - `cargo test -p agent_api --features claude_code`

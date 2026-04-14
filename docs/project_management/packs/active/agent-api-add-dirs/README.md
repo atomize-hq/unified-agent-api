@@ -1,6 +1,6 @@
 # Universal add-dir run extension — seam extraction (ADR-0021)
 
-Source: `docs/adr/0021-universal-agent-api-add-dirs.md`
+Source: `docs/adr/0021-unified-agent-api-add-dirs.md`
 
 This directory contains **seam** artifacts extracted to make the work owner-assignable and
 parallelizable without hiding coupling. These files are planning aids; they are not normative

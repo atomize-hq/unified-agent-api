@@ -15,13 +15,13 @@
   - `crates/agent_api/src/`
 
 ## Related Docs
-- Universal Agent API baseline:
-  - `docs/adr/0009-universal-agent-api.md`
-  - `docs/specs/universal-agent-api/contract.md`
-  - `docs/specs/universal-agent-api/run-protocol-spec.md`
-  - `docs/specs/universal-agent-api/event-envelope-schema-spec.md`
-  - `docs/specs/universal-agent-api/capabilities-schema-spec.md`
-  - `docs/specs/universal-agent-api/extensions-spec.md`
+- Unified Agent API baseline:
+  - `docs/adr/0009-unified-agent-api.md`
+  - `docs/specs/unified-agent-api/contract.md`
+  - `docs/specs/unified-agent-api/run-protocol-spec.md`
+  - `docs/specs/unified-agent-api/event-envelope-schema-spec.md`
+  - `docs/specs/unified-agent-api/capabilities-schema-spec.md`
+  - `docs/specs/unified-agent-api/extensions-spec.md`
 - Current built-in backend adapters (implementation context):
   - `crates/agent_api/src/backends/codex.rs`
   - `crates/agent_api/src/backends/claude_code.rs`
@@ -46,7 +46,7 @@ ADR_BODY_SHA256: f50df499202efeb7d2f1a0a740fa5bfe5c1784c93b33875bc3ac56e84ddbc1e
 
 ## Problem / Context
 
-The Universal Agent API is explicitly designed to support onboarding many different CLI agents.
+The Unified Agent API is explicitly designed to support onboarding many different CLI agents.
 The intended layering is:
 
 - `crates/<agent>`: agent-specific wrapper library (spawn semantics, stream parsing, typed events)
@@ -86,8 +86,8 @@ This ADR MUST NOT change the public Rust API of `agent_api` or the normative uni
 In particular:
 
 - Capability advertising and extension keys remain as specified in:
-  - `docs/specs/universal-agent-api/capabilities-schema-spec.md`
-  - `docs/specs/universal-agent-api/extensions-spec.md`
+  - `docs/specs/unified-agent-api/capabilities-schema-spec.md`
+  - `docs/specs/unified-agent-api/extensions-spec.md`
 - Run finality semantics remain DR-0012 / `run-protocol-spec.md`.
 - Safety bounds and redaction behavior remain as specified in `event-envelope-schema-spec.md`.
 

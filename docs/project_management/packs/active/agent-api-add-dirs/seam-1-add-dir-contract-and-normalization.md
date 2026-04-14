@@ -8,7 +8,7 @@
 ## Scope
 
 - In:
-  - Confirm the owner-doc contract in `docs/specs/universal-agent-api/extensions-spec.md`.
+  - Confirm the owner-doc contract in `docs/specs/unified-agent-api/extensions-spec.md`.
   - Pin:
     - closed schema,
     - bounds,
@@ -32,7 +32,7 @@
 - **Normalization contract**:
   - **Inputs**:
     - raw `dirs` entries
-    - effective working directory (per `docs/specs/universal-agent-api/contract.md` "Working directory resolution (effective working directory)")
+    - effective working directory (per `docs/specs/unified-agent-api/contract.md` "Working directory resolution (effective working directory)")
   - **Outputs**:
     - trimmed, resolved, lexically normalized, deduplicated directory list
 
@@ -47,7 +47,7 @@
 
 - `dirs` is required and the schema is closed in v1.
 - Relative paths resolve against the effective working directory (per
-  `docs/specs/universal-agent-api/contract.md` "Working directory resolution (effective working directory)").
+  `docs/specs/unified-agent-api/contract.md` "Working directory resolution (effective working directory)").
 - There is intentionally no “must stay under working_dir” containment rule.
 - v1 requires lexical normalization only.
 - Invalid messages for this key must not echo raw path values.
@@ -60,14 +60,14 @@
 
 ## Touch surface
 
-- `docs/adr/0021-universal-agent-api-add-dirs.md`
-- `docs/specs/universal-agent-api/extensions-spec.md`
+- `docs/adr/0021-unified-agent-api-add-dirs.md`
+- `docs/specs/unified-agent-api/extensions-spec.md`
 
 ## Verification
 
 - Spec review: confirm the ADR and `extensions-spec.md` say the same thing.
 - Drift guard:
-  - `make adr-check ADR=docs/adr/0021-universal-agent-api-add-dirs.md`
+  - `make adr-check ADR=docs/adr/0021-unified-agent-api-add-dirs.md`
 - Integration gate once implementation lands:
   - `make preflight`
 

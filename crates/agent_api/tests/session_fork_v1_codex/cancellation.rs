@@ -1,7 +1,7 @@
 //! Codex backend tests for explicit cancellation during fork flows.
 //!
 //! Normative source: `docs/specs/codex-app-server-jsonrpc-contract.md` (JSON-RPC cancellation
-//! wiring) + the Universal Agent API run protocol spec (event/completion precedence).
+//! wiring) + the Unified Agent API run protocol spec (event/completion precedence).
 
 use std::time::Duration;
 

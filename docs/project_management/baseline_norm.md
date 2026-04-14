@@ -24,7 +24,7 @@ If there are uncommitted capability-matrix generator + docs changes, either:
 
 ### S1.T1 — Add “Tools facet (structured.v1)” to event envelope spec
 **Touch**
-- `/Users/spensermcconnell/__Active_Code/codex-wrapper/docs/project_management/next/universal-agent-api/event-envelope-schema-spec.md`
+- `/Users/spensermcconnell/__Active_Code/codex-wrapper/docs/project_management/next/unified-agent-api/event-envelope-schema-spec.md`
 
 **Add a normative section** defining `AgentWrapperEvent.data` when `kind ∈ {ToolCall, ToolResult}` and backend supports `agent_api.tools.structured.v1`:
 
@@ -62,7 +62,7 @@ If there are uncommitted capability-matrix generator + docs changes, either:
 
 ### S1.T2 — Document new capability ids + clarify semantics
 **Touch**
-- `/Users/spensermcconnell/__Active_Code/codex-wrapper/docs/project_management/next/universal-agent-api/capabilities-schema-spec.md`
+- `/Users/spensermcconnell/__Active_Code/codex-wrapper/docs/project_management/next/unified-agent-api/capabilities-schema-spec.md`
 
 **Add ids**
 - `agent_api.tools.structured.v1`
@@ -75,7 +75,7 @@ If there are uncommitted capability-matrix generator + docs changes, either:
 
 ### S1.T3 — Update “next” Codex adapter spec (feature-gated C1 doc)
 **Touch**
-- `/Users/spensermcconnell/__Active_Code/codex-wrapper/docs/project_management/next/universal-agent-api/C1-spec.md`
+- `/Users/spensermcconnell/__Active_Code/codex-wrapper/docs/project_management/next/unified-agent-api/C1-spec.md`
 
 **Update mapping section**
 - For tool-ish items:
@@ -222,7 +222,7 @@ Rule:
 
 Add job:
 - `cargo run -p xtask -- capability-matrix`
-- `git diff --exit-code docs/specs/universal-agent-api/capability-matrix.md`
+- `git diff --exit-code docs/specs/unified-agent-api/capability-matrix.md`
 - `cargo run -p xtask -- capability-matrix-audit`
 
 ### S4.T3 — Charter note

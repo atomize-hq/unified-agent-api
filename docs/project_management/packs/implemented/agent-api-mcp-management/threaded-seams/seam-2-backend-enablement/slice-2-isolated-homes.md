@@ -18,7 +18,7 @@
   - When `claude_home` is `Some`, the backend still honors request env overrides (request keys win).
   - Codex behavior remains pinned: when `codex_home` is `Some`, subprocesses operate under the isolated root.
 - **Dependencies**:
-  - MM-C07 contract definition (owned here) is pinned in `docs/specs/universal-agent-api/mcp-management-spec.md`.
+  - MM-C07 contract definition (owned here) is pinned in `docs/specs/unified-agent-api/mcp-management-spec.md`.
   - MM-C03 precedence rules (owned by SEAM-1) for request env overrides.
 - **Verification**:
   - `cargo test -p agent_api --features claude_code`
@@ -35,7 +35,7 @@
 
 - **Outcome**: The Claude built-in backend can run under an isolated, backend-scoped home directory.
 - **Inputs/outputs**:
-  - Input: `docs/specs/universal-agent-api/mcp-management-spec.md` (“Safety posture” → “isolated homes MUST be supported”)
+  - Input: `docs/specs/unified-agent-api/mcp-management-spec.md` (“Safety posture” → “isolated homes MUST be supported”)
   - Output:
     - `crates/agent_api/src/backends/claude_code.rs`: add `claude_home: Option<PathBuf>` to config
     - `crates/agent_api/src/backends/claude_code.rs`: when building `claude_code::ClaudeClient`, call

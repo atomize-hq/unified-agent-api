@@ -7,7 +7,7 @@ request additional filesystem roots without depending on backend-specific flags.
 
 ## Why now
 
-The Universal Agent API owner docs pin the v1 contract (`extensions-spec.md` for key semantics and
+The Unified Agent API owner docs pin the v1 contract (`extensions-spec.md` for key semantics and
 `contract.md` for effective working directory). ADR-0021 is rationale + an implementation plan; the
 remaining work is threading one normalized add-dir set through `agent_api`, Codex, and Claude Code
 without backend drift or session-flow gaps.
@@ -22,8 +22,8 @@ without backend drift or session-flow gaps.
 
 - Implement `agent_api.exec.add_dirs.v1` as a supported run extension for built-in backends.
 - Enforce the pinned v1 contract as defined by:
-  - `docs/specs/universal-agent-api/extensions-spec.md` (normative owner doc for the key)
-  - `docs/specs/universal-agent-api/contract.md` ("Working directory resolution (effective working directory)")
+  - `docs/specs/unified-agent-api/extensions-spec.md` (normative owner doc for the key)
+  - `docs/specs/unified-agent-api/contract.md` ("Working directory resolution (effective working directory)")
 - ADR-0021 is non-normative rationale/plan; treat it as derived-from-spec checklist only. If any
   ADR text conflicts with the owner doc, resolve conflicts in favor of the owner doc.
 - Add deterministic validation and normalization:
@@ -110,10 +110,10 @@ without backend drift or session-flow gaps.
 - Capability publication is owned by the implementation change that flips built-in advertising for
   `agent_api.exec.add_dirs.v1`:
   - the canonical capability id registry
-    `docs/specs/universal-agent-api/capabilities-schema-spec.md` is expected to already contain the
+    `docs/specs/unified-agent-api/capabilities-schema-spec.md` is expected to already contain the
     stable id, and
   - the same change that lands built-in advertising MUST regenerate
-    `docs/specs/universal-agent-api/capability-matrix.md` via
+    `docs/specs/unified-agent-api/capability-matrix.md` via
     `cargo run -p xtask -- capability-matrix`, with the
     `agent_api.exec.add_dirs.v1` row showing ✅ for both `claude_code` and `codex`.
   Until that implementation change lands, omission from the generated matrix remains the current
@@ -122,16 +122,16 @@ without backend drift or session-flow gaps.
 
 ## Ownership + verification
 
-- Canonical capability id registry: `docs/specs/universal-agent-api/capabilities-schema-spec.md`
-  (owned by universal-agent-api spec maintainers).
-- Generated overview: `docs/specs/universal-agent-api/capability-matrix.md` (regen required).
+- Canonical capability id registry: `docs/specs/unified-agent-api/capabilities-schema-spec.md`
+  (owned by unified-agent-api spec maintainers).
+- Generated overview: `docs/specs/unified-agent-api/capability-matrix.md` (regen required).
 - Reviewers MUST verify that `agent_api.exec.add_dirs.v1` appears in the canonical registry.
 - Reviewers MUST expect the regenerated matrix row only in the same change that actually lands
   built-in advertising for the key.
 
 ## Constraints
 
-- Canonical semantics are owned by `docs/specs/universal-agent-api/extensions-spec.md`.
+- Canonical semantics are owned by `docs/specs/unified-agent-api/extensions-spec.md`.
 - Public API and policy extraction stay serde-friendly and backend-neutral at the `agent_api`
   boundary.
 - Tests must stay deterministic and avoid depending on real external CLIs or network access.
@@ -150,7 +150,7 @@ without backend drift or session-flow gaps.
   - `docs/specs/codex-streaming-exec-contract.md`
   - `docs/specs/codex-app-server-jsonrpc-contract.md`
   - `docs/specs/claude-code-session-mapping-contract.md`
-  - `docs/specs/universal-agent-api/capability-matrix.md`
+  - `docs/specs/unified-agent-api/capability-matrix.md`
 
 ## Known unknowns / risks
 

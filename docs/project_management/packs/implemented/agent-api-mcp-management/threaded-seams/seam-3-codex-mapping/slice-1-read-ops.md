@@ -46,7 +46,7 @@
 
 - **Outcome**: Deterministic argv composition functions for Codex read ops that do not spawn processes.
 - **Inputs/outputs**:
-  - Input: `docs/specs/universal-agent-api/mcp-management-spec.md` (“Codex backend mapping (pinned)”)
+  - Input: `docs/specs/unified-agent-api/mcp-management-spec.md` (“Codex backend mapping (pinned)”)
   - Output (suggested):
     - `crates/agent_api/src/backends/codex/mcp_management.rs`: `fn codex_mcp_list_argv() -> Vec<OsString>`
     - `crates/agent_api/src/backends/codex/mcp_management.rs`: `fn codex_mcp_get_argv(name: &str) -> Vec<OsString>`
@@ -70,13 +70,13 @@ Checklist:
 
 - **Outcome**: A bounded capture helper that retains at most `bound_bytes + 1` bytes (or `bound_bytes` + `saw_more`) per stream.
 - **Inputs/outputs**:
-  - Input: `docs/specs/universal-agent-api/mcp-management-spec.md` (“Output capture + truncation algorithm (pinned)”)
+  - Input: `docs/specs/unified-agent-api/mcp-management-spec.md` (“Output capture + truncation algorithm (pinned)”)
   - Output (suggested):
     - `crates/agent_api/src/backends/codex/mcp_management.rs`: `async fn capture_bounded<R: AsyncRead + Unpin>(...) -> ...`
 - **Implementation notes**:
   - Do not buffer unbounded output; enforce the retained-bytes invariant while reading.
   - Return `(captured_bytes, saw_more_bytes)` so SEAM-1’s enforcement helper can apply suffix + flags deterministically.
-  - Prefer a small, locally-tested helper rather than reusing `codex::*` output capture (Codex wrapper capture is unbounded and
+  - Prefer a small, locally-tested helper rather than reusing `codex::*` output capture (Codex crate capture is unbounded and
     treats non-zero exit as an error).
 - **Acceptance criteria**:
   - The helper never grows memory usage beyond the bound (+ small fixed overhead).
@@ -125,7 +125,7 @@ Checklist:
 - **Outcome**: When a Codex MCP op is invoked but the runtime CLI rejects the pinned argv shape as unsupported on this target
   (manifest drift), return `Err(Backend)` and do not mutate advertised capabilities.
 - **Inputs/outputs**:
-  - Input: `docs/specs/universal-agent-api/mcp-management-spec.md` (“Target availability source of truth (pinned)”)
+  - Input: `docs/specs/unified-agent-api/mcp-management-spec.md` (“Target availability source of truth (pinned)”)
   - Output: a small classifier (location flexible) used by the runner before returning `Ok(output)`.
 - **Implementation notes**:
   - Keep messages safe and non-echoing (do not include raw stderr/stdout in the error).

@@ -16,7 +16,7 @@
   - `capture_bounded(...)` retains at most `bound_bytes` (plus small fixed overhead) and reports `saw_more_bytes` when
     truncation occurred.
 - **Dependencies**:
-  - `docs/specs/universal-agent-api/mcp-management-spec.md` (pinned mapping + MM-C04 algorithm).
+  - `docs/specs/unified-agent-api/mcp-management-spec.md` (pinned mapping + MM-C04 algorithm).
   - SEAM-1 provides server-name validation; treat `name` as already validated/trimmed by the SEAM-1 helper.
 - **Verification**:
   - `cargo test -p agent_api --features claude_code`

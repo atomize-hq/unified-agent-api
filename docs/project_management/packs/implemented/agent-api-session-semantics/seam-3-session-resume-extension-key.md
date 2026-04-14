@@ -8,7 +8,7 @@
     - Implement `agent_api.session.resume.v1` for built-in backends that can support it:
       - Add to `supported_extension_keys()` allowlist (fail-closed gate).
       - Add to `AgentWrapperCapabilities.ids` (runtime discovery).
-      - Validate the JSON value per `docs/specs/universal-agent-api/extensions-spec.md`:
+      - Validate the JSON value per `docs/specs/unified-agent-api/extensions-spec.md`:
         - type object, closed schema,
         - `selector` is `"last"` or `"id"`,
         - `"id"` requires a non-empty string after trimming (whitespace-only is invalid), `"last"` forbids `id`,
@@ -29,10 +29,10 @@
       - per-run env overrides (merged `request.env`),
       - best-effort termination handle for explicit cancellation flows (`run_control`), and
       - consistent safety posture (no raw backend lines in errors/events).
-    - Pin the Codex wrapper API surface that `agent_api` uses for resume (to keep tests deterministic):
+    - Pin the Codex crate API surface that `agent_api` uses for resume (to keep tests deterministic):
       - `codex::CodexClient::stream_resume_with_env_overrides_control(request: codex::ResumeRequest, env_overrides: &BTreeMap<String, String>) -> Result<codex::ExecStreamControl, codex::ExecStreamError>`
       - `ExecStreamControl.termination` MUST always be present for this entrypoint (required to satisfy `run_control` cancellation semantics).
-      - Env override merge rule is owned by the Universal Agent API contract (`docs/specs/universal-agent-api/contract.md`): request keys win over backend config env.
+      - Env override merge rule is owned by the Unified Agent API contract (`docs/specs/unified-agent-api/contract.md`): request keys win over backend config env.
     - Pin the `codex exec --json resume` prompt plumbing:
       - For `agent_api.session.resume.v1`, the prompt is always required (universal run contract), so Codex resume MUST always pass `-` and write `AgentWrapperRunRequest.prompt` to stdin (newline-terminated) and then close stdin.
       - Canonical prompt plumbing owner: `docs/specs/codex-wrapper-coverage-scenarios-v1.md` (Scenario 3).
@@ -40,7 +40,7 @@
       - invalid request shapes (type errors, missing/extra keys, invalid selectors, empty/whitespace-only id),
       - fail-closed unknown-key behavior,
       - CLI mapping (fake-binary where appropriate),
-      - extension-validation precedence during staged rollout (per `docs/specs/universal-agent-api/extensions-spec.md` R0):
+      - extension-validation precedence during staged rollout (per `docs/specs/unified-agent-api/extensions-spec.md` R0):
         - only resume supported + both keys present → `UnsupportedCapability` (unsupported fork key),
         - both supported + both present → `InvalidRequest` (mutual exclusivity).
   - Out:
@@ -49,7 +49,7 @@
 - **Primary interfaces (contracts)**
   - Inputs:
     - `AgentWrapperRunRequest.extensions["agent_api.session.resume.v1"]` (object value)
-    - Backends’ session persistence stores keyed by effective working directory + id (backend-defined; see `docs/specs/universal-agent-api/contract.md`)
+    - Backends’ session persistence stores keyed by effective working directory + id (backend-defined; see `docs/specs/unified-agent-api/contract.md`)
   - Outputs:
     - Deterministic spawn mapping to underlying CLIs (resume + follow-up prompt)
     - Capability advertisement (extension key string present in `AgentWrapperCapabilities.ids`)
@@ -57,7 +57,7 @@
   - Prompt remains non-empty and is always treated as the follow-up prompt for the resumed session.
   - Unknown extension keys still fail-closed pre-spawn as `UnsupportedCapability`.
   - Validation errors use `AgentWrapperError::InvalidRequest` and occur pre-spawn.
-  - Selection failures (no session for `"last"`, unknown id for `"id"`) are **not** validation errors; they must follow the pinned selection-failure error model in `docs/specs/universal-agent-api/extensions-spec.md` (safe `AgentWrapperError::Backend` messages; no fallback to start-new).
+  - Selection failures (no session for `"last"`, unknown id for `"id"`) are **not** validation errors; they must follow the pinned selection-failure error model in `docs/specs/unified-agent-api/extensions-spec.md` (safe `AgentWrapperError::Backend` messages; no fallback to start-new).
 - **Dependencies**
   - Blocks:
     - None.
@@ -68,7 +68,7 @@
 - **Touch surface**:
   - `crates/agent_api/src/backends/claude_code.rs`
   - `crates/agent_api/src/backends/codex.rs`
-  - Codex wrapper:
+  - Codex crate:
     - `crates/codex/src/exec.rs` (public streaming API surface)
     - `crates/codex/src/exec/streaming.rs` (spawn wiring for `codex exec resume`)
   - `crates/agent_api/tests/**` (new tests for resume semantics)

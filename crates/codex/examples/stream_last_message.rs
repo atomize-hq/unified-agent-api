@@ -137,7 +137,7 @@ fn write_sample_outputs(
     let last_message = json!({
         "role": "assistant",
         "content": [
-            {"type": "text", "text": "Summary: the repo contains the Codex wrapper crate and a growing example suite."}
+            {"type": "text", "text": "Summary: the repo contains the Codex crate and a growing example suite."}
         ],
         "metadata": {
             "thread_id": "demo-thread",

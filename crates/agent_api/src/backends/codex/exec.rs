@@ -203,7 +203,7 @@ pub(super) async fn spawn_exec_or_resume_flow(
         });
     }
 
-    // Codex wrapper treats `Duration::ZERO` as “no timeout”.
+    // Codex crate treats `Duration::ZERO` as “no timeout”.
     builder = builder.timeout(effective_timeout.unwrap_or(Duration::ZERO));
     builder = builder.add_dirs(add_dirs);
 

@@ -4,7 +4,7 @@
   validation behavior for `agent_api.exec.external_sandbox.v1`.
 - **Scope (in/out)**:
   - In:
-    - Define ES-C01/02/06 in `docs/specs/universal-agent-api/extensions-spec.md`:
+    - Define ES-C01/02/06 in `docs/specs/unified-agent-api/extensions-spec.md`:
       - boolean schema, default `false`, and “dangerous” meaning,
       - validation ordering (before spawn; after R0 support gate),
       - contradiction rules:
@@ -36,7 +36,7 @@
   concrete semantics that are not implied by benign keys.
 - **Inputs/outputs**:
   - Input: `docs/project_management/packs/.../seam-1-external-sandbox-extension-key.md`
-  - Output: updates to `docs/specs/universal-agent-api/extensions-spec.md`
+  - Output: updates to `docs/specs/unified-agent-api/extensions-spec.md`
 - **Implementation notes**:
   - Keep the definition self-contained and explicitly “dangerous”.
   - Ensure the “validated before spawn” requirement is stated alongside the key.
@@ -51,7 +51,7 @@
 Checklist:
 - Implement: add/update the registry entry under core keys.
 - Test: N/A.
-- Validate: `rg -n "agent_api\\.exec\\.external_sandbox\\.v1" docs/specs/universal-agent-api/extensions-spec.md` and confirm schema/default/meaning.
+- Validate: `rg -n "agent_api\\.exec\\.external_sandbox\\.v1" docs/specs/unified-agent-api/extensions-spec.md` and confirm schema/default/meaning.
 - Cleanup: ensure references match canonical doc names.
 
 #### S1.T2 — Specify contradiction rules (ES-C02, ES-C06) with R0 precedence
@@ -60,7 +60,7 @@ Checklist:
   R0 capability support gating.
 - **Inputs/outputs**:
   - Input: `docs/project_management/packs/.../threading.md` (ES-C02, ES-C06)
-  - Output: updates to `docs/specs/universal-agent-api/extensions-spec.md`
+  - Output: updates to `docs/specs/unified-agent-api/extensions-spec.md`
 - **Implementation notes**:
   - Make it explicit that the contradiction rules only apply after all keys pass R0.
   - Include at least one example of `backend.<agent_kind>.exec.*` keys for clarity.

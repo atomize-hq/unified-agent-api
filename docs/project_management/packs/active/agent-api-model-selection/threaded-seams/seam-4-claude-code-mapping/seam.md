@@ -45,205 +45,29 @@ open_remediations: []
 ## Next planning step
 
 - Execute `slice-*.md` sequentially (S1..S4), then complete the dedicated `seam-exit-gate` slice.
-*** Add File: docs/project_management/packs/active/agent-api-model-selection/threaded-seams/seam-4-claude-code-mapping/review.md
----
-seam_id: SEAM-4
-review_phase: pre_exec
-execution_horizon: active
-basis_ref: seam.md#basis
----
-# Review Bundle - SEAM-4 Claude Code backend mapping
+- `S1` → `slice-1-model-handoff.md`: adopt SEAM-2's normalized model helper in Claude request/build wiring and emit exactly one `--model <trimmed-id>` only when the typed handoff is `Some`.
+- `S2` → `slice-2-print-session-argv-conformance.md`: pin argv ordering across print/session flows and prove this universal key never maps to `--fallback-model`.
+- `S3` → `slice-3-runtime-rejection-conformance.md`: harden runtime rejection/error-event translation and update the Claude contract/test surfaces that SEAM-5 will rely on.
 
-This artifact feeds `gates.pre_exec.review`.
-`../../review_surfaces.md` is pack orientation only.
+## Threading Alignment (mandatory)
 
-## Falsification questions
-
-- Can any Claude Code flow still drop an accepted model id silently (especially for session/resume flows)?
-- Can the universal model-selection key map to `--fallback-model` or any other secondary override?
-- Can argv ordering drift so `--model <trimmed-id>` appears after `--add-dir`, session flags, or `--fallback-model`?
-
-## Pre-exec findings
-
-None yet.
-
-## Pre-exec gate disposition
-
-- **Review gate**: pending
-- **Contract gate**: pending
-- **Revalidation gate**: passed (SEAM-1/SEAM-2/SEAM-3 closeouts published)
-- **Opened remediations**: none
-*** Add File: docs/project_management/packs/active/agent-api-model-selection/threaded-seams/seam-4-claude-code-mapping/slice-1-model-handoff.md
----
-slice_id: S1
-seam_id: SEAM-4
-slice_kind: delivery
-execution_horizon: active
-status: decomposed
-plan_version: v1
-basis:
-  currentness: current
-  basis_ref: seam.md#basis
-  stale_triggers: []
-gates:
-  pre_exec:
-    review: inherited
-    contract: inherited
-    revalidation: inherited
-  post_exec:
-    landing: pending
-    closeout: pending
-threads:
-  - THR-05
-contracts_produced:
-  - C-07
-contracts_consumed:
-  - C-02
-  - C-09
-open_remediations: []
-candidate_subslices: []
----
-### S1 - Claude model handoff and argv mapping
-
-- **User/system value**: makes model selection work for the Claude Code print/session flows via the existing request/argv path, with deterministic ordering and without any new raw parsing.
-- **Scope (in/out)**:
-  - In:
-    - consume typed `Option<String>` from SEAM-2 (`C-09`)
-    - thread it into Claude Code request/build mapping
-    - prove exactly one `--model <trimmed-id>` emission and correct ordering
-    - explicitly exclude `--fallback-model` from this universal key
-  - Out:
-    - capability advertising / matrix publication (SEAM-2)
-- **Acceptance criteria**:
-  - `Some(id)` emits exactly one `--model <id>` pair
-  - `None` emits no `--model`
-  - ordering follows `docs/specs/claude-code-session-mapping-contract.md`
-  - no raw parse sites exist outside SEAM-2's helper
-- **Dependencies**: `THR-02` (typed helper), `C-09`, `C-02`
-- **Verification**: targeted argv tests for print/session ordering + fallback exclusion
-
-#### S1.T1 - Plumb typed model selection into Claude request/argv calls
-
-- **Outcome**: Claude request/build path consumes `Option<String>` and emits `--model <trimmed-id>` only when `Some`.
-- **Thread/contract refs**: `THR-05`, `C-09`, `C-07`
-- **Acceptance criteria**: mapping code never inspects raw `request.extensions`.
-*** Add File: docs/project_management/packs/active/agent-api-model-selection/threaded-seams/seam-4-claude-code-mapping/slice-2-print-session-argv-conformance.md
----
-slice_id: S2
-seam_id: SEAM-4
-slice_kind: delivery
-execution_horizon: active
-status: decomposed
-plan_version: v1
-basis:
-  currentness: current
-  basis_ref: seam.md#basis
-  stale_triggers: []
-gates:
-  pre_exec:
-    review: inherited
-    contract: inherited
-    revalidation: inherited
-  post_exec:
-    landing: pending
-    closeout: pending
-threads:
-  - THR-05
-contracts_produced:
-  - C-07
-contracts_consumed:
-  - C-02
-  - C-07
-  - C-09
-open_remediations: []
-candidate_subslices: []
----
-### S2 - Print/session argv conformance (ordering + fallback exclusion)
-
-- **User/system value**: prevents drift by pinning argv ordering and explicitly proving that the universal key does not map to `--fallback-model`.
-- **Acceptance criteria**:
-  - `--model <trimmed-id>` appears in the root-flags region, before any `--add-dir` group, session-selector flags, `--fallback-model`, and the final prompt token
-  - the universal key never maps to `--fallback-model`
-- **Verification**: focused tests that inspect the emitted argv shape for both print + session flows.
-*** Add File: docs/project_management/packs/active/agent-api-model-selection/threaded-seams/seam-4-claude-code-mapping/slice-3-runtime-rejection-conformance.md
----
-slice_id: S3
-seam_id: SEAM-4
-slice_kind: delivery
-execution_horizon: active
-status: decomposed
-plan_version: v1
-basis:
-  currentness: current
-  basis_ref: seam.md#basis
-  stale_triggers: []
-gates:
-  pre_exec:
-    review: inherited
-    contract: inherited
-    revalidation: inherited
-  post_exec:
-    landing: pending
-    closeout: pending
-threads:
-  - THR-05
-contracts_produced:
-  - C-07
-contracts_consumed:
-  - C-04
-  - C-09
-open_remediations: []
-candidate_subslices: []
----
-### S3 - Runtime rejection conformance (Claude)
-
-- **User/system value**: ensures syntactically-valid but runtime-rejected model ids fail safely and consistently (completion + terminal Error event parity) even when the stream is already open.
-- **Acceptance criteria**:
-  - completion error message and terminal Error event message match byte-for-byte
-  - no raw model ids or stderr leaks into consumer-visible errors
-- **Verification**: use a deterministic fake-claude scenario that fails after the stream begins.
-*** Add File: docs/project_management/packs/active/agent-api-model-selection/threaded-seams/seam-4-claude-code-mapping/slice-4-seam-exit-gate.md
----
-slice_id: S4
-seam_id: SEAM-4
-slice_kind: seam_exit_gate
-execution_horizon: active
-status: decomposed
-plan_version: v1
-basis:
-  currentness: current
-  basis_ref: seam.md#basis
-  stale_triggers: []
-gates:
-  pre_exec:
-    review: inherited
-    contract: inherited
-    revalidation: inherited
-  post_exec:
-    landing: pending
-    closeout: pending
-threads:
-  - THR-05
-contracts_produced: []
-contracts_consumed:
-  - C-07
-open_remediations: []
-candidate_subslices: []
----
-### S4 - Seam-exit gate (SEAM-4)
-
-This is the dedicated final seam-exit slice for SEAM-4. It does not hide unfinished feature delivery work.
-
-- **Purpose**: record landed Claude Code mapping truth and publish the signal SEAM-5 and downstream promotion will consume.
-- **Planned landed evidence**:
-  - mapping commit/PR link
-  - links to argv ordering + fallback-exclusion tests
-  - runtime rejection parity tests (completion + terminal Error event)
-- **Contracts expected to publish or change**: `C-07` (and any Claude Code contract doc updates)
-- **Threads expected to advance**: `THR-05`
-- **Promotion readiness statement**:
-  - downstream promotion is blocked unless SEAM-4 closeout records `seam_exit_gate.status: passed` and `promotion_readiness: ready`
-
-Checklist:
-- Validate: closeout file updated: `../../governance/seam-4-closeout.md`
-- Validate: remediation log updated if needed: `../../governance/remediation-log.md`
+- **Contracts produced (owned)**:
+  - `MS-C07`: Claude mapping contract. Claude Code consumes the effective trimmed model id and emits exactly one `--model <trimmed-id>` through the existing print request / argv path, before any `--add-dir` group, session-selector flags, or `--fallback-model`; this key carries no fallback-model or secondary override semantics.
+    - Canonical locations: `threading.md`, `docs/specs/claude-code-session-mapping-contract.md`
+    - Produced by: `S1` (typed handoff adoption), `S2` (print/session mapping + fallback exclusion), `S3` (runtime/error conformance + contract publication)
+- **Contracts consumed**:
+  - `MS-C02`: absence semantics owned by SEAM-1.
+    - Consumed by: `S1.T1` and `S2.T1` so missing `agent_api.config.model.v1` never synthesizes `.model(...)` or `--model`.
+  - `MS-C04`: backend-owned runtime rejection contract owned by SEAM-1.
+    - Consumed by: `S3.T1` and `S3.T2` to translate runtime model rejection into safe backend errors and one terminal `Error` event when applicable.
+  - `MS-C05`: built-in advertising contract owned by SEAM-2.
+    - Consumed by: `S1`/`S2` as a reachability assumption only; Claude mapping is valid only once every exposed print/session flow is deterministic after SEAM-2 lands.
+  - `MS-C09`: shared model-normalizer handoff owned by SEAM-2.
+    - Consumed by: `S1.T1` and `S2.T1`; SEAM-4 must consume only the typed `Option<String>` output and must not re-parse raw extensions.
+- **Dependency edges honored**:
+  - `SEAM-1 gates SEAM-4`: this plan assumes the canonical semantics in `docs/specs/unified-agent-api/extensions-spec.md` are already pinned and only implements Claude-side conformance.
+  - `SEAM-2 blocks SEAM-4`: `S1` and `S2` explicitly depend on the shared helper output from `crates/agent_api/src/backend_harness/normalize.rs`; no task in this seam adds a second parser.
+  - `SEAM-4 blocks SEAM-5B`: `S1`/`S2`/`S3` together provide the final Claude mapping and safe runtime-error behavior that SEAM-5B must assert.
+- **Parallelization notes**:
+  - What can proceed now: draft spec/test cases and fake-Claude scenario hooks in `S3`; prep localized Claude harness/module changes once SEAM-2's helper signature is stable.
+  - What must wait: landing `S1`/`S2` requires SEAM-2's shared helper; SEAM-5B must wait for all three slices because the tests pin both mapping and backend-error behavior.

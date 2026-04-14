@@ -12,10 +12,10 @@ Generated at: 2026-02-24T17:29:17Z
 ### Files with highest issue density (primary locations)
 - docs/adr/0014-agent-api-explicit-cancellation.md: 1
 - docs/project_management/packs/active/agent-api-explicit-cancellation/seam-4-tests.md: 1
-- docs/specs/universal-agent-api/capability-matrix.md: 1
+- docs/specs/unified-agent-api/capability-matrix.md: 1
 - docs/project_management/packs/active/agent-api-explicit-cancellation/decision_register.md: 1
 - docs/adr/0013-agent-api-backend-harness.md: 1
-- docs/specs/universal-agent-api/run-protocol-spec.md: 1
+- docs/specs/unified-agent-api/run-protocol-spec.md: 1
 
 ## Contract inventory (explicit cancellation)
 - CA-C01 — Public explicit cancellation surface
@@ -57,9 +57,9 @@ Generated at: 2026-02-24T17:29:17Z
   - `docs/adr/0014-agent-api-explicit-cancellation.md` L121-L123 — “early completion resolution (error) when the run has not already completed.”
   - `docs/project_management/packs/active/agent-api-explicit-cancellation/seam-2-harness-cancel-propagation.md` L25-L27 — “the completion sender resolves completion to the pinned cancellation error if the backend does”
   - `docs/project_management/packs/active/agent-api-explicit-cancellation/threaded-seams/seam-2-harness-cancel-propagation/slice-1-driver-semantics.md` L9-L14 — “resolve completion to the pinned cancellation error when cancel wins the race.”
-  - `docs/specs/universal-agent-api/run-protocol-spec.md` L113-L118 — “Explicit cancellation is NOT an exception to the completion/event-stream finality rules above:”
+  - `docs/specs/unified-agent-api/run-protocol-spec.md` L113-L118 — “Explicit cancellation is NOT an exception to the completion/event-stream finality rules above:”
 - Cross-references:
-  - `docs/specs/universal-agent-api/run-protocol-spec.md` L93-L118
+  - `docs/specs/unified-agent-api/run-protocol-spec.md` L93-L118
   - `docs/project_management/packs/active/agent-api-explicit-cancellation/seam-2-harness-cancel-propagation.md` L15-L27
   - `docs/project_management/packs/active/agent-api-explicit-cancellation/threaded-seams/seam-2-harness-cancel-propagation/slice-1-driver-semantics.md` L9-L25
   - `docs/project_management/packs/active/agent-api-explicit-cancellation/seam-1-cancellation-contract.md` L70-L77
@@ -81,20 +81,20 @@ Generated at: 2026-02-24T17:29:17Z
   - `docs/project_management/packs/active/agent-api-explicit-cancellation/seam-4-tests.md` L7-L10 — “calling `cancel()` causes the fake process to be terminated best-effort”
   - `docs/project_management/packs/active/agent-api-explicit-cancellation/threaded-seams/seam-4-tests/slice-1-explicit-cancel-integration.md` L6-L9 — “`CANCEL_TERMINATION_TIMEOUT`: `3s` (after calling `cancel()`, both:”
   - `docs/project_management/packs/active/agent-api-explicit-cancellation/threaded-seams/seam-4-tests/slice-1-explicit-cancel-integration.md` L24-L26 — “Calling `cancel()` causes the fake backend process to be terminated best-effort, observed via:”
-  - `docs/specs/universal-agent-api/run-protocol-spec.md` L93-L98 — “Once cancellation is requested, the backend MUST:”
+  - `docs/specs/unified-agent-api/run-protocol-spec.md` L93-L98 — “Once cancellation is requested, the backend MUST:”
   - `docs/project_management/packs/active/agent-api-explicit-cancellation/seam-3-backend-termination.md` L41-L43 — “Built-in backends MUST satisfy those tests on supported platforms.”
   - `docs/project_management/packs/active/agent-api-explicit-cancellation/threaded-seams/seam-4-tests/slice-2-drop-regression.md` L4-L9 — “These timeouts are the same on all supported platforms (no platform-specific adjustment in v1).”
 - Cross-references:
   - `docs/project_management/packs/active/agent-api-explicit-cancellation/threaded-seams/seam-4-tests/slice-1-explicit-cancel-integration.md` L4-L33
   - `docs/project_management/packs/active/agent-api-explicit-cancellation/threaded-seams/seam-4-tests/slice-2-drop-regression.md` L4-L25
   - `docs/project_management/packs/active/agent-api-explicit-cancellation/seam-3-backend-termination.md` L41-L43
-  - `docs/specs/universal-agent-api/run-protocol-spec.md` L93-L118
+  - `docs/specs/unified-agent-api/run-protocol-spec.md` L93-L118
 - Notes: This issue is about making the test contract itself concrete (what to assert), not about choosing an implementation strategy for termination.
 
 ### CA-0003 — Capability matrix does not define absence semantics for standard capability ids (explicit cancellation capability missing)
 - Severity: major
 - Category: consistency
-- Location: `docs/specs/universal-agent-api/capability-matrix.md` L9-L40
+- Location: `docs/specs/unified-agent-api/capability-matrix.md` L9-L40
 - Excerpt: “## `agent_api.exec`”
 - Problem: `capabilities-schema-spec.md` defines `agent_api.control.cancel.v1` as a standard universal capability id with minimum semantics. The generated/approved capability matrix currently lists several `agent_api.*` capability groups but does not include any `agent_api.control.*` section or a row for `agent_api.control.cancel.v1`. Without a pinned rule for what matrix omission means, consumers and implementers cannot tell whether the capability is unsupported, not yet shipped, or simply omitted by the generator unless advertised by a backend.
 - Required to be concrete:
@@ -103,18 +103,18 @@ Generated at: 2026-02-24T17:29:17Z
   - Ensure the explicit cancellation documentation clearly directs runtime availability checks to `AgentWrapperCapabilities.ids` (capability presence on the backend), and clarifies the matrix’s scope so consumers do not treat it as an exhaustive registry.
 - Suggested evidence order: codebase → docs → external → decision
 - Citations:
-  - `docs/specs/universal-agent-api/capability-matrix.md` L9-L39 — “## `agent_api.core`”
-  - `docs/specs/universal-agent-api/capabilities-schema-spec.md` L80-L84 — “- `agent_api.control.cancel.v1`:”
+  - `docs/specs/unified-agent-api/capability-matrix.md` L9-L39 — “## `agent_api.core`”
+  - `docs/specs/unified-agent-api/capabilities-schema-spec.md` L80-L84 — “- `agent_api.control.cancel.v1`:”
 - Cross-references:
-  - `docs/specs/universal-agent-api/capabilities-schema-spec.md` L76-L85
-  - `docs/specs/universal-agent-api/run-protocol-spec.md` L77-L85
+  - `docs/specs/unified-agent-api/capabilities-schema-spec.md` L76-L85
+  - `docs/specs/unified-agent-api/run-protocol-spec.md` L77-L85
   - `docs/project_management/packs/active/agent-api-explicit-cancellation/seam-1-cancellation-contract.md` L57-L62
 - Notes: This is about making the documentation of the generated artifact’s semantics concrete; it does not require changing what any backend advertises.
 
 ### CA-0006 — `run-protocol-spec.md` uses non-testable qualifiers for capability validation timing and error-event emission
 - Severity: major
 - Category: behavior
-- Location: `docs/specs/universal-agent-api/run-protocol-spec.md` L120-L125
+- Location: `docs/specs/unified-agent-api/run-protocol-spec.md` L120-L125
 - Excerpt: “validate capabilities before spawning work where possible”
 - Problem: The run protocol spec is normative, but the capability validation timing section uses qualifiers ("where possible", "if feasible") without defining the conditions under which they apply or the required fallback behavior. This makes the requirement non-concrete and not directly testable: two compliant implementations could validate at different times and disagree on whether an `Error` event is required.
 - Required to be concrete:
@@ -123,11 +123,11 @@ Generated at: 2026-02-24T17:29:17Z
   - If the intent is guidance rather than a requirement, downgrade the language to non-normative and/or provide an explicit testability note.
 - Suggested evidence order: codebase → docs → external → decision
 - Citations:
-  - `docs/specs/universal-agent-api/run-protocol-spec.md` L122-L125 — “validate capabilities before spawning work where possible”
-  - `docs/specs/universal-agent-api/run-protocol-spec.md` L124-L125 — “emit an `Error` event if feasible”
+  - `docs/specs/unified-agent-api/run-protocol-spec.md` L122-L125 — “validate capabilities before spawning work where possible”
+  - `docs/specs/unified-agent-api/run-protocol-spec.md` L124-L125 — “emit an `Error` event if feasible”
 - Cross-references:
-  - `docs/specs/universal-agent-api/contract.md` L169-L191
-  - `docs/specs/universal-agent-api/extensions-spec.md` L39-L56
+  - `docs/specs/unified-agent-api/contract.md` L169-L191
+  - `docs/specs/unified-agent-api/extensions-spec.md` L39-L56
 - Notes: This affects cancellation indirectly because explicit cancellation adds another capability-gated operation (`run_control(...)`).
 
 ### CA-0004 — DR-CA-0002 uses a `<pinned string>` placeholder instead of the pinned cancellation message
@@ -145,7 +145,7 @@ Generated at: 2026-02-24T17:29:17Z
   - `docs/project_management/packs/active/agent-api-explicit-cancellation/seam-1-cancellation-contract.md` L72-L73 — “- `Err(AgentWrapperError::Backend { message })` where `message == "cancelled"`.”
 - Cross-references:
   - `docs/project_management/packs/active/agent-api-explicit-cancellation/seam-1-cancellation-contract.md` L70-L74
-  - `docs/specs/universal-agent-api/run-protocol-spec.md` L104-L108
+  - `docs/specs/unified-agent-api/run-protocol-spec.md` L104-L108
 - Notes: This is a documentation concreteness issue; it does not require changing the chosen (stringly-typed) error representation.
 
 ### CA-0005 — ADR-0013 leaves the backend harness module name as TBD
@@ -190,13 +190,13 @@ Generated at: 2026-02-24T17:29:17Z
 - docs/adr/0003-wrapper-coverage-auto-generation.md
 - docs/adr/0004-wrapper-coverage-iu-subtree-inheritance.md
 - docs/adr/0005-codex-jsonl-log-parser-api.md
-- docs/adr/0006-agent-wrappers-workspace.md
+- docs/adr/0006-unified-agent-api-workspace.md
 - docs/adr/0007-wrapper-events-ingestion-contract.md
 - docs/adr/0008-claude-stream-json-parser-api.md
-- docs/adr/0009-universal-agent-api.md
+- docs/adr/0009-unified-agent-api.md
 - docs/adr/0010-claude-code-live-stream-json.md
 - docs/adr/0011-agent-api-codex-stream-exec.md
-- docs/adr/0012-universal-agent-api-extensions-registry-and-cli-agent-onboarding-charter.md
+- docs/adr/0012-unified-agent-api-extensions-registry-and-cli-agent-onboarding-charter.md
 - docs/adr/0013-agent-api-backend-harness.md
 - docs/adr/0014-agent-api-explicit-cancellation.md
 - docs/specs/claude-stream-json-parser-contract.md
@@ -205,11 +205,11 @@ Generated at: 2026-02-24T17:29:17Z
 - docs/specs/codex-thread-event-jsonl-parser-scenarios-v1.md
 - docs/specs/codex-wrapper-coverage-generator-contract.md
 - docs/specs/codex-wrapper-coverage-scenarios-v1.md
-- docs/specs/universal-agent-api/README.md
-- docs/specs/universal-agent-api/capabilities-schema-spec.md
-- docs/specs/universal-agent-api/capability-matrix.md
-- docs/specs/universal-agent-api/contract.md
-- docs/specs/universal-agent-api/event-envelope-schema-spec.md
-- docs/specs/universal-agent-api/extensions-spec.md
-- docs/specs/universal-agent-api/run-protocol-spec.md
+- docs/specs/unified-agent-api/README.md
+- docs/specs/unified-agent-api/capabilities-schema-spec.md
+- docs/specs/unified-agent-api/capability-matrix.md
+- docs/specs/unified-agent-api/contract.md
+- docs/specs/unified-agent-api/event-envelope-schema-spec.md
+- docs/specs/unified-agent-api/extensions-spec.md
+- docs/specs/unified-agent-api/run-protocol-spec.md
 - docs/specs/wrapper-events-ingestion-contract.md

@@ -42,7 +42,7 @@
   - Contracts produced (owned): ES-C03
   - Contracts consumed: ES-C01
 
-Implementation note: `docs/specs/universal-agent-api/contract.md` already contains a normative
+Implementation note: `docs/specs/unified-agent-api/contract.md` already contains a normative
 “Dangerous capability opt-in (external sandbox exec policy)” section (including the
 `allow_external_sandbox_exec` field and required behaviors). Treat the slices below as a code
 conformance checklist unless the contract doc needs edits.
@@ -59,12 +59,12 @@ conformance checklist unless the contract doc needs edits.
 - **Contracts produced (owned)**:
   - `ES-C03`: Safe default advertising — built-in backends MUST NOT advertise
     `agent_api.exec.external_sandbox.v1` by default; externally sandboxed hosts opt-in explicitly via
-    backend config `allow_external_sandbox_exec` (canonical: `docs/specs/universal-agent-api/contract.md`).
+    backend config `allow_external_sandbox_exec` (canonical: `docs/specs/unified-agent-api/contract.md`).
     - Produced by: `S1` (Codex conformance) + `S2` (Claude Code conformance).
 - **Contracts consumed**:
   - `ES-C01`: External sandbox execution policy extension key — the key id
     `agent_api.exec.external_sandbox.v1` and its “validated before spawn” semantics (owned by SEAM-1;
-    canonical: `docs/specs/universal-agent-api/extensions-spec.md`).
+    canonical: `docs/specs/unified-agent-api/extensions-spec.md`).
     - Consumed by: `S1`/`S2` (advertising/allowlisting the key string only; validation/mapping is
       owned by SEAM-3/SEAM-4).
 - **Dependency edges honored**:
