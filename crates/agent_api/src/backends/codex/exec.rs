@@ -52,42 +52,8 @@ fn snapshot_backend_error_message(stream_state: &Arc<Mutex<CodexStreamState>>) -
         .and_then(|snapshot| snapshot.backend_error_message.clone())
 }
 
-fn is_model_runtime_rejection_signal(
-    code: Option<&str>,
-    message: &str,
-    requested_model_id: &str,
-) -> bool {
-    if code == Some("model_runtime_rejection") {
-        return true;
-    }
-
-    if message.contains(requested_model_id)
-        || message
-            .to_ascii_lowercase()
-            .contains(&requested_model_id.to_ascii_lowercase())
-    {
-        return true;
-    }
-
-    let lower = message.to_ascii_lowercase();
-    if !lower.contains("model") {
-        return false;
-    }
-
-    const SIGNALS: &[&str] = &[
-        "unknown",
-        "not found",
-        "unavailable",
-        "unauthorized",
-        "forbidden",
-        "unsupported",
-        "not allowed",
-        "invalid",
-        "rejected",
-        "cannot",
-        "can't",
-    ];
-    SIGNALS.iter().any(|signal| lower.contains(signal))
+pub(super) fn is_model_runtime_rejection_signal(code: Option<&str>) -> bool {
+    code == Some("model_runtime_rejection")
 }
 
 fn is_unknown_bypass_flag_stderr(stderr: &str) -> bool {
@@ -412,14 +378,12 @@ pub(super) async fn spawn_exec_or_resume_flow(
                             );
 
                         let suppress_model_runtime_rejection =
-                            requested_model_id.as_deref().is_some_and(|requested| {
+                            requested_model_id.as_deref().is_some_and(|_| {
                                 matches!(
                                     &thread_ev,
                                     ThreadEvent::Error(err)
                                         if is_model_runtime_rejection_signal(
-                                            err.code.as_deref(),
-                                            err.message.as_str(),
-                                            requested
+                                            err.code.as_deref()
                                         )
                                 )
                             });

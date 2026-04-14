@@ -336,6 +336,87 @@ async fn nonzero_exit_is_redacted_and_completion_is_ok_with_nonzero_status() {
 }
 
 #[tokio::test]
+async fn short_model_ids_do_not_reclassify_transport_failures_as_runtime_rejection() {
+    for requested_model in ["a", "1"] {
+        let backend = CodexBackend::new(CodexBackendConfig {
+            binary: Some(fake_codex_binary()),
+            env: [
+                (
+                    "FAKE_CODEX_SCENARIO".to_string(),
+                    "model_substring_transport_error_after_thread_started".to_string(),
+                ),
+                (
+                    "FAKE_CODEX_EXPECT_SANDBOX".to_string(),
+                    "workspace-write".to_string(),
+                ),
+                (
+                    "FAKE_CODEX_EXPECT_APPROVAL".to_string(),
+                    "never".to_string(),
+                ),
+                (
+                    "FAKE_CODEX_EXPECT_MODEL".to_string(),
+                    requested_model.to_string(),
+                ),
+            ]
+            .into_iter()
+            .collect(),
+            ..Default::default()
+        });
+
+        let handle = backend
+            .run(AgentWrapperRunRequest {
+                prompt: "hello".to_string(),
+                extensions: [(
+                    "agent_api.config.model.v1".to_string(),
+                    serde_json::Value::String(requested_model.to_string()),
+                )]
+                .into_iter()
+                .collect(),
+                ..Default::default()
+            })
+            .await
+            .expect("spawn succeeds");
+
+        let mut events = handle.events;
+        let completion = handle.completion;
+
+        let seen = drain_to_none(events.as_mut(), Duration::from_secs(2)).await;
+        assert!(
+            any_event_contains(
+                &seen,
+                &format!("transport failure while routing request for model {requested_model}")
+            ),
+            "expected original transport error event for model {requested_model}; events: {seen:?}"
+        );
+        assert!(
+            !any_event_contains(&seen, "model rejected by runtime"),
+            "unexpected runtime rejection remap for model {requested_model}; events: {seen:?}"
+        );
+        assert_eq!(
+            seen.last().map(|event| event.kind.clone()),
+            Some(AgentWrapperEventKind::Error),
+            "expected terminal error event for model {requested_model}; events: {seen:?}"
+        );
+        assert!(
+            seen.last()
+                .and_then(|event| event.message.as_deref())
+                .is_some_and(|message| message.starts_with("codex exited non-zero:")),
+            "expected ordinary non-zero-exit terminal error for model {requested_model}; events: {seen:?}"
+        );
+
+        let completion = tokio::time::timeout(Duration::from_secs(2), completion)
+            .await
+            .expect("completion resolves")
+            .expect("non-zero exit still resolves completion");
+        assert!(
+            !completion.status.success(),
+            "expected non-zero completion for model {requested_model}"
+        );
+        assert_eq!(completion.final_text, None);
+    }
+}
+
+#[tokio::test]
 async fn exec_add_dirs_runtime_rejection_emits_single_terminal_error_and_no_leaks() {
     let temp = tempdir().expect("tempdir");
     let dir_a = temp.path().join("alpha");

@@ -766,6 +766,21 @@ fn main() -> io::Result<()> {
             )?;
             std::process::exit(runtime_rejection_exit_code()?);
         }
+        "model_substring_transport_error_after_thread_started" => {
+            let model = flag_value(&args, "--model").unwrap_or("<missing>");
+
+            emit_jsonl(
+                &mut out,
+                r#"{"type":"thread.started","thread_id":"thread-1"}"#,
+            )?;
+            emit_jsonl(
+                &mut out,
+                &format!(
+                    r#"{{"type":"error","message":"transport failure while routing request for model {model}"}}"#
+                ),
+            )?;
+            std::process::exit(runtime_rejection_exit_code()?);
+        }
         _ => {
             emit_jsonl(
                 &mut out,
