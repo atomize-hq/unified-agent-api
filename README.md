@@ -30,6 +30,7 @@ Rust library import paths remain:
 ## Start here
 
 - Unified Agent API contracts: `docs/specs/unified-agent-api/README.md`
+- Crates.io release guide: `docs/crates-io-release.md`
 - Codex API docs: `crates/codex/README.md`
 - Examples index: `crates/codex/EXAMPLES.md`
 - Documentation index: `docs/README.md`

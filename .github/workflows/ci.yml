@@ -74,6 +74,8 @@ jobs:
   repo-version-guards:
     name: Repo version guards
     runs-on: ubuntu-latest
+    outputs:
+      version_changed: ${{ steps.version-changelog-diff.outputs.version_changed }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -110,6 +112,7 @@ jobs:
 
       - name: Guard CHANGELOG.md updates when VERSION changes
         if: ${{ github.event_name == 'pull_request' || github.event_name == 'push' }}
+        id: version-changelog-diff
         shell: bash
         run: |
           set -euo pipefail
@@ -126,6 +129,7 @@ jobs:
 
           if [ -z "$compare_sha" ] || [ "$compare_sha" = "0000000000000000000000000000000000000000" ]; then
             echo "No comparable base commit is available; skipping VERSION/CHANGELOG diff guard."
+            echo "version_changed=0" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
@@ -146,8 +150,24 @@ jobs:
             exit 1
           fi
 
+          echo "version_changed=$version_changed" >> "$GITHUB_OUTPUT"
           echo "VERSION changed: $version_changed"
           echo "CHANGELOG.md changed: $changelog_changed"
+
+  publish-readiness:
+    name: Publish readiness
+    needs: repo-version-guards
+    if: ${{ needs.repo-version-guards.outputs.version_changed == '1' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Validate publish readiness
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/check_publish_readiness.py
 
   rust-tests:
     name: Rust tests (workspace)
