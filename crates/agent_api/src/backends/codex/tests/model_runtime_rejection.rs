@@ -37,8 +37,10 @@ fn base_env() -> BTreeMap<String, String> {
     .collect()
 }
 
-#[tokio::test]
-async fn codex_runtime_model_rejection_is_safely_redacted_and_parity_is_preserved() {
+async fn assert_codex_runtime_model_rejection(
+    extra_env: impl IntoIterator<Item = (String, String)>,
+    await_completion_before_events: bool,
+) {
     let temp = tempdir().expect("tempdir");
     let run_start_cwd = temp.path().join("run-start");
     let expected_cwd = run_start_cwd.join("repo");
@@ -67,6 +69,7 @@ async fn codex_runtime_model_rejection_is_safely_redacted_and_parity_is_preserve
                 secret.to_string(),
             ),
         ])
+        .chain(extra_env)
         .collect::<BTreeMap<_, _>>();
 
     let adapter = test_adapter_with_config_and_run_start_cwd(
@@ -98,8 +101,39 @@ async fn codex_runtime_model_rejection_is_safely_redacted_and_parity_is_preserve
         .await
         .expect("spawn succeeds");
 
-    let backend_events: Vec<_> = spawned
-        .events
+    let mut events = Some(spawned.events);
+    let mut completion = Some(spawned.completion);
+
+    let completion_message = if await_completion_before_events {
+        let completion = tokio::time::timeout(
+            std::time::Duration::from_secs(2),
+            completion.take().expect("completion future available"),
+        )
+        .await
+        .expect("completion resolves")
+        .expect("completion is Ok for fake codex");
+        let err = adapter
+            .map_completion(completion)
+            .expect_err("runtime rejection must map to Backend error");
+        match err {
+            AgentWrapperError::Backend { message } => {
+                assert_eq!(
+                    message,
+                    "codex backend error: model rejected by runtime (details redacted)"
+                );
+                assert!(!message.contains(secret));
+                assert!(!message.contains(requested_model));
+                Some(message)
+            }
+            other => panic!("expected Backend error, got: {other:?}"),
+        }
+    } else {
+        None
+    };
+
+    let backend_events: Vec<_> = events
+        .take()
+        .expect("events stream available")
         .map(|result| result.expect("backend event stream is infallible for fake codex"))
         .collect()
         .await;
@@ -136,22 +170,45 @@ async fn codex_runtime_model_rejection_is_safely_redacted_and_parity_is_preserve
         );
     }
 
-    let completion = spawned
-        .completion
-        .await
-        .expect("completion is Ok for fake codex");
-    let err = adapter
-        .map_completion(completion)
-        .expect_err("runtime rejection must map to Backend error");
-    match err {
-        AgentWrapperError::Backend { message } => {
-            assert_eq!(
-                message,
-                "codex backend error: model rejected by runtime (details redacted)"
-            );
-            assert!(!message.contains(secret));
-            assert!(!message.contains(requested_model));
+    if let Some(completion_message) = completion_message {
+        assert_eq!(completion_message, error_messages[0]);
+    } else {
+        let completion = completion
+            .take()
+            .expect("completion future available")
+            .await
+            .expect("completion is Ok for fake codex");
+        let err = adapter
+            .map_completion(completion)
+            .expect_err("runtime rejection must map to Backend error");
+        match err {
+            AgentWrapperError::Backend { message } => {
+                assert_eq!(
+                    message,
+                    "codex backend error: model rejected by runtime (details redacted)"
+                );
+                assert!(!message.contains(secret));
+                assert!(!message.contains(requested_model));
+                assert_eq!(message, error_messages[0]);
+            }
+            other => panic!("expected Backend error, got: {other:?}"),
         }
-        other => panic!("expected Backend error, got: {other:?}"),
     }
+}
+
+#[tokio::test]
+async fn codex_runtime_model_rejection_is_safely_redacted_and_parity_is_preserved() {
+    assert_codex_runtime_model_rejection(std::iter::empty(), false).await;
+}
+
+#[tokio::test]
+async fn codex_runtime_model_rejection_remains_fatal_even_on_zero_exit() {
+    assert_codex_runtime_model_rejection(
+        [(
+            "FAKE_CODEX_RUNTIME_REJECTION_EXIT_CODE".to_string(),
+            "0".to_string(),
+        )],
+        true,
+    )
+    .await;
 }

@@ -7,8 +7,8 @@ use std::{
 };
 
 use codex::{CodexError, ExecStreamError, ExecStreamRequest, ThreadEvent};
-use futures_util::future::poll_fn;
-use tokio::sync::oneshot;
+use futures_util::StreamExt;
+use tokio::sync::{mpsc, oneshot};
 
 use crate::{backend_harness::BackendSpawn, backends::spawn_path::resolve_effective_working_dir};
 
@@ -50,6 +50,17 @@ fn snapshot_backend_error_message(stream_state: &Arc<Mutex<CodexStreamState>>) -
         .lock()
         .ok()
         .and_then(|snapshot| snapshot.backend_error_message.clone())
+}
+
+async fn wait_for_event_processing(
+    events_done_rx: &mut Option<oneshot::Receiver<()>>,
+    should_wait: bool,
+) {
+    if should_wait {
+        if let Some(rx) = events_done_rx.take() {
+            let _ = tokio::time::timeout(Duration::from_millis(50), rx).await;
+        }
+    }
 }
 
 pub(super) fn is_model_runtime_rejection_signal(code: Option<&str>) -> bool {
@@ -242,6 +253,11 @@ pub(super) async fn spawn_exec_or_resume_flow(
 
         match outcome {
             Ok(exec_completion) => {
+                wait_for_event_processing(
+                    &mut events_done_rx,
+                    has_add_dirs || has_requested_model_id,
+                )
+                .await;
                 let status = exec_completion.status;
                 let backend_error_message =
                     snapshot_backend_error_message(&stream_state_for_completion);
@@ -268,13 +284,9 @@ pub(super) async fn spawn_exec_or_resume_flow(
                 //
                 // Avoid flaking parity expectations by giving the event stream a brief window to
                 // finish when we have signal-dependent suppression logic.
-                let wait_for_event_processing =
+                let needs_event_processing_wait =
                     resume_selector.is_some() || has_add_dirs || has_requested_model_id;
-                if wait_for_event_processing {
-                    if let Some(rx) = events_done_rx.take() {
-                        let _ = tokio::time::timeout(Duration::from_millis(50), rx).await;
-                    }
-                }
+                wait_for_event_processing(&mut events_done_rx, needs_event_processing_wait).await;
 
                 let backend_error_message =
                     snapshot_backend_error_message(&stream_state_for_completion);
@@ -343,156 +355,105 @@ pub(super) async fn spawn_exec_or_resume_flow(
         }
     });
 
-    let events = Box::pin(futures_util::stream::unfold(
-        (
-            events,
-            stream_state.clone(),
-            Some(events_done_tx),
-            Some(tail_rx),
-            suppress_transport_errors,
-            has_add_dirs,
-            requested_model_id,
-            false,
-        ),
-        |(
-            mut events,
-            stream_state,
-            mut events_done_tx,
-            mut tail_rx,
-            suppress_transport_errors,
-            has_add_dirs,
-            requested_model_id,
-            tail_emitted,
-        )| async move {
-            loop {
-                let item = poll_fn(|cx| events.as_mut().poll_next(cx)).await;
-                match item {
-                    Some(Ok(thread_ev)) => {
-                        let suppress_add_dirs_runtime_rejection = has_add_dirs
-                            && matches!(
+    let (event_tx, event_rx) =
+        mpsc::unbounded_channel::<Result<super::CodexBackendEvent, super::CodexBackendError>>();
+
+    tokio::spawn(async move {
+        let mut events = events;
+        let mut events_done_tx = Some(events_done_tx);
+        let mut tail_rx = Some(tail_rx);
+
+        while let Some(item) = events.next().await {
+            match item {
+                Ok(thread_ev) => {
+                    let suppress_add_dirs_runtime_rejection = has_add_dirs
+                        && matches!(
+                            &thread_ev,
+                            ThreadEvent::Error(err)
+                                if super::is_add_dirs_runtime_rejection_signal(
+                                    err.message.as_str()
+                                )
+                        );
+
+                    let suppress_model_runtime_rejection =
+                        requested_model_id.as_deref().is_some_and(|_| {
+                            matches!(
                                 &thread_ev,
                                 ThreadEvent::Error(err)
-                                    if super::is_add_dirs_runtime_rejection_signal(
-                                        err.message.as_str()
+                                    if is_model_runtime_rejection_signal(
+                                        err.code.as_deref()
                                     )
-                            );
+                            )
+                        });
 
-                        let suppress_model_runtime_rejection =
-                            requested_model_id.as_deref().is_some_and(|_| {
-                                matches!(
-                                    &thread_ev,
-                                    ThreadEvent::Error(err)
-                                        if is_model_runtime_rejection_signal(
-                                            err.code.as_deref()
-                                        )
-                                )
-                            });
-
-                        if let Ok(mut snapshot) = stream_state.lock() {
-                            if thread_ev.thread_id().is_some() {
-                                snapshot.saw_thread_id = true;
-                            }
-
-                            if suppress_add_dirs_runtime_rejection {
-                                snapshot.backend_error_message =
-                                    Some(super::PINNED_ADD_DIRS_RUNTIME_REJECTION.to_string());
-                            } else if suppress_model_runtime_rejection
-                                && snapshot.backend_error_message.is_none()
-                            {
-                                snapshot.backend_error_message =
-                                    Some(super::PINNED_MODEL_RUNTIME_REJECTION.to_string());
-                            } else if suppress_transport_errors
-                                && matches!(thread_ev, ThreadEvent::Error(_))
-                            {
-                                if let ThreadEvent::Error(err) = &thread_ev {
-                                    snapshot.last_transport_error_code = err.code.clone();
-                                    snapshot.last_transport_error_message =
-                                        Some(err.message.clone());
-                                }
-                            }
+                    if let Ok(mut snapshot) = stream_state.lock() {
+                        if thread_ev.thread_id().is_some() {
+                            snapshot.saw_thread_id = true;
                         }
 
-                        if suppress_add_dirs_runtime_rejection
-                            || suppress_model_runtime_rejection
-                            || (suppress_transport_errors
-                                && matches!(thread_ev, ThreadEvent::Error(_)))
+                        if suppress_add_dirs_runtime_rejection {
+                            snapshot.backend_error_message =
+                                Some(super::PINNED_ADD_DIRS_RUNTIME_REJECTION.to_string());
+                        } else if suppress_model_runtime_rejection
+                            && snapshot.backend_error_message.is_none()
                         {
-                            continue;
-                        }
-
-                        return Some((
-                            Ok(super::CodexBackendEvent::Thread(Box::new(thread_ev))),
-                            (
-                                events,
-                                stream_state,
-                                events_done_tx,
-                                tail_rx,
-                                suppress_transport_errors,
-                                has_add_dirs,
-                                requested_model_id,
-                                tail_emitted,
-                            ),
-                        ));
-                    }
-                    Some(Err(err)) => {
-                        if let Ok(mut snapshot) = stream_state.lock() {
-                            snapshot.saw_stream_error = true;
-                        }
-
-                        return Some((
-                            Err(super::CodexBackendError::Exec(err)),
-                            (
-                                events,
-                                stream_state,
-                                events_done_tx,
-                                tail_rx,
-                                suppress_transport_errors,
-                                has_add_dirs,
-                                requested_model_id,
-                                tail_emitted,
-                            ),
-                        ));
-                    }
-                    None => {
-                        if let Some(tx) = events_done_tx.take() {
-                            let _ = tx.send(());
-                        }
-
-                        if tail_emitted {
-                            return None;
-                        }
-
-                        let tail = match tail_rx.take() {
-                            Some(rx) => rx.await.ok().flatten(),
-                            None => None,
-                        }?;
-
-                        let event = match tail {
-                            CodexTailEvent::NonZeroExit { status } => {
-                                super::CodexBackendEvent::NonZeroExit { status }
+                            snapshot.backend_error_message =
+                                Some(super::PINNED_MODEL_RUNTIME_REJECTION.to_string());
+                        } else if suppress_transport_errors
+                            && matches!(thread_ev, ThreadEvent::Error(_))
+                        {
+                            if let ThreadEvent::Error(err) = &thread_ev {
+                                snapshot.last_transport_error_code = err.code.clone();
+                                snapshot.last_transport_error_message = Some(err.message.clone());
                             }
-                            CodexTailEvent::TerminalError { message } => {
-                                super::CodexBackendEvent::TerminalError { message }
-                            }
-                        };
-
-                        return Some((
-                            Ok(event),
-                            (
-                                events,
-                                stream_state,
-                                events_done_tx,
-                                tail_rx,
-                                suppress_transport_errors,
-                                has_add_dirs,
-                                requested_model_id,
-                                true,
-                            ),
-                        ));
+                        }
                     }
+
+                    if suppress_add_dirs_runtime_rejection
+                        || suppress_model_runtime_rejection
+                        || (suppress_transport_errors && matches!(thread_ev, ThreadEvent::Error(_)))
+                    {
+                        continue;
+                    }
+
+                    let _ =
+                        event_tx.send(Ok(super::CodexBackendEvent::Thread(Box::new(thread_ev))));
+                }
+                Err(err) => {
+                    if let Ok(mut snapshot) = stream_state.lock() {
+                        snapshot.saw_stream_error = true;
+                    }
+
+                    let _ = event_tx.send(Err(super::CodexBackendError::Exec(err)));
                 }
             }
-        },
+        }
+
+        if let Some(tx) = events_done_tx.take() {
+            let _ = tx.send(());
+        }
+
+        let tail = match tail_rx.take() {
+            Some(rx) => rx.await.ok().flatten(),
+            None => None,
+        };
+
+        if let Some(tail) = tail {
+            let event = match tail {
+                CodexTailEvent::NonZeroExit { status } => {
+                    super::CodexBackendEvent::NonZeroExit { status }
+                }
+                CodexTailEvent::TerminalError { message } => {
+                    super::CodexBackendEvent::TerminalError { message }
+                }
+            };
+            let _ = event_tx.send(Ok(event));
+        }
+    });
+
+    let events = Box::pin(futures_util::stream::unfold(
+        event_rx,
+        |mut rx| async move { rx.recv().await.map(|event| (event, rx)) },
     ));
 
     let completion = Box::pin(async move {
