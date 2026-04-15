@@ -2,8 +2,8 @@
 seam_id: SEAM-1
 seam_slug: support-semantics-and-publication-contract
 type: integration
-status: exec-ready
-execution_horizon: active
+status: closed
+execution_horizon: future
 plan_version: v1
 basis:
   currentness: current
@@ -22,19 +22,19 @@ gates:
     contract: passed
     revalidation: passed
   post_exec:
-    landing: pending
-    closeout: pending
+    landing: passed
+    closeout: passed
 seam_exit_gate:
   required: true
   planned_location: S99
-  status: pending
+  status: passed
 open_remediations: []
 ---
 
 # SEAM-1 - Support semantics and publication contract
 
 - **Goal / value**: pin one deterministic meaning for published support truth before the repo starts generating new artifacts from current manifest evidence.
-- **Current planning posture**: seam-local planning is now concrete enough for execution. The repo state still lacks the canonical support-matrix spec and neutral `xtask support-matrix` entrypoint, but those gaps are owned delivery scope for this seam rather than upstream blockers.
+- **Current planning posture**: closed. The canonical support-matrix spec, manifest terminology alignment, and neutral `xtask support-matrix` entrypoint all landed and are recorded in `governance/seam-1-closeout.md`.
 - **Scope**
   - In:
     - define the separation between manifest support, backend support, UAA unified support, and passthrough visibility
@@ -96,7 +96,7 @@ open_remediations: []
   - no runtime `agent_api` behavior change
   - existing capability-matrix workflows remain intact
 - **Downstream decomposition context**:
-  - Why this seam is `active`, `next`, or `future`: it is `active` because every downstream seam depends on stable terminology and publication targets.
+  - Why this seam is `active`, `next`, or `future`: it is `future` because it has left the forward planning window after publishing `THR-01` and closing its seam-exit record.
   - Which threads matter most: `THR-01`
   - What the first seam-local review focused on: whether the semantics doc fully disambiguates validated vs supported vs unified support, whether any manifest docs still contradict that pinned meaning, and whether `xtask` command naming still leaks capability-matrix assumptions into the support workflow
   - Boundary slice intent: reserve `S00` for contract-definition cleanup if seam-local planning finds unresolved semantics drift between the UAA support doc, manifest docs, and xtask command naming

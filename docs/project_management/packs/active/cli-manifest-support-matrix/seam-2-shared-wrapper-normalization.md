@@ -2,14 +2,15 @@
 seam_id: SEAM-2
 seam_slug: shared-wrapper-normalization
 type: integration
-status: proposed
-execution_horizon: next
+status: exec-ready
+execution_horizon: active
 plan_version: v1
 basis:
-  currentness: provisional
+  currentness: current
   source_scope_ref: scope_brief.md
   source_scope_version: v1
-  upstream_closeouts: []
+  upstream_closeouts:
+    - governance/seam-1-closeout.md
   required_threads:
     - THR-01
     - THR-02
@@ -19,9 +20,9 @@ basis:
     - wrapper coverage semantics diverge between Codex and Claude roots
 gates:
   pre_exec:
-    review: pending
-    contract: pending
-    revalidation: pending
+    review: passed
+    contract: passed
+    revalidation: passed
   post_exec:
     landing: pending
     closeout: pending
@@ -87,7 +88,7 @@ open_remediations: []
   - behavior-preserving extraction only
   - no publication claims change until downstream seams land
 - **Downstream decomposition context**:
-  - Why this seam is `active`, `next`, or `future`: it is `next` because publication and validation depend on a neutral core, but the final shape must stay provisional until `SEAM-1` semantics are current.
+  - Why this seam is `active`, `next`, or `future`: it is `active` because `SEAM-1` has landed its semantics and command contract, so downstream publication work now depends on landing the shared normalization boundary here.
   - Which threads matter most: `THR-01`, `THR-02`
   - What the first seam-local review should focus on: whether the proposed shared interface truly removes duplicated normalization rules without smuggling in agent-name assumptions
   - Boundary slice intent: reserve `S00` for shared interface freezing if seam-local planning discovers unresolved ambiguity in the shared-vs-adapter boundary

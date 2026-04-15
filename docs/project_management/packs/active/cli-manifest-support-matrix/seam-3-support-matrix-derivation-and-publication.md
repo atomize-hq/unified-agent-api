@@ -3,7 +3,7 @@ seam_id: SEAM-3
 seam_slug: support-matrix-derivation-and-publication
 type: capability
 status: proposed
-execution_horizon: future
+execution_horizon: next
 plan_version: v1
 basis:
   currentness: provisional
@@ -94,7 +94,7 @@ open_remediations: []
   - additive publication only
   - capability matrix remains untouched except for reused rendering patterns
 - **Downstream decomposition context**:
-  - Why this seam is `active`, `next`, or `future`: it is `future` because it should not freeze a row model until semantics and shared normalization are current.
+  - Why this seam is `active`, `next`, or `future`: it is `next` because `SEAM-2` is now the active normalization seam and publication work becomes the next safe consumer once that shared core lands.
   - Which threads matter most: `THR-02`, `THR-03`
   - What the first seam-local review should focus on: whether the row fields, ordering, and evidence-note rules are enough for both publication and validator consumers
   - Boundary slice intent: `S00` is probably unnecessary unless seam-local planning uncovers unresolved row-schema ambiguity that blocks implementation

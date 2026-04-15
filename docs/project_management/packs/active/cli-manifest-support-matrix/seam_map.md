@@ -4,32 +4,32 @@ Primary axis: **integration-first publication pipeline**. The feature turns exis
 
 ## Execution horizon (inferred)
 
-- Active seam: `SEAM-1`
-- Next seam: `SEAM-2`
-- Future seams: `SEAM-3`, `SEAM-4`, `SEAM-5`
+- Active seam: `SEAM-2`
+- Next seam: `SEAM-3`
+- Future seams: `SEAM-4`, `SEAM-5`
 
 Why this horizon:
 
-- `SEAM-1` must pin semantics and authority before any generator code can safely freeze output shapes.
-- `SEAM-2` must extract the neutral shared normalization seam before publication and validation work can reuse it.
-- `SEAM-3` through `SEAM-5` stay future until the semantic model and shared normalization boundary are fixed.
+- `SEAM-1` has landed the support semantics, publication authority, and neutral `xtask support-matrix` command contract.
+- `SEAM-2` now sits on the critical path because publication and validation work need one neutral shared normalization and root-intake seam.
+- `SEAM-3` becomes the queued next seam because derivation and publication still depend on `SEAM-2` landing its shared core.
 
 ## Seams
 
 1. **SEAM-1 - Support semantics and publication contract**
-   - Execution horizon: active
+   - Execution horizon: future
    - Type: integration
    - Owns: target-scoped support semantics, naming cleanup, canonical publication locations, and the neutral `xtask support-matrix` entrypoint contract.
    - Verification path: docs/spec alignment plus a stable command contract in `crates/xtask/src/main.rs`.
 
 2. **SEAM-2 - Shared wrapper normalization and agent-root intake**
-   - Execution horizon: next
+   - Execution horizon: active
    - Type: integration
    - Owns: the reusable normalization seam extracted from existing wrapper-coverage code plus neutral loading of manifest/version/pointer/report inputs from each agent root.
    - Verification path: shared-module unit coverage and thin-adapter review against current Codex and Claude inputs.
 
 3. **SEAM-3 - Support-matrix derivation and publication**
-   - Execution horizon: future
+   - Execution horizon: next
    - Type: capability
    - Owns: single-pass row derivation, deterministic JSON rendering, and Markdown projection from the same model.
    - Verification path: golden outputs and contradiction handling against checked-in fixture roots.
