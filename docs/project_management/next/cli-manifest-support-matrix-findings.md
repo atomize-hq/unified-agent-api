@@ -277,6 +277,212 @@ Rationale:
 - adding a real integration now would mix infrastructure cleanup with new upstream semantics, larger test scope, and new promotion decisions
 - synthetic fixtures are enough to verify that the new shared seams are not accidentally Codex/Claude-specific
 
+### Decision 11. Deferred third-agent onboarding follow-up
+
+Date (UTC): 2026-04-15
+
+Accepted option: `11A`
+
+Decision:
+
+- capture a follow-on TODO to select the first real third CLI agent and prepare its onboarding packet after phase 1 lands
+- do not expand phase 1 to perform the real onboarding work now
+
+Rationale:
+
+- this preserves the chosen phase-1 scope while keeping the next concrete expansion step visible
+- the repo goal includes future CLI-agent onboarding, so the deferred work should be tracked explicitly rather than left as conversational context
+
+### Decision 12. Version status vs published support truth
+
+Date (UTC): 2026-04-15
+
+Accepted option: `12A`
+
+Decision:
+
+- `versions/<v>.json.status` remains a workflow-stage summary field
+- per-target pointers plus target-scoped support-matrix rows are the canonical published truth
+- validator logic should enforce that published support rows and pointers are internally consistent, without forcing the single version-level `status` field to represent every published target outcome directly
+
+Rationale:
+
+- the review already chose target-scoped rows as the primitive, so one scalar status field should not be overloaded into a misleading multi-target truth source
+- this preserves useful workflow state in version metadata while making published support truth explicit and target-scoped
+- it avoids the current ambiguity where `validated` and `supported` are being used as both workflow labels and publication claims
+
+## Eng Review Notes
+
+### Performance review
+
+Date (UTC): 2026-04-15
+
+Observed local command timings during review:
+
+- `cargo run -p xtask -- capability-matrix`: about 1.0s wall time
+- `cargo run -p xtask -- codex-validate --root cli_manifests/codex`: about 0.56s wall time
+
+Observed repository scale:
+
+- `cli_manifests/codex/`: about 736K, 42 files
+- `cli_manifests/claude_code/`: about 284K, 32 files
+- `docs/specs/unified-agent-api/`: about 108K
+- `crates/xtask/tests/`: about 196K, 22 files
+
+Assessment:
+
+- no blocking performance issues were identified for phase 1
+- the dominant performance risk is duplicated derivation work, not raw corpus size
+- phase 1 should keep support-matrix derivation single-pass inside the dedicated support-matrix module, then let validators and Markdown publication consume the same derived model rather than re-deriving it independently
+
+## Phase 1 Implementation Plan
+
+This section turns the resolved `/plan-eng-review` decisions into the concrete phase `1A` execution plan.
+
+### Goal
+
+Land a neutral, validator-enforced support publication pipeline that:
+
+- continues to support ongoing Codex and Claude Code version onboarding
+- keeps backend-crate support distinct from UAA unified support
+- publishes target-scoped support truth from manifest evidence
+- proves future-agent readiness structurally without onboarding a real third agent yet
+
+### What already exists
+
+The implementation must reuse the existing machinery rather than replacing it:
+
+- per-agent manifest evidence under `cli_manifests/**`
+- union snapshots, coverage reports, version metadata, and pointer files
+- `xtask` generation and validator entrypoints
+- checked-in generated Markdown pattern from `capability-matrix`
+- `crates/xtask/tests/*.rs` subprocess-style fixture testing
+
+### Planned workstreams
+
+#### Workstream A. Semantic and naming cleanup
+
+- pin neutral terminology in manifest/spec prose so `validated`, `supported`, backend support, UAA unified support, and passthrough are not conflated
+- hard-cutover generic multi-agent `xtask` command and module naming away from Codex-branded generic names
+- fix known stale prose and cross-pollinated target-name / flag-name references
+
+Primary touchpoints:
+
+- `docs/project_management/next/cli-manifest-support-matrix-findings.md`
+- `cli_manifests/codex/README.md`
+- `cli_manifests/claude_code/README.md`
+- `cli_manifests/codex/VALIDATOR_SPEC.md`
+- `cli_manifests/claude_code/VALIDATOR_SPEC.md`
+- `cli_manifests/codex/CI_AGENT_RUNBOOK.md`
+- `cli_manifests/claude_code/CI_AGENT_RUNBOOK.md`
+- `cli_manifests/codex/RULES.json`
+- `cli_manifests/claude_code/RULES.json`
+- `crates/xtask/src/main.rs`
+
+#### Workstream B. Shared parity/support extraction
+
+- extract a shared wrapper-coverage normalization engine with thin per-agent adapters
+- add a dedicated neutral support-matrix module in `xtask`
+- keep support-matrix derivation single-pass and reusable by generator, validator, and Markdown publication
+
+Primary touchpoints:
+
+- `crates/xtask/src/claude_wrapper_coverage.rs`
+- `crates/xtask/src/codex_wrapper_coverage.rs`
+- new neutral shared module(s) under `crates/xtask/src/`
+- neutralized CLI wiring in `crates/xtask/src/main.rs`
+
+#### Workstream C. Generated support publication
+
+- generate canonical support-matrix JSON under `cli_manifests/`
+- generate Markdown projection under `docs/specs/unified-agent-api/`
+- model support rows target-first and layer-first:
+  - manifest / upstream support
+  - backend-crate support
+  - UAA unified support
+  - backend-specific passthrough visibility where applicable
+
+Primary touchpoints:
+
+- new canonical JSON artifact path under `cli_manifests/`
+- new Markdown projection path under `docs/specs/unified-agent-api/`
+- `crates/xtask/src/capability_matrix.rs` only where publication patterns are reused, not where capability semantics are overloaded
+
+#### Workstream D. Validation and test hardening
+
+- extend validator rules to reject status/pointer/support-row contradictions
+- add fixture-driven derivation tests for Codex, Claude Code, and a synthetic third-agent-shaped case
+- add staleness/golden tests for checked-in Markdown projection
+
+Primary touchpoints:
+
+- validator module(s) under `crates/xtask/src/codex_validate/` or renamed neutral equivalents after cutover
+- `crates/xtask/tests/*.rs`
+
+## Failure Modes
+
+For each new phase-1 codepath, these are the realistic production-maintainer failures that must be covered.
+
+| Codepath | Likely failure | Test needed | Error handling needed | User-visible effect if missed |
+|---|---|---|---|---|
+| Support-matrix derivation | partial-union target rows collapse into false version-global support | yes | yes | published support doc lies |
+| Layer modeling | backend support is promoted to UAA unified support too early | yes | yes | consumers believe cross-agent behavior is deterministic when it is not |
+| Pointer consistency | `latest_supported/*` advances without target-row support evidence | yes | yes | published support pointers drift from machine truth |
+| Markdown projection | checked-in docs stale after JSON changes | yes | yes | reviewers read stale support status |
+| Neutral command cutover | docs/tests still call removed codex-branded generic commands | yes | yes | maintainer workflows fail unexpectedly |
+| Shared wrapper normalization | hidden Codex/Claude assumptions reject future-agent-shaped inputs | yes | yes | future agent onboarding requires rework of “shared” seams |
+
+Critical gap rule from this review:
+
+- no phase-1 implementation is complete unless support-matrix derivation, pointer consistency, and Markdown staleness each have both automated tests and deterministic failure behavior
+
+## Worktree Parallelization Strategy
+
+| Step | Modules touched | Depends on |
+|------|-----------------|------------|
+| Semantic + naming cleanup | `cli_manifests/**`, `docs/specs/**`, `crates/xtask/src/main.rs` | — |
+| Shared wrapper normalization extraction | `crates/xtask/src/*wrapper_coverage*` | semantic naming decisions |
+| Support-matrix module + generation | `crates/xtask/src/` new neutral support module, `cli_manifests/**`, `docs/specs/unified-agent-api/**` | semantic decisions |
+| Validator + tests | `crates/xtask/src/*validate*`, `crates/xtask/tests/*.rs` | support-matrix module shape, semantic decisions |
+
+### Parallel lanes
+
+- Lane A: semantic + naming cleanup
+- Lane B: shared wrapper normalization extraction
+- Lane C: support-matrix module + JSON/Markdown generation
+- Lane D: validator + tests
+
+### Execution order
+
+- launch Lane A first
+- once naming and semantic contracts are pinned, launch Lanes B and C in parallel
+- start Lane D after the support-matrix module shape is stable enough to write fixtures against, while still allowing validator tests to proceed in parallel with final publication wiring
+
+### Conflict flags
+
+- Lanes A, C, and D all touch `crates/xtask/src/main.rs` or adjacent neutral command wiring
+- Lanes C and D both touch validator-facing support-matrix model code
+- do not split Lanes C and D too finely across multiple workers unless ownership is very explicit
+
+## Completion Summary
+
+- Step 0: Scope Challenge — scope accepted as phase `1A`
+- Architecture Review: 5 issues found, all resolved
+- Code Quality Review: 3 issues found, all resolved
+- Test Review: diagram produced, 22 planned gaps identified and turned into required test scope
+- Performance Review: 0 issues found
+- NOT in scope: written
+- What already exists: written
+- TODOS.md updates: 1 item added
+- Failure modes: 3 critical publication/consistency gaps flagged as mandatory coverage areas
+- Outside voice: skipped
+- Parallelization: 4 lanes, 2 parallel after semantic lock-in / 2 dependent follow-on lanes
+- Lake Score: 12/12 decisions chose the more complete option for the selected phase
+
+## Unresolved Decisions That May Bite Later
+
+None for phase `1A`. The major semantic and scope decisions required to begin implementation are now pinned in this document.
+
 ## Research Basis
 
 This briefing is based on:
