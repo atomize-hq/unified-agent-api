@@ -6,12 +6,13 @@ Ownership note: this repo's normative contract surfaces live under `docs/specs/*
 
 ## Execution horizon summary
 
-- Active seam: `SEAM-3`
-- Next seam: `SEAM-4`
-- Future seams: `SEAM-5`
+- Active seam: `SEAM-4`
+- Next seam: `SEAM-5`
+- Future seams: none
 - `SEAM-2` has landed and closed.
-- `SEAM-3` is now eligible for authoritative deep planning.
-- `SEAM-4` is the next queued seam because it consumes the derived row model from `SEAM-3`.
+- `SEAM-3` has landed and closed.
+- `SEAM-4` is now active because it consumes the published row model from `SEAM-3`.
+- `SEAM-5` is the next queued seam because fixture and golden conformance should consume landed contradiction rules from `SEAM-4`.
 
 ## Contract registry
 
@@ -112,10 +113,10 @@ Ownership note: this repo's normative contract surfaces live under `docs/specs/*
   - **Consumer seam(s)**: `SEAM-4`, `SEAM-5`
   - **Carried contract IDs**: `C-04`, `C-05`
   - **Purpose**: expose one derived row model consumed by both JSON/Markdown publication and later validator checks.
-  - **State**: `defined`
+  - **State**: `revalidated`
   - **Revalidation trigger**: any change to row fields, output ordering, or evidence-note rules
   - **Satisfied by**: shared derivation model plus deterministic JSON and Markdown renders from that model
-  - **Notes**: `SEAM-3` is now active with seam-local planning that defines the row-model and Markdown-projection contract surface; `SEAM-4` can now plan directly against that defined thread while still waiting on landing for publication-grade truth.
+  - **Notes**: `SEAM-3` has now landed and closed, and `SEAM-4` has revalidated against the published row-model and Markdown-projection contract surfaces recorded in the seam-3 closeout.
 
 - **Thread ID**: `THR-04`
   - **Producer seam**: `SEAM-4`

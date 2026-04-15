@@ -2,8 +2,8 @@
 seam_id: SEAM-3
 seam_slug: support-matrix-derivation-and-publication
 type: capability
-status: exec-ready
-execution_horizon: active
+status: closed
+execution_horizon: future
 plan_version: v1
 basis:
   currentness: current
@@ -26,18 +26,18 @@ gates:
     contract: passed
     revalidation: passed
   post_exec:
-    landing: pending
-    closeout: pending
+    landing: passed
+    closeout: passed
 seam_exit_gate:
   required: true
   planned_location: S99
-  status: pending
+  status: passed
 open_remediations: []
 ---
 
 # SEAM-3 - Support-matrix derivation and publication
 
-- **Current planning posture**: exec-ready. The seam has consumed the landed semantics and shared-core handoff, and its seam-local review and slice plan now define the row-model and projection contract concretely enough to implement.
+- **Current planning posture**: closed. The row-model contract, derivation path, publication outputs, conformance evidence, and seam-exit closeout are all landed and recorded in `governance/seam-3-closeout.md`.
 - **Goal / value**: publish support truth from committed evidence using one shared derived row model that feeds both the JSON artifact and the Markdown projection.
 - **Scope**
   - In:
@@ -97,7 +97,7 @@ open_remediations: []
   - additive publication only
   - capability matrix remains untouched except for reused rendering patterns
 - **Downstream decomposition context**:
-  - Why this seam is `active`, `next`, or `future`: it is `active` because `SEAM-2` has now landed its shared normalization and root-intake seam, so publication work can safely consume that handoff.
+  - Why this seam is `active`, `next`, or `future`: it is `future` because the seam has landed and closed, and downstream promotion has moved validator work into the active horizon.
   - Which threads matter most: `THR-02`, `THR-03`
   - What the first seam-local review should focus on: whether the row fields, ordering, and evidence-note rules are enough for both publication and validator consumers
   - Boundary slice intent: reserve `S00` for row-model and projection contract-definition work before the derivation and renderer slices start changing production artifacts

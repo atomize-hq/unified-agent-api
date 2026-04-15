@@ -2,14 +2,15 @@
 seam_id: SEAM-4
 seam_slug: consistency-validation-and-gates
 type: conformance
-status: proposed
-execution_horizon: next
+status: exec-ready
+execution_horizon: active
 plan_version: v1
 basis:
-  currentness: provisional
+  currentness: current
   source_scope_ref: scope_brief.md
   source_scope_version: v1
-  upstream_closeouts: []
+  upstream_closeouts:
+    - governance/seam-3-closeout.md
   required_threads:
     - THR-01
     - THR-03
@@ -20,9 +21,9 @@ basis:
     - new contradiction classes appear between pointers, statuses, and published rows
 gates:
   pre_exec:
-    review: pending
-    contract: pending
-    revalidation: pending
+    review: passed
+    contract: passed
+    revalidation: passed
   post_exec:
     landing: pending
     closeout: pending
@@ -87,7 +88,7 @@ open_remediations: []
   - fail-fast and deterministic only
   - repo-gate coupling should stay cheap enough for routine use
 - **Downstream decomposition context**:
-  - Why this seam is `active`, `next`, or `future`: it is `future` because validator enforcement depends on the final derived model and publication outputs.
+  - Why this seam is `active`, `next`, or `future`: it is `active` because `SEAM-3` has now landed and closed, so validator enforcement can consume the published row model and projection surfaces directly.
   - Which threads matter most: `THR-03`, `THR-04`
   - What the first seam-local review should focus on: whether every contradiction class is phrased as a machine-checkable rule rather than a reviewer judgment call
   - Boundary slice intent: `S00` is unnecessary unless repo-gate ownership or validator authority is still ambiguous after `SEAM-3` lands

@@ -3,7 +3,7 @@ seam_id: SEAM-5
 seam_slug: fixture-and-golden-conformance
 type: conformance
 status: proposed
-execution_horizon: future
+execution_horizon: next
 plan_version: v1
 basis:
   currentness: provisional
@@ -91,7 +91,7 @@ open_remediations: []
   - regression-only seam
   - should strengthen, not expand, publication surface area
 - **Downstream decomposition context**:
-  - Why this seam is `active`, `next`, or `future`: it is `future` because conformance should lock in the landed shared core, row model, and validator behavior rather than guess them early.
+  - Why this seam is `active`, `next`, or `future`: it is `next` because the fixture/golden seam should consume the active validator seam's contradiction rules after `SEAM-4` lands instead of guessing them early.
   - Which threads matter most: `THR-05`
   - What the first seam-local review should focus on: whether the fixture matrix is broad enough to protect neutrality and not just current repo shapes
   - Boundary slice intent: `S00` is unnecessary unless conformance ownership between golden outputs and fixture suites is still ambiguous after `SEAM-4`
