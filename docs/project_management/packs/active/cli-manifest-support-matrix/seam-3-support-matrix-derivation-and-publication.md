@@ -2,14 +2,16 @@
 seam_id: SEAM-3
 seam_slug: support-matrix-derivation-and-publication
 type: capability
-status: proposed
-execution_horizon: next
+status: exec-ready
+execution_horizon: active
 plan_version: v1
 basis:
-  currentness: provisional
+  currentness: current
   source_scope_ref: scope_brief.md
   source_scope_version: v1
-  upstream_closeouts: []
+  upstream_closeouts:
+    - governance/seam-1-closeout.md
+    - governance/seam-2-closeout.md
   required_threads:
     - THR-01
     - THR-02
@@ -20,9 +22,9 @@ basis:
     - publication row fields need to distinguish new support states
 gates:
   pre_exec:
-    review: pending
-    contract: pending
-    revalidation: pending
+    review: passed
+    contract: passed
+    revalidation: passed
   post_exec:
     landing: pending
     closeout: pending
@@ -35,6 +37,7 @@ open_remediations: []
 
 # SEAM-3 - Support-matrix derivation and publication
 
+- **Current planning posture**: exec-ready. The seam has consumed the landed semantics and shared-core handoff, and its seam-local review and slice plan now define the row-model and projection contract concretely enough to implement.
 - **Goal / value**: publish support truth from committed evidence using one shared derived row model that feeds both the JSON artifact and the Markdown projection.
 - **Scope**
   - In:
@@ -94,10 +97,10 @@ open_remediations: []
   - additive publication only
   - capability matrix remains untouched except for reused rendering patterns
 - **Downstream decomposition context**:
-  - Why this seam is `active`, `next`, or `future`: it is `next` because `SEAM-2` is now the active normalization seam and publication work becomes the next safe consumer once that shared core lands.
+  - Why this seam is `active`, `next`, or `future`: it is `active` because `SEAM-2` has now landed its shared normalization and root-intake seam, so publication work can safely consume that handoff.
   - Which threads matter most: `THR-02`, `THR-03`
   - What the first seam-local review should focus on: whether the row fields, ordering, and evidence-note rules are enough for both publication and validator consumers
-  - Boundary slice intent: `S00` is probably unnecessary unless seam-local planning uncovers unresolved row-schema ambiguity that blocks implementation
+  - Boundary slice intent: reserve `S00` for row-model and projection contract-definition work before the derivation and renderer slices start changing production artifacts
 - **Expected seam-exit concerns**:
   - Contracts likely to publish: `C-04`, `C-05`
   - Threads likely to advance: `THR-03`

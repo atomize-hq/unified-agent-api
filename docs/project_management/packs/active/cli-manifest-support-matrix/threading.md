@@ -6,12 +6,12 @@ Ownership note: this repo's normative contract surfaces live under `docs/specs/*
 
 ## Execution horizon summary
 
-- Active seam: `SEAM-2`
-- Next seam: `SEAM-3`
-- Future seams: `SEAM-4`, `SEAM-5`
-- Only `SEAM-2` is eligible for authoritative deep planning by default.
-- `SEAM-3` may later receive seam-local review and slices, but only provisional deeper planning while `SEAM-2` is still advancing.
-- `SEAM-4` and `SEAM-5` remain seam briefs only until the active and next seam basis becomes current.
+- Active seam: `SEAM-3`
+- Next seam: `SEAM-4`
+- Future seams: `SEAM-5`
+- `SEAM-2` has landed and closed.
+- `SEAM-3` is now eligible for authoritative deep planning.
+- `SEAM-4` is the next queued seam because it consumes the derived row model from `SEAM-3`.
 
 ## Contract registry
 
@@ -95,27 +95,27 @@ Ownership note: this repo's normative contract surfaces live under `docs/specs/*
   - **State**: `revalidated`
   - **Revalidation trigger**: any change to support-layer vocabulary, canonical output locations, or the published meaning of `validated` vs `supported`
   - **Satisfied by**: landed spec text in `docs/specs/unified-agent-api/support-matrix.md`, aligned manifest docs, neutral `xtask support-matrix` command wiring, and the `SEAM-1` closeout record
-  - **Notes**: `SEAM-2` has now revalidated against this thread; downstream seams should treat the support-layer names, publication targets, and `validated` versus `supported` meaning as current inputs.
+  - **Notes**: `SEAM-2` and `SEAM-3` have now revalidated against this thread; downstream seams should treat the support-layer names, publication targets, and `validated` versus `supported` meaning as current inputs.
 
 - **Thread ID**: `THR-02`
   - **Producer seam**: `SEAM-2`
   - **Consumer seam(s)**: `SEAM-3`, `SEAM-4`, `SEAM-5`
   - **Carried contract IDs**: `C-02`, `C-03`
   - **Purpose**: hand off one neutral normalization + root-intake seam so publication and validator layers do not duplicate Codex/Claude logic.
-  - **State**: `defined`
+  - **State**: `revalidated`
   - **Revalidation trigger**: any shift in root file layout, coverage report shape, or extraction boundaries between shared and per-agent modules
   - **Satisfied by**: shared normalization module plus thin adapters with fixture coverage against current Codex and Claude roots
-  - **Notes**: this thread is now the active seam's main handoff surface for `SEAM-3`, `SEAM-4`, and `SEAM-5`.
+  - **Notes**: this thread is now current input for the active seam and the main handoff surface for `SEAM-3`, `SEAM-4`, and `SEAM-5`.
 
 - **Thread ID**: `THR-03`
   - **Producer seam**: `SEAM-3`
   - **Consumer seam(s)**: `SEAM-4`, `SEAM-5`
   - **Carried contract IDs**: `C-04`, `C-05`
   - **Purpose**: expose one derived row model consumed by both JSON/Markdown publication and later validator checks.
-  - **State**: `identified`
+  - **State**: `defined`
   - **Revalidation trigger**: any change to row fields, output ordering, or evidence-note rules
   - **Satisfied by**: shared derivation model plus deterministic JSON and Markdown renders from that model
-  - **Notes**: `SEAM-4` can prototype checks provisionally, but final validator assertions depend on this thread becoming current.
+  - **Notes**: `SEAM-3` is now active with seam-local planning that defines the row-model and Markdown-projection contract surface; `SEAM-4` can now plan directly against that defined thread while still waiting on landing for publication-grade truth.
 
 - **Thread ID**: `THR-04`
   - **Producer seam**: `SEAM-4`

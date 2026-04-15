@@ -4,15 +4,19 @@ Primary axis: **integration-first publication pipeline**. The feature turns exis
 
 ## Execution horizon (inferred)
 
-- Active seam: `SEAM-2`
-- Next seam: `SEAM-3`
-- Future seams: `SEAM-4`, `SEAM-5`
+- Active seam: `SEAM-3`
+- Next seam: `SEAM-4`
+- Future seams: `SEAM-5`
+- `SEAM-2` has landed and closed.
+- `SEAM-3` is now the active seam.
+- `SEAM-4` is now the next queued seam.
 
 Why this horizon:
 
 - `SEAM-1` has landed the support semantics, publication authority, and neutral `xtask support-matrix` command contract.
-- `SEAM-2` now sits on the critical path because publication and validation work need one neutral shared normalization and root-intake seam.
-- `SEAM-3` becomes the queued next seam because derivation and publication still depend on `SEAM-2` landing its shared core.
+- `SEAM-2` has landed the shared normalization and root-intake seam.
+- `SEAM-3` is now active because publication work can consume the shared core and finalize the derived row model.
+- `SEAM-4` is queued next because consistency validation depends on `SEAM-3`'s final derived row model.
 
 ## Seams
 
@@ -23,19 +27,20 @@ Why this horizon:
    - Verification path: docs/spec alignment plus a stable command contract in `crates/xtask/src/main.rs`.
 
 2. **SEAM-2 - Shared wrapper normalization and agent-root intake**
-   - Execution horizon: active
+   - Execution horizon: future
    - Type: integration
    - Owns: the reusable normalization seam extracted from existing wrapper-coverage code plus neutral loading of manifest/version/pointer/report inputs from each agent root.
    - Verification path: shared-module unit coverage and thin-adapter review against current Codex and Claude inputs.
+   - Note: landed and closed; retained only as historical basis for downstream seams.
 
 3. **SEAM-3 - Support-matrix derivation and publication**
-   - Execution horizon: next
+   - Execution horizon: active
    - Type: capability
    - Owns: single-pass row derivation, deterministic JSON rendering, and Markdown projection from the same model.
    - Verification path: golden outputs and contradiction handling against checked-in fixture roots.
 
 4. **SEAM-4 - Consistency validation and repo-gate enforcement**
-   - Execution horizon: future
+   - Execution horizon: next
    - Type: conformance
    - Owns: generator-level contradiction checks, pointer/status consistency rules, Markdown staleness detection, and repo-gate integration decisions.
    - Verification path: validator tests plus deterministic failure behavior for mismatched manifest inputs.

@@ -10,10 +10,12 @@ This pack captures seam briefs, authoritative threading, pack-level review surfa
 - Pack review surfaces: `review_surfaces.md`
 - Governance: `governance/remediation-log.md`
 
-Execution horizon (inferred from the critical path in the source plan):
+Execution horizon:
 
-- Active seam: `SEAM-2`
-- Next seam: `SEAM-3`
+- Active seam: `SEAM-3`
+- Next seam: `SEAM-4`
+- Future seams: `SEAM-5`
+- `SEAM-2` has landed and closed, so it is now out of the forward window.
 
 Policy:
 
