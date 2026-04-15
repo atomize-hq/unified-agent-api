@@ -23,6 +23,23 @@ fn write_text(path: &Path, contents: &str) {
 fn fixture_workspace(root: &Path) {
     write_text(&root.join("VERSION"), "0.2.0\n");
     write_text(
+        &root.join("CHANGELOG.md"),
+        r#"# Changelog
+
+## [Unreleased]
+
+### Added
+
+- Pending release note.
+
+## [0.2.0] - 2026-04-14
+
+### Added
+
+- Previous release note.
+"#,
+    );
+    write_text(
         &root.join("Cargo.toml"),
         r#"[workspace]
 members = ["crates/leaf", "crates/root", "crates/nonpub"]
@@ -113,6 +130,11 @@ fn c9_spec_version_bump_updates_release_surfaces_in_one_pass() {
 
     let root_manifest = fs::read_to_string(root.join("Cargo.toml")).expect("read root Cargo");
     assert!(root_manifest.contains("version = \"0.3.1\""));
+
+    let changelog = fs::read_to_string(root.join("CHANGELOG.md")).expect("read changelog");
+    assert!(changelog.contains("## [Unreleased]\n\n## [0.3.1] - "));
+    assert!(changelog.contains("- Pending release note."));
+    assert!(changelog.contains("## [0.2.0] - 2026-04-14"));
 
     let root_crate_manifest =
         fs::read_to_string(root.join("crates/root/Cargo.toml")).expect("read root crate");

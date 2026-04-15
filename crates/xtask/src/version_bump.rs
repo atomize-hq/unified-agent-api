@@ -6,8 +6,10 @@ use std::{
 
 use clap::Parser;
 use semver::Version;
+use time::OffsetDateTime;
 use toml_edit::{value, DocumentMut, Item, Table, Value};
 
+const CHANGELOG_PATH: &str = "CHANGELOG.md";
 const DEP_SECTION_KEYS: &[&str] = &["dependencies", "dev-dependencies", "build-dependencies"];
 
 #[derive(Debug, Parser)]
@@ -38,6 +40,7 @@ pub fn run(args: Args) -> Result<(), String> {
 struct WorkspaceState {
     root: PathBuf,
     root_doc: DocumentMut,
+    changelog: String,
     members: Vec<MemberManifest>,
 }
 
@@ -51,7 +54,10 @@ struct MemberManifest {
 impl WorkspaceState {
     fn load(root: &Path) -> Result<Self, String> {
         let root_manifest_path = root.join("Cargo.toml");
+        let changelog_path = root.join(CHANGELOG_PATH);
         let root_doc = read_toml(&root_manifest_path)?;
+        let changelog = fs::read_to_string(&changelog_path)
+            .map_err(|err| format!("read {}: {err}", changelog_path.display()))?;
         let member_paths = workspace_member_manifest_paths(root, &root_doc)?;
         let mut members = Vec::with_capacity(member_paths.len());
 
@@ -71,12 +77,18 @@ impl WorkspaceState {
         Ok(Self {
             root: root.to_path_buf(),
             root_doc,
+            changelog,
             members,
         })
     }
 
     fn apply(&mut self, new_version: &str) -> Result<(), String> {
         self.root_doc["workspace"]["package"]["version"] = value(new_version);
+        self.changelog = update_changelog_for_release(
+            &self.changelog,
+            new_version,
+            &current_utc_date_string(),
+        )?;
         let publishable_names: BTreeSet<String> = self
             .members
             .iter()
@@ -104,6 +116,12 @@ impl WorkspaceState {
         if root_version != new_version {
             return Err(format!(
                 "workspace.package.version drifted to {root_version}, expected {new_version}"
+            ));
+        }
+
+        if !self.changelog.contains(&format!("## [{new_version}]")) {
+            return Err(format!(
+                "{CHANGELOG_PATH} is missing release heading for {new_version}"
             ));
         }
 
@@ -141,10 +159,13 @@ impl WorkspaceState {
 
     fn write(&self) -> Result<(), String> {
         let root_manifest_path = self.root.join("Cargo.toml");
+        let changelog_path = self.root.join(CHANGELOG_PATH);
         let root_version = self.root_doc["workspace"]["package"]["version"]
             .as_str()
             .ok_or_else(|| "workspace.package.version must remain a string".to_string())?;
         write_toml(&root_manifest_path, &self.root_doc)?;
+        fs::write(&changelog_path, &self.changelog)
+            .map_err(|err| format!("write {}: {err}", changelog_path.display()))?;
         fs::write(self.root.join("VERSION"), format!("{root_version}\n"))
             .map_err(|err| format!("write {}: {err}", self.root.join("VERSION").display()))?;
 
@@ -197,6 +218,58 @@ fn write_toml(path: &Path, doc: &DocumentMut) -> Result<(), String> {
         rendered.push('\n');
     }
     fs::write(path, rendered).map_err(|err| format!("write {}: {err}", path.display()))
+}
+
+fn current_utc_date_string() -> String {
+    let now = OffsetDateTime::now_utc().date();
+    format!(
+        "{:04}-{:02}-{:02}",
+        now.year(),
+        u8::from(now.month()),
+        now.day()
+    )
+}
+
+fn update_changelog_for_release(
+    changelog: &str,
+    new_version: &str,
+    release_date: &str,
+) -> Result<String, String> {
+    let release_heading = format!("## [{new_version}]");
+    if changelog.contains(&release_heading) {
+        return Ok(changelog.to_string());
+    }
+
+    let unreleased_heading = "## [Unreleased]";
+    let Some(unreleased_start) = changelog.find(unreleased_heading) else {
+        return Err(format!(
+            "{CHANGELOG_PATH} is missing the `{unreleased_heading}` section"
+        ));
+    };
+    let unreleased_after_heading = unreleased_start + unreleased_heading.len();
+    let remainder = &changelog[unreleased_after_heading..];
+    let next_heading_offset = remainder.find("\n## [").unwrap_or(remainder.len());
+    let unreleased_body = remainder[..next_heading_offset].trim_matches('\n');
+    let rest = remainder[next_heading_offset..].trim_start_matches('\n');
+
+    let mut updated = String::new();
+    updated.push_str(&changelog[..unreleased_after_heading]);
+    updated.push_str("\n\n");
+    updated.push_str(&format!("## [{new_version}] - {release_date}\n"));
+    if !unreleased_body.is_empty() {
+        updated.push('\n');
+        updated.push_str(unreleased_body);
+        updated.push('\n');
+    }
+    if !rest.is_empty() {
+        updated.push('\n');
+        updated.push_str(rest);
+        if !updated.ends_with('\n') {
+            updated.push('\n');
+        }
+    }
+
+    Ok(updated)
 }
 
 fn package_name(doc: &DocumentMut) -> Option<String> {
