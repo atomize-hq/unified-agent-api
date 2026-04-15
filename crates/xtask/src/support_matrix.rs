@@ -209,6 +209,21 @@ pub(crate) fn derive_rows(workspace_root: &Path) -> Result<Vec<SupportRow>, Stri
     derive_rows_for_roots(&roots)
 }
 
+#[cfg(test)]
+pub(crate) fn derive_rows_for_test_roots(
+    workspace_root: &Path,
+    roots: &[(&str, &str)],
+) -> Result<Vec<SupportRow>, String> {
+    let roots = roots
+        .iter()
+        .map(|(agent, rel_root)| AgentRoot {
+            agent: (*agent).to_string(),
+            root: workspace_root.join(rel_root),
+        })
+        .collect::<Vec<_>>();
+    derive_rows_for_roots(&roots)
+}
+
 fn derive_rows_for_roots(roots: &[AgentRoot]) -> Result<Vec<SupportRow>, String> {
     let mut rows = Vec::new();
     for root in roots {

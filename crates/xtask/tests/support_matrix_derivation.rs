@@ -12,8 +12,9 @@ mod support_matrix;
 mod wrapper_coverage_shared;
 
 use support_matrix::{
-    derive_rows, validate_publication_consistency, BackendSupportState, ManifestSupportState,
-    PointerPromotionState, SupportRow, UaaSupportState,
+    derive_rows, derive_rows_for_test_roots, validate_publication_consistency,
+    BackendSupportState, ManifestSupportState, PointerPromotionState, SupportRow,
+    UaaSupportState,
 };
 
 fn make_temp_dir(prefix: &str) -> PathBuf {
@@ -278,4 +279,121 @@ fn derives_target_scoped_rows_with_sparse_caveats_and_pointer_state() {
     assert_eq!(rows[1].target, "linux-x64");
     assert_eq!(rows[1].version, "1.0.0");
     assert_eq!(rows[2].version, "0.9.0");
+}
+
+#[test]
+fn derives_rows_for_codex_claude_and_synthetic_future_agent_roots() {
+    let workspace = make_temp_dir("support-matrix-derivation-future-agent");
+
+    materialize_root(
+        &workspace.join("cli_manifests/codex"),
+        &["linux-x64"],
+        "1.0.0",
+        &["linux-x64"],
+        &[("1.0.0", &["linux-x64"])],
+        &[("linux-x64", "1.0.0")],
+        &[("linux-x64", "1.0.0")],
+        &[(
+            "1.0.0",
+            "coverage.linux-x64.json",
+            json!({
+                "deltas": {
+                    "missing_commands": [],
+                    "missing_flags": [],
+                    "missing_args": [],
+                    "intentionally_unsupported": [],
+                    "wrapper_only_commands": [],
+                    "wrapper_only_flags": [],
+                    "wrapper_only_args": [],
+                }
+            }),
+        )],
+    );
+
+    materialize_root(
+        &workspace.join("cli_manifests/claude_code"),
+        &["linux-x64"],
+        "2.0.0",
+        &["linux-x64"],
+        &[("2.0.0", &["linux-x64"])],
+        &[("linux-x64", "2.0.0")],
+        &[("linux-x64", "2.0.0")],
+        &[(
+            "2.0.0",
+            "coverage.linux-x64.json",
+            json!({
+                "deltas": {
+                    "missing_commands": [],
+                    "missing_flags": [],
+                    "missing_args": [],
+                    "intentionally_unsupported": [],
+                    "wrapper_only_commands": [],
+                    "wrapper_only_flags": [],
+                    "wrapper_only_args": [],
+                }
+            }),
+        )],
+    );
+
+    materialize_root(
+        &workspace.join("cli_manifests/future_agent"),
+        &["linux-x64"],
+        "3.0.0",
+        &["linux-x64"],
+        &[("3.0.0", &["linux-x64"])],
+        &[("linux-x64", "3.0.0")],
+        &[("linux-x64", "3.0.0")],
+        &[(
+            "3.0.0",
+            "coverage.linux-x64.json",
+            json!({
+                "deltas": {
+                    "missing_commands": [],
+                    "missing_flags": [],
+                    "missing_args": [],
+                    "intentionally_unsupported": [
+                        { "path": ["future-only"] }
+                    ],
+                    "wrapper_only_commands": [],
+                    "wrapper_only_flags": [],
+                    "wrapper_only_args": [],
+                }
+            }),
+        )],
+    );
+
+    let rows = derive_rows_for_test_roots(
+        &workspace,
+        &[
+            ("codex", "cli_manifests/codex"),
+            ("claude_code", "cli_manifests/claude_code"),
+            ("future_agent", "cli_manifests/future_agent"),
+        ],
+    )
+    .expect("derive rows for codex, claude, and future-agent-shaped roots");
+
+    assert_eq!(rows.len(), 3, "expected one row per fixture root");
+
+    let codex_row = find_row(&rows, "codex", "1.0.0", "linux-x64");
+    assert_eq!(codex_row.manifest_support, ManifestSupportState::Supported);
+    assert_eq!(codex_row.backend_support, BackendSupportState::Supported);
+    assert_eq!(codex_row.uaa_support, UaaSupportState::Supported);
+
+    let claude_row = find_row(&rows, "claude_code", "2.0.0", "linux-x64");
+    assert_eq!(claude_row.manifest_support, ManifestSupportState::Supported);
+    assert_eq!(claude_row.backend_support, BackendSupportState::Supported);
+    assert_eq!(claude_row.uaa_support, UaaSupportState::Supported);
+
+    let future_row = find_row(&rows, "future_agent", "3.0.0", "linux-x64");
+    assert_eq!(future_row.manifest_support, ManifestSupportState::Supported);
+    assert_eq!(future_row.backend_support, BackendSupportState::Partial);
+    assert_eq!(future_row.uaa_support, UaaSupportState::Partial);
+    assert_eq!(
+        future_row.pointer_promotion,
+        PointerPromotionState::LatestSupportedAndValidated
+    );
+    assert_eq!(
+        future_row.evidence_notes,
+        vec!["backend report includes intentionally unsupported surface outside unified support".to_string()]
+    );
 }
