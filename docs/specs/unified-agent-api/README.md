@@ -21,5 +21,9 @@ Generated artifact:
 - Any change that adds or removes a built-in backend capability id MUST regenerate that artifact in
   the same change so the published backend inventory stays aligned with `capabilities()`.
 
+The support publication contract lives in `docs/specs/unified-agent-api/support-matrix.md`. The
+generated `capability-matrix.md` remains a separate backend inventory surface and does not define
+support policy.
+
 Planning/execution artifacts remain in:
 - the Unified Agent API planning pack under `docs/project_management/next/`

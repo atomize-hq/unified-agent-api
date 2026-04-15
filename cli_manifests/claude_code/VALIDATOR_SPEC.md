@@ -1,6 +1,8 @@
 # Claude Code Parity Validator Spec (`xtask codex-validate`)
 
 This document specifies the deterministic validator used to enforce `cli_manifests/claude_code/RULES.json` invariants in CI.
+The support-publication contract itself lives in `docs/specs/unified-agent-api/support-matrix.md`;
+this validator only enforces the parity artifacts that feed validation and support state.
 
 ## Goals
 
@@ -236,7 +238,7 @@ Violations:
 - `VALIDATION_TARGET_NOT_EXPECTED`
 - `VALIDATION_REQUIRED_TARGET_NOT_EXPLICIT`
 
-### `current_json_identity`: `current.json` corresponds to latest validated
+### `current_json_identity`: `current.json` corresponds to the latest validated promotion snapshot
 
 Using `latest_validated.txt`:
 - Parse union snapshot `snapshots/<latest_validated>/union.json`
