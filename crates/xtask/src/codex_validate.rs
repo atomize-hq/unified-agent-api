@@ -586,26 +586,35 @@ fn validate_support_matrix_publication(ctx: &ValidateCtx, violations: &mut Vec<V
         support_matrix::validate_publication_consistency(&workspace_root, &artifact.rows)
     {
         for issue in issues {
-            let row_index = artifact
-                .rows
-                .iter()
-                .position(|row| {
-                    row.agent == issue.agent
-                        && row.version == issue.version
-                        && row.target == issue.target
-                })
-                .unwrap_or(0);
+            let row_index = artifact.rows.iter().position(|row| {
+                row.agent == issue.agent
+                    && row.version == issue.version
+                    && row.target == issue.target
+            });
+            let has_row_binding = row_index.is_some();
             violations.push(Violation {
                 code: issue.code,
                 path: rel_path(&workspace_root, &artifact_path),
-                json_pointer: Some(format!("/rows/{row_index}")),
+                json_pointer: Some(
+                    row_index
+                        .map(|row_index| format!("/rows/{row_index}"))
+                        .unwrap_or_else(|| "/rows".to_string()),
+                ),
                 message: issue.message,
                 unit: Some("support_matrix"),
                 command_path: None,
-                key_or_name: Some(issue.agent),
+                key_or_name: (!issue.agent.is_empty()).then_some(issue.agent.clone()),
                 field: Some("rows"),
-                target_triple: Some(issue.target),
-                details: Some(serde_json::Value::String(issue.version)),
+                target_triple: (!issue.target.is_empty()).then_some(issue.target.clone()),
+                details: Some(if has_row_binding {
+                    serde_json::Value::String(issue.version)
+                } else {
+                    serde_json::json!({
+                        "agent": issue.agent,
+                        "version": issue.version,
+                        "target": issue.target,
+                    })
+                }),
             });
         }
     }

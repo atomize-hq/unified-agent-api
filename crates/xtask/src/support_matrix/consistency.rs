@@ -12,6 +12,23 @@ use super::{
     UaaSupportState, VersionMetadata, CURRENT_AGENT_ROOTS,
 };
 
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+struct SupportRowIdentity {
+    agent: String,
+    version: String,
+    target: String,
+}
+
+impl SupportRowIdentity {
+    fn from_row(row: &SupportRow) -> Self {
+        Self {
+            agent: row.agent.clone(),
+            version: row.version.clone(),
+            target: row.target.clone(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct SupportMatrixConsistencyIssue {
     pub code: &'static str,
@@ -22,6 +39,39 @@ pub(crate) struct SupportMatrixConsistencyIssue {
 }
 
 impl SupportMatrixConsistencyIssue {
+    fn missing_row(identity: &SupportRowIdentity) -> Self {
+        Self {
+            code: "SUPPORT_MATRIX_ROW_MISSING",
+            agent: identity.agent.clone(),
+            version: identity.version.clone(),
+            target: identity.target.clone(),
+            message: "publication is missing a committed (agent, version, target) row".to_string(),
+        }
+    }
+
+    fn unexpected_row(identity: &SupportRowIdentity) -> Self {
+        Self {
+            code: "SUPPORT_MATRIX_ROW_UNEXPECTED",
+            agent: identity.agent.clone(),
+            version: identity.version.clone(),
+            target: identity.target.clone(),
+            message: "publication contains a row not implied by committed manifest metadata"
+                .to_string(),
+        }
+    }
+
+    fn duplicate_row(identity: &SupportRowIdentity, count: usize) -> Self {
+        Self {
+            code: "SUPPORT_MATRIX_ROW_DUPLICATE",
+            agent: identity.agent.clone(),
+            version: identity.version.clone(),
+            target: identity.target.clone(),
+            message: format!(
+                "publication contains {count} rows for the same committed (agent, version, target) tuple"
+            ),
+        }
+    }
+
     fn pointer_promotion_mismatch(row: &SupportRow, observed: PointerPromotionState) -> Self {
         Self {
             code: "SUPPORT_MATRIX_POINTER_PROMOTION_MISMATCH",
@@ -77,33 +127,31 @@ pub(crate) fn validate_publication_consistency(
 ) -> Result<(), Vec<SupportMatrixConsistencyIssue>> {
     let mut issues = Vec::new();
     let mut roots = BTreeMap::new();
-
-    let required_agents = rows
+    let known_agents = CURRENT_AGENT_ROOTS
         .iter()
-        .map(|row| row.agent.as_str())
+        .map(|(agent, _)| *agent)
         .collect::<BTreeSet<_>>();
-    if required_agents.is_empty() {
-        return Ok(());
-    }
 
-    for agent in required_agents {
-        let Some((_, rel_root)) = CURRENT_AGENT_ROOTS
-            .iter()
-            .find(|(candidate, _)| *candidate == agent)
-        else {
-            issues.push(SupportMatrixConsistencyIssue {
-                code: "SUPPORT_MATRIX_UNKNOWN_AGENT",
-                agent: agent.to_string(),
-                version: String::new(),
-                target: String::new(),
-                message: "row agent does not match a committed manifest root".to_string(),
-            });
-            continue;
-        };
+    for (agent, rel_root) in CURRENT_AGENT_ROOTS {
         let root = AgentRoot {
             agent: agent.to_string(),
             root: workspace_root.join(rel_root),
         };
+        if !root.root.exists() {
+            if rows.iter().any(|row| row.agent == root.agent) {
+                issues.push(SupportMatrixConsistencyIssue {
+                    code: "SUPPORT_MATRIX_ROOT_READ_ERROR",
+                    agent: root.agent.clone(),
+                    version: String::new(),
+                    target: String::new(),
+                    message: format!(
+                        "committed manifest root is missing from workspace: {}",
+                        root.root.display()
+                    ),
+                });
+            }
+            continue;
+        }
         let posture = match read_current_root_posture(&root.root) {
             Ok(posture) => posture,
             Err(err) => {
@@ -153,10 +201,52 @@ pub(crate) fn validate_publication_consistency(
         );
     }
 
+    for agent in rows
+        .iter()
+        .map(|row| row.agent.as_str())
+        .filter(|agent| !known_agents.contains(agent))
+        .collect::<BTreeSet<_>>()
+    {
+        issues.push(SupportMatrixConsistencyIssue {
+            code: "SUPPORT_MATRIX_UNKNOWN_AGENT",
+            agent: agent.to_string(),
+            version: String::new(),
+            target: String::new(),
+            message: "row agent does not match a committed manifest root".to_string(),
+        });
+    }
+
+    let expected_identities = expected_row_identities(&roots);
+    let mut observed_counts = BTreeMap::<SupportRowIdentity, usize>::new();
+    for row in rows {
+        let identity = SupportRowIdentity::from_row(row);
+        *observed_counts.entry(identity).or_default() += 1;
+    }
+
+    for identity in &expected_identities {
+        if !observed_counts.contains_key(identity) {
+            issues.push(SupportMatrixConsistencyIssue::missing_row(identity));
+        }
+    }
+    for (identity, count) in &observed_counts {
+        if *count > 1 {
+            issues.push(SupportMatrixConsistencyIssue::duplicate_row(
+                identity, *count,
+            ));
+        }
+        if !expected_identities.contains(identity) {
+            issues.push(SupportMatrixConsistencyIssue::unexpected_row(identity));
+        }
+    }
+
     for row in rows {
         let Some(ctx) = roots.get(&row.agent) else {
             continue;
         };
+        let identity = SupportRowIdentity::from_row(row);
+        if !expected_identities.contains(&identity) {
+            continue;
+        }
 
         validate_row_consistency(row, ctx, &mut issues);
     }
@@ -198,6 +288,26 @@ fn read_version_statuses(root: &Path) -> Result<BTreeMap<String, Option<String>>
     }
 
     Ok(version_statuses)
+}
+
+fn expected_row_identities(
+    roots: &BTreeMap<String, RootConsistencyContext>,
+) -> BTreeSet<SupportRowIdentity> {
+    let mut identities = BTreeSet::new();
+
+    for (agent, ctx) in roots {
+        for version in ctx.version_statuses.keys() {
+            for target in &ctx.posture.expected_targets {
+                identities.insert(SupportRowIdentity {
+                    agent: agent.clone(),
+                    version: version.clone(),
+                    target: target.clone(),
+                });
+            }
+        }
+    }
+
+    identities
 }
 
 fn validate_row_consistency(

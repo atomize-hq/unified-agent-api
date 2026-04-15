@@ -174,6 +174,248 @@ fn publication_consistency_passes_for_matching_rows() {
 }
 
 #[test]
+fn publication_consistency_rejects_missing_committed_row() {
+    let workspace = make_temp_dir("support-matrix-consistency-missing");
+
+    materialize_root(
+        &workspace.join("cli_manifests/codex"),
+        &["linux-x64", "win32-x64"],
+        "1.0.0",
+        &["linux-x64"],
+        &[("1.0.0", &["linux-x64"])],
+        &[("linux-x64", "1.0.0")],
+        &[("linux-x64", "1.0.0")],
+        &[
+            (
+                "1.0.0",
+                "coverage.linux-x64.json",
+                serde_json::json!({
+                    "deltas": {
+                        "missing_commands": [],
+                        "missing_flags": [],
+                        "missing_args": [],
+                        "intentionally_unsupported": [],
+                        "wrapper_only_commands": [],
+                        "wrapper_only_flags": [],
+                        "wrapper_only_args": [],
+                    }
+                }),
+            ),
+            (
+                "1.0.0",
+                "coverage.win32-x64.json",
+                serde_json::json!({
+                    "deltas": {
+                        "missing_commands": [],
+                        "missing_flags": [],
+                        "missing_args": [],
+                        "intentionally_unsupported": [],
+                        "wrapper_only_commands": [],
+                        "wrapper_only_flags": [],
+                        "wrapper_only_args": [],
+                    }
+                }),
+            ),
+        ],
+    );
+
+    materialize_root(
+        &workspace.join("cli_manifests/claude_code"),
+        &["linux-x64"],
+        "2.0.0",
+        &["linux-x64"],
+        &[("2.0.0", &["linux-x64"])],
+        &[("linux-x64", "2.0.0")],
+        &[("linux-x64", "2.0.0")],
+        &[(
+            "2.0.0",
+            "coverage.linux-x64.json",
+            serde_json::json!({
+                "deltas": {
+                    "missing_commands": [],
+                    "missing_flags": [],
+                    "missing_args": [],
+                    "intentionally_unsupported": [],
+                    "wrapper_only_commands": [],
+                    "wrapper_only_flags": [],
+                    "wrapper_only_args": [],
+                }
+            }),
+        )],
+    );
+
+    let mut rows = derive_rows(&workspace).expect("derive rows");
+    rows.retain(|row| {
+        !(row.agent == "codex" && row.version == "1.0.0" && row.target == "win32-x64")
+    });
+
+    let issues = validate_publication_consistency(&workspace, &rows)
+        .expect_err("missing committed row should be rejected");
+    assert!(
+        issues
+            .iter()
+            .any(|issue| issue.code == "SUPPORT_MATRIX_ROW_MISSING"
+                && issue.agent == "codex"
+                && issue.version == "1.0.0"
+                && issue.target == "win32-x64"),
+        "expected missing-row mismatch, got: {issues:#?}"
+    );
+}
+
+#[test]
+fn publication_consistency_rejects_duplicate_row() {
+    let workspace = make_temp_dir("support-matrix-consistency-duplicate");
+
+    materialize_root(
+        &workspace.join("cli_manifests/codex"),
+        &["linux-x64"],
+        "1.0.0",
+        &["linux-x64"],
+        &[("1.0.0", &["linux-x64"])],
+        &[("linux-x64", "1.0.0")],
+        &[("linux-x64", "1.0.0")],
+        &[(
+            "1.0.0",
+            "coverage.linux-x64.json",
+            serde_json::json!({
+                "deltas": {
+                    "missing_commands": [],
+                    "missing_flags": [],
+                    "missing_args": [],
+                    "intentionally_unsupported": [],
+                    "wrapper_only_commands": [],
+                    "wrapper_only_flags": [],
+                    "wrapper_only_args": [],
+                }
+            }),
+        )],
+    );
+
+    materialize_root(
+        &workspace.join("cli_manifests/claude_code"),
+        &["linux-x64"],
+        "2.0.0",
+        &["linux-x64"],
+        &[("2.0.0", &["linux-x64"])],
+        &[("linux-x64", "2.0.0")],
+        &[("linux-x64", "2.0.0")],
+        &[(
+            "2.0.0",
+            "coverage.linux-x64.json",
+            serde_json::json!({
+                "deltas": {
+                    "missing_commands": [],
+                    "missing_flags": [],
+                    "missing_args": [],
+                    "intentionally_unsupported": [],
+                    "wrapper_only_commands": [],
+                    "wrapper_only_flags": [],
+                    "wrapper_only_args": [],
+                }
+            }),
+        )],
+    );
+
+    let mut rows = derive_rows(&workspace).expect("derive rows");
+    let duplicate = rows
+        .iter()
+        .find(|row| row.agent == "codex" && row.version == "1.0.0" && row.target == "linux-x64")
+        .expect("expected codex row")
+        .clone();
+    rows.push(duplicate);
+
+    let issues = validate_publication_consistency(&workspace, &rows)
+        .expect_err("duplicate committed row should be rejected");
+    assert!(
+        issues
+            .iter()
+            .any(|issue| issue.code == "SUPPORT_MATRIX_ROW_DUPLICATE"
+                && issue.agent == "codex"
+                && issue.version == "1.0.0"
+                && issue.target == "linux-x64"),
+        "expected duplicate-row mismatch, got: {issues:#?}"
+    );
+}
+
+#[test]
+fn publication_consistency_rejects_unexpected_row() {
+    let workspace = make_temp_dir("support-matrix-consistency-unexpected");
+
+    materialize_root(
+        &workspace.join("cli_manifests/codex"),
+        &["linux-x64"],
+        "1.0.0",
+        &["linux-x64"],
+        &[("1.0.0", &["linux-x64"])],
+        &[("linux-x64", "1.0.0")],
+        &[("linux-x64", "1.0.0")],
+        &[(
+            "1.0.0",
+            "coverage.linux-x64.json",
+            serde_json::json!({
+                "deltas": {
+                    "missing_commands": [],
+                    "missing_flags": [],
+                    "missing_args": [],
+                    "intentionally_unsupported": [],
+                    "wrapper_only_commands": [],
+                    "wrapper_only_flags": [],
+                    "wrapper_only_args": [],
+                }
+            }),
+        )],
+    );
+
+    materialize_root(
+        &workspace.join("cli_manifests/claude_code"),
+        &["linux-x64"],
+        "2.0.0",
+        &["linux-x64"],
+        &[("2.0.0", &["linux-x64"])],
+        &[("linux-x64", "2.0.0")],
+        &[("linux-x64", "2.0.0")],
+        &[(
+            "2.0.0",
+            "coverage.linux-x64.json",
+            serde_json::json!({
+                "deltas": {
+                    "missing_commands": [],
+                    "missing_flags": [],
+                    "missing_args": [],
+                    "intentionally_unsupported": [],
+                    "wrapper_only_commands": [],
+                    "wrapper_only_flags": [],
+                    "wrapper_only_args": [],
+                }
+            }),
+        )],
+    );
+
+    let mut rows = derive_rows(&workspace).expect("derive rows");
+    let unexpected = rows
+        .iter()
+        .find(|row| row.agent == "codex" && row.version == "1.0.0" && row.target == "linux-x64")
+        .expect("expected codex row")
+        .clone();
+    rows.push(support_matrix::SupportRow {
+        target: "darwin-arm64".to_string(),
+        ..unexpected
+    });
+
+    let issues = validate_publication_consistency(&workspace, &rows)
+        .expect_err("unexpected row should be rejected");
+    assert!(
+        issues
+            .iter()
+            .any(|issue| issue.code == "SUPPORT_MATRIX_ROW_UNEXPECTED"
+                && issue.agent == "codex"
+                && issue.version == "1.0.0"
+                && issue.target == "darwin-arm64"),
+        "expected unexpected-row mismatch, got: {issues:#?}"
+    );
+}
+
+#[test]
 fn publication_consistency_rejects_pointer_promotion_drift() {
     let workspace = make_temp_dir("support-matrix-consistency-pointer");
 

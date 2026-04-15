@@ -53,6 +53,13 @@ Support publication MUST preserve these distinctions:
 
 Both publication targets MUST be derived in a single pass from one shared support row model.
 Each published row MUST describe exactly one `(agent, version, target)` tuple.
+Publication MUST contain exactly one row for every `(agent, version, target)` tuple implied by the committed root set, each root's `current.json.expected_targets`, and each root's committed `versions/*.json` metadata.
+
+The publication row set is exact:
+
+- omitting an implied tuple is invalid publication state
+- duplicating a tuple is invalid publication state
+- publishing a tuple not implied by committed manifest metadata is invalid publication state
 
 The canonical row field order is:
 

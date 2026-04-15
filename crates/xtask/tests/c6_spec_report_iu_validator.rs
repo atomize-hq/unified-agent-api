@@ -380,6 +380,42 @@ fn c6_validator_detects_pointer_promotion_drift_in_support_matrix_publication() 
 }
 
 #[test]
+fn c6_validator_rejects_incomplete_support_matrix_publication() {
+    let temp = make_temp_dir("ccm-c6-support-matrix-missing");
+    let codex_dir = temp.join("cli_manifests").join("codex");
+    materialize_minimal_valid_codex_dir(&codex_dir);
+    write_support_matrix_artifact(
+        &temp,
+        json!([
+            {
+                "agent": "codex",
+                "version": VERSION,
+                "target": REQUIRED_TARGET,
+                "manifest_support": "supported",
+                "backend_support": "unsupported",
+                "uaa_support": "unsupported",
+                "pointer_promotion": "latest_supported_and_validated",
+                "evidence_notes": [],
+            }
+        ]),
+    );
+
+    let output = run_xtask_validate(&codex_dir);
+    assert!(
+        !output.status.success(),
+        "expected validation failure:\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
+        output.status,
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_violation_surface(
+        &output,
+        "SUPPORT_MATRIX_ROW_MISSING",
+        "cli_manifests/support_matrix/current.json",
+    );
+}
+
+#[test]
 fn c6_validator_detects_support_claim_drift_for_omitted_target() {
     let temp = make_temp_dir("ccm-c6-support-matrix-omission");
     let codex_dir = temp.join("cli_manifests").join("codex");
