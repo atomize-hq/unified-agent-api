@@ -11,6 +11,7 @@ Canonical specs:
 - `docs/specs/unified-agent-api/event-envelope-schema-spec.md`
 - `docs/specs/unified-agent-api/capabilities-schema-spec.md`
 - `docs/specs/unified-agent-api/extensions-spec.md`
+- `docs/specs/unified-agent-api/support-matrix.md`
 
 Draft specs:
 - `docs/specs/unified-agent-api/mcp-management-spec.md`
