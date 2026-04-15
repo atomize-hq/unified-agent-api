@@ -272,6 +272,19 @@ fn write_support_matrix_artifact(workspace_root: &Path, rows: Value) {
     );
 }
 
+fn assert_violation_surface(output: &std::process::Output, code: &str, expected_path: &str) {
+    let combined = format!(
+        "{}\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(combined.contains(code), "expected {code}, got:\n{combined}");
+    assert!(
+        combined.contains(expected_path),
+        "expected {expected_path} in errors, got:\n{combined}"
+    );
+}
+
 fn write_version_status(codex_dir: &Path, status: &str) {
     write_json(
         &codex_dir.join("versions").join(format!("{VERSION}.json")),
@@ -323,15 +336,10 @@ fn c6_validator_detects_version_status_drift_for_latest_validated_rows() {
         String::from_utf8_lossy(&output.stdout),
         String::from_utf8_lossy(&output.stderr)
     );
-
-    let combined = format!(
-        "{}\n{}",
-        String::from_utf8_lossy(&output.stdout),
-        String::from_utf8_lossy(&output.stderr)
-    );
-    assert!(
-        combined.contains("SUPPORT_MATRIX_VERSION_STATUS_MISMATCH"),
-        "expected SUPPORT_MATRIX_VERSION_STATUS_MISMATCH, got:\n{combined}"
+    assert_violation_surface(
+        &output,
+        "SUPPORT_MATRIX_VERSION_STATUS_MISMATCH",
+        "cli_manifests/support_matrix/current.json",
     );
 }
 
@@ -364,15 +372,10 @@ fn c6_validator_detects_pointer_promotion_drift_in_support_matrix_publication() 
         String::from_utf8_lossy(&output.stdout),
         String::from_utf8_lossy(&output.stderr)
     );
-
-    let combined = format!(
-        "{}\n{}",
-        String::from_utf8_lossy(&output.stdout),
-        String::from_utf8_lossy(&output.stderr)
-    );
-    assert!(
-        combined.contains("SUPPORT_MATRIX_POINTER_PROMOTION_MISMATCH"),
-        "expected SUPPORT_MATRIX_POINTER_PROMOTION_MISMATCH, got:\n{combined}"
+    assert_violation_surface(
+        &output,
+        "SUPPORT_MATRIX_POINTER_PROMOTION_MISMATCH",
+        "cli_manifests/support_matrix/current.json",
     );
 }
 
@@ -405,19 +408,15 @@ fn c6_validator_detects_support_claim_drift_for_omitted_target() {
         String::from_utf8_lossy(&output.stdout),
         String::from_utf8_lossy(&output.stderr)
     );
-
-    let combined = format!(
-        "{}\n{}",
-        String::from_utf8_lossy(&output.stdout),
-        String::from_utf8_lossy(&output.stderr)
+    assert_violation_surface(
+        &output,
+        "SUPPORT_MATRIX_CURRENT_SNAPSHOT_OMISSION_MISMATCH",
+        "cli_manifests/support_matrix/current.json",
     );
-    assert!(
-        combined.contains("SUPPORT_MATRIX_CURRENT_SNAPSHOT_OMISSION_MISMATCH"),
-        "expected SUPPORT_MATRIX_CURRENT_SNAPSHOT_OMISSION_MISMATCH, got:\n{combined}"
-    );
-    assert!(
-        combined.contains("SUPPORT_MATRIX_EVIDENCE_NOTES_MISMATCH"),
-        "expected SUPPORT_MATRIX_EVIDENCE_NOTES_MISMATCH, got:\n{combined}"
+    assert_violation_surface(
+        &output,
+        "SUPPORT_MATRIX_EVIDENCE_NOTES_MISMATCH",
+        "cli_manifests/support_matrix/current.json",
     );
 }
 
@@ -436,14 +435,9 @@ fn c6_validator_emits_report_missing_includes_intentionally_unsupported() {
         String::from_utf8_lossy(&output.stdout),
         String::from_utf8_lossy(&output.stderr)
     );
-
-    let combined = format!(
-        "{}\n{}",
-        String::from_utf8_lossy(&output.stdout),
-        String::from_utf8_lossy(&output.stderr)
-    );
-    assert!(
-        combined.contains("REPORT_MISSING_INCLUDES_INTENTIONALLY_UNSUPPORTED"),
-        "expected REPORT_MISSING_INCLUDES_INTENTIONALLY_UNSUPPORTED, got:\n{combined}"
+    assert_violation_surface(
+        &output,
+        "REPORT_MISSING_INCLUDES_INTENTIONALLY_UNSUPPORTED",
+        "reports/0.61.0/coverage.any.json",
     );
 }
