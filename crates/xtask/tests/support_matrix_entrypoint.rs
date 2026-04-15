@@ -30,6 +30,7 @@ fn write_json(path: &Path, value: &Value) {
     write_text(path, &format!("{text}\n"));
 }
 
+#[allow(clippy::too_many_arguments)]
 fn materialize_root(
     root: &Path,
     expected_targets: &[&str],
