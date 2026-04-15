@@ -1,8 +1,8 @@
 [package]
 name = "xtask"
-version = "0.2.0"
+version.workspace = true
 edition = "2021"
-rust-version = "1.78"
+rust-version.workspace = true
 license = "MIT OR Apache-2.0"
 publish = false
 
@@ -24,4 +24,5 @@ serde_json = { workspace = true }
 sha2 = "0.10"
 thiserror = { workspace = true }
 time = { version = "0.3", features = ["formatting", "parsing"] }
+toml_edit = "0.22"
 wait-timeout = "0.2"

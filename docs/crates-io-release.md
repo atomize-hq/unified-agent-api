@@ -10,6 +10,20 @@ This repository publishes four Rust packages for each root `VERSION` bump:
 Rust library import paths remain `codex`, `claude_code`, `wrapper_events`, and
 `agent_api`.
 
+## Bump the release version
+
+Use the xtask helper to update the release version in one pass:
+
+`cargo run -p xtask -- version-bump <new-version>`
+
+This updates:
+
+- the root `VERSION` file
+- `Cargo.toml` `[workspace.package].version`
+- exact inter-crate publish pins such as `version = "=X.Y.Z"`
+
+The command fails closed if the resulting manifests are not in sync.
+
 ## Publish order
 
 Always publish in this order:

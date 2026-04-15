@@ -77,8 +77,12 @@ def run_dependent_package_check(root: Path, package_name: str) -> None:
         return
 
     stderr = result.stderr
-    bootstrap_lookup_error = "no matching package named" in stderr and any(
-        dep in stderr for dep in LEAF_PACKAGES
+    bootstrap_lookup_error = any(dep in stderr for dep in LEAF_PACKAGES) and (
+        "no matching package named" in stderr
+        or (
+            "failed to select a version for the requirement" in stderr
+            and "location searched: crates.io index" in stderr
+        )
     )
     if bootstrap_lookup_error:
         print(
