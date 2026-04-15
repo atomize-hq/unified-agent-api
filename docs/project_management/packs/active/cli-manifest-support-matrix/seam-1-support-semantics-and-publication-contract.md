@@ -2,11 +2,11 @@
 seam_id: SEAM-1
 seam_slug: support-semantics-and-publication-contract
 type: integration
-status: proposed
+status: exec-ready
 execution_horizon: active
 plan_version: v1
 basis:
-  currentness: provisional
+  currentness: current
   source_scope_ref: scope_brief.md
   source_scope_version: v1
   upstream_closeouts: []
@@ -15,12 +15,12 @@ basis:
   stale_triggers:
     - support layer vocabulary changes
     - canonical publication location changes
-    - manifest docs retain "planned" language after semantics are locked
+    - neutral xtask entrypoint naming changes
 gates:
   pre_exec:
-    review: pending
-    contract: pending
-    revalidation: pending
+    review: passed
+    contract: passed
+    revalidation: passed
   post_exec:
     landing: pending
     closeout: pending
@@ -34,6 +34,7 @@ open_remediations: []
 # SEAM-1 - Support semantics and publication contract
 
 - **Goal / value**: pin one deterministic meaning for published support truth before the repo starts generating new artifacts from current manifest evidence.
+- **Current planning posture**: seam-local planning is now concrete enough for execution. The repo state still lacks the canonical support-matrix spec and neutral `xtask support-matrix` entrypoint, but those gaps are owned delivery scope for this seam rather than upstream blockers.
 - **Scope**
   - In:
     - define the separation between manifest support, backend support, UAA unified support, and passthrough visibility
@@ -97,7 +98,7 @@ open_remediations: []
 - **Downstream decomposition context**:
   - Why this seam is `active`, `next`, or `future`: it is `active` because every downstream seam depends on stable terminology and publication targets.
   - Which threads matter most: `THR-01`
-  - What the first seam-local review should focus on: whether the semantics doc fully disambiguates validated vs supported vs unified support and whether any manifest docs still contradict that pinned meaning
+  - What the first seam-local review focused on: whether the semantics doc fully disambiguates validated vs supported vs unified support, whether any manifest docs still contradict that pinned meaning, and whether `xtask` command naming still leaks capability-matrix assumptions into the support workflow
   - Boundary slice intent: reserve `S00` for contract-definition cleanup if seam-local planning finds unresolved semantics drift between the UAA support doc, manifest docs, and xtask command naming
 - **Expected seam-exit concerns**:
   - Contracts likely to publish: `C-01`
