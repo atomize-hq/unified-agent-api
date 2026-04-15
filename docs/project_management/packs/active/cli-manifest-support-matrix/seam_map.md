@@ -4,20 +4,20 @@ Primary axis: **integration-first publication pipeline**. The feature turns exis
 
 ## Execution horizon (inferred)
 
-- Active seam: `SEAM-4`
-- Next seam: `SEAM-5`
+- Active seam: `SEAM-5`
+- Next seam: none
 - Future seams: none
 - `SEAM-2` has landed and closed.
 - `SEAM-3` has landed and closed.
-- `SEAM-4` is now the active seam.
-- `SEAM-5` is now the next queued seam.
+- `SEAM-4` has landed and closed.
+- `SEAM-5` is now the active seam.
 
 Why this horizon:
 
 - `SEAM-1` has landed the support semantics, publication authority, and neutral `xtask support-matrix` command contract.
 - `SEAM-2` has landed the shared normalization and root-intake seam.
-- `SEAM-4` is now active because `SEAM-3` landed the published row model, projection boundary, and closeout handoff required for validator work.
-- `SEAM-5` is queued next because neutral fixture coverage should consume the landed contradiction rules from `SEAM-4` rather than guess them early.
+- `SEAM-4` has landed and closed because `SEAM-3` landed the published row model, projection boundary, and closeout handoff required for validator work.
+- `SEAM-5` is now active because neutral fixture coverage should consume the landed contradiction rules from `SEAM-4` rather than guess them early.
 
 ## Seams
 
@@ -41,13 +41,13 @@ Why this horizon:
    - Verification path: golden outputs and contradiction handling against checked-in fixture roots.
 
 4. **SEAM-4 - Consistency validation and repo-gate enforcement**
-   - Execution horizon: active
+   - Execution horizon: future
    - Type: conformance
    - Owns: generator-level contradiction checks, pointer/status consistency rules, Markdown staleness detection, and repo-gate integration decisions.
    - Verification path: validator tests plus deterministic failure behavior for mismatched manifest inputs.
 
 5. **SEAM-5 - Neutral fixture and regression conformance**
-   - Execution horizon: next
+   - Execution horizon: active
    - Type: conformance
    - Owns: Codex, Claude, and synthetic third-agent-shaped fixture coverage so the neutral seam stays neutral over time.
    - Verification path: fixture suites and golden/regression coverage over row ordering, renderer output, and future-agent-shaped inputs.

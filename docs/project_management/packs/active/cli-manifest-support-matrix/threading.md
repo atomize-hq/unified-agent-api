@@ -6,13 +6,13 @@ Ownership note: this repo's normative contract surfaces live under `docs/specs/*
 
 ## Execution horizon summary
 
-- Active seam: `SEAM-4`
-- Next seam: `SEAM-5`
+- Active seam: `SEAM-5`
+- Next seam: none
 - Future seams: none
 - `SEAM-2` has landed and closed.
 - `SEAM-3` has landed and closed.
-- `SEAM-4` is now active because it consumes the published row model from `SEAM-3`.
-- `SEAM-5` is the next queued seam because fixture and golden conformance should consume landed contradiction rules from `SEAM-4`.
+- `SEAM-4` has landed and closed because validator enforcement consumed the published row model from `SEAM-3` and closed out the contradiction contract.
+- `SEAM-5` is now active because fixture and golden conformance should consume landed contradiction rules from `SEAM-4`.
 
 ## Contract registry
 
@@ -123,10 +123,10 @@ Ownership note: this repo's normative contract surfaces live under `docs/specs/*
   - **Consumer seam(s)**: `SEAM-5`
   - **Carried contract IDs**: `C-06`
   - **Purpose**: convert semantic contradictions into deterministic failures before stale support claims land.
-  - **State**: `identified`
+  - **State**: `revalidated`
   - **Revalidation trigger**: any repo-gate decision that changes whether support-matrix generation runs in `make preflight`, or any new contradiction class
   - **Satisfied by**: validator coverage for pointer/status/row mismatches and stale Markdown
-  - **Notes**: if repo-gate cost changes, this thread must record the revised enforcement boundary explicitly.
+  - **Notes**: `SEAM-5` has revalidated against this thread and treats the contradiction contract as current input; if repo-gate cost changes, the boundary must be recorded explicitly.
 
 - **Thread ID**: `THR-05`
   - **Producer seam**: `SEAM-5`

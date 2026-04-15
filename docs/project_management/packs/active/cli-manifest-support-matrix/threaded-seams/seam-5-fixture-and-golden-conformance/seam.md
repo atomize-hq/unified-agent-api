@@ -1,16 +1,15 @@
 ---
 seam_id: SEAM-5
 seam_slug: fixture-and-golden-conformance
-type: conformance
 status: exec-ready
 execution_horizon: active
 plan_version: v2
 basis:
   currentness: current
-  source_scope_ref: scope_brief.md
-  source_scope_version: v1
+  source_seam_brief: ../../seam-5-fixture-and-golden-conformance.md
+  source_scope_ref: ../../scope_brief.md
   upstream_closeouts:
-    - governance/seam-4-closeout.md
+    - ../../governance/seam-4-closeout.md
   required_threads:
     - THR-02
     - THR-03
@@ -37,9 +36,9 @@ open_remediations: []
 
 # SEAM-5 - Neutral fixture and golden conformance
 
-- **Current planning posture**: exec-ready. The active seam now consumes the contradiction contract and repo-gate posture landed by `SEAM-4`.
-
+- **Current planning posture**: exec-ready. The seam is active and the fixture/golden plan is concrete enough to execute without reopening upstream seams.
 - **Goal / value**: prove the support-matrix pipeline stays neutral, reproducible, and regression-resistant as current and future agent roots evolve.
+- **Type**: conformance
 - **Scope**
   - In:
     - Codex fixture coverage
@@ -104,3 +103,6 @@ open_remediations: []
   - Review-surface areas likely to shift after landing: evidence-to-validation flow and touch-surface map
   - Downstream seams most likely to require revalidation: future manifest-onboarding seams
   - Accepted or published owned-contract artifacts belong here and in closeout evidence, not in pre-exec verification for the producing seam.
+- **Governance pointers**
+  - Pack remediation log: `../../governance/remediation-log.md`
+  - Seam closeout: `../../governance/seam-5-closeout.md`
