@@ -161,6 +161,10 @@ jobs:
       fail-fast: false
       matrix: ${{ fromJSON(needs.prepare.outputs.snapshot_matrix) }}
     steps:
+      - name: Enable Git long paths on Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: git config --global core.longpaths true
       - uses: actions/checkout@v5
         with:
           ref: staging
