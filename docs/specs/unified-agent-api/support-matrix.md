@@ -49,6 +49,67 @@ Support publication MUST preserve these distinctions:
 - a version summary MUST NOT collapse partial target support into a version-global claim.
 - pointer state MAY inform publication, but pointer state alone is not support truth.
 
+## Shared support row model
+
+Both publication targets MUST be derived in a single pass from one shared support row model.
+Each published row MUST describe exactly one `(agent, version, target)` tuple.
+
+The canonical row field order is:
+
+- `agent`
+- `version`
+- `target`
+- `manifest_support`
+- `backend_support`
+- `uaa_support`
+- `pointer_promotion`
+- `evidence_notes`
+
+These fields have the following meanings:
+
+- `agent`: the manifest-root identifier whose committed evidence produced the row.
+- `version`: the semantic version associated with the committed version metadata and reports.
+- `target`: the root-native target identifier for the published row.
+- `manifest_support`: the support state claimed by committed manifest evidence for that target.
+- `backend_support`: the backend support state derived from implementation and manifest inputs for that target.
+- `uaa_support`: the Unified Agent API support state published for that target after applying the support semantics in this spec.
+- `pointer_promotion`: the pointer-derived promotion posture relevant to the row's target.
+- `evidence_notes`: deterministic notes that explain intentional partial support or other non-contradictory caveats grounded in committed evidence.
+
+The shared row model MUST preserve target-scoped truth even when multiple rows share the same version.
+Publication code MUST NOT collapse multiple target rows into one version-global support claim.
+
+The canonical row ordering MUST be deterministic:
+
+- rows MUST sort by `agent` ascending
+- within an agent, rows MUST sort by `target` ascending
+- within an `(agent, target)` grouping, rows MUST sort by semantic `version` descending
+
+`evidence_notes` rules are:
+
+- notes MUST be derived from committed evidence and MUST NOT be speculative
+- notes MAY explain intentional partial support, passthrough visibility, or other non-contradictory caveats visible in committed evidence
+- notes MUST NOT redefine `validated` or `supported`, and MUST NOT stand in for contradiction policy
+- when no such caveat exists, publication MUST treat `evidence_notes` as empty rather than inventing explanatory prose
+
+## Markdown projection boundary
+
+`docs/specs/unified-agent-api/support-matrix.md` is the human-readable Markdown projection of the shared support row model.
+It MUST render the same support truth as `cli_manifests/support_matrix/current.json`.
+
+The Markdown projection MAY:
+
+- group rows for readability
+- add stable headings and table structure
+- restate this spec's already-approved semantics
+
+The Markdown projection MUST NOT:
+
+- derive support truth independently from manifest roots
+- introduce row fields or support states that are absent from the shared row model
+- collapse target-scoped rows into version-global claims
+- become a second mutable support ledger separate from the JSON artifact
+
 ## Authority rules
 
 Published support rows MUST be derived from committed repository evidence.
