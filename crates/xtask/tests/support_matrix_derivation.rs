@@ -12,9 +12,8 @@ mod support_matrix;
 mod wrapper_coverage_shared;
 
 use support_matrix::{
-    derive_rows, derive_rows_for_test_roots, validate_publication_consistency,
-    BackendSupportState, ManifestSupportState, PointerPromotionState, SupportRow,
-    UaaSupportState,
+    derive_rows, derive_rows_for_test_roots, validate_publication_consistency, BackendSupportState,
+    ManifestSupportState, PointerPromotionState, SupportRow, UaaSupportState,
 };
 
 fn make_temp_dir(prefix: &str) -> PathBuf {
@@ -394,6 +393,9 @@ fn derives_rows_for_codex_claude_and_synthetic_future_agent_roots() {
     );
     assert_eq!(
         future_row.evidence_notes,
-        vec!["backend report includes intentionally unsupported surface outside unified support".to_string()]
+        vec![
+            "backend report includes intentionally unsupported surface outside unified support"
+                .to_string()
+        ]
     );
 }
