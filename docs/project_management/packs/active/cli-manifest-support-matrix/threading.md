@@ -6,13 +6,13 @@ Ownership note: this repo's normative contract surfaces live under `docs/specs/*
 
 ## Execution horizon summary
 
-- Active seam: `SEAM-5`
+- Active seam: none
 - Next seam: none
 - Future seams: none
 - `SEAM-2` has landed and closed.
 - `SEAM-3` has landed and closed.
 - `SEAM-4` has landed and closed because validator enforcement consumed the published row model from `SEAM-3` and closed out the contradiction contract.
-- `SEAM-5` is now active because fixture and golden conformance should consume landed contradiction rules from `SEAM-4`.
+- `SEAM-5` has now landed and closed because fixture and golden conformance consumed the landed contradiction rules from `SEAM-4` and published the future-agent neutrality handoff.
 
 ## Contract registry
 
@@ -133,10 +133,10 @@ Ownership note: this repo's normative contract surfaces live under `docs/specs/*
   - **Consumer seam(s)**: pack closeout and future agent-onboarding seams
   - **Carried contract IDs**: `C-07`
   - **Purpose**: keep the shared support-matrix core future-agent-shaped rather than Codex/Claude hard-coded.
-  - **State**: `identified`
+  - **State**: `published`
   - **Revalidation trigger**: any new agent root, fixture schema change, or refactor that introduces agent-name branching into the shared core
-  - **Satisfied by**: Codex + Claude + synthetic third-agent-shaped fixture suites and golden outputs
-  - **Notes**: this thread closes only when the neutral fixture surface is part of routine regression coverage.
+  - **Satisfied by**: Codex + Claude + synthetic third-agent-shaped fixture suites, plus generated JSON and Markdown publication outputs that remain tied to the same shared row model
+  - **Notes**: the thread is now published through `SEAM-5` closeout and must be revalidated by any future agent-onboarding seam that changes root shape, row ordering, evidence-note rules, or shared-core neutrality.
 
 ## Dependency graph
 

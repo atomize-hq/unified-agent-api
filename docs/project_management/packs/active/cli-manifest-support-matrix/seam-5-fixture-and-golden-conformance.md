@@ -2,8 +2,8 @@
 seam_id: SEAM-5
 seam_slug: fixture-and-golden-conformance
 type: conformance
-status: exec-ready
-execution_horizon: active
+status: closed
+execution_horizon: future
 plan_version: v2
 basis:
   currentness: current
@@ -26,18 +26,18 @@ gates:
     contract: passed
     revalidation: passed
   post_exec:
-    landing: pending
-    closeout: pending
+    landing: passed
+    closeout: passed
 seam_exit_gate:
   required: true
   planned_location: S99
-  status: pending
+  status: passed
 open_remediations: []
 ---
 
 # SEAM-5 - Neutral fixture and golden conformance
 
-- **Current planning posture**: exec-ready. The active seam now consumes the contradiction contract and repo-gate posture landed by `SEAM-4`.
+- **Current planning posture**: closed. The neutral fixture proof, coupled golden regressions, and seam-exit closeout are all landed and recorded in `governance/seam-5-closeout.md`.
 
 - **Goal / value**: prove the support-matrix pipeline stays neutral, reproducible, and regression-resistant as current and future agent roots evolve.
 - **Scope**
@@ -94,7 +94,7 @@ open_remediations: []
   - regression-only seam
   - should strengthen, not expand, publication surface area
 - **Downstream decomposition context**:
-  - Why this seam is `active`, `next`, or `future`: it is `active` because the fixture/golden seam should consume the landed contradiction rules from `SEAM-4` instead of guessing them early.
+  - Why this seam is `active`, `next`, or `future`: it is `future` because `SEAM-5` has now landed and closed and there are no remaining seams in the forward window for this pack.
   - Which threads matter most: `THR-05`
   - What the first seam-local review should focus on: whether the fixture matrix is broad enough to protect neutrality and not just current repo shapes
   - Boundary slice intent: `S00` is unnecessary unless conformance ownership between golden outputs and fixture suites is still ambiguous after `SEAM-4`

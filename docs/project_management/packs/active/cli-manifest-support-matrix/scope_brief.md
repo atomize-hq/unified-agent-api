@@ -4,7 +4,7 @@ pack_version: v1
 pack_status: extracted
 source_ref: docs/project_management/next/cli-manifest-support-matrix/plan.md
 execution_horizon:
-  active_seam: SEAM-5
+  active_seam: null
   next_seam: null
 ---
 
