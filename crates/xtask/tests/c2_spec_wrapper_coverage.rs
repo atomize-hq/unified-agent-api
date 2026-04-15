@@ -212,7 +212,7 @@ fn run_xtask_validate(codex_dir: &Path) -> std::process::Output {
 }
 
 fn read_wrapper_version(cargo_toml: &Path) -> String {
-    let text = fs::read_to_string(&cargo_toml)
+    let text = fs::read_to_string(cargo_toml)
         .unwrap_or_else(|e| panic!("read {}: {e}", cargo_toml.display()));
 
     let mut in_package = false;

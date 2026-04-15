@@ -152,12 +152,12 @@ pub(super) fn new_adapter_with_config_and_run_start_cwd(
     new_test_adapter_with_run_start_cwd(config, run_start_cwd)
 }
 
-fn build_fake_claude_binary(repo_root: &Path, binary: &Path) -> Result<(), String> {
+fn build_fake_claude_binary(repo_root: &Path, target_dir: &Path) -> Result<PathBuf, String> {
     let output = Command::new("cargo")
         .args([
             "build",
             "-p",
-            "agent_api",
+            "unified-agent-api",
             "--bin",
             "fake_claude_stream_json_agent_api",
             "--all-features",
@@ -172,12 +172,11 @@ fn build_fake_claude_binary(repo_root: &Path, binary: &Path) -> Result<(), Strin
             String::from_utf8_lossy(&output.stderr)
         ));
     }
-    if !binary.exists() {
-        return Err(format!(
-            "cargo build succeeded but binary missing: {binary:?}"
-        ));
-    }
-    Ok(())
+    find_existing_fake_claude_binary(target_dir).ok_or_else(|| {
+        format!(
+            "cargo build succeeded but fake_claude_stream_json_agent_api was not found under {target_dir:?}"
+        )
+    })
 }
 
 fn find_existing_fake_claude_binary(target_dir: &Path) -> Option<PathBuf> {
@@ -234,15 +233,11 @@ pub(super) fn fake_claude_binary() -> PathBuf {
         .and_then(|dir| dir.parent())
         .expect("resolve repo root from current test binary");
     let built = BUILT_BINARY.get_or_init(|| {
-        if binary.exists() {
-            return Ok(binary.clone());
-        }
-
         if let Some(existing) = find_existing_fake_claude_binary(target_dir) {
             return Ok(existing);
         }
 
-        build_fake_claude_binary(repo_root, &binary).map(|_| binary.clone())
+        build_fake_claude_binary(repo_root, target_dir)
     });
     built
         .clone()
