@@ -15,6 +15,7 @@ mod codex_wrapper_coverage;
 mod parity_triad_scaffold;
 mod support_matrix;
 mod version_bump;
+mod wrapper_coverage_shared;
 
 use clap::{Parser, Subcommand};
 
