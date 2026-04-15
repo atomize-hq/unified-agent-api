@@ -6,6 +6,20 @@ This changelog tracks the root `VERSION` file and uses bare semantic versions (`
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-04-14
+
+### Added
+
+- Added `cargo run -p xtask -- version-bump <new-version>` to update the root `VERSION`, workspace package version, and exact inter-crate publish pins in one pass.
+- Added `xtask` integration coverage for the new version bump flow so invalid semver input and release-surface rewrites are tested directly.
+
+### Changed
+
+- Aligned `xtask` itself with the workspace version source of truth to avoid a separate tool-only version drift surface.
+- Synced the publishable workspace crates and exact sibling dependency pins to the `0.2.1` release line.
+- Hardened publish readiness bootstrap handling so dependent crates do not fail local readiness checks before newly bumped leaf crate versions are visible on crates.io.
+- Restricted manual crates.io publish workflow dispatches to `main` so maintainers cannot publish unmerged branch content by mistake.
+
 ## [0.2.0] - 2026-04-14
 
 ### Added
