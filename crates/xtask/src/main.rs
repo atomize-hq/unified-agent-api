@@ -13,6 +13,7 @@ mod codex_validate;
 mod codex_version_metadata;
 mod codex_wrapper_coverage;
 mod parity_triad_scaffold;
+mod support_matrix;
 mod version_bump;
 
 use clap::{Parser, Subcommand};
@@ -54,6 +55,8 @@ enum Command {
     CapabilityMatrix(capability_matrix::Args),
     /// Audit the capability matrix for orthogonality invariants.
     CapabilityMatrixAudit(capability_matrix_audit::Args),
+    /// Reserve the neutral support-matrix publication entrypoint.
+    SupportMatrix(support_matrix::Args),
     /// Bump the workspace release version and exact inter-crate publish pins.
     VersionBump(version_bump::Args),
 }
@@ -141,6 +144,13 @@ fn main() {
             }
         },
         Command::CapabilityMatrixAudit(args) => match capability_matrix_audit::run(args) {
+            Ok(()) => 0,
+            Err(err) => {
+                eprintln!("{err}");
+                1
+            }
+        },
+        Command::SupportMatrix(args) => match support_matrix::run(args) {
             Ok(()) => 0,
             Err(err) => {
                 eprintln!("{err}");
