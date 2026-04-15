@@ -84,11 +84,8 @@ impl WorkspaceState {
 
     fn apply(&mut self, new_version: &str) -> Result<(), String> {
         self.root_doc["workspace"]["package"]["version"] = value(new_version);
-        self.changelog = update_changelog_for_release(
-            &self.changelog,
-            new_version,
-            &current_utc_date_string(),
-        )?;
+        self.changelog =
+            update_changelog_for_release(&self.changelog, new_version, &current_utc_date_string())?;
         let publishable_names: BTreeSet<String> = self
             .members
             .iter()
