@@ -56,7 +56,7 @@ enum Command {
     CapabilityMatrix(capability_matrix::Args),
     /// Audit the capability matrix for orthogonality invariants.
     CapabilityMatrixAudit(capability_matrix_audit::Args),
-    /// Reserve the neutral support-matrix publication entrypoint.
+    /// Generate support publication JSON and Markdown outputs from committed manifest evidence.
     SupportMatrix(support_matrix::Args),
     /// Bump the workspace release version and exact inter-crate publish pins.
     VersionBump(version_bump::Args),
