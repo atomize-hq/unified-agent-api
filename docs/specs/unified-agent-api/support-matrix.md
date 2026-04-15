@@ -66,6 +66,25 @@ The following MUST remain separate from published support truth:
 - generated capability inventory
 - runtime backend capability checks
 
+## Neutral root intake
+
+The support-matrix pipeline MUST consume committed evidence from each agent root through one neutral root-intake contract.
+
+For phase 1, that intake contract MUST be limited to these evidence categories under `cli_manifests/<agent>/`:
+
+- `versions/*.json` version metadata
+- `pointers/latest_supported/*.txt` and `pointers/latest_validated/*.txt`
+- `current.json`
+- `reports/**`
+
+This intake contract MUST remain shape-driven rather than agent-name-driven:
+
+- the pipeline MUST reason about root-local evidence categories and paths, not special-case Codex or Claude by name inside shared intake logic.
+- the contract MAY preserve root-native target identifiers as loaded evidence; later derivation decides how publication rows compare or project them.
+- the contract MUST NOT introduce a second support evidence store outside the committed manifest roots.
+
+This intake contract governs evidence loading only. It MUST NOT change publication targets, support-layer meanings, or the distinction between `validated` and `supported`.
+
 ## Validated versus supported
 
 `validated` and `supported` are distinct workflow states.
@@ -96,6 +115,7 @@ Before downstream work consumes this contract, reviewers MUST confirm:
 - the canonical support publication targets are named exactly once and without ambiguity.
 - the four support layers have distinct meanings and no overlap with workflow metadata.
 - target-scoped rows are described as primary and per-version summaries as derived projections.
+- the neutral root-intake contract is limited to committed root evidence and does not introduce agent-name-specific loading semantics.
 - `validated` is not treated as equivalent to `supported`.
 - the support matrix is explicitly separate from the capability matrix.
 - the spec is sufficient for downstream implementation without reopening authority or output-path decisions.
