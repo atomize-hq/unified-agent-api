@@ -101,10 +101,30 @@ fn materialize_root(
     }
 }
 
+fn stale_generated_block(original: &str) -> String {
+    let start = original
+        .find("<!-- support-matrix-published:start -->")
+        .expect("generated start marker");
+    let end = original
+        .find("<!-- support-matrix-published:end -->")
+        .expect("generated end marker");
+
+    let mut stale = String::new();
+    stale.push_str(&original[..start]);
+    stale.push_str("<!-- support-matrix-published:start -->\n");
+    stale.push_str("### `codex`\n\n");
+    stale.push_str("| agent | target | version | manifest_support | backend_support | uaa_support | pointer_promotion | evidence_notes |\n");
+    stale.push_str("|---|---|---|---|---|---|---|---|\n");
+    stale.push_str("| `codex` | `linux-x64` | `1.0.0` | `supported` | `partial` | `partial` | `latest_validated` | stale block |\n");
+    stale.push_str("<!-- support-matrix-published:end -->");
+    stale.push_str(&original[end + "<!-- support-matrix-published:end -->".len()..]);
+    stale
+}
+
 #[test]
-fn support_matrix_entrypoint_publishes_json_and_hybrid_markdown() {
+fn support_matrix_check_rejects_stale_generated_markdown_block() {
     let xtask_bin = PathBuf::from(env!("CARGO_BIN_EXE_xtask"));
-    let fixture_root = make_temp_dir("support-matrix-entrypoint");
+    let fixture_root = make_temp_dir("support-matrix-staleness");
 
     write_text(
         &fixture_root.join("Cargo.toml"),
@@ -132,9 +152,7 @@ fn support_matrix_entrypoint_publishes_json_and_hybrid_markdown() {
                     "missing_flags": [],
                     "missing_args": [],
                     "intentionally_unsupported": [],
-                    "wrapper_only_commands": [
-                        { "path": ["backend-only"] }
-                    ],
+                    "wrapper_only_commands": [],
                     "wrapper_only_flags": [],
                     "wrapper_only_args": [],
                 }
@@ -167,127 +185,36 @@ fn support_matrix_entrypoint_publishes_json_and_hybrid_markdown() {
         )],
     );
 
-    let help = Command::new(&xtask_bin)
-        .arg("--help")
-        .current_dir(&fixture_root)
-        .output()
-        .expect("spawn xtask --help");
-    assert!(
-        help.status.success(),
-        "xtask --help failed\nstdout:\n{}\nstderr:\n{}",
-        String::from_utf8_lossy(&help.stdout),
-        String::from_utf8_lossy(&help.stderr)
-    );
-    let help_text = format!(
-        "{}\n{}",
-        String::from_utf8_lossy(&help.stdout),
-        String::from_utf8_lossy(&help.stderr)
-    );
-    assert!(help_text.contains("support-matrix"));
-    assert!(help_text.contains("capability-matrix"));
-
-    let sub_help = Command::new(&xtask_bin)
-        .arg("support-matrix")
-        .arg("--help")
-        .current_dir(&fixture_root)
-        .output()
-        .expect("spawn xtask support-matrix --help");
-    assert!(
-        sub_help.status.success(),
-        "xtask support-matrix --help failed\nstdout:\n{}\nstderr:\n{}",
-        String::from_utf8_lossy(&sub_help.stdout),
-        String::from_utf8_lossy(&sub_help.stderr)
-    );
-    let sub_help_text = format!(
-        "{}\n{}",
-        String::from_utf8_lossy(&sub_help.stdout),
-        String::from_utf8_lossy(&sub_help.stderr)
-    );
-    assert!(
-        sub_help_text.contains("Generate support publication JSON and Markdown outputs"),
-        "support-matrix help text must reflect the implemented publication contract:\n{sub_help_text}"
-    );
-    assert!(sub_help_text.contains("--check"));
-
-    let first_run = Command::new(&xtask_bin)
+    let generate = Command::new(&xtask_bin)
         .arg("support-matrix")
         .current_dir(&fixture_root)
         .output()
         .expect("spawn xtask support-matrix");
     assert!(
-        first_run.status.success(),
+        generate.status.success(),
         "xtask support-matrix failed\nstdout:\n{}\nstderr:\n{}",
-        String::from_utf8_lossy(&first_run.stdout),
-        String::from_utf8_lossy(&first_run.stderr)
+        String::from_utf8_lossy(&generate.stdout),
+        String::from_utf8_lossy(&generate.stderr)
     );
 
-    let json_path = fixture_root.join("cli_manifests/support_matrix/current.json");
     let markdown_path = fixture_root.join("docs/specs/unified-agent-api/support-matrix.md");
-    let json_text = fs::read_to_string(&json_path).expect("read generated current.json");
-    let markdown_text = fs::read_to_string(&markdown_path).expect("read generated markdown");
+    let current_markdown = fs::read_to_string(&markdown_path).expect("read generated markdown");
+    let stale_markdown = stale_generated_block(&current_markdown);
+    fs::write(&markdown_path, stale_markdown).expect("write stale markdown");
 
-    let artifact: Value =
-        serde_json::from_str(&json_text).expect("parse support-matrix current.json");
-    assert_eq!(
-        artifact
-            .get("schema_version")
-            .and_then(|value| value.as_u64()),
-        Some(1)
-    );
-    assert_eq!(
-        artifact
-            .get("rows")
-            .and_then(|value| value.as_array())
-            .map(|rows| rows.len()),
-        Some(2)
-    );
-
-    assert!(markdown_text.contains("## Purpose\nManual contract text."));
-    assert!(markdown_text.contains("## Change control\nManual footer."));
-    assert!(markdown_text.contains("## Published support matrix"));
-    assert!(markdown_text.contains("<!-- support-matrix-published:start -->"));
-    assert!(markdown_text.contains("| `codex` | `linux-x64` | `1.0.0` |"));
-    assert!(markdown_text.contains("| `claude_code` | `linux-x64` | `2.0.0` |"));
-
-    let json_before_check = fs::read_to_string(&json_path).expect("read json before check");
-    let markdown_before_check =
-        fs::read_to_string(&markdown_path).expect("read markdown before check");
-
-    let check_run = Command::new(&xtask_bin)
+    let check = Command::new(&xtask_bin)
         .arg("support-matrix")
         .arg("--check")
         .current_dir(&fixture_root)
         .output()
         .expect("spawn xtask support-matrix --check");
     assert!(
-        check_run.status.success(),
-        "xtask support-matrix --check failed\nstdout:\n{}\nstderr:\n{}",
-        String::from_utf8_lossy(&check_run.stdout),
-        String::from_utf8_lossy(&check_run.stderr)
+        !check.status.success(),
+        "xtask support-matrix --check should fail for stale markdown"
     );
 
-    let json_after_check = fs::read_to_string(&json_path).expect("read json after check");
-    let markdown_after_check =
-        fs::read_to_string(&markdown_path).expect("read markdown after check");
-    assert_eq!(json_before_check, json_after_check);
-    assert_eq!(markdown_before_check, markdown_after_check);
-
-    let second_run = Command::new(&xtask_bin)
-        .arg("support-matrix")
-        .current_dir(&fixture_root)
-        .output()
-        .expect("re-run xtask support-matrix");
-    assert!(
-        second_run.status.success(),
-        "second xtask support-matrix run failed\nstdout:\n{}\nstderr:\n{}",
-        String::from_utf8_lossy(&second_run.stdout),
-        String::from_utf8_lossy(&second_run.stderr)
-    );
-
-    let markdown_text_second =
-        fs::read_to_string(&markdown_path).expect("read markdown after rerun");
-    assert_eq!(
-        markdown_text, markdown_text_second,
-        "rerun should be idempotent"
-    );
+    let stderr = String::from_utf8_lossy(&check.stderr);
+    assert!(stderr.contains("generated block is stale"));
+    assert!(stderr.contains("support-matrix.md"));
+    assert!(stderr.contains("regenerate with `cargo run -p xtask -- support-matrix`"));
 }

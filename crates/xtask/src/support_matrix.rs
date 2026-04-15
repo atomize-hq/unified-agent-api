@@ -24,16 +24,24 @@ const GENERATED_START_MARKER: &str = "<!-- support-matrix-published:start -->";
 const GENERATED_END_MARKER: &str = "<!-- support-matrix-published:end -->";
 
 #[derive(Debug, Parser)]
-pub struct Args {}
+pub struct Args {
+    /// Verify the checked-in publication artifacts without rewriting them.
+    #[arg(long)]
+    pub check: bool,
+}
 
-pub fn run(_args: Args) -> Result<(), String> {
+pub fn run(args: Args) -> Result<(), String> {
     let workspace_root = resolve_workspace_root()?;
     let rows = derive_rows(&workspace_root)?;
     if let Err(issues) = validate_publication_consistency(&workspace_root, &rows) {
         return Err(format_publication_issues(&issues));
     }
     let bundle = render_publication_bundle(&rows)?;
-    write_publication_artifacts(&workspace_root, &bundle)?;
+    if args.check {
+        validate_publication_artifacts(&workspace_root, &bundle)?;
+    } else {
+        write_publication_artifacts(&workspace_root, &bundle)?;
+    }
     Ok(())
 }
 
@@ -834,6 +842,62 @@ fn write_publication_artifacts(
     let updated_markdown = splice_markdown_projection(&existing_markdown, &bundle.markdown);
     write_file(&markdown_path, &updated_markdown)?;
     Ok(())
+}
+
+fn validate_publication_artifacts(
+    workspace_root: &Path,
+    bundle: &PublicationBundle,
+) -> Result<(), String> {
+    let json_path = workspace_root.join(JSON_OUTPUT_PATH);
+    let markdown_path = workspace_root.join(MARKDOWN_OUTPUT_PATH);
+
+    let checked_in_json: serde_json::Value = serde_json::from_str(
+        &fs::read_to_string(&json_path)
+            .map_err(|err| format!("read({}): {err}", json_path.display()))?,
+    )
+    .map_err(|err| format!("parse({}): {err}", json_path.display()))?;
+    let generated_json: serde_json::Value = serde_json::from_str(&bundle.json)
+        .map_err(|err| format!("parse generated support-matrix json: {err}"))?;
+    if checked_in_json != generated_json {
+        return Err(format!(
+            "{} is stale; regenerate with `cargo run -p xtask -- support-matrix`",
+            json_path.display()
+        ));
+    }
+
+    let checked_in_markdown = fs::read_to_string(&markdown_path)
+        .map_err(|err| format!("read({}): {err}", markdown_path.display()))?;
+    let checked_in_block = extract_generated_markdown_block(&checked_in_markdown)?;
+    let generated_block = format!(
+        "{GENERATED_START_MARKER}\n{}{}",
+        bundle.markdown, GENERATED_END_MARKER
+    );
+    if checked_in_block != generated_block {
+        return Err(format!(
+            "{} generated block is stale; regenerate with `cargo run -p xtask -- support-matrix`",
+            markdown_path.display()
+        ));
+    }
+
+    Ok(())
+}
+
+fn extract_generated_markdown_block(existing: &str) -> Result<&str, String> {
+    let start = existing.find(GENERATED_START_MARKER).ok_or_else(|| {
+        format!("missing support-matrix generated block start marker ({GENERATED_START_MARKER})")
+    })?;
+    let end = existing[start..]
+        .find(GENERATED_END_MARKER)
+        .map(|offset| start + offset)
+        .ok_or_else(|| {
+            format!("missing support-matrix generated block end marker ({GENERATED_END_MARKER})")
+        })?;
+
+    if end < start {
+        return Err("support-matrix generated block markers are out of order".to_string());
+    }
+
+    Ok(&existing[start..end + GENERATED_END_MARKER.len()])
 }
 
 fn write_file(path: &Path, contents: &str) -> Result<(), String> {
