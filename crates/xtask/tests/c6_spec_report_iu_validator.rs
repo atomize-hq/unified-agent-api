@@ -259,6 +259,168 @@ fn write_invalid_report_fixture(codex_dir: &Path) {
     );
 }
 
+fn write_support_matrix_artifact(workspace_root: &Path, rows: Value) {
+    write_json(
+        &workspace_root
+            .join("cli_manifests")
+            .join("support_matrix")
+            .join("current.json"),
+        &json!({
+            "schema_version": 1,
+            "rows": rows,
+        }),
+    );
+}
+
+fn write_version_status(codex_dir: &Path, status: &str) {
+    write_json(
+        &codex_dir.join("versions").join(format!("{VERSION}.json")),
+        &json!({
+            "schema_version": 1,
+            "semantic_version": VERSION,
+            "status": status,
+            "updated_at": TS,
+            "coverage": {
+                "supported_targets": [REQUIRED_TARGET],
+                "supported_required_target": true
+            },
+            "validation": {
+                "passed_targets": [REQUIRED_TARGET],
+                "failed_targets": [],
+                "skipped_targets": []
+            }
+        }),
+    );
+}
+
+#[test]
+fn c6_validator_detects_version_status_drift_for_latest_validated_rows() {
+    let temp = make_temp_dir("ccm-c6-support-matrix-status");
+    let codex_dir = temp.join("cli_manifests").join("codex");
+    materialize_minimal_valid_codex_dir(&codex_dir);
+    write_version_status(&codex_dir, "reported");
+    write_support_matrix_artifact(
+        &temp,
+        json!([
+            {
+                "agent": "codex",
+                "version": VERSION,
+                "target": REQUIRED_TARGET,
+                "manifest_support": "supported",
+                "backend_support": "unsupported",
+                "uaa_support": "unsupported",
+                "pointer_promotion": "latest_supported_and_validated",
+                "evidence_notes": [],
+            }
+        ]),
+    );
+
+    let output = run_xtask_validate(&codex_dir);
+    assert!(
+        !output.status.success(),
+        "expected validation failure:\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
+        output.status,
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let combined = format!(
+        "{}\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(
+        combined.contains("SUPPORT_MATRIX_VERSION_STATUS_MISMATCH"),
+        "expected SUPPORT_MATRIX_VERSION_STATUS_MISMATCH, got:\n{combined}"
+    );
+}
+
+#[test]
+fn c6_validator_detects_pointer_promotion_drift_in_support_matrix_publication() {
+    let temp = make_temp_dir("ccm-c6-support-matrix-pointer");
+    let codex_dir = temp.join("cli_manifests").join("codex");
+    materialize_minimal_valid_codex_dir(&codex_dir);
+    write_support_matrix_artifact(
+        &temp,
+        json!([
+            {
+                "agent": "codex",
+                "version": VERSION,
+                "target": REQUIRED_TARGET,
+                "manifest_support": "supported",
+                "backend_support": "unsupported",
+                "uaa_support": "unsupported",
+                "pointer_promotion": "none",
+                "evidence_notes": [],
+            }
+        ]),
+    );
+
+    let output = run_xtask_validate(&codex_dir);
+    assert!(
+        !output.status.success(),
+        "expected validation failure:\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
+        output.status,
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let combined = format!(
+        "{}\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(
+        combined.contains("SUPPORT_MATRIX_POINTER_PROMOTION_MISMATCH"),
+        "expected SUPPORT_MATRIX_POINTER_PROMOTION_MISMATCH, got:\n{combined}"
+    );
+}
+
+#[test]
+fn c6_validator_detects_support_claim_drift_for_omitted_target() {
+    let temp = make_temp_dir("ccm-c6-support-matrix-omission");
+    let codex_dir = temp.join("cli_manifests").join("codex");
+    materialize_minimal_valid_codex_dir(&codex_dir);
+    write_support_matrix_artifact(
+        &temp,
+        json!([
+            {
+                "agent": "codex",
+                "version": VERSION,
+                "target": "aarch64-apple-darwin",
+                "manifest_support": "supported",
+                "backend_support": "unsupported",
+                "uaa_support": "unsupported",
+                "pointer_promotion": "none",
+                "evidence_notes": [],
+            }
+        ]),
+    );
+
+    let output = run_xtask_validate(&codex_dir);
+    assert!(
+        !output.status.success(),
+        "expected validation failure:\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
+        output.status,
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let combined = format!(
+        "{}\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(
+        combined.contains("SUPPORT_MATRIX_CURRENT_SNAPSHOT_OMISSION_MISMATCH"),
+        "expected SUPPORT_MATRIX_CURRENT_SNAPSHOT_OMISSION_MISMATCH, got:\n{combined}"
+    );
+    assert!(
+        combined.contains("SUPPORT_MATRIX_EVIDENCE_NOTES_MISMATCH"),
+        "expected SUPPORT_MATRIX_EVIDENCE_NOTES_MISMATCH, got:\n{combined}"
+    );
+}
+
 #[test]
 fn c6_validator_emits_report_missing_includes_intentionally_unsupported() {
     let temp = make_temp_dir("ccm-c6-report-iu-validator");

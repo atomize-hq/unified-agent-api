@@ -29,6 +29,9 @@ pub struct Args {}
 pub fn run(_args: Args) -> Result<(), String> {
     let workspace_root = resolve_workspace_root()?;
     let rows = derive_rows(&workspace_root)?;
+    if let Err(issues) = validate_publication_consistency(&workspace_root, &rows) {
+        return Err(format_publication_issues(&issues));
+    }
     let bundle = render_publication_bundle(&rows)?;
     write_publication_artifacts(&workspace_root, &bundle)?;
     Ok(())
@@ -108,6 +111,8 @@ struct CurrentUnionBinary {
 #[derive(Debug, Deserialize)]
 struct VersionMetadata {
     semantic_version: String,
+    #[serde(default)]
+    status: Option<String>,
     coverage: VersionCoverage,
 }
 
@@ -174,10 +179,61 @@ struct PublicationBundle {
     markdown: String,
 }
 
-#[derive(Debug, Serialize)]
-struct SupportMatrixArtifact<'a> {
-    schema_version: u8,
-    rows: &'a [SupportRow],
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub(crate) struct SupportMatrixArtifact {
+    pub(crate) schema_version: u8,
+    pub(crate) rows: Vec<SupportRow>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct SupportMatrixConsistencyIssue {
+    pub code: &'static str,
+    pub agent: String,
+    pub version: String,
+    pub target: String,
+    pub message: String,
+}
+
+impl SupportMatrixConsistencyIssue {
+    fn pointer_promotion_mismatch(row: &SupportRow, observed: PointerPromotionState) -> Self {
+        Self {
+            code: "SUPPORT_MATRIX_POINTER_PROMOTION_MISMATCH",
+            agent: row.agent.clone(),
+            version: row.version.clone(),
+            target: row.target.clone(),
+            message: format!(
+                "row pointer_promotion={} does not match committed pointer state {}",
+                row.pointer_promotion.as_str(),
+                observed.as_str()
+            ),
+        }
+    }
+
+    fn omission_contradiction(row: &SupportRow, expected_notes: &[String]) -> Self {
+        Self {
+            code: "SUPPORT_MATRIX_CURRENT_SNAPSHOT_OMISSION_MISMATCH",
+            agent: row.agent.clone(),
+            version: row.version.clone(),
+            target: row.target.clone(),
+            message: format!(
+                "row claims support truth incompatible with current snapshot omission evidence; expected notes {:?}",
+                expected_notes
+            ),
+        }
+    }
+
+    fn evidence_notes_mismatch(row: &SupportRow, expected_notes: &[String]) -> Self {
+        Self {
+            code: "SUPPORT_MATRIX_EVIDENCE_NOTES_MISMATCH",
+            agent: row.agent.clone(),
+            version: row.version.clone(),
+            target: row.target.clone(),
+            message: format!(
+                "row evidence_notes {:?} do not match committed evidence {:?}",
+                row.evidence_notes, expected_notes
+            ),
+        }
+    }
 }
 
 pub(crate) fn derive_rows(workspace_root: &Path) -> Result<Vec<SupportRow>, String> {
@@ -189,6 +245,103 @@ pub(crate) fn derive_rows(workspace_root: &Path) -> Result<Vec<SupportRow>, Stri
         })
         .collect::<Vec<_>>();
     derive_rows_for_roots(&roots)
+}
+
+pub(crate) fn validate_publication_consistency(
+    workspace_root: &Path,
+    rows: &[SupportRow],
+) -> Result<(), Vec<SupportMatrixConsistencyIssue>> {
+    let mut issues = Vec::new();
+    let mut roots = BTreeMap::new();
+
+    let required_agents = rows
+        .iter()
+        .map(|row| row.agent.as_str())
+        .collect::<BTreeSet<_>>();
+    if required_agents.is_empty() {
+        return Ok(());
+    }
+
+    for agent in required_agents {
+        let Some((_, rel_root)) = CURRENT_AGENT_ROOTS
+            .iter()
+            .find(|(candidate, _)| *candidate == agent)
+        else {
+            issues.push(SupportMatrixConsistencyIssue {
+                code: "SUPPORT_MATRIX_UNKNOWN_AGENT",
+                agent: agent.to_string(),
+                version: String::new(),
+                target: String::new(),
+                message: "row agent does not match a committed manifest root".to_string(),
+            });
+            continue;
+        };
+        let root = AgentRoot {
+            agent: agent.to_string(),
+            root: workspace_root.join(rel_root),
+        };
+        let posture = match read_current_root_posture(&root.root) {
+            Ok(posture) => posture,
+            Err(err) => {
+                issues.push(SupportMatrixConsistencyIssue {
+                    code: "SUPPORT_MATRIX_ROOT_READ_ERROR",
+                    agent: root.agent.clone(),
+                    version: String::new(),
+                    target: String::new(),
+                    message: err,
+                });
+                continue;
+            }
+        };
+        let pointers = match read_pointers(&root.root, &posture.expected_targets) {
+            Ok(pointers) => pointers,
+            Err(err) => {
+                issues.push(SupportMatrixConsistencyIssue {
+                    code: "SUPPORT_MATRIX_POINTER_READ_ERROR",
+                    agent: root.agent.clone(),
+                    version: String::new(),
+                    target: String::new(),
+                    message: err,
+                });
+                continue;
+            }
+        };
+        roots.insert(
+            root.agent.clone(),
+            RootConsistencyContext {
+                posture,
+                pointers,
+                layout: RootIntakeLayout::new(root.root.clone()),
+                version_statuses: match read_version_statuses(&root.root) {
+                    Ok(version_statuses) => version_statuses,
+                    Err(err) => {
+                        issues.push(SupportMatrixConsistencyIssue {
+                            code: "SUPPORT_MATRIX_VERSION_STATUS_READ_ERROR",
+                            agent: root.agent.clone(),
+                            version: String::new(),
+                            target: String::new(),
+                            message: err,
+                        });
+                        continue;
+                    }
+                },
+            },
+        );
+    }
+
+    for row in rows {
+        let Some(ctx) = roots.get(&row.agent) else {
+            continue;
+        };
+
+        validate_row_consistency(row, ctx, &mut issues);
+    }
+
+    if issues.is_empty() {
+        Ok(())
+    } else {
+        Err(issues)
+    }
 }
 
 fn derive_rows_for_roots(roots: &[AgentRoot]) -> Result<Vec<SupportRow>, String> {
@@ -258,6 +411,46 @@ fn derive_rows_for_root(root: &AgentRoot) -> Result<Vec<SupportRow>, String> {
     }
 
     Ok(rows)
+}
+
+fn format_publication_issues(issues: &[SupportMatrixConsistencyIssue]) -> String {
+    let mut out = String::from("support-matrix publication contradictions detected");
+    for issue in issues {
+        out.push_str(&format!(
+            "\n- [{}] {} {} {}: {}",
+            issue.code, issue.agent, issue.version, issue.target, issue.message
+        ));
+    }
+    out
+}
+
+fn read_version_statuses(root: &Path) -> Result<BTreeMap<String, Option<String>>, String> {
+    let layout = RootIntakeLayout::new(root.to_path_buf());
+    let versions_dir = layout.versions_dir();
+    let mut version_statuses = BTreeMap::new();
+
+    for entry in fs::read_dir(&versions_dir)
+        .map_err(|err| format!("read_dir({}): {err}", versions_dir.display()))?
+    {
+        let entry = entry.map_err(|err| format!("read_dir entry error: {err}"))?;
+        let path = entry.path();
+        if path.extension().and_then(|ext| ext.to_str()) != Some("json") {
+            continue;
+        }
+
+        let metadata: VersionMetadata = read_json(&path)?;
+        version_statuses.insert(metadata.semantic_version, metadata.status);
+    }
+
+    Ok(version_statuses)
+}
+
+#[derive(Debug, Clone)]
+struct RootConsistencyContext {
+    posture: CurrentRootPosture,
+    pointers: PointerSet,
+    layout: RootIntakeLayout,
+    version_statuses: BTreeMap<String, Option<String>>,
 }
 
 fn read_current_root_posture(root: &Path) -> Result<CurrentRootPosture, String> {
@@ -343,8 +536,10 @@ fn load_support_report(
         return read_json(&exact_target).map(Some);
     }
 
-    for candidate in [version_dir.join("coverage.any.json"), version_dir.join("coverage.all.json")]
-    {
+    for candidate in [
+        version_dir.join("coverage.any.json"),
+        version_dir.join("coverage.all.json"),
+    ] {
         if !candidate.exists() {
             continue;
         }
@@ -439,16 +634,97 @@ fn build_evidence_notes(
             || !report.deltas.wrapper_only_flags.is_empty()
             || !report.deltas.wrapper_only_args.is_empty()
         {
-            notes.push("backend report includes backend-only surface outside unified support".to_string());
+            notes.push(
+                "backend report includes backend-only surface outside unified support".to_string(),
+            );
         }
     }
 
-    if posture.current_version.as_deref() == Some(version) && !posture.current_targets.contains(target)
+    if posture.current_version.as_deref() == Some(version)
+        && !posture.current_targets.contains(target)
     {
         notes.push("current root snapshot omits this target".to_string());
     }
 
     notes
+}
+
+fn validate_row_consistency(
+    row: &SupportRow,
+    ctx: &RootConsistencyContext,
+    issues: &mut Vec<SupportMatrixConsistencyIssue>,
+) {
+    let observed_promotion = classify_pointer_promotion(&ctx.pointers, &row.target, &row.version);
+    if row.pointer_promotion != observed_promotion {
+        issues.push(SupportMatrixConsistencyIssue::pointer_promotion_mismatch(
+            row,
+            observed_promotion,
+        ));
+    }
+
+    let report = match load_support_report(&ctx.layout, &row.version, &row.target) {
+        Ok(report) => report,
+        Err(err) => {
+            issues.push(SupportMatrixConsistencyIssue {
+                code: "SUPPORT_MATRIX_REPORT_READ_ERROR",
+                agent: row.agent.clone(),
+                version: row.version.clone(),
+                target: row.target.clone(),
+                message: err,
+            });
+            return;
+        }
+    };
+    let expected_notes =
+        build_evidence_notes(report.as_ref(), &ctx.posture, &row.target, &row.version);
+
+    if expected_notes != row.evidence_notes {
+        issues.push(SupportMatrixConsistencyIssue::evidence_notes_mismatch(
+            row,
+            &expected_notes,
+        ));
+    }
+
+    if let Some(status) = ctx
+        .version_statuses
+        .get(&row.version)
+        .and_then(|value| value.as_deref())
+    {
+        let requires_validation_status = matches!(
+            row.pointer_promotion,
+            PointerPromotionState::LatestValidated
+                | PointerPromotionState::LatestSupportedAndValidated
+        );
+        if requires_validation_status && !matches!(status, "validated" | "supported") {
+            issues.push(SupportMatrixConsistencyIssue {
+                code: "SUPPORT_MATRIX_VERSION_STATUS_MISMATCH",
+                agent: row.agent.clone(),
+                version: row.version.clone(),
+                target: row.target.clone(),
+                message: format!(
+                    "row pointer_promotion={} requires version status validated or supported, got {}",
+                    row.pointer_promotion.as_str(),
+                    status
+                ),
+            });
+        }
+    }
+
+    let omitted_current_target = ctx.posture.current_version.as_deref()
+        == Some(row.version.as_str())
+        && !ctx.posture.current_targets.contains(&row.target);
+    if omitted_current_target {
+        let support_is_unsupported = row.manifest_support == ManifestSupportState::Unsupported
+            && row.backend_support == BackendSupportState::Unsupported
+            && row.uaa_support == UaaSupportState::Unsupported
+            && row.pointer_promotion == PointerPromotionState::None;
+        if !support_is_unsupported {
+            issues.push(SupportMatrixConsistencyIssue::omission_contradiction(
+                row,
+                &expected_notes,
+            ));
+        }
+    }
 }
 
 fn classify_uaa_support(
@@ -489,14 +765,15 @@ fn read_json<T>(path: &Path) -> Result<T, String>
 where
     T: for<'de> Deserialize<'de>,
 {
-    let text = fs::read_to_string(path).map_err(|err| format!("read({}): {err}", path.display()))?;
+    let text =
+        fs::read_to_string(path).map_err(|err| format!("read({}): {err}", path.display()))?;
     serde_json::from_str(&text).map_err(|err| format!("parse({}): {err}", path.display()))
 }
 
 fn render_publication_bundle(rows: &[SupportRow]) -> Result<PublicationBundle, String> {
     let json = serde_json::to_string_pretty(&SupportMatrixArtifact {
         schema_version: 1,
-        rows,
+        rows: rows.to_vec(),
     })
     .map_err(|err| format!("serialize support-matrix json: {err}"))?;
     let markdown = render_markdown_projection(rows);
@@ -561,15 +838,14 @@ fn write_publication_artifacts(
 
 fn write_file(path: &Path, contents: &str) -> Result<(), String> {
     if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).map_err(|err| format!("create_dir_all({}): {err}", parent.display()))?;
+        fs::create_dir_all(parent)
+            .map_err(|err| format!("create_dir_all({}): {err}", parent.display()))?;
     }
     fs::write(path, contents).map_err(|err| format!("write({}): {err}", path.display()))
 }
 
 fn splice_markdown_projection(existing: &str, projection: &str) -> String {
-    let generated_block = format!(
-        "{GENERATED_START_MARKER}\n{projection}{GENERATED_END_MARKER}"
-    );
+    let generated_block = format!("{GENERATED_START_MARKER}\n{projection}{GENERATED_END_MARKER}");
 
     match (
         existing.find(GENERATED_START_MARKER),
@@ -650,6 +926,104 @@ impl PointerPromotionState {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::json;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn make_temp_dir(prefix: &str) -> PathBuf {
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time after unix epoch");
+        let dir = std::env::temp_dir().join(format!(
+            "{prefix}-{}-{}",
+            std::process::id(),
+            now.as_nanos()
+        ));
+        fs::create_dir_all(&dir).expect("create temp dir");
+        dir
+    }
+
+    fn write_text(path: &Path, contents: &str) {
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).expect("create parent dirs");
+        }
+        fs::write(path, contents).expect("write file");
+    }
+
+    fn write_json(path: &Path, value: &serde_json::Value) {
+        let text = serde_json::to_string_pretty(value).expect("serialize json");
+        write_text(path, &format!("{text}\n"));
+    }
+
+    fn materialize_root(
+        root: &Path,
+        expected_targets: &[&str],
+        current_version: &str,
+        current_targets: &[&str],
+        versions: &[(&str, &[&str])],
+        pointers_supported: &[(&str, &str)],
+        pointers_validated: &[(&str, &str)],
+        reports: &[(&str, &str, serde_json::Value)],
+    ) {
+        let inputs = current_targets
+            .iter()
+            .map(|target| {
+                json!({
+                    "target_triple": target,
+                    "binary": { "semantic_version": current_version },
+                })
+            })
+            .collect::<Vec<_>>();
+
+        write_json(
+            &root.join("current.json"),
+            &json!({
+                "expected_targets": expected_targets,
+                "inputs": inputs,
+            }),
+        );
+
+        for (version, supported_targets) in versions {
+            write_json(
+                &root.join("versions").join(format!("{version}.json")),
+                &json!({
+                    "semantic_version": version,
+                    "coverage": {
+                        "supported_targets": supported_targets,
+                    },
+                }),
+            );
+        }
+
+        for target in expected_targets {
+            let latest_supported = pointers_supported
+                .iter()
+                .find_map(|(candidate, version)| (*candidate == *target).then_some(*version))
+                .unwrap_or("none");
+            let latest_validated = pointers_validated
+                .iter()
+                .find_map(|(candidate, version)| (*candidate == *target).then_some(*version))
+                .unwrap_or("none");
+            write_text(
+                &root
+                    .join("pointers/latest_supported")
+                    .join(format!("{target}.txt")),
+                &format!("{latest_supported}\n"),
+            );
+            write_text(
+                &root
+                    .join("pointers/latest_validated")
+                    .join(format!("{target}.txt")),
+                &format!("{latest_validated}\n"),
+            );
+        }
+
+        for (version, report_name, report) in reports {
+            write_json(
+                &root.join("reports").join(version).join(report_name),
+                report,
+            );
+        }
+    }
 
     fn sample_rows() -> Vec<SupportRow> {
         vec![SupportRow {
@@ -661,8 +1035,7 @@ mod tests {
             uaa_support: UaaSupportState::Partial,
             pointer_promotion: PointerPromotionState::LatestValidated,
             evidence_notes: vec![
-                "backend report includes backend-only surface outside unified support"
-                    .to_string(),
+                "backend report includes backend-only surface outside unified support".to_string(),
             ],
         }]
     }
@@ -687,7 +1060,298 @@ mod tests {
 
         assert!(bundle.json.contains("\"schema_version\": 1"));
         assert!(bundle.json.contains("\"agent\": \"codex\""));
-        assert!(bundle.markdown.contains("| `codex` | `linux-x64` | `1.0.0` |"));
-        assert!(bundle.markdown.contains("backend report includes backend-only surface"));
+        assert!(bundle
+            .markdown
+            .contains("| `codex` | `linux-x64` | `1.0.0` |"));
+        assert!(bundle
+            .markdown
+            .contains("backend report includes backend-only surface"));
+    }
+
+    #[test]
+    fn publication_consistency_passes_for_matching_rows() {
+        let workspace = make_temp_dir("support-matrix-consistency-pass");
+
+        materialize_root(
+            &workspace.join("cli_manifests/codex"),
+            &["linux-x64", "win32-x64"],
+            "1.0.0",
+            &["linux-x64"],
+            &[("0.9.0", &["linux-x64"]), ("1.0.0", &["linux-x64"])],
+            &[("linux-x64", "0.9.0")],
+            &[("linux-x64", "1.0.0")],
+            &[(
+                "1.0.0",
+                "coverage.linux-x64.json",
+                serde_json::json!({
+                    "deltas": {
+                        "missing_commands": [],
+                        "missing_flags": [],
+                        "missing_args": [],
+                        "intentionally_unsupported": [],
+                        "wrapper_only_commands": [
+                            { "path": ["backend-only"] }
+                        ],
+                        "wrapper_only_flags": [],
+                        "wrapper_only_args": [],
+                    }
+                }),
+            )],
+        );
+
+        materialize_root(
+            &workspace.join("cli_manifests/claude_code"),
+            &["linux-x64"],
+            "2.0.0",
+            &["linux-x64"],
+            &[("2.0.0", &["linux-x64"])],
+            &[("linux-x64", "2.0.0")],
+            &[("linux-x64", "2.0.0")],
+            &[(
+                "2.0.0",
+                "coverage.linux-x64.json",
+                serde_json::json!({
+                    "deltas": {
+                        "missing_commands": [],
+                        "missing_flags": [],
+                        "missing_args": [],
+                        "intentionally_unsupported": [],
+                        "wrapper_only_commands": [],
+                        "wrapper_only_flags": [],
+                        "wrapper_only_args": [],
+                    }
+                }),
+            )],
+        );
+
+        let rows = derive_rows(&workspace).expect("derive rows");
+        validate_publication_consistency(&workspace, &rows).expect("matching rows should pass");
+    }
+
+    #[test]
+    fn publication_consistency_rejects_pointer_promotion_drift() {
+        let workspace = make_temp_dir("support-matrix-consistency-pointer");
+
+        materialize_root(
+            &workspace.join("cli_manifests/codex"),
+            &["linux-x64"],
+            "1.0.0",
+            &["linux-x64"],
+            &[("1.0.0", &["linux-x64"])],
+            &[("linux-x64", "1.0.0")],
+            &[("linux-x64", "1.0.0")],
+            &[(
+                "1.0.0",
+                "coverage.linux-x64.json",
+                serde_json::json!({
+                    "deltas": {
+                        "missing_commands": [],
+                        "missing_flags": [],
+                        "missing_args": [],
+                        "intentionally_unsupported": [],
+                        "wrapper_only_commands": [],
+                        "wrapper_only_flags": [],
+                        "wrapper_only_args": [],
+                    }
+                }),
+            )],
+        );
+
+        materialize_root(
+            &workspace.join("cli_manifests/claude_code"),
+            &["linux-x64"],
+            "2.0.0",
+            &["linux-x64"],
+            &[("2.0.0", &["linux-x64"])],
+            &[("linux-x64", "2.0.0")],
+            &[("linux-x64", "2.0.0")],
+            &[(
+                "2.0.0",
+                "coverage.linux-x64.json",
+                serde_json::json!({
+                    "deltas": {
+                        "missing_commands": [],
+                        "missing_flags": [],
+                        "missing_args": [],
+                        "intentionally_unsupported": [],
+                        "wrapper_only_commands": [],
+                        "wrapper_only_flags": [],
+                        "wrapper_only_args": [],
+                    }
+                }),
+            )],
+        );
+
+        let mut rows = derive_rows(&workspace).expect("derive rows");
+        let row = rows
+            .iter_mut()
+            .find(|row| row.agent == "codex" && row.version == "1.0.0" && row.target == "linux-x64")
+            .expect("expected codex row");
+        row.pointer_promotion = PointerPromotionState::None;
+
+        let issues = validate_publication_consistency(&workspace, &rows)
+            .expect_err("pointer drift should be rejected");
+        assert!(
+            issues
+                .iter()
+                .any(|issue| issue.code == "SUPPORT_MATRIX_POINTER_PROMOTION_MISMATCH"),
+            "expected pointer promotion mismatch, got: {issues:#?}"
+        );
+    }
+
+    #[test]
+    fn publication_consistency_rejects_omission_claim_and_note_drift() {
+        let workspace = make_temp_dir("support-matrix-consistency-omission");
+
+        materialize_root(
+            &workspace.join("cli_manifests/codex"),
+            &["linux-x64", "win32-x64"],
+            "1.0.0",
+            &["linux-x64"],
+            &[("1.0.0", &["linux-x64"])],
+            &[("linux-x64", "1.0.0")],
+            &[("linux-x64", "1.0.0")],
+            &[(
+                "1.0.0",
+                "coverage.linux-x64.json",
+                serde_json::json!({
+                    "deltas": {
+                        "missing_commands": [],
+                        "missing_flags": [],
+                        "missing_args": [],
+                        "intentionally_unsupported": [],
+                        "wrapper_only_commands": [],
+                        "wrapper_only_flags": [],
+                        "wrapper_only_args": [],
+                    }
+                }),
+            )],
+        );
+
+        materialize_root(
+            &workspace.join("cli_manifests/claude_code"),
+            &["linux-x64"],
+            "2.0.0",
+            &["linux-x64"],
+            &[("2.0.0", &["linux-x64"])],
+            &[("linux-x64", "2.0.0")],
+            &[("linux-x64", "2.0.0")],
+            &[(
+                "2.0.0",
+                "coverage.linux-x64.json",
+                serde_json::json!({
+                    "deltas": {
+                        "missing_commands": [],
+                        "missing_flags": [],
+                        "missing_args": [],
+                        "intentionally_unsupported": [],
+                        "wrapper_only_commands": [],
+                        "wrapper_only_flags": [],
+                        "wrapper_only_args": [],
+                    }
+                }),
+            )],
+        );
+
+        let mut rows = derive_rows(&workspace).expect("derive rows");
+        let row = rows
+            .iter_mut()
+            .find(|row| row.agent == "codex" && row.version == "1.0.0" && row.target == "win32-x64")
+            .expect("expected omitted codex row");
+        row.manifest_support = ManifestSupportState::Supported;
+        row.backend_support = BackendSupportState::Supported;
+        row.uaa_support = UaaSupportState::Supported;
+        row.pointer_promotion = PointerPromotionState::LatestValidated;
+        row.evidence_notes.clear();
+
+        let issues = validate_publication_consistency(&workspace, &rows)
+            .expect_err("omission contradiction should be rejected");
+        assert!(
+            issues
+                .iter()
+                .any(|issue| issue.code == "SUPPORT_MATRIX_CURRENT_SNAPSHOT_OMISSION_MISMATCH"),
+            "expected omission mismatch, got: {issues:#?}"
+        );
+        assert!(
+            issues
+                .iter()
+                .any(|issue| issue.code == "SUPPORT_MATRIX_EVIDENCE_NOTES_MISMATCH"),
+            "expected note mismatch, got: {issues:#?}"
+        );
+    }
+
+    #[test]
+    fn publication_consistency_rejects_status_drift_for_latest_validated_rows() {
+        let workspace = make_temp_dir("support-matrix-consistency-status");
+
+        materialize_root(
+            &workspace.join("cli_manifests/codex"),
+            &["linux-x64"],
+            "1.0.0",
+            &["linux-x64"],
+            &[("1.0.0", &["linux-x64"])],
+            &[("linux-x64", "1.0.0")],
+            &[("linux-x64", "1.0.0")],
+            &[(
+                "1.0.0",
+                "coverage.linux-x64.json",
+                serde_json::json!({
+                    "deltas": {
+                        "missing_commands": [],
+                        "missing_flags": [],
+                        "missing_args": [],
+                        "intentionally_unsupported": [],
+                        "wrapper_only_commands": [],
+                        "wrapper_only_flags": [],
+                        "wrapper_only_args": [],
+                    }
+                }),
+            )],
+        );
+        write_json(
+            &workspace.join("cli_manifests/codex/versions/1.0.0.json"),
+            &json!({
+                "semantic_version": "1.0.0",
+                "status": "reported",
+                "coverage": {
+                    "supported_targets": ["linux-x64"],
+                },
+            }),
+        );
+
+        materialize_root(
+            &workspace.join("cli_manifests/claude_code"),
+            &["linux-x64"],
+            "2.0.0",
+            &["linux-x64"],
+            &[("2.0.0", &["linux-x64"])],
+            &[("linux-x64", "2.0.0")],
+            &[("linux-x64", "2.0.0")],
+            &[(
+                "2.0.0",
+                "coverage.linux-x64.json",
+                serde_json::json!({
+                    "deltas": {
+                        "missing_commands": [],
+                        "missing_flags": [],
+                        "missing_args": [],
+                        "intentionally_unsupported": [],
+                        "wrapper_only_commands": [],
+                        "wrapper_only_flags": [],
+                        "wrapper_only_args": [],
+                    }
+                }),
+            )],
+        );
+
+        let rows = derive_rows(&workspace).expect("derive rows");
+        let issues = validate_publication_consistency(&workspace, &rows)
+            .expect_err("reported status should not allow latest_validated promotion");
+        assert!(
+            issues
+                .iter()
+                .any(|issue| issue.code == "SUPPORT_MATRIX_VERSION_STATUS_MISMATCH"),
+            "expected status mismatch, got: {issues:#?}"
+        );
     }
 }

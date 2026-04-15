@@ -6,14 +6,14 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde_json::{json, Value};
 
-#[path = "../src/wrapper_coverage_shared.rs"]
-mod wrapper_coverage_shared;
 #[path = "../src/support_matrix.rs"]
 mod support_matrix;
+#[path = "../src/wrapper_coverage_shared.rs"]
+mod wrapper_coverage_shared;
 
 use support_matrix::{
-    derive_rows, BackendSupportState, ManifestSupportState, PointerPromotionState, SupportRow,
-    UaaSupportState,
+    derive_rows, validate_publication_consistency, BackendSupportState, ManifestSupportState,
+    PointerPromotionState, SupportRow, UaaSupportState,
 };
 
 fn make_temp_dir(prefix: &str) -> PathBuf {
@@ -91,7 +91,9 @@ fn materialize_root(
             .find_map(|(candidate, version)| (*candidate == *target).then_some(*version))
             .unwrap_or("none");
         write_text(
-            &root.join("pointers/latest_supported").join(format!("{target}.txt")),
+            &root
+                .join("pointers/latest_supported")
+                .join(format!("{target}.txt")),
             &format!("{latest_supported}\n"),
         );
         write_text(
@@ -110,7 +112,12 @@ fn materialize_root(
     }
 }
 
-fn find_row<'a>(rows: &'a [SupportRow], agent: &str, version: &str, target: &str) -> &'a SupportRow {
+fn find_row<'a>(
+    rows: &'a [SupportRow],
+    agent: &str,
+    version: &str,
+    target: &str,
+) -> &'a SupportRow {
     rows.iter()
         .find(|row| row.agent == agent && row.version == version && row.target == target)
         .unwrap_or_else(|| panic!("missing row {agent} {version} {target}"))
@@ -190,7 +197,13 @@ fn derives_target_scoped_rows_with_sparse_caveats_and_pointer_state() {
     );
 
     let rows = derive_rows(&workspace).expect("derive rows");
-    assert_eq!(rows.len(), 5, "expected two codex versions x two targets + one claude row");
+    validate_publication_consistency(&workspace, &rows)
+        .expect("derived rows should satisfy the shared consistency helper");
+    assert_eq!(
+        rows.len(),
+        5,
+        "expected two codex versions x two targets + one claude row"
+    );
 
     let claude_row = find_row(&rows, "claude_code", "2.0.0", "linux-x64");
     assert_eq!(claude_row.manifest_support, ManifestSupportState::Supported);
@@ -203,8 +216,14 @@ fn derives_target_scoped_rows_with_sparse_caveats_and_pointer_state() {
     assert!(claude_row.evidence_notes.is_empty());
 
     let codex_historical = find_row(&rows, "codex", "0.9.0", "linux-x64");
-    assert_eq!(codex_historical.manifest_support, ManifestSupportState::Supported);
-    assert_eq!(codex_historical.backend_support, BackendSupportState::Supported);
+    assert_eq!(
+        codex_historical.manifest_support,
+        ManifestSupportState::Supported
+    );
+    assert_eq!(
+        codex_historical.backend_support,
+        BackendSupportState::Supported
+    );
     assert_eq!(codex_historical.uaa_support, UaaSupportState::Supported);
     assert_eq!(
         codex_historical.pointer_promotion,
@@ -216,7 +235,10 @@ fn derives_target_scoped_rows_with_sparse_caveats_and_pointer_state() {
     );
 
     let codex_current = find_row(&rows, "codex", "1.0.0", "linux-x64");
-    assert_eq!(codex_current.manifest_support, ManifestSupportState::Supported);
+    assert_eq!(
+        codex_current.manifest_support,
+        ManifestSupportState::Supported
+    );
     assert_eq!(codex_current.backend_support, BackendSupportState::Partial);
     assert_eq!(codex_current.uaa_support, UaaSupportState::Partial);
     assert_eq!(
@@ -237,7 +259,10 @@ fn derives_target_scoped_rows_with_sparse_caveats_and_pointer_state() {
         codex_missing_target.backend_support,
         BackendSupportState::Unsupported
     );
-    assert_eq!(codex_missing_target.uaa_support, UaaSupportState::Unsupported);
+    assert_eq!(
+        codex_missing_target.uaa_support,
+        UaaSupportState::Unsupported
+    );
     assert_eq!(
         codex_missing_target.pointer_promotion,
         PointerPromotionState::None

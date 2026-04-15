@@ -80,7 +80,9 @@ fn materialize_root(
             .find_map(|(candidate, version)| (*candidate == *target).then_some(*version))
             .unwrap_or("none");
         write_text(
-            &root.join("pointers/latest_supported").join(format!("{target}.txt")),
+            &root
+                .join("pointers/latest_supported")
+                .join(format!("{target}.txt")),
             &format!("{latest_supported}\n"),
         );
         write_text(
@@ -104,7 +106,10 @@ fn support_matrix_entrypoint_publishes_json_and_hybrid_markdown() {
     let xtask_bin = PathBuf::from(env!("CARGO_BIN_EXE_xtask"));
     let fixture_root = make_temp_dir("support-matrix-entrypoint");
 
-    write_text(&fixture_root.join("Cargo.toml"), "[workspace]\nmembers = []\n");
+    write_text(
+        &fixture_root.join("Cargo.toml"),
+        "[workspace]\nmembers = []\n",
+    );
     write_text(
         &fixture_root.join("docs/specs/unified-agent-api/support-matrix.md"),
         "# Support Matrix Spec — Unified Agent API\n\n## Purpose\nManual contract text.\n\n## Change control\nManual footer.\n",
@@ -220,9 +225,12 @@ fn support_matrix_entrypoint_publishes_json_and_hybrid_markdown() {
     let json_text = fs::read_to_string(&json_path).expect("read generated current.json");
     let markdown_text = fs::read_to_string(&markdown_path).expect("read generated markdown");
 
-    let artifact: Value = serde_json::from_str(&json_text).expect("parse support-matrix current.json");
+    let artifact: Value =
+        serde_json::from_str(&json_text).expect("parse support-matrix current.json");
     assert_eq!(
-        artifact.get("schema_version").and_then(|value| value.as_u64()),
+        artifact
+            .get("schema_version")
+            .and_then(|value| value.as_u64()),
         Some(1)
     );
     assert_eq!(
@@ -252,6 +260,10 @@ fn support_matrix_entrypoint_publishes_json_and_hybrid_markdown() {
         String::from_utf8_lossy(&second_run.stderr)
     );
 
-    let markdown_text_second = fs::read_to_string(&markdown_path).expect("read markdown after rerun");
-    assert_eq!(markdown_text, markdown_text_second, "rerun should be idempotent");
+    let markdown_text_second =
+        fs::read_to_string(&markdown_path).expect("read markdown after rerun");
+    assert_eq!(
+        markdown_text, markdown_text_second,
+        "rerun should be idempotent"
+    );
 }

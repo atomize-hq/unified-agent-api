@@ -11,6 +11,8 @@ use semver::Version;
 use serde_json::{json, Value};
 use thiserror::Error;
 
+use crate::support_matrix::{self, SupportMatrixArtifact};
+
 mod current;
 mod fix_mode;
 mod models;
@@ -262,6 +264,9 @@ fn run_inner(args: Args) -> Result<Vec<Violation>, FatalError> {
         &version_metadata,
     );
 
+    // 7) Support-matrix publication drift checks reuse the shared support-matrix policy.
+    validate_support_matrix_publication(&ctx, &mut violations);
+
     violations.sort_by(|a, b| {
         a.sort_key()
             .cmp(&b.sort_key())
@@ -509,6 +514,107 @@ fn validate_parity_exclusions_config(ctx: &mut ValidateCtx, violations: &mut Vec
             details: None,
         });
     }
+}
+
+fn validate_support_matrix_publication(ctx: &ValidateCtx, violations: &mut Vec<Violation>) {
+    let Some(workspace_root) = workspace_root_for(&ctx.root) else {
+        return;
+    };
+    let artifact_path = workspace_root.join("cli_manifests/support_matrix/current.json");
+    if !artifact_path.exists() {
+        return;
+    }
+
+    let bytes = match fs::read(&artifact_path) {
+        Ok(bytes) => bytes,
+        Err(err) => {
+            violations.push(Violation {
+                code: "SUPPORT_MATRIX_INVALID_JSON",
+                path: rel_path(&workspace_root, &artifact_path),
+                json_pointer: None,
+                message: format!("failed to read support-matrix publication artifact: {err}"),
+                unit: Some("support_matrix"),
+                command_path: None,
+                key_or_name: None,
+                field: Some("current.json"),
+                target_triple: None,
+                details: None,
+            });
+            return;
+        }
+    };
+
+    let artifact: SupportMatrixArtifact = match serde_json::from_slice(&bytes) {
+        Ok(value) => value,
+        Err(err) => {
+            violations.push(Violation {
+                code: "SUPPORT_MATRIX_INVALID_JSON",
+                path: rel_path(&workspace_root, &artifact_path),
+                json_pointer: None,
+                message: format!("failed to parse support-matrix publication artifact: {err}"),
+                unit: Some("support_matrix"),
+                command_path: None,
+                key_or_name: None,
+                field: Some("current.json"),
+                target_triple: None,
+                details: None,
+            });
+            return;
+        }
+    };
+
+    if artifact.schema_version != 1 {
+        violations.push(Violation {
+            code: "SUPPORT_MATRIX_SCHEMA_INVALID",
+            path: rel_path(&workspace_root, &artifact_path),
+            json_pointer: Some("/schema_version".to_string()),
+            message: format!(
+                "support_matrix/current.json.schema_version must be 1 (got {})",
+                artifact.schema_version
+            ),
+            unit: Some("support_matrix"),
+            command_path: None,
+            key_or_name: None,
+            field: Some("schema_version"),
+            target_triple: None,
+            details: None,
+        });
+        return;
+    }
+
+    if let Err(issues) =
+        support_matrix::validate_publication_consistency(&workspace_root, &artifact.rows)
+    {
+        for issue in issues {
+            let row_index = artifact
+                .rows
+                .iter()
+                .position(|row| {
+                    row.agent == issue.agent
+                        && row.version == issue.version
+                        && row.target == issue.target
+                })
+                .unwrap_or(0);
+            violations.push(Violation {
+                code: issue.code,
+                path: rel_path(&workspace_root, &artifact_path),
+                json_pointer: Some(format!("/rows/{row_index}")),
+                message: issue.message,
+                unit: Some("support_matrix"),
+                command_path: None,
+                key_or_name: Some(issue.agent),
+                field: Some("rows"),
+                target_triple: Some(issue.target),
+                details: Some(serde_json::Value::String(issue.version)),
+            });
+        }
+    }
+}
+
+fn workspace_root_for(root: &Path) -> Option<PathBuf> {
+    root.parent()
+        .and_then(|p| p.parent())
+        .map(Path::to_path_buf)
 }
 
 fn is_union_snapshot(v: &Value) -> bool {
