@@ -122,6 +122,17 @@ fn stale_generated_block(original: &str) -> String {
     stale
 }
 
+fn reverse_generated_rows(path: &Path) {
+    let text = fs::read_to_string(path).expect("read generated json");
+    let mut artifact: Value = serde_json::from_str(&text).expect("parse generated json");
+    let rows = artifact
+        .get_mut("rows")
+        .and_then(Value::as_array_mut)
+        .expect("generated json rows array");
+    rows.reverse();
+    write_json(path, &artifact);
+}
+
 #[test]
 fn support_matrix_check_rejects_stale_generated_markdown_block() {
     let xtask_bin = PathBuf::from(env!("CARGO_BIN_EXE_xtask"));
@@ -217,5 +228,100 @@ fn support_matrix_check_rejects_stale_generated_markdown_block() {
     let stderr = String::from_utf8_lossy(&check.stderr);
     assert!(stderr.contains("generated block is stale"));
     assert!(stderr.contains("support-matrix.md"));
+    assert!(stderr.contains("regenerate with `cargo run -p xtask -- support-matrix`"));
+}
+
+#[test]
+fn support_matrix_check_rejects_stale_generated_json_row_order() {
+    let xtask_bin = PathBuf::from(env!("CARGO_BIN_EXE_xtask"));
+    let fixture_root = make_temp_dir("support-matrix-json-order-staleness");
+
+    write_text(
+        &fixture_root.join("Cargo.toml"),
+        "[workspace]\nmembers = []\n",
+    );
+    write_text(
+        &fixture_root.join("docs/specs/unified-agent-api/support-matrix.md"),
+        "# Support Matrix Spec — Unified Agent API\n\n## Purpose\nManual contract text.\n\n## Change control\nManual footer.\n",
+    );
+
+    materialize_root(
+        &fixture_root.join("cli_manifests/codex"),
+        &["linux-x64"],
+        "1.0.0",
+        &["linux-x64"],
+        &[("1.0.0", &["linux-x64"])],
+        &[("linux-x64", "1.0.0")],
+        &[("linux-x64", "1.0.0")],
+        &[(
+            "1.0.0",
+            "coverage.linux-x64.json",
+            json!({
+                "deltas": {
+                    "missing_commands": [],
+                    "missing_flags": [],
+                    "missing_args": [],
+                    "intentionally_unsupported": [],
+                    "wrapper_only_commands": [],
+                    "wrapper_only_flags": [],
+                    "wrapper_only_args": [],
+                }
+            }),
+        )],
+    );
+
+    materialize_root(
+        &fixture_root.join("cli_manifests/claude_code"),
+        &["linux-x64"],
+        "2.0.0",
+        &["linux-x64"],
+        &[("2.0.0", &["linux-x64"])],
+        &[("linux-x64", "2.0.0")],
+        &[("linux-x64", "2.0.0")],
+        &[(
+            "2.0.0",
+            "coverage.linux-x64.json",
+            json!({
+                "deltas": {
+                    "missing_commands": [],
+                    "missing_flags": [],
+                    "missing_args": [],
+                    "intentionally_unsupported": [],
+                    "wrapper_only_commands": [],
+                    "wrapper_only_flags": [],
+                    "wrapper_only_args": [],
+                }
+            }),
+        )],
+    );
+
+    let generate = Command::new(&xtask_bin)
+        .arg("support-matrix")
+        .current_dir(&fixture_root)
+        .output()
+        .expect("spawn xtask support-matrix");
+    assert!(
+        generate.status.success(),
+        "xtask support-matrix failed\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&generate.stdout),
+        String::from_utf8_lossy(&generate.stderr)
+    );
+
+    reverse_generated_rows(&fixture_root.join("cli_manifests/support_matrix/current.json"));
+
+    let check = Command::new(&xtask_bin)
+        .arg("support-matrix")
+        .arg("--check")
+        .current_dir(&fixture_root)
+        .output()
+        .expect("spawn xtask support-matrix --check");
+    assert!(
+        !check.status.success(),
+        "xtask support-matrix --check should fail for stale json row order"
+    );
+
+    let stderr = String::from_utf8_lossy(&check.stderr);
+    assert!(stderr.contains("current.json is stale"));
+    assert!(stderr.contains("cli_manifests/support_matrix/current.json"));
     assert!(stderr.contains("regenerate with `cargo run -p xtask -- support-matrix`"));
 }

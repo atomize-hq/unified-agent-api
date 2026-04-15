@@ -210,6 +210,7 @@ pub(crate) fn derive_rows(workspace_root: &Path) -> Result<Vec<SupportRow>, Stri
 }
 
 #[cfg(test)]
+#[allow(dead_code)]
 pub(crate) fn derive_rows_for_test_roots(
     workspace_root: &Path,
     roots: &[(&str, &str)],
@@ -745,18 +746,31 @@ impl PointerPromotionState {
 mod tests {
     use super::*;
     fn sample_rows() -> Vec<SupportRow> {
-        vec![SupportRow {
-            agent: "codex".to_string(),
-            version: "1.0.0".to_string(),
-            target: "linux-x64".to_string(),
-            manifest_support: ManifestSupportState::Supported,
-            backend_support: BackendSupportState::Partial,
-            uaa_support: UaaSupportState::Partial,
-            pointer_promotion: PointerPromotionState::LatestValidated,
-            evidence_notes: vec![
-                "backend report includes backend-only surface outside unified support".to_string(),
-            ],
-        }]
+        vec![
+            SupportRow {
+                agent: "codex".to_string(),
+                version: "1.0.0".to_string(),
+                target: "linux-x64".to_string(),
+                manifest_support: ManifestSupportState::Supported,
+                backend_support: BackendSupportState::Partial,
+                uaa_support: UaaSupportState::Partial,
+                pointer_promotion: PointerPromotionState::LatestValidated,
+                evidence_notes: vec![
+                    "backend report includes backend-only surface outside unified support"
+                        .to_string(),
+                ],
+            },
+            SupportRow {
+                agent: "codex".to_string(),
+                version: "0.9.0".to_string(),
+                target: "darwin-arm64".to_string(),
+                manifest_support: ManifestSupportState::Unsupported,
+                backend_support: BackendSupportState::Unsupported,
+                uaa_support: UaaSupportState::Unsupported,
+                pointer_promotion: PointerPromotionState::None,
+                evidence_notes: vec!["current root snapshot omits this target".to_string()],
+            },
+        ]
     }
 
     #[test]
@@ -777,13 +791,18 @@ mod tests {
         let rows = sample_rows();
         let bundle = render_publication_bundle(&rows).expect("render publication bundle");
 
-        assert!(bundle.json.contains("\"schema_version\": 1"));
-        assert!(bundle.json.contains("\"agent\": \"codex\""));
-        assert!(bundle
-            .markdown
-            .contains("| `codex` | `linux-x64` | `1.0.0` |"));
-        assert!(bundle
-            .markdown
-            .contains("backend report includes backend-only surface"));
+        let artifact: SupportMatrixArtifact =
+            serde_json::from_str(&bundle.json).expect("parse generated support-matrix json");
+        assert_eq!(artifact.schema_version, 1);
+        assert_eq!(artifact.rows, rows);
+
+        let expected_markdown = "\
+### `codex`\n\
+\n\
+| agent | target | version | manifest_support | backend_support | uaa_support | pointer_promotion | evidence_notes |\n\
+|---|---|---|---|---|---|---|---|\n\
+| `codex` | `linux-x64` | `1.0.0` | `supported` | `partial` | `partial` | `latest_validated` | backend report includes backend-only surface outside unified support |\n\
+| `codex` | `darwin-arm64` | `0.9.0` | `unsupported` | `unsupported` | `unsupported` | `none` | current root snapshot omits this target |\n";
+        assert_eq!(bundle.markdown, expected_markdown);
     }
 }
