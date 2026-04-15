@@ -2,11 +2,11 @@
 //!
 //! Usage:
 //! - Parse an explicit path:
-//!   `cargo run -p codex --example parse_rollout_jsonl -- --path ~/.codex/sessions/.../rollout-....jsonl`
+//!   `cargo run -p unified-agent-api-codex --example parse_rollout_jsonl -- --path ~/.codex/sessions/.../rollout-....jsonl`
 //! - Find a rollout file by id substring (typically the session id embedded in the filename):
-//!   `cargo run -p codex --example parse_rollout_jsonl -- --session-id <ID>`
+//!   `cargo run -p unified-agent-api-codex --example parse_rollout_jsonl -- --session-id <ID>`
 //! - Parse from stdin:
-//!   `cat rollout.jsonl | cargo run -p codex --example parse_rollout_jsonl -- --stdin`
+//!   `cat rollout.jsonl | cargo run -p unified-agent-api-codex --example parse_rollout_jsonl -- --stdin`
 //!
 //! Notes:
 //! - Rollout logs are not the same schema as `codex exec --json`.

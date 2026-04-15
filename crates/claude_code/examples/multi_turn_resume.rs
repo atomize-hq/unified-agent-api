@@ -1,7 +1,7 @@
 //! Demonstrates a two-turn flow using an explicit `--session-id` then `--resume <value>`.
 //!
 //! Usage:
-//! - `CLAUDE_EXAMPLE_LIVE=1 cargo run -p claude_code --example multi_turn_resume`
+//! - `CLAUDE_EXAMPLE_LIVE=1 cargo run -p unified-agent-api-claude-code --example multi_turn_resume`
 //!
 //! Notes:
 //! - Uses a temp working directory so session persistence doesn't touch the repo.

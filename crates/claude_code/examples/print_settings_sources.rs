@@ -1,7 +1,7 @@
 //! Demonstrates `--setting-sources` and `--settings`.
 //!
 //! Usage:
-//! - `CLAUDE_EXAMPLE_LIVE=1 cargo run -p claude_code --example print_settings_sources -- "hello"`
+//! - `CLAUDE_EXAMPLE_LIVE=1 cargo run -p unified-agent-api-claude-code --example print_settings_sources -- "hello"`
 
 use std::{env, error::Error};
 

@@ -4,7 +4,7 @@ use codex::{CodexClient, ExecRequest, SandboxMode};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Usage: cargo run -p codex --example cli_overrides -- "<prompt>" [cd]
+    // Usage: cargo run -p unified-agent-api-codex --example cli_overrides -- "<prompt>" [cd]
     // Maps to: codex exec --config model_verbosity=high --config features.search=true
     // --config model_reasoning_effort=low --ask-for-approval on-request
     // --sandbox workspace-write --local-provider ollama --oss --enable builder-toggle

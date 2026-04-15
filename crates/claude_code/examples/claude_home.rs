@@ -2,12 +2,12 @@
 //!
 //! Usage:
 //! - Use a fresh temp home (default):
-//!   - `cargo run -p claude_code --example claude_home`
+//!   - `cargo run -p unified-agent-api-claude-code --example claude_home`
 //! - Use a specific directory:
-//!   - `cargo run -p claude_code --example claude_home -- --home /tmp/claude-home-demo`
+//!   - `cargo run -p unified-agent-api-claude-code --example claude_home -- --home /tmp/claude-home-demo`
 //! - Seed from your current user profile (explicit opt-in):
-//!   - `cargo run -p claude_code --example claude_home -- --seed minimal`
-//!   - `cargo run -p claude_code --example claude_home -- --seed full`
+//!   - `cargo run -p unified-agent-api-claude-code --example claude_home -- --seed minimal`
+//!   - `cargo run -p unified-agent-api-claude-code --example claude_home -- --seed full`
 //!
 //! Notes:
 //! - `--seed full` may copy large/sensitive browser/Electron profile data. Use only when needed.

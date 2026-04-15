@@ -7,7 +7,7 @@
 //! Example:
 //! ```bash
 //! OUTPUT_DIR=/tmp/codex-artifacts \
-//!   cargo run -p codex --example stream_last_message -- "Summarize repo status"
+//!   cargo run -p unified-agent-api-codex --example stream_last_message -- "Summarize repo status"
 //! ```
 
 use std::{env, error::Error, fs, path::Path, path::PathBuf};

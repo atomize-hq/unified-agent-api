@@ -1,7 +1,7 @@
 //! Demonstrates selecting a custom Codex model.
 //! Usage:
 //! ```powershell
-//! cargo run -p codex --example select_model -- gpt-5-codex -- "Explain rustfmt defaults"
+//! cargo run -p unified-agent-api-codex --example select_model -- gpt-5-codex -- "Explain rustfmt defaults"
 //! ```
 
 use codex::CodexClient;

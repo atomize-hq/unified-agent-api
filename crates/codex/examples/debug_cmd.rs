@@ -1,11 +1,11 @@
 //! Demonstrates `codex debug ...` surfaces via the wrapper.
 //!
 //! Usage:
-//! - `cargo run -p codex --example debug_cmd -- help`
-//! - `cargo run -p codex --example debug_cmd -- help app-server`
-//! - `cargo run -p codex --example debug_cmd -- app-server`
-//! - `cargo run -p codex --example debug_cmd -- app-server help`
-//! - `cargo run -p codex --example debug_cmd -- app-server send-message-v2 "hello"`
+//! - `cargo run -p unified-agent-api-codex --example debug_cmd -- help`
+//! - `cargo run -p unified-agent-api-codex --example debug_cmd -- help app-server`
+//! - `cargo run -p unified-agent-api-codex --example debug_cmd -- app-server`
+//! - `cargo run -p unified-agent-api-codex --example debug_cmd -- app-server help`
+//! - `cargo run -p unified-agent-api-codex --example debug_cmd -- app-server send-message-v2 "hello"`
 //!
 //! Environment:
 //! - `CODEX_BINARY` (optional): path to the `codex` CLI binary (defaults to `codex` in PATH).

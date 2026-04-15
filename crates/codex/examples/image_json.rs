@@ -1,7 +1,7 @@
 //! Demonstrates attaching an image while streaming Codex JSONL output quietly.
 //! Usage:
 //! ```powershell
-//! cargo run -p codex --example image_json -- "C:\path\to\image.png" "Describe the screenshot"
+//! cargo run -p unified-agent-api-codex --example image_json -- "C:\path\to\image.png" "Describe the screenshot"
 //! ```
 
 use codex::CodexClient;

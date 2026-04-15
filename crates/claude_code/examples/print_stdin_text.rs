@@ -1,8 +1,8 @@
 //! Demonstrates supplying input via stdin (without a prompt positional).
 //!
 //! Usage:
-//! - `CLAUDE_EXAMPLE_LIVE=1 cargo run -p claude_code --example print_stdin_text`
-//! - `CLAUDE_EXAMPLE_LIVE=1 cargo run -p claude_code --example print_stdin_text -- \"hello from stdin\"`
+//! - `CLAUDE_EXAMPLE_LIVE=1 cargo run -p unified-agent-api-claude-code --example print_stdin_text`
+//! - `CLAUDE_EXAMPLE_LIVE=1 cargo run -p unified-agent-api-claude-code --example print_stdin_text -- \"hello from stdin\"`
 
 use std::error::Error;
 

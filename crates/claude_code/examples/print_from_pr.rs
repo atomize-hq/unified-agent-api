@@ -1,8 +1,8 @@
 //! Demonstrates `--from-pr [value]` (opt-in).
 //!
 //! Usage:
-//! - `CLAUDE_EXAMPLE_LIVE=1 CLAUDE_EXAMPLE_FROM_PR=123 cargo run -p claude_code --example print_from_pr`
-//! - `CLAUDE_EXAMPLE_LIVE=1 CLAUDE_EXAMPLE_FROM_PR=https://github.com/org/repo/pull/123 cargo run -p claude_code --example print_from_pr`
+//! - `CLAUDE_EXAMPLE_LIVE=1 CLAUDE_EXAMPLE_FROM_PR=123 cargo run -p unified-agent-api-claude-code --example print_from_pr`
+//! - `CLAUDE_EXAMPLE_LIVE=1 CLAUDE_EXAMPLE_FROM_PR=https://github.com/org/repo/pull/123 cargo run -p unified-agent-api-claude-code --example print_from_pr`
 //!
 //! Notes:
 //! - This may open an interactive picker depending on CLI behavior and the value provided.

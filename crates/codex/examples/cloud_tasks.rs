@@ -6,16 +6,16 @@
 //!
 //! Usage:
 //! - Overview/help:
-//!   `cargo run -p codex --example cloud_tasks -- overview`
+//!   `cargo run -p unified-agent-api-codex --example cloud_tasks -- overview`
 //! - List tasks (JSON):
-//!   `cargo run -p codex --example cloud_tasks -- list --env <ENV_ID> --json --limit 10`
+//!   `cargo run -p unified-agent-api-codex --example cloud_tasks -- list --env <ENV_ID> --json --limit 10`
 //! - Show status:
-//!   `cargo run -p codex --example cloud_tasks -- status <TASK_ID>`
+//!   `cargo run -p unified-agent-api-codex --example cloud_tasks -- status <TASK_ID>`
 //! - Diff/apply (optional attempt):
-//!   `cargo run -p codex --example cloud_tasks -- diff <TASK_ID> [--attempt N]`
-//!   `cargo run -p codex --example cloud_tasks -- apply <TASK_ID> [--attempt N]`
+//!   `cargo run -p unified-agent-api-codex --example cloud_tasks -- diff <TASK_ID> [--attempt N]`
+//!   `cargo run -p unified-agent-api-codex --example cloud_tasks -- apply <TASK_ID> [--attempt N]`
 //! - Execute a task:
-//!   `cargo run -p codex --example cloud_tasks -- exec --env <ENV_ID> [--attempts N] [--branch BRANCH] -- <QUERY>`
+//!   `cargo run -p unified-agent-api-codex --example cloud_tasks -- exec --env <ENV_ID> [--attempts N] [--branch BRANCH] -- <QUERY>`
 //!
 //! Isolation:
 //! - `--isolated-home` uses a fresh `CODEX_HOME` under `target/` (avoids mutating your real home).

@@ -1,7 +1,7 @@
 //! Demonstrates `claude --print` via `ClaudeClient::print` (real CLI only).
 //!
 //! Usage:
-//! - `CLAUDE_EXAMPLE_LIVE=1 cargo run -p claude_code --example print_text -- "Hello"`
+//! - `CLAUDE_EXAMPLE_LIVE=1 cargo run -p unified-agent-api-claude-code --example print_text -- "Hello"`
 //! - Optional isolation: `CLAUDE_EXAMPLE_ISOLATED_HOME=1`
 //!
 //! Environment:

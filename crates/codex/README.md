@@ -2,6 +2,9 @@
 
 Async wrapper around the Codex CLI focused on the headless `codex exec` flow. The client shells out to the bundled or system Codex binary, mirrors stdout/stderr when asked, and keeps the parent process environment untouched.
 
+- crates.io package: `unified-agent-api-codex`
+- Rust library crate: `codex`
+
 ## Capability + versioning release notes (Workstream F)
 - Capability probes now capture `codex --version`, `codex features list` (`--json` when available), and `--help` hints, storing results as `CodexCapabilities` snapshots with `collected_at` timestamps and `BinaryFingerprint` metadata keyed by canonical binary path.
 - Guard helpers (`guard_output_schema`, `guard_add_dir`, `guard_mcp_login`, `guard_features_list`) keep optional flags off when support is unknown; surface `CapabilityGuard.notes` to operators instead of passing flags blindly.
@@ -14,7 +17,7 @@ Async wrapper around the Codex CLI focused on the headless `codex exec` flow. Th
 Run the snapshot example to see disk reuse with fingerprint checks plus cache policy guidance:
 
 ```
-cargo run -p codex --example capability_snapshot -- ./codex ./codex-capabilities.json auto
+cargo run -p unified-agent-api-codex --example capability_snapshot -- ./codex ./codex-capabilities.json auto
 ```
 
 - The example loads a prior snapshot when the fingerprint matches, falls back to `CapabilityCachePolicy::Refresh` after a TTL or hot-swap, and drops to `CapabilityCachePolicy::Bypass` when metadata is missing (typical on some FUSE/overlay mounts) to avoid persisting snapshots that cannot be validated.
@@ -219,7 +222,7 @@ If `RUST_LOG` is unset, the wrapper injects `RUST_LOG=error` for spawned command
 - `examples/app_server_turns.rs`: starts/resumes `codex app-server` threads, streams items/task_complete, and can issue `turn/interrupt` after the first item; metadata/thread IDs come from server responses and are not persisted by the wrapper.
 - `examples/responses_api_proxy.rs`: launches `codex responses-api-proxy` with an API key piped on stdin; falls back to a stub `--sample` path when no `OPENAI_API_KEY`/`CODEX_API_KEY` is available and polls `--server-info` for `{port,pid}`.
 - `examples/stdio_to_uds_live.rs`: Unix-only live bridge that spins up a temp Unix socket listener, runs `codex stdio-to-uds <socket>`, sends `ping`, and prints the echoed `pong`.
-- `cargo test -p codex` exercises env merging and non-destructive behavior (`runtime_api_*`, `app_runtime_*`, `app_runtime_pool_*` cover listing/prepare/start/stop without writing config or altering metadata).
+- `cargo test -p unified-agent-api-codex` exercises env merging and non-destructive behavior (`runtime_api_*`, `app_runtime_*`, `app_runtime_pool_*` cover listing/prepare/start/stop without writing config or altering metadata).
 - See `crates/codex/EXAMPLES.md` for one-to-one CLI parity examples, including `bundled_binary_home` to run Codex from an embedded binary with isolated state.
 
 ## Integration notes

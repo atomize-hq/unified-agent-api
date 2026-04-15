@@ -3,11 +3,11 @@
 //!
 //! Usage:
 //! - Filter a known rollout file (multiple filters allowed):
-//!   `cargo run -p codex --example filter_rollout_event_msg -- --path ~/.codex/sessions/.../rollout-....jsonl --event-msg-type token_count --event-msg-type user_message --response-item-type message`
+//!   `cargo run -p unified-agent-api-codex --example filter_rollout_event_msg -- --path ~/.codex/sessions/.../rollout-....jsonl --event-msg-type token_count --event-msg-type user_message --response-item-type message`
 //! - Find a rollout file by id substring (typically the session id embedded in the filename):
-//!   `cargo run -p codex --example filter_rollout_event_msg -- --session-id <ID> --event-msg-type agent_reasoning`
+//!   `cargo run -p unified-agent-api-codex --example filter_rollout_event_msg -- --session-id <ID> --event-msg-type agent_reasoning`
 //! - Parse from stdin:
-//!   `cat rollout.jsonl | cargo run -p codex --example filter_rollout_event_msg -- --stdin --event-msg-type token_count`
+//!   `cat rollout.jsonl | cargo run -p unified-agent-api-codex --example filter_rollout_event_msg -- --stdin --event-msg-type token_count`
 //!
 //! Notes:
 //! - Rollout logs are not the same schema as `codex exec --json`.

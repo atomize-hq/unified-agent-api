@@ -1,8 +1,8 @@
 //! Demonstrates `--chrome` and `--no-chrome`.
 //!
 //! Usage:
-//! - `CLAUDE_EXAMPLE_LIVE=1 CLAUDE_EXAMPLE_ALLOW_CHROME=1 cargo run -p claude_code --example print_chrome_flags -- chrome -- \"hello\"`
-//! - `CLAUDE_EXAMPLE_LIVE=1 CLAUDE_EXAMPLE_ALLOW_CHROME=1 cargo run -p claude_code --example print_chrome_flags -- no-chrome -- \"hello\"`
+//! - `CLAUDE_EXAMPLE_LIVE=1 CLAUDE_EXAMPLE_ALLOW_CHROME=1 cargo run -p unified-agent-api-claude-code --example print_chrome_flags -- chrome -- \"hello\"`
+//! - `CLAUDE_EXAMPLE_LIVE=1 CLAUDE_EXAMPLE_ALLOW_CHROME=1 cargo run -p unified-agent-api-claude-code --example print_chrome_flags -- no-chrome -- \"hello\"`
 
 use std::{env, error::Error};
 

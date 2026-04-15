@@ -1,10 +1,10 @@
 //! Demonstrates `codex login`, `codex login status`, and `codex logout` via the wrapper.
 //!
 //! Usage:
-//! - Status (default): `cargo run -p codex --example auth_flow`
-//! - Interactive login: `cargo run -p codex --example auth_flow -- login`
-//! - API key login: `CODEX_API_KEY=... cargo run -p codex --example auth_flow -- login-api-key`
-//! - Logout: `cargo run -p codex --example auth_flow -- logout`
+//! - Status (default): `cargo run -p unified-agent-api-codex --example auth_flow`
+//! - Interactive login: `cargo run -p unified-agent-api-codex --example auth_flow -- login`
+//! - API key login: `CODEX_API_KEY=... cargo run -p unified-agent-api-codex --example auth_flow -- login-api-key`
+//! - Logout: `cargo run -p unified-agent-api-codex --example auth_flow -- logout`
 //!
 //! Environment:
 //! - `CODEX_BINARY` (optional): path to the `codex` CLI binary (defaults to `codex` in PATH).

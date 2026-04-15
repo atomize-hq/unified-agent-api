@@ -15,9 +15,22 @@ Claude Code backend highlights (v1):
 - Tolerant parsing of `--output-format=stream-json` (NDJSON)
 - Release-trailing parity lane (`cli_manifests/claude_code/`)
 
+Published Cargo package names are repo-scoped:
+- `unified-agent-api`
+- `unified-agent-api-codex`
+- `unified-agent-api-claude-code`
+- `unified-agent-api-wrapper-events`
+
+Rust library import paths remain:
+- `agent_api`
+- `codex`
+- `claude_code`
+- `wrapper_events`
+
 ## Start here
 
 - Unified Agent API contracts: `docs/specs/unified-agent-api/README.md`
+- Crates.io release guide: `docs/crates-io-release.md`
 - Codex API docs: `crates/codex/README.md`
 - Examples index: `crates/codex/EXAMPLES.md`
 - Documentation index: `docs/README.md`

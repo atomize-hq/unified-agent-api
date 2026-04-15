@@ -13,7 +13,7 @@
 //! CODEX_BUNDLE_VERSION="1.2.3" \
 //! CODEX_PROJECT_HOME="$HOME/.myapp/codex-homes/demo-workspace" \
 //! CODEX_AUTH_SEED_HOME="$HOME/.myapp/codex-auth-seed" \
-//! cargo run -p codex --example bundled_binary_home -- "Health check prompt"
+//! cargo run -p unified-agent-api-codex --example bundled_binary_home -- "Health check prompt"
 //! ```
 //! `CODEX_AUTH_SEED_HOME` is optional; when set, only `auth.json` and
 //! `.credentials.json` are copied. Avoid copying history/logs between project

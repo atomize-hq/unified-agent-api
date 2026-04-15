@@ -9,7 +9,7 @@
 //! Example:
 //! ```bash
 //! CODEX_CONVERSATION_ID=abc123 \
-//!   cargo run -p codex --example mcp_codex_reply -- "Continue the prior run"
+//!   cargo run -p unified-agent-api-codex --example mcp_codex_reply -- "Continue the prior run"
 //! ```
 
 use std::{

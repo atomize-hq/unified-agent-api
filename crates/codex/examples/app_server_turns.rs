@@ -1,7 +1,7 @@
 //! Example for `codex app-server`: start or resume a thread, stream items and
 //! task_complete notifications, and optionally interrupt the active turn.
 //! Usage:
-//! `cargo run -p codex --example app_server_turns -- "<prompt>" [thread-id]`
+//! `cargo run -p unified-agent-api-codex --example app_server_turns -- "<prompt>" [thread-id]`
 //! Gate with `crates/codex/examples/feature_detection.rs` if your binary might not expose app-server endpoints.
 //! Environment:
 //! - `CODEX_BINARY` (optional): path to the `codex` binary (defaults to `codex` in PATH).

@@ -1,7 +1,7 @@
 //! Demonstrates disallowing a tool while still listing it as available.
 //!
 //! Usage:
-//! - `CLAUDE_EXAMPLE_LIVE=1 cargo run -p claude_code --example print_tools_disallowed`
+//! - `CLAUDE_EXAMPLE_LIVE=1 cargo run -p unified-agent-api-claude-code --example print_tools_disallowed`
 
 use std::{error::Error, fs};
 

@@ -1,7 +1,7 @@
 //! Demonstrates combining a custom working directory with Codex JSONL streaming.
 //! Usage:
 //! ```powershell
-//! cargo run -p codex --example working_dir_json -- "C:\path\to\repo" "Summarize repo status"
+//! cargo run -p unified-agent-api-codex --example working_dir_json -- "C:\path\to\repo" "Summarize repo status"
 //! ```
 
 use codex::CodexClient;

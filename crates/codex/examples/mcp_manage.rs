@@ -5,25 +5,25 @@
 //!
 //! Usage:
 //! - List servers (JSON):
-//!   `cargo run -p codex --example mcp_manage -- list --json`
+//!   `cargo run -p unified-agent-api-codex --example mcp_manage -- list --json`
 //! - Get a server entry:
-//!   `cargo run -p codex --example mcp_manage -- get <NAME> --json`
+//!   `cargo run -p unified-agent-api-codex --example mcp_manage -- get <NAME> --json`
 //! - Add (matches `codex mcp add` shape):
 //!   - Streamable HTTP:
-//!     `cargo run -p codex --example mcp_manage -- add <NAME> --url <URL> [--bearer-token-env-var ENV_VAR]`
+//!     `cargo run -p unified-agent-api-codex --example mcp_manage -- add <NAME> --url <URL> [--bearer-token-env-var ENV_VAR]`
 //!   - Stdio:
-//!     `cargo run -p codex --example mcp_manage -- add <NAME> [--env KEY=VALUE ...] -- <COMMAND>...`
+//!     `cargo run -p unified-agent-api-codex --example mcp_manage -- add <NAME> [--env KEY=VALUE ...] -- <COMMAND>...`
 //! - Roundtrip (isolated home): add -> list -> get -> remove
-//!   `cargo run -p codex --example mcp_manage -- roundtrip [NAME] [URL]`
+//!   `cargo run -p unified-agent-api-codex --example mcp_manage -- roundtrip [NAME] [URL]`
 //! - (Legacy aliases)
 //!   - `add-http <NAME> <URL> [BEARER_TOKEN_ENV_VAR]`
 //!   - `add-stdio <NAME> -- <COMMAND>...`
 //! - Remove a server:
-//!   `cargo run -p codex --example mcp_manage -- remove <NAME>`
+//!   `cargo run -p unified-agent-api-codex --example mcp_manage -- remove <NAME>`
 //! - Logout:
-//!   `cargo run -p codex --example mcp_manage -- logout <NAME>`
+//!   `cargo run -p unified-agent-api-codex --example mcp_manage -- logout <NAME>`
 //! - OAuth login (spawns process; stdout/stderr are inherited by the wrapper):
-//!   `cargo run -p codex --example mcp_manage -- login <NAME> [scope1 scope2 ...]`
+//!   `cargo run -p unified-agent-api-codex --example mcp_manage -- login <NAME> [scope1 scope2 ...]`
 //!
 //! Isolation:
 //! - `--isolated-home` uses a fresh `CODEX_HOME` under `target/` (avoids mutating your real home).

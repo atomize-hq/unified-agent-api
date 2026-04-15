@@ -8,8 +8,8 @@
 //! Example:
 //! ```bash
 //! CODEX_LOG_PATH=/tmp/codex.log \
-//!   cargo run -p codex --example stream_with_log -- "Stream with logging"
-//! cargo run -p codex --example stream_with_log -- --sample
+//!   cargo run -p unified-agent-api-codex --example stream_with_log -- "Stream with logging"
+//! cargo run -p unified-agent-api-codex --example stream_with_log -- --sample
 //! ```
 
 use std::{

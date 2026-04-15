@@ -4,9 +4,9 @@
 //! requested.
 //!
 //! Usage:
-//! - Show help (default): `cargo run -p codex --example session_commands`
-//! - Resume: `CODEX_EXAMPLE_LIVE=1 cargo run -p codex --example session_commands -- resume --last --prompt \"continue\"`
-//! - Fork: `CODEX_EXAMPLE_LIVE=1 cargo run -p codex --example session_commands -- fork --last --prompt \"branch off\"`
+//! - Show help (default): `cargo run -p unified-agent-api-codex --example session_commands`
+//! - Resume: `CODEX_EXAMPLE_LIVE=1 cargo run -p unified-agent-api-codex --example session_commands -- resume --last --prompt \"continue\"`
+//! - Fork: `CODEX_EXAMPLE_LIVE=1 cargo run -p unified-agent-api-codex --example session_commands -- fork --last --prompt \"branch off\"`
 //!
 //! Environment:
 //! - `CODEX_BINARY` (optional): path to the `codex` CLI binary (defaults to `codex` in PATH).

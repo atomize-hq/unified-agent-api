@@ -1,7 +1,7 @@
 //! Demonstrates `--system-prompt` and `--append-system-prompt`.
 //!
 //! Usage:
-//! - `CLAUDE_EXAMPLE_LIVE=1 cargo run -p claude_code --example print_system_prompts -- \"hello\"`
+//! - `CLAUDE_EXAMPLE_LIVE=1 cargo run -p unified-agent-api-claude-code --example print_system_prompts -- \"hello\"`
 
 use std::{env, error::Error};
 

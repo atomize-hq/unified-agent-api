@@ -1,7 +1,7 @@
 //! Demonstrates `--output-format json` with `--json-schema`.
 //!
 //! Usage:
-//! - `CLAUDE_EXAMPLE_LIVE=1 cargo run -p claude_code --example print_json_schema -- \"Return a name and a number\"`
+//! - `CLAUDE_EXAMPLE_LIVE=1 cargo run -p unified-agent-api-claude-code --example print_json_schema -- \"Return a name and a number\"`
 
 use std::{env, error::Error};
 

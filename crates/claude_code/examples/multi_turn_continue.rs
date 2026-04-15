@@ -1,7 +1,7 @@
 //! Demonstrates `--continue` in a temp working directory.
 //!
 //! Usage:
-//! - `CLAUDE_EXAMPLE_LIVE=1 cargo run -p claude_code --example multi_turn_continue`
+//! - `CLAUDE_EXAMPLE_LIVE=1 cargo run -p unified-agent-api-claude-code --example multi_turn_continue`
 //!
 //! Notes:
 //! - `--continue` continues the most recent conversation in the current directory.

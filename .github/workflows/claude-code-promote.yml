@@ -66,7 +66,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cargo test -p claude_code
+          cargo test -p unified-agent-api-claude-code
 
       - name: Promote pointers and metadata
         shell: bash

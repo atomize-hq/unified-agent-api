@@ -2,7 +2,7 @@
 //! Set `CODEX_BINARY` before invoking this example:
 //! ```powershell
 //! $env:CODEX_BINARY="C:\bin\codex-nightly.exe"
-//! cargo run -p codex --example env_binary -- "Nightly sanity check"
+//! cargo run -p unified-agent-api-codex --example env_binary -- "Nightly sanity check"
 //! ```
 
 use codex::CodexClient;

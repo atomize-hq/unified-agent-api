@@ -1,7 +1,7 @@
 //! Prints the current session ID from a real `claude --print --output-format stream-json` run.
 //!
 //! Usage:
-//! - `CLAUDE_EXAMPLE_LIVE=1 cargo run -p claude_code --example print_session_id -- "hello"`
+//! - `CLAUDE_EXAMPLE_LIVE=1 cargo run -p unified-agent-api-claude-code --example print_session_id -- "hello"`
 //! - Optional isolation: `CLAUDE_EXAMPLE_ISOLATED_HOME=1`
 
 use std::error::Error;

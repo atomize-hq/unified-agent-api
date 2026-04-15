@@ -1,7 +1,7 @@
 //! Demonstrates `--verbose`.
 //!
 //! Usage:
-//! - `CLAUDE_EXAMPLE_LIVE=1 cargo run -p claude_code --example print_verbose -- "hello"`
+//! - `CLAUDE_EXAMPLE_LIVE=1 cargo run -p unified-agent-api-claude-code --example print_verbose -- "hello"`
 
 use std::{env, error::Error};
 

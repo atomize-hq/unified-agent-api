@@ -1,7 +1,7 @@
 //! Demonstrates `--file <specs...>` (opt-in).
 //!
 //! Usage:
-//! - `CLAUDE_EXAMPLE_LIVE=1 CLAUDE_EXAMPLE_FILE_SPECS=\"file_abc:doc.txt file_def:image.png\" cargo run -p claude_code --example print_file_resources -- \"describe the downloaded files\"`
+//! - `CLAUDE_EXAMPLE_LIVE=1 CLAUDE_EXAMPLE_FILE_SPECS=\"file_abc:doc.txt file_def:image.png\" cargo run -p unified-agent-api-claude-code --example print_file_resources -- \"describe the downloaded files\"`
 //!
 //! Notes:
 //! - `--file` expects file resource specs in the form `file_id:relative_path`.

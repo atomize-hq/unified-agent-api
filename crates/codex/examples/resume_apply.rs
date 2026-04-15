@@ -7,10 +7,10 @@
 //!
 //! Examples:
 //! ```bash
-//! cargo run -p codex --example resume_apply -- --sample
-//! CODEX_CONVERSATION_ID=abc123 cargo run -p codex --example resume_apply
-//! CODEX_TASK_ID=t-123 cargo run -p codex --example resume_apply -- --resume-id abc123
-//! cargo run -p codex --example resume_apply -- --resume-id abc123 --task-id t-123 --no-apply
+//! cargo run -p unified-agent-api-codex --example resume_apply -- --sample
+//! CODEX_CONVERSATION_ID=abc123 cargo run -p unified-agent-api-codex --example resume_apply
+//! CODEX_TASK_ID=t-123 cargo run -p unified-agent-api-codex --example resume_apply -- --resume-id abc123
+//! cargo run -p unified-agent-api-codex --example resume_apply -- --resume-id abc123 --task-id t-123 --no-apply
 //! ```
 
 use std::{

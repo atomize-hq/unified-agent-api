@@ -1,8 +1,8 @@
 //! Demonstrates how examples resolve the real `claude` binary.
 //!
 //! Usage:
-//! - `cargo run -p claude_code --example env_binary`
-//! - Override: `CLAUDE_BINARY=/path/to/claude cargo run -p claude_code --example env_binary`
+//! - `cargo run -p unified-agent-api-claude-code --example env_binary`
+//! - Override: `CLAUDE_BINARY=/path/to/claude cargo run -p unified-agent-api-claude-code --example env_binary`
 
 use std::error::Error;
 

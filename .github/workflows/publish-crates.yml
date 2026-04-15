@@ -1,0 +1,168 @@
+name: Publish crates.io
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: publish-crates-main
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    name: Detect release
+    runs-on: ubuntu-latest
+    outputs:
+      should_publish: ${{ steps.detect.outputs.should_publish }}
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - id: version
+        name: Read root VERSION
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "version=$(tr -d '[:space:]' < VERSION)" >> "$GITHUB_OUTPUT"
+
+      - id: detect
+        name: Detect VERSION bump
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            if [ "${{ github.ref }}" != "refs/heads/main" ]; then
+              echo "Manual publish runs are only allowed from refs/heads/main; got '${{ github.ref }}'."
+              echo "should_publish=0" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+
+            echo "should_publish=1" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          base_sha="${{ github.event.before }}"
+          head_sha="${{ github.sha }}"
+
+          if [ -z "$base_sha" ] || [ "$base_sha" = "0000000000000000000000000000000000000000" ]; then
+            echo "No comparable base commit is available; skipping publish."
+            echo "should_publish=0" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if git diff --quiet "$base_sha" "$head_sha" -- VERSION; then
+            echo "VERSION did not change in $base_sha..$head_sha; skipping publish."
+            echo "should_publish=0" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "VERSION changed in $base_sha..$head_sha; publish workflow enabled."
+          echo "should_publish=1" >> "$GITHUB_OUTPUT"
+
+  validate:
+    name: Validate release
+    needs: prepare
+    if: ${{ needs.prepare.outputs.should_publish == '1' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      - name: make preflight
+        shell: bash
+        run: |
+          set -euo pipefail
+          make preflight
+
+      - name: Validate publishable versions and pins
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/validate_publish_versions.py
+
+      - name: Validate publish readiness
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/check_publish_readiness.py
+
+  publish:
+    name: Publish workspace crates
+    needs: [prepare, validate]
+    if: ${{ needs.prepare.outputs.should_publish == '1' }}
+    runs-on: ubuntu-latest
+    environment: release
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      - uses: rust-lang/crates-io-auth-action@v1
+        id: auth
+
+      - name: Publish crates in dependency order
+        shell: bash
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
+          RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          set -euo pipefail
+
+          crate_version_exists() {
+            local crate="$1"
+            curl --silent --show-error --fail \
+              "https://crates.io/api/v1/crates/${crate}/${RELEASE_VERSION}" >/dev/null
+          }
+
+          publish_if_missing() {
+            local crate="$1"
+            if crate_version_exists "$crate"; then
+              echo "Skipping ${crate}@${RELEASE_VERSION}; already published."
+              return 0
+            fi
+
+            cargo publish --locked -p "$crate"
+          }
+
+          wait_for_publishability() {
+            local crate="$1"
+            local attempts=40
+            local sleep_seconds=15
+
+            if crate_version_exists "$crate"; then
+              echo "${crate}@${RELEASE_VERSION} already published; skipping registry wait."
+              return 0
+            fi
+
+            for attempt in $(seq 1 "$attempts"); do
+              if cargo publish --dry-run --locked -p "$crate"; then
+                echo "${crate}@${RELEASE_VERSION} passed dry-run on attempt ${attempt}."
+                return 0
+              fi
+
+              echo "Waiting for registry visibility before publishing ${crate}@${RELEASE_VERSION} (attempt ${attempt}/${attempts})."
+              sleep "$sleep_seconds"
+            done
+
+            echo "Timed out waiting for ${crate}@${RELEASE_VERSION} to become publishable." >&2
+            return 1
+          }
+
+          publish_if_missing "unified-agent-api-codex"
+          publish_if_missing "unified-agent-api-claude-code"
+
+          wait_for_publishability "unified-agent-api-wrapper-events"
+          publish_if_missing "unified-agent-api-wrapper-events"
+
+          wait_for_publishability "unified-agent-api"
+          publish_if_missing "unified-agent-api"

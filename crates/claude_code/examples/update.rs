@@ -4,7 +4,7 @@
 //! - `CLAUDE_EXAMPLE_ALLOW_MUTATION=1`
 //!
 //! Usage:
-//! - `CLAUDE_EXAMPLE_ALLOW_MUTATION=1 cargo run -p claude_code --example update`
+//! - `CLAUDE_EXAMPLE_ALLOW_MUTATION=1 cargo run -p unified-agent-api-claude-code --example update`
 
 use std::error::Error;
 

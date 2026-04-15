@@ -1,7 +1,7 @@
 //! Demonstrates `--model`, `--fallback-model`, and `--max-budget-usd`.
 //!
 //! Usage:
-//! - `CLAUDE_EXAMPLE_LIVE=1 cargo run -p claude_code --example print_model_fallback_budget -- "hello"`
+//! - `CLAUDE_EXAMPLE_LIVE=1 cargo run -p unified-agent-api-claude-code --example print_model_fallback_budget -- "hello"`
 //!
 //! Optional environment:
 //! - `CLAUDE_EXAMPLE_MODEL`: overrides `--model` (default: `sonnet`)

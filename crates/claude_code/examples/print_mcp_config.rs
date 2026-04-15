@@ -1,7 +1,7 @@
 //! Demonstrates `--mcp-config`, `--strict-mcp-config`, and `--mcp-debug`.
 //!
 //! Usage:
-//! - `CLAUDE_EXAMPLE_LIVE=1 CLAUDE_EXAMPLE_MCP_CONFIG=/path/to/mcp.json cargo run -p claude_code --example print_mcp_config -- "hello"`
+//! - `CLAUDE_EXAMPLE_LIVE=1 CLAUDE_EXAMPLE_MCP_CONFIG=/path/to/mcp.json cargo run -p unified-agent-api-claude-code --example print_mcp_config -- "hello"`
 //!
 //! Notes:
 //! - This example is opt-in because MCP configuration schemas and local setup vary.

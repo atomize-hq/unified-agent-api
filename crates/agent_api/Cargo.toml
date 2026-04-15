@@ -1,10 +1,17 @@
 [package]
-name = "agent_api"
-version = "0.2.0"
+name = "unified-agent-api"
+version.workspace = true
 edition = "2021"
 rust-version = "1.78"
 description = "Agent-agnostic facade and registry for wrapper backends"
-license = "MIT OR Apache-2.0"
+license-file = "../../LICENSE"
+repository = "https://github.com/atomize-hq/unified-agent-api"
+homepage = "https://github.com/atomize-hq/unified-agent-api"
+documentation = "https://docs.rs/unified-agent-api"
+readme = "README.md"
+
+[lib]
+name = "agent_api"
 
 [features]
 default = []
@@ -18,8 +25,8 @@ serde_json = { workspace = true }
 thiserror = { workspace = true }
 url = "2"
 
-codex = { path = "../codex", optional = true }
-claude_code = { path = "../claude_code", optional = true }
+codex = { package = "unified-agent-api-codex", path = "../codex", version = "=0.2.1", optional = true }
+claude_code = { package = "unified-agent-api-claude-code", path = "../claude_code", version = "=0.2.1", optional = true }
 tokio = { workspace = true, optional = true }
 
 [dev-dependencies]

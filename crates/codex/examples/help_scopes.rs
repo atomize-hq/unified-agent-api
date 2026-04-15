@@ -1,7 +1,7 @@
 //! Prints help text for each `codex <scope> help` family supported by the wrapper.
 //!
 //! Usage:
-//! - `cargo run -p codex --example help_scopes`
+//! - `cargo run -p unified-agent-api-codex --example help_scopes`
 //!
 //! Environment:
 //! - `CODEX_BINARY` (optional): path to the `codex` CLI binary (defaults to `codex` in PATH).

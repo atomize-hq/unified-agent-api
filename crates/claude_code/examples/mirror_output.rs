@@ -1,7 +1,7 @@
 //! Demonstrates stdout/stderr mirroring configuration on the wrapper client.
 //!
 //! Usage:
-//! - `cargo run -p claude_code --example mirror_output`
+//! - `cargo run -p unified-agent-api-claude-code --example mirror_output`
 
 use std::error::Error;
 

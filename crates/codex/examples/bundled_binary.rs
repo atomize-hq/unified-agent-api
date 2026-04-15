@@ -10,7 +10,7 @@
 //! ```bash
 //! CODEX_BUNDLE_ROOT="$HOME/.myapp/codex-bin" \
 //! CODEX_BUNDLE_VERSION="1.2.3" \
-//! cargo run -p codex --example bundled_binary -- "Quick health check"
+//! cargo run -p unified-agent-api-codex --example bundled_binary -- "Quick health check"
 //! ```
 
 use std::{env, error::Error, path::PathBuf, time::Duration};

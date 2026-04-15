@@ -7,8 +7,8 @@
 //!
 //! Example:
 //! ```bash
-//! cargo run -p codex --example feature_detection
-//! CODEX_BINARY=/opt/codex-nightly cargo run -p codex --example feature_detection
+//! cargo run -p unified-agent-api-codex --example feature_detection
+//! CODEX_BINARY=/opt/codex-nightly cargo run -p unified-agent-api-codex --example feature_detection
 //! ```
 
 use std::{
