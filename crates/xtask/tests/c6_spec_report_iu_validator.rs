@@ -411,6 +411,27 @@ fn write_version_status(codex_dir: &Path, status: &str) {
 }
 
 #[test]
+fn c6_validator_rejects_missing_support_matrix_publication_artifact() {
+    let temp = make_temp_dir("ccm-c6-support-matrix-artifact-missing");
+    let codex_dir = temp.join("cli_manifests").join("codex");
+    materialize_minimal_valid_codex_dir(&codex_dir);
+
+    let output = run_xtask_validate(&codex_dir);
+    assert!(
+        !output.status.success(),
+        "expected validation failure:\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
+        output.status,
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_violation_surface(
+        &output,
+        "SUPPORT_MATRIX_ARTIFACT_MISSING",
+        "cli_manifests/support_matrix/current.json",
+    );
+}
+
+#[test]
 fn c6_validator_detects_version_status_drift_for_latest_validated_rows() {
     let temp = make_temp_dir("ccm-c6-support-matrix-status");
     let codex_dir = temp.join("cli_manifests").join("codex");

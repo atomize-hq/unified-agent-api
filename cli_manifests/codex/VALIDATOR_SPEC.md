@@ -249,6 +249,23 @@ Violations:
 - `CURRENT_JSON_NOT_EQUAL_UNION` (same as pointer check)
 - `CURRENT_JSON_MISSING_REQUIRED_TARGET`
 
+### `support_matrix_publication`: committed support publication is present and readable
+
+File:
+- `../support_matrix/current.json`
+
+Policy:
+- `xtask codex-validate` treats the committed support-matrix JSON as a required publication
+  artifact when the workspace root can be resolved from `--codex-dir`.
+- The artifact must exist before publication consistency checks run.
+
+Violations:
+- `SUPPORT_MATRIX_ARTIFACT_MISSING`
+- `SUPPORT_MATRIX_INVALID_JSON`
+- `SUPPORT_MATRIX_SCHEMA_INVALID`
+- any `SUPPORT_MATRIX_*` publication-consistency violation emitted from the shared
+  support-matrix consistency validator
+
 ### `schemas` (optional convenience)
 
 Validate JSON files against:

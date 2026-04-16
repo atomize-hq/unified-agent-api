@@ -522,6 +522,18 @@ fn validate_support_matrix_publication(ctx: &ValidateCtx, violations: &mut Vec<V
     };
     let artifact_path = workspace_root.join("cli_manifests/support_matrix/current.json");
     if !artifact_path.exists() {
+        violations.push(Violation {
+            code: "SUPPORT_MATRIX_ARTIFACT_MISSING",
+            path: rel_path(&workspace_root, &artifact_path),
+            json_pointer: None,
+            message: "missing required support-matrix publication artifact".to_string(),
+            unit: Some("support_matrix"),
+            command_path: None,
+            key_or_name: None,
+            field: Some("current.json"),
+            target_triple: None,
+            details: None,
+        });
         return;
     }
 
