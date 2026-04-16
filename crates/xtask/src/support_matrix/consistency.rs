@@ -3,13 +3,10 @@ use std::{
     path::Path,
 };
 
-use crate::wrapper_coverage_shared::RootIntakeLayout;
-
 use super::{
-    build_evidence_notes, classify_pointer_promotion, load_support_report,
-    read_current_root_posture, read_json, read_pointers, AgentRoot, BackendSupportState,
-    CurrentRootPosture, ManifestSupportState, PointerPromotionState, PointerSet, SupportRow,
-    UaaSupportState, VersionMetadata, CURRENT_AGENT_ROOTS,
+    build_evidence_notes, classify_pointer_promotion, derive_rows_for_loaded_roots,
+    load_agent_root, load_support_report, AgentRoot, BackendSupportState, LoadedAgentRoot,
+    ManifestSupportState, PointerPromotionState, SupportRow, UaaSupportState, CURRENT_AGENT_ROOTS,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -111,13 +108,66 @@ impl SupportMatrixConsistencyIssue {
             ),
         }
     }
+
+    fn manifest_support_mismatch(row: &SupportRow, expected: ManifestSupportState) -> Self {
+        Self {
+            code: "SUPPORT_MATRIX_MANIFEST_SUPPORT_MISMATCH",
+            agent: row.agent.clone(),
+            version: row.version.clone(),
+            target: row.target.clone(),
+            message: format!(
+                "row manifest_support={} does not match committed support state {}",
+                row.manifest_support.as_str(),
+                expected.as_str()
+            ),
+        }
+    }
+
+    fn backend_support_mismatch(row: &SupportRow, expected: BackendSupportState) -> Self {
+        Self {
+            code: "SUPPORT_MATRIX_BACKEND_SUPPORT_MISMATCH",
+            agent: row.agent.clone(),
+            version: row.version.clone(),
+            target: row.target.clone(),
+            message: format!(
+                "row backend_support={} does not match committed backend state {}",
+                row.backend_support.as_str(),
+                expected.as_str()
+            ),
+        }
+    }
+
+    fn uaa_support_mismatch(row: &SupportRow, expected: UaaSupportState) -> Self {
+        Self {
+            code: "SUPPORT_MATRIX_UAA_SUPPORT_MISMATCH",
+            agent: row.agent.clone(),
+            version: row.version.clone(),
+            target: row.target.clone(),
+            message: format!(
+                "row uaa_support={} does not match committed unified support state {}",
+                row.uaa_support.as_str(),
+                expected.as_str()
+            ),
+        }
+    }
+
+    fn row_order_mismatch(row: &SupportRow, expected: &SupportRow, index: usize) -> Self {
+        Self {
+            code: "SUPPORT_MATRIX_ROW_ORDER_MISMATCH",
+            agent: row.agent.clone(),
+            version: row.version.clone(),
+            target: row.target.clone(),
+            message: format!(
+                "row order is not canonical at index {index}; expected {} {} {} at this position",
+                expected.agent, expected.version, expected.target
+            ),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
 struct RootConsistencyContext {
-    posture: CurrentRootPosture,
-    pointers: PointerSet,
-    layout: RootIntakeLayout,
+    loaded_root: LoadedAgentRoot,
     version_statuses: BTreeMap<String, Option<String>>,
 }
 
@@ -127,6 +177,7 @@ pub(crate) fn validate_publication_consistency(
 ) -> Result<(), Vec<SupportMatrixConsistencyIssue>> {
     let mut issues = Vec::new();
     let mut roots = BTreeMap::new();
+    let mut loaded_roots = Vec::new();
     let known_agents = CURRENT_AGENT_ROOTS
         .iter()
         .map(|(agent, _)| *agent)
@@ -152,8 +203,8 @@ pub(crate) fn validate_publication_consistency(
             }
             continue;
         }
-        let posture = match read_current_root_posture(&root.root) {
-            Ok(posture) => posture,
+        let loaded_root = match load_agent_root(&root) {
+            Ok(loaded_root) => loaded_root,
             Err(err) => {
                 issues.push(SupportMatrixConsistencyIssue {
                     code: "SUPPORT_MATRIX_ROOT_READ_ERROR",
@@ -165,38 +216,17 @@ pub(crate) fn validate_publication_consistency(
                 continue;
             }
         };
-        let pointers = match read_pointers(&root.root, &posture.expected_targets) {
-            Ok(pointers) => pointers,
-            Err(err) => {
-                issues.push(SupportMatrixConsistencyIssue {
-                    code: "SUPPORT_MATRIX_POINTER_READ_ERROR",
-                    agent: root.agent.clone(),
-                    version: String::new(),
-                    target: String::new(),
-                    message: err,
-                });
-                continue;
-            }
-        };
+        let version_statuses = loaded_root
+            .versions
+            .iter()
+            .map(|metadata| (metadata.semantic_version.clone(), metadata.status.clone()))
+            .collect::<BTreeMap<_, _>>();
+        loaded_roots.push(loaded_root.clone());
         roots.insert(
             root.agent.clone(),
             RootConsistencyContext {
-                posture,
-                pointers,
-                layout: RootIntakeLayout::new(root.root.clone()),
-                version_statuses: match read_version_statuses(&root.root) {
-                    Ok(version_statuses) => version_statuses,
-                    Err(err) => {
-                        issues.push(SupportMatrixConsistencyIssue {
-                            code: "SUPPORT_MATRIX_VERSION_STATUS_READ_ERROR",
-                            agent: root.agent.clone(),
-                            version: String::new(),
-                            target: String::new(),
-                            message: err,
-                        });
-                        continue;
-                    }
-                },
+                loaded_root,
+                version_statuses,
             },
         );
     }
@@ -216,7 +246,27 @@ pub(crate) fn validate_publication_consistency(
         });
     }
 
-    let expected_identities = expected_row_identities(&roots);
+    let expected_rows = match derive_rows_for_loaded_roots(&loaded_roots) {
+        Ok(expected_rows) => expected_rows,
+        Err(err) => {
+            issues.push(SupportMatrixConsistencyIssue {
+                code: "SUPPORT_MATRIX_ROOT_READ_ERROR",
+                agent: String::new(),
+                version: String::new(),
+                target: String::new(),
+                message: err,
+            });
+            return Err(issues);
+        }
+    };
+    let expected_identities = expected_rows
+        .iter()
+        .map(SupportRowIdentity::from_row)
+        .collect::<BTreeSet<_>>();
+    let expected_rows_by_identity = expected_rows
+        .iter()
+        .map(|row| (SupportRowIdentity::from_row(row), row))
+        .collect::<BTreeMap<_, _>>();
     let mut observed_counts = BTreeMap::<SupportRowIdentity, usize>::new();
     for row in rows {
         let identity = SupportRowIdentity::from_row(row);
@@ -239,6 +289,14 @@ pub(crate) fn validate_publication_consistency(
         }
     }
 
+    let exact_identity_match = expected_identities.len() == observed_counts.len()
+        && expected_identities
+            .iter()
+            .all(|identity| observed_counts.get(identity) == Some(&1))
+        && observed_counts
+            .iter()
+            .all(|(identity, count)| *count == 1 && expected_identities.contains(identity));
+
     for row in rows {
         let Some(ctx) = roots.get(&row.agent) else {
             continue;
@@ -248,7 +306,23 @@ pub(crate) fn validate_publication_consistency(
             continue;
         }
 
-        validate_row_consistency(row, ctx, &mut issues);
+        let expected_row = expected_rows_by_identity
+            .get(&identity)
+            .expect("expected row for known committed identity");
+        validate_row_consistency(row, expected_row, ctx, &mut issues);
+    }
+
+    if exact_identity_match {
+        for (index, (row, expected_row)) in rows.iter().zip(expected_rows.iter()).enumerate() {
+            if SupportRowIdentity::from_row(row) != SupportRowIdentity::from_row(expected_row) {
+                issues.push(SupportMatrixConsistencyIssue::row_order_mismatch(
+                    row,
+                    expected_row,
+                    index,
+                ));
+                break;
+            }
+        }
     }
 
     if issues.is_empty() {
@@ -269,53 +343,33 @@ pub(crate) fn format_publication_issues(issues: &[SupportMatrixConsistencyIssue]
     out
 }
 
-fn read_version_statuses(root: &Path) -> Result<BTreeMap<String, Option<String>>, String> {
-    let layout = RootIntakeLayout::new(root.to_path_buf());
-    let versions_dir = layout.versions_dir();
-    let mut version_statuses = BTreeMap::new();
-
-    for entry in std::fs::read_dir(&versions_dir)
-        .map_err(|err| format!("read_dir({}): {err}", versions_dir.display()))?
-    {
-        let entry = entry.map_err(|err| format!("read_dir entry error: {err}"))?;
-        let path = entry.path();
-        if path.extension().and_then(|ext| ext.to_str()) != Some("json") {
-            continue;
-        }
-
-        let metadata: VersionMetadata = read_json(&path)?;
-        version_statuses.insert(metadata.semantic_version, metadata.status);
-    }
-
-    Ok(version_statuses)
-}
-
-fn expected_row_identities(
-    roots: &BTreeMap<String, RootConsistencyContext>,
-) -> BTreeSet<SupportRowIdentity> {
-    let mut identities = BTreeSet::new();
-
-    for (agent, ctx) in roots {
-        for version in ctx.version_statuses.keys() {
-            for target in &ctx.posture.expected_targets {
-                identities.insert(SupportRowIdentity {
-                    agent: agent.clone(),
-                    version: version.clone(),
-                    target: target.clone(),
-                });
-            }
-        }
-    }
-
-    identities
-}
-
 fn validate_row_consistency(
     row: &SupportRow,
+    expected_row: &SupportRow,
     ctx: &RootConsistencyContext,
     issues: &mut Vec<SupportMatrixConsistencyIssue>,
 ) {
-    let observed_promotion = classify_pointer_promotion(&ctx.pointers, &row.target, &row.version);
+    if row.manifest_support != expected_row.manifest_support {
+        issues.push(SupportMatrixConsistencyIssue::manifest_support_mismatch(
+            row,
+            expected_row.manifest_support,
+        ));
+    }
+    if row.backend_support != expected_row.backend_support {
+        issues.push(SupportMatrixConsistencyIssue::backend_support_mismatch(
+            row,
+            expected_row.backend_support,
+        ));
+    }
+    if row.uaa_support != expected_row.uaa_support {
+        issues.push(SupportMatrixConsistencyIssue::uaa_support_mismatch(
+            row,
+            expected_row.uaa_support,
+        ));
+    }
+
+    let observed_promotion =
+        classify_pointer_promotion(&ctx.loaded_root.pointers, &row.target, &row.version);
     if row.pointer_promotion != observed_promotion {
         issues.push(SupportMatrixConsistencyIssue::pointer_promotion_mismatch(
             row,
@@ -323,7 +377,7 @@ fn validate_row_consistency(
         ));
     }
 
-    let report = match load_support_report(&ctx.layout, &row.version, &row.target) {
+    let report = match load_support_report(&ctx.loaded_root.layout, &row.version, &row.target) {
         Ok(report) => report,
         Err(err) => {
             issues.push(SupportMatrixConsistencyIssue {
@@ -336,8 +390,12 @@ fn validate_row_consistency(
             return;
         }
     };
-    let expected_notes =
-        build_evidence_notes(report.as_ref(), &ctx.posture, &row.target, &row.version);
+    let expected_notes = build_evidence_notes(
+        report.as_ref(),
+        &ctx.loaded_root.posture,
+        &row.target,
+        &row.version,
+    );
 
     if expected_notes != row.evidence_notes {
         issues.push(SupportMatrixConsistencyIssue::evidence_notes_mismatch(
@@ -371,9 +429,13 @@ fn validate_row_consistency(
         }
     }
 
-    let omitted_current_target = ctx.posture.current_version.as_deref()
+    let omitted_current_target = ctx.loaded_root.posture.current_version.as_deref()
         == Some(row.version.as_str())
-        && !ctx.posture.current_targets.contains(&row.target);
+        && !ctx
+            .loaded_root
+            .posture
+            .current_targets
+            .contains(&row.target);
     if omitted_current_target {
         let support_is_unsupported = row.manifest_support == ManifestSupportState::Unsupported
             && row.backend_support == BackendSupportState::Unsupported

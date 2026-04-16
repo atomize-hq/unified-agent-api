@@ -113,10 +113,7 @@ fn materialize_root(
     }
 }
 
-#[test]
-fn publication_consistency_passes_for_matching_rows() {
-    let workspace = make_temp_dir("support-matrix-consistency-pass");
-
+fn materialize_baseline_workspace(workspace: &Path) {
     materialize_root(
         &workspace.join("cli_manifests/codex"),
         &["linux-x64", "win32-x64"],
@@ -168,9 +165,112 @@ fn publication_consistency_passes_for_matching_rows() {
             }),
         )],
     );
+}
+
+#[test]
+fn publication_consistency_passes_for_matching_rows() {
+    let workspace = make_temp_dir("support-matrix-consistency-pass");
+    materialize_baseline_workspace(&workspace);
 
     let rows = derive_rows(&workspace).expect("derive rows");
     validate_publication_consistency(&workspace, &rows).expect("matching rows should pass");
+}
+
+#[test]
+fn publication_consistency_rejects_manifest_support_drift() {
+    let workspace = make_temp_dir("support-matrix-consistency-manifest");
+    materialize_baseline_workspace(&workspace);
+
+    let mut rows = derive_rows(&workspace).expect("derive rows");
+    let row = rows
+        .iter_mut()
+        .find(|row| {
+            row.agent == "claude_code" && row.version == "2.0.0" && row.target == "linux-x64"
+        })
+        .expect("expected claude row");
+    row.manifest_support = ManifestSupportState::Unsupported;
+
+    let issues = validate_publication_consistency(&workspace, &rows)
+        .expect_err("manifest support drift should be rejected");
+    assert!(
+        issues.iter().any(
+            |issue| issue.code == "SUPPORT_MATRIX_MANIFEST_SUPPORT_MISMATCH"
+                && issue.agent == "claude_code"
+                && issue.version == "2.0.0"
+                && issue.target == "linux-x64"
+        ),
+        "expected manifest support mismatch, got: {issues:#?}"
+    );
+}
+
+#[test]
+fn publication_consistency_rejects_backend_support_drift() {
+    let workspace = make_temp_dir("support-matrix-consistency-backend");
+    materialize_baseline_workspace(&workspace);
+
+    let mut rows = derive_rows(&workspace).expect("derive rows");
+    let row = rows
+        .iter_mut()
+        .find(|row| {
+            row.agent == "claude_code" && row.version == "2.0.0" && row.target == "linux-x64"
+        })
+        .expect("expected claude row");
+    row.backend_support = BackendSupportState::Unsupported;
+
+    let issues = validate_publication_consistency(&workspace, &rows)
+        .expect_err("backend support drift should be rejected");
+    assert!(
+        issues.iter().any(
+            |issue| issue.code == "SUPPORT_MATRIX_BACKEND_SUPPORT_MISMATCH"
+                && issue.agent == "claude_code"
+                && issue.version == "2.0.0"
+                && issue.target == "linux-x64"
+        ),
+        "expected backend support mismatch, got: {issues:#?}"
+    );
+}
+
+#[test]
+fn publication_consistency_rejects_uaa_support_drift() {
+    let workspace = make_temp_dir("support-matrix-consistency-uaa");
+    materialize_baseline_workspace(&workspace);
+
+    let mut rows = derive_rows(&workspace).expect("derive rows");
+    let row = rows
+        .iter_mut()
+        .find(|row| row.agent == "codex" && row.version == "1.0.0" && row.target == "linux-x64")
+        .expect("expected codex row");
+    row.uaa_support = UaaSupportState::Supported;
+
+    let issues = validate_publication_consistency(&workspace, &rows)
+        .expect_err("uaa support drift should be rejected");
+    assert!(
+        issues
+            .iter()
+            .any(|issue| issue.code == "SUPPORT_MATRIX_UAA_SUPPORT_MISMATCH"
+                && issue.agent == "codex"
+                && issue.version == "1.0.0"
+                && issue.target == "linux-x64"),
+        "expected unified support mismatch, got: {issues:#?}"
+    );
+}
+
+#[test]
+fn publication_consistency_rejects_non_canonical_row_order() {
+    let workspace = make_temp_dir("support-matrix-consistency-order");
+    materialize_baseline_workspace(&workspace);
+
+    let mut rows = derive_rows(&workspace).expect("derive rows");
+    rows.swap(0, 1);
+
+    let issues = validate_publication_consistency(&workspace, &rows)
+        .expect_err("non-canonical row order should be rejected");
+    assert!(
+        issues
+            .iter()
+            .any(|issue| issue.code == "SUPPORT_MATRIX_ROW_ORDER_MISMATCH"),
+        "expected row order mismatch, got: {issues:#?}"
+    );
 }
 
 #[test]

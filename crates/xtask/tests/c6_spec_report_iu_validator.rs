@@ -272,6 +272,44 @@ fn write_support_matrix_artifact(workspace_root: &Path, rows: Value) {
     );
 }
 
+fn write_complete_support_matrix_artifact(workspace_root: &Path) {
+    write_support_matrix_artifact(
+        workspace_root,
+        json!([
+            {
+                "agent": "codex",
+                "version": VERSION,
+                "target": "aarch64-apple-darwin",
+                "manifest_support": "unsupported",
+                "backend_support": "unsupported",
+                "uaa_support": "unsupported",
+                "pointer_promotion": "none",
+                "evidence_notes": ["current root snapshot omits this target"],
+            },
+            {
+                "agent": "codex",
+                "version": VERSION,
+                "target": "x86_64-pc-windows-msvc",
+                "manifest_support": "unsupported",
+                "backend_support": "unsupported",
+                "uaa_support": "unsupported",
+                "pointer_promotion": "none",
+                "evidence_notes": ["current root snapshot omits this target"],
+            },
+            {
+                "agent": "codex",
+                "version": VERSION,
+                "target": REQUIRED_TARGET,
+                "manifest_support": "supported",
+                "backend_support": "unsupported",
+                "uaa_support": "unsupported",
+                "pointer_promotion": "latest_supported_and_validated",
+                "evidence_notes": [],
+            }
+        ]),
+    );
+}
+
 fn assert_violation_surface(output: &std::process::Output, code: &str, expected_path: &str) {
     let combined = format!(
         "{}\n{}",
@@ -375,6 +413,73 @@ fn c6_validator_detects_pointer_promotion_drift_in_support_matrix_publication() 
     assert_violation_surface(
         &output,
         "SUPPORT_MATRIX_POINTER_PROMOTION_MISMATCH",
+        "cli_manifests/support_matrix/current.json",
+    );
+}
+
+#[test]
+fn c6_validator_detects_support_state_drift_in_support_matrix_publication() {
+    let temp = make_temp_dir("ccm-c6-support-matrix-support-state");
+    let codex_dir = temp.join("cli_manifests").join("codex");
+    materialize_minimal_valid_codex_dir(&codex_dir);
+    write_complete_support_matrix_artifact(&temp);
+
+    let artifact_path = temp
+        .join("cli_manifests")
+        .join("support_matrix")
+        .join("current.json");
+    let mut artifact: Value =
+        serde_json::from_str(&fs::read_to_string(&artifact_path).expect("read artifact"))
+            .expect("parse artifact");
+    artifact["rows"][2]["manifest_support"] = json!("unsupported");
+    write_json(&artifact_path, &artifact);
+
+    let output = run_xtask_validate(&codex_dir);
+    assert!(
+        !output.status.success(),
+        "expected validation failure:\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
+        output.status,
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_violation_surface(
+        &output,
+        "SUPPORT_MATRIX_MANIFEST_SUPPORT_MISMATCH",
+        "cli_manifests/support_matrix/current.json",
+    );
+}
+
+#[test]
+fn c6_validator_detects_non_canonical_support_matrix_row_order() {
+    let temp = make_temp_dir("ccm-c6-support-matrix-order");
+    let codex_dir = temp.join("cli_manifests").join("codex");
+    materialize_minimal_valid_codex_dir(&codex_dir);
+    write_complete_support_matrix_artifact(&temp);
+
+    let artifact_path = temp
+        .join("cli_manifests")
+        .join("support_matrix")
+        .join("current.json");
+    let mut artifact: Value =
+        serde_json::from_str(&fs::read_to_string(&artifact_path).expect("read artifact"))
+            .expect("parse artifact");
+    artifact["rows"]
+        .as_array_mut()
+        .expect("rows array")
+        .swap(0, 1);
+    write_json(&artifact_path, &artifact);
+
+    let output = run_xtask_validate(&codex_dir);
+    assert!(
+        !output.status.success(),
+        "expected validation failure:\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
+        output.status,
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_violation_surface(
+        &output,
+        "SUPPORT_MATRIX_ROW_ORDER_MISMATCH",
         "cli_manifests/support_matrix/current.json",
     );
 }

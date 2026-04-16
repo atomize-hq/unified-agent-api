@@ -101,6 +101,15 @@ struct AgentRoot {
     root: PathBuf,
 }
 
+#[derive(Debug, Clone)]
+struct LoadedAgentRoot {
+    agent: String,
+    posture: CurrentRootPosture,
+    pointers: PointerSet,
+    layout: RootIntakeLayout,
+    versions: Vec<VersionMetadata>,
+}
+
 #[derive(Debug, Deserialize)]
 struct CurrentUnion {
     #[serde(default)]
@@ -121,7 +130,7 @@ struct CurrentUnionBinary {
     semantic_version: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 struct VersionMetadata {
     semantic_version: String,
     #[serde(default)]
@@ -129,7 +138,7 @@ struct VersionMetadata {
     coverage: VersionCoverage,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 struct VersionCoverage {
     #[serde(default)]
     supported_targets: Vec<String>,
@@ -226,22 +235,32 @@ pub(crate) fn derive_rows_for_test_roots(
 }
 
 fn derive_rows_for_roots(roots: &[AgentRoot]) -> Result<Vec<SupportRow>, String> {
-    let mut rows = Vec::new();
-    for root in roots {
-        rows.extend(derive_rows_for_root(root)?);
-    }
-
-    rows.sort_by(compare_rows);
-    Ok(rows)
+    let loaded_roots = roots
+        .iter()
+        .map(load_agent_root)
+        .collect::<Result<Vec<_>, _>>()?;
+    derive_rows_for_loaded_roots(&loaded_roots)
 }
 
-fn derive_rows_for_root(root: &AgentRoot) -> Result<Vec<SupportRow>, String> {
+fn load_agent_root(root: &AgentRoot) -> Result<LoadedAgentRoot, String> {
     let posture = read_current_root_posture(&root.root)?;
     let pointers = read_pointers(&root.root, &posture.expected_targets)?;
     let layout = RootIntakeLayout::new(root.root.clone());
+    let versions = read_version_metadata(&layout)?;
 
-    let mut rows = Vec::new();
+    Ok(LoadedAgentRoot {
+        agent: root.agent.clone(),
+        posture,
+        pointers,
+        layout,
+        versions,
+    })
+}
+
+fn read_version_metadata(layout: &RootIntakeLayout) -> Result<Vec<VersionMetadata>, String> {
     let versions_dir = layout.versions_dir();
+    let mut versions = Vec::new();
+
     for entry in fs::read_dir(&versions_dir)
         .map_err(|err| format!("read_dir({}): {err}", versions_dir.display()))?
     {
@@ -251,27 +270,47 @@ fn derive_rows_for_root(root: &AgentRoot) -> Result<Vec<SupportRow>, String> {
             continue;
         }
 
-        let metadata: VersionMetadata = read_json(&path)?;
+        versions.push(read_json(&path)?);
+    }
+
+    Ok(versions)
+}
+
+fn derive_rows_for_loaded_roots(roots: &[LoadedAgentRoot]) -> Result<Vec<SupportRow>, String> {
+    let mut rows = Vec::new();
+    for root in roots {
+        rows.extend(derive_rows_for_loaded_root(root)?);
+    }
+
+    rows.sort_by(compare_rows);
+    Ok(rows)
+}
+
+fn derive_rows_for_loaded_root(root: &LoadedAgentRoot) -> Result<Vec<SupportRow>, String> {
+    let mut rows = Vec::new();
+
+    for metadata in &root.versions {
         let supported_targets = metadata
             .coverage
             .supported_targets
-            .into_iter()
+            .iter()
+            .cloned()
             .collect::<BTreeSet<_>>();
 
-        for target in posture.expected_targets.iter() {
+        for target in &root.posture.expected_targets {
             let manifest_support = if supported_targets.contains(target) {
                 ManifestSupportState::Supported
             } else {
                 ManifestSupportState::Unsupported
             };
 
-            let report = load_support_report(&layout, &metadata.semantic_version, target)?;
+            let report = load_support_report(&root.layout, &metadata.semantic_version, target)?;
             let backend_support = classify_backend_support(report.as_ref());
             let pointer_promotion =
-                classify_pointer_promotion(&pointers, target, &metadata.semantic_version);
+                classify_pointer_promotion(&root.pointers, target, &metadata.semantic_version);
             let evidence_notes = build_evidence_notes(
                 report.as_ref(),
-                &posture,
+                &root.posture,
                 target,
                 &metadata.semantic_version,
             );
