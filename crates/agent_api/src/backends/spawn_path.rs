@@ -355,6 +355,7 @@ mod tests {
 
     #[test]
     fn resolves_relative_default_working_dir_against_relative_run_start_cwd() {
+        let _env_lock = crate::backends::test_support::test_env_lock();
         let current_dir = TempDir::new().expect("current dir");
         let run_start_root = current_dir.path().join("run-start");
         let expected_working_dir = run_start_root.join("repo");
@@ -436,6 +437,7 @@ mod tests {
 
     #[test]
     fn resolves_relative_path_entry_against_relative_current_dir() {
+        let _env_lock = crate::backends::test_support::test_env_lock();
         let parent_dir = TempDir::new().expect("parent dir");
         let wrapper_dir = parent_dir.path().join("wrapper");
         let working_dir = parent_dir.path().join("repo");

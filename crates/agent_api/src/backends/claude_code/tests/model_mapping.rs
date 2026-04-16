@@ -12,7 +12,7 @@ async fn spawn_and_drain(
     env: BTreeMap<String, String>,
     prompt: &str,
 ) {
-    let _env_lock = test_env_lock().lock().await;
+    let _env_lock = test_env_lock();
 
     let adapter = new_adapter_with_config(ClaudeCodeBackendConfig {
         binary: Some(fake_claude_binary()),

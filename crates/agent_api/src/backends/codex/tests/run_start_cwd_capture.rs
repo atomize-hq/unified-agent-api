@@ -84,7 +84,7 @@ fn capture_test_config(
 
 #[tokio::test]
 async fn run_captures_run_start_cwd_before_future_is_awaited() {
-    let _env_lock = test_env_lock().lock().await;
+    let _env_lock = test_env_lock();
     let temp = tempdir().expect("tempdir");
     let run_start_root = temp.path().join("run-start");
     let later_root = temp.path().join("later");
@@ -125,7 +125,7 @@ async fn run_captures_run_start_cwd_before_future_is_awaited() {
 
 #[tokio::test]
 async fn run_control_captures_run_start_cwd_before_future_is_awaited() {
-    let _env_lock = test_env_lock().lock().await;
+    let _env_lock = test_env_lock();
     let temp = tempdir().expect("tempdir");
     let run_start_root = temp.path().join("run-start");
     let later_root = temp.path().join("later");

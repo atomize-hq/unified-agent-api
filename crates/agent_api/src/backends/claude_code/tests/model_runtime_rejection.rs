@@ -6,7 +6,7 @@ use super::support::*;
 
 #[tokio::test]
 async fn claude_runtime_model_rejection_is_safely_redacted_and_parity_is_preserved() {
-    let _env_lock = test_env_lock().lock().await;
+    let _env_lock = test_env_lock();
 
     let prompt = "hello world";
     let requested_model = "request-model";
