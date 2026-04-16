@@ -3,10 +3,13 @@ use std::{
     path::Path,
 };
 
-use super::{
+use super::derive::{
     build_evidence_notes, classify_pointer_promotion, derive_rows_for_loaded_roots,
-    load_agent_root, load_support_report, AgentRoot, BackendSupportState, LoadedAgentRoot,
-    ManifestSupportState, PointerPromotionState, SupportRow, UaaSupportState, CURRENT_AGENT_ROOTS,
+    load_agent_root, load_support_report, AgentRoot, LoadedAgentRoot,
+};
+use super::{
+    BackendSupportState, ManifestSupportState, PointerPromotionState, SupportRow, UaaSupportState,
+    CURRENT_AGENT_ROOTS,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
