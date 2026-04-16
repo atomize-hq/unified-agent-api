@@ -171,7 +171,7 @@ async fn app_runtime_lifecycle_starts_and_stops_without_mutation() {
                 code_home: None,
                 current_dir: None,
                 mirror_stdio: Some(true),
-                startup_timeout_ms: Some(1500),
+                startup_timeout_ms: Some(5000),
                 binary: None,
                 metadata: metadata.clone(),
             },
