@@ -47,6 +47,13 @@ fn write_json(path: &Path, value: &Value) {
     write_text(path, &format!("{text}\n"));
 }
 
+fn write_workspace_manifest(workspace_root: &Path) {
+    write_text(
+        &workspace_root.join("Cargo.toml"),
+        "[workspace]\nmembers = []\n",
+    );
+}
+
 fn copy_from_repo(codex_dir: &Path, filename: &str) {
     let src = workspace_root()
         .join("cli_manifests")
@@ -459,6 +466,7 @@ fn materialize_minimal_valid_workspace(workspace_root: &Path) -> PathBuf {
     let codex_dir = workspace_root.join("cli_manifests").join("codex");
     let claude_dir = workspace_root.join("cli_manifests").join("claude_code");
 
+    write_workspace_manifest(workspace_root);
     materialize_minimal_valid_codex_dir(&codex_dir);
     materialize_minimal_valid_claude_dir(&claude_dir);
     write_support_matrix_artifact(workspace_root);
@@ -567,6 +575,22 @@ fn c0_validate_passes_on_minimal_valid_codex_dir() {
     assert!(
         output.status.success(),
         "expected success:\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
+        output.status,
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
+fn c0_validate_passes_on_standalone_codex_dir_without_workspace_support_matrix() {
+    let temp = make_temp_dir("ccm-c0-validate-standalone-pass");
+    let codex_dir = temp.join("cli_manifests").join("codex");
+    materialize_minimal_valid_codex_dir(&codex_dir);
+
+    let output = run_xtask_validate(&codex_dir);
+    assert!(
+        output.status.success(),
+        "expected standalone success without workspace sibling layout:\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
         output.status,
         String::from_utf8_lossy(&output.stdout),
         String::from_utf8_lossy(&output.stderr)

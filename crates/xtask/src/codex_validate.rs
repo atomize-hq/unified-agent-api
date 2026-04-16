@@ -633,9 +633,19 @@ fn validate_support_matrix_publication(ctx: &ValidateCtx, violations: &mut Vec<V
 }
 
 fn workspace_root_for(root: &Path) -> Option<PathBuf> {
-    root.parent()
-        .and_then(|p| p.parent())
-        .map(Path::to_path_buf)
+    let canonical_root = fs::canonicalize(root).ok()?;
+    for candidate in canonical_root.ancestors() {
+        let cargo_toml = candidate.join("Cargo.toml");
+        let Ok(text) = fs::read_to_string(&cargo_toml) else {
+            continue;
+        };
+        if text.contains("[workspace]")
+            && canonical_root == candidate.join("cli_manifests").join("codex")
+        {
+            return Some(candidate.to_path_buf());
+        }
+    }
+    None
 }
 
 fn is_union_snapshot(v: &Value) -> bool {

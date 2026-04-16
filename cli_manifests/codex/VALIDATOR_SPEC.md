@@ -45,7 +45,13 @@ The validator reads:
 - `SCHEMA.json` and `VERSION_METADATA_SCHEMA.json` as shape contracts
 - The workspace files under `--codex-dir` (snapshots, reports, pointers, metadata)
 
-No other sources are consulted.
+No other sources are consulted for standalone root validation.
+
+When `--codex-dir` resolves to the committed workspace Codex root at `<workspace>/cli_manifests/codex`
+and that workspace is discoverable via an ancestor `Cargo.toml` containing `[workspace]`, the validator
+also enforces the support-matrix publication artifact under `cli_manifests/support_matrix/current.json`
+against the committed workspace root set. Outside that exact workspace-root layout, `codex-validate`
+reads only files under the supplied root.
 
 ## Output
 
