@@ -192,18 +192,18 @@ pub(crate) fn validate_publication_consistency(
             root: workspace_root.join(rel_root),
         };
         if !root.root.exists() {
-            if rows.iter().any(|row| row.agent == root.agent) {
-                issues.push(SupportMatrixConsistencyIssue {
-                    code: "SUPPORT_MATRIX_ROOT_READ_ERROR",
-                    agent: root.agent.clone(),
-                    version: String::new(),
-                    target: String::new(),
-                    message: format!(
-                        "committed manifest root is missing from workspace: {}",
-                        root.root.display()
-                    ),
-                });
-            }
+            // The committed root set is authoritative even when publication rows for that agent
+            // have already been dropped; otherwise missing roots evade the exact-row-set check.
+            issues.push(SupportMatrixConsistencyIssue {
+                code: "SUPPORT_MATRIX_ROOT_READ_ERROR",
+                agent: root.agent.clone(),
+                version: String::new(),
+                target: String::new(),
+                message: format!(
+                    "committed manifest root is missing from workspace: {}",
+                    root.root.display()
+                ),
+            });
             continue;
         }
         let loaded_root = match load_agent_root(&root) {

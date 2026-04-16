@@ -177,6 +177,72 @@ fn materialize_minimal_valid_codex_dir(codex_dir: &Path) {
     write_json(&codex_dir.join("wrapper_coverage.json"), &wrapper_coverage);
 }
 
+fn materialize_minimal_valid_claude_dir(claude_dir: &Path) {
+    fs::create_dir_all(claude_dir).expect("mkdir claude dir");
+
+    write_json(
+        &claude_dir.join("current.json"),
+        &json!({
+            "expected_targets": [REQUIRED_TARGET],
+            "inputs": [{
+                "target_triple": REQUIRED_TARGET,
+                "binary": {
+                    "semantic_version": VERSION,
+                }
+            }],
+        }),
+    );
+
+    write_text(
+        &claude_dir
+            .join("pointers")
+            .join("latest_supported")
+            .join(format!("{REQUIRED_TARGET}.txt")),
+        &format!("{VERSION}\n"),
+    );
+    write_text(
+        &claude_dir
+            .join("pointers")
+            .join("latest_validated")
+            .join(format!("{REQUIRED_TARGET}.txt")),
+        &format!("{VERSION}\n"),
+    );
+
+    write_json(
+        &claude_dir.join("versions").join(format!("{VERSION}.json")),
+        &json!({
+            "semantic_version": VERSION,
+            "status": "validated",
+            "coverage": {
+                "supported_targets": [REQUIRED_TARGET],
+            },
+        }),
+    );
+
+    write_json(
+        &claude_dir
+            .join("reports")
+            .join(VERSION)
+            .join(format!("coverage.{REQUIRED_TARGET}.json")),
+        &json!({
+            "inputs": {
+                "upstream": {
+                    "targets": [REQUIRED_TARGET],
+                }
+            },
+            "deltas": {
+                "missing_commands": [],
+                "missing_flags": [],
+                "missing_args": [],
+                "intentionally_unsupported": [],
+                "wrapper_only_commands": [],
+                "wrapper_only_flags": [],
+                "wrapper_only_args": [],
+            }
+        }),
+    );
+}
+
 fn root_flag_from_help(help_text: &str) -> &'static str {
     if help_text.contains("--root") {
         "--root"
@@ -516,6 +582,65 @@ fn c6_validator_rejects_incomplete_support_matrix_publication() {
     assert_violation_surface(
         &output,
         "SUPPORT_MATRIX_ROW_MISSING",
+        "cli_manifests/support_matrix/current.json",
+    );
+}
+
+#[test]
+fn c6_validator_rejects_missing_committed_agent_root_even_without_rows() {
+    let temp = make_temp_dir("ccm-c6-support-matrix-missing-root");
+    let codex_dir = temp.join("cli_manifests").join("codex");
+    let claude_dir = temp.join("cli_manifests").join("claude_code");
+    materialize_minimal_valid_codex_dir(&codex_dir);
+    materialize_minimal_valid_claude_dir(&claude_dir);
+    write_support_matrix_artifact(
+        &temp,
+        json!([
+            {
+                "agent": "codex",
+                "version": VERSION,
+                "target": "aarch64-apple-darwin",
+                "manifest_support": "unsupported",
+                "backend_support": "unsupported",
+                "uaa_support": "unsupported",
+                "pointer_promotion": "none",
+                "evidence_notes": ["current root snapshot omits this target"],
+            },
+            {
+                "agent": "codex",
+                "version": VERSION,
+                "target": "x86_64-pc-windows-msvc",
+                "manifest_support": "unsupported",
+                "backend_support": "unsupported",
+                "uaa_support": "unsupported",
+                "pointer_promotion": "none",
+                "evidence_notes": ["current root snapshot omits this target"],
+            },
+            {
+                "agent": "codex",
+                "version": VERSION,
+                "target": REQUIRED_TARGET,
+                "manifest_support": "supported",
+                "backend_support": "unsupported",
+                "uaa_support": "unsupported",
+                "pointer_promotion": "latest_supported_and_validated",
+                "evidence_notes": [],
+            }
+        ]),
+    );
+    fs::remove_dir_all(&claude_dir).expect("remove committed claude root");
+
+    let output = run_xtask_validate(&codex_dir);
+    assert!(
+        !output.status.success(),
+        "expected validation failure:\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
+        output.status,
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_violation_surface(
+        &output,
+        "SUPPORT_MATRIX_ROOT_READ_ERROR",
         "cli_manifests/support_matrix/current.json",
     );
 }

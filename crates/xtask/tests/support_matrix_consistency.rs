@@ -363,6 +363,26 @@ fn publication_consistency_rejects_missing_committed_row() {
 }
 
 #[test]
+fn publication_consistency_rejects_missing_committed_agent_root_even_without_rows() {
+    let workspace = make_temp_dir("support-matrix-consistency-missing-root");
+    materialize_baseline_workspace(&workspace);
+
+    let mut rows = derive_rows(&workspace).expect("derive rows");
+    fs::remove_dir_all(workspace.join("cli_manifests/claude_code"))
+        .expect("remove committed claude root");
+    rows.retain(|row| row.agent != "claude_code");
+
+    let issues = validate_publication_consistency(&workspace, &rows)
+        .expect_err("missing committed agent root should be rejected");
+    assert!(
+        issues.iter().any(|issue| {
+            issue.code == "SUPPORT_MATRIX_ROOT_READ_ERROR" && issue.agent == "claude_code"
+        }),
+        "expected missing-root error, got: {issues:#?}"
+    );
+}
+
+#[test]
 fn publication_consistency_rejects_duplicate_row() {
     let workspace = make_temp_dir("support-matrix-consistency-duplicate");
 
