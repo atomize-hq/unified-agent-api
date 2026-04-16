@@ -41,6 +41,34 @@ fn write_json(path: &Path, value: &Value) {
     write_text(path, &format!("{text}\n"));
 }
 
+fn empty_report() -> Value {
+    json!({
+        "deltas": {
+            "missing_commands": [],
+            "missing_flags": [],
+            "missing_args": [],
+            "intentionally_unsupported": [],
+            "wrapper_only_commands": [],
+            "wrapper_only_flags": [],
+            "wrapper_only_args": [],
+        }
+    })
+}
+
+fn backend_only_report() -> Value {
+    json!({
+        "deltas": {
+            "missing_commands": [],
+            "missing_flags": [],
+            "missing_args": [],
+            "intentionally_unsupported": [],
+            "wrapper_only_commands": [{ "path": ["backend-only"] }],
+            "wrapper_only_flags": [],
+            "wrapper_only_args": [],
+        }
+    })
+}
+
 #[allow(clippy::too_many_arguments)]
 fn materialize_root(
     root: &Path,
@@ -122,23 +150,7 @@ fn materialize_baseline_workspace(workspace: &Path) {
         &[("0.9.0", &["linux-x64"]), ("1.0.0", &["linux-x64"])],
         &[("linux-x64", "0.9.0")],
         &[("linux-x64", "1.0.0")],
-        &[(
-            "1.0.0",
-            "coverage.linux-x64.json",
-            serde_json::json!({
-                "deltas": {
-                    "missing_commands": [],
-                    "missing_flags": [],
-                    "missing_args": [],
-                    "intentionally_unsupported": [],
-                    "wrapper_only_commands": [
-                        { "path": ["backend-only"] }
-                    ],
-                    "wrapper_only_flags": [],
-                    "wrapper_only_args": [],
-                }
-            }),
-        )],
+        &[("1.0.0", "coverage.linux-x64.json", backend_only_report())],
     );
 
     materialize_root(
@@ -149,21 +161,7 @@ fn materialize_baseline_workspace(workspace: &Path) {
         &[("2.0.0", &["linux-x64"])],
         &[("linux-x64", "2.0.0")],
         &[("linux-x64", "2.0.0")],
-        &[(
-            "2.0.0",
-            "coverage.linux-x64.json",
-            serde_json::json!({
-                "deltas": {
-                    "missing_commands": [],
-                    "missing_flags": [],
-                    "missing_args": [],
-                    "intentionally_unsupported": [],
-                    "wrapper_only_commands": [],
-                    "wrapper_only_flags": [],
-                    "wrapper_only_args": [],
-                }
-            }),
-        )],
+        &[("2.0.0", "coverage.linux-x64.json", empty_report())],
     );
 }
 
@@ -286,36 +284,8 @@ fn publication_consistency_rejects_missing_committed_row() {
         &[("linux-x64", "1.0.0")],
         &[("linux-x64", "1.0.0")],
         &[
-            (
-                "1.0.0",
-                "coverage.linux-x64.json",
-                serde_json::json!({
-                    "deltas": {
-                        "missing_commands": [],
-                        "missing_flags": [],
-                        "missing_args": [],
-                        "intentionally_unsupported": [],
-                        "wrapper_only_commands": [],
-                        "wrapper_only_flags": [],
-                        "wrapper_only_args": [],
-                    }
-                }),
-            ),
-            (
-                "1.0.0",
-                "coverage.win32-x64.json",
-                serde_json::json!({
-                    "deltas": {
-                        "missing_commands": [],
-                        "missing_flags": [],
-                        "missing_args": [],
-                        "intentionally_unsupported": [],
-                        "wrapper_only_commands": [],
-                        "wrapper_only_flags": [],
-                        "wrapper_only_args": [],
-                    }
-                }),
-            ),
+            ("1.0.0", "coverage.linux-x64.json", empty_report()),
+            ("1.0.0", "coverage.win32-x64.json", empty_report()),
         ],
     );
 
@@ -327,21 +297,7 @@ fn publication_consistency_rejects_missing_committed_row() {
         &[("2.0.0", &["linux-x64"])],
         &[("linux-x64", "2.0.0")],
         &[("linux-x64", "2.0.0")],
-        &[(
-            "2.0.0",
-            "coverage.linux-x64.json",
-            serde_json::json!({
-                "deltas": {
-                    "missing_commands": [],
-                    "missing_flags": [],
-                    "missing_args": [],
-                    "intentionally_unsupported": [],
-                    "wrapper_only_commands": [],
-                    "wrapper_only_flags": [],
-                    "wrapper_only_args": [],
-                }
-            }),
-        )],
+        &[("2.0.0", "coverage.linux-x64.json", empty_report())],
     );
 
     let mut rows = derive_rows(&workspace).expect("derive rows");
@@ -394,21 +350,7 @@ fn publication_consistency_rejects_duplicate_row() {
         &[("1.0.0", &["linux-x64"])],
         &[("linux-x64", "1.0.0")],
         &[("linux-x64", "1.0.0")],
-        &[(
-            "1.0.0",
-            "coverage.linux-x64.json",
-            serde_json::json!({
-                "deltas": {
-                    "missing_commands": [],
-                    "missing_flags": [],
-                    "missing_args": [],
-                    "intentionally_unsupported": [],
-                    "wrapper_only_commands": [],
-                    "wrapper_only_flags": [],
-                    "wrapper_only_args": [],
-                }
-            }),
-        )],
+        &[("1.0.0", "coverage.linux-x64.json", empty_report())],
     );
 
     materialize_root(
@@ -419,21 +361,7 @@ fn publication_consistency_rejects_duplicate_row() {
         &[("2.0.0", &["linux-x64"])],
         &[("linux-x64", "2.0.0")],
         &[("linux-x64", "2.0.0")],
-        &[(
-            "2.0.0",
-            "coverage.linux-x64.json",
-            serde_json::json!({
-                "deltas": {
-                    "missing_commands": [],
-                    "missing_flags": [],
-                    "missing_args": [],
-                    "intentionally_unsupported": [],
-                    "wrapper_only_commands": [],
-                    "wrapper_only_flags": [],
-                    "wrapper_only_args": [],
-                }
-            }),
-        )],
+        &[("2.0.0", "coverage.linux-x64.json", empty_report())],
     );
 
     let mut rows = derive_rows(&workspace).expect("derive rows");
@@ -469,21 +397,7 @@ fn publication_consistency_rejects_unexpected_row() {
         &[("1.0.0", &["linux-x64"])],
         &[("linux-x64", "1.0.0")],
         &[("linux-x64", "1.0.0")],
-        &[(
-            "1.0.0",
-            "coverage.linux-x64.json",
-            serde_json::json!({
-                "deltas": {
-                    "missing_commands": [],
-                    "missing_flags": [],
-                    "missing_args": [],
-                    "intentionally_unsupported": [],
-                    "wrapper_only_commands": [],
-                    "wrapper_only_flags": [],
-                    "wrapper_only_args": [],
-                }
-            }),
-        )],
+        &[("1.0.0", "coverage.linux-x64.json", empty_report())],
     );
 
     materialize_root(
@@ -494,21 +408,7 @@ fn publication_consistency_rejects_unexpected_row() {
         &[("2.0.0", &["linux-x64"])],
         &[("linux-x64", "2.0.0")],
         &[("linux-x64", "2.0.0")],
-        &[(
-            "2.0.0",
-            "coverage.linux-x64.json",
-            serde_json::json!({
-                "deltas": {
-                    "missing_commands": [],
-                    "missing_flags": [],
-                    "missing_args": [],
-                    "intentionally_unsupported": [],
-                    "wrapper_only_commands": [],
-                    "wrapper_only_flags": [],
-                    "wrapper_only_args": [],
-                }
-            }),
-        )],
+        &[("2.0.0", "coverage.linux-x64.json", empty_report())],
     );
 
     let mut rows = derive_rows(&workspace).expect("derive rows");
@@ -547,21 +447,7 @@ fn publication_consistency_rejects_pointer_promotion_drift() {
         &[("1.0.0", &["linux-x64"])],
         &[("linux-x64", "1.0.0")],
         &[("linux-x64", "1.0.0")],
-        &[(
-            "1.0.0",
-            "coverage.linux-x64.json",
-            serde_json::json!({
-                "deltas": {
-                    "missing_commands": [],
-                    "missing_flags": [],
-                    "missing_args": [],
-                    "intentionally_unsupported": [],
-                    "wrapper_only_commands": [],
-                    "wrapper_only_flags": [],
-                    "wrapper_only_args": [],
-                }
-            }),
-        )],
+        &[("1.0.0", "coverage.linux-x64.json", empty_report())],
     );
 
     materialize_root(
@@ -572,21 +458,7 @@ fn publication_consistency_rejects_pointer_promotion_drift() {
         &[("2.0.0", &["linux-x64"])],
         &[("linux-x64", "2.0.0")],
         &[("linux-x64", "2.0.0")],
-        &[(
-            "2.0.0",
-            "coverage.linux-x64.json",
-            serde_json::json!({
-                "deltas": {
-                    "missing_commands": [],
-                    "missing_flags": [],
-                    "missing_args": [],
-                    "intentionally_unsupported": [],
-                    "wrapper_only_commands": [],
-                    "wrapper_only_flags": [],
-                    "wrapper_only_args": [],
-                }
-            }),
-        )],
+        &[("2.0.0", "coverage.linux-x64.json", empty_report())],
     );
 
     let mut rows = derive_rows(&workspace).expect("derive rows");
@@ -618,21 +490,7 @@ fn publication_consistency_rejects_omission_claim_and_note_drift() {
         &[("1.0.0", &["linux-x64"])],
         &[("linux-x64", "1.0.0")],
         &[("linux-x64", "1.0.0")],
-        &[(
-            "1.0.0",
-            "coverage.linux-x64.json",
-            serde_json::json!({
-                "deltas": {
-                    "missing_commands": [],
-                    "missing_flags": [],
-                    "missing_args": [],
-                    "intentionally_unsupported": [],
-                    "wrapper_only_commands": [],
-                    "wrapper_only_flags": [],
-                    "wrapper_only_args": [],
-                }
-            }),
-        )],
+        &[("1.0.0", "coverage.linux-x64.json", empty_report())],
     );
 
     materialize_root(
@@ -643,21 +501,7 @@ fn publication_consistency_rejects_omission_claim_and_note_drift() {
         &[("2.0.0", &["linux-x64"])],
         &[("linux-x64", "2.0.0")],
         &[("linux-x64", "2.0.0")],
-        &[(
-            "2.0.0",
-            "coverage.linux-x64.json",
-            serde_json::json!({
-                "deltas": {
-                    "missing_commands": [],
-                    "missing_flags": [],
-                    "missing_args": [],
-                    "intentionally_unsupported": [],
-                    "wrapper_only_commands": [],
-                    "wrapper_only_flags": [],
-                    "wrapper_only_args": [],
-                }
-            }),
-        )],
+        &[("2.0.0", "coverage.linux-x64.json", empty_report())],
     );
 
     let mut rows = derive_rows(&workspace).expect("derive rows");
@@ -699,21 +543,7 @@ fn publication_consistency_rejects_status_drift_for_latest_validated_rows() {
         &[("1.0.0", &["linux-x64"])],
         &[("linux-x64", "1.0.0")],
         &[("linux-x64", "1.0.0")],
-        &[(
-            "1.0.0",
-            "coverage.linux-x64.json",
-            serde_json::json!({
-                "deltas": {
-                    "missing_commands": [],
-                    "missing_flags": [],
-                    "missing_args": [],
-                    "intentionally_unsupported": [],
-                    "wrapper_only_commands": [],
-                    "wrapper_only_flags": [],
-                    "wrapper_only_args": [],
-                }
-            }),
-        )],
+        &[("1.0.0", "coverage.linux-x64.json", empty_report())],
     );
     write_json(
         &workspace.join("cli_manifests/codex/versions/1.0.0.json"),
@@ -734,21 +564,7 @@ fn publication_consistency_rejects_status_drift_for_latest_validated_rows() {
         &[("2.0.0", &["linux-x64"])],
         &[("linux-x64", "2.0.0")],
         &[("linux-x64", "2.0.0")],
-        &[(
-            "2.0.0",
-            "coverage.linux-x64.json",
-            serde_json::json!({
-                "deltas": {
-                    "missing_commands": [],
-                    "missing_flags": [],
-                    "missing_args": [],
-                    "intentionally_unsupported": [],
-                    "wrapper_only_commands": [],
-                    "wrapper_only_flags": [],
-                    "wrapper_only_args": [],
-                }
-            }),
-        )],
+        &[("2.0.0", "coverage.linux-x64.json", empty_report())],
     );
 
     let rows = derive_rows(&workspace).expect("derive rows");
