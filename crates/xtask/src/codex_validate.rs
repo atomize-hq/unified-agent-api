@@ -639,9 +639,7 @@ fn workspace_root_for(root: &Path) -> Option<PathBuf> {
         let Ok(text) = fs::read_to_string(&cargo_toml) else {
             continue;
         };
-        if text.contains("[workspace]")
-            && canonical_root == candidate.join("cli_manifests").join("codex")
-        {
+        if text.contains("[workspace]") {
             return Some(candidate.to_path_buf());
         }
     }

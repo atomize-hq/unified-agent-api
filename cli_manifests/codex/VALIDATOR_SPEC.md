@@ -47,11 +47,10 @@ The validator reads:
 
 No other sources are consulted for standalone root validation.
 
-When `--codex-dir` resolves to the committed workspace Codex root at `<workspace>/cli_manifests/codex`
-and that workspace is discoverable via an ancestor `Cargo.toml` containing `[workspace]`, the validator
-also enforces the support-matrix publication artifact under `cli_manifests/support_matrix/current.json`
-against the committed workspace root set. Outside that exact workspace-root layout, `codex-validate`
-reads only files under the supplied root.
+When `--root` resolves inside a discoverable Cargo workspace (an ancestor `Cargo.toml` contains
+`[workspace]`), the validator also enforces the support-matrix publication artifact under
+`cli_manifests/support_matrix/current.json` against the committed workspace root set. Outside a
+discoverable workspace layout, `codex-validate` reads only files under the supplied root.
 
 ## Output
 
@@ -262,7 +261,7 @@ File:
 
 Policy:
 - `xtask codex-validate` treats the committed support-matrix JSON as a required publication
-  artifact when the workspace root can be resolved from `--codex-dir`.
+  artifact when the workspace root can be resolved from `--root`.
 - The artifact must exist before publication consistency checks run.
 
 Violations:
