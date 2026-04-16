@@ -114,9 +114,9 @@ fn stale_generated_block(original: &str) -> String {
     stale.push_str(&original[..start]);
     stale.push_str("<!-- support-matrix-published:start -->\n");
     stale.push_str("### `codex`\n\n");
-    stale.push_str("| agent | target | version | manifest_support | backend_support | uaa_support | pointer_promotion | evidence_notes |\n");
+    stale.push_str("| agent | version | target | manifest_support | backend_support | uaa_support | pointer_promotion | evidence_notes |\n");
     stale.push_str("|---|---|---|---|---|---|---|---|\n");
-    stale.push_str("| `codex` | `linux-x64` | `1.0.0` | `supported` | `partial` | `partial` | `latest_validated` | stale block |\n");
+    stale.push_str("| `codex` | `1.0.0` | `linux-x64` | `supported` | `partial` | `partial` | `latest_validated` | stale block |\n");
     stale.push_str("<!-- support-matrix-published:end -->");
     stale.push_str(&original[end + "<!-- support-matrix-published:end -->".len()..]);
     stale

@@ -247,8 +247,8 @@ fn support_matrix_entrypoint_publishes_json_and_hybrid_markdown() {
     assert!(markdown_text.contains("## Change control\nManual footer."));
     assert!(markdown_text.contains("## Published support matrix"));
     assert!(markdown_text.contains("<!-- support-matrix-published:start -->"));
-    assert!(markdown_text.contains("| `codex` | `linux-x64` | `1.0.0` |"));
-    assert!(markdown_text.contains("| `claude_code` | `linux-x64` | `2.0.0` |"));
+    assert!(markdown_text.contains("| `codex` | `1.0.0` | `linux-x64` |"));
+    assert!(markdown_text.contains("| `claude_code` | `2.0.0` | `linux-x64` |"));
 
     let json_before_check = fs::read_to_string(&json_path).expect("read json before check");
     let markdown_before_check =

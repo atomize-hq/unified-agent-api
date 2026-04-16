@@ -44,7 +44,7 @@ fn render_markdown_projection(rows: &[SupportRow]) -> String {
             }
             current_agent = Some(row.agent.as_str());
             out.push_str(&format!("### `{}`\n\n", row.agent));
-            out.push_str("| agent | target | version | manifest_support | backend_support | uaa_support | pointer_promotion | evidence_notes |\n");
+            out.push_str("| agent | version | target | manifest_support | backend_support | uaa_support | pointer_promotion | evidence_notes |\n");
             out.push_str("|---|---|---|---|---|---|---|---|\n");
         }
 
@@ -57,8 +57,8 @@ fn render_markdown_projection(rows: &[SupportRow]) -> String {
         out.push_str(&format!(
             "| `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | {} |\n",
             row.agent,
-            row.target,
             row.version,
+            row.target,
             row.manifest_support.as_str(),
             row.backend_support.as_str(),
             row.uaa_support.as_str(),
@@ -208,7 +208,7 @@ mod tests {
     #[test]
     fn markdown_splice_preserves_normative_contract_text() {
         let existing = "# Spec\n\n## Purpose\nManual contract.\n";
-        let projection = "### `codex`\n\n| agent | target | version | manifest_support | backend_support | uaa_support | pointer_promotion | evidence_notes |\n|---|---|---|---|---|---|---|---|\n";
+        let projection = "### `codex`\n\n| agent | version | target | manifest_support | backend_support | uaa_support | pointer_promotion | evidence_notes |\n|---|---|---|---|---|---|---|---|\n";
 
         let updated = splice_markdown_projection(existing, projection);
 
@@ -231,10 +231,10 @@ mod tests {
         let expected_markdown = "\
 ### `codex`\n\
 \n\
-| agent | target | version | manifest_support | backend_support | uaa_support | pointer_promotion | evidence_notes |\n\
+| agent | version | target | manifest_support | backend_support | uaa_support | pointer_promotion | evidence_notes |\n\
 |---|---|---|---|---|---|---|---|\n\
-| `codex` | `linux-x64` | `1.0.0` | `supported` | `partial` | `partial` | `latest_validated` | backend report includes backend-only surface outside unified support |\n\
-| `codex` | `darwin-arm64` | `0.9.0` | `unsupported` | `unsupported` | `unsupported` | `none` | current root snapshot omits this target |\n";
+| `codex` | `1.0.0` | `linux-x64` | `supported` | `partial` | `partial` | `latest_validated` | backend report includes backend-only surface outside unified support |\n\
+| `codex` | `0.9.0` | `darwin-arm64` | `unsupported` | `unsupported` | `unsupported` | `none` | current root snapshot omits this target |\n";
         assert_eq!(bundle.markdown, expected_markdown);
     }
 }

@@ -201,26 +201,26 @@ Do not edit this section by hand.
 <!-- support-matrix-published:start -->
 ### `claude_code`
 
-| agent | target | version | manifest_support | backend_support | uaa_support | pointer_promotion | evidence_notes |
+| agent | version | target | manifest_support | backend_support | uaa_support | pointer_promotion | evidence_notes |
 |---|---|---|---|---|---|---|---|
-| `claude_code` | `darwin-arm64` | `2.1.29` | `supported` | `supported` | `supported` | `latest_supported_and_validated` | — |
-| `claude_code` | `linux-x64` | `2.1.29` | `supported` | `supported` | `supported` | `latest_supported_and_validated` | — |
-| `claude_code` | `win32-x64` | `2.1.29` | `supported` | `partial` | `partial` | `latest_supported_and_validated` | backend report includes intentionally unsupported surface outside unified support |
+| `claude_code` | `2.1.29` | `darwin-arm64` | `supported` | `supported` | `supported` | `latest_supported_and_validated` | — |
+| `claude_code` | `2.1.29` | `linux-x64` | `supported` | `supported` | `supported` | `latest_supported_and_validated` | — |
+| `claude_code` | `2.1.29` | `win32-x64` | `supported` | `partial` | `partial` | `latest_supported_and_validated` | backend report includes intentionally unsupported surface outside unified support |
 
 ### `codex`
 
-| agent | target | version | manifest_support | backend_support | uaa_support | pointer_promotion | evidence_notes |
+| agent | version | target | manifest_support | backend_support | uaa_support | pointer_promotion | evidence_notes |
 |---|---|---|---|---|---|---|---|
-| `codex` | `aarch64-apple-darwin` | `0.97.0` | `unsupported` | `unsupported` | `unsupported` | `none` | current root snapshot omits this target |
-| `codex` | `aarch64-apple-darwin` | `0.92.0` | `unsupported` | `unsupported` | `unsupported` | `none` | — |
-| `codex` | `aarch64-apple-darwin` | `0.91.0` | `unsupported` | `unsupported` | `unsupported` | `none` | — |
-| `codex` | `aarch64-apple-darwin` | `0.61.0` | `unsupported` | `unsupported` | `unsupported` | `none` | — |
-| `codex` | `x86_64-pc-windows-msvc` | `0.97.0` | `unsupported` | `unsupported` | `unsupported` | `none` | current root snapshot omits this target |
-| `codex` | `x86_64-pc-windows-msvc` | `0.92.0` | `unsupported` | `unsupported` | `unsupported` | `none` | — |
-| `codex` | `x86_64-pc-windows-msvc` | `0.91.0` | `unsupported` | `unsupported` | `unsupported` | `none` | — |
-| `codex` | `x86_64-pc-windows-msvc` | `0.61.0` | `unsupported` | `unsupported` | `unsupported` | `none` | — |
-| `codex` | `x86_64-unknown-linux-musl` | `0.97.0` | `supported` | `partial` | `partial` | `latest_validated` | backend report includes intentionally unsupported surface outside unified support; backend report includes backend-only surface outside unified support |
-| `codex` | `x86_64-unknown-linux-musl` | `0.92.0` | `supported` | `partial` | `partial` | `none` | backend report includes intentionally unsupported surface outside unified support; backend report includes backend-only surface outside unified support |
-| `codex` | `x86_64-unknown-linux-musl` | `0.91.0` | `unsupported` | `unsupported` | `unsupported` | `none` | backend report includes intentionally unsupported surface outside unified support; backend report includes backend-only surface outside unified support |
-| `codex` | `x86_64-unknown-linux-musl` | `0.61.0` | `supported` | `partial` | `partial` | `latest_supported` | backend report includes intentionally unsupported surface outside unified support; backend report includes backend-only surface outside unified support |
+| `codex` | `0.97.0` | `aarch64-apple-darwin` | `unsupported` | `unsupported` | `unsupported` | `none` | current root snapshot omits this target |
+| `codex` | `0.92.0` | `aarch64-apple-darwin` | `unsupported` | `unsupported` | `unsupported` | `none` | — |
+| `codex` | `0.91.0` | `aarch64-apple-darwin` | `unsupported` | `unsupported` | `unsupported` | `none` | — |
+| `codex` | `0.61.0` | `aarch64-apple-darwin` | `unsupported` | `unsupported` | `unsupported` | `none` | — |
+| `codex` | `0.97.0` | `x86_64-pc-windows-msvc` | `unsupported` | `unsupported` | `unsupported` | `none` | current root snapshot omits this target |
+| `codex` | `0.92.0` | `x86_64-pc-windows-msvc` | `unsupported` | `unsupported` | `unsupported` | `none` | — |
+| `codex` | `0.91.0` | `x86_64-pc-windows-msvc` | `unsupported` | `unsupported` | `unsupported` | `none` | — |
+| `codex` | `0.61.0` | `x86_64-pc-windows-msvc` | `unsupported` | `unsupported` | `unsupported` | `none` | — |
+| `codex` | `0.97.0` | `x86_64-unknown-linux-musl` | `supported` | `partial` | `partial` | `latest_validated` | backend report includes intentionally unsupported surface outside unified support; backend report includes backend-only surface outside unified support |
+| `codex` | `0.92.0` | `x86_64-unknown-linux-musl` | `supported` | `partial` | `partial` | `none` | backend report includes intentionally unsupported surface outside unified support; backend report includes backend-only surface outside unified support |
+| `codex` | `0.91.0` | `x86_64-unknown-linux-musl` | `unsupported` | `unsupported` | `unsupported` | `none` | backend report includes intentionally unsupported surface outside unified support; backend report includes backend-only surface outside unified support |
+| `codex` | `0.61.0` | `x86_64-unknown-linux-musl` | `supported` | `partial` | `partial` | `latest_supported` | backend report includes intentionally unsupported surface outside unified support; backend report includes backend-only surface outside unified support |
 <!-- support-matrix-published:end -->
