@@ -441,7 +441,6 @@ fn validate_row_consistency(
             .contains(&row.target);
     if omitted_current_target {
         let support_is_unsupported = row.manifest_support == ManifestSupportState::Unsupported
-            && row.backend_support == BackendSupportState::Unsupported
             && row.uaa_support == UaaSupportState::Unsupported
             && row.pointer_promotion == PointerPromotionState::None;
         if !support_is_unsupported {

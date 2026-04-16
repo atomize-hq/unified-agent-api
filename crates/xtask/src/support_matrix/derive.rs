@@ -451,6 +451,7 @@ fn classify_uaa_support(
             UaaSupportState::Supported
         }
         (ManifestSupportState::Supported, BackendSupportState::Unsupported)
+        | (ManifestSupportState::Unsupported, BackendSupportState::Partial)
         | (ManifestSupportState::Unsupported, BackendSupportState::Supported)
         | (ManifestSupportState::Unsupported, BackendSupportState::Unsupported) => {
             UaaSupportState::Unsupported

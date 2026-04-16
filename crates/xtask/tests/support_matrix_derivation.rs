@@ -169,6 +169,23 @@ fn derives_target_scoped_rows_with_sparse_caveats_and_pointer_state() {
                     }
                 }),
             ),
+            (
+                "1.0.0",
+                "coverage.win32-x64.json",
+                json!({
+                    "deltas": {
+                        "missing_commands": [],
+                        "missing_flags": [],
+                        "missing_args": [],
+                        "intentionally_unsupported": [],
+                        "wrapper_only_commands": [
+                            { "path": ["backend-only"] }
+                        ],
+                        "wrapper_only_flags": [],
+                        "wrapper_only_args": [],
+                    }
+                }),
+            ),
         ],
     );
 
@@ -258,7 +275,7 @@ fn derives_target_scoped_rows_with_sparse_caveats_and_pointer_state() {
     );
     assert_eq!(
         codex_missing_target.backend_support,
-        BackendSupportState::Unsupported
+        BackendSupportState::Partial
     );
     assert_eq!(
         codex_missing_target.uaa_support,
@@ -270,7 +287,10 @@ fn derives_target_scoped_rows_with_sparse_caveats_and_pointer_state() {
     );
     assert_eq!(
         codex_missing_target.evidence_notes,
-        vec!["current root snapshot omits this target".to_string()]
+        vec![
+            "backend report includes backend-only surface outside unified support".to_string(),
+            "current root snapshot omits this target".to_string()
+        ]
     );
 
     assert_eq!(rows[0].agent, "claude_code");
