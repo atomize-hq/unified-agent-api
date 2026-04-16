@@ -452,7 +452,7 @@
       "snapshotted": "Snapshots generated and schema-valid; no wrapper claims.",
       "reported": "Coverage report generated; work queue available; no wrapper validation claim.",
       "validated": "Passed validation matrix (promotion-grade for latest_validated/current.json).",
-      "supported": "Wrapper coverage meets policy requirements for this version (stronger than validated)."
+      "supported": "Wrapper coverage meets the support-matrix policy requirements for this version (stronger than validated)."
     },
     "supported_policy": {
       "requires_union_complete": true,
@@ -472,7 +472,7 @@
       },
       "intentionally_unsupported_requires_note": true,
       "notes": [
-        "supported means there are no uncovered (missing/unknown/unsupported) upstream surfaces on any expected target; every surfaced command/flag/arg is either supported (explicit/passthrough) or explicitly waived (intentionally_unsupported with rationale).",
+        "supported means there are no uncovered (missing/unknown/unsupported) upstream surfaces on any expected target under the support-matrix contract; every surfaced command/flag/arg is either supported (explicit/passthrough) or explicitly waived (intentionally_unsupported with rationale).",
         "supported is a documentation/policy guarantee derived from coverage mapping; it does not replace real-binary validation (validated) for promotion."
       ]
     },

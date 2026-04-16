@@ -30,6 +30,7 @@ Rust library import paths remain:
 ## Start here
 
 - Unified Agent API contracts: `docs/specs/unified-agent-api/README.md`
+- Support publication contract: `docs/specs/unified-agent-api/support-matrix.md`
 - Crates.io release guide: `docs/crates-io-release.md`
 - Codex API docs: `crates/codex/README.md`
 - Examples index: `crates/codex/EXAMPLES.md`
@@ -50,5 +51,7 @@ Rust library import paths remain:
 
 - Ops playbook: `cli_manifests/codex/OPS_PLAYBOOK.md`
 - CLI snapshot artifacts: `cli_manifests/codex/README.md`
+- Support publication artifact: `cli_manifests/support_matrix/current.json`
+- Support publication check: `cargo run -p xtask -- support-matrix --check`
 - Decisions (ADRs): `docs/adr/`
 - Normative contracts: `docs/specs/`

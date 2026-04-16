@@ -1,13 +1,42 @@
 use std::{
     env,
+    fs::{self, File, OpenOptions},
+    io::ErrorKind,
     path::{Path, PathBuf},
-    sync::OnceLock,
+    thread,
+    time::Duration,
 };
-use tokio::sync::Mutex;
 
-pub(crate) fn test_env_lock() -> &'static Mutex<()> {
-    static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
-    LOCK.get_or_init(|| Mutex::new(()))
+pub(crate) struct TestEnvLockGuard {
+    path: PathBuf,
+    _file: File,
+}
+
+pub(crate) fn test_env_lock() -> TestEnvLockGuard {
+    let path = env::temp_dir().join(format!("agent-api-test-env-{}.lock", std::process::id()));
+
+    loop {
+        match OpenOptions::new().write(true).create_new(true).open(&path) {
+            Ok(file) => {
+                return TestEnvLockGuard { path, _file: file };
+            }
+            Err(err) if err.kind() == ErrorKind::AlreadyExists => {
+                thread::sleep(Duration::from_millis(5));
+            }
+            Err(err) => panic!("test env lock should be acquired: {err}"),
+        }
+    }
+}
+
+impl Drop for TestEnvLockGuard {
+    fn drop(&mut self) {
+        if let Err(err) = fs::remove_file(&self.path) {
+            assert!(
+                err.kind() == ErrorKind::NotFound,
+                "test env lock should be released: {err}"
+            );
+        }
+    }
 }
 
 pub(crate) struct CurrentDirGuard {

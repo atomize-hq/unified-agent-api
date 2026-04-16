@@ -79,7 +79,7 @@ fn resolve_codex_mcp_command_uses_backend_defaults_when_request_values_absent() 
 #[cfg(unix)]
 #[test]
 fn resolve_codex_mcp_command_canonicalizes_relative_binary_before_working_dir() {
-    let _env_lock = test_env_lock().lock().expect("lock test env");
+    let _env_lock = test_env_lock();
     let wrapper_dir = super::support::temp_test_dir("relative-wrapper");
     let binary_dir = wrapper_dir.join("bin");
     let working_dir = super::support::temp_test_dir("relative-working-dir");
@@ -109,7 +109,7 @@ fn resolve_codex_mcp_command_canonicalizes_relative_binary_before_working_dir() 
 #[cfg(unix)]
 #[test]
 fn resolve_codex_mcp_command_prefers_request_path_in_child_env() {
-    let _env_lock = test_env_lock().lock().expect("lock test env");
+    let _env_lock = test_env_lock();
     let ambient_dir = super::support::temp_test_dir("ambient-command-path");
     let _ambient_path = EnvGuard::set(PATH_ENV, ambient_dir.as_os_str().to_os_string());
 
@@ -133,7 +133,7 @@ fn resolve_codex_mcp_command_prefers_request_path_in_child_env() {
 #[cfg(unix)]
 #[test]
 fn resolve_codex_mcp_command_uses_config_path_in_child_env_when_request_missing() {
-    let _env_lock = test_env_lock().lock().expect("lock test env");
+    let _env_lock = test_env_lock();
     let ambient_dir = super::support::temp_test_dir("ambient-config-path");
     let _ambient_path = EnvGuard::set(PATH_ENV, ambient_dir.as_os_str().to_os_string());
 
@@ -152,7 +152,7 @@ fn resolve_codex_mcp_command_uses_config_path_in_child_env_when_request_missing(
 #[cfg(unix)]
 #[test]
 fn resolve_codex_mcp_command_injects_ambient_path_into_child_env_when_unset() {
-    let _env_lock = test_env_lock().lock().expect("lock test env");
+    let _env_lock = test_env_lock();
     let ambient_dir = super::support::temp_test_dir("ambient-only-command-path");
     let _ambient_path = EnvGuard::set(PATH_ENV, ambient_dir.as_os_str().to_os_string());
 
@@ -195,7 +195,7 @@ fn resolve_codex_binary_path_uses_effective_path_env_for_unqualified_binary() {
 #[cfg(unix)]
 #[test]
 fn resolve_codex_binary_path_prefers_request_path_over_ambient_path() {
-    let _env_lock = test_env_lock().lock().expect("lock test env");
+    let _env_lock = test_env_lock();
     let request_dir = super::support::temp_test_dir("request-path");
     let ambient_dir = super::support::temp_test_dir("ambient-path");
     let request_binary =
@@ -226,7 +226,7 @@ fn resolve_codex_binary_path_prefers_request_path_over_ambient_path() {
 #[cfg(unix)]
 #[test]
 fn resolve_codex_binary_path_uses_ambient_path_when_effective_path_is_absent() {
-    let _env_lock = test_env_lock().lock().expect("lock test env");
+    let _env_lock = test_env_lock();
     let ambient_dir = super::support::temp_test_dir("ambient-only");
     let ambient_binary =
         super::support::write_fake_codex(&ambient_dir, "#!/usr/bin/env bash\nexit 0\n");
@@ -286,7 +286,7 @@ fn resolve_codex_binary_path_rejects_unresolved_default_binary() {
 #[cfg(unix)]
 #[test]
 fn resolve_codex_mcp_command_resolves_relative_request_path_from_request_working_dir() {
-    let _env_lock = test_env_lock().lock().expect("lock test env");
+    let _env_lock = test_env_lock();
     let request_dir = super::support::temp_test_dir("request-working-dir");
     let default_dir = super::support::temp_test_dir("default-working-dir");
     let request_binary =
@@ -320,7 +320,7 @@ fn resolve_codex_mcp_command_resolves_relative_request_path_from_request_working
 #[cfg(unix)]
 #[test]
 fn resolve_codex_mcp_command_resolves_relative_config_path_from_default_working_dir() {
-    let _env_lock = test_env_lock().lock().expect("lock test env");
+    let _env_lock = test_env_lock();
     let default_dir = super::support::temp_test_dir("config-default-working-dir");
     let default_binary =
         super::support::write_fake_codex(&default_dir.join("bin"), "#!/usr/bin/env bash\nexit 0\n");

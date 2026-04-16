@@ -211,9 +211,8 @@ fn run_xtask_validate(codex_dir: &Path) -> std::process::Output {
     cmd.output().expect("spawn xtask codex-validate")
 }
 
-fn read_codex_wrapper_version() -> String {
-    let cargo_toml = repo_root().join("crates").join("codex").join("Cargo.toml");
-    let text = fs::read_to_string(&cargo_toml)
+fn read_wrapper_version(cargo_toml: &Path) -> String {
+    let text = fs::read_to_string(cargo_toml)
         .unwrap_or_else(|e| panic!("read {}: {e}", cargo_toml.display()));
 
     let mut in_package = false;
@@ -282,83 +281,124 @@ fn read_codex_wrapper_version() -> String {
     );
 }
 
-fn run_xtask_wrapper_coverage(out: &Path, rules: &Path) -> std::process::Output {
+fn run_xtask_wrapper_coverage(subcommand: &str, out: &Path, rules: &Path) -> std::process::Output {
     let xtask_bin = PathBuf::from(env!("CARGO_BIN_EXE_xtask"));
     let output = Command::new(xtask_bin)
-        .arg("codex-wrapper-coverage")
+        .arg(subcommand)
         .arg("--out")
         .arg(out)
         .arg("--rules")
         .arg(rules)
         .env("SOURCE_DATE_EPOCH", "0")
         .output()
-        .expect("spawn xtask codex-wrapper-coverage");
+        .unwrap_or_else(|e| panic!("spawn xtask {subcommand}: {e}"));
 
     let stderr = String::from_utf8_lossy(&output.stderr);
-    if stderr.contains("unrecognized subcommand 'codex-wrapper-coverage'") {
-        panic!("xtask is missing `codex-wrapper-coverage` (C2-code must add the subcommand)");
+    if stderr.contains("unrecognized subcommand") {
+        panic!("xtask is missing `{subcommand}` (C2-code must add the subcommand)");
     }
 
     output
 }
 
+fn assert_wrapper_coverage_top_level_shape(parsed: &Value) {
+    let object = parsed.as_object().expect("wrapper coverage JSON object");
+    let mut keys = object.keys().cloned().collect::<Vec<_>>();
+    keys.sort();
+    assert_eq!(
+        keys,
+        vec![
+            "coverage".to_string(),
+            "generated_at".to_string(),
+            "schema_version".to_string(),
+            "wrapper_version".to_string(),
+        ],
+        "wrapper coverage top-level shape must stay normalized"
+    );
+    assert!(
+        object.get("coverage").and_then(Value::as_array).is_some(),
+        "wrapper coverage must include a coverage array"
+    );
+}
+
 #[test]
 fn c2_wrapper_coverage_generation_is_deterministic_and_includes_wrapper_version() {
     let temp = make_temp_dir("ccm-c2-wrapper-coverage-determinism");
-    let out_a = temp.join("wrapper_coverage.a.json");
-    let out_b = temp.join("wrapper_coverage.b.json");
-    let rules = repo_root()
-        .join("cli_manifests")
-        .join("codex")
-        .join("RULES.json");
+    let cases = [
+        (
+            "codex-wrapper-coverage",
+            repo_root()
+                .join("cli_manifests")
+                .join("codex")
+                .join("RULES.json"),
+            repo_root().join("crates").join("codex").join("Cargo.toml"),
+        ),
+        (
+            "claude-wrapper-coverage",
+            repo_root()
+                .join("cli_manifests")
+                .join("claude_code")
+                .join("RULES.json"),
+            repo_root()
+                .join("crates")
+                .join("claude_code")
+                .join("Cargo.toml"),
+        ),
+    ];
 
-    let output_a = run_xtask_wrapper_coverage(&out_a, &rules);
-    if !output_a.status.success() {
-        panic!(
-            "xtask codex-wrapper-coverage failed:\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
-            output_a.status,
-            String::from_utf8_lossy(&output_a.stdout),
-            String::from_utf8_lossy(&output_a.stderr),
+    for (subcommand, rules, cargo_toml) in cases {
+        let out_a = temp.join(format!("{subcommand}.a.json"));
+        let out_b = temp.join(format!("{subcommand}.b.json"));
+
+        let output_a = run_xtask_wrapper_coverage(subcommand, &out_a, &rules);
+        if !output_a.status.success() {
+            panic!(
+                "xtask {subcommand} failed:\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
+                output_a.status,
+                String::from_utf8_lossy(&output_a.stdout),
+                String::from_utf8_lossy(&output_a.stderr),
+            );
+        }
+        let output_b = run_xtask_wrapper_coverage(subcommand, &out_b, &rules);
+        if !output_b.status.success() {
+            panic!(
+                "xtask {subcommand} failed:\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
+                output_b.status,
+                String::from_utf8_lossy(&output_b.stdout),
+                String::from_utf8_lossy(&output_b.stderr),
+            );
+        }
+
+        let bytes_a = fs::read(&out_a).expect("read wrapper_coverage.a.json");
+        let bytes_b = fs::read(&out_b).expect("read wrapper_coverage.b.json");
+        assert_eq!(bytes_a, bytes_b, "output must be byte-identical");
+        assert!(
+            bytes_a.last().is_some_and(|b| *b == b'\n'),
+            "output must end with a trailing newline"
+        );
+
+        let parsed: Value = serde_json::from_slice(&bytes_a).expect("parse wrapper_coverage JSON");
+        assert_wrapper_coverage_top_level_shape(&parsed);
+        assert_eq!(
+            parsed.get("schema_version").and_then(Value::as_i64),
+            Some(1),
+            "schema_version must be 1"
+        );
+        assert!(
+            parsed.get("generated_at").and_then(Value::as_str).is_some(),
+            "generated_at must be present"
+        );
+
+        let expected_version = read_wrapper_version(&cargo_toml);
+        assert_eq!(
+            parsed
+                .get("wrapper_version")
+                .and_then(Value::as_str)
+                .map(|s| s.to_string()),
+            Some(expected_version),
+            "wrapper_version must match the crate package version"
         );
     }
-    let output_b = run_xtask_wrapper_coverage(&out_b, &rules);
-    if !output_b.status.success() {
-        panic!(
-            "xtask codex-wrapper-coverage failed:\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
-            output_b.status,
-            String::from_utf8_lossy(&output_b.stdout),
-            String::from_utf8_lossy(&output_b.stderr),
-        );
-    }
-
-    let bytes_a = fs::read(&out_a).expect("read wrapper_coverage.a.json");
-    let bytes_b = fs::read(&out_b).expect("read wrapper_coverage.b.json");
-    assert_eq!(bytes_a, bytes_b, "output must be byte-identical");
-    assert!(
-        bytes_a.last().is_some_and(|b| *b == b'\n'),
-        "output must end with a trailing newline"
-    );
-
-    let parsed: Value = serde_json::from_slice(&bytes_a).expect("parse wrapper_coverage JSON");
-    assert_eq!(
-        parsed.get("schema_version").and_then(Value::as_i64),
-        Some(1),
-        "schema_version must be 1"
-    );
-    assert!(
-        parsed.get("generated_at").and_then(Value::as_str).is_some(),
-        "generated_at must be present"
-    );
-
-    let expected_version = read_codex_wrapper_version();
-    assert_eq!(
-        parsed
-            .get("wrapper_version")
-            .and_then(Value::as_str)
-            .map(|s| s.to_string()),
-        Some(expected_version),
-        "wrapper_version must match the codex crate package version"
-    );
 }
 
 #[test]

@@ -1,6 +1,8 @@
 # Codex Parity Validator Spec (`xtask codex-validate`)
 
 This document specifies the deterministic validator used to enforce `cli_manifests/codex/RULES.json` invariants in CI.
+The support-publication contract itself lives in `docs/specs/unified-agent-api/support-matrix.md`;
+this validator only enforces the parity artifacts that feed validation and support state.
 
 ## Goals
 
@@ -43,7 +45,12 @@ The validator reads:
 - `SCHEMA.json` and `VERSION_METADATA_SCHEMA.json` as shape contracts
 - The workspace files under `--codex-dir` (snapshots, reports, pointers, metadata)
 
-No other sources are consulted.
+No other sources are consulted for standalone root validation.
+
+When `--root` resolves inside a discoverable Cargo workspace (an ancestor `Cargo.toml` contains
+`[workspace]`), the validator also enforces the support-matrix publication artifact under
+`cli_manifests/support_matrix/current.json` against the committed workspace root set. Outside a
+discoverable workspace layout, `codex-validate` reads only files under the supplied root.
 
 ## Output
 
@@ -236,7 +243,7 @@ Violations:
 - `VALIDATION_TARGET_NOT_EXPECTED`
 - `VALIDATION_REQUIRED_TARGET_NOT_EXPLICIT`
 
-### `current_json_identity`: `current.json` corresponds to latest validated
+### `current_json_identity`: `current.json` corresponds to the latest validated promotion snapshot
 
 Using `latest_validated.txt`:
 - Parse union snapshot `snapshots/<latest_validated>/union.json`
@@ -246,6 +253,23 @@ Using `latest_validated.txt`:
 Violations:
 - `CURRENT_JSON_NOT_EQUAL_UNION` (same as pointer check)
 - `CURRENT_JSON_MISSING_REQUIRED_TARGET`
+
+### `support_matrix_publication`: committed support publication is present and readable
+
+File:
+- `../support_matrix/current.json`
+
+Policy:
+- `xtask codex-validate` treats the committed support-matrix JSON as a required publication
+  artifact when the workspace root can be resolved from `--root`.
+- The artifact must exist before publication consistency checks run.
+
+Violations:
+- `SUPPORT_MATRIX_ARTIFACT_MISSING`
+- `SUPPORT_MATRIX_INVALID_JSON`
+- `SUPPORT_MATRIX_SCHEMA_INVALID`
+- any `SUPPORT_MATRIX_*` publication-consistency violation emitted from the shared
+  support-matrix consistency validator
 
 ### `schemas` (optional convenience)
 

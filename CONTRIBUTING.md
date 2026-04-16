@@ -30,6 +30,7 @@
 - Format: `make fmt`
 - Lint: `make clippy`
 - Test: `make test`
+- Support publication freshness: `cargo run -p xtask -- support-matrix --check`
 - LOC cap: `make loc-check` (must pass; Rust files must stay under 700 code LOC)
 - Preflight (integration gate): `make preflight`
 

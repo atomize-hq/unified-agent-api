@@ -165,7 +165,7 @@ printf "SERVER_ONLY=%s\n" "${SERVER_ONLY-unset}" 1>&2
 #[tokio::test]
 #[allow(clippy::await_holding_lock)]
 async fn run_codex_mcp_clears_ambient_env_before_spawn() {
-    let _env_lock = test_env_lock().lock().expect("lock test env");
+    let _env_lock = test_env_lock();
     let temp_dir = temp_test_dir("ambient-env");
     let script_path = write_fake_codex(
         &temp_dir,
@@ -209,7 +209,7 @@ printf "PATH=%s\n" "${PATH-unset}" 1>&2
 #[tokio::test]
 #[allow(clippy::await_holding_lock)]
 async fn run_codex_mcp_preserves_path_for_launcher_script_helpers() {
-    let _env_lock = test_env_lock().lock().expect("lock test env");
+    let _env_lock = test_env_lock();
     let temp_dir = temp_test_dir("path-helper");
     let helper_path = temp_dir.join("helper-bin");
     let script_path = temp_dir.join("codex");

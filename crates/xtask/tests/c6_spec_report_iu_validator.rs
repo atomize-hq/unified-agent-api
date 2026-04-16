@@ -14,6 +14,8 @@ const TARGETS: [&str; 3] = [
     "aarch64-apple-darwin",
     "x86_64-pc-windows-msvc",
 ];
+const CLAUDE_REQUIRED_TARGET: &str = "linux-x64";
+const CLAUDE_TARGETS: [&str; 3] = ["linux-x64", "darwin-arm64", "win32-x64"];
 
 fn repo_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -46,12 +48,16 @@ fn write_json(path: &Path, value: &Value) {
     write_text(path, &format!("{text}\n"));
 }
 
-fn copy_from_repo(codex_dir: &Path, filename: &str) {
-    let src = repo_root()
-        .join("cli_manifests")
-        .join("codex")
-        .join(filename);
-    let dst = codex_dir.join(filename);
+fn write_workspace_manifest(workspace_root: &Path) {
+    write_text(
+        &workspace_root.join("Cargo.toml"),
+        "[workspace]\nmembers = []\n",
+    );
+}
+
+fn copy_from_repo(manifest_dir: &Path, agent: &str, filename: &str) {
+    let src = repo_root().join("cli_manifests").join(agent).join(filename);
+    let dst = manifest_dir.join(filename);
     if let Some(parent) = dst.parent() {
         fs::create_dir_all(parent).expect("mkdir dst parent");
     }
@@ -61,9 +67,9 @@ fn copy_from_repo(codex_dir: &Path, filename: &str) {
 fn materialize_minimal_valid_codex_dir(codex_dir: &Path) {
     fs::create_dir_all(codex_dir).expect("mkdir codex dir");
 
-    copy_from_repo(codex_dir, "SCHEMA.json");
-    copy_from_repo(codex_dir, "RULES.json");
-    copy_from_repo(codex_dir, "VERSION_METADATA_SCHEMA.json");
+    copy_from_repo(codex_dir, "codex", "SCHEMA.json");
+    copy_from_repo(codex_dir, "codex", "RULES.json");
+    copy_from_repo(codex_dir, "codex", "VERSION_METADATA_SCHEMA.json");
 
     write_text(
         &codex_dir.join("min_supported.txt"),
@@ -177,6 +183,167 @@ fn materialize_minimal_valid_codex_dir(codex_dir: &Path) {
     write_json(&codex_dir.join("wrapper_coverage.json"), &wrapper_coverage);
 }
 
+fn materialize_minimal_valid_claude_dir(claude_dir: &Path) {
+    fs::create_dir_all(claude_dir).expect("mkdir claude dir");
+
+    copy_from_repo(claude_dir, "claude_code", "SCHEMA.json");
+    copy_from_repo(claude_dir, "claude_code", "RULES.json");
+    copy_from_repo(claude_dir, "claude_code", "VERSION_METADATA_SCHEMA.json");
+
+    write_text(
+        &claude_dir.join("min_supported.txt"),
+        &format!("{VERSION}\n"),
+    );
+    write_text(
+        &claude_dir.join("latest_validated.txt"),
+        &format!("{VERSION}\n"),
+    );
+
+    for target in CLAUDE_TARGETS {
+        let supported = claude_dir
+            .join("pointers")
+            .join("latest_supported")
+            .join(format!("{target}.txt"));
+        let validated = claude_dir
+            .join("pointers")
+            .join("latest_validated")
+            .join(format!("{target}.txt"));
+
+        if target == CLAUDE_REQUIRED_TARGET {
+            write_text(&supported, &format!("{VERSION}\n"));
+            write_text(&validated, &format!("{VERSION}\n"));
+        } else {
+            write_text(&supported, "none\n");
+            write_text(&validated, "none\n");
+        }
+    }
+
+    let union = json!({
+        "snapshot_schema_version": 2,
+        "tool": "claude-code-cli",
+        "mode": "union",
+        "collected_at": TS,
+        "expected_targets": CLAUDE_TARGETS,
+        "complete": false,
+        "missing_targets": [CLAUDE_TARGETS[1], CLAUDE_TARGETS[2]],
+        "inputs": [{
+            "target_triple": CLAUDE_REQUIRED_TARGET,
+            "collected_at": TS,
+            "binary": {
+                "sha256": "00",
+                "size_bytes": 0,
+                "platform": { "os": "linux", "arch": "x86_64" },
+                "target_triple": CLAUDE_REQUIRED_TARGET,
+                "version_output": format!("{VERSION} (Claude Code)"),
+                "semantic_version": VERSION,
+            }
+        }],
+        "commands": [],
+    });
+    let union_path = claude_dir
+        .join("snapshots")
+        .join(VERSION)
+        .join("union.json");
+    write_json(&union_path, &union);
+
+    write_json(
+        &claude_dir
+            .join("snapshots")
+            .join(VERSION)
+            .join(format!("{CLAUDE_REQUIRED_TARGET}.json")),
+        &json!({
+            "snapshot_schema_version": 1,
+            "tool": "claude-code-cli",
+            "collected_at": TS,
+            "binary": {
+                "sha256": "00",
+                "size_bytes": 0,
+                "platform": { "os": "linux", "arch": "x86_64" },
+                "target_triple": CLAUDE_REQUIRED_TARGET,
+                "version_output": format!("{VERSION} (Claude Code)"),
+                "semantic_version": VERSION,
+            },
+            "commands": [],
+        }),
+    );
+
+    write_json(&claude_dir.join("current.json"), &union);
+
+    write_json(
+        &claude_dir.join("versions").join(format!("{VERSION}.json")),
+        &json!({
+            "schema_version": 1,
+            "semantic_version": VERSION,
+            "status": "validated",
+            "updated_at": TS,
+            "artifacts": {
+                "snapshots_dir": format!("snapshots/{VERSION}"),
+                "reports_dir": format!("reports/{VERSION}"),
+                "union_complete": false
+            },
+            "coverage": {
+                "supported_targets": [CLAUDE_REQUIRED_TARGET],
+                "supported_required_target": true
+            },
+            "validation": {
+                "passed_targets": [CLAUDE_REQUIRED_TARGET],
+                "failed_targets": [],
+                "skipped_targets": []
+            },
+            "promotion": {
+                "eligible_for_latest_validated": true
+            },
+        }),
+    );
+
+    write_json(
+        &claude_dir
+            .join("reports")
+            .join(VERSION)
+            .join(format!("coverage.{CLAUDE_REQUIRED_TARGET}.json")),
+        &json!({
+            "schema_version": 1,
+            "generated_at": TS,
+            "inputs": {
+                "upstream": {
+                    "semantic_version": VERSION,
+                    "mode": "union",
+                    "targets": [CLAUDE_REQUIRED_TARGET],
+                },
+                "wrapper": {
+                    "schema_version": 1,
+                    "wrapper_version": "0.0.0-test"
+                },
+                "rules": {
+                    "rules_schema_version": 1
+                }
+            },
+            "platform_filter": {
+                "mode": "exact_target"
+            },
+            "deltas": {
+                "missing_commands": [],
+                "missing_flags": [],
+                "missing_args": [],
+                "intentionally_unsupported": [],
+                "wrapper_only_commands": [],
+                "wrapper_only_flags": [],
+                "wrapper_only_args": [],
+            }
+        }),
+    );
+
+    write_json(
+        &claude_dir.join("wrapper_coverage.json"),
+        &json!({
+            "schema_version": 1,
+            "generated_at": TS,
+            "wrapper_version": "0.0.0-test",
+            "coverage": []
+        }),
+    );
+}
+
 fn root_flag_from_help(help_text: &str) -> &'static str {
     if help_text.contains("--root") {
         "--root"
@@ -187,12 +354,12 @@ fn root_flag_from_help(help_text: &str) -> &'static str {
     }
 }
 
-fn run_xtask_validate(codex_dir: &Path) -> std::process::Output {
+fn run_xtask_validate(manifest_root: &Path) -> std::process::Output {
     let xtask_bin = PathBuf::from(env!("CARGO_BIN_EXE_xtask"));
-    let fixture_root = codex_dir
+    let fixture_root = manifest_root
         .parent()
         .and_then(|p| p.parent())
-        .expect("codex_dir is <fixture_root>/cli_manifests/codex");
+        .expect("manifest_root is <fixture_root>/cli_manifests/<agent>");
 
     let help = Command::new(&xtask_bin)
         .arg("codex-validate")
@@ -215,7 +382,7 @@ fn run_xtask_validate(codex_dir: &Path) -> std::process::Output {
 
     let mut cmd = Command::new(xtask_bin);
     cmd.arg("codex-validate").current_dir(fixture_root);
-    cmd.arg(root_flag_from_help(&help_text)).arg(codex_dir);
+    cmd.arg(root_flag_from_help(&help_text)).arg(manifest_root);
     cmd.output().expect("spawn xtask codex-validate")
 }
 
@@ -259,14 +426,76 @@ fn write_invalid_report_fixture(codex_dir: &Path) {
     );
 }
 
-#[test]
-fn c6_validator_emits_report_missing_includes_intentionally_unsupported() {
-    let temp = make_temp_dir("ccm-c6-report-iu-validator");
-    let codex_dir = temp.join("cli_manifests").join("codex");
-    materialize_minimal_valid_codex_dir(&codex_dir);
-    write_invalid_report_fixture(&codex_dir);
+fn write_support_matrix_artifact(workspace_root: &Path, rows: Value) {
+    write_json(
+        &workspace_root
+            .join("cli_manifests")
+            .join("support_matrix")
+            .join("current.json"),
+        &json!({
+            "schema_version": 1,
+            "rows": rows,
+        }),
+    );
+}
 
-    let output = run_xtask_validate(&codex_dir);
+fn write_complete_support_matrix_artifact(workspace_root: &Path) {
+    write_support_matrix_artifact(
+        workspace_root,
+        json!([
+            {
+                "agent": "codex",
+                "version": VERSION,
+                "target": "aarch64-apple-darwin",
+                "manifest_support": "unsupported",
+                "backend_support": "unsupported",
+                "uaa_support": "unsupported",
+                "pointer_promotion": "none",
+                "evidence_notes": ["current root snapshot omits this target"],
+            },
+            {
+                "agent": "codex",
+                "version": VERSION,
+                "target": "x86_64-pc-windows-msvc",
+                "manifest_support": "unsupported",
+                "backend_support": "unsupported",
+                "uaa_support": "unsupported",
+                "pointer_promotion": "none",
+                "evidence_notes": ["current root snapshot omits this target"],
+            },
+            {
+                "agent": "codex",
+                "version": VERSION,
+                "target": REQUIRED_TARGET,
+                "manifest_support": "supported",
+                "backend_support": "unsupported",
+                "uaa_support": "unsupported",
+                "pointer_promotion": "latest_supported_and_validated",
+                "evidence_notes": [],
+            }
+        ]),
+    );
+}
+
+fn assert_violation_surface(output: &std::process::Output, code: &str, expected_path: &str) {
+    let combined = format!(
+        "{}\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(combined.contains(code), "expected {code}, got:\n{combined}");
+    assert!(
+        combined.contains(expected_path),
+        "expected {expected_path} in errors, got:\n{combined}"
+    );
+}
+
+fn assert_validation_failure(
+    manifest_root: &Path,
+    code: &str,
+    expected_path: &str,
+) -> std::process::Output {
+    let output = run_xtask_validate(manifest_root);
     assert!(
         !output.status.success(),
         "expected validation failure:\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
@@ -274,14 +503,32 @@ fn c6_validator_emits_report_missing_includes_intentionally_unsupported() {
         String::from_utf8_lossy(&output.stdout),
         String::from_utf8_lossy(&output.stderr)
     );
+    assert_violation_surface(&output, code, expected_path);
+    output
+}
 
-    let combined = format!(
-        "{}\n{}",
-        String::from_utf8_lossy(&output.stdout),
-        String::from_utf8_lossy(&output.stderr)
-    );
-    assert!(
-        combined.contains("REPORT_MISSING_INCLUDES_INTENTIONALLY_UNSUPPORTED"),
-        "expected REPORT_MISSING_INCLUDES_INTENTIONALLY_UNSUPPORTED, got:\n{combined}"
+fn write_version_status(codex_dir: &Path, status: &str) {
+    write_json(
+        &codex_dir.join("versions").join(format!("{VERSION}.json")),
+        &json!({
+            "schema_version": 1,
+            "semantic_version": VERSION,
+            "status": status,
+            "updated_at": TS,
+            "coverage": {
+                "supported_targets": [REQUIRED_TARGET],
+                "supported_required_target": true
+            },
+            "validation": {
+                "passed_targets": [REQUIRED_TARGET],
+                "failed_targets": [],
+                "skipped_targets": []
+            }
+        }),
     );
 }
+
+#[path = "c6_spec_report_iu_validator/report_iu_rules.rs"]
+mod report_iu_rules;
+#[path = "c6_spec_report_iu_validator/support_matrix_publication.rs"]
+mod support_matrix_publication;

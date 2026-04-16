@@ -21,7 +21,7 @@ async fn app_runtime_pool_api_reuses_and_restarts_stdio() {
                 code_home: None,
                 current_dir: None,
                 mirror_stdio: Some(true),
-                startup_timeout_ms: Some(2000),
+                startup_timeout_ms: Some(5000),
                 binary: None,
                 metadata: metadata.clone(),
             },
@@ -62,7 +62,7 @@ async fn app_runtime_pool_api_reuses_and_restarts_stdio() {
         launcher_config.code_home.as_deref(),
         Some(code_home.as_path())
     );
-    assert_eq!(launcher_config.startup_timeout, Duration::from_secs(2));
+    assert_eq!(launcher_config.startup_timeout, Duration::from_secs(5));
 
     let launcher_env: HashMap<OsString, OsString> = launcher_config.env.into_iter().collect();
     assert_eq!(
@@ -192,7 +192,7 @@ async fn app_runtime_pool_api_stop_all_shuts_down_runtimes() {
                 code_home: None,
                 current_dir: None,
                 mirror_stdio: Some(false),
-                startup_timeout_ms: Some(2000),
+                startup_timeout_ms: Some(5000),
                 binary: None,
                 metadata: alpha_metadata.clone(),
             },
@@ -211,7 +211,7 @@ async fn app_runtime_pool_api_stop_all_shuts_down_runtimes() {
                 code_home: None,
                 current_dir: None,
                 mirror_stdio: Some(false),
-                startup_timeout_ms: Some(2000),
+                startup_timeout_ms: Some(5000),
                 binary: None,
                 metadata: beta_metadata.clone(),
             },

@@ -35,6 +35,12 @@ Versioning/timestamps:
 - `binary.semantic_version` is the upstream codex version (SemVer-like); promotion pointers accept stable `MAJOR.MINOR.PATCH` only.
 - CI should set committed timestamps deterministically (or omit them where allowed) to avoid churn across reruns.
 
+## Support Publication Contract
+
+- `docs/specs/unified-agent-api/support-matrix.md` is the canonical support-publication contract.
+- `docs/specs/unified-agent-api/capability-matrix.md` remains a separate backend inventory and
+  should not be read as the support policy contract.
+
 ## On-disk Layout (v1)
 
 - `min_supported.txt` — minimum supported Codex CLI version (single semver line).
@@ -51,7 +57,7 @@ Optional/generated:
 ## Conventions
 
 - Keep JSON deterministic: stable sort order, avoid timestamps in fields that would churn diffs unnecessarily (use `collected_at` only).
-- Treat `min_supported.txt` and `latest_validated.txt` as the only authoritative pointers.
+- Treat `min_supported.txt` and `latest_validated.txt` as the only authoritative promotion pointers.
 - Retention: keep snapshots + reports for the last 3 validated versions (sliding window), plus the versions referenced by `min_supported.txt` and `latest_validated.txt`.
 
 ## Snapshot Schema (v1)
@@ -142,8 +148,8 @@ To avoid ambiguity in terms like “validated”, we track per-version workflow 
 Statuses:
 - `snapshotted`: snapshots generated and schema-valid; no wrapper claims.
 - `reported`: coverage report generated; work queue available; no wrapper validation claim.
-- `validated`: passed the validation matrix (promotion-grade for `latest_validated.txt` / `current.json`).
-- `supported`: wrapper coverage meets policy requirements for this version (stronger than validated). Concretely, all surfaced commands/flags/args on all expected targets are covered as `explicit|passthrough|intentionally_unsupported` (no missing/unknown/unsupported), and any `intentionally_unsupported` requires a rationale note.
+- `validated`: passed the validation matrix and is promotion-grade for `latest_validated.txt` / `current.json`.
+- `supported`: wrapper coverage meets the support-publication policy for this version (stronger than validated). Concretely, all surfaced commands/flags/args on all expected targets are covered as `explicit|passthrough|intentionally_unsupported` (no missing/unknown/unsupported), and any `intentionally_unsupported` requires a rationale note.
 
 ## Per-Target Pointers (planned)
 
@@ -152,7 +158,7 @@ Pointers per target triple (committed):
 - `pointers/latest_validated/<target_triple>.txt`
 
 Compatibility:
-- `latest_validated.txt` remains the canonical pointer for the required target (`x86_64-unknown-linux-musl`) and must match `pointers/latest_validated/x86_64-unknown-linux-musl.txt`.
+- `latest_validated.txt` remains the canonical promotion pointer for the required target (`x86_64-unknown-linux-musl`) and must match `pointers/latest_validated/x86_64-unknown-linux-musl.txt`.
 
 Promotion (v1):
 - Linux-first promotion is allowed even when the union snapshot is incomplete (`complete=false`), as long as Linux passed validation and is supported by coverage.

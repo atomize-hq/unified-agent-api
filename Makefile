@@ -175,9 +175,14 @@ flightcheck:
 	cargo clean
 	$(MAKE) check
 	$(MAKE) test
+	$(MAKE) support-matrix-check
 	$(MAKE) loc-check
 	$(MAKE) security
 	$(MAKE) unsafe-report
+
+.PHONY: support-matrix-check
+support-matrix-check:
+	cargo run -p xtask -- support-matrix --check
 
 .PHONY: preflight
 .PHONY: hygiene
