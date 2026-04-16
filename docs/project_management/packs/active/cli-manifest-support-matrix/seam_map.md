@@ -4,20 +4,20 @@ Primary axis: **integration-first publication pipeline**. The feature turns exis
 
 ## Execution horizon (inferred)
 
-- Active seam: `SEAM-5`
+- Active seam: none
 - Next seam: none
 - Future seams: none
 - `SEAM-2` has landed and closed.
 - `SEAM-3` has landed and closed.
 - `SEAM-4` has landed and closed.
-- `SEAM-5` is now the active seam.
+- `SEAM-5` has landed and closed, so the forward window is now empty.
 
 Why this horizon:
 
 - `SEAM-1` has landed the support semantics, publication authority, and neutral `xtask support-matrix` command contract.
 - `SEAM-2` has landed the shared normalization and root-intake seam.
 - `SEAM-4` has landed and closed because `SEAM-3` landed the published row model, projection boundary, and closeout handoff required for validator work.
-- `SEAM-5` is now active because neutral fixture coverage should consume the landed contradiction rules from `SEAM-4` rather than guess them early.
+- `SEAM-5` has landed and closed because neutral fixture coverage consumed the landed contradiction rules from `SEAM-4` and published the future-agent neutrality handoff.
 
 ## Seams
 
@@ -47,7 +47,8 @@ Why this horizon:
    - Verification path: validator tests plus deterministic failure behavior for mismatched manifest inputs.
 
 5. **SEAM-5 - Neutral fixture and regression conformance**
-   - Execution horizon: active
+   - Execution horizon: future
    - Type: conformance
    - Owns: Codex, Claude, and synthetic third-agent-shaped fixture coverage so the neutral seam stays neutral over time.
    - Verification path: fixture suites and golden/regression coverage over row ordering, renderer output, and future-agent-shaped inputs.
+   - Note: landed and closed; retained only as historical basis for future manifest-onboarding seams.
