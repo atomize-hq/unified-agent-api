@@ -418,7 +418,7 @@ pub(super) async fn spawn_fork_v1_flow(
     let approval_required_for_notifications = Arc::clone(&approval_required);
     let stop_forwarding_for_notifications = Arc::clone(&stop_forwarding);
 
-    let notifications_task = tokio::spawn(async move {
+    tokio::spawn(async move {
         let mut approval_signal_tx = Some(approval_signal_tx);
         while let Some(notification) = turn_events.recv().await {
             if let codex::mcp::AppNotification::Raw { method, params } = &notification {
@@ -447,7 +447,6 @@ pub(super) async fn spawn_fork_v1_flow(
         let approval_required = Arc::clone(&approval_required);
         let stop_forwarding = Arc::clone(&stop_forwarding);
         async move {
-            let notifications_task = notifications_task;
             let mut cancel_sent = false;
             tokio::pin!(turn_response);
 
@@ -509,11 +508,9 @@ pub(super) async fn spawn_fork_v1_flow(
                                 let _ = event_tx.send(CodexBackendEvent::TerminalError {
                                     message: PINNED_TIMEOUT.to_string(),
                                 });
-                                notifications_task.abort();
-                                drop(event_tx);
                                 let _ = server.cancel(turn_request_id);
-                                let _ = completion_tx.send(Err(CodexBackendError::Timeout { timeout }));
                                 let _ = server.shutdown().await;
+                                let _ = completion_tx.send(Err(CodexBackendError::Timeout { timeout }));
                                 return;
                             }
                             response_outcome = &mut turn_response => {
