@@ -11,7 +11,8 @@ This document uses RFC 2119 requirement keywords (`MUST`, `MUST NOT`, `SHOULD`).
 
 Define the one OpenCode CLI surface this repo may treat as the canonical v1 wrapper boundary.
 This contract freezes the runtime seam before wrapper implementation, backend mapping, or UAA
-promotion work proceeds.
+promotion work proceeds. The wrapper owns the spawn boundary, event normalization, completion
+finality handling, parser behavior, and redaction behavior for that surface.
 
 ## Normative references
 
@@ -31,6 +32,19 @@ OpenCode wrapper surface.
   MUST NOT require `serve`, `acp`, `run --attach`, direct interactive TUI behavior, or any other
   helper/session-management surface to obtain structured events or completion.
 - Plain formatted stdout or stderr scraping MUST NOT be treated as the canonical wrapper transport.
+
+## Wrapper-owned runtime boundaries
+
+The wrapper implementation that consumes this contract MUST own the following responsibilities:
+
+- process spawn and lifecycle management for the canonical `opencode run --format json` flow
+- normalization of streamed output into typed wrapper events
+- completion-finality detection and handoff
+- parsing of the canonical structured output stream
+- redaction of provider secrets and provider-specific diagnostics before any public wrapper surface
+
+Backend-specific lines, debug text, and provider diagnostics MAY be captured as evidence, but they
+MUST NOT be treated as the canonical wrapper API surface.
 
 ## Accepted v1 controls
 
@@ -70,6 +84,10 @@ backend-specific until a later seam explicitly reopens the boundary.
   invalidate the canonical surface.
 - The wrapper and downstream backends MUST NOT treat raw backend lines, provider secrets, or
   provider-specific diagnostics as canonical public API surface by default.
+- The wrapper MUST keep event typing, completion ownership, parsing, and redaction inside the
+  wrapper seam rather than delegating those semantics to a backend seam.
+- Any support claim that depends on helper-surface recovery of structured events or completion
+  reopens this contract.
 
 ## Reopen triggers
 
@@ -88,6 +106,8 @@ This contract MUST be reopened if any of the following become true:
   for what the OpenCode wrapper is allowed to implement.
 - Later work MAY add bounded detail that stays inside this surface, but it MUST NOT expand the
   surface without reopening this contract.
+- Later seams MAY consume the wrapper-owned runtime boundary described here, but they MUST NOT
+  invent new canonical event, completion, parser, or redaction semantics.
 
 ## Baseline verification checklist
 
