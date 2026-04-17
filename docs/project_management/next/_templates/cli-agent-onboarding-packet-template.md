@@ -14,6 +14,11 @@ Use this template to evaluate exactly 3 real CLI agent candidates and produce on
 
 This artifact is informative, not normative. It must point at authoritative specs, contracts, and committed repo evidence instead of becoming a second source of truth.
 
+The implementation handoff in a filled packet must preserve the repo's crate-first onboarding ladder:
+- wrapper crate first in `crates/<agent>/`
+- `agent_api` backend adapter second
+- UAA promotion assessment last
+
 ## Scope Lock
 
 Use this packet when the goal is to select and prepare the first implementation handoff for a new CLI agent.
@@ -23,7 +28,7 @@ In scope:
 - dated external evidence capture
 - repo-fit analysis against existing wrapper and `agent_api` seams
 - concrete evaluation recipe for the recommended agent
-- shape-agnostic implementation handoff
+- shape-agnostic implementation handoff that keeps wrapper-crate work ahead of `agent_api` work
 
 Out of scope:
 - implementing the new agent
@@ -155,13 +160,14 @@ Provenance: `committed repo evidence + maintainer inference`
 
 Prompt:
 - Explain how the recommended agent maps onto the current repo architecture.
-- Separate wrapper-crate concerns from `agent_api` backend concerns.
+- Keep the wrapper crate as the first implementation stage and separate it from the later `agent_api` backend stage.
 - Call out where current phase-1 seams appear sufficient and where they might crack.
 
 Required outputs:
 - manifest-root expectations
 - wrapper crate expectations
 - `agent_api` backend expectations
+- UAA promotion expectations
 - support/publication expectations
 - likely seam risks
 
@@ -171,12 +177,14 @@ Provenance: `committed repo evidence + maintainer inference`
 
 Prompt:
 - List the concrete artifact types a real onboarding would eventually need.
+- Keep wrapper-crate artifacts explicit and prior to `agent_api` artifacts.
 - Stay shape-agnostic about downstream planning packs.
 
 Required outputs:
 - manifest-root artifact expectations
-- backend-crate artifact expectations
+- wrapper-crate artifact expectations
 - `agent_api` artifact expectations
+- UAA promotion-gate expectations
 - docs/spec artifact expectations
 - evidence/fixture expectations
 
@@ -188,6 +196,7 @@ Prompt:
 - End with an implementation-ready handoff.
 - Do not prescribe one task-pack or feature-pack format.
 - Name the workstreams another maintainer would need to execute.
+- Keep the workstreams explicitly gated: packet closeout, wrapper crate, `agent_api`, then UAA promotion review.
 
 Required outputs:
 - required workstreams
@@ -258,6 +267,8 @@ Required checklist:
 - [ ] The recommendation explains the winner and tie-break reasoning.
 - [ ] The recommended agent includes a concrete evaluation recipe.
 - [ ] Every judgment-heavy section has a provenance line.
+- [ ] The handoff keeps `crates/<agent>/` work ahead of `agent_api` adapter work.
+- [ ] UAA promotion is treated as a later gate, not bundled into initial backend support.
 - [ ] The dated evidence appendix includes all 3 candidates.
 - [ ] Commercial or gated access requirements are explicit where applicable.
 - [ ] Required workstreams, deliverables, risks, and acceptance gates are present.
