@@ -31,7 +31,7 @@ OpenCode manifest-root evidence surface.
 The canonical OpenCode manifest root MUST be `cli_manifests/opencode/`.
 
 The root MUST use the same evidence model already established by the repo’s other CLI manifest
-roots:
+roots. The required artifact inventory for the root is:
 
 - committed pointer files for promotion state
 - committed version metadata for validated versions
@@ -39,14 +39,6 @@ roots:
 - committed coverage or report artifacts for wrapper-derived review
 - a committed root snapshot file representing the current validated state
 - a wrapper coverage declaration or equivalent committed coverage manifest
-
-This contract intentionally separates upstream manifest evidence from wrapper support claims and
-from UAA unified-support claims.
-
-## Required root artifacts
-
-When the OpenCode manifest root is materialized, it MUST contain the following artifact classes:
-
 - `README.md` with human-readable root conventions and generation guidance
 - `SCHEMA.json` defining committed artifact shape rules
 - `RULES.json` defining deterministic merge and comparison rules
@@ -61,6 +53,9 @@ When the OpenCode manifest root is materialized, it MUST contain the following a
 - `snapshots/**` as committed upstream snapshot artifacts
 - `wrapper_coverage.json` as the committed wrapper coverage declaration or equivalent manifest
 - `supplement/commands.json` when explicit help omissions must be recorded
+
+This contract intentionally separates upstream manifest evidence from wrapper support claims and
+from UAA unified-support claims.
 
 Optional or debug-only raw help captures MAY exist as generated artifacts, but they MUST NOT be the
 authoritative committed support signal.
@@ -77,6 +72,20 @@ authoritative committed support signal.
   and MUST be kept deterministic.
 - Snapshot, report, and coverage artifacts MUST be updated mechanically from the validated evidence
   set; they MUST NOT be handwritten as free-form support claims.
+- `artifacts.lock.json` MUST describe the committed inventory for the root and MUST stay aligned
+  with the artifact classes listed above.
+
+## Metadata posture
+
+The OpenCode manifest root MUST preserve the repo's existing truth-store model:
+
+- `versions/*.json` is workflow metadata, not published support truth.
+- `current.json`, pointer files, snapshots, and reports are evidence artifacts, not wrapper or UAA
+  support claims.
+- `wrapper_coverage.json` is the committed wrapper coverage declaration for manifest-root review;
+  it MUST remain distinct from backend reports and unified-support publication.
+- `supplement/commands.json` MAY record explicit help omissions, but it MUST NOT fabricate help
+  detail or act as a support ledger.
 
 ## Evidence expectations
 
@@ -118,6 +127,8 @@ The committed evidence set SHOULD be sufficient for reviewers to answer:
 Before this contract is treated as settled, the repo SHOULD confirm:
 
 - the artifact inventory matches the established manifest-root pattern used by existing CLI roots
+- the inventory is explicit enough that later seams can distinguish the root from wrapper-backed or
+  UAA-backed support evidence
 - promotion pointers are explicit and mechanically checkable
 - committed evidence stays separate from raw help captures
 - wrapper coverage remains distinct from backend or UAA support claims
