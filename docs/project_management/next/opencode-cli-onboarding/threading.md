@@ -10,12 +10,11 @@ passed.
 
 ## Execution horizon summary
 
-- Active seam: `SEAM-3`
-- Next seam: `SEAM-4`
+- Active seam: `SEAM-4`
+- Next seam: none
 - Future seams: none
-- Only `SEAM-3` is eligible for authoritative downstream deep planning by default.
-- `SEAM-4` may later receive seam-local review and slices, but any deeper work stays provisional
-  until `SEAM-3` publishes its handoff.
+- Only `SEAM-4` is eligible for authoritative downstream deep planning by default.
+- No queued seam remains behind `SEAM-4` in this pack after the `SEAM-3` closeout-backed handoff.
 
 ## Contract registry
 
@@ -150,11 +149,12 @@ passed.
   - **Carried contract IDs**: `C-05`, `C-06`
   - **Purpose**: expose the actual OpenCode backend envelope, advertised capabilities, and
     extension-ownership posture for promotion review.
-  - **State**: `identified`
+  - **State**: `revalidated`
   - **Revalidation trigger**: any change to wrapper contract inputs, capability advertisement, or
     backend-specific extension handling
-  - **Satisfied by**: future seam-local planning and closeout for `SEAM-3`
-  - **Notes**: this thread keeps the promotion seam from guessing about backend behavior.
+  - **Satisfied by**: the `SEAM-3` closeout record plus `docs/specs/opencode-agent-api-backend-contract.md`
+  - **Notes**: `SEAM-4` has now revalidated against this thread and can treat the backend-mapping
+    handoff as current input rather than provisional planning prose.
 
 - **Thread ID**: `THR-04`
   - **Producer seam**: `SEAM-4`

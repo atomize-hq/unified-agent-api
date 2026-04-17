@@ -6,13 +6,12 @@ then to the `agent_api` backend seam, and only then to the UAA promotion seam.
 
 ## Execution horizon (v2.5 policy)
 
-- Active seam: `SEAM-3`
-- Next seam: `SEAM-4`
+- Active seam: `SEAM-4`
+- Next seam: none
 - Future seams: none
 
-Note: `SEAM-2` is now closed and serves as closeout-backed upstream evidence, `SEAM-3` is active
-against the published wrapper/manifest handoff, and `SEAM-4` remains queued behind the backend
-seam.
+Note: `SEAM-2` and `SEAM-3` are now closed and serve as closeout-backed upstream evidence, and
+`SEAM-4` is the active promotion-review seam for the pack.
 
 ## Seams
 
@@ -46,27 +45,26 @@ seam.
      - explicit downstream inputs for the backend seam without reopening the runtime lock
 
 3. **SEAM-3 - `agent_api` backend mapping**
-   - Execution horizon: active
+   - Execution horizon: future
    - Type: integration
    - Owns: mapping the wrapper contract into `AgentWrapperRunRequest`, `AgentWrapperEvent`, and
      `AgentWrapperCompletion`; capability advertisement; backend-specific extension ownership; and
      fixture-first validation requirements.
-   - Why it is now active: `SEAM-2` published the bounded wrapper and manifest handoff, so backend
-     planning can now refresh against landed upstream reality and become the current execution
-     target.
+   - Why it is now future: the seam has landed and now serves as the closeout-backed upstream
+     backend handoff that `SEAM-4` consumes.
    - Expected outputs:
      - a backend-owned mapping contract for `opencode`
      - explicit capability and extension boundaries that stay aligned with the universal specs
      - a seam-exit handoff that gives the promotion seam concrete backend behavior to review
 
 4. **SEAM-4 - UAA promotion and publication follow-on**
-   - Execution horizon: next
+   - Execution horizon: active
    - Type: conformance
    - Owns: the boundary between backend support and UAA-promoted support, including which behaviors
      remain backend-specific, which candidate `agent_api.*` promotions are justified, and whether a
      separate follow-on pack is required for canonical spec or capability-matrix updates.
-   - Why it is now next: promotion review sits directly behind the active backend seam, but it
-     still depends on `SEAM-3` publishing concrete backend behavior and extension ownership.
+   - Why it is now active: `SEAM-3` has published concrete backend behavior and extension ownership
+     through closeout-backed `THR-03`, so promotion review is now the current execution target.
    - Expected outputs:
      - an explicit backend-support versus UAA-promotion recommendation
      - a bounded follow-on pack recommendation for any canonical spec or matrix changes

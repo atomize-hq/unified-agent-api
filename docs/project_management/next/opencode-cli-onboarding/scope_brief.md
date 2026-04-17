@@ -4,8 +4,8 @@ pack_version: v1
 pack_status: extracted
 source_ref: docs/project_management/next/opencode-cli-onboarding/plan.md
 execution_horizon:
-  active_seam: SEAM-3
-  next_seam: SEAM-4
+  active_seam: SEAM-4
+  next_seam: null
 ---
 
 # Scope Brief - OpenCode CLI onboarding
@@ -38,8 +38,8 @@ execution_horizon:
   - claiming UAA-promoted support before backend scope is concrete and the multi-backend promotion
     rule is satisfied
 - **Success criteria**:
-  - this directory contains a v2.5 seam pack with one active seam, one next seam, and explicit
-    future seams
+  - this directory contains a v2.5 seam pack with one active seam, an explicit next seam when
+    future work remains, and explicit future seams
   - `SEAM-1` gives downstream planners a concrete contract/evidence lock instead of packet-era
     candidate language
   - `SEAM-2` names an explicit wrapper + manifest-root handoff for later implementation planning
@@ -51,7 +51,8 @@ execution_horizon:
   - this extraction is planning-only and stays inside
     `docs/project_management/next/opencode-cli-onboarding/`
   - the onboarding charter and `docs/specs/**` remain authoritative when planning prose drifts
-  - exactly one `active` seam and one `next` seam are used by default
+  - exactly one `active` seam is used at a time, and `next` is used when future work remains in
+    the forward queue
   - lifecycle state and basis freshness must remain separate
   - OpenCode backend-specific capability or extension behavior must remain backend-specific until
     promotion is justified by the canonical universal rules
@@ -74,7 +75,7 @@ execution_horizon:
 - **Assumptions**:
   - execution horizon is inferred from the critical path: contract/evidence hardening first, then
     wrapper + manifest planning, then backend mapping, then promotion review
-  - the landed `SEAM-1` and `SEAM-2` closeouts are strong enough to mark `SEAM-3` basis as
-    `current`, while `SEAM-4` remains `provisional` until the backend seam publishes `THR-03`
+  - the landed `SEAM-3` closeout is now strong enough to mark `SEAM-4` basis as `current` and
+    make promotion review the active seam
   - new OpenCode-specific durable contracts, when they are created later, should live under
     `docs/specs/**` to match this repo's existing canonical contract posture

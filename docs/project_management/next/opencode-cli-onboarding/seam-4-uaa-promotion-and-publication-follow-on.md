@@ -2,14 +2,15 @@
 seam_id: SEAM-4
 seam_slug: uaa-promotion-and-publication-follow-on
 type: conformance
-status: proposed
-execution_horizon: next
+status: exec-ready
+execution_horizon: active
 plan_version: v1
 basis:
-  currentness: provisional
+  currentness: current
   source_scope_ref: scope_brief.md
   source_scope_version: v1
-  upstream_closeouts: []
+  upstream_closeouts:
+    - governance/seam-3-closeout.md
   required_threads:
     - THR-03
     - THR-04
@@ -19,9 +20,9 @@ basis:
     - backend mapping changes that materially alter what OpenCode exposes
 gates:
   pre_exec:
-    review: pending
-    contract: pending
-    revalidation: pending
+    review: passed
+    contract: passed
+    revalidation: passed
   post_exec:
     landing: pending
     closeout: pending
@@ -51,7 +52,8 @@ open_remediations: []
 - **Primary interfaces**
   - Inputs:
     - `THR-03`
-    - `docs/project_management/next/opencode-cli-onboarding/C3-spec.md`
+    - `docs/project_management/next/opencode-cli-onboarding/governance/seam-3-closeout.md`
+    - `docs/specs/opencode-agent-api-backend-contract.md`
     - `docs/specs/unified-agent-api/capabilities-schema-spec.md`
     - `docs/specs/unified-agent-api/extensions-spec.md`
   - Outputs:
@@ -102,9 +104,9 @@ open_remediations: []
   - no canonical spec edits without a separate approved follow-on execution pack
   - preserve explicit backend-specific publication if universal promotion is premature
 - **Downstream decomposition context**:
-  - Why this seam is `active`, `next`, or `future`: it is `next` because promotion review now
-    queues directly behind the active backend seam, but it still depends on `SEAM-3` publishing
-    concrete behavior and capability claims.
+  - Why this seam is `active`, `next`, or `future`: it is `active` because `SEAM-3` has now
+    published a closeout-backed backend handoff and promotion review is the current execution
+    target.
   - Which threads matter most: `THR-03`, `THR-04`
   - What the first seam-local review should focus on: whether backend evidence is concrete, whether
     multi-backend promotion rules are satisfied, and whether the output is an explicit promotion
