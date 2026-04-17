@@ -39,9 +39,13 @@ open_remediations: []
     payload verification, explicit reopen triggers
   - Out: live-provider-only support claims, promotion review, or manifest-root policy changes
 - **Acceptance criteria**:
-  - backend validation remains fixture-first and reproducible by default
-  - replay and fake-binary posture stay explicit without becoming a new runtime transport
-  - redaction and bounded-payload obligations are concrete enough for later backend tests
+  - backend validation remains fixture-first and reproducible by default without requiring a live
+    provider account
+  - replay and fake-binary posture stay explicit as validation-only support paths and do not become
+    new runtime transports or support claims
+  - redaction and bounded-payload obligations are concrete enough to verify without guessing
+  - upstream reopen triggers are explicit for wrapper, manifest, capability/extension, or
+    payload-redaction drift
 - **Dependencies**:
   - `docs/specs/opencode-agent-api-backend-contract.md`
   - `docs/specs/opencode-onboarding-evidence-contract.md`
@@ -50,7 +54,9 @@ open_remediations: []
 - **Verification**:
   - confirm backend validation can consume the published wrapper/manifest handoff without requiring
     a live provider account by default
-  - confirm redaction and payload-boundary obligations remain explicit and testable
+  - confirm redaction and payload-boundary obligations remain explicit and testable through
+    deterministic validation posture only
+  - confirm reopen triggers force upstream revalidation instead of local drift normalization
 - **Rollout/safety**:
   - keep fixture, replay, and fake-binary posture tied to deterministic validation only
   - force reopen of upstream seams rather than normalizing wrapper or manifest drift locally
@@ -67,7 +73,7 @@ open_remediations: []
 - **Thread/contract refs**: `THR-03`, `C-05`, `C-06`
 - **Implementation notes**:
   - keep replay and fake-binary posture tied to deterministic validation only
-  - keep reopen triggers tied to real wrapper, manifest, capability, or redaction drift
+  - keep reopen triggers tied to real wrapper, manifest, capability, extension, or redaction drift
 - **Acceptance criteria**:
   - backend work can tell when to stop and reopen upstream seams
   - later tests can verify redaction and bounded payload behavior without guessing

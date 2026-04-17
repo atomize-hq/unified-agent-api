@@ -136,6 +136,27 @@ error model.
 - Runtime rejection on the canonical wrapper path MUST NOT be converted into a new wrapper behavior
   or a widened public event shape.
 
+## Validation and evidence posture
+
+The backend MUST keep its validation posture fixture-first and reproducible by default.
+
+- Backend validation MUST be expressible without requiring a live provider account by default.
+- Replay and fake-binary paths MAY be used for deterministic validation support, but they MUST
+  remain validation-only support paths and MUST NOT be described as new runtime transports or as a
+  widening of supported wrapper behavior.
+- The backend MUST keep redaction and bounded-payload obligations reviewable through these
+  validation paths without relying on raw backend lines, provider-specific diagnostics, or public
+  transcript passthrough.
+- The backend MUST preserve the distinction between live runtime behavior and deterministic
+  validation evidence; support claims MUST continue to depend on the canonical wrapper contract and
+  published evidence posture, not on ad hoc local replay assumptions.
+- If validation posture, replay posture, or redaction posture becomes ambiguous or conflicts with
+  the wrapper, manifest, or evidence contracts, the backend MUST stop and reopen the upstream
+  seam rather than normalizing the drift locally.
+- The backend MUST treat drift in wrapper event or completion semantics, manifest inventory or
+  pointer rules, capability or extension registry rules, or payload redaction boundaries as a
+  reopen trigger for upstream seam work.
+
 ## Capability posture
 
 The backend MUST advertise only the capabilities it can deterministically honor for the canonical
