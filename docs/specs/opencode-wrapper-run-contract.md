@@ -11,8 +11,8 @@ This document uses RFC 2119 requirement keywords (`MUST`, `MUST NOT`, `SHOULD`).
 
 Define the one OpenCode CLI surface this repo may treat as the canonical v1 wrapper boundary.
 This contract freezes the runtime seam before wrapper implementation, backend mapping, or UAA
-promotion work proceeds. The wrapper owns the spawn boundary, event normalization, completion
-finality handling, parser behavior, and redaction behavior for that surface.
+promotion work proceeds. The wrapper owns the spawn boundary, typed-event normalization,
+completion-finality handoff, offline parser posture, and redaction boundary for that surface.
 
 ## Normative references
 
@@ -38,13 +38,20 @@ OpenCode wrapper surface.
 The wrapper implementation that consumes this contract MUST own the following responsibilities:
 
 - process spawn and lifecycle management for the canonical `opencode run --format json` flow
-- normalization of streamed output into typed wrapper events
-- completion-finality detection and handoff
-- parsing of the canonical structured output stream
-- redaction of provider secrets and provider-specific diagnostics before any public wrapper surface
+- typed-event normalization from the canonical structured output stream
+- completion-finality detection and handoff from the same canonical run
+- offline parsing of captured canonical transcript or protocol evidence against the same
+  normalization rules used by the live wrapper path
+- redaction of provider secrets, raw backend lines, and provider-specific diagnostics before any
+  public wrapper surface
 
-Backend-specific lines, debug text, and provider diagnostics MAY be captured as evidence, but they
-MUST NOT be treated as the canonical wrapper API surface.
+The wrapper MUST return only wrapper-owned typed events and completion state for the canonical run
+path. It MUST NOT expose raw stdout or stderr scraping as canonical API surface, even if those
+bytes are retained internally for evidence, replay, or diagnostics.
+
+The offline parser MAY be used for deterministic replay, fixture validation, or evidence review, but
+it MUST remain a wrapper-owned support path rather than a new runtime transport. It MUST preserve
+the same event-shape and normalization expectations as the live stream.
 
 ## Accepted v1 controls
 
