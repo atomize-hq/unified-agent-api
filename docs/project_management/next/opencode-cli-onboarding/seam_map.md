@@ -6,17 +6,17 @@ then to the `agent_api` backend seam, and only then to the UAA promotion seam.
 
 ## Execution horizon (v2.5 policy)
 
-- Active seam: `SEAM-1`
-- Next seam: `SEAM-2`
-- Future seams: `SEAM-3`, `SEAM-4`
+- Active seam: `SEAM-2`
+- Next seam: `SEAM-3`
+- Future seams: `SEAM-4`
 
-Note: `SEAM-3` and `SEAM-4` are expected to activate quickly once `SEAM-2` lands, but they remain
-`future` here to preserve the default "exactly one active + one next" horizon rule.
+Note: `SEAM-3` is now the queued seam behind active wrapper/manifest planning, and `SEAM-4`
+remains `future` until the backend seam publishes a concrete handoff.
 
 ## Seams
 
 1. **SEAM-1 - Runtime surface and evidence lock**
-   - Execution horizon: active
+   - Execution horizon: future
    - Type: integration
    - Owns: the canonical v1 OpenCode run surface, deferred-surface policy, install/auth/provider
      posture, maintainer smoke expectations, and the explicit handoff contract that downstream
@@ -32,7 +32,7 @@ Note: `SEAM-3` and `SEAM-4` are expected to activate quickly once `SEAM-2` lands
        prose
 
 2. **SEAM-2 - Wrapper crate and manifest foundation**
-   - Execution horizon: next
+   - Execution horizon: active
    - Type: capability
    - Owns: the implementation planning boundary for `crates/opencode/` and
      `cli_manifests/opencode/`, including spawn/stream/completion/parsing boundaries, fixture and
@@ -46,13 +46,13 @@ Note: `SEAM-3` and `SEAM-4` are expected to activate quickly once `SEAM-2` lands
      - explicit downstream inputs for the backend seam without reopening the runtime lock
 
 3. **SEAM-3 - `agent_api` backend mapping**
-   - Execution horizon: future
+   - Execution horizon: next
    - Type: integration
    - Owns: mapping the wrapper contract into `AgentWrapperRunRequest`, `AgentWrapperEvent`, and
      `AgentWrapperCompletion`; capability advertisement; backend-specific extension ownership; and
      fixture-first validation requirements.
-   - Why it stays future: backend planning depends on landed wrapper/manifest truths, not packet-era
-     guesses about event buckets or extension semantics.
+   - Why it is next: backend planning now sits directly behind the active wrapper/manifest seam,
+     but it still depends on the wrapper seam publishing its own bounded handoff before activation.
    - Expected outputs:
      - a backend-owned mapping contract for `opencode`
      - explicit capability and extension boundaries that stay aligned with the universal specs

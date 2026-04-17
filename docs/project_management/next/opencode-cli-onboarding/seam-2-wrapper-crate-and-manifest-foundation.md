@@ -2,14 +2,15 @@
 seam_id: SEAM-2
 seam_slug: wrapper-crate-and-manifest-foundation
 type: capability
-status: proposed
-execution_horizon: next
-plan_version: v1
+status: exec-ready
+execution_horizon: active
+plan_version: v2
 basis:
-  currentness: provisional
+  currentness: current
   source_scope_ref: scope_brief.md
   source_scope_version: v1
-  upstream_closeouts: []
+  upstream_closeouts:
+    - governance/seam-1-closeout.md
   required_threads:
     - THR-01
     - THR-02
@@ -19,9 +20,9 @@ basis:
     - new evidence that fake-binary, fixture, or offline-parser posture must change
 gates:
   pre_exec:
-    review: pending
-    contract: pending
-    revalidation: pending
+    review: passed
+    contract: passed
+    revalidation: passed
   post_exec:
     landing: pending
     closeout: pending
@@ -108,8 +109,8 @@ open_remediations: []
   - downstream implementation must preserve redaction and completion-finality expectations
   - helper-surface expansion is a blocker, not an opportunistic stretch goal
 - **Downstream decomposition context**:
-  - Why this seam is `active`, `next`, or `future`: it is `next` because it is the first executable
-    repo seam once `SEAM-1` publishes a trustworthy runtime/evidence handoff.
+  - Why this seam is `active`, `next`, or `future`: it is `active` because `SEAM-1` has now
+    published a trustworthy runtime/evidence handoff and this seam is the current execution target.
   - Which threads matter most: `THR-01`, `THR-02`
   - What the first seam-local review should focus on: whether the wrapper-owned event/completion
     boundary is explicit, whether manifest inventory/update rules are concrete, and whether the

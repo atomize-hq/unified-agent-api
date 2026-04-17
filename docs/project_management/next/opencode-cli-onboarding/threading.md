@@ -10,12 +10,12 @@ passed.
 
 ## Execution horizon summary
 
-- Active seam: `SEAM-1`
-- Next seam: `SEAM-2`
-- Future seams: `SEAM-3`, `SEAM-4`
-- Only `SEAM-1` is eligible for authoritative downstream deep planning by default.
-- `SEAM-2` may later receive seam-local review and slices, but any deeper work stays provisional
-  until `SEAM-1` publishes its handoff.
+- Active seam: `SEAM-2`
+- Next seam: `SEAM-3`
+- Future seams: `SEAM-4`
+- Only `SEAM-2` is eligible for authoritative downstream deep planning by default.
+- `SEAM-3` may later receive seam-local review and slices, but any deeper work stays provisional
+  until `SEAM-2` publishes its handoff.
 
 ## Contract registry
 
@@ -120,12 +120,13 @@ passed.
   - **Carried contract IDs**: `C-01`, `C-02`
   - **Purpose**: lock the canonical OpenCode v1 run surface and its evidence/reproducibility
     posture before wrapper or backend planning freezes downstream assumptions.
-  - **State**: `defined`
+  - **State**: `revalidated`
   - **Revalidation trigger**: contradictory maintainer smoke, upstream CLI event-shape drift, or a
     decision to pull `serve`, `acp`, `run --attach`, or interactive TUI behavior into v1 scope
-  - **Satisfied by**: a seam-local review that turns packet evidence into explicit contract text,
-    deferred-surface policy, and reproducibility guidance
-  - **Notes**: this thread is the only legitimate source of truth for downstream scope control.
+  - **Satisfied by**: the `SEAM-1` closeout record plus the canonical runtime and evidence
+    contracts under `docs/specs/opencode-*.md`
+  - **Notes**: `SEAM-2` has now revalidated against this thread; downstream seams should treat the
+    published runtime/evidence handoff as current input instead of packet prose.
 
 - **Thread ID**: `THR-02`
   - **Producer seam**: `SEAM-2`

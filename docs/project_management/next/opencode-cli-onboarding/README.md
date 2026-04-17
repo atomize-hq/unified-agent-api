@@ -6,8 +6,8 @@ Source:
 - `docs/project_management/next/cli-agent-onboarding-third-agent-packet.md`
 
 This pack captures seam briefs, authoritative threading, pack-level review surfaces, seam-exit
-intent, and governance scaffolds for onboarding `OpenCode` as the first real third CLI agent in
-this repo. It intentionally stays one level above seam-local decomposition.
+intent, governance scaffolds, and the active seam-local planning needed to onboard `OpenCode` as
+the first real third CLI agent in this repo.
 
 - Start here: `scope_brief.md`
 - Seam overview: `seam_map.md`
@@ -17,9 +17,9 @@ this repo. It intentionally stays one level above seam-local decomposition.
 
 Execution horizon:
 
-- Active seam: `SEAM-1`
-- Next seam: `SEAM-2`
-- Future seams: `SEAM-3`, `SEAM-4`
+- Active seam: `SEAM-2`
+- Next seam: `SEAM-3`
+- Future seams: `SEAM-4`
 
 Policy:
 
@@ -36,11 +36,12 @@ Policy:
 
 Assumptions captured for extraction:
 
-- the source packet's maintainer-backed smoke evidence is strong enough to treat
-  `opencode run --format json` as the current candidate v1 wrapper seam
+- the source packet's maintainer-backed smoke evidence was strong enough to lock
+  `opencode run --format json` as the current v1 wrapper seam
 - the critical path remains crate-first: runtime/evidence lock first, wrapper + manifest planning
   second, backend mapping third, UAA promotion review last
 - `serve`, `acp`, `run --attach`, and direct interactive TUI surfaces remain deferred until an
   upstream seam explicitly reopens them
+- `SEAM-1` now serves as closeout-backed upstream evidence for the active wrapper/manifest seam
 - legacy triad artifacts in this directory are retained as source provenance, but the seam-pack
   files in this README are now the canonical planning surface for downstream work

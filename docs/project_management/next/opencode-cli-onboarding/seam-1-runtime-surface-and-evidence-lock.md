@@ -2,8 +2,8 @@
 seam_id: SEAM-1
 seam_slug: runtime-surface-and-evidence-lock
 type: integration
-status: exec-ready
-execution_horizon: active
+status: closed
+execution_horizon: future
 plan_version: v1
 basis:
   currentness: current
@@ -22,12 +22,12 @@ gates:
     contract: passed
     revalidation: passed
   post_exec:
-    landing: pending
-    closeout: pending
+    landing: passed
+    closeout: passed
 seam_exit_gate:
   required: true
   planned_location: S99
-  status: pending
+  status: passed
 open_remediations: []
 ---
 
@@ -103,8 +103,8 @@ open_remediations: []
   - fail closed on contradictory evidence
   - preserve crate-first sequencing so downstream seams consume, rather than reinvent, this contract
 - **Downstream decomposition context**:
-  - Why this seam is `active`, `next`, or `future`: it is `active` because every downstream planning
-    seam depends on one explicit runtime/evidence contract instead of packet prose.
+  - Why this seam is `active`, `next`, or `future`: it is `future` because it has landed and now
+    serves as closeout-backed upstream evidence for the wrapper, backend, and promotion seams.
   - Which threads matter most: `THR-01`
   - What the first seam-local review should focus on: whether the current smoke evidence is enough
     to freeze the headless run surface, whether deferred helpers are stated without ambiguity, and

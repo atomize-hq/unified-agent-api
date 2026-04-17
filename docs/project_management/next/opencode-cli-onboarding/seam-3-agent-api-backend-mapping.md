@@ -3,8 +3,8 @@ seam_id: SEAM-3
 seam_slug: agent-api-backend-mapping
 type: integration
 status: proposed
-execution_horizon: future
-plan_version: v1
+execution_horizon: next
+plan_version: v2
 basis:
   currentness: provisional
   source_scope_ref: scope_brief.md
@@ -106,8 +106,9 @@ open_remediations: []
   - provider-backed smoke may supplement verification but must not become the only proof path
   - backend support must remain distinct from UAA promotion
 - **Downstream decomposition context**:
-  - Why this seam is `active`, `next`, or `future`: it is `future` because it should only activate
-    after the wrapper and manifest seam publishes a concrete handoff.
+  - Why this seam is `active`, `next`, or `future`: it is `next` because it now queues directly
+    behind the active wrapper/manifest seam, but it should not activate until `SEAM-2` publishes a
+    concrete handoff.
   - Which threads matter most: `THR-02`, `THR-03`
   - What the first seam-local review should focus on: whether the wrapper handoff is concrete
     enough, whether capability/extension advertisement is explicit, and whether test obligations
