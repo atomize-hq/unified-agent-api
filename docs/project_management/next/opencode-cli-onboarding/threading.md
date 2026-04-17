@@ -10,11 +10,10 @@ passed.
 
 ## Execution horizon summary
 
-- Active seam: `SEAM-4`
+- Active seam: none
 - Next seam: none
 - Future seams: none
-- Only `SEAM-4` is eligible for authoritative downstream deep planning by default.
-- No queued seam remains behind `SEAM-4` in this pack after the `SEAM-3` closeout-backed handoff.
+- No seam remains in the forward planning window for this pack.
 
 ## Contract registry
 
@@ -162,11 +161,13 @@ passed.
   - **Carried contract IDs**: `C-07`
   - **Purpose**: publish the authoritative backend-support versus UAA-promotion recommendation and
     name any required follow-on pack for canonical spec or matrix work.
-  - **State**: `identified`
+  - **State**: `published`
   - **Revalidation trigger**: new multi-backend evidence, spec-registry changes, or additional
     OpenCode behavior that meaningfully changes the promotion case
-  - **Satisfied by**: future seam-local planning and closeout for `SEAM-4`
-  - **Notes**: this thread must remain explicit even when the correct answer is "no promotion yet."
+  - **Satisfied by**: the `SEAM-4` closeout record plus
+    `docs/project_management/next/opencode-cli-onboarding/governance/seam-4-closeout.md`
+  - **Notes**: this published handoff records that no additional UAA promotion work or follow-on
+    pack is required under the current evidence basis; future drift reopens the thread.
 
 ## Dependency graph
 

@@ -6,12 +6,12 @@ then to the `agent_api` backend seam, and only then to the UAA promotion seam.
 
 ## Execution horizon (v2.5 policy)
 
-- Active seam: `SEAM-4`
+- Active seam: none
 - Next seam: none
 - Future seams: none
 
-Note: `SEAM-2` and `SEAM-3` are now closed and serve as closeout-backed upstream evidence, and
-`SEAM-4` is the active promotion-review seam for the pack.
+Note: `SEAM-1` through `SEAM-4` are now closed. `SEAM-4` landed the final promotion-review
+recommendation for this pack, so no active or next seam remains.
 
 ## Seams
 
@@ -58,13 +58,13 @@ Note: `SEAM-2` and `SEAM-3` are now closed and serve as closeout-backed upstream
      - a seam-exit handoff that gives the promotion seam concrete backend behavior to review
 
 4. **SEAM-4 - UAA promotion and publication follow-on**
-   - Execution horizon: active
+   - Execution horizon: future
    - Type: conformance
    - Owns: the boundary between backend support and UAA-promoted support, including which behaviors
      remain backend-specific, which candidate `agent_api.*` promotions are justified, and whether a
      separate follow-on pack is required for canonical spec or capability-matrix updates.
-   - Why it is now active: `SEAM-3` has published concrete backend behavior and extension ownership
-     through closeout-backed `THR-03`, so promotion review is now the current execution target.
+   - Why it is now future: the seam has landed and now serves as the closeout-backed publication
+     record for the bounded promotion outcome and `THR-04` handoff.
    - Expected outputs:
      - an explicit backend-support versus UAA-promotion recommendation
      - a bounded follow-on pack recommendation for any canonical spec or matrix changes

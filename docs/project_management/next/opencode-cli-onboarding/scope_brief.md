@@ -4,7 +4,7 @@ pack_version: v1
 pack_status: extracted
 source_ref: docs/project_management/next/opencode-cli-onboarding/plan.md
 execution_horizon:
-  active_seam: SEAM-4
+  active_seam: null
   next_seam: null
 ---
 
@@ -75,7 +75,7 @@ execution_horizon:
 - **Assumptions**:
   - execution horizon is inferred from the critical path: contract/evidence hardening first, then
     wrapper + manifest planning, then backend mapping, then promotion review
-  - the landed `SEAM-3` closeout is now strong enough to mark `SEAM-4` basis as `current` and
-    make promotion review the active seam
+  - the landed `SEAM-4` closeout now resolves the promotion-review seam with no queued follow-on
+    seam required under the current evidence basis
   - new OpenCode-specific durable contracts, when they are created later, should live under
     `docs/specs/**` to match this repo's existing canonical contract posture

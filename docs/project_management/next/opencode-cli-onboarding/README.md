@@ -17,7 +17,7 @@ the first real third CLI agent in this repo.
 
 Execution horizon:
 
-- Active seam: `SEAM-4`
+- Active seam: none
 - Next seam: none
 - Future seams: none
 
@@ -40,10 +40,11 @@ Assumptions captured for extraction:
   `opencode run --format json` as the current v1 wrapper seam
 - the critical path remains crate-first: runtime/evidence lock first, wrapper + manifest planning
   second, backend mapping third, UAA promotion review last
-- the landed `SEAM-3` closeout now publishes the backend-mapping handoff needed to activate
-  `SEAM-4`, and no further queued seam remains in this pack after promotion
+- the landed `SEAM-4` closeout now records the bounded promotion-review outcome, and no further
+  queued seam remains in this pack
 - `serve`, `acp`, `run --attach`, and direct interactive TUI surfaces remain deferred until an
   upstream seam explicitly reopens them
-- `SEAM-1` now serves as closeout-backed upstream evidence for the active wrapper/manifest seam
+- `SEAM-1` now serves as closeout-backed upstream evidence for the downstream seams and their
+  published closeout records
 - legacy triad artifacts in this directory are retained as source provenance, but the seam-pack
   files in this README are now the canonical planning surface for downstream work

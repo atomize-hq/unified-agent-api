@@ -2,8 +2,8 @@
 seam_id: SEAM-4
 seam_slug: uaa-promotion-and-publication-follow-on
 type: conformance
-status: exec-ready
-execution_horizon: active
+status: closed
+execution_horizon: future
 plan_version: v1
 basis:
   currentness: current
@@ -24,12 +24,12 @@ gates:
     contract: passed
     revalidation: passed
   post_exec:
-    landing: pending
-    closeout: pending
+    landing: passed
+    closeout: passed
 seam_exit_gate:
   required: true
   planned_location: S99
-  status: pending
+  status: passed
 open_remediations: []
 ---
 
@@ -104,9 +104,9 @@ open_remediations: []
   - no canonical spec edits without a separate approved follow-on execution pack
   - preserve explicit backend-specific publication if universal promotion is premature
 - **Downstream decomposition context**:
-  - Why this seam is `active`, `next`, or `future`: it is `active` because `SEAM-3` has now
-    published a closeout-backed backend handoff and promotion review is the current execution
-    target.
+  - Why this seam is `active`, `next`, or `future`: it is `future` because the seam has landed,
+    published its closeout-backed recommendation and `THR-04` handoff, and no additional queued
+    seam remains in this pack.
   - Which threads matter most: `THR-03`, `THR-04`
   - What the first seam-local review should focus on: whether backend evidence is concrete, whether
     multi-backend promotion rules are satisfied, and whether the output is an explicit promotion
