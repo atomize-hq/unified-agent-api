@@ -48,7 +48,7 @@ open_remediations: []
   - Out:
     - changing wrapper-owned semantics from `SEAM-2`
     - promoting backend-specific behavior into universal `agent_api.*` capabilities
-    - editing canonical universal specs in this extraction pass
+    - retroactively redefining the closed universal-spec posture without a new follow-on pack
 - **Primary interfaces**
   - Inputs:
     - `THR-01`

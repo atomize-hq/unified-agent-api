@@ -52,7 +52,6 @@ open_remediations: []
   - Inputs:
     - `docs/project_management/next/cli-agent-onboarding-charter.md`
     - `docs/project_management/next/cli-agent-onboarding-third-agent-packet.md`
-    - `docs/project_management/next/opencode-cli-onboarding/plan.md`
     - maintainer-backed smoke observations captured in the source packet
   - Outputs:
     - `docs/specs/opencode-wrapper-run-contract.md`
@@ -99,7 +98,7 @@ open_remediations: []
   - Risk: helper surfaces may look attractive enough to pressure the v1 seam boundary.
   - De-risk plan: publish a hard deferred-surface list with explicit "reopen only if" criteria.
 - **Rollout / safety**:
-  - docs/planning-only in this extraction pass
+  - this seam landed as a docs-only contract and evidence closeout
   - fail closed on contradictory evidence
   - preserve crate-first sequencing so downstream seams consume, rather than reinvent, this contract
 - **Downstream decomposition context**:
@@ -110,8 +109,8 @@ open_remediations: []
     to freeze the headless run surface, whether deferred helpers are stated without ambiguity, and
     whether provider/auth posture is concrete enough for downstream planning
   - Boundary slice intent: reserve `S00` in downstream seam-local planning if contract-definition
-    cleanup is still needed between the packet evidence, the charter, and the future OpenCode run
-    contract doc
+    cleanup is still needed between the packet evidence, the charter, and the published OpenCode
+    run contract doc
 - **Expected seam-exit concerns**:
   - Contracts likely to publish: `C-01`, `C-02`
   - Threads likely to advance: `THR-01`

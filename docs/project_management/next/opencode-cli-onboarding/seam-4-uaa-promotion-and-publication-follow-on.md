@@ -46,7 +46,7 @@ open_remediations: []
     - identify any required follow-on pack for canonical spec or capability-matrix changes
     - preserve explicit non-promotion paths for backend-specific or unstable behavior
   - Out:
-    - editing canonical specs or capability matrices in this extraction pass
+    - reopening or revising canonical specs or capability matrices inside this closed pack
     - reopening wrapper or backend scope except through explicit blocker escalation
     - treating backend completion as automatic universal promotion
 - **Primary interfaces**
@@ -100,7 +100,7 @@ open_remediations: []
   - De-risk plan: make backend-specific fallback behavior and no-promotion outcomes first-class
     outputs.
 - **Rollout / safety**:
-  - review-only at extraction time
+  - this seam landed as a bounded review and publication decision
   - no canonical spec edits without a separate approved follow-on execution pack
   - preserve explicit backend-specific publication if universal promotion is premature
 - **Downstream decomposition context**:

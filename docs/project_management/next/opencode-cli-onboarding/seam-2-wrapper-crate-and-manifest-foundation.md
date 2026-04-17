@@ -82,7 +82,7 @@ open_remediations: []
   - `crates/opencode/**`
   - `cli_manifests/opencode/**`
   - `docs/specs/opencode-wrapper-run-contract.md`
-  - future `docs/specs/opencode-cli-manifest-contract.md`
+  - `docs/specs/opencode-cli-manifest-contract.md`
   - `docs/project_management/next/opencode-cli-onboarding/`
 - **Verification**:
   - seam-local review should prove the wrapper-owned boundaries are concrete enough to implement
@@ -105,7 +105,7 @@ open_remediations: []
   - De-risk plan: model the inventory directly on current `cli_manifests/**` norms and make
     ownership/update rules concrete.
 - **Rollout / safety**:
-  - this seam remains planning-only at extraction time
+  - this seam landed as a planning/docs contract for later implementation work
   - downstream implementation must preserve redaction and completion-finality expectations
   - helper-surface expansion is a blocker, not an opportunistic stretch goal
 - **Downstream decomposition context**:

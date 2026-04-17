@@ -42,6 +42,6 @@ flowchart TB
   Manifest --> Backend
   Backend --> Matrix["docs/specs/unified-agent-api/capability-matrix.md"]
   Backend --> Ext["docs/specs/unified-agent-api/extensions-spec.md"]
-  Wrapper --> Contract["future docs/specs/opencode-wrapper-run-contract.md"]
-  Manifest --> ManifestContract["future docs/specs/opencode-cli-manifest-contract.md"]
+  Wrapper --> Contract["docs/specs/opencode-wrapper-run-contract.md"]
+  Manifest --> ManifestContract["docs/specs/opencode-cli-manifest-contract.md"]
 ```

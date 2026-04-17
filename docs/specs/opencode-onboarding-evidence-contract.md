@@ -37,12 +37,28 @@ The packet-level evaluation recipe remains admissible as baseline evidence for t
 if it is grounded in the canonical `opencode run --format json` path and the provider/auth/model
 setup needed to exercise that path.
 
-At baseline, the repo SHOULD be able to name:
+## Baseline prerequisite record
 
-- the install command or install path used to obtain OpenCode
-- the provider or account login step required before a real prompt can run
-- the model-routing step used to confirm the chosen provider can execute the canonical surface
-- the exact prompt path used for the maintainer smoke
+The current accepted planning basis for this seam MUST remain pinned to the following baseline
+record unless a reopen trigger fires:
+
+- install path used for the accepted basis: `npm install -g opencode-ai`
+- auth prerequisite used for the accepted basis: configure provider-backed credentials via
+  `opencode auth login`
+- model-routing confirmation path for the accepted basis:
+  - run `opencode models` or `opencode models --refresh` successfully so the chosen provider/model
+    inventory is visible
+  - confirm the canonical runtime surface on `opencode/gpt-5-nano`
+- maintainer smoke path for the accepted basis:
+  - `opencode run --format json -m opencode/gpt-5-nano "Reply with the word OK."`
+  - `opencode run --format json -m opencode/gpt-5-nano "Summarize this repository structure in 5 bullets."`
+  - `opencode run --format json -m opencode/gpt-5-nano --session <session_id> "Reply with CONTINUED."`
+  - `opencode run --format json -m opencode/gpt-5-nano --session <session_id> --fork "Reply with FORKED."`
+  - `opencode run --format json -m opencode/gpt-5-nano --dir . "Reply with DIR_OK."`
+
+Downstream seams MUST use this baseline prerequisite record as the self-sufficient canonical source
+for install, auth, model-routing, and smoke-path facts. Packet prose MAY provide supporting
+context, but it MUST NOT be required to recover these baseline prerequisites.
 
 ## Planning-grade maintainer smoke
 
@@ -101,7 +117,8 @@ Later seams MAY choose the exact artifact layout, but they MUST preserve this di
 
 This contract MUST be reopened if any of the following become true:
 
-- provider or auth posture changes invalidate the observed canonical success path
+- provider or auth posture changes invalidate the baseline prerequisite record or observed
+  canonical success path
 - the canonical run surface stops emitting the structured events needed for the planning-grade
   smoke checklist
 - later support work tries to rely on live smoke alone instead of committed replay evidence
