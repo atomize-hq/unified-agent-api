@@ -17,6 +17,8 @@ This artifact feeds `gates.pre_exec.review`.
   explicit no-promotion answer or an explicit follow-on requirement?
 - Could spec or capability-matrix changes slip into the recommendation path without a separate
   approved follow-on execution pack?
+- Could the capability matrix be mistaken for runtime truth instead of a generated supporting
+  artifact for review only?
 
 ## R1 - Promotion-review handoff
 
@@ -53,6 +55,8 @@ flowchart TB
 - No open pre-exec findings remain after this refresh.
 - `THR-03` is now revalidated against the landed `SEAM-3` closeout and the published backend
   mapping contract.
+- The capability matrix remains a generated evidence artifact; it does not override backend
+  contract evidence or authorize runtime promotion decisions.
 - No blocking remediation is required before `SEAM-4` executes promotion-review planning work.
 
 ## Pre-exec gate disposition
@@ -64,6 +68,9 @@ flowchart TB
 - **Revalidation prerequisites**: satisfied by the landed `SEAM-3` closeout, published `THR-03`,
   and the absence of contradictory stale triggers.
 - **Opened remediations**: none
+- **Publication-state rule**: backend support and universal promotion remain separate states; when
+  cross-backend evidence is missing, the review must resolve to explicit no-promotion rather than
+  implied approval.
 
 ## Planned seam-exit gate focus
 

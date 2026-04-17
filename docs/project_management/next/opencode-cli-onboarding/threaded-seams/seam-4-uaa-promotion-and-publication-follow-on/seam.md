@@ -59,6 +59,8 @@ open_remediations: []
 - **Verification**:
   - `review.md` is the authoritative pre-exec review artifact and must show that backend evidence,
     multi-backend promotion rules, and no-promotion outputs are all concrete enough to execute.
+  - `review.md` must also show that the capability matrix is supporting evidence only, not runtime
+    truth.
   - owned promotion-review outputs must be concrete in seam-local planning before execution; they
     do not require canonical spec or matrix edits to land in this seam.
   - accepted or published owned-contract artifacts remain post-exec evidence recorded in seam exit
@@ -95,7 +97,8 @@ open_remediations: []
 - **Planned location**: `S99`
 - **Why this seam needs an explicit exit gate**: pack closeout and future follow-on work need a
   closeout-backed record of what stayed backend-specific, what if anything is recommended for UAA
-  promotion, and whether a follow-on execution pack is required.
+  promotion, whether a follow-on execution pack is required, and whether the answer is explicitly
+  no-promotion when cross-backend evidence is missing.
 - **Expected contracts to publish**: `C-07`
 - **Expected threads to publish / advance**: `THR-04`
 - **Likely downstream stale triggers**:
@@ -106,6 +109,8 @@ open_remediations: []
   - explicit promotion recommendation or explicit no-promotion outcome
   - explicit follow-on pack requirement or an explicit no-follow-on answer
   - explicit publication of `THR-04` for pack closeout and future work
+  - explicit statement that the capability matrix was used only as supporting evidence, not as
+    runtime truth
 
 ## Slice index
 
