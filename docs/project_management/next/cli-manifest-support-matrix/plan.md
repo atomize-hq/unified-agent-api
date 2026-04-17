@@ -18,6 +18,7 @@ Turn the existing manifest parity evidence in `cli_manifests/codex` and `cli_man
   - backend-crate support
   - UAA unified support
 - Preserve backend-specific passthrough as visible state, but do not count it as UAA unified support.
+- Treat backend support as crate-first: a manifest root may exist before `crates/<agent>` exists, but backend support cannot be claimed until wrapper-derived evidence exists.
 
 ## Success Criteria
 - `cargo run -p xtask -- support-matrix` deterministically writes one machine-readable support artifact and one Markdown projection.
@@ -121,7 +122,7 @@ agent x version x target
         |      "what the committed manifest evidence says"
         |
         +--> backend_support
-        |      "what crates/codex or crates/claude_code safely support"
+        |      "what the agent-specific wrapper crate safely supports"
         |
         +--> uaa_support
         |      "what UAA can claim as deterministic cross-agent behavior"
@@ -135,6 +136,7 @@ Implementation rule:
 - `versions/<v>.json.status` remains workflow-stage metadata.
 - Per-target `latest_supported/*` pointers plus support-matrix rows are the published truth.
 - The generator must reject or flag cases where those truths disagree.
+- A manifest-supported row without wrapper-derived report evidence must remain backend-unsupported.
 
 ## Suggested Branching
 - Orchestration branch: `feat/cli-manifest-support-matrix`

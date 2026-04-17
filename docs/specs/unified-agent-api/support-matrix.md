@@ -18,11 +18,17 @@ It separates support publication from capability advertising so the two concerns
 Support publication MUST distinguish the following four layers:
 
 - `manifest support`: what the committed CLI manifest evidence says about a target or version.
-- `backend support`: what a backend crate can safely support based on its implementation and manifest inputs.
+- `backend support`: what the agent-specific wrapper/backend crate can safely support based on its implementation and manifest inputs.
 - `UAA unified support`: what the Unified Agent API can claim as a deterministic cross-agent support statement.
 - `passthrough visibility`: backend-specific surface area that remains visible but is not promoted into unified support.
 
 These layers MUST NOT be conflated with workflow status fields, pointer files, or generated overview artifacts.
+
+For onboarding and publication purposes, backend support is crate-first:
+
+- a new agent MAY have committed manifest evidence before any wrapper crate exists
+- manifest evidence alone MUST NOT be promoted into backend support
+- backend support MUST remain `unsupported` until crate-owned wrapper evidence exists for that target
 
 ## Publication targets
 
@@ -83,6 +89,9 @@ These fields have the following meanings:
 - `pointer_promotion`: the pointer-derived promotion posture relevant to the row's target.
 - `evidence_notes`: deterministic notes that explain intentional partial support or other non-contradictory caveats grounded in committed evidence.
 
+For phase 1, `backend_support` is specifically the support posture proven by the agent-specific wrapper crate and the committed wrapper-derived reports under `cli_manifests/<agent>/reports/**`.
+A manifest root without wrapper-derived report evidence MUST publish `backend_support` as `unsupported`.
+
 The shared row model MUST preserve target-scoped truth even when multiple rows share the same version.
 Publication code MUST NOT collapse multiple target rows into one version-global support claim.
 
@@ -128,6 +137,9 @@ For this spec set:
 - Unified Agent API publication text is authoritative for unified support semantics.
 - passthrough visibility MUST remain explicit when a backend exposes behavior that is not part of unified support.
 
+For phase 1, backend implementation evidence means wrapper-crate-owned evidence materialized into committed coverage reports.
+Manifest metadata by itself MUST NOT be treated as backend support evidence.
+
 The following MUST remain separate from published support truth:
 
 - `validated` and `supported` status fields in version metadata
@@ -160,6 +172,9 @@ This intake contract governs evidence loading only. It MUST NOT change publicati
 - `validated` means a version passed the validation matrix and is promotion-grade for the version pointer flow.
 - `supported` means wrapper coverage satisfies the stronger support policy for the version and target surface.
 
+A version MAY be manifest-supported before it is backend-supported.
+A version MAY be backend-supported before it is promoted into UAA unified support.
+
 The repository MUST NOT treat `validated` as equivalent to `supported`.
 The repository MUST NOT treat workflow status as a published support row.
 The repository MUST NOT use workflow status as a substitute for target-scoped support evidence.
@@ -184,6 +199,7 @@ Before downstream work consumes this contract, reviewers MUST confirm:
 - the four support layers have distinct meanings and no overlap with workflow metadata.
 - target-scoped rows are described as primary and per-version summaries as derived projections.
 - the neutral root-intake contract is limited to committed root evidence and does not introduce agent-name-specific loading semantics.
+- backend support is explicitly crate-first and cannot be claimed from manifest metadata alone.
 - `validated` is not treated as equivalent to `supported`.
 - the support matrix is explicitly separate from the capability matrix.
 - the spec is sufficient for downstream implementation without reopening authority or output-path decisions.

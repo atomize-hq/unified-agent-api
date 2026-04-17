@@ -12,8 +12,8 @@ mod support_matrix;
 mod wrapper_coverage_shared;
 
 use support_matrix::{
-    derive_rows, validate_publication_consistency, BackendSupportState, ManifestSupportState,
-    PointerPromotionState, UaaSupportState,
+    derive_rows, derive_rows_for_test_roots, validate_publication_consistency, BackendSupportState,
+    ManifestSupportState, PointerPromotionState, UaaSupportState,
 };
 
 fn make_temp_dir(prefix: &str) -> PathBuf {
@@ -251,6 +251,32 @@ fn publication_consistency_rejects_uaa_support_drift() {
                 && issue.target == "linux-x64"),
         "expected unified support mismatch, got: {issues:#?}"
     );
+}
+
+#[test]
+fn manifest_support_without_wrapper_reports_stays_backend_unsupported() {
+    let workspace = make_temp_dir("support-matrix-manifest-only");
+    materialize_root(
+        &workspace.join("cli_manifests/opencode"),
+        &["linux-x64"],
+        "1.0.0",
+        &["linux-x64"],
+        &[("1.0.0", &["linux-x64"])],
+        &[],
+        &[],
+        &[],
+    );
+
+    let rows = derive_rows_for_test_roots(&workspace, &[("opencode", "cli_manifests/opencode")])
+        .expect("derive rows");
+    let row = rows
+        .iter()
+        .find(|row| row.agent == "opencode" && row.version == "1.0.0" && row.target == "linux-x64")
+        .expect("expected opencode row");
+
+    assert_eq!(row.manifest_support, ManifestSupportState::Supported);
+    assert_eq!(row.backend_support, BackendSupportState::Unsupported);
+    assert_eq!(row.uaa_support, UaaSupportState::Unsupported);
 }
 
 #[test]
