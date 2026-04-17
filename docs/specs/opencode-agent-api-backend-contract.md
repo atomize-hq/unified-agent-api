@@ -138,14 +138,28 @@ error model.
 
 ## Capability posture
 
-The backend MUST advertise only the capabilities it can deterministically honor for the exposed
-OpenCode backend behavior.
+The backend MUST advertise only the capabilities it can deterministically honor for the canonical
+`opencode run --format json` surface and its wrapper-controlled inputs.
 
-- The backend MUST fail closed on unsupported capability requests and MUST NOT over-advertise
-  support.
-- Capability support MUST remain aligned with the concrete backend behavior and the universal
-  capability registry.
-- This document does not define new universal capability ids.
+In v1, the backend MUST advertise the following universal capability ids when the implementation
+can honor them end-to-end:
+
+- `agent_api.run`
+- `agent_api.events`
+- `agent_api.events.live`
+- `agent_api.config.model.v1`
+- `agent_api.session.resume.v1`
+- `agent_api.session.fork.v1`
+
+The last three ids are grounded in the canonical wrapper controls already accepted by the
+OpenCode v1 surface: `--model`, `--session` / `--continue`, and `--fork`.
+
+The backend MUST NOT advertise `agent_api.exec.add_dirs.v1` in v1 because the canonical wrapper
+contract explicitly marks multi-directory add-on behavior as out of scope and fail-closed.
+
+The backend MUST fail closed on unsupported capability requests and MUST NOT over-advertise
+support. Any universal capability id not listed above remains unclaimed by this contract revision
+until a later seam adds concrete backend evidence for it.
 
 ## Backend-specific extension ownership
 
@@ -153,7 +167,11 @@ The backend MUST keep OpenCode-specific backend extensions under the backend-own
 
 - Any backend-specific extension keys introduced for OpenCode MUST remain under
   `backend.opencode.*`.
+- This contract does not define any concrete `backend.opencode.*` keys in v1; the namespace is
+  reserved for later backend-owned extension work only if a later seam explicitly justifies it.
 - The backend MUST treat unsupported backend-specific extension keys as fail-closed inputs.
+- If a request includes a key under `backend.opencode.*` that this backend does not recognize, the
+  backend MUST fail closed with `AgentWrapperError::UnsupportedCapability` before spawn.
 - The backend MUST NOT promote backend-specific extension semantics into universal extension keys
   unless a later seam explicitly justifies that change in the canonical specs.
 - This document does not invent concrete backend-specific keys; it only establishes the ownership
@@ -166,6 +184,7 @@ This contract intentionally does not:
 - change the canonical OpenCode wrapper transport surface
 - define helper-surface behavior outside the canonical wrapper contract
 - widen universal capability ids or extension semantics
+- claim support for any backend-specific extension key not explicitly defined here
 - publish backend promotion decisions
 - define evidence-policy details beyond the evidence posture already owned by the OpenCode
   evidence contract
@@ -184,3 +203,5 @@ Before this contract is treated as settled, the repo SHOULD confirm:
 - accepted runtime failures translate to safe `AgentWrapperError::Backend` messages and terminal
   `Error` events when a stream is open
 - public payloads stay bounded and redacted
+- only the capabilities listed above are claimed for v1 backend advertisement
+- backend-specific extension ownership remains under `backend.opencode.*`
