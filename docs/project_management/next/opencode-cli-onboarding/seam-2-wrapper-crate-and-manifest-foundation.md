@@ -2,8 +2,8 @@
 seam_id: SEAM-2
 seam_slug: wrapper-crate-and-manifest-foundation
 type: capability
-status: exec-ready
-execution_horizon: active
+status: closed
+execution_horizon: future
 plan_version: v2
 basis:
   currentness: current
@@ -24,12 +24,12 @@ gates:
     contract: passed
     revalidation: passed
   post_exec:
-    landing: pending
-    closeout: pending
+    landing: passed
+    closeout: passed
 seam_exit_gate:
   required: true
   planned_location: S99
-  status: pending
+  status: passed
 open_remediations: []
 ---
 
@@ -109,8 +109,8 @@ open_remediations: []
   - downstream implementation must preserve redaction and completion-finality expectations
   - helper-surface expansion is a blocker, not an opportunistic stretch goal
 - **Downstream decomposition context**:
-  - Why this seam is `active`, `next`, or `future`: it is `active` because `SEAM-1` has now
-    published a trustworthy runtime/evidence handoff and this seam is the current execution target.
+  - Why this seam is `active`, `next`, or `future`: it is `future` because it has landed and now
+    serves as closeout-backed upstream evidence for the backend and promotion seams.
   - Which threads matter most: `THR-01`, `THR-02`
   - What the first seam-local review should focus on: whether the wrapper-owned event/completion
     boundary is explicit, whether manifest inventory/update rules are concrete, and whether the

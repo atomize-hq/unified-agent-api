@@ -3,7 +3,7 @@ seam_id: SEAM-4
 seam_slug: uaa-promotion-and-publication-follow-on
 type: conformance
 status: proposed
-execution_horizon: future
+execution_horizon: next
 plan_version: v1
 basis:
   currentness: provisional
@@ -102,8 +102,9 @@ open_remediations: []
   - no canonical spec edits without a separate approved follow-on execution pack
   - preserve explicit backend-specific publication if universal promotion is premature
 - **Downstream decomposition context**:
-  - Why this seam is `active`, `next`, or `future`: it is `future` because promotion review is only
-    meaningful after the backend seam publishes concrete behavior and capability claims.
+  - Why this seam is `active`, `next`, or `future`: it is `next` because promotion review now
+    queues directly behind the active backend seam, but it still depends on `SEAM-3` publishing
+    concrete behavior and capability claims.
   - Which threads matter most: `THR-03`, `THR-04`
   - What the first seam-local review should focus on: whether backend evidence is concrete, whether
     multi-backend promotion rules are satisfied, and whether the output is an explicit promotion

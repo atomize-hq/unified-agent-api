@@ -2,14 +2,15 @@
 seam_id: SEAM-3
 seam_slug: agent-api-backend-mapping
 type: integration
-status: proposed
-execution_horizon: next
+status: exec-ready
+execution_horizon: active
 plan_version: v2
 basis:
-  currentness: provisional
+  currentness: current
   source_scope_ref: scope_brief.md
   source_scope_version: v1
-  upstream_closeouts: []
+  upstream_closeouts:
+    - governance/seam-2-closeout.md
   required_threads:
     - THR-01
     - THR-02
@@ -20,9 +21,9 @@ basis:
     - new evidence that backend payload bounding or redaction must differ from current assumptions
 gates:
   pre_exec:
-    review: pending
-    contract: pending
-    revalidation: pending
+    review: passed
+    contract: passed
+    revalidation: passed
   post_exec:
     landing: pending
     closeout: pending
@@ -106,15 +107,15 @@ open_remediations: []
   - provider-backed smoke may supplement verification but must not become the only proof path
   - backend support must remain distinct from UAA promotion
 - **Downstream decomposition context**:
-  - Why this seam is `active`, `next`, or `future`: it is `next` because it now queues directly
-    behind the active wrapper/manifest seam, but it should not activate until `SEAM-2` publishes a
-    concrete handoff.
+  - Why this seam is `active`, `next`, or `future`: it is `active` because `SEAM-2` has now
+    published a closeout-backed wrapper/manifest handoff and this seam owns the next executable
+    backend work.
   - Which threads matter most: `THR-02`, `THR-03`
   - What the first seam-local review should focus on: whether the wrapper handoff is concrete
     enough, whether capability/extension advertisement is explicit, and whether test obligations
     cover redaction and completion-finality risk
-  - Boundary slice intent: reserve `S00` if seam-local planning needs a contract-definition slice
-    for backend-specific capability or extension semantics before mapping slices begin
+  - Boundary slice intent: reserve `S00` because seam-local planning needs a contract-definition
+    slice for backend-owned mapping and extension semantics before mapping slices begin
 - **Expected seam-exit concerns**:
   - Contracts likely to publish: `C-05`, `C-06`
   - Threads likely to advance: `THR-03`

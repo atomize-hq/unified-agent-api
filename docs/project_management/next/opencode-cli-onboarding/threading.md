@@ -10,12 +10,12 @@ passed.
 
 ## Execution horizon summary
 
-- Active seam: `SEAM-2`
-- Next seam: `SEAM-3`
-- Future seams: `SEAM-4`
-- Only `SEAM-2` is eligible for authoritative downstream deep planning by default.
-- `SEAM-3` may later receive seam-local review and slices, but any deeper work stays provisional
-  until `SEAM-2` publishes its handoff.
+- Active seam: `SEAM-3`
+- Next seam: `SEAM-4`
+- Future seams: none
+- Only `SEAM-3` is eligible for authoritative downstream deep planning by default.
+- `SEAM-4` may later receive seam-local review and slices, but any deeper work stays provisional
+  until `SEAM-3` publishes its handoff.
 
 ## Contract registry
 
@@ -135,11 +135,14 @@ passed.
   - **Purpose**: hand the backend seam one wrapper-owned event/completion contract plus one
     manifest-root artifact contract, so backend work stays consumer-shaped instead of redefining the
     wrapper.
-  - **State**: `identified`
+  - **State**: `revalidated`
   - **Revalidation trigger**: any change in wrapper event taxonomy, completion semantics, manifest
     artifact inventory, or fixture/fake-binary strategy
-  - **Satisfied by**: future seam-local planning and closeout for `SEAM-2`
-  - **Notes**: downstream backend planning must stop if this thread is not explicitly published.
+  - **Satisfied by**: the `SEAM-2` closeout record plus the published wrapper and manifest
+    contracts under `docs/specs/opencode-*.md`
+  - **Notes**: `SEAM-3` has now revalidated against this thread; downstream backend planning should
+    treat the published wrapper/manifest handoff as current input instead of provisional seam
+    prose.
 
 - **Thread ID**: `THR-03`
   - **Producer seam**: `SEAM-3`
