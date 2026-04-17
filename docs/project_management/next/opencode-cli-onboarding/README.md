@@ -1,32 +1,46 @@
-# OpenCode CLI Onboarding (Pre-Implementation Triads)
+# OpenCode CLI onboarding - seam extraction
 
-Pre-implementation planning pack for onboarding `OpenCode` as the first real third CLI agent in
-this repo.
-
-Status:
-- packet closeout is recorded
-- `opencode run --format json` is the frozen presumptive v1 wrapper surface
-- this directory is now a repo-standard triad scaffold for C0-C3
-
-Source docs:
+Source:
+- `docs/project_management/next/opencode-cli-onboarding/plan.md`
 - `docs/project_management/next/cli-agent-onboarding-charter.md`
 - `docs/project_management/next/cli-agent-onboarding-third-agent-packet.md`
-- `docs/specs/unified-agent-api/capabilities-schema-spec.md`
-- `docs/specs/unified-agent-api/extensions-spec.md`
 
-Start here:
-- `docs/project_management/next/opencode-cli-onboarding/plan.md`
-- `docs/project_management/next/opencode-cli-onboarding/tasks.json`
-- `docs/project_management/next/opencode-cli-onboarding/session_log.md`
+This pack captures seam briefs, authoritative threading, pack-level review surfaces, seam-exit
+intent, and governance scaffolds for onboarding `OpenCode` as the first real third CLI agent in
+this repo. It intentionally stays one level above seam-local decomposition.
 
-Execution order:
-- C0: packet-closeout confirmation + fixture strategy
-- C1: `crates/opencode/` + `cli_manifests/opencode/` planning
-- C2: `crates/agent_api/` planning bounded by the wrapper contract
-- C3: UAA promotion review after wrapper/backend scope is concrete
+- Start here: `scope_brief.md`
+- Seam overview: `seam_map.md`
+- Threading: `threading.md`
+- Pack review surfaces: `review_surfaces.md`
+- Governance: `governance/remediation-log.md`
 
-Pack boundaries:
-- This pack is docs/planning only.
-- Until a downstream execution pack is created, edits stay inside
-  `docs/project_management/next/opencode-cli-onboarding/`.
-- The charter and `docs/specs/**` remain authoritative for contract semantics.
+Execution horizon:
+
+- Active seam: `SEAM-1`
+- Next seam: `SEAM-2`
+- Future seams: `SEAM-3`, `SEAM-4`
+
+Policy:
+
+- only the active seam is eligible for authoritative downstream sub-slices by default
+- the next seam may later receive seam-local review + slices, and only provisional deeper planning
+- active and next seams must eventually terminate in a dedicated final `S99` seam-exit gate slice
+  once seam-local planning begins
+- seams that still need a contract-definition boundary may reserve `S00` during seam-local planning
+- future seams remain seam briefs only
+- pack-level `review_surfaces.md` is orientation only; active and next seams still need seam-local
+  `review.md` later
+- this repo's normative contract surfaces live under `docs/specs/**`; when downstream work creates
+  new OpenCode-specific canonical contracts, they should also live under `docs/specs/**`
+
+Assumptions captured for extraction:
+
+- the source packet's maintainer-backed smoke evidence is strong enough to treat
+  `opencode run --format json` as the current candidate v1 wrapper seam
+- the critical path remains crate-first: runtime/evidence lock first, wrapper + manifest planning
+  second, backend mapping third, UAA promotion review last
+- `serve`, `acp`, `run --attach`, and direct interactive TUI surfaces remain deferred until an
+  upstream seam explicitly reopens them
+- legacy triad artifacts in this directory are retained as source provenance, but the seam-pack
+  files in this README are now the canonical planning surface for downstream work
