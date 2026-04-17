@@ -26,8 +26,10 @@ Before downstream seams may treat the OpenCode v1 basis as current, the evidence
 all of these explicit:
 
 - at least one supported install path
-- provider or account prerequisites needed to run a real authenticated prompt
-- how the maintainer confirms the canonical runtime surface exists
+- provider or account prerequisites needed to run a real authenticated prompt on the canonical
+  surface
+- how the maintainer confirms the canonical runtime surface exists and can route at least one
+  model-backed prompt successfully
 - which later evidence must be committed so wrapper and backend support do not depend on a live
   provider account
 
@@ -55,6 +57,9 @@ all of the following on `opencode run --format json`:
 - session fork on the canonical surface
 - explicit working-directory control on the canonical surface
 
+This live smoke is planning-grade only. It proves the canonical run path is credible now, but it
+does not by itself prove wrapper support is reproducible without a live provider account.
+
 Helper-surface probes for `serve` or `acp` MAY be recorded only to support their deferred
 classification. They MUST NOT redefine the canonical wrapper boundary.
 
@@ -67,8 +72,15 @@ Before later seams publish support, the repo MUST also carry deterministic evide
 depend on an active provider-backed account. That later evidence MUST include:
 
 - committed transcript or protocol evidence for `run --format json`
-- a replay or fake-binary strategy for deterministic tests
+- a replay or fake-binary strategy for deterministic tests that can exercise the canonical surface
+  without a live provider account
 - committed wrapper-coverage evidence for the help and flag surface
+
+These evidence classes are separate and complementary:
+
+- wrapper coverage proves the CLI surface shape
+- transcript or protocol evidence proves the canonical runtime exchange
+- replay or fake-binary evidence proves the support claim can be tested deterministically later
 
 Later seams MAY choose the exact artifact layout, but they MUST preserve this distinction:
 
@@ -82,6 +94,8 @@ Later seams MAY choose the exact artifact layout, but they MUST preserve this di
 - A provider or auth failure invalidates the current basis only when it shows that the canonical
   `run --format json` path is no longer a credible way to obtain the required planning-grade smoke.
 - Failures on helper surfaces do not, by themselves, widen v1 scope.
+- A missing helper-surface success path does not imply a wrapper defect if the canonical run path
+  still satisfies the planning-grade smoke checklist.
 
 ## Reopen triggers
 
@@ -93,6 +107,7 @@ This contract MUST be reopened if any of the following become true:
 - later support work tries to rely on live smoke alone instead of committed replay evidence
 - helper surfaces become necessary to satisfy the planning-grade smoke checklist
 - new evidence shows that the deferred-surface policy or deterministic replay posture is ambiguous
+- the separation between planning-grade smoke and publication-grade replay is no longer clear
 
 ## Downstream obligations
 
