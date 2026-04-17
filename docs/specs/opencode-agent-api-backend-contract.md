@@ -45,19 +45,61 @@ mapping work.
 - The backend MUST fail closed if a requested input cannot be represented within the accepted
   backend mapping for the canonical wrapper path.
 
+## Request mapping
+
+The backend MUST map the wrapper-owned request into the backend envelope without introducing new
+request semantics.
+
+- The backend MUST treat `AgentWrapperRunRequest.prompt` as the required user prompt input for the
+  canonical OpenCode run path.
+- The backend MUST treat `AgentWrapperRunRequest.working_dir`, `timeout`, and `env` as backend-owned
+  request context inputs only to the extent they are already accepted by the wrapper contract and
+  can be represented without widening the public surface.
+- The backend MUST consume wrapper-owned extension inputs only after the universal request
+  validation path and backend-owned normalization have accepted them.
+- The backend MUST NOT reinterpret a rejected or absent wrapper-owned input as a different backend
+  capability.
+- If an accepted request input has no deterministic representation in the backend mapping for the
+  canonical wrapper path, the backend MUST fail closed rather than synthesizing alternate wrapper
+  behavior.
+
 ## Event and completion boundary
 
 The backend MUST preserve the wrapper-owned event and completion semantics while exposing only the
 bounded Unified Agent API surface.
 
-- The backend MUST emit only backend-owned event kinds and completion state that fit the universal
-  event/completion envelope rules.
+- The backend MUST map wrapper-owned structured output into stable `AgentWrapperEventKind` values
+  rather than exposing wrapper-private event types directly.
+- The backend MUST map assistant text output and streamed textual deltas to `TextOutput` events.
+- The backend MUST map tool lifecycle notifications to `ToolCall` and `ToolResult` events only when
+  the mapped payload is metadata-only and bounded.
+- The backend MUST map wrapper-owned run lifecycle transitions and safe terminal notices to
+  `Status` events.
+- The backend MUST map unsupported or unclassifiable backend notifications to `Unknown` or a safe
+  bounded status/error form, never to raw payload passthrough.
 - The backend MUST preserve completion finality from the wrapper contract.
+- The backend MUST keep `AgentWrapperCompletion.final_text` optional and deterministic; it MAY be
+  populated only when the backend can derive a final assistant text response safely from the
+  supported flow.
 - The backend MUST NOT expose raw backend stdout, stderr, or provider-specific diagnostics as a
   public event or completion payload.
-- The backend MAY retain raw backend output internally for debugging, replay, or evidence purposes
-  only if that retention stays outside the public Unified Agent API surface and remains consistent
-  with the wrapper and evidence contracts.
+- The backend MAY retain raw backend output internally for debugging or evidence purposes only if
+  that retention stays outside the public Unified Agent API surface and remains consistent with
+  the wrapper and evidence contracts.
+
+## Completion mapping
+
+The backend MUST map completion results as a bounded, redacted summary of the supported wrapper run.
+
+- The backend MUST surface the underlying run status in `AgentWrapperCompletion.status`.
+- The backend MUST populate `AgentWrapperCompletion.final_text` only when the supported wrapper flow
+  deterministically yields a final assistant message text that can be extracted without parsing raw
+  backend lines into public API surface.
+- The backend MUST leave `AgentWrapperCompletion.final_text` as `None` when no such deterministic
+  text is available.
+- The backend MUST keep `AgentWrapperCompletion.data` bounded, redacted, and metadata-only.
+- The backend MUST NOT copy raw stdout, stderr, provider diagnostics, or unbounded transcript
+  content into completion data.
 
 ## Bounded payload and redaction baseline
 
@@ -69,8 +111,30 @@ The backend MUST keep public payloads bounded and redacted.
   before anything reaches the public backend surface.
 - The backend MUST treat redaction as a backend-owned responsibility for its own mapping layer; it
   MUST NOT rely on downstream consumers to scrub backend-private content.
+- Event `data` and completion `data` MAY carry only bounded metadata needed to describe the mapped
+  backend state; they MUST NOT carry raw transcript lines, raw provider diagnostics, or other
+  wrapper-private content.
 - If a backend condition cannot be represented safely, the backend MUST fail closed rather than
   widening the public payload shape.
+
+## Accepted runtime failure translation
+
+When the backend has accepted a request input and later discovers at runtime that the canonical
+wrapper path cannot honor it, the backend MUST translate that failure into the universal backend
+error model.
+
+- The backend MUST surface the failure as `AgentWrapperError::Backend { message }`.
+- The backend MUST use a safe, redacted `message` that does not embed raw backend stdout, stderr, or
+  provider-specific diagnostics.
+- If the backend has already returned an `AgentWrapperRunHandle` and the consumer-visible events
+  stream is still open, the backend MUST emit exactly one terminal `AgentWrapperEventKind::Error`
+  event carrying the same safe, redacted `message`.
+- The backend MUST close the stream after emitting that terminal error event.
+- The backend MUST apply this translation only to accepted inputs that later become impossible to
+  honor at runtime; malformed or unsupported inputs remain governed by the earlier fail-closed
+  request validation path.
+- Runtime rejection on the canonical wrapper path MUST NOT be converted into a new wrapper behavior
+  or a widened public event shape.
 
 ## Capability posture
 
@@ -103,9 +167,10 @@ This contract intentionally does not:
 - define helper-surface behavior outside the canonical wrapper contract
 - widen universal capability ids or extension semantics
 - publish backend promotion decisions
-- define fixture, replay, or fake-binary policy beyond the evidence posture already owned by the
-  OpenCode evidence contract
+- define evidence-policy details beyond the evidence posture already owned by the OpenCode
+  evidence contract
 - move wrapper-private parsing, normalization, or redaction duties out of the wrapper seam
+- introduce any planning identifiers or seam-local process markers into canonical spec text
 
 ## Baseline verification checklist
 
@@ -114,8 +179,8 @@ Before this contract is treated as settled, the repo SHOULD confirm:
 - the contract stays aligned with the canonical wrapper run contract and the OpenCode manifest
   contract
 - request mapping is described only at the backend boundary and does not reopen wrapper semantics
-- event and completion handling stays bounded and redacted
-- backend-specific extension ownership remains under `backend.opencode.*`
-- unsupported capability or extension requests fail closed
-- the contract is concrete enough for later backend mapping and capability review work without
-  depending on planning prose
+- event mapping covers stable kinds, bounded metadata, and no raw backend payload passthrough
+- completion mapping preserves finality while keeping `final_text` optional and deterministic
+- accepted runtime failures translate to safe `AgentWrapperError::Backend` messages and terminal
+  `Error` events when a stream is open
+- public payloads stay bounded and redacted
