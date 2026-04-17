@@ -85,3 +85,13 @@ This contract MUST be reopened if any of the following become true:
   for what the OpenCode wrapper is allowed to implement.
 - Later work MAY add bounded detail that stays inside this surface, but it MUST NOT expand the
   surface without reopening this contract.
+
+## Baseline verification checklist
+
+Before a downstream seam treats this contract as settled, the repo SHOULD confirm:
+
+- the only canonical v1 transport is `opencode run --format json`
+- the accepted controls stay on that same surface
+- `serve`, `acp`, `run --attach`, and interactive TUI remain deferred
+- helper-surface probes are evidence only, not canonical transport
+- raw stdout or stderr scraping is not treated as the wrapper boundary

@@ -31,6 +31,17 @@ all of these explicit:
 - which later evidence must be committed so wrapper and backend support do not depend on a live
   provider account
 
+The packet-level evaluation recipe remains admissible as baseline evidence for this seam, but only
+if it is grounded in the canonical `opencode run --format json` path and the provider/auth/model
+setup needed to exercise that path.
+
+At baseline, the repo SHOULD be able to name:
+
+- the install command or install path used to obtain OpenCode
+- the provider or account login step required before a real prompt can run
+- the model-routing step used to confirm the chosen provider can execute the canonical surface
+- the exact prompt path used for the maintainer smoke
+
 ## Planning-grade maintainer smoke
 
 The initial seam lock MAY rely on authenticated maintainer smoke, but that smoke MUST demonstrate
@@ -89,3 +100,14 @@ This contract MUST be reopened if any of the following become true:
   OpenCode basis is still current.
 - If any reopen trigger fires, downstream work MUST stop and reopen the runtime and evidence
   contract rather than normalizing the drift locally.
+
+## Baseline verification checklist
+
+Before this contract is treated as current input, the repo SHOULD confirm:
+
+- one supported install path is named
+- provider or account prerequisites are named
+- the maintainer smoke path runs on `opencode run --format json`
+- model routing is exercised on the canonical surface
+- the live-smoke boundary is distinct from later committed replay evidence
+- helper-surface probes, if recorded, are only evidence for deferred classification
