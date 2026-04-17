@@ -28,19 +28,20 @@ OpenCode wrapper surface.
 - The OpenCode v1 wrapper surface MUST be `opencode run --format json`.
 - The v1 wrapper MUST treat that command as the only canonical prompt-driven runtime transport.
 - The canonical transport MUST be headless and machine-parseable from the run itself; the wrapper
-  MUST NOT require `serve`, `acp`, `run --attach`, or interactive TUI behavior to obtain
-  structured events.
+  MUST NOT require `serve`, `acp`, `run --attach`, direct interactive TUI behavior, or any other
+  helper/session-management surface to obtain structured events or completion.
 - Plain formatted stdout or stderr scraping MUST NOT be treated as the canonical wrapper transport.
 
 ## Accepted v1 controls
 
-On the canonical `run --format json` surface, the v1 wrapper boundary MAY rely on:
+On the canonical `run --format json` surface, the v1 wrapper boundary MAY rely on only the
+following controls:
 
 - prompt input
-- explicit model selection
-- session reuse or continuation
-- session fork
-- explicit working-directory selection
+- explicit model selection via `--model`
+- session reuse or continuation via `--session` and `--continue`
+- session fork via `--fork`
+- explicit working-directory selection via `--dir`
 
 These controls MUST remain on the same canonical surface. A design that requires shifting one of
 them onto a helper surface reopens this contract.
@@ -55,6 +56,8 @@ The following surfaces are explicitly outside the v1 wrapper boundary:
 - direct interactive TUI usage
 - share, web, import/export, or other session-management flows not required for the canonical
   prompt-driven run path
+- any other helper surface that is needed only to recover structured events, completion, or run
+  controls already covered by the canonical `run --format json` transport
 
 These surfaces MAY be documented or probed as evidence, but they MUST remain helper or
 backend-specific until a later seam explicitly reopens the boundary.
