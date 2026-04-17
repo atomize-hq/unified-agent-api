@@ -57,6 +57,11 @@ flowchart TB
   mapping contract.
 - The capability matrix remains a generated evidence artifact; it does not override backend
   contract evidence or authorize runtime promotion decisions.
+- The S2 recommendation ladder is explicit: backend-specific only when the evidence is still
+  backend-bounded or unstable, candidate UAA promotion only when existing universal rules already
+  fit without spec or matrix edits, explicit no-promotion when cross-backend evidence is missing or
+  universal promotion is premature, and follow-on-pack required when canonical spec or matrix work
+  is the only remaining blocker.
 - No blocking remediation is required before `SEAM-4` executes promotion-review planning work.
 
 ## Pre-exec gate disposition
@@ -71,6 +76,7 @@ flowchart TB
 - **Publication-state rule**: backend support and universal promotion remain separate states; when
   cross-backend evidence is missing, the review must resolve to explicit no-promotion rather than
   implied approval.
+- **Matrix rule**: the capability matrix is supporting evidence only, not runtime truth.
 
 ## Planned seam-exit gate focus
 

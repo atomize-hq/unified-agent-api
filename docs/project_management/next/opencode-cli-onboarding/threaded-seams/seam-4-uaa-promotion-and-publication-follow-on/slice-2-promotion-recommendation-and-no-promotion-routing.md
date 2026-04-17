@@ -53,6 +53,16 @@ open_remediations: []
 - **Rollout/safety**:
   - route canonical spec or matrix edits to a separate approved follow-on pack
   - fail closed on promotion ambiguity
+- **Decision ladder**:
+  1. Keep the behavior backend-specific only when the OpenCode evidence is still backend-bounded or
+     unstable and does not justify universal promotion.
+  2. Recommend candidate universal promotion only when the existing backend behavior already
+     satisfies the relevant universal rules without requiring canonical spec or capability-matrix
+     edits.
+  3. Return explicit no-promotion when cross-backend evidence is missing, the case is ambiguous, or
+     universal promotion is still premature.
+  4. Return follow-on-pack required when the only way to justify promotion is to change canonical
+     spec or capability-matrix behavior outside this seam.
 - **Review surface refs**:
   - `review.md#falsification-questions`
 
@@ -67,6 +77,7 @@ open_remediations: []
 - **Implementation notes**:
   - keep no-promotion a first-class outcome rather than an implicit fallback
   - require a separate follow-on pack when the answer depends on canonical spec or matrix edits
+  - treat the capability matrix as supporting evidence only, never as runtime truth
 - **Acceptance criteria**:
   - later closeout can publish one explicit recommendation without ambiguity
   - pack closeout can tell whether new work is needed or not
