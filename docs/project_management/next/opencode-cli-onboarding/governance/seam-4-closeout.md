@@ -14,11 +14,13 @@ basis:
     - THR-03
     - THR-04
   stale_triggers:
-    - backend behavior or multi-backend promotion evidence changes before closeout is recorded
+    - backend mapping or capability advertisement drift after landing
+    - capability-matrix or universal extension-registry rule changes after landing
+    - new multi-backend evidence that changes promotion eligibility after landing
 gates:
   post_exec:
-    landing: pending
-    closeout: pending
+    landing: passed
+    closeout: passed
 open_remediations: []
 ---
 
