@@ -2,8 +2,8 @@
 seam_id: SEAM-3
 seam_slug: agent-api-backend-mapping
 type: integration
-status: exec-ready
-execution_horizon: active
+status: closed
+execution_horizon: future
 plan_version: v2
 basis:
   currentness: current
@@ -25,12 +25,12 @@ gates:
     contract: passed
     revalidation: passed
   post_exec:
-    landing: pending
-    closeout: pending
+    landing: passed
+    closeout: passed
 seam_exit_gate:
   required: true
   planned_location: S99
-  status: pending
+  status: passed
 open_remediations: []
 ---
 
@@ -80,7 +80,7 @@ open_remediations: []
     - future capability-matrix and backend regression work
 - **Touch surface**:
   - `crates/agent_api/**`
-  - future `docs/specs/opencode-agent-api-backend-contract.md`
+  - `docs/specs/opencode-agent-api-backend-contract.md`
   - `docs/specs/unified-agent-api/capabilities-schema-spec.md`
   - `docs/specs/unified-agent-api/extensions-spec.md`
   - `docs/project_management/next/opencode-cli-onboarding/`
@@ -107,9 +107,10 @@ open_remediations: []
   - provider-backed smoke may supplement verification but must not become the only proof path
   - backend support must remain distinct from UAA promotion
 - **Downstream decomposition context**:
-  - Why this seam is `active`, `next`, or `future`: it is `active` because `SEAM-2` has now
-    published a closeout-backed wrapper/manifest handoff and this seam owns the next executable
-    backend work.
+  - Why this seam is `active`, `next`, or `future`: it was `active` because `SEAM-2` published a
+    closeout-backed wrapper/manifest handoff and this seam owned the next executable backend work;
+    it is now `future` because the backend mapping work has landed and the seam exit record is
+    closed.
   - Which threads matter most: `THR-02`, `THR-03`
   - What the first seam-local review should focus on: whether the wrapper handoff is concrete
     enough, whether capability/extension advertisement is explicit, and whether test obligations
