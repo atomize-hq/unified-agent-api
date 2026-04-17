@@ -2,7 +2,7 @@
 seam_id: SEAM-1
 seam_slug: runtime-surface-and-evidence-lock
 type: integration
-status: proposed
+status: exec-ready
 execution_horizon: active
 plan_version: v1
 basis:
@@ -18,9 +18,9 @@ basis:
     - provider-auth posture changes that invalidate the current maintainer smoke assumptions
 gates:
   pre_exec:
-    review: pending
-    contract: pending
-    revalidation: pending
+    review: passed
+    contract: passed
+    revalidation: passed
   post_exec:
     landing: pending
     closeout: pending
@@ -28,9 +28,7 @@ seam_exit_gate:
   required: true
   planned_location: S99
   status: pending
-open_remediations:
-  - REM-001
-  - REM-002
+open_remediations: []
 ---
 
 # SEAM-1 - Runtime surface and evidence lock
@@ -57,7 +55,9 @@ open_remediations:
     - `docs/project_management/next/opencode-cli-onboarding/plan.md`
     - maintainer-backed smoke observations captured in the source packet
   - Outputs:
-    - downstream-ready runtime/evidence contract text
+    - `docs/specs/opencode-wrapper-run-contract.md`
+    - `docs/specs/opencode-onboarding-evidence-contract.md`
+    - `threaded-seams/seam-1-runtime-surface-and-evidence-lock/`
     - explicit deferred-surface list and reopen criteria
     - `THR-01` handoff for the wrapper and backend seams
 - **Key invariants / rules**:
@@ -78,16 +78,16 @@ open_remediations:
   - `docs/project_management/next/opencode-cli-onboarding/`
   - `docs/project_management/next/cli-agent-onboarding-charter.md`
   - `docs/project_management/next/cli-agent-onboarding-third-agent-packet.md`
-  - future `docs/specs/opencode-wrapper-run-contract.md`
-  - future `docs/specs/opencode-onboarding-evidence-contract.md`
+  - `docs/specs/opencode-wrapper-run-contract.md`
+  - `docs/specs/opencode-onboarding-evidence-contract.md`
 - **Verification**:
-  - seam-local review should prove the runtime surface, deferred-surface policy, and evidence
-    posture are concrete enough to drive wrapper planning without ambiguity
-  - verification should confirm the contract names all known prerequisite classes: install, auth,
-    provider selection, smoke evidence, and reopen triggers
-  - because this seam **produces** an owned contract, verification is about making that contract
-    concrete enough for downstream planning and implementation rather than requiring the final
-    accepted artifact to exist already
+  - seam-local review and contract baselines should prove the runtime surface, deferred-surface
+    policy, and evidence posture are concrete enough to drive wrapper planning without ambiguity
+  - verification should confirm the baselines name all known prerequisite classes: install, auth,
+    provider selection, smoke evidence, deterministic replay expectations, and reopen triggers
+  - because this seam **produces** owned contracts, verification is about making those contracts
+    concrete enough for downstream planning and implementation rather than requiring post-exec
+    landing evidence already to exist
 - **Canonical contract refs**:
   - `docs/specs/opencode-wrapper-run-contract.md`
   - `docs/specs/opencode-onboarding-evidence-contract.md`

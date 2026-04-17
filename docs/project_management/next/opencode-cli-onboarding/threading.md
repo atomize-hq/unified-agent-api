@@ -3,10 +3,10 @@
 This document makes the OpenCode onboarding control plane explicit: contracts, dependency edges,
 workstreams, and revalidation triggers.
 
-Ownership note: this repo's normative contract surfaces live under `docs/specs/**`. When this pack
-references OpenCode-specific canonical contract refs that do not exist yet, downstream seam-local
-planning must create or update the relevant `docs/specs/**` artifact before claiming the contract
-is passed.
+Ownership note: this repo's normative contract surfaces live under `docs/specs/**`. `SEAM-1` now
+owns the initial OpenCode-specific canonical refs there, and downstream seam-local planning must
+create or update the later seam-owned `docs/specs/**` artifacts before claiming those contracts are
+passed.
 
 ## Execution horizon summary
 
