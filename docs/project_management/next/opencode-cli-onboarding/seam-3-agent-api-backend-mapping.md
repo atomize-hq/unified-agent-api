@@ -52,7 +52,10 @@ open_remediations: []
   - Inputs:
     - `THR-01`
     - `THR-02`
-    - `docs/project_management/next/opencode-cli-onboarding/C2-spec.md`
+    - `C-01`
+    - `C-02`
+    - `docs/specs/opencode-wrapper-run-contract.md`
+    - `docs/specs/opencode-onboarding-evidence-contract.md`
     - `docs/specs/unified-agent-api/capabilities-schema-spec.md`
     - `docs/specs/unified-agent-api/extensions-spec.md`
   - Outputs:

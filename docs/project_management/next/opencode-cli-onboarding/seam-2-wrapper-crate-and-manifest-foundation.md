@@ -51,7 +51,10 @@ open_remediations: []
 - **Primary interfaces**
   - Inputs:
     - `THR-01`
-    - `docs/project_management/next/opencode-cli-onboarding/C1-spec.md`
+    - `C-01`
+    - `C-02`
+    - `docs/specs/opencode-wrapper-run-contract.md`
+    - `docs/specs/opencode-onboarding-evidence-contract.md`
     - existing repo patterns under `crates/codex/`, `crates/claude_code/`, and `cli_manifests/**`
   - Outputs:
     - wrapper-owned event/completion/redaction contract
@@ -77,7 +80,7 @@ open_remediations: []
 - **Touch surface**:
   - `crates/opencode/**`
   - `cli_manifests/opencode/**`
-  - future `docs/specs/opencode-wrapper-run-contract.md`
+  - `docs/specs/opencode-wrapper-run-contract.md`
   - future `docs/specs/opencode-cli-manifest-contract.md`
   - `docs/project_management/next/opencode-cli-onboarding/`
 - **Verification**:
