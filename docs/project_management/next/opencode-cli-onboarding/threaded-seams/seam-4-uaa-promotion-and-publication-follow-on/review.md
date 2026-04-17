@@ -62,6 +62,9 @@ flowchart TB
   fit without spec or matrix edits, explicit no-promotion when cross-backend evidence is missing or
   universal promotion is premature, and follow-on-pack required when canonical spec or matrix work
   is the only remaining blocker.
+- The current universal capability and extension specs already cover the promotion posture for
+  S3, so this seam does not introduce new `agent_api.*` ids or canonical capability-matrix edits;
+  the matrix remains supporting evidence only.
 - No blocking remediation is required before `SEAM-4` executes promotion-review planning work.
 
 ## Pre-exec gate disposition
