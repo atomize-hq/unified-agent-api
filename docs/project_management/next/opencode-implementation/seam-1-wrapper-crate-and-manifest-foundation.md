@@ -2,9 +2,9 @@
 seam_id: SEAM-1
 seam_slug: wrapper-crate-and-manifest-foundation
 type: capability
-status: proposed
+status: exec-ready
 execution_horizon: active
-plan_version: v1
+plan_version: v2
 basis:
   currentness: current
   source_scope_ref: scope_brief.md
@@ -23,9 +23,9 @@ basis:
     - manifest inventory, pointer rules, or deterministic replay posture drift from the closed onboarding basis
 gates:
   pre_exec:
-    review: pending
-    contract: pending
-    revalidation: pending
+    review: passed
+    contract: passed
+    revalidation: passed
   post_exec:
     landing: pending
     closeout: pending

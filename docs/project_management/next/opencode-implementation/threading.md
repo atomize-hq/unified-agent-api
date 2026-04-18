@@ -24,13 +24,14 @@ OpenCode.
   - **Purpose**: carry forward the closeout-backed recommendation that OpenCode landing should
     proceed as backend-support work and must not spin up active UAA promotion planning under the
     current evidence basis.
-  - **State**: `published`
+  - **State**: `revalidated`
   - **Revalidation trigger**: new multi-backend evidence, spec-registry changes, or additional
     OpenCode behavior that materially changes the promotion case
   - **Satisfied by**: `docs/project_management/next/opencode-cli-onboarding/threading.md` and
     `docs/project_management/next/opencode-cli-onboarding/governance/seam-4-closeout.md`
-  - **Notes**: this pack consumes the thread directly and does not replace it with a new bridge
-    artifact
+  - **Notes**: `SEAM-1` has now revalidated against this thread and should treat the published
+    onboarding recommendation as current input until `THR-05` is published; this pack still
+    consumes the thread directly and does not replace it with a new bridge artifact
 
 ## Contract registry
 
