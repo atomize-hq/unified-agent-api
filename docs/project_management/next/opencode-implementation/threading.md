@@ -100,10 +100,25 @@ OpenCode.
     work and publication follow-through consume landed root truth instead of inferring it from
     planning prose.
   - **State**: `defined`
-  - **Revalidation trigger**: any change to the canonical OpenCode run surface, accepted controls,
-    manifest-root inventory, pointer/update rules, or deterministic validation posture
-  - **Satisfied by**: `SEAM-1` closeout plus the landed wrapper and manifest artifacts
-  - **Notes**: `SEAM-2` must not start authoritative deep planning until this thread is published
+  - **Revalidation trigger**:
+    - any change to the canonical OpenCode run surface or accepted controls
+    - any change to wrapper-owned parser, event typing, completion-finality, or redaction behavior
+    - any change to manifest-root inventory, pointer/update rules, wrapper-coverage posture, or
+      root-validator semantics
+    - any change that weakens deterministic fake-binary, fixture, transcript, offline-parser, or
+      root-validation proof as the default done-ness path
+  - **Satisfied by**:
+    - `SEAM-1` closeout plus the landed wrapper and manifest artifacts
+    - deterministic wrapper proof under `crates/opencode/tests/**` and
+      `crates/opencode/src/bin/fake_opencode_run_json.rs`
+    - committed manifest-root evidence under `cli_manifests/opencode/**`
+    - mechanical root validation via `cargo run -p xtask -- codex-validate --root cli_manifests/opencode`
+  - **Notes**:
+    - `SEAM-2` must not start authoritative deep planning until this thread is published
+    - `SEAM-2` consumes wrapper-owned runtime truth from landed `crates/opencode/**` code and its
+      deterministic proof surfaces, not from live provider-backed smoke or planning prose
+    - `SEAM-3` consumes manifest-root truth from landed `cli_manifests/opencode/**` evidence and
+      the root validator posture, not from backend-planning assumptions or packet-era notes
 
 - **Thread ID**: `THR-06`
   - **Producer seam**: `SEAM-2`
