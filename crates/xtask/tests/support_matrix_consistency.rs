@@ -1,17 +1,9 @@
-#![allow(dead_code)]
-
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde_json::{json, Value};
-
-#[path = "../src/support_matrix.rs"]
-mod support_matrix;
-#[path = "../src/wrapper_coverage_shared.rs"]
-mod wrapper_coverage_shared;
-
-use support_matrix::{
+use xtask::support_matrix::{
     derive_rows, derive_rows_for_test_roots, validate_publication_consistency, BackendSupportState,
     ManifestSupportState, PointerPromotionState, UaaSupportState,
 };
@@ -470,7 +462,7 @@ fn publication_consistency_rejects_unexpected_row() {
         .find(|row| row.agent == "codex" && row.version == "1.0.0" && row.target == "linux-x64")
         .expect("expected codex row")
         .clone();
-    rows.push(support_matrix::SupportRow {
+    rows.push(xtask::support_matrix::SupportRow {
         target: "darwin-arm64".to_string(),
         ..unexpected
     });

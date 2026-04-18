@@ -30,7 +30,7 @@ impl SupportRowIdentity {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct SupportMatrixConsistencyIssue {
+pub struct SupportMatrixConsistencyIssue {
     pub code: &'static str,
     pub agent: String,
     pub version: String,
@@ -174,7 +174,7 @@ struct RootConsistencyContext {
     version_statuses: BTreeMap<String, Option<String>>,
 }
 
-pub(crate) fn validate_publication_consistency(
+pub fn validate_publication_consistency(
     workspace_root: &Path,
     rows: &[SupportRow],
 ) -> Result<(), Vec<SupportMatrixConsistencyIssue>> {
@@ -335,7 +335,7 @@ pub(crate) fn validate_publication_consistency(
     }
 }
 
-pub(crate) fn format_publication_issues(issues: &[SupportMatrixConsistencyIssue]) -> String {
+pub fn format_publication_issues(issues: &[SupportMatrixConsistencyIssue]) -> String {
     let mut out = String::from("support-matrix publication contradictions detected");
     for issue in issues {
         out.push_str(&format!(

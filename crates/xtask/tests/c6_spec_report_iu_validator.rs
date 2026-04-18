@@ -4,13 +4,7 @@ use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde_json::{json, Value};
-
-#[path = "../src/support_matrix.rs"]
-mod support_matrix;
-#[path = "../src/wrapper_coverage_shared.rs"]
-mod wrapper_coverage_shared;
-
-use support_matrix::derive_rows_for_test_roots;
+use xtask::support_matrix::derive_rows_for_test_roots;
 
 const VERSION: &str = "0.61.0";
 const TS: &str = "1970-01-01T00:00:00Z";

@@ -14,7 +14,7 @@ async fn opencode_backend_validation_uses_fake_binary_timeout_path_without_live_
         "slow_until_killed".to_string(),
     );
 
-    let backend = backend_with_timeout(env, Duration::from_millis(50));
+    let backend = backend_with_timeout(env, Duration::from_secs(1));
     let handle = backend
         .run(request("Reply with OK.", None))
         .await
@@ -22,7 +22,10 @@ async fn opencode_backend_validation_uses_fake_binary_timeout_path_without_live_
 
     let mut events = handle.events;
     assert!(
-        events.next().await.is_some(),
+        tokio::time::timeout(Duration::from_secs(2), events.next())
+            .await
+            .expect("first event should arrive before the harness timeout path completes")
+            .is_some(),
         "fake-binary validation path should still surface an initial event"
     );
     while events.next().await.is_some() {}

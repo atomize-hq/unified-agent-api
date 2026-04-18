@@ -13,9 +13,10 @@ mod codex_validate;
 mod codex_version_metadata;
 mod codex_wrapper_coverage;
 mod parity_triad_scaffold;
-mod support_matrix;
 mod version_bump;
 mod wrapper_coverage_shared;
+
+pub use xtask::support_matrix;
 
 use clap::{Parser, Subcommand};
 

@@ -52,7 +52,10 @@ pub(crate) fn collect_builtin_backend_capabilities(
     backends.insert(claude.kind().as_str().to_string(), claude.capabilities());
 
     let opencode = OpencodeBackend::new(OpencodeBackendConfig::default());
-    backends.insert(opencode.kind().as_str().to_string(), opencode.capabilities());
+    backends.insert(
+        opencode.kind().as_str().to_string(),
+        opencode.capabilities(),
+    );
 
     apply_canonical_builtin_target_profile(&mut backends)?;
 

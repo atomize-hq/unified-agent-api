@@ -1,17 +1,9 @@
-#![allow(dead_code)]
-
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde_json::{json, Value};
-
-#[path = "../src/support_matrix.rs"]
-mod support_matrix;
-#[path = "../src/wrapper_coverage_shared.rs"]
-mod wrapper_coverage_shared;
-
-use support_matrix::{
+use xtask::support_matrix::{
     derive_rows, derive_rows_for_test_roots, validate_publication_consistency, BackendSupportState,
     ManifestSupportState, PointerPromotionState, SupportRow, UaaSupportState,
 };
@@ -305,8 +297,14 @@ fn derives_target_scoped_rows_with_sparse_caveats_and_pointer_state() {
     );
 
     let opencode_row = find_row(&rows, "opencode", "3.0.0", "linux-x64");
-    assert_eq!(opencode_row.manifest_support, ManifestSupportState::Supported);
-    assert_eq!(opencode_row.backend_support, BackendSupportState::Unsupported);
+    assert_eq!(
+        opencode_row.manifest_support,
+        ManifestSupportState::Supported
+    );
+    assert_eq!(
+        opencode_row.backend_support,
+        BackendSupportState::Unsupported
+    );
     assert_eq!(opencode_row.uaa_support, UaaSupportState::Unsupported);
     assert_eq!(opencode_row.pointer_promotion, PointerPromotionState::None);
     assert!(opencode_row.evidence_notes.is_empty());

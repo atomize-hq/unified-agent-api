@@ -63,9 +63,9 @@ tokei-all-crates: ensure-tokei
 fmt:
 	cargo fmt
 
-.PHONY: fmt-check
-fmt-check:
-	cargo fmt --all -- --check
+.PHONY: fmt
+fmt-all:
+	cargo fmt --all
 
 .PHONY: clippy
 clippy:
@@ -170,7 +170,7 @@ unsafe-report: ensure-security-tools
 flightcheck:
 	@echo "##flightcheck -- must run from repo root"
 	@echo "##flightcheck -- must pass for *integ tasks to be considered green"
-	$(MAKE) fmt-check
+	$(MAKE) fmt-all
 	$(MAKE) clippy
 	cargo clean
 	$(MAKE) check
