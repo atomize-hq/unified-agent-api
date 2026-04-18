@@ -86,6 +86,13 @@ OpenCode.
   - **Definition**: OpenCode publication work extends the repo's committed root and backend sets so
     support and capability inventories can include OpenCode while preserving manifest support,
     backend support, UAA unified support, and passthrough visibility as distinct layers.
+    Support publication is bounded to `crates/xtask/src/support_matrix.rs`,
+    `crates/xtask/src/support_matrix/**`, `cli_manifests/support_matrix/current.json`, and
+    `docs/specs/unified-agent-api/support-matrix.md`. Capability inventory is bounded to
+    `crates/xtask/src/capability_matrix.rs` and
+    `docs/specs/unified-agent-api/capability-matrix.md`. OpenCode root validation remains a
+    separate proof surface through
+    `cargo run -p xtask -- codex-validate --root cli_manifests/opencode`.
   - **Canonical contract ref**: `docs/specs/unified-agent-api/support-matrix.md`
   - **Versioning / compat**: publication changes must not imply UAA promotion or collapse
     passthrough visibility into unified support
@@ -144,14 +151,22 @@ OpenCode.
   - **Consumer seam(s)**: pack closeout and future stale-trigger follow-on packs
   - **Carried contract IDs**: `C-04`
   - **Purpose**: publish the explicit support/publication answer for OpenCode implementation work:
-    which rows, root sets, and backend inventories were updated, what remained backend-specific,
-    and which stale triggers would reopen promotion review later.
+    which support-publication and capability-inventory surfaces were updated, what remained
+    backend-specific, which deterministic proof commands were used, and which stale triggers would
+    reopen promotion review later.
   - **State**: `identified`
   - **Revalidation trigger**: any `THR-04` stale trigger fires, support-matrix semantics change,
     capability inventory assumptions change, or publication evidence starts implying UAA promotion
-  - **Satisfied by**: `SEAM-3` closeout and the committed support publication artifacts
-  - **Notes**: this thread exists to keep publication follow-through explicit and bounded, not to
-    create a new generic lifecycle framework
+  - **Satisfied by**: `SEAM-3` closeout, the committed support publication artifacts, the
+    committed capability inventory artifact, and OpenCode root-validation evidence from
+    `cargo run -p xtask -- codex-validate --root cli_manifests/opencode`
+  - **Notes**:
+    - this thread exists to keep publication follow-through explicit and bounded, not to create a
+      new generic lifecycle framework
+    - the thread must preserve the four-layer reading: manifest support, backend support, UAA
+      unified support, and passthrough visibility remain distinct and non-promotional
+    - capability inventory remains supporting publication evidence only; it does not authorize new
+      universal support claims by itself
 
 ## Dependency graph
 
