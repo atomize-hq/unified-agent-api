@@ -1,0 +1,323 @@
+{
+  "snapshot_schema_version": 1,
+  "tool": "opencode-cli",
+  "collected_at": "2026-04-18T03:12:12Z",
+  "binary": {
+    "sha256": "4557b09dfbb6e8c28b85e90e9b8d8b83361ce53f622d3e41d908f279c378f091",
+    "size_bytes": 101226400,
+    "platform": {
+      "os": "macos",
+      "arch": "aarch64"
+    },
+    "target_triple": "darwin-arm64",
+    "version_output": "1.4.9",
+    "semantic_version": "1.4.9",
+    "channel": "stable"
+  },
+  "commands": [
+    {
+      "path": [],
+      "args": [
+        {
+          "name": "project",
+          "required": false,
+          "variadic": false
+        }
+      ],
+      "flags": [
+        {
+          "long": "--agent",
+          "takes_value": true
+        },
+        {
+          "long": "--continue",
+          "short": "-c",
+          "takes_value": false
+        },
+        {
+          "long": "--cors",
+          "takes_value": true
+        },
+        {
+          "long": "--fork",
+          "takes_value": false
+        },
+        {
+          "long": "--help",
+          "short": "-h",
+          "takes_value": false
+        },
+        {
+          "long": "--hostname",
+          "takes_value": true
+        },
+        {
+          "long": "--log-level",
+          "takes_value": true
+        },
+        {
+          "long": "--mdns",
+          "takes_value": false
+        },
+        {
+          "long": "--mdns-domain",
+          "takes_value": true
+        },
+        {
+          "long": "--model",
+          "short": "-m",
+          "takes_value": true
+        },
+        {
+          "long": "--port",
+          "takes_value": true
+        },
+        {
+          "long": "--print-logs",
+          "takes_value": false
+        },
+        {
+          "long": "--prompt",
+          "takes_value": true
+        },
+        {
+          "long": "--pure",
+          "takes_value": false
+        },
+        {
+          "long": "--session",
+          "short": "-s",
+          "takes_value": true
+        },
+        {
+          "long": "--version",
+          "short": "-v",
+          "takes_value": false
+        }
+      ]
+    },
+    {
+      "path": [
+        "acp"
+      ],
+      "about": "start ACP (Agent Client Protocol) server"
+    },
+    {
+      "path": [
+        "agent"
+      ],
+      "about": "manage agents"
+    },
+    {
+      "path": [
+        "attach"
+      ],
+      "about": "attach to a running opencode server"
+    },
+    {
+      "path": [
+        "completion"
+      ],
+      "about": "generate shell completion script"
+    },
+    {
+      "path": [
+        "db"
+      ],
+      "about": "database tools"
+    },
+    {
+      "path": [
+        "debug"
+      ],
+      "about": "debugging and troubleshooting tools"
+    },
+    {
+      "path": [
+        "export"
+      ],
+      "about": "export session data as JSON"
+    },
+    {
+      "path": [
+        "github"
+      ],
+      "about": "manage GitHub agent"
+    },
+    {
+      "path": [
+        "import"
+      ],
+      "about": "import session data from JSON file or URL"
+    },
+    {
+      "path": [
+        "mcp"
+      ],
+      "about": "manage MCP (Model Context Protocol) servers"
+    },
+    {
+      "path": [
+        "models"
+      ],
+      "about": "list all available models"
+    },
+    {
+      "path": [
+        "plugin"
+      ],
+      "about": "install plugin and update config"
+    },
+    {
+      "path": [
+        "pr"
+      ],
+      "about": "fetch and checkout a GitHub PR branch, then run opencode"
+    },
+    {
+      "path": [
+        "providers"
+      ],
+      "about": "manage AI providers and credentials"
+    },
+    {
+      "path": [
+        "run"
+      ],
+      "about": "run opencode with a message",
+      "usage": "opencode run [message..]",
+      "args": [
+        {
+          "name": "message",
+          "required": false,
+          "variadic": true
+        }
+      ],
+      "flags": [
+        {
+          "long": "--agent",
+          "takes_value": true
+        },
+        {
+          "long": "--attach",
+          "takes_value": true
+        },
+        {
+          "long": "--command",
+          "takes_value": true
+        },
+        {
+          "long": "--continue",
+          "short": "-c",
+          "takes_value": false
+        },
+        {
+          "long": "--dangerously-skip-permissions",
+          "takes_value": false
+        },
+        {
+          "long": "--dir",
+          "takes_value": true
+        },
+        {
+          "long": "--file",
+          "short": "-f",
+          "takes_value": true
+        },
+        {
+          "long": "--fork",
+          "takes_value": false
+        },
+        {
+          "long": "--format",
+          "takes_value": true
+        },
+        {
+          "long": "--help",
+          "short": "-h",
+          "takes_value": false
+        },
+        {
+          "long": "--model",
+          "short": "-m",
+          "takes_value": true
+        },
+        {
+          "long": "--password",
+          "short": "-p",
+          "takes_value": true
+        },
+        {
+          "long": "--port",
+          "takes_value": true
+        },
+        {
+          "long": "--pure",
+          "takes_value": false
+        },
+        {
+          "long": "--session",
+          "short": "-s",
+          "takes_value": true
+        },
+        {
+          "long": "--share",
+          "takes_value": false
+        },
+        {
+          "long": "--thinking",
+          "takes_value": false
+        },
+        {
+          "long": "--title",
+          "takes_value": true
+        },
+        {
+          "long": "--variant",
+          "takes_value": true
+        },
+        {
+          "long": "--version",
+          "short": "-v",
+          "takes_value": false
+        }
+      ]
+    },
+    {
+      "path": [
+        "serve"
+      ],
+      "about": "starts a headless opencode server"
+    },
+    {
+      "path": [
+        "session"
+      ],
+      "about": "manage sessions"
+    },
+    {
+      "path": [
+        "stats"
+      ],
+      "about": "show token usage and cost statistics"
+    },
+    {
+      "path": [
+        "uninstall"
+      ],
+      "about": "uninstall opencode and remove all related files"
+    },
+    {
+      "path": [
+        "upgrade"
+      ],
+      "about": "upgrade opencode to the latest or a specific version"
+    },
+    {
+      "path": [
+        "web"
+      ],
+      "about": "start opencode server and open web interface"
+    }
+  ]
+}

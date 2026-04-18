@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-04-18T03:12:12Z",
+  "wrapper_version": "0.2.3",
+  "coverage": [
+    {
+      "path": [
+        "run"
+      ],
+      "level": "explicit",
+      "note": "OpenCode v1 wrapper coverage is intentionally bounded to the canonical run --format json surface.",
+      "flags": [
+        {
+          "key": "--continue",
+          "level": "explicit"
+        },
+        {
+          "key": "--dir",
+          "level": "explicit"
+        },
+        {
+          "key": "--fork",
+          "level": "explicit"
+        },
+        {
+          "key": "--format",
+          "level": "explicit"
+        },
+        {
+          "key": "--model",
+          "level": "explicit"
+        },
+        {
+          "key": "--session",
+          "level": "explicit"
+        }
+      ],
+      "args": [
+        {
+          "name": "message",
+          "level": "explicit"
+        }
+      ]
+    }
+  ]
+}
