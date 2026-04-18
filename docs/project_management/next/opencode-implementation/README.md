@@ -20,14 +20,14 @@ above seam-local decomposition.
 
 Execution horizon:
 
-- Active seam: `SEAM-2`
-- Next seam: `SEAM-3`
+- Active seam: `SEAM-3`
+- Next seam: none
 
 Policy:
 
 - only the active seam is eligible for authoritative downstream sub-slices by default
-- the next seam may later receive seam-local review plus slices, but only after `SEAM-2` publishes
-  its closeout-backed handoff
+- no additional queued seam remains after `SEAM-3` activation; any follow-on work must come from
+  a stale-trigger-driven reopen rather than preview planning inside this pack
 - active and next seams must eventually terminate in a dedicated final `S99` seam-exit-gate slice
   once seam-local planning begins
 - seams that still need a contract-definition boundary may reserve `S00` during seam-local

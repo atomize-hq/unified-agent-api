@@ -4,8 +4,8 @@ pack_version: v1
 pack_status: extracted
 source_ref: docs/project_management/next/opencode-cli-onboarding/next-steps-handoff.md
 execution_horizon:
-  active_seam: SEAM-2
-  next_seam: SEAM-3
+  active_seam: SEAM-3
+  next_seam: null
 ---
 
 # Scope Brief - OpenCode implementation

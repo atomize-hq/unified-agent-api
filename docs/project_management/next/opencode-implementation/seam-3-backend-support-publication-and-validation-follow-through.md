@@ -2,9 +2,9 @@
 seam_id: SEAM-3
 seam_slug: backend-support-publication-and-validation-follow-through
 type: conformance
-status: proposed
-execution_horizon: next
-plan_version: v1
+status: exec-ready
+execution_horizon: active
+plan_version: v2
 basis:
   currentness: current
   source_scope_ref: scope_brief.md
@@ -23,9 +23,9 @@ basis:
     - passthrough visibility is no longer explicit or support rows collapse multiple layers together
 gates:
   pre_exec:
-    review: pending
-    contract: pending
-    revalidation: pending
+    review: passed
+    contract: passed
+    revalidation: passed
   post_exec:
     landing: pending
     closeout: pending
@@ -119,14 +119,15 @@ open_remediations: []
   - no active promotion lane exists here unless inherited stale triggers fire
   - keep all changes deterministic and rooted in committed manifest/backend evidence
 - **Downstream decomposition context**:
-  - Why this seam is `active`, `next`, or `future`: it is `future` because it depends on actual
-    landed wrapper and backend evidence, and because current repo evidence does not justify making
-    publication follow-through active before code exists.
+  - Why this seam is `active`, `next`, or `future`: it is now `active` because `SEAM-2` has
+    published `THR-06`, no queued seam remains behind it in this pack, and the only forward work
+    left is the bounded publication follow-through this seam owns.
   - Which threads matter most: `THR-04`, `THR-06`, `THR-07`
   - What the first seam-local review should focus on: committed root/backend enumeration, support
-    row derivation, passthrough visibility notes, and explicit non-promotion posture
-  - Boundary slice intent: reserve `S00` only if seam-local planning needs a dedicated publication
-    contract-definition boundary before implementation slices begin
+    row derivation, passthrough visibility notes, explicit non-promotion posture, and keeping
+    support publication separate from capability inventory
+  - Boundary slice intent: `S00` now defines the publication contract and support-layer baseline
+    before conformance slices update the committed outputs
 - **Expected seam-exit concerns**:
   - Contracts likely to publish: `C-04`
   - Threads likely to advance: `THR-07`

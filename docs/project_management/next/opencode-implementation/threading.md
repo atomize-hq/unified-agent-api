@@ -10,8 +10,8 @@ OpenCode.
 
 ## Execution horizon summary
 
-- Active seam: `SEAM-2`
-- Next seam: `SEAM-3`
+- Active seam: `SEAM-3`
+- Next seam: none
 - Future seam: none
 - `THR-04` from the closed onboarding pack is the authoritative inbound handoff for this pack.
 
@@ -129,12 +129,15 @@ OpenCode.
   - **Carried contract IDs**: `C-03`
   - **Purpose**: expose the actual OpenCode backend behavior, capability posture, extension
     ownership, and validation evidence needed for bounded publication follow-through.
-  - **State**: `identified`
+  - **State**: `revalidated`
   - **Revalidation trigger**: any change in wrapper inputs, event/completion mapping, payload
     bounds, redaction, or capability advertisement
   - **Satisfied by**: `SEAM-2` closeout plus landed backend tests and publication-facing evidence
-  - **Notes**: this thread is intentionally backend-support scoped; it does not authorize UAA
-    promotion by itself
+  - **Notes**:
+    - `SEAM-3` has now revalidated against this thread and can consume the landed backend
+      mapping, capability posture, and validation evidence as current input
+    - this thread is intentionally backend-support scoped; it does not authorize UAA promotion by
+      itself
 
 - **Thread ID**: `THR-07`
   - **Producer seam**: `SEAM-3`

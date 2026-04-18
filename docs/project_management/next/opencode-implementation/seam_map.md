@@ -8,8 +8,8 @@ promotion.
 
 ## Execution horizon (v2.5 policy)
 
-- Active seam: `SEAM-2`
-- Next seam: `SEAM-3`
+- Active seam: `SEAM-3`
+- Next seam: none
 - Future seams: none
 
 Inference note: this split follows the repo-specific execution-horizon guidance in the request. No
@@ -17,9 +17,9 @@ stronger repo evidence justified making `agent_api` work active before the wrapp
 foundation exists, and no additional future seam was extracted because generic lifecycle or process
 codification is explicitly out of scope.
 
-Only the active seam is eligible for authoritative deep planning by default. The next seam may
-later receive seam-local review plus slices, but only after `SEAM-2` publishes its closeout-backed
-handoff. No additional future seam remains in this pack after the `SEAM-1` promotion.
+Only the active seam is eligible for authoritative deep planning by default. No additional queued
+seam remains after `SEAM-3` activation. No additional future seam remains in this pack after the
+`SEAM-1` promotion.
 
 ## Seams
 
@@ -41,13 +41,13 @@ handoff. No additional future seam remains in this pack after the `SEAM-1` promo
      - a closeout-backed `THR-05` handoff to backend and publication work
 
 2. **SEAM-2 - `agent_api` OpenCode backend implementation**
-   - Execution horizon: active
+   - Execution horizon: landed
    - Type: integration
    - Owns: the OpenCode backend inside `crates/agent_api/`, including request mapping, event and
      completion translation, capability advertisement, fail-closed extension handling, redaction,
      bounded payloads, and DR-0012 completion gating coverage.
-   - Why it is next: the backend work should consume a landed wrapper plus manifest handoff rather
-     than defining wrapper semantics indirectly from `agent_api`.
+   - Why it was active: the backend work needed to consume the landed wrapper plus manifest
+     handoff rather than defining wrapper semantics indirectly from `agent_api`.
    - Expected outputs:
      - concrete backend implementation and registration surface for OpenCode
      - explicit capability and backend-specific extension posture for the landed backend
@@ -56,14 +56,12 @@ handoff. No additional future seam remains in this pack after the `SEAM-1` promo
      - a closeout-backed `THR-06` handoff to publication follow-through
 
 3. **SEAM-3 - Backend support publication and validation follow-through**
-   - Execution horizon: next
+   - Execution horizon: active
    - Type: conformance
    - Owns: the bounded publication and validation work needed after code lands so OpenCode can
      appear in manifest/backend support surfaces without implying UAA promotion.
-   - Why it is future: the repo has concrete publication work to do, but it depends on actual
-     wrapper and backend evidence first. Today the `support-matrix` and `capability-matrix`
-     generators still hard-code only Codex and Claude, which makes this a real follow-through seam
-     rather than optional cleanup.
+   - Why it is active: `SEAM-2` has published `THR-06`, no queued seam remains behind it in this
+     pack, and the remaining forward work is the bounded publication follow-through this seam owns.
    - Expected outputs:
      - OpenCode participation in root-based validation and support publication
      - capability inventory updates that keep backend support, UAA support, and passthrough
