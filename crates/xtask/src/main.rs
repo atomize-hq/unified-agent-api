@@ -1,5 +1,6 @@
 #![forbid(unsafe_code)]
 
+mod agent_api_backend_type_leak_guard;
 mod capability_matrix;
 mod capability_matrix_audit;
 mod claude_snapshot;
@@ -31,6 +32,8 @@ struct Cli {
 #[derive(Debug, Subcommand)]
 #[allow(clippy::enum_variant_names)]
 enum Command {
+    /// Guard against backend crate types leaking into the public agent_api surface.
+    AgentApiBackendTypeLeakGuard(agent_api_backend_type_leak_guard::Args),
     /// Generate a Codex CLI snapshot manifest under `cli_manifests/codex/`.
     CodexSnapshot(codex_snapshot::Args),
     /// Generate a Claude Code CLI snapshot manifest under `cli_manifests/claude_code/`.
@@ -67,6 +70,15 @@ fn main() {
     let cli = Cli::parse();
 
     let exit_code = match cli.command {
+        Command::AgentApiBackendTypeLeakGuard(args) => {
+            match agent_api_backend_type_leak_guard::run(args) {
+                Ok(()) => 0,
+                Err(err) => {
+                    eprintln!("{err}");
+                    1
+                }
+            }
+        }
         Command::CodexSnapshot(args) => match codex_snapshot::run(args) {
             Ok(()) => 0,
             Err(err) => {
