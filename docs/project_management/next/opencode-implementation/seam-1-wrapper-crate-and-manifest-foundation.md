@@ -2,8 +2,8 @@
 seam_id: SEAM-1
 seam_slug: wrapper-crate-and-manifest-foundation
 type: capability
-status: landed
-execution_horizon: active
+status: closed
+execution_horizon: future
 plan_version: v2
 basis:
   currentness: current

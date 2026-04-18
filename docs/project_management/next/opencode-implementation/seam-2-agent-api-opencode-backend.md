@@ -2,8 +2,8 @@
 seam_id: SEAM-2
 seam_slug: agent-api-opencode-backend
 type: integration
-status: proposed
-execution_horizon: next
+status: exec-ready
+execution_horizon: active
 plan_version: v1
 basis:
   currentness: current
@@ -23,9 +23,9 @@ basis:
     - new multi-backend evidence changes the no-promotion recommendation carried by `THR-04`
 gates:
   pre_exec:
-    review: pending
-    contract: pending
-    revalidation: pending
+    review: passed
+    contract: passed
+    revalidation: passed
   post_exec:
     landing: pending
     closeout: pending

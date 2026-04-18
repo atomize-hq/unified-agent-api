@@ -10,9 +10,9 @@ OpenCode.
 
 ## Execution horizon summary
 
-- Active seam: `SEAM-1`
-- Next seam: `SEAM-2`
-- Future seam: `SEAM-3`
+- Active seam: `SEAM-2`
+- Next seam: `SEAM-3`
+- Future seam: none
 - `THR-04` from the closed onboarding pack is the authoritative inbound handoff for this pack.
 
 ## Inbound authoritative handoff
@@ -29,9 +29,9 @@ OpenCode.
     OpenCode behavior that materially changes the promotion case
   - **Satisfied by**: `docs/project_management/next/opencode-cli-onboarding/threading.md` and
     `docs/project_management/next/opencode-cli-onboarding/governance/seam-4-closeout.md`
-  - **Notes**: `SEAM-1` has now revalidated against this thread and should treat the published
-    onboarding recommendation as current input until `THR-05` is published; this pack still
-    consumes the thread directly and does not replace it with a new bridge artifact
+  - **Notes**: `SEAM-1` and `SEAM-2` have now revalidated against this thread; this pack still
+    consumes the published onboarding recommendation directly and does not replace it with a new
+    bridge artifact
 
 ## Contract registry
 
@@ -99,7 +99,7 @@ OpenCode.
   - **Purpose**: publish a closeout-backed wrapper and manifest implementation handoff so backend
     work and publication follow-through consume landed root truth instead of inferring it from
     planning prose.
-  - **State**: `published`
+  - **State**: `revalidated`
   - **Revalidation trigger**:
     - any change to the canonical OpenCode run surface or accepted controls
     - any change to wrapper-owned parser, event typing, completion-finality, or redaction behavior
@@ -114,12 +114,14 @@ OpenCode.
     - committed manifest-root evidence under `cli_manifests/opencode/**`
     - mechanical root validation via `cargo run -p xtask -- codex-validate --root cli_manifests/opencode`
   - **Notes**:
+    - `SEAM-2` has now revalidated against this thread and can treat the wrapper and manifest
+      handoff as current input rather than provisional planning prose
     - `SEAM-2` consumes wrapper-owned runtime truth from landed `crates/opencode/**` code and its
       deterministic proof surfaces, not from live provider-backed smoke or planning prose
     - `SEAM-3` consumes manifest-root truth from landed `cli_manifests/opencode/**` evidence and
       the root validator posture, not from backend-planning assumptions or packet-era notes
-    - this published handoff records that `SEAM-1` is complete enough for downstream backend and
-      publication work to consume without reopening wrapper or manifest planning by default
+    - the thread remains the authoritative upstream backend-consumer handoff until `THR-06`
+      publishes from `SEAM-2`
 
 - **Thread ID**: `THR-06`
   - **Producer seam**: `SEAM-2`

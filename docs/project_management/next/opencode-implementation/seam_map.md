@@ -8,9 +8,9 @@ promotion.
 
 ## Execution horizon (v2.5 policy)
 
-- Active seam: `SEAM-1`
-- Next seam: `SEAM-2`
-- Future seams: `SEAM-3`
+- Active seam: `SEAM-2`
+- Next seam: `SEAM-3`
+- Future seams: none
 
 Inference note: this split follows the repo-specific execution-horizon guidance in the request. No
 stronger repo evidence justified making `agent_api` work active before the wrapper and manifest
@@ -18,13 +18,13 @@ foundation exists, and no additional future seam was extracted because generic l
 codification is explicitly out of scope.
 
 Only the active seam is eligible for authoritative deep planning by default. The next seam may
-later receive seam-local review plus slices, but only provisionally and only after `SEAM-1`
-publishes its closeout-backed handoff. The future seam remains seam-brief depth only.
+later receive seam-local review plus slices, but only after `SEAM-2` publishes its closeout-backed
+handoff. No additional future seam remains in this pack after the `SEAM-1` promotion.
 
 ## Seams
 
 1. **SEAM-1 - Wrapper crate and manifest foundation**
-   - Execution horizon: active
+   - Execution horizon: closed
    - Type: capability
    - Owns: the first concrete OpenCode landing surface across `crates/opencode/`,
      `cli_manifests/opencode/`, the workspace wiring needed to host them, and the deterministic
@@ -41,7 +41,7 @@ publishes its closeout-backed handoff. The future seam remains seam-brief depth 
      - a closeout-backed `THR-05` handoff to backend and publication work
 
 2. **SEAM-2 - `agent_api` OpenCode backend implementation**
-   - Execution horizon: next
+   - Execution horizon: active
    - Type: integration
    - Owns: the OpenCode backend inside `crates/agent_api/`, including request mapping, event and
      completion translation, capability advertisement, fail-closed extension handling, redaction,
@@ -56,7 +56,7 @@ publishes its closeout-backed handoff. The future seam remains seam-brief depth 
      - a closeout-backed `THR-06` handoff to publication follow-through
 
 3. **SEAM-3 - Backend support publication and validation follow-through**
-   - Execution horizon: future
+   - Execution horizon: next
    - Type: conformance
    - Owns: the bounded publication and validation work needed after code lands so OpenCode can
      appear in manifest/backend support surfaces without implying UAA promotion.
