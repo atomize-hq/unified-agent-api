@@ -1,6 +1,30 @@
 #![forbid(unsafe_code)]
 
-//! Feature-gated OpenCode backend registration scaffold.
-//!
-//! S00 only establishes the module boundary so later slices can add the actual backend
-//! implementation without reopening the registration contract.
+use std::{collections::BTreeMap, path::PathBuf, time::Duration};
+
+const AGENT_KIND: &str = "opencode";
+
+mod backend;
+mod harness;
+mod mapping;
+
+#[cfg(test)]
+mod tests;
+
+#[derive(Clone, Debug, Default)]
+pub struct OpencodeBackendConfig {
+    pub binary: Option<PathBuf>,
+    pub default_timeout: Option<Duration>,
+    pub env: BTreeMap<String, String>,
+}
+
+#[derive(Clone, Debug)]
+pub struct OpencodeBackend {
+    config: OpencodeBackendConfig,
+}
+
+impl OpencodeBackend {
+    pub fn new(config: OpencodeBackendConfig) -> Self {
+        Self { config }
+    }
+}

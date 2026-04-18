@@ -1,0 +1,151 @@
+use std::{future::Future, path::PathBuf, pin::Pin};
+
+use futures_util::StreamExt;
+
+use crate::{
+    backend_harness::{
+        BackendHarnessAdapter, BackendHarnessErrorPhase, BackendSpawn, DynBackendEventStream,
+        NormalizedRequest,
+    },
+    AgentWrapperCompletion, AgentWrapperError, AgentWrapperEvent, AgentWrapperKind,
+    AgentWrapperRunRequest,
+};
+
+use super::{mapping::map_run_json_event, OpencodeBackend};
+
+const REDACTED_SPAWN_MESSAGE: &str = "opencode backend error: spawn failed";
+const REDACTED_STREAM_MESSAGE: &str = "opencode backend error: malformed run output";
+const REDACTED_COMPLETION_MESSAGE: &str = "opencode backend error: completion failed";
+
+#[derive(Debug)]
+pub enum OpencodeBackendError {
+    Spawn,
+    StreamParse,
+    Completion,
+}
+
+impl BackendHarnessAdapter for OpencodeBackend {
+    fn kind(&self) -> AgentWrapperKind {
+        AgentWrapperKind(super::AGENT_KIND.to_string())
+    }
+
+    fn supported_extension_keys(&self) -> &'static [&'static str] {
+        &[]
+    }
+
+    type Policy = ();
+
+    fn validate_and_extract_policy(
+        &self,
+        _request: &AgentWrapperRunRequest,
+    ) -> Result<Self::Policy, AgentWrapperError> {
+        Ok(())
+    }
+
+    type BackendEvent = opencode::OpencodeRunJsonEvent;
+    type BackendCompletion = opencode::OpencodeRunCompletion;
+    type BackendError = OpencodeBackendError;
+
+    fn spawn(
+        &self,
+        req: NormalizedRequest<Self::Policy>,
+    ) -> Pin<
+        Box<
+            dyn Future<
+                    Output = Result<
+                        BackendSpawn<
+                            Self::BackendEvent,
+                            Self::BackendCompletion,
+                            Self::BackendError,
+                        >,
+                        Self::BackendError,
+                    >,
+                > + Send
+                + 'static,
+        >,
+    > {
+        let binary = self
+            .config
+            .binary
+            .clone()
+            .or_else(|| std::env::var_os("OPENCODE_BINARY").map(PathBuf::from));
+        let timeout = req.effective_timeout;
+        let env = req.env;
+        let working_dir = req.working_dir;
+        let prompt = req.prompt;
+
+        Box::pin(async move {
+            let mut builder = opencode::OpencodeClient::builder();
+            if let Some(binary) = binary {
+                builder = builder.binary(binary);
+            }
+            if let Some(timeout) = timeout {
+                builder = builder.timeout(timeout);
+            }
+            for (key, value) in env {
+                builder = builder.env(key, value);
+            }
+            let client = builder.build();
+
+            let mut run_request = opencode::OpencodeRunRequest::new(prompt);
+            if let Some(working_dir) = working_dir {
+                run_request = run_request.working_dir(working_dir);
+            }
+
+            let handle = client
+                .run_json(run_request)
+                .await
+                .map_err(|_| OpencodeBackendError::Spawn)?;
+            let opencode::OpencodeRunJsonHandle { events, completion } = handle;
+
+            let events: DynBackendEventStream<Self::BackendEvent, Self::BackendError> =
+                Box::pin(events.map(|item| item.map_err(|_| OpencodeBackendError::StreamParse)));
+
+            let completion = Box::pin(async move {
+                completion
+                    .await
+                    .map_err(|_| OpencodeBackendError::Completion)
+            });
+
+            Ok(BackendSpawn {
+                events,
+                completion,
+                events_observability: None,
+            })
+        })
+    }
+
+    fn map_event(&self, event: Self::BackendEvent) -> Vec<AgentWrapperEvent> {
+        map_run_json_event(event)
+    }
+
+    fn map_completion(
+        &self,
+        completion: Self::BackendCompletion,
+    ) -> Result<AgentWrapperCompletion, AgentWrapperError> {
+        Ok(crate::bounds::enforce_completion_bounds(
+            AgentWrapperCompletion {
+                status: completion.status,
+                final_text: crate::bounds::enforce_final_text_bound(completion.final_text),
+                data: None,
+            },
+        ))
+    }
+
+    fn redact_error(&self, phase: BackendHarnessErrorPhase, err: &Self::BackendError) -> String {
+        match (phase, err) {
+            (BackendHarnessErrorPhase::Spawn, OpencodeBackendError::Spawn) => {
+                REDACTED_SPAWN_MESSAGE.to_string()
+            }
+            (BackendHarnessErrorPhase::Stream, OpencodeBackendError::StreamParse) => {
+                REDACTED_STREAM_MESSAGE.to_string()
+            }
+            (BackendHarnessErrorPhase::Completion, OpencodeBackendError::Completion) => {
+                REDACTED_COMPLETION_MESSAGE.to_string()
+            }
+            (_, OpencodeBackendError::Spawn) => REDACTED_SPAWN_MESSAGE.to_string(),
+            (_, OpencodeBackendError::StreamParse) => REDACTED_STREAM_MESSAGE.to_string(),
+            (_, OpencodeBackendError::Completion) => REDACTED_COMPLETION_MESSAGE.to_string(),
+        }
+    }
+}

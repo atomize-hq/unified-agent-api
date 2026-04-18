@@ -4,7 +4,7 @@ mod session_selectors;
 #[cfg(any(feature = "codex", feature = "claude_code", test))]
 mod termination;
 
-#[cfg(any(feature = "codex", feature = "claude_code", test))]
+#[cfg(any(feature = "codex", feature = "claude_code", feature = "opencode", test))]
 pub(crate) mod spawn_path;
 
 #[cfg(test)]
