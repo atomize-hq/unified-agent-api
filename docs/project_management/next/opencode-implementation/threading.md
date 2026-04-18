@@ -154,12 +154,14 @@ OpenCode.
     which support-publication and capability-inventory surfaces were updated, what remained
     backend-specific, which deterministic proof commands were used, and which stale triggers would
     reopen promotion review later.
-  - **State**: `identified`
+  - **State**: `published`
   - **Revalidation trigger**: any `THR-04` stale trigger fires, support-matrix semantics change,
     capability inventory assumptions change, or publication evidence starts implying UAA promotion
-  - **Satisfied by**: `SEAM-3` closeout, the committed support publication artifacts, the
-    committed capability inventory artifact, and OpenCode root-validation evidence from
-    `cargo run -p xtask -- codex-validate --root cli_manifests/opencode`
+  - **Satisfied by**: the `SEAM-3` closeout record, the committed support publication artifacts
+    under `docs/specs/unified-agent-api/support-matrix.md` and
+    `cli_manifests/support_matrix/current.json`, the committed capability inventory artifact under
+    `docs/specs/unified-agent-api/capability-matrix.md`, and OpenCode root-validation evidence
+    from `cargo run -p xtask -- codex-validate --root cli_manifests/opencode`
   - **Notes**:
     - this thread exists to keep publication follow-through explicit and bounded, not to create a
       new generic lifecycle framework
@@ -167,6 +169,9 @@ OpenCode.
       unified support, and passthrough visibility remain distinct and non-promotional
     - capability inventory remains supporting publication evidence only; it does not authorize new
       universal support claims by itself
+    - this published handoff records that OpenCode publication has landed under a bounded
+      no-promotion posture; future drift reopens the thread instead of normalizing new promotion
+      claims locally
 
 ## Dependency graph
 
