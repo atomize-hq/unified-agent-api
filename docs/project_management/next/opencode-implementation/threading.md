@@ -99,7 +99,7 @@ OpenCode.
   - **Purpose**: publish a closeout-backed wrapper and manifest implementation handoff so backend
     work and publication follow-through consume landed root truth instead of inferring it from
     planning prose.
-  - **State**: `defined`
+  - **State**: `published`
   - **Revalidation trigger**:
     - any change to the canonical OpenCode run surface or accepted controls
     - any change to wrapper-owned parser, event typing, completion-finality, or redaction behavior
@@ -114,11 +114,12 @@ OpenCode.
     - committed manifest-root evidence under `cli_manifests/opencode/**`
     - mechanical root validation via `cargo run -p xtask -- codex-validate --root cli_manifests/opencode`
   - **Notes**:
-    - `SEAM-2` must not start authoritative deep planning until this thread is published
     - `SEAM-2` consumes wrapper-owned runtime truth from landed `crates/opencode/**` code and its
       deterministic proof surfaces, not from live provider-backed smoke or planning prose
     - `SEAM-3` consumes manifest-root truth from landed `cli_manifests/opencode/**` evidence and
       the root validator posture, not from backend-planning assumptions or packet-era notes
+    - this published handoff records that `SEAM-1` is complete enough for downstream backend and
+      publication work to consume without reopening wrapper or manifest planning by default
 
 - **Thread ID**: `THR-06`
   - **Producer seam**: `SEAM-2`
