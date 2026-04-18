@@ -10,10 +10,11 @@ OpenCode.
 
 ## Execution horizon summary
 
-- Active seam: `SEAM-3`
+- Active seam: none
 - Next seam: none
-- Future seam: none
+- Future seams: none
 - `THR-04` from the closed onboarding pack is the authoritative inbound handoff for this pack.
+- No seam remains in the forward planning window for this pack.
 
 ## Inbound authoritative handoff
 

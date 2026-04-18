@@ -2,7 +2,7 @@
 seam_id: SEAM-2
 seam_slug: agent-api-opencode-backend
 type: integration
-status: landed
+status: closed
 execution_horizon: future
 plan_version: v2
 basis:

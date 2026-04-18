@@ -4,18 +4,17 @@ pack_version: v1
 pack_status: extracted
 source_ref: docs/project_management/next/opencode-cli-onboarding/next-steps-handoff.md
 execution_horizon:
-  active_seam: SEAM-3
+  active_seam: null
   next_seam: null
 ---
 
 # Scope Brief - OpenCode implementation
 
-- **Goal**: create the single code-facing execution pack that turns the closed OpenCode
-  onboarding/contracts work into implementation planning for `cli_manifests/opencode/`,
+- **Goal**: preserve the closed code-facing execution pack that turned the OpenCode
+  onboarding/contracts work into landed implementation across `cli_manifests/opencode/`,
   `crates/opencode/`, and the `crates/agent_api` OpenCode backend.
-- **Why now**: the repo has already selected OpenCode, locked the runtime/evidence contracts, and
-  closed the onboarding pack; what is still missing is the implementation pack that makes the next
-  code work deterministic.
+- **Why now**: the repo has already landed the bounded OpenCode implementation work, and this pack
+  now needs to read as a closed governance-ready record rather than an active execution queue.
 - **Primary user(s) + JTBD**: repo maintainers need a crate-first execution plan they can follow to
   land OpenCode without reopening candidate selection, inventing a new bridge artifact, or
   accidentally conflating backend support with UAA promotion.
@@ -33,18 +32,16 @@ execution_horizon:
   - a generic scaffolder for future agents
   - active UAA promotion work unless the published stale triggers fire
 - **Success criteria**:
-  - the pack names one active seam and one next seam with a bounded future follow-through seam only
-  - `SEAM-1` is sufficient to plan `crates/opencode/` and `cli_manifests/opencode/` concretely
-  - `SEAM-2` is positioned to implement the OpenCode backend in `crates/agent_api` without
-    redefining wrapper semantics
-  - deterministic validation is the default proof path across wrapper, manifest, backend, and
+  - the pack has no active, next, or future seam in the forward window
+  - `SEAM-1` through `SEAM-3` remain closed or closeout-complete with explicit governance records
+  - deterministic validation remains the default proof path across wrapper, manifest, backend, and
     publication surfaces
   - the four support layers remain separate and UAA promotion stays out of scope by default
 - **Constraints**:
   - this is one pack, not a family of sibling packs
   - no new bridge ledger, sidecar manifest, or lifecycle document
   - canonical OpenCode contract refs remain the existing `docs/specs/**` documents
-  - exactly one `active` seam and one `next` seam are used for this extraction
+  - exactly one `active` seam and one `next` seam are used while work remains in the forward queue
   - live provider-backed smoke is basis-lock evidence only, not routine completion criteria
 - **External systems / dependencies**:
   - OpenCode CLI (`opencode run --format json`)
@@ -70,3 +67,5 @@ execution_horizon:
     pack does not authorize generic future-agent scaffolding work
   - support publication follow-through may update hard-coded root/backend registries, but it must
     not turn into UAA promotion planning
+  - no additional queued seam remains after `SEAM-3`; future work must reopen from published
+    stale-trigger evidence rather than from a standing active seam

@@ -8,18 +8,16 @@ promotion.
 
 ## Execution horizon (v2.5 policy)
 
-- Active seam: `SEAM-3`
+- Active seam: none
 - Next seam: none
 - Future seams: none
 
-Inference note: this split follows the repo-specific execution-horizon guidance in the request. No
-stronger repo evidence justified making `agent_api` work active before the wrapper and manifest
-foundation exists, and no additional future seam was extracted because generic lifecycle or process
-codification is explicitly out of scope.
+Inference note: the forward execution window is now empty. `SEAM-1` through `SEAM-3` have landed,
+and no additional future seam was extracted because generic lifecycle or process codification is
+explicitly out of scope.
 
 Only the active seam is eligible for authoritative deep planning by default. No additional queued
-seam remains after `SEAM-3` activation. No additional future seam remains in this pack after the
-`SEAM-1` promotion.
+or future seam remains in this pack after `SEAM-3` closeout.
 
 ## Seams
 
@@ -41,7 +39,7 @@ seam remains after `SEAM-3` activation. No additional future seam remains in thi
      - a closeout-backed `THR-05` handoff to backend and publication work
 
 2. **SEAM-2 - `agent_api` OpenCode backend implementation**
-   - Execution horizon: landed
+   - Execution horizon: closed
    - Type: integration
    - Owns: the OpenCode backend inside `crates/agent_api/`, including request mapping, event and
      completion translation, capability advertisement, fail-closed extension handling, redaction,
@@ -56,12 +54,13 @@ seam remains after `SEAM-3` activation. No additional future seam remains in thi
      - a closeout-backed `THR-06` handoff to publication follow-through
 
 3. **SEAM-3 - Backend support publication and validation follow-through**
-   - Execution horizon: active
+   - Execution horizon: closed
    - Type: conformance
    - Owns: the bounded publication and validation work needed after code lands so OpenCode can
      appear in manifest/backend support surfaces without implying UAA promotion.
-   - Why it is active: `SEAM-2` has published `THR-06`, no queued seam remains behind it in this
-     pack, and the remaining forward work is the bounded publication follow-through this seam owns.
+   - Why it was active: `SEAM-2` published `THR-06`, no queued seam remained behind it in this
+     pack, and the remaining forward work was the bounded publication follow-through this seam
+     owned.
    - Expected outputs:
      - OpenCode participation in root-based validation and support publication
      - capability inventory updates that keep backend support, UAA support, and passthrough

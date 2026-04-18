@@ -1,4 +1,4 @@
-# OpenCode implementation - seam extraction
+# OpenCode implementation - closed seam pack
 
 Source:
 - `docs/project_management/next/opencode-cli-onboarding/next-steps-handoff.md`
@@ -8,9 +8,10 @@ Source:
 - `docs/project_management/next/opencode-cli-onboarding/governance/seam-3-closeout.md`
 - `docs/project_management/next/opencode-cli-onboarding/governance/seam-4-closeout.md`
 
-This pack is the code-facing plan-of-record for landing OpenCode. It consumes the already-closed
-onboarding/contracts work directly, preserves the no-new-bridge rule, and keeps the pack one level
-above seam-local decomposition.
+This pack is the code-facing closed plan-of-record for landing OpenCode. It consumes the
+already-closed onboarding/contracts work directly, preserves the no-new-bridge rule, and retains
+the implementation seams, threading, and governance records that landed the bounded OpenCode
+execution scope.
 
 - Start here: `scope_brief.md`
 - Seam overview: `seam_map.md`
@@ -20,14 +21,15 @@ above seam-local decomposition.
 
 Execution horizon:
 
-- Active seam: `SEAM-3`
+- Active seam: none
 - Next seam: none
+- Future seams: none
 
 Policy:
 
 - only the active seam is eligible for authoritative downstream sub-slices by default
-- no additional queued seam remains after `SEAM-3` activation; any follow-on work must come from
-  a stale-trigger-driven reopen rather than preview planning inside this pack
+- no additional queued seam remains after `SEAM-3` closeout; any follow-on work must come from a
+  stale-trigger-driven reopen rather than preview planning inside this pack
 - active and next seams must eventually terminate in a dedicated final `S99` seam-exit-gate slice
   once seam-local planning begins
 - seams that still need a contract-definition boundary may reserve `S00` during seam-local
@@ -39,6 +41,15 @@ Policy:
 - canonical OpenCode contract refs for this pack live under `docs/specs/**`, not `docs/contracts/**`
 - UAA promotion is out of scope unless the published stale triggers from the closed onboarding pack
   fire
+
+Closed-pack posture:
+
+- `SEAM-1` through `SEAM-3` have landed with passed closeout gates, and the forward execution
+  window is empty.
+- `THR-05` and `THR-06` remain revalidated upstream handoffs, while `THR-07` is the published
+  support/publication handoff for future stale-trigger-driven follow-on work.
+- the landed support publication, capability inventory, and OpenCode root-validation evidence are
+  the canonical proof surfaces for this pack's completion.
 
 Scope restatement:
 
