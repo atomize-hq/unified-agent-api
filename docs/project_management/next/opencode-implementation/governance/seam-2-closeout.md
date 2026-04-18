@@ -1,11 +1,11 @@
 ---
 seam_id: SEAM-2
-status: proposed
-closeout_version: v0
+status: landed
+closeout_version: v1
 seam_exit_gate:
   source_ref: threaded-seams/seam-2-agent-api-opencode-backend/slice-99-seam-exit-gate.md
-  status: pending
-  promotion_readiness: blocked
+  status: passed
+  promotion_readiness: ready
 basis:
   currentness: current
   upstream_closeouts:
@@ -21,8 +21,8 @@ basis:
     - redaction or bounded-payload posture drift
 gates:
   post_exec:
-    landing: pending
-    closeout: pending
+    landing: passed
+    closeout: passed
 open_remediations: []
 ---
 
@@ -30,28 +30,51 @@ open_remediations: []
 
 ## Seam-exit gate record
 
-- **Source artifact**: `threaded-seams/seam-2-agent-api-opencode-backend/slice-99-seam-exit-gate.md` (planned, not yet created)
+- **Source artifact**: `threaded-seams/seam-2-agent-api-opencode-backend/slice-99-seam-exit-gate.md`
 - **Landed evidence**:
-  - pending
+  - `1adb8f1` `SEAM-2: complete slice-00-backend-contract-and-registration-baselines`
+  - `f9c9982` `SEAM-2: complete slice-1-request-event-and-completion-mapping`
+  - `4adefdf` `SEAM-2: complete slice-2-capability-advertisement-and-extension-ownership`
+  - `ed424c5` `SEAM-2: complete slice-3-validation-and-redaction-boundary`
+  - `cargo check -p unified-agent-api --features opencode`
+  - `cargo test -p unified-agent-api --features opencode`
 - **Contracts published or changed**:
-  - pending
+  - `C-03` published through `docs/specs/opencode-agent-api-backend-contract.md` plus landed
+    `crates/agent_api/src/backends/opencode/**` implementation and backend tests
 - **Threads published / advanced**:
-  - pending
+  - `THR-06` now publishes the landed OpenCode backend request/event/completion mapping,
+    conservative capability posture, fail-closed extension boundary, and deterministic validation
+    evidence for `SEAM-3`
 - **Review-surface delta**:
-  - pending
+  - `crates/agent_api/**` now exposes a feature-gated OpenCode backend that consumes the landed
+    wrapper crate instead of re-implementing wrapper transport or parser behavior
+  - public OpenCode backend events remain bounded and redacted: text maps to `TextOutput`,
+    lifecycle maps to `Status`, parse failures surface as safe `Error` events, and completion data
+    stays `None`
+  - capability advertisement is intentionally conservative: `agent_api.run`,
+    `agent_api.events`, and `agent_api.events.live` are the only claimed OpenCode v1 capability ids
+    under the current runtime evidence
+  - deterministic fake-binary validation, timeout redaction, and missing-binary redaction are now
+    the default backend proof path; live-provider smoke is still basis-lock evidence only
 - **Planned-vs-landed delta**:
-  - pending
+  - S2 landed a narrower capability allowlist than the backend contract's candidate control set
+    because the current wrapper/runtime evidence does not yet justify model or session-specific
+    runtime-failure translation
+  - validation and redaction hardening landed as backend test coverage and harness redaction
+    behavior rather than as new canonical spec mutations
 - **Downstream stale triggers raised**:
-  - pending
+  - wrapper event or completion semantics drift
+  - capability advertisement or extension registry drift
+  - redaction or bounded-payload posture drift
 - **Remediation disposition**:
-  - none yet
+  - none
 - **Promotion blockers**:
-  - seam not executed
-- **Promotion readiness**: blocked
+  - none
+- **Promotion readiness**: ready
 
 ## Post-exec gate disposition
 
-- **Landing gate**: pending
-- **Closeout gate**: pending
+- **Landing gate**: passed
+- **Closeout gate**: passed
 - **Unresolved remediations**: none
 - **Carried-forward remediations**: none
