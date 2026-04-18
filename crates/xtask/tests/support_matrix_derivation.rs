@@ -214,13 +214,24 @@ fn derives_target_scoped_rows_with_sparse_caveats_and_pointer_state() {
         )],
     );
 
+    materialize_root(
+        &workspace.join("cli_manifests/opencode"),
+        &["linux-x64"],
+        "3.0.0",
+        &["linux-x64"],
+        &[("3.0.0", &["linux-x64"])],
+        &[],
+        &[],
+        &[],
+    );
+
     let rows = derive_rows(&workspace).expect("derive rows");
     validate_publication_consistency(&workspace, &rows)
         .expect("derived rows should satisfy the shared consistency helper");
     assert_eq!(
         rows.len(),
-        5,
-        "expected two codex versions x two targets + one claude row"
+        6,
+        "expected two codex versions x two targets + one claude row + one opencode row"
     );
 
     let claude_row = find_row(&rows, "claude_code", "2.0.0", "linux-x64");
@@ -293,11 +304,19 @@ fn derives_target_scoped_rows_with_sparse_caveats_and_pointer_state() {
         ]
     );
 
+    let opencode_row = find_row(&rows, "opencode", "3.0.0", "linux-x64");
+    assert_eq!(opencode_row.manifest_support, ManifestSupportState::Supported);
+    assert_eq!(opencode_row.backend_support, BackendSupportState::Unsupported);
+    assert_eq!(opencode_row.uaa_support, UaaSupportState::Unsupported);
+    assert_eq!(opencode_row.pointer_promotion, PointerPromotionState::None);
+    assert!(opencode_row.evidence_notes.is_empty());
+
     assert_eq!(rows[0].agent, "claude_code");
     assert_eq!(rows[1].agent, "codex");
     assert_eq!(rows[1].target, "linux-x64");
     assert_eq!(rows[1].version, "1.0.0");
     assert_eq!(rows[2].version, "0.9.0");
+    assert_eq!(rows[5].agent, "opencode");
 }
 
 #[test]
@@ -418,4 +437,37 @@ fn derives_rows_for_codex_claude_and_synthetic_future_agent_roots() {
                 .to_string()
         ]
     );
+}
+
+#[test]
+fn missing_version_coverage_defaults_to_manifest_unsupported() {
+    let workspace = make_temp_dir("support-matrix-derivation-missing-coverage");
+
+    materialize_root(
+        &workspace.join("cli_manifests/opencode"),
+        &["linux-x64"],
+        "1.4.9",
+        &["linux-x64"],
+        &[("1.4.9", &["linux-x64"])],
+        &[],
+        &[],
+        &[],
+    );
+    write_json(
+        &workspace.join("cli_manifests/opencode/versions/1.4.9.json"),
+        &json!({
+            "semantic_version": "1.4.9",
+            "status": "snapshotted",
+        }),
+    );
+
+    let rows = derive_rows_for_test_roots(&workspace, &[("opencode", "cli_manifests/opencode")])
+        .expect("derive rows for opencode root without coverage block");
+    let row = find_row(&rows, "opencode", "1.4.9", "linux-x64");
+
+    assert_eq!(row.manifest_support, ManifestSupportState::Unsupported);
+    assert_eq!(row.backend_support, BackendSupportState::Unsupported);
+    assert_eq!(row.uaa_support, UaaSupportState::Unsupported);
+    assert_eq!(row.pointer_promotion, PointerPromotionState::None);
+    assert!(row.evidence_notes.is_empty());
 }

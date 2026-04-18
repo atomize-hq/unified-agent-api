@@ -163,6 +163,30 @@ fn materialize_baseline_workspace(workspace: &Path) {
         &[("linux-x64", "2.0.0")],
         &[("2.0.0", "coverage.linux-x64.json", empty_report())],
     );
+
+    materialize_root(
+        &workspace.join("cli_manifests/opencode"),
+        &["linux-x64"],
+        "3.0.0",
+        &["linux-x64"],
+        &[("3.0.0", &["linux-x64"])],
+        &[],
+        &[],
+        &[],
+    );
+}
+
+fn materialize_opencode_root(workspace: &Path) {
+    materialize_root(
+        &workspace.join("cli_manifests/opencode"),
+        &["linux-x64"],
+        "3.0.0",
+        &["linux-x64"],
+        &[("3.0.0", &["linux-x64"])],
+        &[],
+        &[],
+        &[],
+    );
 }
 
 #[test]
@@ -325,6 +349,7 @@ fn publication_consistency_rejects_missing_committed_row() {
         &[("linux-x64", "2.0.0")],
         &[("2.0.0", "coverage.linux-x64.json", empty_report())],
     );
+    materialize_opencode_root(&workspace);
 
     let mut rows = derive_rows(&workspace).expect("derive rows");
     rows.retain(|row| {
@@ -389,6 +414,7 @@ fn publication_consistency_rejects_duplicate_row() {
         &[("linux-x64", "2.0.0")],
         &[("2.0.0", "coverage.linux-x64.json", empty_report())],
     );
+    materialize_opencode_root(&workspace);
 
     let mut rows = derive_rows(&workspace).expect("derive rows");
     let duplicate = rows
@@ -436,6 +462,7 @@ fn publication_consistency_rejects_unexpected_row() {
         &[("linux-x64", "2.0.0")],
         &[("2.0.0", "coverage.linux-x64.json", empty_report())],
     );
+    materialize_opencode_root(&workspace);
 
     let mut rows = derive_rows(&workspace).expect("derive rows");
     let unexpected = rows
@@ -486,6 +513,7 @@ fn publication_consistency_rejects_pointer_promotion_drift() {
         &[("linux-x64", "2.0.0")],
         &[("2.0.0", "coverage.linux-x64.json", empty_report())],
     );
+    materialize_opencode_root(&workspace);
 
     let mut rows = derive_rows(&workspace).expect("derive rows");
     let row = rows
@@ -529,6 +557,7 @@ fn publication_consistency_rejects_omission_claim_and_note_drift() {
         &[("linux-x64", "2.0.0")],
         &[("2.0.0", "coverage.linux-x64.json", empty_report())],
     );
+    materialize_opencode_root(&workspace);
 
     let mut rows = derive_rows(&workspace).expect("derive rows");
     let row = rows
@@ -592,6 +621,7 @@ fn publication_consistency_rejects_status_drift_for_latest_validated_rows() {
         &[("linux-x64", "2.0.0")],
         &[("2.0.0", "coverage.linux-x64.json", empty_report())],
     );
+    materialize_opencode_root(&workspace);
 
     let rows = derive_rows(&workspace).expect("derive rows");
     let issues = validate_publication_consistency(&workspace, &rows)

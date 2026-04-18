@@ -55,10 +55,11 @@ pub(super) struct VersionMetadata {
     pub(super) semantic_version: String,
     #[serde(default)]
     pub(super) status: Option<String>,
+    #[serde(default)]
     coverage: VersionCoverage,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize)]
 struct VersionCoverage {
     #[serde(default)]
     supported_targets: Vec<String>,
