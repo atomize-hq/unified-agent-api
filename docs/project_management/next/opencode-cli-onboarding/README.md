@@ -8,6 +8,7 @@ This pack captures the closed seam briefs, authoritative threading, pack-level r
 and governance records that onboarded `OpenCode` as the first real third CLI agent in this repo.
 
 - Start here: `scope_brief.md`
+- New-session handoff and next-step brief: `next-steps-handoff.md`
 - Seam overview: `seam_map.md`
 - Threading: `threading.md`
 - Pack review surfaces: `review_surfaces.md`
