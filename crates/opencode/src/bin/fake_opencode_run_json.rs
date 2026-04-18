@@ -1,6 +1,5 @@
 use std::{
-    env,
-    fs,
+    env, fs,
     io::{self, Write},
     thread,
     time::Duration,
@@ -32,15 +31,18 @@ fn capture_invocation() {
         "argv": env::args().skip(1).collect::<Vec<_>>(),
         "cwd": env::current_dir().ok().map(|path| path.display().to_string()),
     });
-    fs::write(capture_path, serde_json::to_vec_pretty(&payload).expect("serialize capture"))
-        .expect("write capture");
+    fs::write(
+        capture_path,
+        serde_json::to_vec_pretty(&payload).expect("serialize capture"),
+    )
+    .expect("write capture");
 }
 
 fn main() -> io::Result<()> {
     capture_invocation();
 
-    let scenario = env::var("FAKE_OPENCODE_SCENARIO")
-        .unwrap_or_else(|_| "three_events_delayed".to_string());
+    let scenario =
+        env::var("FAKE_OPENCODE_SCENARIO").unwrap_or_else(|_| "three_events_delayed".to_string());
 
     let step_start = first_nonempty_line(STEP_START);
     let text = first_nonempty_line(TEXT);

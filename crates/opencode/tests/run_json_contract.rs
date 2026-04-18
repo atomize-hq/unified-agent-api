@@ -1,8 +1,6 @@
 mod support_paths;
 
-use opencode::{
-    OpencodeRunJsonErrorCode, OpencodeRunJsonEvent, OpencodeRunJsonParser,
-};
+use opencode::{OpencodeRunJsonErrorCode, OpencodeRunJsonEvent, OpencodeRunJsonParser};
 
 fn read_fixture(name: &str) -> String {
     std::fs::read_to_string(support_paths::opencode_run_json_fixtures_dir().join(name))

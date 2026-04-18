@@ -48,7 +48,10 @@ async fn run_json_yields_events_incrementally_and_tracks_completion_text() {
         .expect("event parses");
     assert!(matches!(third, OpencodeRunJsonEvent::StepFinish { .. }));
 
-    assert!(events.next().await.is_none(), "expected event stream to close");
+    assert!(
+        events.next().await.is_none(),
+        "expected event stream to close"
+    );
 
     let completion = completion.await.unwrap();
     assert!(completion.status.success());
@@ -211,7 +214,10 @@ async fn run_json_passes_only_the_accepted_controls_on_the_canonical_surface() {
 #[tokio::test]
 async fn run_json_rejects_empty_prompts_before_spawn() {
     let client = make_fake_client("capture_args");
-    let error = client.run_json(OpencodeRunRequest::new("   ")).await.unwrap_err();
+    let error = client
+        .run_json(OpencodeRunRequest::new("   "))
+        .await
+        .unwrap_err();
     match error {
         opencode::OpencodeError::InvalidRequest(message) => {
             assert!(message.contains("prompt"));
