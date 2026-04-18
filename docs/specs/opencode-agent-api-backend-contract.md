@@ -212,6 +212,17 @@ This contract intentionally does not:
 - move wrapper-private parsing, normalization, or redaction duties out of the wrapper seam
 - introduce any planning identifiers or seam-local process markers into canonical spec text
 
+## Registration baseline
+
+The OpenCode backend is expected to enter `crates/agent_api` as a feature-gated backend module
+under `backends::opencode`.
+
+- The `opencode` Cargo feature MAY expose the backend registration surface in
+  `crates/agent_api`, but it MUST NOT imply any request mapping, event mapping, completion
+  handling, capability advertisement, or extension behavior by itself.
+- This contract is satisfied for S00 once the registration baseline exists and remains bounded by
+  the wrapper and manifest contracts.
+
 ## Baseline verification checklist
 
 Before this contract is treated as settled, the repo SHOULD confirm:
