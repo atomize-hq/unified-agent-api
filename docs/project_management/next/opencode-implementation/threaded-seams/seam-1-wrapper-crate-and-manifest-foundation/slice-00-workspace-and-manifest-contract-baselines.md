@@ -81,9 +81,18 @@ open_remediations: []
 - **Implementation notes**:
   - follow the existing naming pattern (`unified-agent-api-opencode`, library name `opencode`)
     unless blocking repo evidence appears during execution
+  - treat `crates/opencode/` as the one intended wrapper home and treat workspace membership in
+    the repo-root `Cargo.toml` as part of that same wrapper-owned landing unit rather than as a
+    separate generic workspace exercise
+  - keep this slice doc-only: S00 defines the baseline, while S1 owns the actual `Cargo.toml` and
+    `crates/opencode/**` edits
   - keep event typing, completion handoff, parser ownership, and redaction in the wrapper seam
 - **Acceptance criteria**:
+  - implementation has one explicit naming baseline to follow:
+    package `unified-agent-api-opencode`, library crate name `opencode`, path `crates/opencode/`
   - implementation can add `crates/opencode/` without backend-owned ambiguity
+  - implementation knows that workspace membership, crate skeleton creation, and any public Rust
+    API materialization belong to S1 rather than this slice
   - helper surfaces remain explicitly deferred
 - **Test notes**:
   - compare the baseline against current `crates/codex/` and `crates/claude_code/` conventions
@@ -101,10 +110,28 @@ open_remediations: []
     validator work
 - **Thread/contract refs**: `THR-05`, `C-02`
 - **Implementation notes**:
-  - keep root validation OpenCode-specific and deterministic
+  - the initial `cli_manifests/opencode/` implementation baseline must include the same committed
+    root classes already present under current roots: `README.md`, `SCHEMA.json`, `RULES.json`,
+    `VALIDATOR_SPEC.md`, `VERSION_METADATA_SCHEMA.json`, `artifacts.lock.json`, `current.json`,
+    `min_supported.txt`, `latest_validated.txt`, `pointers/latest_supported/**`,
+    `pointers/latest_validated/**`, `versions/*.json`, `reports/**`, `snapshots/**`,
+    `wrapper_coverage.json`, and `supplement/commands.json` only when explicit help omissions must
+    be recorded
+  - keep root validation root-driven first by reusing the existing
+    `cargo run -p xtask -- codex-validate --root cli_manifests/opencode` posture before adding new
+    code paths
+  - add bounded OpenCode-specific validator support only where repo evidence shows the current
+    root-driven path is insufficient for this root; do not generalize into future-agent template
+    scaffolding
+  - keep raw or debug-only help captures non-authoritative and outside the committed support
+    signal
   - keep manifest evidence distinct from backend or unified support claims
 - **Acceptance criteria**:
+  - implementation knows the exact committed artifact classes required to make
+    `cli_manifests/opencode/` mechanically reviewable
   - implementation knows which committed artifacts are required to make the root valid
+  - implementation knows that root inventory materialization and validator code changes belong to
+    S2 rather than this slice
   - validator work remains bounded to OpenCode rather than future-agent template work
 - **Test notes**:
   - compare the baseline against current `cli_manifests/codex/**` and
@@ -117,3 +144,6 @@ Checklist:
 - Implement: lock the workspace, wrapper, manifest-root, and validator baselines for OpenCode
 - Test: compare the plan against current repo wrapper and manifest-root norms
 - Validate: confirm `C-01` and `C-02` are concrete enough for implementation to start
+- Guardrail: do not treat S00 as authority to edit `Cargo.toml`, `crates/opencode/**`,
+  `cli_manifests/opencode/**`, `crates/xtask/**`, `crates/agent_api/**`, support publication
+  artifacts, or helper-surface behavior
