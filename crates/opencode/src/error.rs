@@ -17,10 +17,14 @@ pub enum OpencodeError {
     Wait(std::io::Error),
     #[error("failed reading stdout: {0}")]
     StdoutRead(std::io::Error),
+    #[error("failed reading stderr: {0}")]
+    StderrRead(std::io::Error),
     #[error("internal error: missing stdout pipe")]
     MissingStdout,
     #[error("internal error: join failure: {0}")]
     Join(String),
     #[error("request is invalid: {0}")]
     InvalidRequest(String),
+    #[error("{message}")]
+    SelectionFailed { message: String },
 }

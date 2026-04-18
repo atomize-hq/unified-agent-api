@@ -9,7 +9,7 @@ fn opencode_adapter_implements_backend_harness_adapter_contract() {
 }
 
 #[test]
-fn opencode_backend_keeps_capabilities_and_extensions_conservative() {
+fn opencode_backend_advertises_the_canonical_model_and_session_controls() {
     let backend = backend_with_env(Default::default());
 
     assert_eq!(
@@ -18,7 +18,17 @@ fn opencode_backend_keeps_capabilities_and_extensions_conservative() {
             "agent_api.run".to_string(),
             "agent_api.events".to_string(),
             "agent_api.events.live".to_string(),
+            "agent_api.config.model.v1".to_string(),
+            "agent_api.session.resume.v1".to_string(),
+            "agent_api.session.fork.v1".to_string(),
         ])
     );
-    assert!(backend.supported_extension_keys().is_empty());
+    assert_eq!(
+        backend.supported_extension_keys(),
+        &[
+            "agent_api.config.model.v1",
+            "agent_api.session.resume.v1",
+            "agent_api.session.fork.v1",
+        ]
+    );
 }

@@ -422,6 +422,9 @@ mod tests {
                 "agent_api.run".to_string(),
                 "agent_api.events".to_string(),
                 "agent_api.events.live".to_string(),
+                "agent_api.config.model.v1".to_string(),
+                "agent_api.session.resume.v1".to_string(),
+                "agent_api.session.fork.v1".to_string(),
             ]
             .into_iter()
             .collect()

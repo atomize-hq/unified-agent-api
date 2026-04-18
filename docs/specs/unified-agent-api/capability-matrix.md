@@ -32,9 +32,9 @@ Do not edit by hand.
 
 | capability id | `claude_code` | `codex` | `opencode` |
 |---|---|---|---|
-| `agent_api.session.fork.v1` | ✅ | ✅ | — |
+| `agent_api.session.fork.v1` | ✅ | ✅ | ✅ |
 | `agent_api.session.handle.v1` | ✅ | ✅ | — |
-| `agent_api.session.resume.v1` | ✅ | ✅ | — |
+| `agent_api.session.resume.v1` | ✅ | ✅ | ✅ |
 
 ## `agent_api.tools`
 
@@ -61,7 +61,7 @@ Do not edit by hand.
 
 | capability id | `claude_code` | `codex` | `opencode` |
 |---|---|---|---|
-| `agent_api.config.model.v1` | ✅ | ✅ | — |
+| `agent_api.config.model.v1` | ✅ | ✅ | ✅ |
 
 ## `backend.claude_code`
 

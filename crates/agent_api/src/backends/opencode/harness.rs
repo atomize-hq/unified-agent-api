@@ -7,17 +7,32 @@ use crate::{
         BackendHarnessAdapter, BackendHarnessErrorPhase, BackendSpawn, DynBackendEventStream,
         NormalizedRequest,
     },
+    backends::session_selectors::{
+        parse_session_fork_v1, parse_session_resume_v1, validate_resume_fork_mutual_exclusion,
+        SessionSelectorV1, EXT_SESSION_FORK_V1, EXT_SESSION_RESUME_V1,
+    },
     AgentWrapperCompletion, AgentWrapperError, AgentWrapperEvent, AgentWrapperKind,
-    AgentWrapperRunRequest,
+    AgentWrapperRunRequest, EXT_AGENT_API_CONFIG_MODEL_V1,
 };
 
 use super::{mapping::map_run_json_event, OpencodeBackend};
 
+const SUPPORTED_EXTENSION_KEYS: [&str; 3] = [
+    EXT_AGENT_API_CONFIG_MODEL_V1,
+    EXT_SESSION_RESUME_V1,
+    EXT_SESSION_FORK_V1,
+];
 const REDACTED_SPAWN_MESSAGE: &str = "opencode backend error: spawn failed";
 const REDACTED_MISSING_BINARY_MESSAGE: &str = "opencode backend error: binary not found";
 const REDACTED_STREAM_MESSAGE: &str = "opencode backend error: malformed run output";
 const REDACTED_COMPLETION_MESSAGE: &str = "opencode backend error: completion failed";
 const REDACTED_TIMEOUT_MESSAGE: &str = "opencode backend error: timeout";
+
+#[derive(Clone, Debug, Default)]
+pub struct OpencodeExecPolicy {
+    resume: Option<SessionSelectorV1>,
+    fork: Option<SessionSelectorV1>,
+}
 
 #[derive(Debug)]
 pub enum OpencodeBackendError {
@@ -32,16 +47,29 @@ impl BackendHarnessAdapter for OpencodeBackend {
     }
 
     fn supported_extension_keys(&self) -> &'static [&'static str] {
-        &[]
+        &SUPPORTED_EXTENSION_KEYS
     }
 
-    type Policy = ();
+    type Policy = OpencodeExecPolicy;
 
     fn validate_and_extract_policy(
         &self,
-        _request: &AgentWrapperRunRequest,
+        request: &AgentWrapperRunRequest,
     ) -> Result<Self::Policy, AgentWrapperError> {
-        Ok(())
+        validate_resume_fork_mutual_exclusion(&request.extensions)?;
+
+        let resume = request
+            .extensions
+            .get(EXT_SESSION_RESUME_V1)
+            .map(parse_session_resume_v1)
+            .transpose()?;
+        let fork = request
+            .extensions
+            .get(EXT_SESSION_FORK_V1)
+            .map(parse_session_fork_v1)
+            .transpose()?;
+
+        Ok(OpencodeExecPolicy { resume, fork })
     }
 
     type BackendEvent = opencode::OpencodeRunJsonEvent;
@@ -71,10 +99,16 @@ impl BackendHarnessAdapter for OpencodeBackend {
             .binary
             .clone()
             .or_else(|| std::env::var_os("OPENCODE_BINARY").map(PathBuf::from));
-        let timeout = req.effective_timeout;
-        let env = req.env;
-        let working_dir = req.working_dir;
-        let prompt = req.prompt;
+        let NormalizedRequest {
+            prompt,
+            model_id,
+            working_dir,
+            effective_timeout: timeout,
+            env,
+            policy,
+            ..
+        } = req;
+        let OpencodeExecPolicy { resume, fork } = policy;
 
         Box::pin(async move {
             let mut builder = opencode::OpencodeClient::builder();
@@ -90,6 +124,27 @@ impl BackendHarnessAdapter for OpencodeBackend {
             let client = builder.build();
 
             let mut run_request = opencode::OpencodeRunRequest::new(prompt);
+            if let Some(model_id) = model_id {
+                run_request = run_request.model(model_id);
+            }
+            match resume {
+                Some(SessionSelectorV1::Last) => {
+                    run_request = run_request.continue_session(true);
+                }
+                Some(SessionSelectorV1::Id { id }) => {
+                    run_request = run_request.session(id);
+                }
+                None => {}
+            }
+            match fork {
+                Some(SessionSelectorV1::Last) => {
+                    run_request = run_request.continue_session(true).fork(true);
+                }
+                Some(SessionSelectorV1::Id { id }) => {
+                    run_request = run_request.session(id).fork(true);
+                }
+                None => {}
+            }
             if let Some(working_dir) = working_dir {
                 run_request = run_request.working_dir(working_dir);
             }
@@ -137,6 +192,12 @@ impl BackendHarnessAdapter for OpencodeBackend {
                 BackendHarnessErrorPhase::Spawn,
                 OpencodeBackendError::Spawn(opencode::OpencodeError::MissingBinary),
             ) => REDACTED_MISSING_BINARY_MESSAGE.to_string(),
+            (
+                BackendHarnessErrorPhase::Completion,
+                OpencodeBackendError::Completion(opencode::OpencodeError::SelectionFailed {
+                    message,
+                }),
+            ) => message.clone(),
             (BackendHarnessErrorPhase::Spawn, OpencodeBackendError::Spawn(_)) => {
                 REDACTED_SPAWN_MESSAGE.to_string()
             }
@@ -153,6 +214,12 @@ impl BackendHarnessAdapter for OpencodeBackend {
             (_, OpencodeBackendError::Spawn(opencode::OpencodeError::MissingBinary)) => {
                 REDACTED_MISSING_BINARY_MESSAGE.to_string()
             }
+            (
+                _,
+                OpencodeBackendError::Completion(opencode::OpencodeError::SelectionFailed {
+                    message,
+                }),
+            ) => message.clone(),
             (_, OpencodeBackendError::Spawn(_)) => REDACTED_SPAWN_MESSAGE.to_string(),
             (_, OpencodeBackendError::StreamParse) => REDACTED_STREAM_MESSAGE.to_string(),
             (_, OpencodeBackendError::Completion(opencode::OpencodeError::Timeout { .. })) => {

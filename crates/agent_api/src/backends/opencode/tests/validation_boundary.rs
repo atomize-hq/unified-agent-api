@@ -1,10 +1,11 @@
 use std::{collections::BTreeMap, path::PathBuf, time::Duration};
 
 use futures_util::StreamExt;
+use serde_json::json;
 
 use crate::{backends::opencode::OpencodeBackendConfig, AgentWrapperBackend, AgentWrapperError};
 
-use super::support::{backend_with_config, backend_with_timeout, request};
+use super::support::{backend_with_config, backend_with_env, backend_with_timeout, request};
 
 #[tokio::test]
 async fn opencode_backend_validation_uses_fake_binary_timeout_path_without_live_provider_state() {
@@ -76,5 +77,60 @@ async fn opencode_backend_missing_binary_surfaces_safe_spawn_error() {
             assert_eq!(message, "opencode backend error: binary not found");
         }
         other => panic!("expected Backend spawn error, got {other:?}"),
+    }
+}
+
+#[tokio::test]
+async fn opencode_backend_rejects_mutually_exclusive_resume_and_fork_before_spawn() {
+    let backend = backend_with_config(OpencodeBackendConfig {
+        binary: Some(PathBuf::from("/definitely/not/a/real/opencode-binary")),
+        default_timeout: None,
+        env: BTreeMap::new(),
+    });
+    let mut run_request = request("Reply with OK.", None);
+    run_request.extensions.insert(
+        "agent_api.session.resume.v1".to_string(),
+        json!({"selector": "last"}),
+    );
+    run_request.extensions.insert(
+        "agent_api.session.fork.v1".to_string(),
+        json!({"selector": "id", "id": "session-123"}),
+    );
+
+    let err = backend
+        .run(run_request)
+        .await
+        .expect_err("mutually exclusive selectors must fail before spawn");
+    match err {
+        AgentWrapperError::InvalidRequest { message } => assert_eq!(
+            message,
+            "agent_api.session.resume.v1 and agent_api.session.fork.v1 are mutually exclusive"
+        ),
+        other => panic!("expected InvalidRequest, got {other:?}"),
+    }
+}
+
+#[tokio::test]
+async fn opencode_backend_keeps_add_dirs_fail_closed() {
+    let backend = backend_with_env(Default::default());
+    let mut run_request = request("Reply with OK.", None);
+    run_request.extensions.insert(
+        "agent_api.exec.add_dirs.v1".to_string(),
+        json!({"dirs": ["."]}),
+    );
+
+    let err = backend
+        .run(run_request)
+        .await
+        .expect_err("add_dirs must remain unsupported for opencode");
+    match err {
+        AgentWrapperError::UnsupportedCapability {
+            agent_kind,
+            capability,
+        } => {
+            assert_eq!(agent_kind, "opencode");
+            assert_eq!(capability, "agent_api.exec.add_dirs.v1");
+        }
+        other => panic!("expected UnsupportedCapability, got {other:?}"),
     }
 }

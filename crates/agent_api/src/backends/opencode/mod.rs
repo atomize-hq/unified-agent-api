@@ -6,6 +6,8 @@ const AGENT_KIND: &str = "opencode";
 const CAP_RUN_V1: &str = "agent_api.run";
 const CAP_EVENTS_V1: &str = "agent_api.events";
 const CAP_EVENTS_LIVE_V1: &str = "agent_api.events.live";
+const CAP_SESSION_RESUME_V1: &str = "agent_api.session.resume.v1";
+const CAP_SESSION_FORK_V1: &str = "agent_api.session.fork.v1";
 
 mod backend;
 mod harness;

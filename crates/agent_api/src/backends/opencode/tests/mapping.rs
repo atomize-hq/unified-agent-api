@@ -74,3 +74,20 @@ fn unknown_maps_to_unknown_without_echoing_raw_line() {
     assert_eq!(mapped.data, None);
     assert!(!format!("{mapped:?}").contains("do-not-leak"));
 }
+
+#[test]
+fn terminal_error_maps_to_public_error_without_echoing_raw_payload() {
+    let event = opencode::OpencodeRunJsonEvent::TerminalError {
+        message: "no session found".to_string(),
+        raw: json!({"secret":"do-not-leak"}),
+    };
+
+    let mapped = map_run_json_event(event);
+    assert_eq!(mapped.len(), 1);
+
+    let mapped = &mapped[0];
+    assert_eq!(mapped.kind, AgentWrapperEventKind::Error);
+    assert_eq!(mapped.message.as_deref(), Some("no session found"));
+    assert_eq!(mapped.data, None);
+    assert!(!format!("{mapped:?}").contains("do-not-leak"));
+}

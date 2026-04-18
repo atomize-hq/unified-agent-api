@@ -74,6 +74,14 @@ fn main() -> io::Result<()> {
             write_line(&mut out, &format!("{step_start}\n"))?;
             thread::sleep(Duration::from_secs(30));
         }
+        "session_not_found_last" => {
+            eprintln!("NO SESSION found for SECRET_LAST_SESSION_SCOPE");
+            std::process::exit(2);
+        }
+        "session_not_found_id" => {
+            eprintln!("session not found: SECRET_SESSION_ID_DO_NOT_LEAK");
+            std::process::exit(2);
+        }
         _ => {
             write_line(&mut out, &format!("{step_start}\n"))?;
             thread::sleep(Duration::from_millis(150));

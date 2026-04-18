@@ -15,10 +15,10 @@ fn opencode_backend_advertises_only_the_end_to_end_capabilities_it_currently_hon
             "agent_api.run".to_string(),
             "agent_api.events".to_string(),
             "agent_api.events.live".to_string(),
+            "agent_api.config.model.v1".to_string(),
+            "agent_api.session.resume.v1".to_string(),
+            "agent_api.session.fork.v1".to_string(),
         ])
     );
-    assert!(!ids.contains("agent_api.config.model.v1"));
-    assert!(!ids.contains("agent_api.session.resume.v1"));
-    assert!(!ids.contains("agent_api.session.fork.v1"));
     assert!(!ids.contains("agent_api.exec.add_dirs.v1"));
 }

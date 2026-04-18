@@ -18,6 +18,9 @@ impl AgentWrapperBackend for OpencodeBackend {
             super::CAP_RUN_V1.to_string(),
             super::CAP_EVENTS_V1.to_string(),
             super::CAP_EVENTS_LIVE_V1.to_string(),
+            crate::EXT_AGENT_API_CONFIG_MODEL_V1.to_string(),
+            super::CAP_SESSION_RESUME_V1.to_string(),
+            super::CAP_SESSION_FORK_V1.to_string(),
         ]);
         AgentWrapperCapabilities { ids }
     }

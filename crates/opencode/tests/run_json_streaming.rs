@@ -225,3 +225,81 @@ async fn run_json_rejects_empty_prompts_before_spawn() {
         other => panic!("expected invalid request, got {other:?}"),
     }
 }
+
+#[tokio::test]
+async fn run_json_classifies_resume_last_selection_failure_without_leaking_stderr() {
+    let client = make_fake_client("session_not_found_last");
+    let handle = client
+        .run_json(OpencodeRunRequest::new("Reply with OK.").continue_session(true))
+        .await
+        .unwrap();
+
+    let mut events = handle.events;
+    let first = events
+        .next()
+        .await
+        .expect("stream open")
+        .expect("typed terminal error event");
+    match first {
+        OpencodeRunJsonEvent::TerminalError { message, .. } => {
+            assert_eq!(message, "no session found");
+            assert!(!message.contains("SECRET_LAST_SESSION_SCOPE"));
+        }
+        other => panic!("expected terminal error event, got {other:?}"),
+    }
+    assert!(
+        events.next().await.is_none(),
+        "selection failure should end the stream"
+    );
+
+    let error = handle
+        .completion
+        .await
+        .expect_err("selection failure must surface completion error");
+    match error {
+        opencode::OpencodeError::SelectionFailed { message } => {
+            assert_eq!(message, "no session found");
+            assert!(!message.contains("SECRET_LAST_SESSION_SCOPE"));
+        }
+        other => panic!("expected selection failure, got {other:?}"),
+    }
+}
+
+#[tokio::test]
+async fn run_json_classifies_resume_id_selection_failure_without_leaking_stderr() {
+    let client = make_fake_client("session_not_found_id");
+    let handle = client
+        .run_json(OpencodeRunRequest::new("Reply with OK.").session("session-123"))
+        .await
+        .unwrap();
+
+    let mut events = handle.events;
+    let first = events
+        .next()
+        .await
+        .expect("stream open")
+        .expect("typed terminal error event");
+    match first {
+        OpencodeRunJsonEvent::TerminalError { message, .. } => {
+            assert_eq!(message, "session not found");
+            assert!(!message.contains("SECRET_SESSION_ID_DO_NOT_LEAK"));
+        }
+        other => panic!("expected terminal error event, got {other:?}"),
+    }
+    assert!(
+        events.next().await.is_none(),
+        "selection failure should end the stream"
+    );
+
+    let error = handle
+        .completion
+        .await
+        .expect_err("selection failure must surface completion error");
+    match error {
+        opencode::OpencodeError::SelectionFailed { message } => {
+            assert_eq!(message, "session not found");
+            assert!(!message.contains("SECRET_SESSION_ID_DO_NOT_LEAK"));
+        }
+        other => panic!("expected selection failure, got {other:?}"),
+    }
+}

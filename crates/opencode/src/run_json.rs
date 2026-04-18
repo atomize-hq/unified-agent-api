@@ -177,6 +177,10 @@ pub enum OpencodeRunJsonEvent {
         session_id: Option<String>,
         raw: Value,
     },
+    TerminalError {
+        message: String,
+        raw: Value,
+    },
 }
 
 impl OpencodeRunJsonEvent {
@@ -186,6 +190,7 @@ impl OpencodeRunJsonEvent {
             OpencodeRunJsonEvent::Text { raw, .. } => raw,
             OpencodeRunJsonEvent::StepFinish { raw, .. } => raw,
             OpencodeRunJsonEvent::Unknown { raw, .. } => raw,
+            OpencodeRunJsonEvent::TerminalError { raw, .. } => raw,
         }
     }
 
@@ -195,6 +200,7 @@ impl OpencodeRunJsonEvent {
             OpencodeRunJsonEvent::Text { .. } => "text",
             OpencodeRunJsonEvent::StepFinish { .. } => "step_finish",
             OpencodeRunJsonEvent::Unknown { event_type, .. } => event_type.as_str(),
+            OpencodeRunJsonEvent::TerminalError { .. } => "terminal_error",
         }
     }
 
@@ -204,6 +210,7 @@ impl OpencodeRunJsonEvent {
             OpencodeRunJsonEvent::Text { session_id, .. } => session_id.as_deref(),
             OpencodeRunJsonEvent::StepFinish { session_id, .. } => session_id.as_deref(),
             OpencodeRunJsonEvent::Unknown { session_id, .. } => session_id.as_deref(),
+            OpencodeRunJsonEvent::TerminalError { .. } => None,
         }
     }
 }

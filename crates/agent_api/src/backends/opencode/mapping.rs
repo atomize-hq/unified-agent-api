@@ -33,6 +33,17 @@ fn unknown_event() -> AgentWrapperEvent {
     }
 }
 
+fn error_event(message: String) -> AgentWrapperEvent {
+    AgentWrapperEvent {
+        agent_kind: AgentWrapperKind(super::AGENT_KIND.to_string()),
+        kind: AgentWrapperEventKind::Error,
+        channel: Some("error".to_string()),
+        text: None,
+        message: Some(message),
+        data: None,
+    }
+}
+
 pub(super) fn map_run_json_event(event: opencode::OpencodeRunJsonEvent) -> Vec<AgentWrapperEvent> {
     match event {
         opencode::OpencodeRunJsonEvent::Text { text, .. } => vec![text_event(text)],
@@ -43,5 +54,6 @@ pub(super) fn map_run_json_event(event: opencode::OpencodeRunJsonEvent) -> Vec<A
             vec![status_event(Some("step_finish".to_string()))]
         }
         opencode::OpencodeRunJsonEvent::Unknown { .. } => vec![unknown_event()],
+        opencode::OpencodeRunJsonEvent::TerminalError { message, .. } => vec![error_event(message)],
     }
 }
