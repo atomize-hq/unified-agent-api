@@ -4,6 +4,7 @@ use std::{
     path::{Path, PathBuf},
     process::Command,
     sync::OnceLock,
+    time::Duration,
 };
 
 use crate::{
@@ -69,11 +70,26 @@ pub(super) fn fake_opencode_run_json_binary() -> PathBuf {
 }
 
 pub(super) fn backend_with_env(env: BTreeMap<String, String>) -> OpencodeBackend {
-    OpencodeBackend::new(OpencodeBackendConfig {
+    backend_with_config(OpencodeBackendConfig {
         binary: Some(fake_opencode_run_json_binary()),
         default_timeout: None,
         env,
     })
+}
+
+pub(super) fn backend_with_timeout(
+    env: BTreeMap<String, String>,
+    timeout: Duration,
+) -> OpencodeBackend {
+    backend_with_config(OpencodeBackendConfig {
+        binary: Some(fake_opencode_run_json_binary()),
+        default_timeout: Some(timeout),
+        env,
+    })
+}
+
+pub(super) fn backend_with_config(config: OpencodeBackendConfig) -> OpencodeBackend {
+    OpencodeBackend::new(config)
 }
 
 pub(super) fn request(prompt: &str, working_dir: Option<&Path>) -> AgentWrapperRunRequest {

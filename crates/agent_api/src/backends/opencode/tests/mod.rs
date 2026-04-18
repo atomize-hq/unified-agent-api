@@ -4,3 +4,4 @@ mod completion;
 mod extension_ownership;
 mod mapping;
 mod support;
+mod validation_boundary;

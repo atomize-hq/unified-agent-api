@@ -14,14 +14,16 @@ use crate::{
 use super::{mapping::map_run_json_event, OpencodeBackend};
 
 const REDACTED_SPAWN_MESSAGE: &str = "opencode backend error: spawn failed";
+const REDACTED_MISSING_BINARY_MESSAGE: &str = "opencode backend error: binary not found";
 const REDACTED_STREAM_MESSAGE: &str = "opencode backend error: malformed run output";
 const REDACTED_COMPLETION_MESSAGE: &str = "opencode backend error: completion failed";
+const REDACTED_TIMEOUT_MESSAGE: &str = "opencode backend error: timeout";
 
 #[derive(Debug)]
 pub enum OpencodeBackendError {
-    Spawn,
+    Spawn(opencode::OpencodeError),
     StreamParse,
-    Completion,
+    Completion(opencode::OpencodeError),
 }
 
 impl BackendHarnessAdapter for OpencodeBackend {
@@ -95,17 +97,14 @@ impl BackendHarnessAdapter for OpencodeBackend {
             let handle = client
                 .run_json(run_request)
                 .await
-                .map_err(|_| OpencodeBackendError::Spawn)?;
+                .map_err(OpencodeBackendError::Spawn)?;
             let opencode::OpencodeRunJsonHandle { events, completion } = handle;
 
             let events: DynBackendEventStream<Self::BackendEvent, Self::BackendError> =
                 Box::pin(events.map(|item| item.map_err(|_| OpencodeBackendError::StreamParse)));
 
-            let completion = Box::pin(async move {
-                completion
-                    .await
-                    .map_err(|_| OpencodeBackendError::Completion)
-            });
+            let completion =
+                Box::pin(async move { completion.await.map_err(OpencodeBackendError::Completion) });
 
             Ok(BackendSpawn {
                 events,
@@ -134,18 +133,32 @@ impl BackendHarnessAdapter for OpencodeBackend {
 
     fn redact_error(&self, phase: BackendHarnessErrorPhase, err: &Self::BackendError) -> String {
         match (phase, err) {
-            (BackendHarnessErrorPhase::Spawn, OpencodeBackendError::Spawn) => {
+            (
+                BackendHarnessErrorPhase::Spawn,
+                OpencodeBackendError::Spawn(opencode::OpencodeError::MissingBinary),
+            ) => REDACTED_MISSING_BINARY_MESSAGE.to_string(),
+            (BackendHarnessErrorPhase::Spawn, OpencodeBackendError::Spawn(_)) => {
                 REDACTED_SPAWN_MESSAGE.to_string()
             }
             (BackendHarnessErrorPhase::Stream, OpencodeBackendError::StreamParse) => {
                 REDACTED_STREAM_MESSAGE.to_string()
             }
-            (BackendHarnessErrorPhase::Completion, OpencodeBackendError::Completion) => {
+            (
+                BackendHarnessErrorPhase::Completion,
+                OpencodeBackendError::Completion(opencode::OpencodeError::Timeout { .. }),
+            ) => REDACTED_TIMEOUT_MESSAGE.to_string(),
+            (BackendHarnessErrorPhase::Completion, OpencodeBackendError::Completion(_)) => {
                 REDACTED_COMPLETION_MESSAGE.to_string()
             }
-            (_, OpencodeBackendError::Spawn) => REDACTED_SPAWN_MESSAGE.to_string(),
+            (_, OpencodeBackendError::Spawn(opencode::OpencodeError::MissingBinary)) => {
+                REDACTED_MISSING_BINARY_MESSAGE.to_string()
+            }
+            (_, OpencodeBackendError::Spawn(_)) => REDACTED_SPAWN_MESSAGE.to_string(),
             (_, OpencodeBackendError::StreamParse) => REDACTED_STREAM_MESSAGE.to_string(),
-            (_, OpencodeBackendError::Completion) => REDACTED_COMPLETION_MESSAGE.to_string(),
+            (_, OpencodeBackendError::Completion(opencode::OpencodeError::Timeout { .. })) => {
+                REDACTED_TIMEOUT_MESSAGE.to_string()
+            }
+            (_, OpencodeBackendError::Completion(_)) => REDACTED_COMPLETION_MESSAGE.to_string(),
         }
     }
 }
