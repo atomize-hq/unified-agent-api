@@ -66,6 +66,50 @@ fn copy_from_repo(codex_dir: &Path, filename: &str) {
     fs::copy(&src, &dst).unwrap_or_else(|e| panic!("copy {:?} -> {:?}: {}", src, dst, e));
 }
 
+fn copy_dir_recursive(src: &Path, dst: &Path) {
+    fs::create_dir_all(dst).expect("create destination directory");
+    for entry in fs::read_dir(src).unwrap_or_else(|e| panic!("read_dir {:?}: {}", src, e)) {
+        let entry = entry.unwrap_or_else(|e| panic!("read_dir entry {:?}: {}", src, e));
+        let src_path = entry.path();
+        let dst_path = dst.join(entry.file_name());
+        if entry
+            .file_type()
+            .unwrap_or_else(|e| panic!("file_type {:?}: {}", src_path, e))
+            .is_dir()
+        {
+            copy_dir_recursive(&src_path, &dst_path);
+        } else {
+            fs::copy(&src_path, &dst_path)
+                .unwrap_or_else(|e| panic!("copy {:?} -> {:?}: {}", src_path, dst_path, e));
+        }
+    }
+}
+
+fn materialize_committed_opencode_dir(opencode_dir: &Path) {
+    let src = workspace_root().join("cli_manifests").join("opencode");
+    copy_dir_recursive(&src, opencode_dir);
+}
+
+fn opencode_support_rows_from_repo() -> Vec<Value> {
+    let artifact_path = workspace_root()
+        .join("cli_manifests")
+        .join("support_matrix")
+        .join("current.json");
+    let artifact: Value = serde_json::from_str(
+        &fs::read_to_string(&artifact_path)
+            .unwrap_or_else(|e| panic!("read {:?}: {}", artifact_path, e)),
+    )
+    .unwrap_or_else(|e| panic!("parse {:?}: {}", artifact_path, e));
+
+    artifact["rows"]
+        .as_array()
+        .expect("support_matrix/current.json rows array")
+        .iter()
+        .filter(|row| row["agent"] == "opencode")
+        .cloned()
+        .collect()
+}
+
 fn target_platform(target: &str) -> (&'static str, &'static str) {
     match target {
         "x86_64-unknown-linux-musl" => ("linux", "x86_64"),
@@ -450,6 +494,8 @@ fn write_support_matrix_artifact(workspace_root: &Path) {
         );
     }
 
+    rows.extend(opencode_support_rows_from_repo());
+
     write_json(
         &workspace_root
             .join("cli_manifests")
@@ -465,10 +511,12 @@ fn write_support_matrix_artifact(workspace_root: &Path) {
 fn materialize_minimal_valid_workspace(workspace_root: &Path) -> PathBuf {
     let codex_dir = workspace_root.join("cli_manifests").join("codex");
     let claude_dir = workspace_root.join("cli_manifests").join("claude_code");
+    let opencode_dir = workspace_root.join("cli_manifests").join("opencode");
 
     write_workspace_manifest(workspace_root);
     materialize_minimal_valid_codex_dir(&codex_dir);
     materialize_minimal_valid_claude_dir(&claude_dir);
+    materialize_committed_opencode_dir(&opencode_dir);
     write_support_matrix_artifact(workspace_root);
 
     codex_dir
