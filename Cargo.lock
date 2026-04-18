@@ -1564,6 +1564,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "unified-agent-api-opencode"
+version = "0.2.3"
+dependencies = [
+ "futures-core",
+ "futures-util",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror",
+ "tokio",
+]
+
+[[package]]
 name = "unified-agent-api-wrapper-events"
 version = "0.2.3"
 dependencies = [
