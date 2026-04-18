@@ -3,6 +3,9 @@
 use std::{collections::BTreeMap, path::PathBuf, time::Duration};
 
 const AGENT_KIND: &str = "opencode";
+const CAP_RUN_V1: &str = "agent_api.run";
+const CAP_EVENTS_V1: &str = "agent_api.events";
+const CAP_EVENTS_LIVE_V1: &str = "agent_api.events.live";
 
 mod backend;
 mod harness;

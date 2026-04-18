@@ -1,4 +1,4 @@
-use std::{future::Future, pin::Pin, sync::Arc};
+use std::{collections::BTreeSet, future::Future, pin::Pin, sync::Arc};
 
 use crate::{
     backend_harness::{run_harnessed_backend, BackendDefaults},
@@ -14,7 +14,12 @@ impl AgentWrapperBackend for OpencodeBackend {
     }
 
     fn capabilities(&self) -> AgentWrapperCapabilities {
-        AgentWrapperCapabilities::default()
+        let ids = BTreeSet::from([
+            super::CAP_RUN_V1.to_string(),
+            super::CAP_EVENTS_V1.to_string(),
+            super::CAP_EVENTS_LIVE_V1.to_string(),
+        ]);
+        AgentWrapperCapabilities { ids }
     }
 
     fn run(
