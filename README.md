@@ -36,6 +36,11 @@ Rust library import paths remain:
 - `opencode`
 - `wrapper_events`
 
+## License
+
+This repository is dual-licensed under MIT or Apache-2.0, at your option.
+See `LICENSE-MIT` and `LICENSE-APACHE`.
+
 ## Start here
 
 - Unified Agent API contracts: `docs/specs/unified-agent-api/README.md`

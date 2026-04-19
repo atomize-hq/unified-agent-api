@@ -313,3 +313,39 @@ async fn opencode_backend_surfaces_resume_id_selection_failure_as_terminal_error
         other => panic!("expected Backend error, got {other:?}"),
     }
 }
+
+#[tokio::test]
+async fn opencode_backend_surfaces_generic_runtime_failure_as_terminal_error_and_backend_error() {
+    let mut env = BTreeMap::new();
+    env.insert(
+        "FAKE_OPENCODE_SCENARIO".to_string(),
+        "runtime_failure_invalid_model".to_string(),
+    );
+
+    let backend = backend_with_env(env);
+    let handle = backend
+        .run(request("Reply with OK.", None))
+        .await
+        .expect("run should start");
+
+    let mut events = handle.events;
+    let first = events
+        .next()
+        .await
+        .expect("terminal error event must surface");
+    assert_eq!(first.kind, AgentWrapperEventKind::Error);
+    assert_eq!(first.message.as_deref(), Some("opencode run failed"));
+    assert!(
+        events.next().await.is_none(),
+        "runtime failure should close stream"
+    );
+
+    let error = handle
+        .completion
+        .await
+        .expect_err("runtime failure must map to backend error");
+    match error {
+        AgentWrapperError::Backend { message } => assert_eq!(message, "opencode run failed"),
+        other => panic!("expected Backend error, got {other:?}"),
+    }
+}

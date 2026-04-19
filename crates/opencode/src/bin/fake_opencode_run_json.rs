@@ -82,6 +82,10 @@ fn main() -> io::Result<()> {
             eprintln!("session not found: SECRET_SESSION_ID_DO_NOT_LEAK");
             std::process::exit(2);
         }
+        "runtime_failure_invalid_model" => {
+            eprintln!("invalid model SECRET_MODEL_REJECTION_DO_NOT_LEAK");
+            std::process::exit(3);
+        }
         _ => {
             write_line(&mut out, &format!("{step_start}\n"))?;
             thread::sleep(Duration::from_millis(150));

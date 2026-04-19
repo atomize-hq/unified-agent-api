@@ -21,6 +21,7 @@ DEPENDENT_PACKAGES = [
 ]
 
 ALL_PACKAGES = LEAF_PACKAGES + DEPENDENT_PACKAGES
+REQUIRED_LICENSE_EXPRESSION = "MIT OR Apache-2.0"
 
 REQUIRED_METADATA_FIELDS = [
     "description",
@@ -28,14 +29,15 @@ REQUIRED_METADATA_FIELDS = [
     "homepage",
     "documentation",
     "readme",
-    "license_file",
+    "license",
 ]
 
 REQUIRED_PACKAGE_FILES = {
     "Cargo.toml",
     "Cargo.toml.orig",
     "README.md",
-    "LICENSE",
+    "LICENSE-APACHE",
+    "LICENSE-MIT",
 }
 
 BANNED_PACKAGE_PREFIXES = (
@@ -134,7 +136,16 @@ def validate_metadata(root: Path, metadata: dict) -> list[str]:
             if not value:
                 errors.append(f"{name} is missing required metadata field `{field}`")
 
-        for field in ("readme", "license_file"):
+        license_value = package.get("license")
+        if license_value and license_value != REQUIRED_LICENSE_EXPRESSION:
+            errors.append(
+                f"{name} must set `license` to `{REQUIRED_LICENSE_EXPRESSION}`, found `{license_value}`"
+            )
+
+        if package.get("license_file"):
+            errors.append(f"{name} must not set `license_file`; use SPDX `license` metadata only")
+
+        for field in ("readme",):
             value = package.get(field)
             if not value:
                 continue

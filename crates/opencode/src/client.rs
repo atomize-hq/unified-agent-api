@@ -21,6 +21,7 @@ use crate::{
 };
 
 const STDERR_CAPTURE_MAX_BYTES: usize = 4096;
+const RUN_FAILED_MESSAGE: &str = "opencode run failed";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum SelectionMode {
@@ -167,6 +168,7 @@ async fn run_opencode_child(
     let mut events_open = true;
     let mut final_text = String::new();
     let mut saw_finish = false;
+    let mut termination_requested = false;
     let deadline = timeout.map(|value| Instant::now() + value);
 
     loop {
@@ -189,6 +191,7 @@ async fn run_opencode_child(
             let remaining = deadline.saturating_duration_since(Instant::now());
             tokio::select! {
                 _ = termination.requested() => {
+                    termination_requested = true;
                     let _ = child.start_kill();
                     break;
                 }
@@ -212,6 +215,7 @@ async fn run_opencode_child(
         } else {
             tokio::select! {
                 _ = termination.requested() => {
+                    termination_requested = true;
                     let _ = child.start_kill();
                     break;
                 }
@@ -265,6 +269,13 @@ async fn run_opencode_child(
     };
     let stderr = consume_stderr_capture(stderr_capture).await?;
     if !status.success() {
+        if termination_requested {
+            drop(events_tx);
+            return Ok(OpencodeRunCompletion {
+                status,
+                final_text: None,
+            });
+        }
         if let Some(message) = classify_selection_failure(&stderr, selection_mode) {
             if events_open {
                 let _ = events_tx
@@ -277,6 +288,19 @@ async fn run_opencode_child(
             drop(events_tx);
             return Err(OpencodeError::SelectionFailed { message });
         }
+        if events_open {
+            let _ = events_tx
+                .send(Ok(OpencodeRunJsonEvent::TerminalError {
+                    message: RUN_FAILED_MESSAGE.to_string(),
+                    raw: serde_json::Value::Null,
+                }))
+                .await;
+        }
+        drop(events_tx);
+        return Err(OpencodeError::RunFailed {
+            status,
+            message: RUN_FAILED_MESSAGE.to_string(),
+        });
     }
     drop(events_tx);
 
