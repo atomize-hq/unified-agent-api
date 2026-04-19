@@ -172,15 +172,14 @@ async fn run_opencode_child(
     loop {
         if let Some(deadline) = deadline {
             if Instant::now() >= deadline {
-                let _ = child.start_kill();
-                match child.wait().await {
+                match wait_for_child_exit(&mut child, timeout, Some(deadline)).await {
                     Ok(_) => {
                         let _ = consume_stderr_capture(stderr_capture).await;
                         return Err(OpencodeError::Timeout {
                             timeout: timeout.expect("deadline implies timeout"),
                         });
                     }
-                    Err(err) => return Err(OpencodeError::Wait(err)),
+                    Err(err) => return Err(err),
                 }
             }
         }
@@ -197,15 +196,14 @@ async fn run_opencode_child(
                     match read {
                         Ok(result) => result,
                         Err(_) => {
-                            let _ = child.start_kill();
-                            match child.wait().await {
+                            match wait_for_child_exit(&mut child, timeout, Some(deadline)).await {
                                 Ok(_) => {
                                     let _ = consume_stderr_capture(stderr_capture).await;
                                     return Err(OpencodeError::Timeout {
                                         timeout: timeout.expect("deadline implies timeout"),
                                     });
                                 }
-                                Err(err) => return Err(OpencodeError::Wait(err)),
+                                Err(err) => return Err(err),
                             }
                         }
                     }
@@ -257,7 +255,14 @@ async fn run_opencode_child(
         }
     }
 
-    let status = child.wait().await.map_err(OpencodeError::Wait)?;
+    let status = match wait_for_child_exit(&mut child, timeout, deadline).await {
+        Ok(status) => status,
+        Err(err @ OpencodeError::Timeout { .. }) => {
+            let _ = consume_stderr_capture(stderr_capture).await;
+            return Err(err);
+        }
+        Err(err) => return Err(err),
+    };
     let stderr = consume_stderr_capture(stderr_capture).await?;
     if !status.success() {
         if let Some(message) = classify_selection_failure(&stderr, selection_mode) {
@@ -278,6 +283,39 @@ async fn run_opencode_child(
     let final_text = (saw_finish && !final_text.is_empty()).then_some(final_text);
 
     Ok(OpencodeRunCompletion { status, final_text })
+}
+
+async fn wait_for_child_exit(
+    child: &mut tokio::process::Child,
+    timeout: Option<Duration>,
+    deadline: Option<Instant>,
+) -> Result<std::process::ExitStatus, OpencodeError> {
+    match deadline {
+        None => child.wait().await.map_err(OpencodeError::Wait),
+        Some(deadline) => {
+            let remaining = deadline.saturating_duration_since(Instant::now());
+            if remaining.is_zero() {
+                let timeout = timeout.expect("deadline implies timeout");
+                let _ = child.start_kill();
+                match child.wait().await {
+                    Ok(_status) => Err(OpencodeError::Timeout { timeout }),
+                    Err(err) => Err(OpencodeError::Wait(err)),
+                }
+            } else {
+                match tokio::time::timeout(remaining, child.wait()).await {
+                    Ok(result) => result.map_err(OpencodeError::Wait),
+                    Err(_) => {
+                        let timeout = timeout.expect("deadline implies timeout");
+                        let _ = child.start_kill();
+                        match child.wait().await {
+                            Ok(_status) => Err(OpencodeError::Timeout { timeout }),
+                            Err(err) => Err(OpencodeError::Wait(err)),
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 fn selection_mode(request: &OpencodeRunRequest) -> Option<SelectionMode> {
