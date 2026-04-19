@@ -1,6 +1,6 @@
 # TODOS
 
-## Infrastructure
+## Completed
 
 ### Create The OpenCode Execution Pack
 
@@ -13,8 +13,7 @@
 **Effort:** M
 **Priority:** P2
 **Depends on:** Closed OpenCode onboarding pack and normative contracts already landed under `docs/project_management/next/opencode-cli-onboarding/` and `docs/specs/opencode-*.md`
-
-## Completed
+**Completed:** v0.2.3 (2026-04-18)
 
 ### Select The First Real Third CLI Agent And Prepare Its Onboarding Packet
 
