@@ -19,7 +19,6 @@ This changelog tracks the root `VERSION` file and uses bare semantic versions (`
 - Extracted wrapper-coverage normalization and root-intake logic into a shared `xtask` module so Codex and Claude Code coverage generation use the same scope expansion, sorting, and path layout rules.
 - Extended `xtask codex-validate` and `make preflight` to fail when the committed support-matrix artifact is missing, stale, contradictory, or out of sync with committed manifest roots, pointer promotion, and version status metadata.
 - Hardened local test support by fixing fake Claude binary resolution and relaxing runtime app startup timeouts for slower test environments.
-
 ## [0.2.2] - 2026-04-15
 
 ## [0.2.1] - 2026-04-14
