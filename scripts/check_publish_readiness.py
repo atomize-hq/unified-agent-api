@@ -4,23 +4,18 @@
 from __future__ import annotations
 
 import argparse
-import json
-import subprocess
 import sys
 from pathlib import Path
 
-LEAF_PACKAGES = [
-    "unified-agent-api-codex",
-    "unified-agent-api-claude-code",
-    "unified-agent-api-opencode",
-]
+from publish_planner import (
+    WorkspacePackage,
+    load_metadata,
+    load_publishable_packages,
+    package_map,
+    run,
+    topological_publish_order,
+)
 
-DEPENDENT_PACKAGES = [
-    "unified-agent-api-wrapper-events",
-    "unified-agent-api",
-]
-
-ALL_PACKAGES = LEAF_PACKAGES + DEPENDENT_PACKAGES
 REQUIRED_LICENSE_EXPRESSION = "MIT OR Apache-2.0"
 
 REQUIRED_METADATA_FIELDS = [
@@ -47,19 +42,7 @@ BANNED_PACKAGE_PREFIXES = (
     "target/",
     "wt/",
 )
-
-
-def run(cmd: list[str], *, cwd: Path, capture_output: bool = False) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        cmd,
-        cwd=cwd,
-        check=True,
-        capture_output=capture_output,
-        text=True,
-    )
-
-
-def run_dependent_package_check(root: Path, package_name: str) -> None:
+def run_dependent_package_check(root: Path, package: WorkspacePackage) -> None:
     cmd = [
         "cargo",
         "package",
@@ -67,20 +50,19 @@ def run_dependent_package_check(root: Path, package_name: str) -> None:
         "--locked",
         "--no-verify",
         "-p",
-        package_name,
+        package.name,
     ]
-    result = subprocess.run(
+    result = run(
         cmd,
         cwd=root,
         check=False,
         capture_output=True,
-        text=True,
     )
     if result.returncode == 0:
         return
 
     stderr = result.stderr
-    bootstrap_lookup_error = any(dep in stderr for dep in LEAF_PACKAGES) and (
+    bootstrap_lookup_error = any(dep in stderr for dep in package.internal_dependencies) and (
         "no matching package named" in stderr
         or (
             "failed to select a version for the requirement" in stderr
@@ -89,26 +71,13 @@ def run_dependent_package_check(root: Path, package_name: str) -> None:
     )
     if bootstrap_lookup_error:
         print(
-            f"Skipping strict cargo package for {package_name}: dependent crate is not yet visible in crates.io during bootstrap.",
+            "Skipping strict cargo package for "
+            f"{package.name}: dependent crate is not yet visible in crates.io during bootstrap.",
             file=sys.stderr,
         )
         return
 
-    raise subprocess.CalledProcessError(
-        result.returncode,
-        cmd,
-        output=result.stdout,
-        stderr=result.stderr,
-    )
-
-
-def load_metadata(root: Path) -> dict:
-    result = run(
-        ["cargo", "metadata", "--format-version", "1", "--no-deps"],
-        cwd=root,
-        capture_output=True,
-    )
-    return json.loads(result.stdout)
+    result.check_returncode()
 
 
 def package_path(package: dict, field: str) -> Path:
@@ -116,17 +85,16 @@ def package_path(package: dict, field: str) -> Path:
     return (manifest_path.parent / package[field]).resolve()
 
 
-def validate_metadata(root: Path, metadata: dict) -> list[str]:
-    workspace_members = set(metadata["workspace_members"])
-    package_by_name = {
+def validate_metadata(packages: list[WorkspacePackage], metadata: dict) -> list[str]:
+    package_by_name = package_map(packages)
+    package_metadata_by_name = {
         package["name"]: package
         for package in metadata["packages"]
-        if package["id"] in workspace_members
+        if package["name"] in package_by_name
     }
-
     errors: list[str] = []
-    for name in ALL_PACKAGES:
-        package = package_by_name.get(name)
+    for name in package_by_name:
+        package = package_metadata_by_name.get(name)
         if package is None:
             errors.append(f"workspace package {name} is missing from cargo metadata")
             continue
@@ -192,10 +160,12 @@ def main() -> int:
 
     root = Path(args.root).resolve()
     metadata = load_metadata(root)
+    packages = load_publishable_packages(root)
+    ordered_packages = topological_publish_order(packages)
 
-    errors = validate_metadata(root, metadata)
-    for package_name in ALL_PACKAGES:
-        errors.extend(validate_package_listing(root, package_name))
+    errors = validate_metadata(packages, metadata)
+    for package in ordered_packages:
+        errors.extend(validate_package_listing(root, package.name))
 
     if errors:
         print("Publish readiness validation failed:", file=sys.stderr)
@@ -203,7 +173,11 @@ def main() -> int:
             print(f"- {error}", file=sys.stderr)
         return 1
 
-    for package_name in LEAF_PACKAGES:
+    for package in ordered_packages:
+        if package.has_internal_dependencies:
+            run_dependent_package_check(root, package)
+            continue
+
         run(
             [
                 "cargo",
@@ -212,17 +186,14 @@ def main() -> int:
                 "--allow-dirty",
                 "--locked",
                 "-p",
-                package_name,
+                package.name,
             ],
             cwd=root,
         )
 
-    for package_name in DEPENDENT_PACKAGES:
-        run_dependent_package_check(root, package_name)
-
     print(
         "Publish readiness checks passed for "
-        + ", ".join(ALL_PACKAGES)
+        + ", ".join(package.name for package in ordered_packages)
         + "."
     )
     return 0

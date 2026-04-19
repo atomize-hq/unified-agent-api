@@ -163,11 +163,24 @@ jobs:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
+      - name: Unit test publish planner
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s scripts -p 'test_*.py'
       - name: Validate publish readiness
         shell: bash
         run: |
           set -euo pipefail
           python3 scripts/check_publish_readiness.py
+      - name: Preview publish plan
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/publish_crates.py \
+            --plan \
+            --root . \
+            --release-version "$(tr -d '[:space:]' < VERSION)"
 
   preflight:
     name: Preflight
