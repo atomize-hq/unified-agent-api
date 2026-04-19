@@ -168,6 +168,20 @@ jobs:
         run: |
           set -euo pipefail
           python3 scripts/check_publish_readiness.py
+
+  preflight:
+    name: Preflight
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: make preflight
+        shell: bash
+        run: |
+          set -euo pipefail
+          make preflight
+
   rust-tests:
     name: Rust tests (workspace)
     runs-on: ubuntu-latest

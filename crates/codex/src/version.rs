@@ -154,10 +154,8 @@ pub(super) fn parse_features_from_json(output: &str) -> Option<CodexFeatureFlags
 
 fn collect_feature_tokens(value: &Value, tokens: &mut HashSet<String>) {
     match value {
-        Value::String(value) => {
-            if !value.trim().is_empty() {
-                tokens.insert(value.clone());
-            }
+        Value::String(value) if !value.trim().is_empty() => {
+            tokens.insert(value.clone());
         }
         Value::Array(items) => {
             for item in items {
