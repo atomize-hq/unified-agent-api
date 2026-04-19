@@ -66,6 +66,50 @@ fn copy_from_repo(codex_dir: &Path, filename: &str) {
     fs::copy(&src, &dst).unwrap_or_else(|e| panic!("copy {:?} -> {:?}: {}", src, dst, e));
 }
 
+fn copy_dir_recursive(src: &Path, dst: &Path) {
+    fs::create_dir_all(dst).expect("create destination directory");
+    for entry in fs::read_dir(src).unwrap_or_else(|e| panic!("read_dir {:?}: {}", src, e)) {
+        let entry = entry.unwrap_or_else(|e| panic!("read_dir entry {:?}: {}", src, e));
+        let src_path = entry.path();
+        let dst_path = dst.join(entry.file_name());
+        if entry
+            .file_type()
+            .unwrap_or_else(|e| panic!("file_type {:?}: {}", src_path, e))
+            .is_dir()
+        {
+            copy_dir_recursive(&src_path, &dst_path);
+        } else {
+            fs::copy(&src_path, &dst_path)
+                .unwrap_or_else(|e| panic!("copy {:?} -> {:?}: {}", src_path, dst_path, e));
+        }
+    }
+}
+
+fn materialize_committed_opencode_dir(opencode_dir: &Path) {
+    let src = workspace_root().join("cli_manifests").join("opencode");
+    copy_dir_recursive(&src, opencode_dir);
+}
+
+fn opencode_support_rows_from_repo() -> Vec<Value> {
+    let artifact_path = workspace_root()
+        .join("cli_manifests")
+        .join("support_matrix")
+        .join("current.json");
+    let artifact: Value = serde_json::from_str(
+        &fs::read_to_string(&artifact_path)
+            .unwrap_or_else(|e| panic!("read {:?}: {}", artifact_path, e)),
+    )
+    .unwrap_or_else(|e| panic!("parse {:?}: {}", artifact_path, e));
+
+    artifact["rows"]
+        .as_array()
+        .expect("support_matrix/current.json rows array")
+        .iter()
+        .filter(|row| row["agent"] == "opencode")
+        .cloned()
+        .collect()
+}
+
 fn target_platform(target: &str) -> (&'static str, &'static str) {
     match target {
         "x86_64-unknown-linux-musl" => ("linux", "x86_64"),
@@ -450,6 +494,8 @@ fn write_support_matrix_artifact(workspace_root: &Path) {
         );
     }
 
+    rows.extend(opencode_support_rows_from_repo());
+
     write_json(
         &workspace_root
             .join("cli_manifests")
@@ -465,10 +511,12 @@ fn write_support_matrix_artifact(workspace_root: &Path) {
 fn materialize_minimal_valid_workspace(workspace_root: &Path) -> PathBuf {
     let codex_dir = workspace_root.join("cli_manifests").join("codex");
     let claude_dir = workspace_root.join("cli_manifests").join("claude_code");
+    let opencode_dir = workspace_root.join("cli_manifests").join("opencode");
 
     write_workspace_manifest(workspace_root);
     materialize_minimal_valid_codex_dir(&codex_dir);
     materialize_minimal_valid_claude_dir(&claude_dir);
+    materialize_committed_opencode_dir(&opencode_dir);
     write_support_matrix_artifact(workspace_root);
 
     codex_dir
@@ -566,183 +614,9 @@ fn run_xtask_validate(codex_dir: &Path) -> std::process::Output {
     cmd.output().expect("spawn xtask codex-validate")
 }
 
-#[test]
-fn c0_validate_passes_on_minimal_valid_codex_dir() {
-    let temp = make_temp_dir("ccm-c0-validate-pass");
-    let codex_dir = materialize_minimal_valid_workspace(&temp);
-
-    let output = run_xtask_validate(&codex_dir);
-    assert!(
-        output.status.success(),
-        "expected success:\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
-        output.status,
-        String::from_utf8_lossy(&output.stdout),
-        String::from_utf8_lossy(&output.stderr)
-    );
-}
-
-#[test]
-fn c0_validate_passes_on_standalone_codex_dir_without_workspace_support_matrix() {
-    let temp = make_temp_dir("ccm-c0-validate-standalone-pass");
-    let codex_dir = temp.join("cli_manifests").join("codex");
-    materialize_minimal_valid_codex_dir(&codex_dir);
-
-    let output = run_xtask_validate(&codex_dir);
-    assert!(
-        output.status.success(),
-        "expected standalone success without workspace sibling layout:\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
-        output.status,
-        String::from_utf8_lossy(&output.stdout),
-        String::from_utf8_lossy(&output.stderr)
-    );
-}
-
-#[test]
-fn c0_validate_requires_reports_when_version_status_reported() {
-    let temp = make_temp_dir("ccm-c0-validate-reports");
-    let codex_dir = materialize_minimal_valid_workspace(&temp);
-
-    materialize_reported_codex_version(&codex_dir, false);
-    write_support_matrix_artifact(&temp);
-
-    let output = run_xtask_validate(&codex_dir);
-    assert!(
-        !output.status.success(),
-        "expected failure:\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
-        output.status,
-        String::from_utf8_lossy(&output.stdout),
-        String::from_utf8_lossy(&output.stderr)
-    );
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(
-        stderr.contains("reports") && stderr.contains("coverage.any.json"),
-        "expected report requirement violation, got:\n{stderr}"
-    );
-
-    write_minimal_report_files(&codex_dir, REPORTED_VERSION, &[REQUIRED_TARGET], false);
-    write_support_matrix_artifact(&temp);
-
-    let output = run_xtask_validate(&codex_dir);
-    assert!(
-        output.status.success(),
-        "expected success after adding required reports:\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
-        output.status,
-        String::from_utf8_lossy(&output.stdout),
-        String::from_utf8_lossy(&output.stderr)
-    );
-}
-
-#[test]
-fn c0_validate_requires_coverage_all_only_when_union_complete() {
-    let temp = make_temp_dir("ccm-c0-validate-coverage-all");
-    let codex_dir = materialize_minimal_valid_workspace(&temp);
-
-    materialize_reported_codex_version(&codex_dir, true);
-    write_minimal_report_files(&codex_dir, REPORTED_VERSION, &TARGETS, false);
-    write_support_matrix_artifact(&temp);
-
-    let output = run_xtask_validate(&codex_dir);
-    assert!(
-        !output.status.success(),
-        "expected failure (missing coverage.all.json):\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
-        output.status,
-        String::from_utf8_lossy(&output.stdout),
-        String::from_utf8_lossy(&output.stderr)
-    );
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(
-        stderr.contains("coverage.all.json"),
-        "expected missing coverage.all.json violation, got:\n{stderr}"
-    );
-
-    write_minimal_report_files(&codex_dir, REPORTED_VERSION, &TARGETS, true);
-    write_support_matrix_artifact(&temp);
-
-    let output = run_xtask_validate(&codex_dir);
-    assert!(
-        output.status.success(),
-        "expected success after adding coverage.all.json:\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
-        output.status,
-        String::from_utf8_lossy(&output.stdout),
-        String::from_utf8_lossy(&output.stderr)
-    );
-}
-
-#[test]
-fn c0_validate_reports_wrapper_overlap_errors_with_required_fields_and_is_deterministic() {
-    let temp = make_temp_dir("ccm-c0-validate-overlap");
-    let codex_dir = materialize_minimal_valid_workspace(&temp);
-
-    let wrapper_coverage = json!({
-        "schema_version": 1,
-        "generated_at": TS,
-        "wrapper_version": "0.0.0-test",
-        "coverage": [
-            {
-                "path": ["exec"],
-                "level": "explicit",
-                "scope": { "platforms": ["linux"] }
-            },
-            {
-                "path": ["exec"],
-                "level": "explicit",
-                "scope": { "target_triples": [REQUIRED_TARGET] }
-            }
-        ]
-    });
-    write_json(&codex_dir.join("wrapper_coverage.json"), &wrapper_coverage);
-
-    let a = run_xtask_validate(&codex_dir);
-    let b = run_xtask_validate(&codex_dir);
-    assert!(
-        !a.status.success(),
-        "expected overlap failure:\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
-        a.status,
-        String::from_utf8_lossy(&a.stdout),
-        String::from_utf8_lossy(&a.stderr)
-    );
-    assert_eq!(
-        a.stderr, b.stderr,
-        "validator output must be deterministic for identical inputs"
-    );
-
-    let stderr = String::from_utf8_lossy(&a.stderr);
-    assert!(
-        stderr.contains("wrapper_coverage.json"),
-        "expected wrapper_coverage.json path in errors, got:\n{stderr}"
-    );
-    assert!(
-        stderr.contains(REQUIRED_TARGET),
-        "expected target triple in overlap errors, got:\n{stderr}"
-    );
-    assert!(
-        stderr.contains("exec"),
-        "expected unit key (command path) in overlap errors, got:\n{stderr}"
-    );
-    assert!(
-        stderr.contains("0") && stderr.contains("1"),
-        "expected matching entry indexes mentioned in overlap errors, got:\n{stderr}"
-    );
-}
-
-#[test]
-fn c0_validate_rejects_pointer_files_without_trailing_newline() {
-    let temp = make_temp_dir("ccm-c0-validate-pointer-newline");
-    let codex_dir = materialize_minimal_valid_workspace(&temp);
-
-    write_text(&codex_dir.join("latest_validated.txt"), VERSION);
-
-    let output = run_xtask_validate(&codex_dir);
-    assert!(
-        !output.status.success(),
-        "expected pointer format failure:\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
-        output.status,
-        String::from_utf8_lossy(&output.stdout),
-        String::from_utf8_lossy(&output.stderr)
-    );
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(
-        stderr.contains("latest_validated.txt"),
-        "expected latest_validated.txt referenced in errors, got:\n{stderr}"
-    );
-}
+#[path = "c0_spec_validate/happy_path.rs"]
+mod happy_path;
+#[path = "c0_spec_validate/reported_versions.rs"]
+mod reported_versions;
+#[path = "c0_spec_validate/validation_errors.rs"]
+mod validation_errors;

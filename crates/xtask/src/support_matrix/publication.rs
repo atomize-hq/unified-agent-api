@@ -14,9 +14,9 @@ pub(super) struct PublicationBundle {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct SupportMatrixArtifact {
-    pub(crate) schema_version: u8,
-    pub(crate) rows: Vec<SupportRow>,
+pub struct SupportMatrixArtifact {
+    pub schema_version: u8,
+    pub rows: Vec<SupportRow>,
 }
 
 pub(super) fn render_publication_bundle(rows: &[SupportRow]) -> Result<PublicationBundle, String> {

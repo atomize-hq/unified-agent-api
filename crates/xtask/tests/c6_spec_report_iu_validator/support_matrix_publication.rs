@@ -31,6 +31,20 @@ fn c6_validator_rejects_missing_support_matrix_publication_artifact_for_claude_r
 }
 
 #[test]
+fn c6_validator_rejects_missing_support_matrix_publication_artifact_for_opencode_root() {
+    let temp = make_temp_dir("ccm-c6-support-matrix-artifact-missing-opencode");
+    write_workspace_manifest(&temp);
+    let opencode_dir = temp.join("cli_manifests").join("opencode");
+    materialize_committed_opencode_dir(&opencode_dir);
+
+    assert_validation_failure(
+        &opencode_dir,
+        "SUPPORT_MATRIX_ARTIFACT_MISSING",
+        "cli_manifests/support_matrix/current.json",
+    );
+}
+
+#[test]
 fn c6_validator_detects_version_status_drift_for_latest_validated_rows() {
     let temp = make_temp_dir("ccm-c6-support-matrix-status");
     write_workspace_manifest(&temp);
@@ -66,9 +80,30 @@ fn c6_validator_detects_support_matrix_consistency_drift_for_claude_root() {
     write_workspace_manifest(&temp);
     let codex_dir = temp.join("cli_manifests").join("codex");
     let claude_dir = temp.join("cli_manifests").join("claude_code");
+    let opencode_dir = temp.join("cli_manifests").join("opencode");
     materialize_minimal_valid_codex_dir(&codex_dir);
     materialize_minimal_valid_claude_dir(&claude_dir);
+    materialize_committed_opencode_dir(&opencode_dir);
     write_complete_support_matrix_artifact(&temp);
+
+    let artifact_path = temp
+        .join("cli_manifests")
+        .join("support_matrix")
+        .join("current.json");
+    let mut artifact: Value =
+        serde_json::from_str(&fs::read_to_string(&artifact_path).expect("read artifact"))
+            .expect("parse artifact");
+    let rows = artifact["rows"].as_array_mut().expect("rows array");
+    let claude_row = rows
+        .iter()
+        .position(|row| {
+            row["agent"] == "claude_code"
+                && row["version"] == VERSION
+                && row["target"] == CLAUDE_REQUIRED_TARGET
+        })
+        .expect("expected claude row");
+    rows.remove(claude_row);
+    write_json(&artifact_path, &artifact);
 
     assert_validation_failure(
         &claude_dir,
@@ -111,7 +146,11 @@ fn c6_validator_detects_support_state_drift_in_support_matrix_publication() {
     let temp = make_temp_dir("ccm-c6-support-matrix-support-state");
     write_workspace_manifest(&temp);
     let codex_dir = temp.join("cli_manifests").join("codex");
+    let claude_dir = temp.join("cli_manifests").join("claude_code");
+    let opencode_dir = temp.join("cli_manifests").join("opencode");
     materialize_minimal_valid_codex_dir(&codex_dir);
+    materialize_minimal_valid_claude_dir(&claude_dir);
+    materialize_committed_opencode_dir(&opencode_dir);
     write_complete_support_matrix_artifact(&temp);
 
     let artifact_path = temp
@@ -121,7 +160,15 @@ fn c6_validator_detects_support_state_drift_in_support_matrix_publication() {
     let mut artifact: Value =
         serde_json::from_str(&fs::read_to_string(&artifact_path).expect("read artifact"))
             .expect("parse artifact");
-    artifact["rows"][2]["manifest_support"] = json!("unsupported");
+    let target_row = artifact["rows"]
+        .as_array_mut()
+        .expect("rows array")
+        .iter_mut()
+        .find(|row| {
+            row["agent"] == "codex" && row["version"] == VERSION && row["target"] == REQUIRED_TARGET
+        })
+        .expect("expected codex required-target row");
+    target_row["manifest_support"] = json!("unsupported");
     write_json(&artifact_path, &artifact);
 
     assert_validation_failure(
@@ -136,7 +183,11 @@ fn c6_validator_detects_non_canonical_support_matrix_row_order() {
     let temp = make_temp_dir("ccm-c6-support-matrix-order");
     write_workspace_manifest(&temp);
     let codex_dir = temp.join("cli_manifests").join("codex");
+    let claude_dir = temp.join("cli_manifests").join("claude_code");
+    let opencode_dir = temp.join("cli_manifests").join("opencode");
     materialize_minimal_valid_codex_dir(&codex_dir);
+    materialize_minimal_valid_claude_dir(&claude_dir);
+    materialize_committed_opencode_dir(&opencode_dir);
     write_complete_support_matrix_artifact(&temp);
 
     let artifact_path = temp

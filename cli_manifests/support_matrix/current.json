@@ -168,6 +168,70 @@
         "backend report includes intentionally unsupported surface outside unified support",
         "backend report includes backend-only surface outside unified support"
       ]
+    },
+    {
+      "agent": "opencode",
+      "version": "1.4.11",
+      "target": "darwin-arm64",
+      "manifest_support": "unsupported",
+      "backend_support": "unsupported",
+      "uaa_support": "unsupported",
+      "pointer_promotion": "none",
+      "evidence_notes": []
+    },
+    {
+      "agent": "opencode",
+      "version": "1.4.9",
+      "target": "darwin-arm64",
+      "manifest_support": "unsupported",
+      "backend_support": "unsupported",
+      "uaa_support": "unsupported",
+      "pointer_promotion": "none",
+      "evidence_notes": []
+    },
+    {
+      "agent": "opencode",
+      "version": "1.4.11",
+      "target": "linux-x64",
+      "manifest_support": "supported",
+      "backend_support": "unsupported",
+      "uaa_support": "unsupported",
+      "pointer_promotion": "none",
+      "evidence_notes": []
+    },
+    {
+      "agent": "opencode",
+      "version": "1.4.9",
+      "target": "linux-x64",
+      "manifest_support": "unsupported",
+      "backend_support": "unsupported",
+      "uaa_support": "unsupported",
+      "pointer_promotion": "none",
+      "evidence_notes": [
+        "current root snapshot omits this target"
+      ]
+    },
+    {
+      "agent": "opencode",
+      "version": "1.4.11",
+      "target": "win32-x64",
+      "manifest_support": "unsupported",
+      "backend_support": "unsupported",
+      "uaa_support": "unsupported",
+      "pointer_promotion": "none",
+      "evidence_notes": []
+    },
+    {
+      "agent": "opencode",
+      "version": "1.4.9",
+      "target": "win32-x64",
+      "manifest_support": "unsupported",
+      "backend_support": "unsupported",
+      "uaa_support": "unsupported",
+      "pointer_promotion": "none",
+      "evidence_notes": [
+        "current root snapshot omits this target"
+      ]
     }
   ]
 }

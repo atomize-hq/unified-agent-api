@@ -1,15 +1,14 @@
-# OpenCode CLI onboarding - seam extraction
+# OpenCode CLI onboarding - closed seam pack
 
 Source:
-- `docs/project_management/next/opencode-cli-onboarding/plan.md`
 - `docs/project_management/next/cli-agent-onboarding-charter.md`
 - `docs/project_management/next/cli-agent-onboarding-third-agent-packet.md`
 
-This pack captures seam briefs, authoritative threading, pack-level review surfaces, seam-exit
-intent, and governance scaffolds for onboarding `OpenCode` as the first real third CLI agent in
-this repo. It intentionally stays one level above seam-local decomposition.
+This pack captures the closed seam briefs, authoritative threading, pack-level review surfaces,
+and governance records that onboarded `OpenCode` as the first real third CLI agent in this repo.
 
 - Start here: `scope_brief.md`
+- New-session handoff and next-step brief: `next-steps-handoff.md`
 - Seam overview: `seam_map.md`
 - Threading: `threading.md`
 - Pack review surfaces: `review_surfaces.md`
@@ -17,9 +16,9 @@ this repo. It intentionally stays one level above seam-local decomposition.
 
 Execution horizon:
 
-- Active seam: `SEAM-1`
-- Next seam: `SEAM-2`
-- Future seams: `SEAM-3`, `SEAM-4`
+- Active seam: none
+- Next seam: none
+- Future seams: none
 
 Policy:
 
@@ -32,15 +31,20 @@ Policy:
 - pack-level `review_surfaces.md` is orientation only; active and next seams still need seam-local
   `review.md` later
 - this repo's normative contract surfaces live under `docs/specs/**`; when downstream work creates
-  new OpenCode-specific canonical contracts, they should also live under `docs/specs/**`
+  later OpenCode-specific canonical contracts, they should also live under `docs/specs/**`
 
-Assumptions captured for extraction:
+Closed-pack posture:
 
-- the source packet's maintainer-backed smoke evidence is strong enough to treat
-  `opencode run --format json` as the current candidate v1 wrapper seam
+- the source packet's maintainer-backed smoke evidence was strong enough to lock
+  `opencode run --format json` as the current v1 wrapper seam
 - the critical path remains crate-first: runtime/evidence lock first, wrapper + manifest planning
   second, backend mapping third, UAA promotion review last
+- the landed `SEAM-4` closeout now records the bounded promotion-review outcome, and no further
+  queued seam remains in this pack
 - `serve`, `acp`, `run --attach`, and direct interactive TUI surfaces remain deferred until an
   upstream seam explicitly reopens them
+- `SEAM-1` now serves as closeout-backed upstream evidence for the downstream seams and their
+  published closeout records
 - legacy triad artifacts in this directory are retained as source provenance, but the seam-pack
-  files in this README are now the canonical planning surface for downstream work
+  files referenced from this README are now the canonical closed planning surface for downstream
+  work

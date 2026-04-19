@@ -1,0 +1,27 @@
+[package]
+name = "unified-agent-api-opencode"
+version.workspace = true
+edition = "2021"
+rust-version = "1.78"
+description = "Async wrapper around the OpenCode CLI for canonical run --format json flows"
+license-file = "../../LICENSE"
+repository = "https://github.com/atomize-hq/unified-agent-api"
+homepage = "https://github.com/atomize-hq/unified-agent-api"
+documentation = "https://docs.rs/unified-agent-api-opencode"
+keywords = ["opencode", "cli", "wrapper", "agent"]
+categories = ["api-bindings", "command-line-interface"]
+readme = "README.md"
+
+[lib]
+name = "opencode"
+
+[dependencies]
+futures-core = "0.3"
+tokio = { workspace = true, features = ["process", "io-util", "io-std", "macros", "rt", "rt-multi-thread", "time", "sync", "fs"] }
+thiserror = { workspace = true }
+serde_json = { workspace = true }
+serde = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+futures-util = "0.3"

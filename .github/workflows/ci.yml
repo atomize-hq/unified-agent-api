@@ -212,21 +212,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
       - name: "Guard: no backend types in pub API"
         shell: bash
         run: |
           set -euo pipefail
-          # 1) pub signatures must not mention backend crate types
-          if rg -n -U -P "pub\\s+(?:fn|struct|enum|trait|type|const|static)\\b[^{;]*\\b(?:codex|claude_code)::" crates/agent_api/src; then
-            echo "ERROR: backend crate types referenced in pub item signatures"
-            exit 1
-          fi
-
-          # 2) forbid pub re-exports from backend crates
-          if rg -n "pub\\s+use\\s+.*\\b(?:codex|claude_code)::" crates/agent_api/src; then
-            echo "ERROR: backend crate items are re-exported publicly"
-            exit 1
-          fi
+          cargo run -p xtask -- agent-api-backend-type-leak-guard
 
   capability-matrix:
     name: Capability matrix (fresh + audit)
@@ -300,6 +292,39 @@ jobs:
         run: |
           set -euo pipefail
           cargo run -p xtask -- codex-validate --root cli_manifests/claude_code
+
+  opencode-validate-artifacts:
+    name: Validate OpenCode committed artifacts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - id: opencode-artifacts
+        name: Detect OpenCode committed artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          files=(cli_manifests/opencode/versions/*.json)
+          if (( ${#files[@]} > 0 )); then
+            echo "has_versions=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_versions=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Skip (no OpenCode artifacts committed yet)
+        if: ${{ steps.opencode-artifacts.outputs.has_versions != 'true' }}
+        shell: bash
+        run: echo "No cli_manifests/opencode/versions/*.json; skipping codex-validate."
+
+      - uses: dtolnay/rust-toolchain@stable
+        if: ${{ steps.opencode-artifacts.outputs.has_versions == 'true' }}
+
+      - name: xtask codex-validate (opencode root)
+        if: ${{ steps.opencode-artifacts.outputs.has_versions == 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run -p xtask -- codex-validate --root cli_manifests/opencode
 
   versions:
     name: Read Codex version pointers

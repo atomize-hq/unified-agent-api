@@ -5,6 +5,9 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde_json::{json, Value};
 
+const OPENCODE_REQUIRED_TARGET: &str = "linux-x64";
+const OPENCODE_TARGETS: [&str; 3] = ["linux-x64", "darwin-arm64", "win32-x64"];
+
 fn make_temp_dir(prefix: &str) -> PathBuf {
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -133,6 +136,33 @@ fn reverse_generated_rows(path: &Path) {
     write_json(path, &artifact);
 }
 
+fn materialize_minimal_valid_opencode_root(fixture_root: &Path) {
+    materialize_root(
+        &fixture_root.join("cli_manifests/opencode"),
+        &OPENCODE_TARGETS,
+        "1.4.11",
+        &[OPENCODE_REQUIRED_TARGET],
+        &[("1.4.11", &[OPENCODE_REQUIRED_TARGET])],
+        &[(OPENCODE_REQUIRED_TARGET, "1.4.11")],
+        &[(OPENCODE_REQUIRED_TARGET, "1.4.11")],
+        &[(
+            "1.4.11",
+            "coverage.linux-x64.json",
+            json!({
+                "deltas": {
+                    "missing_commands": [],
+                    "missing_flags": [],
+                    "missing_args": [],
+                    "intentionally_unsupported": [],
+                    "wrapper_only_commands": [],
+                    "wrapper_only_flags": [],
+                    "wrapper_only_args": [],
+                }
+            }),
+        )],
+    );
+}
+
 #[test]
 fn support_matrix_check_rejects_stale_generated_markdown_block() {
     let xtask_bin = PathBuf::from(env!("CARGO_BIN_EXE_xtask"));
@@ -196,6 +226,7 @@ fn support_matrix_check_rejects_stale_generated_markdown_block() {
             }),
         )],
     );
+    materialize_minimal_valid_opencode_root(&fixture_root);
 
     let generate = Command::new(&xtask_bin)
         .arg("support-matrix")
@@ -294,6 +325,7 @@ fn support_matrix_check_rejects_stale_generated_json_row_order() {
             }),
         )],
     );
+    materialize_minimal_valid_opencode_root(&fixture_root);
 
     let generate = Command::new(&xtask_bin)
         .arg("support-matrix")

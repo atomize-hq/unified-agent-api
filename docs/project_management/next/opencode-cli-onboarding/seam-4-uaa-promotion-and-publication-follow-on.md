@@ -2,14 +2,15 @@
 seam_id: SEAM-4
 seam_slug: uaa-promotion-and-publication-follow-on
 type: conformance
-status: proposed
+status: closed
 execution_horizon: future
 plan_version: v1
 basis:
-  currentness: provisional
+  currentness: current
   source_scope_ref: scope_brief.md
   source_scope_version: v1
-  upstream_closeouts: []
+  upstream_closeouts:
+    - governance/seam-3-closeout.md
   required_threads:
     - THR-03
     - THR-04
@@ -19,16 +20,16 @@ basis:
     - backend mapping changes that materially alter what OpenCode exposes
 gates:
   pre_exec:
-    review: pending
-    contract: pending
-    revalidation: pending
+    review: passed
+    contract: passed
+    revalidation: passed
   post_exec:
-    landing: pending
-    closeout: pending
+    landing: passed
+    closeout: passed
 seam_exit_gate:
   required: true
   planned_location: S99
-  status: pending
+  status: passed
 open_remediations: []
 ---
 
@@ -45,13 +46,14 @@ open_remediations: []
     - identify any required follow-on pack for canonical spec or capability-matrix changes
     - preserve explicit non-promotion paths for backend-specific or unstable behavior
   - Out:
-    - editing canonical specs or capability matrices in this extraction pass
+    - reopening or revising canonical specs or capability matrices inside this closed pack
     - reopening wrapper or backend scope except through explicit blocker escalation
     - treating backend completion as automatic universal promotion
 - **Primary interfaces**
   - Inputs:
     - `THR-03`
-    - `docs/project_management/next/opencode-cli-onboarding/C3-spec.md`
+    - `docs/project_management/next/opencode-cli-onboarding/governance/seam-3-closeout.md`
+    - `docs/specs/opencode-agent-api-backend-contract.md`
     - `docs/specs/unified-agent-api/capabilities-schema-spec.md`
     - `docs/specs/unified-agent-api/extensions-spec.md`
   - Outputs:
@@ -98,12 +100,13 @@ open_remediations: []
   - De-risk plan: make backend-specific fallback behavior and no-promotion outcomes first-class
     outputs.
 - **Rollout / safety**:
-  - review-only at extraction time
+  - this seam landed as a bounded review and publication decision
   - no canonical spec edits without a separate approved follow-on execution pack
   - preserve explicit backend-specific publication if universal promotion is premature
 - **Downstream decomposition context**:
-  - Why this seam is `active`, `next`, or `future`: it is `future` because promotion review is only
-    meaningful after the backend seam publishes concrete behavior and capability claims.
+  - Why this seam is `active`, `next`, or `future`: it is `future` because the seam has landed,
+    published its closeout-backed recommendation and `THR-04` handoff, and no additional queued
+    seam remains in this pack.
   - Which threads matter most: `THR-03`, `THR-04`
   - What the first seam-local review should focus on: whether backend evidence is concrete, whether
     multi-backend promotion rules are satisfied, and whether the output is an explicit promotion

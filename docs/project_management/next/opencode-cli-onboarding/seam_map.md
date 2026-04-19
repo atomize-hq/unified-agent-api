@@ -6,17 +6,17 @@ then to the `agent_api` backend seam, and only then to the UAA promotion seam.
 
 ## Execution horizon (v2.5 policy)
 
-- Active seam: `SEAM-1`
-- Next seam: `SEAM-2`
-- Future seams: `SEAM-3`, `SEAM-4`
+- Active seam: none
+- Next seam: none
+- Future seams: none
 
-Note: `SEAM-3` and `SEAM-4` are expected to activate quickly once `SEAM-2` lands, but they remain
-`future` here to preserve the default "exactly one active + one next" horizon rule.
+Note: `SEAM-1` through `SEAM-4` are now closed. `SEAM-4` landed the final promotion-review
+recommendation for this pack, so no active or next seam remains.
 
 ## Seams
 
 1. **SEAM-1 - Runtime surface and evidence lock**
-   - Execution horizon: active
+   - Execution horizon: future
    - Type: integration
    - Owns: the canonical v1 OpenCode run surface, deferred-surface policy, install/auth/provider
      posture, maintainer smoke expectations, and the explicit handoff contract that downstream
@@ -32,14 +32,13 @@ Note: `SEAM-3` and `SEAM-4` are expected to activate quickly once `SEAM-2` lands
        prose
 
 2. **SEAM-2 - Wrapper crate and manifest foundation**
-   - Execution horizon: next
+   - Execution horizon: future
    - Type: capability
    - Owns: the implementation planning boundary for `crates/opencode/` and
      `cli_manifests/opencode/`, including spawn/stream/completion/parsing boundaries, fixture and
      fake-binary posture, and manifest-root artifact inventory/update rules.
-   - Why it is next: once the run surface and evidence obligations are explicit, the wrapper and
-     manifest seam becomes the first executable package of repo work, and it is the only valid
-     producer for backend inputs that `SEAM-3` may consume.
+   - Why it is now future: the seam has landed and now serves as the published upstream handoff
+     that `SEAM-3` consumes.
    - Expected outputs:
      - a wrapper-owned event/completion/redaction contract for OpenCode
      - a manifest-root artifact contract for `cli_manifests/opencode/`
@@ -51,8 +50,8 @@ Note: `SEAM-3` and `SEAM-4` are expected to activate quickly once `SEAM-2` lands
    - Owns: mapping the wrapper contract into `AgentWrapperRunRequest`, `AgentWrapperEvent`, and
      `AgentWrapperCompletion`; capability advertisement; backend-specific extension ownership; and
      fixture-first validation requirements.
-   - Why it stays future: backend planning depends on landed wrapper/manifest truths, not packet-era
-     guesses about event buckets or extension semantics.
+   - Why it is now future: the seam has landed and now serves as the closeout-backed upstream
+     backend handoff that `SEAM-4` consumes.
    - Expected outputs:
      - a backend-owned mapping contract for `opencode`
      - explicit capability and extension boundaries that stay aligned with the universal specs
@@ -64,8 +63,8 @@ Note: `SEAM-3` and `SEAM-4` are expected to activate quickly once `SEAM-2` lands
    - Owns: the boundary between backend support and UAA-promoted support, including which behaviors
      remain backend-specific, which candidate `agent_api.*` promotions are justified, and whether a
      separate follow-on pack is required for canonical spec or capability-matrix updates.
-   - Why it stays future: promotion review is meaningful only after the backend seam makes the
-     actual OpenCode surface concrete.
+   - Why it is now future: the seam has landed and now serves as the closeout-backed publication
+     record for the bounded promotion outcome and `THR-04` handoff.
    - Expected outputs:
      - an explicit backend-support versus UAA-promotion recommendation
      - a bounded follow-on pack recommendation for any canonical spec or matrix changes

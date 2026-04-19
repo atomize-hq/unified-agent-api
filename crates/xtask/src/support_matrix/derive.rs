@@ -8,7 +8,7 @@ use std::{
 use semver::Version;
 use serde::Deserialize;
 
-use crate::wrapper_coverage_shared::RootIntakeLayout;
+use crate::root_intake_layout::RootIntakeLayout;
 
 use super::{
     BackendSupportState, ManifestSupportState, PointerPromotionState, SupportRow, UaaSupportState,
@@ -55,10 +55,11 @@ pub(super) struct VersionMetadata {
     pub(super) semantic_version: String,
     #[serde(default)]
     pub(super) status: Option<String>,
+    #[serde(default)]
     coverage: VersionCoverage,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize)]
 struct VersionCoverage {
     #[serde(default)]
     supported_targets: Vec<String>,
@@ -115,7 +116,7 @@ pub(super) struct PointerSet {
     pub(super) latest_validated: BTreeMap<String, Option<String>>,
 }
 
-pub(crate) fn derive_rows(workspace_root: &Path) -> Result<Vec<SupportRow>, String> {
+pub fn derive_rows(workspace_root: &Path) -> Result<Vec<SupportRow>, String> {
     let roots = CURRENT_AGENT_ROOTS
         .iter()
         .map(|(agent, rel_root)| AgentRoot {
@@ -126,9 +127,8 @@ pub(crate) fn derive_rows(workspace_root: &Path) -> Result<Vec<SupportRow>, Stri
     derive_rows_for_roots(&roots)
 }
 
-#[cfg(test)]
-#[allow(dead_code)]
-pub(crate) fn derive_rows_for_test_roots(
+#[doc(hidden)]
+pub fn derive_rows_for_test_roots(
     workspace_root: &Path,
     roots: &[(&str, &str)],
 ) -> Result<Vec<SupportRow>, String> {

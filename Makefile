@@ -59,13 +59,15 @@ tokei-all-crates: ensure-tokei
 	cat "$(LOG_DIR)"/*_*$$(printf '%s\n' "$(RUN_TS)").log > "$(FINAL_LOG)"; \
 	echo "Combined log written to: $(FINAL_LOG)"
 
-.PHONY: fmt
+.PHONY: fmt fmt-all fmt-check
 fmt:
 	cargo fmt
 
-.PHONY: fmt-check
 fmt-check:
 	cargo fmt --all -- --check
+
+fmt-all:
+	$(MAKE) fmt
 
 .PHONY: clippy
 clippy:
@@ -184,12 +186,10 @@ flightcheck:
 support-matrix-check:
 	cargo run -p xtask -- support-matrix --check
 
-.PHONY: preflight
-.PHONY: hygiene
+.PHONY: preflight hygiene
 hygiene:
 	./scripts/check_repo_hygiene.sh
 
-.PHONY: preflight
 preflight: hygiene flightcheck
 
 .PHONY: adr-check

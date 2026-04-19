@@ -1,14 +1,15 @@
 # Crates.io release guide
 
-This repository publishes four Rust packages for each root `VERSION` bump:
+This repository publishes five Rust packages for each root `VERSION` bump:
 
 - `unified-agent-api-codex`
 - `unified-agent-api-claude-code`
+- `unified-agent-api-opencode`
 - `unified-agent-api-wrapper-events`
 - `unified-agent-api`
 
-Rust library import paths remain `codex`, `claude_code`, `wrapper_events`, and
-`agent_api`.
+Rust library import paths remain `codex`, `claude_code`, `opencode`,
+`wrapper_events`, and `agent_api`.
 
 ## Bump the release version
 
@@ -30,10 +31,11 @@ Always publish in this order:
 
 1. `unified-agent-api-codex`
 2. `unified-agent-api-claude-code`
-3. `unified-agent-api-wrapper-events`
-4. `unified-agent-api`
+3. `unified-agent-api-opencode`
+4. `unified-agent-api-wrapper-events`
+5. `unified-agent-api`
 
-The dependent crates (`wrapper-events` and `agent-api`) require the two leaf
+The dependent crates (`wrapper-events` and `agent-api`) require the three leaf
 crates to be visible in the crates.io index before `cargo publish --dry-run`
 can succeed for the same version.
 
@@ -46,9 +48,10 @@ maintainer machine with a short-lived crates.io token.
 2. Run `python3 scripts/validate_publish_versions.py`.
 3. Run `python3 scripts/check_publish_readiness.py`.
 4. Authenticate locally with `cargo login`.
-5. Publish the two leaf crates:
+5. Publish the three leaf crates:
    - `cargo publish --locked -p unified-agent-api-codex`
    - `cargo publish --locked -p unified-agent-api-claude-code`
+   - `cargo publish --locked -p unified-agent-api-opencode`
 6. Wait until dependent dry-runs succeed:
    - `cargo publish --dry-run --locked -p unified-agent-api-wrapper-events`
    - `cargo publish --dry-run --locked -p unified-agent-api`
@@ -59,7 +62,7 @@ maintainer machine with a short-lived crates.io token.
 ## Trusted Publishing
 
 After the first release exists on crates.io, configure Trusted Publishing for
-all four packages and point them at this repository and
+all five packages and point them at this repository and
 `.github/workflows/publish-crates.yml`.
 
 References:

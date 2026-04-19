@@ -14,17 +14,16 @@ use publication::{
     render_publication_bundle, validate_publication_artifacts, write_publication_artifacts,
 };
 
-pub(crate) use consistency::{format_publication_issues, validate_publication_consistency};
-pub(crate) use derive::derive_rows;
-#[cfg(test)]
+pub use consistency::{format_publication_issues, validate_publication_consistency};
+pub use derive::derive_rows;
+pub use derive::derive_rows_for_test_roots;
 #[allow(unused_imports)]
-pub(crate) use derive::derive_rows_for_test_roots;
-#[allow(unused_imports)]
-pub(crate) use publication::SupportMatrixArtifact;
+pub use publication::SupportMatrixArtifact;
 
-const CURRENT_AGENT_ROOTS: [(&str, &str); 2] = [
+const CURRENT_AGENT_ROOTS: [(&str, &str); 3] = [
     ("codex", "cli_manifests/codex"),
     ("claude_code", "cli_manifests/claude_code"),
+    ("opencode", "cli_manifests/opencode"),
 ];
 const JSON_OUTPUT_PATH: &str = "cli_manifests/support_matrix/current.json";
 const MARKDOWN_OUTPUT_PATH: &str = "docs/specs/unified-agent-api/support-matrix.md";

@@ -2,8 +2,8 @@
 seam_id: SEAM-1
 seam_slug: runtime-surface-and-evidence-lock
 type: integration
-status: proposed
-execution_horizon: active
+status: closed
+execution_horizon: future
 plan_version: v1
 basis:
   currentness: current
@@ -18,19 +18,17 @@ basis:
     - provider-auth posture changes that invalidate the current maintainer smoke assumptions
 gates:
   pre_exec:
-    review: pending
-    contract: pending
-    revalidation: pending
+    review: passed
+    contract: passed
+    revalidation: passed
   post_exec:
-    landing: pending
-    closeout: pending
+    landing: passed
+    closeout: passed
 seam_exit_gate:
   required: true
   planned_location: S99
-  status: pending
-open_remediations:
-  - REM-001
-  - REM-002
+  status: passed
+open_remediations: []
 ---
 
 # SEAM-1 - Runtime surface and evidence lock
@@ -54,10 +52,11 @@ open_remediations:
   - Inputs:
     - `docs/project_management/next/cli-agent-onboarding-charter.md`
     - `docs/project_management/next/cli-agent-onboarding-third-agent-packet.md`
-    - `docs/project_management/next/opencode-cli-onboarding/plan.md`
     - maintainer-backed smoke observations captured in the source packet
   - Outputs:
-    - downstream-ready runtime/evidence contract text
+    - `docs/specs/opencode-wrapper-run-contract.md`
+    - `docs/specs/opencode-onboarding-evidence-contract.md`
+    - `threaded-seams/seam-1-runtime-surface-and-evidence-lock/`
     - explicit deferred-surface list and reopen criteria
     - `THR-01` handoff for the wrapper and backend seams
 - **Key invariants / rules**:
@@ -78,16 +77,16 @@ open_remediations:
   - `docs/project_management/next/opencode-cli-onboarding/`
   - `docs/project_management/next/cli-agent-onboarding-charter.md`
   - `docs/project_management/next/cli-agent-onboarding-third-agent-packet.md`
-  - future `docs/specs/opencode-wrapper-run-contract.md`
-  - future `docs/specs/opencode-onboarding-evidence-contract.md`
+  - `docs/specs/opencode-wrapper-run-contract.md`
+  - `docs/specs/opencode-onboarding-evidence-contract.md`
 - **Verification**:
-  - seam-local review should prove the runtime surface, deferred-surface policy, and evidence
-    posture are concrete enough to drive wrapper planning without ambiguity
-  - verification should confirm the contract names all known prerequisite classes: install, auth,
-    provider selection, smoke evidence, and reopen triggers
-  - because this seam **produces** an owned contract, verification is about making that contract
-    concrete enough for downstream planning and implementation rather than requiring the final
-    accepted artifact to exist already
+  - seam-local review and contract baselines should prove the runtime surface, deferred-surface
+    policy, and evidence posture are concrete enough to drive wrapper planning without ambiguity
+  - verification should confirm the baselines name all known prerequisite classes: install, auth,
+    provider selection, smoke evidence, deterministic replay expectations, and reopen triggers
+  - because this seam **produces** owned contracts, verification is about making those contracts
+    concrete enough for downstream planning and implementation rather than requiring post-exec
+    landing evidence already to exist
 - **Canonical contract refs**:
   - `docs/specs/opencode-wrapper-run-contract.md`
   - `docs/specs/opencode-onboarding-evidence-contract.md`
@@ -99,19 +98,19 @@ open_remediations:
   - Risk: helper surfaces may look attractive enough to pressure the v1 seam boundary.
   - De-risk plan: publish a hard deferred-surface list with explicit "reopen only if" criteria.
 - **Rollout / safety**:
-  - docs/planning-only in this extraction pass
+  - this seam landed as a docs-only contract and evidence closeout
   - fail closed on contradictory evidence
   - preserve crate-first sequencing so downstream seams consume, rather than reinvent, this contract
 - **Downstream decomposition context**:
-  - Why this seam is `active`, `next`, or `future`: it is `active` because every downstream planning
-    seam depends on one explicit runtime/evidence contract instead of packet prose.
+  - Why this seam is `active`, `next`, or `future`: it is `future` because it has landed and now
+    serves as closeout-backed upstream evidence for the wrapper, backend, and promotion seams.
   - Which threads matter most: `THR-01`
   - What the first seam-local review should focus on: whether the current smoke evidence is enough
     to freeze the headless run surface, whether deferred helpers are stated without ambiguity, and
     whether provider/auth posture is concrete enough for downstream planning
   - Boundary slice intent: reserve `S00` in downstream seam-local planning if contract-definition
-    cleanup is still needed between the packet evidence, the charter, and the future OpenCode run
-    contract doc
+    cleanup is still needed between the packet evidence, the charter, and the published OpenCode
+    run contract doc
 - **Expected seam-exit concerns**:
   - Contracts likely to publish: `C-01`, `C-02`
   - Threads likely to advance: `THR-01`

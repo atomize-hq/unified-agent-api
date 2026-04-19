@@ -12,6 +12,7 @@ from pathlib import Path
 LEAF_PACKAGES = [
     "unified-agent-api-codex",
     "unified-agent-api-claude-code",
+    "unified-agent-api-opencode",
 ]
 
 DEPENDENT_PACKAGES = [

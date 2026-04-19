@@ -1,17 +1,9 @@
-#![allow(dead_code)]
-
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde_json::{json, Value};
-
-#[path = "../src/support_matrix.rs"]
-mod support_matrix;
-#[path = "../src/wrapper_coverage_shared.rs"]
-mod wrapper_coverage_shared;
-
-use support_matrix::{
+use xtask::support_matrix::{
     derive_rows, derive_rows_for_test_roots, validate_publication_consistency, BackendSupportState,
     ManifestSupportState, PointerPromotionState, UaaSupportState,
 };
@@ -162,6 +154,30 @@ fn materialize_baseline_workspace(workspace: &Path) {
         &[("linux-x64", "2.0.0")],
         &[("linux-x64", "2.0.0")],
         &[("2.0.0", "coverage.linux-x64.json", empty_report())],
+    );
+
+    materialize_root(
+        &workspace.join("cli_manifests/opencode"),
+        &["linux-x64"],
+        "3.0.0",
+        &["linux-x64"],
+        &[("3.0.0", &["linux-x64"])],
+        &[],
+        &[],
+        &[],
+    );
+}
+
+fn materialize_opencode_root(workspace: &Path) {
+    materialize_root(
+        &workspace.join("cli_manifests/opencode"),
+        &["linux-x64"],
+        "3.0.0",
+        &["linux-x64"],
+        &[("3.0.0", &["linux-x64"])],
+        &[],
+        &[],
+        &[],
     );
 }
 
@@ -325,6 +341,7 @@ fn publication_consistency_rejects_missing_committed_row() {
         &[("linux-x64", "2.0.0")],
         &[("2.0.0", "coverage.linux-x64.json", empty_report())],
     );
+    materialize_opencode_root(&workspace);
 
     let mut rows = derive_rows(&workspace).expect("derive rows");
     rows.retain(|row| {
@@ -389,6 +406,7 @@ fn publication_consistency_rejects_duplicate_row() {
         &[("linux-x64", "2.0.0")],
         &[("2.0.0", "coverage.linux-x64.json", empty_report())],
     );
+    materialize_opencode_root(&workspace);
 
     let mut rows = derive_rows(&workspace).expect("derive rows");
     let duplicate = rows
@@ -436,6 +454,7 @@ fn publication_consistency_rejects_unexpected_row() {
         &[("linux-x64", "2.0.0")],
         &[("2.0.0", "coverage.linux-x64.json", empty_report())],
     );
+    materialize_opencode_root(&workspace);
 
     let mut rows = derive_rows(&workspace).expect("derive rows");
     let unexpected = rows
@@ -443,7 +462,7 @@ fn publication_consistency_rejects_unexpected_row() {
         .find(|row| row.agent == "codex" && row.version == "1.0.0" && row.target == "linux-x64")
         .expect("expected codex row")
         .clone();
-    rows.push(support_matrix::SupportRow {
+    rows.push(xtask::support_matrix::SupportRow {
         target: "darwin-arm64".to_string(),
         ..unexpected
     });
@@ -486,6 +505,7 @@ fn publication_consistency_rejects_pointer_promotion_drift() {
         &[("linux-x64", "2.0.0")],
         &[("2.0.0", "coverage.linux-x64.json", empty_report())],
     );
+    materialize_opencode_root(&workspace);
 
     let mut rows = derive_rows(&workspace).expect("derive rows");
     let row = rows
@@ -529,6 +549,7 @@ fn publication_consistency_rejects_omission_claim_and_note_drift() {
         &[("linux-x64", "2.0.0")],
         &[("2.0.0", "coverage.linux-x64.json", empty_report())],
     );
+    materialize_opencode_root(&workspace);
 
     let mut rows = derive_rows(&workspace).expect("derive rows");
     let row = rows
@@ -592,6 +613,7 @@ fn publication_consistency_rejects_status_drift_for_latest_validated_rows() {
         &[("linux-x64", "2.0.0")],
         &[("2.0.0", "coverage.linux-x64.json", empty_report())],
     );
+    materialize_opencode_root(&workspace);
 
     let rows = derive_rows(&workspace).expect("derive rows");
     let issues = validate_publication_consistency(&workspace, &rows)

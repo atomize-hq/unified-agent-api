@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "semantic_version": "1.4.11",
+  "status": "validated",
+  "updated_at": "2026-04-17T00:00:00Z",
+  "artifacts": {
+    "snapshots_dir": "snapshots/1.4.11",
+    "reports_dir": "reports/1.4.11",
+    "union_complete": false
+  },
+  "coverage": {
+    "supported_targets": [
+      "linux-x64"
+    ],
+    "supported_required_target": true
+  },
+  "validation": {
+    "passed_targets": [
+      "linux-x64"
+    ],
+    "failed_targets": [],
+    "skipped_targets": []
+  },
+  "promotion": {
+    "eligible_for_latest_validated": true
+  }
+}

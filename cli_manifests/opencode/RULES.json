@@ -1,0 +1,74 @@
+{
+  "rules_schema_version": 1,
+  "scope": "opencode-cli-parity",
+  "versioning": {
+    "pointers": {
+      "stable_semver_pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "root_pointers_allow_none": true
+    }
+  },
+  "union": {
+    "required_target": "linux-x64",
+    "expected_targets": [
+      "linux-x64",
+      "darwin-arm64",
+      "win32-x64"
+    ],
+    "platform_mapping": {
+      "linux-x64": "linux",
+      "darwin-arm64": "macos",
+      "win32-x64": "windows"
+    }
+  },
+  "wrapper_coverage": {
+    "scope_semantics": {
+      "defaults": {
+        "no_scope_means": "all_expected_targets"
+      },
+      "platforms_expand_to_expected_targets": true,
+      "platforms_expand_using": "union.platform_mapping",
+      "scope_set_resolution": {
+        "mode": "union"
+      }
+    },
+    "validation": {
+      "disallow_overlapping_scopes": true,
+      "overlap_units": [
+        "command_path",
+        "command_flag_key",
+        "command_arg_name"
+      ]
+    }
+  },
+  "parity_exclusions": {
+    "schema_version": 1,
+    "units": [
+      {
+        "unit": "arg",
+        "path": [],
+        "name": "project",
+        "category": "interactive",
+        "note": "Interactive TUI project selection is outside the canonical run --format json wrapper surface."
+      }
+    ]
+  },
+  "storage": {
+    "committed": {
+      "snapshots": {
+        "union": "cli_manifests/opencode/snapshots/<version>/union.json",
+        "per_target": "cli_manifests/opencode/snapshots/<version>/<target_triple>.json",
+        "current_union_pointer": "cli_manifests/opencode/current.json"
+      },
+      "reports": {
+        "json": "cli_manifests/opencode/reports/<version>/coverage.<filter>.json"
+      }
+    },
+    "pointers": {
+      "latest_validated_by_target": "cli_manifests/opencode/pointers/latest_validated/<target_triple>.txt",
+      "latest_supported_by_target": "cli_manifests/opencode/pointers/latest_supported/<target_triple>.txt",
+      "compat": {
+        "latest_validated": "cli_manifests/opencode/latest_validated.txt"
+      }
+    }
+  }
+}

@@ -1,6 +1,19 @@
 # TODOS
 
-## Infrastructure
+## Completed
+
+### Create The OpenCode Execution Pack
+
+**What:** Create a single `docs/project_management/next/opencode-implementation/` execution pack that turns the closed OpenCode onboarding contracts into implementation-ready seams for `cli_manifests/opencode/`, `crates/opencode/`, and the OpenCode `crates/agent_api` backend.
+
+**Why:** The repo already finished candidate selection and contract locking for OpenCode, but implementation still lacks one code-facing plan-of-record. This execution pack is the missing bridge between the closed onboarding pack and actual landing work.
+
+**Context:** The 2026-04-18 `/plan-eng-review` for `docs/project_management/next/opencode-cli-onboarding/next-steps-handoff.md` reduced scope to one execution pack, reused the existing `THR-04` and seam closeouts as the bridge, kept UAA promotion out of scope unless stale triggers fire, and required an explicit verification matrix. The pack should consume the published OpenCode contracts and closeouts directly, stay crate-first, and make deterministic replay/fake-binary/fixture validation the default proof path instead of live provider smoke.
+
+**Effort:** M
+**Priority:** P2
+**Depends on:** Closed OpenCode onboarding pack and normative contracts already landed under `docs/project_management/next/opencode-cli-onboarding/` and `docs/specs/opencode-*.md`
+**Completed:** v0.2.3 (2026-04-18)
 
 ### Select The First Real Third CLI Agent And Prepare Its Onboarding Packet
 
@@ -13,5 +26,4 @@
 **Effort:** M
 **Priority:** P2
 **Depends on:** Phase 1 support-matrix and neutral parity tooling landing cleanly
-
-## Completed
+**Completed:** planning docs landed (2026-04-18)

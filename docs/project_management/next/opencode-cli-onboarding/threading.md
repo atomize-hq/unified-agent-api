@@ -3,19 +3,17 @@
 This document makes the OpenCode onboarding control plane explicit: contracts, dependency edges,
 workstreams, and revalidation triggers.
 
-Ownership note: this repo's normative contract surfaces live under `docs/specs/**`. When this pack
-references OpenCode-specific canonical contract refs that do not exist yet, downstream seam-local
-planning must create or update the relevant `docs/specs/**` artifact before claiming the contract
-is passed.
+Ownership note: this repo's normative contract surfaces live under `docs/specs/**`. `SEAM-1` now
+owns the initial OpenCode-specific canonical refs there, and downstream seam-local planning must
+create or update the later seam-owned `docs/specs/**` artifacts before claiming those contracts are
+passed.
 
 ## Execution horizon summary
 
-- Active seam: `SEAM-1`
-- Next seam: `SEAM-2`
-- Future seams: `SEAM-3`, `SEAM-4`
-- Only `SEAM-1` is eligible for authoritative downstream deep planning by default.
-- `SEAM-2` may later receive seam-local review and slices, but any deeper work stays provisional
-  until `SEAM-1` publishes its handoff.
+- Active seam: none
+- Next seam: none
+- Future seams: none
+- No seam remains in the forward planning window for this pack.
 
 ## Contract registry
 
@@ -120,12 +118,13 @@ is passed.
   - **Carried contract IDs**: `C-01`, `C-02`
   - **Purpose**: lock the canonical OpenCode v1 run surface and its evidence/reproducibility
     posture before wrapper or backend planning freezes downstream assumptions.
-  - **State**: `defined`
+  - **State**: `revalidated`
   - **Revalidation trigger**: contradictory maintainer smoke, upstream CLI event-shape drift, or a
     decision to pull `serve`, `acp`, `run --attach`, or interactive TUI behavior into v1 scope
-  - **Satisfied by**: a seam-local review that turns packet evidence into explicit contract text,
-    deferred-surface policy, and reproducibility guidance
-  - **Notes**: this thread is the only legitimate source of truth for downstream scope control.
+  - **Satisfied by**: the `SEAM-1` closeout record plus the canonical runtime and evidence
+    contracts under `docs/specs/opencode-*.md`
+  - **Notes**: `SEAM-2` has now revalidated against this thread; downstream seams should treat the
+    published runtime/evidence handoff as current input instead of packet prose.
 
 - **Thread ID**: `THR-02`
   - **Producer seam**: `SEAM-2`
@@ -134,11 +133,14 @@ is passed.
   - **Purpose**: hand the backend seam one wrapper-owned event/completion contract plus one
     manifest-root artifact contract, so backend work stays consumer-shaped instead of redefining the
     wrapper.
-  - **State**: `identified`
+  - **State**: `revalidated`
   - **Revalidation trigger**: any change in wrapper event taxonomy, completion semantics, manifest
     artifact inventory, or fixture/fake-binary strategy
-  - **Satisfied by**: future seam-local planning and closeout for `SEAM-2`
-  - **Notes**: downstream backend planning must stop if this thread is not explicitly published.
+  - **Satisfied by**: the `SEAM-2` closeout record plus the published wrapper and manifest
+    contracts under `docs/specs/opencode-*.md`
+  - **Notes**: `SEAM-3` has now revalidated against this thread; downstream backend planning should
+    treat the published wrapper/manifest handoff as current input instead of provisional seam
+    prose.
 
 - **Thread ID**: `THR-03`
   - **Producer seam**: `SEAM-3`
@@ -146,11 +148,12 @@ is passed.
   - **Carried contract IDs**: `C-05`, `C-06`
   - **Purpose**: expose the actual OpenCode backend envelope, advertised capabilities, and
     extension-ownership posture for promotion review.
-  - **State**: `identified`
+  - **State**: `revalidated`
   - **Revalidation trigger**: any change to wrapper contract inputs, capability advertisement, or
     backend-specific extension handling
-  - **Satisfied by**: future seam-local planning and closeout for `SEAM-3`
-  - **Notes**: this thread keeps the promotion seam from guessing about backend behavior.
+  - **Satisfied by**: the `SEAM-3` closeout record plus `docs/specs/opencode-agent-api-backend-contract.md`
+  - **Notes**: `SEAM-4` has now revalidated against this thread and can treat the backend-mapping
+    handoff as current input rather than provisional planning prose.
 
 - **Thread ID**: `THR-04`
   - **Producer seam**: `SEAM-4`
@@ -158,11 +161,13 @@ is passed.
   - **Carried contract IDs**: `C-07`
   - **Purpose**: publish the authoritative backend-support versus UAA-promotion recommendation and
     name any required follow-on pack for canonical spec or matrix work.
-  - **State**: `identified`
+  - **State**: `published`
   - **Revalidation trigger**: new multi-backend evidence, spec-registry changes, or additional
     OpenCode behavior that meaningfully changes the promotion case
-  - **Satisfied by**: future seam-local planning and closeout for `SEAM-4`
-  - **Notes**: this thread must remain explicit even when the correct answer is "no promotion yet."
+  - **Satisfied by**: the `SEAM-4` closeout record plus
+    `docs/project_management/next/opencode-cli-onboarding/governance/seam-4-closeout.md`
+  - **Notes**: this published handoff records that no additional UAA promotion work or follow-on
+    pack is required under the current evidence basis; future drift reopens the thread.
 
 ## Dependency graph
 

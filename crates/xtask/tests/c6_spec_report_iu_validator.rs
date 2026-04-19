@@ -4,6 +4,7 @@ use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde_json::{json, Value};
+use xtask::support_matrix::derive_rows_for_test_roots;
 
 const VERSION: &str = "0.61.0";
 const TS: &str = "1970-01-01T00:00:00Z";
@@ -62,6 +63,30 @@ fn copy_from_repo(manifest_dir: &Path, agent: &str, filename: &str) {
         fs::create_dir_all(parent).expect("mkdir dst parent");
     }
     fs::copy(&src, &dst).unwrap_or_else(|e| panic!("copy {:?} -> {:?}: {}", src, dst, e));
+}
+
+fn copy_dir_recursive(src: &Path, dst: &Path) {
+    fs::create_dir_all(dst).expect("create destination directory");
+    for entry in fs::read_dir(src).unwrap_or_else(|e| panic!("read_dir {:?}: {}", src, e)) {
+        let entry = entry.unwrap_or_else(|e| panic!("read_dir entry {:?}: {}", src, e));
+        let src_path = entry.path();
+        let dst_path = dst.join(entry.file_name());
+        if entry
+            .file_type()
+            .unwrap_or_else(|e| panic!("file_type {:?}: {}", src_path, e))
+            .is_dir()
+        {
+            copy_dir_recursive(&src_path, &dst_path);
+        } else {
+            fs::copy(&src_path, &dst_path)
+                .unwrap_or_else(|e| panic!("copy {:?} -> {:?}: {}", src_path, dst_path, e));
+        }
+    }
+}
+
+fn materialize_committed_opencode_dir(opencode_dir: &Path) {
+    let src = repo_root().join("cli_manifests").join("opencode");
+    copy_dir_recursive(&src, opencode_dir);
 }
 
 fn materialize_minimal_valid_codex_dir(codex_dir: &Path) {
@@ -157,7 +182,7 @@ fn materialize_minimal_valid_codex_dir(codex_dir: &Path) {
     let version_metadata = json!({
         "schema_version": 1,
         "semantic_version": VERSION,
-        "status": "snapshotted",
+        "status": "validated",
         "updated_at": TS,
         "coverage": {
             "supported_targets": [REQUIRED_TARGET],
@@ -181,6 +206,56 @@ fn materialize_minimal_valid_codex_dir(codex_dir: &Path) {
         "coverage": []
     });
     write_json(&codex_dir.join("wrapper_coverage.json"), &wrapper_coverage);
+
+    let base_report = json!({
+        "schema_version": 1,
+        "generated_at": TS,
+        "inputs": {
+            "upstream": {
+                "semantic_version": VERSION,
+                "mode": "union",
+                "targets": [REQUIRED_TARGET]
+            },
+            "wrapper": {
+                "schema_version": 1,
+                "wrapper_version": "0.0.0-test"
+            },
+            "rules": {
+                "rules_schema_version": 1
+            }
+        },
+        "deltas": {
+            "missing_commands": [],
+            "missing_flags": [],
+            "missing_args": [],
+            "intentionally_unsupported": [],
+            "wrapper_only_commands": [],
+            "wrapper_only_flags": [],
+            "wrapper_only_args": [],
+        }
+    });
+    let mut any_report = base_report.clone();
+    any_report["platform_filter"] = json!({ "mode": "any" });
+    write_json(
+        &codex_dir
+            .join("reports")
+            .join(VERSION)
+            .join("coverage.any.json"),
+        &any_report,
+    );
+
+    let mut exact_report = base_report;
+    exact_report["platform_filter"] = json!({
+        "mode": "exact_target",
+        "target_triple": REQUIRED_TARGET
+    });
+    write_json(
+        &codex_dir
+            .join("reports")
+            .join(VERSION)
+            .join(format!("coverage.{REQUIRED_TARGET}.json")),
+        &exact_report,
+    );
 }
 
 fn materialize_minimal_valid_claude_dir(claude_dir: &Path) {
@@ -296,41 +371,54 @@ fn materialize_minimal_valid_claude_dir(claude_dir: &Path) {
         }),
     );
 
+    let base_report = json!({
+        "schema_version": 1,
+        "generated_at": TS,
+        "inputs": {
+            "upstream": {
+                "semantic_version": VERSION,
+                "mode": "union",
+                "targets": [CLAUDE_REQUIRED_TARGET],
+            },
+            "wrapper": {
+                "schema_version": 1,
+                "wrapper_version": "0.0.0-test"
+            },
+            "rules": {
+                "rules_schema_version": 1
+            }
+        },
+        "deltas": {
+            "missing_commands": [],
+            "missing_flags": [],
+            "missing_args": [],
+            "intentionally_unsupported": [],
+            "wrapper_only_commands": [],
+            "wrapper_only_flags": [],
+            "wrapper_only_args": [],
+        }
+    });
+    let mut any_report = base_report.clone();
+    any_report["platform_filter"] = json!({ "mode": "any" });
+    write_json(
+        &claude_dir
+            .join("reports")
+            .join(VERSION)
+            .join("coverage.any.json"),
+        &any_report,
+    );
+
+    let mut exact_report = base_report;
+    exact_report["platform_filter"] = json!({
+        "mode": "exact_target",
+        "target_triple": CLAUDE_REQUIRED_TARGET
+    });
     write_json(
         &claude_dir
             .join("reports")
             .join(VERSION)
             .join(format!("coverage.{CLAUDE_REQUIRED_TARGET}.json")),
-        &json!({
-            "schema_version": 1,
-            "generated_at": TS,
-            "inputs": {
-                "upstream": {
-                    "semantic_version": VERSION,
-                    "mode": "union",
-                    "targets": [CLAUDE_REQUIRED_TARGET],
-                },
-                "wrapper": {
-                    "schema_version": 1,
-                    "wrapper_version": "0.0.0-test"
-                },
-                "rules": {
-                    "rules_schema_version": 1
-                }
-            },
-            "platform_filter": {
-                "mode": "exact_target"
-            },
-            "deltas": {
-                "missing_commands": [],
-                "missing_flags": [],
-                "missing_args": [],
-                "intentionally_unsupported": [],
-                "wrapper_only_commands": [],
-                "wrapper_only_flags": [],
-                "wrapper_only_args": [],
-            }
-        }),
+        &exact_report,
     );
 
     write_json(
@@ -440,40 +528,19 @@ fn write_support_matrix_artifact(workspace_root: &Path, rows: Value) {
 }
 
 fn write_complete_support_matrix_artifact(workspace_root: &Path) {
+    let rows = derive_rows_for_test_roots(
+        workspace_root,
+        &[
+            ("claude_code", "cli_manifests/claude_code"),
+            ("codex", "cli_manifests/codex"),
+            ("opencode", "cli_manifests/opencode"),
+        ],
+    )
+    .expect("derive complete support matrix rows");
+
     write_support_matrix_artifact(
         workspace_root,
-        json!([
-            {
-                "agent": "codex",
-                "version": VERSION,
-                "target": "aarch64-apple-darwin",
-                "manifest_support": "unsupported",
-                "backend_support": "unsupported",
-                "uaa_support": "unsupported",
-                "pointer_promotion": "none",
-                "evidence_notes": ["current root snapshot omits this target"],
-            },
-            {
-                "agent": "codex",
-                "version": VERSION,
-                "target": "x86_64-pc-windows-msvc",
-                "manifest_support": "unsupported",
-                "backend_support": "unsupported",
-                "uaa_support": "unsupported",
-                "pointer_promotion": "none",
-                "evidence_notes": ["current root snapshot omits this target"],
-            },
-            {
-                "agent": "codex",
-                "version": VERSION,
-                "target": REQUIRED_TARGET,
-                "manifest_support": "supported",
-                "backend_support": "unsupported",
-                "uaa_support": "unsupported",
-                "pointer_promotion": "latest_supported_and_validated",
-                "evidence_notes": [],
-            }
-        ]),
+        serde_json::to_value(rows).expect("serialize complete support matrix rows"),
     );
 }
 

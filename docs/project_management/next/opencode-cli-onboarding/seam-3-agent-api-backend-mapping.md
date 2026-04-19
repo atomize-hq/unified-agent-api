@@ -2,14 +2,15 @@
 seam_id: SEAM-3
 seam_slug: agent-api-backend-mapping
 type: integration
-status: proposed
+status: closed
 execution_horizon: future
-plan_version: v1
+plan_version: v2
 basis:
-  currentness: provisional
+  currentness: current
   source_scope_ref: scope_brief.md
   source_scope_version: v1
-  upstream_closeouts: []
+  upstream_closeouts:
+    - governance/seam-2-closeout.md
   required_threads:
     - THR-01
     - THR-02
@@ -20,16 +21,16 @@ basis:
     - new evidence that backend payload bounding or redaction must differ from current assumptions
 gates:
   pre_exec:
-    review: pending
-    contract: pending
-    revalidation: pending
+    review: passed
+    contract: passed
+    revalidation: passed
   post_exec:
-    landing: pending
-    closeout: pending
+    landing: passed
+    closeout: passed
 seam_exit_gate:
   required: true
   planned_location: S99
-  status: pending
+  status: passed
 open_remediations: []
 ---
 
@@ -47,12 +48,15 @@ open_remediations: []
   - Out:
     - changing wrapper-owned semantics from `SEAM-2`
     - promoting backend-specific behavior into universal `agent_api.*` capabilities
-    - editing canonical universal specs in this extraction pass
+    - retroactively redefining the closed universal-spec posture without a new follow-on pack
 - **Primary interfaces**
   - Inputs:
     - `THR-01`
     - `THR-02`
-    - `docs/project_management/next/opencode-cli-onboarding/C2-spec.md`
+    - `C-01`
+    - `C-02`
+    - `docs/specs/opencode-wrapper-run-contract.md`
+    - `docs/specs/opencode-onboarding-evidence-contract.md`
     - `docs/specs/unified-agent-api/capabilities-schema-spec.md`
     - `docs/specs/unified-agent-api/extensions-spec.md`
   - Outputs:
@@ -76,7 +80,7 @@ open_remediations: []
     - future capability-matrix and backend regression work
 - **Touch surface**:
   - `crates/agent_api/**`
-  - future `docs/specs/opencode-agent-api-backend-contract.md`
+  - `docs/specs/opencode-agent-api-backend-contract.md`
   - `docs/specs/unified-agent-api/capabilities-schema-spec.md`
   - `docs/specs/unified-agent-api/extensions-spec.md`
   - `docs/project_management/next/opencode-cli-onboarding/`
@@ -103,14 +107,16 @@ open_remediations: []
   - provider-backed smoke may supplement verification but must not become the only proof path
   - backend support must remain distinct from UAA promotion
 - **Downstream decomposition context**:
-  - Why this seam is `active`, `next`, or `future`: it is `future` because it should only activate
-    after the wrapper and manifest seam publishes a concrete handoff.
+  - Why this seam is `active`, `next`, or `future`: it was `active` because `SEAM-2` published a
+    closeout-backed wrapper/manifest handoff and this seam owned the next executable backend work;
+    it is now `future` because the backend mapping work has landed and the seam exit record is
+    closed.
   - Which threads matter most: `THR-02`, `THR-03`
   - What the first seam-local review should focus on: whether the wrapper handoff is concrete
     enough, whether capability/extension advertisement is explicit, and whether test obligations
     cover redaction and completion-finality risk
-  - Boundary slice intent: reserve `S00` if seam-local planning needs a contract-definition slice
-    for backend-specific capability or extension semantics before mapping slices begin
+  - Boundary slice intent: reserve `S00` because seam-local planning needs a contract-definition
+    slice for backend-owned mapping and extension semantics before mapping slices begin
 - **Expected seam-exit concerns**:
   - Contracts likely to publish: `C-05`, `C-06`
   - Threads likely to advance: `THR-03`

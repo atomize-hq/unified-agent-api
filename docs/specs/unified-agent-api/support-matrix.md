@@ -239,4 +239,15 @@ Do not edit this section by hand.
 | `codex` | `0.92.0` | `x86_64-unknown-linux-musl` | `supported` | `partial` | `partial` | `none` | backend report includes intentionally unsupported surface outside unified support; backend report includes backend-only surface outside unified support |
 | `codex` | `0.91.0` | `x86_64-unknown-linux-musl` | `unsupported` | `unsupported` | `unsupported` | `none` | backend report includes intentionally unsupported surface outside unified support; backend report includes backend-only surface outside unified support |
 | `codex` | `0.61.0` | `x86_64-unknown-linux-musl` | `supported` | `partial` | `partial` | `latest_supported` | backend report includes intentionally unsupported surface outside unified support; backend report includes backend-only surface outside unified support |
+
+### `opencode`
+
+| agent | version | target | manifest_support | backend_support | uaa_support | pointer_promotion | evidence_notes |
+|---|---|---|---|---|---|---|---|
+| `opencode` | `1.4.11` | `darwin-arm64` | `unsupported` | `unsupported` | `unsupported` | `none` | — |
+| `opencode` | `1.4.9` | `darwin-arm64` | `unsupported` | `unsupported` | `unsupported` | `none` | — |
+| `opencode` | `1.4.11` | `linux-x64` | `supported` | `unsupported` | `unsupported` | `none` | — |
+| `opencode` | `1.4.9` | `linux-x64` | `unsupported` | `unsupported` | `unsupported` | `none` | current root snapshot omits this target |
+| `opencode` | `1.4.11` | `win32-x64` | `unsupported` | `unsupported` | `unsupported` | `none` | — |
+| `opencode` | `1.4.9` | `win32-x64` | `unsupported` | `unsupported` | `unsupported` | `none` | current root snapshot omits this target |
 <!-- support-matrix-published:end -->
