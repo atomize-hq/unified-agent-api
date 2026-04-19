@@ -4,7 +4,6 @@ use std::{
     ffi::OsString,
     path::{Path, PathBuf},
     process::ExitStatus,
-    sync::{Mutex, OnceLock},
     time::Duration,
 };
 
@@ -86,9 +85,8 @@ pub(super) fn sample_context() -> AgentWrapperMcpCommandContext {
     }
 }
 
-pub(super) fn test_env_lock() -> &'static Mutex<()> {
-    static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
-    LOCK.get_or_init(|| Mutex::new(()))
+pub(super) fn test_env_lock() -> crate::backends::test_support::TestEnvLockGuard {
+    crate::backends::test_support::test_env_lock()
 }
 
 pub(super) struct EnvGuard {

@@ -1,5 +1,6 @@
 #![forbid(unsafe_code)]
 
+mod agent_api_backend_type_leak_guard;
 mod capability_matrix;
 mod capability_matrix_audit;
 mod claude_snapshot;
@@ -14,6 +15,9 @@ mod codex_version_metadata;
 mod codex_wrapper_coverage;
 mod parity_triad_scaffold;
 mod version_bump;
+mod wrapper_coverage_shared;
+
+pub use xtask::support_matrix;
 
 use clap::{Parser, Subcommand};
 
@@ -28,6 +32,8 @@ struct Cli {
 #[derive(Debug, Subcommand)]
 #[allow(clippy::enum_variant_names)]
 enum Command {
+    /// Guard against backend crate types leaking into the public agent_api surface.
+    AgentApiBackendTypeLeakGuard(agent_api_backend_type_leak_guard::Args),
     /// Generate a Codex CLI snapshot manifest under `cli_manifests/codex/`.
     CodexSnapshot(codex_snapshot::Args),
     /// Generate a Claude Code CLI snapshot manifest under `cli_manifests/claude_code/`.
@@ -54,6 +60,8 @@ enum Command {
     CapabilityMatrix(capability_matrix::Args),
     /// Audit the capability matrix for orthogonality invariants.
     CapabilityMatrixAudit(capability_matrix_audit::Args),
+    /// Generate support publication JSON and Markdown outputs from committed manifest evidence.
+    SupportMatrix(support_matrix::Args),
     /// Bump the workspace release version and exact inter-crate publish pins.
     VersionBump(version_bump::Args),
 }
@@ -62,6 +70,15 @@ fn main() {
     let cli = Cli::parse();
 
     let exit_code = match cli.command {
+        Command::AgentApiBackendTypeLeakGuard(args) => {
+            match agent_api_backend_type_leak_guard::run(args) {
+                Ok(()) => 0,
+                Err(err) => {
+                    eprintln!("{err}");
+                    1
+                }
+            }
+        }
         Command::CodexSnapshot(args) => match codex_snapshot::run(args) {
             Ok(()) => 0,
             Err(err) => {
@@ -141,6 +158,13 @@ fn main() {
             }
         },
         Command::CapabilityMatrixAudit(args) => match capability_matrix_audit::run(args) {
+            Ok(()) => 0,
+            Err(err) => {
+                eprintln!("{err}");
+                1
+            }
+        },
+        Command::SupportMatrix(args) => match support_matrix::run(args) {
             Ok(()) => 0,
             Err(err) => {
                 eprintln!("{err}");

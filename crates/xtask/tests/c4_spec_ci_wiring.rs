@@ -119,3 +119,27 @@ fn c4_spec_ci_workflow_has_conditional_codex_validate_gate() {
         "ci.yml must invoke: cargo run -p xtask -- codex-validate"
     );
 }
+
+#[test]
+fn backend_type_leak_guard_is_centralized_in_ci_and_smoke_workflows() {
+    let guard_invocation = Regex::new(
+        r"cargo\s+run\s+-p\s+xtask\s+--[\s\\]*\n?[\s\\]*agent-api-backend-type-leak-guard",
+    )
+    .expect("valid regex");
+    for workflow in [
+        ".github/workflows/ci.yml",
+        ".github/workflows/unified-agent-api-smoke.yml",
+        ".github/workflows/agent-api-codex-stream-exec-smoke.yml",
+        ".github/workflows/claude-code-live-stream-json-smoke.yml",
+    ] {
+        let yml = read_repo_file(workflow);
+        assert!(
+            guard_invocation.is_match(&yml),
+            "{workflow} must invoke cargo run -p xtask -- agent-api-backend-type-leak-guard"
+        );
+        assert!(
+            !yml.contains("(?:codex|claude_code)::"),
+            "{workflow} must not keep the stale inline backend regex guard"
+        );
+    }
+}

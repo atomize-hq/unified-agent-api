@@ -1,0 +1,105 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "cli_manifests/opencode/VERSION_METADATA_SCHEMA.json",
+  "title": "OpenCode CLI Version Metadata",
+  "description": "Status metadata for an upstream OpenCode version within this repo's manifest workflow.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "semantic_version",
+    "status",
+    "updated_at"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "semantic_version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+(?:[-+][0-9A-Za-z.-]+)?$"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "snapshotted",
+        "reported",
+        "validated",
+        "supported"
+      ]
+    },
+    "updated_at": {
+      "type": "string"
+    },
+    "notes": {
+      "type": "string"
+    },
+    "artifacts": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "snapshots_dir": {
+          "type": "string"
+        },
+        "reports_dir": {
+          "type": "string"
+        },
+        "union_complete": {
+          "type": "boolean"
+        }
+      }
+    },
+    "coverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "supported_targets": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
+        "supported_required_target": {
+          "type": "boolean"
+        }
+      }
+    },
+    "validation": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "passed_targets": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
+        "failed_targets": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
+        "skipped_targets": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        }
+      }
+    },
+    "promotion": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "eligible_for_latest_validated": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}

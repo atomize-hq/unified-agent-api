@@ -3,6 +3,7 @@ members = [
     "crates/agent_api",
     "crates/codex",
     "crates/claude_code",
+    "crates/opencode",
     "crates/wrapper_events",
     "crates/xtask",
 ]
@@ -10,7 +11,7 @@ resolver = "2"
 
 [workspace.package]
 edition = "2021"
-version = "0.2.2"
+version = "0.2.3"
 rust-version = "1.78"
 license = "MIT OR Apache-2.0"
 authors = ["Unified Agent API Contributors"]

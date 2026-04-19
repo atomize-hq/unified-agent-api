@@ -1,0 +1,563 @@
+{
+  "snapshot_schema_version": 2,
+  "tool": "opencode-cli",
+  "mode": "union",
+  "collected_at": "2026-04-17T00:00:00Z",
+  "expected_targets": [
+    "linux-x64",
+    "linux-arm64",
+    "darwin-x64",
+    "darwin-arm64",
+    "win32-x64",
+    "win32-arm64"
+  ],
+  "complete": false,
+  "missing_targets": [
+    "linux-arm64",
+    "darwin-x64",
+    "darwin-arm64",
+    "win32-x64",
+    "win32-arm64"
+  ],
+  "inputs": [
+    {
+      "target_triple": "linux-x64",
+      "collected_at": "2026-04-17T00:00:00Z",
+      "binary": {
+        "sha256": "bfa25c08df8d37edb579f470461137ef49c11fda2f43814785a99d87da97fd85",
+        "size_bytes": 142172442,
+        "platform": {
+          "os": "linux",
+          "arch": "x86_64"
+        },
+        "target_triple": "linux-x64",
+        "version_output": "1.4.11",
+        "semantic_version": "1.4.11"
+      }
+    }
+  ],
+  "commands": [
+    {
+      "path": [],
+      "available_on": [
+        "linux-x64"
+      ],
+      "about": "start opencode tui",
+      "usage": "opencode [project]",
+      "args": [
+        {
+          "name": "project",
+          "required": false,
+          "variadic": false,
+          "note": "captured from root help positional usage",
+          "available_on": [
+            "linux-x64"
+          ]
+        }
+      ],
+      "flags": [
+        {
+          "long": "--help",
+          "short": "-h",
+          "takes_value": false,
+          "available_on": [
+            "linux-x64"
+          ]
+        },
+        {
+          "long": "--version",
+          "short": "-v",
+          "takes_value": false,
+          "available_on": [
+            "linux-x64"
+          ]
+        },
+        {
+          "long": "--print-logs",
+          "takes_value": false,
+          "available_on": [
+            "linux-x64"
+          ]
+        },
+        {
+          "long": "--log-level",
+          "takes_value": true,
+          "value_name": "level",
+          "available_on": [
+            "linux-x64"
+          ]
+        },
+        {
+          "long": "--pure",
+          "takes_value": false,
+          "available_on": [
+            "linux-x64"
+          ]
+        },
+        {
+          "long": "--port",
+          "takes_value": true,
+          "value_name": "port",
+          "available_on": [
+            "linux-x64"
+          ]
+        },
+        {
+          "long": "--hostname",
+          "takes_value": true,
+          "value_name": "hostname",
+          "available_on": [
+            "linux-x64"
+          ]
+        },
+        {
+          "long": "--mdns",
+          "takes_value": false,
+          "available_on": [
+            "linux-x64"
+          ]
+        },
+        {
+          "long": "--mdns-domain",
+          "takes_value": true,
+          "value_name": "domain",
+          "available_on": [
+            "linux-x64"
+          ]
+        },
+        {
+          "long": "--cors",
+          "takes_value": true,
+          "available_on": [
+            "linux-x64"
+          ]
+        },
+        {
+          "long": "--model",
+          "short": "-m",
+          "takes_value": true,
+          "value_name": "provider/model",
+          "available_on": [
+            "linux-x64"
+          ]
+        },
+        {
+          "long": "--continue",
+          "short": "-c",
+          "takes_value": false,
+          "available_on": [
+            "linux-x64"
+          ]
+        },
+        {
+          "long": "--session",
+          "short": "-s",
+          "takes_value": true,
+          "value_name": "session",
+          "available_on": [
+            "linux-x64"
+          ]
+        },
+        {
+          "long": "--fork",
+          "takes_value": false,
+          "available_on": [
+            "linux-x64"
+          ]
+        },
+        {
+          "long": "--prompt",
+          "takes_value": true,
+          "value_name": "prompt",
+          "available_on": [
+            "linux-x64"
+          ]
+        },
+        {
+          "long": "--agent",
+          "takes_value": true,
+          "value_name": "agent",
+          "available_on": [
+            "linux-x64"
+          ]
+        }
+      ]
+    },
+    {
+      "path": [
+        "acp"
+      ],
+      "available_on": [
+        "linux-x64"
+      ],
+      "about": "start ACP (Agent Client Protocol) server"
+    },
+    {
+      "path": [
+        "agent"
+      ],
+      "available_on": [
+        "linux-x64"
+      ],
+      "about": "manage agents"
+    },
+    {
+      "path": [
+        "attach"
+      ],
+      "available_on": [
+        "linux-x64"
+      ],
+      "about": "attach to a running opencode server"
+    },
+    {
+      "path": [
+        "completion"
+      ],
+      "available_on": [
+        "linux-x64"
+      ],
+      "about": "generate shell completion script"
+    },
+    {
+      "path": [
+        "db"
+      ],
+      "available_on": [
+        "linux-x64"
+      ],
+      "about": "database tools"
+    },
+    {
+      "path": [
+        "debug"
+      ],
+      "available_on": [
+        "linux-x64"
+      ],
+      "about": "debugging and troubleshooting tools"
+    },
+    {
+      "path": [
+        "export"
+      ],
+      "available_on": [
+        "linux-x64"
+      ],
+      "about": "export session data as JSON"
+    },
+    {
+      "path": [
+        "github"
+      ],
+      "available_on": [
+        "linux-x64"
+      ],
+      "about": "manage GitHub agent"
+    },
+    {
+      "path": [
+        "import"
+      ],
+      "available_on": [
+        "linux-x64"
+      ],
+      "about": "import session data from JSON file or URL"
+    },
+    {
+      "path": [
+        "mcp"
+      ],
+      "available_on": [
+        "linux-x64"
+      ],
+      "about": "manage MCP (Model Context Protocol) servers"
+    },
+    {
+      "path": [
+        "models"
+      ],
+      "available_on": [
+        "linux-x64"
+      ],
+      "about": "list all available models"
+    },
+    {
+      "path": [
+        "plugin"
+      ],
+      "available_on": [
+        "linux-x64"
+      ],
+      "about": "install plugin and update config"
+    },
+    {
+      "path": [
+        "pr"
+      ],
+      "available_on": [
+        "linux-x64"
+      ],
+      "about": "fetch and checkout a GitHub PR branch, then run opencode"
+    },
+    {
+      "path": [
+        "providers"
+      ],
+      "available_on": [
+        "linux-x64"
+      ],
+      "about": "manage AI providers and credentials"
+    },
+    {
+      "path": [
+        "run"
+      ],
+      "available_on": [
+        "linux-x64"
+      ],
+      "about": "run opencode with a message",
+      "usage": "opencode run [message..]",
+      "args": [
+        {
+          "name": "message",
+          "required": false,
+          "variadic": true,
+          "available_on": [
+            "linux-x64"
+          ]
+        }
+      ],
+      "flags": [
+        {
+          "long": "--help",
+          "short": "-h",
+          "takes_value": false,
+          "available_on": [
+            "linux-x64"
+          ]
+        },
+        {
+          "long": "--version",
+          "short": "-v",
+          "takes_value": false,
+          "available_on": [
+            "linux-x64"
+          ]
+        },
+        {
+          "long": "--print-logs",
+          "takes_value": false,
+          "available_on": [
+            "linux-x64"
+          ]
+        },
+        {
+          "long": "--log-level",
+          "takes_value": true,
+          "value_name": "level",
+          "available_on": [
+            "linux-x64"
+          ]
+        },
+        {
+          "long": "--pure",
+          "takes_value": false,
+          "available_on": [
+            "linux-x64"
+          ]
+        },
+        {
+          "long": "--command",
+          "takes_value": true,
+          "value_name": "command",
+          "available_on": [
+            "linux-x64"
+          ]
+        },
+        {
+          "long": "--continue",
+          "short": "-c",
+          "takes_value": false,
+          "available_on": [
+            "linux-x64"
+          ]
+        },
+        {
+          "long": "--session",
+          "short": "-s",
+          "takes_value": true,
+          "value_name": "session",
+          "available_on": [
+            "linux-x64"
+          ]
+        },
+        {
+          "long": "--fork",
+          "takes_value": false,
+          "available_on": [
+            "linux-x64"
+          ]
+        },
+        {
+          "long": "--share",
+          "takes_value": false,
+          "available_on": [
+            "linux-x64"
+          ]
+        },
+        {
+          "long": "--model",
+          "short": "-m",
+          "takes_value": true,
+          "value_name": "provider/model",
+          "available_on": [
+            "linux-x64"
+          ]
+        },
+        {
+          "long": "--agent",
+          "takes_value": true,
+          "value_name": "agent",
+          "available_on": [
+            "linux-x64"
+          ]
+        },
+        {
+          "long": "--format",
+          "takes_value": true,
+          "value_name": "default|json",
+          "available_on": [
+            "linux-x64"
+          ]
+        },
+        {
+          "long": "--file",
+          "short": "-f",
+          "takes_value": true,
+          "value_name": "files",
+          "available_on": [
+            "linux-x64"
+          ]
+        },
+        {
+          "long": "--title",
+          "takes_value": true,
+          "value_name": "title",
+          "available_on": [
+            "linux-x64"
+          ]
+        },
+        {
+          "long": "--attach",
+          "takes_value": true,
+          "value_name": "url",
+          "available_on": [
+            "linux-x64"
+          ]
+        },
+        {
+          "long": "--password",
+          "short": "-p",
+          "takes_value": true,
+          "value_name": "password",
+          "available_on": [
+            "linux-x64"
+          ]
+        },
+        {
+          "long": "--dir",
+          "takes_value": true,
+          "value_name": "directory",
+          "available_on": [
+            "linux-x64"
+          ]
+        },
+        {
+          "long": "--port",
+          "takes_value": true,
+          "value_name": "port",
+          "available_on": [
+            "linux-x64"
+          ]
+        },
+        {
+          "long": "--variant",
+          "takes_value": true,
+          "value_name": "variant",
+          "available_on": [
+            "linux-x64"
+          ]
+        },
+        {
+          "long": "--thinking",
+          "takes_value": false,
+          "available_on": [
+            "linux-x64"
+          ]
+        },
+        {
+          "long": "--dangerously-skip-permissions",
+          "takes_value": false,
+          "available_on": [
+            "linux-x64"
+          ]
+        }
+      ]
+    },
+    {
+      "path": [
+        "serve"
+      ],
+      "available_on": [
+        "linux-x64"
+      ],
+      "about": "starts a headless opencode server"
+    },
+    {
+      "path": [
+        "session"
+      ],
+      "available_on": [
+        "linux-x64"
+      ],
+      "about": "manage sessions"
+    },
+    {
+      "path": [
+        "stats"
+      ],
+      "available_on": [
+        "linux-x64"
+      ],
+      "about": "show token usage and cost statistics"
+    },
+    {
+      "path": [
+        "uninstall"
+      ],
+      "available_on": [
+        "linux-x64"
+      ],
+      "about": "uninstall opencode and remove all related files"
+    },
+    {
+      "path": [
+        "upgrade"
+      ],
+      "available_on": [
+        "linux-x64"
+      ],
+      "about": "upgrade opencode to the latest or a specific version"
+    },
+    {
+      "path": [
+        "web"
+      ],
+      "available_on": [
+        "linux-x64"
+      ],
+      "about": "start opencode server and open web interface"
+    }
+  ]
+}

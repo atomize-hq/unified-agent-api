@@ -160,6 +160,7 @@ jobs:
 
           publish_if_missing "unified-agent-api-codex"
           publish_if_missing "unified-agent-api-claude-code"
+          publish_if_missing "unified-agent-api-opencode"
 
           wait_for_publishability "unified-agent-api-wrapper-events"
           publish_if_missing "unified-agent-api-wrapper-events"

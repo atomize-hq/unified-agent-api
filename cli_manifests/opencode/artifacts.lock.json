@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "inventory": {
+    "root": "cli_manifests/opencode",
+    "promotion_pointer_targets": [
+      "linux-x64",
+      "darwin-arm64",
+      "win32-x64"
+    ],
+    "committed_pointer_targets": [
+      "linux-x64",
+      "linux-arm64",
+      "darwin-x64",
+      "darwin-arm64",
+      "win32-x64",
+      "win32-arm64"
+    ],
+    "committed_versions": [
+      "1.4.9",
+      "1.4.11"
+    ],
+    "notes": [
+      "This bootstrap root records a validated linux-x64 bundle for 1.4.11 and a local darwin-arm64 snapshot bundle for 1.4.9.",
+      "Support publication remains separate from this manifest-root inventory."
+    ]
+  },
+  "artifacts": [
+    {
+      "semantic_version": "1.4.9",
+      "target_triple": "darwin-arm64",
+      "package_name": "opencode-ai",
+      "package_version": "1.4.9",
+      "asset_name": "bin/.opencode",
+      "download_url": "npm:opencode-ai@1.4.9#darwin-arm64",
+      "sha256": "4557b09dfbb6e8c28b85e90e9b8d8b83361ce53f622d3e41d908f279c378f091",
+      "size_bytes": 101226400
+    },
+    {
+      "semantic_version": "1.4.11",
+      "target_triple": "linux-x64",
+      "asset_name": "snapshots/1.4.11/linux-x64.json",
+      "download_url": "committed:snapshots/1.4.11/linux-x64.json",
+      "sha256": "bfa25c08df8d37edb579f470461137ef49c11fda2f43814785a99d87da97fd85",
+      "size_bytes": 142172442
+    }
+  ]
+}

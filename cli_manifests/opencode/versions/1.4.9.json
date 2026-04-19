@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "semantic_version": "1.4.9",
+  "status": "snapshotted",
+  "updated_at": "2026-04-18T03:12:12Z",
+  "notes": "Bootstrap OpenCode manifest root with one observed darwin-arm64 snapshot; promotion pointers remain unset.",
+  "artifacts": {
+    "snapshots_dir": "snapshots/1.4.9",
+    "union_complete": false
+  }
+}

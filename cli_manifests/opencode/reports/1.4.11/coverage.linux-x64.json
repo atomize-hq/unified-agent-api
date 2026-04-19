@@ -1,0 +1,169 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-04-17T00:00:00Z",
+  "inputs": {
+    "upstream": {
+      "semantic_version": "1.4.11",
+      "mode": "union",
+      "targets": [
+        "linux-x64"
+      ]
+    },
+    "wrapper": {
+      "schema_version": 1,
+      "wrapper_version": "0.0.0-seam1-s2"
+    },
+    "rules": {
+      "rules_schema_version": 1
+    }
+  },
+  "platform_filter": {
+    "mode": "exact_target",
+    "target_triple": "linux-x64"
+  },
+  "deltas": {
+    "missing_commands": [
+      {
+        "path": [
+          "run"
+        ],
+        "upstream_available_on": [
+          "linux-x64"
+        ]
+      },
+      {
+        "path": [
+          "acp"
+        ],
+        "upstream_available_on": [
+          "linux-x64"
+        ]
+      },
+      {
+        "path": [
+          "attach"
+        ],
+        "upstream_available_on": [
+          "linux-x64"
+        ]
+      },
+      {
+        "path": [
+          "models"
+        ],
+        "upstream_available_on": [
+          "linux-x64"
+        ]
+      },
+      {
+        "path": [
+          "providers"
+        ],
+        "upstream_available_on": [
+          "linux-x64"
+        ]
+      },
+      {
+        "path": [
+          "serve"
+        ],
+        "upstream_available_on": [
+          "linux-x64"
+        ]
+      },
+      {
+        "path": [
+          "web"
+        ],
+        "upstream_available_on": [
+          "linux-x64"
+        ]
+      }
+    ],
+    "missing_flags": [
+      {
+        "path": [
+          "run"
+        ],
+        "key": "--format",
+        "upstream_available_on": [
+          "linux-x64"
+        ]
+      },
+      {
+        "path": [
+          "run"
+        ],
+        "key": "--dir",
+        "upstream_available_on": [
+          "linux-x64"
+        ]
+      },
+      {
+        "path": [
+          "run"
+        ],
+        "key": "--attach",
+        "upstream_available_on": [
+          "linux-x64"
+        ]
+      },
+      {
+        "path": [
+          "run"
+        ],
+        "key": "--model",
+        "upstream_available_on": [
+          "linux-x64"
+        ]
+      },
+      {
+        "path": [
+          "run"
+        ],
+        "key": "--continue",
+        "upstream_available_on": [
+          "linux-x64"
+        ]
+      },
+      {
+        "path": [
+          "run"
+        ],
+        "key": "--session",
+        "upstream_available_on": [
+          "linux-x64"
+        ]
+      },
+      {
+        "path": [
+          "run"
+        ],
+        "key": "--fork",
+        "upstream_available_on": [
+          "linux-x64"
+        ]
+      },
+      {
+        "path": [
+          "run"
+        ],
+        "key": "--agent",
+        "upstream_available_on": [
+          "linux-x64"
+        ]
+      }
+    ],
+    "missing_args": [],
+    "excluded_args": [
+      {
+        "path": [],
+        "name": "project",
+        "upstream_available_on": [
+          "linux-x64"
+        ],
+        "note": "Default TUI project argument is excluded from wrapper parity because the wrapper seam targets `opencode run --format json`."
+      }
+    ]
+  }
+}

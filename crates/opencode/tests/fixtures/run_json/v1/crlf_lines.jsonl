@@ -1,0 +1,3 @@
+{"type":"step_start","session_id":"session-test","step":"assistant"}
+{"type":"text","session_id":"session-test","text":"OK"}
+{"type":"step_finish","session_id":"session-test","step":"assistant"}

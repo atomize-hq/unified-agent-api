@@ -111,6 +111,15 @@ The generated file MUST include:
 
 The wrapper-derived manifest MUST be deterministic as a *set* of units (identities + levels + notes). Ordering in the wrapper-derived manifest MUST NOT be relied upon; `xtask` sorting is authoritative.
 
+### Shared normalization boundary
+
+The wrapper-coverage generator MAY implement its normalization logic through one neutral shared module, but the ownership split MUST remain explicit:
+
+- the shared normalization layer MUST own rules parsing, expected-target platform inversion, scope normalization, and deterministic sort-key derivation for commands, flags, and args.
+- the Codex adapter MUST own Codex-specific defaults, path selection, manifest loading, wrapper-version stamping, and output-file emission.
+- the shared normalization layer MUST be shape-driven and future-agent-shaped. It MUST NOT branch on current agent names or hard-code Codex-versus-Claude behavior into the shared logic.
+- the shared normalization layer MUST NOT invent a second evidence store or take ownership of publication semantics. Publication meaning remains owned by `docs/specs/unified-agent-api/support-matrix.md`.
+
 ### Root globals model compatibility
 
 `cli_manifests/codex/RULES.json.globals.root_path` defines `path=[]` as the canonical location for global flags and global positional args.

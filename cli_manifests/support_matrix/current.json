@@ -1,0 +1,237 @@
+{
+  "schema_version": 1,
+  "rows": [
+    {
+      "agent": "claude_code",
+      "version": "2.1.29",
+      "target": "darwin-arm64",
+      "manifest_support": "supported",
+      "backend_support": "supported",
+      "uaa_support": "supported",
+      "pointer_promotion": "latest_supported_and_validated",
+      "evidence_notes": []
+    },
+    {
+      "agent": "claude_code",
+      "version": "2.1.29",
+      "target": "linux-x64",
+      "manifest_support": "supported",
+      "backend_support": "supported",
+      "uaa_support": "supported",
+      "pointer_promotion": "latest_supported_and_validated",
+      "evidence_notes": []
+    },
+    {
+      "agent": "claude_code",
+      "version": "2.1.29",
+      "target": "win32-x64",
+      "manifest_support": "supported",
+      "backend_support": "partial",
+      "uaa_support": "partial",
+      "pointer_promotion": "latest_supported_and_validated",
+      "evidence_notes": [
+        "backend report includes intentionally unsupported surface outside unified support"
+      ]
+    },
+    {
+      "agent": "codex",
+      "version": "0.97.0",
+      "target": "aarch64-apple-darwin",
+      "manifest_support": "unsupported",
+      "backend_support": "unsupported",
+      "uaa_support": "unsupported",
+      "pointer_promotion": "none",
+      "evidence_notes": [
+        "current root snapshot omits this target"
+      ]
+    },
+    {
+      "agent": "codex",
+      "version": "0.92.0",
+      "target": "aarch64-apple-darwin",
+      "manifest_support": "unsupported",
+      "backend_support": "unsupported",
+      "uaa_support": "unsupported",
+      "pointer_promotion": "none",
+      "evidence_notes": []
+    },
+    {
+      "agent": "codex",
+      "version": "0.91.0",
+      "target": "aarch64-apple-darwin",
+      "manifest_support": "unsupported",
+      "backend_support": "unsupported",
+      "uaa_support": "unsupported",
+      "pointer_promotion": "none",
+      "evidence_notes": []
+    },
+    {
+      "agent": "codex",
+      "version": "0.61.0",
+      "target": "aarch64-apple-darwin",
+      "manifest_support": "unsupported",
+      "backend_support": "unsupported",
+      "uaa_support": "unsupported",
+      "pointer_promotion": "none",
+      "evidence_notes": []
+    },
+    {
+      "agent": "codex",
+      "version": "0.97.0",
+      "target": "x86_64-pc-windows-msvc",
+      "manifest_support": "unsupported",
+      "backend_support": "unsupported",
+      "uaa_support": "unsupported",
+      "pointer_promotion": "none",
+      "evidence_notes": [
+        "current root snapshot omits this target"
+      ]
+    },
+    {
+      "agent": "codex",
+      "version": "0.92.0",
+      "target": "x86_64-pc-windows-msvc",
+      "manifest_support": "unsupported",
+      "backend_support": "unsupported",
+      "uaa_support": "unsupported",
+      "pointer_promotion": "none",
+      "evidence_notes": []
+    },
+    {
+      "agent": "codex",
+      "version": "0.91.0",
+      "target": "x86_64-pc-windows-msvc",
+      "manifest_support": "unsupported",
+      "backend_support": "unsupported",
+      "uaa_support": "unsupported",
+      "pointer_promotion": "none",
+      "evidence_notes": []
+    },
+    {
+      "agent": "codex",
+      "version": "0.61.0",
+      "target": "x86_64-pc-windows-msvc",
+      "manifest_support": "unsupported",
+      "backend_support": "unsupported",
+      "uaa_support": "unsupported",
+      "pointer_promotion": "none",
+      "evidence_notes": []
+    },
+    {
+      "agent": "codex",
+      "version": "0.97.0",
+      "target": "x86_64-unknown-linux-musl",
+      "manifest_support": "supported",
+      "backend_support": "partial",
+      "uaa_support": "partial",
+      "pointer_promotion": "latest_validated",
+      "evidence_notes": [
+        "backend report includes intentionally unsupported surface outside unified support",
+        "backend report includes backend-only surface outside unified support"
+      ]
+    },
+    {
+      "agent": "codex",
+      "version": "0.92.0",
+      "target": "x86_64-unknown-linux-musl",
+      "manifest_support": "supported",
+      "backend_support": "partial",
+      "uaa_support": "partial",
+      "pointer_promotion": "none",
+      "evidence_notes": [
+        "backend report includes intentionally unsupported surface outside unified support",
+        "backend report includes backend-only surface outside unified support"
+      ]
+    },
+    {
+      "agent": "codex",
+      "version": "0.91.0",
+      "target": "x86_64-unknown-linux-musl",
+      "manifest_support": "unsupported",
+      "backend_support": "unsupported",
+      "uaa_support": "unsupported",
+      "pointer_promotion": "none",
+      "evidence_notes": [
+        "backend report includes intentionally unsupported surface outside unified support",
+        "backend report includes backend-only surface outside unified support"
+      ]
+    },
+    {
+      "agent": "codex",
+      "version": "0.61.0",
+      "target": "x86_64-unknown-linux-musl",
+      "manifest_support": "supported",
+      "backend_support": "partial",
+      "uaa_support": "partial",
+      "pointer_promotion": "latest_supported",
+      "evidence_notes": [
+        "backend report includes intentionally unsupported surface outside unified support",
+        "backend report includes backend-only surface outside unified support"
+      ]
+    },
+    {
+      "agent": "opencode",
+      "version": "1.4.11",
+      "target": "darwin-arm64",
+      "manifest_support": "unsupported",
+      "backend_support": "unsupported",
+      "uaa_support": "unsupported",
+      "pointer_promotion": "none",
+      "evidence_notes": []
+    },
+    {
+      "agent": "opencode",
+      "version": "1.4.9",
+      "target": "darwin-arm64",
+      "manifest_support": "unsupported",
+      "backend_support": "unsupported",
+      "uaa_support": "unsupported",
+      "pointer_promotion": "none",
+      "evidence_notes": []
+    },
+    {
+      "agent": "opencode",
+      "version": "1.4.11",
+      "target": "linux-x64",
+      "manifest_support": "supported",
+      "backend_support": "unsupported",
+      "uaa_support": "unsupported",
+      "pointer_promotion": "none",
+      "evidence_notes": []
+    },
+    {
+      "agent": "opencode",
+      "version": "1.4.9",
+      "target": "linux-x64",
+      "manifest_support": "unsupported",
+      "backend_support": "unsupported",
+      "uaa_support": "unsupported",
+      "pointer_promotion": "none",
+      "evidence_notes": [
+        "current root snapshot omits this target"
+      ]
+    },
+    {
+      "agent": "opencode",
+      "version": "1.4.11",
+      "target": "win32-x64",
+      "manifest_support": "unsupported",
+      "backend_support": "unsupported",
+      "uaa_support": "unsupported",
+      "pointer_promotion": "none",
+      "evidence_notes": []
+    },
+    {
+      "agent": "opencode",
+      "version": "1.4.9",
+      "target": "win32-x64",
+      "manifest_support": "unsupported",
+      "backend_support": "unsupported",
+      "uaa_support": "unsupported",
+      "pointer_promotion": "none",
+      "evidence_notes": [
+        "current root snapshot omits this target"
+      ]
+    }
+  ]
+}

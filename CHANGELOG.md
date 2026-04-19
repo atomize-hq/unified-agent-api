@@ -6,6 +6,20 @@ This changelog tracks the root `VERSION` file and uses bare semantic versions (`
 
 ## [Unreleased]
 
+## [0.2.3] - 2026-04-18
+
+### Added
+
+- Added the first OpenCode integration surfaces across the workspace: `crates/opencode/` for canonical `opencode run --format json` flows, `cli_manifests/opencode/` for committed manifest-root evidence, and the `crates/agent_api` OpenCode backend with resume, fork, model, and redaction coverage.
+- Added `cargo run -p xtask -- support-matrix` plus committed support-matrix publication artifacts so maintainers can see manifest support, backend support, unified support, and passthrough visibility without inferring it from scattered reports.
+- Added dedicated regression coverage for OpenCode wrapper parsing/streaming behavior, backend mapping and fail-closed boundaries, support-matrix derivation/publication, and agent-api backend type leak detection.
+
+### Changed
+
+- Aligned the manifest docs, validator specs, runbooks, execution packs, and UAA spec text around one target-first support contract that keeps manifest support, backend support, unified support, and passthrough visibility separate while keeping OpenCode promotion out of scope by default.
+- Extracted wrapper-coverage normalization and root-intake logic into shared `xtask` modules so Codex, Claude Code, and OpenCode intake and publication checks use the same layout and drift rules.
+- Hardened CI and release wiring so `make preflight`, the artifact validation jobs, and the publish workflow all understand the new OpenCode root and crate alongside the existing Codex and Claude Code release surfaces.
+
 ## [0.2.2] - 2026-04-15
 
 ## [0.2.1] - 2026-04-14
