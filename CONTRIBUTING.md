@@ -10,11 +10,15 @@
   - Normative JSONL normalization notes: `crates/codex/JSONL_COMPAT.md`
 - Claude Code backend library: `crates/claude_code/`
   - Main guide: `crates/claude_code/README.md`
+- OpenCode backend library: `crates/opencode/`
+  - Main guide: `crates/opencode/README.md`
 - Decisions/specs:
   - ADRs: `docs/adr/`
   - Normative contracts: `docs/specs/`
   - Docs index: `docs/README.md`
 - CLI parity artifacts + ops docs: `cli_manifests/codex/`
+- Claude Code manifest-root artifacts: `cli_manifests/claude_code/`
+- OpenCode manifest-root artifacts: `cli_manifests/opencode/`
 - Triad planning/process: `docs/project_management/`
   - Feature directories: `docs/project_management/next/`
 
@@ -31,6 +35,7 @@
 - Lint: `make clippy`
 - Test: `make test`
 - Support publication freshness: `cargo run -p xtask -- support-matrix --check`
+- OpenCode manifest-root validation: `cargo run -p xtask -- codex-validate --root cli_manifests/opencode`
 - LOC cap: `make loc-check` (must pass; Rust files must stay under 700 code LOC)
 - Preflight (integration gate): `make preflight`
 
