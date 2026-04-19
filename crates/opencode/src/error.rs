@@ -1,4 +1,4 @@
-use std::{path::PathBuf, time::Duration};
+use std::{path::PathBuf, process::ExitStatus, time::Duration};
 
 use thiserror::Error;
 
@@ -27,4 +27,6 @@ pub enum OpencodeError {
     InvalidRequest(String),
     #[error("{message}")]
     SelectionFailed { message: String },
+    #[error("{message}")]
+    RunFailed { status: ExitStatus, message: String },
 }

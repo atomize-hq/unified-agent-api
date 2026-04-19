@@ -161,6 +161,46 @@ async fn run_json_control_termination_closes_stream_and_yields_non_success_statu
 }
 
 #[tokio::test]
+async fn run_json_generic_runtime_failure_surfaces_terminal_error_and_completion_error() {
+    let client = make_fake_client("runtime_failure_invalid_model");
+    let handle = client
+        .run_json(OpencodeRunRequest::new("Reply with OK."))
+        .await
+        .unwrap();
+
+    let mut events = handle.events;
+    let first = events
+        .next()
+        .await
+        .expect("stream open")
+        .expect("typed terminal error event");
+    match first {
+        OpencodeRunJsonEvent::TerminalError { message, .. } => {
+            assert_eq!(message, "opencode run failed");
+            assert!(!message.contains("SECRET_MODEL_REJECTION_DO_NOT_LEAK"));
+        }
+        other => panic!("expected terminal error event, got {other:?}"),
+    }
+    assert!(
+        events.next().await.is_none(),
+        "runtime failure should end the stream"
+    );
+
+    let error = handle
+        .completion
+        .await
+        .expect_err("runtime failure must surface completion error");
+    match error {
+        opencode::OpencodeError::RunFailed { status, message } => {
+            assert!(!status.success());
+            assert_eq!(message, "opencode run failed");
+            assert!(!message.contains("SECRET_MODEL_REJECTION_DO_NOT_LEAK"));
+        }
+        other => panic!("expected run failure, got {other:?}"),
+    }
+}
+
+#[tokio::test]
 async fn run_json_passes_only_the_accepted_controls_on_the_canonical_surface() {
     let capture_file = NamedTempFile::new().unwrap();
     let capture_path = capture_file.path().to_path_buf();

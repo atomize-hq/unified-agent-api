@@ -198,6 +198,13 @@ impl BackendHarnessAdapter for OpencodeBackend {
                     message,
                 }),
             ) => message.clone(),
+            (
+                BackendHarnessErrorPhase::Completion,
+                OpencodeBackendError::Completion(opencode::OpencodeError::RunFailed {
+                    message,
+                    ..
+                }),
+            ) => message.clone(),
             (BackendHarnessErrorPhase::Spawn, OpencodeBackendError::Spawn(_)) => {
                 REDACTED_SPAWN_MESSAGE.to_string()
             }
@@ -218,6 +225,13 @@ impl BackendHarnessAdapter for OpencodeBackend {
                 _,
                 OpencodeBackendError::Completion(opencode::OpencodeError::SelectionFailed {
                     message,
+                }),
+            ) => message.clone(),
+            (
+                _,
+                OpencodeBackendError::Completion(opencode::OpencodeError::RunFailed {
+                    message,
+                    ..
                 }),
             ) => message.clone(),
             (_, OpencodeBackendError::Spawn(_)) => REDACTED_SPAWN_MESSAGE.to_string(),

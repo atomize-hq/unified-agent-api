@@ -11,6 +11,9 @@ This repository publishes five Rust packages for each root `VERSION` bump:
 Rust library import paths remain `codex`, `claude_code`, `opencode`,
 `wrapper_events`, and `agent_api`.
 
+All published crates use SPDX metadata `MIT OR Apache-2.0` and package both
+`LICENSE-MIT` and `LICENSE-APACHE`.
+
 ## Bump the release version
 
 Use the xtask helper to update the release version in one pass:
@@ -46,7 +49,8 @@ maintainer machine with a short-lived crates.io token.
 
 1. Run `make preflight`.
 2. Run `python3 scripts/validate_publish_versions.py`.
-3. Run `python3 scripts/check_publish_readiness.py`.
+3. Run `python3 scripts/check_publish_readiness.py` to verify SPDX license
+   metadata and packaged license files.
 4. Authenticate locally with `cargo login`.
 5. Publish the three leaf crates:
    - `cargo publish --locked -p unified-agent-api-codex`
