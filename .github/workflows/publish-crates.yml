@@ -96,6 +96,21 @@ jobs:
           set -euo pipefail
           python3 scripts/check_publish_readiness.py
 
+      - name: Unit test publish planner
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s scripts -p 'test_*.py'
+
+      - name: Preview publish plan
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/publish_crates.py \
+            --plan \
+            --root . \
+            --release-version "${{ needs.prepare.outputs.version }}"
+
   publish:
     name: Publish workspace crates
     needs: [prepare, validate]
@@ -113,57 +128,11 @@ jobs:
       - name: Publish crates in dependency order
         shell: bash
         env:
-          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
-          RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
+          OIDC_CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
+          BOOTSTRAP_CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
         run: |
           set -euo pipefail
-
-          crate_version_exists() {
-            local crate="$1"
-            curl --silent --show-error --fail \
-              "https://crates.io/api/v1/crates/${crate}/${RELEASE_VERSION}" >/dev/null
-          }
-
-          publish_if_missing() {
-            local crate="$1"
-            if crate_version_exists "$crate"; then
-              echo "Skipping ${crate}@${RELEASE_VERSION}; already published."
-              return 0
-            fi
-
-            cargo publish --locked -p "$crate"
-          }
-
-          wait_for_publishability() {
-            local crate="$1"
-            local attempts=40
-            local sleep_seconds=15
-
-            if crate_version_exists "$crate"; then
-              echo "${crate}@${RELEASE_VERSION} already published; skipping registry wait."
-              return 0
-            fi
-
-            for attempt in $(seq 1 "$attempts"); do
-              if cargo publish --dry-run --locked -p "$crate"; then
-                echo "${crate}@${RELEASE_VERSION} passed dry-run on attempt ${attempt}."
-                return 0
-              fi
-
-              echo "Waiting for registry visibility before publishing ${crate}@${RELEASE_VERSION} (attempt ${attempt}/${attempts})."
-              sleep "$sleep_seconds"
-            done
-
-            echo "Timed out waiting for ${crate}@${RELEASE_VERSION} to become publishable." >&2
-            return 1
-          }
-
-          publish_if_missing "unified-agent-api-codex"
-          publish_if_missing "unified-agent-api-claude-code"
-          publish_if_missing "unified-agent-api-opencode"
-
-          wait_for_publishability "unified-agent-api-wrapper-events"
-          publish_if_missing "unified-agent-api-wrapper-events"
-
-          wait_for_publishability "unified-agent-api"
-          publish_if_missing "unified-agent-api"
+          python3 scripts/publish_crates.py \
+            --execute \
+            --root . \
+            --release-version "${{ needs.prepare.outputs.version }}"
