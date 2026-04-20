@@ -114,9 +114,17 @@ def load_metadata(root: Path) -> dict:
     return json.loads(result.stdout)
 
 
-def is_publishable(package: dict) -> bool:
+def is_crates_io_publishable(package: dict) -> bool:
+    """Return whether cargo metadata allows publishing this package to crates.io."""
+
     publish = package.get("publish")
-    return publish != []
+    if publish is None:
+        return True
+    if publish is False:
+        return False
+    if publish == []:
+        return False
+    return "crates-io" in publish
 
 
 def load_publishable_packages(root: Path) -> list[WorkspacePackage]:
@@ -135,7 +143,7 @@ def workspace_publishable_packages_from_metadata(metadata: dict) -> list[Workspa
     publishable_packages = [
         package
         for package in workspace_packages
-        if is_publishable(package)
+        if is_crates_io_publishable(package)
     ]
     publishable_names = {package["name"] for package in publishable_packages}
     order_key_by_name = {

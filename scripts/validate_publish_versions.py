@@ -9,6 +9,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from publish_planner import is_crates_io_publishable
+
 
 def load_root_version(root: Path) -> str:
     version = (root / "VERSION").read_text(encoding="utf-8").strip()
@@ -28,11 +30,6 @@ def load_metadata(root: Path) -> dict:
     return json.loads(result.stdout)
 
 
-def is_publishable(package: dict) -> bool:
-    publish = package.get("publish")
-    return publish != []
-
-
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--root", default=".", help="workspace root")
@@ -46,7 +43,9 @@ def main() -> int:
     workspace_packages = [
         package for package in metadata["packages"] if package["id"] in workspace_member_ids
     ]
-    publishable_packages = [package for package in workspace_packages if is_publishable(package)]
+    publishable_packages = [
+        package for package in workspace_packages if is_crates_io_publishable(package)
+    ]
     publishable_names = {package["name"] for package in publishable_packages}
 
     errors: list[str] = []
@@ -76,13 +75,15 @@ def main() -> int:
                 )
 
     if errors:
-        print("Publishable workspace version validation failed:", file=sys.stderr)
+        print("Crates.io-publishable workspace version validation failed:", file=sys.stderr)
         for error in errors:
             print(f"- {error}", file=sys.stderr)
         return 1
 
     print(
-        f"Validated {len(publishable_packages)} publishable workspace packages against VERSION={root_version}."
+        "Validated "
+        f"{len(publishable_packages)} crates.io-publishable workspace packages "
+        f"against VERSION={root_version}."
     )
     return 0
 

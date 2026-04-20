@@ -48,6 +48,8 @@ def metadata_fixture() -> dict:
         "path+file:///repo/crates/codex#0.2.3",
         "path+file:///repo/crates/claude_code#0.2.3",
         "path+file:///repo/crates/opencode#0.2.3",
+        "path+file:///repo/crates/explicit_crates_io#0.2.3",
+        "path+file:///repo/crates/internal_registry#0.2.3",
         "path+file:///repo/crates/wrapper_events#0.2.3",
         "path+file:///repo/crates/xtask#0.2.3",
     ]
@@ -61,6 +63,8 @@ def metadata_fixture() -> dict:
                 dep_fixture("unified-agent-api-codex"),
                 dep_fixture("unified-agent-api-claude-code"),
                 dep_fixture("unified-agent-api-opencode"),
+                dep_fixture("unified-agent-api-explicit-crates-io"),
+                dep_fixture("unified-agent-api-internal-registry"),
                 dep_fixture("serde", internal=False),
             ],
         ),
@@ -87,6 +91,22 @@ def metadata_fixture() -> dict:
         ),
         package_fixture(
             package_id=workspace_members[4],
+            name="unified-agent-api-explicit-crates-io",
+            version="0.2.3",
+            manifest_path="/repo/crates/explicit_crates_io/Cargo.toml",
+            dependencies=[dep_fixture("serde", internal=False)],
+            publish=["crates-io"],
+        ),
+        package_fixture(
+            package_id=workspace_members[5],
+            name="unified-agent-api-internal-registry",
+            version="0.2.3",
+            manifest_path="/repo/crates/internal_registry/Cargo.toml",
+            dependencies=[dep_fixture("serde", internal=False)],
+            publish=["internal"],
+        ),
+        package_fixture(
+            package_id=workspace_members[6],
             name="unified-agent-api-wrapper-events",
             version="0.2.3",
             manifest_path="/repo/crates/wrapper_events/Cargo.toml",
@@ -94,11 +114,12 @@ def metadata_fixture() -> dict:
                 dep_fixture("unified-agent-api-codex"),
                 dep_fixture("unified-agent-api-claude-code"),
                 dep_fixture("unified-agent-api-opencode"),
+                dep_fixture("unified-agent-api-explicit-crates-io"),
                 dep_fixture("serde", internal=False),
             ],
         ),
         package_fixture(
-            package_id=workspace_members[5],
+            package_id=workspace_members[7],
             name="xtask",
             version="0.2.3",
             manifest_path="/repo/crates/xtask/Cargo.toml",
@@ -138,9 +159,35 @@ class PublishPlannerTests(unittest.TestCase):
                 "unified-agent-api-codex",
                 "unified-agent-api-claude-code",
                 "unified-agent-api-opencode",
+                "unified-agent-api-explicit-crates-io",
                 "unified-agent-api-wrapper-events",
                 "unified-agent-api",
             ],
+        )
+
+    def test_workspace_filter_excludes_alternate_registry_crates(self) -> None:
+        self.assertEqual(
+            [package.name for package in self.packages],
+            [
+                "unified-agent-api",
+                "unified-agent-api-codex",
+                "unified-agent-api-claude-code",
+                "unified-agent-api-opencode",
+                "unified-agent-api-explicit-crates-io",
+                "unified-agent-api-wrapper-events",
+            ],
+        )
+
+    def test_internal_dependencies_ignore_excluded_alternate_registry_crates(self) -> None:
+        package_by_name = {package.name: package for package in self.packages}
+        self.assertEqual(
+            package_by_name["unified-agent-api"].internal_dependencies,
+            (
+                "unified-agent-api-codex",
+                "unified-agent-api-claude-code",
+                "unified-agent-api-opencode",
+                "unified-agent-api-explicit-crates-io",
+            ),
         )
 
     def test_plan_marks_all_existing_versions_as_skip(self) -> None:
@@ -155,7 +202,7 @@ class PublishPlannerTests(unittest.TestCase):
         )
         self.assertEqual(
             [item.strategy for item in planned],
-            [PublishStrategy.SKIP] * 5,
+            [PublishStrategy.SKIP] * 6,
         )
 
     def test_plan_handles_new_leaf_crate(self) -> None:
@@ -163,12 +210,14 @@ class PublishPlannerTests(unittest.TestCase):
             existing_crates={
                 "unified-agent-api-codex",
                 "unified-agent-api-claude-code",
+                "unified-agent-api-explicit-crates-io",
                 "unified-agent-api-wrapper-events",
                 "unified-agent-api",
             },
             existing_versions={
                 ("unified-agent-api-codex", "0.2.3"),
                 ("unified-agent-api-claude-code", "0.2.3"),
+                ("unified-agent-api-explicit-crates-io", "0.2.3"),
             },
         )
         planned = plan_publish_actions(
@@ -196,12 +245,14 @@ class PublishPlannerTests(unittest.TestCase):
                 "unified-agent-api-codex",
                 "unified-agent-api-claude-code",
                 "unified-agent-api-opencode",
+                "unified-agent-api-explicit-crates-io",
                 "unified-agent-api-wrapper-events",
             },
             existing_versions={
                 ("unified-agent-api-codex", "0.2.3"),
                 ("unified-agent-api-claude-code", "0.2.3"),
                 ("unified-agent-api-opencode", "0.2.3"),
+                ("unified-agent-api-explicit-crates-io", "0.2.3"),
                 ("unified-agent-api-wrapper-events", "0.2.3"),
             },
         )
@@ -216,9 +267,28 @@ class PublishPlannerTests(unittest.TestCase):
             PublishStrategy.PUBLISH_WITH_BOOTSTRAP_TOKEN,
         )
 
+    def test_plan_excludes_alternate_registry_only_crates(self) -> None:
+        registry = FakeRegistryClient(
+            existing_crates={package.name for package in self.packages},
+            existing_versions={(package.name, package.version) for package in self.packages},
+        )
+        planned = plan_publish_actions(
+            self.packages,
+            registry_client=registry,
+            release_version="0.2.3",
+        )
+        self.assertNotIn(
+            "unified-agent-api-internal-registry",
+            {item.package.name for item in planned},
+        )
+
     def test_plan_supports_partial_rerun(self) -> None:
         registry = FakeRegistryClient(
-            existing_crates={package.name for package in self.packages if package.name != "unified-agent-api-opencode"},
+            existing_crates={
+                package.name
+                for package in self.packages
+                if package.name != "unified-agent-api-opencode"
+            },
             existing_versions={
                 ("unified-agent-api-codex", "0.2.3"),
             },

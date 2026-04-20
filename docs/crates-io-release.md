@@ -51,7 +51,9 @@ Trusted Publishing can handle future releases.
 This repository automates that boundary inside
 `.github/workflows/publish-crates.yml`:
 
-1. The workflow computes the publishable workspace graph from `cargo metadata`.
+1. The workflow computes the crates.io-publishable workspace graph from `cargo metadata`.
+   Crates restricted to alternate registries (for example `publish = ["internal"]`)
+   are excluded from this release plan.
 2. For each crate at the target `VERSION`, it checks crates.io:
    - if `crate/version` already exists, the crate is skipped
    - if the crate exists but the version is new, the crate is published with
