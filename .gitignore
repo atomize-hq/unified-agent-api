@@ -1,6 +1,8 @@
 target
 .archived
 .codex
+.claude
+.gstack
 /.idea
 /.vscode
 /wt
