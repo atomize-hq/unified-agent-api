@@ -107,7 +107,8 @@ published manually from a maintainer machine:
 
 1. Run `make preflight`.
 2. Run `python3 scripts/validate_publish_versions.py`.
-3. Run `python3 scripts/check_publish_readiness.py`.
+3. Run `python3 scripts/check_publish_readiness.py` to verify SPDX license
+   metadata and packaged license files.
 4. Authenticate locally with `cargo login`.
 5. Preview the computed order with:
    - `python3 scripts/publish_crates.py --plan --root . --release-version <VERSION>`
