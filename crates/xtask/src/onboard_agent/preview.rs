@@ -3,11 +3,16 @@ mod render;
 use std::{fmt::Write as _, fs, io::Write, path::Path};
 
 use crate::agent_registry::REGISTRY_RELATIVE_PATH;
+use crate::proving_run_closeout::{
+    load_validated_closeout_if_present, ProvingRunCloseout, ProvingRunCloseoutError,
+    ProvingRunCloseoutExpected,
+};
+use crate::workspace_mutation::WorkspacePathJail;
 use toml_edit::DocumentMut;
 
 use self::render::{
-    build_docs_preview as render_docs_preview, load_validated_closeout_if_present,
-    release_touchpoint_lines, PacketPhase, ProvingRunCloseout,
+    build_docs_preview as render_docs_preview, closeout_relative_path, release_touchpoint_lines,
+    PacketPhase,
 };
 use super::{ConfigGate, DraftEntry, Error, TargetGate, RELEASE_DOC_PATH};
 
@@ -72,7 +77,29 @@ pub(super) fn load_proving_run_metrics(
     workspace_root: &Path,
     draft: &DraftEntry,
 ) -> Result<Option<ProvingRunCloseout>, Error> {
-    load_validated_closeout_if_present(workspace_root, draft).map_err(Error::Internal)
+    let closeout_path = draft
+        .docs_pack_root()
+        .join("governance/proving-run-closeout.json");
+    let jail = WorkspacePathJail::new(workspace_root)?;
+    let resolved_closeout_path = jail.resolve(&closeout_path)?;
+    let expected = ProvingRunCloseoutExpected {
+        approval_path: draft.approval_identity().map(|(path, _)| Path::new(path)),
+        onboarding_pack_prefix: &draft.onboarding_pack_prefix,
+    };
+    load_validated_closeout_if_present(
+        workspace_root,
+        Path::new(&closeout_relative_path(draft)),
+        &resolved_closeout_path,
+        expected,
+    )
+    .map_err(map_closeout_error)
+}
+
+fn map_closeout_error(err: ProvingRunCloseoutError) -> Error {
+    match err {
+        ProvingRunCloseoutError::Validation(message) => Error::Validation(message),
+        ProvingRunCloseoutError::Internal(message) => Error::Internal(message),
+    }
 }
 
 pub(super) fn write_input_summary<W: Write>(

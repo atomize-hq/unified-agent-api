@@ -1,12 +1,7 @@
-use std::{
-    fs,
-    path::{Path, PathBuf},
-};
+use std::path::{Path, PathBuf};
 
 use crate::agent_registry::REGISTRY_RELATIVE_PATH;
-use crate::approval_artifact;
-use serde::Deserialize;
-use time::{format_description::well_known::Rfc3339, OffsetDateTime};
+use crate::proving_run_closeout::{DurationTruth, ProvingRunCloseout, ResidualFrictionTruth};
 
 use super::super::{
     CHECK_PUBLISH_READINESS_SCRIPT_PATH, OWNERSHIP_MARKER, PUBLISH_SCRIPT_PATH,
@@ -17,75 +12,10 @@ use super::DraftEntry;
 const DOCS_NEXT_ROOT: &str = "docs/project_management/next";
 const PROVING_RUN_CLOSEOUT_RELATIVE_PATH: &str = "governance/proving-run-closeout.json";
 
-#[derive(Debug, Clone)]
-pub(in crate::onboard_agent) struct ProvingRunCloseout {
-    pub(in crate::onboard_agent) approval_ref: String,
-    pub(in crate::onboard_agent) approval_sha256: String,
-    pub(in crate::onboard_agent) approval_source: String,
-    pub(in crate::onboard_agent) manual_control_plane_edits: u64,
-    pub(in crate::onboard_agent) partial_write_incidents: u64,
-    pub(in crate::onboard_agent) ambiguous_ownership_incidents: u64,
-    pub(in crate::onboard_agent) duration: DurationTruth,
-    pub(in crate::onboard_agent) residual_friction: ResidualFrictionTruth,
-    pub(in crate::onboard_agent) preflight_passed: bool,
-    pub(in crate::onboard_agent) recorded_at: String,
-    pub(in crate::onboard_agent) commit: String,
-}
-
-#[derive(Debug, Clone)]
-pub(in crate::onboard_agent) enum DurationTruth {
-    Seconds(u64),
-    MissingReason(String),
-}
-
-#[derive(Debug, Clone)]
-pub(in crate::onboard_agent) enum ResidualFrictionTruth {
-    Items(Vec<String>),
-    ExplicitNone(String),
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct RawProvingRunCloseout {
-    state: String,
-    approval_ref: Option<String>,
-    approval_sha256: Option<String>,
-    approval_source: Option<String>,
-    manual_control_plane_edits: u64,
-    partial_write_incidents: u64,
-    ambiguous_ownership_incidents: u64,
-    duration_seconds: Option<u64>,
-    duration_missing_reason: Option<String>,
-    residual_friction: Option<Vec<String>>,
-    explicit_none_reason: Option<String>,
-    preflight_passed: bool,
-    recorded_at: String,
-    commit: String,
-}
-
 #[derive(Debug, Clone, Copy)]
 pub(in crate::onboard_agent) enum PacketPhase<'a> {
     Execution,
     Closeout(&'a ProvingRunCloseout),
-}
-
-pub(in crate::onboard_agent) fn load_validated_closeout_if_present(
-    workspace_root: &Path,
-    draft: &DraftEntry,
-) -> Result<Option<ProvingRunCloseout>, String> {
-    let closeout_path = workspace_root.join(closeout_relative_path(draft));
-    let closeout_text = match fs::read_to_string(&closeout_path) {
-        Ok(text) => text,
-        Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(None),
-        Err(err) => {
-            return Err(format!("read {}: {err}", closeout_path.display()));
-        }
-    };
-    let raw = match serde_json::from_str::<RawProvingRunCloseout>(&closeout_text) {
-        Ok(raw) => raw,
-        Err(_) => return Ok(None),
-    };
-    Ok(validate_closeout(workspace_root, draft, raw).ok())
 }
 
 pub(in crate::onboard_agent) fn closeout_relative_path(draft: &DraftEntry) -> String {
@@ -183,91 +113,6 @@ pub(in crate::onboard_agent) fn release_touchpoint_lines(draft: &DraftEntry) -> 
             "Workflow and script files remain unchanged: {PUBLISH_WORKFLOW_PATH}, {PUBLISH_SCRIPT_PATH}, {VALIDATE_PUBLISH_SCRIPT_PATH}, {CHECK_PUBLISH_READINESS_SCRIPT_PATH}."
         ),
     ]
-}
-
-fn validate_closeout(
-    workspace_root: &Path,
-    draft: &DraftEntry,
-    raw: RawProvingRunCloseout,
-) -> Result<ProvingRunCloseout, ()> {
-    if raw.state != "closed" {
-        return Err(());
-    }
-
-    let approval_ref = required_string(raw.approval_ref.as_deref())?;
-    let approval_sha256 = required_string(raw.approval_sha256.as_deref())?;
-    if approval_sha256.len() != 64
-        || !approval_sha256
-            .chars()
-            .all(|ch| matches!(ch, '0'..='9' | 'a'..='f'))
-    {
-        return Err(());
-    }
-    let approval_source = required_string(raw.approval_source.as_deref())?;
-    let approval =
-        approval_artifact::load_approval_artifact(workspace_root, &approval_ref).map_err(|_| ())?;
-    if approval.sha256 != approval_sha256 {
-        return Err(());
-    }
-    if approval.descriptor.onboarding_pack_prefix != draft.onboarding_pack_prefix {
-        return Err(());
-    }
-    OffsetDateTime::parse(&raw.recorded_at, &Rfc3339).map_err(|_| ())?;
-    validate_commit(&raw.commit)?;
-
-    let duration = match (raw.duration_seconds, raw.duration_missing_reason) {
-        (Some(seconds), None) => DurationTruth::Seconds(seconds),
-        (None, Some(reason)) => DurationTruth::MissingReason(required_string(Some(&reason))?),
-        _ => return Err(()),
-    };
-
-    let residual_friction = match (raw.residual_friction, raw.explicit_none_reason) {
-        (Some(items), None) if !items.is_empty() => ResidualFrictionTruth::Items(
-            items
-                .into_iter()
-                .map(|item| required_string(Some(&item)))
-                .collect::<Result<Vec<_>, _>>()?,
-        ),
-        (None, Some(reason)) => {
-            ResidualFrictionTruth::ExplicitNone(required_string(Some(&reason))?)
-        }
-        _ => return Err(()),
-    };
-
-    Ok(ProvingRunCloseout {
-        approval_ref,
-        approval_sha256,
-        approval_source,
-        manual_control_plane_edits: raw.manual_control_plane_edits,
-        partial_write_incidents: raw.partial_write_incidents,
-        ambiguous_ownership_incidents: raw.ambiguous_ownership_incidents,
-        duration,
-        residual_friction,
-        preflight_passed: raw.preflight_passed,
-        recorded_at: raw.recorded_at,
-        commit: raw.commit,
-    })
-}
-
-fn required_string(value: Option<&str>) -> Result<String, ()> {
-    let Some(value) = value else {
-        return Err(());
-    };
-    let trimmed = value.trim();
-    if trimmed.is_empty() {
-        return Err(());
-    }
-    Ok(trimmed.to_string())
-}
-
-fn validate_commit(value: &str) -> Result<(), ()> {
-    let valid = (7..=40).contains(&value.len())
-        && value.chars().all(|ch| matches!(ch, '0'..='9' | 'a'..='f'));
-    if valid {
-        Ok(())
-    } else {
-        Err(())
-    }
 }
 
 fn render_markdown_file(body: String) -> String {

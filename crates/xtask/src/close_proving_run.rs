@@ -5,10 +5,12 @@ use std::{
 };
 
 use clap::Parser;
-use serde::Deserialize;
 use thiserror::Error;
 use xtask::agent_registry::{AgentRegistry, AgentRegistryEntry, REGISTRY_RELATIVE_PATH};
-use xtask::approval_artifact::{self, ApprovalArtifact, ApprovalArtifactError};
+use xtask::proving_run_closeout::{
+    self, DurationTruth, ProvingRunCloseout, ProvingRunCloseoutError, ProvingRunCloseoutExpected,
+    ResidualFrictionTruth,
+};
 use xtask::workspace_mutation::{
     apply_mutations, plan_create_or_replace, WorkspaceMutationError, WorkspacePathJail,
 };
@@ -57,52 +59,6 @@ impl From<WorkspaceMutationError> for Error {
             WorkspaceMutationError::Internal(message) => Self::Internal(message),
         }
     }
-}
-
-#[derive(Debug, Clone)]
-enum DurationTruth {
-    Seconds(u64),
-    MissingReason(String),
-}
-
-#[derive(Debug, Clone)]
-enum ResidualFrictionTruth {
-    Items(Vec<String>),
-    ExplicitNone(String),
-}
-
-#[derive(Debug, Clone)]
-struct ProvingRunCloseout {
-    approval_ref: String,
-    approval_sha256: String,
-    approval_source: String,
-    manual_control_plane_edits: u64,
-    partial_write_incidents: u64,
-    ambiguous_ownership_incidents: u64,
-    duration: DurationTruth,
-    residual_friction: ResidualFrictionTruth,
-    preflight_passed: bool,
-    recorded_at: String,
-    commit: String,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct RawProvingRunCloseout {
-    state: String,
-    approval_ref: Option<String>,
-    approval_sha256: Option<String>,
-    approval_source: Option<String>,
-    manual_control_plane_edits: u64,
-    partial_write_incidents: u64,
-    ambiguous_ownership_incidents: u64,
-    duration_seconds: Option<u64>,
-    duration_missing_reason: Option<String>,
-    residual_friction: Option<Vec<String>>,
-    explicit_none_reason: Option<String>,
-    preflight_passed: bool,
-    recorded_at: String,
-    commit: String,
 }
 
 pub fn run(args: Args) -> Result<(), Error> {
@@ -270,217 +226,23 @@ fn load_validated_closeout(
     approval_path: &Path,
     onboarding_pack_prefix: &str,
 ) -> Result<ProvingRunCloseout, Error> {
-    let closeout_text = fs::read_to_string(resolved_closeout_path)
-        .map_err(|err| Error::Validation(format!("read {}: {err}", closeout_path.display())))?;
-    let raw = serde_json::from_str::<RawProvingRunCloseout>(&closeout_text)
-        .map_err(|err| Error::Validation(format!("parse {}: {err}", closeout_path.display())))?;
-    validate_closeout(
+    let expected = ProvingRunCloseoutExpected {
+        approval_path: Some(approval_path),
+        onboarding_pack_prefix,
+    };
+    proving_run_closeout::load_validated_closeout(
         workspace_root,
         closeout_path,
-        raw,
-        approval_path,
-        onboarding_pack_prefix,
+        resolved_closeout_path,
+        expected,
     )
+    .map_err(map_closeout_error)
 }
 
-fn validate_closeout(
-    workspace_root: &Path,
-    closeout_path: &Path,
-    raw: RawProvingRunCloseout,
-    approval_path: &Path,
-    onboarding_pack_prefix: &str,
-) -> Result<ProvingRunCloseout, Error> {
-    if raw.state != "closed" {
-        return Err(Error::Validation(format!(
-            "{}: state must equal `closed`",
-            closeout_path.display()
-        )));
-    }
-
-    let approval_ref = required_string(closeout_path, "approval_ref", raw.approval_ref.as_deref())?;
-    let approval_sha256 = required_string(
-        closeout_path,
-        "approval_sha256",
-        raw.approval_sha256.as_deref(),
-    )?;
-    let approval_source = required_string(
-        closeout_path,
-        "approval_source",
-        raw.approval_source.as_deref(),
-    )?;
-    validate_lower_hex_sha256(closeout_path, &approval_sha256)?;
-    validate_recorded_at(closeout_path, &raw.recorded_at)?;
-    validate_commit(closeout_path, &raw.commit)?;
-
-    let duration = match (raw.duration_seconds, raw.duration_missing_reason) {
-        (Some(seconds), None) => DurationTruth::Seconds(seconds),
-        (None, Some(reason)) => DurationTruth::MissingReason(non_empty_field(
-            closeout_path,
-            "duration_missing_reason",
-            &reason,
-        )?),
-        _ => {
-            return Err(Error::Validation(format!(
-                "{}: exactly one of `duration_seconds` or `duration_missing_reason` is required",
-                closeout_path.display()
-            )));
-        }
-    };
-
-    let residual_friction = match (raw.residual_friction, raw.explicit_none_reason) {
-        (Some(items), None) => {
-            let items = items
-                .into_iter()
-                .map(|item| non_empty_field(closeout_path, "residual_friction[]", &item))
-                .collect::<Result<Vec<_>, _>>()?;
-            if items.is_empty() {
-                return Err(Error::Validation(format!(
-                    "{}: `residual_friction` must not be empty when present",
-                    closeout_path.display()
-                )));
-            }
-            ResidualFrictionTruth::Items(items)
-        }
-        (None, Some(reason)) => ResidualFrictionTruth::ExplicitNone(non_empty_field(
-            closeout_path,
-            "explicit_none_reason",
-            &reason,
-        )?),
-        _ => {
-            return Err(Error::Validation(format!(
-                "{}: exactly one of `residual_friction` or `explicit_none_reason` is required",
-                closeout_path.display()
-            )));
-        }
-    };
-
-    let provided_approval = load_approval_artifact(workspace_root, approval_path, closeout_path)?;
-    let linked_approval =
-        load_approval_artifact(workspace_root, Path::new(&approval_ref), closeout_path)?;
-    validate_same_approval_artifact(closeout_path, &provided_approval, &linked_approval)?;
-    validate_approval_hash(closeout_path, &provided_approval, &approval_sha256)?;
-    validate_approval_pack_prefix(closeout_path, &provided_approval, onboarding_pack_prefix)?;
-
-    Ok(ProvingRunCloseout {
-        approval_ref,
-        approval_sha256,
-        approval_source,
-        manual_control_plane_edits: raw.manual_control_plane_edits,
-        partial_write_incidents: raw.partial_write_incidents,
-        ambiguous_ownership_incidents: raw.ambiguous_ownership_incidents,
-        duration,
-        residual_friction,
-        preflight_passed: raw.preflight_passed,
-        recorded_at: raw.recorded_at,
-        commit: raw.commit,
-    })
-}
-
-fn required_string(path: &Path, field_name: &str, value: Option<&str>) -> Result<String, Error> {
-    let Some(value) = value else {
-        return Err(Error::Validation(format!(
-            "{}: missing required field `{field_name}`",
-            path.display()
-        )));
-    };
-    non_empty_field(path, field_name, value)
-}
-
-fn non_empty_field(path: &Path, field_name: &str, value: &str) -> Result<String, Error> {
-    let trimmed = value.trim();
-    if trimmed.is_empty() {
-        return Err(Error::Validation(format!(
-            "{}: `{field_name}` must not be empty",
-            path.display()
-        )));
-    }
-    Ok(trimmed.to_string())
-}
-
-fn validate_lower_hex_sha256(path: &Path, value: &str) -> Result<(), Error> {
-    if value.len() != 64 || !value.chars().all(|ch| matches!(ch, '0'..='9' | 'a'..='f')) {
-        return Err(Error::Validation(format!(
-            "{}: `approval_sha256` must be 64 lowercase hex characters",
-            path.display()
-        )));
-    }
-    Ok(())
-}
-
-fn validate_recorded_at(path: &Path, value: &str) -> Result<(), Error> {
-    approval_artifact::validate_rfc3339_value(path, "recorded_at", value)
-        .map_err(|err| map_approval_artifact_error(path, err))
-}
-
-fn validate_commit(path: &Path, value: &str) -> Result<(), Error> {
-    approval_artifact::validate_commit_value(path, "commit", value)
-        .map_err(|err| map_approval_artifact_error(path, err))
-}
-
-fn load_approval_artifact(
-    workspace_root: &Path,
-    approval_path: &Path,
-    closeout_path: &Path,
-) -> Result<ApprovalArtifact, Error> {
-    let approval_path = approval_path.to_string_lossy();
-    approval_artifact::load_approval_artifact(workspace_root, &approval_path)
-        .map_err(|err| map_approval_artifact_error(closeout_path, err))
-}
-
-fn validate_same_approval_artifact(
-    closeout_path: &Path,
-    provided_approval: &ApprovalArtifact,
-    linked_approval: &ApprovalArtifact,
-) -> Result<(), Error> {
-    if provided_approval.canonical_path != linked_approval.canonical_path {
-        return Err(Error::Validation(format!(
-            "{}: approval_ref `{}` does not match --approval `{}`",
-            closeout_path.display(),
-            linked_approval.relative_path,
-            provided_approval.relative_path
-        )));
-    }
-    Ok(())
-}
-
-fn validate_approval_hash(
-    closeout_path: &Path,
-    approval: &ApprovalArtifact,
-    expected_sha256: &str,
-) -> Result<(), Error> {
-    if approval.sha256 != expected_sha256 {
-        return Err(Error::Validation(format!(
-            "{}: approval_sha256 does not match {}",
-            closeout_path.display(),
-            approval.relative_path
-        )));
-    }
-    Ok(())
-}
-
-fn validate_approval_pack_prefix(
-    closeout_path: &Path,
-    approval: &ApprovalArtifact,
-    onboarding_pack_prefix: &str,
-) -> Result<(), Error> {
-    if approval.descriptor.onboarding_pack_prefix != onboarding_pack_prefix {
-        return Err(Error::Validation(format!(
-            "{}: approval artifact `{}` belongs to onboarding_pack_prefix `{}` instead of `{}`",
-            closeout_path.display(),
-            approval.relative_path,
-            approval.descriptor.onboarding_pack_prefix,
-            onboarding_pack_prefix
-        )));
-    }
-    Ok(())
-}
-
-fn map_approval_artifact_error(closeout_path: &Path, err: ApprovalArtifactError) -> Error {
+fn map_closeout_error(err: ProvingRunCloseoutError) -> Error {
     match err {
-        ApprovalArtifactError::Validation(message) => {
-            Error::Validation(format!("{}: {message}", closeout_path.display()))
-        }
-        ApprovalArtifactError::Internal(message) => Error::Internal(message),
+        ProvingRunCloseoutError::Validation(message) => Error::Validation(message),
+        ProvingRunCloseoutError::Internal(message) => Error::Internal(message),
     }
 }
 
