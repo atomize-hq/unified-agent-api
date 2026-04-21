@@ -1,121 +1,228 @@
+<!-- /autoplan restore point: /Users/spensermcconnell/.gstack/projects/atomize-hq-unified-agent-api/feat-cli-agent-onboarding-factory-autoplan-restore-20260420-223712.md -->
 # CLI Agent Onboarding Factory - PLAN
 
 Source: `/Users/spensermcconnell/.gstack/projects/atomize-hq-unified-agent-api/spensermcconnell-main-design-20260420-151505.md`  
-Status: Ready for implementation planning  
-Last updated (UTC): 2026-04-20
+Status: M1 landed on `feat/cli-agent-onboarding-factory`; M2 ready for implementation planning  
+Last updated (UTC): 2026-04-21
 
 ## Purpose
-Turn the current post-OpenCode learning into one bounded M1 implementation plan. M1 does not build a universal agent factory. It replaces the two hardcoded control-plane enrollment seams, pins one committed descriptor registry for the three seeded agents, and lands `xtask onboard-agent --dry-run` so an already-approved next agent deterministically produces the next executable artifact set instead of another vague handoff.
+M2 turns the onboarding bridge from rehearsal into execution.
+
+M1 proved the repo can hold one committed agent registry, derive support enrollment from it, derive capability-matrix enrollment from it, and preview the next control-plane packet with `xtask onboard-agent --dry-run`. That work is now landed on this branch.
+
+The next milestone is not more preview polish. The next milestone is one safe control-plane mutation path plus one real approved-agent proving run. The outcome that matters is simple: after an agent is approved, maintainers stop hand-editing control-plane files one by one, the repo mutates only files it owns, runtime truth stays backend-owned, and the first real onboarding closes with an unmistakable next executable artifact instead of another OpenCode-style stall.
+
+## Landed M1 Baseline
+These are already in the branch and are no longer plan items:
+
+- `crates/xtask/data/agent_registry.toml` exists and seeds `codex`, `claude_code`, and `opencode`.
+- `crates/xtask/src/agent_registry.rs` parses and validates the registry with fail-closed uniqueness checks.
+- `crates/xtask/src/support_matrix/derive.rs` now enrolls roots from the registry instead of `CURRENT_AGENT_ROOTS`.
+- `crates/xtask/src/capability_matrix.rs` now enrolls capability-matrix backends from the registry and applies canonical-target MCP projection.
+- `crates/xtask/src/onboard_agent.rs` and `crates/xtask/src/onboard_agent/preview.rs` implement `xtask onboard-agent --dry-run`.
+- `scripts/publish_planner.py`, `scripts/publish_crates.py`, and `.github/workflows/publish-crates.yml` now handle new crates through the existing crates.io publish flow.
+- `crates/xtask/tests/agent_registry.rs` and `crates/xtask/tests/onboard_agent_entrypoint.rs` cover the seeded registry and dry-run preview surface.
+
+M2 must build on this exact repo state. It is not a greenfield M1 rewrite.
+
+## Premise Challenge
+| Premise | Verdict | Why |
+|---|---|---|
+| The next bottleneck is manual control-plane mutation after approval, not candidate recommendation. | Accept | The branch already has dry-run preview machinery. The remaining gap is converting that preview into a safe write path and landing a real agent without repo archaeology. |
+| Runtime truth must remain owned by wrapper crates, backend implementations, and committed manifest evidence. | Accept | `docs/specs/unified-agent-api/support-matrix.md` keeps support truth crate-first and evidence-first. M2 must not move that truth into the registry. |
+| The first real proving run is mandatory in M2. | Accept | Without a real approved agent run, the factory is still a preview tool. |
+| A fully data-driven backend registry is required now. | Reject | Current residual manual runtime registration is real, but solving it with a framework-scale abstraction now is ocean-boiling. M2 should prove the control-plane mutation slice first. |
+| Recommendation formalization belongs in M2. | Reject | Recommendation remains packet-driven and HITL until the onboarding bridge stops being the bottleneck. |
 
 ## Scope Lock
-- Keep M1 focused on the onboarding bridge.
-- Keep runtime truth owned by wrapper crates and backend implementations.
-- Keep `codex`, `claude_code`, and `opencode` as the only seeded agents in M1.
-- Keep `docs/specs/unified-agent-api/support-matrix.md` as the support/publication semantics owner.
-- Keep `docs/specs/unified-agent-api/capability-matrix.md` as the capability-advertising projection.
-- Keep `crates/xtask` as the control-plane implementation surface.
-- Keep recommendation HITL and packet-driven if formalizing it would delay the bridge fix.
-- Keep all generated onboarding outputs inside control-plane-owned docs, manifest-root, and release/publication surfaces.
+- Keep M2 focused on safe mutation of control-plane-owned artifacts plus one real proving run.
+- Keep runtime/backend behavior owned by `crates/<agent>/` and `crates/agent_api/src/backends/<agent>/`.
+- Keep `docs/specs/unified-agent-api/support-matrix.md` authoritative for support publication semantics.
+- Keep `docs/specs/unified-agent-api/capability-matrix.md` authoritative for capability-advertising projection semantics.
+- Keep the first mutation slice explicit and conservative: no hidden overwrite mode, no best-effort partial writes.
+- Keep the first proving run centered on one already-approved real agent, not a synthetic fixture.
+- Keep the current registry schema for compatibility, but validate it against runtime and manifest truth instead of trusting it over either one.
 
 ## Success Criteria
-- One committed registry artifact exists at `crates/xtask/data/agent_registry.toml`.
-- The registry cleanly seeds `codex`, `claude_code`, and `opencode`.
-- `cargo run -p xtask -- support-matrix --check` derives enrolled roots from the registry instead of a hardcoded list.
-- `cargo run -p xtask -- capability-matrix` derives enrolled backends and canonical target metadata from the registry instead of hardcoded builtin assumptions.
-- `cargo run -p xtask -- onboard-agent --dry-run --agent-id <approved-agent>` deterministically previews all generated control-plane outputs without mutating runtime-owned files.
-- Registry parity, support publication parity, capability publication parity, and dry-run ownership safety are all covered by automated tests.
-- `make preflight` remains the final integration gate.
+M2 is complete only when all of these are true:
+
+- `cargo run -p xtask -- onboard-agent --write --agent-id <approved-agent> ...` exists as an explicit mutation mode beside `--dry-run`.
+- The write mode mutates only control-plane-owned surfaces:
+  - `crates/xtask/data/agent_registry.toml`
+  - `docs/project_management/next/<prefix>/**`
+  - `cli_manifests/<agent>/**` control-plane skeleton files
+  - root `Cargo.toml` workspace membership when `crate_path` is a new member
+  - the generated publishable-crate block inside `docs/crates-io-release.md`
+- On validation failure or write failure, the command leaves the repo unchanged.
+- Re-running the same approved descriptor against an already-generated identical control-plane state is a deterministic no-op, not a duplicate-entry failure.
+- M2 defines one explicit canonical-target rule for capability-matrix target-sensitive projection and one explicit parity rule between registry `canonical_targets` and manifest-root `current.json.expected_targets`.
+- The first real approved-agent proving run lands through this sequence:
+  - `onboard-agent --dry-run`
+  - `onboard-agent --write`
+  - manual runtime-owned wrapper/backend implementation
+  - committed manifest evidence population
+  - regenerated support/capability publication artifacts
+  - `make preflight`
+- Outcome metrics are recorded for the proving run:
+  - manual control-plane file edits by maintainers: `0`
+  - partial-write incidents: `0`
+  - ambiguous ownership incidents: `0`
+  - approved-agent to repo-ready control-plane mutation time: recorded
+  - proving-run closeout passes `make preflight`
 
 ## What Already Exists
-The plan must reuse these surfaces instead of rebuilding them:
+M2 must reuse these surfaces instead of inventing new ones:
 
-- Existing control-plane modules:
-  - [crates/xtask/src/main.rs](/Users/spensermcconnell/__Active_Code/atomize-hq/unified-agent-api/crates/xtask/src/main.rs)
-  - [crates/xtask/src/support_matrix.rs](/Users/spensermcconnell/__Active_Code/atomize-hq/unified-agent-api/crates/xtask/src/support_matrix.rs)
-  - [crates/xtask/src/support_matrix/derive.rs](/Users/spensermcconnell/__Active_Code/atomize-hq/unified-agent-api/crates/xtask/src/support_matrix/derive.rs)
-  - [crates/xtask/src/capability_matrix.rs](/Users/spensermcconnell/__Active_Code/atomize-hq/unified-agent-api/crates/xtask/src/capability_matrix.rs)
-  - [crates/xtask/src/wrapper_coverage_shared.rs](/Users/spensermcconnell/__Active_Code/atomize-hq/unified-agent-api/crates/xtask/src/wrapper_coverage_shared.rs)
-- Existing seeded wrappers and backends:
-  - `crates/codex/`
-  - `crates/claude_code/`
-  - `crates/opencode/`
-  - `crates/agent_api/src/backends/{codex,claude_code,opencode}/`
-- Existing manifest roots:
-  - `cli_manifests/codex/`
-  - `cli_manifests/claude_code/`
-  - `cli_manifests/opencode/`
-- Existing publication contracts:
-  - [docs/specs/unified-agent-api/support-matrix.md](/Users/spensermcconnell/__Active_Code/atomize-hq/unified-agent-api/docs/specs/unified-agent-api/support-matrix.md)
-  - [docs/specs/unified-agent-api/capability-matrix.md](/Users/spensermcconnell/__Active_Code/atomize-hq/unified-agent-api/docs/specs/unified-agent-api/capability-matrix.md)
-  - [docs/crates-io-release.md](/Users/spensermcconnell/__Active_Code/atomize-hq/unified-agent-api/docs/crates-io-release.md)
+- Control-plane entrypoints:
+  - `crates/xtask/src/main.rs`
+  - `crates/xtask/src/onboard_agent.rs`
+  - `crates/xtask/src/onboard_agent/preview.rs`
+  - `crates/xtask/src/agent_registry.rs`
+- Publication and evidence consumers:
+  - `crates/xtask/src/support_matrix.rs`
+  - `crates/xtask/src/support_matrix/derive.rs`
+  - `crates/xtask/src/capability_matrix.rs`
+  - `docs/specs/unified-agent-api/support-matrix.md`
+  - `docs/specs/unified-agent-api/capability-matrix.md`
+- Release/publication rails:
+  - `Cargo.toml`
+  - `docs/crates-io-release.md`
+  - `scripts/publish_planner.py`
+  - `scripts/publish_crates.py`
+  - `.github/workflows/publish-crates.yml`
 - Existing test posture:
+  - `crates/xtask/tests/agent_registry.rs`
+  - `crates/xtask/tests/onboard_agent_entrypoint.rs`
   - `crates/xtask/tests/support_matrix_*.rs`
   - `crates/xtask/tests/c8_spec_capability_matrix_*.rs`
-  - `make preflight`
 
 ## Not In Scope
-- Building a universal runtime probe framework.
-- Editing runtime/backend behavior in `crates/agent_api/src/backends/**`.
-- Generating wrapper surface truth or backend implementation files.
-- Replacing backend-owned capability computation with registry-owned logic.
-- Formalizing `recommend-agent` if that delays M1.
-- Solving already-onboarded-agent lifecycle maintenance beyond parity and dry-run safety.
-- Reworking the support-matrix or capability-matrix semantics themselves.
+- Generating wrapper crate source files or backend implementation files.
+- Auto-implementing runtime capability computation for the new agent.
+- Replacing explicit backend registration with a plugin system or universal backend factory.
+- Formalizing `xtask recommend-agent` or recommendation artifacts before the proving run.
+- Adding update mode for already-onboarded agents.
+- Reworking support-matrix semantics, capability-matrix semantics, or release workflow semantics.
+- Making `onboard-agent` infer runtime truth from upstream CLIs.
 
-## Control-Plane Flow
+## Dream State Delta
 ```text
-approved next agent
-        |
-        v
-xtask onboard-agent --dry-run
-        |
-        +--> crates/xtask/data/agent_registry.toml
-        +--> docs/project_management/next/<agent>-cli-onboarding/**
-        +--> cli_manifests/<agent>/**
-        +--> release/publication touch points
-        |
-        v
-manual runtime follow-up list
+CURRENT STATE
+approved agent
+    |
+    +--> dry-run preview
+    +--> human copies paths and edits control-plane files manually
+    +--> runtime work
+    +--> regenerate artifacts
 
-agent_registry.toml
-        |
-        +--> support-matrix root enrollment
-        +--> capability-matrix backend enrollment
-        +--> release/publication metadata wiring
+M2
+approved agent
+    |
+    +--> onboard-agent --dry-run
+    +--> onboard-agent --write
+    +--> runtime-owned implementation lane
+    +--> regenerate evidence + publication artifacts
+    +--> preflight closeout
+
+12-MONTH IDEAL
+approved recommendation artifact
+    |
+    +--> replay-safe control-plane mutation
+    +--> well-bounded runtime implementation lane
+    +--> drift checks for already-onboarded agents
+    +--> boring, repeatable onboarding closeout
 ```
 
-Runtime truth stays outside the registry:
+M2 does not reach the 12-month ideal. It closes the most expensive remaining gap between approval and executable repo state.
 
-```text
-wrapper crates + backend implementations
-        |
-        +--> wrapper surface declarations
-        +--> runtime capability computation
-        +--> probe / preflight / guard logic
-```
+## Implementation Alternatives
+### Approach A: Keep Dry-Run, Do The Proving Run Mostly By Hand
+Summary: leave `onboard-agent` as preview-only and use the first real agent to manually apply the preview output.
 
-## Concrete Artifact Decisions
-These are part of M1, not open design questions:
+Effort: S  
+Risk: High
 
-| Concern | Decision |
-|---|---|
-| Registry path | `crates/xtask/data/agent_registry.toml` |
-| Registry format | TOML |
-| Registry owner | `crates/xtask` control plane |
-| Seeded agents | `codex`, `claude_code`, `opencode` |
-| Support-matrix consumer | registry-backed enrolled roots |
-| Capability-matrix consumer | registry-backed enrolled backends and canonical target metadata |
-| New onboarding command | `cargo run -p xtask -- onboard-agent --dry-run --agent-id <approved-agent>` |
-| Docs scaffold root | `docs/project_management/next/<agent>-cli-onboarding/` |
-| Manifest-root scaffold | `cli_manifests/<agent>/` |
-| Final M1 gate | `make preflight` |
+Pros:
+- smallest diff
+- avoids write-transaction design work
+- lets the team land the next agent quickly if urgency is extreme
 
-## Exact `onboard-agent --dry-run` CLI Contract
-M1 must not leave the CLI shape to implementer taste.
+Cons:
+- preserves the exact manual-control-plane bottleneck M2 is supposed to remove
+- yields no replay or rollback semantics
+- teaches the repo nothing durable about safe mutation
 
-### Accepted invocation
+Reuses:
+- current dry-run output
+- existing manual runtime follow-up
+
+### Approach B: Safe Control-Plane Mutation + First Real Proving Run
+Summary: add one explicit write mode for control-plane-owned files, make it replay-safe and rollback-safe, then run one approved real agent through the full flow.
+
+Effort: M  
+Risk: Medium
+
+Pros:
+- fixes the actual remaining bottleneck
+- keeps runtime truth ownership intact
+- generates concrete proof about what still feels clumsy after a real run
+
+Cons:
+- requires explicit transaction semantics and path-jailing
+- still leaves runtime lane partially manual
+- requires a real agent decision and closeout discipline
+
+Reuses:
+- current dry-run renderers
+- current support/capability publication rails
+- current publish planner/workflow
+
+### Approach C: Full Data-Driven Onboarding Runtime
+Summary: use M2 to eliminate explicit backend registration, derive everything from registry metadata, and add update mode immediately.
+
+Effort: XL  
+Risk: High
+
+Pros:
+- closest to a long-term factory ideal
+- would remove more residual manual runtime registration
+- creates one stronger abstraction story
+
+Cons:
+- reopens runtime-truth and authority boundaries that the specs just locked
+- likely invents a generic framework before the second real use is proven
+- increases blast radius far beyond the next bottleneck
+
+Reuses:
+- M1 registry and preview scaffolding, but stretches them into a new abstraction layer
+
+**Recommendation:** Choose Approach B. It fixes the actual remaining bottleneck without pretending the repo is ready for a universal runtime framework.
+
+## Mode Selection
+Auto-decided mode: `SELECTIVE EXPANSION`.
+
+Reasoning:
+- the repo is on an existing feature iteration, not a greenfield concept
+- the current plan already overshot into now-landed M1 details
+- M2 needs a complete bounded milestone, not a bigger platform rewrite
+
+Accepted expansion:
+- add outcome metrics for the proving run so M2 measures lead-time reduction instead of only artifact existence
+
+Deferred expansions:
+- backend-registry abstraction
+- update mode for already-onboarded agents
+- recommendation artifact formalization
+
+## M2 Plan Of Record
+### Goal
+Turn `xtask onboard-agent` into a safe control-plane mutator and prove the flow on one real approved agent without moving runtime truth into the registry.
+
+### Command Contract
+M2 keeps `--dry-run` and adds one explicit write mode:
+
 ```bash
-cargo run -p xtask -- onboard-agent --dry-run \
+cargo run -p xtask -- onboard-agent --write \
   --agent-id <agent_id> \
   --display-name <display_name> \
   --crate-path <repo-relative-path> \
@@ -137,464 +244,363 @@ cargo run -p xtask -- onboard-agent --dry-run \
   --onboarding-pack-prefix <prefix>
 ```
 
-### Flag semantics
-- `--dry-run` is required in M1. Invocation without `--dry-run` must fail closed with a usage error until M2.
-- `--canonical-target` is repeatable and order-preserving.
-- `--always-on-capability` is repeatable and order-insensitive in parsing, but must render sorted in preview output.
-- `--target-gated-capability` encodes one capability plus one or more targets.
-- `--config-gated-capability` encodes one capability, one config key, and optional target intersection. If targets are present, the capability is advertised only when both the config and target gate pass.
-- `--backend-extension` is repeatable and reserved for backend-owned extension ids such as `backend.codex.exec_stream`.
-- `--support-matrix-enabled` and `--capability-matrix-enabled` are required booleans, not inferred defaults.
+Rules:
+- `--dry-run` and `--write` are mutually exclusive.
+- `--write` uses the exact same render plan as `--dry-run`; no hidden write-only behavior.
+- M2 has no update mode. Existing divergent generated files fail closed.
+- Exact-byte replay against already-generated identical outputs is a success no-op.
+- Stdout section order stays the same as dry-run, plus one final mutation summary line under `== RESULT ==`.
 
-### Stdout contract
-Successful dry-run output must render these sections in this exact order:
+### Ownership Boundary
+| Surface | Owner | M2 write mode |
+|---|---|---|
+| `crates/xtask/data/agent_registry.toml` | control plane | write |
+| `docs/project_management/next/<prefix>/**` | control plane | write |
+| `cli_manifests/<agent>/current.json` and empty skeleton dirs | control plane | write |
+| root `Cargo.toml` workspace `members` entry | control plane | write when new |
+| generated publishable-crate block in `docs/crates-io-release.md` | control plane | write when new |
+| `crates/<agent>/**` | runtime owner | never |
+| `crates/agent_api/src/backends/<agent>/**` | runtime owner | never |
+| `scripts/publish_*.py` and workflow files | release rails | never in M2 |
+| support/capability generated outputs | existing generators | regenerated after runtime evidence exists |
 
-1. `== ONBOARD-AGENT DRY RUN ==`
-2. `== INPUT SUMMARY ==`
-3. `== REGISTRY ENTRY PREVIEW ==`
-4. `== DOCS SCAFFOLD PREVIEW ==`
-5. `== MANIFEST ROOT PREVIEW ==`
-6. `== RELEASE/PUBLICATION TOUCHPOINTS ==`
-7. `== MANUAL FOLLOW-UP ==`
-8. `== RESULT ==`
+### Capability And Target Authority Rules
+- Support publication remains driven by committed manifest evidence under `cli_manifests/<agent>/`.
+- Runtime backend capabilities remain authoritative for the capability matrix.
+- Registry capability declarations are treated as projection metadata and must validate against runtime backend capabilities. They are never trusted over runtime output.
+- `capability_matrix` keeps its backend-global table shape in M2. For target-sensitive MCP projection, the first item in `canonical_targets` is the one canonical comparison target.
+- Once runtime evidence exists for the new agent, the first canonical target must appear in `current.json.expected_targets`.
+- If registry canonical targets and manifest expected targets diverge after the proving run, `preflight` must fail closed.
 
-### Exit behavior
-- exit `0`: successful dry-run preview
-- exit `2`: validation or ownership conflict
-- exit `1`: unexpected internal failure
-
-### Dry-run side effects
-- no filesystem writes
-- no temp-file writes inside the repo
-- no edits to wrapper crates, backend implementation files, workflow files, or release scripts
-- preview text only
-
-## Registry Contract
-The registry is the control-plane source of truth for declaration and enrollment metadata only.
-
-### Registry-owned fields
-- agent identity and display metadata
-- crate path and manifest-root path
-- package and release/publication metadata
-- canonical targets
-- wrapper-coverage binding metadata
-- normalized capability-declaration shape
-- onboarding scaffold metadata
-
-### Explicitly not registry-owned
-- live capability probes
-- final runtime capability values
-- wrapper surface contents
-- backend execution behavior
-- backend-specific guard/preflight logic
-- generated support rows or generated capability rows
-
-### Required field schema
-| Field | Type | Required | Shape | Notes |
-|---|---|---|---|---|
-| `agent_id` | string | yes | unique | Control-plane identifier. |
-| `display_name` | string | yes | scalar | Human-facing only. |
-| `crate_path` | string | yes | repo-relative path | Wrapper crate root. |
-| `backend_module` | string | yes | repo-relative path | Backend module path under `crates/agent_api/src/backends/`. |
-| `manifest_root` | string | yes | repo-relative path | Root under `cli_manifests/`. |
-| `package_name` | string | yes | scalar | Publishable crate package name. |
-| `canonical_targets` | array<string> | yes | 1..n | Ordered capability-projection/scaffold target set. |
-| `wrapper_coverage.binding_kind` | string | yes | enum | Start with `generated_from_wrapper_crate`. |
-| `wrapper_coverage.source_path` | string | yes | repo-relative path | Wrapper-owned source/generator path. |
-| `capability_declaration.always_on` | array<string> | yes | 0..n | Always-advertised ids. |
-| `capability_declaration.target_gated` | array<table> | yes | 0..n | `capability_id` plus non-empty `targets = []`. |
-| `capability_declaration.config_gated` | array<table> | yes | 0..n | `capability_id` plus `config_key`, optional `targets = []` for intersection gating. |
-| `capability_declaration.backend_extensions` | array<string> | yes | 0..n | Backend-owned extension ids. |
-| `publication.support_matrix_enabled` | bool | yes | scalar | Include in support publication. |
-| `publication.capability_matrix_enabled` | bool | yes | scalar | Include in capability publication. |
-| `release.docs_release_track` | string | yes | scalar | Start with `crates-io` for seeded crates. |
-| `scaffold.onboarding_pack_prefix` | string | yes | scalar | Prefix for generated planning paths. |
-
-Evaluation rules:
-- `support_matrix` root enrollment comes from registry membership, but target row derivation still reads each enrolled root's committed `current.json.expected_targets`. `canonical_targets` does not replace manifest-root expected targets for support publication.
-- `capability_matrix` uses `canonical_targets` for target-sensitive capability projection.
-- Final advertised capability set is the union of `always_on`, matching `target_gated`, and matching `config_gated`, plus `backend_extensions`.
-- `backend_extensions` may be emitted only if the owning backend currently advertises them under default config or an explicitly declared config gate.
-
-## Pinned Initial Registry Contents
-M1 should start from these exact seeded entries. Workers should not infer or re-derive them from prose.
-
-```toml
-[[agents]]
-agent_id = "codex"
-display_name = "Codex CLI"
-crate_path = "crates/codex"
-backend_module = "crates/agent_api/src/backends/codex"
-manifest_root = "cli_manifests/codex"
-package_name = "unified-agent-api-codex"
-canonical_targets = ["x86_64-unknown-linux-musl"]
-
-[agents.wrapper_coverage]
-binding_kind = "generated_from_wrapper_crate"
-source_path = "crates/codex"
-
-[agents.capability_declaration]
-always_on = [
-  "agent_api.run",
-  "agent_api.events",
-  "agent_api.events.live",
-  "agent_api.control.cancel.v1",
-  "agent_api.tools.structured.v1",
-  "agent_api.tools.results.v1",
-  "agent_api.artifacts.final_text.v1",
-  "agent_api.session.handle.v1",
-  "agent_api.session.fork.v1",
-  "agent_api.session.resume.v1",
-  "agent_api.config.model.v1",
-  "agent_api.exec.add_dirs.v1",
-  "agent_api.exec.non_interactive",
-]
-backend_extensions = [
-  "backend.codex.exec.approval_policy",
-  "backend.codex.exec.sandbox_mode",
-  "backend.codex.exec_stream",
-]
-
-[[agents.capability_declaration.target_gated]]
-capability_id = "agent_api.tools.mcp.list.v1"
-targets = ["x86_64-unknown-linux-musl"]
-
-[[agents.capability_declaration.target_gated]]
-capability_id = "agent_api.tools.mcp.get.v1"
-targets = ["x86_64-unknown-linux-musl"]
-
-[[agents.capability_declaration.config_gated]]
-capability_id = "agent_api.tools.mcp.add.v1"
-config_key = "allow_mcp_write"
-targets = ["x86_64-unknown-linux-musl"]
-
-[[agents.capability_declaration.config_gated]]
-capability_id = "agent_api.tools.mcp.remove.v1"
-config_key = "allow_mcp_write"
-targets = ["x86_64-unknown-linux-musl"]
-
-[[agents.capability_declaration.config_gated]]
-capability_id = "agent_api.exec.external_sandbox.v1"
-config_key = "allow_external_sandbox_exec"
-
-[agents.publication]
-support_matrix_enabled = true
-capability_matrix_enabled = true
-
-[agents.release]
-docs_release_track = "crates-io"
-
-[agents.scaffold]
-onboarding_pack_prefix = "codex-cli-onboarding"
-
-[[agents]]
-agent_id = "claude_code"
-display_name = "Claude Code"
-crate_path = "crates/claude_code"
-backend_module = "crates/agent_api/src/backends/claude_code"
-manifest_root = "cli_manifests/claude_code"
-package_name = "unified-agent-api-claude-code"
-canonical_targets = ["linux-x64", "darwin-arm64", "win32-x64"]
-
-[agents.wrapper_coverage]
-binding_kind = "generated_from_wrapper_crate"
-source_path = "crates/claude_code"
-
-[agents.capability_declaration]
-always_on = [
-  "agent_api.run",
-  "agent_api.events",
-  "agent_api.events.live",
-  "agent_api.control.cancel.v1",
-  "agent_api.tools.structured.v1",
-  "agent_api.tools.results.v1",
-  "agent_api.artifacts.final_text.v1",
-  "agent_api.session.handle.v1",
-  "agent_api.config.model.v1",
-  "agent_api.exec.add_dirs.v1",
-  "agent_api.exec.non_interactive",
-  "agent_api.session.resume.v1",
-  "agent_api.session.fork.v1",
-]
-backend_extensions = [
-  "backend.claude_code.print_stream_json",
-]
-
-[[agents.capability_declaration.target_gated]]
-capability_id = "agent_api.tools.mcp.list.v1"
-targets = ["linux-x64", "darwin-arm64", "win32-x64"]
-
-[[agents.capability_declaration.target_gated]]
-capability_id = "agent_api.tools.mcp.get.v1"
-targets = ["win32-x64"]
-
-[[agents.capability_declaration.config_gated]]
-capability_id = "agent_api.tools.mcp.add.v1"
-config_key = "allow_mcp_write"
-targets = ["win32-x64"]
-
-[[agents.capability_declaration.config_gated]]
-capability_id = "agent_api.tools.mcp.remove.v1"
-config_key = "allow_mcp_write"
-targets = ["win32-x64"]
-
-[[agents.capability_declaration.config_gated]]
-capability_id = "agent_api.exec.external_sandbox.v1"
-config_key = "allow_external_sandbox_exec"
-
-[agents.publication]
-support_matrix_enabled = true
-capability_matrix_enabled = true
-
-[agents.release]
-docs_release_track = "crates-io"
-
-[agents.scaffold]
-onboarding_pack_prefix = "claude-code-cli-onboarding"
-
-[[agents]]
-agent_id = "opencode"
-display_name = "OpenCode"
-crate_path = "crates/opencode"
-backend_module = "crates/agent_api/src/backends/opencode"
-manifest_root = "cli_manifests/opencode"
-package_name = "unified-agent-api-opencode"
-canonical_targets = ["linux-x64", "darwin-arm64", "win32-x64"]
-
-[agents.wrapper_coverage]
-binding_kind = "generated_from_wrapper_crate"
-source_path = "crates/opencode"
-
-[agents.capability_declaration]
-always_on = [
-  "agent_api.run",
-  "agent_api.events",
-  "agent_api.events.live",
-  "agent_api.config.model.v1",
-  "agent_api.session.resume.v1",
-  "agent_api.session.fork.v1",
-]
-backend_extensions = []
-
-[agents.publication]
-support_matrix_enabled = true
-capability_matrix_enabled = true
-
-[agents.release]
-docs_release_track = "crates-io"
-
-[agents.scaffold]
-onboarding_pack_prefix = "opencode-cli-onboarding"
+## Architecture
+```text
+approved real agent
+        |
+        v
+xtask onboard-agent --dry-run
+        |
+        v
+xtask onboard-agent --write
+        |
+        +--> registry append / replay check
+        +--> docs pack materialization
+        +--> manifest-root skeleton materialization
+        +--> Cargo.toml workspace member insertion (if new)
+        +--> docs/crates-io-release.md generated block refresh (if new)
+        |
+        v
+manual runtime-owned lane
+        |
+        +--> crates/<agent>/**
+        +--> crates/agent_api/src/backends/<agent>/**
+        +--> explicit backend registration touchpoints
+        +--> manifest evidence population
+        |
+        v
+existing generators + gates
+        |
+        +--> cargo run -p xtask -- support-matrix --check
+        +--> cargo run -p xtask -- capability-matrix
+        +--> make preflight
 ```
 
-## Consumer Cutover Map
-| Consumer | Current hardcoded seam | M1 change |
-|---|---|---|
-| [crates/xtask/src/support_matrix.rs](/Users/spensermcconnell/__Active_Code/atomize-hq/unified-agent-api/crates/xtask/src/support_matrix.rs) | `CURRENT_AGENT_ROOTS` hardcodes enrolled manifest roots | Replace with registry-backed root enrollment and root metadata loading. |
-| [crates/xtask/src/capability_matrix.rs](/Users/spensermcconnell/__Active_Code/atomize-hq/unified-agent-api/crates/xtask/src/capability_matrix.rs) | builtin backend collection and canonical target assumptions are hardcoded | Load enrolled backends and canonical target metadata from the registry while keeping runtime capability computation backend-owned. |
-| [crates/xtask/src/main.rs](/Users/spensermcconnell/__Active_Code/atomize-hq/unified-agent-api/crates/xtask/src/main.rs) | no onboarding factory command surface exists | Add `OnboardAgent` entrypoint. |
-| [docs/crates-io-release.md](/Users/spensermcconnell/__Active_Code/atomize-hq/unified-agent-api/docs/crates-io-release.md) | release assumptions are tied to the current fixed crate set | Use registry release metadata for new-agent enrollment while preserving current seeded-crate order and rules. |
-| `docs/project_management/next/**` | handoff naming and path prefix are manual | Standardize via `scaffold.onboarding_pack_prefix`. |
-
-## Release And Publication Touchpoint Matrix
-Workers should not guess which release files are in scope for M1.
-
-| File | M1 status | Exact rule |
-|---|---|---|
-| [docs/crates-io-release.md](/Users/spensermcconnell/__Active_Code/atomize-hq/unified-agent-api/docs/crates-io-release.md) | touch only if release docs become stale | Seeded-agent normalization should not rewrite publish order. Dry-run for a new agent may preview a future docs addition, but M1 does not mutate it. |
-| [.github/workflows/publish-crates.yml](/Users/spensermcconnell/__Active_Code/atomize-hq/unified-agent-api/.github/workflows/publish-crates.yml) | out of scope | No M1 edits. The workflow already computes publishable crates from cargo metadata. |
-| [scripts/publish_crates.py](/Users/spensermcconnell/__Active_Code/atomize-hq/unified-agent-api/scripts/publish_crates.py) | out of scope | No M1 edits unless M1 proves the workflow cannot model a registry-backed new crate, which is not expected. |
-| [scripts/validate_publish_versions.py](/Users/spensermcconnell/__Active_Code/atomize-hq/unified-agent-api/scripts/validate_publish_versions.py) | out of scope | No M1 edits for seeded normalization. |
-| [scripts/check_publish_readiness.py](/Users/spensermcconnell/__Active_Code/atomize-hq/unified-agent-api/scripts/check_publish_readiness.py) | out of scope | No M1 edits for seeded normalization. |
-| `Cargo.toml` | preview-only for new-agent dry-run | Only preview as a future mutation touchpoint when the proposed `crate_path` is a new workspace member not already present. |
-| `crates/<agent>/Cargo.toml` | preview-only for new-agent dry-run | Only preview as future manual/runtime-owned work, not a dry-run-generated file. |
-
-Preview contract for W5:
-- If the proposed package name matches one of the seeded publishable crates, `== RELEASE/PUBLICATION TOUCHPOINTS ==` must print `NO RELEASE CHANGES`.
-- If the proposed package name is new, the section must list exactly which of `Cargo.toml` and `docs/crates-io-release.md` would require future mutation in M2, and must explicitly print that workflow and script files remain unchanged in M1.
-
-## M1 Workstreams
-### W1. Registry schema and loader
-Goal: add the registry artifact and fail-closed parsing/validation.
+## Workstreams
+### W1. Shared Render Plan + Explicit Write Mode
+Goal: one render pipeline feeds both preview and mutation.
 
 Primary work:
-- add `crates/xtask/data/agent_registry.toml`
-- add registry loader and validation module(s) under `crates/xtask/src/`
-- enforce uniqueness for `agent_id`, `crate_path`, `backend_module`, and `manifest_root`
-- reject malformed target-gated or config-gated declarations
-
-Acceptance:
-- the seeded registry parses cleanly
-- malformed or duplicate entries fail closed
-- no consumer is cut over yet without parity checks
-
-### W2. Seeded normalization and parity
-Goal: seed the three current agents and prove the registry matches existing enrollment before cutover.
-
-Primary work:
-- seed `codex`, `claude_code`, and `opencode`
-- add parity validation comparing current hardcoded enrollment to registry-derived enrollment
-- allow temporary dual-source coexistence only behind explicit parity tests
-
-Acceptance:
-- registry-derived enrolled roots match current `support_matrix` enrollment
-- registry-derived enrolled backends match current `capability_matrix` enrollment
-- CI fails on drift while both sources coexist
-
-### W3. Support-matrix cutover
-Goal: move root enrollment to the registry without changing support publication semantics.
-
-Primary work:
-- replace `CURRENT_AGENT_ROOTS`
-- preserve current publication paths and row semantics
-- keep derivation single-pass and deterministic
+- lift current preview rendering into a shared in-memory mutation plan
+- add `--write` mode to `onboard-agent`
+- keep dry-run and write outputs byte-aligned for the same descriptor
+- add replay-safe identical-state detection
 
 Primary touchpoints:
-- `crates/xtask/src/support_matrix.rs`
-- `crates/xtask/src/support_matrix/derive.rs`
-- `crates/xtask/tests/support_matrix_*.rs`
+- `crates/xtask/src/onboard_agent.rs`
+- `crates/xtask/src/onboard_agent/preview.rs`
+- `crates/xtask/tests/onboard_agent_entrypoint.rs`
 
 Acceptance:
-- row set and staleness behavior remain unchanged for seeded agents
-- support publication reads enrolled roots from the registry
+- every file that write mode would materialize is already visible in dry-run
+- identical replays return success without duplicate registry failures
+- divergent pre-existing generated files fail closed
 
-### W4. Capability-matrix cutover
-Goal: move backend enrollment and canonical target metadata to the registry without moving runtime truth into the registry.
+### W2. Path Jailing, Overwrite Policy, And Rollback
+Goal: safe mutation, not best-effort mutation.
 
 Primary work:
-- replace builtin backend enrollment assumptions
-- source canonical target metadata from the registry
-- keep backend capability computation inside backend-owned code
+- canonicalize every candidate path before writing
+- reject symlink escapes or any resolved path outside workspace root
+- stage writes through temp paths and atomic rename where possible
+- track created files/directories and remove them on failure
+- keep overwrite policy explicit: absent or identical only
+
+Primary touchpoints:
+- `crates/xtask/src/onboard_agent.rs`
+- `crates/xtask/tests/onboard_agent_entrypoint.rs`
+
+Acceptance:
+- validation failures leave zero repo diffs
+- injected fs-write failures leave zero partial outputs
+- symlink escape attempts fail with exit `2`
+
+### W3. Release And Workspace Mutation Slice
+Goal: the first real control-plane mutation includes the whole owned transaction, not just preview text.
+
+Primary work:
+- insert a new workspace member into root `Cargo.toml` when `crate_path` is new
+- convert the publishable-crate inventory/order block in `docs/crates-io-release.md` into a generated section derived from current publishable packages
+- keep workflow and script files unchanged
+
+Primary touchpoints:
+- `Cargo.toml`
+- `docs/crates-io-release.md`
+- `scripts/publish_planner.py` tests only if generator assumptions need new assertions
+- `crates/xtask/tests/onboard_agent_entrypoint.rs`
+
+Acceptance:
+- write mode updates the same release/workspace surfaces that dry-run previews today
+- no workflow or publish script rewrite is required for the proving run
+- generated release-doc section is deterministic and reviewer-friendly
+
+### W4. Target Parity And Capability Ownership Hardening
+Goal: remove silent drift between registry projection metadata, manifest evidence, and runtime capability truth.
+
+Primary work:
+- pin the primary canonical target rule in code and docs
+- add a target parity validator between registry `canonical_targets` and manifest `current.json.expected_targets`
+- validate that registry capability declarations are subsets/projections of runtime backend capabilities, not substitutes for them
+- keep explicit backend registration for the proving run, but document the exact touchpoints instead of pretending they are factory-driven
 
 Primary touchpoints:
 - `crates/xtask/src/capability_matrix.rs`
+- `crates/xtask/src/agent_registry.rs`
+- `crates/xtask/tests/agent_registry.rs`
 - `crates/xtask/tests/c8_spec_capability_matrix_*.rs`
 
 Acceptance:
-- seeded-agent capability inventory stays stable unless an intentional backend change occurs
-- registry only shapes enrollment and declaration metadata
+- multi-target agents publish capabilities under one explicit canonical-target rule
+- target mismatches fail before publication artifacts drift
+- proving-run docs list the remaining runtime-owned registration edits exactly once
 
-### W5. `onboard-agent --dry-run`
-Goal: land the bridge command without mutation mode.
+### W5. First Real Approved-Agent Proving Run
+Goal: prove the bridge on one real agent and record what still feels clumsy.
 
 Primary work:
-- add a neutral `OnboardAgent` entrypoint to `xtask`
-- preview registry diff, docs scaffold, manifest-root scaffold, and release/publication touch points
-- print a deterministic handoff summary naming runtime-owned manual follow-up work
-- fail closed on duplicate ids, ambiguous ownership, or pre-existing conflicting targets
+- take one approved real agent descriptor as input
+- run `--dry-run`, then `--write`
+- complete manual runtime-owned wrapper/backend lane
+- populate manifest evidence and rerun publication generators
+- close out with `make preflight`
+- record actual outcome metrics and residual friction
 
-Expected dry-run outputs:
-- registry entry preview in `crates/xtask/data/agent_registry.toml`
-- docs scaffold preview under `docs/project_management/next/<agent>-cli-onboarding/`
-- manifest-root scaffold preview under `cli_manifests/<agent>/`
-- release/publication touch-point preview
-- final handoff summary
-
-Required scaffold file contract:
-- `docs/project_management/next/<agent>-cli-onboarding/README.md`
-- `docs/project_management/next/<agent>-cli-onboarding/scope_brief.md`
-- `docs/project_management/next/<agent>-cli-onboarding/seam_map.md`
-- `docs/project_management/next/<agent>-cli-onboarding/threading.md`
-- `docs/project_management/next/<agent>-cli-onboarding/review_surfaces.md`
-- `docs/project_management/next/<agent>-cli-onboarding/governance/remediation-log.md`
-- `docs/project_management/next/<agent>-cli-onboarding/HANDOFF.md`
-- `cli_manifests/<agent>/current.json`
-- `cli_manifests/<agent>/versions/.gitkeep`
-- `cli_manifests/<agent>/pointers/latest_supported/.gitkeep`
-- `cli_manifests/<agent>/pointers/latest_validated/.gitkeep`
-- `cli_manifests/<agent>/reports/.gitkeep`
-
-Required ownership markers:
-- every generated Markdown preview must start with `<!-- generated-by: xtask onboard-agent; owner: control-plane -->`
-- `HANDOFF.md` must include a `## Manual Runtime Follow-Up` section
-- no ownership markers are required for `.gitkeep`
+Primary touchpoints:
+- `docs/project_management/next/<prefix>/HANDOFF.md`
+- `cli_manifests/<agent>/**`
+- runtime-owned wrapper/backend files for the chosen agent
+- final verification notes in the proving-run packet
 
 Acceptance:
-- dry-run does not mutate wrapper or backend implementation files
-- output order is deterministic
-- the command always terminates in a concrete next executable artifact set plus manual follow-up list
-- command flags, stdout sections, and exit behavior match the pinned contract above
+- zero manual control-plane edits outside the command
+- proving run closes without an OpenCode-style ambiguous handoff
+- residual manual runtime steps are explicit and bounded
 
 ## Minimal Execution Sequence
 ```text
-W1 registry schema + loader
+W1 shared render plan + --write
     |
     v
-W2 seeded normalization + parity
+W2 path jail + rollback
     |
-    +--> W3 support-matrix cutover
-    +--> W4 capability-matrix cutover
-    +--> W5 onboard-agent --dry-run
-               |
-               v
-         parity + dry-run safety + preflight
+    +--> W3 release/workspace mutation slice
+    +--> W4 target parity + capability ownership hardening
+                |
+                v
+         W5 first real approved-agent proving run
+                |
+                v
+      support-matrix check + capability-matrix + preflight
 ```
 
-Do not reverse this. The registry shape must be pinned before the consumers or the command surface harden around it.
+## Error & Rescue Registry
+| Method / Codepath | What can go wrong | Exception / failure class | Rescued? | Rescue action | User sees |
+|---|---|---|---|---|---|
+| `onboard-agent` argument parse | invalid flag combination | usage error | yes | clap exits with usage text | exit `2` + clear stderr |
+| descriptor normalization | malformed target or capability gate | validation error | yes | reject before planning writes | exit `2` |
+| path canonicalization | symlink escape or non-workspace target | ownership violation | yes | reject before any write | exit `2` |
+| registry replay check | duplicate divergent entry | conflict | yes | reject, print owning surface | exit `2` |
+| mutation staging | temp write failure | io error | yes | abort and clean staged outputs | exit `1` |
+| atomic apply | rename/create_dir failure mid-transaction | io error | yes | rollback created paths, surface exact file | exit `1` |
+| proving-run publication | canonical target mismatch or stale manifest evidence | parity failure | yes | fail the proving-run gate before publish claims drift | failing test / check output |
+| proving-run closeout | runtime-owned lane incomplete | preflight failure | yes | keep packet open, do not declare success | failing verification output |
 
-## Test Strategy
-### Codepath coverage
-| Codepath | What must be proven |
-|---|---|
-| Registry load | malformed or duplicate entries fail closed |
-| Registry parity | seeded registry matches current builtin enrollment before cutover |
-| Support-matrix cutover | registry-backed roots publish the same row set and staleness behavior as today |
-| Capability-matrix cutover | registry-backed backend enrollment preserves seeded-agent capability inventory |
-| Dry-run scaffold | generated outputs are deterministic and do not mutate runtime-owned files |
-| Overwrite safety | existing generated targets fail closed unless explicit update mode exists |
+## Test Diagram
+```text
+NEW CONTROL-PLANE FLOWS
+=======================
+[+] onboard-agent --write
+    |
+    ├── [GAP -> unit/integration] shared render plan equals dry-run render plan
+    ├── [GAP -> integration] absent-path write succeeds and materializes all owned outputs
+    ├── [GAP -> integration] identical replay is a no-op
+    ├── [GAP -> integration] divergent generated file fails closed with no writes
+    └── [GAP -> integration] injected write failure rolls back everything
 
-### Required test surfaces
-- keep `crates/xtask/tests/support_matrix_derivation.rs`
-- keep `crates/xtask/tests/support_matrix_consistency.rs`
-- keep `crates/xtask/tests/support_matrix_entrypoint.rs`
-- keep `crates/xtask/tests/support_matrix_staleness.rs`
-- keep `crates/xtask/tests/c8_spec_capability_matrix_paths.rs`
-- keep `crates/xtask/tests/c8_spec_capability_matrix_staleness.rs`
-- add registry loader and parity tests under `crates/xtask/tests/`
-- add dry-run scaffold golden tests under `crates/xtask/tests/`
-- add duplicate-id and pre-existing-target conflict tests
+[+] path safety
+    |
+    ├── [GAP -> unit] symlink escape via crate_path is rejected
+    ├── [GAP -> unit] symlink escape via backend_module is rejected
+    └── [GAP -> unit] symlink escape via manifest_root is rejected
 
-### Commands
+[+] target/capability parity
+    |
+    ├── [GAP -> unit] primary canonical target rule is explicit for multi-target agents
+    ├── [GAP -> integration] registry canonical_targets mismatch current.json.expected_targets
+    └── [GAP -> integration] registry-declared capability id missing from runtime backend capabilities
+
+[+] release/workspace mutation
+    |
+    ├── [GAP -> integration] new workspace member is inserted deterministically
+    ├── [GAP -> integration] release-doc generated block refresh is deterministic
+    └── [GAP -> regression] workflow and publish scripts remain untouched
+
+PROVING-RUN FLOW
+================
+[+] approved agent -> dry-run -> write -> runtime lane -> generators -> preflight
+    |
+    ├── [GAP -> system] dry-run and write materialize identical control-plane intent
+    ├── [GAP -> system] handoff still names the exact next executable artifact after write
+    ├── [GAP -> system] support-matrix check passes after runtime evidence lands
+    ├── [GAP -> system] capability-matrix output includes the real agent under the pinned target rule
+    └── [GAP -> system] make preflight passes for the proving run branch
+```
+
+## Required Test Surfaces
+- extend `crates/xtask/tests/onboard_agent_entrypoint.rs` for:
+  - `--write` happy path
+  - identical replay no-op
+  - divergent generated file rejection
+  - rollback on injected write failure
+  - `Cargo.toml` mutation
+  - `docs/crates-io-release.md` generated block mutation
+- extend `crates/xtask/tests/agent_registry.rs` for capability-projection subset validation
+- add parity tests under `crates/xtask/tests/c8_spec_capability_matrix_*.rs` for primary canonical target and target drift
+- add a proving-run checklist doc test or packet validation step for post-write handoff completeness
+
+## Commands
 - `cargo test -p xtask`
+- `cargo run -p xtask -- onboard-agent --dry-run --agent-id <approved-agent> ...`
+- `cargo run -p xtask -- onboard-agent --write --agent-id <approved-agent> ...`
 - `cargo run -p xtask -- support-matrix --check`
 - `cargo run -p xtask -- capability-matrix`
-- `cargo run -p xtask -- onboard-agent --dry-run --agent-id <approved-agent>`
 - `make preflight`
 
-## Failure Modes
-| Codepath | Failure | Guardrail |
-|---|---|---|
-| registry seed data | duplicate `agent_id` or overlapping roots | loader validation + conflict tests |
-| support-matrix cutover | enrolled root omitted and rows silently disappear | parity tests + deterministic row-set checks |
-| capability-matrix cutover | canonical target drift changes published inventory unexpectedly | parity tests + staleness tests |
-| dry-run scaffold | command touches runtime-owned wrapper/backend files | ownership rules + golden tests |
-| release wiring | new crate metadata bypasses the current crates.io release flow | release metadata checks + docs update rules |
-| handoff summary | dry-run emits scaffolding but not the next executable artifact | explicit command contract + golden tests |
+## Failure Modes Registry
+| Codepath | Failure mode | Rescued? | Test? | User sees | Logged? |
+|---|---|---|---|---|---|
+| write transaction | partial file set lands before a failing write | must be | add integration rollback test | explicit failure, zero repo diff | yes |
+| path resolution | generated path resolves outside workspace via symlink | must be | add unit + integration test | explicit validation failure | yes |
+| target parity | capability matrix claims a target that support evidence does not | must be | add parity regression | failing check before publication | yes |
+| replay | identical rerun duplicates registry entry | must be | add replay regression | success no-op | yes |
+| proving run | write mode succeeds but packet still does not name the next executable runtime step | must be | add system checklist test | failing closeout checklist | yes |
+| runtime capability drift | registry capability declaration outgrows runtime backend capability set | must be | add subset validation test | failing generator/check | yes |
 
-Critical M1 gap rule:
-- M1 is not complete unless registry parity, support publication parity, capability publication parity, and dry-run ownership safety each have automated coverage plus fail-closed behavior.
+Critical gap rule:
+- If any failure mode above has no test and no fail-closed behavior, M2 is not ready.
+
+## Security Review
+- Path ownership is the main new attack surface. M2 must canonicalize and jail every candidate path before touching disk.
+- No new secrets or external credentials are introduced by `onboard-agent`.
+- `Cargo.toml` and release-doc mutation must be scoped to deterministic generated blocks only. No arbitrary text rewriting.
+- Runtime-owned surfaces stay out of the write set, which keeps the blast radius bounded.
+
+## Performance Review
+- The current dry-run conflict scan walks `reports/**` repeatedly. M2 should avoid multiplying that cost during write-mode validation.
+- Release-doc generation should derive from existing publishable-package discovery once per invocation, not re-scan cargo metadata per file.
+- Replay detection should hash or compare rendered outputs in memory once, not through repeated read/parse loops for each file.
+
+## What The Implementer Needs To Know
+### Hour 1
+- M2 is a rebaseline, not a continuation of greenfield M1.
+- The write set is only control-plane-owned files.
+- Replay-safe and rollback-safe behavior are non-negotiable.
+
+### Hour 2-3
+- The command must use the same render plan for dry-run and write.
+- Canonical target authority must be explicit because capability-matrix output is backend-global, not target-expanded.
+
+### Hour 4-5
+- The proving run is where residual manual runtime registration surfaces get named, not abstracted away.
+- `docs/crates-io-release.md` needs one deterministic generated block if the new crate is publishable.
+
+### Hour 6+
+- Capture actual proving-run metrics and residual friction.
+- Do not silently broaden scope into update mode, recommendation formalization, or generic backend registries.
 
 ## Parallelization Strategy
 | Lane | Modules touched | Depends on |
 |---|---|---|
-| A. registry schema + loader | `crates/xtask/data/**`, new registry module(s), `crates/xtask/src/main.rs` | — |
-| B. support-matrix cutover | `crates/xtask/src/support_matrix*`, related tests | A |
-| C. capability-matrix cutover | `crates/xtask/src/capability_matrix.rs`, related tests | A |
-| D. dry-run onboarding command | new onboarding module, `crates/xtask/src/main.rs`, scaffold tests | A |
+| A. write transaction core | `crates/xtask/src/onboard_agent*`, `crates/xtask/tests/onboard_agent_entrypoint.rs` | — |
+| B. release/workspace mutation | repo root `Cargo.toml`, `docs/`, onboard-agent tests | A |
+| C. target/capability parity hardening | `crates/xtask/src/capability_matrix.rs`, `crates/xtask/src/agent_registry.rs`, related tests | A |
+| D. proving-run packet + closeout | `docs/project_management/next/<prefix>/`, `cli_manifests/<agent>/`, runtime-owned files | A, B, C |
 
 Execution order:
 - launch Lane A first
-- once schema validation and seeded entries are pinned, launch B, C, and D in parallel
-- merge only after parity and `make preflight` pass
+- once write-transaction semantics are pinned, launch B and C in parallel
+- launch D after B and C merge
 
 Conflict flags:
-- Lanes A and D both touch `crates/xtask/src/main.rs`
-- Lanes B and C both depend on the final registry shape
-- D should not guess artifact names or path prefixes before A lands
+- Lanes A and B both touch `crates/xtask/src/onboard_agent*` tests
+- Lane D depends on the final shape from A, B, and C and should stay sequential
 
-## Follow-On After This Plan
-M1 is the current plan-of-record. The follow-on shape stays explicit so implementation does not get clumsy after v1:
+## Deferred To TODOS.md
+- Formalize recommendation approval artifacts after one successful proving run. Reason: still upstream of the current bottleneck.
+- Add update mode for already-onboarded agents after replay-safe write mode proves insufficient. Reason: first prove create-mode and replay semantics.
+- Revisit backend registration abstraction only if the proving run shows explicit runtime registration is the dominant residual manual step. Reason: avoid ocean-boiling before the second real use is proven.
 
-- `M2`: add real mutation mode and use the next approved real agent as the first full proving run
-- `M3`: formalize recommendation output as a stable approval artifact, either via `xtask recommend-agent` or a deterministic packet generator
-- `M4`: add maintenance ergonomics, drift detection, and repeatability hardening after real proving runs expose the clumsy parts
+## Completion Summary
+- Step 0: Scope challenge — rebaselined from stale M1 plan to landed-M1-plus-M2 plan-of-record
+- CEO review: 5 issues found, all resolved in the rewrite by narrowing M2 to safe mutation + proving run
+- CEO voices: Codex high-level reframe matched Claude subagent on the main point
+- Design review: skipped, no UI scope
+- Eng review: 5 issues found, all resolved in the rewrite as explicit M2 requirements
+- Eng voices: Codex and Claude subagent both required atomic mutation, explicit target authority, and a real proving run
+- Test review: diagram produced, gaps enumerated, proving-run artifact required
+- Performance review: report-tree scan and replay cost called out
+- Not in scope: written
+- What already exists: written
+- Failure modes: written with critical gap rule
+- Parallelization: 4 lanes, 2 parallel before proving-run closeout
+
+## Cross-Phase Themes
+- The plan had become stale because it still talked like pre-landing M1. Both CEO and Eng voices pushed to rebaseline around current repo truth.
+- The durable milestone is safe mutation plus one real proving run, not more preview ceremony.
+- Runtime truth must stay backend/evidence-owned. The registry can project and enroll, but it cannot become a second executable truth store.
+
+## Decision Audit Trail
+| # | Phase | Decision | Classification | Principle | Rationale | Rejected |
+|---|---|---|---|---|---|---|
+| 1 | CEO | Rebaseline the document around landed M1 and actionable M2 | mechanical | explicit over clever | The branch already contains M1 code, so planning against a future-M1 fiction would mislead implementation | keep stale greenfield-M1 framing |
+| 2 | CEO | Make safe mutation plus one proving run the M2 goal | mechanical | choose completeness | This is the smallest milestone that removes the remaining bottleneck | more preview-only work |
+| 3 | CEO | Keep recommendation formalization out of M2 | mechanical | pragmatic | It is upstream of the current bottleneck | pull `recommend-agent` into M2 |
+| 4 | CEO | Add proving-run outcome metrics to success criteria | taste | boil lakes | Artifact existence alone does not prove the workflow got better | artifact-only success criteria |
+| 5 | Eng | Add explicit `--write` beside `--dry-run` | mechanical | explicit over clever | Separate mode flags are easier to reason about and test than implicit mutation | implicit default write mode |
+| 6 | Eng | Make replay-safe identical reruns succeed as no-ops | taste | pragmatic | It prevents duplicate-entry churn without opening update mode | fail every rerun |
+| 7 | Eng | Keep overwrite policy at absent-or-identical only | mechanical | explicit over clever | First mutation slice should be conservative and fail closed | generalized update mode |
+| 8 | Eng | Pin first canonical target as the capability-matrix comparison target | mechanical | explicit over clever | Current output shape is backend-global, so the target rule must be singular and visible | union/intersection target inference |
+| 9 | Eng | Validate registry capability declarations against runtime backend capabilities | mechanical | DRY | Runtime truth stays backend-owned, registry declarations must not drift away from it | trusting registry declarations over runtime |
+| 10 | Eng | Defer backend-registry abstraction to later | taste | pragmatic | The proving run should tell us if explicit backend registration is the real next bottleneck | full data-driven backend factory now |
+
+## GSTACK REVIEW REPORT
+
+| Review | Trigger | Why | Runs | Status | Findings |
+|--------|---------|-----|------|--------|----------|
+| CEO Review | `/plan-ceo-review` | Scope & strategy | 1 | clear via `/autoplan` | rebaseline to landed M1, make M2 the safe-mutation + proving-run milestone |
+| Codex Review | `codex exec` | Independent 2nd opinion | 2 | clear via `/autoplan` | both runs pushed on stale framing, outcome metrics, atomic mutation, and truth ownership |
+| Eng Review | `/plan-eng-review` | Architecture & tests (required) | 1 | clear via `/autoplan` | atomic write contract, replay policy, target parity, path jailing, and proving-run closeout pinned |
+| Design Review | `/plan-design-review` | UI/UX gaps | 0 | skipped | no UI scope |
+
+**CODEX:** Both Codex passes converged on the same correction. Stop treating this like pre-landing M1 and make M2 prove safe mutation on a real agent.
+**CROSS-MODEL:** Claude subagents and Codex agreed on the main direction. The plan needed rebaselining, a real proving run, rollback-safe mutation, and a stricter runtime-truth boundary.
+**UNRESOLVED:** 0
+**VERDICT:** CEO + ENG CLEARED — M2 is concrete enough to implement.
