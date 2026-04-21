@@ -1,5 +1,43 @@
 # TODOS
 
+## Pending
+
+### Formalize Recommendation Automation After Two Governance-Backed Selection Cycles
+
+**What:** Revisit `recommend-agent` automation or a deterministic packet generator only after the repo completes two onboarding selections with explicit comparison, approval, and closeout linkage.
+
+**Why:** M3 identified that the next missing truth is governance and provenance, not candidate automation. The repo should automate recommendation only after it has real approval-versus-recommendation feedback to target.
+
+**Context:** The 2026-04-21 `/autoplan` rebaseline for `PLAN.md` reframed M3 around selection-to-proof governance because `docs/project_management/next/cli-agent-onboarding-third-agent-packet.md` recommended `OpenCode` while the first closed M2 proving run landed `gemini_cli`. That mismatch needs explicit comparison, approval, override, and closeout truth before the repo turns recommendation into tooling.
+
+**Effort:** M
+**Priority:** P2
+**Depends on:** M3 landing with governance-backed approval artifacts and validated proving-run closeout artifacts
+
+### Compress The Runtime-Owned Onboarding Lane After Governance Truth Lands
+
+**What:** Identify and reduce the dominant wrapper/backend/manual evidence steps that still control lead time after M3 makes selection and approval provenance explicit.
+
+**Why:** M2 solved control-plane mutation. M3 solves governance truth. The next likely bottleneck is the runtime-owned lane, but the repo should name that only after the governance chain is trustworthy enough to measure it cleanly.
+
+**Context:** The 2026-04-21 `/autoplan` for the CLI agent onboarding factory explicitly deferred runtime-lane compression because the current repo still cannot say why `gemini_cli` was approved after `OpenCode` was recommended, or what residual friction the first proving run actually exposed. Once M3 closes that gap, the runtime lane becomes the right next target.
+
+**Effort:** M
+**Priority:** P2
+**Depends on:** M3 governance artifacts plus one post-M3 onboarding cycle with recorded duration and residual friction truth
+
+### Add Multi-Agent Drift And Update Maintenance Flows
+
+**What:** Add update-mode, drift detection, and already-onboarded maintenance workflows after the repo finishes one post-M3 onboarding cycle with explicit approval and closeout linkage.
+
+**Why:** The repo should not widen into ongoing maintenance flows until the create-mode governance chain is trustworthy and replay-safe under the new approval/closeout model.
+
+**Context:** The 2026-04-21 `/autoplan` kept update mode and maintenance flows out of M3. The review concluded that the repo still needs immutable approval identity, validated closeout state, and historical reconciliation before it should generalize into long-lived lifecycle tooling.
+
+**Effort:** M
+**Priority:** P3
+**Depends on:** M3 landing cleanly and at least one additional onboarding cycle after the Gemini backfill
+
 ## Completed
 
 ### Create The OpenCode Execution Pack

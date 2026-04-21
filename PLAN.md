@@ -1,585 +1,542 @@
-<!-- /autoplan restore point: /Users/spensermcconnell/.gstack/projects/atomize-hq-unified-agent-api/feat-cli-agent-onboarding-factory-autoplan-restore-20260420-223712.md -->
+<!-- /autoplan restore point: /Users/spensermcconnell/.gstack/projects/atomize-hq-unified-agent-api/feat-cli-agent-onboarding-factory-autoplan-restore-20260421-105543.md -->
 # CLI Agent Onboarding Factory - PLAN
 
-Source: `/Users/spensermcconnell/.gstack/projects/atomize-hq-unified-agent-api/spensermcconnell-main-design-20260420-151505.md`  
-Status: M1 landed on `feat/cli-agent-onboarding-factory`; M2 ready for implementation planning  
+Source:
+- `/Users/spensermcconnell/.gstack/projects/atomize-hq-unified-agent-api/spensermcconnell-main-design-20260420-151505.md`
+- `docs/project_management/next/cli-agent-onboarding-third-agent-packet.md`
+- `docs/project_management/next/gemini-cli-onboarding/HANDOFF.md`
+
+Status: M1 and M2 landed on `feat/cli-agent-onboarding-factory`; M3 ready for implementation planning
 Last updated (UTC): 2026-04-21
 
 ## Purpose
-M2 turns the onboarding bridge from rehearsal into execution.
+M3 turns the post-M2 selection gap from folklore into governed repo truth.
 
-M1 proved the repo can hold one committed agent registry, derive support enrollment from it, derive capability-matrix enrollment from it, and preview the next control-plane packet with `xtask onboard-agent --dry-run`. That work is now landed on this branch.
+M2 proved the control-plane mutation slice is real:
+- `xtask onboard-agent --write` exists
+- control-plane writes are transactional and replay-safe
+- one real proving run landed for `gemini_cli`
+- the proving run closed with committed packet artifacts and `make preflight`
 
-The next milestone is not more preview polish. The next milestone is one safe control-plane mutation path plus one real approved-agent proving run. The outcome that matters is simple: after an agent is approved, maintainers stop hand-editing control-plane files one by one, the repo mutates only files it owns, runtime truth stays backend-owned, and the first real onboarding closes with an unmistakable next executable artifact instead of another OpenCode-style stall.
+That changed the next bottleneck.
 
-## Landed M1 Baseline
+The problem is no longer "can the repo write the control-plane packet?" The problem is that the repo can now point to three different truths without saying how they relate:
+- a comparison packet that recommended `OpenCode`
+- a proving run that landed `gemini_cli`
+- a top-level plan that still talks like M2 is pending
+
+If M3 only formalizes recommendation tooling, it will automate the least trustworthy part of the funnel. The next milestone has to formalize the selection-to-proof chain:
+- what was compared
+- what was recommended
+- what was approved
+- why approval diverged when it did
+- what the proving run taught us
+
+## Landed Baseline
 These are already in the branch and are no longer plan items:
 
-- `crates/xtask/data/agent_registry.toml` exists and seeds `codex`, `claude_code`, and `opencode`.
-- `crates/xtask/src/agent_registry.rs` parses and validates the registry with fail-closed uniqueness checks.
-- `crates/xtask/src/support_matrix/derive.rs` now enrolls roots from the registry instead of `CURRENT_AGENT_ROOTS`.
-- `crates/xtask/src/capability_matrix.rs` now enrolls capability-matrix backends from the registry and applies canonical-target MCP projection.
-- `crates/xtask/src/onboard_agent.rs` and `crates/xtask/src/onboard_agent/preview.rs` implement `xtask onboard-agent --dry-run`.
-- `scripts/publish_planner.py`, `scripts/publish_crates.py`, and `.github/workflows/publish-crates.yml` now handle new crates through the existing crates.io publish flow.
-- `crates/xtask/tests/agent_registry.rs` and `crates/xtask/tests/onboard_agent_entrypoint.rs` cover the seeded registry and dry-run preview surface.
+- `crates/xtask/data/agent_registry.toml` seeds `codex`, `claude_code`, `opencode`, and `gemini_cli`.
+- `crates/xtask/src/onboard_agent.rs` implements `--dry-run` and `--write`.
+- `crates/xtask/src/onboard_agent/mutation.rs` enforces path jailing, staged writes, and rollback.
+- `crates/xtask/src/onboard_agent/validation.rs` enforces registry/package/filesystem fail-closed behavior for raw descriptor input.
+- `docs/project_management/next/gemini-cli-onboarding/**` is the first closed proving-run packet.
+- `docs/project_management/next/gemini-cli-onboarding/governance/proving-run-metrics.json` records M2 closeout metrics, but not enough provenance for M3.
+- `crates/xtask/tests/onboard_agent_entrypoint.rs` and `crates/xtask/tests/onboard_agent_closeout_preview.rs` prove M2 packet generation and closeout rendering.
 
-M2 must build on this exact repo state. It is not a greenfield M1 rewrite.
+M3 must build on this exact repo state. It is not a partial M2 cleanup.
 
 ## Premise Challenge
 | Premise | Verdict | Why |
 |---|---|---|
-| The next bottleneck is manual control-plane mutation after approval, not candidate recommendation. | Accept | The branch already has dry-run preview machinery. The remaining gap is converting that preview into a safe write path and landing a real agent without repo archaeology. |
-| Runtime truth must remain owned by wrapper crates, backend implementations, and committed manifest evidence. | Accept | `docs/specs/unified-agent-api/support-matrix.md` keeps support truth crate-first and evidence-first. M2 must not move that truth into the registry. |
-| The first real proving run is mandatory in M2. | Accept | Without a real approved agent run, the factory is still a preview tool. |
-| A fully data-driven backend registry is required now. | Reject | Current residual manual runtime registration is real, but solving it with a framework-scale abstraction now is ocean-boiling. M2 should prove the control-plane mutation slice first. |
-| Recommendation formalization belongs in M2. | Reject | Recommendation remains packet-driven and HITL until the onboarding bridge stops being the bottleneck. |
+| The next bottleneck is recommendation generation itself. | Reject | The sharper gap is decision provenance between comparison, approval, and proving run. |
+| Recommendation and approval can be treated as the same artifact. | Reject | `OpenCode` was recommended, `gemini_cli` was landed. The repo needs room for explicit override truth. |
+| Approval state belongs in `agent_registry.toml` or `cli_manifests/**`. | Reject | Registry metadata and manifest evidence are downstream truths. Approval is governance input, not runtime or publication truth. |
+| `onboard-agent` should stay long-flag driven for real operator use. | Reject | Re-entering the full descriptor by hand after approval keeps the most error-prone seam manual. |
+| M3 should add `recommend-agent` before it fixes approval and closeout governance. | Reject | That would formalize ceremony before the repo can explain why recommendation and reality diverged. |
+| M3 should formalize a selection-to-proof chain, with explicit approval and closeout artifacts. | Accept | This is the smallest complete slice that makes agent five boring instead of archaeological. |
+| The selection rubric needs an explicit mode for why we are choosing an agent now. | Accept | The repo mixed "factory validation" and "frontier expansion" logic in one packet and then shipped a different agent. |
+| M3 should record whether `gemini_cli` superseded `OpenCode` or was only a proving-run vehicle. | Accept | The answer is now explicit: `gemini_cli` was the fourth-agent proving-run vehicle, while `OpenCode` remains the next recommendation lineage. |
 
 ## Scope Lock
-- Keep M2 focused on safe mutation of control-plane-owned artifacts plus one real proving run.
-- Keep runtime/backend behavior owned by `crates/<agent>/` and `crates/agent_api/src/backends/<agent>/`.
-- Keep `docs/specs/unified-agent-api/support-matrix.md` authoritative for support publication semantics.
-- Keep `docs/specs/unified-agent-api/capability-matrix.md` authoritative for capability-advertising projection semantics.
-- Keep the first mutation slice explicit and conservative: no hidden overwrite mode, no best-effort partial writes.
-- Keep the first proving run centered on one already-approved real agent, not a synthetic fixture.
-- Keep the current registry schema for compatibility, but validate it against runtime and manifest truth instead of trusting it over either one.
+- Rebaseline the top-level plan around post-M2 repo truth.
+- Formalize three artifacts in the selection-to-proof chain:
+  - candidate comparison packet
+  - approval artifact
+  - proving-run closeout artifact
+- Keep approval and closeout artifacts under `docs/project_management/next/<prefix>/governance/`.
+- Make `xtask onboard-agent` consume an approval artifact as the canonical operator path.
+- Keep raw long-flag input only as a fixture/backfill path, not the preferred human workflow.
+- Add one explicit closeout validation path so packet state is not inferred from metrics-file presence alone.
+- Backfill one authoritative decision record explaining that `gemini_cli` was the fourth-agent proving-run vehicle while `OpenCode` remains the next recommendation lineage.
+- Keep recommendation authoring human-in-the-loop in M3. The repo does not need automated candidate research to solve the current trust gap.
 
 ## Success Criteria
-M2 is complete only when all of these are true:
+M3 is complete only when all of these are true:
 
-- `cargo run -p xtask -- onboard-agent --write --agent-id <approved-agent> ...` exists as an explicit mutation mode beside `--dry-run`.
-- The write mode mutates only control-plane-owned surfaces:
-  - `crates/xtask/data/agent_registry.toml`
-  - `docs/project_management/next/<prefix>/**`
-  - `cli_manifests/<agent>/**` control-plane skeleton files
-  - root `Cargo.toml` workspace membership when `crate_path` is a new member
-  - the generated publishable-crate block inside `docs/crates-io-release.md`
-- On validation failure or write failure, the command leaves the repo unchanged.
-- Re-running the same approved descriptor against an already-generated identical control-plane state is a deterministic no-op, not a duplicate-entry failure.
-- M2 defines one explicit canonical-target rule for capability-matrix target-sensitive projection and one explicit parity rule between registry `canonical_targets` and manifest-root `current.json.expected_targets`.
-- The first real approved-agent proving run lands through this sequence:
-  - `onboard-agent --dry-run`
-  - `onboard-agent --write`
-  - manual runtime-owned wrapper/backend implementation
-  - committed manifest evidence population
-  - regenerated support/capability publication artifacts
-  - `make preflight`
-- Outcome metrics are recorded for the proving run:
-  - manual control-plane file edits by maintainers: `0`
-  - partial-write incidents: `0`
-  - ambiguous ownership incidents: `0`
-  - approved-agent to repo-ready control-plane mutation time: recorded
-  - proving-run closeout passes `make preflight`
+- `PLAN.md` is post-M2 accurate and no longer frames M2 as pending.
+- A committed approval artifact exists and records:
+  - `comparison_ref`
+  - `selection_mode`
+  - `recommended_agent_id`
+  - `approved_agent_id`
+  - `override_reason` when those differ
+  - the exact onboarding descriptor consumed by the factory
+- `cargo run -p xtask -- onboard-agent --approval <path> --dry-run` exists.
+- `cargo run -p xtask -- onboard-agent --approval <path> --write` exists.
+- Artifact mode is exclusive with semantic descriptor flags. No dual authority.
+- Generated packet outputs stamp the approval artifact path plus an immutable approval hash or id.
+- Proving-run closeout can no longer be inferred from metrics-file presence alone.
+- A validated closeout artifact exists and records:
+  - approval source
+  - exactly one of `duration_seconds` or `duration_missing_reason`
+  - either explicit residual friction items or `explicit_none_reason`
+  - proving-run state
+- The repo records one authoritative answer to this question:
+  - `gemini_cli` was the fourth-agent proving-run vehicle
+  - `OpenCode` remains the next recommendation lineage and was not replaced by Gemini
+- The historical `gemini_cli` proving run is backfilled or superseded so the closed packet has trustworthy provenance.
+- A full M3 test plan exists at `/Users/spensermcconnell/.gstack/projects/atomize-hq-unified-agent-api/spensermcconnell-feat-cli-agent-onboarding-factory-test-plan-20260421-105654.md`.
 
 ## What Already Exists
-M2 must reuse these surfaces instead of inventing new ones:
+M3 must reuse these surfaces instead of inventing a second factory:
 
+- Comparison inputs:
+  - `docs/project_management/next/_templates/cli-agent-onboarding-packet-template.md`
+  - `docs/project_management/next/cli-agent-onboarding-third-agent-packet.md`
 - Control-plane entrypoints:
   - `crates/xtask/src/main.rs`
   - `crates/xtask/src/onboard_agent.rs`
   - `crates/xtask/src/onboard_agent/preview.rs`
-  - `crates/xtask/src/agent_registry.rs`
-- Publication and evidence consumers:
-  - `crates/xtask/src/support_matrix.rs`
-  - `crates/xtask/src/support_matrix/derive.rs`
-  - `crates/xtask/src/capability_matrix.rs`
+  - `crates/xtask/src/onboard_agent/preview/render.rs`
+  - `crates/xtask/src/onboard_agent/validation.rs`
+- Truth-owning downstream artifacts:
+  - `crates/xtask/data/agent_registry.toml`
+  - `cli_manifests/<agent>/**`
   - `docs/specs/unified-agent-api/support-matrix.md`
   - `docs/specs/unified-agent-api/capability-matrix.md`
-- Release/publication rails:
-  - `Cargo.toml`
-  - `docs/crates-io-release.md`
-  - `scripts/publish_planner.py`
-  - `scripts/publish_crates.py`
-  - `.github/workflows/publish-crates.yml`
+- Historical proving-run evidence:
+  - `docs/project_management/next/gemini-cli-onboarding/**`
 - Existing test posture:
-  - `crates/xtask/tests/agent_registry.rs`
   - `crates/xtask/tests/onboard_agent_entrypoint.rs`
-  - `crates/xtask/tests/support_matrix_*.rs`
+  - `crates/xtask/tests/onboard_agent_closeout_preview.rs`
+  - `crates/xtask/tests/agent_registry.rs`
   - `crates/xtask/tests/c8_spec_capability_matrix_*.rs`
 
 ## Not In Scope
-- Generating wrapper crate source files or backend implementation files.
-- Auto-implementing runtime capability computation for the new agent.
-- Replacing explicit backend registration with a plugin system or universal backend factory.
-- Formalizing `xtask recommend-agent` or recommendation artifacts before the proving run.
-- Adding update mode for already-onboarded agents.
-- Reworking support-matrix semantics, capability-matrix semantics, or release workflow semantics.
-- Making `onboard-agent` infer runtime truth from upstream CLIs.
+- Auto-generating the 3-candidate comparison from live web research.
+- Reworking support-matrix or capability-matrix semantics.
+- Moving approval truth into the registry or manifest roots.
+- Generating wrapper crate or backend source files.
+- Runtime-lane compression for wrapper/backend implementation.
+- Update mode for already-onboarded agents.
+- Universal agent lifecycle orchestration across recommendation, approval, onboarding, and maintenance in one monolithic command.
 
 ## Dream State Delta
 ```text
 CURRENT STATE
-approved agent
+comparison packet
     |
-    +--> dry-run preview
-    +--> human copies paths and edits control-plane files manually
-    +--> runtime work
-    +--> regenerate artifacts
+    +--> recommends OpenCode
+    |
+    +--> proving run lands Gemini CLI
+    |
+    +--> closeout says "no residual friction recorded"
+    |
+    +--> next operator has to infer what actually happened
 
-M2
-approved agent
+M3
+comparison packet
     |
-    +--> onboard-agent --dry-run
-    +--> onboard-agent --write
-    +--> runtime-owned implementation lane
-    +--> regenerate evidence + publication artifacts
-    +--> preflight closeout
+    +--> approval artifact
+    |       - recommended agent
+    |       - approved agent
+    |       - override reason when needed
+    |       - exact onboarding descriptor
+    |
+    +--> onboard-agent --approval
+    |
+    +--> runtime lane
+    |
+    +--> validated closeout artifact
+            - approval source
+            - duration or explicit missing reason
+            - residual friction or explicit none reason
 
 12-MONTH IDEAL
-approved recommendation artifact
+comparison mode chosen explicitly
     |
-    +--> replay-safe control-plane mutation
-    +--> well-bounded runtime implementation lane
-    +--> drift checks for already-onboarded agents
-    +--> boring, repeatable onboarding closeout
+    +--> boring approval artifact
+    +--> boring onboard-agent invocation
+    +--> boring closeout and feedback loop
+    +--> next recommendation learns from the last proving run
 ```
 
-M2 does not reach the 12-month ideal. It closes the most expensive remaining gap between approval and executable repo state.
-
 ## Implementation Alternatives
-### Approach A: Keep Dry-Run, Do The Proving Run Mostly By Hand
-Summary: leave `onboard-agent` as preview-only and use the first real agent to manually apply the preview output.
+### Approach A: Recommendation Tooling First
+Summary: build `recommend-agent` or a packet generator now, then retrofit approval and closeout provenance later.
 
-Effort: S  
+Effort: M  
 Risk: High
 
 Pros:
-- smallest diff
-- avoids write-transaction design work
-- lets the team land the next agent quickly if urgency is extreme
+- visible automation win
+- reduces packet-authoring repetition
 
 Cons:
-- preserves the exact manual-control-plane bottleneck M2 is supposed to remove
-- yields no replay or rollback semantics
-- teaches the repo nothing durable about safe mutation
+- formalizes the least trustworthy stage first
+- does not explain `OpenCode` versus `gemini_cli`
+- creates recommendation theater if humans still override off-record
 
-Reuses:
-- current dry-run output
-- existing manual runtime follow-up
-
-### Approach B: Safe Control-Plane Mutation + First Real Proving Run
-Summary: add one explicit write mode for control-plane-owned files, make it replay-safe and rollback-safe, then run one approved real agent through the full flow.
+### Approach B: Selection-To-Proof Governance First
+Summary: keep comparison authoring HITL, add immutable approval and closeout artifacts, make `onboard-agent` consume approved input, then revisit recommendation tooling with actual governance truth in place.
 
 Effort: M  
 Risk: Medium
 
 Pros:
-- fixes the actual remaining bottleneck
-- keeps runtime truth ownership intact
-- generates concrete proof about what still feels clumsy after a real run
+- fixes the observed trust gap directly
+- removes descriptor re-entry from the operator path
+- preserves the registry/manifest/runtime ownership boundary M2 established
+- creates the evidence chain future recommendation automation can safely target
 
 Cons:
-- requires explicit transaction semantics and path-jailing
-- still leaves runtime lane partially manual
-- requires a real agent decision and closeout discipline
+- does not automate candidate research yet
+- requires one historical backfill to explain the Gemini proving run without treating it as an OpenCode replacement
+- adds lifecycle validation that current packet rendering does not yet enforce
 
-Reuses:
-- current dry-run renderers
-- current support/capability publication rails
-- current publish planner/workflow
-
-### Approach C: Full Data-Driven Onboarding Runtime
-Summary: use M2 to eliminate explicit backend registration, derive everything from registry metadata, and add update mode immediately.
+### Approach C: Full Lifecycle CLI Suite Now
+Summary: add `recommend-agent`, `approve-agent`, `onboard-agent`, and `close-proving-run` in one milestone.
 
 Effort: XL  
 Risk: High
 
 Pros:
-- closest to a long-term factory ideal
-- would remove more residual manual runtime registration
-- creates one stronger abstraction story
+- cleanest long-term story
+- one end-to-end command family
 
 Cons:
-- reopens runtime-truth and authority boundaries that the specs just locked
-- likely invents a generic framework before the second real use is proven
-- increases blast radius far beyond the next bottleneck
+- turns a bounded governance fix into a platform rewrite
+- expands blast radius before the repo agrees on the post-M2 truth
+- risks rebuilding the same ambiguity with more code
 
-Reuses:
-- M1 registry and preview scaffolding, but stretches them into a new abstraction layer
-
-**Recommendation:** Choose Approach B. It fixes the actual remaining bottleneck without pretending the repo is ready for a universal runtime framework.
+**Recommendation:** Choose Approach B. It is the smallest complete milestone that turns the current repo narrative into something trustworthy.
 
 ## Mode Selection
 Auto-decided mode: `SELECTIVE EXPANSION`.
 
 Reasoning:
-- the repo is on an existing feature iteration, not a greenfield concept
-- the current plan already overshot into now-landed M1 details
-- M2 needs a complete bounded milestone, not a bigger platform rewrite
+- the repo already landed the M2 mutation slice and one real proving run
+- the missing gap is governance and provenance, not a bigger platform rewrite
+- adding approval and closeout artifacts is a complete lake
+- full lifecycle recommendation automation is still ocean-boiling before the trust chain is fixed
 
 Accepted expansion:
-- add outcome metrics for the proving run so M2 measures lead-time reduction instead of only artifact existence
+- add one explicit selection mode field to approval artifacts:
+  - `factory_validation`
+  - `frontier_expansion`
 
 Deferred expansions:
-- backend-registry abstraction
-- update mode for already-onboarded agents
-- recommendation artifact formalization
+- `recommend-agent` automation
+- runtime-lane compression
+- multi-agent update/drift maintenance flows
 
-## M2 Plan Of Record
+## M3 Plan Of Record
 ### Goal
-Turn `xtask onboard-agent` into a safe control-plane mutator and prove the flow on one real approved agent without moving runtime truth into the registry.
+Turn "we compared one thing, approved another, and closed a proving run without saying why" into a deterministic, auditable selection-to-proof chain.
 
 ### Milestone Outcome
-M2 is one bounded milestone, not a loose bundle of improvements. At the end of this milestone:
+At the end of M3:
 
-- maintainers can take an approved agent descriptor and materialize every control-plane-owned artifact without hand-editing those files
-- the command fails closed on ownership violations, divergent generated state, and mid-transaction write failures
-- the remaining manual runtime lane is explicit, bounded, and attached to a real proving run instead of implied by dry-run output
-- the proving run ends with regenerated publication artifacts, `make preflight`, and recorded outcome metrics
+- maintainers author or commit one comparison packet for a candidate set
+- maintainers freeze one approval artifact that contains the exact onboarding descriptor and the approval rationale
+- `xtask onboard-agent` consumes that approved input directly
+- proving-run closeout cannot claim success without approval linkage, timing truth, and residual-friction truth
+- the historical `OpenCode` recommendation and `gemini_cli` fourth-agent proving run are recorded once, explicitly, in repo truth
 
-### Execution Shape
+### Governance Chain
 ```text
-approved descriptor
+comparison packet (informative)
         |
         v
-shared render plan
+approval artifact (machine-readable, immutable)
         |
         v
-transactional owned writes
-        |
-        +--> release/workspace owned surfaces
-        +--> target/capability parity guards
+onboard-agent --approval
         |
         v
-real-agent proving run
+runtime-owned implementation lane
         |
         v
-generators + preflight + metrics
+proving-run closeout artifact (machine-readable, validated)
+        |
+        v
+closed packet + feedback into next selection
 ```
 
+### Artifact Contract
+#### 1. Comparison packet
+Format: Markdown  
+Owner: maintainer workflow  
+Role: explain candidate set, rubric, recommendation, and evidence
+
+Notes:
+- remains informative, not normative
+- may recommend one agent without locking approval to that winner
+
+#### 2. Approval artifact
+Path: `docs/project_management/next/<prefix>/governance/approved-agent.toml`  
+Format: TOML  
+Owner: governance input
+
+Required fields:
+- `artifact_version`
+- `comparison_ref`
+- `selection_mode`
+- `recommended_agent_id`
+- `approved_agent_id`
+- `approval_commit`
+- `approval_recorded_at`
+- `override_reason` when `approved_agent_id != recommended_agent_id`
+- embedded onboarding descriptor fields currently passed as long flags to `onboard-agent`
+
+Rules:
+- immutable once used for a write or proving run
+- repo-relative path, jailed, and namespace-validated
+- must not live in `agent_registry.toml` or `cli_manifests/**`
+
+#### 3. Proving-run closeout artifact
+Path: `docs/project_management/next/<prefix>/governance/proving-run-closeout.json`  
+Format: JSON  
+Owner: governance closeout
+
+Required fields:
+- `state = "closed"`
+- `approval_ref`
+- `approval_sha256` or equivalent immutable approval id
+- `approval_source`
+- `manual_control_plane_edits`
+- `partial_write_incidents`
+- `ambiguous_ownership_incidents`
+- exactly one of:
+  - `duration_seconds`
+  - `duration_missing_reason`
+- exactly one of:
+  - `residual_friction`
+  - `explicit_none_reason`
+- `preflight_passed`
+- `recorded_at`
+- `commit`
+
+Rules:
+- metrics-file presence alone must not close a packet
+- closeout must fail validation if approval linkage, timing truth, or residual-friction truth is missing
+
 ### Command Contract
-M2 keeps `--dry-run` and adds one explicit write mode:
+M3 keeps the existing raw descriptor path for fixtures and backfills, but the canonical operator path becomes approval-driven:
 
 ```bash
-cargo run -p xtask -- onboard-agent --write \
-  --agent-id <agent_id> \
-  --display-name <display_name> \
-  --crate-path <repo-relative-path> \
-  --backend-module <repo-relative-path> \
-  --manifest-root <repo-relative-path> \
-  --package-name <crate-package-name> \
-  --canonical-target <target> \
-  [--canonical-target <target> ...] \
-  --wrapper-coverage-binding-kind <binding-kind> \
-  --wrapper-coverage-source-path <repo-relative-path> \
-  --always-on-capability <capability-id> \
-  [--always-on-capability <capability-id> ...] \
-  [--target-gated-capability '<capability-id>:<target>[,<target>...]' ...] \
-  [--config-gated-capability '<capability-id>:<config-key>[:<target>[,<target>...]]' ...] \
-  [--backend-extension <capability-id> ...] \
-  --support-matrix-enabled <true|false> \
-  --capability-matrix-enabled <true|false> \
-  --docs-release-track <track> \
-  --onboarding-pack-prefix <prefix>
+cargo run -p xtask -- onboard-agent --approval docs/project_management/next/<prefix>/governance/approved-agent.toml --dry-run
+cargo run -p xtask -- onboard-agent --approval docs/project_management/next/<prefix>/governance/approved-agent.toml --write
+cargo run -p xtask -- close-proving-run --approval docs/project_management/next/<prefix>/governance/approved-agent.toml --closeout docs/project_management/next/<prefix>/governance/proving-run-closeout.json
 ```
 
 Rules:
-- `--dry-run` and `--write` are mutually exclusive.
-- `--write` uses the exact same render plan as `--dry-run`; no hidden write-only behavior.
-- M2 has no update mode. Existing divergent generated files fail closed.
-- Exact-byte replay against already-generated identical outputs is a success no-op.
-- Stdout section order stays the same as dry-run, plus one final mutation summary line under `== RESULT ==`.
+- `--approval` is mutually exclusive with semantic descriptor flags.
+- Artifact mode must print the resolved approval artifact id/hash in stdout.
+- Generated packet artifacts must stamp the approval reference and approval hash.
+- `close-proving-run` validates the closeout artifact and refreshes packet closeout rendering.
 
-### Controlled Write Set
-The first write mode is intentionally narrow. If a surface is not in this table, `onboard-agent --write` does not touch it.
-
-| Surface | Owner | M2 write mode |
-|---|---|---|
-| `crates/xtask/data/agent_registry.toml` | control plane | write |
-| `docs/project_management/next/<prefix>/**` | control plane | write |
-| `cli_manifests/<agent>/current.json` and empty skeleton dirs | control plane | write |
-| root `Cargo.toml` workspace `members` entry | control plane | write when new |
-| generated publishable-crate block in `docs/crates-io-release.md` | control plane | write when new |
-| `crates/<agent>/**` | runtime owner | never |
-| `crates/agent_api/src/backends/<agent>/**` | runtime owner | never |
-| `scripts/publish_*.py` and workflow files | release rails | never in M2 |
-| support/capability generated outputs | existing generators | regenerated after runtime evidence exists |
-
-### Milestone Invariants
-These are the non-negotiable contracts that make M2 implementable instead of hand-wavy:
-
-1. Render-plan parity: dry-run and write are two execution modes over the same in-memory mutation plan.
-2. Transactional writes: validation runs before mutation, writes stage safely, and any failure leaves the repo unchanged.
-3. Truth ownership stays split correctly: registry metadata can enroll and project, but runtime wrappers, backends, and committed manifests still own executable truth.
-4. Proving-run closure is part of the milestone: M2 is not done when `--write` exists, it is done when one real agent makes it through closeout with zero manual control-plane edits.
-
-### Capability And Target Authority Rules
-- Support publication remains driven by committed manifest evidence under `cli_manifests/<agent>/`.
-- Runtime backend capabilities remain authoritative for the capability matrix.
-- Registry capability declarations are treated as projection metadata and must validate against runtime backend capabilities. They are never trusted over runtime output.
-- `capability_matrix` keeps its backend-global table shape in M2. For target-sensitive MCP projection, the first item in `canonical_targets` is the one canonical comparison target.
-- Once runtime evidence exists for the new agent, the first canonical target must appear in `current.json.expected_targets`.
-- If registry canonical targets and manifest expected targets diverge after the proving run, `preflight` must fail closed.
-
-## Architecture
+### Architecture
 ```text
-approved real agent
-        |
-        v
-xtask onboard-agent --dry-run
-        |
-        v
-xtask onboard-agent --write
-        |
-        +--> registry append / replay check
-        +--> docs pack materialization
-        +--> manifest-root skeleton materialization
-        +--> Cargo.toml workspace member insertion (if new)
-        +--> docs/crates-io-release.md generated block refresh (if new)
-        |
-        v
-manual runtime-owned lane
-        |
-        +--> crates/<agent>/**
-        +--> crates/agent_api/src/backends/<agent>/**
-        +--> explicit backend registration touchpoints
-        +--> manifest evidence population
-        |
-        v
-existing generators + gates
-        |
-        +--> cargo run -p xtask -- support-matrix --check
-        +--> cargo run -p xtask -- capability-matrix
-        +--> make preflight
+comparison.md
+    |
+    +--> approved-agent.toml
+            |
+            +--> onboard-agent --approval
+                    |
+                    +--> registry append / replay check
+                    +--> docs packet materialization
+                    +--> manifest-root skeleton materialization
+                    +--> Cargo.toml workspace insertion
+                    +--> docs/crates-io-release.md generated block refresh
+                    |
+                    v
+              runtime-owned lane
+                    |
+                    v
+           proving-run-closeout.json
+                    |
+                    +--> close-proving-run validation
+                    +--> closed packet rendering
+                    +--> feedback into next selection cycle
 ```
 
 ## Workstreams
-### W1. Shared Render Plan + Explicit Write Mode
-Goal: make dry-run and write two views over the same execution contract.
+### W1. Post-M2 Rebaseline
+Goal: make the repo say what is actually true before adding new lifecycle logic.
 
 Deliverables:
-- one shared in-memory mutation plan inside `onboard-agent`
-- `--write` CLI plumbing that consumes that plan without introducing write-only render logic
-- replay-safe identical-state detection for already-generated control-plane outputs
+- rewrite `PLAN.md` around landed M2 plus M3 scope
+- record explicitly that `gemini_cli` was the fourth-agent proving-run vehicle and did not replace `OpenCode`
+- define the M3 governance state machine and artifact inventory
+
+Exit criteria:
+- no top-level planning doc still frames M2 as pending
+- historical recommendation versus proving-run divergence has one explicit owner truth
+
+### W2. Approval Artifact + `onboard-agent --approval`
+Goal: remove descriptor re-entry from the operator path without blurring truth boundaries.
+
+Deliverables:
+- `approved-agent.toml` schema and validation
+- `--approval` input mode for `onboard-agent`
+- hash/id stamping in generated packet outputs
+- namespace and provenance validation for approval artifacts
 
 Primary touchpoints:
+- `crates/xtask/src/main.rs`
 - `crates/xtask/src/onboard_agent.rs`
+- `crates/xtask/src/onboard_agent/validation.rs`
+
+Exit criteria:
+- artifact mode and raw semantic flags cannot be mixed
+- approval artifacts are repo-jail-safe, immutable, and auditable
+- dry-run and write parity still holds under approval mode
+
+### W3. Closeout Contract + Packet State Hardening
+Goal: stop inferring packet closure from loose metrics blobs.
+
+Deliverables:
+- validated closeout schema
+- `close-proving-run` entrypoint
+- rendering changes that require approval linkage plus complete closeout truth
+- explicit execution-mode versus closeout-mode packet transitions
+
+Primary touchpoints:
+- `crates/xtask/src/main.rs`
 - `crates/xtask/src/onboard_agent/preview.rs`
-- `crates/xtask/tests/onboard_agent_entrypoint.rs`
+- `crates/xtask/src/onboard_agent/preview/render.rs`
 
 Exit criteria:
-- every file write mode would materialize is already named in dry-run
-- dry-run and write remain byte-aligned for the same descriptor
-- identical replay succeeds as a no-op, not a duplicate-entry failure
+- partial or stale closeout artifacts cannot render a closed packet
+- packet closeout requires approval linkage, duration truth, and residual-friction truth
 
-### W2. Path Jailing, Overwrite Policy, And Rollback
-Goal: turn write mode into a transaction instead of a best-effort file copier.
+### W4. Historical Reconciliation
+Goal: clean up the first real mismatch before the repo repeats it.
 
 Deliverables:
-- workspace-root canonicalization for every candidate path
-- explicit rejection of symlink escapes and out-of-root resolved paths
-- staged write + rollback behavior for created files and directories
-- explicit overwrite policy of absent-or-identical only
-
-Primary touchpoints:
-- `crates/xtask/src/onboard_agent.rs`
-- `crates/xtask/tests/onboard_agent_entrypoint.rs`
+- backfilled approval artifact for the `gemini_cli` proving run
+- explicit recorded relationship to `cli-agent-onboarding-third-agent-packet.md`
+- migrated or superseding closeout artifact with M3-required fields
 
 Exit criteria:
-- validation failures leave zero repo diffs
-- injected fs-write failures leave zero partial outputs
-- ownership violations fail before the first write
-
-### W3. Release And Workspace Mutation Slice
-Goal: include every control-plane-owned repo mutation needed for the proving run, not just the registry and packet.
-
-Deliverables:
-- deterministic insertion of a new workspace member in root `Cargo.toml` when `crate_path` is new
-- deterministic refresh of the generated publishable-crate block in `docs/crates-io-release.md`
-- tests that prove write mode can materialize these owned surfaces without touching release scripts or workflows
-
-Primary touchpoints:
-- `Cargo.toml`
-- `docs/crates-io-release.md`
-- `crates/xtask/tests/onboard_agent_entrypoint.rs`
-- `scripts/publish_planner.py` tests only if generator assumptions need new assertions
-
-Exit criteria:
-- write mode updates the same release/workspace surfaces that dry-run previews
-- workflow and publish script files remain unchanged
-- generated release-doc output stays deterministic and reviewer-friendly
-
-### W4. Target Parity And Capability Ownership Hardening
-Goal: prevent the registry, manifests, and runtime backend capability truth from silently drifting apart.
-
-Deliverables:
-- one explicit primary canonical-target rule for multi-target capability projection
-- parity validation between registry `canonical_targets` and manifest `current.json.expected_targets`
-- subset validation showing registry-declared capabilities do not outrun runtime backend capability truth
-- proving-run docs that name remaining runtime-owned backend registration touchpoints exactly once
-
-Primary touchpoints:
-- `crates/xtask/src/capability_matrix.rs`
-- `crates/xtask/src/agent_registry.rs`
-- `crates/xtask/tests/agent_registry.rs`
-- `crates/xtask/tests/c8_spec_capability_matrix_*.rs`
-
-Exit criteria:
-- target mismatches fail before publication artifacts drift
-- capability declaration drift fails closed
-- the plan no longer pretends explicit backend registration is already automated
-
-### W5. First Real Approved-Agent Proving Run
-Goal: prove the bridge on one real approved agent, then capture what is still manual and why.
-
-Deliverables:
-- one approved real agent descriptor exercised through `--dry-run` and `--write`
-- one bounded runtime-owned implementation lane
-- committed manifest evidence plus regenerated support/capability publication outputs
-- proving-run packet closeout notes with actual metrics and residual friction
-
-Primary touchpoints:
-- `docs/project_management/next/<prefix>/HANDOFF.md`
-- `cli_manifests/<agent>/**`
-- runtime-owned wrapper/backend files for the chosen agent
-- final proving-run verification notes
-
-Exit criteria:
-- zero manual control-plane edits outside the command
-- the handoff after `--write` names the exact next executable runtime step
-- the proving run closes with `make preflight`
+- the historical `OpenCode` recommendation and `gemini_cli` fourth-agent proving run are legible in committed repo truth
+- future maintainers do not have to infer why Gemini landed as the fourth agent without replacing OpenCode as the next recommended lineage
 
 ## Execution Sequence
-This is the concrete order of operations. If any earlier step is still unstable, do not start the next one.
-
-### Phase 1. Transaction Foundation
-Scope:
-- complete W1
-- pin the mutation-plan shape, dry-run/write parity, and replay semantics
-
+### Phase 1. Rebaseline + Governance Schema
 Outputs:
-- shared render-plan implementation
-- `--write` command surface
-- entrypoint coverage for parity and replay
+- post-M2 `PLAN.md`
+- artifact definitions
+- historical-decision resolution
 
 Exit gate:
-- dry-run output is sufficient to predict all owned writes
-- replay-safe no-op behavior is proven in tests
+- no unresolved ambiguity about what M3 is trying to solve
 
-### Phase 2. Safety Hardening
-Scope:
-- complete W2 on top of the W1 contract
-
+### Phase 2. Approval-Driven Onboarding
 Outputs:
-- path jailing
-- explicit overwrite policy
-- rollback coverage for validation and io failures
+- `--approval` mode
+- approval artifact validation
+- approval hash/id propagation through packet outputs
 
 Exit gate:
-- no partial writes survive any injected failure path
-- ownership violations fail before mutation begins
+- approval-driven dry-run and write produce the same mutations as the raw descriptor path
 
-### Phase 3. Control-Plane Completion
-Scope:
-- complete W3 and W4 against the now-stable write transaction
-
+### Phase 3. Closeout Validation
 Outputs:
-- release/workspace mutation support
-- target/capability parity guards
-- documentation of remaining explicit runtime registration touchpoints
+- `close-proving-run`
+- validated closeout schema
+- packet state-machine hardening
 
 Exit gate:
-- all control-plane-owned surfaces required by the proving run are command-owned
-- publication parity fails closed on target or capability drift
+- metrics-file presence alone can no longer close a packet
 
-### Phase 4. Real-Agent Proving Run
-Scope:
-- execute W5 only after Phases 1-3 are merged or otherwise stable in one branch
-
+### Phase 4. Historical Backfill
 Outputs:
-- one real agent run through the full flow
-- regenerated publication artifacts
-- recorded metrics and residual friction list
+- reconciled Gemini approval chain
+- migrated closeout truth
+- updated operator docs or handoff references
 
 Exit gate:
-- `make preflight` passes
-- proving-run packet closes with no ambiguous next step
-
-## Minimal Execution Sequence
-```text
-Phase 1: W1 shared render plan + --write
-    |
-    v
-Phase 2: W2 path jail + rollback
-    |
-    +--> Phase 3A: W3 release/workspace mutation slice
-    +--> Phase 3B: W4 target parity + capability ownership hardening
-                |
-                v
-         Phase 4: W5 first real approved-agent proving run
-                |
-                v
-      support-matrix check + capability-matrix + preflight
-```
+- the repo can explain the first real proving run without conversation archaeology
 
 ## Error & Rescue Registry
 | Method / Codepath | What can go wrong | Exception / failure class | Rescued? | Rescue action | User sees |
 |---|---|---|---|---|---|
-| `onboard-agent` argument parse | invalid flag combination | usage error | yes | clap exits with usage text | exit `2` + clear stderr |
-| descriptor normalization | malformed target or capability gate | validation error | yes | reject before planning writes | exit `2` |
-| path canonicalization | symlink escape or non-workspace target | ownership violation | yes | reject before any write | exit `2` |
-| registry replay check | duplicate divergent entry | conflict | yes | reject, print owning surface | exit `2` |
-| mutation staging | temp write failure | io error | yes | abort and clean staged outputs | exit `1` |
-| atomic apply | rename/create_dir failure mid-transaction | io error | yes | rollback created paths, surface exact file | exit `1` |
-| proving-run publication | canonical target mismatch or stale manifest evidence | parity failure | yes | fail the proving-run gate before publish claims drift | failing test / check output |
-| proving-run closeout | runtime-owned lane incomplete | preflight failure | yes | keep packet open, do not declare success | failing verification output |
+| approval artifact parse | malformed TOML or missing required fields | validation error | yes | reject before planning writes | exit `2` |
+| approval artifact path | artifact path escapes repo or points outside governance surfaces | ownership violation | yes | reject before artifact load | exit `2` |
+| approval override validation | `recommended_agent_id != approved_agent_id` without `override_reason` | validation error | yes | reject before dry-run/write | exit `2` |
+| approval replay check | approval descriptor differs from already-onboarded identical agent state | conflict | yes | reject with approval id/hash context | exit `2` |
+| packet rendering | closeout artifact exists but approval linkage or state is incomplete | state transition error | yes | keep packet in execution mode | explicit validation failure |
+| closeout validation | duration and residual-friction truth missing | validation error | yes | reject closeout until explicit truth exists | exit `2` |
+| historical backfill | Gemini approval chain cannot be explained from available evidence | needs-context | no | record explicit open decision for maintainer resolution | blocked docs update |
 
 ## Test Diagram
 ```text
-NEW CONTROL-PLANE FLOWS
-=======================
-[+] onboard-agent --write
+NEW GOVERNANCE FLOWS
+====================
+[+] comparison packet -> approved-agent.toml
     |
-    ├── [GAP -> unit/integration] shared render plan equals dry-run render plan
-    ├── [GAP -> integration] absent-path write succeeds and materializes all owned outputs
-    ├── [GAP -> integration] identical replay is a no-op
-    ├── [GAP -> integration] divergent generated file fails closed with no writes
-    └── [GAP -> integration] injected write failure rolls back everything
+    ├── [GAP -> validation] approved differs from recommended without override reason fails
+    ├── [GAP -> validation] selection_mode must be explicit
+    └── [GAP -> validation] approval artifact path must stay inside repo/governance roots
 
-[+] path safety
+[+] approved-agent.toml -> onboard-agent --approval
     |
-    ├── [GAP -> unit] symlink escape via crate_path is rejected
-    ├── [GAP -> unit] symlink escape via backend_module is rejected
-    └── [GAP -> unit] symlink escape via manifest_root is rejected
+    ├── [GAP -> integration] approval mode matches raw long-flag mutation plan exactly
+    ├── [GAP -> integration] semantic flags are rejected when approval mode is used
+    ├── [GAP -> integration] approval hash/id appears in stdout and generated packet files
+    └── [GAP -> regression] replay-safe identical rerun still succeeds as a no-op
 
-[+] target/capability parity
+[+] runtime lane -> proving-run-closeout.json -> close-proving-run
     |
-    ├── [GAP -> unit] primary canonical target rule is explicit for multi-target agents
-    ├── [GAP -> integration] registry canonical_targets mismatch current.json.expected_targets
-    └── [GAP -> integration] registry-declared capability id missing from runtime backend capabilities
+    ├── [GAP -> validation] closeout without approval linkage fails
+    ├── [GAP -> validation] closeout without duration truth fails
+    ├── [GAP -> validation] closeout without residual-friction truth fails
+    ├── [GAP -> integration] stale metrics file alone does not close packet
+    └── [GAP -> integration] packet stays in execution mode until validated closeout exists
 
-[+] release/workspace mutation
+HISTORICAL RECONCILIATION
+=========================
+[+] OpenCode recommendation -> Gemini proving run
     |
-    ├── [GAP -> integration] new workspace member is inserted deterministically
-    ├── [GAP -> integration] release-doc generated block refresh is deterministic
-    └── [GAP -> regression] workflow and publish scripts remain untouched
-
-PROVING-RUN FLOW
-================
-[+] approved agent -> dry-run -> write -> runtime lane -> generators -> preflight
-    |
-    ├── [GAP -> system] dry-run and write materialize identical control-plane intent
-    ├── [GAP -> system] handoff still names the exact next executable artifact after write
-    ├── [GAP -> system] support-matrix check passes after runtime evidence lands
-    ├── [GAP -> system] capability-matrix output includes the real agent under the pinned target rule
-    └── [GAP -> system] make preflight passes for the proving run branch
+    ├── [GAP -> docs/validation] one authoritative override record exists
+    └── [GAP -> regression] future maintainers can trace comparison -> approval -> closeout without conversation history
 ```
 
 ## Required Test Surfaces
 - extend `crates/xtask/tests/onboard_agent_entrypoint.rs` for:
-  - `--write` happy path
-  - identical replay no-op
-  - divergent generated file rejection
-  - rollback on injected write failure
-  - `Cargo.toml` mutation
-  - `docs/crates-io-release.md` generated block mutation
-- extend `crates/xtask/tests/agent_registry.rs` for capability-projection subset validation
-- add parity tests under `crates/xtask/tests/c8_spec_capability_matrix_*.rs` for primary canonical target and target drift
-- add a proving-run checklist doc test or packet validation step for post-write handoff completeness
+  - `--approval` happy path
+  - `--approval` parity with the raw long-flag path
+  - rejection when semantic flags are mixed with `--approval`
+  - rejection when `approved_agent_id != recommended_agent_id` and `override_reason` is missing
+  - approval artifact path provenance rejection
+- extend `crates/xtask/tests/onboard_agent_closeout_preview.rs` for:
+  - closeout rejected without approval linkage
+  - closeout rejected without duration truth
+  - closeout rejected without residual-friction truth
+  - execution-mode packet preserved when only a loose metrics blob exists
+- add lifecycle tests for create-only packet semantics versus immutable approval/closeout artifacts
+- add a historical backfill validation test for the Gemini approval chain
+
+Test plan artifact:
+- `/Users/spensermcconnell/.gstack/projects/atomize-hq-unified-agent-api/spensermcconnell-feat-cli-agent-onboarding-factory-test-plan-20260421-105654.md`
 
 ## Commands
+- `cargo run -p xtask -- onboard-agent --approval docs/project_management/next/<prefix>/governance/approved-agent.toml --dry-run`
+- `cargo run -p xtask -- onboard-agent --approval docs/project_management/next/<prefix>/governance/approved-agent.toml --write`
+- `cargo run -p xtask -- close-proving-run --approval docs/project_management/next/<prefix>/governance/approved-agent.toml --closeout docs/project_management/next/<prefix>/governance/proving-run-closeout.json`
 - `cargo test -p xtask`
-- `cargo run -p xtask -- onboard-agent --dry-run --agent-id <approved-agent> ...`
-- `cargo run -p xtask -- onboard-agent --write --agent-id <approved-agent> ...`
 - `cargo run -p xtask -- support-matrix --check`
 - `cargo run -p xtask -- capability-matrix`
 - `make preflight`
@@ -587,117 +544,152 @@ PROVING-RUN FLOW
 ## Failure Modes Registry
 | Codepath | Failure mode | Rescued? | Test? | User sees | Logged? |
 |---|---|---|---|---|---|
-| write transaction | partial file set lands before a failing write | must be | add integration rollback test | explicit failure, zero repo diff | yes |
-| path resolution | generated path resolves outside workspace via symlink | must be | add unit + integration test | explicit validation failure | yes |
-| target parity | capability matrix claims a target that support evidence does not | must be | add parity regression | failing check before publication | yes |
-| replay | identical rerun duplicates registry entry | must be | add replay regression | success no-op | yes |
-| proving run | write mode succeeds but packet still does not name the next executable runtime step | must be | add system checklist test | failing closeout checklist | yes |
-| runtime capability drift | registry capability declaration outgrows runtime backend capability set | must be | add subset validation test | failing generator/check | yes |
+| approval identity | packet claims an approved agent without immutable approval linkage | must be | add validation + integration tests | explicit validation failure | yes |
+| dual authority | semantic flags drift from approval artifact input | must be | add entrypoint regression | explicit usage error | yes |
+| governance drift | closeout artifact references the wrong approval or stale approval contents | must be | add hash-link validation test | closeout rejected | yes |
+| closure theater | loose metrics file closes packet without timing or residual-friction truth | must be | add closeout regression | packet remains execution-mode | yes |
+| historical ambiguity | recommendation and proving run diverge without override truth | must be | add backfill validation | blocked reconciliation | yes |
 
 Critical gap rule:
-- If any failure mode above has no test and no fail-closed behavior, M2 is not ready.
+- If any failure mode above lacks both validation and tests, M3 is not ready.
 
 ## Security Review
-- Path ownership is the main new attack surface. M2 must canonicalize and jail every candidate path before touching disk.
-- No new secrets or external credentials are introduced by `onboard-agent`.
-- `Cargo.toml` and release-doc mutation must be scoped to deterministic generated blocks only. No arbitrary text rewriting.
-- Runtime-owned surfaces stay out of the write set, which keeps the blast radius bounded.
+- Approval artifact input is a new trust boundary. It must be path-jailed, schema-validated, and provenance-validated before the repo trusts any descriptor field.
+- Approval artifacts must stay out of `agent_registry.toml` and `cli_manifests/**` so governance truth does not masquerade as runtime or publication truth.
+- Artifact mode must be exclusive with semantic descriptor flags. Mixed-authority invocation is a correctness bug.
+- Closeout artifacts must not be treated as proof of success unless linked to a specific approval artifact and validated as complete.
 
 ## Performance Review
-- The current dry-run conflict scan walks `reports/**` repeatedly. M2 should avoid multiplying that cost during write-mode validation.
-- Release-doc generation should derive from existing publishable-package discovery once per invocation, not re-scan cargo metadata per file.
-- Replay detection should hash or compare rendered outputs in memory once, not through repeated read/parse loops for each file.
+- Approval ingestion should parse once and feed the existing mutation-plan path. No duplicate rendering path.
+- Approval hash stamping should be computed once per invocation, not per generated file.
+- Closeout validation should refresh packet rendering deterministically without re-scanning unrelated repo surfaces.
 
 ## What The Implementer Needs To Know
 ### Hour 1
-- M2 is a rebaseline, not a continuation of greenfield M1.
-- The write set is only control-plane-owned files.
-- Replay-safe and rollback-safe behavior are non-negotiable.
+- M3 is a post-M2 governance milestone, not another mutation milestone.
+- The key repo lie to remove is the disconnected `OpenCode` recommendation versus `gemini_cli` proving run.
 
 ### Hour 2-3
-- The command must use the same render plan for dry-run and write.
-- Canonical target authority must be explicit because capability-matrix output is backend-global, not target-expanded.
+- Approval artifacts are governance input, not downstream truth.
+- `onboard-agent --approval` must reuse the exact same mutation-plan core as raw descriptor input.
 
 ### Hour 4-5
-- The proving run is where residual manual runtime registration surfaces get named, not abstracted away.
-- `docs/crates-io-release.md` needs one deterministic generated block if the new crate is publishable.
+- Packet closure cannot be inferred from metrics-file existence anymore.
+- Historical backfill is part of the milestone, not optional cleanup.
 
 ### Hour 6+
-- Capture actual proving-run metrics and residual friction.
-- Do not silently broaden scope into update mode, recommendation formalization, or generic backend registries.
+- Keep recommendation authoring HITL for now.
+- Do not widen scope into automated candidate research or runtime-lane compression.
 
 ## Parallelization Strategy
-Parallelization only starts after the mutation-plan contract is stable enough that other lanes are not guessing at file shape or error behavior.
-
 | Lane | Scope | Modules touched | Start gate | Must hand off |
 |---|---|---|---|---|
-| A. transaction core | shared render plan, `--write`, replay semantics, rollback contract | `crates/xtask/src/onboard_agent*`, `crates/xtask/tests/onboard_agent_entrypoint.rs` | — | stable mutation-plan API, stderr/result contract, fixture shape |
-| B. release/workspace mutation | `Cargo.toml` member insertion, release-doc generated block, related tests | repo root `Cargo.toml`, `docs/crates-io-release.md`, onboard-agent tests | A | deterministic generated-block behavior and test fixtures |
-| C. target/capability parity hardening | canonical-target rule, parity validation, capability subset validation | `crates/xtask/src/capability_matrix.rs`, `crates/xtask/src/agent_registry.rs`, related tests | A | pinned target rule, failing-check coverage, proving-run parity checklist |
-| D. proving-run closeout | approved-agent packet, runtime lane, manifest evidence, final closeout | `docs/project_management/next/<prefix>/`, `cli_manifests/<agent>/`, runtime-owned files | A, B, C | final proving-run metrics and residual friction notes |
+| A. governance artifacts | approval schema, closeout schema, top-level rebaseline | `PLAN.md`, governance docs, `main.rs` | — | stable artifact names and invariants |
+| B. approval-driven onboarding | `--approval` parsing, validation, hash propagation | `onboard_agent.rs`, `validation.rs`, tests | A | canonical approval ingestion contract |
+| C. closeout hardening | `close-proving-run`, preview/render validation, closeout tests | `preview.rs`, `preview/render.rs`, tests | A | validated packet state transitions |
+| D. historical reconciliation | Gemini backfill artifacts and docs updates | `docs/project_management/next/gemini-cli-onboarding/**` | A, B, C | authoritative OpenCode/Gemini relationship |
 
 Recommended execution:
-1. Land Lane A first. This is the contract all later work assumes.
-2. Run Lanes B and C in parallel once A's mutation-plan shape and fixture conventions are pinned.
-3. Rebase and merge B and C before starting Lane D.
-4. Run Lane D sequentially. It is the integration proof, not a speculative implementation lane.
-
-Coordination rules:
-- Lane A owns shared `onboard_agent` test fixtures. B and C should add new fixtures only after A's fixture format is stable.
-- Lane B owns the release/workspace generated-output assertions. Lane C owns target/capability parity assertions.
-- Lane D should not invent missing control-plane behavior. If D discovers that B or C left a gap, stop and fix the upstream lane first.
-- If staffing is one engineer, follow the same order serially: A -> B -> C -> D.
+1. Land Lane A first.
+2. Run Lanes B and C in parallel once artifact names and invariants are stable.
+3. Land Lane D only after B and C define the final artifact contract.
 
 ## Deferred To TODOS.md
-- Formalize recommendation approval artifacts after one successful proving run. Reason: still upstream of the current bottleneck.
-- Add update mode for already-onboarded agents after replay-safe write mode proves insufficient. Reason: first prove create-mode and replay semantics.
-- Revisit backend registration abstraction only if the proving run shows explicit runtime registration is the dominant residual manual step. Reason: avoid ocean-boiling before the second real use is proven.
+- Add `recommend-agent` automation or a deterministic packet generator after two governance-backed comparison cycles prove repetition is real.
+- Compress the runtime-owned wrapper/backend lane after the governance chain exposes which runtime steps still dominate lead time.
+- Add multi-agent drift/update maintenance flows after the repo finishes one post-M3 onboarding cycle with explicit approval and closeout linkage.
+
+## CEO Dual Voices
+### CODEX SAYS (CEO — strategy challenge)
+- `PLAN.md` is stale and still optimizes a solved M2 problem.
+- decision governance is broken because `OpenCode` was recommended and `gemini_cli` was landed
+- the shortlist rubric optimized for architectural novelty instead of the real selection logic
+- M2 closeout learned too little because timing and friction truth were not captured
+
+### CLAUDE SUBAGENT (CEO — strategic independence)
+- M3 should formalize the selection-to-proof contract, not recommendation theater
+- approval, override, proving-run outcome, and feedback need one chain
+- the repo needs explicit selection mode because "factory validation" and "frontier expansion" are different decisions
+
+### CEO DUAL VOICES — CONSENSUS TABLE
+| Dimension | Claude | Codex | Consensus |
+|---|---|---|---|
+| Premises valid? | concern | concern | CONFIRMED |
+| Right problem to solve? | selection-to-proof | post-M2 governance | CONFIRMED |
+| Scope calibration correct? | current note is too small | current note is stale | CONFIRMED |
+| Alternatives sufficiently explored? | no | no | CONFIRMED |
+| Competitive/market risks covered? | weakly | weakly | CONFIRMED |
+| 6-month trajectory sound? | not under current framing | not under current framing | CONFIRMED |
+
+## Design Review
+Skipped, no UI scope.
+
+## Eng Dual Voices
+### CODEX SAYS (eng — architecture challenge)
+- the current lifecycle has no trustworthy identity boundary
+- create-only packet files cannot represent later lifecycle transitions safely
+- closeout validation must be separate from onboarding mutation
+- artifact mode beside semantic flags creates dual authority
+
+### CLAUDE SUBAGENT (eng — independent review)
+- packet closure currently depends on metrics-file presence, which is too weak
+- approval artifacts belong under governance, not registry or manifests
+- descriptor-file input adds a new trust boundary that current validators do not cover
+- immutable approval records are required for replay-safe lifecycle history
+
+### ENG DUAL VOICES — CONSENSUS TABLE
+| Dimension | Claude | Codex | Consensus |
+|---|---|---|---|
+| Architecture sound? | concern | concern | CONFIRMED |
+| Test coverage sufficient? | concern | concern | CONFIRMED |
+| Performance risks addressed? | mild concern | mild concern | CONFIRMED |
+| Security threats covered? | concern | concern | CONFIRMED |
+| Error paths handled? | concern | concern | CONFIRMED |
+| Deployment risk manageable? | concern | concern | CONFIRMED |
 
 ## Completion Summary
-- Step 0: Scope challenge — rebaselined from stale M1 plan to landed-M1-plus-M2 plan-of-record
-- CEO review: 5 issues found, all resolved in the rewrite by narrowing M2 to safe mutation + proving run
-- CEO voices: Codex high-level reframe matched Claude subagent on the main point
+- Step 0: rebaselined the document from "M2 pending" to "M2 landed, M3 needed"
+- CEO review: current "recommendation formalization" note rejected as too small and pointed at the wrong seam
+- CEO voices: both outside voices converged on selection-to-proof governance as the real problem
 - Design review: skipped, no UI scope
-- Eng review: 5 issues found, all resolved in the rewrite as explicit M2 requirements
-- Eng voices: Codex and Claude subagent both required atomic mutation, explicit target authority, and a real proving run
-- M2 execution threading: unified around milestone outcome, invariants, phased execution, and schedulable lane handoffs
-- Test review: diagram produced, gaps enumerated, proving-run artifact required
-- Performance review: report-tree scan and replay cost called out
+- Eng review: pinned approval artifacts, closeout validation, dual-authority rejection, and historical reconciliation as the M3 core
+- Architecture: selection-to-proof chain defined with separate governance and downstream truth boundaries
+- Test review: new lifecycle test diagram produced and artifact test plan path pinned
 - Not in scope: written
 - What already exists: written
 - Failure modes: written with critical gap rule
-- Parallelization: 4 lanes, 2 parallel before proving-run closeout
+- Parallelization: 4 lanes, with governance artifacts first and historical backfill last
 
 ## Cross-Phase Themes
-- The plan had become stale because it still talked like pre-landing M1. Both CEO and Eng voices pushed to rebaseline around current repo truth.
-- The durable milestone is safe mutation plus one real proving run, not more preview ceremony.
-- Runtime truth must stay backend/evidence-owned. The registry can project and enroll, but it cannot become a second executable truth store.
+- The repo narrative drifted behind shipped reality. M3 starts by fixing the story the repo tells about itself.
+- Recommendation, approval, and proving run must not be collapsed into one truth source.
+- Governance artifacts belong under `docs/project_management/next/<prefix>/governance/`, while registry and manifest artifacts remain downstream truth.
+- The first real proving run is valuable only if the repo records what it learned.
 
 ## Decision Audit Trail
 | # | Phase | Decision | Classification | Principle | Rationale | Rejected |
 |---|---|---|---|---|---|---|
-| 1 | CEO | Rebaseline the document around landed M1 and actionable M2 | mechanical | explicit over clever | The branch already contains M1 code, so planning against a future-M1 fiction would mislead implementation | keep stale greenfield-M1 framing |
-| 2 | CEO | Make safe mutation plus one proving run the M2 goal | mechanical | choose completeness | This is the smallest milestone that removes the remaining bottleneck | more preview-only work |
-| 3 | CEO | Keep recommendation formalization out of M2 | mechanical | pragmatic | It is upstream of the current bottleneck | pull `recommend-agent` into M2 |
-| 4 | CEO | Add proving-run outcome metrics to success criteria | taste | boil lakes | Artifact existence alone does not prove the workflow got better | artifact-only success criteria |
-| 5 | Eng | Add explicit `--write` beside `--dry-run` | mechanical | explicit over clever | Separate mode flags are easier to reason about and test than implicit mutation | implicit default write mode |
-| 6 | Eng | Make replay-safe identical reruns succeed as no-ops | taste | pragmatic | It prevents duplicate-entry churn without opening update mode | fail every rerun |
-| 7 | Eng | Keep overwrite policy at absent-or-identical only | mechanical | explicit over clever | First mutation slice should be conservative and fail closed | generalized update mode |
-| 8 | Eng | Pin first canonical target as the capability-matrix comparison target | mechanical | explicit over clever | Current output shape is backend-global, so the target rule must be singular and visible | union/intersection target inference |
-| 9 | Eng | Validate registry capability declarations against runtime backend capabilities | mechanical | DRY | Runtime truth stays backend-owned, registry declarations must not drift away from it | trusting registry declarations over runtime |
-| 10 | Eng | Defer backend-registry abstraction to later | taste | pragmatic | The proving run should tell us if explicit backend registration is the real next bottleneck | full data-driven backend factory now |
-| 11 | Eng | Rewrite the M2 core as one phased execution plan with explicit lane handoffs | mechanical | explicit over clever | The milestone was already correct, but the document still made implementers stitch sequencing and ownership together from separate sections | keep the same content fragmented across review-shaped sections |
+| 1 | CEO | Rebaseline `PLAN.md` around landed M2 | mechanical | explicit over clever | The repo already shipped the proving run, so planning against a pending-M2 fiction is wrong | keep stale M2 framing |
+| 2 | CEO | Reframe M3 around selection-to-proof governance | mechanical | choose completeness | Recommendation alone does not explain the repo's actual decision chain, and the Gemini/OpenCode relationship is now explicitly recorded | pure recommendation formalization |
+| 3 | CEO | Keep recommendation authoring HITL in M3 | mechanical | pragmatic | Governance truth is the missing slice, not candidate automation | build `recommend-agent` first |
+| 4 | CEO | Add explicit `selection_mode` to approval artifacts | taste | explicit over clever | The repo mixed factory validation and frontier expansion in one packet | keep one ambiguous rubric |
+| 5 | Eng | Place approval artifacts under `docs/project_management/next/<prefix>/governance/` | mechanical | DRY | Registry and manifest artifacts already have separate owners | store approval in registry or manifests |
+| 6 | Eng | Make `onboard-agent --approval` the canonical operator path | taste | explicit over clever | Re-entering the descriptor by hand is the wrong seam to preserve | long-flag operator workflow |
+| 7 | Eng | Make artifact mode exclusive with semantic flags | mechanical | explicit over clever | Mixed authority would let operators mutate a different agent than the approved one | optional flag overrides in approval mode |
+| 8 | Eng | Add validated closeout artifacts and a separate `close-proving-run` path | mechanical | choose completeness | Packet closure must become a validated lifecycle transition, not a loose metrics side effect | metrics-file presence closes packet |
+| 9 | Eng | Require explicit override truth when approved agent differs from recommended agent | mechanical | explicit over clever | The `OpenCode` versus `gemini_cli` split is the observed repo bug | silent approval divergence |
+| 10 | Eng | Backfill the Gemini proving run under the M3 artifact model | mechanical | boil lakes | Leaving the first mismatch unresolved would teach the repo the wrong lesson | defer historical reconciliation |
 
 ## GSTACK REVIEW REPORT
 
 | Review | Trigger | Why | Runs | Status | Findings |
 |--------|---------|-----|------|--------|----------|
-| CEO Review | `/plan-ceo-review` | Scope & strategy | 1 | clear via `/autoplan` | rebaseline to landed M1, make M2 the safe-mutation + proving-run milestone |
-| Codex Review | `codex exec` | Independent 2nd opinion | 2 | clear via `/autoplan` | both runs pushed on stale framing, outcome metrics, atomic mutation, and truth ownership |
-| Eng Review | `/plan-eng-review` | Architecture & tests (required) | 1 | clear via `/autoplan` | atomic write contract, replay policy, target parity, path jailing, and proving-run closeout pinned |
+| CEO Review | `/plan-ceo-review` | Scope & strategy | 1 | issues_open via `/autoplan` | current M3 note is too small; repo needs selection-to-proof governance and a post-M2 rebaseline |
+| Codex Review | `codex exec` | Independent 2nd opinion | 2 | issues_open via `/autoplan` | stale top-level framing, broken decision governance, weak postmortem capture, and lifecycle-splitting requirements |
+| Eng Review | `/plan-eng-review` | Architecture & tests (required) | 1 | issues_open via `/autoplan` | approval artifact location, immutable identity, closeout validation, dual-authority rejection, and lifecycle tests pinned |
 | Design Review | `/plan-design-review` | UI/UX gaps | 0 | skipped | no UI scope |
 
-**CODEX:** Both Codex passes converged on the same correction. Stop treating this like pre-landing M1 and make M2 prove safe mutation on a real agent.
-**CROSS-MODEL:** Claude subagents and Codex agreed on the main direction. The plan needed rebaselining, a real proving run, rollback-safe mutation, and a stricter runtime-truth boundary.
+**CODEX:** Both Codex passes converged on the same correction. Stop planning M3 like recommendation theater and make the repo record what it actually decided and why.
+**CROSS-MODEL:** Claude subagents and Codex agreed on the main direction. M3 must formalize approval provenance, closeout truth, and the recorded relationship where `gemini_cli` served as the fourth-agent proving-run vehicle without replacing `OpenCode` as the next recommendation lineage.
 **UNRESOLVED:** 0
-**VERDICT:** CEO + ENG CLEARED — M2 is concrete enough to implement.
+**VERDICT:** CEO + ENG CLEARED — M3 is concrete enough to implement.
