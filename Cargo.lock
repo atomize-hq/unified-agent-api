@@ -1529,6 +1529,7 @@ dependencies = [
  "tokio",
  "unified-agent-api-claude-code",
  "unified-agent-api-codex",
+ "unified-agent-api-gemini-cli",
  "unified-agent-api-opencode",
  "url",
 ]
@@ -1562,6 +1563,19 @@ dependencies = [
  "tokio",
  "toml",
  "tracing",
+]
+
+[[package]]
+name = "unified-agent-api-gemini-cli"
+version = "0.2.3"
+dependencies = [
+ "futures-core",
+ "futures-util",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror",
+ "tokio",
 ]
 
 [[package]]

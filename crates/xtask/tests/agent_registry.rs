@@ -16,19 +16,28 @@ fn seeded_registry_parses_successfully() {
         .iter()
         .map(|agent| agent.agent_id.as_str())
         .collect();
-    assert_eq!(agent_ids, vec!["codex", "claude_code", "opencode"]);
+    assert_eq!(
+        agent_ids,
+        vec!["codex", "claude_code", "opencode", "gemini_cli"]
+    );
 
     let support_ids: Vec<&str> = registry
         .support_matrix_entries()
         .map(|agent| agent.agent_id.as_str())
         .collect();
-    assert_eq!(support_ids, vec!["codex", "claude_code", "opencode"]);
+    assert_eq!(
+        support_ids,
+        vec!["codex", "claude_code", "opencode", "gemini_cli"]
+    );
 
     let capability_ids: Vec<&str> = registry
         .capability_matrix_entries()
         .map(|agent| agent.agent_id.as_str())
         .collect();
-    assert_eq!(capability_ids, vec!["codex", "claude_code", "opencode"]);
+    assert_eq!(
+        capability_ids,
+        vec!["codex", "claude_code", "opencode", "gemini_cli"]
+    );
 
     let codex = registry.find("codex").expect("seeded codex entry");
     assert_eq!(
@@ -51,6 +60,18 @@ fn seeded_registry_parses_successfully() {
         opencode.capability_declaration.config_gated.is_empty(),
         "opencode defaults absent config-gated bucket to empty"
     );
+
+    let gemini = registry
+        .find("gemini_cli")
+        .expect("seeded gemini_cli entry");
+    assert!(
+        gemini.capability_declaration.target_gated.is_empty(),
+        "gemini_cli defaults absent target-gated bucket to empty"
+    );
+    assert!(
+        gemini.capability_declaration.config_gated.is_empty(),
+        "gemini_cli defaults absent config-gated bucket to empty"
+    );
 }
 
 #[test]
@@ -68,7 +89,7 @@ fn workspace_loader_reads_seeded_registry() {
             .iter()
             .map(|agent| agent.agent_id.as_str())
             .collect::<Vec<_>>(),
-        vec!["codex", "claude_code", "opencode"]
+        vec!["codex", "claude_code", "opencode", "gemini_cli"]
     );
     assert_eq!(
         workspace_root.join(REGISTRY_RELATIVE_PATH),

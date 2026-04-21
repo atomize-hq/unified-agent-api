@@ -95,7 +95,12 @@ fn materialize_committed_opencode_dir(opencode_dir: &Path) {
     copy_dir_recursive(&src, opencode_dir);
 }
 
-fn opencode_support_rows_from_repo() -> Vec<Value> {
+fn materialize_committed_gemini_dir(gemini_dir: &Path) {
+    let src = workspace_root().join("cli_manifests").join("gemini_cli");
+    copy_dir_recursive(&src, gemini_dir);
+}
+
+fn support_rows_for_agent_from_repo(agent: &str) -> Vec<Value> {
     let artifact_path = workspace_root()
         .join("cli_manifests")
         .join("support_matrix")
@@ -110,7 +115,7 @@ fn opencode_support_rows_from_repo() -> Vec<Value> {
         .as_array()
         .expect("support_matrix/current.json rows array")
         .iter()
-        .filter(|row| row["agent"] == "opencode")
+        .filter(|row| row["agent"] == agent)
         .cloned()
         .collect()
 }
@@ -499,7 +504,8 @@ fn write_support_matrix_artifact(workspace_root: &Path) {
         );
     }
 
-    rows.extend(opencode_support_rows_from_repo());
+    rows.extend(support_rows_for_agent_from_repo("gemini_cli"));
+    rows.extend(support_rows_for_agent_from_repo("opencode"));
 
     write_json(
         &workspace_root
@@ -516,11 +522,13 @@ fn write_support_matrix_artifact(workspace_root: &Path) {
 fn materialize_minimal_valid_workspace(workspace_root: &Path) -> PathBuf {
     let codex_dir = workspace_root.join("cli_manifests").join("codex");
     let claude_dir = workspace_root.join("cli_manifests").join("claude_code");
+    let gemini_dir = workspace_root.join("cli_manifests").join("gemini_cli");
     let opencode_dir = workspace_root.join("cli_manifests").join("opencode");
 
     write_workspace_manifest(workspace_root);
     materialize_minimal_valid_codex_dir(&codex_dir);
     materialize_minimal_valid_claude_dir(&claude_dir);
+    materialize_committed_gemini_dir(&gemini_dir);
     materialize_committed_opencode_dir(&opencode_dir);
     write_support_matrix_artifact(workspace_root);
 

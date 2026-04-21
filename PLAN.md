@@ -218,6 +218,34 @@ Deferred expansions:
 ### Goal
 Turn `xtask onboard-agent` into a safe control-plane mutator and prove the flow on one real approved agent without moving runtime truth into the registry.
 
+### Milestone Outcome
+M2 is one bounded milestone, not a loose bundle of improvements. At the end of this milestone:
+
+- maintainers can take an approved agent descriptor and materialize every control-plane-owned artifact without hand-editing those files
+- the command fails closed on ownership violations, divergent generated state, and mid-transaction write failures
+- the remaining manual runtime lane is explicit, bounded, and attached to a real proving run instead of implied by dry-run output
+- the proving run ends with regenerated publication artifacts, `make preflight`, and recorded outcome metrics
+
+### Execution Shape
+```text
+approved descriptor
+        |
+        v
+shared render plan
+        |
+        v
+transactional owned writes
+        |
+        +--> release/workspace owned surfaces
+        +--> target/capability parity guards
+        |
+        v
+real-agent proving run
+        |
+        v
+generators + preflight + metrics
+```
+
 ### Command Contract
 M2 keeps `--dry-run` and adds one explicit write mode:
 
@@ -251,7 +279,9 @@ Rules:
 - Exact-byte replay against already-generated identical outputs is a success no-op.
 - Stdout section order stays the same as dry-run, plus one final mutation summary line under `== RESULT ==`.
 
-### Ownership Boundary
+### Controlled Write Set
+The first write mode is intentionally narrow. If a surface is not in this table, `onboard-agent --write` does not touch it.
+
 | Surface | Owner | M2 write mode |
 |---|---|---|
 | `crates/xtask/data/agent_registry.toml` | control plane | write |
@@ -263,6 +293,14 @@ Rules:
 | `crates/agent_api/src/backends/<agent>/**` | runtime owner | never |
 | `scripts/publish_*.py` and workflow files | release rails | never in M2 |
 | support/capability generated outputs | existing generators | regenerated after runtime evidence exists |
+
+### Milestone Invariants
+These are the non-negotiable contracts that make M2 implementable instead of hand-wavy:
+
+1. Render-plan parity: dry-run and write are two execution modes over the same in-memory mutation plan.
+2. Transactional writes: validation runs before mutation, writes stage safely, and any failure leaves the repo unchanged.
+3. Truth ownership stays split correctly: registry metadata can enroll and project, but runtime wrappers, backends, and committed manifests still own executable truth.
+4. Proving-run closure is part of the milestone: M2 is not done when `--write` exists, it is done when one real agent makes it through closeout with zero manual control-plane edits.
 
 ### Capability And Target Authority Rules
 - Support publication remains driven by committed manifest evidence under `cli_manifests/<agent>/`.
@@ -306,70 +344,68 @@ existing generators + gates
 
 ## Workstreams
 ### W1. Shared Render Plan + Explicit Write Mode
-Goal: one render pipeline feeds both preview and mutation.
+Goal: make dry-run and write two views over the same execution contract.
 
-Primary work:
-- lift current preview rendering into a shared in-memory mutation plan
-- add `--write` mode to `onboard-agent`
-- keep dry-run and write outputs byte-aligned for the same descriptor
-- add replay-safe identical-state detection
+Deliverables:
+- one shared in-memory mutation plan inside `onboard-agent`
+- `--write` CLI plumbing that consumes that plan without introducing write-only render logic
+- replay-safe identical-state detection for already-generated control-plane outputs
 
 Primary touchpoints:
 - `crates/xtask/src/onboard_agent.rs`
 - `crates/xtask/src/onboard_agent/preview.rs`
 - `crates/xtask/tests/onboard_agent_entrypoint.rs`
 
-Acceptance:
-- every file that write mode would materialize is already visible in dry-run
-- identical replays return success without duplicate registry failures
-- divergent pre-existing generated files fail closed
+Exit criteria:
+- every file write mode would materialize is already named in dry-run
+- dry-run and write remain byte-aligned for the same descriptor
+- identical replay succeeds as a no-op, not a duplicate-entry failure
 
 ### W2. Path Jailing, Overwrite Policy, And Rollback
-Goal: safe mutation, not best-effort mutation.
+Goal: turn write mode into a transaction instead of a best-effort file copier.
 
-Primary work:
-- canonicalize every candidate path before writing
-- reject symlink escapes or any resolved path outside workspace root
-- stage writes through temp paths and atomic rename where possible
-- track created files/directories and remove them on failure
-- keep overwrite policy explicit: absent or identical only
+Deliverables:
+- workspace-root canonicalization for every candidate path
+- explicit rejection of symlink escapes and out-of-root resolved paths
+- staged write + rollback behavior for created files and directories
+- explicit overwrite policy of absent-or-identical only
 
 Primary touchpoints:
 - `crates/xtask/src/onboard_agent.rs`
 - `crates/xtask/tests/onboard_agent_entrypoint.rs`
 
-Acceptance:
+Exit criteria:
 - validation failures leave zero repo diffs
 - injected fs-write failures leave zero partial outputs
-- symlink escape attempts fail with exit `2`
+- ownership violations fail before the first write
 
 ### W3. Release And Workspace Mutation Slice
-Goal: the first real control-plane mutation includes the whole owned transaction, not just preview text.
+Goal: include every control-plane-owned repo mutation needed for the proving run, not just the registry and packet.
 
-Primary work:
-- insert a new workspace member into root `Cargo.toml` when `crate_path` is new
-- convert the publishable-crate inventory/order block in `docs/crates-io-release.md` into a generated section derived from current publishable packages
-- keep workflow and script files unchanged
+Deliverables:
+- deterministic insertion of a new workspace member in root `Cargo.toml` when `crate_path` is new
+- deterministic refresh of the generated publishable-crate block in `docs/crates-io-release.md`
+- tests that prove write mode can materialize these owned surfaces without touching release scripts or workflows
 
 Primary touchpoints:
 - `Cargo.toml`
 - `docs/crates-io-release.md`
-- `scripts/publish_planner.py` tests only if generator assumptions need new assertions
 - `crates/xtask/tests/onboard_agent_entrypoint.rs`
+- `scripts/publish_planner.py` tests only if generator assumptions need new assertions
 
-Acceptance:
-- write mode updates the same release/workspace surfaces that dry-run previews today
-- no workflow or publish script rewrite is required for the proving run
-- generated release-doc section is deterministic and reviewer-friendly
+Exit criteria:
+- write mode updates the same release/workspace surfaces that dry-run previews
+- workflow and publish script files remain unchanged
+- generated release-doc output stays deterministic and reviewer-friendly
 
 ### W4. Target Parity And Capability Ownership Hardening
-Goal: remove silent drift between registry projection metadata, manifest evidence, and runtime capability truth.
+Goal: prevent the registry, manifests, and runtime backend capability truth from silently drifting apart.
 
-Primary work:
-- pin the primary canonical target rule in code and docs
-- add a target parity validator between registry `canonical_targets` and manifest `current.json.expected_targets`
-- validate that registry capability declarations are subsets/projections of runtime backend capabilities, not substitutes for them
-- keep explicit backend registration for the proving run, but document the exact touchpoints instead of pretending they are factory-driven
+Deliverables:
+- one explicit primary canonical-target rule for multi-target capability projection
+- parity validation between registry `canonical_targets` and manifest `current.json.expected_targets`
+- subset validation showing registry-declared capabilities do not outrun runtime backend capability truth
+- proving-run docs that name remaining runtime-owned backend registration touchpoints exactly once
 
 Primary touchpoints:
 - `crates/xtask/src/capability_matrix.rs`
@@ -377,45 +413,99 @@ Primary touchpoints:
 - `crates/xtask/tests/agent_registry.rs`
 - `crates/xtask/tests/c8_spec_capability_matrix_*.rs`
 
-Acceptance:
-- multi-target agents publish capabilities under one explicit canonical-target rule
+Exit criteria:
 - target mismatches fail before publication artifacts drift
-- proving-run docs list the remaining runtime-owned registration edits exactly once
+- capability declaration drift fails closed
+- the plan no longer pretends explicit backend registration is already automated
 
 ### W5. First Real Approved-Agent Proving Run
-Goal: prove the bridge on one real agent and record what still feels clumsy.
+Goal: prove the bridge on one real approved agent, then capture what is still manual and why.
 
-Primary work:
-- take one approved real agent descriptor as input
-- run `--dry-run`, then `--write`
-- complete manual runtime-owned wrapper/backend lane
-- populate manifest evidence and rerun publication generators
-- close out with `make preflight`
-- record actual outcome metrics and residual friction
+Deliverables:
+- one approved real agent descriptor exercised through `--dry-run` and `--write`
+- one bounded runtime-owned implementation lane
+- committed manifest evidence plus regenerated support/capability publication outputs
+- proving-run packet closeout notes with actual metrics and residual friction
 
 Primary touchpoints:
 - `docs/project_management/next/<prefix>/HANDOFF.md`
 - `cli_manifests/<agent>/**`
 - runtime-owned wrapper/backend files for the chosen agent
-- final verification notes in the proving-run packet
+- final proving-run verification notes
 
-Acceptance:
+Exit criteria:
 - zero manual control-plane edits outside the command
-- proving run closes without an OpenCode-style ambiguous handoff
-- residual manual runtime steps are explicit and bounded
+- the handoff after `--write` names the exact next executable runtime step
+- the proving run closes with `make preflight`
+
+## Execution Sequence
+This is the concrete order of operations. If any earlier step is still unstable, do not start the next one.
+
+### Phase 1. Transaction Foundation
+Scope:
+- complete W1
+- pin the mutation-plan shape, dry-run/write parity, and replay semantics
+
+Outputs:
+- shared render-plan implementation
+- `--write` command surface
+- entrypoint coverage for parity and replay
+
+Exit gate:
+- dry-run output is sufficient to predict all owned writes
+- replay-safe no-op behavior is proven in tests
+
+### Phase 2. Safety Hardening
+Scope:
+- complete W2 on top of the W1 contract
+
+Outputs:
+- path jailing
+- explicit overwrite policy
+- rollback coverage for validation and io failures
+
+Exit gate:
+- no partial writes survive any injected failure path
+- ownership violations fail before mutation begins
+
+### Phase 3. Control-Plane Completion
+Scope:
+- complete W3 and W4 against the now-stable write transaction
+
+Outputs:
+- release/workspace mutation support
+- target/capability parity guards
+- documentation of remaining explicit runtime registration touchpoints
+
+Exit gate:
+- all control-plane-owned surfaces required by the proving run are command-owned
+- publication parity fails closed on target or capability drift
+
+### Phase 4. Real-Agent Proving Run
+Scope:
+- execute W5 only after Phases 1-3 are merged or otherwise stable in one branch
+
+Outputs:
+- one real agent run through the full flow
+- regenerated publication artifacts
+- recorded metrics and residual friction list
+
+Exit gate:
+- `make preflight` passes
+- proving-run packet closes with no ambiguous next step
 
 ## Minimal Execution Sequence
 ```text
-W1 shared render plan + --write
+Phase 1: W1 shared render plan + --write
     |
     v
-W2 path jail + rollback
+Phase 2: W2 path jail + rollback
     |
-    +--> W3 release/workspace mutation slice
-    +--> W4 target parity + capability ownership hardening
+    +--> Phase 3A: W3 release/workspace mutation slice
+    +--> Phase 3B: W4 target parity + capability ownership hardening
                 |
                 v
-         W5 first real approved-agent proving run
+         Phase 4: W5 first real approved-agent proving run
                 |
                 v
       support-matrix check + capability-matrix + preflight
@@ -537,21 +627,26 @@ Critical gap rule:
 - Do not silently broaden scope into update mode, recommendation formalization, or generic backend registries.
 
 ## Parallelization Strategy
-| Lane | Modules touched | Depends on |
-|---|---|---|
-| A. write transaction core | `crates/xtask/src/onboard_agent*`, `crates/xtask/tests/onboard_agent_entrypoint.rs` | — |
-| B. release/workspace mutation | repo root `Cargo.toml`, `docs/`, onboard-agent tests | A |
-| C. target/capability parity hardening | `crates/xtask/src/capability_matrix.rs`, `crates/xtask/src/agent_registry.rs`, related tests | A |
-| D. proving-run packet + closeout | `docs/project_management/next/<prefix>/`, `cli_manifests/<agent>/`, runtime-owned files | A, B, C |
+Parallelization only starts after the mutation-plan contract is stable enough that other lanes are not guessing at file shape or error behavior.
 
-Execution order:
-- launch Lane A first
-- once write-transaction semantics are pinned, launch B and C in parallel
-- launch D after B and C merge
+| Lane | Scope | Modules touched | Start gate | Must hand off |
+|---|---|---|---|---|
+| A. transaction core | shared render plan, `--write`, replay semantics, rollback contract | `crates/xtask/src/onboard_agent*`, `crates/xtask/tests/onboard_agent_entrypoint.rs` | — | stable mutation-plan API, stderr/result contract, fixture shape |
+| B. release/workspace mutation | `Cargo.toml` member insertion, release-doc generated block, related tests | repo root `Cargo.toml`, `docs/crates-io-release.md`, onboard-agent tests | A | deterministic generated-block behavior and test fixtures |
+| C. target/capability parity hardening | canonical-target rule, parity validation, capability subset validation | `crates/xtask/src/capability_matrix.rs`, `crates/xtask/src/agent_registry.rs`, related tests | A | pinned target rule, failing-check coverage, proving-run parity checklist |
+| D. proving-run closeout | approved-agent packet, runtime lane, manifest evidence, final closeout | `docs/project_management/next/<prefix>/`, `cli_manifests/<agent>/`, runtime-owned files | A, B, C | final proving-run metrics and residual friction notes |
 
-Conflict flags:
-- Lanes A and B both touch `crates/xtask/src/onboard_agent*` tests
-- Lane D depends on the final shape from A, B, and C and should stay sequential
+Recommended execution:
+1. Land Lane A first. This is the contract all later work assumes.
+2. Run Lanes B and C in parallel once A's mutation-plan shape and fixture conventions are pinned.
+3. Rebase and merge B and C before starting Lane D.
+4. Run Lane D sequentially. It is the integration proof, not a speculative implementation lane.
+
+Coordination rules:
+- Lane A owns shared `onboard_agent` test fixtures. B and C should add new fixtures only after A's fixture format is stable.
+- Lane B owns the release/workspace generated-output assertions. Lane C owns target/capability parity assertions.
+- Lane D should not invent missing control-plane behavior. If D discovers that B or C left a gap, stop and fix the upstream lane first.
+- If staffing is one engineer, follow the same order serially: A -> B -> C -> D.
 
 ## Deferred To TODOS.md
 - Formalize recommendation approval artifacts after one successful proving run. Reason: still upstream of the current bottleneck.
@@ -565,6 +660,7 @@ Conflict flags:
 - Design review: skipped, no UI scope
 - Eng review: 5 issues found, all resolved in the rewrite as explicit M2 requirements
 - Eng voices: Codex and Claude subagent both required atomic mutation, explicit target authority, and a real proving run
+- M2 execution threading: unified around milestone outcome, invariants, phased execution, and schedulable lane handoffs
 - Test review: diagram produced, gaps enumerated, proving-run artifact required
 - Performance review: report-tree scan and replay cost called out
 - Not in scope: written
@@ -590,6 +686,7 @@ Conflict flags:
 | 8 | Eng | Pin first canonical target as the capability-matrix comparison target | mechanical | explicit over clever | Current output shape is backend-global, so the target rule must be singular and visible | union/intersection target inference |
 | 9 | Eng | Validate registry capability declarations against runtime backend capabilities | mechanical | DRY | Runtime truth stays backend-owned, registry declarations must not drift away from it | trusting registry declarations over runtime |
 | 10 | Eng | Defer backend-registry abstraction to later | taste | pragmatic | The proving run should tell us if explicit backend registration is the real next bottleneck | full data-driven backend factory now |
+| 11 | Eng | Rewrite the M2 core as one phased execution plan with explicit lane handoffs | mechanical | explicit over clever | The milestone was already correct, but the document still made implementers stitch sequencing and ownership together from separate sections | keep the same content fragmented across review-shaped sections |
 
 ## GSTACK REVIEW REPORT
 

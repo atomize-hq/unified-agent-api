@@ -94,6 +94,11 @@ fn materialize_committed_opencode_dir(opencode_dir: &Path) {
     copy_dir_recursive(&src, opencode_dir);
 }
 
+fn materialize_committed_gemini_dir(gemini_dir: &Path) {
+    let src = repo_root().join("cli_manifests").join("gemini_cli");
+    copy_dir_recursive(&src, gemini_dir);
+}
+
 fn materialize_minimal_valid_codex_dir(codex_dir: &Path) {
     fs::create_dir_all(codex_dir).expect("mkdir codex dir");
 

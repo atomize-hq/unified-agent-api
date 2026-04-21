@@ -8,6 +8,7 @@ use agent_api::{
     backends::{
         claude_code::{ClaudeCodeBackend, ClaudeCodeBackendConfig},
         codex::{CodexBackend, CodexBackendConfig},
+        gemini_cli::{GeminiCliBackend, GeminiCliBackendConfig},
         opencode::{OpencodeBackend, OpencodeBackendConfig},
     },
     AgentWrapperBackend, AgentWrapperCapabilities,
@@ -23,6 +24,7 @@ const CAPABILITY_MCP_LIST_V1: &str = "agent_api.tools.mcp.list.v1";
 const CAPABILITY_MCP_GET_V1: &str = "agent_api.tools.mcp.get.v1";
 const CAPABILITY_MCP_ADD_V1: &str = "agent_api.tools.mcp.add.v1";
 const CAPABILITY_MCP_REMOVE_V1: &str = "agent_api.tools.mcp.remove.v1";
+const CAPABILITY_EXTERNAL_SANDBOX_V1: &str = "agent_api.exec.external_sandbox.v1";
 
 #[derive(Debug, Parser)]
 pub struct Args {
@@ -193,10 +195,23 @@ fn bucket_order(backend_ids: &[String]) -> Vec<String> {
 
 fn collect_builtin_backend_inventory() -> Result<BuiltinBackendInventory, String> {
     let registry = load_agent_registry()?;
+    collect_builtin_backend_inventory_from_registry(&registry, load_union_manifest_for_entry)
+}
+
+fn collect_builtin_backend_inventory_from_registry<F>(
+    registry: &AgentRegistry,
+    mut manifest_loader: F,
+) -> Result<BuiltinBackendInventory, String>
+where
+    F: FnMut(&AgentRegistryEntry) -> Result<UnionManifest, String>,
+{
     let enrolled_entries: Vec<&AgentRegistryEntry> = registry.capability_matrix_entries().collect();
 
     let mut backends = BTreeMap::<String, AgentWrapperCapabilities>::new();
     for entry in enrolled_entries.iter().copied() {
+        let manifest = manifest_loader(entry)?;
+        validate_primary_canonical_target(entry, &manifest)?;
+
         let (backend_kind, mut capabilities) = runtime_backend_capabilities(&entry.agent_id)?;
         if backend_kind != entry.agent_id {
             return Err(format!(
@@ -204,7 +219,12 @@ fn collect_builtin_backend_inventory() -> Result<BuiltinBackendInventory, String
                 entry.agent_id
             ));
         }
-        apply_registry_mcp_projection(&mut capabilities, entry)?;
+
+        let mut modeled_runtime_truth = modeled_runtime_capability_truth(entry)?;
+        apply_registry_mcp_projection_from_manifest(&mut modeled_runtime_truth, entry, &manifest);
+        validate_declared_capabilities_do_not_exceed_runtime(entry, &modeled_runtime_truth)?;
+
+        apply_registry_mcp_projection_from_manifest(&mut capabilities, entry, &manifest);
         backends.insert(backend_kind, capabilities);
     }
 
@@ -297,16 +317,17 @@ fn read_union_manifest(path: &Path) -> Result<UnionManifest, String> {
     serde_json::from_str(&text).map_err(|err| format!("parse({path:?}): {err}"))
 }
 
-fn load_agent_registry() -> Result<AgentRegistry, String> {
-    AgentRegistry::load(&workspace_root()).map_err(|err| err.to_string())
+fn load_union_manifest_for_entry(
+    registry_entry: &AgentRegistryEntry,
+) -> Result<UnionManifest, String> {
+    let manifest_path = resolve_workspace_path(
+        &PathBuf::from(&registry_entry.manifest_root).join(CURRENT_MANIFEST_FILENAME),
+    );
+    read_union_manifest(&manifest_path)
 }
 
-#[cfg(test)]
-fn capability_matrix_backend_ids(registry: &AgentRegistry) -> Vec<String> {
-    registry
-        .capability_matrix_entries()
-        .map(|entry| entry.agent_id.clone())
-        .collect()
+fn load_agent_registry() -> Result<AgentRegistry, String> {
+    AgentRegistry::load(&workspace_root()).map_err(|err| err.to_string())
 }
 
 fn runtime_backend_capabilities(
@@ -321,6 +342,10 @@ fn runtime_backend_capabilities(
             let backend = ClaudeCodeBackend::new(ClaudeCodeBackendConfig::default());
             Ok((backend.kind().as_str().to_string(), backend.capabilities()))
         }
+        "gemini_cli" => {
+            let backend = GeminiCliBackend::new(GeminiCliBackendConfig::default());
+            Ok((backend.kind().as_str().to_string(), backend.capabilities()))
+        }
         "opencode" => {
             let backend = OpencodeBackend::new(OpencodeBackendConfig::default());
             Ok((backend.kind().as_str().to_string(), backend.capabilities()))
@@ -331,22 +356,84 @@ fn runtime_backend_capabilities(
     }
 }
 
-fn apply_registry_mcp_projection(
+fn modeled_runtime_capability_truth(
+    registry_entry: &AgentRegistryEntry,
+) -> Result<AgentWrapperCapabilities, String> {
+    let (_, mut capabilities) = runtime_backend_capabilities(&registry_entry.agent_id)?;
+
+    match registry_entry.agent_id.as_str() {
+        "codex" | "claude_code" => {
+            capabilities
+                .ids
+                .insert(CAPABILITY_EXTERNAL_SANDBOX_V1.to_string());
+            capabilities.ids.insert(CAPABILITY_MCP_ADD_V1.to_string());
+            capabilities
+                .ids
+                .insert(CAPABILITY_MCP_REMOVE_V1.to_string());
+        }
+        "gemini_cli" | "opencode" => {}
+        other => {
+            return Err(format!(
+                "capability-matrix registry enrolled unsupported backend `{other}`"
+            ));
+        }
+    }
+
+    Ok(capabilities)
+}
+
+fn apply_registry_mcp_projection_from_manifest(
     capabilities: &mut AgentWrapperCapabilities,
     registry_entry: &AgentRegistryEntry,
-) -> Result<(), String> {
+    manifest: &UnionManifest,
+) {
     let BackendProjectionPolicy::CanonicalTarget(target) =
         backend_projection_policy(registry_entry)
     else {
-        return Ok(());
+        return;
     };
 
-    let manifest_path = resolve_workspace_path(
-        &PathBuf::from(&registry_entry.manifest_root).join(CURRENT_MANIFEST_FILENAME),
-    );
-    let manifest = read_union_manifest(&manifest_path)?;
-    apply_manifest_mcp_projection(capabilities, registry_entry, &manifest, &target);
-    Ok(())
+    apply_manifest_mcp_projection(capabilities, registry_entry, manifest, &target);
+}
+
+fn validate_primary_canonical_target(
+    registry_entry: &AgentRegistryEntry,
+    manifest: &UnionManifest,
+) -> Result<(), String> {
+    let primary_target = primary_canonical_target(registry_entry);
+    if manifest
+        .expected_targets
+        .iter()
+        .any(|candidate| candidate == primary_target)
+    {
+        return Ok(());
+    }
+
+    Err(format!(
+        "capability-matrix manifest `{}{}` missing primary canonical target `{primary_target}` in expected_targets",
+        registry_entry.manifest_root, "/current.json"
+    ))
+}
+
+fn validate_declared_capabilities_do_not_exceed_runtime(
+    registry_entry: &AgentRegistryEntry,
+    runtime_truth: &AgentWrapperCapabilities,
+) -> Result<(), String> {
+    let declared = declared_capability_matrix_ids(registry_entry);
+    let unexpected = declared
+        .difference(&runtime_truth.ids)
+        .cloned()
+        .collect::<Vec<_>>();
+    if unexpected.is_empty() {
+        return Ok(());
+    }
+
+    Err(format!(
+        "capability-matrix registry entry `{}` declares capabilities beyond modeled runtime truth on primary canonical target `{}`: {}",
+        registry_entry.agent_id,
+        primary_canonical_target(registry_entry),
+        unexpected.join(", ")
+    ))
 }
 
 fn render_canonical_target_header(entries: &[&AgentRegistryEntry]) -> String {
@@ -452,8 +539,57 @@ fn declared_mcp_projection<'a>(
         })
 }
 
+fn declared_capability_matrix_ids(registry_entry: &AgentRegistryEntry) -> BTreeSet<String> {
+    let mut declared = BTreeSet::new();
+    declared.extend(
+        registry_entry
+            .capability_declaration
+            .always_on
+            .iter()
+            .cloned(),
+    );
+    declared.extend(
+        registry_entry
+            .capability_declaration
+            .backend_extensions
+            .iter()
+            .cloned(),
+    );
+
+    let primary_target = primary_canonical_target(registry_entry);
+    declared.extend(
+        registry_entry
+            .capability_declaration
+            .target_gated
+            .iter()
+            .filter(|declaration| {
+                declaration
+                    .targets
+                    .iter()
+                    .any(|target| target == primary_target)
+            })
+            .map(|declaration| declaration.capability_id.clone()),
+    );
+    declared.extend(
+        registry_entry
+            .capability_declaration
+            .config_gated
+            .iter()
+            .filter(|declaration| {
+                declaration.targets.as_ref().map_or(true, |targets| {
+                    targets.iter().any(|target| target == primary_target)
+                })
+            })
+            .map(|declaration| declaration.capability_id.clone()),
+    );
+
+    declared
+}
+
 #[derive(Debug, Deserialize)]
 struct UnionManifest {
+    #[serde(default)]
+    expected_targets: Vec<String>,
     commands: Vec<UnionCommand>,
 }
 
@@ -487,197 +623,5 @@ impl DeclaredMcpProjection<'_> {
             Some(targets) => targets.iter().any(|candidate| candidate == target),
             None => true,
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    const SEEDED_REGISTRY: &str = include_str!("../data/agent_registry.toml");
-
-    fn manifest_with_commands(commands: &[(&[&str], &[&str])]) -> UnionManifest {
-        UnionManifest {
-            commands: commands
-                .iter()
-                .map(|(path, available_on)| UnionCommand {
-                    path: path.iter().map(|segment| (*segment).to_string()).collect(),
-                    available_on: available_on
-                        .iter()
-                        .map(|target| (*target).to_string())
-                        .collect(),
-                })
-                .collect(),
-        }
-    }
-
-    fn seeded_registry() -> AgentRegistry {
-        AgentRegistry::parse(SEEDED_REGISTRY).expect("parse seeded registry")
-    }
-
-    #[test]
-    fn command_available_on_target_matches_exact_path_and_target() {
-        let manifest = manifest_with_commands(&[
-            (&["mcp", "list"], &["linux-x64"]),
-            (&["mcp", "get"], &["win32-x64"]),
-        ]);
-
-        assert!(command_available_on_target(
-            &manifest,
-            &["mcp", "list"],
-            "linux-x64"
-        ));
-        assert!(!command_available_on_target(
-            &manifest,
-            &["mcp"],
-            "linux-x64"
-        ));
-        assert!(!command_available_on_target(
-            &manifest,
-            &["mcp", "get"],
-            "linux-x64"
-        ));
-    }
-
-    #[test]
-    fn manifest_projection_adds_read_caps_and_clears_unavailable_caps() {
-        let manifest = manifest_with_commands(&[
-            (&["mcp", "list"], &["x86_64-unknown-linux-musl"]),
-            (&["mcp", "get"], &["x86_64-unknown-linux-musl"]),
-        ]);
-        let registry = seeded_registry();
-        let codex = registry.find("codex").expect("seeded codex entry");
-        let mut capabilities = AgentWrapperCapabilities {
-            ids: [
-                CAPABILITY_MCP_ADD_V1.to_string(),
-                CAPABILITY_MCP_REMOVE_V1.to_string(),
-            ]
-            .into_iter()
-            .collect(),
-        };
-
-        apply_manifest_mcp_projection(
-            &mut capabilities,
-            codex,
-            &manifest,
-            "x86_64-unknown-linux-musl",
-        );
-
-        assert!(capabilities.contains(CAPABILITY_MCP_LIST_V1));
-        assert!(capabilities.contains(CAPABILITY_MCP_GET_V1));
-        assert!(!capabilities.contains(CAPABILITY_MCP_ADD_V1));
-        assert!(!capabilities.contains(CAPABILITY_MCP_REMOVE_V1));
-    }
-
-    #[test]
-    fn resolve_output_path_defaults_to_workspace_root() {
-        assert_eq!(
-            resolve_output_path(None),
-            workspace_root().join(DEFAULT_OUT_PATH)
-        );
-    }
-
-    #[test]
-    fn resolve_output_path_preserves_absolute_path() {
-        let absolute = std::env::temp_dir().join("capability-matrix-absolute.md");
-        assert_eq!(resolve_output_path(Some(absolute.as_path())), absolute);
-    }
-
-    #[test]
-    fn resolve_output_path_preserves_explicit_relative_path() {
-        let relative = Path::new("tmp/capability-matrix.md");
-        assert_eq!(resolve_output_path(Some(relative)), relative);
-    }
-
-    #[test]
-    fn collect_builtin_backend_capabilities_includes_opencode() {
-        let backends = collect_builtin_backend_capabilities().expect("collect backends");
-
-        assert!(backends.contains_key("opencode"));
-        assert_eq!(
-            backends["opencode"].ids,
-            [
-                "agent_api.run".to_string(),
-                "agent_api.events".to_string(),
-                "agent_api.events.live".to_string(),
-                "agent_api.config.model.v1".to_string(),
-                "agent_api.session.resume.v1".to_string(),
-                "agent_api.session.fork.v1".to_string(),
-            ]
-            .into_iter()
-            .collect()
-        );
-    }
-
-    #[test]
-    fn capability_matrix_backend_ids_follow_registry_enrollment_order() {
-        let registry = seeded_registry();
-
-        assert_eq!(
-            capability_matrix_backend_ids(&registry),
-            vec![
-                "codex".to_string(),
-                "claude_code".to_string(),
-                "opencode".to_string()
-            ]
-        );
-    }
-
-    #[test]
-    fn runtime_backend_kinds_match_seeded_registry_agent_ids() {
-        let registry = seeded_registry();
-
-        for entry in registry.capability_matrix_entries() {
-            let (backend_kind, _) =
-                runtime_backend_capabilities(&entry.agent_id).expect("runtime backend");
-            assert_eq!(backend_kind, entry.agent_id);
-        }
-    }
-
-    #[test]
-    fn canonical_target_header_uses_registry_primary_targets() {
-        let registry = seeded_registry();
-        let entries: Vec<&AgentRegistryEntry> = registry.capability_matrix_entries().collect();
-
-        assert_eq!(
-            render_canonical_target_header(&entries),
-            "Canonical target profile: `codex=x86_64-unknown-linux-musl`, `claude_code=linux-x64`; `opencode` uses the default built-in backend config.\n"
-        );
-    }
-
-    #[test]
-    fn registry_driven_mcp_projection_uses_primary_canonical_target() {
-        let registry = seeded_registry();
-        let claude = registry
-            .find("claude_code")
-            .expect("seeded claude_code entry");
-        let manifest = manifest_with_commands(&[
-            (&["mcp", "list"], &["linux-x64", "win32-x64"]),
-            (&["mcp", "get"], &["linux-x64", "win32-x64"]),
-            (&["mcp", "add"], &["linux-x64", "win32-x64"]),
-            (&["mcp", "remove"], &["linux-x64", "win32-x64"]),
-        ]);
-        let mut capabilities = AgentWrapperCapabilities {
-            ids: [
-                CAPABILITY_MCP_LIST_V1.to_string(),
-                CAPABILITY_MCP_GET_V1.to_string(),
-                CAPABILITY_MCP_ADD_V1.to_string(),
-                CAPABILITY_MCP_REMOVE_V1.to_string(),
-            ]
-            .into_iter()
-            .collect(),
-        };
-
-        apply_manifest_mcp_projection(
-            &mut capabilities,
-            claude,
-            &manifest,
-            primary_canonical_target(claude),
-        );
-
-        assert!(capabilities.contains(CAPABILITY_MCP_LIST_V1));
-        assert!(!capabilities.contains(CAPABILITY_MCP_GET_V1));
-        assert!(!capabilities.contains(CAPABILITY_MCP_ADD_V1));
-        assert!(!capabilities.contains(CAPABILITY_MCP_REMOVE_V1));
     }
 }

@@ -170,6 +170,16 @@
       ]
     },
     {
+      "agent": "gemini_cli",
+      "version": "0.38.2",
+      "target": "darwin-arm64",
+      "manifest_support": "unsupported",
+      "backend_support": "unsupported",
+      "uaa_support": "unsupported",
+      "pointer_promotion": "none",
+      "evidence_notes": []
+    },
+    {
       "agent": "opencode",
       "version": "1.4.11",
       "target": "darwin-arm64",

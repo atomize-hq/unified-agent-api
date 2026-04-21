@@ -1,4 +1,6 @@
+mod mutation;
 mod preview;
+mod validation;
 
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -7,15 +9,21 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::agent_registry::{AgentRegistry, AgentRegistryError, REGISTRY_RELATIVE_PATH};
-use clap::Parser;
+use crate::agent_registry::{AgentRegistry, REGISTRY_RELATIVE_PATH};
+use clap::{ArgGroup, Parser};
 use thiserror::Error;
-use toml_edit::{DocumentMut, Item};
+use toml_edit::DocumentMut;
 
+use self::mutation::{apply_mutations, ApplySummary, PlannedMutation, WorkspacePathJail};
 use self::preview::{
     build_docs_preview, build_manifest_preview, build_manual_follow_up, build_release_preview,
     render_registry_entry_preview, write_docs_preview, write_input_summary, write_manifest_preview,
     write_manual_follow_up, write_registry_preview, write_release_preview,
+};
+use self::validation::{
+    desired_registry_text, map_registry_load_error, validate_candidate_registry,
+    validate_filesystem_conflicts, validate_registry_conflicts,
+    validate_workspace_package_name_conflicts,
 };
 
 const OWNERSHIP_MARKER: &str = "<!-- generated-by: xtask onboard-agent; owner: control-plane -->";
@@ -27,10 +35,20 @@ const VALIDATE_PUBLISH_SCRIPT_PATH: &str = "scripts/validate_publish_versions.py
 const CHECK_PUBLISH_READINESS_SCRIPT_PATH: &str = "scripts/check_publish_readiness.py";
 
 #[derive(Debug, Parser, Clone)]
+#[command(group(
+    ArgGroup::new("mode")
+        .required(true)
+        .args(["dry_run", "write"])
+        .multiple(false)
+))]
 pub struct Args {
-    /// Preview-only mode. M1 requires this flag and performs no filesystem writes.
-    #[arg(long, required = true)]
+    /// Preview the onboarding plan without mutating the workspace.
+    #[arg(long)]
     pub dry_run: bool,
+
+    /// Apply the onboarding plan to the workspace.
+    #[arg(long)]
+    pub write: bool,
 
     /// Control-plane agent identifier.
     #[arg(long)]
@@ -139,17 +157,27 @@ struct DraftEntry {
     onboarding_pack_prefix: String,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 struct TargetGate {
     capability_id: String,
     targets: Vec<String>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 struct ConfigGate {
     capability_id: String,
     config_key: String,
     targets: Option<Vec<String>>,
+}
+
+#[derive(Debug)]
+struct OnboardingPlan {
+    registry_entry_preview: String,
+    docs_preview: Vec<(String, Option<String>)>,
+    manifest_preview: Vec<(String, Option<String>)>,
+    release_preview: preview::ReleasePreview,
+    manual_follow_up: Vec<String>,
+    mutations: Vec<PlannedMutation>,
 }
 
 pub fn run(args: Args) -> Result<(), Error> {
@@ -163,51 +191,62 @@ pub fn run_in_workspace<W: Write>(
     args: Args,
     writer: &mut W,
 ) -> Result<(), Error> {
-    if !args.dry_run {
-        return Err(Error::Validation(
-            "--dry-run is required in M1; mutation mode is not available".to_string(),
-        ));
-    }
-
-    let registry = AgentRegistry::load(workspace_root).map_err(map_registry_load_error)?;
-    let registry_text = fs::read_to_string(workspace_root.join(REGISTRY_RELATIVE_PATH))
+    let jail = WorkspacePathJail::new(workspace_root)?;
+    let dry_run_mode = args.dry_run;
+    let registry_path = jail.resolve(Path::new(REGISTRY_RELATIVE_PATH))?;
+    let registry_text = fs::read_to_string(&registry_path)
         .map_err(|err| Error::Internal(format!("read {REGISTRY_RELATIVE_PATH}: {err}")))?;
+    let registry = AgentRegistry::parse(&registry_text).map_err(map_registry_load_error)?;
     let draft = DraftEntry::from_args(args)?;
 
     validate_registry_conflicts(&registry, &draft)?;
-    validate_workspace_package_name_conflicts(workspace_root, &draft)?;
-    validate_filesystem_conflicts(workspace_root, &draft)?;
+    validate_workspace_package_name_conflicts(&draft, &jail)?;
+    validate_filesystem_conflicts(&draft, &jail)?;
 
-    let registry_entry_preview = render_registry_entry_preview(&draft);
-    validate_candidate_registry(&registry_text, &registry_entry_preview)?;
+    let plan = OnboardingPlan::build(workspace_root, &registry, &draft, &registry_text)?;
 
-    let release_preview = build_release_preview(workspace_root, &draft)?;
-    let docs_preview = build_docs_preview(&draft, &release_preview);
-    let manifest_preview = build_manifest_preview(&draft);
-    let manual_follow_up = build_manual_follow_up(&draft);
-
-    writeln!(writer, "== ONBOARD-AGENT DRY RUN ==")
-        .map_err(|err| Error::Internal(format!("write stdout: {err}")))?;
     writeln!(
         writer,
-        "M1 preview-only mode; no filesystem writes performed."
+        "== ONBOARD-AGENT {} ==",
+        if dry_run_mode { "DRY RUN" } else { "WRITE" }
     )
     .map_err(|err| Error::Internal(format!("write stdout: {err}")))?;
+    if dry_run_mode {
+        writeln!(
+            writer,
+            "Shared onboarding plan preview; no filesystem writes performed."
+        )
+        .map_err(|err| Error::Internal(format!("write stdout: {err}")))?;
+    } else {
+        writeln!(writer, "Shared onboarding plan preview before apply.")
+            .map_err(|err| Error::Internal(format!("write stdout: {err}")))?;
+    }
     writeln!(writer).map_err(|err| Error::Internal(format!("write stdout: {err}")))?;
 
     write_input_summary(writer, &draft)?;
-    write_registry_preview(writer, &registry_entry_preview)?;
-    write_docs_preview(writer, &docs_preview)?;
-    write_manifest_preview(writer, &manifest_preview)?;
-    write_release_preview(writer, &release_preview)?;
-    write_manual_follow_up(writer, &manual_follow_up)?;
+    write_registry_preview(writer, &plan.registry_entry_preview)?;
+    write_docs_preview(writer, &plan.docs_preview)?;
+    write_manifest_preview(writer, &plan.manifest_preview)?;
+    write_release_preview(writer, &plan.release_preview)?;
+    write_manual_follow_up(writer, &plan.manual_follow_up)?;
+
+    let apply_summary = if dry_run_mode {
+        None
+    } else {
+        Some(apply_mutations(workspace_root, &plan.mutations)?)
+    };
 
     writeln!(writer, "== RESULT ==")
         .map_err(|err| Error::Internal(format!("write stdout: {err}")))?;
-    writeln!(writer, "OK: onboard-agent dry-run preview complete.")
-        .map_err(|err| Error::Internal(format!("write stdout: {err}")))?;
-    writeln!(writer, "No files were written.")
-        .map_err(|err| Error::Internal(format!("write stdout: {err}")))?;
+    match apply_summary {
+        Some(summary) => write_apply_result(writer, summary)?,
+        None => {
+            writeln!(writer, "OK: onboard-agent dry-run preview complete.")
+                .map_err(|err| Error::Internal(format!("write stdout: {err}")))?;
+            writeln!(writer, "No files were written.")
+                .map_err(|err| Error::Internal(format!("write stdout: {err}")))?;
+        }
+    }
 
     Ok(())
 }
@@ -269,6 +308,69 @@ impl DraftEntry {
     }
 }
 
+impl OnboardingPlan {
+    fn build(
+        workspace_root: &Path,
+        registry: &AgentRegistry,
+        draft: &DraftEntry,
+        registry_text: &str,
+    ) -> Result<Self, Error> {
+        let registry_entry_preview = render_registry_entry_preview(draft);
+        let registry_after =
+            desired_registry_text(registry, draft, registry_text, &registry_entry_preview);
+        validate_candidate_registry(&registry_after)?;
+
+        let release_preview = build_release_preview(workspace_root, draft)?;
+        let docs_preview = build_docs_preview(draft, &release_preview);
+        let manifest_preview = build_manifest_preview(draft);
+        let manual_follow_up = build_manual_follow_up(draft);
+
+        let mut mutations = Vec::with_capacity(3 + docs_preview.len() + manifest_preview.len());
+        mutations.push(PlannedMutation::replace(
+            REGISTRY_RELATIVE_PATH,
+            registry_text.as_bytes().to_vec(),
+            registry_after.into_bytes(),
+        ));
+        mutations.push(PlannedMutation::replace(
+            &release_preview.workspace_manifest.path,
+            release_preview
+                .workspace_manifest
+                .expected_before
+                .clone()
+                .into_bytes(),
+            release_preview
+                .workspace_manifest
+                .desired_after
+                .clone()
+                .into_bytes(),
+        ));
+        mutations.push(PlannedMutation::replace(
+            &release_preview.release_doc.path,
+            release_preview
+                .release_doc
+                .expected_before
+                .clone()
+                .into_bytes(),
+            release_preview
+                .release_doc
+                .desired_after
+                .clone()
+                .into_bytes(),
+        ));
+        mutations.extend(preview_writes(&docs_preview));
+        mutations.extend(preview_writes(&manifest_preview));
+
+        Ok(Self {
+            registry_entry_preview,
+            docs_preview,
+            manifest_preview,
+            release_preview,
+            manual_follow_up,
+            mutations,
+        })
+    }
+}
+
 fn resolve_workspace_root() -> Result<PathBuf, Error> {
     let current_dir = std::env::current_dir()
         .map_err(|err| Error::Internal(format!("resolve current directory: {err}")))?;
@@ -288,250 +390,27 @@ fn resolve_workspace_root() -> Result<PathBuf, Error> {
     )))
 }
 
-fn map_registry_load_error(err: AgentRegistryError) -> Error {
-    match err {
-        AgentRegistryError::Read { path, source } => {
-            Error::Internal(format!("read {path}: {source}"))
-        }
-        AgentRegistryError::Toml(err) => {
-            Error::Validation(format!("parse agent registry TOML: {err}"))
-        }
-        AgentRegistryError::Validation(message) => Error::Validation(message),
-    }
+fn preview_writes(previews: &[(String, Option<String>)]) -> Vec<PlannedMutation> {
+    previews
+        .iter()
+        .map(|(path, contents)| {
+            PlannedMutation::create(
+                path.clone(),
+                contents.clone().unwrap_or_default().into_bytes(),
+            )
+        })
+        .collect()
 }
 
-fn validate_registry_conflicts(registry: &AgentRegistry, draft: &DraftEntry) -> Result<(), Error> {
-    if registry.find(&draft.agent_id).is_some() {
-        return Err(Error::Validation(format!(
-            "agent_id `{}` already exists in {REGISTRY_RELATIVE_PATH}",
-            draft.agent_id
-        )));
-    }
-
-    for entry in &registry.agents {
-        if entry.crate_path == draft.crate_path {
-            return Err(Error::Validation(format!(
-                "crate_path `{}` is already owned by agent `{}`",
-                draft.crate_path, entry.agent_id
-            )));
-        }
-        if entry.backend_module == draft.backend_module {
-            return Err(Error::Validation(format!(
-                "backend_module `{}` is already owned by agent `{}`",
-                draft.backend_module, entry.agent_id
-            )));
-        }
-        if entry.manifest_root == draft.manifest_root {
-            return Err(Error::Validation(format!(
-                "manifest_root `{}` is already owned by agent `{}`",
-                draft.manifest_root, entry.agent_id
-            )));
-        }
-        if entry.package_name == draft.package_name {
-            return Err(Error::Validation(format!(
-                "package_name `{}` is already owned by agent `{}`",
-                draft.package_name, entry.agent_id
-            )));
-        }
-        if entry.scaffold.onboarding_pack_prefix == draft.onboarding_pack_prefix {
-            return Err(Error::Validation(format!(
-                "onboarding_pack_prefix `{}` is already owned by agent `{}`",
-                draft.onboarding_pack_prefix, entry.agent_id
-            )));
-        }
-    }
-
-    Ok(())
-}
-
-fn validate_workspace_package_name_conflicts(
-    workspace_root: &Path,
-    draft: &DraftEntry,
-) -> Result<(), Error> {
-    let root_manifest_path = workspace_root.join("Cargo.toml");
-    let root_manifest = read_toml(&root_manifest_path)?;
-    for member in workspace_members(&root_manifest)? {
-        let manifest_path = workspace_root.join(&member).join("Cargo.toml");
-        let manifest = read_toml(&manifest_path)?;
-        let Some(package_name) = package_name(&manifest) else {
-            continue;
-        };
-        if package_name == draft.package_name {
-            return Err(Error::Validation(format!(
-                "package_name `{}` already exists in workspace member `{}` ({})",
-                draft.package_name,
-                member.display(),
-                manifest_path
-                    .strip_prefix(workspace_root)
-                    .unwrap_or(&manifest_path)
-                    .display()
-            )));
-        }
-    }
-    Ok(())
-}
-
-fn validate_filesystem_conflicts(workspace_root: &Path, draft: &DraftEntry) -> Result<(), Error> {
-    validate_runtime_owned_path_absent(workspace_root, &draft.crate_path, "crate_path")?;
-    validate_runtime_owned_path_absent(workspace_root, &draft.backend_module, "backend_module")?;
-
-    let docs_pack_root = draft.docs_pack_root();
-    let docs_pack_path = workspace_root.join(&docs_pack_root);
-    if docs_pack_path.exists() {
-        return Err(Error::Validation(format!(
-            "docs scaffold path `{}` already exists; ownership is ambiguous",
-            docs_pack_root.display()
-        )));
-    }
-
-    let manifest_root_path = workspace_root.join(&draft.manifest_root);
-    if !manifest_root_path.exists() {
-        return Ok(());
-    }
-
-    let current_json_path = manifest_root_path.join("current.json");
-    if current_json_path.exists() {
-        let text = fs::read_to_string(&current_json_path).map_err(|err| {
-            Error::Internal(format!("read {}: {err}", current_json_path.display()))
-        })?;
-        let value: serde_json::Value = serde_json::from_str(&text).map_err(|err| {
-            Error::Validation(format!(
-                "parse {}: {err}",
-                current_json_path
-                    .strip_prefix(workspace_root)
-                    .unwrap_or(&current_json_path)
-                    .display()
-            ))
-        })?;
-        if let Some(existing_targets) = value
-            .get("expected_targets")
-            .and_then(|value| value.as_array())
-        {
-            let existing_targets = existing_targets
-                .iter()
-                .map(|value| {
-                    value.as_str().ok_or_else(|| {
-                        Error::Validation(format!(
-                            "{} contains non-string expected_targets entries",
-                            current_json_path
-                                .strip_prefix(workspace_root)
-                                .unwrap_or(&current_json_path)
-                                .display()
-                        ))
-                    })
-                })
-                .collect::<Result<Vec<_>, _>>()?;
-            if existing_targets
-                != draft
-                    .canonical_targets
-                    .iter()
-                    .map(String::as_str)
-                    .collect::<Vec<_>>()
-            {
-                return Err(Error::Validation(format!(
-                    "manifest_root `{}` already contains expected_targets {:?}, which conflicts with proposed canonical_targets {:?}",
-                    draft.manifest_root,
-                    existing_targets,
-                    draft.canonical_targets
-                )));
-            }
-        }
-    }
-
-    let mut conflicting_targets = Vec::new();
-    for target in &draft.canonical_targets {
-        let supported_pointer = manifest_root_path
-            .join("pointers/latest_supported")
-            .join(format!("{target}.txt"));
-        let validated_pointer = manifest_root_path
-            .join("pointers/latest_validated")
-            .join(format!("{target}.txt"));
-        let coverage_suffix = format!("coverage.{target}.json");
-        if supported_pointer.exists() {
-            conflicting_targets.push(format!(
-                "{}/pointers/latest_supported/{}.txt",
-                draft.manifest_root, target
-            ));
-        }
-        if validated_pointer.exists() {
-            conflicting_targets.push(format!(
-                "{}/pointers/latest_validated/{}.txt",
-                draft.manifest_root, target
-            ));
-        }
-        if manifest_root_contains_report(&manifest_root_path.join("reports"), &coverage_suffix)? {
-            conflicting_targets.push(format!(
-                "{}/reports/**/{}",
-                draft.manifest_root, coverage_suffix
-            ));
-        }
-    }
-
-    if !conflicting_targets.is_empty() {
-        conflicting_targets.sort();
-        conflicting_targets.dedup();
-        return Err(Error::Validation(format!(
-            "pre-existing target artifacts conflict with proposed canonical_targets: {}",
-            conflicting_targets.join(", ")
-        )));
-    }
-
-    Err(Error::Validation(format!(
-        "manifest_root `{}` already exists; ownership is ambiguous",
-        draft.manifest_root
-    )))
-}
-
-fn validate_runtime_owned_path_absent(
-    workspace_root: &Path,
-    relative_path: &str,
-    field_name: &str,
-) -> Result<(), Error> {
-    if workspace_root.join(relative_path).exists() {
-        return Err(Error::Validation(format!(
-            "{field_name} `{relative_path}` already exists on disk; ownership is ambiguous"
-        )));
-    }
-    Ok(())
-}
-
-fn manifest_root_contains_report(root: &Path, suffix: &str) -> Result<bool, Error> {
-    if !root.exists() {
-        return Ok(false);
-    }
-    for entry in fs::read_dir(root)
-        .map_err(|err| Error::Internal(format!("read {}: {err}", root.display())))?
-    {
-        let entry =
-            entry.map_err(|err| Error::Internal(format!("read {}: {err}", root.display())))?;
-        let path = entry.path();
-        let file_type = entry
-            .file_type()
-            .map_err(|err| Error::Internal(format!("read {}: {err}", path.display())))?;
-        if file_type.is_dir() {
-            if manifest_root_contains_report(&path, suffix)? {
-                return Ok(true);
-            }
-        } else if file_type.is_file()
-            && path
-                .file_name()
-                .and_then(|name| name.to_str())
-                .is_some_and(|name| name == suffix)
-        {
-            return Ok(true);
-        }
-    }
-    Ok(false)
-}
-
-fn validate_candidate_registry(
-    registry_text: &str,
-    registry_entry_preview: &str,
-) -> Result<(), Error> {
-    let mut combined = registry_text.trim_end().to_string();
-    combined.push_str("\n\n");
-    combined.push_str(registry_entry_preview);
-    AgentRegistry::parse(&combined).map_err(map_registry_load_error)?;
+fn write_apply_result<W: Write>(writer: &mut W, summary: ApplySummary) -> Result<(), Error> {
+    writeln!(writer, "OK: onboard-agent write complete.")
+        .map_err(|err| Error::Internal(format!("write stdout: {err}")))?;
+    writeln!(
+        writer,
+        "Mutation summary: {} written, {} identical, {} total planned.",
+        summary.written, summary.identical, summary.total
+    )
+    .map_err(|err| Error::Internal(format!("write stdout: {err}")))?;
     Ok(())
 }
 
@@ -555,13 +434,6 @@ fn workspace_members(root_doc: &DocumentMut) -> Result<Vec<PathBuf>, Error> {
             Ok(PathBuf::from(member))
         })
         .collect()
-}
-
-fn package_name(doc: &DocumentMut) -> Option<&str> {
-    doc.get("package")
-        .and_then(Item::as_table_like)
-        .and_then(|package| package.get("name"))
-        .and_then(Item::as_str)
 }
 
 fn normalize_ordered_unique(

@@ -49,7 +49,9 @@ fn c6_validator_detects_version_status_drift_for_latest_validated_rows() {
     let temp = make_temp_dir("ccm-c6-support-matrix-status");
     write_workspace_manifest(&temp);
     let codex_dir = temp.join("cli_manifests").join("codex");
+    let gemini_dir = temp.join("cli_manifests").join("gemini_cli");
     materialize_minimal_valid_codex_dir(&codex_dir);
+    materialize_committed_gemini_dir(&gemini_dir);
     write_version_status(&codex_dir, "reported");
     write_support_matrix_artifact(
         &temp,
@@ -80,9 +82,11 @@ fn c6_validator_detects_support_matrix_consistency_drift_for_claude_root() {
     write_workspace_manifest(&temp);
     let codex_dir = temp.join("cli_manifests").join("codex");
     let claude_dir = temp.join("cli_manifests").join("claude_code");
+    let gemini_dir = temp.join("cli_manifests").join("gemini_cli");
     let opencode_dir = temp.join("cli_manifests").join("opencode");
     materialize_minimal_valid_codex_dir(&codex_dir);
     materialize_minimal_valid_claude_dir(&claude_dir);
+    materialize_committed_gemini_dir(&gemini_dir);
     materialize_committed_opencode_dir(&opencode_dir);
     write_complete_support_matrix_artifact(&temp);
 
@@ -117,7 +121,9 @@ fn c6_validator_detects_pointer_promotion_drift_in_support_matrix_publication() 
     let temp = make_temp_dir("ccm-c6-support-matrix-pointer");
     write_workspace_manifest(&temp);
     let codex_dir = temp.join("cli_manifests").join("codex");
+    let gemini_dir = temp.join("cli_manifests").join("gemini_cli");
     materialize_minimal_valid_codex_dir(&codex_dir);
+    materialize_committed_gemini_dir(&gemini_dir);
     write_support_matrix_artifact(
         &temp,
         json!([
@@ -147,9 +153,11 @@ fn c6_validator_detects_support_state_drift_in_support_matrix_publication() {
     write_workspace_manifest(&temp);
     let codex_dir = temp.join("cli_manifests").join("codex");
     let claude_dir = temp.join("cli_manifests").join("claude_code");
+    let gemini_dir = temp.join("cli_manifests").join("gemini_cli");
     let opencode_dir = temp.join("cli_manifests").join("opencode");
     materialize_minimal_valid_codex_dir(&codex_dir);
     materialize_minimal_valid_claude_dir(&claude_dir);
+    materialize_committed_gemini_dir(&gemini_dir);
     materialize_committed_opencode_dir(&opencode_dir);
     write_complete_support_matrix_artifact(&temp);
 
@@ -184,9 +192,11 @@ fn c6_validator_detects_non_canonical_support_matrix_row_order() {
     write_workspace_manifest(&temp);
     let codex_dir = temp.join("cli_manifests").join("codex");
     let claude_dir = temp.join("cli_manifests").join("claude_code");
+    let gemini_dir = temp.join("cli_manifests").join("gemini_cli");
     let opencode_dir = temp.join("cli_manifests").join("opencode");
     materialize_minimal_valid_codex_dir(&codex_dir);
     materialize_minimal_valid_claude_dir(&claude_dir);
+    materialize_committed_gemini_dir(&gemini_dir);
     materialize_committed_opencode_dir(&opencode_dir);
     write_complete_support_matrix_artifact(&temp);
 
@@ -215,7 +225,9 @@ fn c6_validator_rejects_incomplete_support_matrix_publication() {
     let temp = make_temp_dir("ccm-c6-support-matrix-missing");
     write_workspace_manifest(&temp);
     let codex_dir = temp.join("cli_manifests").join("codex");
+    let gemini_dir = temp.join("cli_manifests").join("gemini_cli");
     materialize_minimal_valid_codex_dir(&codex_dir);
+    materialize_committed_gemini_dir(&gemini_dir);
     write_support_matrix_artifact(
         &temp,
         json!([
@@ -245,8 +257,10 @@ fn c6_validator_rejects_missing_committed_agent_root_even_without_rows() {
     write_workspace_manifest(&temp);
     let codex_dir = temp.join("cli_manifests").join("codex");
     let claude_dir = temp.join("cli_manifests").join("claude_code");
+    let gemini_dir = temp.join("cli_manifests").join("gemini_cli");
     materialize_minimal_valid_codex_dir(&codex_dir);
     materialize_minimal_valid_claude_dir(&claude_dir);
+    materialize_committed_gemini_dir(&gemini_dir);
     write_support_matrix_artifact(
         &temp,
         json!([
@@ -296,7 +310,9 @@ fn c6_validator_detects_support_claim_drift_for_omitted_target() {
     let temp = make_temp_dir("ccm-c6-support-matrix-omission");
     write_workspace_manifest(&temp);
     let codex_dir = temp.join("cli_manifests").join("codex");
+    let gemini_dir = temp.join("cli_manifests").join("gemini_cli");
     materialize_minimal_valid_codex_dir(&codex_dir);
+    materialize_committed_gemini_dir(&gemini_dir);
     write_support_matrix_artifact(
         &temp,
         json!([

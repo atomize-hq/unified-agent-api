@@ -163,3 +163,29 @@ docs_release_track = "crates-io"
 
 [agents.scaffold]
 onboarding_pack_prefix = "opencode-cli-onboarding"
+
+[[agents]]
+agent_id = "gemini_cli"
+display_name = "Gemini CLI"
+crate_path = "crates/gemini_cli"
+backend_module = "crates/agent_api/src/backends/gemini_cli"
+manifest_root = "cli_manifests/gemini_cli"
+package_name = "unified-agent-api-gemini-cli"
+canonical_targets = ["darwin-arm64"]
+
+[agents.wrapper_coverage]
+binding_kind = "generated_from_wrapper_crate"
+source_path = "crates/gemini_cli"
+
+[agents.capability_declaration]
+always_on = ["agent_api.config.model.v1", "agent_api.events", "agent_api.events.live", "agent_api.run"]
+backend_extensions = []
+[agents.publication]
+support_matrix_enabled = true
+capability_matrix_enabled = true
+
+[agents.release]
+docs_release_track = "crates-io"
+
+[agents.scaffold]
+onboarding_pack_prefix = "gemini-cli-onboarding"
