@@ -250,10 +250,15 @@ fn onboard_agent_dry_run_preview_is_deterministic_and_writes_nothing() {
     assert!(first
         .stdout
         .contains("<!-- generated-by: xtask onboard-agent; owner: control-plane -->"));
-    assert!(first.stdout.contains("## Manual Runtime Follow-Up"));
+    assert!(first.stdout.contains("## Next executable runtime step"));
+    assert!(first.stdout.contains("Next executable runtime step:"));
     assert!(first
         .stdout
         .contains("Shared onboarding plan preview; no filesystem writes performed."));
+    assert!(!first.stdout.contains(" M1"));
+    assert!(!first.stdout.contains("future M2"));
+    assert!(!first.stdout.contains("dry-run mode"));
+    assert!(!first.stdout.contains("Create the wrapper crate"));
 }
 
 #[test]
@@ -375,6 +380,74 @@ fn onboard_agent_write_allows_preexisting_runtime_owned_directories() {
 
     assert_eq!(output.exit_code, 0, "stderr:\n{}", output.stderr);
     assert!(output.stdout.contains("OK: onboard-agent write complete."));
+}
+
+#[test]
+fn onboard_agent_closeout_packet_replays_identically_without_rewriting_manual_metrics() {
+    let fixture = fixture_root("onboard-agent-closeout");
+    seed_release_touchpoints(&fixture);
+    let metrics_path = fixture.join(
+        "docs/project_management/next/cursor-cli-onboarding/governance/proving-run-metrics.json",
+    );
+    let metrics = concat!(
+        "{\n",
+        "  \"manual_control_plane_edits\": 0,\n",
+        "  \"partial_write_incidents\": 0,\n",
+        "  \"ambiguous_ownership_incidents\": 0,\n",
+        "  \"control_plane_mutation_duration_seconds\": null,\n",
+        "  \"control_plane_mutation_duration_recorded\": false,\n",
+        "  \"control_plane_mutation_duration_note\": \"Exact duration not recoverable from committed evidence.\",\n",
+        "  \"preflight_passed\": true,\n",
+        "  \"residual_friction\": [\n",
+        "    \"Runtime-owned evidence capture still requires a local CLI install.\"\n",
+        "  ],\n",
+        "  \"recorded_at\": \"2026-04-21T11:23:09Z\",\n",
+        "  \"commit\": \"test-closeout-commit\"\n",
+        "}\n"
+    );
+    write_text(&metrics_path, metrics);
+
+    let metrics_before = fs::read(&metrics_path).expect("read initial metrics");
+    let first = run_cli(write_args("cursor"), &fixture);
+    let after_first = snapshot_files(&fixture);
+    let metrics_after_first = fs::read(&metrics_path).expect("read metrics after first write");
+    let second = run_cli(write_args("cursor"), &fixture);
+    let after_second = snapshot_files(&fixture);
+    let metrics_after_second = fs::read(&metrics_path).expect("read metrics after second write");
+
+    assert_eq!(first.exit_code, 0, "stderr:\n{}", first.stderr);
+    assert_eq!(second.exit_code, 0, "stderr:\n{}", second.stderr);
+    assert!(first
+        .stdout
+        .contains("Mutation summary: 15 written, 0 identical, 15 total planned."));
+    assert!(second
+        .stdout
+        .contains("Mutation summary: 0 written, 15 identical, 15 total planned."));
+    assert_eq!(metrics_before, metrics_after_first);
+    assert_eq!(metrics_before, metrics_after_second);
+    assert_eq!(after_first, after_second);
+
+    let handoff = fs::read_to_string(
+        fixture.join("docs/project_management/next/cursor-cli-onboarding/HANDOFF.md"),
+    )
+    .expect("read closeout handoff");
+    assert!(handoff.contains("This packet records the closed proving run for `cursor`."));
+    assert!(handoff.contains("manual control-plane file edits by maintainers: `0`"));
+    assert!(handoff
+        .contains("approved-agent to repo-ready control-plane mutation time: `not recorded`"));
+    assert!(handoff.contains("closeout metadata: `docs/project_management/next/cursor-cli-onboarding/governance/proving-run-metrics.json`"));
+    assert!(handoff.contains("No open runtime next step remains in this packet."));
+
+    let remediation =
+        fs::read_to_string(fixture.join(
+            "docs/project_management/next/cursor-cli-onboarding/governance/remediation-log.md",
+        ))
+        .expect("read remediation log");
+    assert!(
+        remediation.contains("Runtime-owned evidence capture still requires a local CLI install.")
+    );
+    assert!(remediation
+        .contains("Timing note: Exact duration not recoverable from committed evidence."));
 }
 
 #[cfg(unix)]

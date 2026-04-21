@@ -17,8 +17,9 @@ use toml_edit::DocumentMut;
 use self::mutation::{apply_mutations, ApplySummary, PlannedMutation, WorkspacePathJail};
 use self::preview::{
     build_docs_preview, build_manifest_preview, build_manual_follow_up, build_release_preview,
-    render_registry_entry_preview, write_docs_preview, write_input_summary, write_manifest_preview,
-    write_manual_follow_up, write_registry_preview, write_release_preview,
+    load_proving_run_metrics, render_registry_entry_preview, write_docs_preview,
+    write_input_summary, write_manifest_preview, write_manual_follow_up, write_registry_preview,
+    write_release_preview,
 };
 use self::validation::{
     desired_registry_text, map_registry_load_error, validate_candidate_registry,
@@ -321,9 +322,11 @@ impl OnboardingPlan {
         validate_candidate_registry(&registry_after)?;
 
         let release_preview = build_release_preview(workspace_root, draft)?;
-        let docs_preview = build_docs_preview(draft, &release_preview);
+        let proving_run_metrics = load_proving_run_metrics(workspace_root, draft)?;
+        let docs_preview =
+            build_docs_preview(draft, &release_preview, proving_run_metrics.as_ref());
         let manifest_preview = build_manifest_preview(draft);
-        let manual_follow_up = build_manual_follow_up(draft);
+        let manual_follow_up = build_manual_follow_up(draft, proving_run_metrics.as_ref());
 
         let mut mutations = Vec::with_capacity(3 + docs_preview.len() + manifest_preview.len());
         mutations.push(PlannedMutation::replace(
@@ -357,6 +360,8 @@ impl OnboardingPlan {
                 .clone()
                 .into_bytes(),
         ));
+        // Closeout metadata is packet-local manual state. The onboarding command can read it to
+        // render closeout-aware docs, but it must not rewrite or heal that file implicitly.
         mutations.extend(preview_writes(&docs_preview));
         mutations.extend(preview_writes(&manifest_preview));
 

@@ -2,4 +2,5 @@
 
 # Remediation log
 
-No mutations are applied in M1 dry-run mode. Record follow-up decisions here once runtime-owned work starts.
+- No residual friction recorded.
+- Timing note: Exact duration not recoverable from committed evidence.

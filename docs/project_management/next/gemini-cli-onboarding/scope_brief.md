@@ -2,10 +2,11 @@
 
 # Scope brief
 
-Control-plane-owned preview outputs:
+This packet records the closed proving run for `gemini_cli`.
 
-- Registry enrollment preview in `crates/xtask/data/agent_registry.toml`
-- Docs scaffold preview in `docs/project_management/next/gemini-cli-onboarding`
-- Manifest-root scaffold preview in `cli_manifests/gemini_cli`
+- Registry enrollment in `crates/xtask/data/agent_registry.toml`
+- Docs pack in `docs/project_management/next/gemini-cli-onboarding`
+- Manifest root in `cli_manifests/gemini_cli`
+- Closeout metadata in `docs/project_management/next/gemini-cli-onboarding/governance/proving-run-metrics.json`
 
-Runtime-owned implementation remains manual in M1.
+Closeout status: `make preflight` passed for this proving run.

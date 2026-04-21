@@ -1,8 +1,15 @@
+mod render;
+
 use std::{fmt::Write as _, fs, io::Write, path::Path};
 
 use crate::agent_registry::REGISTRY_RELATIVE_PATH;
 use toml_edit::DocumentMut;
 
+use self::render::{
+    render_current_json, render_handoff_body, render_readme_body, render_remediation_log_body,
+    render_review_surfaces_body, render_scope_brief_body, render_threading_body, PacketPhase,
+    ProvingRunMetrics,
+};
 use super::{
     ConfigGate, DraftEntry, Error, TargetGate, CHECK_PUBLISH_READINESS_SCRIPT_PATH,
     OWNERSHIP_MARKER, PUBLISH_SCRIPT_PATH, PUBLISH_WORKFLOW_PATH, RELEASE_DOC_PATH,
@@ -15,6 +22,7 @@ const RELEASE_DOC_END_MARKER: &str =
     "<!-- /generated-by: xtask onboard-agent; section: crates-io-release -->";
 const WRAPPER_EVENTS_PACKAGE_NAME: &str = "unified-agent-api-wrapper-events";
 const ROOT_AGENT_API_PACKAGE_NAME: &str = "unified-agent-api";
+const PROVING_RUN_METRICS_RELATIVE_PATH: &str = "governance/proving-run-metrics.json";
 
 #[derive(Debug)]
 pub(super) struct ReleasePreview {
@@ -70,6 +78,26 @@ pub(super) fn build_release_preview(
             desired_after: desired_release_doc,
         },
     })
+}
+
+pub(super) fn load_proving_run_metrics(
+    workspace_root: &Path,
+    draft: &DraftEntry,
+) -> Result<Option<ProvingRunMetrics>, Error> {
+    let metrics_path = workspace_root.join(proving_run_metrics_relative_path(draft));
+    let text = match fs::read_to_string(&metrics_path) {
+        Ok(text) => text,
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(err) => {
+            return Err(Error::Internal(format!(
+                "read {}: {err}",
+                metrics_path.display()
+            )));
+        }
+    };
+    let metrics = serde_json::from_str::<ProvingRunMetrics>(&text)
+        .map_err(|err| Error::Validation(format!("parse {}: {err}", metrics_path.display())))?;
+    Ok(Some(metrics))
 }
 
 pub(super) fn write_input_summary<W: Write>(
@@ -326,40 +354,44 @@ pub(super) fn render_registry_entry_preview(draft: &DraftEntry) -> String {
 pub(super) fn build_docs_preview(
     draft: &DraftEntry,
     release_preview: &ReleasePreview,
+    metrics: Option<&ProvingRunMetrics>,
 ) -> Vec<(String, Option<String>)> {
     let docs_root = draft.docs_pack_root();
     let docs_root_display = docs_root.display().to_string();
+    let metrics_path = proving_run_metrics_relative_path(draft);
     let release_touchpoints = release_preview
         .lines
         .iter()
         .map(|line| format!("- {line}"))
         .collect::<Vec<_>>()
         .join("\n");
+    let phase = match metrics {
+        Some(metrics) => PacketPhase::Closeout(metrics),
+        None => PacketPhase::Execution,
+    };
 
     vec![
         (
             docs_root.join("README.md").display().to_string(),
-            Some(render_markdown_file(format!(
-                "# {} onboarding pack\n\nThis preview seeds the control-plane onboarding packet for `{}`.\n\n- Agent id: `{}`\n- Wrapper crate: `{}`\n- Backend module: `{}`\n- Manifest root: `{}`\n",
-                draft.display_name,
-                draft.display_name,
-                draft.agent_id,
-                draft.crate_path,
-                draft.backend_module,
-                draft.manifest_root
+            Some(render_markdown_file(render_readme_body(
+                draft,
+                phase,
+                &metrics_path,
             ))),
         ),
         (
             docs_root.join("scope_brief.md").display().to_string(),
-            Some(render_markdown_file(format!(
-                "# Scope brief\n\nControl-plane-owned preview outputs:\n\n- Registry enrollment preview in `{REGISTRY_RELATIVE_PATH}`\n- Docs scaffold preview in `{docs_root_display}`\n- Manifest-root scaffold preview in `{}`\n\nRuntime-owned implementation remains manual in M1.\n",
-                draft.manifest_root
+            Some(render_markdown_file(render_scope_brief_body(
+                draft,
+                phase,
+                &docs_root_display,
+                &metrics_path,
             ))),
         ),
         (
             docs_root.join("seam_map.md").display().to_string(),
             Some(render_markdown_file(format!(
-                "# Seam map\n\n- Declaration seam: registry entry for `{}`\n- Docs seam: onboarding pack `{docs_root_display}`\n- Manifest seam: `{}` skeleton\n- Runtime seam: wrapper crate `{}` and backend module `{}`\n",
+                "# Seam map\n\n- Declaration seam: registry entry for `{}`\n- Docs seam: onboarding pack `{docs_root_display}`\n- Manifest seam: `{}`\n- Runtime seam: wrapper crate `{}` and backend module `{}`\n",
                 draft.agent_id,
                 draft.manifest_root,
                 draft.crate_path,
@@ -368,15 +400,14 @@ pub(super) fn build_docs_preview(
         ),
         (
             docs_root.join("threading.md").display().to_string(),
-            Some(render_markdown_file(
-                "# Threading\n\n1. Approve the dry-run preview.\n2. Materialize runtime-owned wrapper and backend work outside M1.\n3. Populate manifest evidence after runtime artifacts exist.\n4. Apply any future M2 release/doc mutations listed in this packet.\n".to_string(),
-            )),
+            Some(render_markdown_file(render_threading_body(draft, phase))),
         ),
         (
             docs_root.join("review_surfaces.md").display().to_string(),
-            Some(render_markdown_file(format!(
-                "# Review surfaces\n\n- `{REGISTRY_RELATIVE_PATH}`\n- `{docs_root_display}`\n- `{}`\n- `{RELEASE_DOC_PATH}`\n- `{PUBLISH_WORKFLOW_PATH}` remains unchanged in M1\n",
-                draft.manifest_root
+            Some(render_markdown_file(render_review_surfaces_body(
+                draft,
+                phase,
+                &docs_root_display,
             ))),
         ),
         (
@@ -384,16 +415,16 @@ pub(super) fn build_docs_preview(
                 .join("governance/remediation-log.md")
                 .display()
                 .to_string(),
-            Some(render_markdown_file(
-                "# Remediation log\n\nNo mutations are applied in M1 dry-run mode. Record follow-up decisions here once runtime-owned work starts.\n".to_string(),
-            )),
+            Some(render_markdown_file(render_remediation_log_body(phase))),
         ),
         (
             docs_root.join("HANDOFF.md").display().to_string(),
             Some(render_markdown_file(render_handoff_body(
                 draft,
+                phase,
+                &metrics_path,
                 &release_touchpoints,
-                &build_manual_follow_up(draft),
+                &build_manual_follow_up(draft, metrics),
             ))),
         ),
     ]
@@ -439,27 +470,31 @@ pub(super) fn build_manifest_preview(draft: &DraftEntry) -> Vec<(String, Option<
     ]
 }
 
-pub(super) fn build_manual_follow_up(draft: &DraftEntry) -> Vec<String> {
-    vec![
-        format!(
-            "Create the wrapper crate at `{}` and keep any file edits runtime-owned.",
-            draft.crate_path
-        ),
-        format!(
-            "Implement backend behavior under `{}` and ensure backend-owned capability extensions match the preview.",
-            draft.backend_module
-        ),
-        format!(
-            "Author wrapper coverage input at `{}` for binding kind `{}`.",
-            draft.wrapper_coverage_source_path, draft.wrapper_coverage_binding_kind
-        ),
-        format!(
-            "Populate `{}/current.json`, pointers, versions, and reports from committed runtime evidence once the agent exists.",
-            draft.manifest_root
-        ),
-        "Re-run `xtask onboard-agent --dry-run` after runtime-owned work changes the proposed artifact set."
-            .to_string(),
-    ]
+pub(super) fn build_manual_follow_up(
+    draft: &DraftEntry,
+    metrics: Option<&ProvingRunMetrics>,
+) -> Vec<String> {
+    match metrics {
+        Some(_) => vec![
+            "No open runtime follow-up remains; the proving run is closed.".to_string(),
+        ],
+        None => vec![
+            format!(
+                "Next executable runtime step: implement the runtime-owned wrapper crate at `{}` and backend module `{}`.",
+                draft.crate_path, draft.backend_module
+            ),
+            format!(
+                "Author wrapper coverage input at `{}` for binding kind `{}`.",
+                draft.wrapper_coverage_source_path, draft.wrapper_coverage_binding_kind
+            ),
+            format!(
+                "Populate `{}/current.json`, pointers, versions, and reports from committed runtime evidence.",
+                draft.manifest_root
+            ),
+            "Regenerate support and capability publication artifacts, then run `make preflight`."
+                .to_string(),
+        ],
+    }
 }
 
 fn build_workspace_manifest_mutation(
@@ -695,33 +730,14 @@ fn render_string_array(values: &[String]) -> String {
     format!("[{}]", rendered.join(", "))
 }
 
-fn render_handoff_body(
-    draft: &DraftEntry,
-    release_touchpoints: &str,
-    manual_follow_up: &[String],
-) -> String {
-    format!(
-        "# Handoff\n\nThis packet previews the next executable control-plane artifacts for `{}`.\n\n## Release touchpoints\n\n{}\n\n## Manual Runtime Follow-Up\n\n{}\n",
-        draft.agent_id,
-        release_touchpoints,
-        manual_follow_up
-            .iter()
-            .map(|line| format!("- {line}"))
-            .collect::<Vec<_>>()
-            .join("\n")
-    )
+fn proving_run_metrics_relative_path(draft: &DraftEntry) -> String {
+    draft
+        .docs_pack_root()
+        .join(PROVING_RUN_METRICS_RELATIVE_PATH)
+        .display()
+        .to_string()
 }
 
 fn render_markdown_file(body: String) -> String {
     format!("{OWNERSHIP_MARKER}\n\n{body}")
-}
-
-fn render_current_json(draft: &DraftEntry) -> String {
-    let targets = draft
-        .canonical_targets
-        .iter()
-        .map(|target| format!("    \"{target}\""))
-        .collect::<Vec<_>>()
-        .join(",\n");
-    format!("{{\n  \"expected_targets\": [\n{targets}\n  ],\n  \"inputs\": []\n}}\n")
 }

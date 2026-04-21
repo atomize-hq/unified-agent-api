@@ -2,7 +2,7 @@
 
 # Handoff
 
-This packet previews the next executable control-plane artifacts for `gemini_cli`.
+This packet records the closed proving run for `gemini_cli`.
 
 ## Release touchpoints
 
@@ -10,10 +10,22 @@ This packet previews the next executable control-plane artifacts for `gemini_cli
 - Path: docs/crates-io-release.md will ensure the generated release block includes `unified-agent-api-gemini-cli` on release track `crates-io`.
 - Workflow and script files remain unchanged: .github/workflows/publish-crates.yml, scripts/publish_crates.py, scripts/validate_publish_versions.py, scripts/check_publish_readiness.py.
 
-## Manual Runtime Follow-Up
+## Proving-run closeout
 
-- Create the wrapper crate at `crates/gemini_cli` and keep any file edits runtime-owned.
-- Implement backend behavior under `crates/agent_api/src/backends/gemini_cli` and ensure backend-owned capability extensions match the preview.
-- Author wrapper coverage input at `crates/gemini_cli` for binding kind `generated_from_wrapper_crate`.
-- Populate `cli_manifests/gemini_cli/current.json`, pointers, versions, and reports from committed runtime evidence once the agent exists.
-- Re-run `xtask onboard-agent --dry-run` after runtime-owned work changes the proposed artifact set.
+- manual control-plane file edits by maintainers: `0`
+- partial-write incidents: `0`
+- ambiguous ownership incidents: `0`
+- approved-agent to repo-ready control-plane mutation time: `not recorded`
+- proving-run closeout passes `make preflight`: `true`
+- recorded at: `2026-04-21T11:23:09Z`
+- commit: `6b7d5f6e9cf2bf54933659f5700bb59d1f8a95e8`
+- closeout metadata: `docs/project_management/next/gemini-cli-onboarding/governance/proving-run-metrics.json`
+
+## Residual friction
+
+- No residual friction recorded.
+- Timing note: Exact duration not recoverable from committed evidence.
+
+## Status
+
+No open runtime next step remains in this packet.

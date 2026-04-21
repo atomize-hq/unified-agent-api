@@ -119,8 +119,11 @@ pub(super) fn validate_filesystem_conflicts(
         return Ok(());
     }
 
+    let has_current_json = manifest_root_path.join("current.json").exists();
     validate_manifest_root_targets(draft, jail, &manifest_root_path)?;
-    validate_manifest_root_artifact_conflicts(draft, &manifest_root_path)?;
+    if !has_current_json {
+        validate_manifest_root_artifact_conflicts(draft, &manifest_root_path)?;
+    }
     Ok(())
 }
 
