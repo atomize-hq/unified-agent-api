@@ -6,6 +6,16 @@ This changelog tracks the root `VERSION` file and uses bare semantic versions (`
 
 ## [Unreleased]
 
+### Added
+
+- Added the first Gemini CLI proving-run surfaces across the workspace: `crates/gemini_cli/` for canonical headless `stream-json` execution, `cli_manifests/gemini_cli/` for committed manifest-root evidence, and the `crates/agent_api` Gemini backend with bounded event/completion redaction coverage.
+- Added `xtask onboard-agent --write` plus transactional control-plane mutation coverage so approved-agent onboarding can materialize registry, docs-pack, release-doc, workspace-membership, and manifest-root skeleton surfaces without manual control-plane edits.
+
+### Changed
+
+- Rebased control-plane enrollment onto `crates/xtask/data/agent_registry.toml`, including package-name conflict validation, canonical-target parity enforcement, and capability-matrix projection checks against runtime backend truth.
+- Recorded the first real approved-agent proving run in the generated Gemini onboarding packet, including closeout metrics, release touchpoints, and regenerated support/capability publication artifacts.
+
 ## [0.2.3] - 2026-04-18
 
 ### Added
