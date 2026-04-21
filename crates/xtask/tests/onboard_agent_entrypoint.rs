@@ -1,13 +1,17 @@
-use std::{
-    collections::BTreeMap,
-    fs,
-    path::{Path, PathBuf},
-};
+use std::{fs, path::Path};
 
 use clap::{CommandFactory, Parser, Subcommand};
+use serde_json::json;
 use xtask::onboard_agent;
 
-const SEEDED_REGISTRY: &str = include_str!("../data/agent_registry.toml");
+#[path = "support/onboard_agent_harness.rs"]
+mod harness;
+
+use harness::{
+    approval_args, args_with_overrides, assert_sections_in_order, base_args, base_args_with_mode,
+    base_args_with_package_name, fixture_root, seed_approval_artifact, seed_release_touchpoints,
+    sha256_hex, snapshot_files, write_args, write_text, HarnessOutput,
+};
 
 #[derive(Debug, Parser)]
 #[command(name = "xtask")]
@@ -23,13 +27,6 @@ enum Command {
     OnboardAgent(onboard_agent::Args),
 }
 
-#[derive(Debug)]
-struct HarnessOutput {
-    exit_code: i32,
-    stdout: String,
-    stderr: String,
-}
-
 #[test]
 fn onboard_agent_help_text_includes_required_surface() {
     let top_help = Cli::command().render_help().to_string();
@@ -41,6 +38,7 @@ fn onboard_agent_help_text_includes_required_surface() {
     let help_text = err.to_string();
     assert!(help_text.contains("--dry-run"));
     assert!(help_text.contains("--write"));
+    assert!(help_text.contains("--approval"));
     assert!(help_text.contains("--agent-id"));
     assert!(help_text.contains("--canonical-target"));
     assert!(help_text.contains("--always-on-capability"));
@@ -262,6 +260,29 @@ fn onboard_agent_dry_run_preview_is_deterministic_and_writes_nothing() {
 }
 
 #[test]
+fn onboard_agent_approval_dry_run_matches_raw_descriptor_preview_and_writes_nothing() {
+    let fixture = fixture_root("onboard-agent-approval-preview");
+    seed_release_touchpoints(&fixture);
+    let approval_path = seed_approval_artifact(
+        &fixture,
+        "docs/project_management/next/cursor-cli-onboarding/governance/approved-agent.toml",
+        "cursor",
+        "cursor",
+        None,
+    );
+
+    let before = snapshot_files(&fixture);
+    let approval = run_cli(approval_args("--dry-run", &approval_path), &fixture);
+    let raw = run_cli(base_args("cursor"), &fixture);
+    let after = snapshot_files(&fixture);
+
+    assert_eq!(approval.exit_code, 0, "stderr:\n{}", approval.stderr);
+    assert_eq!(raw.exit_code, 0, "stderr:\n{}", raw.stderr);
+    assert_eq!(approval.stdout, raw.stdout);
+    assert_eq!(before, after, "approval dry-run must not write any files");
+}
+
+#[test]
 fn onboard_agent_write_applies_plan_and_replays_identically() {
     let fixture = fixture_root("onboard-agent-write");
     seed_release_touchpoints(&fixture);
@@ -344,6 +365,89 @@ fn onboard_agent_write_applies_plan_and_replays_identically() {
 }
 
 #[test]
+fn onboard_agent_approval_write_applies_plan_and_replays_identically() {
+    let fixture = fixture_root("onboard-agent-approval-write");
+    seed_release_touchpoints(&fixture);
+    let approval_path = seed_approval_artifact(
+        &fixture,
+        "docs/project_management/next/cursor-cli-onboarding/governance/approved-agent.toml",
+        "cursor",
+        "cursor",
+        None,
+    );
+
+    let before = snapshot_files(&fixture);
+    let first = run_cli(approval_args("--write", &approval_path), &fixture);
+    let after_first = snapshot_files(&fixture);
+    let second = run_cli(approval_args("--write", &approval_path), &fixture);
+    let after_second = snapshot_files(&fixture);
+
+    assert_eq!(first.exit_code, 0, "stderr:\n{}", first.stderr);
+    assert_eq!(second.exit_code, 0, "stderr:\n{}", second.stderr);
+    assert_ne!(
+        before, after_first,
+        "approval write mode must mutate the workspace"
+    );
+    assert_eq!(after_first, after_second);
+    assert!(first.stdout.contains("OK: onboard-agent write complete."));
+    assert!(second
+        .stdout
+        .contains("Mutation summary: 0 written, 15 identical, 15 total planned."));
+}
+
+#[test]
+fn onboard_agent_rejects_mixed_approval_and_descriptor_flags() {
+    let fixture = fixture_root("onboard-agent-approval-mixed-flags");
+    let approval_path = seed_approval_artifact(
+        &fixture,
+        "docs/project_management/next/cursor-cli-onboarding/governance/approved-agent.toml",
+        "cursor",
+        "cursor",
+        None,
+    );
+    let mut args = base_args("cursor");
+    args.extend(["--approval".to_string(), approval_path]);
+
+    let output = run_cli(args, &fixture);
+
+    assert_eq!(output.exit_code, 2);
+    assert!(output
+        .stderr
+        .contains("--approval cannot be mixed with semantic descriptor flags"));
+}
+
+#[test]
+fn onboard_agent_approval_requires_override_reason_for_nonrecommended_selection() {
+    let fixture = fixture_root("onboard-agent-approval-override-required");
+    let approval_path = seed_approval_artifact(
+        &fixture,
+        "docs/project_management/next/cursor-cli-onboarding/governance/approved-agent.toml",
+        "codex",
+        "cursor",
+        None,
+    );
+
+    let output = run_cli(approval_args("--dry-run", &approval_path), &fixture);
+
+    assert_eq!(output.exit_code, 2);
+    assert!(output.stderr.contains("override_reason"));
+}
+
+#[test]
+fn onboard_agent_approval_rejects_paths_outside_governance_roots() {
+    let fixture = fixture_root("onboard-agent-approval-invalid-path");
+    let invalid_path = "docs/project_management/next/cursor-cli-onboarding/approved-agent.toml";
+    seed_approval_artifact(&fixture, invalid_path, "cursor", "cursor", None);
+
+    let output = run_cli(approval_args("--dry-run", invalid_path), &fixture);
+
+    assert_eq!(output.exit_code, 2);
+    assert!(output
+        .stderr
+        .contains("must be repo-relative and rooted under"));
+}
+
+#[test]
 fn onboard_agent_write_rejects_divergent_replay_without_mutating_other_files() {
     let fixture = fixture_root("onboard-agent-divergent-replay");
     seed_release_touchpoints(&fixture);
@@ -386,6 +490,33 @@ fn onboard_agent_write_allows_preexisting_runtime_owned_directories() {
 fn onboard_agent_closeout_packet_replays_identically_without_rewriting_manual_metrics() {
     let fixture = fixture_root("onboard-agent-closeout");
     seed_release_touchpoints(&fixture);
+    let approval_rel =
+        "docs/project_management/next/cursor-cli-onboarding/governance/approved-agent.toml";
+    let approval_path = seed_approval_artifact(&fixture, approval_rel, "cursor", "cursor", None);
+    let closeout_path = fixture.join(
+        "docs/project_management/next/cursor-cli-onboarding/governance/proving-run-closeout.json",
+    );
+    let approval_sha256 = sha256_hex(&fixture.join(&approval_path));
+    write_text(
+        &closeout_path,
+        &serde_json::to_string_pretty(&json!({
+            "state": "closed",
+            "approval_ref": approval_path,
+            "approval_sha256": approval_sha256,
+            "approval_source": "governance-review",
+            "manual_control_plane_edits": 0,
+            "partial_write_incidents": 0,
+            "ambiguous_ownership_incidents": 0,
+            "duration_missing_reason": "Exact duration not recoverable from committed evidence.",
+            "preflight_passed": true,
+            "residual_friction": [
+                "Runtime-owned evidence capture still requires a local CLI install."
+            ],
+            "recorded_at": "2026-04-21T11:23:09Z",
+            "commit": "deadbeef"
+        }))
+        .expect("serialize closeout"),
+    );
     let metrics_path = fixture.join(
         "docs/project_management/next/cursor-cli-onboarding/governance/proving-run-metrics.json",
     );
@@ -432,10 +563,11 @@ fn onboard_agent_closeout_packet_replays_identically_without_rewriting_manual_me
     )
     .expect("read closeout handoff");
     assert!(handoff.contains("This packet records the closed proving run for `cursor`."));
+    assert!(handoff.contains("approval source: `governance-review`"));
     assert!(handoff.contains("manual control-plane file edits by maintainers: `0`"));
     assert!(handoff
-        .contains("approved-agent to repo-ready control-plane mutation time: `not recorded`"));
-    assert!(handoff.contains("closeout metadata: `docs/project_management/next/cursor-cli-onboarding/governance/proving-run-metrics.json`"));
+        .contains("approved-agent to repo-ready control-plane mutation time: `missing (Exact duration not recoverable from committed evidence.)`"));
+    assert!(handoff.contains("closeout metadata: `docs/project_management/next/cursor-cli-onboarding/governance/proving-run-closeout.json`"));
     assert!(handoff.contains("No open runtime next step remains in this packet."));
 
     let remediation =
@@ -446,8 +578,9 @@ fn onboard_agent_closeout_packet_replays_identically_without_rewriting_manual_me
     assert!(
         remediation.contains("Runtime-owned evidence capture still requires a local CLI install.")
     );
-    assert!(remediation
-        .contains("Timing note: Exact duration not recoverable from committed evidence."));
+    assert!(remediation.contains(
+        "Duration missing reason: Exact duration not recoverable from committed evidence."
+    ));
 }
 
 #[cfg(unix)]
@@ -519,203 +652,5 @@ where
             stdout: String::new(),
             stderr: err.to_string(),
         },
-    }
-}
-
-fn base_args(agent_id: &str) -> Vec<String> {
-    base_args_with_package_name(agent_id, "unified-agent-api-cursor")
-}
-
-fn base_args_with_package_name(agent_id: &str, package_name: &str) -> Vec<String> {
-    base_args_with_mode(agent_id, package_name, "--dry-run", false)
-}
-
-fn write_args(agent_id: &str) -> Vec<String> {
-    base_args_with_mode(agent_id, "unified-agent-api-cursor", "--write", false)
-}
-
-fn base_args_with_mode(
-    agent_id: &str,
-    package_name: &str,
-    mode_flag: &str,
-    include_other_mode: bool,
-) -> Vec<String> {
-    args_with_overrides(mode_flag, agent_id, package_name, &[], include_other_mode)
-}
-
-fn args_with_overrides(
-    mode_flag: &str,
-    agent_id: &str,
-    package_name: &str,
-    overrides: &[(&str, &str)],
-    include_other_mode: bool,
-) -> Vec<String> {
-    let mut args = vec![
-        "xtask".to_string(),
-        "onboard-agent".to_string(),
-        mode_flag.to_string(),
-    ];
-    if include_other_mode {
-        args.push(if mode_flag == "--dry-run" {
-            "--write".to_string()
-        } else {
-            "--dry-run".to_string()
-        });
-    }
-
-    args.extend([
-        "--agent-id".to_string(),
-        agent_id.to_string(),
-        "--display-name".to_string(),
-        "Cursor CLI".to_string(),
-        "--crate-path".to_string(),
-        "crates/cursor".to_string(),
-        "--backend-module".to_string(),
-        "crates/agent_api/src/backends/cursor".to_string(),
-        "--manifest-root".to_string(),
-        "cli_manifests/cursor".to_string(),
-        "--package-name".to_string(),
-        package_name.to_string(),
-        "--canonical-target".to_string(),
-        "linux-x64".to_string(),
-        "--wrapper-coverage-binding-kind".to_string(),
-        "generated_from_wrapper_crate".to_string(),
-        "--wrapper-coverage-source-path".to_string(),
-        "crates/cursor".to_string(),
-        "--always-on-capability".to_string(),
-        "agent_api.run".to_string(),
-        "--target-gated-capability".to_string(),
-        "agent_api.tools.mcp.list.v1:linux-x64".to_string(),
-        "--config-gated-capability".to_string(),
-        "agent_api.exec.external_sandbox.v1:allow_external_sandbox_exec".to_string(),
-        "--support-matrix-enabled".to_string(),
-        "true".to_string(),
-        "--capability-matrix-enabled".to_string(),
-        "true".to_string(),
-        "--docs-release-track".to_string(),
-        "crates-io".to_string(),
-        "--onboarding-pack-prefix".to_string(),
-        "cursor-cli-onboarding".to_string(),
-    ]);
-
-    for (flag, value) in overrides {
-        let position = args
-            .iter()
-            .position(|existing| existing == flag)
-            .expect("override flag must exist");
-        args[position + 1] = (*value).to_string();
-    }
-
-    args
-}
-
-fn fixture_root(prefix: &str) -> PathBuf {
-    let root = std::env::temp_dir().join(format!(
-        "{prefix}-{}-{}",
-        std::process::id(),
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .expect("system time after unix epoch")
-            .as_nanos()
-    ));
-    fs::create_dir_all(&root).expect("create temp fixture");
-    write_text(
-        &root.join("Cargo.toml"),
-        "[workspace]\nmembers = [\n  \"crates/agent_api\",\n  \"crates/codex\",\n  \"crates/claude_code\",\n  \"crates/opencode\",\n  \"crates/wrapper_events\",\n  \"crates/xtask\",\n]\n",
-    );
-    write_text(
-        &root.join("crates/xtask/data/agent_registry.toml"),
-        SEEDED_REGISTRY,
-    );
-    write_text(
-        &root.join("crates/agent_api/Cargo.toml"),
-        "[package]\nname = \"unified-agent-api\"\nversion = \"0.2.3\"\nedition = \"2021\"\n",
-    );
-    write_text(
-        &root.join("crates/codex/Cargo.toml"),
-        "[package]\nname = \"unified-agent-api-codex\"\nversion = \"0.2.3\"\nedition = \"2021\"\n",
-    );
-    write_text(
-        &root.join("crates/claude_code/Cargo.toml"),
-        "[package]\nname = \"unified-agent-api-claude-code\"\nversion = \"0.2.3\"\nedition = \"2021\"\n",
-    );
-    write_text(
-        &root.join("crates/opencode/Cargo.toml"),
-        "[package]\nname = \"unified-agent-api-opencode\"\nversion = \"0.2.3\"\nedition = \"2021\"\n",
-    );
-    write_text(
-        &root.join("crates/wrapper_events/Cargo.toml"),
-        "[package]\nname = \"unified-agent-api-wrapper-events\"\nversion = \"0.2.3\"\nedition = \"2021\"\n",
-    );
-    write_text(
-        &root.join("crates/xtask/Cargo.toml"),
-        "[package]\nname = \"xtask\"\nversion = \"0.2.3\"\nedition = \"2021\"\npublish = false\n",
-    );
-    root
-}
-
-fn write_text(path: &Path, contents: &str) {
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).expect("create parent dirs");
-    }
-    fs::write(path, contents).expect("write file");
-}
-
-fn seed_release_touchpoints(root: &Path) {
-    write_text(
-        &root.join("docs/crates-io-release.md"),
-        "# Release docs\n\nManual contract text.\n",
-    );
-    write_text(
-        &root.join(".github/workflows/publish-crates.yml"),
-        "name: publish-crates\n",
-    );
-    write_text(
-        &root.join("scripts/publish_crates.py"),
-        "print('publish')\n",
-    );
-    write_text(
-        &root.join("scripts/validate_publish_versions.py"),
-        "print('validate')\n",
-    );
-    write_text(
-        &root.join("scripts/check_publish_readiness.py"),
-        "print('readiness')\n",
-    );
-}
-
-fn assert_sections_in_order(stdout: &str, sections: &[&str]) {
-    let mut cursor = 0usize;
-    for section in sections {
-        let found = stdout[cursor..]
-            .find(section)
-            .map(|offset| cursor + offset)
-            .unwrap_or_else(|| panic!("missing section `{section}` in stdout:\n{stdout}"));
-        cursor = found + section.len();
-    }
-}
-
-fn snapshot_files(root: &Path) -> BTreeMap<String, Vec<u8>> {
-    let mut out = BTreeMap::new();
-    snapshot_files_recursive(root, root, &mut out);
-    out
-}
-
-fn snapshot_files_recursive(root: &Path, current: &Path, out: &mut BTreeMap<String, Vec<u8>>) {
-    let entries = fs::read_dir(current).expect("read dir");
-    for entry in entries {
-        let entry = entry.expect("read dir entry");
-        let path = entry.path();
-        let file_type = entry.file_type().expect("read file type");
-        if file_type.is_dir() {
-            snapshot_files_recursive(root, &path, out);
-        } else if file_type.is_file() {
-            let rel = path
-                .strip_prefix(root)
-                .expect("path relative to root")
-                .display()
-                .to_string();
-            out.insert(rel, fs::read(&path).expect("read file"));
-        }
     }
 }

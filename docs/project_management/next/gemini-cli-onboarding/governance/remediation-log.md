@@ -2,5 +2,5 @@
 
 # Remediation log
 
-- No residual friction recorded.
-- Timing note: Exact duration not recoverable from committed evidence.
+- No residual friction recorded: No residual friction remained in the committed proving-run evidence.
+- Duration missing reason: Exact duration not recoverable from committed evidence.

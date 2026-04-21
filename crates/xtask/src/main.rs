@@ -6,6 +6,7 @@ mod capability_matrix_audit;
 mod claude_snapshot;
 mod claude_union;
 mod claude_wrapper_coverage;
+mod close_proving_run;
 mod codex_report;
 mod codex_retain;
 mod codex_snapshot;
@@ -39,6 +40,8 @@ enum Command {
     CodexSnapshot(codex_snapshot::Args),
     /// Generate a Claude Code CLI snapshot manifest under `cli_manifests/claude_code/`.
     ClaudeSnapshot(claude_snapshot::Args),
+    /// Validate a proving-run closeout artifact and refresh the onboarding packet docs.
+    CloseProvingRun(close_proving_run::Args),
     /// Merge per-target snapshots into a union snapshot under `cli_manifests/codex/`.
     CodexUnion(codex_union::Args),
     /// Merge per-target snapshots into a union snapshot under `cli_manifests/claude_code/`.
@@ -94,6 +97,13 @@ fn main() {
             Err(err) => {
                 eprintln!("{err}");
                 1
+            }
+        },
+        Command::CloseProvingRun(args) => match close_proving_run::run(args) {
+            Ok(()) => 0,
+            Err(err) => {
+                eprintln!("{err}");
+                err.exit_code()
             }
         },
         Command::CodexUnion(args) => match codex_union::run(args) {

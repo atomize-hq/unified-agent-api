@@ -1,3 +1,4 @@
+mod approval;
 mod mutation;
 mod preview;
 mod validation;
@@ -51,29 +52,33 @@ pub struct Args {
     #[arg(long)]
     pub write: bool,
 
+    /// Repo-relative approved onboarding artifact under docs/project_management/next/**/governance/approved-agent.toml.
+    #[arg(long)]
+    pub approval: Option<String>,
+
     /// Control-plane agent identifier.
     #[arg(long)]
-    pub agent_id: String,
+    pub agent_id: Option<String>,
 
     /// Human-facing agent name.
     #[arg(long)]
-    pub display_name: String,
+    pub display_name: Option<String>,
 
     /// Repo-relative wrapper crate root.
     #[arg(long)]
-    pub crate_path: String,
+    pub crate_path: Option<String>,
 
     /// Repo-relative backend module path under `crates/agent_api/src/backends/`.
     #[arg(long)]
-    pub backend_module: String,
+    pub backend_module: Option<String>,
 
     /// Repo-relative manifest root under `cli_manifests/`.
     #[arg(long)]
-    pub manifest_root: String,
+    pub manifest_root: Option<String>,
 
     /// Publishable crate package name.
     #[arg(long)]
-    pub package_name: String,
+    pub package_name: Option<String>,
 
     /// Canonical target triple used for capability projection and scaffolding.
     #[arg(long = "canonical-target")]
@@ -81,11 +86,11 @@ pub struct Args {
 
     /// Wrapper coverage binding kind.
     #[arg(long = "wrapper-coverage-binding-kind")]
-    pub wrapper_coverage_binding_kind: String,
+    pub wrapper_coverage_binding_kind: Option<String>,
 
     /// Repo-relative wrapper coverage source path.
     #[arg(long = "wrapper-coverage-source-path")]
-    pub wrapper_coverage_source_path: String,
+    pub wrapper_coverage_source_path: Option<String>,
 
     /// Always-advertised capability id.
     #[arg(long = "always-on-capability")]
@@ -105,19 +110,19 @@ pub struct Args {
 
     /// Whether the agent is enrolled in support-matrix publication.
     #[arg(long = "support-matrix-enabled", action = clap::ArgAction::Set)]
-    pub support_matrix_enabled: bool,
+    pub support_matrix_enabled: Option<bool>,
 
     /// Whether the agent is enrolled in capability-matrix publication.
     #[arg(long = "capability-matrix-enabled", action = clap::ArgAction::Set)]
-    pub capability_matrix_enabled: bool,
+    pub capability_matrix_enabled: Option<bool>,
 
     /// Release documentation track name.
     #[arg(long = "docs-release-track")]
-    pub docs_release_track: String,
+    pub docs_release_track: Option<String>,
 
     /// Docs onboarding pack directory prefix under `docs/project_management/next/`.
     #[arg(long = "onboarding-pack-prefix")]
-    pub onboarding_pack_prefix: String,
+    pub onboarding_pack_prefix: Option<String>,
 }
 
 #[derive(Debug, Error)]
@@ -156,6 +161,8 @@ struct DraftEntry {
     capability_matrix_enabled: bool,
     docs_release_track: String,
     onboarding_pack_prefix: String,
+    approval_artifact_path: Option<String>,
+    approval_artifact_sha256: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -169,6 +176,29 @@ struct ConfigGate {
     capability_id: String,
     config_key: String,
     targets: Option<Vec<String>>,
+}
+
+#[derive(Debug, Clone)]
+struct DraftDescriptorInput {
+    agent_id: String,
+    display_name: String,
+    crate_path: String,
+    backend_module: String,
+    manifest_root: String,
+    package_name: String,
+    canonical_targets: Vec<String>,
+    wrapper_coverage_binding_kind: String,
+    wrapper_coverage_source_path: String,
+    always_on_capabilities: Vec<String>,
+    target_gated_capabilities: Vec<String>,
+    config_gated_capabilities: Vec<String>,
+    backend_extensions: Vec<String>,
+    support_matrix_enabled: bool,
+    capability_matrix_enabled: bool,
+    docs_release_track: String,
+    onboarding_pack_prefix: String,
+    approval_artifact_path: Option<String>,
+    approval_artifact_sha256: Option<String>,
 }
 
 #[derive(Debug)]
@@ -198,7 +228,8 @@ pub fn run_in_workspace<W: Write>(
     let registry_text = fs::read_to_string(&registry_path)
         .map_err(|err| Error::Internal(format!("read {REGISTRY_RELATIVE_PATH}: {err}")))?;
     let registry = AgentRegistry::parse(&registry_text).map_err(map_registry_load_error)?;
-    let draft = DraftEntry::from_args(args)?;
+    let draft = DraftEntry::from_args(args, &jail)?;
+    let _approval_identity = draft.approval_identity();
 
     validate_registry_conflicts(&registry, &draft)?;
     validate_workspace_package_name_conflicts(&draft, &jail)?;
@@ -253,16 +284,31 @@ pub fn run_in_workspace<W: Write>(
 }
 
 impl DraftEntry {
-    fn from_args(args: Args) -> Result<Self, Error> {
+    fn from_args(args: Args, jail: &WorkspacePathJail) -> Result<Self, Error> {
+        let descriptor = match args.approval.clone() {
+            Some(approval_path) => {
+                if args.has_semantic_descriptor_flags() {
+                    return Err(Error::Validation(
+                        "--approval cannot be mixed with semantic descriptor flags".to_string(),
+                    ));
+                }
+                approval::load_descriptor_input(&approval_path, jail)?
+            }
+            None => DraftDescriptorInput::from_raw_args(args)?,
+        };
+        Self::from_descriptor_input(descriptor)
+    }
+
+    fn from_descriptor_input(input: DraftDescriptorInput) -> Result<Self, Error> {
         let canonical_targets =
-            normalize_ordered_unique(args.canonical_targets, "--canonical-target", true)?;
+            normalize_ordered_unique(input.canonical_targets, "--canonical-target", true)?;
         let canonical_index = canonical_index(&canonical_targets);
         let always_on_capabilities =
-            normalize_sorted_unique(args.always_on_capabilities, "--always-on-capability")?;
+            normalize_sorted_unique(input.always_on_capabilities, "--always-on-capability")?;
         let backend_extensions =
-            normalize_sorted_unique(args.backend_extensions, "--backend-extension")?;
+            normalize_sorted_unique(input.backend_extensions, "--backend-extension")?;
         let mut target_gated_capabilities = parse_target_gates(
-            args.target_gated_capabilities,
+            input.target_gated_capabilities,
             "--target-gated-capability",
             &canonical_index,
         )?;
@@ -272,7 +318,7 @@ impl DraftEntry {
                 .then_with(|| left.targets.cmp(&right.targets))
         });
         let mut config_gated_capabilities = parse_config_gates(
-            args.config_gated_capabilities,
+            input.config_gated_capabilities,
             "--config-gated-capability",
             &canonical_index,
         )?;
@@ -284,28 +330,100 @@ impl DraftEntry {
         });
 
         Ok(Self {
-            agent_id: args.agent_id,
-            display_name: args.display_name,
-            crate_path: args.crate_path,
-            backend_module: args.backend_module,
-            manifest_root: args.manifest_root,
-            package_name: args.package_name,
+            agent_id: input.agent_id,
+            display_name: input.display_name,
+            crate_path: input.crate_path,
+            backend_module: input.backend_module,
+            manifest_root: input.manifest_root,
+            package_name: input.package_name,
             canonical_targets,
-            wrapper_coverage_binding_kind: args.wrapper_coverage_binding_kind,
-            wrapper_coverage_source_path: args.wrapper_coverage_source_path,
+            wrapper_coverage_binding_kind: input.wrapper_coverage_binding_kind,
+            wrapper_coverage_source_path: input.wrapper_coverage_source_path,
             always_on_capabilities,
             target_gated_capabilities,
             config_gated_capabilities,
             backend_extensions,
-            support_matrix_enabled: args.support_matrix_enabled,
-            capability_matrix_enabled: args.capability_matrix_enabled,
-            docs_release_track: args.docs_release_track,
-            onboarding_pack_prefix: args.onboarding_pack_prefix,
+            support_matrix_enabled: input.support_matrix_enabled,
+            capability_matrix_enabled: input.capability_matrix_enabled,
+            docs_release_track: input.docs_release_track,
+            onboarding_pack_prefix: input.onboarding_pack_prefix,
+            approval_artifact_path: input.approval_artifact_path,
+            approval_artifact_sha256: input.approval_artifact_sha256,
         })
     }
 
     fn docs_pack_root(&self) -> PathBuf {
         Path::new(DOCS_NEXT_ROOT).join(&self.onboarding_pack_prefix)
+    }
+
+    fn approval_identity(&self) -> Option<(&str, &str)> {
+        Some((
+            self.approval_artifact_path.as_deref()?,
+            self.approval_artifact_sha256.as_deref()?,
+        ))
+    }
+}
+
+impl DraftDescriptorInput {
+    fn from_raw_args(args: Args) -> Result<Self, Error> {
+        Ok(Self {
+            agent_id: required_arg(args.agent_id, "--agent-id")?,
+            display_name: required_arg(args.display_name, "--display-name")?,
+            crate_path: required_arg(args.crate_path, "--crate-path")?,
+            backend_module: required_arg(args.backend_module, "--backend-module")?,
+            manifest_root: required_arg(args.manifest_root, "--manifest-root")?,
+            package_name: required_arg(args.package_name, "--package-name")?,
+            canonical_targets: args.canonical_targets,
+            wrapper_coverage_binding_kind: required_arg(
+                args.wrapper_coverage_binding_kind,
+                "--wrapper-coverage-binding-kind",
+            )?,
+            wrapper_coverage_source_path: required_arg(
+                args.wrapper_coverage_source_path,
+                "--wrapper-coverage-source-path",
+            )?,
+            always_on_capabilities: args.always_on_capabilities,
+            target_gated_capabilities: args.target_gated_capabilities,
+            config_gated_capabilities: args.config_gated_capabilities,
+            backend_extensions: args.backend_extensions,
+            support_matrix_enabled: required_bool(
+                args.support_matrix_enabled,
+                "--support-matrix-enabled",
+            )?,
+            capability_matrix_enabled: required_bool(
+                args.capability_matrix_enabled,
+                "--capability-matrix-enabled",
+            )?,
+            docs_release_track: required_arg(args.docs_release_track, "--docs-release-track")?,
+            onboarding_pack_prefix: required_arg(
+                args.onboarding_pack_prefix,
+                "--onboarding-pack-prefix",
+            )?,
+            approval_artifact_path: None,
+            approval_artifact_sha256: None,
+        })
+    }
+}
+
+impl Args {
+    fn has_semantic_descriptor_flags(&self) -> bool {
+        self.agent_id.is_some()
+            || self.display_name.is_some()
+            || self.crate_path.is_some()
+            || self.backend_module.is_some()
+            || self.manifest_root.is_some()
+            || self.package_name.is_some()
+            || !self.canonical_targets.is_empty()
+            || self.wrapper_coverage_binding_kind.is_some()
+            || self.wrapper_coverage_source_path.is_some()
+            || !self.always_on_capabilities.is_empty()
+            || !self.target_gated_capabilities.is_empty()
+            || !self.config_gated_capabilities.is_empty()
+            || !self.backend_extensions.is_empty()
+            || self.support_matrix_enabled.is_some()
+            || self.capability_matrix_enabled.is_some()
+            || self.docs_release_track.is_some()
+            || self.onboarding_pack_prefix.is_some()
     }
 }
 
@@ -599,4 +717,27 @@ fn canonical_index(canonical_targets: &[String]) -> BTreeMap<String, usize> {
         .enumerate()
         .map(|(index, target)| (target.clone(), index))
         .collect()
+}
+
+fn required_arg(value: Option<String>, flag_name: &str) -> Result<String, Error> {
+    let value = value.ok_or_else(|| {
+        Error::Validation(format!(
+            "{flag_name} must be provided when --approval is not used"
+        ))
+    })?;
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        return Err(Error::Validation(format!(
+            "{flag_name} must not be empty when --approval is not used"
+        )));
+    }
+    Ok(trimmed.to_string())
+}
+
+fn required_bool(value: Option<bool>, flag_name: &str) -> Result<bool, Error> {
+    value.ok_or_else(|| {
+        Error::Validation(format!(
+            "{flag_name} must be provided when --approval is not used"
+        ))
+    })
 }

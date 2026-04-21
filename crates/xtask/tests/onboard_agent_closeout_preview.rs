@@ -1,10 +1,20 @@
-use std::{
-    fs,
-    path::{Path, PathBuf},
-};
+use std::{fs, path::Path};
 
 use clap::{Parser, Subcommand};
+use serde_json::json;
 use xtask::onboard_agent;
+
+#[allow(dead_code)]
+#[path = "../src/close_proving_run.rs"]
+mod close_proving_run;
+
+#[path = "support/onboard_agent_harness.rs"]
+mod harness;
+
+use harness::{
+    fixture_root, gemini_dry_run_args, repo_root, seed_release_touchpoints, sha256_hex, write_text,
+    HarnessOutput,
+};
 
 #[derive(Debug, Parser)]
 #[command(name = "xtask")]
@@ -16,28 +26,14 @@ struct Cli {
 
 #[derive(Debug, Subcommand)]
 enum Command {
-    OnboardAgent(onboard_agent::Args),
-}
-
-#[derive(Debug)]
-struct HarnessOutput {
-    exit_code: i32,
-    stdout: String,
-    stderr: String,
+    CloseProvingRun(close_proving_run::Args),
+    OnboardAgent(Box<onboard_agent::Args>),
 }
 
 #[test]
-fn onboard_agent_branch_real_gemini_closeout_packet_matches_committed_preview() {
+fn committed_gemini_preview_renders_closed_packet_from_valid_m3_closeout() {
     let workspace_root = repo_root();
     let output = run_cli(gemini_dry_run_args(), &workspace_root);
-    let metrics_path = workspace_root.join(
-        "docs/project_management/next/gemini-cli-onboarding/governance/proving-run-metrics.json",
-    );
-    let metrics_text = fs::read_to_string(&metrics_path).expect("read committed metrics");
-    let metrics: serde_json::Value =
-        serde_json::from_str(&metrics_text).expect("parse committed metrics");
-    let recorded_at = metrics["recorded_at"].as_str().expect("recorded_at string");
-    let commit = metrics["commit"].as_str().expect("commit string");
 
     assert_eq!(output.exit_code, 0, "stderr:\n{}", output.stderr);
     assert!(output
@@ -45,44 +41,274 @@ fn onboard_agent_branch_real_gemini_closeout_packet_matches_committed_preview() 
         .contains("Shared onboarding plan preview; no filesystem writes performed."));
     assert!(output
         .stdout
-        .contains("This packet records the closed proving run for `gemini_cli`."));
-    assert!(output.stdout.contains(recorded_at));
-    assert!(output.stdout.contains(commit));
-    assert_stdout_contains_file_preview(
-        &output.stdout,
-        &workspace_root,
-        "docs/project_management/next/gemini-cli-onboarding/README.md",
+        .contains("This packet records the closed proving run for `Gemini CLI`."));
+    assert!(output
+        .stdout
+        .contains("- Packet state: `closed_proving_run`"));
+    assert!(output.stdout.contains(
+        "Closeout metadata is recorded in `docs/project_management/next/gemini-cli-onboarding/governance/proving-run-closeout.json`."
+    ));
+    assert!(output
+        .stdout
+        .contains("Approval linkage: `historical-m3-backfill` via"));
+}
+
+#[test]
+fn legacy_metrics_alone_does_not_close_packet() {
+    let fixture = fixture_root("onboard-agent-legacy-metrics");
+    seed_release_touchpoints(&fixture);
+    write_text(
+        &fixture.join(
+            "docs/project_management/next/gemini-cli-onboarding/governance/proving-run-metrics.json",
+        ),
+        &serde_json::to_string_pretty(&json!({
+            "manual_control_plane_edits": 0,
+            "partial_write_incidents": 0,
+            "ambiguous_ownership_incidents": 0,
+            "control_plane_mutation_duration_seconds": 7,
+            "control_plane_mutation_duration_recorded": true,
+            "preflight_passed": true,
+            "residual_friction": [],
+            "recorded_at": "2026-04-21T11:23:09Z",
+            "commit": "6b7d5f6e9cf2bf54933659f5700bb59d1f8a95e8"
+        }))
+        .expect("serialize metrics"),
     );
-    assert_stdout_contains_file_preview(
-        &output.stdout,
-        &workspace_root,
-        "docs/project_management/next/gemini-cli-onboarding/scope_brief.md",
+
+    let output = run_cli(gemini_dry_run_args(), &fixture);
+
+    assert_eq!(output.exit_code, 0, "stderr:\n{}", output.stderr);
+    assert!(output
+        .stdout
+        .contains("This packet captures the next executable onboarding step for `gemini_cli`."));
+    assert!(output.stdout.contains("- Packet state: `execution`"));
+    assert!(!output.stdout.contains("closed_proving_run"));
+    assert!(!output.stdout.contains("Approval linkage:"));
+}
+
+#[test]
+fn close_proving_run_validates_and_refreshes_packet_docs() {
+    let fixture = fixture_root("close-proving-run-pass");
+    seed_release_touchpoints(&fixture);
+    let approval_rel =
+        "docs/project_management/next/gemini-cli-onboarding/governance/proving-run-approval.md";
+    let approval_path = fixture.join(approval_rel);
+    write_text(&approval_path, "# Approval\n\nM3 proving run approved.\n");
+    let approval_sha256 = sha256_hex(&approval_path);
+    let closeout_path = fixture.join(
+        "docs/project_management/next/gemini-cli-onboarding/governance/proving-run-closeout.json",
     );
-    assert_stdout_contains_file_preview(
-        &output.stdout,
-        &workspace_root,
-        "docs/project_management/next/gemini-cli-onboarding/seam_map.md",
+    write_text(
+        &closeout_path,
+        &serde_json::to_string_pretty(&json!({
+            "state": "closed",
+            "approval_ref": approval_rel,
+            "approval_sha256": approval_sha256,
+            "approval_source": "governance-review",
+            "manual_control_plane_edits": 0,
+            "partial_write_incidents": 0,
+            "ambiguous_ownership_incidents": 0,
+            "duration_seconds": 17,
+            "residual_friction": ["Manual review step still took coordination."],
+            "preflight_passed": true,
+            "recorded_at": "2026-04-21T11:23:09Z",
+            "commit": "6b7d5f6e9cf2bf54933659f5700bb59d1f8a95e8"
+        }))
+        .expect("serialize closeout"),
     );
-    assert_stdout_contains_file_preview(
-        &output.stdout,
-        &workspace_root,
-        "docs/project_management/next/gemini-cli-onboarding/threading.md",
+
+    let closeout_output = run_cli(
+        vec![
+            "xtask".to_string(),
+            "close-proving-run".to_string(),
+            "--approval".to_string(),
+            approval_rel.to_string(),
+            "--closeout".to_string(),
+            "docs/project_management/next/gemini-cli-onboarding/governance/proving-run-closeout.json"
+                .to_string(),
+        ],
+        &fixture,
     );
-    assert_stdout_contains_file_preview(
-        &output.stdout,
-        &workspace_root,
-        "docs/project_management/next/gemini-cli-onboarding/review_surfaces.md",
+
+    assert_eq!(
+        closeout_output.exit_code, 0,
+        "stderr:\n{}",
+        closeout_output.stderr
     );
-    assert_stdout_contains_file_preview(
-        &output.stdout,
-        &workspace_root,
-        "docs/project_management/next/gemini-cli-onboarding/governance/remediation-log.md",
+    assert!(closeout_output
+        .stdout
+        .contains("OK: close-proving-run write complete."));
+
+    let readme = fs::read_to_string(
+        fixture.join("docs/project_management/next/gemini-cli-onboarding/README.md"),
+    )
+    .expect("read refreshed readme");
+    let handoff = fs::read_to_string(
+        fixture.join("docs/project_management/next/gemini-cli-onboarding/HANDOFF.md"),
+    )
+    .expect("read refreshed handoff");
+
+    assert!(readme.contains("- Packet state: `closed_proving_run`"));
+    assert!(readme.contains("Approval linkage: `governance-review` via"));
+    assert!(handoff.contains("- approval ref: `docs/project_management/next/gemini-cli-onboarding/governance/proving-run-approval.md`"));
+    assert!(handoff.contains("- closeout metadata: `docs/project_management/next/gemini-cli-onboarding/governance/proving-run-closeout.json`"));
+
+    let preview_output = run_cli(gemini_dry_run_args(), &fixture);
+    assert_eq!(
+        preview_output.exit_code, 0,
+        "stderr:\n{}",
+        preview_output.stderr
     );
-    assert_stdout_contains_file_preview(
-        &output.stdout,
-        &workspace_root,
-        "docs/project_management/next/gemini-cli-onboarding/HANDOFF.md",
+    assert!(preview_output
+        .stdout
+        .contains("This packet records the closed proving run for `Gemini CLI`."));
+    assert!(preview_output
+        .stdout
+        .contains("- Packet state: `closed_proving_run`"));
+    assert!(preview_output
+        .stdout
+        .contains("Approval linkage: `governance-review` via"));
+}
+
+#[test]
+fn closeout_without_approval_linkage_fails_with_exit_code_2() {
+    let fixture = fixture_root("close-proving-run-missing-approval");
+    let approval_rel =
+        "docs/project_management/next/gemini-cli-onboarding/governance/proving-run-approval.md";
+    let approval_path = fixture.join(approval_rel);
+    write_text(&approval_path, "approval\n");
+    let closeout_path = fixture.join(
+        "docs/project_management/next/gemini-cli-onboarding/governance/proving-run-closeout.json",
     );
+    write_text(
+        &closeout_path,
+        &serde_json::to_string_pretty(&json!({
+            "state": "closed",
+            "manual_control_plane_edits": 0,
+            "partial_write_incidents": 0,
+            "ambiguous_ownership_incidents": 0,
+            "duration_seconds": 17,
+            "explicit_none_reason": "No residual friction remained.",
+            "preflight_passed": true,
+            "recorded_at": "2026-04-21T11:23:09Z",
+            "commit": "6b7d5f6e9cf2bf54933659f5700bb59d1f8a95e8"
+        }))
+        .expect("serialize closeout"),
+    );
+
+    let output = run_cli(
+        vec![
+            "xtask".to_string(),
+            "close-proving-run".to_string(),
+            "--approval".to_string(),
+            approval_rel.to_string(),
+            "--closeout".to_string(),
+            "docs/project_management/next/gemini-cli-onboarding/governance/proving-run-closeout.json"
+                .to_string(),
+        ],
+        &fixture,
+    );
+
+    assert_eq!(output.exit_code, 2, "stdout:\n{}", output.stdout);
+    assert!(output
+        .stderr
+        .contains("missing required field `approval_ref`"));
+}
+
+#[test]
+fn closeout_without_duration_truth_fails_with_exit_code_2() {
+    let fixture = fixture_root("close-proving-run-missing-duration");
+    let approval_rel =
+        "docs/project_management/next/gemini-cli-onboarding/governance/proving-run-approval.md";
+    let approval_path = fixture.join(approval_rel);
+    write_text(&approval_path, "approval\n");
+    let approval_sha256 = sha256_hex(&approval_path);
+    let closeout_path = fixture.join(
+        "docs/project_management/next/gemini-cli-onboarding/governance/proving-run-closeout.json",
+    );
+    write_text(
+        &closeout_path,
+        &serde_json::to_string_pretty(&json!({
+            "state": "closed",
+            "approval_ref": approval_rel,
+            "approval_sha256": approval_sha256,
+            "approval_source": "governance-review",
+            "manual_control_plane_edits": 0,
+            "partial_write_incidents": 0,
+            "ambiguous_ownership_incidents": 0,
+            "explicit_none_reason": "No residual friction remained.",
+            "preflight_passed": true,
+            "recorded_at": "2026-04-21T11:23:09Z",
+            "commit": "6b7d5f6e9cf2bf54933659f5700bb59d1f8a95e8"
+        }))
+        .expect("serialize closeout"),
+    );
+
+    let output = run_cli(
+        vec![
+            "xtask".to_string(),
+            "close-proving-run".to_string(),
+            "--approval".to_string(),
+            approval_rel.to_string(),
+            "--closeout".to_string(),
+            "docs/project_management/next/gemini-cli-onboarding/governance/proving-run-closeout.json"
+                .to_string(),
+        ],
+        &fixture,
+    );
+
+    assert_eq!(output.exit_code, 2, "stdout:\n{}", output.stdout);
+    assert!(output
+        .stderr
+        .contains("exactly one of `duration_seconds` or `duration_missing_reason` is required"));
+}
+
+#[test]
+fn closeout_without_residual_friction_truth_fails_with_exit_code_2() {
+    let fixture = fixture_root("close-proving-run-missing-residual");
+    let approval_rel =
+        "docs/project_management/next/gemini-cli-onboarding/governance/proving-run-approval.md";
+    let approval_path = fixture.join(approval_rel);
+    write_text(&approval_path, "approval\n");
+    let approval_sha256 = sha256_hex(&approval_path);
+    let closeout_path = fixture.join(
+        "docs/project_management/next/gemini-cli-onboarding/governance/proving-run-closeout.json",
+    );
+    write_text(
+        &closeout_path,
+        &serde_json::to_string_pretty(&json!({
+            "state": "closed",
+            "approval_ref": approval_rel,
+            "approval_sha256": approval_sha256,
+            "approval_source": "governance-review",
+            "manual_control_plane_edits": 0,
+            "partial_write_incidents": 0,
+            "ambiguous_ownership_incidents": 0,
+            "duration_seconds": 17,
+            "preflight_passed": true,
+            "recorded_at": "2026-04-21T11:23:09Z",
+            "commit": "6b7d5f6e9cf2bf54933659f5700bb59d1f8a95e8"
+        }))
+        .expect("serialize closeout"),
+    );
+
+    let output = run_cli(
+        vec![
+            "xtask".to_string(),
+            "close-proving-run".to_string(),
+            "--approval".to_string(),
+            approval_rel.to_string(),
+            "--closeout".to_string(),
+            "docs/project_management/next/gemini-cli-onboarding/governance/proving-run-closeout.json"
+                .to_string(),
+        ],
+        &fixture,
+    );
+
+    assert_eq!(output.exit_code, 2, "stdout:\n{}", output.stdout);
+    assert!(output
+        .stderr
+        .contains("exactly one of `residual_friction` or `explicit_none_reason` is required"));
 }
 
 fn run_cli<I, S>(argv: I, workspace_root: &Path) -> HarnessOutput
@@ -101,7 +327,16 @@ where
             let mut stderr = String::new();
             let exit_code = match cli.command {
                 Command::OnboardAgent(args) => {
-                    match onboard_agent::run_in_workspace(workspace_root, args, &mut stdout) {
+                    match onboard_agent::run_in_workspace(workspace_root, *args, &mut stdout) {
+                        Ok(()) => 0,
+                        Err(err) => {
+                            stderr = format!("{err}\n");
+                            err.exit_code()
+                        }
+                    }
+                }
+                Command::CloseProvingRun(args) => {
+                    match close_proving_run::run_in_workspace(workspace_root, args, &mut stdout) {
                         Ok(()) => 0,
                         Err(err) => {
                             stderr = format!("{err}\n");
@@ -122,64 +357,4 @@ where
             stderr: err.to_string(),
         },
     }
-}
-
-fn gemini_dry_run_args() -> Vec<String> {
-    vec![
-        "xtask".to_string(),
-        "onboard-agent".to_string(),
-        "--dry-run".to_string(),
-        "--agent-id".to_string(),
-        "gemini_cli".to_string(),
-        "--display-name".to_string(),
-        "Gemini CLI".to_string(),
-        "--crate-path".to_string(),
-        "crates/gemini_cli".to_string(),
-        "--backend-module".to_string(),
-        "crates/agent_api/src/backends/gemini_cli".to_string(),
-        "--manifest-root".to_string(),
-        "cli_manifests/gemini_cli".to_string(),
-        "--package-name".to_string(),
-        "unified-agent-api-gemini-cli".to_string(),
-        "--canonical-target".to_string(),
-        "darwin-arm64".to_string(),
-        "--wrapper-coverage-binding-kind".to_string(),
-        "generated_from_wrapper_crate".to_string(),
-        "--wrapper-coverage-source-path".to_string(),
-        "crates/gemini_cli".to_string(),
-        "--always-on-capability".to_string(),
-        "agent_api.config.model.v1".to_string(),
-        "--always-on-capability".to_string(),
-        "agent_api.events".to_string(),
-        "--always-on-capability".to_string(),
-        "agent_api.events.live".to_string(),
-        "--always-on-capability".to_string(),
-        "agent_api.run".to_string(),
-        "--support-matrix-enabled".to_string(),
-        "true".to_string(),
-        "--capability-matrix-enabled".to_string(),
-        "true".to_string(),
-        "--docs-release-track".to_string(),
-        "crates-io".to_string(),
-        "--onboarding-pack-prefix".to_string(),
-        "gemini-cli-onboarding".to_string(),
-    ]
-}
-
-fn repo_root() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .expect("crates dir")
-        .parent()
-        .expect("repo root")
-        .to_path_buf()
-}
-
-fn assert_stdout_contains_file_preview(stdout: &str, root: &Path, relative_path: &str) {
-    let contents = fs::read_to_string(root.join(relative_path)).expect("read committed file");
-    let expected = format!("Path: {relative_path}\n```md\n{contents}```");
-    assert!(
-        stdout.contains(&expected),
-        "stdout did not contain committed preview for {relative_path}:\n{stdout}"
-    );
 }

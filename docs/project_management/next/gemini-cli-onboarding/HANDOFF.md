@@ -12,19 +12,22 @@ This packet records the closed proving run for `gemini_cli`.
 
 ## Proving-run closeout
 
+- approval ref: `docs/project_management/next/gemini-cli-onboarding/governance/approved-agent.toml`
+- approval source: `historical-m3-backfill`
+- approval artifact sha256: `a935c753a6e9d7084af1aedff39a84a48199cea33f43c48a7bbe828d6b44efab`
 - manual control-plane file edits by maintainers: `0`
 - partial-write incidents: `0`
 - ambiguous ownership incidents: `0`
-- approved-agent to repo-ready control-plane mutation time: `not recorded`
+- approved-agent to repo-ready control-plane mutation time: `missing (Exact duration not recoverable from committed evidence.)`
 - proving-run closeout passes `make preflight`: `true`
 - recorded at: `2026-04-21T11:23:09Z`
 - commit: `6b7d5f6e9cf2bf54933659f5700bb59d1f8a95e8`
-- closeout metadata: `docs/project_management/next/gemini-cli-onboarding/governance/proving-run-metrics.json`
+- closeout metadata: `docs/project_management/next/gemini-cli-onboarding/governance/proving-run-closeout.json`
 
 ## Residual friction
 
-- No residual friction recorded.
-- Timing note: Exact duration not recoverable from committed evidence.
+- No residual friction recorded: No residual friction remained in the committed proving-run evidence.
+- Duration missing reason: Exact duration not recoverable from committed evidence.
 
 ## Status
 

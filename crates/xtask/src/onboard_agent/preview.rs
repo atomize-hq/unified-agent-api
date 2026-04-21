@@ -6,15 +6,10 @@ use crate::agent_registry::REGISTRY_RELATIVE_PATH;
 use toml_edit::DocumentMut;
 
 use self::render::{
-    render_current_json, render_handoff_body, render_readme_body, render_remediation_log_body,
-    render_review_surfaces_body, render_scope_brief_body, render_threading_body, PacketPhase,
-    ProvingRunMetrics,
+    build_docs_preview as render_docs_preview, load_validated_closeout_if_present,
+    release_touchpoint_lines, PacketPhase, ProvingRunCloseout,
 };
-use super::{
-    ConfigGate, DraftEntry, Error, TargetGate, CHECK_PUBLISH_READINESS_SCRIPT_PATH,
-    OWNERSHIP_MARKER, PUBLISH_SCRIPT_PATH, PUBLISH_WORKFLOW_PATH, RELEASE_DOC_PATH,
-    VALIDATE_PUBLISH_SCRIPT_PATH,
-};
+use super::{ConfigGate, DraftEntry, Error, TargetGate, RELEASE_DOC_PATH};
 
 const RELEASE_DOC_START_MARKER: &str =
     "<!-- generated-by: xtask onboard-agent; section: crates-io-release -->";
@@ -22,7 +17,6 @@ const RELEASE_DOC_END_MARKER: &str =
     "<!-- /generated-by: xtask onboard-agent; section: crates-io-release -->";
 const WRAPPER_EVENTS_PACKAGE_NAME: &str = "unified-agent-api-wrapper-events";
 const ROOT_AGENT_API_PACKAGE_NAME: &str = "unified-agent-api";
-const PROVING_RUN_METRICS_RELATIVE_PATH: &str = "governance/proving-run-metrics.json";
 
 #[derive(Debug)]
 pub(super) struct ReleasePreview {
@@ -56,19 +50,7 @@ pub(super) fn build_release_preview(
     let release_doc_block = render_release_doc_block(&publishable_packages);
     let desired_release_doc = splice_release_doc_block(&release_doc_text, &release_doc_block);
 
-    let mut lines = vec![
-        format!(
-            "Path: Cargo.toml will ensure workspace member `{}` is enrolled.",
-            draft.crate_path
-        ),
-        format!(
-            "Path: {RELEASE_DOC_PATH} will ensure the generated release block includes `{}` on release track `{}`.",
-            draft.package_name, draft.docs_release_track
-        ),
-    ];
-    lines.push(format!(
-        "Workflow and script files remain unchanged: {PUBLISH_WORKFLOW_PATH}, {PUBLISH_SCRIPT_PATH}, {VALIDATE_PUBLISH_SCRIPT_PATH}, {CHECK_PUBLISH_READINESS_SCRIPT_PATH}."
-    ));
+    let lines = release_touchpoint_lines(draft);
     Ok(ReleasePreview {
         lines,
         workspace_manifest,
@@ -83,21 +65,8 @@ pub(super) fn build_release_preview(
 pub(super) fn load_proving_run_metrics(
     workspace_root: &Path,
     draft: &DraftEntry,
-) -> Result<Option<ProvingRunMetrics>, Error> {
-    let metrics_path = workspace_root.join(proving_run_metrics_relative_path(draft));
-    let text = match fs::read_to_string(&metrics_path) {
-        Ok(text) => text,
-        Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(None),
-        Err(err) => {
-            return Err(Error::Internal(format!(
-                "read {}: {err}",
-                metrics_path.display()
-            )));
-        }
-    };
-    let metrics = serde_json::from_str::<ProvingRunMetrics>(&text)
-        .map_err(|err| Error::Validation(format!("parse {}: {err}", metrics_path.display())))?;
-    Ok(Some(metrics))
+) -> Result<Option<ProvingRunCloseout>, Error> {
+    load_validated_closeout_if_present(workspace_root, draft).map_err(Error::Internal)
 }
 
 pub(super) fn write_input_summary<W: Write>(
@@ -354,80 +323,13 @@ pub(super) fn render_registry_entry_preview(draft: &DraftEntry) -> String {
 pub(super) fn build_docs_preview(
     draft: &DraftEntry,
     release_preview: &ReleasePreview,
-    metrics: Option<&ProvingRunMetrics>,
+    closeout: Option<&ProvingRunCloseout>,
 ) -> Vec<(String, Option<String>)> {
-    let docs_root = draft.docs_pack_root();
-    let docs_root_display = docs_root.display().to_string();
-    let metrics_path = proving_run_metrics_relative_path(draft);
-    let release_touchpoints = release_preview
-        .lines
-        .iter()
-        .map(|line| format!("- {line}"))
-        .collect::<Vec<_>>()
-        .join("\n");
-    let phase = match metrics {
-        Some(metrics) => PacketPhase::Closeout(metrics),
+    let phase = match closeout {
+        Some(closeout) => PacketPhase::Closeout(closeout),
         None => PacketPhase::Execution,
     };
-
-    vec![
-        (
-            docs_root.join("README.md").display().to_string(),
-            Some(render_markdown_file(render_readme_body(
-                draft,
-                phase,
-                &metrics_path,
-            ))),
-        ),
-        (
-            docs_root.join("scope_brief.md").display().to_string(),
-            Some(render_markdown_file(render_scope_brief_body(
-                draft,
-                phase,
-                &docs_root_display,
-                &metrics_path,
-            ))),
-        ),
-        (
-            docs_root.join("seam_map.md").display().to_string(),
-            Some(render_markdown_file(format!(
-                "# Seam map\n\n- Declaration seam: registry entry for `{}`\n- Docs seam: onboarding pack `{docs_root_display}`\n- Manifest seam: `{}`\n- Runtime seam: wrapper crate `{}` and backend module `{}`\n",
-                draft.agent_id,
-                draft.manifest_root,
-                draft.crate_path,
-                draft.backend_module
-            ))),
-        ),
-        (
-            docs_root.join("threading.md").display().to_string(),
-            Some(render_markdown_file(render_threading_body(draft, phase))),
-        ),
-        (
-            docs_root.join("review_surfaces.md").display().to_string(),
-            Some(render_markdown_file(render_review_surfaces_body(
-                draft,
-                phase,
-                &docs_root_display,
-            ))),
-        ),
-        (
-            docs_root
-                .join("governance/remediation-log.md")
-                .display()
-                .to_string(),
-            Some(render_markdown_file(render_remediation_log_body(phase))),
-        ),
-        (
-            docs_root.join("HANDOFF.md").display().to_string(),
-            Some(render_markdown_file(render_handoff_body(
-                draft,
-                phase,
-                &metrics_path,
-                &release_touchpoints,
-                &build_manual_follow_up(draft, metrics),
-            ))),
-        ),
-    ]
+    render_docs_preview(draft, &release_preview.lines, phase)
 }
 
 pub(super) fn build_manifest_preview(draft: &DraftEntry) -> Vec<(String, Option<String>)> {
@@ -470,11 +372,21 @@ pub(super) fn build_manifest_preview(draft: &DraftEntry) -> Vec<(String, Option<
     ]
 }
 
+fn render_current_json(draft: &DraftEntry) -> String {
+    let targets = draft
+        .canonical_targets
+        .iter()
+        .map(|target| format!("    \"{target}\""))
+        .collect::<Vec<_>>()
+        .join(",\n");
+    format!("{{\n  \"expected_targets\": [\n{targets}\n  ],\n  \"inputs\": []\n}}\n")
+}
+
 pub(super) fn build_manual_follow_up(
     draft: &DraftEntry,
-    metrics: Option<&ProvingRunMetrics>,
+    closeout: Option<&ProvingRunCloseout>,
 ) -> Vec<String> {
-    match metrics {
+    match closeout {
         Some(_) => vec![
             "No open runtime follow-up remains; the proving run is closed.".to_string(),
         ],
@@ -728,16 +640,4 @@ fn render_string_array(values: &[String]) -> String {
         .map(|value| format!("{value:?}"))
         .collect::<Vec<_>>();
     format!("[{}]", rendered.join(", "))
-}
-
-fn proving_run_metrics_relative_path(draft: &DraftEntry) -> String {
-    draft
-        .docs_pack_root()
-        .join(PROVING_RUN_METRICS_RELATIVE_PATH)
-        .display()
-        .to_string()
-}
-
-fn render_markdown_file(body: String) -> String {
-    format!("{OWNERSHIP_MARKER}\n\n{body}")
 }
