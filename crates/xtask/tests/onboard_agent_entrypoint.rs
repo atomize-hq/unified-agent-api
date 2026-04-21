@@ -9,8 +9,9 @@ mod harness;
 
 use harness::{
     approval_args, args_with_overrides, assert_sections_in_order, base_args, base_args_with_mode,
-    base_args_with_package_name, fixture_root, seed_approval_artifact, seed_release_touchpoints,
-    sha256_hex, snapshot_files, write_args, write_text, HarnessOutput,
+    base_args_with_package_name, fixture_root, seed_approval_artifact,
+    seed_approval_artifact_with_pack_prefix, seed_release_touchpoints, sha256_hex, snapshot_files,
+    write_args, write_text, HarnessOutput,
 };
 
 #[derive(Debug, Parser)]
@@ -496,9 +497,188 @@ fn onboard_agent_approval_rejects_paths_outside_governance_roots() {
     let output = run_cli(approval_args("--dry-run", invalid_path), &fixture);
 
     assert_eq!(output.exit_code, 2);
+    assert!(output.stderr.contains("must be repo-relative and match"));
+}
+
+#[test]
+fn onboard_agent_approval_rejects_pack_prefix_mismatch() {
+    let fixture = fixture_root("onboard-agent-approval-pack-prefix-mismatch");
+    let approval_path = seed_approval_artifact_with_pack_prefix(
+        &fixture,
+        "docs/project_management/next/cursor-cli-onboarding/governance/approved-agent.toml",
+        "cursor",
+        "cursor",
+        None,
+        "other-cursor-pack",
+    );
+
+    let output = run_cli(approval_args("--dry-run", &approval_path), &fixture);
+
+    assert_eq!(output.exit_code, 2);
+    assert!(output.stderr.contains("belongs to onboarding_pack_prefix"));
+}
+
+#[test]
+fn onboard_agent_approval_rejects_unsupported_artifact_version() {
+    let fixture = fixture_root("onboard-agent-approval-unsupported-version");
+    let approval_path = seed_approval_artifact(
+        &fixture,
+        "docs/project_management/next/cursor-cli-onboarding/governance/approved-agent.toml",
+        "cursor",
+        "cursor",
+        None,
+    );
+    let approval_file = fixture.join(&approval_path);
+    let contents = fs::read_to_string(&approval_file).expect("read approval");
+    write_text(
+        &approval_file,
+        &contents.replace("artifact_version = \"1\"", "artifact_version = \"2\""),
+    );
+
+    let output = run_cli(approval_args("--dry-run", &approval_path), &fixture);
+
+    assert_eq!(output.exit_code, 2);
+    assert!(output.stderr.contains("unsupported `artifact_version`"));
+}
+
+#[test]
+fn onboard_agent_approval_rejects_nonexistent_comparison_ref() {
+    let fixture = fixture_root("onboard-agent-approval-missing-comparison-ref");
+    let approval_path = seed_approval_artifact(
+        &fixture,
+        "docs/project_management/next/cursor-cli-onboarding/governance/approved-agent.toml",
+        "cursor",
+        "cursor",
+        None,
+    );
+    let approval_file = fixture.join(&approval_path);
+    let contents = fs::read_to_string(&approval_file).expect("read approval");
+    write_text(
+        &approval_file,
+        &contents.replace(
+            "docs/project_management/next/comparisons/cursor.md",
+            "docs/project_management/next/comparisons/missing.md",
+        ),
+    );
+
+    let output = run_cli(approval_args("--dry-run", &approval_path), &fixture);
+
+    assert_eq!(output.exit_code, 2);
     assert!(output
         .stderr
-        .contains("must be repo-relative and rooted under"));
+        .contains("field `comparison_ref` does not resolve"));
+}
+
+#[test]
+fn onboard_agent_approval_rejects_non_file_comparison_ref() {
+    let fixture = fixture_root("onboard-agent-approval-directory-comparison-ref");
+    let approval_path = seed_approval_artifact(
+        &fixture,
+        "docs/project_management/next/cursor-cli-onboarding/governance/approved-agent.toml",
+        "cursor",
+        "cursor",
+        None,
+    );
+    fs::create_dir_all(fixture.join("docs/project_management/next/comparisons/directory"))
+        .expect("create comparison dir");
+    let approval_file = fixture.join(&approval_path);
+    let contents = fs::read_to_string(&approval_file).expect("read approval");
+    write_text(
+        &approval_file,
+        &contents.replace(
+            "docs/project_management/next/comparisons/cursor.md",
+            "docs/project_management/next/comparisons/directory",
+        ),
+    );
+
+    let output = run_cli(approval_args("--dry-run", &approval_path), &fixture);
+
+    assert_eq!(output.exit_code, 2);
+    assert!(output
+        .stderr
+        .contains("field `comparison_ref` must point to an existing file"));
+}
+
+#[test]
+fn onboard_agent_approval_rejects_non_normal_comparison_ref() {
+    let fixture = fixture_root("onboard-agent-approval-nonnormal-comparison-ref");
+    let approval_path = seed_approval_artifact(
+        &fixture,
+        "docs/project_management/next/cursor-cli-onboarding/governance/approved-agent.toml",
+        "cursor",
+        "cursor",
+        None,
+    );
+    let approval_file = fixture.join(&approval_path);
+    let contents = fs::read_to_string(&approval_file).expect("read approval");
+    write_text(
+        &approval_file,
+        &contents.replace(
+            "docs/project_management/next/comparisons/cursor.md",
+            "../outside.md",
+        ),
+    );
+
+    let output = run_cli(approval_args("--dry-run", &approval_path), &fixture);
+
+    assert_eq!(output.exit_code, 2);
+    assert!(output.stderr.contains("must be a repo-relative file path"));
+}
+
+#[test]
+fn onboard_agent_approval_rejects_invalid_approval_commit() {
+    let fixture = fixture_root("onboard-agent-approval-invalid-commit");
+    let approval_path = seed_approval_artifact(
+        &fixture,
+        "docs/project_management/next/cursor-cli-onboarding/governance/approved-agent.toml",
+        "cursor",
+        "cursor",
+        None,
+    );
+    let approval_file = fixture.join(&approval_path);
+    let contents = fs::read_to_string(&approval_file).expect("read approval");
+    write_text(
+        &approval_file,
+        &contents.replace(
+            "approval_commit = \"deadbeef\"",
+            "approval_commit = \"test-approval-commit\"",
+        ),
+    );
+
+    let output = run_cli(approval_args("--dry-run", &approval_path), &fixture);
+
+    assert_eq!(output.exit_code, 2);
+    assert!(output
+        .stderr
+        .contains("`approval_commit` must be 7-40 lowercase hex characters"));
+}
+
+#[test]
+fn onboard_agent_approval_rejects_invalid_approval_recorded_at() {
+    let fixture = fixture_root("onboard-agent-approval-invalid-recorded-at");
+    let approval_path = seed_approval_artifact(
+        &fixture,
+        "docs/project_management/next/cursor-cli-onboarding/governance/approved-agent.toml",
+        "cursor",
+        "cursor",
+        None,
+    );
+    let approval_file = fixture.join(&approval_path);
+    let contents = fs::read_to_string(&approval_file).expect("read approval");
+    write_text(
+        &approval_file,
+        &contents.replace(
+            "approval_recorded_at = \"2026-04-21T11:23:09Z\"",
+            "approval_recorded_at = \"not-a-timestamp\"",
+        ),
+    );
+
+    let output = run_cli(approval_args("--dry-run", &approval_path), &fixture);
+
+    assert_eq!(output.exit_code, 2);
+    assert!(output
+        .stderr
+        .contains("`approval_recorded_at` must be RFC3339"));
 }
 
 #[test]

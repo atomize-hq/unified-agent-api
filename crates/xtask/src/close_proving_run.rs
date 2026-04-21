@@ -7,7 +7,6 @@ use std::{
 use clap::Parser;
 use serde::Deserialize;
 use thiserror::Error;
-use time::{format_description::well_known::Rfc3339, OffsetDateTime};
 use xtask::agent_registry::{AgentRegistry, AgentRegistryEntry, REGISTRY_RELATIVE_PATH};
 use xtask::approval_artifact::{self, ApprovalArtifact, ApprovalArtifactError};
 
@@ -392,25 +391,13 @@ fn validate_lower_hex_sha256(path: &Path, value: &str) -> Result<(), Error> {
 }
 
 fn validate_recorded_at(path: &Path, value: &str) -> Result<(), Error> {
-    OffsetDateTime::parse(value, &Rfc3339).map_err(|err| {
-        Error::Validation(format!(
-            "{}: `recorded_at` must be RFC3339 ({err})",
-            path.display()
-        ))
-    })?;
-    Ok(())
+    approval_artifact::validate_rfc3339_value(path, "recorded_at", value)
+        .map_err(|err| map_approval_artifact_error(path, err))
 }
 
 fn validate_commit(path: &Path, value: &str) -> Result<(), Error> {
-    let valid = (7..=40).contains(&value.len())
-        && value.chars().all(|ch| matches!(ch, '0'..='9' | 'a'..='f'));
-    if !valid {
-        return Err(Error::Validation(format!(
-            "{}: `commit` must be 7-40 lowercase hex characters",
-            path.display()
-        )));
-    }
-    Ok(())
+    approval_artifact::validate_commit_value(path, "commit", value)
+        .map_err(|err| map_approval_artifact_error(path, err))
 }
 
 fn load_approval_artifact(

@@ -215,9 +215,7 @@ fn close_proving_run_rejects_noncanonical_approval_artifact_even_when_ref_and_sh
     );
 
     assert_eq!(output.exit_code, 2, "stdout:\n{}", output.stdout);
-    assert!(output
-        .stderr
-        .contains("must be repo-relative and rooted under"));
+    assert!(output.stderr.contains("must be repo-relative and match"));
 }
 
 #[test]
@@ -279,7 +277,7 @@ fn close_proving_run_rejects_schema_invalid_approval_artifact_at_canonical_path(
         &approval_path,
         concat!(
             "artifact_version = \"1\"\n",
-            "comparison_ref = \"compare/gemini\"\n",
+            "comparison_ref = \"docs/project_management/next/comparisons/gemini.md\"\n",
             "selection_mode = \"factory_validation\"\n",
             "recommended_agent_id = \"gemini_cli\"\n",
             "approved_agent_id = \"gemini_cli\"\n",
@@ -327,6 +325,65 @@ fn close_proving_run_rejects_schema_invalid_approval_artifact_at_canonical_path(
     assert!(output
         .stderr
         .contains("missing required table `descriptor`"));
+}
+
+#[test]
+fn close_proving_run_rejects_invalid_approval_metadata_from_shared_loader() {
+    let fixture = fixture_root("close-proving-run-invalid-approval-metadata");
+    seed_release_touchpoints(&fixture);
+    let approval_rel =
+        "docs/project_management/next/gemini-cli-onboarding/governance/approved-agent.toml";
+    let approval_path =
+        seed_gemini_approval_artifact(&fixture, approval_rel, "gemini-cli-onboarding");
+    let approval_file = fixture.join(&approval_path);
+    let approval_contents = fs::read_to_string(&approval_file).expect("read approval");
+    write_text(
+        &approval_file,
+        &approval_contents.replace(
+            "approval_recorded_at = \"2026-04-21T11:23:09Z\"",
+            "approval_recorded_at = \"not-a-timestamp\"",
+        ),
+    );
+    let approval_sha256 = sha256_hex(&approval_file);
+    let closeout_path = fixture.join(
+        "docs/project_management/next/gemini-cli-onboarding/governance/proving-run-closeout.json",
+    );
+    write_text(
+        &closeout_path,
+        &serde_json::to_string_pretty(&json!({
+            "state": "closed",
+            "approval_ref": approval_rel,
+            "approval_sha256": approval_sha256,
+            "approval_source": "governance-review",
+            "manual_control_plane_edits": 0,
+            "partial_write_incidents": 0,
+            "ambiguous_ownership_incidents": 0,
+            "duration_seconds": 17,
+            "residual_friction": ["Manual review step still took coordination."],
+            "preflight_passed": true,
+            "recorded_at": "2026-04-21T11:23:09Z",
+            "commit": "6b7d5f6e9cf2bf54933659f5700bb59d1f8a95e8"
+        }))
+        .expect("serialize closeout"),
+    );
+
+    let output = run_cli(
+        vec![
+            "xtask".to_string(),
+            "close-proving-run".to_string(),
+            "--approval".to_string(),
+            approval_rel.to_string(),
+            "--closeout".to_string(),
+            "docs/project_management/next/gemini-cli-onboarding/governance/proving-run-closeout.json"
+                .to_string(),
+        ],
+        &fixture,
+    );
+
+    assert_eq!(output.exit_code, 2, "stdout:\n{}", output.stdout);
+    assert!(output
+        .stderr
+        .contains("`approval_recorded_at` must be RFC3339"));
 }
 
 #[test]
@@ -572,7 +629,7 @@ fn seed_gemini_approval_artifact(
     let contents = format!(
         concat!(
             "artifact_version = \"1\"\n",
-            "comparison_ref = \"compare/gemini\"\n",
+            "comparison_ref = \"docs/project_management/next/comparisons/gemini.md\"\n",
             "selection_mode = \"factory_validation\"\n",
             "recommended_agent_id = \"gemini_cli\"\n",
             "approved_agent_id = \"gemini_cli\"\n",

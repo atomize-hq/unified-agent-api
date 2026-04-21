@@ -207,6 +207,14 @@ pub fn fixture_root(prefix: &str) -> PathBuf {
         &root.join("crates/xtask/Cargo.toml"),
         "[package]\nname = \"xtask\"\nversion = \"0.2.3\"\nedition = \"2021\"\npublish = false\n",
     );
+    write_text(
+        &root.join("docs/project_management/next/comparisons/cursor.md"),
+        "# Cursor comparison\n",
+    );
+    write_text(
+        &root.join("docs/project_management/next/comparisons/gemini.md"),
+        "# Gemini comparison\n",
+    );
     root
 }
 
@@ -268,11 +276,11 @@ pub fn seed_approval_artifact_with_pack_prefix(
     let mut contents = format!(
         concat!(
             "artifact_version = \"1\"\n",
-            "comparison_ref = \"compare/cursor\"\n",
+            "comparison_ref = \"docs/project_management/next/comparisons/cursor.md\"\n",
             "selection_mode = \"factory_validation\"\n",
             "recommended_agent_id = \"{recommended_agent_id}\"\n",
             "approved_agent_id = \"{approved_agent_id}\"\n",
-            "approval_commit = \"test-approval-commit\"\n",
+            "approval_commit = \"deadbeef\"\n",
             "approval_recorded_at = \"2026-04-21T11:23:09Z\"\n",
         ),
         recommended_agent_id = recommended_agent_id,

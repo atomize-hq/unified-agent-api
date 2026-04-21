@@ -4,6 +4,7 @@ use std::{
 };
 
 use sha2::{Digest, Sha256};
+use time::{format_description::well_known::Rfc3339, OffsetDateTime};
 use toml_edit::{DocumentMut, TableLike};
 
 const DOCS_NEXT_ROOT: &str = "docs/project_management/next";
@@ -11,6 +12,7 @@ const APPROVAL_FILE_NAME: &str = "approved-agent.toml";
 const GOVERNANCE_DIR_NAME: &str = "governance";
 const FACTORY_VALIDATION_MODE: &str = "factory_validation";
 const FRONTIER_EXPANSION_MODE: &str = "frontier_expansion";
+const APPROVAL_ARTIFACT_VERSION: &str = "1";
 
 #[derive(Debug, Clone)]
 pub struct ApprovalArtifact {
@@ -60,7 +62,7 @@ pub fn load_approval_artifact(
     approval_path: &str,
 ) -> Result<ApprovalArtifact, ApprovalArtifactError> {
     let relative_path = PathBuf::from(approval_path);
-    validate_approval_path(&relative_path)?;
+    let path_pack_prefix = validate_approval_path(&relative_path)?;
 
     let workspace_root = fs::canonicalize(workspace_root).map_err(|err| {
         ApprovalArtifactError::Internal(format!("canonicalize {}: {err}", workspace_root.display()))
@@ -98,13 +100,22 @@ pub fn load_approval_artifact(
         ))
     })?;
 
-    parse_approval_document(document, &relative_path, &canonical_path, &bytes)
+    parse_approval_document(
+        document,
+        &workspace_root,
+        &relative_path,
+        &canonical_path,
+        &path_pack_prefix,
+        &bytes,
+    )
 }
 
 fn parse_approval_document(
     document: DocumentMut,
+    workspace_root: &Path,
     relative_path: &Path,
     canonical_path: &Path,
+    path_pack_prefix: &str,
     bytes: &[u8],
 ) -> Result<ApprovalArtifact, ApprovalArtifactError> {
     let root = document.as_item().as_table_like().ok_or_else(|| {
@@ -115,7 +126,14 @@ fn parse_approval_document(
     })?;
 
     let artifact_version = required_string(root, "artifact_version", relative_path)?;
+    validate_artifact_version(relative_path, &artifact_version)?;
     let comparison_ref = required_string(root, "comparison_ref", relative_path)?;
+    validate_repo_relative_existing_file(
+        workspace_root,
+        relative_path,
+        "comparison_ref",
+        &comparison_ref,
+    )?;
     let selection_mode = required_string(root, "selection_mode", relative_path)?;
     match selection_mode.as_str() {
         FACTORY_VALIDATION_MODE | FRONTIER_EXPANSION_MODE => {}
@@ -129,7 +147,9 @@ fn parse_approval_document(
     let recommended_agent_id = required_string(root, "recommended_agent_id", relative_path)?;
     let approved_agent_id = required_string(root, "approved_agent_id", relative_path)?;
     let approval_commit = required_string(root, "approval_commit", relative_path)?;
+    validate_commit_value(relative_path, "approval_commit", &approval_commit)?;
     let approval_recorded_at = required_string(root, "approval_recorded_at", relative_path)?;
+    validate_rfc3339_value(relative_path, "approval_recorded_at", &approval_recorded_at)?;
     let override_reason = optional_string(root, "override_reason", relative_path)?;
     if recommended_agent_id != approved_agent_id
         && override_reason.as_deref().unwrap_or_default().is_empty()
@@ -160,13 +180,16 @@ fn parse_approval_document(
             relative_path.display()
         )));
     }
-
-    let _ = (
-        artifact_version,
-        comparison_ref,
-        approval_commit,
-        approval_recorded_at,
-    );
+    let onboarding_pack_prefix =
+        required_string(descriptor, "onboarding_pack_prefix", relative_path)?;
+    if onboarding_pack_prefix != path_pack_prefix {
+        return Err(ApprovalArtifactError::Validation(format!(
+            "approval artifact `{}` belongs to onboarding_pack_prefix `{}` instead of `{}`",
+            relative_path.display(),
+            onboarding_pack_prefix,
+            path_pack_prefix
+        )));
+    }
 
     Ok(ApprovalArtifact {
         relative_path: relative_path.display().to_string(),
@@ -215,16 +238,12 @@ fn parse_approval_document(
                 relative_path,
             )?,
             docs_release_track: required_string(descriptor, "docs_release_track", relative_path)?,
-            onboarding_pack_prefix: required_string(
-                descriptor,
-                "onboarding_pack_prefix",
-                relative_path,
-            )?,
+            onboarding_pack_prefix,
         },
     })
 }
 
-fn validate_approval_path(relative_path: &Path) -> Result<(), ApprovalArtifactError> {
+fn validate_approval_path(relative_path: &Path) -> Result<String, ApprovalArtifactError> {
     let components = relative_path.components().collect::<Vec<_>>();
     if components.is_empty()
         || components
@@ -238,27 +257,120 @@ fn validate_approval_path(relative_path: &Path) -> Result<(), ApprovalArtifactEr
         .strip_prefix(DOCS_NEXT_ROOT)
         .map_err(|_| invalid_approval_path(relative_path))?;
     let rooted_components = rooted.components().collect::<Vec<_>>();
-    if rooted_components.len() < 3
+    if rooted_components.len() != 3
         || !matches!(
-            rooted_components[rooted_components.len() - 2],
+            rooted_components[1],
             Component::Normal(part) if part == GOVERNANCE_DIR_NAME
         )
         || !matches!(
-            rooted_components[rooted_components.len() - 1],
+            rooted_components[2],
             Component::Normal(part) if part == APPROVAL_FILE_NAME
         )
     {
         return Err(invalid_approval_path(relative_path));
     }
 
-    Ok(())
+    let Component::Normal(prefix) = rooted_components[0] else {
+        return Err(invalid_approval_path(relative_path));
+    };
+    Ok(prefix.to_string_lossy().into_owned())
 }
 
 fn invalid_approval_path(relative_path: &Path) -> ApprovalArtifactError {
     ApprovalArtifactError::Validation(format!(
-        "approval path `{}` must be repo-relative and rooted under `{DOCS_NEXT_ROOT}/**/{GOVERNANCE_DIR_NAME}/{APPROVAL_FILE_NAME}`",
+        "approval path `{}` must be repo-relative and match `{DOCS_NEXT_ROOT}/<prefix>/{GOVERNANCE_DIR_NAME}/{APPROVAL_FILE_NAME}`",
         relative_path.display()
     ))
+}
+
+fn validate_artifact_version(
+    relative_path: &Path,
+    artifact_version: &str,
+) -> Result<(), ApprovalArtifactError> {
+    if artifact_version != APPROVAL_ARTIFACT_VERSION {
+        return Err(ApprovalArtifactError::Validation(format!(
+            "approval artifact `{}` has unsupported `artifact_version` `{artifact_version}`; expected `{APPROVAL_ARTIFACT_VERSION}`",
+            relative_path.display()
+        )));
+    }
+    Ok(())
+}
+
+fn validate_repo_relative_existing_file(
+    workspace_root: &Path,
+    relative_path: &Path,
+    field_name: &str,
+    field_value: &str,
+) -> Result<(), ApprovalArtifactError> {
+    let referenced = Path::new(field_value);
+    let components = referenced.components().collect::<Vec<_>>();
+    if components.is_empty()
+        || components
+            .iter()
+            .any(|component| !matches!(component, Component::Normal(_)))
+    {
+        return Err(ApprovalArtifactError::Validation(format!(
+            "approval artifact `{}` field `{field_name}` must be a repo-relative file path with only normal path components",
+            relative_path.display()
+        )));
+    }
+
+    let canonical_path = fs::canonicalize(workspace_root.join(referenced)).map_err(|err| {
+        ApprovalArtifactError::Validation(format!(
+            "approval artifact `{}` field `{field_name}` does not resolve: {err}",
+            relative_path.display()
+        ))
+    })?;
+    if !canonical_path.starts_with(workspace_root) {
+        return Err(ApprovalArtifactError::Validation(format!(
+            "approval artifact `{}` field `{field_name}` resolves outside workspace root",
+            relative_path.display()
+        )));
+    }
+    let metadata = fs::metadata(&canonical_path).map_err(|err| {
+        ApprovalArtifactError::Validation(format!(
+            "approval artifact `{}` field `{field_name}` cannot be inspected: {err}",
+            relative_path.display()
+        ))
+    })?;
+    if !metadata.is_file() {
+        return Err(ApprovalArtifactError::Validation(format!(
+            "approval artifact `{}` field `{field_name}` must point to an existing file",
+            relative_path.display()
+        )));
+    }
+
+    Ok(())
+}
+
+pub fn validate_commit_value(
+    path: &Path,
+    field_name: &str,
+    value: &str,
+) -> Result<(), ApprovalArtifactError> {
+    let valid = (7..=40).contains(&value.len())
+        && value.chars().all(|ch| matches!(ch, '0'..='9' | 'a'..='f'));
+    if !valid {
+        return Err(ApprovalArtifactError::Validation(format!(
+            "{}: `{field_name}` must be 7-40 lowercase hex characters",
+            path.display()
+        )));
+    }
+    Ok(())
+}
+
+pub fn validate_rfc3339_value(
+    path: &Path,
+    field_name: &str,
+    value: &str,
+) -> Result<(), ApprovalArtifactError> {
+    OffsetDateTime::parse(value, &Rfc3339).map_err(|err| {
+        ApprovalArtifactError::Validation(format!(
+            "{}: `{field_name}` must be RFC3339 ({err})",
+            path.display()
+        ))
+    })?;
+    Ok(())
 }
 
 fn required_string(
