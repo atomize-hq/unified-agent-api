@@ -118,6 +118,15 @@ fn duplicate_identity_and_path_fields_fail_closed() {
             ),
             "duplicate manifest_root `cli_manifests/codex`",
         ),
+        (
+            "duplicate package_name",
+            SEEDED_REGISTRY.replacen(
+                "package_name = \"unified-agent-api-claude-code\"",
+                "package_name = \"unified-agent-api-codex\"",
+                1,
+            ),
+            "duplicate package_name `unified-agent-api-codex`",
+        ),
     ];
 
     for (label, raw, expected) in cases {

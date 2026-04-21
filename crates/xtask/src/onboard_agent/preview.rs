@@ -1,6 +1,6 @@
-use std::{collections::BTreeSet, fmt::Write as _, fs, io::Write, path::Path};
+use std::{fmt::Write as _, fs, io::Write, path::Path};
 
-use crate::agent_registry::{AgentRegistry, REGISTRY_RELATIVE_PATH};
+use crate::agent_registry::REGISTRY_RELATIVE_PATH;
 use toml_edit::DocumentMut;
 
 use super::{
@@ -16,21 +16,8 @@ pub(super) struct ReleasePreview {
 
 pub(super) fn build_release_preview(
     workspace_root: &Path,
-    registry: &AgentRegistry,
     draft: &DraftEntry,
 ) -> Result<ReleasePreview, Error> {
-    let seeded_package_names = registry
-        .agents
-        .iter()
-        .map(|entry| entry.package_name.as_str())
-        .collect::<BTreeSet<_>>();
-
-    if seeded_package_names.contains(draft.package_name.as_str()) {
-        return Ok(ReleasePreview {
-            lines: vec!["NO RELEASE CHANGES".to_string()],
-        });
-    }
-
     let mut lines = Vec::new();
     if !workspace_membership_contains(workspace_root, &draft.crate_path)? {
         lines.push(format!(

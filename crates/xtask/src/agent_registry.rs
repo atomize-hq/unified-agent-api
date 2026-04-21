@@ -67,6 +67,7 @@ impl AgentRegistry {
         let mut seen_crate_paths = BTreeMap::<&str, &str>::new();
         let mut seen_backend_modules = BTreeMap::<&str, &str>::new();
         let mut seen_manifest_roots = BTreeMap::<&str, &str>::new();
+        let mut seen_package_names = BTreeMap::<&str, &str>::new();
 
         for agent in &self.agents {
             agent.validate()?;
@@ -93,6 +94,12 @@ impl AgentRegistry {
                 &agent.manifest_root,
                 &agent.agent_id,
                 &mut seen_manifest_roots,
+            )?;
+            record_unique(
+                "package_name",
+                &agent.package_name,
+                &agent.agent_id,
+                &mut seen_package_names,
             )?;
         }
 

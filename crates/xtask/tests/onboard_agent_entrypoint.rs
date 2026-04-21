@@ -110,6 +110,42 @@ fn onboard_agent_duplicate_agent_id_exits_with_validation_code() {
 }
 
 #[test]
+fn onboard_agent_duplicate_registry_package_name_exits_with_validation_code() {
+    let fixture = fixture_root("onboard-agent-duplicate-package-name");
+    let output = run_cli(
+        base_args_with_package_name("cursor", "unified-agent-api-codex"),
+        &fixture,
+    );
+
+    assert_eq!(output.exit_code, 2);
+    assert!(
+        output
+            .stderr
+            .contains("package_name `unified-agent-api-codex` is already owned by agent `codex`"),
+        "stderr did not mention duplicate package name:\n{}",
+        output.stderr
+    );
+}
+
+#[test]
+fn onboard_agent_duplicate_workspace_package_name_exits_with_validation_code() {
+    let fixture = fixture_root("onboard-agent-workspace-package-name");
+    let output = run_cli(
+        base_args_with_package_name("cursor", "unified-agent-api"),
+        &fixture,
+    );
+
+    assert_eq!(output.exit_code, 2);
+    assert!(
+        output.stderr.contains(
+            "package_name `unified-agent-api` already exists in workspace member `crates/agent_api` (crates/agent_api/Cargo.toml)"
+        ),
+        "stderr did not mention workspace package name conflict:\n{}",
+        output.stderr
+    );
+}
+
+#[test]
 fn onboard_agent_preexisting_target_conflict_exits_with_validation_code() {
     let fixture = fixture_root("onboard-agent-target-conflict");
     write_text(
@@ -242,43 +278,47 @@ where
     }
 }
 
-fn base_args(agent_id: &str) -> Vec<&str> {
+fn base_args(agent_id: &str) -> Vec<String> {
+    base_args_with_package_name(agent_id, "unified-agent-api-cursor")
+}
+
+fn base_args_with_package_name(agent_id: &str, package_name: &str) -> Vec<String> {
     vec![
-        "xtask",
-        "onboard-agent",
-        "--dry-run",
-        "--agent-id",
-        agent_id,
-        "--display-name",
-        "Cursor CLI",
-        "--crate-path",
-        "crates/cursor",
-        "--backend-module",
-        "crates/agent_api/src/backends/cursor",
-        "--manifest-root",
-        "cli_manifests/cursor",
-        "--package-name",
-        "unified-agent-api-cursor",
-        "--canonical-target",
-        "linux-x64",
-        "--wrapper-coverage-binding-kind",
-        "generated_from_wrapper_crate",
-        "--wrapper-coverage-source-path",
-        "crates/cursor",
-        "--always-on-capability",
-        "agent_api.run",
-        "--target-gated-capability",
-        "agent_api.tools.mcp.list.v1:linux-x64",
-        "--config-gated-capability",
-        "agent_api.exec.external_sandbox.v1:allow_external_sandbox_exec",
-        "--support-matrix-enabled",
-        "true",
-        "--capability-matrix-enabled",
-        "true",
-        "--docs-release-track",
-        "crates-io",
-        "--onboarding-pack-prefix",
-        "cursor-cli-onboarding",
+        "xtask".to_string(),
+        "onboard-agent".to_string(),
+        "--dry-run".to_string(),
+        "--agent-id".to_string(),
+        agent_id.to_string(),
+        "--display-name".to_string(),
+        "Cursor CLI".to_string(),
+        "--crate-path".to_string(),
+        "crates/cursor".to_string(),
+        "--backend-module".to_string(),
+        "crates/agent_api/src/backends/cursor".to_string(),
+        "--manifest-root".to_string(),
+        "cli_manifests/cursor".to_string(),
+        "--package-name".to_string(),
+        package_name.to_string(),
+        "--canonical-target".to_string(),
+        "linux-x64".to_string(),
+        "--wrapper-coverage-binding-kind".to_string(),
+        "generated_from_wrapper_crate".to_string(),
+        "--wrapper-coverage-source-path".to_string(),
+        "crates/cursor".to_string(),
+        "--always-on-capability".to_string(),
+        "agent_api.run".to_string(),
+        "--target-gated-capability".to_string(),
+        "agent_api.tools.mcp.list.v1:linux-x64".to_string(),
+        "--config-gated-capability".to_string(),
+        "agent_api.exec.external_sandbox.v1:allow_external_sandbox_exec".to_string(),
+        "--support-matrix-enabled".to_string(),
+        "true".to_string(),
+        "--capability-matrix-enabled".to_string(),
+        "true".to_string(),
+        "--docs-release-track".to_string(),
+        "crates-io".to_string(),
+        "--onboarding-pack-prefix".to_string(),
+        "cursor-cli-onboarding".to_string(),
     ]
 }
 
@@ -299,6 +339,26 @@ fn fixture_root(prefix: &str) -> PathBuf {
     write_text(
         &root.join("crates/xtask/data/agent_registry.toml"),
         SEEDED_REGISTRY,
+    );
+    write_text(
+        &root.join("crates/agent_api/Cargo.toml"),
+        "[package]\nname = \"unified-agent-api\"\nversion = \"0.2.3\"\nedition = \"2021\"\n",
+    );
+    write_text(
+        &root.join("crates/codex/Cargo.toml"),
+        "[package]\nname = \"unified-agent-api-codex\"\nversion = \"0.2.3\"\nedition = \"2021\"\n",
+    );
+    write_text(
+        &root.join("crates/claude_code/Cargo.toml"),
+        "[package]\nname = \"unified-agent-api-claude-code\"\nversion = \"0.2.3\"\nedition = \"2021\"\n",
+    );
+    write_text(
+        &root.join("crates/opencode/Cargo.toml"),
+        "[package]\nname = \"unified-agent-api-opencode\"\nversion = \"0.2.3\"\nedition = \"2021\"\n",
+    );
+    write_text(
+        &root.join("crates/xtask/Cargo.toml"),
+        "[package]\nname = \"xtask\"\nversion = \"0.2.3\"\nedition = \"2021\"\npublish = false\n",
     );
     root
 }

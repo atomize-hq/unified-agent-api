@@ -10,6 +10,7 @@ use std::{
 use crate::agent_registry::{AgentRegistry, AgentRegistryError, REGISTRY_RELATIVE_PATH};
 use clap::Parser;
 use thiserror::Error;
+use toml_edit::{DocumentMut, Item};
 
 use self::preview::{
     build_docs_preview, build_manifest_preview, build_manual_follow_up, build_release_preview,
@@ -174,12 +175,13 @@ pub fn run_in_workspace<W: Write>(
     let draft = DraftEntry::from_args(args)?;
 
     validate_registry_conflicts(&registry, &draft)?;
+    validate_workspace_package_name_conflicts(workspace_root, &draft)?;
     validate_filesystem_conflicts(workspace_root, &draft)?;
 
     let registry_entry_preview = render_registry_entry_preview(&draft);
     validate_candidate_registry(&registry_text, &registry_entry_preview)?;
 
-    let release_preview = build_release_preview(workspace_root, &registry, &draft)?;
+    let release_preview = build_release_preview(workspace_root, &draft)?;
     let docs_preview = build_docs_preview(&draft, &release_preview);
     let manifest_preview = build_manifest_preview(&draft);
     let manual_follow_up = build_manual_follow_up(&draft);
@@ -325,6 +327,12 @@ fn validate_registry_conflicts(registry: &AgentRegistry, draft: &DraftEntry) -> 
                 draft.manifest_root, entry.agent_id
             )));
         }
+        if entry.package_name == draft.package_name {
+            return Err(Error::Validation(format!(
+                "package_name `{}` is already owned by agent `{}`",
+                draft.package_name, entry.agent_id
+            )));
+        }
         if entry.scaffold.onboarding_pack_prefix == draft.onboarding_pack_prefix {
             return Err(Error::Validation(format!(
                 "onboarding_pack_prefix `{}` is already owned by agent `{}`",
@@ -333,6 +341,33 @@ fn validate_registry_conflicts(registry: &AgentRegistry, draft: &DraftEntry) -> 
         }
     }
 
+    Ok(())
+}
+
+fn validate_workspace_package_name_conflicts(
+    workspace_root: &Path,
+    draft: &DraftEntry,
+) -> Result<(), Error> {
+    let root_manifest_path = workspace_root.join("Cargo.toml");
+    let root_manifest = read_toml(&root_manifest_path)?;
+    for member in workspace_members(&root_manifest)? {
+        let manifest_path = workspace_root.join(&member).join("Cargo.toml");
+        let manifest = read_toml(&manifest_path)?;
+        let Some(package_name) = package_name(&manifest) else {
+            continue;
+        };
+        if package_name == draft.package_name {
+            return Err(Error::Validation(format!(
+                "package_name `{}` already exists in workspace member `{}` ({})",
+                draft.package_name,
+                member.display(),
+                manifest_path
+                    .strip_prefix(workspace_root)
+                    .unwrap_or(&manifest_path)
+                    .display()
+            )));
+        }
+    }
     Ok(())
 }
 
@@ -498,6 +533,35 @@ fn validate_candidate_registry(
     combined.push_str(registry_entry_preview);
     AgentRegistry::parse(&combined).map_err(map_registry_load_error)?;
     Ok(())
+}
+
+fn read_toml(path: &Path) -> Result<DocumentMut, Error> {
+    let text = fs::read_to_string(path)
+        .map_err(|err| Error::Internal(format!("read {}: {err}", path.display())))?;
+    text.parse::<DocumentMut>()
+        .map_err(|err| Error::Internal(format!("parse {}: {err}", path.display())))
+}
+
+fn workspace_members(root_doc: &DocumentMut) -> Result<Vec<PathBuf>, Error> {
+    let members = root_doc["workspace"]["members"]
+        .as_array()
+        .ok_or_else(|| Error::Internal("workspace.members must be an array".to_string()))?;
+    members
+        .iter()
+        .map(|member| {
+            let member = member.as_str().ok_or_else(|| {
+                Error::Internal("workspace.members entries must be strings".to_string())
+            })?;
+            Ok(PathBuf::from(member))
+        })
+        .collect()
+}
+
+fn package_name(doc: &DocumentMut) -> Option<&str> {
+    doc.get("package")
+        .and_then(Item::as_table_like)
+        .and_then(|package| package.get("name"))
+        .and_then(Item::as_str)
 }
 
 fn normalize_ordered_unique(
