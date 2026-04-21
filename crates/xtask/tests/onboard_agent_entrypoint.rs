@@ -278,8 +278,35 @@ fn onboard_agent_approval_dry_run_matches_raw_descriptor_preview_and_writes_noth
 
     assert_eq!(approval.exit_code, 0, "stderr:\n{}", approval.stderr);
     assert_eq!(raw.exit_code, 0, "stderr:\n{}", raw.stderr);
-    assert_eq!(approval.stdout, raw.stdout);
     assert_eq!(before, after, "approval dry-run must not write any files");
+    assert!(approval
+        .stdout
+        .contains("Shared onboarding plan preview; no filesystem writes performed."));
+    assert!(raw
+        .stdout
+        .contains("Shared onboarding plan preview; no filesystem writes performed."));
+    assert!(approval.stdout.contains("agent_id: cursor"));
+    assert!(raw.stdout.contains("agent_id: cursor"));
+    assert!(approval
+        .stdout
+        .contains("approval_artifact_path: docs/project_management/next/cursor-cli-onboarding/governance/approved-agent.toml"));
+    assert!(approval.stdout.contains("approval_artifact_sha256: "));
+    assert!(approval.stdout.contains(
+        "Approval linkage: `docs/project_management/next/cursor-cli-onboarding/governance/approved-agent.toml` (`sha256:"
+    ));
+    assert!(approval.stdout.contains(
+        "Approval linkage via `docs/project_management/next/cursor-cli-onboarding/governance/approved-agent.toml` (`sha256:"
+    ));
+    assert!(approval.stdout.contains("## Approval provenance"));
+    assert!(approval.stdout.contains(
+        "- approval ref: `docs/project_management/next/cursor-cli-onboarding/governance/approved-agent.toml`"
+    ));
+    assert!(!raw.stdout.contains("approval_artifact_path:"));
+    assert!(!raw.stdout.contains("approval_artifact_sha256:"));
+    assert!(!raw.stdout.contains("## Approval provenance"));
+    assert!(!raw.stdout.contains(
+        "Approval linkage: `docs/project_management/next/cursor-cli-onboarding/governance/approved-agent.toml` (`sha256:"
+    ));
 }
 
 #[test]
@@ -390,9 +417,36 @@ fn onboard_agent_approval_write_applies_plan_and_replays_identically() {
     );
     assert_eq!(after_first, after_second);
     assert!(first.stdout.contains("OK: onboard-agent write complete."));
+    assert!(first.stdout.contains("approval_artifact_path: docs/project_management/next/cursor-cli-onboarding/governance/approved-agent.toml"));
+    assert!(first.stdout.contains("## Approval provenance"));
     assert!(second
         .stdout
         .contains("Mutation summary: 0 written, 15 identical, 15 total planned."));
+
+    let readme = fs::read_to_string(
+        fixture.join("docs/project_management/next/cursor-cli-onboarding/README.md"),
+    )
+    .expect("read approval-mode readme");
+    let scope_brief = fs::read_to_string(
+        fixture.join("docs/project_management/next/cursor-cli-onboarding/scope_brief.md"),
+    )
+    .expect("read approval-mode scope brief");
+    let handoff = fs::read_to_string(
+        fixture.join("docs/project_management/next/cursor-cli-onboarding/HANDOFF.md"),
+    )
+    .expect("read approval-mode handoff");
+
+    assert!(readme.contains(
+        "Approval linkage: `docs/project_management/next/cursor-cli-onboarding/governance/approved-agent.toml` (`sha256:"
+    ));
+    assert!(scope_brief.contains(
+        "Approval linkage via `docs/project_management/next/cursor-cli-onboarding/governance/approved-agent.toml` (`sha256:"
+    ));
+    assert!(handoff.contains("## Approval provenance"));
+    assert!(handoff.contains(
+        "- approval ref: `docs/project_management/next/cursor-cli-onboarding/governance/approved-agent.toml`"
+    ));
+    assert!(handoff.contains("- approval artifact sha256: `"));
 }
 
 #[test]

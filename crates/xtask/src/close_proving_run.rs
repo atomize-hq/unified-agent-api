@@ -6,10 +6,10 @@ use std::{
 
 use clap::Parser;
 use serde::Deserialize;
-use sha2::{Digest, Sha256};
 use thiserror::Error;
 use time::{format_description::well_known::Rfc3339, OffsetDateTime};
 use xtask::agent_registry::{AgentRegistry, AgentRegistryEntry, REGISTRY_RELATIVE_PATH};
+use xtask::approval_artifact::{self, ApprovalArtifact, ApprovalArtifactError};
 
 const OWNERSHIP_MARKER: &str = "<!-- generated-by: xtask onboard-agent; owner: control-plane -->";
 const DOCS_NEXT_ROOT: &str = "docs/project_management/next";
@@ -106,10 +106,14 @@ pub fn run_in_workspace<W: Write>(
     writer: &mut W,
 ) -> Result<(), Error> {
     let closeout_path = absolutize(workspace_root, &args.closeout);
-    let approval_path = absolutize(workspace_root, &args.approval);
     let onboarding_pack_prefix =
         onboarding_pack_prefix_from_closeout_path(workspace_root, &closeout_path)?;
-    let closeout = load_validated_closeout(workspace_root, &closeout_path, &approval_path)?;
+    let closeout = load_validated_closeout(
+        workspace_root,
+        &closeout_path,
+        &args.approval,
+        &onboarding_pack_prefix,
+    )?;
     let registry = AgentRegistry::load(workspace_root)
         .map_err(|err| Error::Internal(format!("load {REGISTRY_RELATIVE_PATH}: {err}")))?;
     let entry = registry
@@ -248,12 +252,19 @@ fn load_validated_closeout(
     workspace_root: &Path,
     closeout_path: &Path,
     approval_path: &Path,
+    onboarding_pack_prefix: &str,
 ) -> Result<ProvingRunCloseout, Error> {
     let closeout_text = fs::read_to_string(closeout_path)
         .map_err(|err| Error::Validation(format!("read {}: {err}", closeout_path.display())))?;
     let raw = serde_json::from_str::<RawProvingRunCloseout>(&closeout_text)
         .map_err(|err| Error::Validation(format!("parse {}: {err}", closeout_path.display())))?;
-    validate_closeout(workspace_root, closeout_path, raw, approval_path)
+    validate_closeout(
+        workspace_root,
+        closeout_path,
+        raw,
+        approval_path,
+        onboarding_pack_prefix,
+    )
 }
 
 fn validate_closeout(
@@ -261,6 +272,7 @@ fn validate_closeout(
     closeout_path: &Path,
     raw: RawProvingRunCloseout,
     approval_path: &Path,
+    onboarding_pack_prefix: &str,
 ) -> Result<ProvingRunCloseout, Error> {
     if raw.state != "closed" {
         return Err(Error::Validation(format!(
@@ -326,9 +338,12 @@ fn validate_closeout(
         }
     };
 
-    let linked_approval_path = absolutize(workspace_root, Path::new(&approval_ref));
-    validate_approval_path_matches(closeout_path, approval_path, &linked_approval_path)?;
-    validate_approval_hash(closeout_path, approval_path, &approval_sha256)?;
+    let provided_approval = load_approval_artifact(workspace_root, approval_path, closeout_path)?;
+    let linked_approval =
+        load_approval_artifact(workspace_root, Path::new(&approval_ref), closeout_path)?;
+    validate_same_approval_artifact(closeout_path, &provided_approval, &linked_approval)?;
+    validate_approval_hash(closeout_path, &provided_approval, &approval_sha256)?;
+    validate_approval_pack_prefix(closeout_path, &provided_approval, onboarding_pack_prefix)?;
 
     Ok(ProvingRunCloseout {
         approval_ref,
@@ -398,31 +413,27 @@ fn validate_commit(path: &Path, value: &str) -> Result<(), Error> {
     Ok(())
 }
 
-fn validate_approval_path_matches(
+fn load_approval_artifact(
+    workspace_root: &Path,
+    approval_path: &Path,
     closeout_path: &Path,
-    provided_approval_path: &Path,
-    linked_approval_path: &Path,
+) -> Result<ApprovalArtifact, Error> {
+    let approval_path = approval_path.to_string_lossy();
+    approval_artifact::load_approval_artifact(workspace_root, &approval_path)
+        .map_err(|err| map_approval_artifact_error(closeout_path, err))
+}
+
+fn validate_same_approval_artifact(
+    closeout_path: &Path,
+    provided_approval: &ApprovalArtifact,
+    linked_approval: &ApprovalArtifact,
 ) -> Result<(), Error> {
-    let provided = fs::canonicalize(provided_approval_path).map_err(|err| {
-        Error::Validation(format!(
-            "{}: read approval artifact {}: {err}",
-            closeout_path.display(),
-            provided_approval_path.display()
-        ))
-    })?;
-    let linked = fs::canonicalize(linked_approval_path).map_err(|err| {
-        Error::Validation(format!(
-            "{}: approval_ref {} does not resolve: {err}",
-            closeout_path.display(),
-            linked_approval_path.display()
-        ))
-    })?;
-    if provided != linked {
+    if provided_approval.canonical_path != linked_approval.canonical_path {
         return Err(Error::Validation(format!(
             "{}: approval_ref `{}` does not match --approval `{}`",
             closeout_path.display(),
-            linked_approval_path.display(),
-            provided_approval_path.display()
+            linked_approval.relative_path,
+            provided_approval.relative_path
         )));
     }
     Ok(())
@@ -430,25 +441,43 @@ fn validate_approval_path_matches(
 
 fn validate_approval_hash(
     closeout_path: &Path,
-    approval_path: &Path,
+    approval: &ApprovalArtifact,
     expected_sha256: &str,
 ) -> Result<(), Error> {
-    let approval_bytes = fs::read(approval_path).map_err(|err| {
-        Error::Validation(format!(
-            "{}: read approval artifact {}: {err}",
-            closeout_path.display(),
-            approval_path.display()
-        ))
-    })?;
-    let actual_sha256 = hex::encode(Sha256::digest(&approval_bytes));
-    if actual_sha256 != expected_sha256 {
+    if approval.sha256 != expected_sha256 {
         return Err(Error::Validation(format!(
             "{}: approval_sha256 does not match {}",
             closeout_path.display(),
-            approval_path.display()
+            approval.relative_path
         )));
     }
     Ok(())
+}
+
+fn validate_approval_pack_prefix(
+    closeout_path: &Path,
+    approval: &ApprovalArtifact,
+    onboarding_pack_prefix: &str,
+) -> Result<(), Error> {
+    if approval.descriptor.onboarding_pack_prefix != onboarding_pack_prefix {
+        return Err(Error::Validation(format!(
+            "{}: approval artifact `{}` belongs to onboarding_pack_prefix `{}` instead of `{}`",
+            closeout_path.display(),
+            approval.relative_path,
+            approval.descriptor.onboarding_pack_prefix,
+            onboarding_pack_prefix
+        )));
+    }
+    Ok(())
+}
+
+fn map_approval_artifact_error(closeout_path: &Path, err: ApprovalArtifactError) -> Error {
+    match err {
+        ApprovalArtifactError::Validation(message) => {
+            Error::Validation(format!("{}: {message}", closeout_path.display()))
+        }
+        ApprovalArtifactError::Internal(message) => Error::Internal(message),
+    }
 }
 
 fn onboarding_pack_prefix_from_closeout_path(

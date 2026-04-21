@@ -4,14 +4,15 @@ use std::{
 };
 
 use crate::agent_registry::REGISTRY_RELATIVE_PATH;
+use crate::approval_artifact;
 use serde::Deserialize;
-use sha2::{Digest, Sha256};
 use time::{format_description::well_known::Rfc3339, OffsetDateTime};
 
 use super::super::{
     CHECK_PUBLISH_READINESS_SCRIPT_PATH, OWNERSHIP_MARKER, PUBLISH_SCRIPT_PATH,
     PUBLISH_WORKFLOW_PATH, RELEASE_DOC_PATH, VALIDATE_PUBLISH_SCRIPT_PATH,
 };
+use super::ApprovalRenderInput;
 use super::DraftEntry;
 const DOCS_NEXT_ROOT: &str = "docs/project_management/next";
 const PROVING_RUN_CLOSEOUT_RELATIVE_PATH: &str = "governance/proving-run-closeout.json";
@@ -84,7 +85,7 @@ pub(in crate::onboard_agent) fn load_validated_closeout_if_present(
         Ok(raw) => raw,
         Err(_) => return Ok(None),
     };
-    Ok(validate_closeout(workspace_root, raw).ok())
+    Ok(validate_closeout(workspace_root, draft, raw).ok())
 }
 
 pub(in crate::onboard_agent) fn closeout_relative_path(draft: &DraftEntry) -> String {
@@ -98,6 +99,7 @@ pub(in crate::onboard_agent) fn build_docs_preview(
     draft: &DraftEntry,
     release_touchpoints: &[String],
     phase: PacketPhase<'_>,
+    approval: Option<ApprovalRenderInput<'_>>,
 ) -> Vec<(String, Option<String>)> {
     let docs_root = draft.docs_pack_root();
     let docs_root_display = docs_root.display().to_string();
@@ -115,6 +117,7 @@ pub(in crate::onboard_agent) fn build_docs_preview(
                 draft,
                 phase,
                 &closeout_path,
+                approval,
             ))),
         ),
         (
@@ -124,6 +127,7 @@ pub(in crate::onboard_agent) fn build_docs_preview(
                 phase,
                 &docs_root_display,
                 &closeout_path,
+                approval,
             ))),
         ),
         (
@@ -159,6 +163,7 @@ pub(in crate::onboard_agent) fn build_docs_preview(
                 phase,
                 &closeout_path,
                 &release_touchpoints,
+                approval,
             ))),
         ),
     ]
@@ -182,6 +187,7 @@ pub(in crate::onboard_agent) fn release_touchpoint_lines(draft: &DraftEntry) -> 
 
 fn validate_closeout(
     workspace_root: &Path,
+    draft: &DraftEntry,
     raw: RawProvingRunCloseout,
 ) -> Result<ProvingRunCloseout, ()> {
     if raw.state != "closed" {
@@ -198,14 +204,12 @@ fn validate_closeout(
         return Err(());
     }
     let approval_source = required_string(raw.approval_source.as_deref())?;
-    let approval_path = if Path::new(&approval_ref).is_absolute() {
-        Path::new(&approval_ref).to_path_buf()
-    } else {
-        workspace_root.join(&approval_ref)
-    };
-    let approval_bytes = fs::read(&approval_path).map_err(|_| ())?;
-    let actual_sha256 = hex::encode(Sha256::digest(&approval_bytes));
-    if actual_sha256 != approval_sha256 {
+    let approval =
+        approval_artifact::load_approval_artifact(workspace_root, &approval_ref).map_err(|_| ())?;
+    if approval.sha256 != approval_sha256 {
+        return Err(());
+    }
+    if approval.descriptor.onboarding_pack_prefix != draft.onboarding_pack_prefix {
         return Err(());
     }
     OffsetDateTime::parse(&raw.recorded_at, &Rfc3339).map_err(|_| ())?;
@@ -270,7 +274,12 @@ fn render_markdown_file(body: String) -> String {
     format!("{OWNERSHIP_MARKER}\n\n{body}")
 }
 
-fn render_readme_body(draft: &DraftEntry, phase: PacketPhase<'_>, closeout_path: &str) -> String {
+fn render_readme_body(
+    draft: &DraftEntry,
+    phase: PacketPhase<'_>,
+    closeout_path: &str,
+    approval: Option<ApprovalRenderInput<'_>>,
+) -> String {
     let packet_state = match phase {
         PacketPhase::Execution => "execution",
         PacketPhase::Closeout(_) => "closed_proving_run",
@@ -289,7 +298,7 @@ fn render_readme_body(draft: &DraftEntry, phase: PacketPhase<'_>, closeout_path:
         PacketPhase::Execution => {
             format!(
                 "Closeout metadata becomes authoritative at `{closeout_path}` once the proving run closes."
-            )
+            ) + &render_execution_approval_linkage(approval)
         }
         PacketPhase::Closeout(closeout) => {
             format!("Closeout metadata is recorded in `{closeout_path}`.")
@@ -318,12 +327,14 @@ fn render_scope_brief_body(
     phase: PacketPhase<'_>,
     docs_root_display: &str,
     closeout_path: &str,
+    approval: Option<ApprovalRenderInput<'_>>,
 ) -> String {
     match phase {
         PacketPhase::Execution => format!(
-            "# Scope brief\n\nThis packet covers the control-plane-owned onboarding surfaces for `{}`.\n\n- Registry enrollment in `{REGISTRY_RELATIVE_PATH}`\n- Docs pack in `{docs_root_display}`\n- Manifest root in `{}`\n- Release/workspace touchpoints in `Cargo.toml` and `{RELEASE_DOC_PATH}`\n\nCurrent proving-run target: complete the runtime-owned wrapper/backend lane, commit manifest evidence, regenerate publication artifacts, and close with `make preflight`.\n",
+            "# Scope brief\n\nThis packet covers the control-plane-owned onboarding surfaces for `{}`.\n\n- Registry enrollment in `{REGISTRY_RELATIVE_PATH}`\n- Docs pack in `{docs_root_display}`\n- Manifest root in `{}`\n- Release/workspace touchpoints in `Cargo.toml` and `{RELEASE_DOC_PATH}`{}\n\nCurrent proving-run target: complete the runtime-owned wrapper/backend lane, commit manifest evidence, regenerate publication artifacts, and close with `make preflight`.\n",
             draft.agent_id,
-            draft.manifest_root
+            draft.manifest_root,
+            render_execution_scope_approval(approval),
         ),
         PacketPhase::Closeout(closeout) => format!(
             "# Scope brief\n\nThis packet records the closed proving run for `{}`.\n\n- Registry enrollment in `{REGISTRY_RELATIVE_PATH}`\n- Docs pack in `{docs_root_display}`\n- Manifest root in `{}`\n- Closeout metadata in `{closeout_path}`\n- Approval linkage via `{}` (`{}`, sha256 `{}`)\n\nCloseout status: `make preflight` {} for this proving run.\n",
@@ -396,12 +407,14 @@ fn render_handoff_body(
     phase: PacketPhase<'_>,
     closeout_path: &str,
     release_touchpoints: &str,
+    approval: Option<ApprovalRenderInput<'_>>,
 ) -> String {
     match phase {
         PacketPhase::Execution => format!(
-            "# Handoff\n\nThis packet captures the next executable onboarding step for `{}`.\n\n## Release touchpoints\n\n{}\n\n## Next executable runtime step\n\nImplement the runtime-owned wrapper crate at `{}` and backend module `{}`.\n\n## Remaining runtime checklist\n\n- Author wrapper coverage input at `{}` for binding kind `{}`.\n- Populate `{}/current.json`, pointers, versions, and reports from committed runtime evidence.\n- Regenerate support and capability publication artifacts, then run `make preflight`.\n",
+            "# Handoff\n\nThis packet captures the next executable onboarding step for `{}`.\n\n## Release touchpoints\n\n{}\n\n{}\n## Next executable runtime step\n\nImplement the runtime-owned wrapper crate at `{}` and backend module `{}`.\n\n## Remaining runtime checklist\n\n- Author wrapper coverage input at `{}` for binding kind `{}`.\n- Populate `{}/current.json`, pointers, versions, and reports from committed runtime evidence.\n- Regenerate support and capability publication artifacts, then run `make preflight`.\n",
             draft.agent_id,
             release_touchpoints,
+            render_execution_handoff_approval(closeout_path, approval),
             draft.crate_path,
             draft.backend_module,
             draft.wrapper_coverage_source_path,
@@ -432,6 +445,39 @@ fn render_closeout_duration(closeout: &ProvingRunCloseout) -> String {
     match &closeout.duration {
         DurationTruth::Seconds(seconds) => format!("{seconds}s"),
         DurationTruth::MissingReason(reason) => format!("missing ({reason})"),
+    }
+}
+
+fn render_execution_approval_linkage(approval: Option<ApprovalRenderInput<'_>>) -> String {
+    match approval {
+        Some(approval) => format!(
+            "\n- Approval linkage: `{}` (`sha256: {}`)",
+            approval.artifact_path, approval.artifact_sha256
+        ),
+        None => String::new(),
+    }
+}
+
+fn render_execution_scope_approval(approval: Option<ApprovalRenderInput<'_>>) -> String {
+    match approval {
+        Some(approval) => format!(
+            "\n- Approval linkage via `{}` (`sha256: {}`)",
+            approval.artifact_path, approval.artifact_sha256
+        ),
+        None => String::new(),
+    }
+}
+
+fn render_execution_handoff_approval(
+    closeout_path: &str,
+    approval: Option<ApprovalRenderInput<'_>>,
+) -> String {
+    match approval {
+        Some(approval) => format!(
+            "## Approval provenance\n\n- approval ref: `{}`\n- approval artifact sha256: `{}`\n- closeout metadata will become authoritative at `{}`.\n\n",
+            approval.artifact_path, approval.artifact_sha256, closeout_path
+        ),
+        None => String::new(),
     }
 }
 

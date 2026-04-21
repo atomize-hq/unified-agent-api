@@ -247,6 +247,24 @@ pub fn seed_approval_artifact(
     approved_agent_id: &str,
     override_reason: Option<&str>,
 ) -> String {
+    seed_approval_artifact_with_pack_prefix(
+        root,
+        relative_path,
+        recommended_agent_id,
+        approved_agent_id,
+        override_reason,
+        "cursor-cli-onboarding",
+    )
+}
+
+pub fn seed_approval_artifact_with_pack_prefix(
+    root: &Path,
+    relative_path: &str,
+    recommended_agent_id: &str,
+    approved_agent_id: &str,
+    override_reason: Option<&str>,
+    onboarding_pack_prefix: &str,
+) -> String {
     let mut contents = format!(
         concat!(
             "artifact_version = \"1\"\n",
@@ -263,32 +281,35 @@ pub fn seed_approval_artifact(
     if let Some(override_reason) = override_reason {
         contents.push_str(&format!("override_reason = \"{override_reason}\"\n"));
     }
-    contents.push_str(concat!(
-        "\n",
-        "[descriptor]\n",
-        "agent_id = \"cursor\"\n",
-        "display_name = \"Cursor CLI\"\n",
-        "crate_path = \"crates/cursor\"\n",
-        "backend_module = \"crates/agent_api/src/backends/cursor\"\n",
-        "manifest_root = \"cli_manifests/cursor\"\n",
-        "package_name = \"unified-agent-api-cursor\"\n",
-        "canonical_targets = [\"linux-x64\"]\n",
-        "wrapper_coverage_binding_kind = \"generated_from_wrapper_crate\"\n",
-        "wrapper_coverage_source_path = \"crates/cursor\"\n",
-        "always_on_capabilities = [\"agent_api.run\"]\n",
-        "backend_extensions = []\n",
-        "support_matrix_enabled = true\n",
-        "capability_matrix_enabled = true\n",
-        "docs_release_track = \"crates-io\"\n",
-        "onboarding_pack_prefix = \"cursor-cli-onboarding\"\n",
-        "\n",
-        "[[descriptor.target_gated_capabilities]]\n",
-        "capability_id = \"agent_api.tools.mcp.list.v1\"\n",
-        "targets = [\"linux-x64\"]\n",
-        "\n",
-        "[[descriptor.config_gated_capabilities]]\n",
-        "capability_id = \"agent_api.exec.external_sandbox.v1\"\n",
-        "config_key = \"allow_external_sandbox_exec\"\n",
+    contents.push_str(&format!(
+        concat!(
+            "\n",
+            "[descriptor]\n",
+            "agent_id = \"cursor\"\n",
+            "display_name = \"Cursor CLI\"\n",
+            "crate_path = \"crates/cursor\"\n",
+            "backend_module = \"crates/agent_api/src/backends/cursor\"\n",
+            "manifest_root = \"cli_manifests/cursor\"\n",
+            "package_name = \"unified-agent-api-cursor\"\n",
+            "canonical_targets = [\"linux-x64\"]\n",
+            "wrapper_coverage_binding_kind = \"generated_from_wrapper_crate\"\n",
+            "wrapper_coverage_source_path = \"crates/cursor\"\n",
+            "always_on_capabilities = [\"agent_api.run\"]\n",
+            "backend_extensions = []\n",
+            "support_matrix_enabled = true\n",
+            "capability_matrix_enabled = true\n",
+            "docs_release_track = \"crates-io\"\n",
+            "onboarding_pack_prefix = \"{onboarding_pack_prefix}\"\n",
+            "\n",
+            "[[descriptor.target_gated_capabilities]]\n",
+            "capability_id = \"agent_api.tools.mcp.list.v1\"\n",
+            "targets = [\"linux-x64\"]\n",
+            "\n",
+            "[[descriptor.config_gated_capabilities]]\n",
+            "capability_id = \"agent_api.exec.external_sandbox.v1\"\n",
+            "config_key = \"allow_external_sandbox_exec\"\n",
+        ),
+        onboarding_pack_prefix = onboarding_pack_prefix,
     ));
     write_text(&root.join(relative_path), &contents);
     relative_path.to_string()

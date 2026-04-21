@@ -18,6 +18,12 @@ const RELEASE_DOC_END_MARKER: &str =
 const WRAPPER_EVENTS_PACKAGE_NAME: &str = "unified-agent-api-wrapper-events";
 const ROOT_AGENT_API_PACKAGE_NAME: &str = "unified-agent-api";
 
+#[derive(Debug, Clone, Copy)]
+pub(super) struct ApprovalRenderInput<'a> {
+    pub(super) artifact_path: &'a str,
+    pub(super) artifact_sha256: &'a str,
+}
+
 #[derive(Debug)]
 pub(super) struct ReleasePreview {
     pub(super) lines: Vec<String>,
@@ -73,6 +79,7 @@ pub(super) fn write_input_summary<W: Write>(
     writer: &mut W,
     draft: &DraftEntry,
 ) -> Result<(), Error> {
+    let approval = approval_render_input(draft);
     writeln!(writer, "== INPUT SUMMARY ==")
         .map_err(|err| Error::Internal(format!("write stdout: {err}")))?;
     writeln!(writer, "agent_id: {}", draft.agent_id)
@@ -131,6 +138,16 @@ pub(super) fn write_input_summary<W: Write>(
         draft.onboarding_pack_prefix
     )
     .map_err(|err| Error::Internal(format!("write stdout: {err}")))?;
+    if let Some(approval) = approval {
+        writeln!(writer, "approval_artifact_path: {}", approval.artifact_path)
+            .map_err(|err| Error::Internal(format!("write stdout: {err}")))?;
+        writeln!(
+            writer,
+            "approval_artifact_sha256: {}",
+            approval.artifact_sha256
+        )
+        .map_err(|err| Error::Internal(format!("write stdout: {err}")))?;
+    }
     writeln!(writer).map_err(|err| Error::Internal(format!("write stdout: {err}")))?;
     Ok(())
 }
@@ -325,11 +342,20 @@ pub(super) fn build_docs_preview(
     release_preview: &ReleasePreview,
     closeout: Option<&ProvingRunCloseout>,
 ) -> Vec<(String, Option<String>)> {
+    let approval = approval_render_input(draft);
     let phase = match closeout {
         Some(closeout) => PacketPhase::Closeout(closeout),
         None => PacketPhase::Execution,
     };
-    render_docs_preview(draft, &release_preview.lines, phase)
+    render_docs_preview(draft, &release_preview.lines, phase, approval)
+}
+
+fn approval_render_input(draft: &DraftEntry) -> Option<ApprovalRenderInput<'_>> {
+    let (artifact_path, artifact_sha256) = draft.approval_identity()?;
+    Some(ApprovalRenderInput {
+        artifact_path,
+        artifact_sha256,
+    })
 }
 
 pub(super) fn build_manifest_preview(draft: &DraftEntry) -> Vec<(String, Option<String>)> {

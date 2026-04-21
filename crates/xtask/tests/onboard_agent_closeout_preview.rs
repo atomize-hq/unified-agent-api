@@ -91,10 +91,10 @@ fn close_proving_run_validates_and_refreshes_packet_docs() {
     let fixture = fixture_root("close-proving-run-pass");
     seed_release_touchpoints(&fixture);
     let approval_rel =
-        "docs/project_management/next/gemini-cli-onboarding/governance/proving-run-approval.md";
-    let approval_path = fixture.join(approval_rel);
-    write_text(&approval_path, "# Approval\n\nM3 proving run approved.\n");
-    let approval_sha256 = sha256_hex(&approval_path);
+        "docs/project_management/next/gemini-cli-onboarding/governance/approved-agent.toml";
+    let approval_path =
+        seed_gemini_approval_artifact(&fixture, approval_rel, "gemini-cli-onboarding");
+    let approval_sha256 = sha256_hex(&fixture.join(&approval_path));
     let closeout_path = fixture.join(
         "docs/project_management/next/gemini-cli-onboarding/governance/proving-run-closeout.json",
     );
@@ -122,7 +122,7 @@ fn close_proving_run_validates_and_refreshes_packet_docs() {
             "xtask".to_string(),
             "close-proving-run".to_string(),
             "--approval".to_string(),
-            approval_rel.to_string(),
+            approval_path.clone(),
             "--closeout".to_string(),
             "docs/project_management/next/gemini-cli-onboarding/governance/proving-run-closeout.json"
                 .to_string(),
@@ -150,7 +150,7 @@ fn close_proving_run_validates_and_refreshes_packet_docs() {
 
     assert!(readme.contains("- Packet state: `closed_proving_run`"));
     assert!(readme.contains("Approval linkage: `governance-review` via"));
-    assert!(handoff.contains("- approval ref: `docs/project_management/next/gemini-cli-onboarding/governance/proving-run-approval.md`"));
+    assert!(handoff.contains("- approval ref: `docs/project_management/next/gemini-cli-onboarding/governance/approved-agent.toml`"));
     assert!(handoff.contains("- closeout metadata: `docs/project_management/next/gemini-cli-onboarding/governance/proving-run-closeout.json`"));
 
     let preview_output = run_cli(gemini_dry_run_args(), &fixture);
@@ -171,12 +171,217 @@ fn close_proving_run_validates_and_refreshes_packet_docs() {
 }
 
 #[test]
-fn closeout_without_approval_linkage_fails_with_exit_code_2() {
-    let fixture = fixture_root("close-proving-run-missing-approval");
+fn close_proving_run_rejects_noncanonical_approval_artifact_even_when_ref_and_sha_match() {
+    let fixture = fixture_root("close-proving-run-noncanonical-approval");
+    seed_release_touchpoints(&fixture);
     let approval_rel =
         "docs/project_management/next/gemini-cli-onboarding/governance/proving-run-approval.md";
     let approval_path = fixture.join(approval_rel);
-    write_text(&approval_path, "approval\n");
+    write_text(&approval_path, "# not an approval artifact\n");
+    let approval_sha256 = sha256_hex(&approval_path);
+    let closeout_path = fixture.join(
+        "docs/project_management/next/gemini-cli-onboarding/governance/proving-run-closeout.json",
+    );
+    write_text(
+        &closeout_path,
+        &serde_json::to_string_pretty(&json!({
+            "state": "closed",
+            "approval_ref": approval_rel,
+            "approval_sha256": approval_sha256,
+            "approval_source": "governance-review",
+            "manual_control_plane_edits": 0,
+            "partial_write_incidents": 0,
+            "ambiguous_ownership_incidents": 0,
+            "duration_seconds": 17,
+            "residual_friction": ["Manual review step still took coordination."],
+            "preflight_passed": true,
+            "recorded_at": "2026-04-21T11:23:09Z",
+            "commit": "6b7d5f6e9cf2bf54933659f5700bb59d1f8a95e8"
+        }))
+        .expect("serialize closeout"),
+    );
+
+    let output = run_cli(
+        vec![
+            "xtask".to_string(),
+            "close-proving-run".to_string(),
+            "--approval".to_string(),
+            approval_rel.to_string(),
+            "--closeout".to_string(),
+            "docs/project_management/next/gemini-cli-onboarding/governance/proving-run-closeout.json"
+                .to_string(),
+        ],
+        &fixture,
+    );
+
+    assert_eq!(output.exit_code, 2, "stdout:\n{}", output.stdout);
+    assert!(output
+        .stderr
+        .contains("must be repo-relative and rooted under"));
+}
+
+#[test]
+fn close_proving_run_rejects_invalid_toml_at_canonical_approval_path() {
+    let fixture = fixture_root("close-proving-run-invalid-approval-toml");
+    seed_release_touchpoints(&fixture);
+    let approval_rel =
+        "docs/project_management/next/gemini-cli-onboarding/governance/approved-agent.toml";
+    let approval_path = fixture.join(approval_rel);
+    write_text(&approval_path, "not = [valid toml\n");
+    let approval_sha256 = sha256_hex(&approval_path);
+    let closeout_path = fixture.join(
+        "docs/project_management/next/gemini-cli-onboarding/governance/proving-run-closeout.json",
+    );
+    write_text(
+        &closeout_path,
+        &serde_json::to_string_pretty(&json!({
+            "state": "closed",
+            "approval_ref": approval_rel,
+            "approval_sha256": approval_sha256,
+            "approval_source": "governance-review",
+            "manual_control_plane_edits": 0,
+            "partial_write_incidents": 0,
+            "ambiguous_ownership_incidents": 0,
+            "duration_seconds": 17,
+            "residual_friction": ["Manual review step still took coordination."],
+            "preflight_passed": true,
+            "recorded_at": "2026-04-21T11:23:09Z",
+            "commit": "6b7d5f6e9cf2bf54933659f5700bb59d1f8a95e8"
+        }))
+        .expect("serialize closeout"),
+    );
+
+    let output = run_cli(
+        vec![
+            "xtask".to_string(),
+            "close-proving-run".to_string(),
+            "--approval".to_string(),
+            approval_rel.to_string(),
+            "--closeout".to_string(),
+            "docs/project_management/next/gemini-cli-onboarding/governance/proving-run-closeout.json"
+                .to_string(),
+        ],
+        &fixture,
+    );
+
+    assert_eq!(output.exit_code, 2, "stdout:\n{}", output.stdout);
+    assert!(output.stderr.contains("parse approval artifact"));
+}
+
+#[test]
+fn close_proving_run_rejects_schema_invalid_approval_artifact_at_canonical_path() {
+    let fixture = fixture_root("close-proving-run-invalid-approval-schema");
+    seed_release_touchpoints(&fixture);
+    let approval_rel =
+        "docs/project_management/next/gemini-cli-onboarding/governance/approved-agent.toml";
+    let approval_path = fixture.join(approval_rel);
+    write_text(
+        &approval_path,
+        concat!(
+            "artifact_version = \"1\"\n",
+            "comparison_ref = \"compare/gemini\"\n",
+            "selection_mode = \"factory_validation\"\n",
+            "recommended_agent_id = \"gemini_cli\"\n",
+            "approved_agent_id = \"gemini_cli\"\n",
+            "approval_commit = \"deadbeef\"\n",
+            "approval_recorded_at = \"2026-04-21T11:23:09Z\"\n",
+        ),
+    );
+    let approval_sha256 = sha256_hex(&approval_path);
+    let closeout_path = fixture.join(
+        "docs/project_management/next/gemini-cli-onboarding/governance/proving-run-closeout.json",
+    );
+    write_text(
+        &closeout_path,
+        &serde_json::to_string_pretty(&json!({
+            "state": "closed",
+            "approval_ref": approval_rel,
+            "approval_sha256": approval_sha256,
+            "approval_source": "governance-review",
+            "manual_control_plane_edits": 0,
+            "partial_write_incidents": 0,
+            "ambiguous_ownership_incidents": 0,
+            "duration_seconds": 17,
+            "residual_friction": ["Manual review step still took coordination."],
+            "preflight_passed": true,
+            "recorded_at": "2026-04-21T11:23:09Z",
+            "commit": "6b7d5f6e9cf2bf54933659f5700bb59d1f8a95e8"
+        }))
+        .expect("serialize closeout"),
+    );
+
+    let output = run_cli(
+        vec![
+            "xtask".to_string(),
+            "close-proving-run".to_string(),
+            "--approval".to_string(),
+            approval_rel.to_string(),
+            "--closeout".to_string(),
+            "docs/project_management/next/gemini-cli-onboarding/governance/proving-run-closeout.json"
+                .to_string(),
+        ],
+        &fixture,
+    );
+
+    assert_eq!(output.exit_code, 2, "stdout:\n{}", output.stdout);
+    assert!(output
+        .stderr
+        .contains("missing required table `descriptor`"));
+}
+
+#[test]
+fn close_proving_run_rejects_pack_mismatched_approval_artifact() {
+    let fixture = fixture_root("close-proving-run-pack-mismatch");
+    seed_release_touchpoints(&fixture);
+    let approval_rel =
+        "docs/project_management/next/gemini-cli-onboarding/governance/approved-agent.toml";
+    let approval_path = seed_gemini_approval_artifact(&fixture, approval_rel, "other-gemini-pack");
+    let approval_sha256 = sha256_hex(&fixture.join(&approval_path));
+    let closeout_path = fixture.join(
+        "docs/project_management/next/gemini-cli-onboarding/governance/proving-run-closeout.json",
+    );
+    write_text(
+        &closeout_path,
+        &serde_json::to_string_pretty(&json!({
+            "state": "closed",
+            "approval_ref": approval_path,
+            "approval_sha256": approval_sha256,
+            "approval_source": "governance-review",
+            "manual_control_plane_edits": 0,
+            "partial_write_incidents": 0,
+            "ambiguous_ownership_incidents": 0,
+            "duration_seconds": 17,
+            "residual_friction": ["Manual review step still took coordination."],
+            "preflight_passed": true,
+            "recorded_at": "2026-04-21T11:23:09Z",
+            "commit": "6b7d5f6e9cf2bf54933659f5700bb59d1f8a95e8"
+        }))
+        .expect("serialize closeout"),
+    );
+
+    let output = run_cli(
+        vec![
+            "xtask".to_string(),
+            "close-proving-run".to_string(),
+            "--approval".to_string(),
+            approval_path.clone(),
+            "--closeout".to_string(),
+            "docs/project_management/next/gemini-cli-onboarding/governance/proving-run-closeout.json"
+                .to_string(),
+        ],
+        &fixture,
+    );
+
+    assert_eq!(output.exit_code, 2, "stdout:\n{}", output.stdout);
+    assert!(output.stderr.contains("belongs to onboarding_pack_prefix"));
+}
+
+#[test]
+fn closeout_without_approval_linkage_fails_with_exit_code_2() {
+    let fixture = fixture_root("close-proving-run-missing-approval");
+    let approval_rel =
+        "docs/project_management/next/gemini-cli-onboarding/governance/approved-agent.toml";
+    seed_gemini_approval_artifact(&fixture, approval_rel, "gemini-cli-onboarding");
     let closeout_path = fixture.join(
         "docs/project_management/next/gemini-cli-onboarding/governance/proving-run-closeout.json",
     );
@@ -219,10 +424,10 @@ fn closeout_without_approval_linkage_fails_with_exit_code_2() {
 fn closeout_without_duration_truth_fails_with_exit_code_2() {
     let fixture = fixture_root("close-proving-run-missing-duration");
     let approval_rel =
-        "docs/project_management/next/gemini-cli-onboarding/governance/proving-run-approval.md";
-    let approval_path = fixture.join(approval_rel);
-    write_text(&approval_path, "approval\n");
-    let approval_sha256 = sha256_hex(&approval_path);
+        "docs/project_management/next/gemini-cli-onboarding/governance/approved-agent.toml";
+    let approval_path =
+        seed_gemini_approval_artifact(&fixture, approval_rel, "gemini-cli-onboarding");
+    let approval_sha256 = sha256_hex(&fixture.join(&approval_path));
     let closeout_path = fixture.join(
         "docs/project_management/next/gemini-cli-onboarding/governance/proving-run-closeout.json",
     );
@@ -267,10 +472,10 @@ fn closeout_without_duration_truth_fails_with_exit_code_2() {
 fn closeout_without_residual_friction_truth_fails_with_exit_code_2() {
     let fixture = fixture_root("close-proving-run-missing-residual");
     let approval_rel =
-        "docs/project_management/next/gemini-cli-onboarding/governance/proving-run-approval.md";
-    let approval_path = fixture.join(approval_rel);
-    write_text(&approval_path, "approval\n");
-    let approval_sha256 = sha256_hex(&approval_path);
+        "docs/project_management/next/gemini-cli-onboarding/governance/approved-agent.toml";
+    let approval_path =
+        seed_gemini_approval_artifact(&fixture, approval_rel, "gemini-cli-onboarding");
+    let approval_sha256 = sha256_hex(&fixture.join(&approval_path));
     let closeout_path = fixture.join(
         "docs/project_management/next/gemini-cli-onboarding/governance/proving-run-closeout.json",
     );
@@ -357,4 +562,42 @@ where
             stderr: err.to_string(),
         },
     }
+}
+
+fn seed_gemini_approval_artifact(
+    root: &Path,
+    relative_path: &str,
+    onboarding_pack_prefix: &str,
+) -> String {
+    let contents = format!(
+        concat!(
+            "artifact_version = \"1\"\n",
+            "comparison_ref = \"compare/gemini\"\n",
+            "selection_mode = \"factory_validation\"\n",
+            "recommended_agent_id = \"gemini_cli\"\n",
+            "approved_agent_id = \"gemini_cli\"\n",
+            "approval_commit = \"deadbeef\"\n",
+            "approval_recorded_at = \"2026-04-21T11:23:09Z\"\n",
+            "\n",
+            "[descriptor]\n",
+            "agent_id = \"gemini_cli\"\n",
+            "display_name = \"Gemini CLI\"\n",
+            "crate_path = \"crates/gemini_cli\"\n",
+            "backend_module = \"crates/agent_api/src/backends/gemini_cli\"\n",
+            "manifest_root = \"cli_manifests/gemini_cli\"\n",
+            "package_name = \"unified-agent-api-gemini-cli\"\n",
+            "canonical_targets = [\"darwin-arm64\"]\n",
+            "wrapper_coverage_binding_kind = \"generated_from_wrapper_crate\"\n",
+            "wrapper_coverage_source_path = \"crates/gemini_cli\"\n",
+            "always_on_capabilities = [\"agent_api.run\"]\n",
+            "backend_extensions = []\n",
+            "support_matrix_enabled = true\n",
+            "capability_matrix_enabled = true\n",
+            "docs_release_track = \"crates-io\"\n",
+            "onboarding_pack_prefix = \"{onboarding_pack_prefix}\"\n",
+        ),
+        onboarding_pack_prefix = onboarding_pack_prefix,
+    );
+    write_text(&root.join(relative_path), &contents);
+    relative_path.to_string()
 }

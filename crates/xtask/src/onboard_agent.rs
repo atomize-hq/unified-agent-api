@@ -11,6 +11,7 @@ use std::{
 };
 
 use crate::agent_registry::{AgentRegistry, REGISTRY_RELATIVE_PATH};
+use crate::approval_artifact;
 use clap::{ArgGroup, Parser};
 use thiserror::Error;
 use toml_edit::DocumentMut;
@@ -161,8 +162,13 @@ struct DraftEntry {
     capability_matrix_enabled: bool,
     docs_release_track: String,
     onboarding_pack_prefix: String,
-    approval_artifact_path: Option<String>,
-    approval_artifact_sha256: Option<String>,
+    approval_provenance: Option<ApprovalProvenance>,
+}
+
+#[derive(Debug, Clone)]
+struct ApprovalProvenance {
+    artifact_path: String,
+    artifact_sha256: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -197,8 +203,7 @@ struct DraftDescriptorInput {
     capability_matrix_enabled: bool,
     docs_release_track: String,
     onboarding_pack_prefix: String,
-    approval_artifact_path: Option<String>,
-    approval_artifact_sha256: Option<String>,
+    approval_provenance: Option<ApprovalProvenance>,
 }
 
 #[derive(Debug)]
@@ -228,8 +233,7 @@ pub fn run_in_workspace<W: Write>(
     let registry_text = fs::read_to_string(&registry_path)
         .map_err(|err| Error::Internal(format!("read {REGISTRY_RELATIVE_PATH}: {err}")))?;
     let registry = AgentRegistry::parse(&registry_text).map_err(map_registry_load_error)?;
-    let draft = DraftEntry::from_args(args, &jail)?;
-    let _approval_identity = draft.approval_identity();
+    let draft = DraftEntry::from_args(args, workspace_root)?;
 
     validate_registry_conflicts(&registry, &draft)?;
     validate_workspace_package_name_conflicts(&draft, &jail)?;
@@ -284,7 +288,7 @@ pub fn run_in_workspace<W: Write>(
 }
 
 impl DraftEntry {
-    fn from_args(args: Args, jail: &WorkspacePathJail) -> Result<Self, Error> {
+    fn from_args(args: Args, workspace_root: &Path) -> Result<Self, Error> {
         let descriptor = match args.approval.clone() {
             Some(approval_path) => {
                 if args.has_semantic_descriptor_flags() {
@@ -292,7 +296,7 @@ impl DraftEntry {
                         "--approval cannot be mixed with semantic descriptor flags".to_string(),
                     ));
                 }
-                approval::load_descriptor_input(&approval_path, jail)?
+                approval::load_descriptor_input(&approval_path, workspace_root)?
             }
             None => DraftDescriptorInput::from_raw_args(args)?,
         };
@@ -347,8 +351,7 @@ impl DraftEntry {
             capability_matrix_enabled: input.capability_matrix_enabled,
             docs_release_track: input.docs_release_track,
             onboarding_pack_prefix: input.onboarding_pack_prefix,
-            approval_artifact_path: input.approval_artifact_path,
-            approval_artifact_sha256: input.approval_artifact_sha256,
+            approval_provenance: input.approval_provenance,
         })
     }
 
@@ -357,10 +360,8 @@ impl DraftEntry {
     }
 
     fn approval_identity(&self) -> Option<(&str, &str)> {
-        Some((
-            self.approval_artifact_path.as_deref()?,
-            self.approval_artifact_sha256.as_deref()?,
-        ))
+        let provenance = self.approval_provenance.as_ref()?;
+        Some((&provenance.artifact_path, &provenance.artifact_sha256))
     }
 }
 
@@ -399,9 +400,37 @@ impl DraftDescriptorInput {
                 args.onboarding_pack_prefix,
                 "--onboarding-pack-prefix",
             )?,
-            approval_artifact_path: None,
-            approval_artifact_sha256: None,
+            approval_provenance: None,
         })
+    }
+}
+
+impl From<approval_artifact::ApprovalArtifact> for DraftDescriptorInput {
+    fn from(artifact: approval_artifact::ApprovalArtifact) -> Self {
+        let descriptor = artifact.descriptor;
+        Self {
+            agent_id: descriptor.agent_id,
+            display_name: descriptor.display_name,
+            crate_path: descriptor.crate_path,
+            backend_module: descriptor.backend_module,
+            manifest_root: descriptor.manifest_root,
+            package_name: descriptor.package_name,
+            canonical_targets: descriptor.canonical_targets,
+            wrapper_coverage_binding_kind: descriptor.wrapper_coverage_binding_kind,
+            wrapper_coverage_source_path: descriptor.wrapper_coverage_source_path,
+            always_on_capabilities: descriptor.always_on_capabilities,
+            target_gated_capabilities: descriptor.target_gated_capabilities,
+            config_gated_capabilities: descriptor.config_gated_capabilities,
+            backend_extensions: descriptor.backend_extensions,
+            support_matrix_enabled: descriptor.support_matrix_enabled,
+            capability_matrix_enabled: descriptor.capability_matrix_enabled,
+            docs_release_track: descriptor.docs_release_track,
+            onboarding_pack_prefix: descriptor.onboarding_pack_prefix,
+            approval_provenance: Some(ApprovalProvenance {
+                artifact_path: artifact.relative_path,
+                artifact_sha256: artifact.sha256,
+            }),
+        }
     }
 }
 
