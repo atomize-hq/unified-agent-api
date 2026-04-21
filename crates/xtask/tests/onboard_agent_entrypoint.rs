@@ -1,0 +1,336 @@
+use std::{
+    collections::BTreeMap,
+    fs,
+    path::{Path, PathBuf},
+};
+
+use clap::{CommandFactory, Parser, Subcommand};
+use xtask::onboard_agent;
+
+const SEEDED_REGISTRY: &str = include_str!("../data/agent_registry.toml");
+
+#[derive(Debug, Parser)]
+#[command(name = "xtask")]
+#[command(about = "Project automation tasks")]
+struct Cli {
+    #[command(subcommand)]
+    command: Command,
+}
+
+#[derive(Debug, Subcommand)]
+enum Command {
+    /// Preview the next control-plane onboarding packet without writing files.
+    OnboardAgent(onboard_agent::Args),
+}
+
+#[derive(Debug)]
+struct HarnessOutput {
+    exit_code: i32,
+    stdout: String,
+    stderr: String,
+}
+
+#[test]
+fn onboard_agent_help_text_includes_required_surface() {
+    let top_help = Cli::command().render_help().to_string();
+    assert!(top_help.contains("onboard-agent"));
+
+    let err = Cli::try_parse_from(["xtask", "onboard-agent", "--help"])
+        .expect_err("subcommand help should short-circuit parsing");
+    assert_eq!(err.exit_code(), 0);
+    let help_text = err.to_string();
+    assert!(help_text.contains("--dry-run"));
+    assert!(help_text.contains("--agent-id"));
+    assert!(help_text.contains("--canonical-target"));
+    assert!(help_text.contains("--always-on-capability"));
+    assert!(help_text.contains("--target-gated-capability"));
+    assert!(help_text.contains("--config-gated-capability"));
+    assert!(help_text.contains("--backend-extension"));
+    assert!(help_text.contains("--support-matrix-enabled"));
+    assert!(help_text.contains("--capability-matrix-enabled"));
+    assert!(help_text.contains("--docs-release-track"));
+    assert!(help_text.contains("--onboarding-pack-prefix"));
+}
+
+#[test]
+fn onboard_agent_requires_dry_run_flag() {
+    let output = run_cli(
+        [
+            "xtask",
+            "onboard-agent",
+            "--agent-id",
+            "cursor",
+            "--display-name",
+            "Cursor CLI",
+            "--crate-path",
+            "crates/cursor",
+            "--backend-module",
+            "crates/agent_api/src/backends/cursor",
+            "--manifest-root",
+            "cli_manifests/cursor",
+            "--package-name",
+            "unified-agent-api-cursor",
+            "--canonical-target",
+            "linux-x64",
+            "--wrapper-coverage-binding-kind",
+            "generated_from_wrapper_crate",
+            "--wrapper-coverage-source-path",
+            "crates/cursor",
+            "--always-on-capability",
+            "agent_api.run",
+            "--support-matrix-enabled",
+            "true",
+            "--capability-matrix-enabled",
+            "true",
+            "--docs-release-track",
+            "crates-io",
+            "--onboarding-pack-prefix",
+            "cursor-cli-onboarding",
+        ],
+        &fixture_root("onboard-agent-missing-dry-run"),
+    );
+
+    assert_eq!(output.exit_code, 2);
+    assert!(output.stderr.contains("--dry-run"));
+}
+
+#[test]
+fn onboard_agent_duplicate_agent_id_exits_with_validation_code() {
+    let fixture = fixture_root("onboard-agent-duplicate-id");
+    let output = run_cli(base_args("codex"), &fixture);
+
+    assert_eq!(output.exit_code, 2);
+    assert!(
+        output
+            .stderr
+            .contains("agent_id `codex` already exists in crates/xtask/data/agent_registry.toml"),
+        "stderr did not mention duplicate agent id:\n{}",
+        output.stderr
+    );
+}
+
+#[test]
+fn onboard_agent_preexisting_target_conflict_exits_with_validation_code() {
+    let fixture = fixture_root("onboard-agent-target-conflict");
+    write_text(
+        &fixture.join("cli_manifests/cursor/current.json"),
+        "{\n  \"expected_targets\": [\"darwin-arm64\"],\n  \"inputs\": []\n}\n",
+    );
+
+    let output = run_cli(base_args("cursor"), &fixture);
+
+    assert_eq!(output.exit_code, 2);
+    assert!(output
+        .stderr
+        .contains("conflicts with proposed canonical_targets"));
+}
+
+#[test]
+fn onboard_agent_dry_run_preview_is_deterministic_and_writes_nothing() {
+    let fixture = fixture_root("onboard-agent-preview");
+    write_text(
+        &fixture.join("docs/crates-io-release.md"),
+        "# Release docs\n\nManual contract text.\n",
+    );
+    write_text(
+        &fixture.join(".github/workflows/publish-crates.yml"),
+        "name: publish-crates\n",
+    );
+    write_text(
+        &fixture.join("scripts/publish_crates.py"),
+        "print('publish')\n",
+    );
+    write_text(
+        &fixture.join("scripts/validate_publish_versions.py"),
+        "print('validate')\n",
+    );
+    write_text(
+        &fixture.join("scripts/check_publish_readiness.py"),
+        "print('readiness')\n",
+    );
+
+    let before = snapshot_files(&fixture);
+    let first = run_cli(base_args("cursor"), &fixture);
+    let second = run_cli(base_args("cursor"), &fixture);
+    let after = snapshot_files(&fixture);
+
+    assert_eq!(first.exit_code, 0, "stderr:\n{}", first.stderr);
+    assert_eq!(second.exit_code, 0, "stderr:\n{}", second.stderr);
+    assert_eq!(
+        first.stdout, second.stdout,
+        "dry-run output must be deterministic"
+    );
+    assert_eq!(before, after, "dry-run must not write any files");
+
+    let sections = [
+        "== ONBOARD-AGENT DRY RUN ==",
+        "== INPUT SUMMARY ==",
+        "== REGISTRY ENTRY PREVIEW ==",
+        "== DOCS SCAFFOLD PREVIEW ==",
+        "== MANIFEST ROOT PREVIEW ==",
+        "== RELEASE/PUBLICATION TOUCHPOINTS ==",
+        "== MANUAL FOLLOW-UP ==",
+        "== RESULT ==",
+    ];
+    let mut cursor = 0usize;
+    for section in sections {
+        let found = first.stdout[cursor..]
+            .find(section)
+            .map(|offset| cursor + offset)
+            .unwrap_or_else(|| panic!("missing section `{section}` in stdout:\n{}", first.stdout));
+        cursor = found + section.len();
+    }
+
+    assert!(first
+        .stdout
+        .contains("Path: crates/xtask/data/agent_registry.toml"));
+    assert!(first
+        .stdout
+        .contains("Path: docs/project_management/next/cursor-cli-onboarding/README.md"));
+    assert!(first
+        .stdout
+        .contains("Path: cli_manifests/cursor/current.json"));
+    assert!(first
+        .stdout
+        .contains("FUTURE M2: Cargo.toml must add workspace member `crates/cursor`."));
+    assert!(first.stdout.contains("FUTURE M2: docs/crates-io-release.md must add `unified-agent-api-cursor` on release track `crates-io`."));
+    assert!(first
+        .stdout
+        .contains("Workflow and script files remain unchanged in M1"));
+    assert!(first
+        .stdout
+        .contains("<!-- generated-by: xtask onboard-agent; owner: control-plane -->"));
+    assert!(first.stdout.contains("## Manual Runtime Follow-Up"));
+}
+
+fn run_cli<I, S>(argv: I, workspace_root: &Path) -> HarnessOutput
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<str>,
+{
+    let args = argv
+        .into_iter()
+        .map(|arg| arg.as_ref().to_string())
+        .collect::<Vec<_>>();
+
+    match Cli::try_parse_from(args) {
+        Ok(cli) => {
+            let mut stdout = Vec::new();
+            let mut stderr = String::new();
+            let exit_code = match cli.command {
+                Command::OnboardAgent(args) => {
+                    match onboard_agent::run_in_workspace(workspace_root, args, &mut stdout) {
+                        Ok(()) => 0,
+                        Err(err) => {
+                            stderr = format!("{err}\n");
+                            err.exit_code()
+                        }
+                    }
+                }
+            };
+            HarnessOutput {
+                exit_code,
+                stdout: String::from_utf8(stdout).expect("stdout must be utf-8"),
+                stderr,
+            }
+        }
+        Err(err) => HarnessOutput {
+            exit_code: err.exit_code(),
+            stdout: String::new(),
+            stderr: err.to_string(),
+        },
+    }
+}
+
+fn base_args(agent_id: &str) -> Vec<&str> {
+    vec![
+        "xtask",
+        "onboard-agent",
+        "--dry-run",
+        "--agent-id",
+        agent_id,
+        "--display-name",
+        "Cursor CLI",
+        "--crate-path",
+        "crates/cursor",
+        "--backend-module",
+        "crates/agent_api/src/backends/cursor",
+        "--manifest-root",
+        "cli_manifests/cursor",
+        "--package-name",
+        "unified-agent-api-cursor",
+        "--canonical-target",
+        "linux-x64",
+        "--wrapper-coverage-binding-kind",
+        "generated_from_wrapper_crate",
+        "--wrapper-coverage-source-path",
+        "crates/cursor",
+        "--always-on-capability",
+        "agent_api.run",
+        "--target-gated-capability",
+        "agent_api.tools.mcp.list.v1:linux-x64",
+        "--config-gated-capability",
+        "agent_api.exec.external_sandbox.v1:allow_external_sandbox_exec",
+        "--support-matrix-enabled",
+        "true",
+        "--capability-matrix-enabled",
+        "true",
+        "--docs-release-track",
+        "crates-io",
+        "--onboarding-pack-prefix",
+        "cursor-cli-onboarding",
+    ]
+}
+
+fn fixture_root(prefix: &str) -> PathBuf {
+    let root = std::env::temp_dir().join(format!(
+        "{prefix}-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("system time after unix epoch")
+            .as_nanos()
+    ));
+    fs::create_dir_all(&root).expect("create temp fixture");
+    write_text(
+        &root.join("Cargo.toml"),
+        "[workspace]\nmembers = [\n  \"crates/agent_api\",\n  \"crates/codex\",\n  \"crates/claude_code\",\n  \"crates/opencode\",\n  \"crates/xtask\",\n]\n",
+    );
+    write_text(
+        &root.join("crates/xtask/data/agent_registry.toml"),
+        SEEDED_REGISTRY,
+    );
+    root
+}
+
+fn write_text(path: &Path, contents: &str) {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).expect("create parent dirs");
+    }
+    fs::write(path, contents).expect("write file");
+}
+
+fn snapshot_files(root: &Path) -> BTreeMap<String, Vec<u8>> {
+    let mut out = BTreeMap::new();
+    snapshot_files_recursive(root, root, &mut out);
+    out
+}
+
+fn snapshot_files_recursive(root: &Path, current: &Path, out: &mut BTreeMap<String, Vec<u8>>) {
+    let entries = fs::read_dir(current).expect("read dir");
+    for entry in entries {
+        let entry = entry.expect("read dir entry");
+        let path = entry.path();
+        let file_type = entry.file_type().expect("read file type");
+        if file_type.is_dir() {
+            snapshot_files_recursive(root, &path, out);
+        } else if file_type.is_file() {
+            let rel = path
+                .strip_prefix(root)
+                .expect("path relative to root")
+                .display()
+                .to_string();
+            out.insert(rel, fs::read(&path).expect("read file"));
+        }
+    }
+}

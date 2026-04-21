@@ -8,6 +8,8 @@ use xtask::support_matrix::{
     ManifestSupportState, PointerPromotionState, SupportRow, UaaSupportState,
 };
 
+const SEEDED_REGISTRY: &str = include_str!("../data/agent_registry.toml");
+
 fn make_temp_dir(prefix: &str) -> PathBuf {
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -31,6 +33,13 @@ fn write_text(path: &Path, contents: &str) {
 fn write_json(path: &Path, value: &Value) {
     let text = serde_json::to_string_pretty(value).expect("serialize json");
     write_text(path, &format!("{text}\n"));
+}
+
+fn write_seeded_agent_registry(workspace_root: &Path) {
+    write_text(
+        &workspace_root.join("crates/xtask/data/agent_registry.toml"),
+        SEEDED_REGISTRY,
+    );
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -119,6 +128,7 @@ fn find_row<'a>(
 #[test]
 fn derives_target_scoped_rows_with_sparse_caveats_and_pointer_state() {
     let workspace = make_temp_dir("support-matrix-derivation");
+    write_seeded_agent_registry(&workspace);
 
     materialize_root(
         &workspace.join("cli_manifests/codex"),

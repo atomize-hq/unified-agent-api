@@ -17,6 +17,7 @@ mod parity_triad_scaffold;
 mod version_bump;
 mod wrapper_coverage_shared;
 
+pub use xtask::onboard_agent;
 pub use xtask::support_matrix;
 
 use clap::{Parser, Subcommand};
@@ -56,6 +57,8 @@ enum Command {
     CodexValidate(codex_validate::Args),
     /// Generate a triad scaffold directory from a parity coverage report.
     ParityTriadScaffold(parity_triad_scaffold::Args),
+    /// Preview the next control-plane onboarding packet without writing files.
+    OnboardAgent(Box<onboard_agent::Args>),
     /// Generate a universal agent capability matrix markdown.
     CapabilityMatrix(capability_matrix::Args),
     /// Audit the capability matrix for orthogonality invariants.
@@ -148,6 +151,13 @@ fn main() {
             Err(err) => {
                 eprintln!("{err}");
                 1
+            }
+        },
+        Command::OnboardAgent(args) => match onboard_agent::run(*args) {
+            Ok(()) => 0,
+            Err(err) => {
+                eprintln!("{err}");
+                err.exit_code()
             }
         },
         Command::CapabilityMatrix(args) => match capability_matrix::run(args) {

@@ -1,0 +1,165 @@
+[[agents]]
+agent_id = "codex"
+display_name = "Codex CLI"
+crate_path = "crates/codex"
+backend_module = "crates/agent_api/src/backends/codex"
+manifest_root = "cli_manifests/codex"
+package_name = "unified-agent-api-codex"
+canonical_targets = ["x86_64-unknown-linux-musl"]
+
+[agents.wrapper_coverage]
+binding_kind = "generated_from_wrapper_crate"
+source_path = "crates/codex"
+
+[agents.capability_declaration]
+always_on = [
+  "agent_api.run",
+  "agent_api.events",
+  "agent_api.events.live",
+  "agent_api.control.cancel.v1",
+  "agent_api.tools.structured.v1",
+  "agent_api.tools.results.v1",
+  "agent_api.artifacts.final_text.v1",
+  "agent_api.session.handle.v1",
+  "agent_api.session.fork.v1",
+  "agent_api.session.resume.v1",
+  "agent_api.config.model.v1",
+  "agent_api.exec.add_dirs.v1",
+  "agent_api.exec.non_interactive",
+]
+backend_extensions = [
+  "backend.codex.exec.approval_policy",
+  "backend.codex.exec.sandbox_mode",
+  "backend.codex.exec_stream",
+]
+
+[[agents.capability_declaration.target_gated]]
+capability_id = "agent_api.tools.mcp.list.v1"
+targets = ["x86_64-unknown-linux-musl"]
+
+[[agents.capability_declaration.target_gated]]
+capability_id = "agent_api.tools.mcp.get.v1"
+targets = ["x86_64-unknown-linux-musl"]
+
+[[agents.capability_declaration.config_gated]]
+capability_id = "agent_api.tools.mcp.add.v1"
+config_key = "allow_mcp_write"
+targets = ["x86_64-unknown-linux-musl"]
+
+[[agents.capability_declaration.config_gated]]
+capability_id = "agent_api.tools.mcp.remove.v1"
+config_key = "allow_mcp_write"
+targets = ["x86_64-unknown-linux-musl"]
+
+[[agents.capability_declaration.config_gated]]
+capability_id = "agent_api.exec.external_sandbox.v1"
+config_key = "allow_external_sandbox_exec"
+
+[agents.publication]
+support_matrix_enabled = true
+capability_matrix_enabled = true
+
+[agents.release]
+docs_release_track = "crates-io"
+
+[agents.scaffold]
+onboarding_pack_prefix = "codex-cli-onboarding"
+
+[[agents]]
+agent_id = "claude_code"
+display_name = "Claude Code"
+crate_path = "crates/claude_code"
+backend_module = "crates/agent_api/src/backends/claude_code"
+manifest_root = "cli_manifests/claude_code"
+package_name = "unified-agent-api-claude-code"
+canonical_targets = ["linux-x64", "darwin-arm64", "win32-x64"]
+
+[agents.wrapper_coverage]
+binding_kind = "generated_from_wrapper_crate"
+source_path = "crates/claude_code"
+
+[agents.capability_declaration]
+always_on = [
+  "agent_api.run",
+  "agent_api.events",
+  "agent_api.events.live",
+  "agent_api.control.cancel.v1",
+  "agent_api.tools.structured.v1",
+  "agent_api.tools.results.v1",
+  "agent_api.artifacts.final_text.v1",
+  "agent_api.session.handle.v1",
+  "agent_api.config.model.v1",
+  "agent_api.exec.add_dirs.v1",
+  "agent_api.exec.non_interactive",
+  "agent_api.session.resume.v1",
+  "agent_api.session.fork.v1",
+]
+backend_extensions = [
+  "backend.claude_code.print_stream_json",
+]
+
+[[agents.capability_declaration.target_gated]]
+capability_id = "agent_api.tools.mcp.list.v1"
+targets = ["linux-x64", "darwin-arm64", "win32-x64"]
+
+[[agents.capability_declaration.target_gated]]
+capability_id = "agent_api.tools.mcp.get.v1"
+targets = ["win32-x64"]
+
+[[agents.capability_declaration.config_gated]]
+capability_id = "agent_api.tools.mcp.add.v1"
+config_key = "allow_mcp_write"
+targets = ["win32-x64"]
+
+[[agents.capability_declaration.config_gated]]
+capability_id = "agent_api.tools.mcp.remove.v1"
+config_key = "allow_mcp_write"
+targets = ["win32-x64"]
+
+[[agents.capability_declaration.config_gated]]
+capability_id = "agent_api.exec.external_sandbox.v1"
+config_key = "allow_external_sandbox_exec"
+
+[agents.publication]
+support_matrix_enabled = true
+capability_matrix_enabled = true
+
+[agents.release]
+docs_release_track = "crates-io"
+
+[agents.scaffold]
+onboarding_pack_prefix = "claude-code-cli-onboarding"
+
+[[agents]]
+agent_id = "opencode"
+display_name = "OpenCode"
+crate_path = "crates/opencode"
+backend_module = "crates/agent_api/src/backends/opencode"
+manifest_root = "cli_manifests/opencode"
+package_name = "unified-agent-api-opencode"
+canonical_targets = ["linux-x64", "darwin-arm64", "win32-x64"]
+
+[agents.wrapper_coverage]
+binding_kind = "generated_from_wrapper_crate"
+source_path = "crates/opencode"
+
+[agents.capability_declaration]
+always_on = [
+  "agent_api.run",
+  "agent_api.events",
+  "agent_api.events.live",
+  "agent_api.config.model.v1",
+  "agent_api.session.resume.v1",
+  "agent_api.session.fork.v1",
+]
+backend_extensions = []
+
+[agents.publication]
+support_matrix_enabled = true
+capability_matrix_enabled = true
+
+[agents.release]
+docs_release_track = "crates-io"
+
+[agents.scaffold]
+onboarding_pack_prefix = "opencode-cli-onboarding"

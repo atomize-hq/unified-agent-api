@@ -20,11 +20,6 @@ pub use derive::derive_rows_for_test_roots;
 #[allow(unused_imports)]
 pub use publication::SupportMatrixArtifact;
 
-const CURRENT_AGENT_ROOTS: [(&str, &str); 3] = [
-    ("codex", "cli_manifests/codex"),
-    ("claude_code", "cli_manifests/claude_code"),
-    ("opencode", "cli_manifests/opencode"),
-];
 const JSON_OUTPUT_PATH: &str = "cli_manifests/support_matrix/current.json";
 const MARKDOWN_OUTPUT_PATH: &str = "docs/specs/unified-agent-api/support-matrix.md";
 const GENERATED_SECTION_TITLE: &str = "## Published support matrix";

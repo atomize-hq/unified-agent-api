@@ -4,8 +4,9 @@ use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde_json::{json, Value};
-use xtask::support_matrix::derive_rows_for_test_roots;
+use xtask::support_matrix::derive_rows;
 
+const SEEDED_REGISTRY: &str = include_str!("../data/agent_registry.toml");
 const VERSION: &str = "0.61.0";
 const TS: &str = "1970-01-01T00:00:00Z";
 
@@ -53,6 +54,10 @@ fn write_workspace_manifest(workspace_root: &Path) {
     write_text(
         &workspace_root.join("Cargo.toml"),
         "[workspace]\nmembers = []\n",
+    );
+    write_text(
+        &workspace_root.join("crates/xtask/data/agent_registry.toml"),
+        SEEDED_REGISTRY,
     );
 }
 
@@ -528,15 +533,7 @@ fn write_support_matrix_artifact(workspace_root: &Path, rows: Value) {
 }
 
 fn write_complete_support_matrix_artifact(workspace_root: &Path) {
-    let rows = derive_rows_for_test_roots(
-        workspace_root,
-        &[
-            ("claude_code", "cli_manifests/claude_code"),
-            ("codex", "cli_manifests/codex"),
-            ("opencode", "cli_manifests/opencode"),
-        ],
-    )
-    .expect("derive complete support matrix rows");
+    let rows = derive_rows(workspace_root).expect("derive complete support matrix rows");
 
     write_support_matrix_artifact(
         workspace_root,

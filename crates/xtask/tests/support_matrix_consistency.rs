@@ -8,6 +8,8 @@ use xtask::support_matrix::{
     ManifestSupportState, PointerPromotionState, UaaSupportState,
 };
 
+const SEEDED_REGISTRY: &str = include_str!("../data/agent_registry.toml");
+
 fn make_temp_dir(prefix: &str) -> PathBuf {
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -31,6 +33,13 @@ fn write_text(path: &Path, contents: &str) {
 fn write_json(path: &Path, value: &Value) {
     let text = serde_json::to_string_pretty(value).expect("serialize json");
     write_text(path, &format!("{text}\n"));
+}
+
+fn write_seeded_agent_registry(workspace_root: &Path) {
+    write_text(
+        &workspace_root.join("crates/xtask/data/agent_registry.toml"),
+        SEEDED_REGISTRY,
+    );
 }
 
 fn empty_report() -> Value {
@@ -134,6 +143,8 @@ fn materialize_root(
 }
 
 fn materialize_baseline_workspace(workspace: &Path) {
+    write_seeded_agent_registry(workspace);
+
     materialize_root(
         &workspace.join("cli_manifests/codex"),
         &["linux-x64", "win32-x64"],
@@ -316,6 +327,7 @@ fn publication_consistency_rejects_non_canonical_row_order() {
 #[test]
 fn publication_consistency_rejects_missing_committed_row() {
     let workspace = make_temp_dir("support-matrix-consistency-missing");
+    write_seeded_agent_registry(&workspace);
 
     materialize_root(
         &workspace.join("cli_manifests/codex"),
@@ -384,6 +396,7 @@ fn publication_consistency_rejects_missing_committed_agent_root_even_without_row
 #[test]
 fn publication_consistency_rejects_duplicate_row() {
     let workspace = make_temp_dir("support-matrix-consistency-duplicate");
+    write_seeded_agent_registry(&workspace);
 
     materialize_root(
         &workspace.join("cli_manifests/codex"),
@@ -432,6 +445,7 @@ fn publication_consistency_rejects_duplicate_row() {
 #[test]
 fn publication_consistency_rejects_unexpected_row() {
     let workspace = make_temp_dir("support-matrix-consistency-unexpected");
+    write_seeded_agent_registry(&workspace);
 
     materialize_root(
         &workspace.join("cli_manifests/codex"),
@@ -483,6 +497,7 @@ fn publication_consistency_rejects_unexpected_row() {
 #[test]
 fn publication_consistency_rejects_pointer_promotion_drift() {
     let workspace = make_temp_dir("support-matrix-consistency-pointer");
+    write_seeded_agent_registry(&workspace);
 
     materialize_root(
         &workspace.join("cli_manifests/codex"),
@@ -527,6 +542,7 @@ fn publication_consistency_rejects_pointer_promotion_drift() {
 #[test]
 fn publication_consistency_rejects_omission_claim_and_note_drift() {
     let workspace = make_temp_dir("support-matrix-consistency-omission");
+    write_seeded_agent_registry(&workspace);
 
     materialize_root(
         &workspace.join("cli_manifests/codex"),
@@ -581,6 +597,7 @@ fn publication_consistency_rejects_omission_claim_and_note_drift() {
 #[test]
 fn publication_consistency_rejects_status_drift_for_latest_validated_rows() {
     let workspace = make_temp_dir("support-matrix-consistency-status");
+    write_seeded_agent_registry(&workspace);
 
     materialize_root(
         &workspace.join("cli_manifests/codex"),

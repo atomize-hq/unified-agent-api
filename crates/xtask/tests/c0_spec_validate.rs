@@ -5,6 +5,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde_json::{json, Value};
 
+const SEEDED_REGISTRY: &str = include_str!("../data/agent_registry.toml");
 const VERSION: &str = "0.61.0";
 const REPORTED_VERSION: &str = "0.60.0";
 const TS: &str = "1970-01-01T00:00:00Z";
@@ -51,6 +52,10 @@ fn write_workspace_manifest(workspace_root: &Path) {
     write_text(
         &workspace_root.join("Cargo.toml"),
         "[workspace]\nmembers = []\n",
+    );
+    write_text(
+        &workspace_root.join("crates/xtask/data/agent_registry.toml"),
+        SEEDED_REGISTRY,
     );
 }
 

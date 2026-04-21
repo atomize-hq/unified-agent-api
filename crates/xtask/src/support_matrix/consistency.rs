@@ -5,11 +5,10 @@ use std::{
 
 use super::derive::{
     build_evidence_notes, classify_pointer_promotion, derive_rows_for_loaded_roots,
-    load_agent_root, load_support_report, AgentRoot, LoadedAgentRoot,
+    enrolled_agent_roots, load_agent_root, load_support_report, LoadedAgentRoot,
 };
 use super::{
     BackendSupportState, ManifestSupportState, PointerPromotionState, SupportRow, UaaSupportState,
-    CURRENT_AGENT_ROOTS,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -181,16 +180,25 @@ pub fn validate_publication_consistency(
     let mut issues = Vec::new();
     let mut roots = BTreeMap::new();
     let mut loaded_roots = Vec::new();
-    let known_agents = CURRENT_AGENT_ROOTS
+    let enrolled_roots = match enrolled_agent_roots(workspace_root) {
+        Ok(roots) => roots,
+        Err(err) => {
+            issues.push(SupportMatrixConsistencyIssue {
+                code: "SUPPORT_MATRIX_ROOT_READ_ERROR",
+                agent: String::new(),
+                version: String::new(),
+                target: String::new(),
+                message: err,
+            });
+            return Err(issues);
+        }
+    };
+    let known_agents = enrolled_roots
         .iter()
-        .map(|(agent, _)| *agent)
+        .map(|root| root.agent.clone())
         .collect::<BTreeSet<_>>();
 
-    for (agent, rel_root) in CURRENT_AGENT_ROOTS {
-        let root = AgentRoot {
-            agent: agent.to_string(),
-            root: workspace_root.join(rel_root),
-        };
+    for root in enrolled_roots {
         if !root.root.exists() {
             // The committed root set is authoritative even when publication rows for that agent
             // have already been dropped; otherwise missing roots evade the exact-row-set check.
@@ -236,13 +244,13 @@ pub fn validate_publication_consistency(
 
     for agent in rows
         .iter()
-        .map(|row| row.agent.as_str())
+        .map(|row| row.agent.clone())
         .filter(|agent| !known_agents.contains(agent))
         .collect::<BTreeSet<_>>()
     {
         issues.push(SupportMatrixConsistencyIssue {
             code: "SUPPORT_MATRIX_UNKNOWN_AGENT",
-            agent: agent.to_string(),
+            agent,
             version: String::new(),
             target: String::new(),
             message: "row agent does not match a committed manifest root".to_string(),
