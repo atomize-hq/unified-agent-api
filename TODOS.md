@@ -26,17 +26,17 @@
 **Priority:** P2
 **Depends on:** M3 governance artifacts plus one post-M3 onboarding cycle with recorded duration and residual friction truth
 
-### Add Multi-Agent Drift And Update Maintenance Flows
+### Implement The M4 Post-Onboarding Maintenance Lane
 
-**What:** Add update-mode, drift detection, and already-onboarded maintenance workflows after the repo finishes one post-M3 onboarding cycle with explicit approval and closeout linkage.
+**What:** Add a separate maintenance lifecycle for already-onboarded agents: agent-scoped drift detection, a dedicated maintenance packet/request, bounded control-plane refresh ergonomics, and explicit maintenance closeout.
 
-**Why:** The repo should not widen into ongoing maintenance flows until the create-mode governance chain is trustworthy and replay-safe under the new approval/closeout model.
+**Why:** `onboard-agent` is the create-mode bridge for new agents. Once an agent is already in the repo, maintainers still need a boring way to detect and repair drift across registry truth, publication outputs, release docs, and closed packet/governance docs without reopening new-agent onboarding.
 
-**Context:** The 2026-04-21 `/autoplan` kept update mode and maintenance flows out of M3. The review concluded that the repo still needs immutable approval identity, validated closeout state, and historical reconciliation before it should generalize into long-lived lifecycle tooling.
+**Context:** The 2026-04-21 M4 `/autoplan` for the CLI agent onboarding factory reframed this work as a separate post-onboarding lifecycle milestone. The plan anchors the proving run on OpenCode because `/Users/spensermcconnell/.gstack/projects/atomize-hq-unified-agent-api/spensermcconnell-main-test-outcome-20260420-091704.md` already documents a real stale closeout claim in `docs/project_management/next/opencode-implementation/governance/seam-2-closeout.md`.
 
 **Effort:** M
-**Priority:** P3
-**Depends on:** M3 landing cleanly and at least one additional onboarding cycle after the Gemini backfill
+**Priority:** P2
+**Depends on:** M3 landing cleanly with approval-driven onboarding and validated proving-run closeout
 
 ## Completed
 
