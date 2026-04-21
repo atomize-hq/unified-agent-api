@@ -16,6 +16,7 @@ use clap::{ArgGroup, Parser};
 use thiserror::Error;
 use toml_edit::DocumentMut;
 
+use self::mutation::WorkspaceMutationError;
 use self::mutation::{apply_mutations, ApplySummary, PlannedMutation, WorkspacePathJail};
 use self::preview::{
     build_docs_preview, build_manifest_preview, build_manual_follow_up, build_release_preview,
@@ -139,6 +140,15 @@ impl Error {
         match self {
             Self::Validation(_) => 2,
             Self::Internal(_) => 1,
+        }
+    }
+}
+
+impl From<WorkspaceMutationError> for Error {
+    fn from(err: WorkspaceMutationError) -> Self {
+        match err {
+            WorkspaceMutationError::Validation(message) => Self::Validation(message),
+            WorkspaceMutationError::Internal(message) => Self::Internal(message),
         }
     }
 }

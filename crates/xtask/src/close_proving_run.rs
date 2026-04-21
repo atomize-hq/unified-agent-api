@@ -9,6 +9,9 @@ use serde::Deserialize;
 use thiserror::Error;
 use xtask::agent_registry::{AgentRegistry, AgentRegistryEntry, REGISTRY_RELATIVE_PATH};
 use xtask::approval_artifact::{self, ApprovalArtifact, ApprovalArtifactError};
+use xtask::workspace_mutation::{
+    apply_mutations, plan_create_or_replace, WorkspaceMutationError, WorkspacePathJail,
+};
 
 const OWNERSHIP_MARKER: &str = "<!-- generated-by: xtask onboard-agent; owner: control-plane -->";
 const DOCS_NEXT_ROOT: &str = "docs/project_management/next";
@@ -43,6 +46,15 @@ impl Error {
         match self {
             Self::Validation(_) => 2,
             Self::Internal(_) => 1,
+        }
+    }
+}
+
+impl From<WorkspaceMutationError> for Error {
+    fn from(err: WorkspaceMutationError) -> Self {
+        match err {
+            WorkspaceMutationError::Validation(message) => Self::Validation(message),
+            WorkspaceMutationError::Internal(message) => Self::Internal(message),
         }
     }
 }
@@ -104,12 +116,14 @@ pub fn run_in_workspace<W: Write>(
     args: Args,
     writer: &mut W,
 ) -> Result<(), Error> {
-    let closeout_path = absolutize(workspace_root, &args.closeout);
-    let onboarding_pack_prefix =
-        onboarding_pack_prefix_from_closeout_path(workspace_root, &closeout_path)?;
+    let closeout_path = normalize_repo_relative_path(workspace_root, &args.closeout, "--closeout")?;
+    let onboarding_pack_prefix = onboarding_pack_prefix_from_closeout_path(&closeout_path)?;
+    let jail = WorkspacePathJail::new(workspace_root)?;
+    let resolved_closeout_path = jail.resolve(&closeout_path)?;
     let closeout = load_validated_closeout(
         workspace_root,
         &closeout_path,
+        &resolved_closeout_path,
         &args.approval,
         &onboarding_pack_prefix,
     )?;
@@ -125,7 +139,7 @@ pub fn run_in_workspace<W: Write>(
             ))
         })?;
 
-    let docs_preview = build_docs_preview(workspace_root, entry, &closeout, &closeout_path);
+    let docs_preview = build_docs_preview(entry, &closeout, &closeout_path);
     write_docs(workspace_root, &docs_preview)?;
 
     writeln!(writer, "OK: close-proving-run write complete.")
@@ -135,7 +149,7 @@ pub fn run_in_workspace<W: Write>(
         "Refreshed {} docs files for `{}` from `{}`.",
         docs_preview.len(),
         entry.agent_id,
-        display_workspace_path(workspace_root, &closeout_path)
+        display_repo_relative_path(&closeout_path)
     )
     .map_err(|err| Error::Internal(format!("write stdout: {err}")))?;
 
@@ -162,14 +176,13 @@ fn resolve_workspace_root() -> Result<PathBuf, Error> {
 }
 
 fn build_docs_preview(
-    workspace_root: &Path,
     entry: &AgentRegistryEntry,
     closeout: &ProvingRunCloseout,
     closeout_path: &Path,
 ) -> Vec<(String, Option<String>)> {
     let docs_root = docs_pack_root(&entry.scaffold.onboarding_pack_prefix);
     let docs_root_display = docs_root.display().to_string();
-    let closeout_path_display = display_workspace_path(workspace_root, closeout_path);
+    let closeout_path_display = display_repo_relative_path(closeout_path);
     let release_touchpoints = release_touchpoint_lines(entry)
         .into_iter()
         .map(|line| format!("- {line}"))
@@ -235,25 +248,29 @@ fn write_docs(
     workspace_root: &Path,
     docs_preview: &[(String, Option<String>)],
 ) -> Result<(), Error> {
-    for (relative_path, contents) in docs_preview {
-        let path = workspace_root.join(relative_path);
-        if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent)
-                .map_err(|err| Error::Internal(format!("create {}: {err}", parent.display())))?;
-        }
-        fs::write(&path, contents.clone().unwrap_or_default())
-            .map_err(|err| Error::Internal(format!("write {}: {err}", path.display())))?;
-    }
+    let jail = WorkspacePathJail::new(workspace_root)?;
+    let mutations = docs_preview
+        .iter()
+        .map(|(relative_path, contents)| {
+            plan_create_or_replace(
+                &jail,
+                PathBuf::from(relative_path),
+                contents.clone().unwrap_or_default().into_bytes(),
+            )
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    apply_mutations(workspace_root, &mutations)?;
     Ok(())
 }
 
 fn load_validated_closeout(
     workspace_root: &Path,
     closeout_path: &Path,
+    resolved_closeout_path: &Path,
     approval_path: &Path,
     onboarding_pack_prefix: &str,
 ) -> Result<ProvingRunCloseout, Error> {
-    let closeout_text = fs::read_to_string(closeout_path)
+    let closeout_text = fs::read_to_string(resolved_closeout_path)
         .map_err(|err| Error::Validation(format!("read {}: {err}", closeout_path.display())))?;
     let raw = serde_json::from_str::<RawProvingRunCloseout>(&closeout_text)
         .map_err(|err| Error::Validation(format!("parse {}: {err}", closeout_path.display())))?;
@@ -467,18 +484,8 @@ fn map_approval_artifact_error(closeout_path: &Path, err: ApprovalArtifactError)
     }
 }
 
-fn onboarding_pack_prefix_from_closeout_path(
-    workspace_root: &Path,
-    closeout_path: &Path,
-) -> Result<String, Error> {
-    let relative = closeout_path.strip_prefix(workspace_root).map_err(|_| {
-        Error::Validation(format!(
-            "{} is not contained by workspace root {}",
-            closeout_path.display(),
-            workspace_root.display()
-        ))
-    })?;
-    let components = relative.components().collect::<Vec<_>>();
+fn onboarding_pack_prefix_from_closeout_path(closeout_path: &Path) -> Result<String, Error> {
+    let components = closeout_path.components().collect::<Vec<_>>();
     let expected_prefix = [
         Component::Normal("docs".as_ref()),
         Component::Normal("project_management".as_ref()),
@@ -510,19 +517,41 @@ fn docs_pack_root(prefix: &str) -> PathBuf {
     Path::new(DOCS_NEXT_ROOT).join(prefix)
 }
 
-fn absolutize(workspace_root: &Path, path: &Path) -> PathBuf {
-    if path.is_absolute() {
-        path.to_path_buf()
+fn normalize_repo_relative_path(
+    workspace_root: &Path,
+    path: &Path,
+    flag_name: &str,
+) -> Result<PathBuf, Error> {
+    let relative = if path.is_absolute() {
+        path.strip_prefix(workspace_root)
+            .map(Path::to_path_buf)
+            .map_err(|_| {
+                Error::Validation(format!(
+                    "{flag_name} `{}` must be inside workspace root {}",
+                    path.display(),
+                    workspace_root.display()
+                ))
+            })?
     } else {
-        workspace_root.join(path)
+        path.to_path_buf()
+    };
+
+    if relative.components().next().is_none()
+        || relative
+            .components()
+            .any(|component| !matches!(component, Component::Normal(_)))
+    {
+        return Err(Error::Validation(format!(
+            "{flag_name} `{}` must be a repo-relative path with only normal components",
+            path.display()
+        )));
     }
+
+    Ok(relative)
 }
 
-fn display_workspace_path(workspace_root: &Path, path: &Path) -> String {
-    path.strip_prefix(workspace_root)
-        .unwrap_or(path)
-        .display()
-        .to_string()
+fn display_repo_relative_path(path: &Path) -> String {
+    path.display().to_string()
 }
 
 fn release_touchpoint_lines(entry: &AgentRegistryEntry) -> Vec<String> {
