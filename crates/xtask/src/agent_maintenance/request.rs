@@ -347,13 +347,17 @@ fn validate_repo_relative_reference(
     }
 
     let resolved = jail.resolve(&relative).map_err(map_jail_error)?;
-    if let Ok(metadata) = fs::symlink_metadata(&resolved) {
-        if metadata.file_type().is_symlink() || !metadata.is_file() {
-            return Err(MaintenanceRequestError::Validation(format!(
-                "maintenance request `{}` field `{field_name}` must point to a file path when present on disk",
-                request_path.display()
-            )));
-        }
+    let metadata = fs::symlink_metadata(&resolved).map_err(|err| {
+        MaintenanceRequestError::Validation(format!(
+            "maintenance request `{}` field `{field_name}` must point to an existing file: {err}",
+            request_path.display()
+        ))
+    })?;
+    if metadata.file_type().is_symlink() || !metadata.is_file() {
+        return Err(MaintenanceRequestError::Validation(format!(
+            "maintenance request `{}` field `{field_name}` must point to an existing file",
+            request_path.display()
+        )));
     }
     Ok(())
 }

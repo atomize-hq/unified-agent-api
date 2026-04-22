@@ -5,6 +5,7 @@ use std::{
 
 use clap::Parser;
 
+use super::super::{finding_signature::FindingSignature, request};
 use crate::workspace_mutation::{ApplySummary, WorkspaceMutationError};
 
 #[derive(Debug, Parser, Clone)]
@@ -145,15 +146,6 @@ impl From<WorkspaceMutationError> for MaintenanceCloseoutError {
 }
 
 impl MaintenanceTriggerKind {
-    pub(crate) fn parse(value: &str) -> Option<Self> {
-        match value {
-            "drift_detected" => Some(Self::DriftDetected),
-            "manual_reopen" => Some(Self::ManualReopen),
-            "post_release_audit" => Some(Self::PostReleaseAudit),
-            _ => None,
-        }
-    }
-
     pub(crate) fn as_str(self) -> &'static str {
         match self {
             Self::DriftDetected => "drift_detected",
@@ -163,17 +155,56 @@ impl MaintenanceTriggerKind {
     }
 }
 
-impl MaintenanceControlPlaneAction {
-    pub(crate) fn parse(value: &str) -> Option<Self> {
-        match value {
-            "packet_doc_refresh" => Some(Self::PacketDocRefresh),
-            "support_matrix_refresh" => Some(Self::SupportMatrixRefresh),
-            "capability_matrix_refresh" => Some(Self::CapabilityMatrixRefresh),
-            "release_doc_refresh" => Some(Self::ReleaseDocRefresh),
-            _ => None,
+impl From<request::MaintenanceRequest> for MaintenanceRequest {
+    fn from(value: request::MaintenanceRequest) -> Self {
+        Self {
+            agent_id: value.agent_id,
+            trigger_kind: value.trigger_kind.into(),
+            basis_ref: value.basis_ref,
+            opened_from: value.opened_from,
+            requested_control_plane_actions: value
+                .requested_control_plane_actions
+                .into_iter()
+                .map(Into::into)
+                .collect(),
+            runtime_followup_required: value.runtime_followup_required.into(),
+            request_recorded_at: value.request_recorded_at,
+            request_commit: value.request_commit,
         }
     }
+}
 
+impl From<request::TriggerKind> for MaintenanceTriggerKind {
+    fn from(value: request::TriggerKind) -> Self {
+        match value {
+            request::TriggerKind::DriftDetected => Self::DriftDetected,
+            request::TriggerKind::ManualReopen => Self::ManualReopen,
+            request::TriggerKind::PostReleaseAudit => Self::PostReleaseAudit,
+        }
+    }
+}
+
+impl From<request::MaintenanceAction> for MaintenanceControlPlaneAction {
+    fn from(value: request::MaintenanceAction) -> Self {
+        match value {
+            request::MaintenanceAction::PacketDocRefresh => Self::PacketDocRefresh,
+            request::MaintenanceAction::SupportMatrixRefresh => Self::SupportMatrixRefresh,
+            request::MaintenanceAction::CapabilityMatrixRefresh => Self::CapabilityMatrixRefresh,
+            request::MaintenanceAction::ReleaseDocRefresh => Self::ReleaseDocRefresh,
+        }
+    }
+}
+
+impl From<request::RuntimeFollowupRequired> for RuntimeFollowupRequired {
+    fn from(value: request::RuntimeFollowupRequired) -> Self {
+        Self {
+            required: value.required,
+            items: value.items,
+        }
+    }
+}
+
+impl MaintenanceControlPlaneAction {
     pub(crate) fn as_str(self) -> &'static str {
         match self {
             Self::PacketDocRefresh => "packet_doc_refresh",
@@ -204,6 +235,12 @@ impl MaintenanceDriftCategory {
             Self::ReleaseDoc => "release_doc_drift",
             Self::GovernanceDoc => "governance_doc_drift",
         }
+    }
+}
+
+impl MaintenanceFinding {
+    pub(crate) fn signature(&self) -> FindingSignature {
+        FindingSignature::new(self.category_id.as_id(), &self.surfaces)
     }
 }
 

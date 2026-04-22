@@ -14,6 +14,8 @@ use crate::{
 };
 use clap::Parser;
 
+use super::finding_signature::FindingSignature;
+
 const CAPABILITY_MATRIX_PATH: &str = "docs/specs/unified-agent-api/capability-matrix.md";
 const SUPPORT_MATRIX_JSON_PATH: &str = "cli_manifests/support_matrix/current.json";
 const SUPPORT_MATRIX_MARKDOWN_PATH: &str = "docs/specs/unified-agent-api/support-matrix.md";
@@ -24,8 +26,6 @@ const RELEASE_DOC_END_MARKER: &str =
     "<!-- /generated-by: xtask onboard-agent; section: crates-io-release -->";
 const SUPPORT_MARKDOWN_START_MARKER: &str = "<!-- support-matrix-published:start -->";
 const SUPPORT_MARKDOWN_END_MARKER: &str = "<!-- support-matrix-published:end -->";
-const WRAPPER_EVENTS_PACKAGE: &str = "unified-agent-api-wrapper-events";
-const AGENT_API_PACKAGE: &str = "unified-agent-api";
 
 const CAPABILITY_MCP_LIST_V1: &str = "agent_api.tools.mcp.list.v1";
 const CAPABILITY_MCP_GET_V1: &str = "agent_api.tools.mcp.get.v1";
@@ -70,6 +70,10 @@ pub struct DriftFinding {
 impl DriftFinding {
     pub fn category_id(&self) -> &'static str {
         self.category.category_id()
+    }
+
+    pub fn signature(&self) -> FindingSignature {
+        FindingSignature::new(self.category_id(), &self.surfaces)
     }
 }
 
@@ -177,13 +181,16 @@ pub fn check_agent_drift(
         ))
     })?;
 
-    let support_rows = support_matrix::derive_rows(workspace_root)
-        .map_err(|err| DriftCheckError::Validation(format!("derive support rows: {err}")))?;
-    let expected_support_rows = support_rows
-        .iter()
-        .filter(|row| row.agent == agent_id)
-        .cloned()
-        .collect::<Vec<_>>();
+    let expected_support_rows = if entry.publication.support_matrix_enabled {
+        support_matrix::derive_rows_for_agent_root(
+            workspace_root,
+            &entry.agent_id,
+            &entry.manifest_root,
+        )
+        .map_err(|err| format!("derive support rows: {err}"))
+    } else {
+        Ok(Vec::new())
+    };
 
     let capability_truth = shared::collect_capability_truth(entry, workspace_root);
 
@@ -198,9 +205,11 @@ pub fn check_agent_drift(
     ) {
         findings.push(finding);
     }
-    if let Some(finding) =
-        publication::inspect_support_publication(entry, workspace_root, &expected_support_rows)
-    {
+    if let Some(finding) = publication::inspect_support_publication(
+        entry,
+        workspace_root,
+        expected_support_rows.as_ref(),
+    ) {
         findings.push(finding);
     }
     if let Some(finding) = publication::inspect_release_doc(entry, workspace_root, &registry) {
@@ -210,7 +219,7 @@ pub fn check_agent_drift(
         entry,
         workspace_root,
         capability_truth.as_ref(),
-        &expected_support_rows,
+        expected_support_rows.as_ref(),
     ) {
         findings.push(finding);
     }

@@ -15,6 +15,8 @@ mod agent_registry;
 mod approval_artifact;
 #[path = "../src/agent_maintenance/drift/mod.rs"]
 mod drift;
+#[path = "../src/agent_maintenance/finding_signature.rs"]
+mod finding_signature;
 #[path = "../src/release_doc.rs"]
 mod release_doc;
 #[path = "../src/root_intake_layout.rs"]
@@ -129,6 +131,37 @@ fn check_agent_drift_reports_governance_doc_mismatch() {
 }
 
 #[test]
+fn check_agent_drift_ignores_unrelated_broken_manifest_roots() {
+    let fixture = fixture_root("agent-maintenance-drift-unrelated-root");
+    seed_publication_inputs(&fixture);
+
+    fs::remove_file(fixture.join("cli_manifests/gemini_cli/current.json"))
+        .expect("remove unrelated manifest root");
+
+    let report = check_agent_drift(&fixture, "opencode").expect("opencode report");
+    assert_eq!(report.agent_id, "opencode");
+}
+
+#[test]
+fn check_agent_drift_skips_support_derivation_when_agent_is_not_support_enrolled() {
+    let fixture = fixture_root("agent-maintenance-drift-support-disabled");
+    seed_publication_inputs(&fixture);
+    set_support_matrix_enabled(&fixture, "opencode", false);
+    fs::remove_file(fixture.join("cli_manifests/opencode/versions/1.0.0.json"))
+        .expect("remove selected agent version metadata");
+
+    let report = check_agent_drift(&fixture, "opencode").expect("opencode report");
+    assert!(
+        report
+            .findings
+            .iter()
+            .all(|finding| finding.category != DriftCategory::SupportPublication),
+        "{}",
+        report.render()
+    );
+}
+
+#[test]
 fn check_agent_drift_reports_gemini_approval_descriptor_mismatch() {
     let fixture = fixture_root("agent-maintenance-drift-gemini-approval");
     seed_publication_inputs(&fixture);
@@ -208,6 +241,97 @@ fn check_agent_drift_reports_recurring_closed_governance_surface() {
         "{}",
         report.render()
     );
+}
+
+#[test]
+fn check_agent_drift_reports_support_derivation_failure_as_categorized_drift() {
+    let fixture = fixture_root("agent-maintenance-drift-support-derivation-error");
+    seed_publication_inputs(&fixture);
+
+    fs::remove_file(fixture.join("cli_manifests/opencode/pointers/latest_supported/linux-x64.txt"))
+        .expect("remove selected agent support pointer");
+
+    let report = check_agent_drift(&fixture, "opencode").expect("drift report");
+    let finding = report
+        .findings
+        .iter()
+        .find(|finding| finding.category == DriftCategory::SupportPublication)
+        .expect("support publication finding");
+    assert!(finding.summary.contains("derive support rows"));
+    assert!(finding
+        .surfaces
+        .contains(&"cli_manifests/opencode".to_string()));
+    assert!(finding
+        .surfaces
+        .contains(&"cli_manifests/support_matrix/current.json".to_string()));
+}
+
+#[test]
+fn check_agent_drift_entrypoint_exits_two_for_support_derivation_drift() {
+    let fixture = fixture_root("agent-maintenance-drift-exit-support-derivation-error");
+    seed_publication_inputs(&fixture);
+
+    fs::remove_file(fixture.join("cli_manifests/opencode/pointers/latest_supported/linux-x64.txt"))
+        .expect("remove selected agent support pointer");
+
+    let output = run_xtask_check_agent_drift(&fixture, "opencode");
+    assert_eq!(output.status.code(), Some(2));
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("status: drift_detected"));
+    assert!(stdout.contains("category_id: support_publication_drift"));
+    assert!(stdout.contains("derive support rows"));
+}
+
+#[test]
+fn check_agent_drift_reports_release_doc_missing_tail_packages() {
+    let fixture = fixture_root("agent-maintenance-drift-release-doc-missing-tail");
+    seed_publication_inputs(&fixture);
+
+    write_text(
+        &fixture.join(release_doc::RELEASE_DOC_PATH),
+        &release_doc_with_packages(&[
+            "unified-agent-api-codex",
+            "unified-agent-api-claude-code",
+            "unified-agent-api-opencode",
+            "unified-agent-api-gemini-cli",
+        ]),
+    );
+
+    let report = check_agent_drift(&fixture, "opencode").expect("drift report");
+    let finding = report
+        .findings
+        .iter()
+        .find(|finding| finding.category == DriftCategory::ReleaseDoc)
+        .expect("release doc finding");
+    assert!(finding.summary.contains("unified-agent-api-wrapper-events"));
+    assert!(finding.summary.contains("unified-agent-api"));
+}
+
+#[test]
+fn check_agent_drift_reports_release_doc_duplicate_package_entries() {
+    let fixture = fixture_root("agent-maintenance-drift-release-doc-duplicate-package");
+    seed_publication_inputs(&fixture);
+
+    write_text(
+        &fixture.join(release_doc::RELEASE_DOC_PATH),
+        &release_doc_with_packages(&[
+            "unified-agent-api-codex",
+            "unified-agent-api-claude-code",
+            "unified-agent-api-opencode",
+            "unified-agent-api-opencode",
+            "unified-agent-api-wrapper-events",
+            "unified-agent-api",
+        ]),
+    );
+
+    let report = check_agent_drift(&fixture, "opencode").expect("drift report");
+    let finding = report
+        .findings
+        .iter()
+        .find(|finding| finding.category == DriftCategory::ReleaseDoc)
+        .expect("release doc finding");
+    assert!(finding.summary.contains("duplicate package"));
+    assert!(finding.summary.contains("unified-agent-api-opencode"));
 }
 
 #[test]
@@ -388,6 +512,39 @@ fn run_xtask_check_agent_drift(fixture_root: &Path, agent_id: &str) -> std::proc
         .current_dir(fixture_root)
         .output()
         .expect("spawn xtask check-agent-drift")
+}
+
+fn release_doc_with_packages(packages: &[&str]) -> String {
+    let packages = packages
+        .iter()
+        .map(|package| package.to_string())
+        .collect::<Vec<_>>();
+    release_doc::splice_release_doc_block(
+        "# Release docs\n\nManual contract text.\n",
+        &release_doc::render_release_doc_block(&packages),
+    )
+}
+
+fn set_support_matrix_enabled(root: &Path, agent_id: &str, enabled: bool) {
+    let registry_path = root.join("crates/xtask/data/agent_registry.toml");
+    let registry = fs::read_to_string(&registry_path).expect("read registry");
+    let agent_marker = format!("agent_id = \"{agent_id}\"");
+    let agent_start = registry.find(&agent_marker).expect("agent in registry");
+    let support_marker = "support_matrix_enabled = true";
+    let support_start = registry[agent_start..]
+        .find(support_marker)
+        .map(|offset| agent_start + offset)
+        .expect("support flag after agent entry");
+    let mut updated = registry;
+    updated.replace_range(
+        support_start..support_start + support_marker.len(),
+        if enabled {
+            "support_matrix_enabled = true"
+        } else {
+            "support_matrix_enabled = false"
+        },
+    );
+    write_text(&registry_path, &updated);
 }
 
 fn seed_publishable_workspace_member(root: &Path, member_path: &str, package_name: &str) {

@@ -70,6 +70,88 @@ fn runtime_owned_actions_rejected() {
 }
 
 #[test]
+fn missing_basis_ref_is_rejected() {
+    let fixture = fixture_root("agent-maintenance-missing-basis-ref");
+    seed_publication_inputs(&fixture);
+
+    let request_path =
+        "docs/project_management/next/opencode-maintenance/governance/maintenance-request.toml";
+    write_text(
+        &fixture.join(request_path),
+        &request_toml_with_refs(
+            "opencode",
+            "docs/project_management/next/opencode-maintenance/governance/missing-basis.md",
+            "docs/project_management/next/opencode-implementation/governance/seam-2-closeout.md",
+            &["packet_doc_refresh"],
+            false,
+            &[],
+        ),
+    );
+
+    let err = build_refresh_plan(&fixture, Path::new(request_path)).expect_err("missing basis ref");
+    assert!(err.to_string().contains("field `basis_ref`"));
+    assert!(err.to_string().contains("must point to an existing file"));
+}
+
+#[test]
+fn missing_opened_from_is_rejected() {
+    let fixture = fixture_root("agent-maintenance-missing-opened-from");
+    seed_publication_inputs(&fixture);
+
+    let request_path =
+        "docs/project_management/next/opencode-maintenance/governance/maintenance-request.toml";
+    write_text(
+        &fixture.join(request_path),
+        &request_toml_with_refs(
+            "opencode",
+            "docs/project_management/next/opencode-implementation/governance/seam-2-closeout.md",
+            "docs/project_management/next/opencode-maintenance/governance/missing-opened-from.md",
+            &["packet_doc_refresh"],
+            false,
+            &[],
+        ),
+    );
+
+    let err =
+        build_refresh_plan(&fixture, Path::new(request_path)).expect_err("missing opened_from");
+    assert!(err.to_string().contains("field `opened_from`"));
+    assert!(err.to_string().contains("must point to an existing file"));
+}
+
+#[test]
+fn release_doc_refresh_uses_registry_order_instead_of_workspace_member_order() {
+    let fixture = fixture_root("agent-maintenance-release-doc-registry-order");
+    seed_publication_inputs(&fixture);
+    write_text(
+        &fixture.join("Cargo.toml"),
+        "[workspace]\nmembers = [\n  \"crates/agent_api\",\n  \"crates/opencode\",\n  \"crates/codex\",\n  \"crates/claude_code\",\n  \"crates/gemini_cli\",\n  \"crates/wrapper_events\",\n  \"crates/xtask\",\n]\n",
+    );
+
+    let request_path =
+        "docs/project_management/next/opencode-maintenance/governance/maintenance-request.toml";
+    write_text(
+        &fixture.join(request_path),
+        &request_toml("opencode", &["release_doc_refresh"], false, &[]),
+    );
+
+    let plan = build_refresh_plan(&fixture, Path::new(request_path)).expect("build refresh plan");
+    let release_doc = plan
+        .files
+        .iter()
+        .find(|file| file.relative_path == release_doc::RELEASE_DOC_PATH)
+        .expect("release doc planned");
+    let markdown = String::from_utf8(release_doc.contents.clone()).expect("utf8 release doc");
+
+    let codex_position = markdown
+        .find("1. `unified-agent-api-codex`")
+        .expect("codex order");
+    let opencode_position = markdown
+        .find("3. `unified-agent-api-opencode`")
+        .expect("opencode order");
+    assert!(codex_position < opencode_position);
+}
+
+#[test]
 fn dry_run_write_plan_identity_and_no_write_vs_write_parity() {
     let fixture = fixture_root("agent-maintenance-plan-parity");
     seed_publication_inputs(&fixture);
@@ -211,6 +293,12 @@ fn identical_replay_is_noop() {
 fn seed_publication_inputs(root: &Path) {
     seed_release_touchpoints(root);
     write_text(
+        &root.join(
+            "docs/project_management/next/opencode-implementation/governance/seam-2-closeout.md",
+        ),
+        "# Closeout\n\nThis stale capability claim triggered maintenance.\n",
+    );
+    write_text(
         &root.join("docs/specs/unified-agent-api/support-matrix.md"),
         "# Support matrix\n\nManual contract text.\n",
     );
@@ -339,6 +427,24 @@ fn request_toml(
     runtime_required: bool,
     runtime_items: &[&str],
 ) -> String {
+    request_toml_with_refs(
+        agent_id,
+        "docs/project_management/next/opencode-implementation/governance/seam-2-closeout.md",
+        "docs/project_management/next/opencode-implementation/governance/seam-2-closeout.md",
+        actions,
+        runtime_required,
+        runtime_items,
+    )
+}
+
+fn request_toml_with_refs(
+    agent_id: &str,
+    basis_ref: &str,
+    opened_from: &str,
+    actions: &[&str],
+    runtime_required: bool,
+    runtime_items: &[&str],
+) -> String {
     let actions_block = actions
         .iter()
         .map(|action| format!("  \"{action}\","))
@@ -359,8 +465,8 @@ fn request_toml(
             "artifact_version = \"1\"\n",
             "agent_id = \"{agent_id}\"\n",
             "trigger_kind = \"drift_detected\"\n",
-            "basis_ref = \"docs/project_management/next/opencode-implementation/governance/seam-2-closeout.md\"\n",
-            "opened_from = \"docs/project_management/next/opencode-implementation/governance/seam-2-closeout.md\"\n",
+            "basis_ref = \"{basis_ref}\"\n",
+            "opened_from = \"{opened_from}\"\n",
             "requested_control_plane_actions = [\n",
             "{actions_block}\n",
             "]\n",
@@ -374,6 +480,8 @@ fn request_toml(
             "]\n"
         ),
         agent_id = agent_id,
+        basis_ref = basis_ref,
+        opened_from = opened_from,
         actions_block = actions_block,
         runtime_required = if runtime_required { "true" } else { "false" },
         runtime_items_block = runtime_items_block

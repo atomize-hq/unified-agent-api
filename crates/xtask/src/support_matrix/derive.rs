@@ -121,6 +121,18 @@ pub fn derive_rows(workspace_root: &Path) -> Result<Vec<SupportRow>, String> {
     derive_rows_for_roots(&roots)
 }
 
+pub fn derive_rows_for_agent_root(
+    workspace_root: &Path,
+    agent: &str,
+    manifest_root: &str,
+) -> Result<Vec<SupportRow>, String> {
+    let roots = [AgentRoot {
+        agent: agent.to_string(),
+        root: workspace_root.join(manifest_root),
+    }];
+    derive_rows_for_roots(&roots)
+}
+
 #[doc(hidden)]
 pub fn derive_rows_for_test_roots(
     workspace_root: &Path,

@@ -5,39 +5,16 @@ use std::{
 };
 
 use serde::Deserialize;
-use sha2::{Digest, Sha256};
 use time::{format_description::well_known::Rfc3339, OffsetDateTime};
 
-use crate::agent_registry::{AgentRegistry, AgentRegistryError, REGISTRY_RELATIVE_PATH};
 use crate::workspace_mutation::WorkspacePathJail;
 
+use super::super::{drift, request};
 use super::{
     maintenance_pack_root, DeferredFindingsTruth, LinkedMaintenanceCloseout,
     LoadedMaintenanceRequest, MaintenanceCloseout, MaintenanceCloseoutError,
-    MaintenanceControlPlaneAction, MaintenanceDriftCategory, MaintenanceFinding,
-    MaintenanceRequest, MaintenanceTriggerKind, RuntimeFollowupRequired,
+    MaintenanceDriftCategory, MaintenanceFinding,
 };
-
-#[derive(Debug, Clone, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct RawMaintenanceRequest {
-    artifact_version: String,
-    agent_id: String,
-    trigger_kind: String,
-    basis_ref: String,
-    opened_from: String,
-    requested_control_plane_actions: Vec<String>,
-    runtime_followup_required: RawRuntimeFollowupRequired,
-    request_recorded_at: String,
-    request_commit: String,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct RawRuntimeFollowupRequired {
-    required: bool,
-    items: Vec<String>,
-}
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -104,17 +81,22 @@ pub fn load_linked_closeout(
         &loaded_request.request_sha256,
         raw_closeout,
     )?;
-    let request = closeout_request(&closeout_path, workspace_root, &request_path)?;
+    validate_live_drift_truth(
+        workspace_root,
+        &closeout_path,
+        &loaded_request.request.agent_id,
+        &closeout,
+    )?;
     let maintenance_pack_root = maintenance_pack_root(&maintenance_pack_prefix);
 
     Ok(LinkedMaintenanceCloseout {
+        request: loaded_request.request.clone(),
         loaded_request,
         request_path: request_path.clone(),
         closeout_path: closeout_path.clone(),
         maintenance_pack_prefix: maintenance_pack_prefix.clone(),
         maintenance_pack_root,
         request_sha256: closeout.request_sha256.clone(),
-        request,
         closeout,
     })
 }
@@ -124,135 +106,17 @@ pub fn load_request_artifact(
     request_path: &Path,
 ) -> Result<LoadedMaintenanceRequest, MaintenanceCloseoutError> {
     let request_path = validate_repo_relative_path(request_path, "request path")?;
-    let maintenance_pack_prefix = maintenance_pack_prefix_from_request_path(&request_path)?;
-    let maintenance_pack_root = maintenance_pack_root(&maintenance_pack_prefix);
-    let jail = WorkspacePathJail::new(workspace_root)?;
-    let resolved_request_path = jail.resolve(&request_path)?;
-    let request_bytes = load_request_bytes(&resolved_request_path, &request_path)?;
-    let request_text = std::str::from_utf8(&request_bytes).map_err(|err| {
-        MaintenanceCloseoutError::Validation(format!(
-            "{}: request artifact must be valid utf-8: {err}",
-            request_path.display()
-        ))
-    })?;
-    let raw_request =
-        toml_edit::de::from_str::<RawMaintenanceRequest>(request_text).map_err(|err| {
-            MaintenanceCloseoutError::Validation(format!("parse {}: {err}", request_path.display()))
-        })?;
-    let request = validate_request(
-        workspace_root,
-        &request_path,
-        &maintenance_pack_prefix,
-        raw_request,
-    )?;
+    let request = request::load_request(workspace_root, &request_path)
+        .map_err(|err| map_request_error(&request_path, err))?;
+    let maintenance_pack_prefix = request.maintenance_pack_prefix.clone();
+    let maintenance_pack_root = PathBuf::from(&request.maintenance_root);
 
     Ok(LoadedMaintenanceRequest {
         request_path,
         maintenance_pack_prefix,
         maintenance_pack_root,
-        request_sha256: hex::encode(Sha256::digest(&request_bytes)),
-        request,
-    })
-}
-
-fn load_request_bytes(
-    resolved_request_path: &Path,
-    request_path: &Path,
-) -> Result<Vec<u8>, MaintenanceCloseoutError> {
-    fs::read(resolved_request_path).map_err(|err| match err.kind() {
-        io::ErrorKind::NotFound => {
-            MaintenanceCloseoutError::Validation(format!("read {}: {err}", request_path.display()))
-        }
-        _ => {
-            MaintenanceCloseoutError::Validation(format!("read {}: {err}", request_path.display()))
-        }
-    })
-}
-
-fn closeout_request(
-    closeout_path: &Path,
-    workspace_root: &Path,
-    request_path: &Path,
-) -> Result<MaintenanceRequest, MaintenanceCloseoutError> {
-    load_request_artifact(workspace_root, request_path)
-        .map(|loaded| loaded.request)
-        .map_err(|err| match err {
-            MaintenanceCloseoutError::Validation(message) => {
-                MaintenanceCloseoutError::Validation(format!(
-                    "{}: unable to reload linked request: {message}",
-                    closeout_path.display()
-                ))
-            }
-            MaintenanceCloseoutError::Internal(message) => {
-                MaintenanceCloseoutError::Internal(format!(
-                    "{}: unable to reload linked request: {message}",
-                    closeout_path.display()
-                ))
-            }
-        })
-}
-
-fn validate_request(
-    workspace_root: &Path,
-    request_path: &Path,
-    maintenance_pack_prefix: &str,
-    raw: RawMaintenanceRequest,
-) -> Result<MaintenanceRequest, MaintenanceCloseoutError> {
-    if raw.artifact_version != "1" {
-        return Err(MaintenanceCloseoutError::Validation(format!(
-            "{}: `artifact_version` must equal `1`",
-            request_path.display()
-        )));
-    }
-
-    let registry = AgentRegistry::load(workspace_root).map_err(|err| {
-        map_registry_error(request_path, err, format!("load {REGISTRY_RELATIVE_PATH}"))
-    })?;
-    let agent_id = non_empty_field(request_path, "agent_id", &raw.agent_id)?;
-    if registry.find(&agent_id).is_none() {
-        return Err(MaintenanceCloseoutError::Validation(format!(
-            "{}: `agent_id` `{agent_id}` does not exist in {}",
-            request_path.display(),
-            REGISTRY_RELATIVE_PATH
-        )));
-    }
-    let expected_pack_prefix = format!("{agent_id}-maintenance");
-    if expected_pack_prefix != maintenance_pack_prefix {
-        return Err(MaintenanceCloseoutError::Validation(format!(
-            "{}: maintenance pack prefix `{maintenance_pack_prefix}` does not match agent `{agent_id}`",
-            request_path.display()
-        )));
-    }
-
-    let trigger_kind =
-        MaintenanceTriggerKind::parse(&raw.trigger_kind).ok_or_else(|| {
-            MaintenanceCloseoutError::Validation(format!(
-                "{}: `trigger_kind` must be one of `drift_detected`, `manual_reopen`, or `post_release_audit`",
-                request_path.display()
-            ))
-        })?;
-    let basis_ref = validate_path_field(request_path, "basis_ref", &raw.basis_ref)?;
-    let opened_from = validate_path_field(request_path, "opened_from", &raw.opened_from)?;
-    let requested_control_plane_actions =
-        validate_requested_actions(request_path, &raw.requested_control_plane_actions)?;
-    let runtime_followup_required =
-        validate_runtime_followup(request_path, raw.runtime_followup_required)?;
-    validate_rfc3339_utc(
-        request_path,
-        "request_recorded_at",
-        &raw.request_recorded_at,
-    )?;
-    validate_commit_shape(request_path, "request_commit", &raw.request_commit)?;
-
-    Ok(MaintenanceRequest {
-        agent_id,
-        trigger_kind,
-        basis_ref,
-        opened_from,
-        requested_control_plane_actions,
-        runtime_followup_required,
-        request_recorded_at: raw.request_recorded_at,
-        request_commit: raw.request_commit,
+        request_sha256: request.sha256.clone(),
+        request: request.into(),
     })
 }
 
@@ -340,26 +204,102 @@ fn validate_closeout(
     })
 }
 
-fn maintenance_pack_prefix_from_request_path(
-    request_path: &Path,
-) -> Result<String, MaintenanceCloseoutError> {
-    let components = request_path.components().collect::<Vec<_>>();
-    let expected_prefix = [
-        Component::Normal("docs".as_ref()),
-        Component::Normal("project_management".as_ref()),
-        Component::Normal("next".as_ref()),
-    ];
-    if components.len() != 6
-        || components[0..3] != expected_prefix
-        || components[4] != Component::Normal("governance".as_ref())
-        || components[5] != Component::Normal("maintenance-request.toml".as_ref())
-    {
-        return Err(MaintenanceCloseoutError::Validation(format!(
-            "{} must point to docs/project_management/next/<agent>-maintenance/governance/maintenance-request.toml",
-            request_path.display()
-        )));
+pub(crate) fn validate_live_drift_truth(
+    workspace_root: &Path,
+    closeout_path: &Path,
+    agent_id: &str,
+    closeout: &MaintenanceCloseout,
+) -> Result<(), MaintenanceCloseoutError> {
+    let live_report = drift::check_agent_drift(workspace_root, agent_id);
+    validate_live_drift_report(closeout_path, agent_id, closeout, live_report)
+}
+
+pub(crate) fn validate_live_drift_report(
+    closeout_path: &Path,
+    agent_id: &str,
+    closeout: &MaintenanceCloseout,
+    live_report: Result<drift::AgentDriftReport, drift::DriftCheckError>,
+) -> Result<(), MaintenanceCloseoutError> {
+    let live_report = live_report.map_err(|err| match err {
+        drift::DriftCheckError::Validation(message) => {
+            MaintenanceCloseoutError::Validation(format!(
+                "{}: live drift re-check failed for `{agent_id}`: {message}",
+                closeout_path.display()
+            ))
+        }
+        drift::DriftCheckError::Internal(message) => MaintenanceCloseoutError::Internal(format!(
+            "{}: live drift re-check failed for `{agent_id}`: {message}",
+            closeout_path.display()
+        )),
+    })?;
+
+    let live_signatures = live_report
+        .findings
+        .iter()
+        .map(drift::DriftFinding::signature)
+        .collect::<BTreeSet<_>>();
+    let resolved_signatures = closeout
+        .resolved_findings
+        .iter()
+        .map(MaintenanceFinding::signature)
+        .collect::<BTreeSet<_>>();
+
+    for signature in &resolved_signatures {
+        if live_signatures.contains(signature) {
+            return Err(MaintenanceCloseoutError::Validation(format!(
+                "{}: `resolved_findings` still matches live drift for category `{}` on surfaces [{}]",
+                closeout_path.display(),
+                signature.category_id,
+                signature.surfaces.join(", ")
+            )));
+        }
     }
-    path_component_to_string(components[3], request_path)
+
+    match &closeout.deferred_findings {
+        DeferredFindingsTruth::ExplicitNone(_) => {
+            if !live_signatures.is_empty() {
+                return Err(MaintenanceCloseoutError::Validation(format!(
+                    "{}: `explicit_none_reason` is only allowed when the live drift report is clean",
+                    closeout_path.display()
+                )));
+            }
+        }
+        DeferredFindingsTruth::Findings(findings) => {
+            if live_signatures.is_empty() {
+                return Err(MaintenanceCloseoutError::Validation(format!(
+                    "{}: `deferred_findings` must be empty when the live drift report is clean",
+                    closeout_path.display()
+                )));
+            }
+
+            let deferred_signatures = findings
+                .iter()
+                .map(MaintenanceFinding::signature)
+                .collect::<BTreeSet<_>>();
+            for signature in &live_signatures {
+                if !deferred_signatures.contains(signature) {
+                    return Err(MaintenanceCloseoutError::Validation(format!(
+                        "{}: live drift category `{}` on surfaces [{}] is not accounted for in `deferred_findings`",
+                        closeout_path.display(),
+                        signature.category_id,
+                        signature.surfaces.join(", ")
+                    )));
+                }
+            }
+            for signature in &deferred_signatures {
+                if !live_signatures.contains(signature) {
+                    return Err(MaintenanceCloseoutError::Validation(format!(
+                        "{}: `deferred_findings` includes category `{}` on surfaces [{}] that is no longer present in the live drift report",
+                        closeout_path.display(),
+                        signature.category_id,
+                        signature.surfaces.join(", ")
+                    )));
+                }
+            }
+        }
+    }
+
+    Ok(())
 }
 
 fn maintenance_pack_prefix_from_closeout_path(
@@ -424,68 +364,6 @@ fn validate_path_field(
     Ok(trimmed)
 }
 
-fn validate_requested_actions(
-    request_path: &Path,
-    requested_control_plane_actions: &[String],
-) -> Result<Vec<MaintenanceControlPlaneAction>, MaintenanceCloseoutError> {
-    if requested_control_plane_actions.is_empty() {
-        return Err(MaintenanceCloseoutError::Validation(format!(
-            "{}: `requested_control_plane_actions` must not be empty",
-            request_path.display()
-        )));
-    }
-
-    let mut seen = BTreeSet::new();
-    let mut actions = Vec::with_capacity(requested_control_plane_actions.len());
-    for action in requested_control_plane_actions {
-        let action = non_empty_field(request_path, "requested_control_plane_actions[]", action)?;
-        if !seen.insert(action.clone()) {
-            return Err(MaintenanceCloseoutError::Validation(format!(
-                "{}: `requested_control_plane_actions` must not contain duplicates",
-                request_path.display()
-            )));
-        }
-        let parsed = MaintenanceControlPlaneAction::parse(&action).ok_or_else(|| {
-            MaintenanceCloseoutError::Validation(format!(
-                "{}: `requested_control_plane_actions` contains unsupported action `{action}`",
-                request_path.display()
-            ))
-        })?;
-        actions.push(parsed);
-    }
-    Ok(actions)
-}
-
-fn validate_runtime_followup(
-    request_path: &Path,
-    runtime_followup_required: RawRuntimeFollowupRequired,
-) -> Result<RuntimeFollowupRequired, MaintenanceCloseoutError> {
-    let items = runtime_followup_required
-        .items
-        .into_iter()
-        .map(|item| non_empty_field(request_path, "runtime_followup_required.items[]", &item))
-        .collect::<Result<Vec<_>, _>>()?;
-
-    if runtime_followup_required.required {
-        if items.is_empty() {
-            return Err(MaintenanceCloseoutError::Validation(format!(
-                "{}: `runtime_followup_required.items` must not be empty when `required = true`",
-                request_path.display()
-            )));
-        }
-    } else if !items.is_empty() {
-        return Err(MaintenanceCloseoutError::Validation(format!(
-            "{}: `runtime_followup_required.items` must be empty when `required = false`",
-            request_path.display()
-        )));
-    }
-
-    Ok(RuntimeFollowupRequired {
-        required: runtime_followup_required.required,
-        items,
-    })
-}
-
 fn validate_findings(
     closeout_path: &Path,
     field_name: &str,
@@ -541,20 +419,23 @@ fn validate_finding(
     })
 }
 
-fn map_registry_error(
+fn map_request_error(
     request_path: &Path,
-    err: AgentRegistryError,
-    context: String,
+    err: request::MaintenanceRequestError,
 ) -> MaintenanceCloseoutError {
     match err {
-        AgentRegistryError::Validation(message) => MaintenanceCloseoutError::Validation(format!(
-            "{}: {context}: {message}",
-            request_path.display()
-        )),
-        _ => MaintenanceCloseoutError::Internal(format!(
-            "{}: {context}: {err}",
-            request_path.display()
-        )),
+        request::MaintenanceRequestError::Validation(message) => {
+            MaintenanceCloseoutError::Validation(format!(
+                "{}: unable to load linked request: {message}",
+                request_path.display()
+            ))
+        }
+        request::MaintenanceRequestError::Internal(message) => {
+            MaintenanceCloseoutError::Internal(format!(
+                "{}: unable to load linked request: {message}",
+                request_path.display()
+            ))
+        }
     }
 }
 

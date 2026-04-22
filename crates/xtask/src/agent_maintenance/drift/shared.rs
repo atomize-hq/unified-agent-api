@@ -5,7 +5,7 @@ use std::{
 };
 
 use crate::{
-    agent_registry::{AgentRegistry, AgentRegistryEntry},
+    agent_registry::AgentRegistryEntry,
     support_matrix::{
         BackendSupportState, ManifestSupportState, PointerPromotionState, SupportRow,
         UaaSupportState,
@@ -23,10 +23,10 @@ use agent_api::{
 use serde::Deserialize;
 
 use super::{
-    AGENT_API_PACKAGE, CAPABILITY_EXTERNAL_SANDBOX_V1, CAPABILITY_MCP_ADD_V1,
-    CAPABILITY_MCP_GET_V1, CAPABILITY_MCP_LIST_V1, CAPABILITY_MCP_REMOVE_V1,
-    RELEASE_DOC_END_MARKER, RELEASE_DOC_START_MARKER, SUPPORT_MARKDOWN_END_MARKER,
-    SUPPORT_MARKDOWN_START_MARKER, SUPPORT_MATRIX_MARKDOWN_PATH, WRAPPER_EVENTS_PACKAGE,
+    CAPABILITY_EXTERNAL_SANDBOX_V1, CAPABILITY_MCP_ADD_V1, CAPABILITY_MCP_GET_V1,
+    CAPABILITY_MCP_LIST_V1, CAPABILITY_MCP_REMOVE_V1, RELEASE_DOC_END_MARKER,
+    RELEASE_DOC_START_MARKER, SUPPORT_MARKDOWN_END_MARKER, SUPPORT_MARKDOWN_START_MARKER,
+    SUPPORT_MATRIX_MARKDOWN_PATH,
 };
 
 pub(super) fn collect_capability_truth(
@@ -236,21 +236,6 @@ pub(super) fn parse_release_doc_packages(text: &str) -> Result<ReleaseDocPackage
         published_crates,
         publish_order,
     })
-}
-
-pub(super) fn registry_release_packages(
-    registry: &AgentRegistry,
-    release_track: &str,
-) -> Vec<String> {
-    let mut packages = registry
-        .agents
-        .iter()
-        .filter(|entry| entry.release.docs_release_track == release_track)
-        .map(|entry| entry.package_name.clone())
-        .collect::<Vec<_>>();
-    packages.push(WRAPPER_EVENTS_PACKAGE.to_string());
-    packages.push(AGENT_API_PACKAGE.to_string());
-    packages
 }
 
 pub(super) fn extract_marked_block(

@@ -6,6 +6,7 @@ use std::{
 
 use crate::{
     agent_registry::{AgentRegistry, AgentRegistryEntry, REGISTRY_RELATIVE_PATH},
+    release_doc,
     support_matrix::{validate_publication_consistency, SupportMatrixArtifact, SupportRow},
 };
 
@@ -174,13 +175,33 @@ pub(super) fn inspect_capability_publication(
 pub(super) fn inspect_support_publication(
     entry: &AgentRegistryEntry,
     workspace_root: &Path,
-    expected_rows: &[SupportRow],
+    expected_rows: Result<&Vec<SupportRow>, &String>,
 ) -> Option<DriftFinding> {
     if !entry.publication.support_matrix_enabled {
         return None;
     }
 
     let mut issues = Vec::new();
+    let expected_rows = match expected_rows {
+        Ok(rows) => rows.as_slice(),
+        Err(err) => {
+            issues.push(err.clone());
+            return Some(build_finding(
+                DriftCategory::SupportPublication,
+                "published support artifacts no longer match committed support truth.",
+                issues,
+                shared::build_surfaces(
+                    workspace_root,
+                    [
+                        PathBuf::from(&entry.manifest_root),
+                        PathBuf::from(SUPPORT_MATRIX_JSON_PATH),
+                        PathBuf::from(SUPPORT_MATRIX_MARKDOWN_PATH),
+                    ],
+                ),
+            ));
+        }
+    };
+
     let json_path = workspace_root.join(SUPPORT_MATRIX_JSON_PATH);
     let json_artifact = match shared::read_json::<SupportMatrixArtifact>(&json_path) {
         Ok(artifact) => artifact,
@@ -318,42 +339,21 @@ pub(super) fn inspect_release_doc(
         }
     };
 
-    let expected = shared::registry_release_packages(registry, &entry.release.docs_release_track);
+    let expected =
+        release_doc::registry_release_packages(registry, &entry.release.docs_release_track);
     let mut issues = Vec::new();
-    match package_index(&expected, &entry.package_name) {
-        Some(expected_index) => {
-            match package_index(&actual.published_crates, &entry.package_name) {
-                Some(index) if index == expected_index => {}
-                Some(index) => issues.push(format!(
-                    "published crates block lists `{}` at position {}, expected {}",
-                    entry.package_name,
-                    index + 1,
-                    expected_index + 1
-                )),
-                None => issues.push(format!(
-                    "published crates block is missing `{}`",
-                    entry.package_name
-                )),
-            }
-            match package_index(&actual.publish_order, &entry.package_name) {
-                Some(index) if index == expected_index => {}
-                Some(index) => issues.push(format!(
-                    "publish order block lists `{}` at position {}, expected {}",
-                    entry.package_name,
-                    index + 1,
-                    expected_index + 1
-                )),
-                None => issues.push(format!(
-                    "publish order block is missing `{}`",
-                    entry.package_name
-                )),
-            }
-        }
-        None => issues.push(format!(
-            "registry-derived publish order does not include `{}`",
-            entry.package_name
-        )),
-    }
+    compare_release_doc_section(
+        "published crates block",
+        &actual.published_crates,
+        &expected,
+        &mut issues,
+    );
+    compare_release_doc_section(
+        "publish order block",
+        &actual.publish_order,
+        &expected,
+        &mut issues,
+    );
 
     if issues.is_empty() {
         None
@@ -373,8 +373,62 @@ pub(super) fn inspect_release_doc(
     }
 }
 
-fn package_index(packages: &[String], package_name: &str) -> Option<usize> {
-    packages
+fn compare_release_doc_section(
+    section_name: &str,
+    actual: &[String],
+    expected: &[String],
+    issues: &mut Vec<String>,
+) {
+    if actual == expected {
+        return;
+    }
+
+    let missing = expected
         .iter()
-        .position(|candidate| candidate == package_name)
+        .filter(|package| !actual.contains(*package))
+        .cloned()
+        .collect::<Vec<_>>();
+    if !missing.is_empty() {
+        issues.push(format!(
+            "{section_name} is missing package(s): {}",
+            missing.join(", ")
+        ));
+    }
+
+    let unexpected = actual
+        .iter()
+        .filter(|package| !expected.contains(*package))
+        .cloned()
+        .collect::<Vec<_>>();
+    if !unexpected.is_empty() {
+        issues.push(format!(
+            "{section_name} contains unexpected package(s): {}",
+            unexpected.join(", ")
+        ));
+    }
+
+    let duplicates = duplicate_packages(actual);
+    if !duplicates.is_empty() {
+        issues.push(format!(
+            "{section_name} contains duplicate package(s): {}",
+            duplicates.join(", ")
+        ));
+    }
+
+    if missing.is_empty() && unexpected.is_empty() && duplicates.is_empty() {
+        issues.push(format!(
+            "{section_name} order does not match expected registry-backed publish order"
+        ));
+    }
+}
+
+fn duplicate_packages(packages: &[String]) -> Vec<String> {
+    let mut seen = BTreeSet::new();
+    let mut duplicates = BTreeSet::new();
+    for package in packages {
+        if !seen.insert(package.clone()) {
+            duplicates.insert(package.clone());
+        }
+    }
+    duplicates.into_iter().collect()
 }

@@ -18,7 +18,7 @@ pub(super) fn inspect_governance_docs(
     entry: &AgentRegistryEntry,
     workspace_root: &Path,
     capability_truth: Result<&BTreeSet<String>, &String>,
-    expected_support_rows: &[SupportRow],
+    expected_support_rows: Result<&Vec<SupportRow>, &String>,
 ) -> Option<DriftFinding> {
     let mut issues = Vec::new();
     let mut surfaces = BTreeSet::new();
@@ -41,9 +41,10 @@ pub(super) fn inspect_governance_docs(
             GovernanceComparisonKind::MarkdownCapabilityClaim => {
                 inspect_markdown_capability_claim(&check_path, check, capability_truth)
             }
-            GovernanceComparisonKind::MarkdownSupportClaim => {
-                inspect_markdown_support_claim(&check_path, check, expected_support_rows)
-            }
+            GovernanceComparisonKind::MarkdownSupportClaim => match expected_support_rows {
+                Ok(rows) => inspect_markdown_support_claim(&check_path, check, rows.as_slice()),
+                Err(_) => GovernanceInspectionResult::default(),
+            },
         };
 
         if !result.issues.is_empty() {

@@ -17,6 +17,7 @@ use publication::{validate_publication_artifacts, write_publication_artifacts};
 
 pub use consistency::{format_publication_issues, validate_publication_consistency};
 pub use derive::derive_rows;
+pub use derive::derive_rows_for_agent_root;
 pub use derive::derive_rows_for_test_roots;
 pub use publication::{
     render_publication_artifacts, render_publication_bundle, PublicationBundle,

@@ -1,6 +1,6 @@
 use std::{fs, path::Path};
 
-use toml_edit::DocumentMut;
+use crate::agent_registry::{AgentRegistry, REGISTRY_RELATIVE_PATH};
 
 pub const RELEASE_DOC_PATH: &str = "docs/crates-io-release.md";
 pub const RELEASE_DOC_START_MARKER: &str =
@@ -8,7 +8,7 @@ pub const RELEASE_DOC_START_MARKER: &str =
 pub const RELEASE_DOC_END_MARKER: &str =
     "<!-- /generated-by: xtask onboard-agent; section: crates-io-release -->";
 
-const WORKSPACE_MANIFEST_PATH: &str = "Cargo.toml";
+const CRATES_IO_RELEASE_TRACK: &str = "crates-io";
 const WRAPPER_EVENTS_PACKAGE_NAME: &str = "unified-agent-api-wrapper-events";
 const ROOT_AGENT_API_PACKAGE_NAME: &str = "unified-agent-api";
 
@@ -19,81 +19,23 @@ pub fn render_release_doc(workspace_root: &Path) -> Result<String, String> {
             workspace_root.join(RELEASE_DOC_PATH).display()
         )
     })?;
-    let packages = publishable_release_packages(workspace_root)?;
+    let registry = AgentRegistry::load(workspace_root)
+        .map_err(|err| format!("load {REGISTRY_RELATIVE_PATH}: {err}"))?;
+    let packages = registry_release_packages(&registry, CRATES_IO_RELEASE_TRACK);
     let block = render_release_doc_block(&packages);
     Ok(splice_release_doc_block(&existing, &block))
 }
 
-pub fn publishable_release_packages(workspace_root: &Path) -> Result<Vec<String>, String> {
-    let workspace_manifest_text = fs::read_to_string(workspace_root.join(WORKSPACE_MANIFEST_PATH))
-        .map_err(|err| {
-            format!(
-                "read {}: {err}",
-                workspace_root.join(WORKSPACE_MANIFEST_PATH).display()
-            )
-        })?;
-    let doc = workspace_manifest_text
-        .parse::<DocumentMut>()
-        .map_err(|err| {
-            format!(
-                "parse {}: {err}",
-                workspace_root.join(WORKSPACE_MANIFEST_PATH).display()
-            )
-        })?;
-    let members = doc["workspace"]["members"]
-        .as_array()
-        .ok_or_else(|| "workspace.members must be an array".to_string())?;
-
-    let mut leaf_packages = Vec::new();
-    let mut wrapper_events = None;
-    let mut root_agent_api = None;
-
-    for member in members {
-        let Some(member_path) = member.as_str() else {
-            return Err("workspace.members entries must be strings".to_string());
-        };
-        let manifest_path = workspace_root.join(member_path).join("Cargo.toml");
-        let manifest_text = match fs::read_to_string(&manifest_path) {
-            Ok(text) => text,
-            Err(err) if err.kind() == std::io::ErrorKind::NotFound => continue,
-            Err(err) => return Err(format!("read {}: {err}", manifest_path.display())),
-        };
-        let manifest = manifest_text
-            .parse::<DocumentMut>()
-            .map_err(|err| format!("parse {}: {err}", manifest_path.display()))?;
-        if package_publish_disabled(&manifest) {
-            continue;
-        }
-        let Some(package_name) = manifest
-            .get("package")
-            .and_then(toml_edit::Item::as_table_like)
-            .and_then(|package| package.get("name"))
-            .and_then(toml_edit::Item::as_str)
-        else {
-            continue;
-        };
-        if !package_name.starts_with("unified-agent-api") {
-            continue;
-        }
-
-        let package_name = package_name.to_string();
-        if package_name == WRAPPER_EVENTS_PACKAGE_NAME {
-            wrapper_events = Some(package_name);
-        } else if package_name == ROOT_AGENT_API_PACKAGE_NAME {
-            root_agent_api = Some(package_name);
-        } else {
-            leaf_packages.push(package_name);
-        }
-    }
-
-    if let Some(package_name) = wrapper_events {
-        leaf_packages.push(package_name);
-    }
-    if let Some(package_name) = root_agent_api {
-        leaf_packages.push(package_name);
-    }
-
-    Ok(leaf_packages)
+pub fn registry_release_packages(registry: &AgentRegistry, release_track: &str) -> Vec<String> {
+    let mut packages = registry
+        .agents
+        .iter()
+        .filter(|entry| entry.release.docs_release_track == release_track)
+        .map(|entry| entry.package_name.clone())
+        .collect::<Vec<_>>();
+    packages.push(WRAPPER_EVENTS_PACKAGE_NAME.to_string());
+    packages.push(ROOT_AGENT_API_PACKAGE_NAME.to_string());
+    packages
 }
 
 pub fn render_release_doc_block(packages: &[String]) -> String {
@@ -132,17 +74,10 @@ pub fn splice_release_doc_block(existing: &str, block: &str) -> String {
     }
 }
 
-fn package_publish_disabled(doc: &DocumentMut) -> bool {
-    doc.get("package")
-        .and_then(toml_edit::Item::as_table_like)
-        .and_then(|package| package.get("publish"))
-        .and_then(toml_edit::Item::as_bool)
-        == Some(false)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::agent_registry::AgentRegistry;
 
     #[test]
     fn splice_release_doc_replaces_existing_generated_block() {
@@ -155,5 +90,23 @@ mod tests {
         assert!(updated.contains("after"));
         assert!(updated.contains("\nnew\n"));
         assert!(!updated.contains("\nold\n"));
+    }
+
+    #[test]
+    fn registry_release_packages_follow_registry_order_and_append_tail_packages() {
+        let registry = AgentRegistry::parse(include_str!("../data/agent_registry.toml"))
+            .expect("parse registry");
+
+        assert_eq!(
+            registry_release_packages(&registry, "crates-io"),
+            vec![
+                "unified-agent-api-codex".to_string(),
+                "unified-agent-api-claude-code".to_string(),
+                "unified-agent-api-opencode".to_string(),
+                "unified-agent-api-gemini-cli".to_string(),
+                "unified-agent-api-wrapper-events".to_string(),
+                "unified-agent-api".to_string(),
+            ]
+        );
     }
 }
