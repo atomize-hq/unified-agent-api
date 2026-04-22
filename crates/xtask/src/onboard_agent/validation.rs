@@ -1,8 +1,4 @@
-use std::{
-    collections::BTreeSet,
-    fs,
-    path::{Path, PathBuf},
-};
+use std::{collections::BTreeSet, fs, path::Path};
 
 use toml_edit::{DocumentMut, Item};
 
@@ -80,16 +76,17 @@ pub(super) fn validate_workspace_package_name_conflicts(
 ) -> Result<(), Error> {
     let root_manifest_path = jail.resolve(Path::new("Cargo.toml"))?;
     let root_manifest = read_toml(&root_manifest_path)?;
+    let draft_crate_path = Path::new(&draft.crate_path);
     for member in workspace_members(&root_manifest)? {
         let manifest_path = jail.resolve(&member.join("Cargo.toml"))?;
-        if member == PathBuf::from(&draft.crate_path) && !manifest_path.exists() {
+        if member.as_path() == draft_crate_path && !manifest_path.exists() {
             continue;
         }
         let manifest = read_toml(&manifest_path)?;
         let Some(package_name) = package_name(&manifest) else {
             continue;
         };
-        if member == PathBuf::from(&draft.crate_path) && package_name == draft.package_name {
+        if member.as_path() == draft_crate_path && package_name == draft.package_name {
             continue;
         }
         if package_name == draft.package_name {

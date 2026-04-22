@@ -449,6 +449,10 @@ pub(super) fn build_manual_follow_up(
                 draft.crate_path, draft.backend_module
             ),
             format!(
+                "When the wrapper crate is crates.io-publishable, include crate-local `README.md`, `LICENSE-APACHE`, `LICENSE-MIT`, and set `readme = \"README.md\"` in `{}/Cargo.toml`.",
+                draft.crate_path
+            ),
+            format!(
                 "Author wrapper coverage input at `{}` for binding kind `{}`.",
                 draft.wrapper_coverage_source_path, draft.wrapper_coverage_binding_kind
             ),

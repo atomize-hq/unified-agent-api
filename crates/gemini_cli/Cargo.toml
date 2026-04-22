@@ -10,6 +10,7 @@ homepage = "https://github.com/atomize-hq/unified-agent-api"
 documentation = "https://docs.rs/unified-agent-api-gemini-cli"
 keywords = ["gemini", "cli", "wrapper", "agent"]
 categories = ["api-bindings", "command-line-interface"]
+readme = "README.md"
 
 [lib]
 name = "gemini_cli"
