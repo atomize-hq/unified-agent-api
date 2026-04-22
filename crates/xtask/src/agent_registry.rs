@@ -122,6 +122,8 @@ pub struct AgentRegistryEntry {
     pub publication: PublicationFlags,
     pub release: ReleaseMetadata,
     pub scaffold: ScaffoldMetadata,
+    #[serde(default)]
+    pub maintenance: MaintenanceMetadata,
 }
 
 impl AgentRegistryEntry {
@@ -148,6 +150,7 @@ impl AgentRegistryEntry {
         self.capability_declaration.validate(&canonical_targets)?;
         self.release.validate()?;
         self.scaffold.validate()?;
+        self.maintenance.validate(self)?;
 
         Ok(())
     }
@@ -293,6 +296,173 @@ impl ScaffoldMetadata {
             ));
         }
         Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct MaintenanceMetadata {
+    #[serde(default)]
+    pub governance_checks: Vec<GovernanceCheck>,
+}
+
+impl MaintenanceMetadata {
+    fn validate(&self, entry: &AgentRegistryEntry) -> Result<(), AgentRegistryError> {
+        let mut seen_paths = BTreeSet::new();
+        for check in &self.governance_checks {
+            check.validate(entry)?;
+            if !seen_paths.insert(check.path.as_str()) {
+                return Err(AgentRegistryError::Validation(format!(
+                    "maintenance.governance_checks contains duplicate path `{}`",
+                    check.path
+                )));
+            }
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct GovernanceCheck {
+    pub path: String,
+    pub required: bool,
+    pub comparison_kind: GovernanceComparisonKind,
+    #[serde(default)]
+    pub start_marker: Option<String>,
+    #[serde(default)]
+    pub end_marker: Option<String>,
+    #[serde(default)]
+    pub extraction_mode: Option<MarkdownExtractionMode>,
+}
+
+impl GovernanceCheck {
+    fn validate(&self, entry: &AgentRegistryEntry) -> Result<(), AgentRegistryError> {
+        validate_repo_relative_path("maintenance.governance_checks.path", &self.path)?;
+
+        match self.comparison_kind {
+            GovernanceComparisonKind::ApprovedAgentDescriptor => {
+                if !self.path.ends_with("/governance/approved-agent.toml") {
+                    return Err(AgentRegistryError::Validation(format!(
+                        "maintenance.governance_checks.path must end with `/governance/approved-agent.toml` for `approved_agent_descriptor` (got `{}`)",
+                        self.path
+                    )));
+                }
+                if self.path
+                    != format!(
+                        "docs/project_management/next/{}/governance/approved-agent.toml",
+                        entry.scaffold.onboarding_pack_prefix
+                    )
+                {
+                    return Err(AgentRegistryError::Validation(format!(
+                        "maintenance.governance_checks.path `{}` must match onboarding_pack_prefix `{}` for `approved_agent_descriptor`",
+                        self.path, entry.scaffold.onboarding_pack_prefix
+                    )));
+                }
+                if self.start_marker.is_some()
+                    || self.end_marker.is_some()
+                    || self.extraction_mode.is_some()
+                {
+                    return Err(AgentRegistryError::Validation(
+                        "maintenance.governance_checks for `approved_agent_descriptor` must not declare markdown parser config".to_string(),
+                    ));
+                }
+            }
+            GovernanceComparisonKind::MarkdownCapabilityClaim => {
+                self.validate_markdown_config(MarkdownExtractionMode::InlineCodeIds)?;
+            }
+            GovernanceComparisonKind::MarkdownSupportClaim => {
+                self.validate_markdown_config(MarkdownExtractionMode::SupportStateLines)?;
+            }
+        }
+
+        Ok(())
+    }
+
+    fn validate_markdown_config(
+        &self,
+        expected_mode: MarkdownExtractionMode,
+    ) -> Result<(), AgentRegistryError> {
+        if !self.path.ends_with(".md") {
+            return Err(AgentRegistryError::Validation(format!(
+                "maintenance.governance_checks.path must end with `.md` for `{}` (got `{}`)",
+                self.comparison_kind.as_str(),
+                self.path
+            )));
+        }
+
+        let start_marker = self.start_marker.as_deref().ok_or_else(|| {
+            AgentRegistryError::Validation(format!(
+                "maintenance.governance_checks `{}` is missing required `start_marker` for `{}`",
+                self.path,
+                self.comparison_kind.as_str()
+            ))
+        })?;
+        let end_marker = self.end_marker.as_deref().ok_or_else(|| {
+            AgentRegistryError::Validation(format!(
+                "maintenance.governance_checks `{}` is missing required `end_marker` for `{}`",
+                self.path,
+                self.comparison_kind.as_str()
+            ))
+        })?;
+        validate_non_empty_scalar("maintenance.governance_checks.start_marker", start_marker)?;
+        validate_non_empty_scalar("maintenance.governance_checks.end_marker", end_marker)?;
+        if start_marker == end_marker {
+            return Err(AgentRegistryError::Validation(format!(
+                "maintenance.governance_checks `{}` must use distinct `start_marker` and `end_marker`",
+                self.path
+            )));
+        }
+
+        match self.extraction_mode {
+            Some(mode) if mode == expected_mode => Ok(()),
+            Some(mode) => Err(AgentRegistryError::Validation(format!(
+                "maintenance.governance_checks `{}` must use extraction_mode `{}` for `{}` (got `{}`)",
+                self.path,
+                expected_mode.as_str(),
+                self.comparison_kind.as_str(),
+                mode.as_str()
+            ))),
+            None => Err(AgentRegistryError::Validation(format!(
+                "maintenance.governance_checks `{}` is missing required `extraction_mode` for `{}`",
+                self.path,
+                self.comparison_kind.as_str()
+            ))),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum GovernanceComparisonKind {
+    ApprovedAgentDescriptor,
+    MarkdownCapabilityClaim,
+    MarkdownSupportClaim,
+}
+
+impl GovernanceComparisonKind {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::ApprovedAgentDescriptor => "approved_agent_descriptor",
+            Self::MarkdownCapabilityClaim => "markdown_capability_claim",
+            Self::MarkdownSupportClaim => "markdown_support_claim",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MarkdownExtractionMode {
+    InlineCodeIds,
+    SupportStateLines,
+}
+
+impl MarkdownExtractionMode {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::InlineCodeIds => "inline_code_ids",
+            Self::SupportStateLines => "support_state_lines",
+        }
     }
 }
 

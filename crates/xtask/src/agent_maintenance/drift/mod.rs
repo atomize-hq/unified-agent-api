@@ -109,18 +109,14 @@ impl AgentDriftReport {
 
 #[derive(Debug)]
 pub enum DriftCheckError {
-    UnknownAgent { agent_id: String },
-    Registry(String),
+    Validation(String),
+    Internal(String),
 }
 
 impl fmt::Display for DriftCheckError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::UnknownAgent { agent_id } => write!(
-                f,
-                "agent_id `{agent_id}` does not exist in {REGISTRY_RELATIVE_PATH}"
-            ),
-            Self::Registry(message) => f.write_str(message),
+            Self::Validation(message) | Self::Internal(message) => f.write_str(message),
         }
     }
 }
@@ -128,13 +124,28 @@ impl fmt::Display for DriftCheckError {
 impl DriftCheckError {
     pub fn exit_code(&self) -> i32 {
         match self {
-            Self::UnknownAgent { .. } | Self::Registry(_) => 2,
+            Self::Validation(_) => 2,
+            Self::Internal(_) => 1,
         }
     }
 }
 
-pub fn run(args: Args) -> Result<(), DriftCheckError> {
-    let workspace_root = resolve_workspace_root().map_err(DriftCheckError::Registry)?;
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DriftCheckOutcome {
+    Clean(AgentDriftReport),
+    DriftDetected(AgentDriftReport),
+}
+
+impl DriftCheckOutcome {
+    pub fn report(&self) -> &AgentDriftReport {
+        match self {
+            Self::Clean(report) | Self::DriftDetected(report) => report,
+        }
+    }
+}
+
+pub fn run(args: Args) -> Result<DriftCheckOutcome, DriftCheckError> {
+    let workspace_root = resolve_workspace_root().map_err(DriftCheckError::Internal)?;
     let mut stdout = io::stdout();
     run_in_workspace(&workspace_root, args, &mut stdout)
 }
@@ -143,11 +154,15 @@ pub fn run_in_workspace<W: Write>(
     workspace_root: &Path,
     args: Args,
     writer: &mut W,
-) -> Result<(), DriftCheckError> {
+) -> Result<DriftCheckOutcome, DriftCheckError> {
     let report = check_agent_drift(workspace_root, &args.agent)?;
     write!(writer, "{}", report.render())
-        .map_err(|err| DriftCheckError::Registry(format!("write stdout: {err}")))?;
-    Ok(())
+        .map_err(|err| DriftCheckError::Internal(format!("write stdout: {err}")))?;
+    if report.is_clean() {
+        Ok(DriftCheckOutcome::Clean(report))
+    } else {
+        Ok(DriftCheckOutcome::DriftDetected(report))
+    }
 }
 
 pub fn check_agent_drift(
@@ -155,15 +170,15 @@ pub fn check_agent_drift(
     agent_id: &str,
 ) -> Result<AgentDriftReport, DriftCheckError> {
     let registry = AgentRegistry::load(workspace_root)
-        .map_err(|err| DriftCheckError::Registry(format!("load agent registry: {err}")))?;
-    let entry = registry
-        .find(agent_id)
-        .ok_or_else(|| DriftCheckError::UnknownAgent {
-            agent_id: agent_id.to_string(),
-        })?;
+        .map_err(|err| DriftCheckError::Validation(format!("load agent registry: {err}")))?;
+    let entry = registry.find(agent_id).ok_or_else(|| {
+        DriftCheckError::Validation(format!(
+            "agent_id `{agent_id}` does not exist in {REGISTRY_RELATIVE_PATH}"
+        ))
+    })?;
 
     let support_rows = support_matrix::derive_rows(workspace_root)
-        .map_err(|err| DriftCheckError::Registry(format!("derive support rows: {err}")))?;
+        .map_err(|err| DriftCheckError::Validation(format!("derive support rows: {err}")))?;
     let expected_support_rows = support_rows
         .iter()
         .filter(|row| row.agent == agent_id)

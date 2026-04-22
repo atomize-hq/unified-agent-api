@@ -164,6 +164,24 @@ docs_release_track = "crates-io"
 [agents.scaffold]
 onboarding_pack_prefix = "opencode-cli-onboarding"
 
+[agents.maintenance]
+
+[[agents.maintenance.governance_checks]]
+path = "docs/project_management/next/opencode-implementation/governance/seam-2-closeout.md"
+required = true
+comparison_kind = "markdown_capability_claim"
+start_marker = "<!-- xtask-governance-check:opencode-capabilities:start -->"
+end_marker = "<!-- xtask-governance-check:opencode-capabilities:end -->"
+extraction_mode = "inline_code_ids"
+
+[[agents.maintenance.governance_checks]]
+path = "docs/project_management/next/opencode-implementation/governance/seam-3-closeout.md"
+required = true
+comparison_kind = "markdown_support_claim"
+start_marker = "<!-- xtask-governance-check:opencode-support:start -->"
+end_marker = "<!-- xtask-governance-check:opencode-support:end -->"
+extraction_mode = "support_state_lines"
+
 [[agents]]
 agent_id = "gemini_cli"
 display_name = "Gemini CLI"
@@ -189,3 +207,10 @@ docs_release_track = "crates-io"
 
 [agents.scaffold]
 onboarding_pack_prefix = "gemini-cli-onboarding"
+
+[agents.maintenance]
+
+[[agents.maintenance.governance_checks]]
+path = "docs/project_management/next/gemini-cli-onboarding/governance/approved-agent.toml"
+required = true
+comparison_kind = "approved_agent_descriptor"

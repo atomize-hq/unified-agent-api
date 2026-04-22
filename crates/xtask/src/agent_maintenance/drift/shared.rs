@@ -1,5 +1,5 @@
 use std::{
-    collections::BTreeSet,
+    collections::{BTreeMap, BTreeSet},
     fs,
     path::{Path, PathBuf},
 };
@@ -253,24 +253,19 @@ pub(super) fn registry_release_packages(
     packages
 }
 
-pub(super) fn extract_bullet_block(text: &str, needle: &str) -> Option<String> {
-    let lines = text.lines().collect::<Vec<_>>();
-    let start = lines.iter().position(|line| line.contains(needle))?;
-    let mut block = String::new();
-    let mut index = start;
-    while index < lines.len() {
-        let line = lines[index];
-        if index > start && line.starts_with("- **") {
-            break;
-        }
-        if index > start && line.starts_with("## ") {
-            break;
-        }
-        block.push_str(line);
-        block.push('\n');
-        index += 1;
-    }
-    Some(block)
+pub(super) fn extract_marked_block(
+    text: &str,
+    start_marker: &str,
+    end_marker: &str,
+) -> Result<String, String> {
+    let start = text
+        .find(start_marker)
+        .ok_or_else(|| format!("missing governance block start marker ({start_marker})"))?;
+    let rest = &text[start + start_marker.len()..];
+    let end = rest
+        .find(end_marker)
+        .ok_or_else(|| format!("missing governance block end marker ({end_marker})"))?;
+    Ok(rest[..end].trim().to_string())
 }
 
 pub(super) fn inline_code_ids(text: &str) -> BTreeSet<String> {
@@ -290,6 +285,39 @@ pub(super) fn inline_code_ids(text: &str) -> BTreeSet<String> {
     ids
 }
 
+pub(super) fn parse_support_state_lines(text: &str) -> Result<BTreeMap<String, String>, String> {
+    let mut states = BTreeMap::new();
+    for raw_line in text.lines() {
+        let line = raw_line.trim();
+        if line.is_empty() {
+            continue;
+        }
+        let Some((key, value)) = line.split_once('=') else {
+            return Err(format!(
+                "governance support block must use `key = value` lines (got `{line}`)"
+            ));
+        };
+        let key = key.trim();
+        let value = value.trim();
+        if key.is_empty() || value.is_empty() {
+            return Err(format!(
+                "governance support block must not contain blank keys or values (got `{line}`)"
+            ));
+        }
+        if states.insert(key.to_string(), value.to_string()).is_some() {
+            return Err(format!(
+                "governance support block contains duplicate key `{key}`"
+            ));
+        }
+    }
+
+    if states.is_empty() {
+        return Err("governance support block must not be empty".to_string());
+    }
+
+    Ok(states)
+}
+
 pub(super) fn build_surfaces<const N: usize>(
     workspace_root: &Path,
     paths: [PathBuf; N],
@@ -306,13 +334,6 @@ pub(super) fn path_to_repo_relative(workspace_root: &Path, path: impl AsRef<Path
         .unwrap_or(path)
         .to_string_lossy()
         .replace('\\', "/")
-}
-
-pub(super) fn historical_pack_root(entry: &AgentRegistryEntry) -> PathBuf {
-    PathBuf::from(format!(
-        "docs/project_management/next/{}-implementation",
-        entry.agent_id.replace('_', "-")
-    ))
 }
 
 pub(super) fn read_json<T>(path: &Path) -> Result<T, String>

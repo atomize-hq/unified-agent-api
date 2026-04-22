@@ -1,12 +1,18 @@
 #![allow(dead_code, unused_imports)]
 
-use std::{fs, path::Path};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+    process::Command,
+};
 
 #[path = "support/onboard_agent_harness.rs"]
 mod harness;
 
 #[path = "../src/agent_registry.rs"]
 mod agent_registry;
+#[path = "../src/approval_artifact.rs"]
+mod approval_artifact;
 #[path = "../src/agent_maintenance/drift/mod.rs"]
 mod drift;
 #[path = "../src/release_doc.rs"]
@@ -17,7 +23,7 @@ mod root_intake_layout;
 mod support_matrix;
 
 use drift::{check_agent_drift, DriftCategory, DriftCheckError};
-use harness::{fixture_root, seed_release_touchpoints, write_text};
+use harness::{fixture_root, seed_gemini_approval_artifact, seed_release_touchpoints, write_text};
 
 #[test]
 fn check_agent_drift_reports_clean_agent() {
@@ -34,10 +40,9 @@ fn check_agent_drift_rejects_unknown_agent() {
     seed_publication_inputs(&fixture);
 
     let err = check_agent_drift(&fixture, "missing-agent").expect_err("unknown agent should fail");
-    assert!(matches!(
-        err,
-        DriftCheckError::UnknownAgent { agent_id } if agent_id == "missing-agent"
-    ));
+    assert!(
+        matches!(err, DriftCheckError::Validation(message) if message.contains("missing-agent"))
+    );
 }
 
 #[test]
@@ -124,7 +129,58 @@ fn check_agent_drift_reports_governance_doc_mismatch() {
 }
 
 #[test]
-fn check_agent_drift_suppresses_closed_governance_surface() {
+fn check_agent_drift_reports_gemini_approval_descriptor_mismatch() {
+    let fixture = fixture_root("agent-maintenance-drift-gemini-approval");
+    seed_publication_inputs(&fixture);
+
+    write_text(
+        &fixture.join(
+            "docs/project_management/next/gemini-cli-onboarding/governance/approved-agent.toml",
+        ),
+        concat!(
+            "artifact_version = \"1\"\n",
+            "comparison_ref = \"docs/project_management/next/comparisons/gemini.md\"\n",
+            "selection_mode = \"factory_validation\"\n",
+            "recommended_agent_id = \"gemini_cli\"\n",
+            "approved_agent_id = \"gemini_cli\"\n",
+            "approval_commit = \"deadbeef\"\n",
+            "approval_recorded_at = \"2026-04-21T11:23:09Z\"\n\n",
+            "[descriptor]\n",
+            "agent_id = \"gemini_cli\"\n",
+            "display_name = \"Gemini CLI\"\n",
+            "crate_path = \"crates/gemini_cli\"\n",
+            "backend_module = \"crates/agent_api/src/backends/gemini_cli\"\n",
+            "manifest_root = \"cli_manifests/gemini_cli\"\n",
+            "package_name = \"unified-agent-api-gemini-cli\"\n",
+            "canonical_targets = [\"darwin-arm64\"]\n",
+            "wrapper_coverage_binding_kind = \"generated_from_wrapper_crate\"\n",
+            "wrapper_coverage_source_path = \"crates/gemini_cli\"\n",
+            "always_on_capabilities = [\"agent_api.run\"]\n",
+            "backend_extensions = []\n",
+            "support_matrix_enabled = true\n",
+            "capability_matrix_enabled = true\n",
+            "docs_release_track = \"crates-io\"\n",
+            "onboarding_pack_prefix = \"gemini-cli-onboarding\"\n",
+        ),
+    );
+
+    let report = check_agent_drift(&fixture, "gemini_cli").expect("drift report");
+    let finding = report
+        .findings
+        .iter()
+        .find(|finding| finding.category == DriftCategory::GovernanceDoc)
+        .expect("governance finding");
+    assert!(finding.surfaces.contains(
+        &"docs/project_management/next/gemini-cli-onboarding/governance/approved-agent.toml"
+            .to_string()
+    ));
+    assert!(finding
+        .surfaces
+        .contains(&"crates/xtask/data/agent_registry.toml".to_string()));
+}
+
+#[test]
+fn check_agent_drift_reports_recurring_closed_governance_surface() {
     let fixture = fixture_root("agent-maintenance-drift-governance-closed");
     seed_publication_inputs(&fixture);
     seed_governance_closeouts(
@@ -148,10 +204,75 @@ fn check_agent_drift_suppresses_closed_governance_surface() {
         report
             .findings
             .iter()
-            .all(|finding| finding.category != DriftCategory::GovernanceDoc),
+            .any(|finding| finding.category == DriftCategory::GovernanceDoc),
         "{}",
         report.render()
     );
+}
+
+#[test]
+fn check_agent_drift_entrypoint_exits_zero_for_clean_agent() {
+    let fixture = fixture_root("agent-maintenance-drift-exit-clean");
+    seed_publication_inputs(&fixture);
+
+    let output = run_xtask_check_agent_drift(&fixture, "gemini_cli");
+    assert!(
+        output.status.success(),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(String::from_utf8_lossy(&output.stdout).contains("status: clean"));
+}
+
+#[test]
+fn check_agent_drift_entrypoint_exits_two_for_drift() {
+    let fixture = fixture_root("agent-maintenance-drift-exit-drift");
+    seed_publication_inputs(&fixture);
+    seed_governance_closeouts(
+        &fixture,
+        &["agent_api.run", "agent_api.events", "agent_api.events.live"],
+        true,
+    );
+
+    let output = run_xtask_check_agent_drift(&fixture, "opencode");
+    assert_eq!(output.status.code(), Some(2));
+    assert!(String::from_utf8_lossy(&output.stdout).contains("status: drift_detected"));
+}
+
+#[test]
+fn check_agent_drift_entrypoint_exits_two_for_unknown_agent() {
+    let fixture = fixture_root("agent-maintenance-drift-exit-unknown");
+    seed_publication_inputs(&fixture);
+
+    let output = run_xtask_check_agent_drift(&fixture, "missing-agent");
+    assert_eq!(output.status.code(), Some(2));
+    assert!(String::from_utf8_lossy(&output.stderr).contains("missing-agent"));
+}
+
+#[test]
+fn check_agent_drift_entrypoint_exits_one_when_workspace_root_is_missing() {
+    let dir = std::env::temp_dir().join(format!(
+        "agent-maintenance-drift-no-workspace-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("system time after unix epoch")
+            .as_nanos()
+    ));
+    fs::create_dir_all(&dir).expect("create temp dir");
+
+    let xtask_bin = PathBuf::from(env!("CARGO_BIN_EXE_xtask"));
+    let output = Command::new(xtask_bin)
+        .arg("check-agent-drift")
+        .arg("--agent")
+        .arg("opencode")
+        .current_dir(&dir)
+        .output()
+        .expect("spawn xtask check-agent-drift");
+
+    assert_eq!(output.status.code(), Some(1));
+    assert!(String::from_utf8_lossy(&output.stderr).contains("could not resolve workspace root"));
 }
 
 fn seed_publication_inputs(root: &Path) {
@@ -197,6 +318,12 @@ fn seed_publication_inputs(root: &Path) {
         &default_capability_matrix_markdown(),
     );
 
+    seed_gemini_approval_artifact(
+        root,
+        "docs/project_management/next/gemini-cli-onboarding/governance/approved-agent.toml",
+        "gemini-cli-onboarding",
+    );
+
     let release_doc = release_doc::render_release_doc(root).expect("render release doc");
     write_text(&root.join(release_doc::RELEASE_DOC_PATH), &release_doc);
 }
@@ -216,14 +343,14 @@ fn seed_governance_closeouts(
             "docs/project_management/next/opencode-implementation/governance/seam-2-closeout.md",
         ),
         &format!(
-            "# Closeout\n\n- capability advertisement is intentionally conservative and now matches the landed backend contract and generated capability inventory: {capability_lines} are the claimed OpenCode v1 capability ids under the current runtime evidence\n"
+            "# Closeout\n\n- capability advertisement is intentionally conservative and now matches the landed backend contract and generated capability inventory:\n  <!-- xtask-governance-check:opencode-capabilities:start -->\n  {capability_lines}\n  <!-- xtask-governance-check:opencode-capabilities:end -->\n  are the claimed OpenCode v1 capability ids under the current runtime evidence\n"
         ),
     );
 
     let seam3_text = if support_unsupported {
-        "# Closeout\n\n- backend support and UAA support remain `unsupported` under the current backend evidence and pointer posture\n"
+        "# Closeout\n\n- the support publication artifacts now show OpenCode as manifest-supported only where committed root evidence justifies it, while\n  <!-- xtask-governance-check:opencode-support:start -->\n  backend_support = unsupported\n  uaa_support = unsupported\n  <!-- xtask-governance-check:opencode-support:end -->\n  under the current backend evidence and pointer posture\n"
     } else {
-        "# Closeout\n\n- support posture changed\n"
+        "# Closeout\n\n- the support publication artifacts now show OpenCode as manifest-supported only where committed root evidence justifies it, while\n  <!-- xtask-governance-check:opencode-support:start -->\n  backend_support = supported\n  uaa_support = supported\n  <!-- xtask-governance-check:opencode-support:end -->\n  under the current backend evidence and pointer posture\n"
     };
     write_text(
         &root.join(
@@ -250,6 +377,17 @@ fn seed_closed_governance_maintenance(root: &Path, resolved_surface: &str) {
         }))
         .expect("serialize maintenance closeout"),
     );
+}
+
+fn run_xtask_check_agent_drift(fixture_root: &Path, agent_id: &str) -> std::process::Output {
+    let xtask_bin = PathBuf::from(env!("CARGO_BIN_EXE_xtask"));
+    Command::new(xtask_bin)
+        .arg("check-agent-drift")
+        .arg("--agent")
+        .arg(agent_id)
+        .current_dir(fixture_root)
+        .output()
+        .expect("spawn xtask check-agent-drift")
 }
 
 fn seed_publishable_workspace_member(root: &Path, member_path: &str, package_name: &str) {

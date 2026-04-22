@@ -60,6 +60,11 @@ fn seeded_registry_parses_successfully() {
         opencode.capability_declaration.config_gated.is_empty(),
         "opencode defaults absent config-gated bucket to empty"
     );
+    assert_eq!(
+        opencode.maintenance.governance_checks.len(),
+        2,
+        "opencode seeds explicit governance checks"
+    );
 
     let gemini = registry
         .find("gemini_cli")
@@ -71,6 +76,11 @@ fn seeded_registry_parses_successfully() {
     assert!(
         gemini.capability_declaration.config_gated.is_empty(),
         "gemini_cli defaults absent config-gated bucket to empty"
+    );
+    assert_eq!(
+        gemini.maintenance.governance_checks.len(),
+        1,
+        "gemini_cli seeds approval-artifact governance checks"
     );
 }
 
@@ -237,4 +247,55 @@ fn malformed_gated_declarations_fail_closed() {
         let text = err.to_string();
         assert!(text.contains(expected), "{label}: {text}");
     }
+}
+
+#[test]
+fn malformed_governance_checks_fail_closed() {
+    let cases = [
+        (
+            "duplicate governance path",
+            SEEDED_REGISTRY.replacen(
+                "path = \"docs/project_management/next/opencode-implementation/governance/seam-3-closeout.md\"",
+                "path = \"docs/project_management/next/opencode-implementation/governance/seam-2-closeout.md\"",
+                1,
+            ),
+            "maintenance.governance_checks contains duplicate path",
+        ),
+        (
+            "missing markdown start marker",
+            SEEDED_REGISTRY.replacen(
+                "start_marker = \"<!-- xtask-governance-check:opencode-capabilities:start -->\"\n",
+                "",
+                1,
+            ),
+            "missing required `start_marker`",
+        ),
+        (
+            "unsupported extraction mode for descriptor",
+            SEEDED_REGISTRY.replacen(
+                "comparison_kind = \"approved_agent_descriptor\"",
+                "comparison_kind = \"approved_agent_descriptor\"\nstart_marker = \"<!-- nope:start -->\"\nend_marker = \"<!-- nope:end -->\"\nextraction_mode = \"inline_code_ids\"",
+                1,
+            ),
+            "must not declare markdown parser config",
+        ),
+    ];
+
+    for (label, raw, expected) in cases {
+        let err = AgentRegistry::parse(&raw).unwrap_err();
+        let text = err.to_string();
+        assert!(text.contains(expected), "{label}: {text}");
+    }
+}
+
+#[test]
+fn invalid_governance_comparison_kind_fails_closed() {
+    let raw = SEEDED_REGISTRY.replacen(
+        "comparison_kind = \"approved_agent_descriptor\"",
+        "comparison_kind = \"not_a_real_check\"",
+        1,
+    );
+    let err = AgentRegistry::parse(&raw).unwrap_err();
+    let text = err.to_string();
+    assert!(text.contains("unknown variant"), "{text}");
 }

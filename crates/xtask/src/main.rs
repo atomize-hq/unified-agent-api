@@ -195,7 +195,8 @@ fn main() {
             }
         },
         Command::CheckAgentDrift(args) => match agent_maintenance_drift::run(args) {
-            Ok(()) => 0,
+            Ok(agent_maintenance_drift::DriftCheckOutcome::Clean(_)) => 0,
+            Ok(agent_maintenance_drift::DriftCheckOutcome::DriftDetected(_)) => 2,
             Err(err) => {
                 eprintln!("{err}");
                 err.exit_code()
