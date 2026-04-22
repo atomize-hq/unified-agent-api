@@ -214,6 +214,27 @@ close-agent-maintenance
 closed maintenance pack + reopen trigger record
 ```
 
+### Step 0. Scope Challenge
+M4 should extend the existing `xtask` control plane, not create a second factory.
+
+Existing code already solves most of the hard parts:
+- path jailing, symlink rejection, identical-write detection, and rollback already live in `crates/xtask/src/workspace_mutation.rs`
+- bounded onboarding preview and write planning already exist in `crates/xtask/src/onboard_agent.rs`
+- generated publication truth already exists in `crates/xtask/src/support_matrix.rs` and `crates/xtask/src/capability_matrix.rs`
+- closeout-style artifact validation already exists in `crates/xtask/src/approval_artifact.rs` and `crates/xtask/src/proving_run_closeout.rs`
+
+Minimum complete change set:
+- add one maintenance namespace under `crates/xtask/src/` for drift, refresh, and closeout logic
+- wire three new subcommands in `crates/xtask/src/main.rs`
+- reuse existing generator and mutation primitives instead of cloning onboarding logic
+- add maintenance-specific integration tests and one maintenance packet root per agent
+
+Complexity guardrail:
+- no new crate
+- no lifecycle umbrella abstraction
+- no runtime-owned writes
+- no file-by-file special cases in `main.rs` beyond thin command routing
+
 ## Artifact Contract
 ### 1. Maintenance request artifact
 Path: `docs/project_management/next/<agent>-maintenance/governance/maintenance-request.toml`
@@ -241,6 +262,47 @@ Rules:
   - `capability_matrix_refresh`
   - `release_doc_refresh`
 
+Exact schema rules:
+- TOML root only. Unknown top-level keys fail validation.
+- `artifact_version = "1"`
+- `agent_id = "<registry agent id>"`, non-empty, must already exist in `crates/xtask/data/agent_registry.toml`
+- `trigger_kind` is one of:
+  - `drift_detected`
+  - `manual_reopen`
+  - `post_release_audit`
+- `basis_ref` is a repo-relative path to the evidence that triggered maintenance. It must resolve inside the workspace and may point to:
+  - an existing governance closeout doc
+  - a committed spec or publication doc
+  - a committed maintenance packet doc created during the same maintenance run
+- `opened_from` is a repo-relative path to the document or artifact where the maintainer initiated the maintenance run
+- `requested_control_plane_actions` is a non-empty array of unique strings, sorted in file order as written by the maintainer; all values must come from the allowed action set above
+- `runtime_followup_required` is a table with exact fields:
+  - `required = true|false`
+  - `items = ["..."]`
+- `runtime_followup_required.required = false` requires `items = []`
+- `runtime_followup_required.required = true` requires `items` to be a non-empty array of non-blank strings
+- `request_recorded_at` must be RFC3339 UTC
+- `request_commit` must be 7-40 lowercase hex characters
+
+Example:
+```toml
+artifact_version = "1"
+agent_id = "opencode"
+trigger_kind = "drift_detected"
+basis_ref = "docs/project_management/next/opencode-implementation/governance/seam-2-closeout.md"
+opened_from = "docs/project_management/next/opencode-implementation/governance/seam-2-closeout.md"
+requested_control_plane_actions = [
+  "packet_doc_refresh",
+  "capability_matrix_refresh",
+]
+request_recorded_at = "2026-04-22T01:15:00Z"
+request_commit = "1adb8f1"
+
+[runtime_followup_required]
+required = false
+items = []
+```
+
 ### 2. Maintenance closeout artifact
 Path: `docs/project_management/next/<agent>-maintenance/governance/maintenance-closeout.json`
 Format: JSON
@@ -262,6 +324,47 @@ Rules:
 - closeout must state what was resolved and whether anything remains deferred
 - maintenance closure must not mutate historical onboarding packet docs directly
 
+Exact schema rules:
+- JSON object root only. Unknown fields fail validation.
+- `request_ref` is the exact repo-relative path to `governance/maintenance-request.toml`
+- `request_sha256` must be 64 lowercase hex characters and must match the current bytes of `request_ref`
+- `resolved_findings` is a non-empty array of objects with exact fields:
+  - `category_id`
+  - `summary`
+  - `surfaces`
+- `deferred_findings`, when present, is a non-empty array of the same object shape as `resolved_findings`
+- every `category_id` in `resolved_findings` or `deferred_findings` must be one of the drift category IDs defined in the drift output contract below
+- every `surfaces` value is a non-empty array of repo-relative paths
+- exactly one of:
+  - `deferred_findings`
+  - `explicit_none_reason`
+- `explicit_none_reason` must be non-empty and is allowed only when `deferred_findings` is absent
+- `preflight_passed` is boolean
+- `recorded_at` must be RFC3339 UTC
+- `commit` must be 7-40 lowercase hex characters
+
+Example:
+```json
+{
+  "request_ref": "docs/project_management/next/opencode-maintenance/governance/maintenance-request.toml",
+  "request_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "resolved_findings": [
+    {
+      "category_id": "governance_doc_drift",
+      "summary": "SEAM-2 closeout now matches the landed capability advertisement boundary.",
+      "surfaces": [
+        "docs/project_management/next/opencode-implementation/governance/seam-2-closeout.md",
+        "docs/project_management/next/opencode-maintenance/HANDOFF.md"
+      ]
+    }
+  ],
+  "explicit_none_reason": "No deferred maintenance findings remain after publication and packet refresh.",
+  "preflight_passed": true,
+  "recorded_at": "2026-04-22T01:45:00Z",
+  "commit": "4adefdf"
+}
+```
+
 ## Command Contract
 M4 adds a separate maintenance command set.
 
@@ -275,12 +378,64 @@ Rules:
 - agent must already exist in `crates/xtask/data/agent_registry.toml`
 - exit `0` means no drift
 - exit `2` means drift or maintenance preconditions failed
+- exit `1` means internal or IO failure
 - output categories must include, when present:
   - registry versus manifest evidence drift
   - runtime/backend versus capability publication drift
   - support publication drift
   - release/doc generated-block drift
   - closed packet/governance doc drift
+
+Stable drift category IDs:
+- `registry_manifest_drift`
+- `capability_publication_drift`
+- `support_publication_drift`
+- `release_doc_drift`
+- `governance_doc_drift`
+
+Exact stdout contract:
+- human-readable summary on stdout
+- deterministic block order:
+  1. header
+  2. agent id
+  3. status
+  4. zero or more drift records sorted by `category_id`
+- exact header line:
+  - `== AGENT DRIFT REPORT ==`
+- exact status line:
+  - clean run: `status: clean`
+  - drift run: `status: drift_detected`
+
+Exact drift record shape on stdout:
+```text
+category_id: <stable id>
+summary: <single line>
+surfaces:
+  - <repo-relative path>
+  - <repo-relative path>
+```
+
+Exact clean-run example:
+```text
+== AGENT DRIFT REPORT ==
+agent_id: opencode
+status: clean
+```
+
+Exact drift example:
+```text
+== AGENT DRIFT REPORT ==
+agent_id: opencode
+status: drift_detected
+
+category_id: governance_doc_drift
+summary: maintenance-relevant closeout prose no longer matches landed capability truth.
+surfaces:
+  - docs/project_management/next/opencode-implementation/governance/seam-2-closeout.md
+  - docs/specs/unified-agent-api/capability-matrix.md
+```
+
+M4 deliberately does not add JSON output for `check-agent-drift`. The stdout contract above is the only drift-detector output in this milestone.
 
 ### Maintenance refresh
 ```bash
@@ -295,6 +450,9 @@ Rules:
 - unknown agent ids fail closed
 - request actions that imply runtime-owned mutations fail closed
 - exact-byte replay after an identical write is a success no-op
+- exit `0` means success, including identical no-op replay
+- exit `2` means validation or ownership failure
+- exit `1` means internal or IO failure
 
 ### Maintenance closeout
 ```bash
@@ -306,6 +464,9 @@ Rules:
 - requires explicit resolved findings plus either deferred findings or `explicit_none_reason`
 - refreshes maintenance packet docs only
 - does not reopen or rewrite the historical onboarding packet root
+- exit `0` means validated closure
+- exit `2` means validation or unresolved-maintenance failure
+- exit `1` means internal or IO failure
 
 ## Controlled Write Set
 The maintenance lane is intentionally narrow.
@@ -315,12 +476,99 @@ The maintenance lane is intentionally narrow.
 | `docs/project_management/next/<agent>-maintenance/**` | maintenance control plane | write |
 | `docs/specs/unified-agent-api/support-matrix.md` and `cli_manifests/support_matrix/current.json` via existing generator | generated publication | write |
 | `docs/specs/unified-agent-api/capability-matrix.md` via existing generator | generated publication | write |
-| generated block in `docs/crates-io-release.md` | generated publication | write when drifted |
+| generated block in `docs/crates-io-release.md` between `<!-- generated-by: xtask onboard-agent; section: crates-io-release -->` and `<!-- /generated-by: xtask onboard-agent; section: crates-io-release -->` | generated publication | write when drifted |
 | `crates/xtask/data/agent_registry.toml` | registry truth | read-only in M4 unless explicit follow-on reopening is approved |
 | `cli_manifests/<agent>/current.json`, `versions/`, `pointers/`, `reports/` | manifest evidence | never |
 | `crates/<agent>/**` | runtime owner | never |
 | `crates/agent_api/src/backends/<agent>/**` | runtime owner | never |
 | `docs/project_management/next/<agent>-cli-onboarding/**` | historical onboarding packet | never |
+
+Exact maintenance packet docs surface:
+- `docs/project_management/next/<agent>-maintenance/README.md`
+- `docs/project_management/next/<agent>-maintenance/scope_brief.md`
+- `docs/project_management/next/<agent>-maintenance/seam_map.md`
+- `docs/project_management/next/<agent>-maintenance/threading.md`
+- `docs/project_management/next/<agent>-maintenance/review_surfaces.md`
+- `docs/project_management/next/<agent>-maintenance/HANDOFF.md`
+- `docs/project_management/next/<agent>-maintenance/governance/remediation-log.md`
+- `docs/project_management/next/<agent>-maintenance/governance/maintenance-request.toml`
+- `docs/project_management/next/<agent>-maintenance/governance/maintenance-closeout.json`
+
+Command ownership:
+- maintainer-created only:
+  - `docs/project_management/next/<agent>-maintenance/governance/maintenance-request.toml`
+- `refresh-agent` may write only:
+  - `README.md`
+  - `scope_brief.md`
+  - `seam_map.md`
+  - `threading.md`
+  - `review_surfaces.md`
+  - `HANDOFF.md`
+  - `governance/remediation-log.md`
+- `close-agent-maintenance` may write only:
+  - `governance/maintenance-closeout.json`
+  - `HANDOFF.md`
+  - `governance/remediation-log.md`
+
+No maintenance command may write any other docs path.
+
+## Architecture Review
+### Preferred module shape
+Keep M4 inside the existing `xtask` crate and make the new code boring:
+- `crates/xtask/src/main.rs`
+  - thin CLI routing only
+- `crates/xtask/src/lib.rs`
+  - export the maintenance namespace only if tests or shared helpers need it
+- `crates/xtask/src/agent_maintenance/`
+  - `drift.rs`
+  - `request.rs`
+  - `refresh.rs`
+  - `closeout.rs`
+  - `docs.rs` only if packet rendering grows past one file
+
+If the code stays small, `agent_maintenance.rs` plus a couple of sibling files is better than premature submodule fan-out. The rule is explicit over clever.
+
+### Dependency graph
+```text
+xtask main.rs
+    |
+    +--> check-agent-drift
+    |      |
+    |      +--> agent_registry::AgentRegistry
+    |      +--> support_matrix::{derive, consistency}
+    |      +--> capability_matrix runtime/publication truth
+    |      \--> maintenance packet drift inspector
+    |
+    +--> refresh-agent
+    |      |
+    |      +--> maintenance request validator
+    |      +--> workspace_mutation::{WorkspacePathJail, apply_mutations}
+    |      +--> support_matrix generator reuse
+    |      +--> capability_matrix generator reuse
+    |      \--> crates-io generated-block refresh
+    |
+    \--> close-agent-maintenance
+           |
+           +--> maintenance closeout validator
+           +--> request hash/linkage verifier
+           +--> maintenance packet doc refresh
+           \--> workspace_mutation::{WorkspacePathJail, apply_mutations}
+```
+
+### Architecture decisions
+- `check-agent-drift` is a read-only aggregation layer. It should call existing truth producers and validators, then classify mismatches by agent instead of inventing a second source of truth.
+- `refresh-agent` is the only write-capable maintenance command. It should build one in-memory mutation plan, print it in `--dry-run`, and apply that exact plan in `--write`.
+- `close-agent-maintenance` is a closeout validator plus maintenance-doc refresher. It should look more like `close_proving_run` than `onboard_agent`.
+- Global generated outputs remain global. Agent scoping happens at the operator contract, not by forking support or capability generators into per-agent implementations.
+
+## Code Quality Guardrails
+- Keep `main.rs` as routing glue. Real logic lives in maintenance modules.
+- Model drift categories as explicit enums/structs, not ad hoc strings. The command output can still render readable prose.
+- Keep request and closeout artifact parsing symmetrical with existing approval/closeout validators: parse, validate path ownership, validate schema, then execute.
+- Reuse `workspace_mutation` for every write. No direct `fs::write` calls in maintenance commands.
+- Reuse existing generators for support/capability/release refreshes. Do not duplicate their derivation logic inside maintenance code.
+- Keep maintenance docs rendering deterministic and side-effect free before write mode.
+- If two codepaths need the same validation, extract one small helper. If only one codepath needs it, keep it local. Minimal diff over speculative abstraction.
 
 ## Workstreams
 ### W1. Agent-Scoped Drift Detection
@@ -332,11 +580,13 @@ Deliverables:
 - agent-scoped output that aggregates existing validators instead of duplicating them
 
 Primary modules:
+- `crates/xtask/src/main.rs`
+- `crates/xtask/src/agent_registry.rs`
 - `crates/xtask/src/support_matrix.rs`
 - `crates/xtask/src/support_matrix/derive.rs`
 - `crates/xtask/src/support_matrix/consistency.rs`
 - `crates/xtask/src/capability_matrix.rs`
-- `crates/xtask/src/agent_registry.rs`
+- new maintenance drift module(s) under `crates/xtask/src/`
 
 Exit criteria:
 - one command can tell maintainers whether an onboarded agent is clean or which surfaces drifted
@@ -352,8 +602,10 @@ Deliverables:
 
 Primary modules:
 - `crates/xtask/src/main.rs`
-- new maintenance command module(s) under `crates/xtask/src/`
+- new maintenance request and refresh module(s) under `crates/xtask/src/`
 - `crates/xtask/src/workspace_mutation.rs`
+- `crates/xtask/src/support_matrix.rs`
+- `crates/xtask/src/capability_matrix.rs`
 
 Exit criteria:
 - already-onboarded maintenance no longer requires `onboard-agent`
@@ -370,6 +622,7 @@ Deliverables:
 Primary modules:
 - `crates/xtask/src/main.rs`
 - new maintenance closeout module(s) under `crates/xtask/src/`
+- `crates/xtask/src/workspace_mutation.rs`
 - maintenance packet docs under `docs/project_management/next/<agent>-maintenance/**`
 
 Exit criteria:
@@ -393,12 +646,36 @@ Primary modules:
 Exit criteria:
 - the repo can repair the OpenCode stale closeout claim through the new M4 flow without conversation archaeology
 
+### OpenCode source-of-truth precedence
+To remove ambiguity in the proving run, maintenance must resolve conflicting claims in this order:
+1. landed runtime/backend behavior in `crates/agent_api/src/backends/opencode/**`
+2. canonical spec contract in `docs/specs/opencode-agent-api-backend-contract.md`
+3. generated publication outputs derived from the landed runtime/spec truth
+4. historical governance and closeout docs under `docs/project_management/next/opencode-implementation/**`
+
+Implications:
+- if historical governance prose disagrees with runtime/spec truth, governance docs are repaired
+- if generated capability publication disagrees with runtime/spec truth, the generator output is refreshed
+- M4 does not mutate runtime code or raw manifest evidence to make the docs “look consistent”
+- the OpenCode proving run is blocked only if runtime behavior and canonical spec disagree with each other, because that is a pre-existing truth conflict outside the M4 write set
+
 ## Implementation Sequence
 ### Phase 1. Drift Contract Lock
 Outputs:
 - drift taxonomy
 - `check-agent-drift`
 - OpenCode proving-run target confirmed
+
+Modules touched:
+- `crates/xtask/src/main.rs`
+- maintenance drift module(s)
+- `crates/xtask/src/agent_registry.rs`
+- existing support/capability matrix readers
+
+Implementation notes:
+- define the drift categories first, because every later artifact needs those names
+- keep this phase read-only
+- prove the OpenCode stale capability claim appears as one of the categories instead of a one-off doc complaint
 
 Exit gate:
 - one command can expose the OpenCode stale capability claim as maintenance drift
@@ -409,6 +686,17 @@ Outputs:
 - maintenance pack scaffold
 - `refresh-agent --dry-run/--write`
 
+Modules touched:
+- `crates/xtask/src/main.rs`
+- maintenance request / refresh module(s)
+- `crates/xtask/src/workspace_mutation.rs`
+- existing support/capability/release refresh call sites
+
+Implementation notes:
+- keep one request artifact as the source of truth for both dry-run and write
+- scaffold the maintenance packet root in this phase so later closeout work never has to infer paths
+- reject runtime-owned actions at request-validation time, not halfway through mutation planning
+
 Exit gate:
 - maintenance writes are bounded and replay-safe
 
@@ -418,6 +706,16 @@ Outputs:
 - `close-agent-maintenance`
 - reopen rules
 
+Modules touched:
+- `crates/xtask/src/main.rs`
+- maintenance closeout module(s)
+- maintenance packet doc rendering helpers
+
+Implementation notes:
+- mirror the validation posture of `close_proving_run`
+- closeout only succeeds when request linkage, resolved findings, and deferred-or-none truth all line up
+- keep reopen rules documentary and explicit, not implicit via edits to historical onboarding docs
+
 Exit gate:
 - maintenance history closes without mutating closed onboarding packets
 
@@ -426,6 +724,16 @@ Outputs:
 - OpenCode maintenance pack
 - repaired capability-claim truth
 - validated closeout
+
+Modules touched:
+- `docs/project_management/next/opencode-maintenance/**`
+- `docs/project_management/next/opencode-implementation/governance/seam-2-closeout.md`
+- generated publication outputs touched by the repair
+
+Implementation notes:
+- treat OpenCode as a proving run, not a bespoke exception path
+- the proving run is only valid if a new maintainer can reproduce the repair from the maintenance packet and commands alone
+- if the proving run needs manual runtime or evidence follow-up, record it explicitly in the maintenance pack instead of hiding it in the closeout prose
 
 Exit gate:
 - the repo can repair one already-onboarded agent boringly
@@ -538,28 +846,44 @@ Critical gap rule:
 ### Dependency Table
 | Step | Modules touched | Depends on |
 |---|---|---|
-| W1. drift detection | `crates/xtask/src/support_matrix/**`, `crates/xtask/src/capability_matrix.rs`, new maintenance drift module(s), tests | — |
-| W2. request + refresh | `crates/xtask/src/main.rs`, new maintenance refresh module(s), `crates/xtask/src/workspace_mutation.rs`, tests | W1 |
-| W3. closeout + reopen rules | `crates/xtask/src/main.rs`, new maintenance closeout module(s), maintenance docs templates, tests | W2 |
-| W4. OpenCode proving run | `docs/project_management/next/opencode-maintenance/**`, related governance docs | W1, W2, W3 |
+| W1. drift detection | `crates/xtask/src/main.rs`, maintenance drift module(s), `support_matrix/**`, `capability_matrix.rs`, tests | — |
+| W2. request + refresh | `crates/xtask/src/main.rs`, maintenance request/refresh module(s), `workspace_mutation.rs`, tests | W1 |
+| W3. closeout + reopen rules | `crates/xtask/src/main.rs`, maintenance closeout module(s), maintenance docs templates, tests | W2 |
+| W4. OpenCode maintenance pack scaffold | `docs/project_management/next/opencode-maintenance/**`, related governance docs | W1, W2 |
+| W5. OpenCode proving run execution | generated publication outputs, maintenance packet closeout docs | W3, W4 |
 
 ### Parallel Lanes
-Lane A: W1
-This lands first. The drift taxonomy and detection output define what the rest of M4 is repairing.
+Lane A: W1 -> W2 -> W3
+Core command lane. This stays sequential because all three steps touch `crates/xtask/src/main.rs` and the same maintenance command namespace.
 
-Lane B: W2
-Refresh ergonomics. Runs after W1.
+Lane B: W4
+Docs scaffold lane. This can start after W2 freezes the request schema and maintenance pack root shape.
 
-Lane C: W3
-Closeout and reopen rules. Runs after W2 stabilizes the request schema.
+Lane C: W5
+Final proving-run lane. This starts only after Lane A and Lane B merge, because it consumes the final command contract plus the concrete OpenCode maintenance packet.
 
-Lane D: W4
-OpenCode proving run. Runs last, because it should consume the final maintenance contract rather than encode a moving target.
+### Execution Order
+1. Launch Lane A alone. W1 must land first because it defines the taxonomy and exit codes the rest of the milestone depends on.
+2. After W2 stabilizes the request schema, launch W3 and W4 in separate worktrees only if W4 stays docs-only.
+3. Merge W3 first so the final closeout contract is fixed.
+4. Run W5 last in the main integration worktree using the merged command surface and packet docs.
 
 ### Conflict Flags
-- W2 and W3 both touch `crates/xtask/src/main.rs` and the new maintenance module namespace.
-- W1 and W2 both touch `crates/xtask/tests/**`. Split test ownership early.
-- W4 should not start before request and closeout schemas stabilize or it will encode the wrong maintenance truth.
+- W1, W2, and W3 all touch `crates/xtask/src/main.rs`. Do not parallelize those.
+- W2 and W3 both touch the maintenance module namespace and `crates/xtask/tests/**`. Split test files early if two worktrees are used after W2.
+- W4 must stay packet-doc scoped. If it starts changing command behavior, it no longer belongs in a parallel lane.
+- W5 is integration-only. If earlier lanes are still moving, W5 becomes churn and should wait.
+
+## Completion Summary
+- Step 0: Scope challenge, separate maintenance lane confirmed. No onboarding scope creep, no new crate, no lifecycle umbrella.
+- Architecture review: one `xtask` maintenance namespace, shared generators and mutation helpers reused, global publications remain global.
+- Code quality review: explicit artifacts, explicit exit codes, deterministic dry-run/write parity, and reuse of existing validation/mutation primitives required.
+- Test review: diagram produced, 14 required coverage points identified across drift detection, refresh, closeout, and OpenCode proving-run regression coverage.
+- Performance review: aggregation reuse, batched writes, and agent-scoped operator semantics locked.
+- Not in scope: written.
+- What already exists: written.
+- Failure modes: two critical gates remain non-negotiable, runtime-owned mutation must stay impossible and OpenCode must prove the lane on a real drift case.
+- Parallelization: three lanes total, one narrow docs-only parallel window after W2, core command work remains sequential by design.
 
 ## Deferred To TODOS.md
 - automate maintenance-request generation from upstream release scans only after two successful maintenance cycles prove the shape
