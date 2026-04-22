@@ -7,7 +7,7 @@ mod harness;
 
 #[path = "../src/agent_registry.rs"]
 mod agent_registry;
-#[path = "../src/agent_maintenance/drift.rs"]
+#[path = "../src/agent_maintenance/drift/mod.rs"]
 mod drift;
 #[path = "../src/release_doc.rs"]
 mod release_doc;

@@ -156,6 +156,44 @@ pub fn gemini_dry_run_args() -> Vec<String> {
     ]
 }
 
+pub fn seed_gemini_approval_artifact(
+    root: &Path,
+    relative_path: &str,
+    onboarding_pack_prefix: &str,
+) -> String {
+    let contents = format!(
+        concat!(
+            "artifact_version = \"1\"\n",
+            "comparison_ref = \"docs/project_management/next/comparisons/gemini.md\"\n",
+            "selection_mode = \"factory_validation\"\n",
+            "recommended_agent_id = \"gemini_cli\"\n",
+            "approved_agent_id = \"gemini_cli\"\n",
+            "approval_commit = \"deadbeef\"\n",
+            "approval_recorded_at = \"2026-04-21T11:23:09Z\"\n",
+            "\n",
+            "[descriptor]\n",
+            "agent_id = \"gemini_cli\"\n",
+            "display_name = \"Gemini CLI\"\n",
+            "crate_path = \"crates/gemini_cli\"\n",
+            "backend_module = \"crates/agent_api/src/backends/gemini_cli\"\n",
+            "manifest_root = \"cli_manifests/gemini_cli\"\n",
+            "package_name = \"unified-agent-api-gemini-cli\"\n",
+            "canonical_targets = [\"darwin-arm64\"]\n",
+            "wrapper_coverage_binding_kind = \"generated_from_wrapper_crate\"\n",
+            "wrapper_coverage_source_path = \"crates/gemini_cli\"\n",
+            "always_on_capabilities = [\"agent_api.run\"]\n",
+            "backend_extensions = []\n",
+            "support_matrix_enabled = true\n",
+            "capability_matrix_enabled = true\n",
+            "docs_release_track = \"crates-io\"\n",
+            "onboarding_pack_prefix = \"{onboarding_pack_prefix}\"\n",
+        ),
+        onboarding_pack_prefix = onboarding_pack_prefix,
+    );
+    write_text(&root.join(relative_path), &contents);
+    relative_path.to_string()
+}
+
 pub fn repo_root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
         .parent()
