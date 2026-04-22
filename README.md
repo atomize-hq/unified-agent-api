@@ -3,6 +3,7 @@
 This repository provides a unified Rust API over coding-agent CLIs, starting with:
 - OpenAI Codex CLI (`codex`)
 - Anthropic Claude Code (`claude`)
+- Google Gemini CLI (`gemini`)
 - OpenCode CLI (`opencode`)
 
 Codex backend highlights:
@@ -22,10 +23,16 @@ OpenCode backend highlights (v1):
 - Session resume/fork and working-directory mapping on the supported runtime surface
 - Deterministic committed manifest root and validation lane (`cli_manifests/opencode/`)
 
+Gemini CLI backend highlights (v1):
+- Canonical headless `gemini --prompt --format stream-json` execution only
+- Incremental stream-json event streaming with bounded parse-failure redaction
+- Deterministic committed manifest root and proving-run onboarding packet (`cli_manifests/gemini_cli/`)
+
 Published Cargo package names are repo-scoped:
 - `unified-agent-api`
 - `unified-agent-api-codex`
 - `unified-agent-api-claude-code`
+- `unified-agent-api-gemini-cli`
 - `unified-agent-api-opencode`
 - `unified-agent-api-wrapper-events`
 
@@ -33,6 +40,7 @@ Rust library import paths remain:
 - `agent_api`
 - `codex`
 - `claude_code`
+- `gemini_cli`
 - `opencode`
 - `wrapper_events`
 
@@ -57,10 +65,12 @@ See `LICENSE-MIT` and `LICENSE-APACHE`.
 - `crates/agent_api/` — unified API surface and backend harness
 - `crates/codex/` — Codex backend crate
 - `crates/claude_code/` — Claude Code backend crate
+- `crates/gemini_cli/` — Gemini CLI backend crate
 - `crates/opencode/` — OpenCode backend crate
 - `docs/` — ADRs, specs, integration notes, project management
 - `cli_manifests/codex/` — Codex CLI parity artifacts + ops docs
 - `cli_manifests/claude_code/` — Claude Code parity artifacts + ops docs
+- `cli_manifests/gemini_cli/` — Gemini CLI manifest-root artifacts + ops docs
 - `cli_manifests/opencode/` — OpenCode manifest-root artifacts + ops docs
 
 ## Operations / parity maintenance

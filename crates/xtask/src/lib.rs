@@ -1,4 +1,12 @@
 #![forbid(unsafe_code)]
 
+pub mod agent_maintenance;
+pub mod agent_registry;
+pub mod approval_artifact;
+pub mod capability_matrix;
+pub mod onboard_agent;
+pub mod proving_run_closeout;
+pub mod release_doc;
 mod root_intake_layout;
 pub mod support_matrix;
+pub mod workspace_mutation;

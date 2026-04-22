@@ -1,15 +1,7 @@
 # Crates.io release guide
 
-This repository publishes five Rust packages for each root `VERSION` bump:
-
-- `unified-agent-api-codex`
-- `unified-agent-api-claude-code`
-- `unified-agent-api-opencode`
-- `unified-agent-api-wrapper-events`
-- `unified-agent-api`
-
-Rust library import paths remain `codex`, `claude_code`, `opencode`,
-`wrapper_events`, and `agent_api`.
+Rust library import paths remain the corresponding library crate names declared
+by each published package.
 
 All published crates use SPDX metadata `MIT OR Apache-2.0` and package both
 `LICENSE-MIT` and `LICENSE-APACHE`.
@@ -28,6 +20,18 @@ This updates:
 
 The command fails closed if the resulting manifests are not in sync.
 
+<!-- generated-by: xtask onboard-agent; section: crates-io-release -->
+## Published crates
+
+This repository publishes 6 Rust packages for each root `VERSION` bump:
+
+- `unified-agent-api-codex`
+- `unified-agent-api-claude-code`
+- `unified-agent-api-opencode`
+- `unified-agent-api-gemini-cli`
+- `unified-agent-api-wrapper-events`
+- `unified-agent-api`
+
 ## Publish order
 
 Always publish in this order:
@@ -35,12 +39,14 @@ Always publish in this order:
 1. `unified-agent-api-codex`
 2. `unified-agent-api-claude-code`
 3. `unified-agent-api-opencode`
-4. `unified-agent-api-wrapper-events`
-5. `unified-agent-api`
+4. `unified-agent-api-gemini-cli`
+5. `unified-agent-api-wrapper-events`
+6. `unified-agent-api`
+<!-- /generated-by: xtask onboard-agent; section: crates-io-release -->
 
-The dependent crates (`wrapper-events` and `agent-api`) require the three leaf
-crates to be visible in the crates.io index before `cargo publish --dry-run`
-can succeed for the same version.
+The dependent crates (`wrapper-events` and `agent-api`) require the leaf crates
+to be visible in the crates.io index before `cargo publish --dry-run` can
+succeed for the same version.
 
 ## Automated bootstrap
 

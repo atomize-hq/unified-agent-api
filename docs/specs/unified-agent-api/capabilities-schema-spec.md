@@ -21,6 +21,8 @@ Reserved ids (v1):
 
 - `codex`
 - `claude_code`
+- `gemini_cli`
+- `opencode`
 
 ## Capability id naming (DR-0003)
 
@@ -36,6 +38,8 @@ Reserved ids (v1):
   - Examples:
     - `backend.codex.exec_stream`
     - `backend.claude_code.print_stream_json`
+  - Built-in backend-owned namespaces also include `backend.gemini_cli.*` and
+    `backend.opencode.*`, even when this spec does not yet pin concrete ids under those prefixes.
 
 ## Capability buckets (rubric; naming convention)
 
@@ -82,6 +86,8 @@ Semantics (pinned):
   generator. In v1 that profile is:
   - `codex` -> `x86_64-unknown-linux-musl`
   - `claude_code` -> `linux-x64`
+  - `gemini_cli` -> default built-in backend config
+  - `opencode` -> default built-in backend config
 - The matrix is **not** an exhaustive registry of standard `agent_api.*` capability ids.
 - If a standard capability id defined in this spec is absent from the matrix, that means no built-in backend currently
   advertises it under the generator's default built-in configs for that canonical target profile (not that the id is invalid or removed).
@@ -194,9 +200,15 @@ This section defines stable universal capability ids and their minimum semantics
     - `codex` MAY advertise globally once exec/resume apply `--model <trimmed-id>` and fork keeps
       the pinned pre-handle safe rejection path from
       `docs/specs/codex-app-server-jsonrpc-contract.md`.
-  - `claude_code` MAY advertise globally once its print exec/resume/fork flows all emit exactly
-    one `--model <trimmed-id>` pair per
-    `docs/specs/claude-code-session-mapping-contract.md`.
+    - `claude_code` MAY advertise globally once its print exec/resume/fork flows all emit exactly
+      one `--model <trimmed-id>` pair per
+      `docs/specs/claude-code-session-mapping-contract.md`.
+    - `gemini_cli` MAY advertise globally for its exposed flow set when that flow set accepts the
+      universal model key and deterministically maps the trimmed model id per the owner-doc
+      semantics.
+    - `opencode` MAY advertise globally for its exposed flow set when that flow set accepts the
+      universal model key and deterministically maps the trimmed model id per the owner-doc
+      semantics.
 - `agent_api.exec.add_dirs.v1`:
   - Bucket: `agent_api.exec.*`.
   - This is the stable capability id and R0 gate for the universal add-dirs extension key.

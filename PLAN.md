@@ -1,600 +1,906 @@
+<!-- /autoplan restore point: /Users/spensermcconnell/.gstack/projects/atomize-hq-unified-agent-api/feat-cli-agent-onboarding-factory-autoplan-restore-20260421-105543.md -->
 # CLI Agent Onboarding Factory - PLAN
 
-Source: `/Users/spensermcconnell/.gstack/projects/atomize-hq-unified-agent-api/spensermcconnell-main-design-20260420-151505.md`  
-Status: Ready for implementation planning  
-Last updated (UTC): 2026-04-20
+Source:
+- `/Users/spensermcconnell/.gstack/projects/atomize-hq-unified-agent-api/spensermcconnell-main-design-20260420-151505.md`
+- `docs/project_management/next/opencode-cli-onboarding/next-steps-handoff.md`
+- `/Users/spensermcconnell/.gstack/projects/atomize-hq-unified-agent-api/spensermcconnell-main-test-outcome-20260420-091704.md`
+- `docs/project_management/next/gemini-cli-onboarding/HANDOFF.md`
+
+Status: M1, M2, and M3 landed on `feat/cli-agent-onboarding-factory`; M4 is the next implementation milestone
+Last updated (UTC): 2026-04-21
 
 ## Purpose
-Turn the current post-OpenCode learning into one bounded M1 implementation plan. M1 does not build a universal agent factory. It replaces the two hardcoded control-plane enrollment seams, pins one committed descriptor registry for the three seeded agents, and lands `xtask onboard-agent --dry-run` so an already-approved next agent deterministically produces the next executable artifact set instead of another vague handoff.
+M4 turns post-onboarding maintenance from repo archaeology into a separate, repeatable lifecycle.
+
+M1 created the reproducible onboarding bridge.
+M2 added write-mode and proved the bridge on one real agent.
+M3 formalized comparison -> approval -> proving-run closeout governance.
+
+That leaves the next bottleneck. Once an agent is already in the repo, maintainers still have to discover drift manually across:
+- `crates/xtask/data/agent_registry.toml`
+- `cli_manifests/<agent>/**`
+- `docs/specs/unified-agent-api/support-matrix.md`
+- `docs/specs/unified-agent-api/capability-matrix.md`
+- `docs/crates-io-release.md`
+- closed onboarding and implementation packet docs
+
+`onboard-agent` is not the answer to that problem. It is the create-mode bridge for new agents. M4 needs a separate maintenance lane for already-onboarded agents.
+
+## Problem Statement
+If an onboarded agent changes upstream or repo truth drifts, the current repo has no single maintenance entrypoint.
+
+OpenCode already showed the failure shape. The landing itself succeeded, but `/Users/spensermcconnell/.gstack/projects/atomize-hq-unified-agent-api/spensermcconnell-main-test-outcome-20260420-091704.md` records that `docs/project_management/next/opencode-implementation/governance/seam-2-closeout.md` understates the landed OpenCode capability set versus:
+- `crates/agent_api/src/backends/opencode/backend.rs`
+- `docs/specs/opencode-agent-api-backend-contract.md`
+- `docs/specs/unified-agent-api/capability-matrix.md`
+
+That is exactly the class of bug M4 should eliminate:
+- landed runtime/backend truth says one thing
+- generated publication says one thing
+- closed packet/governance docs say something else
+- the operator has to manually rediscover the right repair path
+
+The repo can now onboard a new agent with governed create-mode. It still cannot repair an existing agent boringly once drift appears. M4 must fix that.
+
+## Landed Baseline
+These are already true in this branch and are not M4 work:
+
+- `crates/xtask/data/agent_registry.toml` seeds `codex`, `claude_code`, `opencode`, and `gemini_cli`.
+- `crates/xtask/src/onboard_agent.rs` implements `--dry-run`, `--write`, and `--approval` for new-agent control-plane mutation.
+- `crates/xtask/src/approval_artifact.rs` and `crates/xtask/src/proving_run_closeout.rs` validate approval and closeout truth.
+- `crates/xtask/src/close_proving_run.rs` refreshes onboarding packet docs from a validated proving-run closeout artifact.
+- `crates/xtask/src/support_matrix.rs`, `crates/xtask/src/support_matrix/derive.rs`, and `crates/xtask/src/support_matrix/consistency.rs` already derive and fail closed on support-publication drift.
+- `crates/xtask/src/capability_matrix.rs` already derives capability publication from registry enrollment plus runtime/backend truth.
+- `docs/project_management/next/gemini-cli-onboarding/**` is the first closed factory-backed proving-run packet.
+- OpenCode is already landed, and `/Users/spensermcconnell/.gstack/projects/atomize-hq-unified-agent-api/spensermcconnell-main-test-outcome-20260420-091704.md` documents a real post-onboarding drift issue to use as M4 input.
+
+M4 builds on this exact repo state. It is not M2 or M3 cleanup, and it is not permission to widen `onboard-agent` into an everything command.
 
 ## Scope Lock
-- Keep M1 focused on the onboarding bridge.
-- Keep runtime truth owned by wrapper crates and backend implementations.
-- Keep `codex`, `claude_code`, and `opencode` as the only seeded agents in M1.
-- Keep `docs/specs/unified-agent-api/support-matrix.md` as the support/publication semantics owner.
-- Keep `docs/specs/unified-agent-api/capability-matrix.md` as the capability-advertising projection.
-- Keep `crates/xtask` as the control-plane implementation surface.
-- Keep recommendation HITL and packet-driven if formalizing it would delay the bridge fix.
-- Keep all generated onboarding outputs inside control-plane-owned docs, manifest-root, and release/publication surfaces.
-
-## Success Criteria
-- One committed registry artifact exists at `crates/xtask/data/agent_registry.toml`.
-- The registry cleanly seeds `codex`, `claude_code`, and `opencode`.
-- `cargo run -p xtask -- support-matrix --check` derives enrolled roots from the registry instead of a hardcoded list.
-- `cargo run -p xtask -- capability-matrix` derives enrolled backends and canonical target metadata from the registry instead of hardcoded builtin assumptions.
-- `cargo run -p xtask -- onboard-agent --dry-run --agent-id <approved-agent>` deterministically previews all generated control-plane outputs without mutating runtime-owned files.
-- Registry parity, support publication parity, capability publication parity, and dry-run ownership safety are all covered by automated tests.
-- `make preflight` remains the final integration gate.
-
-## What Already Exists
-The plan must reuse these surfaces instead of rebuilding them:
-
-- Existing control-plane modules:
-  - [crates/xtask/src/main.rs](/Users/spensermcconnell/__Active_Code/atomize-hq/unified-agent-api/crates/xtask/src/main.rs)
-  - [crates/xtask/src/support_matrix.rs](/Users/spensermcconnell/__Active_Code/atomize-hq/unified-agent-api/crates/xtask/src/support_matrix.rs)
-  - [crates/xtask/src/support_matrix/derive.rs](/Users/spensermcconnell/__Active_Code/atomize-hq/unified-agent-api/crates/xtask/src/support_matrix/derive.rs)
-  - [crates/xtask/src/capability_matrix.rs](/Users/spensermcconnell/__Active_Code/atomize-hq/unified-agent-api/crates/xtask/src/capability_matrix.rs)
-  - [crates/xtask/src/wrapper_coverage_shared.rs](/Users/spensermcconnell/__Active_Code/atomize-hq/unified-agent-api/crates/xtask/src/wrapper_coverage_shared.rs)
-- Existing seeded wrappers and backends:
-  - `crates/codex/`
-  - `crates/claude_code/`
-  - `crates/opencode/`
-  - `crates/agent_api/src/backends/{codex,claude_code,opencode}/`
-- Existing manifest roots:
-  - `cli_manifests/codex/`
-  - `cli_manifests/claude_code/`
-  - `cli_manifests/opencode/`
-- Existing publication contracts:
-  - [docs/specs/unified-agent-api/support-matrix.md](/Users/spensermcconnell/__Active_Code/atomize-hq/unified-agent-api/docs/specs/unified-agent-api/support-matrix.md)
-  - [docs/specs/unified-agent-api/capability-matrix.md](/Users/spensermcconnell/__Active_Code/atomize-hq/unified-agent-api/docs/specs/unified-agent-api/capability-matrix.md)
-  - [docs/crates-io-release.md](/Users/spensermcconnell/__Active_Code/atomize-hq/unified-agent-api/docs/crates-io-release.md)
-- Existing test posture:
-  - `crates/xtask/tests/support_matrix_*.rs`
-  - `crates/xtask/tests/c8_spec_capability_matrix_*.rs`
-  - `make preflight`
+In scope:
+- define a separate post-onboarding maintenance lifecycle for already-onboarded agents
+- add agent-scoped drift detection across registry truth, manifest evidence, publication outputs, release docs, and packet/governance docs
+- add a separate maintenance packet root under `docs/project_management/next/<agent>-maintenance/`
+- add separate maintenance request and maintenance closeout artifacts
+- add separate refresh ergonomics for control-plane-owned maintenance work
+- keep maintenance writes bounded to control-plane-owned and generated surfaces
+- use OpenCode as the first maintenance proving run because it has a real documented post-onboarding drift issue
+- make reopen and closeout rules explicit so closed onboarding packets stay immutable
 
 ## Not In Scope
-- Building a universal runtime probe framework.
-- Editing runtime/backend behavior in `crates/agent_api/src/backends/**`.
-- Generating wrapper surface truth or backend implementation files.
-- Replacing backend-owned capability computation with registry-owned logic.
-- Formalizing `recommend-agent` if that delays M1.
-- Solving already-onboarded-agent lifecycle maintenance beyond parity and dry-run safety.
-- Reworking the support-matrix or capability-matrix semantics themselves.
+- adding update mode to `xtask onboard-agent`
+- changing the recommendation, approval, or new-agent onboarding flow from M3
+- generating or mutating runtime-owned wrapper/backend code under `crates/<agent>/` or `crates/agent_api/src/backends/<agent>/`
+- mutating raw manifest evidence under `cli_manifests/<agent>/current.json`, `versions/`, `pointers/`, or `reports/` from the control plane
+- collapsing recommendation, onboarding, proving-run closeout, and maintenance into one universal lifecycle command family
+- changing support-matrix or capability-matrix semantics
+- automating candidate research or building `recommend-agent`
+- building a framework-scale runtime abstraction because one agent drifted
 
-## Control-Plane Flow
+## Success Criteria
+M4 is complete only when all of these are true:
+
+- `xtask onboard-agent` remains create-only for new agents. Already-onboarded maintenance does not flow through it.
+- `cargo run -p xtask -- check-agent-drift --agent <agent_id>` exists and:
+  - exits `0` when the agent is clean
+  - exits `2` when drift or validation problems are found
+  - emits explicit drift categories instead of a generic failure blob
+- `cargo run -p xtask -- refresh-agent --request <path> --dry-run` exists for already-onboarded agents.
+- `cargo run -p xtask -- refresh-agent --request <path> --write` exists and shares the exact same render plan as `--dry-run`.
+- `cargo run -p xtask -- close-agent-maintenance --request <path> --closeout <path>` exists and validates maintenance closure truth.
+- Maintenance write mode mutates only:
+  - `docs/project_management/next/<agent>-maintenance/**`
+  - generated publication outputs from existing generators
+  - the generated block inside `docs/crates-io-release.md` when it drifted
+- Maintenance write mode never mutates:
+  - `crates/<agent>/**`
+  - `crates/agent_api/src/backends/<agent>/**`
+  - raw manifest evidence files under `cli_manifests/<agent>/**`
+  - historical onboarding packet roots such as `docs/project_management/next/<agent>-cli-onboarding/**`
+- Closed onboarding packets remain immutable. Maintenance history is recorded in the separate maintenance pack.
+- OpenCode is used as the proving run and the known stale capability claim in `docs/project_management/next/opencode-implementation/governance/seam-2-closeout.md` becomes legible, repairable, and closeable through the M4 flow.
+- The M4 test plan exists and remains current at `/Users/spensermcconnell/.gstack/projects/atomize-hq-unified-agent-api/spensermcconnell-feat-cli-agent-onboarding-factory-test-plan-20260421-233454.md`.
+
+## What Already Exists
+M4 must reuse these surfaces instead of inventing a second factory:
+
+- Registry and path truth:
+  - `crates/xtask/data/agent_registry.toml`
+  - `crates/xtask/src/agent_registry.rs`
+- Existing control-plane mutation primitives:
+  - `crates/xtask/src/onboard_agent.rs`
+  - `crates/xtask/src/onboard_agent/preview.rs`
+  - `crates/xtask/src/onboard_agent/preview/render.rs`
+  - `crates/xtask/src/onboard_agent/validation.rs`
+  - `crates/xtask/src/workspace_mutation.rs`
+- Existing proving-run governance primitives:
+  - `crates/xtask/src/approval_artifact.rs`
+  - `crates/xtask/src/proving_run_closeout.rs`
+  - `crates/xtask/src/close_proving_run.rs`
+- Existing drift-sensitive publication surfaces:
+  - `crates/xtask/src/support_matrix.rs`
+  - `crates/xtask/src/support_matrix/derive.rs`
+  - `crates/xtask/src/support_matrix/consistency.rs`
+  - `crates/xtask/src/capability_matrix.rs`
+  - `docs/specs/unified-agent-api/support-matrix.md`
+  - `docs/specs/unified-agent-api/capability-matrix.md`
+- Existing release/doc generation surface:
+  - `docs/crates-io-release.md`
+- Historical maintenance input:
+  - `docs/project_management/next/opencode-cli-onboarding/next-steps-handoff.md`
+  - `docs/project_management/next/opencode-implementation/**`
+  - `/Users/spensermcconnell/.gstack/projects/atomize-hq-unified-agent-api/spensermcconnell-main-test-outcome-20260420-091704.md`
+
+## Chosen Approach
+M4 is a separate maintenance lane, not onboarding scope creep.
+
+The repo already has a governed create flow:
+- comparison
+- approval
+- create-mode onboarding
+- proving-run closeout
+
+The missing lifecycle is what happens after that when an onboarded agent drifts. The smallest complete M4 is:
+- one drift detector
+- one maintenance request artifact
+- one bounded control-plane refresh command
+- one maintenance closeout artifact
+- one real proving run on OpenCode
+
+Anything bigger is ocean-boiling. Anything smaller leaves the repo in the same archaeological post-onboarding posture that OpenCode exposed.
+
+## Dream State Delta
 ```text
-approved next agent
+CURRENT STATE
+already-onboarded agent
+    |
+    +--> drift appears in docs, publication, or governance truth
+    +--> maintainer manually compares registry, manifests, runtime code, and packet docs
+    +--> repair path is rediscovered from repo history
+
+M4
+already-onboarded agent
+    |
+    +--> check-agent-drift --agent <id>
+    +--> maintenance-request.toml
+    +--> refresh-agent --dry-run / --write
+    +--> runtime/evidence follow-up when required
+    +--> close-agent-maintenance
+
+12-MONTH IDEAL
+already-onboarded agent
+    |
+    +--> boring per-agent drift checks
+    +--> boring maintenance packets
+    +--> boring refresh/closeout loop
+    +--> no reopen requires conversation archaeology
+```
+
+## M4 Plan Of Record
+### Goal
+Make already-onboarded agents repairable without reopening new-agent onboarding.
+
+### Milestone Outcome
+At the end of M4:
+
+- maintainers can detect drift for one onboarded agent in one command
+- maintainers can open one bounded maintenance packet for that agent
+- control-plane-owned repair steps are previewable and replay-safe
+- runtime/evidence follow-up stays explicit and separate
+- maintenance closure records exactly what was resolved, what was deferred, and whether `make preflight` passed
+- OpenCode proves the workflow on a real post-onboarding drift case
+
+### Maintenance Chain
+```text
+drift trigger or stale proof
         |
         v
-xtask onboard-agent --dry-run
-        |
-        +--> crates/xtask/data/agent_registry.toml
-        +--> docs/project_management/next/<agent>-cli-onboarding/**
-        +--> cli_manifests/<agent>/**
-        +--> release/publication touch points
+check-agent-drift --agent <agent_id>
         |
         v
-manual runtime follow-up list
-
-agent_registry.toml
+maintenance-request.toml
         |
-        +--> support-matrix root enrollment
-        +--> capability-matrix backend enrollment
-        +--> release/publication metadata wiring
-```
-
-Runtime truth stays outside the registry:
-
-```text
-wrapper crates + backend implementations
+        v
+refresh-agent --dry-run / --write
         |
-        +--> wrapper surface declarations
-        +--> runtime capability computation
-        +--> probe / preflight / guard logic
+        +--> control-plane-owned refreshes
+        +--> explicit runtime/evidence follow-up list
+        |
+        v
+close-agent-maintenance
+        |
+        v
+closed maintenance pack + reopen trigger record
 ```
 
-## Concrete Artifact Decisions
-These are part of M1, not open design questions:
+### Step 0. Scope Challenge
+M4 should extend the existing `xtask` control plane, not create a second factory.
 
-| Concern | Decision |
-|---|---|
-| Registry path | `crates/xtask/data/agent_registry.toml` |
-| Registry format | TOML |
-| Registry owner | `crates/xtask` control plane |
-| Seeded agents | `codex`, `claude_code`, `opencode` |
-| Support-matrix consumer | registry-backed enrolled roots |
-| Capability-matrix consumer | registry-backed enrolled backends and canonical target metadata |
-| New onboarding command | `cargo run -p xtask -- onboard-agent --dry-run --agent-id <approved-agent>` |
-| Docs scaffold root | `docs/project_management/next/<agent>-cli-onboarding/` |
-| Manifest-root scaffold | `cli_manifests/<agent>/` |
-| Final M1 gate | `make preflight` |
+Existing code already solves most of the hard parts:
+- path jailing, symlink rejection, identical-write detection, and rollback already live in `crates/xtask/src/workspace_mutation.rs`
+- bounded onboarding preview and write planning already exist in `crates/xtask/src/onboard_agent.rs`
+- generated publication truth already exists in `crates/xtask/src/support_matrix.rs` and `crates/xtask/src/capability_matrix.rs`
+- closeout-style artifact validation already exists in `crates/xtask/src/approval_artifact.rs` and `crates/xtask/src/proving_run_closeout.rs`
 
-## Exact `onboard-agent --dry-run` CLI Contract
-M1 must not leave the CLI shape to implementer taste.
+Minimum complete change set:
+- add one maintenance namespace under `crates/xtask/src/` for drift, refresh, and closeout logic
+- wire three new subcommands in `crates/xtask/src/main.rs`
+- reuse existing generator and mutation primitives instead of cloning onboarding logic
+- add maintenance-specific integration tests and one maintenance packet root per agent
 
-### Accepted invocation
-```bash
-cargo run -p xtask -- onboard-agent --dry-run \
-  --agent-id <agent_id> \
-  --display-name <display_name> \
-  --crate-path <repo-relative-path> \
-  --backend-module <repo-relative-path> \
-  --manifest-root <repo-relative-path> \
-  --package-name <crate-package-name> \
-  --canonical-target <target> \
-  [--canonical-target <target> ...] \
-  --wrapper-coverage-binding-kind <binding-kind> \
-  --wrapper-coverage-source-path <repo-relative-path> \
-  --always-on-capability <capability-id> \
-  [--always-on-capability <capability-id> ...] \
-  [--target-gated-capability '<capability-id>:<target>[,<target>...]' ...] \
-  [--config-gated-capability '<capability-id>:<config-key>[:<target>[,<target>...]]' ...] \
-  [--backend-extension <capability-id> ...] \
-  --support-matrix-enabled <true|false> \
-  --capability-matrix-enabled <true|false> \
-  --docs-release-track <track> \
-  --onboarding-pack-prefix <prefix>
-```
+Complexity guardrail:
+- no new crate
+- no lifecycle umbrella abstraction
+- no runtime-owned writes
+- no file-by-file special cases in `main.rs` beyond thin command routing
 
-### Flag semantics
-- `--dry-run` is required in M1. Invocation without `--dry-run` must fail closed with a usage error until M2.
-- `--canonical-target` is repeatable and order-preserving.
-- `--always-on-capability` is repeatable and order-insensitive in parsing, but must render sorted in preview output.
-- `--target-gated-capability` encodes one capability plus one or more targets.
-- `--config-gated-capability` encodes one capability, one config key, and optional target intersection. If targets are present, the capability is advertised only when both the config and target gate pass.
-- `--backend-extension` is repeatable and reserved for backend-owned extension ids such as `backend.codex.exec_stream`.
-- `--support-matrix-enabled` and `--capability-matrix-enabled` are required booleans, not inferred defaults.
+## Artifact Contract
+### 1. Maintenance request artifact
+Path: `docs/project_management/next/<agent>-maintenance/governance/maintenance-request.toml`
+Format: TOML
+Owner: maintainer workflow
 
-### Stdout contract
-Successful dry-run output must render these sections in this exact order:
+Required fields:
+- `artifact_version`
+- `agent_id`
+- `trigger_kind`
+- `basis_ref`
+- `opened_from`
+- `requested_control_plane_actions`
+- `runtime_followup_required`
+- `request_recorded_at`
+- `request_commit`
 
-1. `== ONBOARD-AGENT DRY RUN ==`
-2. `== INPUT SUMMARY ==`
-3. `== REGISTRY ENTRY PREVIEW ==`
-4. `== DOCS SCAFFOLD PREVIEW ==`
-5. `== MANIFEST ROOT PREVIEW ==`
-6. `== RELEASE/PUBLICATION TOUCHPOINTS ==`
-7. `== MANUAL FOLLOW-UP ==`
-8. `== RESULT ==`
+Rules:
+- must reference an already-onboarded agent in `agent_registry.toml`
+- must not be used to create a new agent
+- must live under the maintenance pack root, not the onboarding pack root
+- `requested_control_plane_actions` may include only bounded maintenance actions:
+  - `packet_doc_refresh`
+  - `support_matrix_refresh`
+  - `capability_matrix_refresh`
+  - `release_doc_refresh`
 
-### Exit behavior
-- exit `0`: successful dry-run preview
-- exit `2`: validation or ownership conflict
-- exit `1`: unexpected internal failure
+Exact schema rules:
+- TOML root only. Unknown top-level keys fail validation.
+- `artifact_version = "1"`
+- `agent_id = "<registry agent id>"`, non-empty, must already exist in `crates/xtask/data/agent_registry.toml`
+- `trigger_kind` is one of:
+  - `drift_detected`
+  - `manual_reopen`
+  - `post_release_audit`
+- `basis_ref` is a repo-relative path to the evidence that triggered maintenance. It must resolve inside the workspace and may point to:
+  - an existing governance closeout doc
+  - a committed spec or publication doc
+  - a committed maintenance packet doc created during the same maintenance run
+- `opened_from` is a repo-relative path to the document or artifact where the maintainer initiated the maintenance run
+- `requested_control_plane_actions` is a non-empty array of unique strings, sorted in file order as written by the maintainer; all values must come from the allowed action set above
+- `runtime_followup_required` is a table with exact fields:
+  - `required = true|false`
+  - `items = ["..."]`
+- `runtime_followup_required.required = false` requires `items = []`
+- `runtime_followup_required.required = true` requires `items` to be a non-empty array of non-blank strings
+- `request_recorded_at` must be RFC3339 UTC
+- `request_commit` must be 7-40 lowercase hex characters
 
-### Dry-run side effects
-- no filesystem writes
-- no temp-file writes inside the repo
-- no edits to wrapper crates, backend implementation files, workflow files, or release scripts
-- preview text only
-
-## Registry Contract
-The registry is the control-plane source of truth for declaration and enrollment metadata only.
-
-### Registry-owned fields
-- agent identity and display metadata
-- crate path and manifest-root path
-- package and release/publication metadata
-- canonical targets
-- wrapper-coverage binding metadata
-- normalized capability-declaration shape
-- onboarding scaffold metadata
-
-### Explicitly not registry-owned
-- live capability probes
-- final runtime capability values
-- wrapper surface contents
-- backend execution behavior
-- backend-specific guard/preflight logic
-- generated support rows or generated capability rows
-
-### Required field schema
-| Field | Type | Required | Shape | Notes |
-|---|---|---|---|---|
-| `agent_id` | string | yes | unique | Control-plane identifier. |
-| `display_name` | string | yes | scalar | Human-facing only. |
-| `crate_path` | string | yes | repo-relative path | Wrapper crate root. |
-| `backend_module` | string | yes | repo-relative path | Backend module path under `crates/agent_api/src/backends/`. |
-| `manifest_root` | string | yes | repo-relative path | Root under `cli_manifests/`. |
-| `package_name` | string | yes | scalar | Publishable crate package name. |
-| `canonical_targets` | array<string> | yes | 1..n | Ordered capability-projection/scaffold target set. |
-| `wrapper_coverage.binding_kind` | string | yes | enum | Start with `generated_from_wrapper_crate`. |
-| `wrapper_coverage.source_path` | string | yes | repo-relative path | Wrapper-owned source/generator path. |
-| `capability_declaration.always_on` | array<string> | yes | 0..n | Always-advertised ids. |
-| `capability_declaration.target_gated` | array<table> | yes | 0..n | `capability_id` plus non-empty `targets = []`. |
-| `capability_declaration.config_gated` | array<table> | yes | 0..n | `capability_id` plus `config_key`, optional `targets = []` for intersection gating. |
-| `capability_declaration.backend_extensions` | array<string> | yes | 0..n | Backend-owned extension ids. |
-| `publication.support_matrix_enabled` | bool | yes | scalar | Include in support publication. |
-| `publication.capability_matrix_enabled` | bool | yes | scalar | Include in capability publication. |
-| `release.docs_release_track` | string | yes | scalar | Start with `crates-io` for seeded crates. |
-| `scaffold.onboarding_pack_prefix` | string | yes | scalar | Prefix for generated planning paths. |
-
-Evaluation rules:
-- `support_matrix` root enrollment comes from registry membership, but target row derivation still reads each enrolled root's committed `current.json.expected_targets`. `canonical_targets` does not replace manifest-root expected targets for support publication.
-- `capability_matrix` uses `canonical_targets` for target-sensitive capability projection.
-- Final advertised capability set is the union of `always_on`, matching `target_gated`, and matching `config_gated`, plus `backend_extensions`.
-- `backend_extensions` may be emitted only if the owning backend currently advertises them under default config or an explicitly declared config gate.
-
-## Pinned Initial Registry Contents
-M1 should start from these exact seeded entries. Workers should not infer or re-derive them from prose.
-
+Example:
 ```toml
-[[agents]]
-agent_id = "codex"
-display_name = "Codex CLI"
-crate_path = "crates/codex"
-backend_module = "crates/agent_api/src/backends/codex"
-manifest_root = "cli_manifests/codex"
-package_name = "unified-agent-api-codex"
-canonical_targets = ["x86_64-unknown-linux-musl"]
-
-[agents.wrapper_coverage]
-binding_kind = "generated_from_wrapper_crate"
-source_path = "crates/codex"
-
-[agents.capability_declaration]
-always_on = [
-  "agent_api.run",
-  "agent_api.events",
-  "agent_api.events.live",
-  "agent_api.control.cancel.v1",
-  "agent_api.tools.structured.v1",
-  "agent_api.tools.results.v1",
-  "agent_api.artifacts.final_text.v1",
-  "agent_api.session.handle.v1",
-  "agent_api.session.fork.v1",
-  "agent_api.session.resume.v1",
-  "agent_api.config.model.v1",
-  "agent_api.exec.add_dirs.v1",
-  "agent_api.exec.non_interactive",
-]
-backend_extensions = [
-  "backend.codex.exec.approval_policy",
-  "backend.codex.exec.sandbox_mode",
-  "backend.codex.exec_stream",
-]
-
-[[agents.capability_declaration.target_gated]]
-capability_id = "agent_api.tools.mcp.list.v1"
-targets = ["x86_64-unknown-linux-musl"]
-
-[[agents.capability_declaration.target_gated]]
-capability_id = "agent_api.tools.mcp.get.v1"
-targets = ["x86_64-unknown-linux-musl"]
-
-[[agents.capability_declaration.config_gated]]
-capability_id = "agent_api.tools.mcp.add.v1"
-config_key = "allow_mcp_write"
-targets = ["x86_64-unknown-linux-musl"]
-
-[[agents.capability_declaration.config_gated]]
-capability_id = "agent_api.tools.mcp.remove.v1"
-config_key = "allow_mcp_write"
-targets = ["x86_64-unknown-linux-musl"]
-
-[[agents.capability_declaration.config_gated]]
-capability_id = "agent_api.exec.external_sandbox.v1"
-config_key = "allow_external_sandbox_exec"
-
-[agents.publication]
-support_matrix_enabled = true
-capability_matrix_enabled = true
-
-[agents.release]
-docs_release_track = "crates-io"
-
-[agents.scaffold]
-onboarding_pack_prefix = "codex-cli-onboarding"
-
-[[agents]]
-agent_id = "claude_code"
-display_name = "Claude Code"
-crate_path = "crates/claude_code"
-backend_module = "crates/agent_api/src/backends/claude_code"
-manifest_root = "cli_manifests/claude_code"
-package_name = "unified-agent-api-claude-code"
-canonical_targets = ["linux-x64", "darwin-arm64", "win32-x64"]
-
-[agents.wrapper_coverage]
-binding_kind = "generated_from_wrapper_crate"
-source_path = "crates/claude_code"
-
-[agents.capability_declaration]
-always_on = [
-  "agent_api.run",
-  "agent_api.events",
-  "agent_api.events.live",
-  "agent_api.control.cancel.v1",
-  "agent_api.tools.structured.v1",
-  "agent_api.tools.results.v1",
-  "agent_api.artifacts.final_text.v1",
-  "agent_api.session.handle.v1",
-  "agent_api.config.model.v1",
-  "agent_api.exec.add_dirs.v1",
-  "agent_api.exec.non_interactive",
-  "agent_api.session.resume.v1",
-  "agent_api.session.fork.v1",
-]
-backend_extensions = [
-  "backend.claude_code.print_stream_json",
-]
-
-[[agents.capability_declaration.target_gated]]
-capability_id = "agent_api.tools.mcp.list.v1"
-targets = ["linux-x64", "darwin-arm64", "win32-x64"]
-
-[[agents.capability_declaration.target_gated]]
-capability_id = "agent_api.tools.mcp.get.v1"
-targets = ["win32-x64"]
-
-[[agents.capability_declaration.config_gated]]
-capability_id = "agent_api.tools.mcp.add.v1"
-config_key = "allow_mcp_write"
-targets = ["win32-x64"]
-
-[[agents.capability_declaration.config_gated]]
-capability_id = "agent_api.tools.mcp.remove.v1"
-config_key = "allow_mcp_write"
-targets = ["win32-x64"]
-
-[[agents.capability_declaration.config_gated]]
-capability_id = "agent_api.exec.external_sandbox.v1"
-config_key = "allow_external_sandbox_exec"
-
-[agents.publication]
-support_matrix_enabled = true
-capability_matrix_enabled = true
-
-[agents.release]
-docs_release_track = "crates-io"
-
-[agents.scaffold]
-onboarding_pack_prefix = "claude-code-cli-onboarding"
-
-[[agents]]
+artifact_version = "1"
 agent_id = "opencode"
-display_name = "OpenCode"
-crate_path = "crates/opencode"
-backend_module = "crates/agent_api/src/backends/opencode"
-manifest_root = "cli_manifests/opencode"
-package_name = "unified-agent-api-opencode"
-canonical_targets = ["linux-x64", "darwin-arm64", "win32-x64"]
-
-[agents.wrapper_coverage]
-binding_kind = "generated_from_wrapper_crate"
-source_path = "crates/opencode"
-
-[agents.capability_declaration]
-always_on = [
-  "agent_api.run",
-  "agent_api.events",
-  "agent_api.events.live",
-  "agent_api.config.model.v1",
-  "agent_api.session.resume.v1",
-  "agent_api.session.fork.v1",
+trigger_kind = "drift_detected"
+basis_ref = "docs/project_management/next/opencode-implementation/governance/seam-2-closeout.md"
+opened_from = "docs/project_management/next/opencode-implementation/governance/seam-2-closeout.md"
+requested_control_plane_actions = [
+  "packet_doc_refresh",
+  "capability_matrix_refresh",
 ]
-backend_extensions = []
+request_recorded_at = "2026-04-22T01:15:00Z"
+request_commit = "1adb8f1"
 
-[agents.publication]
-support_matrix_enabled = true
-capability_matrix_enabled = true
-
-[agents.release]
-docs_release_track = "crates-io"
-
-[agents.scaffold]
-onboarding_pack_prefix = "opencode-cli-onboarding"
+[runtime_followup_required]
+required = false
+items = []
 ```
 
-## Consumer Cutover Map
-| Consumer | Current hardcoded seam | M1 change |
+### 2. Maintenance closeout artifact
+Path: `docs/project_management/next/<agent>-maintenance/governance/maintenance-closeout.json`
+Format: JSON
+Owner: maintenance closeout
+
+Required fields:
+- `request_ref`
+- `request_sha256`
+- `resolved_findings`
+- exactly one of:
+  - `deferred_findings`
+  - `explicit_none_reason`
+- `preflight_passed`
+- `recorded_at`
+- `commit`
+
+Rules:
+- closeout must fail validation if it cannot link back to the request artifact
+- closeout must state what was resolved and whether anything remains deferred
+- maintenance closure must not mutate historical onboarding packet docs directly
+
+Exact schema rules:
+- JSON object root only. Unknown fields fail validation.
+- `request_ref` is the exact repo-relative path to `governance/maintenance-request.toml`
+- `request_sha256` must be 64 lowercase hex characters and must match the current bytes of `request_ref`
+- `resolved_findings` is a non-empty array of objects with exact fields:
+  - `category_id`
+  - `summary`
+  - `surfaces`
+- `deferred_findings`, when present, is a non-empty array of the same object shape as `resolved_findings`
+- every `category_id` in `resolved_findings` or `deferred_findings` must be one of the drift category IDs defined in the drift output contract below
+- every `surfaces` value is a non-empty array of repo-relative paths
+- exactly one of:
+  - `deferred_findings`
+  - `explicit_none_reason`
+- `explicit_none_reason` must be non-empty and is allowed only when `deferred_findings` is absent
+- `preflight_passed` is boolean
+- `recorded_at` must be RFC3339 UTC
+- `commit` must be 7-40 lowercase hex characters
+
+Example:
+```json
+{
+  "request_ref": "docs/project_management/next/opencode-maintenance/governance/maintenance-request.toml",
+  "request_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "resolved_findings": [
+    {
+      "category_id": "governance_doc_drift",
+      "summary": "SEAM-2 closeout now matches the landed capability advertisement boundary.",
+      "surfaces": [
+        "docs/project_management/next/opencode-implementation/governance/seam-2-closeout.md",
+        "docs/project_management/next/opencode-maintenance/HANDOFF.md"
+      ]
+    }
+  ],
+  "explicit_none_reason": "No deferred maintenance findings remain after publication and packet refresh.",
+  "preflight_passed": true,
+  "recorded_at": "2026-04-22T01:45:00Z",
+  "commit": "4adefdf"
+}
+```
+
+## Command Contract
+M4 adds a separate maintenance command set.
+
+### Drift detection
+```bash
+cargo run -p xtask -- check-agent-drift --agent <agent_id>
+```
+
+Rules:
+- read-only
+- agent must already exist in `crates/xtask/data/agent_registry.toml`
+- exit `0` means no drift
+- exit `2` means drift or maintenance preconditions failed
+- exit `1` means internal or IO failure
+- output categories must include, when present:
+  - registry versus manifest evidence drift
+  - runtime/backend versus capability publication drift
+  - support publication drift
+  - release/doc generated-block drift
+  - closed packet/governance doc drift
+
+Stable drift category IDs:
+- `registry_manifest_drift`
+- `capability_publication_drift`
+- `support_publication_drift`
+- `release_doc_drift`
+- `governance_doc_drift`
+
+Exact stdout contract:
+- human-readable summary on stdout
+- deterministic block order:
+  1. header
+  2. agent id
+  3. status
+  4. zero or more drift records sorted by `category_id`
+- exact header line:
+  - `== AGENT DRIFT REPORT ==`
+- exact status line:
+  - clean run: `status: clean`
+  - drift run: `status: drift_detected`
+
+Exact drift record shape on stdout:
+```text
+category_id: <stable id>
+summary: <single line>
+surfaces:
+  - <repo-relative path>
+  - <repo-relative path>
+```
+
+Exact clean-run example:
+```text
+== AGENT DRIFT REPORT ==
+agent_id: opencode
+status: clean
+```
+
+Exact drift example:
+```text
+== AGENT DRIFT REPORT ==
+agent_id: opencode
+status: drift_detected
+
+category_id: governance_doc_drift
+summary: maintenance-relevant closeout prose no longer matches landed capability truth.
+surfaces:
+  - docs/project_management/next/opencode-implementation/governance/seam-2-closeout.md
+  - docs/specs/unified-agent-api/capability-matrix.md
+```
+
+M4 deliberately does not add JSON output for `check-agent-drift`. The stdout contract above is the only drift-detector output in this milestone.
+
+### Maintenance refresh
+```bash
+cargo run -p xtask -- refresh-agent --request docs/project_management/next/<agent>-maintenance/governance/maintenance-request.toml --dry-run
+cargo run -p xtask -- refresh-agent --request docs/project_management/next/<agent>-maintenance/governance/maintenance-request.toml --write
+```
+
+Rules:
+- `--dry-run` and `--write` are mutually exclusive
+- dry-run and write must share one in-memory render plan
+- request artifact path is jailed and maintenance-root validated
+- unknown agent ids fail closed
+- request actions that imply runtime-owned mutations fail closed
+- exact-byte replay after an identical write is a success no-op
+- exit `0` means success, including identical no-op replay
+- exit `2` means validation or ownership failure
+- exit `1` means internal or IO failure
+
+### Maintenance closeout
+```bash
+cargo run -p xtask -- close-agent-maintenance --request docs/project_management/next/<agent>-maintenance/governance/maintenance-request.toml --closeout docs/project_management/next/<agent>-maintenance/governance/maintenance-closeout.json
+```
+
+Rules:
+- validates request linkage and request hash
+- requires explicit resolved findings plus either deferred findings or `explicit_none_reason`
+- refreshes maintenance packet docs only
+- does not reopen or rewrite the historical onboarding packet root
+- exit `0` means validated closure
+- exit `2` means validation or unresolved-maintenance failure
+- exit `1` means internal or IO failure
+
+## Controlled Write Set
+The maintenance lane is intentionally narrow.
+
+| Surface | Owner | M4 write mode |
 |---|---|---|
-| [crates/xtask/src/support_matrix.rs](/Users/spensermcconnell/__Active_Code/atomize-hq/unified-agent-api/crates/xtask/src/support_matrix.rs) | `CURRENT_AGENT_ROOTS` hardcodes enrolled manifest roots | Replace with registry-backed root enrollment and root metadata loading. |
-| [crates/xtask/src/capability_matrix.rs](/Users/spensermcconnell/__Active_Code/atomize-hq/unified-agent-api/crates/xtask/src/capability_matrix.rs) | builtin backend collection and canonical target assumptions are hardcoded | Load enrolled backends and canonical target metadata from the registry while keeping runtime capability computation backend-owned. |
-| [crates/xtask/src/main.rs](/Users/spensermcconnell/__Active_Code/atomize-hq/unified-agent-api/crates/xtask/src/main.rs) | no onboarding factory command surface exists | Add `OnboardAgent` entrypoint. |
-| [docs/crates-io-release.md](/Users/spensermcconnell/__Active_Code/atomize-hq/unified-agent-api/docs/crates-io-release.md) | release assumptions are tied to the current fixed crate set | Use registry release metadata for new-agent enrollment while preserving current seeded-crate order and rules. |
-| `docs/project_management/next/**` | handoff naming and path prefix are manual | Standardize via `scaffold.onboarding_pack_prefix`. |
+| `docs/project_management/next/<agent>-maintenance/**` | maintenance control plane | write |
+| `docs/specs/unified-agent-api/support-matrix.md` and `cli_manifests/support_matrix/current.json` via existing generator | generated publication | write |
+| `docs/specs/unified-agent-api/capability-matrix.md` via existing generator | generated publication | write |
+| generated block in `docs/crates-io-release.md` between `<!-- generated-by: xtask onboard-agent; section: crates-io-release -->` and `<!-- /generated-by: xtask onboard-agent; section: crates-io-release -->` | generated publication | write when drifted |
+| `crates/xtask/data/agent_registry.toml` | registry truth | read-only in M4 unless explicit follow-on reopening is approved |
+| `cli_manifests/<agent>/current.json`, `versions/`, `pointers/`, `reports/` | manifest evidence | never |
+| `crates/<agent>/**` | runtime owner | never |
+| `crates/agent_api/src/backends/<agent>/**` | runtime owner | never |
+| `docs/project_management/next/<agent>-cli-onboarding/**` | historical onboarding packet | never |
 
-## Release And Publication Touchpoint Matrix
-Workers should not guess which release files are in scope for M1.
+Exact maintenance packet docs surface:
+- `docs/project_management/next/<agent>-maintenance/README.md`
+- `docs/project_management/next/<agent>-maintenance/scope_brief.md`
+- `docs/project_management/next/<agent>-maintenance/seam_map.md`
+- `docs/project_management/next/<agent>-maintenance/threading.md`
+- `docs/project_management/next/<agent>-maintenance/review_surfaces.md`
+- `docs/project_management/next/<agent>-maintenance/HANDOFF.md`
+- `docs/project_management/next/<agent>-maintenance/governance/remediation-log.md`
+- `docs/project_management/next/<agent>-maintenance/governance/maintenance-request.toml`
+- `docs/project_management/next/<agent>-maintenance/governance/maintenance-closeout.json`
 
-| File | M1 status | Exact rule |
-|---|---|---|
-| [docs/crates-io-release.md](/Users/spensermcconnell/__Active_Code/atomize-hq/unified-agent-api/docs/crates-io-release.md) | touch only if release docs become stale | Seeded-agent normalization should not rewrite publish order. Dry-run for a new agent may preview a future docs addition, but M1 does not mutate it. |
-| [.github/workflows/publish-crates.yml](/Users/spensermcconnell/__Active_Code/atomize-hq/unified-agent-api/.github/workflows/publish-crates.yml) | out of scope | No M1 edits. The workflow already computes publishable crates from cargo metadata. |
-| [scripts/publish_crates.py](/Users/spensermcconnell/__Active_Code/atomize-hq/unified-agent-api/scripts/publish_crates.py) | out of scope | No M1 edits unless M1 proves the workflow cannot model a registry-backed new crate, which is not expected. |
-| [scripts/validate_publish_versions.py](/Users/spensermcconnell/__Active_Code/atomize-hq/unified-agent-api/scripts/validate_publish_versions.py) | out of scope | No M1 edits for seeded normalization. |
-| [scripts/check_publish_readiness.py](/Users/spensermcconnell/__Active_Code/atomize-hq/unified-agent-api/scripts/check_publish_readiness.py) | out of scope | No M1 edits for seeded normalization. |
-| `Cargo.toml` | preview-only for new-agent dry-run | Only preview as a future mutation touchpoint when the proposed `crate_path` is a new workspace member not already present. |
-| `crates/<agent>/Cargo.toml` | preview-only for new-agent dry-run | Only preview as future manual/runtime-owned work, not a dry-run-generated file. |
+Command ownership:
+- maintainer-created only:
+  - `docs/project_management/next/<agent>-maintenance/governance/maintenance-request.toml`
+- `refresh-agent` may write only:
+  - `README.md`
+  - `scope_brief.md`
+  - `seam_map.md`
+  - `threading.md`
+  - `review_surfaces.md`
+  - `HANDOFF.md`
+  - `governance/remediation-log.md`
+- `close-agent-maintenance` may write only:
+  - `governance/maintenance-closeout.json`
+  - `HANDOFF.md`
+  - `governance/remediation-log.md`
 
-Preview contract for W5:
-- If the proposed package name matches one of the seeded publishable crates, `== RELEASE/PUBLICATION TOUCHPOINTS ==` must print `NO RELEASE CHANGES`.
-- If the proposed package name is new, the section must list exactly which of `Cargo.toml` and `docs/crates-io-release.md` would require future mutation in M2, and must explicitly print that workflow and script files remain unchanged in M1.
+No maintenance command may write any other docs path.
 
-## M1 Workstreams
-### W1. Registry schema and loader
-Goal: add the registry artifact and fail-closed parsing/validation.
+## Architecture Review
+### Preferred module shape
+Keep M4 inside the existing `xtask` crate and make the new code boring:
+- `crates/xtask/src/main.rs`
+  - thin CLI routing only
+- `crates/xtask/src/lib.rs`
+  - export the maintenance namespace only if tests or shared helpers need it
+- `crates/xtask/src/agent_maintenance/`
+  - `drift.rs`
+  - `request.rs`
+  - `refresh.rs`
+  - `closeout.rs`
+  - `docs.rs` only if packet rendering grows past one file
 
-Primary work:
-- add `crates/xtask/data/agent_registry.toml`
-- add registry loader and validation module(s) under `crates/xtask/src/`
-- enforce uniqueness for `agent_id`, `crate_path`, `backend_module`, and `manifest_root`
-- reject malformed target-gated or config-gated declarations
+If the code stays small, `agent_maintenance.rs` plus a couple of sibling files is better than premature submodule fan-out. The rule is explicit over clever.
 
-Acceptance:
-- the seeded registry parses cleanly
-- malformed or duplicate entries fail closed
-- no consumer is cut over yet without parity checks
+### Dependency graph
+```text
+xtask main.rs
+    |
+    +--> check-agent-drift
+    |      |
+    |      +--> agent_registry::AgentRegistry
+    |      +--> support_matrix::{derive, consistency}
+    |      +--> capability_matrix runtime/publication truth
+    |      \--> maintenance packet drift inspector
+    |
+    +--> refresh-agent
+    |      |
+    |      +--> maintenance request validator
+    |      +--> workspace_mutation::{WorkspacePathJail, apply_mutations}
+    |      +--> support_matrix generator reuse
+    |      +--> capability_matrix generator reuse
+    |      \--> crates-io generated-block refresh
+    |
+    \--> close-agent-maintenance
+           |
+           +--> maintenance closeout validator
+           +--> request hash/linkage verifier
+           +--> maintenance packet doc refresh
+           \--> workspace_mutation::{WorkspacePathJail, apply_mutations}
+```
 
-### W2. Seeded normalization and parity
-Goal: seed the three current agents and prove the registry matches existing enrollment before cutover.
+### Architecture decisions
+- `check-agent-drift` is a read-only aggregation layer. It should call existing truth producers and validators, then classify mismatches by agent instead of inventing a second source of truth.
+- `refresh-agent` is the only write-capable maintenance command. It should build one in-memory mutation plan, print it in `--dry-run`, and apply that exact plan in `--write`.
+- `close-agent-maintenance` is a closeout validator plus maintenance-doc refresher. It should look more like `close_proving_run` than `onboard_agent`.
+- Global generated outputs remain global. Agent scoping happens at the operator contract, not by forking support or capability generators into per-agent implementations.
 
-Primary work:
-- seed `codex`, `claude_code`, and `opencode`
-- add parity validation comparing current hardcoded enrollment to registry-derived enrollment
-- allow temporary dual-source coexistence only behind explicit parity tests
+## Code Quality Guardrails
+- Keep `main.rs` as routing glue. Real logic lives in maintenance modules.
+- Model drift categories as explicit enums/structs, not ad hoc strings. The command output can still render readable prose.
+- Keep request and closeout artifact parsing symmetrical with existing approval/closeout validators: parse, validate path ownership, validate schema, then execute.
+- Reuse `workspace_mutation` for every write. No direct `fs::write` calls in maintenance commands.
+- Reuse existing generators for support/capability/release refreshes. Do not duplicate their derivation logic inside maintenance code.
+- Keep maintenance docs rendering deterministic and side-effect free before write mode.
+- If two codepaths need the same validation, extract one small helper. If only one codepath needs it, keep it local. Minimal diff over speculative abstraction.
 
-Acceptance:
-- registry-derived enrolled roots match current `support_matrix` enrollment
-- registry-derived enrolled backends match current `capability_matrix` enrollment
-- CI fails on drift while both sources coexist
+## Workstreams
+### W1. Agent-Scoped Drift Detection
+Goal: stop making operators manually discover which truth surfaces disagree.
 
-### W3. Support-matrix cutover
-Goal: move root enrollment to the registry without changing support publication semantics.
+Deliverables:
+- `check-agent-drift` entrypoint
+- one explicit drift category taxonomy
+- agent-scoped output that aggregates existing validators instead of duplicating them
 
-Primary work:
-- replace `CURRENT_AGENT_ROOTS`
-- preserve current publication paths and row semantics
-- keep derivation single-pass and deterministic
-
-Primary touchpoints:
+Primary modules:
+- `crates/xtask/src/main.rs`
+- `crates/xtask/src/agent_registry.rs`
 - `crates/xtask/src/support_matrix.rs`
 - `crates/xtask/src/support_matrix/derive.rs`
-- `crates/xtask/tests/support_matrix_*.rs`
-
-Acceptance:
-- row set and staleness behavior remain unchanged for seeded agents
-- support publication reads enrolled roots from the registry
-
-### W4. Capability-matrix cutover
-Goal: move backend enrollment and canonical target metadata to the registry without moving runtime truth into the registry.
-
-Primary work:
-- replace builtin backend enrollment assumptions
-- source canonical target metadata from the registry
-- keep backend capability computation inside backend-owned code
-
-Primary touchpoints:
+- `crates/xtask/src/support_matrix/consistency.rs`
 - `crates/xtask/src/capability_matrix.rs`
-- `crates/xtask/tests/c8_spec_capability_matrix_*.rs`
+- new maintenance drift module(s) under `crates/xtask/src/`
 
-Acceptance:
-- seeded-agent capability inventory stays stable unless an intentional backend change occurs
-- registry only shapes enrollment and declaration metadata
+Exit criteria:
+- one command can tell maintainers whether an onboarded agent is clean or which surfaces drifted
 
-### W5. `onboard-agent --dry-run`
-Goal: land the bridge command without mutation mode.
+### W2. Maintenance Request + Refresh
+Goal: add a separate operator path for already-onboarded agents.
 
-Primary work:
-- add a neutral `OnboardAgent` entrypoint to `xtask`
-- preview registry diff, docs scaffold, manifest-root scaffold, and release/publication touch points
-- print a deterministic handoff summary naming runtime-owned manual follow-up work
-- fail closed on duplicate ids, ambiguous ownership, or pre-existing conflicting targets
+Deliverables:
+- `maintenance-request.toml` schema
+- `refresh-agent --dry-run`
+- `refresh-agent --write`
+- maintenance pack scaffold under `docs/project_management/next/<agent>-maintenance/`
 
-Expected dry-run outputs:
-- registry entry preview in `crates/xtask/data/agent_registry.toml`
-- docs scaffold preview under `docs/project_management/next/<agent>-cli-onboarding/`
-- manifest-root scaffold preview under `cli_manifests/<agent>/`
-- release/publication touch-point preview
-- final handoff summary
+Primary modules:
+- `crates/xtask/src/main.rs`
+- new maintenance request and refresh module(s) under `crates/xtask/src/`
+- `crates/xtask/src/workspace_mutation.rs`
+- `crates/xtask/src/support_matrix.rs`
+- `crates/xtask/src/capability_matrix.rs`
 
-Required scaffold file contract:
-- `docs/project_management/next/<agent>-cli-onboarding/README.md`
-- `docs/project_management/next/<agent>-cli-onboarding/scope_brief.md`
-- `docs/project_management/next/<agent>-cli-onboarding/seam_map.md`
-- `docs/project_management/next/<agent>-cli-onboarding/threading.md`
-- `docs/project_management/next/<agent>-cli-onboarding/review_surfaces.md`
-- `docs/project_management/next/<agent>-cli-onboarding/governance/remediation-log.md`
-- `docs/project_management/next/<agent>-cli-onboarding/HANDOFF.md`
-- `cli_manifests/<agent>/current.json`
-- `cli_manifests/<agent>/versions/.gitkeep`
-- `cli_manifests/<agent>/pointers/latest_supported/.gitkeep`
-- `cli_manifests/<agent>/pointers/latest_validated/.gitkeep`
-- `cli_manifests/<agent>/reports/.gitkeep`
+Exit criteria:
+- already-onboarded maintenance no longer requires `onboard-agent`
+- refresh writes stay bounded to maintenance and generated publication surfaces
 
-Required ownership markers:
-- every generated Markdown preview must start with `<!-- generated-by: xtask onboard-agent; owner: control-plane -->`
-- `HANDOFF.md` must include a `## Manual Runtime Follow-Up` section
-- no ownership markers are required for `.gitkeep`
+### W3. Maintenance Closeout + Reopen Rules
+Goal: close repairs deterministically without mutating historical onboarding truth.
 
-Acceptance:
-- dry-run does not mutate wrapper or backend implementation files
-- output order is deterministic
-- the command always terminates in a concrete next executable artifact set plus manual follow-up list
-- command flags, stdout sections, and exit behavior match the pinned contract above
+Deliverables:
+- `maintenance-closeout.json` schema
+- `close-agent-maintenance` entrypoint
+- explicit reopen rules for recurring drift
 
-## Minimal Execution Sequence
-```text
-W1 registry schema + loader
-    |
-    v
-W2 seeded normalization + parity
-    |
-    +--> W3 support-matrix cutover
-    +--> W4 capability-matrix cutover
-    +--> W5 onboard-agent --dry-run
-               |
-               v
-         parity + dry-run safety + preflight
-```
+Primary modules:
+- `crates/xtask/src/main.rs`
+- new maintenance closeout module(s) under `crates/xtask/src/`
+- `crates/xtask/src/workspace_mutation.rs`
+- maintenance packet docs under `docs/project_management/next/<agent>-maintenance/**`
 
-Do not reverse this. The registry shape must be pinned before the consumers or the command surface harden around it.
+Exit criteria:
+- closed maintenance runs are explicit and replay-safe
+- reopening uses the maintenance lane, not edits to closed onboarding packets
+
+### W4. OpenCode Maintenance Proving Run
+Goal: prove the maintenance lane on a real post-onboarding drift issue.
+
+Deliverables:
+- `docs/project_management/next/opencode-maintenance/**`
+- a maintenance request that cites the stale capability claim
+- refreshed maintenance packet truth
+- validated maintenance closeout
+
+Primary modules:
+- `docs/project_management/next/opencode-implementation/**`
+- `docs/specs/opencode-agent-api-backend-contract.md`
+- `docs/specs/unified-agent-api/capability-matrix.md`
+
+Exit criteria:
+- the repo can repair the OpenCode stale closeout claim through the new M4 flow without conversation archaeology
+
+### OpenCode source-of-truth precedence
+To remove ambiguity in the proving run, maintenance must resolve conflicting claims in this order:
+1. landed runtime/backend behavior in `crates/agent_api/src/backends/opencode/**`
+2. canonical spec contract in `docs/specs/opencode-agent-api-backend-contract.md`
+3. generated publication outputs derived from the landed runtime/spec truth
+4. historical governance and closeout docs under `docs/project_management/next/opencode-implementation/**`
+
+Implications:
+- if historical governance prose disagrees with runtime/spec truth, governance docs are repaired
+- if generated capability publication disagrees with runtime/spec truth, the generator output is refreshed
+- M4 does not mutate runtime code or raw manifest evidence to make the docs “look consistent”
+- the OpenCode proving run is blocked only if runtime behavior and canonical spec disagree with each other, because that is a pre-existing truth conflict outside the M4 write set
+
+## Implementation Sequence
+### Phase 1. Drift Contract Lock
+Outputs:
+- drift taxonomy
+- `check-agent-drift`
+- OpenCode proving-run target confirmed
+
+Modules touched:
+- `crates/xtask/src/main.rs`
+- maintenance drift module(s)
+- `crates/xtask/src/agent_registry.rs`
+- existing support/capability matrix readers
+
+Implementation notes:
+- define the drift categories first, because every later artifact needs those names
+- keep this phase read-only
+- prove the OpenCode stale capability claim appears as one of the categories instead of a one-off doc complaint
+
+Exit gate:
+- one command can expose the OpenCode stale capability claim as maintenance drift
+
+### Phase 2. Maintenance Request + Refresh
+Outputs:
+- maintenance request schema
+- maintenance pack scaffold
+- `refresh-agent --dry-run/--write`
+
+Modules touched:
+- `crates/xtask/src/main.rs`
+- maintenance request / refresh module(s)
+- `crates/xtask/src/workspace_mutation.rs`
+- existing support/capability/release refresh call sites
+
+Implementation notes:
+- keep one request artifact as the source of truth for both dry-run and write
+- scaffold the maintenance packet root in this phase so later closeout work never has to infer paths
+- reject runtime-owned actions at request-validation time, not halfway through mutation planning
+
+Exit gate:
+- maintenance writes are bounded and replay-safe
+
+### Phase 3. Maintenance Closeout
+Outputs:
+- closeout schema
+- `close-agent-maintenance`
+- reopen rules
+
+Modules touched:
+- `crates/xtask/src/main.rs`
+- maintenance closeout module(s)
+- maintenance packet doc rendering helpers
+
+Implementation notes:
+- mirror the validation posture of `close_proving_run`
+- closeout only succeeds when request linkage, resolved findings, and deferred-or-none truth all line up
+- keep reopen rules documentary and explicit, not implicit via edits to historical onboarding docs
+
+Exit gate:
+- maintenance history closes without mutating closed onboarding packets
+
+### Phase 4. OpenCode Proving Run
+Outputs:
+- OpenCode maintenance pack
+- repaired capability-claim truth
+- validated closeout
+
+Modules touched:
+- `docs/project_management/next/opencode-maintenance/**`
+- `docs/project_management/next/opencode-implementation/governance/seam-2-closeout.md`
+- generated publication outputs touched by the repair
+
+Implementation notes:
+- treat OpenCode as a proving run, not a bespoke exception path
+- the proving run is only valid if a new maintainer can reproduce the repair from the maintenance packet and commands alone
+- if the proving run needs manual runtime or evidence follow-up, record it explicitly in the maintenance pack instead of hiding it in the closeout prose
+
+Exit gate:
+- the repo can repair one already-onboarded agent boringly
+
+## Error & Rescue Registry
+| Method / Codepath | What can go wrong | Failure class | Rescued? | Rescue action | User sees |
+|---|---|---|---|---|---|
+| `check-agent-drift --agent` | unknown or non-onboarded agent id | validation error | yes | reject before comparison work | exit `2` |
+| drift aggregation | one source loads, another source fails | partial truth | yes | fail closed with category-specific error | explicit drift/load failure |
+| maintenance request parse | malformed TOML or invalid `requested_control_plane_actions` | validation error | yes | reject before refresh plan build | exit `2` |
+| maintenance request path | request artifact escapes maintenance root | ownership violation | yes | reject before artifact load | exit `2` |
+| refresh write plan | request implies runtime-owned mutation | scope violation | yes | reject before any writes | exit `2` |
+| refresh apply | one generated surface diverges mid-transaction | mutation error | yes | rollback staged writes | repo unchanged |
+| maintenance closeout | request linkage missing or hashes do not match | validation error | yes | reject closeout | exit `2` |
+| OpenCode proving run | stale claim cannot be reconciled to runtime/spec truth | needs-context | no | block closeout until maintainer decides source of truth | blocked docs update |
 
 ## Test Strategy
-### Codepath coverage
-| Codepath | What must be proven |
-|---|---|
-| Registry load | malformed or duplicate entries fail closed |
-| Registry parity | seeded registry matches current builtin enrollment before cutover |
-| Support-matrix cutover | registry-backed roots publish the same row set and staleness behavior as today |
-| Capability-matrix cutover | registry-backed backend enrollment preserves seeded-agent capability inventory |
-| Dry-run scaffold | generated outputs are deterministic and do not mutate runtime-owned files |
-| Overwrite safety | existing generated targets fail closed unless explicit update mode exists |
+### Test Diagram
+```text
+POST-ONBOARDING MAINTENANCE
+===========================
+[+] already-onboarded agent -> check-agent-drift
+    |
+    ├── [GAP -> validation] unknown agent fails closed
+    ├── [GAP -> aggregation] support publication drift is surfaced per agent
+    ├── [GAP -> aggregation] capability/runtime drift is surfaced per agent
+    └── [GAP -> aggregation] governance packet drift is surfaced per agent
 
-### Required test surfaces
-- keep `crates/xtask/tests/support_matrix_derivation.rs`
-- keep `crates/xtask/tests/support_matrix_consistency.rs`
-- keep `crates/xtask/tests/support_matrix_entrypoint.rs`
-- keep `crates/xtask/tests/support_matrix_staleness.rs`
-- keep `crates/xtask/tests/c8_spec_capability_matrix_paths.rs`
-- keep `crates/xtask/tests/c8_spec_capability_matrix_staleness.rs`
-- add registry loader and parity tests under `crates/xtask/tests/`
-- add dry-run scaffold golden tests under `crates/xtask/tests/`
-- add duplicate-id and pre-existing-target conflict tests
+[+] maintenance-request.toml -> refresh-agent --dry-run / --write
+    |
+    ├── [GAP -> validation] request outside maintenance root fails
+    ├── [GAP -> validation] runtime-owned actions are rejected
+    ├── [GAP -> integration] dry-run and write share the same plan
+    ├── [GAP -> integration] historical onboarding packet remains untouched
+    └── [GAP -> regression] identical replay is a no-op
 
-### Commands
-- `cargo test -p xtask`
+[+] maintenance-closeout.json -> close-agent-maintenance
+    |
+    ├── [GAP -> validation] request hash/linkage is required
+    ├── [GAP -> validation] resolved plus deferred/explicit-none truth is required
+    └── [GAP -> integration] maintenance packet docs refresh without touching onboarding packet docs
+
+OPENCODE PROVING RUN
+====================
+[+] stale `SEAM-2` capability claim -> maintenance request -> refresh -> closeout
+    |
+    ├── [GAP -> docs/validation] stale capability claim becomes explicit maintenance drift
+    └── [GAP -> regression] repair path is reproducible without conversation history
+```
+
+### Required Test Surfaces
+- Add `crates/xtask/tests/agent_maintenance_drift.rs`
+  - `check_agent_drift_reports_clean_agent`
+  - `check_agent_drift_rejects_unknown_agent`
+  - `check_agent_drift_reports_support_publication_mismatch`
+  - `check_agent_drift_reports_capability_truth_mismatch`
+  - `check_agent_drift_reports_governance_doc_mismatch`
+- Add `crates/xtask/tests/agent_maintenance_refresh.rs`
+  - `refresh_agent_dry_run_matches_write_plan`
+  - `refresh_agent_rejects_request_outside_maintenance_root`
+  - `refresh_agent_rejects_runtime_owned_actions`
+  - `refresh_agent_does_not_touch_onboarding_packet_root`
+  - `refresh_agent_replay_is_noop`
+- Add `crates/xtask/tests/agent_maintenance_closeout.rs`
+  - `close_agent_maintenance_requires_request_linkage`
+  - `close_agent_maintenance_requires_resolved_and_deferred_truth`
+  - `close_agent_maintenance_rejects_symlinked_output`
+  - `opencode_maintenance_proving_run_fixes_stale_capability_claim`
+
+### Verification Commands
+- `cargo run -p xtask -- check-agent-drift --agent opencode`
+- `cargo run -p xtask -- refresh-agent --request docs/project_management/next/opencode-maintenance/governance/maintenance-request.toml --dry-run`
+- `cargo run -p xtask -- refresh-agent --request docs/project_management/next/opencode-maintenance/governance/maintenance-request.toml --write`
+- `cargo run -p xtask -- close-agent-maintenance --request docs/project_management/next/opencode-maintenance/governance/maintenance-request.toml --closeout docs/project_management/next/opencode-maintenance/governance/maintenance-closeout.json`
 - `cargo run -p xtask -- support-matrix --check`
 - `cargo run -p xtask -- capability-matrix`
-- `cargo run -p xtask -- onboard-agent --dry-run --agent-id <approved-agent>`
+- `cargo test -p xtask`
 - `make preflight`
 
-## Failure Modes
-| Codepath | Failure | Guardrail |
+### Test Plan Artifact
+- `/Users/spensermcconnell/.gstack/projects/atomize-hq-unified-agent-api/spensermcconnell-feat-cli-agent-onboarding-factory-test-plan-20260421-233454.md`
+
+## Failure Modes Registry
+| Codepath | Failure mode | Test required? | Error handling required? | User sees | Logged? |
+|---|---|---|---|---|---|
+| drift detection | known drift exists but stays hidden in repo-wide generators only | yes | yes | false clean state | yes |
+| maintenance scope | maintenance path widens into new-agent onboarding or runtime mutation | yes | yes | unsafe write rejection | yes |
+| packet immutability | refresh mutates historical onboarding packets | yes | yes | validation failure | yes |
+| publication repair | agent-scoped repair misses global generated outputs | yes | yes | stale support/capability docs remain | yes |
+| governance truth | maintenance closeout claims clean state while deferrals still exist | yes | yes | closeout rejected | yes |
+| OpenCode proving run | stale capability claim remains unrepairable without archaeology | yes | yes | blocked proving run | yes |
+
+Critical gap rule:
+- if maintenance can mutate runtime-owned code or historical onboarding packet roots, M4 is not ready
+- if OpenCode cannot prove the repair lane on a real drift case, M4 is not ready
+
+## Security Review
+- maintenance request and closeout artifacts are new trust boundaries and must be path-jailed
+- `refresh-agent` must never infer permission to mutate runtime-owned code from a maintenance request
+- agent-scoped drift checks must not trust packet docs over runtime/spec truth
+- global generated outputs must refresh deterministically or fail closed
+- the maintenance lane should reuse the same symlink and rollback protections that M2/M3 added for onboarding
+
+## Performance Review
+- `check-agent-drift` should aggregate existing support/capability validators instead of re-implementing them
+- `refresh-agent` should batch planned writes into one transaction instead of re-running file updates per surface
+- maintenance should stay agent-scoped at the operator layer even when publication outputs are global files
+
+## Worktree Parallelization Strategy
+### Dependency Table
+| Step | Modules touched | Depends on |
 |---|---|---|
-| registry seed data | duplicate `agent_id` or overlapping roots | loader validation + conflict tests |
-| support-matrix cutover | enrolled root omitted and rows silently disappear | parity tests + deterministic row-set checks |
-| capability-matrix cutover | canonical target drift changes published inventory unexpectedly | parity tests + staleness tests |
-| dry-run scaffold | command touches runtime-owned wrapper/backend files | ownership rules + golden tests |
-| release wiring | new crate metadata bypasses the current crates.io release flow | release metadata checks + docs update rules |
-| handoff summary | dry-run emits scaffolding but not the next executable artifact | explicit command contract + golden tests |
+| W1. drift detection | `crates/xtask/src/main.rs`, maintenance drift module(s), `support_matrix/**`, `capability_matrix.rs`, tests | — |
+| W2. request + refresh | `crates/xtask/src/main.rs`, maintenance request/refresh module(s), `workspace_mutation.rs`, tests | W1 |
+| W3. closeout + reopen rules | `crates/xtask/src/main.rs`, maintenance closeout module(s), maintenance docs templates, tests | W2 |
+| W4. OpenCode maintenance pack scaffold | `docs/project_management/next/opencode-maintenance/**`, related governance docs | W1, W2 |
+| W5. OpenCode proving run execution | generated publication outputs, maintenance packet closeout docs | W3, W4 |
 
-Critical M1 gap rule:
-- M1 is not complete unless registry parity, support publication parity, capability publication parity, and dry-run ownership safety each have automated coverage plus fail-closed behavior.
+### Parallel Lanes
+Lane A: W1 -> W2 -> W3
+Core command lane. This stays sequential because all three steps touch `crates/xtask/src/main.rs` and the same maintenance command namespace.
 
-## Parallelization Strategy
-| Lane | Modules touched | Depends on |
-|---|---|---|
-| A. registry schema + loader | `crates/xtask/data/**`, new registry module(s), `crates/xtask/src/main.rs` | — |
-| B. support-matrix cutover | `crates/xtask/src/support_matrix*`, related tests | A |
-| C. capability-matrix cutover | `crates/xtask/src/capability_matrix.rs`, related tests | A |
-| D. dry-run onboarding command | new onboarding module, `crates/xtask/src/main.rs`, scaffold tests | A |
+Lane B: W4
+Docs scaffold lane. This can start after W2 freezes the request schema and maintenance pack root shape.
 
-Execution order:
-- launch Lane A first
-- once schema validation and seeded entries are pinned, launch B, C, and D in parallel
-- merge only after parity and `make preflight` pass
+Lane C: W5
+Final proving-run lane. This starts only after Lane A and Lane B merge, because it consumes the final command contract plus the concrete OpenCode maintenance packet.
 
-Conflict flags:
-- Lanes A and D both touch `crates/xtask/src/main.rs`
-- Lanes B and C both depend on the final registry shape
-- D should not guess artifact names or path prefixes before A lands
+### Execution Order
+1. Launch Lane A alone. W1 must land first because it defines the taxonomy and exit codes the rest of the milestone depends on.
+2. After W2 stabilizes the request schema, launch W3 and W4 in separate worktrees only if W4 stays docs-only.
+3. Merge W3 first so the final closeout contract is fixed.
+4. Run W5 last in the main integration worktree using the merged command surface and packet docs.
 
-## Follow-On After This Plan
-M1 is the current plan-of-record. The follow-on shape stays explicit so implementation does not get clumsy after v1:
+### Conflict Flags
+- W1, W2, and W3 all touch `crates/xtask/src/main.rs`. Do not parallelize those.
+- W2 and W3 both touch the maintenance module namespace and `crates/xtask/tests/**`. Split test files early if two worktrees are used after W2.
+- W4 must stay packet-doc scoped. If it starts changing command behavior, it no longer belongs in a parallel lane.
+- W5 is integration-only. If earlier lanes are still moving, W5 becomes churn and should wait.
 
-- `M2`: add real mutation mode and use the next approved real agent as the first full proving run
-- `M3`: formalize recommendation output as a stable approval artifact, either via `xtask recommend-agent` or a deterministic packet generator
-- `M4`: add maintenance ergonomics, drift detection, and repeatability hardening after real proving runs expose the clumsy parts
+## Completion Summary
+- Step 0: Scope challenge, separate maintenance lane confirmed. No onboarding scope creep, no new crate, no lifecycle umbrella.
+- Architecture review: one `xtask` maintenance namespace, shared generators and mutation helpers reused, global publications remain global.
+- Code quality review: explicit artifacts, explicit exit codes, deterministic dry-run/write parity, and reuse of existing validation/mutation primitives required.
+- Test review: diagram produced, 14 required coverage points identified across drift detection, refresh, closeout, and OpenCode proving-run regression coverage.
+- Performance review: aggregation reuse, batched writes, and agent-scoped operator semantics locked.
+- Not in scope: written.
+- What already exists: written.
+- Failure modes: two critical gates remain non-negotiable, runtime-owned mutation must stay impossible and OpenCode must prove the lane on a real drift case.
+- Parallelization: three lanes total, one narrow docs-only parallel window after W2, core command work remains sequential by design.
+
+## Deferred To TODOS.md
+- automate maintenance-request generation from upstream release scans only after two successful maintenance cycles prove the shape
+- add manifest-evidence refresh helpers only after the repo proves it can keep manifest evidence ownership separate from control-plane refresh
+- consider batched multi-agent maintenance scheduling only after per-agent maintenance is boring
+
+## GSTACK REVIEW REPORT
+
+| Review | Trigger | Why | Runs | Status | Findings |
+|--------|---------|-----|------|--------|----------|
+| CEO Review | `/plan-ceo-review` | Scope & strategy | 1 | issues_open via `/autoplan` | M4 must be a separate post-onboarding lifecycle, not `onboard-agent` update mode or lifecycle-command sprawl |
+| Codex Review | `codex exec` | Independent 2nd opinion | 1 | partial / timed out | outside-voice attempt timed out after repo sweep; usable signal still matched the local read that OpenCode is the right proving run because it has a real post-onboarding drift issue |
+| Eng Review | `/plan-eng-review` | Architecture & tests (required) | 1 | issues_open via `/autoplan` | drift aggregation, separate maintenance request/closeout artifacts, bounded refresh writes, and historical packet immutability must be pinned |
+| Design Review | `/plan-design-review` | UI/UX gaps | 0 | skipped | no UI scope |
+
+**CEO:** The strategic trap is obvious. If M4 widens `onboard-agent` or invents a universal lifecycle umbrella, the repo will spend a milestone rebuilding abstractions instead of fixing the first real maintenance seam.
+**ENG:** The engineering seam is also clear. The repo already has most of the primitives. M4 should compose them into agent-scoped drift detection, separate maintenance packets, and bounded refresh writes instead of duplicating generator logic.
+**CROSS-PHASE THEME:** OpenCode is the high-confidence proving run because it already produced a concrete post-onboarding drift issue in committed artifacts.
+**UNRESOLVED:** 0
+**VERDICT:** CEO + ENG CLEARED — M4 is concrete enough to implement.

@@ -14,16 +14,20 @@ Normative language: this contract uses RFC 2119 requirement keywords (`MUST`, `M
 - Cargo package: `unified-agent-api`
 - Rust library crate: `agent_api` (workspace member under `crates/agent_api`)
 - The crate MUST compile with default features (no backends) enabled.
-- The crate MUST NOT publicly re-export any `codex` or `claude_code` types in v1.
+- The crate MUST NOT publicly re-export types from backend wrapper crates (`codex`, `claude_code`, `gemini_cli`, or `opencode`) in v1.
 
 ## Feature flags (crate features; normative)
 
 - `codex`: enable Codex backend support (depends on `crates/codex`)
 - `claude_code`: enable Claude Code backend support (depends on `crates/claude_code`)
+- `gemini_cli`: enable Gemini CLI backend support (depends on `crates/gemini_cli`)
+- `opencode`: enable OpenCode backend support (depends on `crates/opencode`)
 
 Consumers must enable features using Cargo’s standard syntax, e.g.:
 - `cargo test -p unified-agent-api --features codex`
 - `cargo test -p unified-agent-api --features claude_code`
+- `cargo test -p unified-agent-api --features gemini_cli`
+- `cargo test -p unified-agent-api --features opencode`
 - `cargo test -p unified-agent-api --all-features`
 
 ## Terminology (v1, normative)
@@ -34,8 +38,8 @@ In this spec set, “serde-friendly types” is a public API hygiene constraint:
 
 - Public structs/enums MUST be composed of owned, ubiquitous std types and serde ecosystem types already present in the
   public surface (e.g., `String`, `Vec`, `Option`, `BTreeMap`, `PathBuf`, `Duration`, `ExitStatus`, `serde_json::Value`).
-- Public APIs MUST NOT expose wrapper-specific crate types (no `codex::*` / `claude_code::*`) and MUST NOT require
-  consumers to depend on those wrapper crates.
+- Public APIs MUST NOT expose wrapper-specific crate types (no `codex::*`, `claude_code::*`, `gemini_cli::*`, or
+  `opencode::*`) and MUST NOT require consumers to depend on those wrapper crates.
 - This is **not** a requirement that every public type implements `serde::Serialize` / `serde::Deserialize`.
   - When a stable serialized representation is required for cross-process or cross-language boundaries, the relevant
     schema spec MUST pin that representation explicitly.
@@ -271,7 +275,7 @@ For each emitted `AgentWrapperEvent`:
 ## Provided backends (feature-gated; v1, normative)
 
 When enabled, `agent_api` MUST provide built-in backends with stable paths and constructor/config
-types that use **only** std + [serde-friendly types](#serde-friendly-types) (no `codex::*` / `claude_code::*` in the public
+types that use **only** std + [serde-friendly types](#serde-friendly-types) (no backend wrapper crate types in the public
 API).
 
 ## Extensions (authoritative; v1)
@@ -305,11 +309,12 @@ pub mod backends {
         pub struct CodexBackendConfig {
             pub binary: Option<PathBuf>,
             pub codex_home: Option<PathBuf>,
+            pub model: Option<String>,
             pub default_timeout: Option<Duration>,
             pub default_working_dir: Option<PathBuf>,
             pub env: BTreeMap<String, String>,
-            pub allow_external_sandbox_exec: bool,
             pub allow_mcp_write: bool,
+            pub allow_external_sandbox_exec: bool,
         }
 
         pub struct CodexBackend { /* private */ }
@@ -342,8 +347,8 @@ pub mod backends {
             pub default_timeout: Option<Duration>,
             pub default_working_dir: Option<PathBuf>,
             pub env: BTreeMap<String, String>,
-            pub allow_external_sandbox_exec: bool,
             pub allow_mcp_write: bool,
+            pub allow_external_sandbox_exec: bool,
         }
 
         pub struct ClaudeCodeBackend { /* private */ }
@@ -354,6 +359,66 @@ pub mod backends {
 
         impl AgentWrapperBackend for ClaudeCodeBackend {
             fn kind(&self) -> AgentWrapperKind; // MUST be "claude_code"
+            fn capabilities(&self) -> super::super::AgentWrapperCapabilities;
+            fn run(&self, request: AgentWrapperRunRequest) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<AgentWrapperRunHandle, AgentWrapperError>> + Send + '_>>;
+        }
+    }
+
+    // Gemini CLI backend (`feature = "gemini_cli"`)
+    #[cfg(feature = "gemini_cli")]
+    pub mod gemini_cli {
+        use std::{collections::BTreeMap, path::PathBuf, time::Duration};
+
+        use super::super::{
+            AgentWrapperBackend, AgentWrapperError, AgentWrapperKind, AgentWrapperRunHandle,
+            AgentWrapperRunRequest,
+        };
+
+        #[derive(Clone, Debug, Default)]
+        pub struct GeminiCliBackendConfig {
+            pub binary: Option<PathBuf>,
+            pub default_timeout: Option<Duration>,
+            pub env: BTreeMap<String, String>,
+        }
+
+        pub struct GeminiCliBackend { /* private */ }
+
+        impl GeminiCliBackend {
+            pub fn new(config: GeminiCliBackendConfig) -> Self;
+        }
+
+        impl AgentWrapperBackend for GeminiCliBackend {
+            fn kind(&self) -> AgentWrapperKind; // MUST be "gemini_cli"
+            fn capabilities(&self) -> super::super::AgentWrapperCapabilities;
+            fn run(&self, request: AgentWrapperRunRequest) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<AgentWrapperRunHandle, AgentWrapperError>> + Send + '_>>;
+        }
+    }
+
+    // OpenCode backend (`feature = "opencode"`)
+    #[cfg(feature = "opencode")]
+    pub mod opencode {
+        use std::{collections::BTreeMap, path::PathBuf, time::Duration};
+
+        use super::super::{
+            AgentWrapperBackend, AgentWrapperError, AgentWrapperKind, AgentWrapperRunHandle,
+            AgentWrapperRunRequest,
+        };
+
+        #[derive(Clone, Debug, Default)]
+        pub struct OpencodeBackendConfig {
+            pub binary: Option<PathBuf>,
+            pub default_timeout: Option<Duration>,
+            pub env: BTreeMap<String, String>,
+        }
+
+        pub struct OpencodeBackend { /* private */ }
+
+        impl OpencodeBackend {
+            pub fn new(config: OpencodeBackendConfig) -> Self;
+        }
+
+        impl AgentWrapperBackend for OpencodeBackend {
+            fn kind(&self) -> AgentWrapperKind; // MUST be "opencode"
             fn capabilities(&self) -> super::super::AgentWrapperCapabilities;
             fn run(&self, request: AgentWrapperRunRequest) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<AgentWrapperRunHandle, AgentWrapperError>> + Send + '_>>;
         }

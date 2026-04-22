@@ -52,10 +52,12 @@ open_remediations: []
     lifecycle maps to `Status`, parse failures surface as safe `Error` events, and completion data
     stays `None`
   - capability advertisement is intentionally conservative and now matches the landed backend
-    contract and generated capability inventory: `agent_api.run`, `agent_api.events`,
-    `agent_api.events.live`, `agent_api.config.model.v1`, `agent_api.session.resume.v1`, and
-    `agent_api.session.fork.v1` are the claimed OpenCode v1 capability ids under the current
-    runtime evidence
+    contract and generated capability inventory:
+    <!-- xtask-governance-check:opencode-capabilities:start -->
+    `agent_api.run`, `agent_api.events`, `agent_api.events.live`,
+    `agent_api.config.model.v1`, `agent_api.session.resume.v1`, `agent_api.session.fork.v1`
+    <!-- xtask-governance-check:opencode-capabilities:end -->
+    are the claimed OpenCode v1 capability ids under the current runtime evidence
   - deterministic fake-binary validation, timeout redaction, and missing-binary redaction are now
     the default backend proof path; live-provider smoke is still basis-lock evidence only
 - **Planned-vs-landed delta**:

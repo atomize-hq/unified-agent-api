@@ -55,8 +55,12 @@ open_remediations: []
     layers: manifest support, backend support, UAA unified support, and passthrough visibility
     remain distinct and reviewable
   - the support publication artifacts now show OpenCode as manifest-supported only where committed
-    root evidence justifies it, while backend support and UAA support remain `unsupported` under
-    the current backend evidence and pointer posture
+    root evidence justifies it, while
+    <!-- xtask-governance-check:opencode-support:start -->
+    backend_support = unsupported
+    uaa_support = unsupported
+    <!-- xtask-governance-check:opencode-support:end -->
+    under the current backend evidence and pointer posture
   - the capability inventory now exposes OpenCode as backend-specific evidence only; it documents
     a conservative capability posture and explicitly does not act as support or promotion truth
   - deterministic proof remains the default completion path for publication follow-through:

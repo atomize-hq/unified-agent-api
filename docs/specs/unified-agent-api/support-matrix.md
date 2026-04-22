@@ -240,6 +240,12 @@ Do not edit this section by hand.
 | `codex` | `0.91.0` | `x86_64-unknown-linux-musl` | `unsupported` | `unsupported` | `unsupported` | `none` | backend report includes intentionally unsupported surface outside unified support; backend report includes backend-only surface outside unified support |
 | `codex` | `0.61.0` | `x86_64-unknown-linux-musl` | `supported` | `partial` | `partial` | `latest_supported` | backend report includes intentionally unsupported surface outside unified support; backend report includes backend-only surface outside unified support |
 
+### `gemini_cli`
+
+| agent | version | target | manifest_support | backend_support | uaa_support | pointer_promotion | evidence_notes |
+|---|---|---|---|---|---|---|---|
+| `gemini_cli` | `0.38.2` | `darwin-arm64` | `unsupported` | `unsupported` | `unsupported` | `none` | — |
+
 ### `opencode`
 
 | agent | version | target | manifest_support | backend_support | uaa_support | pointer_promotion | evidence_notes |

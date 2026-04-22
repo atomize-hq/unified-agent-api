@@ -8,11 +8,11 @@ use std::{
 use semver::Version;
 use serde::Deserialize;
 
+use crate::agent_registry::AgentRegistry;
 use crate::root_intake_layout::RootIntakeLayout;
 
 use super::{
     BackendSupportState, ManifestSupportState, PointerPromotionState, SupportRow, UaaSupportState,
-    CURRENT_AGENT_ROOTS,
 };
 
 #[derive(Debug, Clone)]
@@ -117,13 +117,19 @@ pub(super) struct PointerSet {
 }
 
 pub fn derive_rows(workspace_root: &Path) -> Result<Vec<SupportRow>, String> {
-    let roots = CURRENT_AGENT_ROOTS
-        .iter()
-        .map(|(agent, rel_root)| AgentRoot {
-            agent: (*agent).to_string(),
-            root: workspace_root.join(rel_root),
-        })
-        .collect::<Vec<_>>();
+    let roots = enrolled_agent_roots(workspace_root)?;
+    derive_rows_for_roots(&roots)
+}
+
+pub fn derive_rows_for_agent_root(
+    workspace_root: &Path,
+    agent: &str,
+    manifest_root: &str,
+) -> Result<Vec<SupportRow>, String> {
+    let roots = [AgentRoot {
+        agent: agent.to_string(),
+        root: workspace_root.join(manifest_root),
+    }];
     derive_rows_for_roots(&roots)
 }
 
@@ -148,6 +154,19 @@ fn derive_rows_for_roots(roots: &[AgentRoot]) -> Result<Vec<SupportRow>, String>
         .map(load_agent_root)
         .collect::<Result<Vec<_>, _>>()?;
     derive_rows_for_loaded_roots(&loaded_roots)
+}
+
+pub(super) fn enrolled_agent_roots(workspace_root: &Path) -> Result<Vec<AgentRoot>, String> {
+    let registry =
+        AgentRegistry::load(workspace_root).map_err(|err| format!("load agent registry: {err}"))?;
+
+    Ok(registry
+        .support_matrix_entries()
+        .map(|entry| AgentRoot {
+            agent: entry.agent_id.clone(),
+            root: workspace_root.join(&entry.manifest_root),
+        })
+        .collect())
 }
 
 pub(super) fn derive_rows_for_loaded_roots(
