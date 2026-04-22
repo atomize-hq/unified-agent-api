@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "semantic_version": "0.38.2",
+  "status": "snapshotted",
+  "updated_at": "2026-04-21T11:23:09Z",
+  "notes": "Bootstrap Gemini CLI manifest root with one observed darwin-arm64 version and no committed support reports yet.",
+  "artifacts": {
+    "snapshots_dir": "snapshots/0.38.2",
+    "union_complete": true
+  }
+}

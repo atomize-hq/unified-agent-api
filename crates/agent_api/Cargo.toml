@@ -17,6 +17,7 @@ name = "agent_api"
 default = []
 codex = ["dep:codex", "dep:tokio", "dep:futures-util"]
 claude_code = ["dep:claude_code", "dep:tokio", "dep:futures-util"]
+gemini_cli = ["dep:gemini_cli", "dep:tokio", "dep:futures-util"]
 opencode = ["dep:opencode", "dep:tokio", "dep:futures-util"]
 
 [dependencies]
@@ -26,9 +27,10 @@ serde_json = { workspace = true }
 thiserror = { workspace = true }
 url = "2"
 
-codex = { package = "unified-agent-api-codex", path = "../codex", version = "=0.2.3", optional = true }
-claude_code = { package = "unified-agent-api-claude-code", path = "../claude_code", version = "=0.2.3", optional = true }
-opencode = { package = "unified-agent-api-opencode", path = "../opencode", version = "=0.2.3", optional = true }
+codex = { package = "unified-agent-api-codex", path = "../codex", version = "=0.3.0", optional = true }
+claude_code = { package = "unified-agent-api-claude-code", path = "../claude_code", version = "=0.3.0", optional = true }
+gemini_cli = { package = "unified-agent-api-gemini-cli", path = "../gemini_cli", version = "=0.3.0", optional = true }
+opencode = { package = "unified-agent-api-opencode", path = "../opencode", version = "=0.3.0", optional = true }
 tokio = { workspace = true, optional = true }
 
 [dev-dependencies]

@@ -8,9 +8,9 @@ use super::{
 };
 
 #[derive(Debug, Clone)]
-pub(super) struct PublicationBundle {
-    pub(super) json: String,
-    pub(super) markdown: String,
+pub struct PublicationBundle {
+    pub json: String,
+    pub markdown: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -19,7 +19,7 @@ pub struct SupportMatrixArtifact {
     pub rows: Vec<SupportRow>,
 }
 
-pub(super) fn render_publication_bundle(rows: &[SupportRow]) -> Result<PublicationBundle, String> {
+pub fn render_publication_bundle(rows: &[SupportRow]) -> Result<PublicationBundle, String> {
     let json = serde_json::to_string_pretty(&SupportMatrixArtifact {
         schema_version: 1,
         rows: rows.to_vec(),
@@ -30,6 +30,17 @@ pub(super) fn render_publication_bundle(rows: &[SupportRow]) -> Result<Publicati
     Ok(PublicationBundle {
         json: format!("{json}\n"),
         markdown,
+    })
+}
+
+pub fn render_publication_artifacts(
+    existing_markdown: &str,
+    rows: &[SupportRow],
+) -> Result<PublicationBundle, String> {
+    let bundle = render_publication_bundle(rows)?;
+    Ok(PublicationBundle {
+        json: bundle.json,
+        markdown: splice_markdown_projection(existing_markdown, &bundle.markdown),
     })
 }
 
@@ -70,7 +81,7 @@ fn render_markdown_projection(rows: &[SupportRow]) -> String {
     out
 }
 
-pub(super) fn write_publication_artifacts(
+pub fn write_publication_artifacts(
     workspace_root: &Path,
     bundle: &PublicationBundle,
 ) -> Result<(), String> {
@@ -85,7 +96,7 @@ pub(super) fn write_publication_artifacts(
     Ok(())
 }
 
-pub(super) fn validate_publication_artifacts(
+pub fn validate_publication_artifacts(
     workspace_root: &Path,
     bundle: &PublicationBundle,
 ) -> Result<(), String> {

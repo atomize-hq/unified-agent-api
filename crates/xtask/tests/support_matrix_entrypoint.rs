@@ -5,6 +5,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde_json::{json, Value};
 
+const SEEDED_REGISTRY: &str = include_str!("../data/agent_registry.toml");
+
 fn make_temp_dir(prefix: &str) -> PathBuf {
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -28,6 +30,13 @@ fn write_text(path: &Path, contents: &str) {
 fn write_json(path: &Path, value: &Value) {
     let text = serde_json::to_string_pretty(value).expect("serialize json");
     write_text(path, &format!("{text}\n"));
+}
+
+fn write_seeded_agent_registry(workspace_root: &Path) {
+    write_text(
+        &workspace_root.join("crates/xtask/data/agent_registry.toml"),
+        SEEDED_REGISTRY,
+    );
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -111,6 +120,7 @@ fn support_matrix_entrypoint_publishes_json_and_hybrid_markdown() {
         &fixture_root.join("Cargo.toml"),
         "[workspace]\nmembers = []\n",
     );
+    write_seeded_agent_registry(&fixture_root);
     write_text(
         &fixture_root.join("docs/specs/unified-agent-api/support-matrix.md"),
         "# Support Matrix Spec — Unified Agent API\n\n## Purpose\nManual contract text.\n\n## Change control\nManual footer.\n",
@@ -174,6 +184,17 @@ fn support_matrix_entrypoint_publishes_json_and_hybrid_markdown() {
         "3.0.0",
         &["linux-x64"],
         &[("3.0.0", &["linux-x64"])],
+        &[],
+        &[],
+        &[],
+    );
+
+    materialize_root(
+        &fixture_root.join("cli_manifests/gemini_cli"),
+        &["darwin-arm64"],
+        "0.38.2",
+        &["darwin-arm64"],
+        &[("0.38.2", &[])],
         &[],
         &[],
         &[],
@@ -251,7 +272,7 @@ fn support_matrix_entrypoint_publishes_json_and_hybrid_markdown() {
             .get("rows")
             .and_then(|value| value.as_array())
             .map(|rows| rows.len()),
-        Some(3)
+        Some(4)
     );
 
     assert!(markdown_text.contains("## Purpose\nManual contract text."));
@@ -260,6 +281,7 @@ fn support_matrix_entrypoint_publishes_json_and_hybrid_markdown() {
     assert!(markdown_text.contains("<!-- support-matrix-published:start -->"));
     assert!(markdown_text.contains("| `codex` | `1.0.0` | `linux-x64` |"));
     assert!(markdown_text.contains("| `claude_code` | `2.0.0` | `linux-x64` |"));
+    assert!(markdown_text.contains("| `gemini_cli` | `0.38.2` | `darwin-arm64` |"));
     assert!(markdown_text.contains("| `opencode` | `3.0.0` | `linux-x64` |"));
 
     let json_before_check = fs::read_to_string(&json_path).expect("read json before check");

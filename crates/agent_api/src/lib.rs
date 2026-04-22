@@ -18,13 +18,28 @@ use crate::mcp::{
     CAPABILITY_MCP_GET_V1, CAPABILITY_MCP_LIST_V1, CAPABILITY_MCP_REMOVE_V1,
 };
 
-#[cfg(any(feature = "codex", feature = "claude_code", feature = "opencode"))]
+#[cfg(any(
+    feature = "codex",
+    feature = "claude_code",
+    feature = "gemini_cli",
+    feature = "opencode"
+))]
 mod bounds;
 
-#[cfg(any(feature = "codex", feature = "claude_code", feature = "opencode"))]
+#[cfg(any(
+    feature = "codex",
+    feature = "claude_code",
+    feature = "gemini_cli",
+    feature = "opencode"
+))]
 mod run_handle_gate;
 
-#[cfg(any(feature = "codex", feature = "claude_code", feature = "opencode"))]
+#[cfg(any(
+    feature = "codex",
+    feature = "claude_code",
+    feature = "gemini_cli",
+    feature = "opencode"
+))]
 mod backend_harness;
 
 pub mod backends;
@@ -32,7 +47,13 @@ pub mod mcp;
 
 const CAPABILITY_CONTROL_CANCEL_V1: &str = "agent_api.control.cancel.v1";
 #[allow(dead_code)]
-#[cfg(any(feature = "codex", feature = "claude_code", feature = "opencode", test))]
+#[cfg(any(
+    feature = "codex",
+    feature = "claude_code",
+    feature = "gemini_cli",
+    feature = "opencode",
+    test
+))]
 pub(crate) const EXT_AGENT_API_CONFIG_MODEL_V1: &str = "agent_api.config.model.v1";
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]

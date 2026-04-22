@@ -19,6 +19,12 @@ It is designed to keep the system **orthogonal**:
 - Keep the universal event envelope small and stable while allowing backend-specific expansion.
 - Prevent cross-document contradictions by having exactly one owner doc per contract surface.
 
+## Normative references
+
+- `docs/specs/agent-registry-contract.md`
+- `docs/specs/unified-agent-api/capabilities-schema-spec.md`
+- `docs/specs/unified-agent-api/extensions-spec.md`
+
 ## Non-Goals
 
 - Forcing semantic parity across all agents (capabilities differ; the API must represent that).

@@ -8,6 +8,8 @@ use xtask::support_matrix::{
     ManifestSupportState, PointerPromotionState, SupportRow, UaaSupportState,
 };
 
+const SEEDED_REGISTRY: &str = include_str!("../data/agent_registry.toml");
+
 fn make_temp_dir(prefix: &str) -> PathBuf {
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -31,6 +33,13 @@ fn write_text(path: &Path, contents: &str) {
 fn write_json(path: &Path, value: &Value) {
     let text = serde_json::to_string_pretty(value).expect("serialize json");
     write_text(path, &format!("{text}\n"));
+}
+
+fn write_seeded_agent_registry(workspace_root: &Path) {
+    write_text(
+        &workspace_root.join("crates/xtask/data/agent_registry.toml"),
+        SEEDED_REGISTRY,
+    );
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -116,9 +125,23 @@ fn find_row<'a>(
         .unwrap_or_else(|| panic!("missing row {agent} {version} {target}"))
 }
 
+fn materialize_gemini_root(workspace: &Path) {
+    materialize_root(
+        &workspace.join("cli_manifests/gemini_cli"),
+        &["darwin-arm64"],
+        "0.38.2",
+        &["darwin-arm64"],
+        &[("0.38.2", &[])],
+        &[],
+        &[],
+        &[],
+    );
+}
+
 #[test]
 fn derives_target_scoped_rows_with_sparse_caveats_and_pointer_state() {
     let workspace = make_temp_dir("support-matrix-derivation");
+    write_seeded_agent_registry(&workspace);
 
     materialize_root(
         &workspace.join("cli_manifests/codex"),
@@ -217,13 +240,15 @@ fn derives_target_scoped_rows_with_sparse_caveats_and_pointer_state() {
         &[],
     );
 
+    materialize_gemini_root(&workspace);
+
     let rows = derive_rows(&workspace).expect("derive rows");
     validate_publication_consistency(&workspace, &rows)
         .expect("derived rows should satisfy the shared consistency helper");
     assert_eq!(
         rows.len(),
-        6,
-        "expected two codex versions x two targets + one claude row + one opencode row"
+        7,
+        "expected two codex versions x two targets + one claude row + one opencode row + one gemini row"
     );
 
     let claude_row = find_row(&rows, "claude_code", "2.0.0", "linux-x64");
@@ -309,12 +334,23 @@ fn derives_target_scoped_rows_with_sparse_caveats_and_pointer_state() {
     assert_eq!(opencode_row.pointer_promotion, PointerPromotionState::None);
     assert!(opencode_row.evidence_notes.is_empty());
 
+    let gemini_row = find_row(&rows, "gemini_cli", "0.38.2", "darwin-arm64");
+    assert_eq!(
+        gemini_row.manifest_support,
+        ManifestSupportState::Unsupported
+    );
+    assert_eq!(gemini_row.backend_support, BackendSupportState::Unsupported);
+    assert_eq!(gemini_row.uaa_support, UaaSupportState::Unsupported);
+    assert_eq!(gemini_row.pointer_promotion, PointerPromotionState::None);
+    assert!(gemini_row.evidence_notes.is_empty());
+
     assert_eq!(rows[0].agent, "claude_code");
     assert_eq!(rows[1].agent, "codex");
     assert_eq!(rows[1].target, "linux-x64");
     assert_eq!(rows[1].version, "1.0.0");
     assert_eq!(rows[2].version, "0.9.0");
-    assert_eq!(rows[5].agent, "opencode");
+    assert_eq!(rows[5].agent, "gemini_cli");
+    assert_eq!(rows[6].agent, "opencode");
 }
 
 #[test]

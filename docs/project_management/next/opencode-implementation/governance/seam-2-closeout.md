@@ -51,15 +51,19 @@ open_remediations: []
   - public OpenCode backend events remain bounded and redacted: text maps to `TextOutput`,
     lifecycle maps to `Status`, parse failures surface as safe `Error` events, and completion data
     stays `None`
-  - capability advertisement is intentionally conservative: `agent_api.run`,
-    `agent_api.events`, and `agent_api.events.live` are the only claimed OpenCode v1 capability ids
-    under the current runtime evidence
+  - capability advertisement is intentionally conservative and now matches the landed backend
+    contract and generated capability inventory:
+    <!-- xtask-governance-check:opencode-capabilities:start -->
+    `agent_api.run`, `agent_api.events`, `agent_api.events.live`,
+    `agent_api.config.model.v1`, `agent_api.session.resume.v1`, `agent_api.session.fork.v1`
+    <!-- xtask-governance-check:opencode-capabilities:end -->
+    are the claimed OpenCode v1 capability ids under the current runtime evidence
   - deterministic fake-binary validation, timeout redaction, and missing-binary redaction are now
     the default backend proof path; live-provider smoke is still basis-lock evidence only
 - **Planned-vs-landed delta**:
-  - S2 landed a narrower capability allowlist than the backend contract's candidate control set
-    because the current wrapper/runtime evidence does not yet justify model or session-specific
-    runtime-failure translation
+  - S2 landed the contract-defined capability set for model selection and session reuse/fork while
+    keeping unrelated universal surfaces, including add-dirs, cancel, handle, and final-text
+    claims, outside the OpenCode v1 advertisement boundary
   - validation and redaction hardening landed as backend test coverage and harness redaction
     behavior rather than as new canonical spec mutations
 - **Downstream stale triggers raised**:

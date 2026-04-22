@@ -5,6 +5,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde_json::{json, Value};
 
+const SEEDED_REGISTRY: &str = include_str!("../data/agent_registry.toml");
+
 const OPENCODE_REQUIRED_TARGET: &str = "linux-x64";
 const OPENCODE_TARGETS: [&str; 3] = ["linux-x64", "darwin-arm64", "win32-x64"];
 
@@ -31,6 +33,13 @@ fn write_text(path: &Path, contents: &str) {
 fn write_json(path: &Path, value: &Value) {
     let text = serde_json::to_string_pretty(value).expect("serialize json");
     write_text(path, &format!("{text}\n"));
+}
+
+fn write_seeded_agent_registry(workspace_root: &Path) {
+    write_text(
+        &workspace_root.join("crates/xtask/data/agent_registry.toml"),
+        SEEDED_REGISTRY,
+    );
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -163,6 +172,19 @@ fn materialize_minimal_valid_opencode_root(fixture_root: &Path) {
     );
 }
 
+fn materialize_minimal_gemini_root(fixture_root: &Path) {
+    materialize_root(
+        &fixture_root.join("cli_manifests/gemini_cli"),
+        &["darwin-arm64"],
+        "0.38.2",
+        &["darwin-arm64"],
+        &[("0.38.2", &[])],
+        &[],
+        &[],
+        &[],
+    );
+}
+
 #[test]
 fn support_matrix_check_rejects_stale_generated_markdown_block() {
     let xtask_bin = PathBuf::from(env!("CARGO_BIN_EXE_xtask"));
@@ -172,6 +194,7 @@ fn support_matrix_check_rejects_stale_generated_markdown_block() {
         &fixture_root.join("Cargo.toml"),
         "[workspace]\nmembers = []\n",
     );
+    write_seeded_agent_registry(&fixture_root);
     write_text(
         &fixture_root.join("docs/specs/unified-agent-api/support-matrix.md"),
         "# Support Matrix Spec — Unified Agent API\n\n## Purpose\nManual contract text.\n\n## Change control\nManual footer.\n",
@@ -227,6 +250,7 @@ fn support_matrix_check_rejects_stale_generated_markdown_block() {
         )],
     );
     materialize_minimal_valid_opencode_root(&fixture_root);
+    materialize_minimal_gemini_root(&fixture_root);
 
     let generate = Command::new(&xtask_bin)
         .arg("support-matrix")
@@ -271,6 +295,7 @@ fn support_matrix_check_rejects_stale_generated_json_row_order() {
         &fixture_root.join("Cargo.toml"),
         "[workspace]\nmembers = []\n",
     );
+    write_seeded_agent_registry(&fixture_root);
     write_text(
         &fixture_root.join("docs/specs/unified-agent-api/support-matrix.md"),
         "# Support Matrix Spec — Unified Agent API\n\n## Purpose\nManual contract text.\n\n## Change control\nManual footer.\n",
@@ -326,6 +351,7 @@ fn support_matrix_check_rejects_stale_generated_json_row_order() {
         )],
     );
     materialize_minimal_valid_opencode_root(&fixture_root);
+    materialize_minimal_gemini_root(&fixture_root);
 
     let generate = Command::new(&xtask_bin)
         .arg("support-matrix")

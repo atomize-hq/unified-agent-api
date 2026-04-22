@@ -178,6 +178,7 @@ flightcheck:
 	$(MAKE) check
 	$(MAKE) test
 	$(MAKE) support-matrix-check
+	$(MAKE) publish-guards
 	$(MAKE) loc-check
 	$(MAKE) security
 	$(MAKE) unsafe-report
@@ -185,6 +186,11 @@ flightcheck:
 .PHONY: support-matrix-check
 support-matrix-check:
 	cargo run -p xtask -- support-matrix --check
+
+.PHONY: publish-guards
+publish-guards:
+	python3 scripts/validate_publish_versions.py
+	python3 scripts/check_publish_readiness.py
 
 .PHONY: preflight hygiene
 hygiene:

@@ -1,11 +1,11 @@
 #![forbid(unsafe_code)]
 
 mod agent_api_backend_type_leak_guard;
-mod capability_matrix;
 mod capability_matrix_audit;
 mod claude_snapshot;
 mod claude_union;
 mod claude_wrapper_coverage;
+mod close_proving_run;
 mod codex_report;
 mod codex_retain;
 mod codex_snapshot;
@@ -17,6 +17,12 @@ mod parity_triad_scaffold;
 mod version_bump;
 mod wrapper_coverage_shared;
 
+use xtask::agent_maintenance::{
+    closeout as agent_maintenance_closeout, drift as agent_maintenance_drift,
+    refresh as agent_maintenance_refresh,
+};
+use xtask::capability_matrix;
+pub use xtask::onboard_agent;
 pub use xtask::support_matrix;
 
 use clap::{Parser, Subcommand};
@@ -38,6 +44,8 @@ enum Command {
     CodexSnapshot(codex_snapshot::Args),
     /// Generate a Claude Code CLI snapshot manifest under `cli_manifests/claude_code/`.
     ClaudeSnapshot(claude_snapshot::Args),
+    /// Validate a proving-run closeout artifact and refresh the onboarding packet docs.
+    CloseProvingRun(close_proving_run::Args),
     /// Merge per-target snapshots into a union snapshot under `cli_manifests/codex/`.
     CodexUnion(codex_union::Args),
     /// Merge per-target snapshots into a union snapshot under `cli_manifests/claude_code/`.
@@ -56,10 +64,18 @@ enum Command {
     CodexValidate(codex_validate::Args),
     /// Generate a triad scaffold directory from a parity coverage report.
     ParityTriadScaffold(parity_triad_scaffold::Args),
+    /// Preview the next control-plane onboarding packet without writing files.
+    OnboardAgent(Box<onboard_agent::Args>),
     /// Generate a universal agent capability matrix markdown.
     CapabilityMatrix(capability_matrix::Args),
     /// Audit the capability matrix for orthogonality invariants.
     CapabilityMatrixAudit(capability_matrix_audit::Args),
+    /// Detect maintenance-relevant drift for an already-onboarded agent.
+    CheckAgentDrift(agent_maintenance_drift::Args),
+    /// Refresh maintenance packet docs and generated publication surfaces from a maintenance request.
+    RefreshAgent(agent_maintenance_refresh::Args),
+    /// Validate and close an agent maintenance run.
+    CloseAgentMaintenance(agent_maintenance_closeout::Args),
     /// Generate support publication JSON and Markdown outputs from committed manifest evidence.
     SupportMatrix(support_matrix::Args),
     /// Bump the workspace release version and exact inter-crate publish pins.
@@ -91,6 +107,13 @@ fn main() {
             Err(err) => {
                 eprintln!("{err}");
                 1
+            }
+        },
+        Command::CloseProvingRun(args) => match close_proving_run::run(args) {
+            Ok(()) => 0,
+            Err(err) => {
+                eprintln!("{err}");
+                err.exit_code()
             }
         },
         Command::CodexUnion(args) => match codex_union::run(args) {
@@ -150,6 +173,13 @@ fn main() {
                 1
             }
         },
+        Command::OnboardAgent(args) => match onboard_agent::run(*args) {
+            Ok(()) => 0,
+            Err(err) => {
+                eprintln!("{err}");
+                err.exit_code()
+            }
+        },
         Command::CapabilityMatrix(args) => match capability_matrix::run(args) {
             Ok(()) => 0,
             Err(err) => {
@@ -162,6 +192,28 @@ fn main() {
             Err(err) => {
                 eprintln!("{err}");
                 1
+            }
+        },
+        Command::CheckAgentDrift(args) => match agent_maintenance_drift::run(args) {
+            Ok(agent_maintenance_drift::DriftCheckOutcome::Clean(_)) => 0,
+            Ok(agent_maintenance_drift::DriftCheckOutcome::DriftDetected(_)) => 2,
+            Err(err) => {
+                eprintln!("{err}");
+                err.exit_code()
+            }
+        },
+        Command::RefreshAgent(args) => match agent_maintenance_refresh::run(args) {
+            Ok(()) => 0,
+            Err(err) => {
+                eprintln!("{err}");
+                err.exit_code()
+            }
+        },
+        Command::CloseAgentMaintenance(args) => match agent_maintenance_closeout::run(args) {
+            Ok(()) => 0,
+            Err(err) => {
+                eprintln!("{err}");
+                err.exit_code()
             }
         },
         Command::SupportMatrix(args) => match support_matrix::run(args) {
