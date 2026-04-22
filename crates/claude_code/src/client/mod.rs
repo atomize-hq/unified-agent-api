@@ -539,6 +539,12 @@ impl Stream for ClaudeStreamJsonEventChannelStream {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+enum ChildExit {
+    Exited(std::process::ExitStatus),
+    TimedOut,
+}
+
 async fn mirror_child_stream_to_parent_stderr<R>(mut reader: R) -> Result<(), std::io::Error>
 where
     R: AsyncRead + Unpin,
@@ -680,7 +686,7 @@ async fn run_print_stream_json_child(
 
     // `start_kill` may leave a zombie until `wait()` reaps the process (Tokio docs). For Agent API
     // DR-0012 / CA-C02 invariants, completion must not resolve before backend process exit.
-    if timed_out || cancelled || io_error.is_some() {
+    if cancelled || io_error.is_some() {
         let _ = child.start_kill();
     }
 
@@ -690,40 +696,18 @@ async fn run_print_stream_json_child(
             Err(err)
         }
         None if cancelled => child.wait().await.map_err(ClaudeCodeError::Wait),
-        None if timed_out => {
-            let timeout = timeout.expect("timed_out implies timeout");
-            match child.wait().await.map_err(ClaudeCodeError::Wait) {
-                Ok(_status) => Err(ClaudeCodeError::Timeout { timeout }),
-                Err(err) => Err(err),
-            }
-        }
-        None => {
-            if let Some(deadline) = deadline {
-                let remaining = deadline.saturating_duration_since(time::Instant::now());
-                if remaining.is_zero() {
-                    let timeout = timeout.expect("deadline implies timeout");
-                    let _ = child.start_kill();
-                    match child.wait().await.map_err(ClaudeCodeError::Wait) {
-                        Ok(_status) => Err(ClaudeCodeError::Timeout { timeout }),
-                        Err(err) => Err(err),
-                    }
-                } else {
-                    match time::timeout(remaining, child.wait()).await {
-                        Ok(res) => res.map_err(ClaudeCodeError::Wait),
-                        Err(_) => {
-                            let timeout = timeout.expect("deadline implies timeout");
-                            let _ = child.start_kill();
-                            match child.wait().await.map_err(ClaudeCodeError::Wait) {
-                                Ok(_status) => Err(ClaudeCodeError::Timeout { timeout }),
-                                Err(err) => Err(err),
-                            }
-                        }
-                    }
-                }
-            } else {
-                child.wait().await.map_err(ClaudeCodeError::Wait)
-            }
-        }
+        None if timed_out => match wait_for_child_exit(&mut child, timeout, deadline).await? {
+            ChildExit::Exited(status) => Ok(status),
+            ChildExit::TimedOut => Err(ClaudeCodeError::Timeout {
+                timeout: timeout.expect("timed_out implies timeout"),
+            }),
+        },
+        None => match wait_for_child_exit(&mut child, timeout, deadline).await? {
+            ChildExit::Exited(status) => Ok(status),
+            ChildExit::TimedOut => Err(ClaudeCodeError::Timeout {
+                timeout: timeout.expect("deadline implies timeout"),
+            }),
+        },
     };
 
     if let Some(task) = stderr_task {
@@ -745,6 +729,51 @@ async fn run_print_stream_json_child(
     status
 }
 
+async fn wait_for_child_exit(
+    child: &mut tokio::process::Child,
+    timeout: Option<Duration>,
+    deadline: Option<time::Instant>,
+) -> Result<ChildExit, ClaudeCodeError> {
+    match deadline {
+        None => child
+            .wait()
+            .await
+            .map(ChildExit::Exited)
+            .map_err(ClaudeCodeError::Wait),
+        Some(deadline) => {
+            let remaining = deadline.saturating_duration_since(time::Instant::now());
+            if remaining.is_zero() {
+                match child.try_wait().map_err(ClaudeCodeError::Wait)? {
+                    Some(status) => Ok(ChildExit::Exited(status)),
+                    None => {
+                        timeout.expect("deadline implies timeout");
+                        let _ = child.start_kill();
+                        match child.wait().await.map_err(ClaudeCodeError::Wait) {
+                            Ok(_status) => Ok(ChildExit::TimedOut),
+                            Err(err) => Err(err),
+                        }
+                    }
+                }
+            } else {
+                match time::timeout(remaining, child.wait()).await {
+                    Ok(res) => res.map(ChildExit::Exited).map_err(ClaudeCodeError::Wait),
+                    Err(_) => match child.try_wait().map_err(ClaudeCodeError::Wait)? {
+                        Some(status) => Ok(ChildExit::Exited(status)),
+                        None => {
+                            timeout.expect("deadline implies timeout");
+                            let _ = child.start_kill();
+                            match child.wait().await.map_err(ClaudeCodeError::Wait) {
+                                Ok(_status) => Ok(ChildExit::TimedOut),
+                                Err(err) => Err(err),
+                            }
+                        }
+                    },
+                }
+            }
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct ClaudePrintResult {
     pub output: CommandOutput,
@@ -755,4 +784,37 @@ pub struct ClaudePrintResult {
 pub enum ClaudeParsedOutput {
     Json(serde_json::Value),
     StreamJson(Vec<StreamJsonLineOutcome>),
+}
+
+#[cfg(test)]
+mod tests {
+    use std::process::Stdio;
+    use std::time::Duration;
+
+    use super::{wait_for_child_exit, ChildExit};
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn wait_for_child_exit_returns_status_when_deadline_has_elapsed() {
+        let mut child = tokio::process::Command::new("sh")
+            .args(["-c", "exit 0"])
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .expect("spawn child");
+        tokio::time::sleep(Duration::from_millis(50)).await;
+
+        let outcome = wait_for_child_exit(
+            &mut child,
+            Some(Duration::from_millis(1)),
+            Some(tokio::time::Instant::now()),
+        )
+        .await
+        .expect("wait helper succeeds");
+
+        match outcome {
+            ChildExit::Exited(status) => assert!(status.success()),
+            ChildExit::TimedOut => panic!("expected exited status, got timeout"),
+        }
+    }
 }

@@ -170,12 +170,17 @@ async fn run_opencode_child(
     let mut saw_finish = false;
     let mut termination_requested = false;
     let deadline = timeout.map(|value| Instant::now() + value);
+    let mut exit_status = None;
 
     loop {
         if let Some(deadline) = deadline {
             if Instant::now() >= deadline {
                 match wait_for_child_exit(&mut child, timeout, Some(deadline)).await {
-                    Ok(_) => {
+                    Ok(ChildExit::Exited(status)) => {
+                        exit_status = Some(status);
+                        break;
+                    }
+                    Ok(ChildExit::TimedOut) => {
                         let _ = consume_stderr_capture(stderr_capture).await;
                         return Err(OpencodeError::Timeout {
                             timeout: timeout.expect("deadline implies timeout"),
@@ -200,7 +205,11 @@ async fn run_opencode_child(
                         Ok(result) => result,
                         Err(_) => {
                             match wait_for_child_exit(&mut child, timeout, Some(deadline)).await {
-                                Ok(_) => {
+                                Ok(ChildExit::Exited(status)) => {
+                                    exit_status = Some(status);
+                                    break;
+                                }
+                                Ok(ChildExit::TimedOut) => {
                                     let _ = consume_stderr_capture(stderr_capture).await;
                                     return Err(OpencodeError::Timeout {
                                         timeout: timeout.expect("deadline implies timeout"),
@@ -259,13 +268,18 @@ async fn run_opencode_child(
         }
     }
 
-    let status = match wait_for_child_exit(&mut child, timeout, deadline).await {
-        Ok(status) => status,
-        Err(err @ OpencodeError::Timeout { .. }) => {
-            let _ = consume_stderr_capture(stderr_capture).await;
-            return Err(err);
-        }
-        Err(err) => return Err(err),
+    let status = match exit_status {
+        Some(status) => status,
+        None => match wait_for_child_exit(&mut child, timeout, deadline).await {
+            Ok(ChildExit::Exited(status)) => status,
+            Ok(ChildExit::TimedOut) => {
+                let _ = consume_stderr_capture(stderr_capture).await;
+                return Err(OpencodeError::Timeout {
+                    timeout: timeout.expect("deadline implies timeout"),
+                });
+            }
+            Err(err) => return Err(err),
+        },
     };
     let stderr = consume_stderr_capture(stderr_capture).await?;
     if !status.success() {
@@ -309,33 +323,51 @@ async fn run_opencode_child(
     Ok(OpencodeRunCompletion { status, final_text })
 }
 
+#[derive(Debug, Clone, Copy)]
+enum ChildExit {
+    Exited(std::process::ExitStatus),
+    TimedOut,
+}
+
 async fn wait_for_child_exit(
     child: &mut tokio::process::Child,
     timeout: Option<Duration>,
     deadline: Option<Instant>,
-) -> Result<std::process::ExitStatus, OpencodeError> {
+) -> Result<ChildExit, OpencodeError> {
     match deadline {
-        None => child.wait().await.map_err(OpencodeError::Wait),
+        None => child
+            .wait()
+            .await
+            .map(ChildExit::Exited)
+            .map_err(OpencodeError::Wait),
         Some(deadline) => {
             let remaining = deadline.saturating_duration_since(Instant::now());
             if remaining.is_zero() {
-                let timeout = timeout.expect("deadline implies timeout");
-                let _ = child.start_kill();
-                match child.wait().await {
-                    Ok(_status) => Err(OpencodeError::Timeout { timeout }),
-                    Err(err) => Err(OpencodeError::Wait(err)),
-                }
-            } else {
-                match tokio::time::timeout(remaining, child.wait()).await {
-                    Ok(result) => result.map_err(OpencodeError::Wait),
-                    Err(_) => {
-                        let timeout = timeout.expect("deadline implies timeout");
+                match child.try_wait().map_err(OpencodeError::Wait)? {
+                    Some(status) => Ok(ChildExit::Exited(status)),
+                    None => {
+                        timeout.expect("deadline implies timeout");
                         let _ = child.start_kill();
                         match child.wait().await {
-                            Ok(_status) => Err(OpencodeError::Timeout { timeout }),
+                            Ok(_status) => Ok(ChildExit::TimedOut),
                             Err(err) => Err(OpencodeError::Wait(err)),
                         }
                     }
+                }
+            } else {
+                match tokio::time::timeout(remaining, child.wait()).await {
+                    Ok(result) => result.map(ChildExit::Exited).map_err(OpencodeError::Wait),
+                    Err(_) => match child.try_wait().map_err(OpencodeError::Wait)? {
+                        Some(status) => Ok(ChildExit::Exited(status)),
+                        None => {
+                            timeout.expect("deadline implies timeout");
+                            let _ = child.start_kill();
+                            match child.wait().await {
+                                Ok(_status) => Ok(ChildExit::TimedOut),
+                                Err(err) => Err(OpencodeError::Wait(err)),
+                            }
+                        }
+                    },
                 }
             }
         }
@@ -416,4 +448,37 @@ fn classify_selection_failure(
         SelectionMode::Last => "no session found".to_string(),
         SelectionMode::Id => "session not found".to_string(),
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use std::process::Stdio;
+    use std::time::{Duration, Instant};
+
+    use super::{wait_for_child_exit, ChildExit};
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn wait_for_child_exit_returns_status_when_deadline_has_elapsed() {
+        let mut child = tokio::process::Command::new("sh")
+            .args(["-c", "exit 0"])
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .expect("spawn child");
+        tokio::time::sleep(Duration::from_millis(50)).await;
+
+        let outcome = wait_for_child_exit(
+            &mut child,
+            Some(Duration::from_millis(1)),
+            Some(Instant::now()),
+        )
+        .await
+        .expect("wait helper succeeds");
+
+        match outcome {
+            ChildExit::Exited(status) => assert!(status.success()),
+            ChildExit::TimedOut => panic!("expected exited status, got timeout"),
+        }
+    }
 }
