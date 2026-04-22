@@ -26,6 +26,8 @@
 **Priority:** P2
 **Depends on:** M3 governance artifacts plus one post-M3 onboarding cycle with recorded duration and residual friction truth
 
+## Completed
+
 ### Implement The M4 Post-Onboarding Maintenance Lane
 
 **What:** Add a separate maintenance lifecycle for already-onboarded agents: agent-scoped drift detection, a dedicated maintenance packet/request, bounded control-plane refresh ergonomics, and explicit maintenance closeout.
@@ -37,8 +39,7 @@
 **Effort:** M
 **Priority:** P2
 **Depends on:** M3 landing cleanly with approval-driven onboarding and validated proving-run closeout
-
-## Completed
+**Completed:** v0.3.0 (2026-04-22)
 
 ### Create The OpenCode Execution Pack
 

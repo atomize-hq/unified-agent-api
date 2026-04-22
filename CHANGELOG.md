@@ -6,15 +6,24 @@ This changelog tracks the root `VERSION` file and uses bare semantic versions (`
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-04-22
+
 ### Added
 
 - Added the first Gemini CLI proving-run surfaces across the workspace: `crates/gemini_cli/` for canonical headless `stream-json` execution, `cli_manifests/gemini_cli/` for committed manifest-root evidence, and the `crates/agent_api` Gemini backend with bounded event/completion redaction coverage.
-- Added `xtask onboard-agent --write` plus transactional control-plane mutation coverage so approved-agent onboarding can materialize registry, docs-pack, release-doc, workspace-membership, and manifest-root skeleton surfaces without manual control-plane edits.
+- Added registry-backed agent enrollment and governed scaffold generation for approved agents, including `xtask onboard-agent --write`, transactional workspace mutation planning, and generated Gemini onboarding packet outputs.
+- Added the M4 post-onboarding maintenance lane in `xtask`: `check-agent-drift`, `refresh-agent`, and `close-agent-maintenance`, plus the dedicated `docs/project_management/next/<agent>-maintenance/` packet shape and the first OpenCode maintenance proving run.
 
 ### Changed
 
-- Rebased control-plane enrollment onto `crates/xtask/data/agent_registry.toml`, including package-name conflict validation, canonical-target parity enforcement, and capability-matrix projection checks against runtime backend truth.
+- Rebased control-plane enrollment onto `crates/xtask/data/agent_registry.toml`, including package-name conflict validation, canonical-target parity enforcement, capability-matrix projection checks against runtime backend truth, and registry-ordered release-doc generation.
 - Recorded the first real approved-agent proving run in the generated Gemini onboarding packet, including closeout metrics, release touchpoints, and regenerated support/capability publication artifacts.
+- Refactored the unified agent API contract, adapter wiring, and event-handling surfaces so Codex, Claude Code, OpenCode, and Gemini all flow through the same hardened backend harness boundaries.
+
+### Fixed
+
+- Hardened approval and closeout governance by rejecting cross-pack approval artifacts, duplicate package names, non-canonical request or closeout linkages, and symlink/path-escape writes during onboarding and proving-run closeout.
+- Fixed agent-scoped maintenance drift so unrelated broken manifest roots no longer block the selected agent, and fixed maintenance refresh ordering so `docs/crates-io-release.md` follows registry publish order instead of Cargo workspace member order.
 
 ## [0.2.3] - 2026-04-18
 
