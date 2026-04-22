@@ -4,6 +4,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use crate::agent_registry::{AgentRegistry, AgentRegistryEntry};
 use agent_api::{
     backends::{
         claude_code::{ClaudeCodeBackend, ClaudeCodeBackendConfig},
@@ -15,9 +16,8 @@ use agent_api::{
 };
 use clap::Parser;
 use serde::Deserialize;
-use xtask::agent_registry::{AgentRegistry, AgentRegistryEntry};
 
-const DEFAULT_OUT_PATH: &str = "docs/specs/unified-agent-api/capability-matrix.md";
+pub const DEFAULT_OUT_PATH: &str = "docs/specs/unified-agent-api/capability-matrix.md";
 const CURRENT_MANIFEST_FILENAME: &str = "current.json";
 
 const CAPABILITY_MCP_LIST_V1: &str = "agent_api.tools.mcp.list.v1";
@@ -34,16 +34,23 @@ pub struct Args {
 }
 
 pub fn run(args: Args) -> Result<(), String> {
-    let inventory = collect_builtin_backend_inventory()?;
-    let markdown = render_matrix(&inventory.backends, &inventory.canonical_target_header);
+    let markdown = generate_markdown()?;
     let out = resolve_output_path(args.out.as_deref());
     write_file(&out, &markdown)?;
     Ok(())
 }
 
-pub(crate) fn collect_builtin_backend_capabilities(
+pub fn collect_builtin_backend_capabilities(
 ) -> Result<BTreeMap<String, AgentWrapperCapabilities>, String> {
     collect_builtin_backend_inventory().map(|inventory| inventory.backends)
+}
+
+pub fn generate_markdown() -> Result<String, String> {
+    let inventory = collect_builtin_backend_inventory()?;
+    Ok(render_matrix(
+        &inventory.backends,
+        &inventory.canonical_target_header,
+    ))
 }
 
 fn write_file(path: &Path, contents: &str) -> Result<(), String> {

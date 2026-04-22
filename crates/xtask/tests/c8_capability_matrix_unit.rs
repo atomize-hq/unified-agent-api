@@ -1,3 +1,7 @@
+mod agent_registry {
+    pub use xtask::agent_registry::*;
+}
+
 mod capability_matrix {
     #![allow(dead_code)]
 

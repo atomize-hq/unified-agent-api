@@ -1,7 +1,6 @@
 #![forbid(unsafe_code)]
 
 mod agent_api_backend_type_leak_guard;
-mod capability_matrix;
 mod capability_matrix_audit;
 mod claude_snapshot;
 mod claude_union;
@@ -18,6 +17,11 @@ mod parity_triad_scaffold;
 mod version_bump;
 mod wrapper_coverage_shared;
 
+use xtask::agent_maintenance::{
+    closeout as agent_maintenance_closeout, drift as agent_maintenance_drift,
+    refresh as agent_maintenance_refresh,
+};
+use xtask::capability_matrix;
 pub use xtask::onboard_agent;
 pub use xtask::support_matrix;
 
@@ -66,6 +70,12 @@ enum Command {
     CapabilityMatrix(capability_matrix::Args),
     /// Audit the capability matrix for orthogonality invariants.
     CapabilityMatrixAudit(capability_matrix_audit::Args),
+    /// Detect maintenance-relevant drift for an already-onboarded agent.
+    CheckAgentDrift(agent_maintenance_drift::Args),
+    /// Refresh maintenance packet docs and generated publication surfaces from a maintenance request.
+    RefreshAgent(agent_maintenance_refresh::Args),
+    /// Validate and close an agent maintenance run.
+    CloseAgentMaintenance(agent_maintenance_closeout::Args),
     /// Generate support publication JSON and Markdown outputs from committed manifest evidence.
     SupportMatrix(support_matrix::Args),
     /// Bump the workspace release version and exact inter-crate publish pins.
@@ -182,6 +192,27 @@ fn main() {
             Err(err) => {
                 eprintln!("{err}");
                 1
+            }
+        },
+        Command::CheckAgentDrift(args) => match agent_maintenance_drift::run(args) {
+            Ok(()) => 0,
+            Err(err) => {
+                eprintln!("{err}");
+                err.exit_code()
+            }
+        },
+        Command::RefreshAgent(args) => match agent_maintenance_refresh::run(args) {
+            Ok(()) => 0,
+            Err(err) => {
+                eprintln!("{err}");
+                err.exit_code()
+            }
+        },
+        Command::CloseAgentMaintenance(args) => match agent_maintenance_closeout::run(args) {
+            Ok(()) => 0,
+            Err(err) => {
+                eprintln!("{err}");
+                err.exit_code()
             }
         },
         Command::SupportMatrix(args) => match support_matrix::run(args) {
