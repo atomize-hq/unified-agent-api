@@ -7,8 +7,86 @@ Source:
 - `/Users/spensermcconnell/.gstack/projects/atomize-hq-unified-agent-api/spensermcconnell-main-test-outcome-20260420-091704.md`
 - `docs/project_management/next/gemini-cli-onboarding/HANDOFF.md`
 
-Status: M1, M2, and M3 landed on `feat/cli-agent-onboarding-factory`; M4 is the next implementation milestone
-Last updated (UTC): 2026-04-21
+Status: M1 through M4 landed on `feat/cli-agent-onboarding-factory`; M5 is the next implementation milestone
+Last updated (UTC): 2026-04-22
+
+## Post-M4 Roadmap
+This file still contains the full M4 plan-of-record because that milestone just landed and remains the design basis for the maintenance lane. The active planning focus is now M5.
+
+Correct gstack workflow from here:
+- CEO review is done for this slice. Scope is no longer the open question.
+- The right posture for M5 is engineering planning and hardening, basically `/plan-eng-review` mode rather than more scope exploration.
+- M5 should make the current factory truthful and boring before the repo takes on the next ownership-boundary change in M6.
+
+### M5. Factory Truth Hardening
+Goal:
+- make the control plane trustworthy at head so maintainers can believe the factory's green checks, generated publications, and agent-scoped drift output
+
+Why M5 exists:
+- M4 proved the separate maintenance lane on `opencode`
+- the current repo still has one important trust gap: `check-agent-drift` and `capability-matrix.md` do not fully agree on default-versus-config-gated capability semantics for seeded agents
+- `make preflight` can still go green without checking all of the publication truth that the factory now claims to own
+
+In scope:
+- align `check-agent-drift` capability-publication truth with the same default built-in backend projection used by `cargo run -p xtask -- capability-matrix`
+- remove false-positive capability drift for seeded agents, especially `codex` and `claude_code`
+- add or wire the missing factory gate so local preflight and CI enforce the same capability-publication freshness story
+- add explicit tests that prove the seeded agents are clean on the intended default projection
+- update stale status and command documentation that still describe M4 as upcoming work
+
+Not in scope:
+- widening `xtask onboard-agent` into wrapper-crate scaffolding
+- mutating runtime-owned wrapper or backend code to paper over control-plane drift
+- full documentation cleanup and operator guide consolidation
+
+Success criteria:
+- `cargo run -p xtask -- check-agent-drift --agent codex` exits `0` on a clean repo
+- `cargo run -p xtask -- check-agent-drift --agent claude_code` exits `0` on a clean repo
+- `cargo run -p xtask -- check-agent-drift --agent opencode` and `--agent gemini_cli` remain clean
+- the local factory gate catches stale `docs/specs/unified-agent-api/capability-matrix.md` before merge, not only a separate CI leg
+- `PLAN.md`, maintenance notes, and closeout-facing docs no longer claim M4 is the next milestone
+
+Planned M5 workstreams:
+1. Capability truth alignment
+   - make `crates/xtask/src/agent_maintenance/drift/shared.rs` and `crates/xtask/src/capability_matrix.rs` use one consistent model for config-gated capability advertising
+   - confirm the chosen rule in tests instead of leaving it implicit in two separate codepaths
+2. Gate unification
+   - extend the local preflight/factory gate so capability publication freshness is checked alongside support publication and publish readiness
+   - keep the gate boring and explicit rather than inventing another umbrella workflow
+3. Status and operator-surface cleanup
+   - update `PLAN.md` and nearby planning/maintenance docs so the milestone sequence matches repo reality
+   - keep this bounded to stale milestone/operator truth, not full documentation cleanup
+
+### M6. Separate Wrapper Scaffold Command
+Status:
+- planned follow-on after M5 lands cleanly
+
+Current direction:
+- prefer a separate wrapper scaffold command over widening `xtask onboard-agent`
+
+Why this is the likely shape:
+- it preserves the current control-plane versus runtime-owned boundary
+- it avoids silently changing `onboard-agent` from “control-plane enrollment” into “create the wrapper crate too”
+- it gives the repo a place to add package-surface scaffolding like `README.md`, `LICENSE-*`, and other publishability requirements without rewriting the meaning of the onboarding packet or closeout flow
+
+Initial M6 scope note:
+- scaffold the minimal wrapper-crate package surfaces needed after agent approval and control-plane enrollment
+- keep the command separate from maintenance and separate from create-mode onboarding
+- re-contract ownership language only where the new scaffold step must be documented explicitly
+
+### M7. Documentation And Legacy Cleanup
+Status:
+- tentative follow-on after M5 and M6 land cleanly
+
+Intent:
+- clean up outdated, duplicated, or confusing onboarding/maintenance docs
+- create one detailed reference for the new system with commands, artifact shapes, typical workflows, and operator guidance
+
+Candidate deliverables:
+- one canonical “CLI agent onboarding factory” operator guide
+- command reference for `onboard-agent`, `check-agent-drift`, `refresh-agent`, `close-agent-maintenance`, and the planned wrapper scaffold command
+- migration notes for old packet assumptions and legacy docs that are now historical only
+- cleanup of stale status language and superseded handoff notes where they still create ambiguity
 
 ## Purpose
 M4 turns post-onboarding maintenance from repo archaeology into a separate, repeatable lifecycle.
