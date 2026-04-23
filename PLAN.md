@@ -1,4 +1,4 @@
-<!-- /autoplan restore point: /Users/spensermcconnell/.gstack/projects/atomize-hq-unified-agent-api/feat-cli-agent-onboarding-factory-autoplan-restore-20260421-105543.md -->
+<!-- /autoplan restore point: /Users/spensermcconnell/.gstack/projects/atomize-hq-unified-agent-api/staging-autoplan-restore-20260423-065640.md -->
 # CLI Agent Onboarding Factory - PLAN
 
 Source:
@@ -8,7 +8,7 @@ Source:
 - `docs/project_management/next/gemini-cli-onboarding/HANDOFF.md`
 
 Status: M1 through M4 landed on `feat/cli-agent-onboarding-factory`; M5 is the next implementation milestone
-Last updated (UTC): 2026-04-22
+Last updated (UTC): 2026-04-23
 
 ## Post-M4 Roadmap
 This file still contains the full M4 plan-of-record because that milestone just landed and remains the design basis for the maintenance lane. The active planning focus is now M5.
@@ -19,43 +19,487 @@ Correct gstack workflow from here:
 - M5 should make the current factory truthful and boring before the repo takes on the next ownership-boundary change in M6.
 
 ### M5. Factory Truth Hardening
+Status:
+- active implementation milestone on `staging`
+- 2026-04-23 `/autoplan` premise gate approved; the accepted M5 review decisions are folded into this section so M5 reads as one plan-of-record instead of a roadmap block plus a late addendum
+- design review skipped because M5 has no UI scope
+
 Goal:
 - make the control plane trustworthy at head so maintainers can believe the factory's green checks, generated publications, and agent-scoped drift output
 
-Why M5 exists:
-- M4 proved the separate maintenance lane on `opencode`
-- the current repo still has one important trust gap: `check-agent-drift` and `capability-matrix.md` do not fully agree on default-versus-config-gated capability semantics for seeded agents
-- `make preflight` can still go green without checking all of the publication truth that the factory now claims to own
+#### Purpose
+M4 proved the separate maintenance lane on `opencode`.
 
+M5 makes that lane truthful. The current trust gap is not missing command surface, it is that publication truth, drift truth, and maintenance-closeout truth can still disagree about what built-in backends advertise by default. If local green and CI green are different predicates, the factory is lying. M5 fixes that before M6 widens ownership boundaries.
+
+#### Problem Statement
+The checked-in capability matrix is already correct for the current repo state, but the control plane can still reason about that truth in two different ways:
+
+- `crates/xtask/src/capability_matrix.rs` models published default capability truth from the registry, built-in backend defaults, and manifest availability.
+- `crates/xtask/src/agent_maintenance/drift/shared.rs` separately models capability truth for `check-agent-drift`, and today that path can overclaim default-off config-gated capabilities for seeded agents such as `codex` and `claude_code`.
+- `crates/xtask/src/agent_maintenance/closeout/validate.rs` trusts the live drift report, so any semantic fork in drift truth leaks directly into maintenance closeout truth.
+- `make preflight` currently does not enforce capability publication freshness while CI still runs `cargo run -p xtask -- capability-matrix` plus `cargo run -p xtask -- capability-matrix-audit`, so maintainers cannot fully trust local green.
+
+M5 is therefore not a two-file hotfix. It is a factory-truth hardening milestone that removes duplicated capability semantics and makes local and CI green mean the same thing.
+
+#### Landed Baseline
+These are already true on `staging` and are not M5 work:
+
+- `crates/xtask/data/agent_registry.toml` seeds `codex`, `claude_code`, `opencode`, and `gemini_cli`, and all four are enrolled in capability publication.
+- `crates/xtask/src/capability_matrix.rs` already regenerates the checked-in `docs/specs/unified-agent-api/capability-matrix.md` without drift.
+- `crates/xtask/src/agent_maintenance/drift/shared.rs` already collects per-agent publication truth and is the current source of the false-positive capability drift.
+- `crates/xtask/src/agent_maintenance/closeout/validate.rs` already re-checks live drift truth as part of maintenance closeout validation.
+- `Makefile` already exposes the repo's check-only publication pattern through `cargo run -p xtask -- support-matrix --check`.
+- `.github/workflows/ci.yml` already runs capability publication generation and `cargo run -p xtask -- capability-matrix-audit`.
+- The current regression surfaces already exist in `crates/xtask/tests/c8_capability_matrix_unit.rs`, `crates/xtask/tests/agent_maintenance_drift.rs`, `crates/xtask/tests/agent_maintenance_closeout.rs`, and `crates/xtask/tests/agent_registry.rs`.
+
+#### Step 0. Scope Challenge
+- Existing code leverage: the repo already has the publication generator, the maintenance drift/closeout path, the registry validator, the `support-matrix --check` pattern, and the targeted regression suites. M5 should reuse those surfaces, not invent a second factory.
+- Minimum complete change: one shared capability projection contract, one explicit primary publication-target contract, one check-only capability publication gate, and one regression suite that covers both publication and maintenance truth. No new crate, no new lifecycle command family, no runtime-owned code changes.
+- Complexity check: the blast radius is expected to be 8-10 files across `xtask`, tests, `Makefile`, CI, and one or two narrow spec notes. That is acceptable because every touched file sits inside one control-plane seam. Widening into M6 wrapper scaffolding would be the real overbuild.
+- Search check: [Layer 1] reuse the repo's existing `support-matrix --check` pattern and current CI audit shape instead of inventing a second gate mechanism. [Layer 3] remove the hidden `canonical_targets[0]` ordering contract by making the primary capability-publication target explicit in registry-owned truth.
+- Completeness check: do the whole fix now. Patching `check-agent-drift` alone would still leave closeout truth and local-vs-CI gate divergence intact.
+- Distribution check: M5 does not introduce a new binary, package, container, or release rail. No distribution work is needed beyond keeping the existing preflight and CI contract truthful.
+
+#### Scope Lock
 In scope:
-- align `check-agent-drift` capability-publication truth with the same default built-in backend projection used by `cargo run -p xtask -- capability-matrix`
-- remove false-positive capability drift for seeded agents, especially `codex` and `claude_code`
-- add or wire the missing factory gate so local preflight and CI enforce the same capability-publication freshness story
-- add explicit tests that prove the seeded agents are clean on the intended default projection
-- update stale status and command documentation that still describe M4 as upcoming work
+- extract one shared capability projection path so publication truth, drift truth, and closeout truth stop re-deciding config-gated semantics per caller
+- make the primary capability-publication target explicit in registry-owned truth instead of relying on ordering in `canonical_targets`
+- validate registry `config_key` values against an explicit built-in allowlist; the current intended keys are `allow_mcp_write` and `allow_external_sandbox_exec`
+- keep config-gated capability advertising default-off in published truth unless the projection explicitly opts in, matching the seeded backend defaults already exposed by `crates/agent_api/src/backends/codex/backend.rs` and `crates/agent_api/src/backends/claude_code/backend.rs`
+- add a first-class `cargo run -p xtask -- capability-matrix --check` path, or an equivalent check-only entrypoint wired through the same command, so local preflight and CI use the same freshness contract
+- treat `cargo run -p xtask -- capability-matrix-audit` as the secondary but still-required semantic guard; freshness belongs to `--check`, orthogonality belongs to the audit, and both must run the same way locally and in CI
+- add seeded-agent parity tests and targeted registry/publication regressions so the fifth enrolled agent cannot silently reopen this bug class
+- update `PLAN.md` plus the narrow normative notes in `docs/specs/agent-registry-contract.md` and `docs/specs/unified-agent-api/capabilities-schema-spec.md` only where M5 changes the authoritative truth or gate definition
+- remove stale status language that still implies M4 is the next milestone
 
-Not in scope:
-- widening `xtask onboard-agent` into wrapper-crate scaffolding
+#### Not In Scope
+- widening `xtask onboard-agent` into wrapper-crate scaffolding or any other M6 ownership shift
 - mutating runtime-owned wrapper or backend code to paper over control-plane drift
-- full documentation cleanup and operator guide consolidation
+- replacing `docs/specs/unified-agent-api/capability-matrix.md` with a new structured artifact in M5
+- full documentation cleanup, operator-guide consolidation, or historical doc gardening outside the narrow truth-surface notes M5 changes
 
-Success criteria:
+#### Success Criteria
+M5 is complete only when all of these are true:
+
+- every `capability_matrix_enabled` agent is drift-clean under one canonical projection contract; the current seeded expectation is `codex`, `claude_code`, `opencode`, and `gemini_cli`
 - `cargo run -p xtask -- check-agent-drift --agent codex` exits `0` on a clean repo
 - `cargo run -p xtask -- check-agent-drift --agent claude_code` exits `0` on a clean repo
-- `cargo run -p xtask -- check-agent-drift --agent opencode` and `--agent gemini_cli` remain clean
-- the local factory gate catches stale `docs/specs/unified-agent-api/capability-matrix.md` before merge, not only a separate CI leg
-- `PLAN.md`, maintenance notes, and closeout-facing docs no longer claim M4 is the next milestone
+- `cargo run -p xtask -- check-agent-drift --agent opencode` and `cargo run -p xtask -- check-agent-drift --agent gemini_cli` remain clean
+- capability truth is modeled once and reused by capability publication, drift inspection, and maintenance closeout validation instead of being duplicated per caller
+- the primary capability-publication target is explicit in registry-owned truth and target-order churn cannot silently change publication output
+- `cargo run -p xtask -- capability-matrix --check` exists and fails on stale publication without mutating the worktree
+- `make preflight` and CI both run the same capability-publication freshness and audit contract
+- regression coverage proves config-gated capabilities stay default-off in publication truth, malformed `config_key` values fail closed, missing primary publication targets fail closed, and target-order churn cannot silently change publication truth
+- `PLAN.md` and the touched normative notes no longer claim M4 is the next milestone or leave the M5 green gate ambiguous
 
-Planned M5 workstreams:
-1. Capability truth alignment
-   - make `crates/xtask/src/agent_maintenance/drift/shared.rs` and `crates/xtask/src/capability_matrix.rs` use one consistent model for config-gated capability advertising
-   - confirm the chosen rule in tests instead of leaving it implicit in two separate codepaths
-2. Gate unification
-   - extend the local preflight/factory gate so capability publication freshness is checked alongside support publication and publish readiness
-   - keep the gate boring and explicit rather than inventing another umbrella workflow
-3. Status and operator-surface cleanup
-   - update `PLAN.md` and nearby planning/maintenance docs so the milestone sequence matches repo reality
-   - keep this bounded to stale milestone/operator truth, not full documentation cleanup
+#### What Already Exists
+| Sub-problem | Existing code to reuse | Why it matters |
+|---|---|---|
+| published capability truth | `crates/xtask/src/capability_matrix.rs` | already models the correct checked-in default publication truth and should stay the render/check entrypoint |
+| drift inspection | `crates/xtask/src/agent_maintenance/drift/shared.rs`, `crates/xtask/src/agent_maintenance/drift/publication.rs` | already collects per-agent drift and is the current false-positive source |
+| closeout truth | `crates/xtask/src/agent_maintenance/closeout/validate.rs` | already consumes live drift truth, so projection bugs leak directly into maintenance closure |
+| registry validation | `crates/xtask/src/agent_registry.rs`, `crates/xtask/data/agent_registry.toml` | already validates path and shape constraints and is the right place to make publication-target and `config_key` truth explicit |
+| local gate pattern | `Makefile` | already demonstrates the repo's intended check-only generator pattern through `support-matrix --check` |
+| CI gate pattern | `.github/workflows/ci.yml` | already shows the stricter capability publication contract that local preflight must match |
+| regression harness | `crates/xtask/tests/c8_capability_matrix_unit.rs`, `crates/xtask/tests/agent_maintenance_drift.rs`, `crates/xtask/tests/agent_maintenance_closeout.rs`, `crates/xtask/tests/agent_registry.rs` | the repo already has the right test homes; M5 should extend them instead of inventing new harnesses |
+
+#### Chosen Approach
+M5 hardens one control-plane seam:
+
+1. define one shared capability projection contract
+2. route both publication and maintenance truth through it
+3. make the capability freshness gate check-only and identical locally and in CI
+4. pin the whole thing with seeded-agent and registry regression coverage
+
+That is the smallest complete fix. Anything smaller leaves the lying-factory problem intact. Anything bigger turns M5 into M6 scope creep.
+
+#### Dream State Delta
+```text
+CURRENT
+capability_matrix.rs decides published default truth
+drift/shared.rs decides maintenance truth separately
+closeout validation inherits drift semantics
+local preflight and CI disagree about what "green" means
+
+M5
+one shared capability projection contract
+one explicit primary publication target
+one check-only capability freshness gate
+one seeded-agent parity suite proving publication and maintenance truth match
+
+12-MONTH IDEAL
+new enrolled agents consume the same projection contract automatically
+publication truth cannot fork from maintenance truth without a failing test
+local and CI green are the same predicate
+```
+
+#### Architecture Review
+##### Preferred Module Shape
+Keep M5 inside the existing `xtask` crate and make the new code boring:
+
+- `crates/xtask/src/main.rs`
+  - thin CLI routing only; extend the existing `CapabilityMatrix` command surface rather than adding a second entrypoint
+- `crates/xtask/src/agent_registry.rs`
+  - own the explicit primary publication-target contract and `config_key` fail-closed validation
+- one small shared capability-projection helper inside `crates/xtask/src/`
+  - reusable by publication, drift, and closeout truth; one implementation, no per-caller forks
+- `crates/xtask/src/capability_matrix.rs`
+  - keep markdown rendering plus the new check-only freshness path
+- `crates/xtask/src/agent_maintenance/drift/shared.rs`
+  - consume the shared projection helper instead of restating config-gated semantics
+- `crates/xtask/src/agent_maintenance/closeout/validate.rs`
+  - continue to validate live drift truth, but only after M5 removes the semantic fork upstream
+
+If the shared helper stays small, one file is enough. Do not build a mini-framework around capability truth.
+
+##### Dependency Graph
+```text
+crates/xtask/data/agent_registry.toml
+                |
+                v
+       crates/xtask/src/agent_registry.rs
+                |
+                v
+  shared capability projection contract
+  - declared registry truth
+  - explicit primary publication target
+  - built-in default runtime truth
+  - manifest availability truth
+                |
+        +-------+-------------------+
+        |                           |
+        v                           v
+crates/xtask/src/            crates/xtask/src/agent_maintenance/
+capability_matrix.rs         drift/shared.rs
+render + --check             check-agent-drift
+        |                           |
+        v                           v
+docs/specs/unified-agent-api/   closeout/validate.rs
+capability-matrix.md            validate_live_drift_truth
+        |
+        v
+Makefile preflight + CI capability gate
+```
+
+##### Architecture Decisions
+- One shared capability projection contract is the whole game. Publication truth, drift truth, and closeout truth must stop carrying duplicate policy.
+- The primary capability-publication target must become explicit registry-owned truth. Depending on `canonical_targets[0]` is a hidden control-plane contract and is no longer acceptable after M5.
+- `cargo run -p xtask -- capability-matrix --check` owns freshness. `cargo run -p xtask -- capability-matrix-audit` remains a second semantic guard, not a replacement for freshness checks.
+- Local verification must be check-only. Any write-then-diff design would self-heal drift and make local green less trustworthy than CI.
+- M5 must not mutate runtime-owned code to make drift disappear. If runtime and control-plane truth disagree, the control plane must fail closed and say so.
+
+#### Code Quality Guardrails
+- Keep `main.rs` as routing glue. Real logic belongs in registry, projection, publication, and maintenance modules.
+- Do not keep two projection helpers. If two callers need the same capability truth, extract one small shared helper and delete the duplicate policy.
+- Keep the new publication-target and `config_key` validation explicit and fail closed. Silent fallback is the bug class M5 is supposed to remove.
+- Compare generated capability publication in memory for `--check`; do not write files during verification just to discover staleness.
+- Extend the existing targeted xtask regression files before creating new ones. Minimal diff and obvious test ownership win here.
+- If M5 changes any nearby ASCII diagram comments in code or docs, update them in the same change. Stale diagrams are worse than no diagrams.
+
+#### Workstreams
+##### W1. Canonical Capability Projection Contract
+Goal: remove semantic duplication at the source.
+
+Deliverables:
+- one shared capability projection helper reused by publication, drift, and closeout truth
+- one explicit primary capability-publication target contract in registry-owned data
+- one explicit `config_key` allowlist for config-gated capability declarations
+
+Primary modules:
+- `crates/xtask/src/agent_registry.rs`
+- `crates/xtask/data/agent_registry.toml`
+- one shared projection helper under `crates/xtask/src/`
+- `crates/xtask/src/capability_matrix.rs`
+- `crates/xtask/tests/c8_capability_matrix_unit.rs`
+- `crates/xtask/tests/agent_registry.rs`
+
+Exit criteria:
+- publication truth no longer depends on hidden target ordering
+- registry declarations cannot silently introduce unknown config gates
+
+##### W2. Maintenance Drift + Closeout Parity
+Goal: make maintenance truth consume the same projection contract as publication truth.
+
+Deliverables:
+- `check-agent-drift` stops overclaiming default-off config-gated capabilities for seeded agents
+- maintenance closeout continues to re-check live drift truth, but now through the unified projection model
+- seeded parity coverage proves `codex`, `claude_code`, `opencode`, and `gemini_cli` are all clean on a clean repo
+
+Primary modules:
+- `crates/xtask/src/agent_maintenance/drift/shared.rs`
+- `crates/xtask/src/agent_maintenance/drift/publication.rs`
+- `crates/xtask/src/agent_maintenance/closeout/validate.rs`
+- `crates/xtask/tests/agent_maintenance_drift.rs`
+- `crates/xtask/tests/agent_maintenance_closeout.rs`
+
+Exit criteria:
+- maintenance truth and publication truth agree for all seeded agents under default built-in configs
+
+##### W3. Gate Unification
+Goal: make local and CI green mean the same thing.
+
+Deliverables:
+- `cargo run -p xtask -- capability-matrix --check`
+- `make preflight` wiring for capability publication freshness
+- CI wiring that uses the same freshness command and keeps `capability-matrix-audit` as the semantic companion gate
+
+Primary modules:
+- `crates/xtask/src/main.rs`
+- `crates/xtask/src/capability_matrix.rs`
+- `Makefile`
+- `.github/workflows/ci.yml`
+- `crates/xtask/tests/c8_spec_capability_matrix_paths.rs`
+
+Exit criteria:
+- maintainers can trust local green because it now evaluates the same capability-publication contract as CI
+
+##### W4. Regression Coverage + Operator Truth
+Goal: make this bug class hard to reintroduce and easy to explain.
+
+Deliverables:
+- regression tests for default-off config-gated publication, missing primary publication target, unknown `config_key`, target-order churn, and stale publication checks
+- one updated M5 plan-of-record plus narrow normative notes that name the authoritative truth sources and the authoritative green gate
+
+Primary modules:
+- `PLAN.md`
+- `docs/specs/agent-registry-contract.md`
+- `docs/specs/unified-agent-api/capabilities-schema-spec.md`
+- `crates/xtask/tests/c8_capability_matrix_unit.rs`
+- `crates/xtask/tests/agent_registry.rs`
+- `crates/xtask/tests/agent_maintenance_drift.rs`
+- `crates/xtask/tests/agent_maintenance_closeout.rs`
+
+Exit criteria:
+- the next enrolled agent cannot reopen this bug class without failing an obvious test or contract check
+
+#### Implementation Sequence
+##### Phase 1. Projection Contract Lock
+Outputs:
+- shared capability projection helper
+- explicit primary capability-publication target contract
+- explicit `config_key` allowlist validation
+
+Modules touched:
+- `crates/xtask/src/agent_registry.rs`
+- `crates/xtask/data/agent_registry.toml`
+- one shared projection helper under `crates/xtask/src/`
+- `crates/xtask/src/capability_matrix.rs`
+- targeted registry and capability-matrix tests
+
+Implementation notes:
+- lock the truth model first because every later phase consumes it
+- prefer explicit registry-owned metadata over clever inference from target ordering
+- keep this phase inside the control-plane seam only
+
+Exit gate:
+- publication truth is defined once and can be reused without call-site policy forks
+
+##### Phase 2. Maintenance Truth Parity
+Outputs:
+- drift/shared parity fix
+- closeout validation still grounded in live drift truth
+- seeded-agent clean proof for all four current capability-matrix-enrolled agents
+
+Modules touched:
+- `crates/xtask/src/agent_maintenance/drift/shared.rs`
+- `crates/xtask/src/agent_maintenance/drift/publication.rs`
+- `crates/xtask/src/agent_maintenance/closeout/validate.rs`
+- maintenance drift and closeout tests
+
+Implementation notes:
+- delete the duplicate config-gated policy instead of teaching it the same rule twice
+- keep the proving signal user-facing: a maintainer should be able to run `check-agent-drift --agent <id>` and believe the result
+
+Exit gate:
+- maintenance truth and publication truth no longer disagree on seeded default capability advertising
+
+##### Phase 3. Gate Parity
+Outputs:
+- `capability-matrix --check`
+- `make preflight` capability freshness gate
+- CI capability freshness gate aligned with local preflight
+
+Modules touched:
+- `crates/xtask/src/main.rs`
+- `crates/xtask/src/capability_matrix.rs`
+- `Makefile`
+- `.github/workflows/ci.yml`
+- capability-matrix entrypoint/path tests
+
+Implementation notes:
+- compare generated output in memory and fail on drift; do not write during verification
+- keep freshness and orthogonality separate, but run both in both environments
+
+Exit gate:
+- local green and CI green are the same predicate for capability publication
+
+##### Phase 4. Regression Coverage + Narrow Contract Notes
+Outputs:
+- final regression suite
+- updated plan/status language
+- updated narrow normative notes for registry and capability publication truth
+
+Modules touched:
+- targeted xtask tests
+- `PLAN.md`
+- `docs/specs/agent-registry-contract.md`
+- `docs/specs/unified-agent-api/capabilities-schema-spec.md`
+
+Implementation notes:
+- land docs after the code contract is final so the notes name the real gate and the real truth sources
+- keep the documentation touch small; M7 owns broad cleanup
+
+Exit gate:
+- a new maintainer can explain the authoritative capability truth and the authoritative green gate without reading repo history
+
+#### Error & Rescue Registry
+| Method / Codepath | What can go wrong | Failure class | Rescued? | Rescue action | User sees |
+|---|---|---|---|---|---|
+| registry parse | primary publication target missing or invalid | validation error | yes | reject registry load before generation or drift work | explicit validation failure |
+| registry config-gated declaration | unknown `config_key` is accepted | schema drift | yes | fail closed on registry validation | explicit validation failure |
+| projection helper | config-gated capability is treated as always-on in one caller only | semantic fork | yes | route all callers through one helper and fail tests if they diverge | false clean or false drift disappears |
+| `capability-matrix --check` | stale markdown is silently rewritten during verification | gate integrity bug | yes | compare in memory and fail without mutation | non-zero check-only failure |
+| `check-agent-drift --agent` | seeded agent reports false-positive capability drift | maintenance truth bug | yes | reuse shared projection helper and keep targeted seeded parity tests | non-zero drift report on a clean repo |
+| maintenance closeout | resolved findings still match live drift truth | closeout truth bug | yes | reject closeout until live drift is actually clean | closeout validation failure |
+| local vs CI gate | one environment runs freshness and the other does not | operator trust gap | yes | wire the same freshness plus audit contract into both | green in one place, red in the other |
+
+#### Test Strategy
+##### Test Diagram
+```text
+CANONICAL CAPABILITY PROJECTION
+==============================
+[+] registry declaration
+    |
+    +--> explicit primary publication target
+    +--> declared registry truth
+    +--> built-in default runtime truth
+    +--> manifest availability truth
+    |
+    +--> [GAP -> validation] unknown config_key fails closed
+    +--> [GAP -> validation] missing primary publication target fails closed
+    +--> [GAP -> regression] target-order churn cannot silently change published truth
+
+PUBLICATION FRESHNESS
+=====================
+[+] capability-matrix --check
+    |
+    +--> [GAP -> regression] stale markdown fails without mutating the worktree
+    +--> [GAP -> integration] make preflight and CI both call the same freshness rule
+    +--> [GAP -> integration] capability-matrix-audit stays paired with freshness locally and in CI
+
+MAINTENANCE TRUTH
+=================
+[+] check-agent-drift --agent codex / claude_code / opencode / gemini_cli
+    |
+    +--> [GAP -> regression] seeded agents are clean on a clean repo
+    +--> [GAP -> regression] codex and claude_code do not advertise default-off write/sandbox capability drift
+
+[+] validate_live_drift_truth
+    |
+    +--> [GAP -> regression] closeout validation consumes the same projection semantics as publication and drift
+```
+
+##### Required Test Surfaces
+- Extend `crates/xtask/tests/c8_capability_matrix_unit.rs`
+  - explicit primary publication target selection drives projection
+  - config-gated MCP write and external sandbox capabilities stay default-off in publication truth
+  - target-order churn does not change the published result
+- Extend `crates/xtask/tests/agent_registry.rs`
+  - unknown `config_key` is rejected
+  - missing or invalid primary publication target is rejected
+- Extend `crates/xtask/tests/agent_maintenance_drift.rs`
+  - `check_agent_drift_reports_clean_agent` covers `codex`, `claude_code`, `opencode`, and `gemini_cli`
+  - false-positive capability drift for config-gated capability ids is gone
+- Extend `crates/xtask/tests/agent_maintenance_closeout.rs`
+  - `validate_live_drift_truth` rejects stale truth using the unified projection model
+- Extend `crates/xtask/tests/c8_spec_capability_matrix_paths.rs`
+  - `capability-matrix --check` fails on stale markdown and does not rewrite it
+
+##### Verification Commands
+- `cargo run -p xtask -- check-agent-drift --agent codex`
+- `cargo run -p xtask -- check-agent-drift --agent claude_code`
+- `cargo run -p xtask -- check-agent-drift --agent opencode`
+- `cargo run -p xtask -- check-agent-drift --agent gemini_cli`
+- `cargo run -p xtask -- capability-matrix --check`
+- `cargo run -p xtask -- capability-matrix-audit`
+- `cargo test -p xtask --test c8_capability_matrix_unit`
+- `cargo test -p xtask --test agent_maintenance_drift`
+- `cargo test -p xtask --test agent_maintenance_closeout`
+- `cargo test -p xtask --test agent_registry`
+- `make preflight`
+
+##### Test Plan Artifact
+- `/Users/spensermcconnell/.gstack/projects/atomize-hq-unified-agent-api/spensermcconnell-staging-test-plan-20260423-065703.md`
+
+#### Failure Modes Registry
+| Codepath | Failure mode | Test required? | Error handling required? | User sees | Logged? |
+|---|---|---|---|---|---|
+| projection helper | config-gated capability is published as always-on | yes | yes | false clean or false drift | yes |
+| registry validation | typoed or unsupported `config_key` is accepted | yes | yes | control plane claims a gate runtime does not own | yes |
+| publication target selection | target ordering changes truth without an explicit contract change | yes | yes | silent publication churn | yes |
+| local preflight | freshness verification rewrites files instead of only checking | yes | yes | self-healing green gate | yes |
+| maintenance closeout | live drift re-check accepts stale capability truth | yes | yes | maintenance pack can close while factory still lies | yes |
+| CI/local mismatch | CI remains stricter than local after M5 | yes | yes | maintainers cannot trust local green | yes |
+
+Critical gap rule:
+- if capability publication, drift truth, and closeout truth still carry separate semantics after M5, the milestone failed
+- if local and CI capability publication checks still differ after M5, the milestone failed
+
+#### Security Review
+- registry-owned capability gates must fail closed; unknown `config_key` values are not harmless metadata
+- check-only publication verification must not mutate the worktree, because self-healing verification hides drift
+- maintenance closeout must continue to distrust packet prose over live control-plane truth
+- M5 must not create a path where runtime-owned code is mutated to make control-plane drift disappear
+
+#### Performance Review
+- capability publication freshness should compare generated output in memory, not write and re-read files
+- drift and closeout validation should reuse the same projection helper instead of re-parsing policy in multiple places
+- seeded parity coverage should stay targeted so the repo gets signal quickly without turning M5 into a full-workspace retest tax
+
+#### Worktree Parallelization Strategy
+##### Dependency Table
+| Step | Modules touched | Depends on |
+|---|---|---|
+| W1. projection contract | `crates/xtask/src/agent_registry.rs`, `crates/xtask/data/agent_registry.toml`, one shared projection helper under `crates/xtask/src/`, `crates/xtask/src/capability_matrix.rs`, targeted registry/publication tests | — |
+| W2. maintenance parity | `crates/xtask/src/agent_maintenance/drift/**`, `crates/xtask/src/agent_maintenance/closeout/validate.rs`, maintenance parity tests | W1 |
+| W3. gate parity | `crates/xtask/src/main.rs`, `crates/xtask/src/capability_matrix.rs`, `Makefile`, `.github/workflows/ci.yml`, capability-matrix path tests | W1 |
+| W4. docs and contract notes | `PLAN.md`, `docs/specs/agent-registry-contract.md`, `docs/specs/unified-agent-api/capabilities-schema-spec.md` | W2, W3 |
+
+##### Parallel Lanes
+Lane A: W1 -> W3
+Core publication lane. Keep these sequential because both steps touch `crates/xtask/src/capability_matrix.rs` and the command-entry surface.
+
+Lane B: W2
+Maintenance parity lane. Launch this after W1 freezes the shared helper signature and registry truth shape.
+
+Lane C: W4
+Docs lane. Run this only after W2 and W3 merge so the written contract names the final gate and the final truth sources.
+
+##### Execution Order
+1. Launch Lane A first. W1 defines the contract every later step consumes.
+2. After W1 merges, launch Lane B and the W3 part of Lane A in parallel worktrees.
+3. Merge W2 and W3.
+4. Run Lane C last as a docs-only closeout once the code contract is stable.
+
+##### Conflict Flags
+- W1 and W3 both touch `crates/xtask/src/capability_matrix.rs`. Do not parallelize them.
+- W2 must stay inside `agent_maintenance/**` plus its tests after W1 lands. If W2 starts editing publication entrypoints again, it will collide with Lane A.
+- W4 must stay docs-only. If the docs lane starts changing code, it loses its parallel safety.
+
+#### Completion Summary
+- Step 0: scope challenge accepted as-is, M6 kept separate, and the explicit primary publication-target fix is now in scope.
+- Architecture review: one projection contract, one explicit publication-target contract, one freshness gate, and no runtime-owned mutation.
+- Code quality review: fail-closed registry validation, no duplicate policy helpers, and check-only verification are non-negotiable.
+- Test review: diagram produced, 8 required coverage points locked across projection truth, maintenance parity, and gate parity.
+- Performance review: in-memory freshness comparison and helper reuse keep the change boring and cheap.
+- Not in scope: written.
+- What already exists: written.
+- Failure modes: two critical gates remain non-negotiable, semantic duplication must disappear and local green must equal CI green.
+- Parallelization: three lanes total, one real parallel window after W1, docs stay last by design.
+
+#### Deferred To TODOS.md
+- explicit follow-on decision about whether `docs/specs/unified-agent-api/capability-matrix.md` should remain the long-term canonical published truth surface after M5 lands
 
 ### M6. Separate Wrapper Scaffold Command
 Status:
@@ -972,13 +1416,12 @@ Final proving-run lane. This starts only after Lane A and Lane B merge, because 
 
 | Review | Trigger | Why | Runs | Status | Findings |
 |--------|---------|-----|------|--------|----------|
-| CEO Review | `/plan-ceo-review` | Scope & strategy | 1 | issues_open via `/autoplan` | M4 must be a separate post-onboarding lifecycle, not `onboard-agent` update mode or lifecycle-command sprawl |
-| Codex Review | `codex exec` | Independent 2nd opinion | 1 | partial / timed out | outside-voice attempt timed out after repo sweep; usable signal still matched the local read that OpenCode is the right proving run because it has a real post-onboarding drift issue |
-| Eng Review | `/plan-eng-review` | Architecture & tests (required) | 1 | issues_open via `/autoplan` | drift aggregation, separate maintenance request/closeout artifacts, bounded refresh writes, and historical packet immutability must be pinned |
-| Design Review | `/plan-design-review` | UI/UX gaps | 0 | skipped | no UI scope |
+| CEO Review | `/plan-ceo-review` | Scope & strategy | 1 | issues_open via `/autoplan` (incorporated) | M5 must be canonical capability-projection hardening, not a narrow drift hotfix, and M6 wrapper scaffolding stays out of scope |
+| Codex Review | `codex exec` | Independent 2nd opinion | 1 | codex-only via `/autoplan` | outside voice pushed the same two high-signal requirements now folded into the plan: delete duplicate capability semantics and make local green equal CI green |
+| Eng Review | `/plan-eng-review` | Architecture & tests (required) | 1 | issues_open via `/autoplan` (incorporated) | one shared projection helper, one explicit primary publication-target contract, one check-only capability freshness gate, and seeded regression coverage are required |
+| Design Review | `/plan-design-review` | UI/UX gaps | 0 | skipped | no UI scope in M5 |
 
-**CEO:** The strategic trap is obvious. If M4 widens `onboard-agent` or invents a universal lifecycle umbrella, the repo will spend a milestone rebuilding abstractions instead of fixing the first real maintenance seam.
-**ENG:** The engineering seam is also clear. The repo already has most of the primitives. M4 should compose them into agent-scoped drift detection, separate maintenance packets, and bounded refresh writes instead of duplicating generator logic.
-**CROSS-PHASE THEME:** OpenCode is the high-confidence proving run because it already produced a concrete post-onboarding drift issue in committed artifacts.
-**UNRESOLVED:** 0
-**VERDICT:** CEO + ENG CLEARED — M4 is concrete enough to implement.
+**CODEX:** The outside voice agreed with the local read that the real problem is duplicated control-plane semantics, not stale checked-in markdown.
+**CROSS-MODEL:** No contradiction remained after consolidation. The only initially open scope edge was whether to make the publication target explicit now, and that choice is now accepted into M5.
+**UNRESOLVED:** 0 after folding the approved explicit publication-target decision into the M5 scope.
+**VERDICT:** CEO + ENG review outcomes are incorporated into the M5 plan-of-record — ready to implement M5.

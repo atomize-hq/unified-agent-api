@@ -2,6 +2,18 @@
 
 ## Pending
 
+### Decide Whether Capability Matrix Markdown Stays Canonical After M5
+
+**What:** After M5 lands, decide whether `docs/specs/unified-agent-api/capability-matrix.md` remains the canonical published truth surface or becomes a rendered view over a more structured canonical artifact.
+
+**Why:** The 2026-04-23 `/autoplan` for M5 found that local and CI verification currently reason about capability publication differently. M5 should unify the gate first. The next question is whether markdown itself should stay the canonical control-plane truth or only the human-readable publication surface.
+
+**Context:** `make preflight` currently omits capability publication freshness while CI runs `cargo run -p xtask -- capability-matrix`, a `git diff`, and `cargo run -p xtask -- capability-matrix-audit`. That is good enough to fix in M5, but the longer-term truth-surface decision should be made explicitly before more agents or more publication consumers pile on.
+
+**Effort:** S
+**Priority:** P2
+**Depends on:** M5 landing with one canonical capability projection contract and one shared local/CI check-only gate
+
 ### Formalize Recommendation Automation After Two Governance-Backed Selection Cycles
 
 **What:** Revisit `recommend-agent` automation or a deterministic packet generator only after the repo completes two onboarding selections with explicit comparison, approval, and closeout linkage.
