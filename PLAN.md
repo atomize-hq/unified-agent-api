@@ -1,4 +1,4 @@
-<!-- /autoplan restore point: /Users/spensermcconnell/.gstack/projects/atomize-hq-unified-agent-api/staging-autoplan-restore-20260423-065640.md -->
+<!-- /autoplan restore point: /Users/spensermcconnell/.gstack/projects/atomize-hq-unified-agent-api/feat-fill-trust-gap-autoplan-restore-20260423-151422.md -->
 # CLI Agent Onboarding Factory - PLAN
 
 Source:
@@ -503,20 +503,303 @@ Docs lane. Run this only after W2 and W3 merge so the written contract names the
 
 ### M6. Separate Wrapper Scaffold Command
 Status:
-- planned follow-on after M5 lands cleanly
+- next implementation milestone after M5 lands cleanly and the factory-truth gate stays green
+- no UI scope; design review stays skipped unless the operator workflow later gains a human-facing surface
 
-Current direction:
-- prefer a separate wrapper scaffold command over widening `xtask onboard-agent`
+Goal:
+- turn "approved and enrolled agent" into a publishable wrapper-crate shell through one explicit runtime-lane command, without changing what `xtask onboard-agent` means
 
-Why this is the likely shape:
-- it preserves the current control-plane versus runtime-owned boundary
-- it avoids silently changing `onboard-agent` from “control-plane enrollment” into “create the wrapper crate too”
-- it gives the repo a place to add package-surface scaffolding like `README.md`, `LICENSE-*`, and other publishability requirements without rewriting the meaning of the onboarding packet or closeout flow
+#### Purpose
+M5 makes the control plane trustworthy. M6 should make the first runtime step boring.
 
-Initial M6 scope note:
-- scaffold the minimal wrapper-crate package surfaces needed after agent approval and control-plane enrollment
-- keep the command separate from maintenance and separate from create-mode onboarding
-- re-contract ownership language only where the new scaffold step must be documented explicitly
+Right now `xtask onboard-agent` can enroll the registry entry, docs pack, manifest root, workspace membership, and release-touchpoint docs, then the workflow drops the maintainer into manual wrapper-crate bootstrapping. Gemini already showed the cost of that gap: the control plane can be green while the wrapper crate still misses crate-local packaging surfaces such as `README.md`, `LICENSE-APACHE`, `LICENSE-MIT`, and `readme = "README.md"` in `Cargo.toml`.
+
+M6 closes that gap, but it should not do it by quietly widening `onboard-agent` into an everything command. The repo already encodes a control-plane versus runtime-owned boundary, and M6 should preserve that boundary while making the runtime lane start from a valid, publishable shell instead of an empty directory.
+
+#### Problem Statement
+The current repo state already tells us where the missing step lives:
+
+- `crates/xtask/src/onboard_agent.rs` owns control-plane enrollment and today writes the registry/docs/manifest/release surfaces only.
+- `crates/xtask/src/onboard_agent/preview/render.rs` and `crates/xtask/src/onboard_agent/preview.rs` explicitly describe the next runtime step as "implement the runtime-owned wrapper crate" and still treat crate-local publishability files as later manual follow-up.
+- `crates/xtask/tests/onboard_agent_entrypoint/help_and_preview.rs` explicitly guards against `onboard-agent` preview text becoming "Create the wrapper crate".
+- `crates/xtask/tests/onboard_agent_entrypoint/write_mode.rs` locks in the current control-plane write set and the current `15 total planned` replay semantics.
+- `docs/project_management/next/cli-agent-onboarding-charter.md` still starts the onboarding checklist with manual wrapper-crate creation.
+
+So the actual M6 problem is not "should the repo scaffold wrapper shells?" The answer is yes. The problem is command shape and ownership: how do we add deterministic wrapper-shell scaffolding without collapsing approval artifacts, control-plane writes, runtime-owned code, and publishability templates into one overloaded `onboard-agent` contract?
+
+#### Landed Baseline
+These are already true on `feat/fill-trust-gap` and are not M6 work:
+
+- `xtask onboard-agent` exists as the create-mode control-plane bridge for new agents.
+- `onboard-agent` already inserts the wrapper crate path into workspace membership and release docs, and it already emits the onboarding pack that points the maintainer at the runtime-owned next step.
+- `crates/xtask/src/workspace_mutation.rs` already gives the repo jailed, replay-safe mutation primitives with fail-closed semantics.
+- `crates/xtask/src/agent_registry.rs` already owns the canonical `crate_path`, `package_name`, release-track, and onboarding-pack metadata that a scaffold command should consume.
+- `crates/gemini_cli/`, `crates/opencode/`, `crates/codex/`, and `crates/claude_code/` already show the target wrapper-crate package surfaces that a minimal scaffold should match.
+- publish guards already exist and now fail earlier, so M6 can target the missing crate shell instead of adding yet another late-stage publish check.
+
+#### Step 0. Scope Challenge
+- Existing code leverage: M6 should reuse `main.rs` command routing, `agent_registry` as the read-only input contract, `workspace_mutation` for bounded writes, and the existing onboard-agent preview/render surfaces for downstream packet wording. It should not invent a second registry, a second approval artifact, or an ad hoc file writer.
+- Minimum complete change: one new `xtask` subcommand, one narrow runtime file write set under `crates/<agent>/`, one docs wording update so the onboarding packet points at the new command, and one test harness proving replay, divergence protection, and workspace validity.
+- Complexity check: the likely blast radius is about 8 to 12 files across `crates/xtask/src/**`, `crates/xtask/tests/**`, `PLAN.md`, and the onboarding charter. That is acceptable because every touched file belongs to one onboarding-to-runtime seam.
+- Search check: reuse the repo's existing `onboard-agent` preview/write split and `workspace_mutation` rollback semantics instead of inventing bespoke template plumbing. Use the existing wrapper crates as template evidence instead of introducing a generic package DSL.
+- Completeness check: a partial M6 that only writes README/license files is not enough. The scaffold must also write `src/lib.rs` and a valid `Cargo.toml`, or the workspace remains structurally broken after `onboard-agent` has already added the member to root `Cargo.toml`.
+- Distribution check: M6 adds no new binary and no new release rail. It is a subcommand inside `xtask`.
+
+#### Scope Lock
+In scope:
+- add a separate `xtask` subcommand for wrapper-shell scaffolding, with `--dry-run` and `--write` modes
+- make the command registry-driven: input should be the enrolled agent id, not a second descriptor CLI surface and not a second approval-artifact parser
+- generate the minimal publishable wrapper-crate shell under `crates/<agent>/`:
+  - `Cargo.toml`
+  - `README.md`
+  - `LICENSE-APACHE`
+  - `LICENSE-MIT`
+  - `src/lib.rs`
+- reuse repo-owned license text and current wrapper-crate conventions so the shell matches the already-landed crates closely enough to be boring
+- fail closed on unknown agents, path escapes, partial writes, or divergent pre-existing runtime files
+- update onboarding packet preview/render wording so the "next executable runtime step" points at the new scaffold command instead of manual crate creation
+- update `docs/project_management/next/cli-agent-onboarding-charter.md` so the onboarding checklist reflects the new explicit wrapper-shell step
+- add fixture-driven tests for preview, write, identical replay, divergent replay, and workspace-valid generated shells
+
+#### Not In Scope
+- widening `xtask onboard-agent` to write runtime-owned wrapper files directly
+- backend module scaffolding under `crates/agent_api/src/backends/<agent>/`
+- manifest evidence generation under `cli_manifests/<agent>/**`
+- runtime probe logic, backend-specific CLI quirks, or fake-binary implementation work
+- maintenance-lane changes under `check-agent-drift`, `refresh-agent`, or `close-agent-maintenance`
+- registry schema expansion unless a concrete missing field proves it is necessary
+- automatic chaining where `onboard-agent` implicitly invokes the new scaffold command
+
+#### Success Criteria
+M6 is complete only when all of these are true:
+
+- `cargo run -p xtask -- scaffold-wrapper-crate --agent <agent> --dry-run` exists, reads the enrolled agent from `crates/xtask/data/agent_registry.toml`, and previews the exact wrapper-shell file set without mutating the worktree
+- `cargo run -p xtask -- scaffold-wrapper-crate --agent <agent> --write` writes the wrapper-shell file set under `crates/<agent>/` and is idempotent on identical replay
+- replaying the command against divergent pre-existing wrapper-shell files fails without partial writes
+- the scaffold command rejects unknown agents, missing registry-owned paths, and symlink/path-escape attempts with validation exit `2`
+- the scaffold command does not mutate registry/docs/manifest/publication surfaces owned by `onboard-agent`
+- the generated `Cargo.toml` includes the minimum publishability metadata needed to avoid the Gemini failure class, including `readme = "README.md"` and crate-local dual-license surfaces
+- the generated wrapper shell is structurally valid Rust workspace content, including `src/lib.rs`, so targeted `cargo check -p <package>` can succeed once the shell lands
+- `crates/xtask/src/onboard_agent/preview.rs`, `crates/xtask/src/onboard_agent/preview/render.rs`, and their tests no longer describe manual wrapper-crate creation as the immediate next step
+- `docs/project_management/next/cli-agent-onboarding-charter.md` reflects the new explicit wrapper-shell step without rewriting the broader control-plane/runtime boundary
+
+#### What Already Exists
+| Sub-problem | Existing code to reuse | Why it matters |
+|---|---|---|
+| control-plane enrollment | `crates/xtask/src/onboard_agent.rs` | already owns registry/docs/manifest/release writes and defines the boundary M6 must not silently widen |
+| path-jail and rollback-safe writes | `crates/xtask/src/workspace_mutation.rs` | already gives the repo the right fail-closed mutation primitive for runtime-shell scaffolding |
+| enrolled agent lookup | `crates/xtask/src/agent_registry.rs` | already owns `crate_path`, `package_name`, release track, and scaffold metadata, so M6 should read from it instead of re-asking the operator |
+| onboarding packet wording | `crates/xtask/src/onboard_agent/preview.rs`, `crates/xtask/src/onboard_agent/preview/render.rs` | already define the maintainer-facing next-step contract and must be updated so the workflow stays truthful |
+| wrapper package examples | `crates/gemini_cli/**`, `crates/opencode/**`, `crates/codex/**`, `crates/claude_code/**` | already show the minimal crate layout, README shape, dual-license surfaces, and publishable package metadata |
+| entrypoint test harness | `crates/xtask/tests/onboard_agent_entrypoint/*.rs`, `crates/xtask/tests/support/onboard_agent_harness.rs` | already prove dry-run/write/replay/divergence semantics and can be extended instead of inventing a new test style |
+| onboarding workflow charter | `docs/project_management/next/cli-agent-onboarding-charter.md` | already captures the operator workflow and is the narrow doc surface that must stop implying manual shell creation |
+
+#### Chosen Approach
+M6 should add one explicit command:
+
+`cargo run -p xtask -- scaffold-wrapper-crate --agent <agent_id> --dry-run|--write`
+
+That is the smallest complete fix.
+
+It preserves `onboard-agent` as the create-mode control-plane enrollment step. It gives the repo one place to own publishable wrapper-shell scaffolding. It avoids threading crate template choices back through approval artifacts or widening the current `15 total planned` control-plane mutation contract into a mixed control-plane/runtime write set.
+
+The command should be registry-driven, not descriptor-driven. Once the agent is enrolled, the control plane already knows the `crate_path`, `package_name`, release track, and pack prefix. Re-asking for those fields would duplicate truth and create a second drift surface.
+
+#### Dream State Delta
+```text
+CURRENT
+onboard-agent enrolls control-plane surfaces
+packet tells maintainer to create wrapper crate manually
+crate-local publishability files can be forgotten until late
+
+M6
+scaffold-wrapper-crate writes a minimal publishable wrapper shell from registry truth
+onboarding packet points at the new command
+runtime lane starts from a valid package shell instead of a blank directory
+
+12-MONTH IDEAL
+approved agent
+  -> onboard-agent
+  -> scaffold-wrapper-crate
+  -> backend implementation
+  -> manifest evidence generation
+  -> make preflight
+no ownership confusion and no late publish-surface surprises
+```
+
+#### Architecture Review
+##### Preferred Module Shape
+Keep M6 inside the existing `xtask` crate and keep the code boring:
+
+- `crates/xtask/src/main.rs`
+  - add the new subcommand and route it like the other `xtask` entrypoints
+- `crates/xtask/src/lib.rs`
+  - export the new scaffold module for library-driven tests
+- `crates/xtask/src/wrapper_scaffold.rs`
+  - own command args, registry lookup, write planning, and top-level run logic
+- optional narrow helper splits under `crates/xtask/src/wrapper_scaffold/`
+  - `preview.rs` for dry-run rendering
+  - `validation.rs` for fail-closed agent/path/file checks
+- `crates/xtask/src/agent_registry.rs`
+  - remain the read-only source of enrolled-agent metadata
+- `crates/xtask/src/workspace_mutation.rs`
+  - remain the only write primitive for runtime-shell file creation
+- `crates/xtask/src/onboard_agent/preview.rs`
+- `crates/xtask/src/onboard_agent/preview/render.rs`
+  - update packet wording so the next runtime step is "run scaffold-wrapper-crate, then implement backend/runtime details"
+
+If one file is enough for the command, keep it in one file. Do not build a mini templating framework for five files.
+
+##### Dependency Graph
+```text
+crates/xtask/data/agent_registry.toml
+                |
+                v
+     crates/xtask/src/agent_registry.rs
+                |
+                v
+  scaffold-wrapper-crate command input
+  - crate_path
+  - package_name
+  - display_name
+  - release metadata
+                |
+                v
+     crates/xtask/src/wrapper_scaffold.rs
+                |
+        +-------+------------------+
+        |                          |
+        v                          v
+workspace_mutation.rs      preview/validation helpers
+        |                          |
+        v                          v
+crates/<agent>/**          stdout preview + fail-closed checks
+                |
+                v
+onboard-agent packet wording updates
+```
+
+##### Architecture Decisions
+- `onboard-agent` remains control-plane-only. M6 must not quietly rewrite its meaning.
+- the new scaffold command should take `--agent <agent_id>`, not a second descriptor surface and not `--approval`
+- registry metadata is enough input for M6; the scaffold command should not grow new committed truth unless the current registry is provably insufficient
+- `src/lib.rs` is required, not optional. A crate shell that still leaves the workspace structurally invalid is not a real scaffold
+- M6 should not touch backend modules, manifest evidence, or publication artifacts. Those stay downstream runtime work
+- dry-run and write mode semantics must mirror the rest of `xtask`: preview first, no hidden writes, deterministic replay, fail closed on divergence
+
+#### Code Quality Guardrails
+- keep the file templates explicit and small; five obvious files beat a generic package-scaffold abstraction
+- read from registry truth once and pass a narrow typed scaffold plan through the command
+- fail closed on divergent files instead of trying to merge maintainer-written runtime code
+- keep output ownership obvious: the new command owns only `crates/<agent>/**` package-shell files, and `onboard-agent` keeps owning registry/docs/manifest/release surfaces
+- update preview/help tests in the same change as the packet wording so the repo never publishes stale workflow instructions
+
+#### Error & Rescue Registry
+| Condition | Detection surface | User-visible failure | Auto-recovery | Maintainer action |
+|---|---|---|---|---|
+| agent id is not enrolled | registry lookup in scaffold command | validation error, exit `2` | no | run `onboard-agent` first or fix the agent id |
+| `crate_path` escapes the workspace or hits a symlink | `workspace_mutation` path jail | validation error, exit `2` | no | fix registry/path ownership before retrying |
+| wrapper-shell file already exists with divergent contents | planned mutation compare | divergent replay error, no writes | no | inspect runtime-owned edits, then rerun only if overwrite is intentional |
+| scaffold writes README/licenses but not valid Rust sources | targeted `cargo check -p <package>` or fixture validation | broken workspace/package shell | no | M6 must include `src/lib.rs` and valid `Cargo.toml`; otherwise the milestone failed |
+| onboarding packet still says "implement the wrapper crate manually" | preview/help tests and packet diff review | stale operator workflow | yes, via same M6 change | update `onboard-agent` render/preview text and tests |
+| scaffold command starts mutating registry/docs/publication surfaces | write-mode tests | ownership-boundary regression | yes, via test failure | keep those writes in `onboard-agent`; remove them from scaffold command |
+
+#### Test Diagram
+| Codepath | Required proof | Test home |
+|---|---|---|
+| dry-run preview from registry-loaded agent | preview lists exact crate-shell files and no writes occur | new `wrapper_scaffold` entrypoint test |
+| write mode first apply | scaffold writes the expected five files | new `wrapper_scaffold` entrypoint test |
+| identical replay | second write is a no-op | new `wrapper_scaffold` entrypoint test |
+| divergent replay | pre-existing edited file fails closed and leaves no partial writes | new `wrapper_scaffold` entrypoint test |
+| unknown agent | invalid agent id exits `2` | new `wrapper_scaffold` validation test |
+| symlink/path escape | jailed path rejection exits `2` | new `wrapper_scaffold` validation test |
+| workflow wording | onboarding preview/handoff now points to scaffold command | updates to `crates/xtask/tests/onboard_agent_entrypoint/help_and_preview.rs` |
+| structural validity | generated shell supports targeted `cargo check -p <package>` in a fixture workspace | new integration-style xtask test |
+
+#### Workstreams
+##### W1. Scaffold Command Skeleton
+Goal: add the command without changing current control-plane ownership.
+
+Deliverables:
+- new `xtask` subcommand wired through `crates/xtask/src/main.rs`
+- registry-driven agent lookup and validation
+- dry-run and write mode surfaces with deterministic preview text
+
+Primary modules:
+- `crates/xtask/src/main.rs`
+- `crates/xtask/src/lib.rs`
+- `crates/xtask/src/wrapper_scaffold.rs`
+- optional `crates/xtask/src/wrapper_scaffold/{preview,validation}.rs`
+
+Exit criteria:
+- command exists
+- unknown agents fail closed
+- dry-run does not write
+
+##### W2. Runtime Shell File Generation
+Goal: generate the minimal publishable wrapper shell and nothing more.
+
+Deliverables:
+- `Cargo.toml`
+- `README.md`
+- `LICENSE-APACHE`
+- `LICENSE-MIT`
+- `src/lib.rs`
+
+Primary modules:
+- `crates/xtask/src/wrapper_scaffold.rs`
+- `crates/xtask/src/workspace_mutation.rs`
+- wrapper-shell fixture tests
+
+Exit criteria:
+- identical replay is a no-op
+- divergent replay fails without partial writes
+- generated shell is structurally valid for targeted `cargo check -p <package>`
+
+##### W3. Workflow Re-Contracting
+Goal: make the operator-facing workflow truthful once the new command exists.
+
+Deliverables:
+- onboarding packet preview/handoff wording that points at `scaffold-wrapper-crate`
+- onboarding charter checklist update
+- tests that guard the new wording and preserve the control-plane/runtime boundary
+
+Primary modules:
+- `crates/xtask/src/onboard_agent/preview.rs`
+- `crates/xtask/src/onboard_agent/preview/render.rs`
+- `crates/xtask/tests/onboard_agent_entrypoint/help_and_preview.rs`
+- `docs/project_management/next/cli-agent-onboarding-charter.md`
+
+Exit criteria:
+- no onboarding preview text still implies the first runtime step is manual crate creation
+- the charter shows the explicit wrapper-shell step without widening `onboard-agent`
+
+#### Failure Modes Registry
+| Surface | Failure | Prevent in M6? | Detect in tests? | User impact | Blocker? |
+|---|---|---|---|---|---|
+| command boundary | `onboard-agent` silently starts writing runtime crate files | yes | yes | approval/control-plane semantics become ambiguous | yes |
+| runtime shell | generated crate misses `src/lib.rs` or valid package metadata | yes | yes | workspace stays broken or publish checks fail late | yes |
+| replay safety | scaffold overwrites maintainer-edited runtime files | yes | yes | user loses runtime work | yes |
+| path safety | scaffold follows a symlink or escapes `crate_path` | yes | yes | unsafe write outside repo boundary | yes |
+| operator docs | onboarding packet still points at manual wrapper creation | yes | yes | maintainers follow stale workflow | yes |
+| scope creep | scaffold command starts owning backend or manifest work | yes | yes | one command becomes another overloaded lifecycle tool | yes |
+
+#### Decision Audit Trail
+| # | Phase | Decision | Classification | Principle | Rationale | Rejected |
+|---|---|---|---|---|---|---|
+| 1 | CEO | keep M6 as a separate scaffold command | mechanical | explicit over clever | the repo already encodes `onboard-agent` as control-plane-only and tests guard that boundary | widen `onboard-agent` |
+| 2 | CEO | make the command registry-driven with `--agent` input | mechanical | DRY | enrolled metadata already exists in the registry and should not be re-entered | second descriptor CLI surface |
+| 3 | Eng | require `src/lib.rs` in the scaffolded shell | mechanical | completeness | README/license files alone do not restore workspace validity | docs-only or package-only shell |
+| 4 | Eng | keep backend modules and manifest evidence out of M6 | mechanical | boil lakes, not oceans | M6 should close the wrapper-shell gap, not absorb the entire runtime lane | backend scaffold or manifest generation in the same milestone |
+
+#### Completion Summary
+| Dimension | Verdict | Notes |
+|---|---|---|
+| Scope | ready | M6 is now bounded to one runtime-shell seam after M5, not a generic onboarding rewrite |
+| Architecture | ready | separate `scaffold-wrapper-crate` command is the clean seam and preserves existing ownership |
+| Tests | ready with explicit gate | dry-run/write/replay/divergence/path-safety and targeted `cargo check` are the minimum proof set |
+| Docs | ready with narrow re-contract | only packet wording and the onboarding charter need contract updates if M6 stays registry-driven |
+| Deferred | none beyond M7 | broader docs cleanup and operator-guide consolidation remain M7 work |
 
 ### M7. Documentation And Legacy Cleanup
 Status:
