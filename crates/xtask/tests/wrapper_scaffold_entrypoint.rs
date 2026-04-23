@@ -1,21 +1,15 @@
-use std::{
-    fs,
-    path::{Path, PathBuf},
-};
+use std::{fs, path::Path};
 
 #[path = "support/onboard_agent_harness.rs"]
 mod harness;
 
-use harness::{fixture_root, run_xtask, snapshot_files, wrapper_scaffold_args};
+use harness::{
+    nested_scaffold_fixture_root, run_xtask, scaffold_fixture_root, snapshot_files,
+    wrapper_scaffold_args, NESTED_GEMINI_CRATE_PATH, SEEDED_GEMINI_CRATE_PATH,
+};
 
-fn scaffold_fixture(prefix: &str) -> PathBuf {
-    let fixture = fixture_root(prefix);
-    fs::remove_dir_all(fixture.join("crates/gemini_cli")).expect("remove seeded gemini crate");
-    fixture
-}
-
-fn assert_scaffold_shell(root: &Path) {
-    let crate_root = root.join("crates/gemini_cli");
+fn assert_scaffold_shell(root: &Path, crate_path: &str) {
+    let crate_root = root.join(crate_path);
     assert!(crate_root.join("Cargo.toml").is_file());
     assert!(crate_root.join("README.md").is_file());
     assert!(crate_root.join("LICENSE-APACHE").is_file());
@@ -25,7 +19,7 @@ fn assert_scaffold_shell(root: &Path) {
 
 #[test]
 fn scaffold_wrapper_crate_dry_run_previews_exact_file_set() {
-    let fixture = scaffold_fixture("wrapper-scaffold-dry-run");
+    let fixture = scaffold_fixture_root("wrapper-scaffold-dry-run");
     let before = snapshot_files(&fixture);
 
     let first = run_xtask(&fixture, wrapper_scaffold_args("--dry-run", "gemini_cli"));
@@ -57,7 +51,7 @@ fn scaffold_wrapper_crate_dry_run_previews_exact_file_set() {
 
 #[test]
 fn scaffold_wrapper_crate_write_creates_minimal_publishable_shell() {
-    let fixture = scaffold_fixture("wrapper-scaffold-write");
+    let fixture = scaffold_fixture_root("wrapper-scaffold-write");
     let before = snapshot_files(&fixture);
 
     let output = run_xtask(&fixture, wrapper_scaffold_args("--write", "gemini_cli"));
@@ -65,7 +59,7 @@ fn scaffold_wrapper_crate_write_creates_minimal_publishable_shell() {
 
     assert_eq!(output.exit_code, 0, "stderr:\n{}", output.stderr);
     assert_ne!(before, after, "write mode must mutate the fixture");
-    assert_scaffold_shell(&fixture);
+    assert_scaffold_shell(&fixture, SEEDED_GEMINI_CRATE_PATH);
 
     let manifest =
         fs::read_to_string(fixture.join("crates/gemini_cli/Cargo.toml")).expect("read manifest");
@@ -92,7 +86,7 @@ fn scaffold_wrapper_crate_write_creates_minimal_publishable_shell() {
 
 #[test]
 fn scaffold_wrapper_crate_replay_is_noop() {
-    let fixture = scaffold_fixture("wrapper-scaffold-replay");
+    let fixture = scaffold_fixture_root("wrapper-scaffold-replay");
 
     let first = run_xtask(&fixture, wrapper_scaffold_args("--write", "gemini_cli"));
     let after_first = snapshot_files(&fixture);
@@ -109,7 +103,7 @@ fn scaffold_wrapper_crate_replay_is_noop() {
 
 #[test]
 fn scaffold_wrapper_crate_divergent_file_fails_without_partial_writes() {
-    let fixture = scaffold_fixture("wrapper-scaffold-divergent");
+    let fixture = scaffold_fixture_root("wrapper-scaffold-divergent");
     let first = run_xtask(&fixture, wrapper_scaffold_args("--write", "gemini_cli"));
     assert_eq!(first.exit_code, 0, "stderr:\n{}", first.stderr);
 
@@ -131,6 +125,73 @@ fn scaffold_wrapper_crate_divergent_file_fails_without_partial_writes() {
     );
     assert_eq!(
         before, after,
+        "divergent replay must not leave partial writes"
+    );
+}
+
+#[test]
+fn scaffold_wrapper_crate_supports_nested_registry_crate_path() {
+    let fixture = nested_scaffold_fixture_root("wrapper-scaffold-nested-path");
+    let before = snapshot_files(&fixture);
+
+    let dry_run = run_xtask(&fixture, wrapper_scaffold_args("--dry-run", "gemini_cli"));
+    let after_dry_run = snapshot_files(&fixture);
+
+    assert_eq!(dry_run.exit_code, 0, "stderr:\n{}", dry_run.stderr);
+    assert_eq!(before, after_dry_run, "dry-run must not mutate the fixture");
+
+    for path in [
+        "crates/runtime/gemini_shell/Cargo.toml",
+        "crates/runtime/gemini_shell/README.md",
+        "crates/runtime/gemini_shell/LICENSE-APACHE",
+        "crates/runtime/gemini_shell/LICENSE-MIT",
+        "crates/runtime/gemini_shell/src/lib.rs",
+    ] {
+        assert!(
+            dry_run.stdout.contains(path),
+            "dry-run stdout must mention {path}:\n{}",
+            dry_run.stdout
+        );
+    }
+
+    let first = run_xtask(&fixture, wrapper_scaffold_args("--write", "gemini_cli"));
+    assert_eq!(first.exit_code, 0, "stderr:\n{}", first.stderr);
+    assert_scaffold_shell(&fixture, NESTED_GEMINI_CRATE_PATH);
+
+    let manifest = fs::read_to_string(fixture.join(NESTED_GEMINI_CRATE_PATH).join("Cargo.toml"))
+        .expect("read nested manifest");
+    assert!(manifest.contains("name = \"unified-agent-api-gemini-cli\""));
+
+    let after_first = snapshot_files(&fixture);
+    let second = run_xtask(&fixture, wrapper_scaffold_args("--write", "gemini_cli"));
+    let after_second = snapshot_files(&fixture);
+
+    assert_eq!(second.exit_code, 0, "stderr:\n{}", second.stderr);
+    assert_eq!(
+        after_first, after_second,
+        "identical replay must not change the filesystem"
+    );
+
+    fs::write(
+        fixture.join(NESTED_GEMINI_CRATE_PATH).join("README.md"),
+        "# Tampered Nested README\n",
+    )
+    .expect("tamper nested README");
+    let before_divergence = snapshot_files(&fixture);
+
+    let divergent = run_xtask(&fixture, wrapper_scaffold_args("--write", "gemini_cli"));
+    let after_divergence = snapshot_files(&fixture);
+
+    assert_eq!(divergent.exit_code, 2, "stderr:\n{}", divergent.stderr);
+    assert!(
+        divergent
+            .stderr
+            .contains("crates/runtime/gemini_shell/README.md"),
+        "stderr did not mention divergent nested README:\n{}",
+        divergent.stderr
+    );
+    assert_eq!(
+        before_divergence, after_divergence,
         "divergent replay must not leave partial writes"
     );
 }

@@ -539,7 +539,7 @@ These are already true on `feat/fill-trust-gap` and are not M6 work:
 
 #### Step 0. Scope Challenge
 - Existing code leverage: M6 should reuse `main.rs` command routing, `agent_registry` as the read-only input contract, `workspace_mutation` for bounded writes, and the existing onboard-agent preview/render surfaces for downstream packet wording. It should not invent a second registry, a second approval artifact, or an ad hoc file writer.
-- Minimum complete change: one new `xtask` subcommand, one narrow runtime file write set under `crates/<agent>/`, one docs wording update so the onboarding packet points at the new command, and one test harness proving replay, divergence protection, and workspace validity.
+- Minimum complete change: one new `xtask` subcommand, one narrow runtime file write set at the registry-owned `crate_path` under `crates/`, one docs wording update so the onboarding packet points at the new command, and one test harness proving replay, divergence protection, and workspace validity.
 - Complexity check: the likely blast radius is about 8 to 12 files across `crates/xtask/src/**`, `crates/xtask/tests/**`, `PLAN.md`, and the onboarding charter. That is acceptable because every touched file belongs to one onboarding-to-runtime seam.
 - Search check: reuse the repo's existing `onboard-agent` preview/write split and `workspace_mutation` rollback semantics instead of inventing bespoke template plumbing. Use the existing wrapper crates as template evidence instead of introducing a generic package DSL.
 - Completeness check: a partial M6 that only writes README/license files is not enough. The scaffold must also write `src/lib.rs` and a valid `Cargo.toml`, or the workspace remains structurally broken after `onboard-agent` has already added the member to root `Cargo.toml`.
@@ -549,7 +549,7 @@ These are already true on `feat/fill-trust-gap` and are not M6 work:
 In scope:
 - add a separate `xtask` subcommand for wrapper-shell scaffolding, with `--dry-run` and `--write` modes
 - make the command registry-driven: input should be the enrolled agent id, not a second descriptor CLI surface and not a second approval-artifact parser
-- generate the minimal publishable wrapper-crate shell under `crates/<agent>/`:
+- generate the minimal publishable wrapper-crate shell at the registry-owned `crate_path` under `crates/`:
   - `Cargo.toml`
   - `README.md`
   - `LICENSE-APACHE`
@@ -574,7 +574,7 @@ In scope:
 M6 is complete only when all of these are true:
 
 - `cargo run -p xtask -- scaffold-wrapper-crate --agent <agent> --dry-run` exists, reads the enrolled agent from `crates/xtask/data/agent_registry.toml`, and previews the exact wrapper-shell file set without mutating the worktree
-- `cargo run -p xtask -- scaffold-wrapper-crate --agent <agent> --write` writes the wrapper-shell file set under `crates/<agent>/` and is idempotent on identical replay
+- `cargo run -p xtask -- scaffold-wrapper-crate --agent <agent> --write` writes the wrapper-shell file set at the enrolled agent's registry-owned `crate_path` and is idempotent on identical replay
 - replaying the command against divergent pre-existing wrapper-shell files fails without partial writes
 - the scaffold command rejects unknown agents, missing registry-owned paths, and symlink/path-escape attempts with validation exit `2`
 - the scaffold command does not mutate registry/docs/manifest/publication surfaces owned by `onboard-agent`
@@ -673,7 +673,7 @@ crates/xtask/data/agent_registry.toml
 workspace_mutation.rs      preview/validation helpers
         |                          |
         v                          v
-crates/<agent>/**          stdout preview + fail-closed checks
+registry-owned crate_path/**          stdout preview + fail-closed checks
                 |
                 v
 onboard-agent packet wording updates
@@ -691,7 +691,7 @@ onboard-agent packet wording updates
 - keep the file templates explicit and small; five obvious files beat a generic package-scaffold abstraction
 - read from registry truth once and pass a narrow typed scaffold plan through the command
 - fail closed on divergent files instead of trying to merge maintainer-written runtime code
-- keep output ownership obvious: the new command owns only `crates/<agent>/**` package-shell files, and `onboard-agent` keeps owning registry/docs/manifest/release surfaces
+- keep output ownership obvious: the new command owns only the registry-owned `crate_path/**` package-shell files, and `onboard-agent` keeps owning registry/docs/manifest/release surfaces
 - update preview/help tests in the same change as the packet wording so the repo never publishes stale workflow instructions
 
 #### Error & Rescue Registry
@@ -732,7 +732,7 @@ WRITE MODE
     |    \--> [GAP -> regression] divergent existing file fails without partial writes
     |
     \--> ownership boundary stays narrow
-         \--> [GAP -> regression] no writes escape crates/<agent>/**
+         \--> [GAP -> regression] no writes escape the registry-owned crate_path/**
 
 WORKFLOW RE-CONTRACT
 ====================
@@ -1036,7 +1036,7 @@ In scope:
 ## Not In Scope
 - adding update mode to `xtask onboard-agent`
 - changing the recommendation, approval, or new-agent onboarding flow from M3
-- generating or mutating runtime-owned wrapper/backend code under `crates/<agent>/` or `crates/agent_api/src/backends/<agent>/`
+- generating or mutating runtime-owned wrapper/backend code under the registry-owned `crate_path` or `crates/agent_api/src/backends/<agent>/`
 - mutating raw manifest evidence under `cli_manifests/<agent>/current.json`, `versions/`, `pointers/`, or `reports/` from the control plane
 - collapsing recommendation, onboarding, proving-run closeout, and maintenance into one universal lifecycle command family
 - changing support-matrix or capability-matrix semantics
@@ -1059,7 +1059,7 @@ M4 is complete only when all of these are true:
   - generated publication outputs from existing generators
   - the generated block inside `docs/crates-io-release.md` when it drifted
 - Maintenance write mode never mutates:
-  - `crates/<agent>/**`
+  - registry-owned `crate_path/**`
   - `crates/agent_api/src/backends/<agent>/**`
   - raw manifest evidence files under `cli_manifests/<agent>/**`
   - historical onboarding packet roots such as `docs/project_management/next/<agent>-cli-onboarding/**`
@@ -1444,7 +1444,7 @@ The maintenance lane is intentionally narrow.
 | generated block in `docs/crates-io-release.md` between `<!-- generated-by: xtask onboard-agent; section: crates-io-release -->` and `<!-- /generated-by: xtask onboard-agent; section: crates-io-release -->` | generated publication | write when drifted |
 | `crates/xtask/data/agent_registry.toml` | registry truth | read-only in M4 unless explicit follow-on reopening is approved |
 | `cli_manifests/<agent>/current.json`, `versions/`, `pointers/`, `reports/` | manifest evidence | never |
-| `crates/<agent>/**` | runtime owner | never |
+| registry-owned `crate_path/**` | runtime owner | never |
 | `crates/agent_api/src/backends/<agent>/**` | runtime owner | never |
 | `docs/project_management/next/<agent>-cli-onboarding/**` | historical onboarding packet | never |
 

@@ -30,6 +30,9 @@ schema.
 Each `[[agents]]` entry MUST continue to declare the existing identity, capability, publication,
 release, and scaffold fields enforced by `xtask`.
 
+Downstream `xtask` commands that materialize wrapper-crate files MUST use the entry's `crate_path`
+directly. They MUST NOT derive a second crate-location contract from `agent_id`.
+
 If capability publication is enabled for an agent, the registry publication block is also the
 canonical source of the target-scoped publication contract. In particular:
 

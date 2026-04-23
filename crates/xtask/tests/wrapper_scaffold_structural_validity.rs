@@ -1,25 +1,21 @@
-use std::{fs, path::PathBuf, process::Command};
+use std::{fs, process::Command};
 
 #[path = "support/onboard_agent_harness.rs"]
 mod harness;
 
-use harness::{fixture_root, run_xtask, wrapper_scaffold_args};
-
-fn scaffold_fixture(prefix: &str) -> PathBuf {
-    let fixture = fixture_root(prefix);
-    fs::remove_dir_all(fixture.join("crates/gemini_cli")).expect("remove seeded gemini crate");
-    fixture
-}
+use harness::{
+    nested_scaffold_fixture_root, run_xtask, wrapper_scaffold_args, NESTED_GEMINI_CRATE_PATH,
+};
 
 #[test]
-fn scaffold_wrapper_crate_generated_shell_passes_targeted_cargo_check() {
-    let fixture = scaffold_fixture("wrapper-scaffold-structural-validity");
+fn scaffold_wrapper_crate_nested_registry_path_passes_targeted_cargo_check() {
+    let fixture = nested_scaffold_fixture_root("wrapper-scaffold-structural-validity");
 
     let scaffold = run_xtask(&fixture, wrapper_scaffold_args("--write", "gemini_cli"));
     assert_eq!(scaffold.exit_code, 0, "stderr:\n{}", scaffold.stderr);
 
-    let manifest =
-        fs::read_to_string(fixture.join("crates/gemini_cli/Cargo.toml")).expect("read manifest");
+    let manifest = fs::read_to_string(fixture.join(NESTED_GEMINI_CRATE_PATH).join("Cargo.toml"))
+        .expect("read manifest");
     assert!(manifest.contains("version.workspace = true"));
     assert!(manifest.contains("edition = \"2021\""));
     assert!(manifest.contains("rust-version = \"1.78\""));

@@ -117,7 +117,7 @@ pub fn run_in_workspace<W: Write>(
         ))
     })?;
     let licenses = load_root_licenses(&jail)?;
-    let plan = build_plan(agent, &args.agent_id, licenses)?;
+    let plan = build_plan(agent, licenses)?;
     let preview = collect_preview_states(&jail, &plan)?;
 
     write_plan_preview(writer, &plan, &preview, args.write)?;
@@ -183,24 +183,15 @@ fn load_root_licenses(jail: &WorkspacePathJail) -> Result<(Vec<u8>, Vec<u8>), Er
 
 fn build_plan(
     agent: &AgentRegistryEntry,
-    requested_agent_id: &str,
     licenses: (Vec<u8>, Vec<u8>),
 ) -> Result<WrapperScaffoldPlan, Error> {
-    let expected_crate_path = format!("crates/{requested_agent_id}");
-    if agent.crate_path != expected_crate_path {
-        return Err(Error::Validation(format!(
-            "agent `{requested_agent_id}` owns crate path `{}`, expected `{expected_crate_path}`",
-            agent.crate_path
-        )));
-    }
-
     let crate_dir = Path::new(&agent.crate_path)
         .file_name()
         .and_then(|part| part.to_str())
         .ok_or_else(|| {
             Error::Validation(format!(
-                "agent `{requested_agent_id}` has invalid crate path `{}`",
-                agent.crate_path
+                "agent `{}` has invalid crate path `{}`",
+                agent.agent_id, agent.crate_path
             ))
         })?;
     let primary_keyword = primary_keyword(&agent.display_name)?;

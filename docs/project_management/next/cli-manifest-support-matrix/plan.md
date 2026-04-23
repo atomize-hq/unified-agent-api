@@ -18,7 +18,7 @@ Turn the existing manifest parity evidence in `cli_manifests/codex` and `cli_man
   - backend-crate support
   - UAA unified support
 - Preserve backend-specific passthrough as visible state, but do not count it as UAA unified support.
-- Treat backend support as crate-first: a manifest root may exist before `crates/<agent>` exists, but backend support cannot be claimed until wrapper-derived evidence exists.
+- Treat backend support as crate-first: a manifest root may exist before the registry-owned `crate_path` exists, but backend support cannot be claimed until wrapper-derived evidence exists.
 
 ## Success Criteria
 - `cargo run -p xtask -- support-matrix` deterministically writes one machine-readable support artifact and one Markdown projection.

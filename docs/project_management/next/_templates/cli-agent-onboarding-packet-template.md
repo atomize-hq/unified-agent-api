@@ -15,7 +15,7 @@ Use this template to evaluate exactly 3 real CLI agent candidates and produce on
 This artifact is informative, not normative. It must point at authoritative specs, contracts, and committed repo evidence instead of becoming a second source of truth.
 
 The implementation handoff in a filled packet must preserve the repo's crate-first onboarding ladder:
-- wrapper crate first in `crates/<agent>/`
+- wrapper crate first at the registry-owned `crate_path` under `crates/`
 - `agent_api` backend adapter second
 - UAA promotion assessment last
 
@@ -267,7 +267,7 @@ Required checklist:
 - [ ] The recommendation explains the winner and tie-break reasoning.
 - [ ] The recommended agent includes a concrete evaluation recipe.
 - [ ] Every judgment-heavy section has a provenance line.
-- [ ] The handoff keeps `crates/<agent>/` work ahead of `agent_api` adapter work.
+- [ ] The handoff keeps registry-owned wrapper-crate-path work ahead of `agent_api` adapter work.
 - [ ] UAA promotion is treated as a later gate, not bundled into initial backend support.
 - [ ] The dated evidence appendix includes all 3 candidates.
 - [ ] Commercial or gated access requirements are explicit where applicable.

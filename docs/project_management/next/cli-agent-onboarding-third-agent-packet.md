@@ -15,7 +15,7 @@ Select the first real third CLI agent to onboard after phase 1, using a reproduc
 This packet is informative, not normative. Specs under `docs/specs/**` remain authoritative for contract semantics.
 
 Implementation sequencing for the recommended agent follows the crate-first charter:
-- wrapper crate first in `crates/<agent>/`
+- wrapper crate first at the registry-owned `crate_path` under `crates/`
 - `agent_api` backend adapter second
 - UAA promotion assessment last
 
