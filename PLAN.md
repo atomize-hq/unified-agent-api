@@ -704,17 +704,77 @@ onboard-agent packet wording updates
 | onboarding packet still says "implement the wrapper crate manually" | preview/help tests and packet diff review | stale operator workflow | yes, via same M6 change | update `onboard-agent` render/preview text and tests |
 | scaffold command starts mutating registry/docs/publication surfaces | write-mode tests | ownership-boundary regression | yes, via test failure | keep those writes in `onboard-agent`; remove them from scaffold command |
 
-#### Test Diagram
-| Codepath | Required proof | Test home |
-|---|---|---|
-| dry-run preview from registry-loaded agent | preview lists exact crate-shell files and no writes occur | new `wrapper_scaffold` entrypoint test |
-| write mode first apply | scaffold writes the expected five files | new `wrapper_scaffold` entrypoint test |
-| identical replay | second write is a no-op | new `wrapper_scaffold` entrypoint test |
-| divergent replay | pre-existing edited file fails closed and leaves no partial writes | new `wrapper_scaffold` entrypoint test |
-| unknown agent | invalid agent id exits `2` | new `wrapper_scaffold` validation test |
-| symlink/path escape | jailed path rejection exits `2` | new `wrapper_scaffold` validation test |
-| workflow wording | onboarding preview/handoff now points to scaffold command | updates to `crates/xtask/tests/onboard_agent_entrypoint/help_and_preview.rs` |
-| structural validity | generated shell supports targeted `cargo check -p <package>` in a fixture workspace | new integration-style xtask test |
+#### Test Review
+##### Test Diagram
+```text
+WRAPPER SCAFFOLD COMMAND
+========================
+[+] cargo run -p xtask -- scaffold-wrapper-crate --agent <id> --dry-run
+    |
+    +--> registry lookup
+    |    +--> [GAP -> validation] unknown agent exits 2
+    |    \--> [GAP -> validation] missing or invalid crate_path exits 2
+    |
+    +--> scaffold plan build
+    |    +--> [GAP -> preview] exact five-file plan renders in stable order
+    |    \--> [GAP -> validation] path-jail and symlink rejection happen before any writes
+    |
+    \--> preview output only
+         \--> [GAP -> regression] worktree stays unchanged
+
+WRITE MODE
+==========
+[+] cargo run -p xtask -- scaffold-wrapper-crate --agent <id> --write
+    |
+    +--> apply the same in-memory plan used by --dry-run
+    |    +--> [GAP -> regression] first write creates Cargo.toml, README.md, dual licenses, and src/lib.rs
+    |    +--> [GAP -> regression] identical replay is a no-op
+    |    \--> [GAP -> regression] divergent existing file fails without partial writes
+    |
+    \--> ownership boundary stays narrow
+         \--> [GAP -> regression] no writes escape crates/<agent>/**
+
+WORKFLOW RE-CONTRACT
+====================
+[+] onboard-agent preview + charter
+    |
+    +--> [GAP -> regression] preview and handoff now point at scaffold-wrapper-crate
+    \--> [GAP -> regression] onboarding charter names the explicit wrapper-shell step
+
+STRUCTURAL VALIDITY
+===================
+[+] generated wrapper shell
+    |
+    +--> [GAP -> integration] Cargo.toml includes readme and dual-license metadata
+    +--> [GAP -> integration] src/lib.rs exists and compiles as a minimal crate shell
+    \--> [GAP -> integration] targeted cargo check -p <package> succeeds in a fixture workspace
+```
+
+##### Required Test Surfaces
+- Add `crates/xtask/tests/wrapper_scaffold_entrypoint.rs`
+  - `scaffold_wrapper_crate_dry_run_previews_exact_file_set`
+  - `scaffold_wrapper_crate_write_creates_minimal_publishable_shell`
+  - `scaffold_wrapper_crate_replay_is_noop`
+  - `scaffold_wrapper_crate_divergent_file_fails_without_partial_writes`
+- Add `crates/xtask/tests/wrapper_scaffold_validation.rs`
+  - `scaffold_wrapper_crate_rejects_unknown_agent`
+  - `scaffold_wrapper_crate_rejects_path_escape_or_symlinked_crate_path`
+- Update `crates/xtask/tests/onboard_agent_entrypoint/help_and_preview.rs`
+  - assert the next runtime step names `scaffold-wrapper-crate`
+  - keep the guard that `onboard-agent` itself does not create the wrapper crate
+- Add one fixture-backed structural validity test
+  - either in `wrapper_scaffold_entrypoint.rs` or a narrow companion file
+  - assert the generated shell passes targeted `cargo check -p <package>` without requiring backend implementation
+
+##### Verification Commands
+- `cargo test -p xtask --test wrapper_scaffold_entrypoint`
+- `cargo test -p xtask --test wrapper_scaffold_validation`
+- `cargo test -p xtask --test onboard_agent_entrypoint`
+- `cargo check -p xtask`
+- `make preflight`
+
+##### Test Plan Artifact
+- `/Users/spensermcconnell/.gstack/projects/atomize-hq-unified-agent-api/spensermcconnell-feat-fill-trust-gap-eng-review-test-plan-20260423-152745.md`
 
 #### Workstreams
 ##### W1. Scaffold Command Skeleton
@@ -774,6 +834,104 @@ Exit criteria:
 - no onboarding preview text still implies the first runtime step is manual crate creation
 - the charter shows the explicit wrapper-shell step without widening `onboard-agent`
 
+#### Implementation Sequence
+##### Phase 1. Command Contract Lock
+Outputs:
+- `scaffold-wrapper-crate` CLI surface wired through `crates/xtask/src/main.rs`
+- registry-driven agent lookup and validation contract
+- deterministic `--dry-run` preview text
+
+Modules touched:
+- `crates/xtask/src/main.rs`
+- `crates/xtask/src/lib.rs`
+- `crates/xtask/src/wrapper_scaffold.rs`
+- optional `crates/xtask/src/wrapper_scaffold/{preview,validation}.rs`
+
+Implementation notes:
+- lock the command shape first so later work does not relitigate ownership
+- keep the command registry-driven and fail closed on unknown agents or invalid crate paths
+- make `--dry-run` the authoritative render path; `--write` should only apply that exact plan
+
+Exit gate:
+- the repo has one explicit runtime-shell scaffold entrypoint and it still preserves the `onboard-agent` boundary
+
+##### Phase 2. Shell Generation + Replay Safety
+Outputs:
+- the minimal five-file wrapper shell
+- identical replay no-op
+- divergent replay failure without partial writes
+
+Modules touched:
+- `crates/xtask/src/wrapper_scaffold.rs`
+- `crates/xtask/src/workspace_mutation.rs`
+- `crates/xtask/tests/wrapper_scaffold_entrypoint.rs`
+- `crates/xtask/tests/wrapper_scaffold_validation.rs`
+
+Implementation notes:
+- keep file templates explicit and small
+- use one mutation plan for both preview and write mode
+- validate all file targets before the first write so replay failures stay atomic
+
+Exit gate:
+- a newly enrolled agent can receive a valid package shell without risking runtime-owned overwrite
+
+##### Phase 3. Workflow Re-Contract + Proof
+Outputs:
+- updated onboarding preview and handoff wording
+- updated onboarding charter checklist
+- fixture proof that the generated shell passes targeted `cargo check -p <package>`
+
+Modules touched:
+- `crates/xtask/src/onboard_agent/preview.rs`
+- `crates/xtask/src/onboard_agent/preview/render.rs`
+- `crates/xtask/tests/onboard_agent_entrypoint/help_and_preview.rs`
+- `docs/project_management/next/cli-agent-onboarding-charter.md`
+- the fixture-backed xtask test selected in Phase 2
+
+Implementation notes:
+- land wording updates only after the command contract is stable
+- keep the docs touch narrow and ownership-specific
+- use targeted fixture compilation as the proof that M6 closes the Gemini publishability gap instead of only changing prose
+
+Exit gate:
+- the operator-facing workflow is truthful and the scaffolded shell is mechanically valid
+
+#### Performance Review
+- Build the scaffold plan once per invocation and share it across `--dry-run` and `--write`. Two render trees for five files would be self-inflicted drift.
+- Keep templates explicit and local. M6 should not copy whole example crates or walk the workspace beyond registry lookup and jailed file validation.
+- Run targeted `cargo check -p <package>` in a fixture workspace for structural proof instead of full-workspace compilation inside every new test.
+- Reuse `workspace_mutation` transaction semantics so divergence is detected before the first file write, not after half a crate shell lands.
+
+#### Worktree Parallelization Strategy
+##### Dependency Table
+| Step | Modules touched | Depends on |
+|---|---|---|
+| W1. command contract lock | `crates/xtask/src/main.rs`, `crates/xtask/src/lib.rs`, `crates/xtask/src/wrapper_scaffold*` | — |
+| W2. shell generation + replay safety | `crates/xtask/src/wrapper_scaffold*`, `crates/xtask/src/workspace_mutation.rs`, `crates/xtask/tests/wrapper_scaffold_*.rs` | W1 |
+| W3. workflow re-contract | `crates/xtask/src/onboard_agent/preview*`, `crates/xtask/tests/onboard_agent_entrypoint/**`, `docs/project_management/next/cli-agent-onboarding-charter.md` | W1 |
+| W4. final fixture proof | `crates/xtask/tests/wrapper_scaffold_*.rs`, fixture support under `crates/xtask/tests/support/**` | W2, W3 |
+
+##### Parallel Lanes
+Lane A: W1 -> W2
+Core scaffold-command lane. Keep these sequential because W2 depends on the exact contract and file-plan shape W1 defines.
+
+Lane B: W3
+Workflow wording lane. Launch after W1 lands so docs point at the final command name and argument shape, not a moving target.
+
+Lane C: W4
+Final proof lane. Run this only after W2 and W3 merge because it validates both the generated shell and the operator-facing workflow.
+
+##### Execution Order
+1. Launch Lane A first. W1 sets the command seam and failure posture every later step consumes.
+2. After W1 merges, launch W2 and Lane B in parallel worktrees.
+3. Merge W2 and W3.
+4. Run Lane C last as the fixture-backed proof pass against the merged command and wording.
+
+##### Conflict Flags
+- W1 and W2 both touch `crates/xtask/src/wrapper_scaffold*`. Do not parallelize them.
+- W2 and W4 both likely touch `crates/xtask/tests/wrapper_scaffold_*.rs`. Split test ownership early if two worktrees are used.
+- W3 must stay limited to `onboard_agent` preview surfaces plus the charter. If it starts changing scaffold command behavior, it collides with Lane A.
+
 #### Failure Modes Registry
 | Surface | Failure | Prevent in M6? | Detect in tests? | User impact | Blocker? |
 |---|---|---|---|---|---|
@@ -797,8 +955,10 @@ Exit criteria:
 |---|---|---|
 | Scope | ready | M6 is now bounded to one runtime-shell seam after M5, not a generic onboarding rewrite |
 | Architecture | ready | separate `scaffold-wrapper-crate` command is the clean seam and preserves existing ownership |
-| Tests | ready with explicit gate | dry-run/write/replay/divergence/path-safety and targeted `cargo check` are the minimum proof set |
+| Tests | ready with explicit gate | dry-run/write/replay/divergence/path-safety, workflow wording coverage, and targeted `cargo check` are the minimum proof set |
+| Performance | ready | one shared scaffold plan plus targeted fixture compilation keeps the lane boring and cheap |
 | Docs | ready with narrow re-contract | only packet wording and the onboarding charter need contract updates if M6 stays registry-driven |
+| Parallelization | ready | one real parallel window opens after W1, then fixture proof runs last |
 | Deferred | none beyond M7 | broader docs cleanup and operator-guide consolidation remain M7 work |
 
 ### M7. Documentation And Legacy Cleanup
