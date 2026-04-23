@@ -237,9 +237,24 @@ fn onboard_agent_dry_run_preview_is_deterministic_and_writes_nothing() {
     assert!(first.stdout.contains("Next executable runtime step:"));
     assert!(first
         .stdout
+        .contains("cargo run -p xtask -- scaffold-wrapper-crate --agent cursor --write"));
+    assert!(first
+        .stdout
+        .contains("`onboard-agent` does not create the wrapper crate."));
+    assert!(first
+        .stdout
         .contains("Shared onboarding plan preview; no filesystem writes performed."));
     assert!(!first.stdout.contains(" M1"));
     assert!(!first.stdout.contains("future M2"));
     assert!(!first.stdout.contains("dry-run mode"));
     assert!(!first.stdout.contains("Create the wrapper crate"));
+    assert!(!first
+        .stdout
+        .contains("Next executable runtime step: implement the runtime-owned wrapper crate"));
+    assert!(!first
+        .stdout
+        .contains("When the wrapper crate is crates.io-publishable"));
+    assert!(!first.stdout.contains("LICENSE-APACHE"));
+    assert!(!first.stdout.contains("LICENSE-MIT"));
+    assert!(!first.stdout.contains("readme = \"README.md\""));
 }

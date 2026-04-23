@@ -4,11 +4,14 @@ use std::{
     collections::BTreeMap,
     fs,
     path::{Path, PathBuf},
+    process::Command,
 };
 
 use sha2::{Digest, Sha256};
 
 const SEEDED_REGISTRY: &str = include_str!("../../data/agent_registry.toml");
+const ROOT_LICENSE_APACHE: &str = include_str!("../../../../LICENSE-APACHE");
+const ROOT_LICENSE_MIT: &str = include_str!("../../../../LICENSE-MIT");
 
 #[derive(Debug)]
 pub struct HarnessOutput {
@@ -114,6 +117,37 @@ pub fn approval_args(mode_flag: &str, approval_path: &str) -> Vec<String> {
         "--approval".to_string(),
         approval_path.to_string(),
     ]
+}
+
+pub fn wrapper_scaffold_args(mode_flag: &str, agent_id: &str) -> Vec<String> {
+    vec![
+        "scaffold-wrapper-crate".to_string(),
+        "--agent".to_string(),
+        agent_id.to_string(),
+        mode_flag.to_string(),
+    ]
+}
+
+pub fn xtask_bin() -> PathBuf {
+    PathBuf::from(env!("CARGO_BIN_EXE_xtask"))
+}
+
+pub fn run_xtask<I, S>(workspace_root: &Path, argv: I) -> HarnessOutput
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<str>,
+{
+    let output = Command::new(xtask_bin())
+        .current_dir(workspace_root)
+        .args(argv.into_iter().map(|arg| arg.as_ref().to_string()))
+        .output()
+        .expect("run xtask binary");
+
+    HarnessOutput {
+        exit_code: output.status.code().unwrap_or(1),
+        stdout: String::from_utf8(output.stdout).expect("stdout must be utf-8"),
+        stderr: String::from_utf8(output.stderr).expect("stderr must be utf-8"),
+    }
 }
 
 pub fn gemini_dry_run_args() -> Vec<String> {
@@ -222,36 +256,60 @@ pub fn fixture_root(prefix: &str) -> PathBuf {
     fs::create_dir_all(&root).expect("create temp fixture");
     write_text(
         &root.join("Cargo.toml"),
-        "[workspace]\nmembers = [\n  \"crates/agent_api\",\n  \"crates/codex\",\n  \"crates/claude_code\",\n  \"crates/opencode\",\n  \"crates/wrapper_events\",\n  \"crates/xtask\",\n]\n",
+        concat!(
+            "[workspace]\n",
+            "members = [\n",
+            "  \"crates/agent_api\",\n",
+            "  \"crates/codex\",\n",
+            "  \"crates/claude_code\",\n",
+            "  \"crates/opencode\",\n",
+            "  \"crates/gemini_cli\",\n",
+            "  \"crates/wrapper_events\",\n",
+            "  \"crates/xtask\",\n",
+            "]\n",
+            "resolver = \"2\"\n",
+            "\n",
+            "[workspace.package]\n",
+            "version = \"0.3.0\"\n",
+            "edition = \"2021\"\n",
+            "rust-version = \"1.78\"\n",
+            "license = \"MIT OR Apache-2.0\"\n",
+            "authors = [\"Unified Agent API Contributors\"]\n",
+        ),
     );
+    write_text(&root.join("LICENSE-APACHE"), ROOT_LICENSE_APACHE);
+    write_text(&root.join("LICENSE-MIT"), ROOT_LICENSE_MIT);
     write_text(
         &root.join("crates/xtask/data/agent_registry.toml"),
         SEEDED_REGISTRY,
     );
-    write_text(
-        &root.join("crates/agent_api/Cargo.toml"),
-        "[package]\nname = \"unified-agent-api\"\nversion = \"0.2.3\"\nedition = \"2021\"\n",
+    seed_workspace_member(&root, "crates/agent_api", "unified-agent-api", false);
+    seed_workspace_member(&root, "crates/codex", "unified-agent-api-codex", false);
+    seed_workspace_member(
+        &root,
+        "crates/claude_code",
+        "unified-agent-api-claude-code",
+        false,
     );
-    write_text(
-        &root.join("crates/codex/Cargo.toml"),
-        "[package]\nname = \"unified-agent-api-codex\"\nversion = \"0.2.3\"\nedition = \"2021\"\n",
+    seed_workspace_member(
+        &root,
+        "crates/opencode",
+        "unified-agent-api-opencode",
+        false,
     );
-    write_text(
-        &root.join("crates/claude_code/Cargo.toml"),
-        "[package]\nname = \"unified-agent-api-claude-code\"\nversion = \"0.2.3\"\nedition = \"2021\"\n",
+    seed_workspace_member(
+        &root,
+        "crates/gemini_cli",
+        "unified-agent-api-gemini-cli",
+        false,
     );
-    write_text(
-        &root.join("crates/opencode/Cargo.toml"),
-        "[package]\nname = \"unified-agent-api-opencode\"\nversion = \"0.2.3\"\nedition = \"2021\"\n",
+    seed_workspace_member(
+        &root,
+        "crates/wrapper_events",
+        "unified-agent-api-wrapper-events",
+        false,
     );
-    write_text(
-        &root.join("crates/wrapper_events/Cargo.toml"),
-        "[package]\nname = \"unified-agent-api-wrapper-events\"\nversion = \"0.2.3\"\nedition = \"2021\"\n",
-    );
-    write_text(
-        &root.join("crates/xtask/Cargo.toml"),
-        "[package]\nname = \"xtask\"\nversion = \"0.2.3\"\nedition = \"2021\"\npublish = false\n",
-    );
+    seed_workspace_member(&root, "crates/xtask", "xtask", true);
     write_text(
         &root.join("docs/project_management/next/comparisons/cursor.md"),
         "# Cursor comparison\n",
@@ -268,6 +326,39 @@ pub fn write_text(path: &Path, contents: &str) {
         fs::create_dir_all(parent).expect("create parent dirs");
     }
     fs::write(path, contents).expect("write file");
+}
+
+fn seed_workspace_member(
+    root: &Path,
+    relative_path: &str,
+    package_name: &str,
+    publish_false: bool,
+) {
+    let publish = if publish_false {
+        "publish = false\n"
+    } else {
+        ""
+    };
+    write_text(
+        &root.join(relative_path).join("Cargo.toml"),
+        &format!(
+            concat!(
+                "[package]\n",
+                "name = {package_name:?}\n",
+                "version.workspace = true\n",
+                "edition.workspace = true\n",
+                "rust-version.workspace = true\n",
+                "license.workspace = true\n",
+                "{publish}",
+            ),
+            package_name = package_name,
+            publish = publish,
+        ),
+    );
+    write_text(
+        &root.join(relative_path).join("src/lib.rs"),
+        "#![forbid(unsafe_code)]\n",
+    );
 }
 
 pub fn seed_release_touchpoints(root: &Path) {

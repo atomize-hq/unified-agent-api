@@ -11,3 +11,4 @@ pub mod release_doc;
 mod root_intake_layout;
 pub mod support_matrix;
 pub mod workspace_mutation;
+pub mod wrapper_scaffold;

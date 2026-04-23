@@ -128,22 +128,31 @@ Backend-specific exec-policy knobs (pattern):
 
 ## Onboarding checklist (new CLI agent)
 
-1) Create wrapper crate `crates/<agent>/`:
+1) Run `onboard-agent --write` to enroll the control-plane surfaces:
+   - registry entry
+   - docs pack
+   - manifest root
+   - workspace/release touchpoints
+   - `onboard-agent` does not create the wrapper crate
+2) Run `scaffold-wrapper-crate --agent <agent> --write` to create the wrapper crate shell at `crates/<agent>/`:
+   - initial crate layout and Cargo metadata
+   - initial publishability metadata owned by the scaffold, including crate-local `README.md`, `LICENSE-APACHE`, `LICENSE-MIT`, and `readme = "README.md"`
+3) Implement backend/runtime details in the wrapper crate and `agent_api` backend adapter:
    - builder + request types
    - streaming typed events + completion
    - offline parser API
    - fixtures/fake binary strategy
-2) Add wrapper coverage manifest (or equivalent) proving which CLI flags/flows are supported.
-3) Add `agent_api` backend adapter:
    - map typed events → universal envelope
    - enforce redaction + bounds
    - preserve completion gating (DR-0012)
    - advertise capabilities + extension keys
-4) Add C2-style tests in `agent_api` that do not require a real CLI:
+4) Add wrapper coverage manifest (or equivalent) proving which CLI flags/flows are supported.
+5) Add C2-style tests in `agent_api` that do not require a real CLI:
    - “live event before completion”
    - redaction (no raw line leakage)
    - exec-policy default behavior (non-interactive) and override levers if applicable
-5) Ensure required CI workflows pass (see below).
+6) Populate manifest evidence and regenerate publication outputs from committed runtime evidence.
+7) Ensure required CI workflows pass (see below).
 
 ## CI expectations (must stay green)
 
