@@ -87,6 +87,8 @@ pub fn args_with_overrides(
         "true".to_string(),
         "--capability-matrix-enabled".to_string(),
         "true".to_string(),
+        "--capability-matrix-target".to_string(),
+        "linux-x64".to_string(),
         "--docs-release-track".to_string(),
         "crates-io".to_string(),
         "--onboarding-pack-prefix".to_string(),

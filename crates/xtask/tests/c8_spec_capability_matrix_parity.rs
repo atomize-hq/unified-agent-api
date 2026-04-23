@@ -2,6 +2,12 @@ mod agent_registry {
     pub use xtask::agent_registry::*;
 }
 
+mod capability_projection {
+    #![allow(dead_code)]
+
+    include!("../src/capability_projection.rs");
+}
+
 mod capability_matrix {
     #![allow(dead_code)]
 

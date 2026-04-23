@@ -1,5 +1,10 @@
 #[path = "../src/agent_registry.rs"]
 mod agent_registry;
+mod capability_projection {
+    #![allow(dead_code)]
+
+    include!("../src/capability_projection.rs");
+}
 
 use std::path::PathBuf;
 
@@ -50,6 +55,10 @@ fn seeded_registry_parses_successfully() {
         3,
         "codex seeded config-gated declarations"
     );
+    assert_eq!(
+        codex.publication.capability_matrix_target.as_deref(),
+        Some("x86_64-unknown-linux-musl")
+    );
 
     let opencode = registry.find("opencode").expect("seeded opencode entry");
     assert!(
@@ -82,6 +91,7 @@ fn seeded_registry_parses_successfully() {
         1,
         "gemini_cli seeds approval-artifact governance checks"
     );
+    assert_eq!(gemini.publication.capability_matrix_target, None);
 }
 
 #[test]
@@ -239,6 +249,45 @@ fn malformed_gated_declarations_fail_closed() {
                 1,
             ),
             "capability_declaration.config_gated.config_key must not be empty",
+        ),
+        (
+            "unknown config key",
+            SEEDED_REGISTRY.replacen(
+                "config_key = \"allow_external_sandbox_exec\"",
+                "config_key = \"allow_shell_everything\"",
+                1,
+            ),
+            "capability_declaration.config_gated.config_key must be one of",
+        ),
+    ];
+
+    for (label, raw, expected) in cases {
+        let err = AgentRegistry::parse(&raw).unwrap_err();
+        let text = err.to_string();
+        assert!(text.contains(expected), "{label}: {text}");
+    }
+}
+
+#[test]
+fn capability_matrix_publication_target_validation_fails_closed() {
+    let cases = [
+        (
+            "missing required publication target",
+            SEEDED_REGISTRY.replacen(
+                "capability_matrix_target = \"x86_64-unknown-linux-musl\"\n",
+                "",
+                1,
+            ),
+            "publication.capability_matrix_target must be set when capability-matrix projection uses target-scoped declarations",
+        ),
+        (
+            "unknown publication target",
+            SEEDED_REGISTRY.replacen(
+                "capability_matrix_target = \"linux-x64\"",
+                "capability_matrix_target = \"unknown-target\"",
+                1,
+            ),
+            "publication.capability_matrix_target `unknown-target` must be listed in canonical_targets",
         ),
     ];
 

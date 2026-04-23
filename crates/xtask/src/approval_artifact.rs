@@ -39,6 +39,7 @@ pub struct ApprovalDescriptor {
     pub backend_extensions: Vec<String>,
     pub support_matrix_enabled: bool,
     pub capability_matrix_enabled: bool,
+    pub capability_matrix_target: Option<String>,
     pub docs_release_track: String,
     pub onboarding_pack_prefix: String,
 }
@@ -235,6 +236,11 @@ fn parse_approval_document(
             capability_matrix_enabled: required_bool(
                 descriptor,
                 "capability_matrix_enabled",
+                relative_path,
+            )?,
+            capability_matrix_target: optional_string(
+                descriptor,
+                "capability_matrix_target",
                 relative_path,
             )?,
             docs_release_track: required_string(descriptor, "docs_release_track", relative_path)?,

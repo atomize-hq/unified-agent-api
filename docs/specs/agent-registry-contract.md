@@ -30,6 +30,23 @@ schema.
 Each `[[agents]]` entry MUST continue to declare the existing identity, capability, publication,
 release, and scaffold fields enforced by `xtask`.
 
+If capability publication is enabled for an agent, the registry publication block is also the
+canonical source of the target-scoped publication contract. In particular:
+
+- `publication.capability_matrix_target` MAY be omitted when the agent does not require a
+  target-scoped capability publication declaration.
+- `publication.capability_matrix_target` MUST be present when
+  `publication.capability_matrix_enabled = true` and publication truth depends on a specific
+  declared target.
+- when present, `publication.capability_matrix_target` MUST equal one entry from
+  `canonical_targets`
+- target ordering in `canonical_targets` MUST NOT be treated as an implicit publication-selection
+  contract
+
+Registry-controlled publication truth for capability advertising MUST be derived from the shared
+projection contract reused by publication generation and maintenance drift/closeout checks; callers
+MUST NOT restate config-gated capability semantics independently.
+
 If maintenance governance auditing is configured for an agent, it MUST live under:
 
 ```toml
@@ -65,6 +82,11 @@ Rules:
 
 - `path` MUST match the agent entry’s `scaffold.onboarding_pack_prefix`
 - no markdown parser config may be present
+- approval and governance comparison MAY omit `capability_matrix_target`; when absent, governance
+  comparison MUST treat the field as not asserted rather than as a mismatch
+- onboarding approval-mode MUST remain backward-compatible with legacy single-target descriptors,
+  while newly generated descriptors MUST include `capability_matrix_target` whenever the registry
+  contract requires it
 
 ### `markdown_capability_claim`
 

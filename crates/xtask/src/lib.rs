@@ -4,6 +4,7 @@ pub mod agent_maintenance;
 pub mod agent_registry;
 pub mod approval_artifact;
 pub mod capability_matrix;
+pub mod capability_projection;
 pub mod onboard_agent;
 pub mod proving_run_closeout;
 pub mod release_doc;

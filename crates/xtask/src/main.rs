@@ -66,7 +66,7 @@ enum Command {
     ParityTriadScaffold(parity_triad_scaffold::Args),
     /// Preview the next control-plane onboarding packet without writing files.
     OnboardAgent(Box<onboard_agent::Args>),
-    /// Generate a universal agent capability matrix markdown.
+    /// Generate or verify the universal agent capability matrix markdown.
     CapabilityMatrix(capability_matrix::Args),
     /// Audit the capability matrix for orthogonality invariants.
     CapabilityMatrixAudit(capability_matrix_audit::Args),

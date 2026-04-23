@@ -58,6 +58,7 @@ config_key = "allow_external_sandbox_exec"
 [agents.publication]
 support_matrix_enabled = true
 capability_matrix_enabled = true
+capability_matrix_target = "x86_64-unknown-linux-musl"
 
 [agents.release]
 docs_release_track = "crates-io"
@@ -123,6 +124,7 @@ config_key = "allow_external_sandbox_exec"
 [agents.publication]
 support_matrix_enabled = true
 capability_matrix_enabled = true
+capability_matrix_target = "linux-x64"
 
 [agents.release]
 docs_release_track = "crates-io"

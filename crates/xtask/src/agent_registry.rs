@@ -4,6 +4,9 @@ use std::{
     path::{Component, Path},
 };
 
+use crate::capability_projection::{
+    resolve_capability_publication_target, validate_config_key_allowlist,
+};
 use serde::Deserialize;
 use thiserror::Error;
 
@@ -148,6 +151,7 @@ impl AgentRegistryEntry {
             validate_non_empty_string_array("canonical_targets", &self.canonical_targets)?;
         self.wrapper_coverage.validate()?;
         self.capability_declaration.validate(&canonical_targets)?;
+        self.publication.validate(self)?;
         self.release.validate()?;
         self.scaffold.validate()?;
         self.maintenance.validate(self)?;
@@ -248,6 +252,11 @@ impl ConfigGatedCapability {
             "capability_declaration.config_gated.config_key",
             &self.config_key,
         )?;
+        validate_config_key_allowlist(
+            &self.config_key,
+            "capability_declaration.config_gated.config_key",
+        )
+        .map_err(AgentRegistryError::Validation)?;
         if let Some(targets) = &self.targets {
             validate_gate_targets(
                 "capability_declaration.config_gated.targets",
@@ -264,6 +273,19 @@ impl ConfigGatedCapability {
 pub struct PublicationFlags {
     pub support_matrix_enabled: bool,
     pub capability_matrix_enabled: bool,
+    #[serde(default)]
+    pub capability_matrix_target: Option<String>,
+}
+
+impl PublicationFlags {
+    fn validate(&self, entry: &AgentRegistryEntry) -> Result<(), AgentRegistryError> {
+        if let Some(target) = &self.capability_matrix_target {
+            validate_non_empty_scalar("publication.capability_matrix_target", target)?;
+        }
+        resolve_capability_publication_target(entry)
+            .map(|_| ())
+            .map_err(AgentRegistryError::Validation)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]

@@ -157,6 +157,10 @@ pub(super) fn write_input_summary<W: Write>(
         draft.capability_matrix_enabled
     )
     .map_err(|err| Error::Internal(format!("write stdout: {err}")))?;
+    if let Some(target) = draft.capability_matrix_target.as_deref() {
+        writeln!(writer, "capability_matrix_target: {target}")
+            .map_err(|err| Error::Internal(format!("write stdout: {err}")))?;
+    }
     writeln!(writer, "docs_release_track: {}", draft.docs_release_track)
         .map_err(|err| Error::Internal(format!("write stdout: {err}")))?;
     writeln!(
@@ -343,6 +347,9 @@ pub(super) fn render_registry_entry_preview(draft: &DraftEntry) -> String {
         draft.capability_matrix_enabled
     )
     .expect("write String");
+    if let Some(target) = draft.capability_matrix_target.as_deref() {
+        writeln!(&mut out, "capability_matrix_target = {:?}", target).expect("write String");
+    }
     writeln!(&mut out).expect("write String");
 
     writeln!(&mut out, "[agents.release]").expect("write String");

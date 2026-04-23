@@ -9,6 +9,8 @@ mod harness;
 mod agent_registry;
 #[path = "../src/capability_matrix.rs"]
 mod capability_matrix;
+#[path = "../src/capability_projection.rs"]
+mod capability_projection;
 #[path = "../src/agent_maintenance/docs.rs"]
 mod docs;
 #[path = "../src/agent_maintenance/refresh.rs"]

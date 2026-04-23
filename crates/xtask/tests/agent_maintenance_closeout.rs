@@ -18,6 +18,8 @@ mod workspace_mutation {
 
 #[path = "../src/approval_artifact.rs"]
 mod approval_artifact;
+#[path = "../src/capability_projection.rs"]
+mod capability_projection;
 #[path = "../src/agent_maintenance/closeout.rs"]
 mod closeout;
 #[path = "../src/agent_maintenance/drift/mod.rs"]

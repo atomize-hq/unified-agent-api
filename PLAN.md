@@ -7,11 +7,11 @@ Source:
 - `/Users/spensermcconnell/.gstack/projects/atomize-hq-unified-agent-api/spensermcconnell-main-test-outcome-20260420-091704.md`
 - `docs/project_management/next/gemini-cli-onboarding/HANDOFF.md`
 
-Status: M1 through M4 landed on `feat/cli-agent-onboarding-factory`; M5 is the next implementation milestone
+Status: M1 through M4 landed on `feat/cli-agent-onboarding-factory`; M5 is the active plan-of-record on `staging`, and W4 is the narrow docs closeout lane
 Last updated (UTC): 2026-04-23
 
 ## Post-M4 Roadmap
-This file still contains the full M4 plan-of-record because that milestone just landed and remains the design basis for the maintenance lane. The active planning focus is now M5.
+This file still contains the full M4 plan-of-record because that milestone just landed and remains the design basis for the maintenance lane. M5 is now the active implementation and closeout milestone, and M4 is no longer the next step.
 
 Correct gstack workflow from here:
 - CEO review is done for this slice. Scope is no longer the open question.
@@ -1424,4 +1424,4 @@ Final proving-run lane. This starts only after Lane A and Lane B merge, because 
 **CODEX:** The outside voice agreed with the local read that the real problem is duplicated control-plane semantics, not stale checked-in markdown.
 **CROSS-MODEL:** No contradiction remained after consolidation. The only initially open scope edge was whether to make the publication target explicit now, and that choice is now accepted into M5.
 **UNRESOLVED:** 0 after folding the approved explicit publication-target decision into the M5 scope.
-**VERDICT:** CEO + ENG review outcomes are incorporated into the M5 plan-of-record — ready to implement M5.
+**VERDICT:** CEO + ENG review outcomes are incorporated into the active M5 plan-of-record; W1-W3 carry the implementation contract and W4 is the docs closeout against that merged truth.

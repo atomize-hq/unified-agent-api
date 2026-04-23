@@ -28,6 +28,7 @@ fn onboard_agent_help_text_includes_required_surface() {
     assert!(help_text.contains("--backend-extension"));
     assert!(help_text.contains("--support-matrix-enabled"));
     assert!(help_text.contains("--capability-matrix-enabled"));
+    assert!(help_text.contains("--capability-matrix-target"));
     assert!(help_text.contains("--docs-release-track"));
     assert!(help_text.contains("--onboarding-pack-prefix"));
 }
@@ -155,6 +156,24 @@ fn onboard_agent_preexisting_target_conflict_exits_with_validation_code() {
 }
 
 #[test]
+fn onboard_agent_requires_explicit_capability_matrix_target_for_target_scoped_projection() {
+    let fixture = fixture_root("onboard-agent-missing-capability-matrix-target");
+    let mut args = base_args("cursor");
+    let position = args
+        .iter()
+        .position(|value| value == "--capability-matrix-target")
+        .expect("base args capability target flag");
+    args.drain(position..=position + 1);
+
+    let output = run_cli(args, &fixture);
+
+    assert_eq!(output.exit_code, 2);
+    assert!(output
+        .stderr
+        .contains("--capability-matrix-target is required when capability-matrix publication uses target-scoped declarations"));
+}
+
+#[test]
 fn onboard_agent_dry_run_preview_is_deterministic_and_writes_nothing() {
     let fixture = fixture_root("onboard-agent-preview");
     seed_release_touchpoints(&fixture);
@@ -194,6 +213,10 @@ fn onboard_agent_dry_run_preview_is_deterministic_and_writes_nothing() {
     assert!(first
         .stdout
         .contains("Path: crates/xtask/data/agent_registry.toml"));
+    assert!(first.stdout.contains("capability_matrix_target: linux-x64"));
+    assert!(first
+        .stdout
+        .contains("capability_matrix_target = \"linux-x64\""));
     assert!(first
         .stdout
         .contains("Path: docs/project_management/next/cursor-cli-onboarding/README.md"));

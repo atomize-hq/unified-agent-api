@@ -1,4 +1,5 @@
 mod approval;
+mod descriptor;
 mod mutation;
 mod preview;
 mod validation;
@@ -11,7 +12,6 @@ use std::{
 };
 
 use crate::agent_registry::{AgentRegistry, REGISTRY_RELATIVE_PATH};
-use crate::approval_artifact;
 use clap::{ArgGroup, Parser};
 use thiserror::Error;
 use toml_edit::DocumentMut;
@@ -118,6 +118,10 @@ pub struct Args {
     #[arg(long = "capability-matrix-enabled", action = clap::ArgAction::Set)]
     pub capability_matrix_enabled: Option<bool>,
 
+    /// Explicit target triple used for capability-matrix publication projection.
+    #[arg(long = "capability-matrix-target")]
+    pub capability_matrix_target: Option<String>,
+
     /// Release documentation track name.
     #[arg(long = "docs-release-track")]
     pub docs_release_track: Option<String>,
@@ -170,6 +174,7 @@ struct DraftEntry {
     backend_extensions: Vec<String>,
     support_matrix_enabled: bool,
     capability_matrix_enabled: bool,
+    capability_matrix_target: Option<String>,
     docs_release_track: String,
     onboarding_pack_prefix: String,
     approval_provenance: Option<ApprovalProvenance>,
@@ -211,6 +216,7 @@ struct DraftDescriptorInput {
     backend_extensions: Vec<String>,
     support_matrix_enabled: bool,
     capability_matrix_enabled: bool,
+    capability_matrix_target: Option<String>,
     docs_release_track: String,
     onboarding_pack_prefix: String,
     approval_provenance: Option<ApprovalProvenance>,
@@ -316,7 +322,7 @@ impl DraftEntry {
     fn from_descriptor_input(input: DraftDescriptorInput) -> Result<Self, Error> {
         let canonical_targets =
             normalize_ordered_unique(input.canonical_targets, "--canonical-target", true)?;
-        let canonical_index = canonical_index(&canonical_targets);
+        let canonical_index = descriptor::canonical_index(&canonical_targets);
         let always_on_capabilities =
             normalize_sorted_unique(input.always_on_capabilities, "--always-on-capability")?;
         let backend_extensions =
@@ -342,6 +348,15 @@ impl DraftEntry {
                 .then_with(|| left.config_key.cmp(&right.config_key))
                 .then_with(|| left.targets.cmp(&right.targets))
         });
+        let capability_matrix_target = descriptor::normalize_capability_matrix_target(
+            input.capability_matrix_target,
+            &canonical_targets,
+            &canonical_index,
+            input.capability_matrix_enabled,
+            &target_gated_capabilities,
+            &config_gated_capabilities,
+            input.approval_provenance.is_some(),
+        )?;
 
         Ok(Self {
             agent_id: input.agent_id,
@@ -359,6 +374,7 @@ impl DraftEntry {
             backend_extensions,
             support_matrix_enabled: input.support_matrix_enabled,
             capability_matrix_enabled: input.capability_matrix_enabled,
+            capability_matrix_target,
             docs_release_track: input.docs_release_track,
             onboarding_pack_prefix: input.onboarding_pack_prefix,
             approval_provenance: input.approval_provenance,
@@ -372,75 +388,6 @@ impl DraftEntry {
     fn approval_identity(&self) -> Option<(&str, &str)> {
         let provenance = self.approval_provenance.as_ref()?;
         Some((&provenance.artifact_path, &provenance.artifact_sha256))
-    }
-}
-
-impl DraftDescriptorInput {
-    fn from_raw_args(args: Args) -> Result<Self, Error> {
-        Ok(Self {
-            agent_id: required_arg(args.agent_id, "--agent-id")?,
-            display_name: required_arg(args.display_name, "--display-name")?,
-            crate_path: required_arg(args.crate_path, "--crate-path")?,
-            backend_module: required_arg(args.backend_module, "--backend-module")?,
-            manifest_root: required_arg(args.manifest_root, "--manifest-root")?,
-            package_name: required_arg(args.package_name, "--package-name")?,
-            canonical_targets: args.canonical_targets,
-            wrapper_coverage_binding_kind: required_arg(
-                args.wrapper_coverage_binding_kind,
-                "--wrapper-coverage-binding-kind",
-            )?,
-            wrapper_coverage_source_path: required_arg(
-                args.wrapper_coverage_source_path,
-                "--wrapper-coverage-source-path",
-            )?,
-            always_on_capabilities: args.always_on_capabilities,
-            target_gated_capabilities: args.target_gated_capabilities,
-            config_gated_capabilities: args.config_gated_capabilities,
-            backend_extensions: args.backend_extensions,
-            support_matrix_enabled: required_bool(
-                args.support_matrix_enabled,
-                "--support-matrix-enabled",
-            )?,
-            capability_matrix_enabled: required_bool(
-                args.capability_matrix_enabled,
-                "--capability-matrix-enabled",
-            )?,
-            docs_release_track: required_arg(args.docs_release_track, "--docs-release-track")?,
-            onboarding_pack_prefix: required_arg(
-                args.onboarding_pack_prefix,
-                "--onboarding-pack-prefix",
-            )?,
-            approval_provenance: None,
-        })
-    }
-}
-
-impl From<approval_artifact::ApprovalArtifact> for DraftDescriptorInput {
-    fn from(artifact: approval_artifact::ApprovalArtifact) -> Self {
-        let descriptor = artifact.descriptor;
-        Self {
-            agent_id: descriptor.agent_id,
-            display_name: descriptor.display_name,
-            crate_path: descriptor.crate_path,
-            backend_module: descriptor.backend_module,
-            manifest_root: descriptor.manifest_root,
-            package_name: descriptor.package_name,
-            canonical_targets: descriptor.canonical_targets,
-            wrapper_coverage_binding_kind: descriptor.wrapper_coverage_binding_kind,
-            wrapper_coverage_source_path: descriptor.wrapper_coverage_source_path,
-            always_on_capabilities: descriptor.always_on_capabilities,
-            target_gated_capabilities: descriptor.target_gated_capabilities,
-            config_gated_capabilities: descriptor.config_gated_capabilities,
-            backend_extensions: descriptor.backend_extensions,
-            support_matrix_enabled: descriptor.support_matrix_enabled,
-            capability_matrix_enabled: descriptor.capability_matrix_enabled,
-            docs_release_track: descriptor.docs_release_track,
-            onboarding_pack_prefix: descriptor.onboarding_pack_prefix,
-            approval_provenance: Some(ApprovalProvenance {
-                artifact_path: artifact.relative_path,
-                artifact_sha256: artifact.sha256,
-            }),
-        }
     }
 }
 
@@ -461,6 +408,7 @@ impl Args {
             || !self.backend_extensions.is_empty()
             || self.support_matrix_enabled.is_some()
             || self.capability_matrix_enabled.is_some()
+            || self.capability_matrix_target.is_some()
             || self.docs_release_track.is_some()
             || self.onboarding_pack_prefix.is_some()
     }
@@ -748,35 +696,4 @@ fn parse_gate_targets(
         }
     }
     Ok(targets)
-}
-
-fn canonical_index(canonical_targets: &[String]) -> BTreeMap<String, usize> {
-    canonical_targets
-        .iter()
-        .enumerate()
-        .map(|(index, target)| (target.clone(), index))
-        .collect()
-}
-
-fn required_arg(value: Option<String>, flag_name: &str) -> Result<String, Error> {
-    let value = value.ok_or_else(|| {
-        Error::Validation(format!(
-            "{flag_name} must be provided when --approval is not used"
-        ))
-    })?;
-    let trimmed = value.trim();
-    if trimmed.is_empty() {
-        return Err(Error::Validation(format!(
-            "{flag_name} must not be empty when --approval is not used"
-        )));
-    }
-    Ok(trimmed.to_string())
-}
-
-fn required_bool(value: Option<bool>, flag_name: &str) -> Result<bool, Error> {
-    value.ok_or_else(|| {
-        Error::Validation(format!(
-            "{flag_name} must be provided when --approval is not used"
-        ))
-    })
 }
