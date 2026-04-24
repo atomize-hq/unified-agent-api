@@ -963,12 +963,13 @@ Final proof lane. Run this only after W2 and W3 merge because it validates both 
 
 ### M7. Documentation And Legacy Cleanup
 Status:
-- next documentation milestone after M6 lands cleanly
+- reviewed follow-on milestone queued behind M5 truth hardening and M6 ownership hardening
+- 2026-04-23 consolidation pass folded the accepted M7 review shape into this section so it reads as one plan-of-record
 - no UI scope; design review remains skipped
 
 Goal:
 - make the factory understandable to a maintainer who did not live through M1 through M6
-- replace repo-archaeology onboarding with one canonical operator guide plus narrow cleanup of stale entry docs
+- replace repo-archaeology onboarding with one canonical operator guide plus narrow cleanup of stale entry docs and legacy framing
 
 #### Purpose
 M5 makes factory truth reliable.
@@ -996,7 +997,7 @@ Concrete examples already visible on this branch:
 - `README.md` and `CONTRIBUTING.md` still mention `support-matrix --check`, but they do not explain the full green gate or the new factory command chain.
 - `docs/README.md` still lacks a pointer to any canonical factory/operator guide.
 - historical planning roots such as `docs/project_management/next/opencode-cli-onboarding/next-steps-handoff.md` remain discoverable and useful as provenance, but they can still read like current operating procedure if they are not explicitly framed as historical.
-- `PLAN.md` itself currently has stale M4 maintenance content pasted under the M7 heading, which is a plan-integrity bug, not just a writing problem.
+- earlier roadmap edits left the M7 slot half-migrated, which means this section must now stay truthful and cohesive instead of regressing into copied M4 maintenance language or loose review notes.
 
 M7 is therefore not "write nicer docs." It is the milestone that turns a working factory into a legible one.
 
@@ -1018,6 +1019,7 @@ These are already true on `feat/fill-trust-gap` and are not M7 work:
 - `docs/crates-io-release.md` already contains the generated publish-order block emitted by the control plane.
 
 M7 should document this state clearly. It should not reopen any code-path or contract decisions from M5 or M6.
+This section is the plan-of-record for that cleanup. It should not split back into roadmap bullets plus a separate review addendum.
 
 #### Step 0. Scope Challenge
 - Existing doc leverage: the repo already has the right raw inputs in `README.md`, `CONTRIBUTING.md`, `docs/README.md`, `docs/project_management/next/cli-agent-onboarding-charter.md`, generated onboarding/maintenance packets, and the command surface in `crates/xtask/src/main.rs`. M7 should consolidate and point, not invent a second explanation tree.
@@ -1075,7 +1077,7 @@ M7 is complete only when all of these are true:
 - `README.md`, `CONTRIBUTING.md`, and `docs/README.md` all point maintainers at the operator guide instead of leaving them to reconstruct the workflow from scattered docs
 - the onboarding charter remains the normative checklist/contract surface, but no longer has to double as the only discoverable operator manual
 - the most discoverable hand-authored legacy planning docs that could be mistaken for live procedure are explicitly framed as historical provenance and point to the operator guide
-- `PLAN.md` no longer contains pasted M4 maintenance content under the M7 heading
+- `PLAN.md` contains one cohesive M7 plan with the same implementable structure and gate language as the surrounding reviewed milestones
 
 #### What Already Exists
 | Sub-problem | Existing surface to reuse | Why it matters |
@@ -1124,7 +1126,7 @@ runs one create-mode or maintenance-mode workflow correctly
 does not need private branch lore to understand what is current
 ```
 
-#### Documentation Architecture Review
+#### Architecture Review
 ##### Preferred Document Topology
 Keep the docs structure boring:
 
@@ -1170,14 +1172,14 @@ historical planning / proving-run / maintenance packet docs
 as examples and provenance, not the primary manual
 ```
 
-##### Documentation Decisions
+##### Architecture Decisions
 - The operator guide should be procedural, not normative. It says "what to run" and "how the lifecycle fits together."
 - The charter should remain normative. It says "what the repo requires from onboarding."
 - Generated packets stay examples and evidence, not the only way to learn the process.
 - Historical planning docs should stay in the repo, but operators must not have to guess whether they are current. If a document is provenance-only, say so explicitly.
 - Entry docs should summarize and point. They should not each become their own partial command reference.
 
-#### Code Quality Guardrails For Docs
+#### Code Quality Review
 - Use exact command lines from `xtask` and exact file paths from the repo. No paraphrased command names.
 - Keep the operator guide authoritative for procedure. If an entry doc needs more than a short summary, link instead of duplicating.
 - Distinguish four kinds of truth explicitly:
@@ -1338,10 +1340,10 @@ Exit gate:
 | README / CONTRIBUTING | entry docs keep partial stale instructions | discoverability bug | yes | reduce them to summary-plus-pointer | maintainer follows an incomplete workflow |
 | charter | charter becomes duplicate procedural manual | ownership drift | yes | keep charter normative and link to guide for procedure | two docs disagree about the flow |
 | historical planning docs | old handoff still reads like current procedure | provenance ambiguity | yes | add explicit historical/provenance framing | operator uses a superseded path |
-| PLAN.md | roadmap still contains pasted M4 content under M7 | plan integrity bug | yes | rewrite M7 as an actual docs milestone | maintainers mistrust the roadmap itself |
+| PLAN.md | roadmap drifts back into copied milestone text or half-migrated review notes | plan integrity bug | yes | keep M7 as one cohesive plan-of-record and review it like any other milestone | maintainers mistrust the roadmap itself |
 
-#### Documentation Verification Strategy
-##### Verification Matrix
+#### Test Review
+##### Test Diagram
 ```text
 CREATE-MODE WORKFLOW
 ====================
@@ -1379,9 +1381,25 @@ GREEN GATE
 
 [GAP -> docs]
 - entry docs must stop mentioning only part of the gate
+
+PLAN-OF-RECORD INTEGRITY
+=======================
+[+] M7 roadmap block
+    |
+    +--> status matches current branch reality
+    +--> scope / workstreams / phases all describe the same milestone
+    \--> no stale copied M4 wording or dangling review-only fragments
+
+[GAP -> plan]
+- M7 must stay readable as one implementable plan, not a roadmap block plus hidden reviewer context
 ```
 
-##### Required Verification Surfaces
+Coverage target:
+- authored docs: `README.md`, `CONTRIBUTING.md`, `docs/README.md`, `docs/cli-agent-onboarding-factory-operator-guide.md`, `docs/project_management/next/cli-agent-onboarding-charter.md`
+- selected legacy hand-authored planning docs that remain top search hits for this workflow
+- `PLAN.md` itself, because roadmap drift here reintroduces operator confusion before implementation even starts
+
+##### Required Test Surfaces
 - `README.md`
   - points to the operator guide
   - does not imply only the support-matrix check matters
@@ -1398,6 +1416,9 @@ GREEN GATE
   - points to the guide for procedure
 - selected historical planning docs
   - explicitly framed as provenance or historical guidance
+- `PLAN.md`
+  - reads as one cohesive milestone
+  - does not claim stale current-state bugs this rewrite has already resolved
 
 ##### Verification Commands
 - `cargo run -p xtask -- --help`
@@ -1411,6 +1432,19 @@ GREEN GATE
 - `cargo run -p xtask -- capability-matrix-audit`
 - `make preflight`
 - `rg -n "scaffold-wrapper-crate|check-agent-drift|refresh-agent|close-agent-maintenance|capability-matrix --check|support-matrix --check" README.md CONTRIBUTING.md docs/README.md docs/cli-agent-onboarding-factory-operator-guide.md docs/project_management/next/cli-agent-onboarding-charter.md docs/project_management/next`
+- `rg -n "copied M4|maintenance lane for already-onboarded agents|half-migrated|operator guide" PLAN.md`
+
+##### Test Plan Artifact
+Write a docs-verification artifact before closing M7:
+
+- path: `~/.gstack/projects/atomize-hq-unified-agent-api/{user}-{branch}-m7-doc-verification-{datetime}.md`
+- contents:
+  - affected docs and why they changed
+  - create-mode flow checks
+  - maintenance-mode flow checks
+  - green-gate command checks
+  - historical-provenance framing checks
+  - roadmap integrity checks for `PLAN.md`
 
 #### Failure Modes Registry
 | Surface | Failure mode | Prevent in M7? | Detect in verification? | User impact | Blocker? |
@@ -1419,7 +1453,7 @@ GREEN GATE
 | entry docs | still point operators into stale fragments instead of the guide | yes | yes | repo root remains confusing | yes |
 | historical planning docs | still look like live instructions | yes | yes | maintainers follow old workflow | yes |
 | normative docs | charter/specs duplicate or contradict procedure | yes | yes | operator cannot tell contract from how-to guidance | yes |
-| roadmap | M7 text still contains maintenance-lane content from M4 | yes | yes | roadmap stops being credible | yes |
+| roadmap | M7 text regresses into copied M4 language or contradicts the current doc cleanup scope | yes | yes | roadmap stops being credible | yes |
 
 Critical gap rule:
 - if the operator guide does not become the obvious center of gravity, M7 failed
@@ -1467,11 +1501,15 @@ Final contradiction sweep. Run only after Lane A and Lane B merge.
 | 2 | CEO | create one canonical operator guide under `docs/` | mechanical | explicit over clever | maintainers need one obvious procedure hub, not another planning artifact | spreading procedure across README, charter, and packets |
 | 3 | Eng | keep generated packet files out of manual cleanup scope | mechanical | DRY | hand-editing generated outputs would create immediate drift with `xtask` | tone-cleaning generated packet docs by hand |
 | 4 | Eng | treat historical planning docs as provenance, not procedure | mechanical | pragmatic | these docs still have value, but they should stop competing with the live manual | deleting or relocating the planning history wholesale |
+| 5 | Eng | normalize M7 to the standard reviewed-plan structure, including explicit test review and parallelization | mechanical | explicit over clever | maintainers should be able to execute M7 with the same muscle memory they use for M5 and M6 | leaving M7 as a docs-only special case with weaker planning rigor |
 
 #### Completion Summary
-- Scope: M7 is now a real docs milestone, not copied M4 maintenance text.
-- Architecture: one operator guide becomes the center of gravity, entry docs point to it, normative docs stay normative, historical docs get provenance framing.
-- Verification: command references are validated against `xtask`, and the green gate is documented as one contract instead of scattered fragments.
+- Step 0: scope accepted as docs-only, with one guide hub, one repointing pass, one provenance pass, and one contradiction sweep.
+- Architecture review: one operator guide becomes the center of gravity, entry docs point to it, normative docs stay normative, historical docs get provenance framing.
+- Code quality review: command names stay exact, generated packets stay out of hand-edited cleanup scope, and document roles stay explicit.
+- Test review: diagram produced; create-mode, maintenance-mode, green-gate, legacy-framing, and roadmap-integrity checks are all explicit.
+- Performance review: future drift drops because procedure lives in one guide instead of duplicated entry docs.
+- Parallelization: three lanes total, one real parallel window after W1, contradiction sweep stays last.
 - Deferred: broad repo-wide docs gardening remains out of scope; M7 only fixes the factory/operator seam.
 
 #### Deferred To TODOS.md
