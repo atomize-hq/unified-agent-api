@@ -49,7 +49,7 @@ pub fn seed_opencode_basis(root: &Path) {
 
     seed_gemini_approval_artifact(
         root,
-        "docs/project_management/next/gemini-cli-onboarding/governance/approved-agent.toml",
+        "docs/reports/agent-lifecycle/gemini-cli-onboarding/governance/approved-agent.toml",
         "gemini-cli-onboarding",
     );
     seed_clean_governance_closeouts(root);
@@ -61,7 +61,7 @@ pub fn seed_opencode_basis(root: &Path) {
 pub fn overwrite_opencode_governance_with_stale_claim(root: &Path) {
     write_text(
         &root.join(
-            "docs/project_management/next/opencode-implementation/governance/seam-2-closeout.md",
+            "docs/integrations/opencode/governance/seam-2-closeout.md",
         ),
         "# Closeout\n\n- capability advertisement is intentionally conservative and now matches the landed backend contract and generated capability inventory:\n  <!-- xtask-governance-check:opencode-capabilities:start -->\n  `agent_api.events`, `agent_api.events.live`, `agent_api.run`\n  <!-- xtask-governance-check:opencode-capabilities:end -->\n  are the claimed OpenCode v1 capability ids under the current runtime evidence\n",
     );
@@ -70,13 +70,13 @@ pub fn overwrite_opencode_governance_with_stale_claim(root: &Path) {
 fn seed_clean_governance_closeouts(root: &Path) {
     write_text(
         &root.join(
-            "docs/project_management/next/opencode-implementation/governance/seam-2-closeout.md",
+            "docs/integrations/opencode/governance/seam-2-closeout.md",
         ),
         "# Closeout\n\n- capability advertisement is intentionally conservative and now matches the landed backend contract and generated capability inventory:\n  <!-- xtask-governance-check:opencode-capabilities:start -->\n  `agent_api.config.model.v1`, `agent_api.events`, `agent_api.events.live`, `agent_api.run`, `agent_api.session.fork.v1`, `agent_api.session.resume.v1`\n  <!-- xtask-governance-check:opencode-capabilities:end -->\n  are the claimed OpenCode v1 capability ids under the current runtime evidence\n",
     );
     write_text(
         &root.join(
-            "docs/project_management/next/opencode-implementation/governance/seam-3-closeout.md",
+            "docs/integrations/opencode/governance/seam-3-closeout.md",
         ),
         "# Closeout\n\n- the support publication artifacts now show OpenCode as manifest-supported only where committed root evidence justifies it, while\n  <!-- xtask-governance-check:opencode-support:start -->\n  backend_support = supported\n  uaa_support = supported\n  <!-- xtask-governance-check:opencode-support:end -->\n  under the current backend evidence and pointer posture\n",
     );

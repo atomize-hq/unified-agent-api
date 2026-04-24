@@ -24,7 +24,7 @@ fn committed_gemini_preview_renders_closed_packet_from_valid_m3_closeout() {
         .stdout
         .contains("- Packet state: `closed_proving_run`"));
     assert!(output.stdout.contains(
-        "Closeout metadata is recorded in `docs/project_management/next/gemini-cli-onboarding/governance/proving-run-closeout.json`."
+        "Closeout metadata is recorded in `docs/reports/agent-lifecycle/gemini-cli-onboarding/governance/proving-run-closeout.json`."
     ));
     assert!(output
         .stdout
@@ -37,7 +37,7 @@ fn legacy_metrics_alone_does_not_close_packet() {
     seed_release_touchpoints(&fixture);
     write_text(
         &fixture.join(
-            "docs/project_management/next/gemini-cli-onboarding/governance/proving-run-metrics.json",
+            "docs/reports/agent-lifecycle/gemini-cli-onboarding/governance/proving-run-metrics.json",
         ),
         &serde_json::to_string_pretty(&json!({
             "manual_control_plane_edits": 0,
@@ -70,7 +70,7 @@ fn onboard_agent_dry_run_fails_closed_when_closeout_json_is_malformed() {
     seed_release_touchpoints(&fixture);
     write_text(
         &fixture.join(
-            "docs/project_management/next/gemini-cli-onboarding/governance/proving-run-closeout.json",
+            "docs/reports/agent-lifecycle/gemini-cli-onboarding/governance/proving-run-closeout.json",
         ),
         "{ not valid json }\n",
     );
@@ -79,7 +79,7 @@ fn onboard_agent_dry_run_fails_closed_when_closeout_json_is_malformed() {
 
     assert_eq!(output.exit_code, 2, "stdout:\n{}", output.stdout);
     assert!(output.stderr.contains(
-        "parse docs/project_management/next/gemini-cli-onboarding/governance/proving-run-closeout.json"
+        "parse docs/reports/agent-lifecycle/gemini-cli-onboarding/governance/proving-run-closeout.json"
     ));
     assert!(!output
         .stdout
@@ -92,11 +92,11 @@ fn onboard_agent_dry_run_rejects_invalid_closeout_truth_instead_of_falling_back_
     let fixture = fixture_root("onboard-agent-invalid-closeout");
     seed_release_touchpoints(&fixture);
     let approval_rel =
-        "docs/project_management/next/gemini-cli-onboarding/governance/approved-agent.toml";
+        "docs/reports/agent-lifecycle/gemini-cli-onboarding/governance/approved-agent.toml";
     seed_gemini_approval_artifact(&fixture, approval_rel, "gemini-cli-onboarding");
     write_text(
         &fixture.join(
-            "docs/project_management/next/gemini-cli-onboarding/governance/proving-run-closeout.json",
+            "docs/reports/agent-lifecycle/gemini-cli-onboarding/governance/proving-run-closeout.json",
         ),
         &serde_json::to_string_pretty(&json!({
             "state": "closed",

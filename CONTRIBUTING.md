@@ -7,7 +7,7 @@ Use `docs/cli-agent-onboarding-factory-operator-guide.md` as the procedural hub 
 - Operator procedure hub: `docs/cli-agent-onboarding-factory-operator-guide.md`
 - Documentation index: `docs/README.md`
 - Normative contract index: `docs/specs/unified-agent-api/README.md`
-- Onboarding charter: `docs/project_management/next/cli-agent-onboarding-charter.md`
+- Onboarding charter: `docs/specs/cli-agent-onboarding-charter.md`
 
 The operator guide owns the create-mode onboarding flow, maintenance-mode refresh flow, and command ordering. The charter remains normative rather than a duplicate how-to guide.
 

@@ -70,7 +70,7 @@ fn onboard_agent_write_applies_plan_and_replays_identically() {
     assert!(cursor_index < wrapper_events_index);
 
     let readme = fs::read_to_string(
-        fixture.join("docs/project_management/next/cursor-cli-onboarding/README.md"),
+        fixture.join("docs/reports/agent-lifecycle/cursor-cli-onboarding/README.md"),
     )
     .expect("read docs README");
     assert!(readme.contains("# Cursor CLI onboarding pack"));
@@ -136,10 +136,10 @@ fn onboard_agent_closeout_packet_replays_identically_without_rewriting_manual_me
     let fixture = fixture_root("onboard-agent-closeout");
     seed_release_touchpoints(&fixture);
     let approval_rel =
-        "docs/project_management/next/cursor-cli-onboarding/governance/approved-agent.toml";
+        "docs/reports/agent-lifecycle/cursor-cli-onboarding/governance/approved-agent.toml";
     let approval_path = seed_approval_artifact(&fixture, approval_rel, "cursor", "cursor", None);
     let closeout_path = fixture.join(
-        "docs/project_management/next/cursor-cli-onboarding/governance/proving-run-closeout.json",
+        "docs/reports/agent-lifecycle/cursor-cli-onboarding/governance/proving-run-closeout.json",
     );
     let approval_sha256 = sha256_hex(&fixture.join(&approval_path));
     write_text(
@@ -163,7 +163,7 @@ fn onboard_agent_closeout_packet_replays_identically_without_rewriting_manual_me
         .expect("serialize closeout"),
     );
     let metrics_path = fixture.join(
-        "docs/project_management/next/cursor-cli-onboarding/governance/proving-run-metrics.json",
+        "docs/reports/agent-lifecycle/cursor-cli-onboarding/governance/proving-run-metrics.json",
     );
     let metrics = concat!(
         "{\n",
@@ -204,7 +204,7 @@ fn onboard_agent_closeout_packet_replays_identically_without_rewriting_manual_me
     assert_eq!(after_first, after_second);
 
     let handoff = fs::read_to_string(
-        fixture.join("docs/project_management/next/cursor-cli-onboarding/HANDOFF.md"),
+        fixture.join("docs/reports/agent-lifecycle/cursor-cli-onboarding/HANDOFF.md"),
     )
     .expect("read closeout handoff");
     assert!(handoff.contains("This packet records the closed proving run for `cursor`."));
@@ -212,12 +212,12 @@ fn onboard_agent_closeout_packet_replays_identically_without_rewriting_manual_me
     assert!(handoff.contains("manual control-plane file edits by maintainers: `0`"));
     assert!(handoff
         .contains("approved-agent to repo-ready control-plane mutation time: `missing (Exact duration not recoverable from committed evidence.)`"));
-    assert!(handoff.contains("closeout metadata: `docs/project_management/next/cursor-cli-onboarding/governance/proving-run-closeout.json`"));
+    assert!(handoff.contains("closeout metadata: `docs/reports/agent-lifecycle/cursor-cli-onboarding/governance/proving-run-closeout.json`"));
     assert!(handoff.contains("No open runtime next step remains in this packet."));
 
     let remediation =
         fs::read_to_string(fixture.join(
-            "docs/project_management/next/cursor-cli-onboarding/governance/remediation-log.md",
+            "docs/reports/agent-lifecycle/cursor-cli-onboarding/governance/remediation-log.md",
         ))
         .expect("read remediation log");
     assert!(
@@ -236,10 +236,10 @@ fn onboard_agent_write_rejects_symlink_escape_paths() {
     let fixture = fixture_root("onboard-agent-symlink-escape");
     seed_release_touchpoints(&fixture);
     let outside = fixture_root("onboard-agent-symlink-outside");
-    fs::create_dir_all(fixture.join("docs/project_management/next")).expect("create docs parent");
+    fs::create_dir_all(fixture.join("docs/reports/agent-lifecycle")).expect("create docs parent");
     symlink(
         &outside,
-        fixture.join("docs/project_management/next/linked"),
+        fixture.join("docs/reports/agent-lifecycle/linked"),
     )
     .expect("create symlink");
 
@@ -258,5 +258,5 @@ fn onboard_agent_write_rejects_symlink_escape_paths() {
     assert!(output.stderr.contains("symlinked component"));
     assert!(output
         .stderr
-        .contains("docs/project_management/next/linked/escape-pack"));
+        .contains("docs/reports/agent-lifecycle/linked/escape-pack"));
 }

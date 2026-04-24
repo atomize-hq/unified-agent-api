@@ -11,7 +11,7 @@ Use that guide for create-mode onboarding, maintenance-mode refresh, artifact ow
 - Unified Agent API contract index: `docs/specs/unified-agent-api/README.md`
 - Normative contracts: `docs/specs/`
 - Architecture decisions: `docs/adr/`
-- Onboarding charter: `docs/project_management/next/cli-agent-onboarding-charter.md`
+- Onboarding charter: `docs/specs/cli-agent-onboarding-charter.md`
 
 ## Repo entry docs
 

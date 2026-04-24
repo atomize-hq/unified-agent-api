@@ -14,7 +14,7 @@ use crate::{
     workspace_mutation::WorkspacePathJail,
 };
 
-const DOCS_NEXT_ROOT: &str = "docs/project_management/next";
+const DOCS_NEXT_ROOT: &str = "docs/reports/agent-lifecycle";
 const GOVERNANCE_DIR_NAME: &str = "governance";
 const REQUEST_FILE_NAME: &str = "maintenance-request.toml";
 const ARTIFACT_VERSION: &str = "1";
@@ -281,8 +281,8 @@ fn validate_request_path(relative_path: &Path) -> Result<String, MaintenanceRequ
     let components = relative_path.components().collect::<Vec<_>>();
     let expected_prefix = [
         Component::Normal("docs".as_ref()),
-        Component::Normal("project_management".as_ref()),
-        Component::Normal("next".as_ref()),
+        Component::Normal("reports".as_ref()),
+        Component::Normal("agent-lifecycle".as_ref()),
     ];
 
     if components.len() != 6
@@ -291,14 +291,14 @@ fn validate_request_path(relative_path: &Path) -> Result<String, MaintenanceRequ
         || components[5] != Component::Normal(REQUEST_FILE_NAME.as_ref())
     {
         return Err(MaintenanceRequestError::Validation(format!(
-            "{} must point to docs/project_management/next/<agent>-maintenance/governance/maintenance-request.toml",
+            "{} must point to docs/reports/agent-lifecycle/<agent>-maintenance/governance/maintenance-request.toml",
             relative_path.display()
         )));
     }
 
     let Component::Normal(pack_prefix) = components[3] else {
         return Err(MaintenanceRequestError::Validation(format!(
-            "{} must point to docs/project_management/next/<agent>-maintenance/governance/maintenance-request.toml",
+            "{} must point to docs/reports/agent-lifecycle/<agent>-maintenance/governance/maintenance-request.toml",
             relative_path.display()
         )));
     };

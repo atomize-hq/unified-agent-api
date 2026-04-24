@@ -219,7 +219,7 @@ fn onboard_agent_dry_run_preview_is_deterministic_and_writes_nothing() {
         .contains("capability_matrix_target = \"linux-x64\""));
     assert!(first
         .stdout
-        .contains("Path: docs/project_management/next/cursor-cli-onboarding/README.md"));
+        .contains("Path: docs/reports/agent-lifecycle/cursor-cli-onboarding/README.md"));
     assert!(first
         .stdout
         .contains("Path: cli_manifests/cursor/current.json"));

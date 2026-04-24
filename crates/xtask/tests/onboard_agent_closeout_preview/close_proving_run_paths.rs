@@ -15,11 +15,11 @@ fn close_proving_run_accepts_absolute_closeout_path_inside_workspace() {
     let fixture = fixture_root("close-proving-run-absolute-inside");
     seed_release_touchpoints(&fixture);
     let approval_rel =
-        "docs/project_management/next/gemini-cli-onboarding/governance/approved-agent.toml";
+        "docs/reports/agent-lifecycle/gemini-cli-onboarding/governance/approved-agent.toml";
     let approval_path =
         seed_gemini_approval_artifact(&fixture, approval_rel, "gemini-cli-onboarding");
     let closeout_path = fixture.join(
-        "docs/project_management/next/gemini-cli-onboarding/governance/proving-run-closeout.json",
+        "docs/reports/agent-lifecycle/gemini-cli-onboarding/governance/proving-run-closeout.json",
     );
     let approval_sha256 = sha256_hex(&fixture.join(&approval_path));
     write_text(
@@ -72,7 +72,7 @@ fn close_proving_run_rejects_absolute_closeout_path_outside_workspace() {
             "xtask".to_string(),
             "close-proving-run".to_string(),
             "--approval".to_string(),
-            "docs/project_management/next/gemini-cli-onboarding/governance/approved-agent.toml"
+            "docs/reports/agent-lifecycle/gemini-cli-onboarding/governance/approved-agent.toml"
                 .to_string(),
             "--closeout".to_string(),
             outside_closeout.display().to_string(),
@@ -92,7 +92,7 @@ fn close_proving_run_rejects_symlinked_closeout_path() {
     let fixture = fixture_root("close-proving-run-symlinked-closeout");
     seed_release_touchpoints(&fixture);
     let approval_rel =
-        "docs/project_management/next/gemini-cli-onboarding/governance/approved-agent.toml";
+        "docs/reports/agent-lifecycle/gemini-cli-onboarding/governance/approved-agent.toml";
     let approval_path =
         seed_gemini_approval_artifact(&fixture, approval_rel, "gemini-cli-onboarding");
     let approval_sha256 = sha256_hex(&fixture.join(&approval_path));
@@ -117,7 +117,7 @@ fn close_proving_run_rejects_symlinked_closeout_path() {
         .expect("serialize closeout"),
     );
     let closeout_path = fixture.join(
-        "docs/project_management/next/gemini-cli-onboarding/governance/proving-run-closeout.json",
+        "docs/reports/agent-lifecycle/gemini-cli-onboarding/governance/proving-run-closeout.json",
     );
     if let Some(parent) = closeout_path.parent() {
         fs::create_dir_all(parent).expect("create governance dir");
@@ -131,7 +131,7 @@ fn close_proving_run_rejects_symlinked_closeout_path() {
             "--approval".to_string(),
             approval_path,
             "--closeout".to_string(),
-            "docs/project_management/next/gemini-cli-onboarding/governance/proving-run-closeout.json"
+            "docs/reports/agent-lifecycle/gemini-cli-onboarding/governance/proving-run-closeout.json"
                 .to_string(),
         ],
         &fixture,
@@ -140,7 +140,7 @@ fn close_proving_run_rejects_symlinked_closeout_path() {
     assert_eq!(output.exit_code, 2, "stdout:\n{}", output.stdout);
     assert!(output.stderr.contains("symlinked component"));
     assert!(!fixture
-        .join("docs/project_management/next/gemini-cli-onboarding/README.md")
+        .join("docs/reports/agent-lifecycle/gemini-cli-onboarding/README.md")
         .exists());
 }
 
@@ -152,12 +152,12 @@ fn close_proving_run_rejects_symlinked_output_target_without_partial_refresh() {
     let fixture = fixture_root("close-proving-run-symlinked-output");
     seed_release_touchpoints(&fixture);
     let approval_rel =
-        "docs/project_management/next/gemini-cli-onboarding/governance/approved-agent.toml";
+        "docs/reports/agent-lifecycle/gemini-cli-onboarding/governance/approved-agent.toml";
     let approval_path =
         seed_gemini_approval_artifact(&fixture, approval_rel, "gemini-cli-onboarding");
     let approval_sha256 = sha256_hex(&fixture.join(&approval_path));
     let closeout_path = fixture.join(
-        "docs/project_management/next/gemini-cli-onboarding/governance/proving-run-closeout.json",
+        "docs/reports/agent-lifecycle/gemini-cli-onboarding/governance/proving-run-closeout.json",
     );
     write_text(
         &closeout_path,
@@ -178,7 +178,7 @@ fn close_proving_run_rejects_symlinked_output_target_without_partial_refresh() {
         .expect("serialize closeout"),
     );
 
-    let packet_root = fixture.join("docs/project_management/next/gemini-cli-onboarding");
+    let packet_root = fixture.join("docs/reports/agent-lifecycle/gemini-cli-onboarding");
     let readme_path = packet_root.join("README.md");
     write_text(&readme_path, "before refresh\n");
     let outside = fixture_root("close-proving-run-symlinked-output-target");
@@ -196,7 +196,7 @@ fn close_proving_run_rejects_symlinked_output_target_without_partial_refresh() {
             "--approval".to_string(),
             approval_path,
             "--closeout".to_string(),
-            "docs/project_management/next/gemini-cli-onboarding/governance/proving-run-closeout.json"
+            "docs/reports/agent-lifecycle/gemini-cli-onboarding/governance/proving-run-closeout.json"
                 .to_string(),
         ],
         &fixture,

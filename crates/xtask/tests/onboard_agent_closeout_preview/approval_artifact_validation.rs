@@ -13,12 +13,12 @@ fn close_proving_run_rejects_noncanonical_approval_artifact_even_when_ref_and_sh
     let fixture = fixture_root("close-proving-run-noncanonical-approval");
     seed_release_touchpoints(&fixture);
     let approval_rel =
-        "docs/project_management/next/gemini-cli-onboarding/governance/proving-run-approval.md";
+        "docs/reports/agent-lifecycle/gemini-cli-onboarding/governance/proving-run-approval.md";
     let approval_path = fixture.join(approval_rel);
     write_text(&approval_path, "# not an approval artifact\n");
     let approval_sha256 = sha256_hex(&approval_path);
     let closeout_path = fixture.join(
-        "docs/project_management/next/gemini-cli-onboarding/governance/proving-run-closeout.json",
+        "docs/reports/agent-lifecycle/gemini-cli-onboarding/governance/proving-run-closeout.json",
     );
     write_text(
         &closeout_path,
@@ -46,7 +46,7 @@ fn close_proving_run_rejects_noncanonical_approval_artifact_even_when_ref_and_sh
             "--approval".to_string(),
             approval_rel.to_string(),
             "--closeout".to_string(),
-            "docs/project_management/next/gemini-cli-onboarding/governance/proving-run-closeout.json"
+            "docs/reports/agent-lifecycle/gemini-cli-onboarding/governance/proving-run-closeout.json"
                 .to_string(),
         ],
         &fixture,
@@ -61,12 +61,12 @@ fn close_proving_run_rejects_invalid_toml_at_canonical_approval_path() {
     let fixture = fixture_root("close-proving-run-invalid-approval-toml");
     seed_release_touchpoints(&fixture);
     let approval_rel =
-        "docs/project_management/next/gemini-cli-onboarding/governance/approved-agent.toml";
+        "docs/reports/agent-lifecycle/gemini-cli-onboarding/governance/approved-agent.toml";
     let approval_path = fixture.join(approval_rel);
     write_text(&approval_path, "not = [valid toml\n");
     let approval_sha256 = sha256_hex(&approval_path);
     let closeout_path = fixture.join(
-        "docs/project_management/next/gemini-cli-onboarding/governance/proving-run-closeout.json",
+        "docs/reports/agent-lifecycle/gemini-cli-onboarding/governance/proving-run-closeout.json",
     );
     write_text(
         &closeout_path,
@@ -94,7 +94,7 @@ fn close_proving_run_rejects_invalid_toml_at_canonical_approval_path() {
             "--approval".to_string(),
             approval_rel.to_string(),
             "--closeout".to_string(),
-            "docs/project_management/next/gemini-cli-onboarding/governance/proving-run-closeout.json"
+            "docs/reports/agent-lifecycle/gemini-cli-onboarding/governance/proving-run-closeout.json"
                 .to_string(),
         ],
         &fixture,
@@ -109,13 +109,13 @@ fn close_proving_run_rejects_schema_invalid_approval_artifact_at_canonical_path(
     let fixture = fixture_root("close-proving-run-invalid-approval-schema");
     seed_release_touchpoints(&fixture);
     let approval_rel =
-        "docs/project_management/next/gemini-cli-onboarding/governance/approved-agent.toml";
+        "docs/reports/agent-lifecycle/gemini-cli-onboarding/governance/approved-agent.toml";
     let approval_path = fixture.join(approval_rel);
     write_text(
         &approval_path,
         concat!(
             "artifact_version = \"1\"\n",
-            "comparison_ref = \"docs/project_management/next/comparisons/gemini.md\"\n",
+            "comparison_ref = \"docs/reports/verification/cli-agent-selection/third-agent-packet.md\"\n",
             "selection_mode = \"factory_validation\"\n",
             "recommended_agent_id = \"gemini_cli\"\n",
             "approved_agent_id = \"gemini_cli\"\n",
@@ -125,7 +125,7 @@ fn close_proving_run_rejects_schema_invalid_approval_artifact_at_canonical_path(
     );
     let approval_sha256 = sha256_hex(&approval_path);
     let closeout_path = fixture.join(
-        "docs/project_management/next/gemini-cli-onboarding/governance/proving-run-closeout.json",
+        "docs/reports/agent-lifecycle/gemini-cli-onboarding/governance/proving-run-closeout.json",
     );
     write_text(
         &closeout_path,
@@ -153,7 +153,7 @@ fn close_proving_run_rejects_schema_invalid_approval_artifact_at_canonical_path(
             "--approval".to_string(),
             approval_rel.to_string(),
             "--closeout".to_string(),
-            "docs/project_management/next/gemini-cli-onboarding/governance/proving-run-closeout.json"
+            "docs/reports/agent-lifecycle/gemini-cli-onboarding/governance/proving-run-closeout.json"
                 .to_string(),
         ],
         &fixture,
@@ -170,7 +170,7 @@ fn close_proving_run_rejects_invalid_approval_metadata_from_shared_loader() {
     let fixture = fixture_root("close-proving-run-invalid-approval-metadata");
     seed_release_touchpoints(&fixture);
     let approval_rel =
-        "docs/project_management/next/gemini-cli-onboarding/governance/approved-agent.toml";
+        "docs/reports/agent-lifecycle/gemini-cli-onboarding/governance/approved-agent.toml";
     let approval_path =
         seed_gemini_approval_artifact(&fixture, approval_rel, "gemini-cli-onboarding");
     let approval_file = fixture.join(&approval_path);
@@ -184,7 +184,7 @@ fn close_proving_run_rejects_invalid_approval_metadata_from_shared_loader() {
     );
     let approval_sha256 = sha256_hex(&approval_file);
     let closeout_path = fixture.join(
-        "docs/project_management/next/gemini-cli-onboarding/governance/proving-run-closeout.json",
+        "docs/reports/agent-lifecycle/gemini-cli-onboarding/governance/proving-run-closeout.json",
     );
     write_text(
         &closeout_path,
@@ -212,7 +212,7 @@ fn close_proving_run_rejects_invalid_approval_metadata_from_shared_loader() {
             "--approval".to_string(),
             approval_rel.to_string(),
             "--closeout".to_string(),
-            "docs/project_management/next/gemini-cli-onboarding/governance/proving-run-closeout.json"
+            "docs/reports/agent-lifecycle/gemini-cli-onboarding/governance/proving-run-closeout.json"
                 .to_string(),
         ],
         &fixture,
@@ -229,11 +229,11 @@ fn close_proving_run_rejects_pack_mismatched_approval_artifact() {
     let fixture = fixture_root("close-proving-run-pack-mismatch");
     seed_release_touchpoints(&fixture);
     let approval_rel =
-        "docs/project_management/next/gemini-cli-onboarding/governance/approved-agent.toml";
+        "docs/reports/agent-lifecycle/gemini-cli-onboarding/governance/approved-agent.toml";
     let approval_path = seed_gemini_approval_artifact(&fixture, approval_rel, "other-gemini-pack");
     let approval_sha256 = sha256_hex(&fixture.join(&approval_path));
     let closeout_path = fixture.join(
-        "docs/project_management/next/gemini-cli-onboarding/governance/proving-run-closeout.json",
+        "docs/reports/agent-lifecycle/gemini-cli-onboarding/governance/proving-run-closeout.json",
     );
     write_text(
         &closeout_path,
@@ -261,7 +261,7 @@ fn close_proving_run_rejects_pack_mismatched_approval_artifact() {
             "--approval".to_string(),
             approval_path.clone(),
             "--closeout".to_string(),
-            "docs/project_management/next/gemini-cli-onboarding/governance/proving-run-closeout.json"
+            "docs/reports/agent-lifecycle/gemini-cli-onboarding/governance/proving-run-closeout.json"
                 .to_string(),
         ],
         &fixture,

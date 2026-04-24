@@ -202,7 +202,7 @@ pub fn seed_gemini_approval_artifact(
     let contents = format!(
         concat!(
             "artifact_version = \"1\"\n",
-            "comparison_ref = \"docs/project_management/next/comparisons/gemini.md\"\n",
+            "comparison_ref = \"docs/reports/verification/cli-agent-selection/third-agent-packet.md\"\n",
             "selection_mode = \"factory_validation\"\n",
             "recommended_agent_id = \"gemini_cli\"\n",
             "approved_agent_id = \"gemini_cli\"\n",
@@ -313,12 +313,8 @@ pub fn fixture_root(prefix: &str) -> PathBuf {
     );
     seed_workspace_member(&root, "crates/xtask", "xtask", true);
     write_text(
-        &root.join("docs/project_management/next/comparisons/cursor.md"),
-        "# Cursor comparison\n",
-    );
-    write_text(
-        &root.join("docs/project_management/next/comparisons/gemini.md"),
-        "# Gemini comparison\n",
+        &root.join("docs/reports/verification/cli-agent-selection/third-agent-packet.md"),
+        "# Third agent packet\n",
     );
     root
 }
@@ -447,7 +443,7 @@ pub fn seed_approval_artifact_with_pack_prefix(
     let mut contents = format!(
         concat!(
             "artifact_version = \"1\"\n",
-            "comparison_ref = \"docs/project_management/next/comparisons/cursor.md\"\n",
+            "comparison_ref = \"docs/reports/verification/cli-agent-selection/third-agent-packet.md\"\n",
             "selection_mode = \"factory_validation\"\n",
             "recommended_agent_id = \"{recommended_agent_id}\"\n",
             "approved_agent_id = \"{approved_agent_id}\"\n",

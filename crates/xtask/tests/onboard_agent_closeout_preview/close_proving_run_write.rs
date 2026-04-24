@@ -15,16 +15,16 @@ fn onboard_agent_write_does_not_rewrite_packet_files_when_closeout_is_invalid() 
     let fixture = fixture_root("onboard-agent-invalid-closeout-write");
     seed_release_touchpoints(&fixture);
     let approval_rel =
-        "docs/project_management/next/gemini-cli-onboarding/governance/approved-agent.toml";
+        "docs/reports/agent-lifecycle/gemini-cli-onboarding/governance/approved-agent.toml";
     seed_gemini_approval_artifact(&fixture, approval_rel, "gemini-cli-onboarding");
-    let readme_path = fixture.join("docs/project_management/next/gemini-cli-onboarding/README.md");
+    let readme_path = fixture.join("docs/reports/agent-lifecycle/gemini-cli-onboarding/README.md");
     let handoff_path =
-        fixture.join("docs/project_management/next/gemini-cli-onboarding/HANDOFF.md");
+        fixture.join("docs/reports/agent-lifecycle/gemini-cli-onboarding/HANDOFF.md");
     write_text(&readme_path, "existing readme\n");
     write_text(&handoff_path, "existing handoff\n");
     write_text(
         &fixture.join(
-            "docs/project_management/next/gemini-cli-onboarding/governance/proving-run-closeout.json",
+            "docs/reports/agent-lifecycle/gemini-cli-onboarding/governance/proving-run-closeout.json",
         ),
         &serde_json::to_string_pretty(&json!({
             "state": "closed",
@@ -63,7 +63,7 @@ fn onboard_agent_write_does_not_rewrite_packet_files_when_closeout_is_invalid() 
         "existing handoff\n"
     );
     assert!(!fixture
-        .join("docs/project_management/next/gemini-cli-onboarding/scope_brief.md")
+        .join("docs/reports/agent-lifecycle/gemini-cli-onboarding/scope_brief.md")
         .exists());
 }
 
@@ -72,12 +72,12 @@ fn close_proving_run_validates_and_refreshes_packet_docs() {
     let fixture = fixture_root("close-proving-run-pass");
     seed_release_touchpoints(&fixture);
     let approval_rel =
-        "docs/project_management/next/gemini-cli-onboarding/governance/approved-agent.toml";
+        "docs/reports/agent-lifecycle/gemini-cli-onboarding/governance/approved-agent.toml";
     let approval_path =
         seed_gemini_approval_artifact(&fixture, approval_rel, "gemini-cli-onboarding");
     let approval_sha256 = sha256_hex(&fixture.join(&approval_path));
     let closeout_path = fixture.join(
-        "docs/project_management/next/gemini-cli-onboarding/governance/proving-run-closeout.json",
+        "docs/reports/agent-lifecycle/gemini-cli-onboarding/governance/proving-run-closeout.json",
     );
     write_text(
         &closeout_path,
@@ -105,7 +105,7 @@ fn close_proving_run_validates_and_refreshes_packet_docs() {
             "--approval".to_string(),
             approval_path.clone(),
             "--closeout".to_string(),
-            "docs/project_management/next/gemini-cli-onboarding/governance/proving-run-closeout.json"
+            "docs/reports/agent-lifecycle/gemini-cli-onboarding/governance/proving-run-closeout.json"
                 .to_string(),
         ],
         &fixture,
@@ -121,18 +121,18 @@ fn close_proving_run_validates_and_refreshes_packet_docs() {
         .contains("OK: close-proving-run write complete."));
 
     let readme = fs::read_to_string(
-        fixture.join("docs/project_management/next/gemini-cli-onboarding/README.md"),
+        fixture.join("docs/reports/agent-lifecycle/gemini-cli-onboarding/README.md"),
     )
     .expect("read refreshed readme");
     let handoff = fs::read_to_string(
-        fixture.join("docs/project_management/next/gemini-cli-onboarding/HANDOFF.md"),
+        fixture.join("docs/reports/agent-lifecycle/gemini-cli-onboarding/HANDOFF.md"),
     )
     .expect("read refreshed handoff");
 
     assert!(readme.contains("- Packet state: `closed_proving_run`"));
     assert!(readme.contains("Approval linkage: `governance-review` via"));
-    assert!(handoff.contains("- approval ref: `docs/project_management/next/gemini-cli-onboarding/governance/approved-agent.toml`"));
-    assert!(handoff.contains("- closeout metadata: `docs/project_management/next/gemini-cli-onboarding/governance/proving-run-closeout.json`"));
+    assert!(handoff.contains("- approval ref: `docs/reports/agent-lifecycle/gemini-cli-onboarding/governance/approved-agent.toml`"));
+    assert!(handoff.contains("- closeout metadata: `docs/reports/agent-lifecycle/gemini-cli-onboarding/governance/proving-run-closeout.json`"));
 
     let preview_output = run_cli(gemini_dry_run_args(), &fixture);
     assert_eq!(

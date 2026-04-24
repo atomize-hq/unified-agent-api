@@ -304,8 +304,8 @@ fn malformed_governance_checks_fail_closed() {
         (
             "duplicate governance path",
             SEEDED_REGISTRY.replacen(
-                "path = \"docs/project_management/next/opencode-implementation/governance/seam-3-closeout.md\"",
-                "path = \"docs/project_management/next/opencode-implementation/governance/seam-2-closeout.md\"",
+                "path = \"docs/integrations/opencode/governance/seam-3-closeout.md\"",
+                "path = \"docs/integrations/opencode/governance/seam-2-closeout.md\"",
                 1,
             ),
             "maintenance.governance_checks contains duplicate path",

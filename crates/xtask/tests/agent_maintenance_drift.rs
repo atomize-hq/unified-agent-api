@@ -161,10 +161,9 @@ fn check_agent_drift_reports_governance_doc_mismatch() {
         .iter()
         .find(|finding| finding.category == DriftCategory::GovernanceDoc)
         .expect("governance finding");
-    assert!(finding.surfaces.contains(
-        &"docs/project_management/next/opencode-implementation/governance/seam-2-closeout.md"
-            .to_string()
-    ));
+    assert!(finding
+        .surfaces
+        .contains(&"docs/integrations/opencode/governance/seam-2-closeout.md".to_string()));
     assert!(finding
         .surfaces
         .contains(&"docs/specs/unified-agent-api/capability-matrix.md".to_string()));
@@ -208,11 +207,11 @@ fn check_agent_drift_reports_gemini_approval_descriptor_mismatch() {
 
     write_text(
         &fixture.join(
-            "docs/project_management/next/gemini-cli-onboarding/governance/approved-agent.toml",
+            "docs/reports/agent-lifecycle/gemini-cli-onboarding/governance/approved-agent.toml",
         ),
         concat!(
             "artifact_version = \"1\"\n",
-            "comparison_ref = \"docs/project_management/next/comparisons/gemini.md\"\n",
+            "comparison_ref = \"docs/reports/verification/cli-agent-selection/third-agent-packet.md\"\n",
             "selection_mode = \"factory_validation\"\n",
             "recommended_agent_id = \"gemini_cli\"\n",
             "approved_agent_id = \"gemini_cli\"\n",
@@ -244,7 +243,7 @@ fn check_agent_drift_reports_gemini_approval_descriptor_mismatch() {
         .find(|finding| finding.category == DriftCategory::GovernanceDoc)
         .expect("governance finding");
     assert!(finding.surfaces.contains(
-        &"docs/project_management/next/gemini-cli-onboarding/governance/approved-agent.toml"
+        &"docs/reports/agent-lifecycle/gemini-cli-onboarding/governance/approved-agent.toml"
             .to_string()
     ));
     assert!(finding
@@ -269,7 +268,7 @@ fn check_agent_drift_reports_recurring_closed_governance_surface() {
     );
     seed_closed_governance_maintenance(
         &fixture,
-        "docs/project_management/next/opencode-implementation/governance/seam-2-closeout.md",
+        "docs/integrations/opencode/governance/seam-2-closeout.md",
     );
 
     let report = check_agent_drift(&fixture, "opencode").expect("drift report");
@@ -484,7 +483,7 @@ fn seed_publication_inputs(root: &Path) {
 
     seed_gemini_approval_artifact(
         root,
-        "docs/project_management/next/gemini-cli-onboarding/governance/approved-agent.toml",
+        "docs/reports/agent-lifecycle/gemini-cli-onboarding/governance/approved-agent.toml",
         "gemini-cli-onboarding",
     );
 
@@ -504,7 +503,7 @@ fn seed_governance_closeouts(
         .join(", ");
     write_text(
         &root.join(
-            "docs/project_management/next/opencode-implementation/governance/seam-2-closeout.md",
+            "docs/integrations/opencode/governance/seam-2-closeout.md",
         ),
         &format!(
             "# Closeout\n\n- capability advertisement is intentionally conservative and now matches the landed backend contract and generated capability inventory:\n  <!-- xtask-governance-check:opencode-capabilities:start -->\n  {capability_lines}\n  <!-- xtask-governance-check:opencode-capabilities:end -->\n  are the claimed OpenCode v1 capability ids under the current runtime evidence\n"
@@ -517,9 +516,7 @@ fn seed_governance_closeouts(
         "# Closeout\n\n- the support publication artifacts now show OpenCode as manifest-supported only where committed root evidence justifies it, while\n  <!-- xtask-governance-check:opencode-support:start -->\n  backend_support = supported\n  uaa_support = supported\n  <!-- xtask-governance-check:opencode-support:end -->\n  under the current backend evidence and pointer posture\n"
     };
     write_text(
-        &root.join(
-            "docs/project_management/next/opencode-implementation/governance/seam-3-closeout.md",
-        ),
+        &root.join("docs/integrations/opencode/governance/seam-3-closeout.md"),
         seam3_text,
     );
 }
@@ -531,7 +528,7 @@ fn default_capability_matrix_markdown() -> String {
 fn seed_closed_governance_maintenance(root: &Path, resolved_surface: &str) {
     write_text(
         &root.join(
-            "docs/project_management/next/opencode-maintenance/governance/maintenance-closeout.json",
+            "docs/reports/agent-lifecycle/opencode-maintenance/governance/maintenance-closeout.json",
         ),
         &serde_json::to_string_pretty(&serde_json::json!({
             "resolved_findings": [{

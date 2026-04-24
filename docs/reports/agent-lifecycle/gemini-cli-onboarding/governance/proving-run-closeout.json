@@ -1,7 +1,7 @@
 {
   "state": "closed",
-  "approval_ref": "docs/project_management/next/gemini-cli-onboarding/governance/approved-agent.toml",
-  "approval_sha256": "a935c753a6e9d7084af1aedff39a84a48199cea33f43c48a7bbe828d6b44efab",
+  "approval_ref": "docs/reports/agent-lifecycle/gemini-cli-onboarding/governance/approved-agent.toml",
+  "approval_sha256": "8a9ec8996c3952b65842df77a919c76a20f05b52f6e625d82c592e63ff3ef163",
   "approval_source": "historical-m3-backfill",
   "manual_control_plane_edits": 0,
   "partial_write_incidents": 0,

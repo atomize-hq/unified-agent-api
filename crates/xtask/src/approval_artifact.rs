@@ -7,9 +7,11 @@ use sha2::{Digest, Sha256};
 use time::{format_description::well_known::Rfc3339, OffsetDateTime};
 use toml_edit::{DocumentMut, TableLike};
 
-const DOCS_NEXT_ROOT: &str = "docs/project_management/next";
+const DOCS_NEXT_ROOT: &str = "docs/reports/agent-lifecycle";
 const APPROVAL_FILE_NAME: &str = "approved-agent.toml";
 const GOVERNANCE_DIR_NAME: &str = "governance";
+const COMPARISON_REF_PATH: &str =
+    "docs/reports/verification/cli-agent-selection/third-agent-packet.md";
 const FACTORY_VALIDATION_MODE: &str = "factory_validation";
 const FRONTIER_EXPANSION_MODE: &str = "frontier_expansion";
 const APPROVAL_ARTIFACT_VERSION: &str = "1";
@@ -129,6 +131,12 @@ fn parse_approval_document(
     let artifact_version = required_string(root, "artifact_version", relative_path)?;
     validate_artifact_version(relative_path, &artifact_version)?;
     let comparison_ref = required_string(root, "comparison_ref", relative_path)?;
+    if comparison_ref != COMPARISON_REF_PATH {
+        return Err(ApprovalArtifactError::Validation(format!(
+            "approval artifact `{}` field `comparison_ref` must equal `{COMPARISON_REF_PATH}`",
+            relative_path.display()
+        )));
+    }
     validate_repo_relative_existing_file(
         workspace_root,
         relative_path,

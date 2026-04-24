@@ -77,9 +77,9 @@ Additional rules:
 
 ### `approved_agent_descriptor`
 
-Use this comparison kind only for historical approval artifacts under:
+Use this comparison kind only for approval artifacts under:
 
-`docs/project_management/next/<onboarding_pack_prefix>/governance/approved-agent.toml`
+`docs/reports/agent-lifecycle/<onboarding_pack_prefix>/governance/approved-agent.toml`
 
 Rules:
 

@@ -52,7 +52,7 @@ fn runtime_owned_actions_rejected() {
     seed_publication_inputs(&fixture);
 
     let request_path =
-        "docs/project_management/next/opencode-maintenance/governance/maintenance-request.toml";
+        "docs/reports/agent-lifecycle/opencode-maintenance/governance/maintenance-request.toml";
     write_text(
         &fixture.join(request_path),
         &request_toml(
@@ -77,13 +77,13 @@ fn missing_basis_ref_is_rejected() {
     seed_publication_inputs(&fixture);
 
     let request_path =
-        "docs/project_management/next/opencode-maintenance/governance/maintenance-request.toml";
+        "docs/reports/agent-lifecycle/opencode-maintenance/governance/maintenance-request.toml";
     write_text(
         &fixture.join(request_path),
         &request_toml_with_refs(
             "opencode",
-            "docs/project_management/next/opencode-maintenance/governance/missing-basis.md",
-            "docs/project_management/next/opencode-implementation/governance/seam-2-closeout.md",
+            "docs/reports/agent-lifecycle/opencode-maintenance/governance/missing-basis.md",
+            "docs/integrations/opencode/governance/seam-2-closeout.md",
             &["packet_doc_refresh"],
             false,
             &[],
@@ -101,13 +101,13 @@ fn missing_opened_from_is_rejected() {
     seed_publication_inputs(&fixture);
 
     let request_path =
-        "docs/project_management/next/opencode-maintenance/governance/maintenance-request.toml";
+        "docs/reports/agent-lifecycle/opencode-maintenance/governance/maintenance-request.toml";
     write_text(
         &fixture.join(request_path),
         &request_toml_with_refs(
             "opencode",
-            "docs/project_management/next/opencode-implementation/governance/seam-2-closeout.md",
-            "docs/project_management/next/opencode-maintenance/governance/missing-opened-from.md",
+            "docs/integrations/opencode/governance/seam-2-closeout.md",
+            "docs/reports/agent-lifecycle/opencode-maintenance/governance/missing-opened-from.md",
             &["packet_doc_refresh"],
             false,
             &[],
@@ -130,7 +130,7 @@ fn release_doc_refresh_uses_registry_order_instead_of_workspace_member_order() {
     );
 
     let request_path =
-        "docs/project_management/next/opencode-maintenance/governance/maintenance-request.toml";
+        "docs/reports/agent-lifecycle/opencode-maintenance/governance/maintenance-request.toml";
     write_text(
         &fixture.join(request_path),
         &request_toml("opencode", &["release_doc_refresh"], false, &[]),
@@ -159,7 +159,7 @@ fn dry_run_write_plan_identity_and_no_write_vs_write_parity() {
     seed_publication_inputs(&fixture);
 
     let request_path =
-        "docs/project_management/next/opencode-maintenance/governance/maintenance-request.toml";
+        "docs/reports/agent-lifecycle/opencode-maintenance/governance/maintenance-request.toml";
     write_text(
         &fixture.join(request_path),
         &request_toml(
@@ -206,8 +206,8 @@ fn onboarding_and_implementation_historical_roots_untouched() {
     seed_publication_inputs(&fixture);
 
     let onboarding_root = fixture.join("docs/project_management/next/opencode-cli-onboarding");
-    let implementation_closeout = fixture
-        .join("docs/project_management/next/opencode-implementation/governance/seam-2-closeout.md");
+    let implementation_closeout =
+        fixture.join("docs/integrations/opencode/governance/seam-2-closeout.md");
     write_text(
         &onboarding_root.join("README.md"),
         "# Historical onboarding packet\n",
@@ -223,7 +223,7 @@ fn onboarding_and_implementation_historical_roots_untouched() {
         fs::read_to_string(&implementation_closeout).expect("read implementation");
 
     let request_path =
-        "docs/project_management/next/opencode-maintenance/governance/maintenance-request.toml";
+        "docs/reports/agent-lifecycle/opencode-maintenance/governance/maintenance-request.toml";
     write_text(
         &fixture.join(request_path),
         &request_toml(
@@ -257,7 +257,7 @@ fn identical_replay_is_noop() {
     seed_publication_inputs(&fixture);
 
     let request_path =
-        "docs/project_management/next/opencode-maintenance/governance/maintenance-request.toml";
+        "docs/reports/agent-lifecycle/opencode-maintenance/governance/maintenance-request.toml";
     write_text(
         &fixture.join(request_path),
         &request_toml(
@@ -295,9 +295,7 @@ fn identical_replay_is_noop() {
 fn seed_publication_inputs(root: &Path) {
     seed_release_touchpoints(root);
     write_text(
-        &root.join(
-            "docs/project_management/next/opencode-implementation/governance/seam-2-closeout.md",
-        ),
+        &root.join("docs/integrations/opencode/governance/seam-2-closeout.md"),
         "# Closeout\n\nThis stale capability claim triggered maintenance.\n",
     );
     write_text(
@@ -431,8 +429,8 @@ fn request_toml(
 ) -> String {
     request_toml_with_refs(
         agent_id,
-        "docs/project_management/next/opencode-implementation/governance/seam-2-closeout.md",
-        "docs/project_management/next/opencode-implementation/governance/seam-2-closeout.md",
+        "docs/integrations/opencode/governance/seam-2-closeout.md",
+        "docs/integrations/opencode/governance/seam-2-closeout.md",
         actions,
         runtime_required,
         runtime_items,

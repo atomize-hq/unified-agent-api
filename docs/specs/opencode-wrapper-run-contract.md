@@ -16,7 +16,7 @@ completion-finality handoff, offline parser posture, and redaction boundary for 
 
 ## Normative references
 
-- `docs/project_management/next/cli-agent-onboarding-charter.md`
+- `docs/specs/cli-agent-onboarding-charter.md`
 - `docs/specs/unified-agent-api/run-protocol-spec.md`
 - `docs/specs/unified-agent-api/extensions-spec.md`
 - `docs/specs/opencode-onboarding-evidence-contract.md`
