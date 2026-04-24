@@ -10,6 +10,11 @@ It is designed to keep the system **orthogonal**:
 - wrapper crates can evolve independently, and
 - the universal facade (`agent_api`) can onboard new backends mechanically with minimal drift.
 
+Procedure note:
+- this charter is normative and defines repo requirements
+- the shipped operator workflow lives in `docs/cli-agent-onboarding-factory-operator-guide.md`
+- if the charter and an operator step summary ever diverge, the charter and `docs/specs/**` own the contract truth
+
 ## Goals
 
 - Make adding “CLI Agent X” a deterministic process:

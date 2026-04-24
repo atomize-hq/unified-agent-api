@@ -1,70 +1,31 @@
 # Contributing
 
-## Repo map (where things live)
+Use `docs/cli-agent-onboarding-factory-operator-guide.md` as the procedural hub for the shipped factory workflow. This file is only the contributor entrypoint for repo basics, verification, and hygiene.
 
-- Unified API surface: `crates/agent_api/`
-  - Normative contract index: `docs/specs/unified-agent-api/README.md`
-- Codex backend library: `crates/codex/`
-  - Main guide: `crates/codex/README.md`
-  - Examples index: `crates/codex/EXAMPLES.md`
-  - Normative JSONL normalization notes: `crates/codex/JSONL_COMPAT.md`
-- Claude Code backend library: `crates/claude_code/`
-  - Main guide: `crates/claude_code/README.md`
-- Gemini CLI backend library: `crates/gemini_cli/`
-- OpenCode backend library: `crates/opencode/`
-  - Main guide: `crates/opencode/README.md`
-- Decisions/specs:
-  - ADRs: `docs/adr/`
-  - Normative contracts: `docs/specs/`
-  - Docs index: `docs/README.md`
-- CLI parity artifacts + ops docs: `cli_manifests/codex/`
-- Claude Code manifest-root artifacts: `cli_manifests/claude_code/`
-- Gemini CLI manifest-root artifacts: `cli_manifests/gemini_cli/`
-- OpenCode manifest-root artifacts: `cli_manifests/opencode/`
-- Triad planning/process: `docs/project_management/`
-  - Feature directories: `docs/project_management/next/`
+## Contribution entrypoints
 
-## Development
+- Operator procedure hub: `docs/cli-agent-onboarding-factory-operator-guide.md`
+- Documentation index: `docs/README.md`
+- Normative contract index: `docs/specs/unified-agent-api/README.md`
+- Onboarding charter: `docs/project_management/next/cli-agent-onboarding-charter.md`
 
-### Requirements
+The operator guide owns the create-mode onboarding flow, maintenance-mode refresh flow, and command ordering. The charter remains normative rather than a duplicate how-to guide.
 
-- Rust toolchain (stable)
-- `make` (optional, but recommended for the project’s preflight gate)
+## Green gate
 
-### Common commands
+The repo green gate is:
 
-- Format: `make fmt`
-- Lint: `make clippy`
-- Test: `make test`
-- Support publication freshness: `cargo run -p xtask -- support-matrix --check`
-- OpenCode manifest-root validation: `cargo run -p xtask -- codex-validate --root cli_manifests/opencode`
-- LOC cap: `make loc-check` (must pass; Rust files must stay under 700 code LOC)
-- Preflight (integration gate): `make preflight`
+```sh
+cargo run -p xtask -- support-matrix --check
+cargo run -p xtask -- capability-matrix --check
+cargo run -p xtask -- capability-matrix-audit
+make preflight
+```
 
-### Release metadata
+Run targeted commands while iterating as needed, but use the same green gate above for the full repo pass.
 
-- Root release version: `VERSION` (bare semver, currently aligned with `[workspace.package].version`)
-- Root release notes: `CHANGELOG.md`
+## Repo hygiene
 
-## Repository hygiene rules
-
-This repo intentionally does not commit:
-
-- Worktrees: `wt/`
-- Build output: `target/`
-- Download/extract scratch: `_download/`, `_extract/`
-- Raw help captures: `cli_manifests/codex/raw_help/`
-- Ad-hoc logs at repo root (for example `codex-stream.log`, `error.log`)
-
-`make preflight` runs a repo hygiene check to prevent accidentally committing these artifacts.
-
-## Triads/worktrees (project management)
-
-Feature work is planned as triads (code / test / integration) with checklists and prompts under the
-feature directory in `docs/project_management/next/<feature>/`.
-
-Conventions:
-- Task worktrees live under `wt/<branch>` (in-repo).
-- Do not edit `docs/project_management/**` from inside a worktree.
-
-See `docs/project_management/task-triads-feature-setup-standard.md`.
+- Do not commit generated or scratch artifacts such as `target/`, `wt/`, `_download/`, `_extract/`, repo-root `*.log`, or `cli_manifests/codex/raw_help/`.
+- Prefer the workspace helpers in `crates/xtask/` and the `make` targets already wired into the repo.
+- If behavior or format changes, update the relevant canonical contract under `docs/specs/**`.

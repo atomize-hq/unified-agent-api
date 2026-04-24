@@ -1,14 +1,21 @@
 # OpenCode CLI onboarding - closed seam pack
 
+Historical note:
+- this directory is retained as closed planning provenance for the OpenCode onboarding decision and seam closeout
+- it is not the live factory operator manual; use `docs/cli-agent-onboarding-factory-operator-guide.md` for current procedure
+- normative onboarding rules still live in `docs/project_management/next/cli-agent-onboarding-charter.md` and `docs/specs/**`
+
 Source:
 - `docs/project_management/next/cli-agent-onboarding-charter.md`
 - `docs/project_management/next/cli-agent-onboarding-third-agent-packet.md`
 
 This pack captures the closed seam briefs, authoritative threading, pack-level review surfaces,
 and governance records that onboarded `OpenCode` as the first real third CLI agent in this repo.
+Read it as historical planning evidence, not as the current operator entrypoint for onboarding or
+maintenance work.
 
-- Start here: `scope_brief.md`
-- New-session handoff and next-step brief: `next-steps-handoff.md`
+- Historical pack entrypoint: `scope_brief.md`
+- Historical restart handoff: `next-steps-handoff.md`
 - Seam overview: `seam_map.md`
 - Threading: `threading.md`
 - Pack review surfaces: `review_surfaces.md`

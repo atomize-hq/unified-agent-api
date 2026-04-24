@@ -1,5 +1,10 @@
 # OpenCode Onboarding - Next Steps Handoff
 
+Historical note:
+- this handoff is a retained planning artifact from the pre-implementation OpenCode onboarding pack
+- it is not the current factory procedure; use `docs/cli-agent-onboarding-factory-operator-guide.md` for operator workflow
+- treat the analysis below as provenance for why the pack closed the way it did, not as the current repo start point
+
 Status: Draft handoff, updated with `/plan-eng-review` decisions through 2026-04-18  
 Date (UTC): 2026-04-18  
 Branch when written: `feat/opencode-cli-onboarding`  
@@ -7,7 +12,8 @@ Commit when written: `2637101`
 
 ## Purpose
 
-This file is the restart point for a fresh `/plan-eng-review` or `/office-hours` session.
+This file was the restart point for a fresh `/plan-eng-review` or `/office-hours` session while
+the OpenCode onboarding pack was active.
 
 It captures:
 - what is already true in the repo
@@ -16,7 +22,8 @@ It captures:
 - the recommended operating-model change
 - the concrete deliverables to create next
 
-Use this file instead of re-reading the full packet history unless a session needs seam-local detail.
+Use this file only when reconstructing the historical planning context or reviewing why the pack
+closed with its recorded handoff state.
 
 ## Current State Summary
 
