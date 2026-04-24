@@ -40,19 +40,19 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          docs/project_management/packs/active/agent-api-codex-stream-exec/smoke/linux-smoke.sh
+          docs/project_management/packs/implemented/agent-api-codex-stream-exec/smoke/linux-smoke.sh
 
       - name: macOS smoke
         if: ${{ matrix.os == 'macos-latest' }}
         shell: bash
         run: |
           set -euo pipefail
-          docs/project_management/packs/active/agent-api-codex-stream-exec/smoke/macos-smoke.sh
+          docs/project_management/packs/implemented/agent-api-codex-stream-exec/smoke/macos-smoke.sh
 
       - name: Windows smoke
         if: ${{ matrix.os == 'windows-latest' }}
         shell: pwsh
-        run: docs/project_management/packs/active/agent-api-codex-stream-exec/smoke/windows-smoke.ps1
+        run: docs/project_management/packs/implemented/agent-api-codex-stream-exec/smoke/windows-smoke.ps1
 
   preflight-linux:
     name: Preflight (ubuntu-latest)

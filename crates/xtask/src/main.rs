@@ -13,7 +13,6 @@ mod codex_union;
 mod codex_validate;
 mod codex_version_metadata;
 mod codex_wrapper_coverage;
-mod parity_triad_scaffold;
 mod version_bump;
 mod wrapper_coverage_shared;
 
@@ -63,8 +62,6 @@ enum Command {
     ClaudeWrapperCoverage(claude_wrapper_coverage::CliArgs),
     /// Validate committed Codex parity artifacts under `cli_manifests/codex/`.
     CodexValidate(codex_validate::Args),
-    /// Generate a triad scaffold directory from a parity coverage report.
-    ParityTriadScaffold(parity_triad_scaffold::Args),
     /// Preview the next control-plane onboarding packet without writing files.
     OnboardAgent(Box<onboard_agent::Args>),
     /// Create a publishable wrapper crate shell for an onboarded agent.
@@ -169,13 +166,6 @@ fn main() {
             }
         },
         Command::CodexValidate(args) => codex_validate::run(args),
-        Command::ParityTriadScaffold(args) => match parity_triad_scaffold::run(args) {
-            Ok(()) => 0,
-            Err(err) => {
-                eprintln!("{err}");
-                1
-            }
-        },
         Command::OnboardAgent(args) => match onboard_agent::run(*args) {
             Ok(()) => 0,
             Err(err) => {
