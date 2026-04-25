@@ -371,8 +371,8 @@ def _make_prompt_text(
             "Hard rules:",
             "- Do not proceed to any other task IDs.",
             "- Do NOT edit feature docs, task tracking, or session logs:",
-            "  - docs/project_management/next/**/tasks.json",
-            "  - docs/project_management/next/**/session_log.md",
+            "  - .archived/project_management/next/**/tasks.json",
+            "  - .archived/project_management/next/**/session_log.md",
             "- Do NOT create/remove git worktrees; the orchestrator handles that.",
             "- Do NOT update task statuses; the orchestrator handles that.",
             "- Do NOT run `git checkout` / `git pull` or otherwise switch branches; the orchestrator already prepared the worktree on the task branch.",
@@ -392,7 +392,7 @@ def _make_prompt_text(
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Orchestrate this repo's triad tasks.json with low-poll monitoring.")
     parser.add_argument("--repo-root", required=True)
-    parser.add_argument("--queue", required=True, help="Path to docs/project_management/.../tasks.json")
+    parser.add_argument("--queue", required=True, help="Path to .archived/project_management/.../tasks.json")
     parser.add_argument("--run-root", default=".runs", help="Repo-relative run state root")
     parser.add_argument("--max-workers", type=int, default=2, help="Global max parallel workers")
     parser.add_argument("--per-workstream", type=int, default=1, help="Max concurrent tasks per workstream")

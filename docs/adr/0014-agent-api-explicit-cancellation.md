@@ -23,10 +23,10 @@
   - `docs/specs/unified-agent-api/contract.md`
   - `docs/specs/unified-agent-api/run-protocol-spec.md`
 - Cancellation feature pack (planning spine; this ADR’s execution home):
-  - `docs/project_management/packs/active/agent-api-explicit-cancellation/README.md`
-  - `docs/project_management/packs/active/agent-api-explicit-cancellation/scope_brief.md`
-  - `docs/project_management/packs/active/agent-api-explicit-cancellation/seam_map.md`
-  - `docs/project_management/packs/active/agent-api-explicit-cancellation/threading.md`
+  - `.archived/project_management/packs/implemented/agent-api-explicit-cancellation/README.md`
+  - `.archived/project_management/packs/implemented/agent-api-explicit-cancellation/scope_brief.md`
+  - `.archived/project_management/packs/implemented/agent-api-explicit-cancellation/seam_map.md`
+  - `.archived/project_management/packs/implemented/agent-api-explicit-cancellation/threading.md`
 - Backend harness (internal refactor context):
   - `docs/adr/0013-agent-api-backend-harness.md`
 - Substrate integration posture (orchestrator context):
@@ -49,7 +49,7 @@ ADR_BODY_SHA256: 2f21a08280b6a4d3bb36e31a099cfa78a880015ede03e7fa1b5a07f318144bd
     - `docs/specs/unified-agent-api/run-protocol-spec.md`
     - `docs/specs/unified-agent-api/contract.md`
     - `docs/specs/unified-agent-api/capability-matrix.md` (current backend support; generated)
-    - `docs/project_management/packs/active/agent-api-explicit-cancellation/seam-1-cancellation-contract.md`
+    - `.archived/project_management/packs/implemented/agent-api-explicit-cancellation/seam-1-cancellation-contract.md`
 
 ## Problem / Context
 
@@ -148,9 +148,9 @@ the base run handle shape stable while enabling orchestrator-grade cancellation.
 ## Sequencing / Dependencies
 
 - This ADR is implemented via the execution pack:
-  - `docs/project_management/packs/active/agent-api-explicit-cancellation/`
+  - `.archived/project_management/packs/implemented/agent-api-explicit-cancellation/`
 - Current rollout/support status (and the plan-of-record for landing backend support) is tracked in:
-  - `docs/project_management/packs/active/agent-api-explicit-cancellation/README.md`
+  - `.archived/project_management/packs/implemented/agent-api-explicit-cancellation/README.md`
 - Dependencies:
   - Backend harness structure (ADR-0013) is assumed for wiring cancellation without duplicating
     driver logic per backend.
@@ -192,4 +192,4 @@ the base run handle shape stable while enabling orchestrator-grade cancellation.
 This ADR introduces multiple non-trivial decisions (API shape, completion error representation, and
 backend-level cancellation responsibilities). Those decisions are tracked in:
 
-- `docs/project_management/packs/active/agent-api-explicit-cancellation/decision_register.md`
+- `.archived/project_management/packs/implemented/agent-api-explicit-cancellation/decision_register.md`

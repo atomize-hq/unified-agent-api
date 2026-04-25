@@ -229,9 +229,9 @@ def lint_ci_checkpoint_plan(plan_path: Path) -> list[LintError]:
 
 def main(argv: list[str]) -> int:
     repo_root = Path(__file__).resolve().parent.parent
-    next_dir = repo_root / "docs" / "project_management" / "next"
+    next_dir = repo_root / ".archived" / "project_management" / "next"
     if not next_dir.exists():
-        print("lint-ci-checkpoint-plans: SKIP (docs/project_management/next/ missing)")
+        print("lint-ci-checkpoint-plans: SKIP (.archived/project_management/next/ missing)")
         return 0
 
     plans = sorted(next_dir.glob("*/ci_checkpoint_plan.md"))
@@ -255,4 +255,3 @@ def main(argv: list[str]) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main(sys.argv))
-

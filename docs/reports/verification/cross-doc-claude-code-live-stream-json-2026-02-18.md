@@ -1,6 +1,6 @@
 # Cross-Documentation Verification Report
 
-**Target**: `docs/project_management/next/claude-code-live-stream-json/` (planning pack)  
+**Target**: `.archived/project_management/next/claude-code-live-stream-json/` (planning pack)  
 **Date (UTC)**: 2026-02-18  
 **Documents Checked**: 19 (planning pack docs + ADR/baselines)
 

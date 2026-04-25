@@ -13,7 +13,7 @@
     "status": "completed",
     "type": "docs",
     "workstream_id": "WS-DOC",
-    "kickoff_prompt": "Verify `docs/project_management/next/unified-agent-api/*` docs are mutually consistent (contract/run-protocol/event-envelope/capabilities/extensions/spec_manifest/impact_map). Pay special attention to extension key ownership, defaults, and capability gating rules."
+    "kickoff_prompt": "Verify `.archived/project_management/next/unified-agent-api/*` docs are mutually consistent (contract/run-protocol/event-envelope/capabilities/extensions/spec_manifest/impact_map). Pay special attention to extension key ownership, defaults, and capability gating rules."
   },
   {
     "id": "V-PACK",
@@ -21,7 +21,7 @@
     "status": "completed",
     "type": "docs",
     "workstream_id": "WS-DOC",
-    "kickoff_prompt": "Verify all `docs/project_management/packs/active/agent-api-codex-stream-exec/*` docs are mutually consistent and correctly defer to universal baselines. Focus: exec-policy keys + defaults, final_text policy, redaction rules, and platform parity evidence expectations."
+    "kickoff_prompt": "Verify all `.archived/project_management/packs/implemented/agent-api-codex-stream-exec/*` docs are mutually consistent and correctly defer to universal baselines. Focus: exec-policy keys + defaults, final_text policy, redaction rules, and platform parity evidence expectations."
   },
   {
     "id": "V-CI",

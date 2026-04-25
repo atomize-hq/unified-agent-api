@@ -31,7 +31,7 @@ proceed with triads `C1 → C2`.
 
 ### Gap 1: Redaction mapping in code does not implement the pinned “canonical, deterministic” shapes
 
-- **Location 1**: `docs/project_management/packs/active/agent-api-codex-stream-exec/codex-stream-exec-adapter-protocol-spec.md` (lines 141–160)
+- **Location 1**: `.archived/project_management/packs/implemented/agent-api-codex-stream-exec/codex-stream-exec-adapter-protocol-spec.md` (lines 141–160)
 - **Location 2**: `crates/agent_api/src/backends/codex.rs` (`redacted_exec_error`)
 - **Gap**: Spec requires stable messages including `line_bytes={n}` for Parse/Normalize and stable `{kind}` categories for Codex
   errors; code currently emits simplified strings (and collapses all `ExecStreamError::Codex(_)` to `"codex error"`).
@@ -39,7 +39,7 @@ proceed with triads `C1 → C2`.
 
 ### Gap 2: C2 fake-binary scenarios + tests required by the pack are not yet present
 
-- **Location 1**: `docs/project_management/packs/active/agent-api-codex-stream-exec/C2-spec.md` (lines 55–92)
+- **Location 1**: `.archived/project_management/packs/implemented/agent-api-codex-stream-exec/C2-spec.md` (lines 55–92)
 - **Location 2**: `crates/agent_api/src/bin/fake_codex_stream_json_agent_api.rs` (no `FAKE_CODEX_SCENARIO`; only argv validation + fixture emit)
 - **Location 3**: `crates/agent_api/tests/c1_codex_exec_policy.rs` (exec-policy only; does not cover env precedence/redaction/live-before-completion; filename differs from spec)
 - **Gap**: The pack requires scenario selection, an env dump path, and a raw-line redaction sentinel test; current artifacts only
@@ -48,7 +48,7 @@ proceed with triads `C1 → C2`.
 
 ## Positive Findings
 
-- ✅ Core extension ownership rules are centralized in `docs/project_management/next/unified-agent-api/extensions-spec.md`.
+- ✅ Core extension ownership rules are centralized in `.archived/project_management/next/unified-agent-api/extensions-spec.md`.
 - ✅ `.github/workflows/ci.yml` now includes `cargo test -p agent_api --all-features` (ubuntu-latest) as required by the decision register.
 - ✅ `.github/workflows/agent-api-codex-stream-exec-smoke.yml` matches the pack’s platform parity spec (OS matrix + public API guard + Linux preflight).
 

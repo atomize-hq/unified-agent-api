@@ -12,7 +12,7 @@
 - Universal spec set (canonical):
   - `docs/specs/unified-agent-api/`
 - Planning pack (derived pointers + execution artifacts):
-  - `docs/project_management/next/unified-agent-api/`
+  - `.archived/project_management/next/unified-agent-api/`
 - Onboarding charter doc:
   - `docs/specs/cli-agent-onboarding-charter.md`
 
@@ -27,7 +27,7 @@
 - Onboarding charter introduced by this ADR:
   - `docs/specs/cli-agent-onboarding-charter.md`
 - Current exec-policy usage in a feature pack (context; not authoritative for core keys):
-  - `docs/project_management/packs/active/agent-api-codex-stream-exec/contract.md`
+  - `.archived/project_management/packs/implemented/agent-api-codex-stream-exec/contract.md`
 
 ## Executive Summary (Operator)
 

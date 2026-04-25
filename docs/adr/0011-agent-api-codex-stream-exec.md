@@ -9,31 +9,31 @@
 - Owner(s): spensermcconnell
 
 ## Scope
-- Feature directory: `docs/project_management/packs/active/agent-api-codex-stream-exec/`
+- Feature directory: `.archived/project_management/packs/implemented/agent-api-codex-stream-exec/`
 - Intended branch: `feat/agent-api-codex-stream-exec`
 - Standards:
   - `/Users/spensermcconnell/__Active_Code/atomize-hq/substrate/docs/project_management/standards/ADR_STANDARD_AND_TEMPLATE.md`
 
 ## Related Docs
 - Planning pack (to be created for execution readiness):
-  - Spec manifest: `docs/project_management/packs/active/agent-api-codex-stream-exec/spec_manifest.md`
-  - Plan: `docs/project_management/packs/active/agent-api-codex-stream-exec/plan.md`
-  - Tasks: `docs/project_management/packs/active/agent-api-codex-stream-exec/tasks.json`
+  - Spec manifest: `.archived/project_management/packs/implemented/agent-api-codex-stream-exec/spec_manifest.md`
+  - Plan: `.archived/project_management/packs/implemented/agent-api-codex-stream-exec/plan.md`
+  - Tasks: `.archived/project_management/packs/implemented/agent-api-codex-stream-exec/tasks.json`
   - Slice specs:
-    - `docs/project_management/packs/active/agent-api-codex-stream-exec/C0-spec.md`
-    - `docs/project_management/packs/active/agent-api-codex-stream-exec/C1-spec.md`
-    - `docs/project_management/packs/active/agent-api-codex-stream-exec/C2-spec.md`
-  - Contract: `docs/project_management/packs/active/agent-api-codex-stream-exec/contract.md`
-  - Adapter protocol: `docs/project_management/packs/active/agent-api-codex-stream-exec/codex-stream-exec-adapter-protocol-spec.md`
-  - Platform parity: `docs/project_management/packs/active/agent-api-codex-stream-exec/platform-parity-spec.md`
-  - Decision Register: `docs/project_management/packs/active/agent-api-codex-stream-exec/decision_register.md`
-  - Impact Map: `docs/project_management/packs/active/agent-api-codex-stream-exec/impact_map.md`
-  - Manual Playbook: `docs/project_management/packs/active/agent-api-codex-stream-exec/manual_testing_playbook.md`
+    - `.archived/project_management/packs/implemented/agent-api-codex-stream-exec/C0-spec.md`
+    - `.archived/project_management/packs/implemented/agent-api-codex-stream-exec/C1-spec.md`
+    - `.archived/project_management/packs/implemented/agent-api-codex-stream-exec/C2-spec.md`
+  - Contract: `.archived/project_management/packs/implemented/agent-api-codex-stream-exec/contract.md`
+  - Adapter protocol: `.archived/project_management/packs/implemented/agent-api-codex-stream-exec/codex-stream-exec-adapter-protocol-spec.md`
+  - Platform parity: `.archived/project_management/packs/implemented/agent-api-codex-stream-exec/platform-parity-spec.md`
+  - Decision Register: `.archived/project_management/packs/implemented/agent-api-codex-stream-exec/decision_register.md`
+  - Impact Map: `.archived/project_management/packs/implemented/agent-api-codex-stream-exec/impact_map.md`
+  - Manual Playbook: `.archived/project_management/packs/implemented/agent-api-codex-stream-exec/manual_testing_playbook.md`
   - Smoke scripts:
     - `scripts/smoke/agent-api-codex-stream-exec/linux-smoke.sh`
     - `scripts/smoke/agent-api-codex-stream-exec/macos-smoke.sh`
     - `scripts/smoke/agent-api-codex-stream-exec/windows-smoke.ps1`
-  - Quality gate report: `docs/project_management/packs/active/agent-api-codex-stream-exec/quality_gate_report.md`
+  - Quality gate report: `.archived/project_management/packs/implemented/agent-api-codex-stream-exec/quality_gate_report.md`
 - Baseline universal contract:
   - `docs/adr/0009-unified-agent-api.md`
   - `docs/specs/unified-agent-api/contract.md`
@@ -149,7 +149,7 @@ This ADR changes implementation shape but preserves the public Rust contract of 
 
 ### Platform guarantees
 - Linux/macOS/Windows MUST be supported (GitHub-hosted runner parity is required; see ADR 0009’s
-  platform parity planning under `docs/project_management/next/unified-agent-api/platform-parity-spec.md`).
+  platform parity planning under `.archived/project_management/next/unified-agent-api/platform-parity-spec.md`).
 - Tests MUST NOT require a real Codex binary on CI runners (fixture/fake-binary strategy only).
 
 ## Architecture Shape
@@ -221,7 +221,7 @@ Integration dependency notes:
 
 ### Manual validation
 - Manual playbook lives in the feature planning pack:
-  - `docs/project_management/packs/active/agent-api-codex-stream-exec/manual_testing_playbook.md`
+  - `.archived/project_management/packs/implemented/agent-api-codex-stream-exec/manual_testing_playbook.md`
 
 ### Smoke scripts
 - Smoke scripts live in the feature planning pack:
@@ -239,4 +239,4 @@ Integration dependency notes:
   reimplement process + ingestion logic directly in `agent_api`.
 - Execution-readiness A/B decisions (exec policy, redaction mapping, env override strategy, and
   `final_text` policy) are tracked in the feature pack’s decision register:
-  - `docs/project_management/packs/active/agent-api-codex-stream-exec/decision_register.md`
+  - `.archived/project_management/packs/implemented/agent-api-codex-stream-exec/decision_register.md`

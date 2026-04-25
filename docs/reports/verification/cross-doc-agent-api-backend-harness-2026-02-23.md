@@ -1,6 +1,6 @@
 # Cross-Documentation Verification Report
 
-**Target**: `docs/project_management/packs/active/agent-api-backend-harness/` (execution pack)  
+**Target**: `.archived/project_management/packs/implemented/agent-api-backend-harness/` (execution pack)  
 **Date**: 2026-02-23  
 **Documents Checked**: ADR-0013 + execution pack seams/slices + relevant Unified Agent API specs
 
@@ -24,16 +24,16 @@ Recommendation: **PROCEED**
 - ADR:
   - `docs/adr/0013-agent-api-backend-harness.md`
 - Execution pack (primary):
-  - `docs/project_management/packs/active/agent-api-backend-harness/scope_brief.md`
-  - `docs/project_management/packs/active/agent-api-backend-harness/seam_map.md`
-  - `docs/project_management/packs/active/agent-api-backend-harness/threading.md`
-  - `docs/project_management/packs/active/agent-api-backend-harness/seam-1-harness-contract.md`
-  - `docs/project_management/packs/active/agent-api-backend-harness/seam-2-request-normalization.md`
-  - `docs/project_management/packs/active/agent-api-backend-harness/seam-3-streaming-pump.md`
-  - `docs/project_management/packs/active/agent-api-backend-harness/seam-4-completion-gating.md`
-  - `docs/project_management/packs/active/agent-api-backend-harness/seam-5-backend-adoption-and-tests.md`
+  - `.archived/project_management/packs/implemented/agent-api-backend-harness/scope_brief.md`
+  - `.archived/project_management/packs/implemented/agent-api-backend-harness/seam_map.md`
+  - `.archived/project_management/packs/implemented/agent-api-backend-harness/threading.md`
+  - `.archived/project_management/packs/implemented/agent-api-backend-harness/seam-1-harness-contract.md`
+  - `.archived/project_management/packs/implemented/agent-api-backend-harness/seam-2-request-normalization.md`
+  - `.archived/project_management/packs/implemented/agent-api-backend-harness/seam-3-streaming-pump.md`
+  - `.archived/project_management/packs/implemented/agent-api-backend-harness/seam-4-completion-gating.md`
+  - `.archived/project_management/packs/implemented/agent-api-backend-harness/seam-5-backend-adoption-and-tests.md`
 - Execution pack (threaded seams / slices):
-  - `docs/project_management/packs/active/agent-api-backend-harness/threaded-seams/`
+  - `.archived/project_management/packs/implemented/agent-api-backend-harness/threaded-seams/`
 - Normative anchors (specs):
   - `docs/specs/unified-agent-api/contract.md`
   - `docs/specs/unified-agent-api/run-protocol-spec.md`

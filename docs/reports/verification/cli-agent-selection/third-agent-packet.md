@@ -5,7 +5,7 @@ Date (UTC): 2026-04-16
 Prepared for: post-phase-1 third-agent selection and implementation handoff  
 Related source docs:
 - `docs/specs/cli-agent-onboarding-charter.md`
-- `docs/project_management/next/cli-manifest-support-matrix/plan.md`
+- `.archived/project_management/next/cli-manifest-support-matrix/plan.md`
 - `docs/template/agent-onboarding/cli-agent-onboarding-packet-template.md`
 
 ## Purpose
@@ -62,7 +62,7 @@ Reusable repo surfaces:
 - `cli_manifests/codex/**`
 - `cli_manifests/claude_code/**`
 - `docs/specs/cli-agent-onboarding-charter.md`
-- `docs/project_management/next/cli-manifest-support-matrix/plan.md`
+- `.archived/project_management/next/cli-manifest-support-matrix/plan.md`
 - `docs/specs/unified-agent-api/**`
 - `crates/codex/`, `crates/claude_code/`, `crates/agent_api/`
 - `crates/xtask/**`
@@ -431,7 +431,7 @@ Provenance: `maintainer inference grounded in repo constraints`
 ### Required deliverables
 
 - one closed packet with real smoke evidence and an explicit runtime-surface decision
-- one triad scaffold under `docs/project_management/next/opencode-cli-onboarding/`
+- one triad scaffold under `.archived/project_management/next/opencode-cli-onboarding/`
 - one manifest-root plan for `cli_manifests/opencode/`
 - one wrapper parser/fixture strategy for `run --format json`
 - one bounded `agent_api` planning phase that starts only after wrapper decisions are fixed

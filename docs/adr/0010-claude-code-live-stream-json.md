@@ -9,30 +9,30 @@
 - Owner(s): spensermcconnell
 
 ## Scope
-- Feature directory: `docs/project_management/next/claude-code-live-stream-json/`
+- Feature directory: `.archived/project_management/next/claude-code-live-stream-json/`
 - Intended branch: `feat/claude-code-live-stream-json`
-- Sequencing spine: `docs/project_management/next/sequencing.json`
+- Sequencing spine: `.archived/sequencing.json`
 - Standards:
-  - `docs/project_management/task-triads-feature-setup-standard.md`
-  - `docs/project_management/prompt_templates/adr-to-triad-feature-scaffold.md`
+  - `.archived/task-triads-feature-setup-standard.md`
+  - `.archived/prompt_templates/adr-to-triad-feature-scaffold.md`
 
 ## Related Docs
 - Prior ADR (universal contract baseline): `docs/adr/0009-unified-agent-api.md`
-- Prior planning pack (baseline): `docs/project_management/next/unified-agent-api/`
-- Spec manifest: `docs/project_management/next/claude-code-live-stream-json/spec_manifest.md`
-- Decision Register: `docs/project_management/next/claude-code-live-stream-json/decision_register.md`
-- Plan: `docs/project_management/next/claude-code-live-stream-json/plan.md`
-- Tasks: `docs/project_management/next/claude-code-live-stream-json/tasks.json`
-- Session log: `docs/project_management/next/claude-code-live-stream-json/session_log.md`
+- Prior planning pack (baseline): `.archived/project_management/next/unified-agent-api/`
+- Spec manifest: `.archived/project_management/next/claude-code-live-stream-json/spec_manifest.md`
+- Decision Register: `.archived/project_management/next/claude-code-live-stream-json/decision_register.md`
+- Plan: `.archived/project_management/next/claude-code-live-stream-json/plan.md`
+- Tasks: `.archived/project_management/next/claude-code-live-stream-json/tasks.json`
+- Session log: `.archived/project_management/next/claude-code-live-stream-json/session_log.md`
 - Specs (pinned by `spec_manifest.md`):
-  - `docs/project_management/next/claude-code-live-stream-json/contract.md`
-  - `docs/project_management/next/claude-code-live-stream-json/stream-json-print-protocol-spec.md`
-  - `docs/project_management/next/claude-code-live-stream-json/platform-parity-spec.md`
-  - `docs/project_management/next/claude-code-live-stream-json/ci_checkpoint_plan.md`
-  - `docs/project_management/next/claude-code-live-stream-json/C0-spec.md`
-  - `docs/project_management/next/claude-code-live-stream-json/C1-spec.md`
-- Impact Map: `docs/project_management/next/claude-code-live-stream-json/impact_map.md`
-- Manual Playbook: `docs/project_management/next/claude-code-live-stream-json/manual_testing_playbook.md`
+  - `.archived/project_management/next/claude-code-live-stream-json/contract.md`
+  - `.archived/project_management/next/claude-code-live-stream-json/stream-json-print-protocol-spec.md`
+  - `.archived/project_management/next/claude-code-live-stream-json/platform-parity-spec.md`
+  - `.archived/project_management/next/claude-code-live-stream-json/ci_checkpoint_plan.md`
+  - `.archived/project_management/next/claude-code-live-stream-json/C0-spec.md`
+  - `.archived/project_management/next/claude-code-live-stream-json/C1-spec.md`
+- Impact Map: `.archived/project_management/next/claude-code-live-stream-json/impact_map.md`
+- Manual Playbook: `.archived/project_management/next/claude-code-live-stream-json/manual_testing_playbook.md`
 
 ## Executive Summary (Operator)
 
@@ -175,7 +175,7 @@ Update the built-in Claude backend (`feature = "claude_code"`) so that:
 
 ## Sequencing / Dependencies
 
-- Sequencing entry: `docs/project_management/next/sequencing.json` → add new feature track `claude-code-live-stream-json`.
+- Sequencing entry: `.archived/sequencing.json` → add new feature track `claude-code-live-stream-json`.
 - Prerequisites:
   - Requires the baseline universal API contract (ADR 0009) and existing `agent_api` Claude backend to exist.
 - Triad model:
@@ -209,7 +209,7 @@ Update the built-in Claude backend (`feature = "claude_code"`) so that:
   - `cargo test --workspace --all-targets --all-features`
 
 ### Manual validation
-- Manual playbook (required): `docs/project_management/next/claude-code-live-stream-json/manual_testing_playbook.md`
+- Manual playbook (required): `.archived/project_management/next/claude-code-live-stream-json/manual_testing_playbook.md`
   - Run a real `claude` print stream-json session and confirm:
     - at least one event arrives before process exit
     - `completion` resolves only after events stream finality (Unified Agent API DR-0012)
@@ -234,5 +234,5 @@ Update the built-in Claude backend (`feature = "claude_code"`) so that:
 
 - This body of work contains multiple architectural decisions; a Decision Register is required.
 - Decision Register entries:
-  - `docs/project_management/next/claude-code-live-stream-json/decision_register.md`:
+  - `.archived/project_management/next/claude-code-live-stream-json/decision_register.md`:
     - DR-0001, DR-0002, DR-0003, DR-0004, DR-0005, DR-0006, DR-0007, DR-0008, DR-0009, DR-0010, DR-0011, DR-0012, DR-0013
