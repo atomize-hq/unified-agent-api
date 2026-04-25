@@ -50,7 +50,7 @@ Responsibilities (high level):
   - `xtask codex-version-metadata --root cli_manifests/claude_code`
   - `xtask codex-validate --root cli_manifests/claude_code`
 - Generate a triad scaffold under:
-  - `docs/project_management/next/claude-code-cli-parity-<version>/`
+  - `.archived/project_management/next/claude-code-cli-parity-<version>/`
 - Open a PR branch `automation/claude-code-<version>`.
 
 ## Promotion (manual gate)

@@ -33,6 +33,39 @@ check_no_tracked_glob() {
   fi
 }
 
+check_tracked_content_pattern() {
+  local pattern="$1"
+  shift
+  local hits
+  hits="$(git grep -n -I -e "$pattern" -- . "$@" || true)"
+  if [[ -n "$hits" ]]; then
+    echo "ERROR: repo hygiene: tracked file contents match pattern: $pattern"
+    echo "$hits"
+    fail=1
+  fi
+}
+
+check_duplicate_adr_numbers() {
+  local duplicates
+  duplicates="$(
+    git ls-files 'docs/adr/*.md' \
+      | while IFS= read -r path; do
+          [[ -f "$path" ]] && printf '%s\n' "$path"
+        done \
+      | sed -E 's#docs/adr/([0-9]{4})-.*#\1#' \
+      | sort \
+      | uniq -d
+  )"
+  if [[ -n "$duplicates" ]]; then
+    echo "ERROR: repo hygiene: duplicate ADR numbers detected under docs/adr"
+    while IFS= read -r number; do
+      [[ -z "$number" ]] && continue
+      git ls-files "docs/adr/${number}-*.md"
+    done <<< "$duplicates"
+    fail=1
+  fi
+}
+
 # Directories that should never be committed.
 check_no_tracked_under "wt"
 check_no_tracked_under "target"
@@ -49,6 +82,14 @@ check_no_tracked_under "x86_64-pc-windows-msvc.json"
 # Common artifact types that should not be committed.
 check_no_tracked_glob "\\.log$"
 check_no_tracked_glob "universal-agent-api-planning-pack_.*\\.zip$"
+
+check_tracked_content_pattern "docs/project_management/next/" \
+  ':(exclude).archived/**' \
+  ':(exclude)scripts/check_repo_hygiene.sh' \
+  ':(exclude)crates/xtask/tests/agent_maintenance_refresh.rs'
+check_tracked_content_pattern "docs/specs/universal-agent-api/" \
+  ':(exclude)scripts/check_repo_hygiene.sh'
+check_duplicate_adr_numbers
 
 if [[ "$fail" -ne 0 ]]; then
   exit 1

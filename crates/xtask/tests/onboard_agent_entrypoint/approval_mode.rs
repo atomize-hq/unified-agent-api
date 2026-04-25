@@ -218,7 +218,7 @@ fn onboard_agent_approval_rejects_nonexistent_comparison_ref() {
         None,
     );
     fs::remove_file(
-        fixture.join("docs/reports/verification/cli-agent-selection/third-agent-packet.md"),
+        fixture.join("docs/reports/verification/cli-agent-selection/cli-agent-selection-packet.md"),
     )
     .expect("remove canonical comparison packet");
 
@@ -241,7 +241,7 @@ fn onboard_agent_approval_rejects_non_file_comparison_ref() {
         None,
     );
     let comparison_path =
-        fixture.join("docs/reports/verification/cli-agent-selection/third-agent-packet.md");
+        fixture.join("docs/reports/verification/cli-agent-selection/cli-agent-selection-packet.md");
     fs::remove_file(&comparison_path).expect("remove comparison packet file");
     fs::create_dir_all(&comparison_path).expect("create comparison dir");
 
@@ -268,7 +268,7 @@ fn onboard_agent_approval_rejects_non_normal_comparison_ref() {
     super::harness::write_text(
         &approval_file,
         &contents.replace(
-            "docs/reports/verification/cli-agent-selection/third-agent-packet.md",
+            "docs/reports/verification/cli-agent-selection/cli-agent-selection-packet.md",
             "../outside.md",
         ),
     );

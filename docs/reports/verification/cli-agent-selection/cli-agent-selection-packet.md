@@ -1,4 +1,4 @@
-# Packet — First Real Third CLI Agent Onboarding
+# Packet — CLI Agent Selection (First Real Third-Agent Decision)
 
 Status: Draft  
 Date (UTC): 2026-04-16  
@@ -6,7 +6,7 @@ Prepared for: post-phase-1 third-agent selection and implementation handoff
 Related source docs:
 - `docs/specs/cli-agent-onboarding-charter.md`
 - `.archived/project_management/next/cli-manifest-support-matrix/plan.md`
-- `docs/template/agent-onboarding/cli-agent-onboarding-packet-template.md`
+- `docs/templates/agent-selection/cli-agent-selection-packet-template.md`
 
 ## Purpose
 

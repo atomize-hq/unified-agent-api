@@ -11,7 +11,7 @@ const DOCS_NEXT_ROOT: &str = "docs/reports/agent-lifecycle";
 const APPROVAL_FILE_NAME: &str = "approved-agent.toml";
 const GOVERNANCE_DIR_NAME: &str = "governance";
 const COMPARISON_REF_PATH: &str =
-    "docs/reports/verification/cli-agent-selection/third-agent-packet.md";
+    "docs/reports/verification/cli-agent-selection/cli-agent-selection-packet.md";
 const FACTORY_VALIDATION_MODE: &str = "factory_validation";
 const FRONTIER_EXPANSION_MODE: &str = "frontier_expansion";
 const APPROVAL_ARTIFACT_VERSION: &str = "1";

@@ -211,7 +211,7 @@ fn check_agent_drift_reports_gemini_approval_descriptor_mismatch() {
         ),
         concat!(
             "artifact_version = \"1\"\n",
-            "comparison_ref = \"docs/reports/verification/cli-agent-selection/third-agent-packet.md\"\n",
+            "comparison_ref = \"docs/reports/verification/cli-agent-selection/cli-agent-selection-packet.md\"\n",
             "selection_mode = \"factory_validation\"\n",
             "recommended_agent_id = \"gemini_cli\"\n",
             "approved_agent_id = \"gemini_cli\"\n",

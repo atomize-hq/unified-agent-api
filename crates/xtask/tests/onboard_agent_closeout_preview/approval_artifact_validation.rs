@@ -115,7 +115,7 @@ fn close_proving_run_rejects_schema_invalid_approval_artifact_at_canonical_path(
         &approval_path,
         concat!(
             "artifact_version = \"1\"\n",
-            "comparison_ref = \"docs/reports/verification/cli-agent-selection/third-agent-packet.md\"\n",
+            "comparison_ref = \"docs/reports/verification/cli-agent-selection/cli-agent-selection-packet.md\"\n",
             "selection_mode = \"factory_validation\"\n",
             "recommended_agent_id = \"gemini_cli\"\n",
             "approved_agent_id = \"gemini_cli\"\n",

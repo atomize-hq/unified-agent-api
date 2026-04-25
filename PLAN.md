@@ -3,9 +3,9 @@
 
 Source:
 - `/Users/spensermcconnell/.gstack/projects/atomize-hq-unified-agent-api/spensermcconnell-main-design-20260420-151505.md`
-- `docs/project_management/next/opencode-cli-onboarding/next-steps-handoff.md`
+- `.archived/project_management/next/opencode-cli-onboarding/next-steps-handoff.md`
 - `/Users/spensermcconnell/.gstack/projects/atomize-hq-unified-agent-api/spensermcconnell-main-test-outcome-20260420-091704.md`
-- `docs/project_management/next/gemini-cli-onboarding/HANDOFF.md`
+- `docs/reports/agent-lifecycle/gemini-cli-onboarding/HANDOFF.md`
 
 Status: M1 through M4 landed on `feat/cli-agent-onboarding-factory`; M5 is the active plan-of-record on `staging`, and W4 is the narrow docs closeout lane
 Last updated (UTC): 2026-04-23
@@ -523,7 +523,7 @@ The current repo state already tells us where the missing step lives:
 - `crates/xtask/src/onboard_agent/preview/render.rs` and `crates/xtask/src/onboard_agent/preview.rs` explicitly describe the next runtime step as "implement the runtime-owned wrapper crate" and still treat crate-local publishability files as later manual follow-up.
 - `crates/xtask/tests/onboard_agent_entrypoint/help_and_preview.rs` explicitly guards against `onboard-agent` preview text becoming "Create the wrapper crate".
 - `crates/xtask/tests/onboard_agent_entrypoint/write_mode.rs` locks in the current control-plane write set and the current `15 total planned` replay semantics.
-- `docs/project_management/next/cli-agent-onboarding-charter.md` still starts the onboarding checklist with manual wrapper-crate creation.
+- `docs/specs/cli-agent-onboarding-charter.md` still starts the onboarding checklist with manual wrapper-crate creation.
 
 So the actual M6 problem is not "should the repo scaffold wrapper shells?" The answer is yes. The problem is command shape and ownership: how do we add deterministic wrapper-shell scaffolding without collapsing approval artifacts, control-plane writes, runtime-owned code, and publishability templates into one overloaded `onboard-agent` contract?
 
@@ -558,7 +558,7 @@ In scope:
 - reuse repo-owned license text and current wrapper-crate conventions so the shell matches the already-landed crates closely enough to be boring
 - fail closed on unknown agents, path escapes, partial writes, or divergent pre-existing runtime files
 - update onboarding packet preview/render wording so the "next executable runtime step" points at the new scaffold command instead of manual crate creation
-- update `docs/project_management/next/cli-agent-onboarding-charter.md` so the onboarding checklist reflects the new explicit wrapper-shell step
+- update `docs/specs/cli-agent-onboarding-charter.md` so the onboarding checklist reflects the new explicit wrapper-shell step
 - add fixture-driven tests for preview, write, identical replay, divergent replay, and workspace-valid generated shells
 
 #### Not In Scope
@@ -581,7 +581,7 @@ M6 is complete only when all of these are true:
 - the generated `Cargo.toml` includes the minimum publishability metadata needed to avoid the Gemini failure class, including `readme = "README.md"` and crate-local dual-license surfaces
 - the generated wrapper shell is structurally valid Rust workspace content, including `src/lib.rs`, so targeted `cargo check -p <package>` can succeed once the shell lands
 - `crates/xtask/src/onboard_agent/preview.rs`, `crates/xtask/src/onboard_agent/preview/render.rs`, and their tests no longer describe manual wrapper-crate creation as the immediate next step
-- `docs/project_management/next/cli-agent-onboarding-charter.md` reflects the new explicit wrapper-shell step without rewriting the broader control-plane/runtime boundary
+- `docs/specs/cli-agent-onboarding-charter.md` reflects the new explicit wrapper-shell step without rewriting the broader control-plane/runtime boundary
 
 #### What Already Exists
 | Sub-problem | Existing code to reuse | Why it matters |
@@ -592,7 +592,7 @@ M6 is complete only when all of these are true:
 | onboarding packet wording | `crates/xtask/src/onboard_agent/preview.rs`, `crates/xtask/src/onboard_agent/preview/render.rs` | already define the maintainer-facing next-step contract and must be updated so the workflow stays truthful |
 | wrapper package examples | `crates/gemini_cli/**`, `crates/opencode/**`, `crates/codex/**`, `crates/claude_code/**` | already show the minimal crate layout, README shape, dual-license surfaces, and publishable package metadata |
 | entrypoint test harness | `crates/xtask/tests/onboard_agent_entrypoint/*.rs`, `crates/xtask/tests/support/onboard_agent_harness.rs` | already prove dry-run/write/replay/divergence semantics and can be extended instead of inventing a new test style |
-| onboarding workflow charter | `docs/project_management/next/cli-agent-onboarding-charter.md` | already captures the operator workflow and is the narrow doc surface that must stop implying manual shell creation |
+| onboarding workflow charter | `docs/specs/cli-agent-onboarding-charter.md` | already captures the operator workflow and is the narrow doc surface that must stop implying manual shell creation |
 
 #### Chosen Approach
 M6 should add one explicit command:
@@ -828,7 +828,7 @@ Primary modules:
 - `crates/xtask/src/onboard_agent/preview.rs`
 - `crates/xtask/src/onboard_agent/preview/render.rs`
 - `crates/xtask/tests/onboard_agent_entrypoint/help_and_preview.rs`
-- `docs/project_management/next/cli-agent-onboarding-charter.md`
+- `docs/specs/cli-agent-onboarding-charter.md`
 
 Exit criteria:
 - no onboarding preview text still implies the first runtime step is manual crate creation
@@ -885,7 +885,7 @@ Modules touched:
 - `crates/xtask/src/onboard_agent/preview.rs`
 - `crates/xtask/src/onboard_agent/preview/render.rs`
 - `crates/xtask/tests/onboard_agent_entrypoint/help_and_preview.rs`
-- `docs/project_management/next/cli-agent-onboarding-charter.md`
+- `docs/specs/cli-agent-onboarding-charter.md`
 - the fixture-backed xtask test selected in Phase 2
 
 Implementation notes:
@@ -908,7 +908,7 @@ Exit gate:
 |---|---|---|
 | W1. command contract lock | `crates/xtask/src/main.rs`, `crates/xtask/src/lib.rs`, `crates/xtask/src/wrapper_scaffold*` | — |
 | W2. shell generation + replay safety | `crates/xtask/src/wrapper_scaffold*`, `crates/xtask/src/workspace_mutation.rs`, `crates/xtask/tests/wrapper_scaffold_*.rs` | W1 |
-| W3. workflow re-contract | `crates/xtask/src/onboard_agent/preview*`, `crates/xtask/tests/onboard_agent_entrypoint/**`, `docs/project_management/next/cli-agent-onboarding-charter.md` | W1 |
+| W3. workflow re-contract | `crates/xtask/src/onboard_agent/preview*`, `crates/xtask/tests/onboard_agent_entrypoint/**`, `docs/specs/cli-agent-onboarding-charter.md` | W1 |
 | W4. final fixture proof | `crates/xtask/tests/wrapper_scaffold_*.rs`, fixture support under `crates/xtask/tests/support/**` | W2, W3 |
 
 ##### Parallel Lanes
@@ -993,10 +993,10 @@ The current repo state is internally consistent enough to build and maintain age
 Concrete examples already visible on this branch:
 
 - `crates/xtask/src/main.rs` exposes `onboard-agent`, `scaffold-wrapper-crate`, `check-agent-drift`, `refresh-agent`, and `close-agent-maintenance`, but the repo entry docs do not present them as one lifecycle.
-- `docs/project_management/next/cli-agent-onboarding-charter.md` now correctly names `scaffold-wrapper-crate`, but it is a charter, not the day-to-day operator manual.
+- `docs/specs/cli-agent-onboarding-charter.md` now correctly names `scaffold-wrapper-crate`, but it is a charter, not the day-to-day operator manual.
 - `README.md` and `CONTRIBUTING.md` still mention `support-matrix --check`, but they do not explain the full green gate or the new factory command chain.
 - `docs/README.md` still lacks a pointer to any canonical factory/operator guide.
-- historical planning roots such as `docs/project_management/next/opencode-cli-onboarding/next-steps-handoff.md` remain discoverable and useful as provenance, but they can still read like current operating procedure if they are not explicitly framed as historical.
+- historical planning roots such as `.archived/project_management/next/opencode-cli-onboarding/next-steps-handoff.md` remain discoverable and useful as provenance, but they can still read like current operating procedure if they are not explicitly framed as historical.
 - earlier roadmap edits left the M7 slot half-migrated, which means this section must now stay truthful and cohesive instead of regressing into copied M4 maintenance language or loose review notes.
 
 M7 is therefore not "write nicer docs." It is the milestone that turns a working factory into a legible one.
@@ -1012,9 +1012,9 @@ These are already true on `feat/fill-trust-gap` and are not M7 work:
   - `close-agent-maintenance`
   - `support-matrix`
   - `capability-matrix`
-- `docs/project_management/next/cli-agent-onboarding-charter.md` already reflects the M6 ownership boundary: `onboard-agent` does not create the wrapper crate and `scaffold-wrapper-crate` does.
-- `docs/project_management/next/gemini-cli-onboarding/**` already provides one closed proving-run onboarding packet.
-- `docs/project_management/next/opencode-maintenance/**` already provides one real maintenance packet and closeout example.
+- `docs/specs/cli-agent-onboarding-charter.md` already reflects the M6 ownership boundary: `onboard-agent` does not create the wrapper crate and `scaffold-wrapper-crate` does.
+- `docs/reports/agent-lifecycle/gemini-cli-onboarding/**` already provides one closed proving-run onboarding packet.
+- `docs/reports/agent-lifecycle/opencode-maintenance/**` already provides one real maintenance packet and closeout example.
 - `docs/specs/agent-registry-contract.md` and `docs/specs/unified-agent-api/capabilities-schema-spec.md` already pin the narrow normative truth M5 needed.
 - `docs/crates-io-release.md` already contains the generated publish-order block emitted by the control plane.
 
@@ -1022,7 +1022,7 @@ M7 should document this state clearly. It should not reopen any code-path or con
 This section is the plan-of-record for that cleanup. It should not split back into roadmap bullets plus a separate review addendum.
 
 #### Step 0. Scope Challenge
-- Existing doc leverage: the repo already has the right raw inputs in `README.md`, `CONTRIBUTING.md`, `docs/README.md`, `docs/project_management/next/cli-agent-onboarding-charter.md`, generated onboarding/maintenance packets, and the command surface in `crates/xtask/src/main.rs`. M7 should consolidate and point, not invent a second explanation tree.
+- Existing doc leverage: the repo already has the right raw inputs in `README.md`, `CONTRIBUTING.md`, `docs/README.md`, `docs/specs/cli-agent-onboarding-charter.md`, generated onboarding/maintenance packets, and the command surface in `crates/xtask/src/main.rs`. M7 should consolidate and point, not invent a second explanation tree.
 - Minimum complete change: one canonical operator guide, one repo-entry cleanup pass, one historical/provenance framing pass for the most discoverable stale planning docs, and one `PLAN.md` correction so the roadmap itself is truthful.
 - Complexity check: the likely blast radius is 6 to 10 documentation files plus `PLAN.md`. That is acceptable because the whole milestone is about reducing confusion in one narrow factory seam.
 - Search check: quote the exact commands and artifact paths already present in `xtask`, the charter, and the generated packets. Do not invent a "friendly" workflow that diverges from the repo.
@@ -1039,16 +1039,16 @@ In scope:
   - the green-gate verification sequence
   - ownership boundaries between control-plane surfaces, runtime-owned code, generated publication, and historical packets
 - update `README.md`, `CONTRIBUTING.md`, and `docs/README.md` so they point to the operator guide and stop acting like partial command references
-- update `docs/project_management/next/cli-agent-onboarding-charter.md` so it stays normative and links to the operator guide for operational procedure instead of trying to be both charter and manual
+- update `docs/specs/cli-agent-onboarding-charter.md` so it stays normative and links to the operator guide for operational procedure instead of trying to be both charter and manual
 - add narrow "historical only" or "provenance" framing to the highest-confusion hand-authored legacy planning surfaces that remain discoverable after M6, starting with:
-  - `docs/project_management/next/opencode-cli-onboarding/next-steps-handoff.md`
+  - `.archived/project_management/next/opencode-cli-onboarding/next-steps-handoff.md`
   - any nearby hand-authored README/handoff surface that still reads like current execution guidance after the new operator guide exists
 - repair `PLAN.md` so M7 is a real docs milestone instead of copied M4 maintenance text
 
 #### Not In Scope
 - changing command behavior, flags, exit codes, or generated packet templates
 - editing generated onboarding or maintenance packet files purely for tone cleanup
-- moving historical planning packs out of `docs/project_management/next/`
+- moving historical planning packs out of `.archived/project_management/next/`
 - rewriting normative specs to duplicate operator guidance
 - creating a second operator guide under `docs/project_management/`
 - broad documentation gardening outside the factory/operator seam
@@ -1083,12 +1083,12 @@ M7 is complete only when all of these are true:
 | Sub-problem | Existing surface to reuse | Why it matters |
 |---|---|---|
 | command inventory | `crates/xtask/src/main.rs` | already exposes the real command set M7 must document exactly |
-| runtime-step ownership boundary | `docs/project_management/next/cli-agent-onboarding-charter.md`, `crates/xtask/src/onboard_agent/preview.rs`, `crates/xtask/src/onboard_agent/preview/render.rs` | already encode the M6 split between `onboard-agent` and `scaffold-wrapper-crate` |
-| proving-run example | `docs/project_management/next/gemini-cli-onboarding/**` | already shows the create-mode packet/output shape |
-| maintenance example | `docs/project_management/next/opencode-maintenance/**` | already shows the maintenance lane and closeout shape |
+| runtime-step ownership boundary | `docs/specs/cli-agent-onboarding-charter.md`, `crates/xtask/src/onboard_agent/preview.rs`, `crates/xtask/src/onboard_agent/preview/render.rs` | already encode the M6 split between `onboard-agent` and `scaffold-wrapper-crate` |
+| proving-run example | `docs/reports/agent-lifecycle/gemini-cli-onboarding/**` | already shows the create-mode packet/output shape |
+| maintenance example | `docs/reports/agent-lifecycle/opencode-maintenance/**` | already shows the maintenance lane and closeout shape |
 | green-gate contract | `docs/specs/unified-agent-api/capabilities-schema-spec.md`, `README.md`, `CONTRIBUTING.md`, `docs/crates-io-release.md` | already contain fragments of the verification story M7 must unify |
 | repo entrypoints | `README.md`, `CONTRIBUTING.md`, `docs/README.md` | already act as discoverability surfaces and therefore must stop being partially stale |
-| historical provenance docs | `docs/project_management/next/opencode-cli-onboarding/next-steps-handoff.md` and nearby hand-authored planning docs | still useful as source provenance, but need explicit framing so operators do not mistake them for current procedure |
+| historical provenance docs | `.archived/project_management/next/opencode-cli-onboarding/next-steps-handoff.md` and nearby hand-authored planning docs | still useful as source provenance, but need explicit framing so operators do not mistake them for current procedure |
 
 #### Chosen Approach
 M7 should use a hub-and-spokes documentation model:
@@ -1141,10 +1141,10 @@ Keep the docs structure boring:
   - pointer to the operator guide
 - `docs/cli-agent-onboarding-factory-operator-guide.md`
   - canonical human operator manual
-- `docs/project_management/next/cli-agent-onboarding-charter.md`
+- `docs/specs/cli-agent-onboarding-charter.md`
   - normative onboarding charter
   - points to the operator guide for procedure
-- historical planning docs under `docs/project_management/next/**`
+- historical planning docs under `.archived/project_management/next/**`
   - remain source provenance
   - gain narrow supersession or provenance framing where needed
 
@@ -1165,7 +1165,7 @@ README.md              CONTRIBUTING.md      docs/README.md
    +----------- pointers ----+-------------------+
         |
         v
-docs/project_management/next/cli-agent-onboarding-charter.md
+docs/specs/cli-agent-onboarding-charter.md
         |
         v
 historical planning / proving-run / maintenance packet docs
@@ -1204,9 +1204,9 @@ Deliverables:
 Primary modules:
 - `docs/cli-agent-onboarding-factory-operator-guide.md`
 - `crates/xtask/src/main.rs`
-- `docs/project_management/next/cli-agent-onboarding-charter.md`
-- `docs/project_management/next/gemini-cli-onboarding/**`
-- `docs/project_management/next/opencode-maintenance/**`
+- `docs/specs/cli-agent-onboarding-charter.md`
+- `docs/reports/agent-lifecycle/gemini-cli-onboarding/**`
+- `docs/reports/agent-lifecycle/opencode-maintenance/**`
 
 Exit criteria:
 - a maintainer can follow one doc to understand the full factory lifecycle
@@ -1237,8 +1237,8 @@ Deliverables:
 - stale status cleanup in `PLAN.md`
 
 Primary modules:
-- `docs/project_management/next/cli-agent-onboarding-charter.md`
-- `docs/project_management/next/opencode-cli-onboarding/next-steps-handoff.md`
+- `docs/specs/cli-agent-onboarding-charter.md`
+- `.archived/project_management/next/opencode-cli-onboarding/next-steps-handoff.md`
 - any nearby hand-authored planning README/handoff file that still reads like live procedure
 - `PLAN.md`
 
@@ -1257,7 +1257,7 @@ Primary modules:
 - `CONTRIBUTING.md`
 - `docs/README.md`
 - `docs/cli-agent-onboarding-factory-operator-guide.md`
-- `docs/project_management/next/cli-agent-onboarding-charter.md`
+- `docs/specs/cli-agent-onboarding-charter.md`
 - selected historical pointer docs
 
 Exit criteria:
@@ -1305,7 +1305,7 @@ Outputs:
 - `PLAN.md` M7 section becomes truthful
 
 Modules touched:
-- `docs/project_management/next/cli-agent-onboarding-charter.md`
+- `docs/specs/cli-agent-onboarding-charter.md`
 - selected hand-authored historical docs
 - `PLAN.md`
 
@@ -1395,7 +1395,7 @@ PLAN-OF-RECORD INTEGRITY
 ```
 
 Coverage target:
-- authored docs: `README.md`, `CONTRIBUTING.md`, `docs/README.md`, `docs/cli-agent-onboarding-factory-operator-guide.md`, `docs/project_management/next/cli-agent-onboarding-charter.md`
+- authored docs: `README.md`, `CONTRIBUTING.md`, `docs/README.md`, `docs/cli-agent-onboarding-factory-operator-guide.md`, `docs/specs/cli-agent-onboarding-charter.md`
 - selected legacy hand-authored planning docs that remain top search hits for this workflow
 - `PLAN.md` itself, because roadmap drift here reintroduces operator confusion before implementation even starts
 
@@ -1411,7 +1411,7 @@ Coverage target:
 - `docs/cli-agent-onboarding-factory-operator-guide.md`
   - matches `crates/xtask/src/main.rs`
   - names the create-mode and maintenance-mode artifact roots correctly
-- `docs/project_management/next/cli-agent-onboarding-charter.md`
+- `docs/specs/cli-agent-onboarding-charter.md`
   - remains normative
   - points to the guide for procedure
 - selected historical planning docs
@@ -1431,7 +1431,7 @@ Coverage target:
 - `cargo run -p xtask -- capability-matrix --check`
 - `cargo run -p xtask -- capability-matrix-audit`
 - `make preflight`
-- `rg -n "scaffold-wrapper-crate|check-agent-drift|refresh-agent|close-agent-maintenance|capability-matrix --check|support-matrix --check" README.md CONTRIBUTING.md docs/README.md docs/cli-agent-onboarding-factory-operator-guide.md docs/project_management/next/cli-agent-onboarding-charter.md docs/project_management/next`
+- `rg -n "scaffold-wrapper-crate|check-agent-drift|refresh-agent|close-agent-maintenance|capability-matrix --check|support-matrix --check" README.md CONTRIBUTING.md docs/README.md docs/cli-agent-onboarding-factory-operator-guide.md docs/specs/cli-agent-onboarding-charter.md .archived/project_management/next`
 - `rg -n "copied M4|maintenance lane for already-onboarded agents|half-migrated|operator guide" PLAN.md`
 
 ##### Test Plan Artifact

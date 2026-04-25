@@ -1,4 +1,4 @@
-# Template — CLI Agent Onboarding Packet
+# Template — CLI Agent Selection Packet
 
 Status: Canonical reusable template  
 Date (UTC): `<fill>`  
@@ -10,7 +10,7 @@ Related source docs:
 
 ## Purpose
 
-Use this template to evaluate exactly 3 real CLI agent candidates and produce one implementation-ready onboarding packet for the recommended winner.
+Use this template to evaluate exactly 3 real CLI agent candidates and produce one implementation-ready CLI agent selection packet for the recommended winner.
 
 This artifact is informative, not normative. It must point at authoritative specs, contracts, and committed repo evidence instead of becoming a second source of truth.
 
@@ -21,7 +21,7 @@ The implementation handoff in a filled packet must preserve the repo's crate-fir
 
 ## Scope Lock
 
-Use this packet when the goal is to select and prepare the first implementation handoff for a new CLI agent.
+Use this packet when the goal is to compare viable CLI agent candidates and prepare the implementation handoff for the recommended new CLI agent.
 
 In scope:
 - candidate shortlist and recommendation

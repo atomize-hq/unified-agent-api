@@ -24,12 +24,12 @@
 ## Related Docs
 
 - Workspace + parity-lane structure:
-  - `docs/adr/0006-agent-wrappers-workspace.md`
+  - `docs/adr/0006-unified-agent-api-workspace.md`
 - Universal Agent API scope and non-goals:
-  - `docs/adr/0009-universal-agent-api.md`
-  - `docs/specs/universal-agent-api/contract.md`
-  - `docs/specs/universal-agent-api/run-protocol-spec.md`
-  - `docs/specs/universal-agent-api/event-envelope-schema-spec.md`
+  - `docs/adr/0009-unified-agent-api.md`
+  - `docs/specs/unified-agent-api/contract.md`
+  - `docs/specs/unified-agent-api/run-protocol-spec.md`
+  - `docs/specs/unified-agent-api/event-envelope-schema-spec.md`
 - Current backend-owned transport contracts:
   - `docs/specs/claude-code-session-mapping-contract.md`
   - `docs/specs/codex-streaming-exec-contract.md`
@@ -41,7 +41,7 @@
 
 ## Executive Summary (Operator)
 
-ADR_BODY_SHA256: 2581291fa9a1623cbc88963cf2914c1c2282c0e793775b21cad736b7dc3930f2
+ADR_BODY_SHA256: 5e22b0d7368d793a3c3b7d620d227bb8f123d12471c92eea0a45d18cc4de7b5c
 
 ### Decision (draft)
 
@@ -77,8 +77,8 @@ However, the initial framing pushed that concern into the Universal Agent API it
 well grounded in the repo's current contracts:
 
 - `agent_api` is explicitly a headless universal run surface:
-  - `docs/adr/0009-universal-agent-api.md`
-  - `docs/specs/universal-agent-api/contract.md`
+  - `docs/adr/0009-unified-agent-api.md`
+  - `docs/specs/unified-agent-api/contract.md`
 - the built-in backends already expose backend-specific primary transports:
   - Claude Code headless print/stream-json
   - Codex streaming exec/resume
