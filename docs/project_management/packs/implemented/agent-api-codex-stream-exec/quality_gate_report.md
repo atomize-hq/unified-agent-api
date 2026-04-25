@@ -14,9 +14,9 @@ RECOMMENDATION: FLAG FOR HUMAN REVIEW
 - [ ] All required cross-platform / decision-heavy artifacts exist:
   - `docs/project_management/packs/active/agent-api-codex-stream-exec/decision_register.md`
   - `docs/project_management/packs/active/agent-api-codex-stream-exec/manual_testing_playbook.md`
-  - `docs/project_management/packs/active/agent-api-codex-stream-exec/smoke/linux-smoke.sh`
-  - `docs/project_management/packs/active/agent-api-codex-stream-exec/smoke/macos-smoke.sh`
-  - `docs/project_management/packs/active/agent-api-codex-stream-exec/smoke/windows-smoke.ps1`
+  - `scripts/smoke/agent-api-codex-stream-exec/linux-smoke.sh`
+  - `scripts/smoke/agent-api-codex-stream-exec/macos-smoke.sh`
+  - `scripts/smoke/agent-api-codex-stream-exec/windows-smoke.ps1`
 - [ ] `decision_register.md` pins the minimum required A/B decisions listed in:
   - `docs/project_management/packs/active/agent-api-codex-stream-exec/spec_manifest.md`
   - `docs/project_management/packs/active/agent-api-codex-stream-exec/impact_map.md` (“Concrete follow-ups”)

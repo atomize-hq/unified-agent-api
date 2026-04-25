@@ -32,9 +32,9 @@ Feature directory: `docs/project_management/next/unified-agent-api/`
   - `docs/project_management/next/unified-agent-api/decision_register.md`
   - `docs/project_management/next/unified-agent-api/manual_testing_playbook.md`
   - `docs/project_management/next/unified-agent-api/quality_gate_report.md`
-  - `docs/project_management/next/unified-agent-api/smoke/linux-smoke.sh`
-  - `docs/project_management/next/unified-agent-api/smoke/macos-smoke.sh`
-  - `docs/project_management/next/unified-agent-api/smoke/windows-smoke.ps1`
+  - `scripts/smoke/unified-agent-api/linux-smoke.sh`
+  - `scripts/smoke/unified-agent-api/macos-smoke.sh`
+  - `scripts/smoke/unified-agent-api/windows-smoke.ps1`
   - `docs/project_management/next/unified-agent-api/C0-spec.md`
   - `docs/project_management/next/unified-agent-api/C1-spec.md`
   - `docs/project_management/next/unified-agent-api/C2-spec.md`

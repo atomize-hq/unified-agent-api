@@ -19,7 +19,7 @@
 - Preserve safety posture: do not retain or emit raw backend lines; parse errors must be redacted.
 - Add the dedicated workflow + smoke scripts referenced by `ci_checkpoint_plan.md`:
   - `.github/workflows/claude-code-live-stream-json-smoke.yml`
-  - `docs/project_management/next/claude-code-live-stream-json/smoke/*`
+  - `scripts/smoke/claude-code-live-stream-json/*`
 
 ## Commands (required)
 - `cargo fmt`

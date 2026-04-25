@@ -1,7 +1,10 @@
-#!/usr/bin/env bash
-set -euo pipefail
+$ErrorActionPreference = "Stop"
 
-echo "## Claude Code live stream-json smoke (linux)"
+$root = Resolve-Path (Join-Path $PSScriptRoot "..\\..\\..")
+Set-Location $root
+
+Write-Host "## Unified Agent API smoke (windows)"
+
 rustc --version
 cargo --version
 
@@ -9,5 +12,4 @@ cargo fmt --all -- --check
 cargo clippy --workspace --all-targets --all-features -- -D warnings
 cargo test --workspace --all-targets --all-features
 
-echo "OK"
-
+Write-Host "OK"

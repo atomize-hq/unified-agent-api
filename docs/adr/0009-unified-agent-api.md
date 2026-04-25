@@ -32,7 +32,7 @@ Owner(s): spensermcconnell
   - `docs/project_management/next/unified-agent-api/platform-parity-spec.md`
 - Manual/smoke validation:
   - `docs/project_management/next/unified-agent-api/manual_testing_playbook.md`
-  - `docs/project_management/next/unified-agent-api/smoke/`
+  - `scripts/smoke/unified-agent-api/`
 - Wrapper crates (inputs):
   - `crates/codex/`
   - `crates/claude_code/`

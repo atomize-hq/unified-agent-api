@@ -51,7 +51,7 @@ The workflow at `.github/workflows/unified-agent-api-smoke.yml` MUST:
 
 - Be triggerable via `workflow_dispatch`.
 - Run a 3-OS matrix using GitHub-hosted runners:
-  - `ubuntu-latest` → `docs/project_management/next/unified-agent-api/smoke/linux-smoke.sh`
-  - `macos-latest` → `docs/project_management/next/unified-agent-api/smoke/macos-smoke.sh`
-  - `windows-latest` → `docs/project_management/next/unified-agent-api/smoke/windows-smoke.ps1`
+  - `ubuntu-latest` → `scripts/smoke/unified-agent-api/linux-smoke.sh`
+  - `macos-latest` → `scripts/smoke/unified-agent-api/macos-smoke.sh`
+  - `windows-latest` → `scripts/smoke/unified-agent-api/windows-smoke.ps1`
 - Run `make preflight` on `ubuntu-latest` for the same tested ref (can be a separate job).

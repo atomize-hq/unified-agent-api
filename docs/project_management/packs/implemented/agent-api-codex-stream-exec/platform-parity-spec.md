@@ -56,6 +56,6 @@ This feature’s cross-platform evidence MUST be produced on GitHub-hosted runne
 - `.github/workflows/agent-api-codex-stream-exec-smoke.yml`
 
 That workflow MUST:
-- run the feature-local smoke scripts under `docs/project_management/packs/active/agent-api-codex-stream-exec/smoke/`
+- run the feature-local smoke scripts under `scripts/smoke/agent-api-codex-stream-exec/`
 - include the repo’s “public API guard” job (no backend types in `agent_api` public API)
 - run `make preflight` on Linux.

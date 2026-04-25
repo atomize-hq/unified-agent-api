@@ -216,9 +216,9 @@ Update the built-in Claude backend (`feature = "claude_code"`) so that:
 
 ### Smoke scripts
 - A dedicated feature-local smoke set MUST exist under:
-  - `docs/project_management/next/claude-code-live-stream-json/smoke/linux-smoke.sh`
-  - `docs/project_management/next/claude-code-live-stream-json/smoke/macos-smoke.sh`
-  - `docs/project_management/next/claude-code-live-stream-json/smoke/windows-smoke.ps1`
+  - `scripts/smoke/claude-code-live-stream-json/linux-smoke.sh`
+  - `scripts/smoke/claude-code-live-stream-json/macos-smoke.sh`
+  - `scripts/smoke/claude-code-live-stream-json/windows-smoke.ps1`
 
 ## Rollout / Backwards Compatibility
 

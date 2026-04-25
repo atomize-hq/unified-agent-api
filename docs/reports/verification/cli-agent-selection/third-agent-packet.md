@@ -6,7 +6,7 @@ Prepared for: post-phase-1 third-agent selection and implementation handoff
 Related source docs:
 - `docs/specs/cli-agent-onboarding-charter.md`
 - `docs/project_management/next/cli-manifest-support-matrix/plan.md`
-- `docs/project_management/next/_templates/cli-agent-onboarding-packet-template.md`
+- `docs/template/agent-onboarding/cli-agent-onboarding-packet-template.md`
 
 ## Purpose
 

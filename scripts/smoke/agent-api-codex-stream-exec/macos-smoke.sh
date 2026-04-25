@@ -5,7 +5,7 @@ echo "## Agent API Codex stream_exec parity smoke (macos)"
 rustc --version
 cargo --version
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../../../../" && pwd)"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../" && pwd)"
 cd "$ROOT"
 
 TMP="$(mktemp -d)"
@@ -70,4 +70,3 @@ if [[ "${RUN_WORKSPACE_ALL:-0}" == "1" ]]; then
 fi
 
 echo "OK"
-

@@ -25,9 +25,9 @@ Inputs:
 Run the feature-local smoke script for your OS (these scripts create a temporary fake `codex`
 binary and ensure required tests run):
 
-- Linux: `docs/project_management/packs/active/agent-api-codex-stream-exec/smoke/linux-smoke.sh`
-- macOS: `docs/project_management/packs/active/agent-api-codex-stream-exec/smoke/macos-smoke.sh`
-- Windows: `docs/project_management/packs/active/agent-api-codex-stream-exec/smoke/windows-smoke.ps1`
+- Linux: `scripts/smoke/agent-api-codex-stream-exec/linux-smoke.sh`
+- macOS: `scripts/smoke/agent-api-codex-stream-exec/macos-smoke.sh`
+- Windows: `scripts/smoke/agent-api-codex-stream-exec/windows-smoke.ps1`
 
 ### Step 2 — Targeted test runs (still fixture-based)
 

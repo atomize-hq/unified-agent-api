@@ -32,10 +32,10 @@ Feature directory: `docs/project_management/packs/active/agent-api-codex-stream-
 - `docs/project_management/packs/active/agent-api-codex-stream-exec/C1-spec.md`
 - `docs/project_management/packs/active/agent-api-codex-stream-exec/C2-spec.md`
 - `docs/project_management/packs/active/agent-api-codex-stream-exec/kickoff_prompts/`
-- `docs/project_management/packs/active/agent-api-codex-stream-exec/smoke/`
-- `docs/project_management/packs/active/agent-api-codex-stream-exec/smoke/linux-smoke.sh`
-- `docs/project_management/packs/active/agent-api-codex-stream-exec/smoke/macos-smoke.sh`
-- `docs/project_management/packs/active/agent-api-codex-stream-exec/smoke/windows-smoke.ps1`
+- `scripts/smoke/agent-api-codex-stream-exec/`
+- `scripts/smoke/agent-api-codex-stream-exec/linux-smoke.sh`
+- `scripts/smoke/agent-api-codex-stream-exec/macos-smoke.sh`
+- `scripts/smoke/agent-api-codex-stream-exec/windows-smoke.ps1`
 - `.github/workflows/agent-api-codex-stream-exec-smoke.yml`
 - `crates/agent_api/src/bin/fake_codex_stream_json_agent_api.rs`
 - `crates/agent_api/tests/c2_codex_stream_exec_parity.rs`

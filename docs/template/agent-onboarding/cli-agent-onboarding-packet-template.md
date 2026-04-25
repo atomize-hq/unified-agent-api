@@ -4,8 +4,8 @@ Status: Canonical reusable template
 Date (UTC): `<fill>`  
 Owner(s): wrappers team / packet author  
 Related source docs:
-- `docs/project_management/next/cli-agent-onboarding-charter.md`
-- `docs/project_management/next/cli-manifest-support-matrix/plan.md`
+- `docs/specs/cli-agent-onboarding-charter.md`
+- `docs/specs/unified-agent-api/support-matrix.md`
 - `docs/specs/**` for any normative contract this packet cites
 
 ## Purpose

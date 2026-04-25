@@ -25,9 +25,9 @@ Feature directory: `docs/project_management/next/claude-code-live-stream-json/`
 - `docs/project_management/next/claude-code-live-stream-json/impact_map.md`
 - `docs/project_management/next/claude-code-live-stream-json/manual_testing_playbook.md`
 - Smoke scripts:
-  - `docs/project_management/next/claude-code-live-stream-json/smoke/linux-smoke.sh`
-  - `docs/project_management/next/claude-code-live-stream-json/smoke/macos-smoke.sh`
-  - `docs/project_management/next/claude-code-live-stream-json/smoke/windows-smoke.ps1`
+  - `scripts/smoke/claude-code-live-stream-json/linux-smoke.sh`
+  - `scripts/smoke/claude-code-live-stream-json/macos-smoke.sh`
+  - `scripts/smoke/claude-code-live-stream-json/windows-smoke.ps1`
 
 ## Required spec documents (deterministic set)
 

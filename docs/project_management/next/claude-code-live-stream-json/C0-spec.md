@@ -23,7 +23,7 @@ In-scope:
 - Timeout/cancellation: align with `tokio::time::timeout` + `kill_on_drop(true)` semantics pinned in `stream-json-print-protocol-spec.md`.
 - Add the feature-local CI workflow + smoke scripts used by the checkpoint:
   - `.github/workflows/claude-code-live-stream-json-smoke.yml`
-  - `docs/project_management/next/claude-code-live-stream-json/smoke/*`
+  - `scripts/smoke/claude-code-live-stream-json/*`
 
 ## Acceptance Criteria
 

@@ -4,7 +4,7 @@ Write-Host "## Agent API Codex stream_exec parity smoke (windows)"
 rustc --version
 cargo --version
 
-$root = Resolve-Path (Join-Path $PSScriptRoot "..\\..\\..\\..\\..\\..")
+$root = Resolve-Path (Join-Path $PSScriptRoot "..\\..\\..")
 Set-Location $root
 
 $tmp = Join-Path $env:TEMP ("agent-api-codex-smoke-" + [guid]::NewGuid().ToString())
@@ -84,4 +84,3 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0fake_codex.ps1" %*
 } finally {
   Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $tmp
 }
-

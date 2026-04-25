@@ -1,7 +1,10 @@
-$ErrorActionPreference = "Stop"
+#!/usr/bin/env bash
+set -euo pipefail
 
-Write-Host "## Claude Code live stream-json smoke (windows)"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../" && pwd)"
+cd "$ROOT"
 
+echo "## Unified Agent API smoke (linux)"
 rustc --version
 cargo --version
 
@@ -9,5 +12,4 @@ cargo fmt --all -- --check
 cargo clippy --workspace --all-targets --all-features -- -D warnings
 cargo test --workspace --all-targets --all-features
 
-Write-Host "OK"
-
+echo "OK"

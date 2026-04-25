@@ -51,9 +51,9 @@ Boundary choice:
         "compile_and_unit_test_matrix": {
           "os": ["ubuntu-latest", "macos-latest", "windows-latest"],
           "commands": [
-            "linux: docs/project_management/next/unified-agent-api/smoke/linux-smoke.sh",
-            "macos: docs/project_management/next/unified-agent-api/smoke/macos-smoke.sh",
-            "windows: docs/project_management/next/unified-agent-api/smoke/windows-smoke.ps1"
+            "linux: scripts/smoke/unified-agent-api/linux-smoke.sh",
+            "macos: scripts/smoke/unified-agent-api/macos-smoke.sh",
+            "windows: scripts/smoke/unified-agent-api/windows-smoke.ps1"
           ]
         },
         "integration_gate_linux_only": {

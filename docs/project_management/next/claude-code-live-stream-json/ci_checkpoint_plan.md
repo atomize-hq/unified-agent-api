@@ -49,9 +49,9 @@ Boundary choice:
         "compile_and_unit_test_matrix": {
           "os": ["ubuntu-latest", "macos-latest", "windows-latest"],
           "commands": [
-            "linux: docs/project_management/next/claude-code-live-stream-json/smoke/linux-smoke.sh",
-            "macos: docs/project_management/next/claude-code-live-stream-json/smoke/macos-smoke.sh",
-            "windows: docs/project_management/next/claude-code-live-stream-json/smoke/windows-smoke.ps1"
+            "linux: scripts/smoke/claude-code-live-stream-json/linux-smoke.sh",
+            "macos: scripts/smoke/claude-code-live-stream-json/macos-smoke.sh",
+            "windows: scripts/smoke/claude-code-live-stream-json/windows-smoke.ps1"
           ]
         },
         "integration_gate_linux_only": {

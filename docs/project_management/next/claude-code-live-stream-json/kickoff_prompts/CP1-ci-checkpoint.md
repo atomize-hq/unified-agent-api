@@ -15,9 +15,9 @@
 - Trigger the dedicated workflow:
   - `.github/workflows/claude-code-live-stream-json-smoke.yml`
 - The workflow MUST run the multi-OS smoke scripts on GitHub-hosted runners:
-  - Linux: `docs/project_management/next/claude-code-live-stream-json/smoke/linux-smoke.sh`
-  - macOS: `docs/project_management/next/claude-code-live-stream-json/smoke/macos-smoke.sh`
-  - Windows: `docs/project_management/next/claude-code-live-stream-json/smoke/windows-smoke.ps1`
+  - Linux: `scripts/smoke/claude-code-live-stream-json/linux-smoke.sh`
+  - macOS: `scripts/smoke/claude-code-live-stream-json/macos-smoke.sh`
+  - Windows: `scripts/smoke/claude-code-live-stream-json/windows-smoke.ps1`
 - Run Linux-only gate:
   - `make preflight`
 

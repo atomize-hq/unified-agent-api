@@ -137,9 +137,9 @@ Explicit v1 scope boundary:
 
 Pinned requirement:
 - Add `.github/workflows/agent-api-codex-stream-exec-smoke.yml` that runs:
-  - `docs/project_management/packs/active/agent-api-codex-stream-exec/smoke/linux-smoke.sh`
-  - `docs/project_management/packs/active/agent-api-codex-stream-exec/smoke/macos-smoke.sh`
-  - `docs/project_management/packs/active/agent-api-codex-stream-exec/smoke/windows-smoke.ps1`
+  - `scripts/smoke/agent-api-codex-stream-exec/linux-smoke.sh`
+  - `scripts/smoke/agent-api-codex-stream-exec/macos-smoke.sh`
+  - `scripts/smoke/agent-api-codex-stream-exec/windows-smoke.ps1`
   - and includes the existing public API guard used by other smoke workflows.
 
 ## DR-0008 — Post-merge CI gating for `agent_api` backend feature flags

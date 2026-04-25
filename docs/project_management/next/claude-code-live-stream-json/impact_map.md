@@ -22,9 +22,9 @@ Feature directory: `docs/project_management/next/claude-code-live-stream-json/`
   - `docs/project_management/next/claude-code-live-stream-json/session_log.md`
   - `docs/project_management/next/claude-code-live-stream-json/ci_checkpoint_plan.md`
   - `docs/project_management/next/claude-code-live-stream-json/manual_testing_playbook.md`
-  - `docs/project_management/next/claude-code-live-stream-json/smoke/linux-smoke.sh`
-  - `docs/project_management/next/claude-code-live-stream-json/smoke/macos-smoke.sh`
-  - `docs/project_management/next/claude-code-live-stream-json/smoke/windows-smoke.ps1`
+  - `scripts/smoke/claude-code-live-stream-json/linux-smoke.sh`
+  - `scripts/smoke/claude-code-live-stream-json/macos-smoke.sh`
+  - `scripts/smoke/claude-code-live-stream-json/windows-smoke.ps1`
   - `docs/project_management/next/claude-code-live-stream-json/C0-spec.md`
   - `docs/project_management/next/claude-code-live-stream-json/C1-spec.md`
   - `docs/project_management/next/claude-code-live-stream-json/kickoff_prompts/C0-code.md`

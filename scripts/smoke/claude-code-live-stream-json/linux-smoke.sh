@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-echo "## Unified Agent API smoke (macos)"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../" && pwd)"
+cd "$ROOT"
+
+echo "## Claude Code live stream-json smoke (linux)"
 rustc --version
 cargo --version
 
@@ -10,4 +13,3 @@ cargo clippy --workspace --all-targets --all-features -- -D warnings
 cargo test --workspace --all-targets --all-features
 
 echo "OK"
-

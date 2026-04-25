@@ -35,9 +35,9 @@ Feature directory: `docs/project_management/packs/active/agent-api-codex-stream-
 - `docs/project_management/packs/active/agent-api-codex-stream-exec/impact_map.md`
 - `docs/project_management/packs/active/agent-api-codex-stream-exec/manual_testing_playbook.md`
 - Smoke scripts:
-  - `docs/project_management/packs/active/agent-api-codex-stream-exec/smoke/linux-smoke.sh`
-  - `docs/project_management/packs/active/agent-api-codex-stream-exec/smoke/macos-smoke.sh`
-  - `docs/project_management/packs/active/agent-api-codex-stream-exec/smoke/windows-smoke.ps1`
+  - `scripts/smoke/agent-api-codex-stream-exec/linux-smoke.sh`
+  - `scripts/smoke/agent-api-codex-stream-exec/macos-smoke.sh`
+  - `scripts/smoke/agent-api-codex-stream-exec/windows-smoke.ps1`
 
 ## Required before execution triads begin
 
