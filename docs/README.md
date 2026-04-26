@@ -1,38 +1,32 @@
 # Documentation Index
 
-## Most-used docs
+## Operator procedure
 
-- `docs/specs/unified-agent-api/README.md` — normative unified API contract index
-- `crates/codex/README.md` — Codex backend API guide
-- `crates/codex/EXAMPLES.md` — examples ↔ native CLI mapping
-- `crates/claude_code/README.md` — Claude Code backend API guide
-- `docs/integrations/substrate.md` — using the unified API from Substrate
+- Canonical factory workflow: `docs/cli-agent-onboarding-factory-operator-guide.md`
 
-## Decisions and specs
+Use that guide for create-mode onboarding, maintenance-mode refresh, artifact ownership boundaries, and command sequencing. This index stays as a docs map, not a competing procedure manual.
 
-- `docs/adr/` — architecture decision records (ADRs)
-- `docs/specs/` — **normative** contracts and scenario catalogs
-- `docs/STYLE.md` — documentation conventions used in this repo
+## Normative docs
 
-## Operations and maintenance
+- Unified Agent API contract index: `docs/specs/unified-agent-api/README.md`
+- Normative contracts: `docs/specs/`
+- Architecture decisions: `docs/adr/`
+- Onboarding charter: `docs/specs/cli-agent-onboarding-charter.md`
 
-Codex CLI parity maintenance lives next to the generated artifacts:
+## Repo entry docs
 
-- `cli_manifests/codex/OPS_PLAYBOOK.md`
-- `cli_manifests/codex/README.md`
-- `cli_manifests/codex/CI_AGENT_RUNBOOK.md`
-- `cli_manifests/codex/CI_WORKFLOWS_PLAN.md`
-- `cli_manifests/codex/VALIDATOR_SPEC.md`
+- Repo overview: `README.md`
+- Contributor entrypoint: `CONTRIBUTING.md`
 
-Claude Code parity maintenance lives next to the generated artifacts:
+## Green gate
 
-- `cli_manifests/claude_code/OPS_PLAYBOOK.md`
-- `cli_manifests/claude_code/README.md`
-- `cli_manifests/claude_code/CI_AGENT_RUNBOOK.md`
-- `cli_manifests/claude_code/CI_WORKFLOWS_PLAN.md`
-- `cli_manifests/claude_code/VALIDATOR_SPEC.md`
+The repo green gate is:
 
-## Project management (triads)
+```sh
+cargo run -p xtask -- support-matrix --check
+cargo run -p xtask -- capability-matrix --check
+cargo run -p xtask -- capability-matrix-audit
+make preflight
+```
 
-- `docs/project_management/task-triads-feature-setup-standard.md`
-- `docs/project_management/next/` (feature directories)
+The operator guide is the procedural source of truth for how that gate fits into the factory lifecycle.

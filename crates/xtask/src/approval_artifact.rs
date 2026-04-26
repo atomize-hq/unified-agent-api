@@ -7,9 +7,10 @@ use sha2::{Digest, Sha256};
 use time::{format_description::well_known::Rfc3339, OffsetDateTime};
 use toml_edit::{DocumentMut, TableLike};
 
-const DOCS_NEXT_ROOT: &str = "docs/project_management/next";
+const DOCS_NEXT_ROOT: &str = "docs/agents/lifecycle";
 const APPROVAL_FILE_NAME: &str = "approved-agent.toml";
 const GOVERNANCE_DIR_NAME: &str = "governance";
+const COMPARISON_REF_PATH: &str = "docs/agents/selection/cli-agent-selection-packet.md";
 const FACTORY_VALIDATION_MODE: &str = "factory_validation";
 const FRONTIER_EXPANSION_MODE: &str = "frontier_expansion";
 const APPROVAL_ARTIFACT_VERSION: &str = "1";
@@ -39,6 +40,7 @@ pub struct ApprovalDescriptor {
     pub backend_extensions: Vec<String>,
     pub support_matrix_enabled: bool,
     pub capability_matrix_enabled: bool,
+    pub capability_matrix_target: Option<String>,
     pub docs_release_track: String,
     pub onboarding_pack_prefix: String,
 }
@@ -128,6 +130,12 @@ fn parse_approval_document(
     let artifact_version = required_string(root, "artifact_version", relative_path)?;
     validate_artifact_version(relative_path, &artifact_version)?;
     let comparison_ref = required_string(root, "comparison_ref", relative_path)?;
+    if comparison_ref != COMPARISON_REF_PATH {
+        return Err(ApprovalArtifactError::Validation(format!(
+            "approval artifact `{}` field `comparison_ref` must equal `{COMPARISON_REF_PATH}`",
+            relative_path.display()
+        )));
+    }
     validate_repo_relative_existing_file(
         workspace_root,
         relative_path,
@@ -235,6 +243,11 @@ fn parse_approval_document(
             capability_matrix_enabled: required_bool(
                 descriptor,
                 "capability_matrix_enabled",
+                relative_path,
+            )?,
+            capability_matrix_target: optional_string(
+                descriptor,
+                "capability_matrix_target",
                 relative_path,
             )?,
             docs_release_track: required_string(descriptor, "docs_release_track", relative_path)?,

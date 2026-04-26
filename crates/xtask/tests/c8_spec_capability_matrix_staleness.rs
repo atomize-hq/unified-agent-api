@@ -1,5 +1,5 @@
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -21,41 +21,109 @@ fn make_temp_dir(prefix: &str) -> PathBuf {
     dir
 }
 
+fn write_text(path: &Path, contents: &str) {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).expect("create parent dirs");
+    }
+    fs::write(path, contents).expect("write fixture file");
+}
+
+fn copy_repo_file(fixture_root: &Path, relative_path: &str) {
+    let source = repo_root().join(relative_path);
+    let destination = fixture_root.join(relative_path);
+    let contents = fs::read(&source).unwrap_or_else(|err| panic!("read {source:?}: {err}"));
+    if let Some(parent) = destination.parent() {
+        fs::create_dir_all(parent).expect("create destination parent dirs");
+    }
+    fs::write(&destination, contents)
+        .unwrap_or_else(|err| panic!("write {destination:?} from {source:?}: {err}"));
+}
+
+fn seed_fixture_workspace(fixture_root: &Path) {
+    write_text(
+        &fixture_root.join("Cargo.toml"),
+        "[workspace]\nmembers = []\n",
+    );
+    copy_repo_file(fixture_root, "crates/xtask/data/agent_registry.toml");
+    copy_repo_file(fixture_root, "cli_manifests/codex/current.json");
+    copy_repo_file(fixture_root, "cli_manifests/claude_code/current.json");
+    copy_repo_file(fixture_root, "cli_manifests/opencode/current.json");
+    copy_repo_file(fixture_root, "cli_manifests/gemini_cli/current.json");
+}
+
 #[test]
-fn c8_spec_capability_matrix_matches_checked_in_file() {
+fn c8_spec_capability_matrix_check_passes_when_fresh_and_fails_without_rewriting_when_stale() {
     let xtask_bin = PathBuf::from(env!("CARGO_BIN_EXE_xtask"));
-    let workdir = repo_root().join("crates").join("xtask");
-    let temp_dir = make_temp_dir("capability-matrix-staleness");
-    let generated = temp_dir.join("matrix.md");
-    let checked_in = repo_root()
+    let fixture_root = make_temp_dir("capability-matrix-staleness");
+    seed_fixture_workspace(&fixture_root);
+
+    let checked_in = fixture_root
         .join("docs")
         .join("specs")
         .join("unified-agent-api")
         .join("capability-matrix.md");
 
-    let output = Command::new(&xtask_bin)
+    let generate = Command::new(&xtask_bin)
         .arg("capability-matrix")
-        .arg("--out")
-        .arg(&generated)
-        .current_dir(&workdir)
+        .current_dir(&fixture_root)
         .output()
         .expect("spawn xtask capability-matrix");
 
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let stderr = String::from_utf8_lossy(&output.stderr);
+    let stdout = String::from_utf8_lossy(&generate.stdout);
+    let stderr = String::from_utf8_lossy(&generate.stderr);
     assert!(
-        output.status.success(),
+        generate.status.success(),
         "capability-matrix generation failed\nstdout:\n{}\nstderr:\n{}",
         stdout,
         stderr
     );
 
-    let generated_bytes = fs::read(&generated).expect("read generated capability matrix");
-    let checked_in_bytes = fs::read(&checked_in).expect("read checked-in capability matrix");
+    let baseline = fs::read_to_string(&checked_in).expect("read generated capability matrix");
+    assert!(
+        baseline.contains("# Capability matrix"),
+        "generated capability matrix missing title:\n{baseline}"
+    );
 
+    let fresh_check = Command::new(&xtask_bin)
+        .arg("capability-matrix")
+        .arg("--check")
+        .current_dir(&fixture_root)
+        .output()
+        .expect("spawn xtask capability-matrix --check");
+    assert!(
+        fresh_check.status.success(),
+        "capability-matrix --check should pass on fresh generated file\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&fresh_check.stdout),
+        String::from_utf8_lossy(&fresh_check.stderr)
+    );
+
+    let mutated = baseline.replacen(
+        "| `agent_api.run` |",
+        "| `agent_api.run.local-mutation` |",
+        1,
+    );
+    fs::write(&checked_in, &mutated).expect("write deliberate local mutation");
+
+    let stale_check = Command::new(&xtask_bin)
+        .arg("capability-matrix")
+        .arg("--check")
+        .current_dir(&fixture_root)
+        .output()
+        .expect("spawn stale xtask capability-matrix --check");
+    assert!(
+        !stale_check.status.success(),
+        "capability-matrix --check should fail on a deliberate local mutation\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&stale_check.stdout),
+        String::from_utf8_lossy(&stale_check.stderr)
+    );
+
+    let stale_stderr = String::from_utf8_lossy(&stale_check.stderr);
+    assert!(stale_stderr.contains("capability-matrix.md is stale"));
+    assert!(stale_stderr.contains("cargo run -p xtask -- capability-matrix"));
+
+    let post_check = fs::read_to_string(&checked_in).expect("read capability matrix after check");
     assert_eq!(
-        generated_bytes,
-        checked_in_bytes,
-        "checked-in capability matrix is stale; regenerate with `cargo run -p xtask -- capability-matrix`"
+        post_check, mutated,
+        "--check must not rewrite the checked-in capability matrix"
     );
 }

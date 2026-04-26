@@ -1,5 +1,10 @@
 #[path = "../src/agent_registry.rs"]
 mod agent_registry;
+mod capability_projection {
+    #![allow(dead_code)]
+
+    include!("../src/capability_projection.rs");
+}
 
 use std::path::PathBuf;
 
@@ -50,6 +55,10 @@ fn seeded_registry_parses_successfully() {
         3,
         "codex seeded config-gated declarations"
     );
+    assert_eq!(
+        codex.publication.capability_matrix_target.as_deref(),
+        Some("x86_64-unknown-linux-musl")
+    );
 
     let opencode = registry.find("opencode").expect("seeded opencode entry");
     assert!(
@@ -82,6 +91,7 @@ fn seeded_registry_parses_successfully() {
         1,
         "gemini_cli seeds approval-artifact governance checks"
     );
+    assert_eq!(gemini.publication.capability_matrix_target, None);
 }
 
 #[test]
@@ -112,6 +122,26 @@ fn malformed_toml_fails_closed() {
     let err = AgentRegistry::parse("[[agents]\nagent_id = \"codex\"").expect_err("malformed TOML");
     let text = err.to_string();
     assert!(text.contains("parse agent registry TOML"), "{text}");
+}
+
+#[test]
+fn hyphenated_crate_path_basename_normalizes_into_scaffold_lib_name() {
+    let raw = SEEDED_REGISTRY.replacen(
+        "crate_path = \"crates/gemini_cli\"",
+        "crate_path = \"crates/gemini-cli\"",
+        1,
+    );
+
+    let registry = AgentRegistry::parse(&raw).expect("parse registry with hyphenated crate path");
+    let gemini = registry
+        .find("gemini_cli")
+        .expect("seeded gemini_cli entry should still exist");
+
+    assert_eq!(gemini.crate_path, "crates/gemini-cli");
+    assert_eq!(
+        gemini.scaffold_lib_name().expect("normalize lib name"),
+        "gemini_cli"
+    );
 }
 
 #[test]
@@ -164,6 +194,44 @@ fn duplicate_identity_and_path_fields_fail_closed() {
         let err = AgentRegistry::parse(&raw).unwrap_err();
         let text = err.to_string();
         assert!(text.contains(expected), "{label}: {text}");
+    }
+}
+
+#[test]
+fn unsupported_crate_path_basenames_fail_closed() {
+    let cases = [
+        (
+            "dot basename",
+            SEEDED_REGISTRY.replacen(
+                "crate_path = \"crates/gemini_cli\"",
+                "crate_path = \"crates/gemini.cli\"",
+                1,
+            ),
+            "crate_path `crates/gemini.cli`",
+        ),
+        (
+            "space basename",
+            SEEDED_REGISTRY.replacen(
+                "crate_path = \"crates/gemini_cli\"",
+                "crate_path = \"crates/gemini cli\"",
+                1,
+            ),
+            "crate_path `crates/gemini cli`",
+        ),
+    ];
+
+    for (label, raw, expected_path) in cases {
+        let err = AgentRegistry::parse(&raw).expect_err("invalid crate_path basename must fail");
+        let text = err.to_string();
+        assert!(text.contains(expected_path), "{label}: {text}");
+        assert!(
+            text.contains("normalized lib name candidate"),
+            "{label}: {text}"
+        );
+        assert!(
+            text.contains("ASCII letters, digits, or `_`"),
+            "{label}: {text}"
+        );
     }
 }
 
@@ -240,6 +308,45 @@ fn malformed_gated_declarations_fail_closed() {
             ),
             "capability_declaration.config_gated.config_key must not be empty",
         ),
+        (
+            "unknown config key",
+            SEEDED_REGISTRY.replacen(
+                "config_key = \"allow_external_sandbox_exec\"",
+                "config_key = \"allow_shell_everything\"",
+                1,
+            ),
+            "capability_declaration.config_gated.config_key must be one of",
+        ),
+    ];
+
+    for (label, raw, expected) in cases {
+        let err = AgentRegistry::parse(&raw).unwrap_err();
+        let text = err.to_string();
+        assert!(text.contains(expected), "{label}: {text}");
+    }
+}
+
+#[test]
+fn capability_matrix_publication_target_validation_fails_closed() {
+    let cases = [
+        (
+            "missing required publication target",
+            SEEDED_REGISTRY.replacen(
+                "capability_matrix_target = \"x86_64-unknown-linux-musl\"\n",
+                "",
+                1,
+            ),
+            "publication.capability_matrix_target must be set when capability-matrix projection uses target-scoped declarations",
+        ),
+        (
+            "unknown publication target",
+            SEEDED_REGISTRY.replacen(
+                "capability_matrix_target = \"linux-x64\"",
+                "capability_matrix_target = \"unknown-target\"",
+                1,
+            ),
+            "publication.capability_matrix_target `unknown-target` must be listed in canonical_targets",
+        ),
     ];
 
     for (label, raw, expected) in cases {
@@ -255,8 +362,8 @@ fn malformed_governance_checks_fail_closed() {
         (
             "duplicate governance path",
             SEEDED_REGISTRY.replacen(
-                "path = \"docs/project_management/next/opencode-implementation/governance/seam-3-closeout.md\"",
-                "path = \"docs/project_management/next/opencode-implementation/governance/seam-2-closeout.md\"",
+                "path = \"docs/integrations/opencode/governance/seam-3-closeout.md\"",
+                "path = \"docs/integrations/opencode/governance/seam-2-closeout.md\"",
                 1,
             ),
             "maintenance.governance_checks contains duplicate path",

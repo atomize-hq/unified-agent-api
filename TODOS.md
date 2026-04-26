@@ -20,7 +20,7 @@
 
 **Why:** M3 identified that the next missing truth is governance and provenance, not candidate automation. The repo should automate recommendation only after it has real approval-versus-recommendation feedback to target.
 
-**Context:** The 2026-04-21 `/autoplan` rebaseline for `PLAN.md` reframed M3 around selection-to-proof governance because `docs/project_management/next/cli-agent-onboarding-third-agent-packet.md` recommended `OpenCode` while the first closed M2 proving run landed `gemini_cli`. That mismatch needs explicit comparison, approval, override, and closeout truth before the repo turns recommendation into tooling.
+**Context:** The 2026-04-21 `/autoplan` rebaseline for `PLAN.md` reframed M3 around selection-to-proof governance because `docs/agents/selection/cli-agent-selection-packet.md` recommended `OpenCode` while the first closed M2 proving run landed `gemini_cli`. That mismatch needs explicit comparison, approval, override, and closeout truth before the repo turns recommendation into tooling.
 
 **Effort:** M
 **Priority:** P2
@@ -46,7 +46,7 @@
 
 **Why:** `onboard-agent` is the create-mode bridge for new agents. Once an agent is already in the repo, maintainers still need a boring way to detect and repair drift across registry truth, publication outputs, release docs, and closed packet/governance docs without reopening new-agent onboarding.
 
-**Context:** The 2026-04-21 M4 `/autoplan` for the CLI agent onboarding factory reframed this work as a separate post-onboarding lifecycle milestone. The plan anchors the proving run on OpenCode because `/Users/spensermcconnell/.gstack/projects/atomize-hq-unified-agent-api/spensermcconnell-main-test-outcome-20260420-091704.md` already documents a real stale closeout claim in `docs/project_management/next/opencode-implementation/governance/seam-2-closeout.md`.
+**Context:** The 2026-04-21 M4 `/autoplan` for the CLI agent onboarding factory reframed this work as a separate post-onboarding lifecycle milestone. The plan anchors the proving run on OpenCode because `/Users/spensermcconnell/.gstack/projects/atomize-hq-unified-agent-api/spensermcconnell-main-test-outcome-20260420-091704.md` already documents a real stale closeout claim in `.archived/project_management/next/opencode-implementation/governance/seam-2-closeout.md`.
 
 **Effort:** M
 **Priority:** P2
@@ -55,15 +55,15 @@
 
 ### Create The OpenCode Execution Pack
 
-**What:** Create a single `docs/project_management/next/opencode-implementation/` execution pack that turns the closed OpenCode onboarding contracts into implementation-ready seams for `cli_manifests/opencode/`, `crates/opencode/`, and the OpenCode `crates/agent_api` backend.
+**What:** Create a single `.archived/project_management/next/opencode-implementation/` execution pack that turns the closed OpenCode onboarding contracts into implementation-ready seams for `cli_manifests/opencode/`, `crates/opencode/`, and the OpenCode `crates/agent_api` backend.
 
 **Why:** The repo already finished candidate selection and contract locking for OpenCode, but implementation still lacks one code-facing plan-of-record. This execution pack is the missing bridge between the closed onboarding pack and actual landing work.
 
-**Context:** The 2026-04-18 `/plan-eng-review` for `docs/project_management/next/opencode-cli-onboarding/next-steps-handoff.md` reduced scope to one execution pack, reused the existing `THR-04` and seam closeouts as the bridge, kept UAA promotion out of scope unless stale triggers fire, and required an explicit verification matrix. The pack should consume the published OpenCode contracts and closeouts directly, stay crate-first, and make deterministic replay/fake-binary/fixture validation the default proof path instead of live provider smoke.
+**Context:** The 2026-04-18 `/plan-eng-review` for `.archived/project_management/next/opencode-cli-onboarding/next-steps-handoff.md` reduced scope to one execution pack, reused the existing `THR-04` and seam closeouts as the bridge, kept UAA promotion out of scope unless stale triggers fire, and required an explicit verification matrix. The pack should consume the published OpenCode contracts and closeouts directly, stay crate-first, and make deterministic replay/fake-binary/fixture validation the default proof path instead of live provider smoke.
 
 **Effort:** M
 **Priority:** P2
-**Depends on:** Closed OpenCode onboarding pack and normative contracts already landed under `docs/project_management/next/opencode-cli-onboarding/` and `docs/specs/opencode-*.md`
+**Depends on:** Closed OpenCode onboarding pack and normative contracts already landed under `.archived/project_management/next/opencode-cli-onboarding/` and `docs/specs/opencode-*.md`
 **Completed:** v0.2.3 (2026-04-18)
 
 ### Select The First Real Third CLI Agent And Prepare Its Onboarding Packet

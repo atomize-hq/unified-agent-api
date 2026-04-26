@@ -308,8 +308,8 @@ fn maintenance_pack_prefix_from_closeout_path(
     let components = closeout_path.components().collect::<Vec<_>>();
     let expected_prefix = [
         Component::Normal("docs".as_ref()),
-        Component::Normal("project_management".as_ref()),
-        Component::Normal("next".as_ref()),
+        Component::Normal("agents".as_ref()),
+        Component::Normal("lifecycle".as_ref()),
     ];
     if components.len() != 6
         || components[0..3] != expected_prefix
@@ -317,7 +317,7 @@ fn maintenance_pack_prefix_from_closeout_path(
         || components[5] != Component::Normal("maintenance-closeout.json".as_ref())
     {
         return Err(MaintenanceCloseoutError::Validation(format!(
-            "{} must point to docs/project_management/next/<agent>-maintenance/governance/maintenance-closeout.json",
+            "{} must point to docs/agents/lifecycle/<agent>-maintenance/governance/maintenance-closeout.json",
             closeout_path.display()
         )));
     }

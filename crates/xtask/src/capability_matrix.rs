@@ -5,6 +5,11 @@ use std::{
 };
 
 use crate::agent_registry::{AgentRegistry, AgentRegistryEntry};
+use crate::capability_projection::{
+    manifest_projected_capability_path, project_advertised_capabilities,
+    resolve_capability_publication_target, CapabilityCommandView, CapabilityManifestView,
+    CapabilityPublicationTarget,
+};
 use agent_api::{
     backends::{
         claude_code::{ClaudeCodeBackend, ClaudeCodeBackendConfig},
@@ -20,14 +25,12 @@ use serde::Deserialize;
 pub const DEFAULT_OUT_PATH: &str = "docs/specs/unified-agent-api/capability-matrix.md";
 const CURRENT_MANIFEST_FILENAME: &str = "current.json";
 
-const CAPABILITY_MCP_LIST_V1: &str = "agent_api.tools.mcp.list.v1";
-const CAPABILITY_MCP_GET_V1: &str = "agent_api.tools.mcp.get.v1";
-const CAPABILITY_MCP_ADD_V1: &str = "agent_api.tools.mcp.add.v1";
-const CAPABILITY_MCP_REMOVE_V1: &str = "agent_api.tools.mcp.remove.v1";
-const CAPABILITY_EXTERNAL_SANDBOX_V1: &str = "agent_api.exec.external_sandbox.v1";
-
 #[derive(Debug, Parser)]
 pub struct Args {
+    /// Verify the checked-in capability matrix without rewriting it.
+    #[arg(long, conflicts_with = "out")]
+    pub check: bool,
+
     /// Write the generated markdown to this path. Defaults to the workspace-root capability matrix path when omitted.
     #[arg(long)]
     pub out: Option<PathBuf>,
@@ -35,8 +38,13 @@ pub struct Args {
 
 pub fn run(args: Args) -> Result<(), String> {
     let markdown = generate_markdown()?;
-    let out = resolve_output_path(args.out.as_deref());
-    write_file(&out, &markdown)?;
+    if args.check {
+        let checked_in = resolve_output_path(None)?;
+        validate_checked_in_file(&checked_in, &markdown)?;
+    } else {
+        let out = resolve_output_path(args.out.as_deref())?;
+        write_file(&out, &markdown)?;
+    }
     Ok(())
 }
 
@@ -59,6 +67,18 @@ fn write_file(path: &Path, contents: &str) -> Result<(), String> {
     }
     fs::write(path, contents).map_err(|err| format!("write({path:?}): {err}"))?;
     Ok(())
+}
+
+fn validate_checked_in_file(path: &Path, contents: &str) -> Result<(), String> {
+    let checked_in = fs::read_to_string(path).map_err(|err| format!("read({path:?}): {err}"))?;
+    if checked_in == contents {
+        return Ok(());
+    }
+
+    Err(format!(
+        "{} is stale; regenerate with `cargo run -p xtask -- capability-matrix`",
+        path.display()
+    ))
 }
 
 fn render_matrix(
@@ -217,7 +237,7 @@ where
     let mut backends = BTreeMap::<String, AgentWrapperCapabilities>::new();
     for entry in enrolled_entries.iter().copied() {
         let manifest = manifest_loader(entry)?;
-        validate_primary_canonical_target(entry, &manifest)?;
+        validate_capability_publication_target(entry, &manifest)?;
 
         let (backend_kind, mut capabilities) = runtime_backend_capabilities(&entry.agent_id)?;
         if backend_kind != entry.agent_id {
@@ -227,63 +247,22 @@ where
             ));
         }
 
-        let mut modeled_runtime_truth = modeled_runtime_capability_truth(entry)?;
-        apply_registry_mcp_projection_from_manifest(&mut modeled_runtime_truth, entry, &manifest);
-        validate_declared_capabilities_do_not_exceed_runtime(entry, &modeled_runtime_truth)?;
+        let modeled_runtime_truth = modeled_runtime_capability_truth(entry, &manifest)?;
+        let advertised_ids = projected_advertised_capabilities(entry, &manifest)?;
+        validate_declared_capabilities_do_not_exceed_runtime(
+            entry,
+            &advertised_ids,
+            &modeled_runtime_truth,
+        )?;
 
-        apply_registry_mcp_projection_from_manifest(&mut capabilities, entry, &manifest);
+        capabilities.ids = advertised_ids;
         backends.insert(backend_kind, capabilities);
     }
 
     Ok(BuiltinBackendInventory {
         backends,
-        canonical_target_header: render_canonical_target_header(&enrolled_entries),
+        canonical_target_header: render_canonical_target_header(&enrolled_entries)?,
     })
-}
-
-fn apply_manifest_mcp_projection(
-    capabilities: &mut AgentWrapperCapabilities,
-    registry_entry: &AgentRegistryEntry,
-    manifest: &UnionManifest,
-    target: &str,
-) {
-    for capability_id in [
-        CAPABILITY_MCP_LIST_V1,
-        CAPABILITY_MCP_GET_V1,
-        CAPABILITY_MCP_ADD_V1,
-        CAPABILITY_MCP_REMOVE_V1,
-    ] {
-        let declaration = declared_mcp_projection(registry_entry, capability_id);
-        let available_on_canonical_target = declaration.as_ref().is_some_and(|declaration| {
-            declaration.supports_target(target)
-                && command_available_on_target(manifest, mcp_command_path(capability_id), target)
-        });
-        let advertise_when_available =
-            declaration.is_some_and(|declaration| declaration.advertise_when_available);
-
-        sync_capability_from_manifest(
-            capabilities,
-            capability_id,
-            available_on_canonical_target,
-            advertise_when_available,
-        );
-    }
-}
-
-fn sync_capability_from_manifest(
-    capabilities: &mut AgentWrapperCapabilities,
-    capability_id: &str,
-    available_on_canonical_target: bool,
-    advertise_when_available: bool,
-) {
-    if available_on_canonical_target {
-        if advertise_when_available {
-            capabilities.ids.insert(capability_id.to_string());
-        }
-        return;
-    }
-
-    capabilities.ids.remove(capability_id);
 }
 
 fn command_available_on_target(manifest: &UnionManifest, path: &[&str], target: &str) -> bool {
@@ -300,23 +279,33 @@ fn command_available_on_target(manifest: &UnionManifest, path: &[&str], target: 
         .is_some_and(|command| command.available_on.iter().any(|item| item == target))
 }
 
-fn resolve_output_path(explicit: Option<&Path>) -> PathBuf {
+fn resolve_output_path(explicit: Option<&Path>) -> Result<PathBuf, String> {
     match explicit {
-        Some(path) => path.to_path_buf(),
+        Some(path) => Ok(path.to_path_buf()),
         None => resolve_workspace_path(Path::new(DEFAULT_OUT_PATH)),
     }
 }
 
-fn resolve_workspace_path(path: &Path) -> PathBuf {
-    workspace_root().join(path)
+fn resolve_workspace_path(path: &Path) -> Result<PathBuf, String> {
+    Ok(resolve_workspace_root()?.join(path))
 }
 
-fn workspace_root() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .and_then(|p| p.parent())
-        .expect("CARGO_MANIFEST_DIR has crates/xtask parent structure")
-        .to_path_buf()
+fn resolve_workspace_root() -> Result<PathBuf, String> {
+    let current_dir = std::env::current_dir().map_err(|err| format!("current_dir: {err}"))?;
+    for candidate in current_dir.ancestors() {
+        let cargo_toml = candidate.join("Cargo.toml");
+        let Ok(text) = fs::read_to_string(&cargo_toml) else {
+            continue;
+        };
+        if text.contains("[workspace]") {
+            return Ok(candidate.to_path_buf());
+        }
+    }
+
+    Err(format!(
+        "could not resolve workspace root from {}",
+        current_dir.display()
+    ))
 }
 
 fn read_union_manifest(path: &Path) -> Result<UnionManifest, String> {
@@ -329,12 +318,12 @@ fn load_union_manifest_for_entry(
 ) -> Result<UnionManifest, String> {
     let manifest_path = resolve_workspace_path(
         &PathBuf::from(&registry_entry.manifest_root).join(CURRENT_MANIFEST_FILENAME),
-    );
+    )?;
     read_union_manifest(&manifest_path)
 }
 
 fn load_agent_registry() -> Result<AgentRegistry, String> {
-    AgentRegistry::load(&workspace_root()).map_err(|err| err.to_string())
+    AgentRegistry::load(&resolve_workspace_root()?).map_err(|err| err.to_string())
 }
 
 fn runtime_backend_capabilities(
@@ -365,70 +354,74 @@ fn runtime_backend_capabilities(
 
 fn modeled_runtime_capability_truth(
     registry_entry: &AgentRegistryEntry,
-) -> Result<AgentWrapperCapabilities, String> {
-    let (_, mut capabilities) = runtime_backend_capabilities(&registry_entry.agent_id)?;
+    manifest: &UnionManifest,
+) -> Result<BTreeSet<String>, String> {
+    let (_, capabilities) = runtime_backend_capabilities(&registry_entry.agent_id)?;
+    let mut modeled = capabilities.ids;
 
-    match registry_entry.agent_id.as_str() {
-        "codex" | "claude_code" => {
-            capabilities
-                .ids
-                .insert(CAPABILITY_EXTERNAL_SANDBOX_V1.to_string());
-            capabilities.ids.insert(CAPABILITY_MCP_ADD_V1.to_string());
-            capabilities
-                .ids
-                .insert(CAPABILITY_MCP_REMOVE_V1.to_string());
+    match resolve_capability_publication_target(registry_entry)? {
+        CapabilityPublicationTarget::DefaultBuiltInConfig => {
+            for gate in &registry_entry.capability_declaration.target_gated {
+                modeled.remove(&gate.capability_id);
+            }
         }
-        "gemini_cli" | "opencode" => {}
-        other => {
-            return Err(format!(
-                "capability-matrix registry enrolled unsupported backend `{other}`"
-            ));
+        CapabilityPublicationTarget::Explicit(target) => {
+            for gate in &registry_entry.capability_declaration.target_gated {
+                if !gate.targets.iter().any(|candidate| candidate == target) {
+                    modeled.remove(&gate.capability_id);
+                    continue;
+                }
+
+                if let Some(path) = manifest_projected_capability_path(&gate.capability_id) {
+                    if command_available_on_target(manifest, path, target) {
+                        modeled.insert(gate.capability_id.clone());
+                    } else {
+                        modeled.remove(&gate.capability_id);
+                    }
+                } else {
+                    modeled.insert(gate.capability_id.clone());
+                }
+            }
         }
     }
 
-    Ok(capabilities)
+    Ok(modeled)
 }
 
-fn apply_registry_mcp_projection_from_manifest(
-    capabilities: &mut AgentWrapperCapabilities,
+fn projected_advertised_capabilities(
     registry_entry: &AgentRegistryEntry,
     manifest: &UnionManifest,
-) {
-    let BackendProjectionPolicy::CanonicalTarget(target) =
-        backend_projection_policy(registry_entry)
-    else {
-        return;
-    };
-
-    apply_manifest_mcp_projection(capabilities, registry_entry, manifest, &target);
-}
-
-fn validate_primary_canonical_target(
-    registry_entry: &AgentRegistryEntry,
-    manifest: &UnionManifest,
-) -> Result<(), String> {
-    let primary_target = primary_canonical_target(registry_entry);
-    if manifest
-        .expected_targets
+) -> Result<BTreeSet<String>, String> {
+    let command_views = manifest
+        .commands
         .iter()
-        .any(|candidate| candidate == primary_target)
-    {
-        return Ok(());
-    }
-
-    Err(format!(
-        "capability-matrix manifest `{}{}` missing primary canonical target `{primary_target}` in expected_targets",
-        registry_entry.manifest_root, "/current.json"
-    ))
+        .map(|command| CapabilityCommandView {
+            path: command.path.as_slice(),
+            available_on: command.available_on.as_slice(),
+        })
+        .collect::<Vec<_>>();
+    project_advertised_capabilities(
+        registry_entry,
+        CapabilityManifestView {
+            expected_targets: &manifest.expected_targets,
+            commands: &command_views,
+        },
+    )
+    .map_err(|err| {
+        format!(
+            "capability-matrix registry entry `{}` has invalid publication projection: {err}",
+            registry_entry.agent_id
+        )
+    })
 }
 
 fn validate_declared_capabilities_do_not_exceed_runtime(
     registry_entry: &AgentRegistryEntry,
-    runtime_truth: &AgentWrapperCapabilities,
+    advertised_truth: &BTreeSet<String>,
+    runtime_truth: &BTreeSet<String>,
 ) -> Result<(), String> {
-    let declared = declared_capability_matrix_ids(registry_entry);
-    let unexpected = declared
-        .difference(&runtime_truth.ids)
+    let unexpected = advertised_truth
+        .difference(runtime_truth)
         .cloned()
         .collect::<Vec<_>>();
     if unexpected.is_empty() {
@@ -436,24 +429,62 @@ fn validate_declared_capabilities_do_not_exceed_runtime(
     }
 
     Err(format!(
-        "capability-matrix registry entry `{}` declares capabilities beyond modeled runtime truth on primary canonical target `{}`: {}",
+        "capability-matrix registry entry `{}` advertises capabilities beyond modeled runtime truth on {}: {}",
         registry_entry.agent_id,
-        primary_canonical_target(registry_entry),
+        render_publication_target_description(registry_entry)?,
         unexpected.join(", ")
     ))
 }
 
-fn render_canonical_target_header(entries: &[&AgentRegistryEntry]) -> String {
+fn validate_capability_publication_target(
+    registry_entry: &AgentRegistryEntry,
+    manifest: &UnionManifest,
+) -> Result<(), String> {
+    match resolve_capability_publication_target(registry_entry)? {
+        CapabilityPublicationTarget::DefaultBuiltInConfig => Ok(()),
+        CapabilityPublicationTarget::Explicit(target) => {
+            if manifest
+                .expected_targets
+                .iter()
+                .any(|candidate| candidate == target)
+            {
+                return Ok(());
+            }
+
+            Err(format!(
+                "capability-matrix manifest `{}{}` missing publication.capability_matrix_target `{target}` in expected_targets",
+                registry_entry.manifest_root, "/current.json"
+            ))
+        }
+    }
+}
+
+fn render_publication_target_description(
+    registry_entry: &AgentRegistryEntry,
+) -> Result<String, String> {
+    Ok(
+        match resolve_capability_publication_target(registry_entry)? {
+            CapabilityPublicationTarget::DefaultBuiltInConfig => {
+                "the default built-in backend config".to_string()
+            }
+            CapabilityPublicationTarget::Explicit(target) => {
+                format!("publication.capability_matrix_target `{target}`")
+            }
+        },
+    )
+}
+
+fn render_canonical_target_header(entries: &[&AgentRegistryEntry]) -> Result<String, String> {
     let mut canonical_targets = Vec::<String>::new();
     let mut default_backends = Vec::<String>::new();
 
     for entry in entries.iter().copied() {
-        match backend_projection_policy(entry) {
-            BackendProjectionPolicy::CanonicalTarget(target) => {
-                canonical_targets.push(format!("`{}={target}`", entry.agent_id))
+        match resolve_capability_publication_target(entry)? {
+            CapabilityPublicationTarget::Explicit(target) => {
+                canonical_targets.push(format!("`{}={target}`", entry.agent_id));
             }
-            BackendProjectionPolicy::DefaultBuiltInConfig => {
-                default_backends.push(format!("`{}`", entry.agent_id))
+            CapabilityPublicationTarget::DefaultBuiltInConfig => {
+                default_backends.push(format!("`{}`", entry.agent_id));
             }
         }
     }
@@ -476,121 +507,7 @@ fn render_canonical_target_header(entries: &[&AgentRegistryEntry]) -> String {
         out.push_str(" the default built-in backend config");
     }
     out.push_str(".\n");
-    out
-}
-
-fn backend_projection_policy(entry: &AgentRegistryEntry) -> BackendProjectionPolicy {
-    if known_mcp_capability_ids()
-        .iter()
-        .any(|capability_id| declared_mcp_projection(entry, capability_id).is_some())
-    {
-        return BackendProjectionPolicy::CanonicalTarget(
-            primary_canonical_target(entry).to_string(),
-        );
-    }
-
-    BackendProjectionPolicy::DefaultBuiltInConfig
-}
-
-fn primary_canonical_target(entry: &AgentRegistryEntry) -> &str {
-    entry
-        .canonical_targets
-        .first()
-        .map(String::as_str)
-        .unwrap_or("")
-}
-
-fn known_mcp_capability_ids() -> [&'static str; 4] {
-    [
-        CAPABILITY_MCP_LIST_V1,
-        CAPABILITY_MCP_GET_V1,
-        CAPABILITY_MCP_ADD_V1,
-        CAPABILITY_MCP_REMOVE_V1,
-    ]
-}
-
-fn mcp_command_path(capability_id: &str) -> &'static [&'static str] {
-    match capability_id {
-        CAPABILITY_MCP_LIST_V1 => &["mcp", "list"],
-        CAPABILITY_MCP_GET_V1 => &["mcp", "get"],
-        CAPABILITY_MCP_ADD_V1 => &["mcp", "add"],
-        CAPABILITY_MCP_REMOVE_V1 => &["mcp", "remove"],
-        _ => &[],
-    }
-}
-
-fn declared_mcp_projection<'a>(
-    registry_entry: &'a AgentRegistryEntry,
-    capability_id: &str,
-) -> Option<DeclaredMcpProjection<'a>> {
-    if let Some(target_gated) = registry_entry
-        .capability_declaration
-        .target_gated
-        .iter()
-        .find(|declaration| declaration.capability_id == capability_id)
-    {
-        return Some(DeclaredMcpProjection {
-            targets: Some(target_gated.targets.as_slice()),
-            advertise_when_available: true,
-        });
-    }
-
-    registry_entry
-        .capability_declaration
-        .config_gated
-        .iter()
-        .find(|declaration| declaration.capability_id == capability_id)
-        .map(|config_gated| DeclaredMcpProjection {
-            targets: config_gated.targets.as_deref(),
-            advertise_when_available: false,
-        })
-}
-
-fn declared_capability_matrix_ids(registry_entry: &AgentRegistryEntry) -> BTreeSet<String> {
-    let mut declared = BTreeSet::new();
-    declared.extend(
-        registry_entry
-            .capability_declaration
-            .always_on
-            .iter()
-            .cloned(),
-    );
-    declared.extend(
-        registry_entry
-            .capability_declaration
-            .backend_extensions
-            .iter()
-            .cloned(),
-    );
-
-    let primary_target = primary_canonical_target(registry_entry);
-    declared.extend(
-        registry_entry
-            .capability_declaration
-            .target_gated
-            .iter()
-            .filter(|declaration| {
-                declaration
-                    .targets
-                    .iter()
-                    .any(|target| target == primary_target)
-            })
-            .map(|declaration| declaration.capability_id.clone()),
-    );
-    declared.extend(
-        registry_entry
-            .capability_declaration
-            .config_gated
-            .iter()
-            .filter(|declaration| {
-                declaration.targets.as_ref().map_or(true, |targets| {
-                    targets.iter().any(|target| target == primary_target)
-                })
-            })
-            .map(|declaration| declaration.capability_id.clone()),
-    );
-
-    declared
+    Ok(out)
 }
 
 #[derive(Debug, Deserialize)]
@@ -610,25 +527,4 @@ struct UnionCommand {
 struct BuiltinBackendInventory {
     backends: BTreeMap<String, AgentWrapperCapabilities>,
     canonical_target_header: String,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-enum BackendProjectionPolicy {
-    CanonicalTarget(String),
-    DefaultBuiltInConfig,
-}
-
-#[derive(Debug, Clone, Copy)]
-struct DeclaredMcpProjection<'a> {
-    targets: Option<&'a [String]>,
-    advertise_when_available: bool,
-}
-
-impl DeclaredMcpProjection<'_> {
-    fn supports_target(&self, target: &str) -> bool {
-        match self.targets {
-            Some(targets) => targets.iter().any(|candidate| candidate == target),
-            None => true,
-        }
-    }
 }

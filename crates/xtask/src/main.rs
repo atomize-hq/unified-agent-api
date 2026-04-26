@@ -13,7 +13,6 @@ mod codex_union;
 mod codex_validate;
 mod codex_version_metadata;
 mod codex_wrapper_coverage;
-mod parity_triad_scaffold;
 mod version_bump;
 mod wrapper_coverage_shared;
 
@@ -24,6 +23,7 @@ use xtask::agent_maintenance::{
 use xtask::capability_matrix;
 pub use xtask::onboard_agent;
 pub use xtask::support_matrix;
+pub use xtask::wrapper_scaffold;
 
 use clap::{Parser, Subcommand};
 
@@ -62,11 +62,11 @@ enum Command {
     ClaudeWrapperCoverage(claude_wrapper_coverage::CliArgs),
     /// Validate committed Codex parity artifacts under `cli_manifests/codex/`.
     CodexValidate(codex_validate::Args),
-    /// Generate a triad scaffold directory from a parity coverage report.
-    ParityTriadScaffold(parity_triad_scaffold::Args),
     /// Preview the next control-plane onboarding packet without writing files.
     OnboardAgent(Box<onboard_agent::Args>),
-    /// Generate a universal agent capability matrix markdown.
+    /// Create a publishable wrapper crate shell for an onboarded agent.
+    ScaffoldWrapperCrate(wrapper_scaffold::Args),
+    /// Generate or verify the universal agent capability matrix markdown.
     CapabilityMatrix(capability_matrix::Args),
     /// Audit the capability matrix for orthogonality invariants.
     CapabilityMatrixAudit(capability_matrix_audit::Args),
@@ -166,14 +166,14 @@ fn main() {
             }
         },
         Command::CodexValidate(args) => codex_validate::run(args),
-        Command::ParityTriadScaffold(args) => match parity_triad_scaffold::run(args) {
+        Command::OnboardAgent(args) => match onboard_agent::run(*args) {
             Ok(()) => 0,
             Err(err) => {
                 eprintln!("{err}");
-                1
+                err.exit_code()
             }
         },
-        Command::OnboardAgent(args) => match onboard_agent::run(*args) {
+        Command::ScaffoldWrapperCrate(args) => match wrapper_scaffold::run(args) {
             Ok(()) => 0,
             Err(err) => {
                 eprintln!("{err}");

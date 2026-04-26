@@ -16,7 +16,7 @@ requirements.
 
 ## Normative references
 
-- `docs/project_management/next/cli-agent-onboarding-charter.md`
+- `docs/specs/cli-agent-onboarding-charter.md`
 - `docs/specs/opencode-wrapper-run-contract.md`
 - `docs/specs/unified-agent-api/run-protocol-spec.md`
 

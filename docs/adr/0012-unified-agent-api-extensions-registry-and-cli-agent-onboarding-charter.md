@@ -12,9 +12,9 @@
 - Universal spec set (canonical):
   - `docs/specs/unified-agent-api/`
 - Planning pack (derived pointers + execution artifacts):
-  - `docs/project_management/next/unified-agent-api/`
+  - `.archived/project_management/next/unified-agent-api/`
 - Onboarding charter doc:
-  - `docs/project_management/next/cli-agent-onboarding-charter.md`
+  - `docs/specs/cli-agent-onboarding-charter.md`
 
 ## Related Docs
 - Unified Agent API baselines:
@@ -25,9 +25,9 @@
 - New spec introduced by this ADR:
   - `docs/specs/unified-agent-api/extensions-spec.md`
 - Onboarding charter introduced by this ADR:
-  - `docs/project_management/next/cli-agent-onboarding-charter.md`
+  - `docs/specs/cli-agent-onboarding-charter.md`
 - Current exec-policy usage in a feature pack (context; not authoritative for core keys):
-  - `docs/project_management/packs/active/agent-api-codex-stream-exec/contract.md`
+  - `.archived/project_management/packs/implemented/agent-api-codex-stream-exec/contract.md`
 
 ## Executive Summary (Operator)
 
@@ -50,7 +50,7 @@ ADR_BODY_SHA256: e335f45f122ecab4ca4ea18efa11bfdacc4df23a62edd389d70251b8bf066b8
     rubric, test evidence expectations, and CI expectations.
   - Why: enables adding many more CLI agents quickly without re-deciding fundamentals each time.
   - Links:
-    - `docs/project_management/next/cli-agent-onboarding-charter.md`
+    - `docs/specs/cli-agent-onboarding-charter.md`
 
 ## Problem / Context
 
@@ -106,7 +106,7 @@ No new platform divergences are introduced by this ADR (documentation-only chang
     - core extension key registry (schema + defaults + validation)
     - ownership rules for backend keys
 - Add a new charter doc:
-  - `docs/project_management/next/cli-agent-onboarding-charter.md`
+  - `docs/specs/cli-agent-onboarding-charter.md`
     - wrapper crate rules
     - universal backend adapter rules
     - mapping rubric (“capability buckets”)

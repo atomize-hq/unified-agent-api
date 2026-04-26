@@ -26,4 +26,4 @@ generated `capability-matrix.md` remains a separate backend inventory surface an
 support policy.
 
 Planning/execution artifacts remain in:
-- the Unified Agent API planning pack under `docs/project_management/next/`
+- the Unified Agent API planning/provenance area under `.archived/project_management/next/`

@@ -30,7 +30,7 @@ constraints deserve a dedicated ADR.
   - `docs/specs/unified-agent-api/capabilities-schema-spec.md`
   - `docs/specs/unified-agent-api/extensions-spec.md` (owner doc for the core key)
 - Planning pack (non-normative seam extraction):
-  - `docs/project_management/packs/active/agent-api-external-sandbox-exec-policy/`
+  - `.archived/project_management/packs/implemented/agent-api-external-sandbox-exec-policy/`
 
 ## Executive Summary (Operator)
 

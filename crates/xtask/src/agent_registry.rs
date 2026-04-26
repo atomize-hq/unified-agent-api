@@ -4,6 +4,9 @@ use std::{
     path::{Component, Path},
 };
 
+use crate::capability_projection::{
+    resolve_capability_publication_target, validate_config_key_allowlist,
+};
 use serde::Deserialize;
 use thiserror::Error;
 
@@ -127,6 +130,10 @@ pub struct AgentRegistryEntry {
 }
 
 impl AgentRegistryEntry {
+    pub(crate) fn scaffold_lib_name(&self) -> Result<String, AgentRegistryError> {
+        scaffold_lib_name_from_crate_path(&self.crate_path)
+    }
+
     fn validate(&self) -> Result<(), AgentRegistryError> {
         validate_non_empty_scalar("agent_id", &self.agent_id)?;
         validate_non_empty_scalar("display_name", &self.display_name)?;
@@ -143,11 +150,13 @@ impl AgentRegistryEntry {
             BACKEND_MODULE_PREFIX,
         )?;
         ensure_has_prefix("manifest_root", &self.manifest_root, MANIFEST_ROOT_PREFIX)?;
+        self.scaffold_lib_name()?;
 
         let canonical_targets =
             validate_non_empty_string_array("canonical_targets", &self.canonical_targets)?;
         self.wrapper_coverage.validate()?;
         self.capability_declaration.validate(&canonical_targets)?;
+        self.publication.validate(self)?;
         self.release.validate()?;
         self.scaffold.validate()?;
         self.maintenance.validate(self)?;
@@ -248,6 +257,11 @@ impl ConfigGatedCapability {
             "capability_declaration.config_gated.config_key",
             &self.config_key,
         )?;
+        validate_config_key_allowlist(
+            &self.config_key,
+            "capability_declaration.config_gated.config_key",
+        )
+        .map_err(AgentRegistryError::Validation)?;
         if let Some(targets) = &self.targets {
             validate_gate_targets(
                 "capability_declaration.config_gated.targets",
@@ -264,6 +278,19 @@ impl ConfigGatedCapability {
 pub struct PublicationFlags {
     pub support_matrix_enabled: bool,
     pub capability_matrix_enabled: bool,
+    #[serde(default)]
+    pub capability_matrix_target: Option<String>,
+}
+
+impl PublicationFlags {
+    fn validate(&self, entry: &AgentRegistryEntry) -> Result<(), AgentRegistryError> {
+        if let Some(target) = &self.capability_matrix_target {
+            validate_non_empty_scalar("publication.capability_matrix_target", target)?;
+        }
+        resolve_capability_publication_target(entry)
+            .map(|_| ())
+            .map_err(AgentRegistryError::Validation)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
@@ -350,7 +377,7 @@ impl GovernanceCheck {
                 }
                 if self.path
                     != format!(
-                        "docs/project_management/next/{}/governance/approved-agent.toml",
+                        "docs/agents/lifecycle/{}/governance/approved-agent.toml",
                         entry.scaffold.onboarding_pack_prefix
                     )
                 {
@@ -501,6 +528,32 @@ fn validate_non_empty_scalar(field_name: &str, value: &str) -> Result<(), AgentR
         )));
     }
     Ok(())
+}
+
+pub(crate) fn scaffold_lib_name_from_crate_path(
+    crate_path: &str,
+) -> Result<String, AgentRegistryError> {
+    let Some(crate_basename) = Path::new(crate_path)
+        .file_name()
+        .and_then(|part| part.to_str())
+    else {
+        return Err(AgentRegistryError::Validation(format!(
+            "crate_path `{crate_path}` must end with a UTF-8 basename that can be normalized into an ASCII lib target name"
+        )));
+    };
+
+    let lib_name = crate_basename.replace('-', "_");
+    if lib_name.is_empty()
+        || !lib_name
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_')
+    {
+        return Err(AgentRegistryError::Validation(format!(
+            "crate_path `{crate_path}` has unsupported lib target basename `{crate_basename}`; normalized lib name candidate `{lib_name}` must contain only ASCII letters, digits, or `_` after `-` to `_` normalization"
+        )));
+    }
+
+    Ok(lib_name)
 }
 
 fn validate_repo_relative_path(field_name: &str, value: &str) -> Result<(), AgentRegistryError> {

@@ -6,8 +6,8 @@ Owner(s): spensermcconnell
 
 ## Scope
 
-- Feature directory: `docs/project_management/next/unified-agent-api/` (planning + triads)
-- Sequencing spine: `docs/project_management/next/sequencing.json`
+- Feature directory: `.archived/project_management/next/unified-agent-api/` (planning + triads)
+- Sequencing spine: `.archived/sequencing.json`
 - Repo docs conventions: `docs/STYLE.md`
 
 ## Related Docs
@@ -15,13 +15,13 @@ Owner(s): spensermcconnell
 - Existing ingestion contract ADR (reused, not replaced): `docs/adr/0007-wrapper-events-ingestion-contract.md`
 - Existing workspace shape ADR (context): `docs/adr/0006-unified-agent-api-workspace.md`
 - Feature plan/tasks:
-  - `docs/project_management/next/unified-agent-api/plan.md`
-  - `docs/project_management/next/unified-agent-api/tasks.json`
-  - `docs/project_management/next/unified-agent-api/session_log.md`
-  - `docs/project_management/next/unified-agent-api/decision_register.md`
-- Spec manifest (derived, authoritative for spec set): `docs/project_management/next/unified-agent-api/spec_manifest.md`
-- Impact map (derived, authoritative for touch set + conflicts): `docs/project_management/next/unified-agent-api/impact_map.md`
-- CI checkpoint plan (derived, authoritative for bounded multi-OS gates): `docs/project_management/next/unified-agent-api/ci_checkpoint_plan.md`
+  - `.archived/project_management/next/unified-agent-api/plan.md`
+  - `.archived/project_management/next/unified-agent-api/tasks.json`
+  - `.archived/project_management/next/unified-agent-api/session_log.md`
+  - `.archived/project_management/next/unified-agent-api/decision_register.md`
+- Spec manifest (derived, authoritative for spec set): `.archived/project_management/next/unified-agent-api/spec_manifest.md`
+- Impact map (derived, authoritative for touch set + conflicts): `.archived/project_management/next/unified-agent-api/impact_map.md`
+- CI checkpoint plan (derived, authoritative for bounded multi-OS gates): `.archived/project_management/next/unified-agent-api/ci_checkpoint_plan.md`
 - Canonical spec docs (authoritative):
   - `docs/specs/unified-agent-api/contract.md`
   - `docs/specs/unified-agent-api/run-protocol-spec.md`
@@ -29,10 +29,10 @@ Owner(s): spensermcconnell
   - `docs/specs/unified-agent-api/capabilities-schema-spec.md`
   - `docs/specs/unified-agent-api/extensions-spec.md`
 - Platform parity planning (derived, non-normative):
-  - `docs/project_management/next/unified-agent-api/platform-parity-spec.md`
+  - `.archived/project_management/next/unified-agent-api/platform-parity-spec.md`
 - Manual/smoke validation:
-  - `docs/project_management/next/unified-agent-api/manual_testing_playbook.md`
-  - `docs/project_management/next/unified-agent-api/smoke/`
+  - `.archived/project_management/next/unified-agent-api/manual_testing_playbook.md`
+  - `scripts/smoke/unified-agent-api/`
 - Wrapper crates (inputs):
   - `crates/codex/`
   - `crates/claude_code/`
@@ -173,8 +173,8 @@ The event stream is a unified, minimal contract:
 
 ## Sequencing / Dependencies
 
-- Sequencing entry: `docs/project_management/next/sequencing.json` → add a new track
-  sourced by this ADR under `docs/project_management/next/unified-agent-api/`.
+- Sequencing entry: `.archived/sequencing.json` → add a new track
+  sourced by this ADR under `.archived/project_management/next/unified-agent-api/`.
 - Dependencies:
   - Reuses `wrapper_events` patterns (feature-gated adapters, normalized event kinds).
   - Must not break existing public APIs of `codex` and `claude_code`.
@@ -208,7 +208,7 @@ The event stream is a unified, minimal contract:
 
 ### Manual validation
 
-- Manual playbook will be created under `docs/project_management/next/unified-agent-api/` once the
+- Manual playbook will be created under `.archived/project_management/next/unified-agent-api/` once the
   ADR is accepted and the triad feature scaffold exists.
 
 ## Rollout / Backwards Compatibility
@@ -221,4 +221,4 @@ The event stream is a unified, minimal contract:
 - This ADR is intentionally self-contained: this repo’s existing ADR set does not use a separate
   Decision Register pattern. If the universal API work expands into multiple competing designs, a
   feature-local `decision_register.md` will be introduced under
-  `docs/project_management/next/unified-agent-api/`.
+  `.archived/project_management/next/unified-agent-api/`.

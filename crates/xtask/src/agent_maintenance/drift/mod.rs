@@ -27,12 +27,6 @@ const RELEASE_DOC_END_MARKER: &str =
 const SUPPORT_MARKDOWN_START_MARKER: &str = "<!-- support-matrix-published:start -->";
 const SUPPORT_MARKDOWN_END_MARKER: &str = "<!-- support-matrix-published:end -->";
 
-const CAPABILITY_MCP_LIST_V1: &str = "agent_api.tools.mcp.list.v1";
-const CAPABILITY_MCP_GET_V1: &str = "agent_api.tools.mcp.get.v1";
-const CAPABILITY_MCP_ADD_V1: &str = "agent_api.tools.mcp.add.v1";
-const CAPABILITY_MCP_REMOVE_V1: &str = "agent_api.tools.mcp.remove.v1";
-const CAPABILITY_EXTERNAL_SANDBOX_V1: &str = "agent_api.exec.external_sandbox.v1";
-
 #[derive(Debug, Parser, Clone)]
 pub struct Args {
     #[arg(long)]

@@ -77,6 +77,8 @@ The repository capability matrix is a generated artifact:
 
 - Location: `docs/specs/unified-agent-api/capability-matrix.md`
 - Generator: `cargo run -p xtask -- capability-matrix`
+- Freshness check contract: `cargo run -p xtask -- capability-matrix --check`
+- Semantic companion gate: `cargo run -p xtask -- capability-matrix-audit`
 
 Semantics (pinned):
 
@@ -106,6 +108,10 @@ capability id is introduced or promoted:
 - The capability matrix MUST be regenerated, and reviewers SHOULD verify the id appears in both
   this spec and the generated matrix (noting that config-conditional capabilities may be absent
   from the matrix under default generator settings).
+- `cargo run -p xtask -- capability-matrix --check` is the authoritative freshness contract and
+  MUST fail without mutating the worktree when the generated artifact is stale.
+- `cargo run -p xtask -- capability-matrix-audit` is the required semantic companion gate and MUST
+  remain paired with the freshness check in local preflight and CI.
 
 ## Required minimum capabilities (v1, normative)
 

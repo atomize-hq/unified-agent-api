@@ -172,7 +172,7 @@ Runtime rejection parity (pinned):
   (`agent_api.config.model.v1`, "Runtime rejection behavior (v1, normative)").
 
 Implementation note (non-normative): the active verification plan for this contract clause lives in
-`docs/project_management/packs/active/agent-api-model-selection/seam-4-claude-code-mapping.md`.
+`.archived/project_management/packs/implemented/agent-api-model-selection/seam-4-claude-code-mapping.md`.
 
 ## `agent_api.session.resume.v1` mapping (pinned)
 

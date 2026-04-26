@@ -157,6 +157,10 @@ pub(super) fn write_input_summary<W: Write>(
         draft.capability_matrix_enabled
     )
     .map_err(|err| Error::Internal(format!("write stdout: {err}")))?;
+    if let Some(target) = draft.capability_matrix_target.as_deref() {
+        writeln!(writer, "capability_matrix_target: {target}")
+            .map_err(|err| Error::Internal(format!("write stdout: {err}")))?;
+    }
     writeln!(writer, "docs_release_track: {}", draft.docs_release_track)
         .map_err(|err| Error::Internal(format!("write stdout: {err}")))?;
     writeln!(
@@ -343,6 +347,9 @@ pub(super) fn render_registry_entry_preview(draft: &DraftEntry) -> String {
         draft.capability_matrix_enabled
     )
     .expect("write String");
+    if let Some(target) = draft.capability_matrix_target.as_deref() {
+        writeln!(&mut out, "capability_matrix_target = {:?}", target).expect("write String");
+    }
     writeln!(&mut out).expect("write String");
 
     writeln!(&mut out, "[agents.release]").expect("write String");
@@ -445,12 +452,12 @@ pub(super) fn build_manual_follow_up(
         ],
         None => vec![
             format!(
-                "Next executable runtime step: implement the runtime-owned wrapper crate at `{}` and backend module `{}`.",
-                draft.crate_path, draft.backend_module
+                "Next executable runtime step: run `cargo run -p xtask -- scaffold-wrapper-crate --agent {} --write` to create the runtime-owned wrapper crate shell at `{}`; `onboard-agent` does not create the wrapper crate.",
+                draft.agent_id, draft.crate_path
             ),
             format!(
-                "When the wrapper crate is crates.io-publishable, include crate-local `README.md`, `LICENSE-APACHE`, `LICENSE-MIT`, and set `readme = \"README.md\"` in `{}/Cargo.toml`.",
-                draft.crate_path
+                "Then implement backend/runtime details in `{}` and `{}`.",
+                draft.crate_path, draft.backend_module
             ),
             format!(
                 "Author wrapper coverage input at `{}` for binding kind `{}`.",

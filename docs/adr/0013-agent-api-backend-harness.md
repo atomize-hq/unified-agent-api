@@ -26,7 +26,7 @@
   - `crates/agent_api/src/backends/codex.rs`
   - `crates/agent_api/src/backends/claude_code.rs`
 - Onboarding charter (process context):
-  - `docs/project_management/next/cli-agent-onboarding-charter.md`
+  - `docs/specs/cli-agent-onboarding-charter.md`
 
 ## Executive Summary (Operator)
 

@@ -1,0 +1,30 @@
+artifact_version = "1"
+comparison_ref = "docs/agents/selection/cli-agent-selection-packet.md"
+selection_mode = "factory_validation"
+recommended_agent_id = "opencode"
+approved_agent_id = "gemini_cli"
+approval_commit = "443157bda4e49a4020280180e4f46e87cdf65764"
+approval_recorded_at = "2026-04-21T16:57:27Z"
+override_reason = "Gemini CLI was approved as the fourth-agent proving-run vehicle to validate the post-M2 onboarding factory on one real run while preserving OpenCode as the next recommendation lineage."
+
+[descriptor]
+agent_id = "gemini_cli"
+display_name = "Gemini CLI"
+crate_path = "crates/gemini_cli"
+backend_module = "crates/agent_api/src/backends/gemini_cli"
+manifest_root = "cli_manifests/gemini_cli"
+package_name = "unified-agent-api-gemini-cli"
+canonical_targets = ["darwin-arm64"]
+wrapper_coverage_binding_kind = "generated_from_wrapper_crate"
+wrapper_coverage_source_path = "crates/gemini_cli"
+always_on_capabilities = [
+  "agent_api.config.model.v1",
+  "agent_api.events",
+  "agent_api.events.live",
+  "agent_api.run",
+]
+backend_extensions = []
+support_matrix_enabled = true
+capability_matrix_enabled = true
+docs_release_track = "crates-io"
+onboarding_pack_prefix = "gemini-cli-onboarding"

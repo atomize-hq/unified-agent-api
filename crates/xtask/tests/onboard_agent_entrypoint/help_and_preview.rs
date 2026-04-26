@@ -2,8 +2,8 @@ use clap::{CommandFactory, Parser};
 
 use super::{
     harness::{
-        base_args, base_args_with_mode, base_args_with_package_name, fixture_root,
-        seed_release_touchpoints, snapshot_files, write_text,
+        args_with_overrides, base_args, base_args_with_mode, base_args_with_package_name,
+        fixture_root, seed_release_touchpoints, snapshot_files, write_text,
     },
     run_cli, Cli,
 };
@@ -28,6 +28,7 @@ fn onboard_agent_help_text_includes_required_surface() {
     assert!(help_text.contains("--backend-extension"));
     assert!(help_text.contains("--support-matrix-enabled"));
     assert!(help_text.contains("--capability-matrix-enabled"));
+    assert!(help_text.contains("--capability-matrix-target"));
     assert!(help_text.contains("--docs-release-track"));
     assert!(help_text.contains("--onboarding-pack-prefix"));
 }
@@ -155,6 +156,24 @@ fn onboard_agent_preexisting_target_conflict_exits_with_validation_code() {
 }
 
 #[test]
+fn onboard_agent_requires_explicit_capability_matrix_target_for_target_scoped_projection() {
+    let fixture = fixture_root("onboard-agent-missing-capability-matrix-target");
+    let mut args = base_args("cursor");
+    let position = args
+        .iter()
+        .position(|value| value == "--capability-matrix-target")
+        .expect("base args capability target flag");
+    args.drain(position..=position + 1);
+
+    let output = run_cli(args, &fixture);
+
+    assert_eq!(output.exit_code, 2);
+    assert!(output
+        .stderr
+        .contains("--capability-matrix-target is required when capability-matrix publication uses target-scoped declarations"));
+}
+
+#[test]
 fn onboard_agent_dry_run_preview_is_deterministic_and_writes_nothing() {
     let fixture = fixture_root("onboard-agent-preview");
     seed_release_touchpoints(&fixture);
@@ -194,9 +213,13 @@ fn onboard_agent_dry_run_preview_is_deterministic_and_writes_nothing() {
     assert!(first
         .stdout
         .contains("Path: crates/xtask/data/agent_registry.toml"));
+    assert!(first.stdout.contains("capability_matrix_target: linux-x64"));
     assert!(first
         .stdout
-        .contains("Path: docs/project_management/next/cursor-cli-onboarding/README.md"));
+        .contains("capability_matrix_target = \"linux-x64\""));
+    assert!(first
+        .stdout
+        .contains("Path: docs/agents/lifecycle/cursor-cli-onboarding/README.md"));
     assert!(first
         .stdout
         .contains("Path: cli_manifests/cursor/current.json"));
@@ -214,9 +237,57 @@ fn onboard_agent_dry_run_preview_is_deterministic_and_writes_nothing() {
     assert!(first.stdout.contains("Next executable runtime step:"));
     assert!(first
         .stdout
+        .contains("cargo run -p xtask -- scaffold-wrapper-crate --agent cursor --write"));
+    assert!(first
+        .stdout
+        .contains("`onboard-agent` does not create the wrapper crate."));
+    assert!(first
+        .stdout
         .contains("Shared onboarding plan preview; no filesystem writes performed."));
     assert!(!first.stdout.contains(" M1"));
     assert!(!first.stdout.contains("future M2"));
     assert!(!first.stdout.contains("dry-run mode"));
     assert!(!first.stdout.contains("Create the wrapper crate"));
+    assert!(!first
+        .stdout
+        .contains("Next executable runtime step: implement the runtime-owned wrapper crate"));
+    assert!(!first
+        .stdout
+        .contains("When the wrapper crate is crates.io-publishable"));
+    assert!(!first.stdout.contains("LICENSE-APACHE"));
+    assert!(!first.stdout.contains("LICENSE-MIT"));
+    assert!(!first.stdout.contains("readme = \"README.md\""));
+}
+
+#[test]
+fn onboard_agent_dry_run_accepts_hyphenated_crate_path_without_rewriting_it() {
+    let fixture = fixture_root("onboard-agent-hyphenated-crate-path");
+    seed_release_touchpoints(&fixture);
+
+    let before = snapshot_files(&fixture);
+    let output = run_cli(
+        args_with_overrides(
+            "--dry-run",
+            "cursor",
+            "unified-agent-api-cursor",
+            &[
+                ("--crate-path", "crates/cursor-cli"),
+                ("--wrapper-coverage-source-path", "crates/cursor-cli"),
+            ],
+            false,
+        ),
+        &fixture,
+    );
+    let after = snapshot_files(&fixture);
+
+    assert_eq!(output.exit_code, 0, "stderr:\n{}", output.stderr);
+    assert_eq!(before, after, "dry-run must not write any files");
+    assert!(output.stdout.contains("crate_path: crates/cursor-cli"));
+    assert!(output.stdout.contains("crate_path = \"crates/cursor-cli\""));
+    assert!(output.stdout.contains(
+        "Path: Cargo.toml will ensure workspace member `crates/cursor-cli` is enrolled."
+    ));
+    assert!(output
+        .stdout
+        .contains("create the runtime-owned wrapper crate shell at `crates/cursor-cli`"));
 }

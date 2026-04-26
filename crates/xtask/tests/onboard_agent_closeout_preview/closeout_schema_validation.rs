@@ -8,12 +8,10 @@ use super::{
 #[test]
 fn closeout_without_approval_linkage_fails_with_exit_code_2() {
     let fixture = fixture_root("close-proving-run-missing-approval");
-    let approval_rel =
-        "docs/project_management/next/gemini-cli-onboarding/governance/approved-agent.toml";
+    let approval_rel = "docs/agents/lifecycle/gemini-cli-onboarding/governance/approved-agent.toml";
     seed_gemini_approval_artifact(&fixture, approval_rel, "gemini-cli-onboarding");
-    let closeout_path = fixture.join(
-        "docs/project_management/next/gemini-cli-onboarding/governance/proving-run-closeout.json",
-    );
+    let closeout_path = fixture
+        .join("docs/agents/lifecycle/gemini-cli-onboarding/governance/proving-run-closeout.json");
     write_text(
         &closeout_path,
         &serde_json::to_string_pretty(&json!({
@@ -37,7 +35,7 @@ fn closeout_without_approval_linkage_fails_with_exit_code_2() {
             "--approval".to_string(),
             approval_rel.to_string(),
             "--closeout".to_string(),
-            "docs/project_management/next/gemini-cli-onboarding/governance/proving-run-closeout.json"
+            "docs/agents/lifecycle/gemini-cli-onboarding/governance/proving-run-closeout.json"
                 .to_string(),
         ],
         &fixture,
@@ -52,14 +50,12 @@ fn closeout_without_approval_linkage_fails_with_exit_code_2() {
 #[test]
 fn closeout_without_duration_truth_fails_with_exit_code_2() {
     let fixture = fixture_root("close-proving-run-missing-duration");
-    let approval_rel =
-        "docs/project_management/next/gemini-cli-onboarding/governance/approved-agent.toml";
+    let approval_rel = "docs/agents/lifecycle/gemini-cli-onboarding/governance/approved-agent.toml";
     let approval_path =
         seed_gemini_approval_artifact(&fixture, approval_rel, "gemini-cli-onboarding");
     let approval_sha256 = sha256_hex(&fixture.join(&approval_path));
-    let closeout_path = fixture.join(
-        "docs/project_management/next/gemini-cli-onboarding/governance/proving-run-closeout.json",
-    );
+    let closeout_path = fixture
+        .join("docs/agents/lifecycle/gemini-cli-onboarding/governance/proving-run-closeout.json");
     write_text(
         &closeout_path,
         &serde_json::to_string_pretty(&json!({
@@ -85,7 +81,7 @@ fn closeout_without_duration_truth_fails_with_exit_code_2() {
             "--approval".to_string(),
             approval_rel.to_string(),
             "--closeout".to_string(),
-            "docs/project_management/next/gemini-cli-onboarding/governance/proving-run-closeout.json"
+            "docs/agents/lifecycle/gemini-cli-onboarding/governance/proving-run-closeout.json"
                 .to_string(),
         ],
         &fixture,
@@ -100,14 +96,12 @@ fn closeout_without_duration_truth_fails_with_exit_code_2() {
 #[test]
 fn closeout_without_residual_friction_truth_fails_with_exit_code_2() {
     let fixture = fixture_root("close-proving-run-missing-residual");
-    let approval_rel =
-        "docs/project_management/next/gemini-cli-onboarding/governance/approved-agent.toml";
+    let approval_rel = "docs/agents/lifecycle/gemini-cli-onboarding/governance/approved-agent.toml";
     let approval_path =
         seed_gemini_approval_artifact(&fixture, approval_rel, "gemini-cli-onboarding");
     let approval_sha256 = sha256_hex(&fixture.join(&approval_path));
-    let closeout_path = fixture.join(
-        "docs/project_management/next/gemini-cli-onboarding/governance/proving-run-closeout.json",
-    );
+    let closeout_path = fixture
+        .join("docs/agents/lifecycle/gemini-cli-onboarding/governance/proving-run-closeout.json");
     write_text(
         &closeout_path,
         &serde_json::to_string_pretty(&json!({
@@ -133,7 +127,7 @@ fn closeout_without_residual_friction_truth_fails_with_exit_code_2() {
             "--approval".to_string(),
             approval_rel.to_string(),
             "--closeout".to_string(),
-            "docs/project_management/next/gemini-cli-onboarding/governance/proving-run-closeout.json"
+            "docs/agents/lifecycle/gemini-cli-onboarding/governance/proving-run-closeout.json"
                 .to_string(),
         ],
         &fixture,

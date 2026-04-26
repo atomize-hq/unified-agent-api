@@ -18,6 +18,8 @@ mod workspace_mutation {
 
 #[path = "../src/approval_artifact.rs"]
 mod approval_artifact;
+#[path = "../src/capability_projection.rs"]
+mod capability_projection;
 #[path = "../src/agent_maintenance/closeout.rs"]
 mod closeout;
 #[path = "../src/agent_maintenance/drift/mod.rs"]
@@ -46,32 +48,31 @@ use harness::{fixture_root, write_text};
 fn close_agent_maintenance_requires_request_linkage() {
     let fixture = fixture_root("close-agent-maintenance-request-linkage");
     maintenance_harness::seed_opencode_basis(&fixture);
-    let request_path = Path::new(
-        "docs/project_management/next/opencode-maintenance/governance/maintenance-request.toml",
-    );
+    let request_path =
+        Path::new("docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml");
     let request_absolute = fixture.join(request_path);
     write_text(
         &request_absolute,
         &maintenance_request_toml(
             "opencode",
-            "docs/project_management/next/opencode-implementation/governance/seam-2-closeout.md",
+            "docs/integrations/opencode/governance/seam-2-closeout.md",
         ),
     );
 
     let closeout_path = Path::new(
-        "docs/project_management/next/opencode-maintenance/governance/maintenance-closeout.json",
+        "docs/agents/lifecycle/opencode-maintenance/governance/maintenance-closeout.json",
     );
     write_text(
         &fixture.join(closeout_path),
         &serde_json::to_string_pretty(&json!({
-            "request_ref": "docs/project_management/next/opencode-maintenance/governance/not-the-request.toml",
+            "request_ref": "docs/agents/lifecycle/opencode-maintenance/governance/not-the-request.toml",
             "request_sha256": sha256_hex(&request_absolute),
             "resolved_findings": [finding_json(
                 "governance_doc_drift",
                 "SEAM-2 closeout now matches the landed capability advertisement boundary.",
                 &[
-                    "docs/project_management/next/opencode-implementation/governance/seam-2-closeout.md",
-                    "docs/project_management/next/opencode-maintenance/HANDOFF.md"
+                    "docs/integrations/opencode/governance/seam-2-closeout.md",
+                    "docs/agents/lifecycle/opencode-maintenance/HANDOFF.md"
                 ],
             )],
             "explicit_none_reason": "No deferred maintenance findings remain after packet refresh.",
@@ -86,27 +87,26 @@ fn close_agent_maintenance_requires_request_linkage() {
         .expect_err("request linkage mismatch should fail");
     assert!(err
         .to_string()
-        .contains("`request_ref` must equal `docs/project_management/next/opencode-maintenance/governance/maintenance-request.toml`"));
+        .contains("`request_ref` must equal `docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml`"));
 }
 
 #[test]
 fn close_agent_maintenance_requires_resolved_and_deferred_truth() {
     let fixture = fixture_root("close-agent-maintenance-truth");
     maintenance_harness::seed_opencode_basis(&fixture);
-    let request_path = Path::new(
-        "docs/project_management/next/opencode-maintenance/governance/maintenance-request.toml",
-    );
+    let request_path =
+        Path::new("docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml");
     let request_absolute = fixture.join(request_path);
     write_text(
         &request_absolute,
         &maintenance_request_toml(
             "opencode",
-            "docs/project_management/next/opencode-implementation/governance/seam-2-closeout.md",
+            "docs/integrations/opencode/governance/seam-2-closeout.md",
         ),
     );
 
     let closeout_path = Path::new(
-        "docs/project_management/next/opencode-maintenance/governance/maintenance-closeout.json",
+        "docs/agents/lifecycle/opencode-maintenance/governance/maintenance-closeout.json",
     );
     write_text(
         &fixture.join(closeout_path),
@@ -137,7 +137,7 @@ fn close_agent_maintenance_requires_resolved_and_deferred_truth() {
                 "governance_doc_drift",
                 "SEAM-2 closeout now matches the landed capability advertisement boundary.",
                 &[
-                    "docs/project_management/next/opencode-implementation/governance/seam-2-closeout.md",
+                    "docs/integrations/opencode/governance/seam-2-closeout.md",
                 ],
             )],
             "deferred_findings": [finding_json(
@@ -166,20 +166,19 @@ fn close_agent_maintenance_requires_resolved_and_deferred_truth() {
 fn close_agent_maintenance_rejects_symlinked_output() {
     let fixture = fixture_root("close-agent-maintenance-symlink-output");
     maintenance_harness::seed_opencode_basis(&fixture);
-    let request_path = Path::new(
-        "docs/project_management/next/opencode-maintenance/governance/maintenance-request.toml",
-    );
+    let request_path =
+        Path::new("docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml");
     let request_absolute = fixture.join(request_path);
     write_text(
         &request_absolute,
         &maintenance_request_toml(
             "opencode",
-            "docs/project_management/next/opencode-implementation/governance/seam-2-closeout.md",
+            "docs/integrations/opencode/governance/seam-2-closeout.md",
         ),
     );
 
     let closeout_path = Path::new(
-        "docs/project_management/next/opencode-maintenance/governance/maintenance-closeout.json",
+        "docs/agents/lifecycle/opencode-maintenance/governance/maintenance-closeout.json",
     );
     write_text(
         &fixture.join(closeout_path),
@@ -190,7 +189,7 @@ fn close_agent_maintenance_rejects_symlinked_output() {
                 "governance_doc_drift",
                 "SEAM-2 closeout still matches live governance drift.",
                 &[
-                    "docs/project_management/next/opencode-implementation/governance/seam-2-closeout.md",
+                    "docs/integrations/opencode/governance/seam-2-closeout.md",
                     "docs/specs/unified-agent-api/capability-matrix.md"
                 ],
             )],
@@ -202,7 +201,7 @@ fn close_agent_maintenance_rejects_symlinked_output() {
         .expect("serialize closeout"),
     );
 
-    let handoff_path = fixture.join("docs/project_management/next/opencode-maintenance/HANDOFF.md");
+    let handoff_path = fixture.join("docs/agents/lifecycle/opencode-maintenance/HANDOFF.md");
     let outside = fixture_root("close-agent-maintenance-symlink-target");
     let outside_target = outside.join("handoff.md");
     write_text(&outside_target, "outside handoff\n");
@@ -222,21 +221,20 @@ fn close_agent_maintenance_rejects_symlinked_output() {
 fn close_agent_maintenance_rejects_missing_request_evidence_refs() {
     let fixture = fixture_root("close-agent-maintenance-missing-request-evidence");
     maintenance_harness::seed_opencode_basis(&fixture);
-    let request_path = Path::new(
-        "docs/project_management/next/opencode-maintenance/governance/maintenance-request.toml",
-    );
+    let request_path =
+        Path::new("docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml");
     let request_absolute = fixture.join(request_path);
     write_text(
         &request_absolute,
         &maintenance_request_toml_with_refs(
             "opencode",
-            "docs/project_management/next/opencode-maintenance/governance/missing-basis.md",
-            "docs/project_management/next/opencode-maintenance/governance/missing-opened-from.md",
+            "docs/agents/lifecycle/opencode-maintenance/governance/missing-basis.md",
+            "docs/agents/lifecycle/opencode-maintenance/governance/missing-opened-from.md",
         ),
     );
 
     let closeout_path = Path::new(
-        "docs/project_management/next/opencode-maintenance/governance/maintenance-closeout.json",
+        "docs/agents/lifecycle/opencode-maintenance/governance/maintenance-closeout.json",
     );
     write_text(
         &fixture.join(closeout_path),
@@ -254,10 +252,10 @@ fn close_agent_maintenance_rejects_missing_request_evidence_refs() {
 #[test]
 fn close_agent_maintenance_rejects_resolved_findings_that_still_match_live_drift() {
     let closeout_path = Path::new(
-        "docs/project_management/next/opencode-maintenance/governance/maintenance-closeout.json",
+        "docs/agents/lifecycle/opencode-maintenance/governance/maintenance-closeout.json",
     );
     let closeout = valid_closeout_struct(
-        "docs/project_management/next/opencode-maintenance/governance/maintenance-request.toml",
+        "docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml",
         "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     );
 
@@ -271,9 +269,8 @@ fn close_agent_maintenance_rejects_resolved_findings_that_still_match_live_drift
                 category: drift::DriftCategory::GovernanceDoc,
                 summary: "Live governance drift is still present.".to_string(),
                 surfaces: vec![
-                    "docs/project_management/next/opencode-implementation/governance/seam-2-closeout.md"
-                        .to_string(),
-                    "docs/project_management/next/opencode-maintenance/HANDOFF.md".to_string(),
+                    "docs/integrations/opencode/governance/seam-2-closeout.md".to_string(),
+                    "docs/agents/lifecycle/opencode-maintenance/HANDOFF.md".to_string(),
                 ],
             }],
         }),
@@ -289,19 +286,18 @@ fn close_agent_maintenance_rejects_explicit_none_when_live_drift_exists() {
     let fixture = fixture_root("close-agent-maintenance-live-explicit-none");
     maintenance_harness::seed_opencode_basis(&fixture);
     maintenance_harness::overwrite_opencode_governance_with_stale_claim(&fixture);
-    let request_path = Path::new(
-        "docs/project_management/next/opencode-maintenance/governance/maintenance-request.toml",
-    );
+    let request_path =
+        Path::new("docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml");
     let request_absolute = fixture.join(request_path);
     write_text(
         &request_absolute,
         &maintenance_request_toml(
             "opencode",
-            "docs/project_management/next/opencode-implementation/governance/seam-2-closeout.md",
+            "docs/integrations/opencode/governance/seam-2-closeout.md",
         ),
     );
     let closeout_path = Path::new(
-        "docs/project_management/next/opencode-maintenance/governance/maintenance-closeout.json",
+        "docs/agents/lifecycle/opencode-maintenance/governance/maintenance-closeout.json",
     );
     write_text(
         &fixture.join(closeout_path),
@@ -320,19 +316,18 @@ fn close_agent_maintenance_rejects_unaccounted_live_deferred_drift() {
     let fixture = fixture_root("close-agent-maintenance-live-deferred-missing");
     maintenance_harness::seed_opencode_basis(&fixture);
     maintenance_harness::overwrite_opencode_governance_with_stale_claim(&fixture);
-    let request_path = Path::new(
-        "docs/project_management/next/opencode-maintenance/governance/maintenance-request.toml",
-    );
+    let request_path =
+        Path::new("docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml");
     let request_absolute = fixture.join(request_path);
     write_text(
         &request_absolute,
         &maintenance_request_toml(
             "opencode",
-            "docs/project_management/next/opencode-implementation/governance/seam-2-closeout.md",
+            "docs/integrations/opencode/governance/seam-2-closeout.md",
         ),
     );
     let closeout_path = Path::new(
-        "docs/project_management/next/opencode-maintenance/governance/maintenance-closeout.json",
+        "docs/agents/lifecycle/opencode-maintenance/governance/maintenance-closeout.json",
     );
     write_text(
         &fixture.join(closeout_path),
@@ -368,10 +363,10 @@ fn close_agent_maintenance_rejects_deferred_findings_when_live_report_is_clean()
     let fixture = fixture_root("close-agent-maintenance-clean-deferred");
     maintenance_harness::seed_opencode_basis(&fixture);
     let closeout_path = Path::new(
-        "docs/project_management/next/opencode-maintenance/governance/maintenance-closeout.json",
+        "docs/agents/lifecycle/opencode-maintenance/governance/maintenance-closeout.json",
     );
     let closeout = valid_closeout_struct(
-        "docs/project_management/next/opencode-maintenance/governance/maintenance-request.toml",
+        "docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml",
         "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     );
 
@@ -390,10 +385,10 @@ fn close_agent_maintenance_rejects_deferred_findings_when_live_report_is_clean()
 #[test]
 fn close_agent_maintenance_blocks_when_live_drift_recheck_returns_error() {
     let closeout_path = Path::new(
-        "docs/project_management/next/opencode-maintenance/governance/maintenance-closeout.json",
+        "docs/agents/lifecycle/opencode-maintenance/governance/maintenance-closeout.json",
     );
     let closeout = valid_closeout_struct(
-        "docs/project_management/next/opencode-maintenance/governance/maintenance-request.toml",
+        "docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml",
         "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     );
 
@@ -415,19 +410,18 @@ fn close_agent_maintenance_blocks_when_live_drift_recheck_returns_error() {
 fn opencode_maintenance_closeout_writes_only_owned_outputs_after_refresh_state() {
     let fixture = fixture_root("opencode-maintenance-closeout-write");
     maintenance_harness::seed_opencode_basis(&fixture);
-    let request_path = Path::new(
-        "docs/project_management/next/opencode-maintenance/governance/maintenance-request.toml",
-    );
+    let request_path =
+        Path::new("docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml");
     let request_absolute = fixture.join(request_path);
     write_text(
         &request_absolute,
         &maintenance_request_toml(
             "opencode",
-            "docs/project_management/next/opencode-implementation/governance/seam-2-closeout.md",
+            "docs/integrations/opencode/governance/seam-2-closeout.md",
         ),
     );
 
-    let packet_root = fixture.join("docs/project_management/next/opencode-maintenance");
+    let packet_root = fixture.join("docs/agents/lifecycle/opencode-maintenance");
     write_text(
         &packet_root.join("README.md"),
         "historical maintenance readme\n",
@@ -443,7 +437,7 @@ fn opencode_maintenance_closeout_writes_only_owned_outputs_after_refresh_state()
     write_text(&packet_root.join("HANDOFF.md"), "old handoff\n");
 
     let closeout_path = Path::new(
-        "docs/project_management/next/opencode-maintenance/governance/maintenance-closeout.json",
+        "docs/agents/lifecycle/opencode-maintenance/governance/maintenance-closeout.json",
     );
     write_text(
         &fixture.join(closeout_path),
@@ -467,7 +461,7 @@ fn opencode_maintenance_closeout_writes_only_owned_outputs_after_refresh_state()
         .contains("SEAM-2 closeout now matches the landed capability advertisement boundary."));
 
     let closeout = fs::read_to_string(fixture.join(closeout_path)).expect("read closeout");
-    assert!(closeout.contains("\"request_ref\": \"docs/project_management/next/opencode-maintenance/governance/maintenance-request.toml\""));
+    assert!(closeout.contains("\"request_ref\": \"docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml\""));
     assert!(closeout.contains("\"explicit_none_reason\": \"No deferred maintenance findings remain after publication and packet refresh.\""));
 
     assert_eq!(
@@ -480,7 +474,7 @@ fn opencode_maintenance_closeout_writes_only_owned_outputs_after_refresh_state()
     );
     assert_eq!(
         fs::read_to_string(fixture.join(
-            "docs/project_management/next/opencode-implementation/governance/seam-2-closeout.md"
+            "docs/integrations/opencode/governance/seam-2-closeout.md"
         ))
         .expect("read onboarding closeout"),
         "# Closeout\n\n- capability advertisement is intentionally conservative and now matches the landed backend contract and generated capability inventory:\n  <!-- xtask-governance-check:opencode-capabilities:start -->\n  `agent_api.config.model.v1`, `agent_api.events`, `agent_api.events.live`, `agent_api.run`, `agent_api.session.fork.v1`, `agent_api.session.resume.v1`\n  <!-- xtask-governance-check:opencode-capabilities:end -->\n  are the claimed OpenCode v1 capability ids under the current runtime evidence\n"
@@ -544,8 +538,8 @@ fn valid_closeout(request_ref: &str, request_sha256: &str) -> serde_json::Value 
             "governance_doc_drift",
             "SEAM-2 closeout now matches the landed capability advertisement boundary.",
             &[
-                "docs/project_management/next/opencode-implementation/governance/seam-2-closeout.md",
-                "docs/project_management/next/opencode-maintenance/HANDOFF.md"
+                "docs/integrations/opencode/governance/seam-2-closeout.md",
+                "docs/agents/lifecycle/opencode-maintenance/HANDOFF.md"
             ],
         )],
         "explicit_none_reason": "No deferred maintenance findings remain after publication and packet refresh.",
@@ -564,9 +558,8 @@ fn valid_closeout_struct(request_ref: &str, request_sha256: &str) -> closeout::M
             summary: "SEAM-2 closeout now matches the landed capability advertisement boundary."
                 .to_string(),
             surfaces: vec![
-                "docs/project_management/next/opencode-implementation/governance/seam-2-closeout.md"
-                    .to_string(),
-                "docs/project_management/next/opencode-maintenance/HANDOFF.md".to_string(),
+                "docs/integrations/opencode/governance/seam-2-closeout.md".to_string(),
+                "docs/agents/lifecycle/opencode-maintenance/HANDOFF.md".to_string(),
             ],
         }],
         deferred_findings: closeout::DeferredFindingsTruth::Findings(vec![
@@ -574,8 +567,7 @@ fn valid_closeout_struct(request_ref: &str, request_sha256: &str) -> closeout::M
                 category_id: closeout::MaintenanceDriftCategory::GovernanceDoc,
                 summary: "Governance drift remains deferred.".to_string(),
                 surfaces: vec![
-                    "docs/project_management/next/opencode-implementation/governance/seam-2-closeout.md"
-                        .to_string(),
+                    "docs/integrations/opencode/governance/seam-2-closeout.md".to_string()
                 ],
             },
         ]),
@@ -594,8 +586,7 @@ fn closeout_with_deferred(
                 category_id: closeout::MaintenanceDriftCategory::GovernanceDoc,
                 summary: "Governance drift remains deferred.".to_string(),
                 surfaces: vec![
-                    "docs/project_management/next/opencode-implementation/governance/seam-2-closeout.md"
-                        .to_string(),
+                    "docs/integrations/opencode/governance/seam-2-closeout.md".to_string()
                 ],
             },
         ]),

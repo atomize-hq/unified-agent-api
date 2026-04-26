@@ -4,11 +4,17 @@ use std::{
     collections::BTreeMap,
     fs,
     path::{Path, PathBuf},
+    process::Command,
 };
 
 use sha2::{Digest, Sha256};
 
 const SEEDED_REGISTRY: &str = include_str!("../../data/agent_registry.toml");
+const ROOT_LICENSE_APACHE: &str = include_str!("../../../../LICENSE-APACHE");
+const ROOT_LICENSE_MIT: &str = include_str!("../../../../LICENSE-MIT");
+pub const SEEDED_GEMINI_CRATE_PATH: &str = "crates/gemini_cli";
+pub const NESTED_GEMINI_CRATE_PATH: &str = "crates/runtime/gemini_shell";
+pub const HYPHENATED_GEMINI_CRATE_PATH: &str = "crates/gemini-cli";
 
 #[derive(Debug)]
 pub struct HarnessOutput {
@@ -87,6 +93,8 @@ pub fn args_with_overrides(
         "true".to_string(),
         "--capability-matrix-enabled".to_string(),
         "true".to_string(),
+        "--capability-matrix-target".to_string(),
+        "linux-x64".to_string(),
         "--docs-release-track".to_string(),
         "crates-io".to_string(),
         "--onboarding-pack-prefix".to_string(),
@@ -112,6 +120,37 @@ pub fn approval_args(mode_flag: &str, approval_path: &str) -> Vec<String> {
         "--approval".to_string(),
         approval_path.to_string(),
     ]
+}
+
+pub fn wrapper_scaffold_args(mode_flag: &str, agent_id: &str) -> Vec<String> {
+    vec![
+        "scaffold-wrapper-crate".to_string(),
+        "--agent".to_string(),
+        agent_id.to_string(),
+        mode_flag.to_string(),
+    ]
+}
+
+pub fn xtask_bin() -> PathBuf {
+    PathBuf::from(env!("CARGO_BIN_EXE_xtask"))
+}
+
+pub fn run_xtask<I, S>(workspace_root: &Path, argv: I) -> HarnessOutput
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<str>,
+{
+    let output = Command::new(xtask_bin())
+        .current_dir(workspace_root)
+        .args(argv.into_iter().map(|arg| arg.as_ref().to_string()))
+        .output()
+        .expect("run xtask binary");
+
+    HarnessOutput {
+        exit_code: output.status.code().unwrap_or(1),
+        stdout: String::from_utf8(output.stdout).expect("stdout must be utf-8"),
+        stderr: String::from_utf8(output.stderr).expect("stderr must be utf-8"),
+    }
 }
 
 pub fn gemini_dry_run_args() -> Vec<String> {
@@ -164,7 +203,7 @@ pub fn seed_gemini_approval_artifact(
     let contents = format!(
         concat!(
             "artifact_version = \"1\"\n",
-            "comparison_ref = \"docs/project_management/next/comparisons/gemini.md\"\n",
+            "comparison_ref = \"docs/agents/selection/cli-agent-selection-packet.md\"\n",
             "selection_mode = \"factory_validation\"\n",
             "recommended_agent_id = \"gemini_cli\"\n",
             "approved_agent_id = \"gemini_cli\"\n",
@@ -220,45 +259,101 @@ pub fn fixture_root(prefix: &str) -> PathBuf {
     fs::create_dir_all(&root).expect("create temp fixture");
     write_text(
         &root.join("Cargo.toml"),
-        "[workspace]\nmembers = [\n  \"crates/agent_api\",\n  \"crates/codex\",\n  \"crates/claude_code\",\n  \"crates/opencode\",\n  \"crates/wrapper_events\",\n  \"crates/xtask\",\n]\n",
+        concat!(
+            "[workspace]\n",
+            "members = [\n",
+            "  \"crates/agent_api\",\n",
+            "  \"crates/codex\",\n",
+            "  \"crates/claude_code\",\n",
+            "  \"crates/opencode\",\n",
+            "  \"crates/gemini_cli\",\n",
+            "  \"crates/wrapper_events\",\n",
+            "  \"crates/xtask\",\n",
+            "]\n",
+            "resolver = \"2\"\n",
+            "\n",
+            "[workspace.package]\n",
+            "version = \"0.3.0\"\n",
+            "edition = \"2021\"\n",
+            "rust-version = \"1.78\"\n",
+            "license = \"MIT OR Apache-2.0\"\n",
+            "authors = [\"Unified Agent API Contributors\"]\n",
+        ),
     );
+    write_text(&root.join("LICENSE-APACHE"), ROOT_LICENSE_APACHE);
+    write_text(&root.join("LICENSE-MIT"), ROOT_LICENSE_MIT);
     write_text(
         &root.join("crates/xtask/data/agent_registry.toml"),
         SEEDED_REGISTRY,
     );
-    write_text(
-        &root.join("crates/agent_api/Cargo.toml"),
-        "[package]\nname = \"unified-agent-api\"\nversion = \"0.2.3\"\nedition = \"2021\"\n",
+    seed_workspace_member(&root, "crates/agent_api", "unified-agent-api", false);
+    seed_workspace_member(&root, "crates/codex", "unified-agent-api-codex", false);
+    seed_workspace_member(
+        &root,
+        "crates/claude_code",
+        "unified-agent-api-claude-code",
+        false,
     );
-    write_text(
-        &root.join("crates/codex/Cargo.toml"),
-        "[package]\nname = \"unified-agent-api-codex\"\nversion = \"0.2.3\"\nedition = \"2021\"\n",
+    seed_workspace_member(
+        &root,
+        "crates/opencode",
+        "unified-agent-api-opencode",
+        false,
     );
-    write_text(
-        &root.join("crates/claude_code/Cargo.toml"),
-        "[package]\nname = \"unified-agent-api-claude-code\"\nversion = \"0.2.3\"\nedition = \"2021\"\n",
+    seed_workspace_member(
+        &root,
+        "crates/gemini_cli",
+        "unified-agent-api-gemini-cli",
+        false,
     );
-    write_text(
-        &root.join("crates/opencode/Cargo.toml"),
-        "[package]\nname = \"unified-agent-api-opencode\"\nversion = \"0.2.3\"\nedition = \"2021\"\n",
+    seed_workspace_member(
+        &root,
+        "crates/wrapper_events",
+        "unified-agent-api-wrapper-events",
+        false,
     );
+    seed_workspace_member(&root, "crates/xtask", "xtask", true);
     write_text(
-        &root.join("crates/wrapper_events/Cargo.toml"),
-        "[package]\nname = \"unified-agent-api-wrapper-events\"\nversion = \"0.2.3\"\nedition = \"2021\"\n",
-    );
-    write_text(
-        &root.join("crates/xtask/Cargo.toml"),
-        "[package]\nname = \"xtask\"\nversion = \"0.2.3\"\nedition = \"2021\"\npublish = false\n",
-    );
-    write_text(
-        &root.join("docs/project_management/next/comparisons/cursor.md"),
-        "# Cursor comparison\n",
-    );
-    write_text(
-        &root.join("docs/project_management/next/comparisons/gemini.md"),
-        "# Gemini comparison\n",
+        &root.join("docs/agents/selection/cli-agent-selection-packet.md"),
+        "# CLI agent selection packet\n",
     );
     root
+}
+
+pub fn scaffold_fixture_root(prefix: &str) -> PathBuf {
+    let fixture = fixture_root(prefix);
+    fs::remove_dir_all(fixture.join(SEEDED_GEMINI_CRATE_PATH)).expect("remove seeded gemini crate");
+    fixture
+}
+
+pub fn nested_scaffold_fixture_root(prefix: &str) -> PathBuf {
+    let fixture = scaffold_fixture_root(prefix);
+    replace_text_once(
+        &fixture.join("crates/xtask/data/agent_registry.toml"),
+        "crate_path = \"crates/gemini_cli\"\n",
+        "crate_path = \"crates/runtime/gemini_shell\"\n",
+    );
+    replace_text_once(
+        &fixture.join("Cargo.toml"),
+        "  \"crates/gemini_cli\",\n",
+        "  \"crates/runtime/gemini_shell\",\n",
+    );
+    fixture
+}
+
+pub fn hyphenated_scaffold_fixture_root(prefix: &str) -> PathBuf {
+    let fixture = scaffold_fixture_root(prefix);
+    replace_text_once(
+        &fixture.join("crates/xtask/data/agent_registry.toml"),
+        "crate_path = \"crates/gemini_cli\"\n",
+        "crate_path = \"crates/gemini-cli\"\n",
+    );
+    replace_text_once(
+        &fixture.join("Cargo.toml"),
+        "  \"crates/gemini_cli\",\n",
+        "  \"crates/gemini-cli\",\n",
+    );
+    fixture
 }
 
 pub fn write_text(path: &Path, contents: &str) {
@@ -266,6 +361,51 @@ pub fn write_text(path: &Path, contents: &str) {
         fs::create_dir_all(parent).expect("create parent dirs");
     }
     fs::write(path, contents).expect("write file");
+}
+
+pub fn replace_text_once(path: &Path, from: &str, to: &str) {
+    let contents = fs::read_to_string(path).expect("read file");
+    let matches = contents.matches(from).count();
+    assert_eq!(
+        matches,
+        1,
+        "expected exactly one `{from}` match in {} but found {matches}",
+        path.display()
+    );
+    write_text(path, &contents.replacen(from, to, 1));
+}
+
+fn seed_workspace_member(
+    root: &Path,
+    relative_path: &str,
+    package_name: &str,
+    publish_false: bool,
+) {
+    let publish = if publish_false {
+        "publish = false\n"
+    } else {
+        ""
+    };
+    write_text(
+        &root.join(relative_path).join("Cargo.toml"),
+        &format!(
+            concat!(
+                "[package]\n",
+                "name = {package_name:?}\n",
+                "version.workspace = true\n",
+                "edition.workspace = true\n",
+                "rust-version.workspace = true\n",
+                "license.workspace = true\n",
+                "{publish}",
+            ),
+            package_name = package_name,
+            publish = publish,
+        ),
+    );
+    write_text(
+        &root.join(relative_path).join("src/lib.rs"),
+        "#![forbid(unsafe_code)]\n",
+    );
 }
 
 pub fn seed_release_touchpoints(root: &Path) {
@@ -319,7 +459,7 @@ pub fn seed_approval_artifact_with_pack_prefix(
     let mut contents = format!(
         concat!(
             "artifact_version = \"1\"\n",
-            "comparison_ref = \"docs/project_management/next/comparisons/cursor.md\"\n",
+            "comparison_ref = \"docs/agents/selection/cli-agent-selection-packet.md\"\n",
             "selection_mode = \"factory_validation\"\n",
             "recommended_agent_id = \"{recommended_agent_id}\"\n",
             "approved_agent_id = \"{approved_agent_id}\"\n",

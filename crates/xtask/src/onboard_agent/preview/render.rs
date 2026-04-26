@@ -9,7 +9,7 @@ use super::super::{
 };
 use super::ApprovalRenderInput;
 use super::DraftEntry;
-const DOCS_NEXT_ROOT: &str = "docs/project_management/next";
+const DOCS_NEXT_ROOT: &str = "docs/agents/lifecycle";
 const PROVING_RUN_CLOSEOUT_RELATIVE_PATH: &str = "governance/proving-run-closeout.json";
 
 #[derive(Debug, Clone, Copy)]
@@ -195,7 +195,7 @@ fn render_scope_brief_body(
 
 fn render_seam_map_body(draft: &DraftEntry, docs_root_display: &str) -> String {
     format!(
-        "# Seam map\n\n- Declaration seam: registry entry for `{}`\n- Docs seam: onboarding pack `{docs_root_display}`\n- Manifest seam: `{}`\n- Runtime seam: wrapper crate `{}` and backend module `{}`\n",
+        "# Seam map\n\n- Declaration seam: registry entry for `{}`\n- Docs seam: onboarding pack `{docs_root_display}`\n- Manifest seam: `{}`\n- Runtime seam: wrapper crate shell `{}` via `scaffold-wrapper-crate` and backend module `{}`\n",
         draft.agent_id,
         draft.manifest_root,
         draft.crate_path,
@@ -206,8 +206,8 @@ fn render_seam_map_body(draft: &DraftEntry, docs_root_display: &str) -> String {
 fn render_threading_body(draft: &DraftEntry, phase: PacketPhase<'_>) -> String {
     match phase {
         PacketPhase::Execution => format!(
-            "# Threading\n\n1. Apply the control-plane onboarding packet with `onboard-agent --write`.\n2. Implement the runtime-owned wrapper crate at `{}` and backend module `{}`.\n3. Populate manifest evidence under `{}` from committed runtime outputs.\n4. Regenerate support/capability artifacts and close the proving run with `make preflight`.\n",
-            draft.crate_path, draft.backend_module, draft.manifest_root
+            "# Threading\n\n1. Apply the control-plane onboarding packet with `onboard-agent --write`.\n2. Run `cargo run -p xtask -- scaffold-wrapper-crate --agent {} --write` to create the runtime-owned wrapper crate shell at `{}`; `onboard-agent` does not create the wrapper crate.\n3. Implement backend/runtime details in `{}` and `{}`.\n4. Populate manifest evidence under `{}` from committed runtime outputs, regenerate support/capability publication artifacts, and close the proving run with `make preflight`.\n",
+            draft.agent_id, draft.crate_path, draft.crate_path, draft.backend_module, draft.manifest_root
         ),
         PacketPhase::Closeout(_) => format!(
             "# Threading\n\n1. Control-plane onboarding writes for `{}` landed without follow-up packet drift.\n2. Runtime-owned wrapper and backend work landed at `{}` and `{}`.\n3. Manifest evidence and publication artifacts were regenerated from committed runtime outputs.\n4. The proving run closed with `make preflight`.\n",
@@ -256,10 +256,12 @@ fn render_handoff_body(
 ) -> String {
     match phase {
         PacketPhase::Execution => format!(
-            "# Handoff\n\nThis packet captures the next executable onboarding step for `{}`.\n\n## Release touchpoints\n\n{}\n\n{}\n## Next executable runtime step\n\nImplement the runtime-owned wrapper crate at `{}` and backend module `{}`.\n\n## Remaining runtime checklist\n\n- Author wrapper coverage input at `{}` for binding kind `{}`.\n- Populate `{}/current.json`, pointers, versions, and reports from committed runtime evidence.\n- Regenerate support and capability publication artifacts, then run `make preflight`.\n",
+            "# Handoff\n\nThis packet captures the next executable onboarding step for `{}`.\n\n## Release touchpoints\n\n{}\n\n{}\n## Next executable runtime step\n\nRun `cargo run -p xtask -- scaffold-wrapper-crate --agent {} --write` to create the runtime-owned wrapper crate shell at `{}`. `onboard-agent` does not create the wrapper crate.\n\n## Remaining runtime checklist\n\n- Implement backend/runtime details in `{}` and `{}`.\n- Author wrapper coverage input at `{}` for binding kind `{}`.\n- Populate `{}/current.json`, pointers, versions, and reports from committed runtime evidence.\n- Regenerate support and capability publication artifacts, then run `make preflight`.\n",
             draft.agent_id,
             release_touchpoints,
             render_execution_handoff_approval(closeout_path, approval),
+            draft.agent_id,
+            draft.crate_path,
             draft.crate_path,
             draft.backend_module,
             draft.wrapper_coverage_source_path,

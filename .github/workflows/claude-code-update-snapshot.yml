@@ -331,15 +331,6 @@ jobs:
           cargo run -p xtask -- codex-version-metadata --root cli_manifests/claude_code --version "$VERSION" --status reported
           cargo run -p xtask -- codex-validate --root cli_manifests/claude_code
 
-      - name: Generate triad scaffold from report
-        shell: bash
-        env:
-          VERSION: ${{ inputs.version }}
-        run: |
-          set -euo pipefail
-          OUT="docs/project_management/next/claude-code-cli-parity-${VERSION}"
-          cargo run -p xtask -- parity-triad-scaffold --root cli_manifests/claude_code --version "$VERSION" --out "$OUT"
-
       - name: Create update PR
         uses: peter-evans/create-pull-request@v8
         with:

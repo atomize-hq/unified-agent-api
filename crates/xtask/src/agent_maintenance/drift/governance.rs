@@ -178,6 +178,14 @@ fn inspect_approved_agent_descriptor(
         artifact.descriptor.capability_matrix_enabled,
         entry.publication.capability_matrix_enabled,
     );
+    if let Some(target) = artifact.descriptor.capability_matrix_target.as_deref() {
+        compare_descriptor_optional_field(
+            &mut mismatches,
+            "capability_matrix_target",
+            Some(target),
+            entry.publication.capability_matrix_target.as_deref(),
+        );
+    }
     compare_descriptor_array(
         &mut mismatches,
         "canonical_targets",
@@ -409,6 +417,21 @@ fn compare_descriptor_bool(
     if actual != expected {
         mismatches.push(format!(
             "{field_name} expected `{expected}` but historical approval records `{actual}`"
+        ));
+    }
+}
+
+fn compare_descriptor_optional_field(
+    mismatches: &mut Vec<String>,
+    field_name: &str,
+    actual: Option<&str>,
+    expected: Option<&str>,
+) {
+    if actual != expected {
+        mismatches.push(format!(
+            "{field_name} expected `{}` but historical approval records `{}`",
+            expected.unwrap_or("(none)"),
+            actual.unwrap_or("(none)")
         ));
     }
 }

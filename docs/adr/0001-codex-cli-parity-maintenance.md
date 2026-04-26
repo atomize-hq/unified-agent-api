@@ -5,7 +5,7 @@ Status: Accepted
 
 Note: CI/workflow and artifact model details are implemented per ADR 0002
 (`docs/adr/0002-codex-cli-parity-coverage-mapping.md`) and the planning pack at
-`docs/project_management/next/codex-cli-parity-coverage-mapping/`. ADR 0001 remains the
+`.archived/project_management/next/codex-cli-parity-coverage-mapping/`. ADR 0001 remains the
 high-level release-trailing policy and “validated” definition.
 
 ## Context

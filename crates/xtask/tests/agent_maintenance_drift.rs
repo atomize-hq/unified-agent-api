@@ -13,6 +13,8 @@ mod harness;
 mod agent_registry;
 #[path = "../src/approval_artifact.rs"]
 mod approval_artifact;
+#[path = "../src/capability_projection.rs"]
+mod capability_projection;
 #[path = "../src/agent_maintenance/drift/mod.rs"]
 mod drift;
 #[path = "../src/agent_maintenance/finding_signature.rs"]
@@ -31,6 +33,44 @@ use harness::{fixture_root, seed_gemini_approval_artifact, seed_release_touchpoi
 fn check_agent_drift_reports_clean_agent() {
     let fixture = fixture_root("agent-maintenance-drift-clean");
     seed_publication_inputs(&fixture);
+
+    let report = check_agent_drift(&fixture, "gemini_cli").expect("clean report");
+    assert!(report.is_clean(), "{}", report.render());
+}
+
+#[test]
+fn check_agent_drift_does_not_force_add_default_off_config_gated_capabilities() {
+    let fixture = fixture_root("agent-maintenance-drift-default-off-config-gated");
+    seed_publication_inputs(&fixture);
+
+    let report = check_agent_drift(&fixture, "codex").expect("drift report");
+    let finding = report
+        .findings
+        .iter()
+        .find(|finding| finding.category == DriftCategory::CapabilityPublication)
+        .expect("capability publication finding");
+    assert!(!finding.summary.contains("agent_api.tools.mcp.add.v1"));
+    assert!(!finding.summary.contains("agent_api.tools.mcp.remove.v1"));
+    assert!(!finding
+        .summary
+        .contains("agent_api.exec.external_sandbox.v1"));
+}
+
+#[test]
+fn check_agent_drift_treats_absent_approval_publication_target_as_unasserted() {
+    let fixture = fixture_root("agent-maintenance-drift-approval-target-optional");
+    seed_publication_inputs(&fixture);
+
+    let registry_path = fixture.join("crates/xtask/data/agent_registry.toml");
+    let registry = fs::read_to_string(&registry_path).expect("read registry");
+    write_text(
+        &registry_path,
+        &registry.replacen(
+            "capability_matrix_enabled = true\n\n[agents.release]\ndocs_release_track = \"crates-io\"\n\n[agents.scaffold]\nonboarding_pack_prefix = \"gemini-cli-onboarding\"\n",
+            "capability_matrix_enabled = true\ncapability_matrix_target = \"darwin-arm64\"\n\n[agents.release]\ndocs_release_track = \"crates-io\"\n\n[agents.scaffold]\nonboarding_pack_prefix = \"gemini-cli-onboarding\"\n",
+            1,
+        ),
+    );
 
     let report = check_agent_drift(&fixture, "gemini_cli").expect("clean report");
     assert!(report.is_clean(), "{}", report.render());
@@ -121,10 +161,9 @@ fn check_agent_drift_reports_governance_doc_mismatch() {
         .iter()
         .find(|finding| finding.category == DriftCategory::GovernanceDoc)
         .expect("governance finding");
-    assert!(finding.surfaces.contains(
-        &"docs/project_management/next/opencode-implementation/governance/seam-2-closeout.md"
-            .to_string()
-    ));
+    assert!(finding
+        .surfaces
+        .contains(&"docs/integrations/opencode/governance/seam-2-closeout.md".to_string()));
     assert!(finding
         .surfaces
         .contains(&"docs/specs/unified-agent-api/capability-matrix.md".to_string()));
@@ -167,12 +206,10 @@ fn check_agent_drift_reports_gemini_approval_descriptor_mismatch() {
     seed_publication_inputs(&fixture);
 
     write_text(
-        &fixture.join(
-            "docs/project_management/next/gemini-cli-onboarding/governance/approved-agent.toml",
-        ),
+        &fixture.join("docs/agents/lifecycle/gemini-cli-onboarding/governance/approved-agent.toml"),
         concat!(
             "artifact_version = \"1\"\n",
-            "comparison_ref = \"docs/project_management/next/comparisons/gemini.md\"\n",
+            "comparison_ref = \"docs/agents/selection/cli-agent-selection-packet.md\"\n",
             "selection_mode = \"factory_validation\"\n",
             "recommended_agent_id = \"gemini_cli\"\n",
             "approved_agent_id = \"gemini_cli\"\n",
@@ -204,8 +241,7 @@ fn check_agent_drift_reports_gemini_approval_descriptor_mismatch() {
         .find(|finding| finding.category == DriftCategory::GovernanceDoc)
         .expect("governance finding");
     assert!(finding.surfaces.contains(
-        &"docs/project_management/next/gemini-cli-onboarding/governance/approved-agent.toml"
-            .to_string()
+        &"docs/agents/lifecycle/gemini-cli-onboarding/governance/approved-agent.toml".to_string()
     ));
     assert!(finding
         .surfaces
@@ -229,7 +265,7 @@ fn check_agent_drift_reports_recurring_closed_governance_surface() {
     );
     seed_closed_governance_maintenance(
         &fixture,
-        "docs/project_management/next/opencode-implementation/governance/seam-2-closeout.md",
+        "docs/integrations/opencode/governance/seam-2-closeout.md",
     );
 
     let report = check_agent_drift(&fixture, "opencode").expect("drift report");
@@ -444,7 +480,7 @@ fn seed_publication_inputs(root: &Path) {
 
     seed_gemini_approval_artifact(
         root,
-        "docs/project_management/next/gemini-cli-onboarding/governance/approved-agent.toml",
+        "docs/agents/lifecycle/gemini-cli-onboarding/governance/approved-agent.toml",
         "gemini-cli-onboarding",
     );
 
@@ -464,7 +500,7 @@ fn seed_governance_closeouts(
         .join(", ");
     write_text(
         &root.join(
-            "docs/project_management/next/opencode-implementation/governance/seam-2-closeout.md",
+            "docs/integrations/opencode/governance/seam-2-closeout.md",
         ),
         &format!(
             "# Closeout\n\n- capability advertisement is intentionally conservative and now matches the landed backend contract and generated capability inventory:\n  <!-- xtask-governance-check:opencode-capabilities:start -->\n  {capability_lines}\n  <!-- xtask-governance-check:opencode-capabilities:end -->\n  are the claimed OpenCode v1 capability ids under the current runtime evidence\n"
@@ -477,21 +513,19 @@ fn seed_governance_closeouts(
         "# Closeout\n\n- the support publication artifacts now show OpenCode as manifest-supported only where committed root evidence justifies it, while\n  <!-- xtask-governance-check:opencode-support:start -->\n  backend_support = supported\n  uaa_support = supported\n  <!-- xtask-governance-check:opencode-support:end -->\n  under the current backend evidence and pointer posture\n"
     };
     write_text(
-        &root.join(
-            "docs/project_management/next/opencode-implementation/governance/seam-3-closeout.md",
-        ),
+        &root.join("docs/integrations/opencode/governance/seam-3-closeout.md"),
         seam3_text,
     );
 }
 
 fn default_capability_matrix_markdown() -> String {
-    "# Capability matrix — Unified Agent API\n\nStatus: Approved  \nApproved (UTC): 2026-02-21\n\nThis file is generated by `cargo run -p xtask -- capability-matrix`.\nCanonical target profile: `codex=x86_64-unknown-linux-musl`, `claude_code=linux-x64`; `opencode`, `gemini_cli` use the default built-in backend config.\nThis inventory documents backend capability advertising, not support or promotion status.\nDo not edit by hand.\n\n## `agent_api.core`\n\n| capability id | `claude_code` | `codex` | `gemini_cli` | `opencode` |\n|---|---|---|---|---|\n| `agent_api.events` | ✅ | ✅ | ✅ | ✅ |\n| `agent_api.run` | ✅ | ✅ | ✅ | ✅ |\n\n## `agent_api.events`\n\n| capability id | `claude_code` | `codex` | `gemini_cli` | `opencode` |\n|---|---|---|---|---|\n| `agent_api.events.live` | ✅ | ✅ | ✅ | ✅ |\n\n## `agent_api.session`\n\n| capability id | `claude_code` | `codex` | `gemini_cli` | `opencode` |\n|---|---|---|---|---|\n| `agent_api.session.fork.v1` | ✅ | ✅ | — | ✅ |\n| `agent_api.session.resume.v1` | ✅ | ✅ | — | ✅ |\n\n## `agent_api.config`\n\n| capability id | `claude_code` | `codex` | `gemini_cli` | `opencode` |\n|---|---|---|---|---|\n| `agent_api.config.model.v1` | ✅ | ✅ | ✅ | ✅ |\n".to_string()
+    "# Capability matrix — Unified Agent API\n\nStatus: Approved  \nApproved (UTC): 2026-02-21\n\nThis file is generated by `cargo run -p xtask -- capability-matrix`.\nCanonical target profile: `codex=x86_64-unknown-linux-musl`, `claude_code=linux-x64`; `opencode`, `gemini_cli` use the default built-in backend config.\nThis inventory documents backend capability advertising, not support or promotion status.\nDo not edit by hand.\n\n## `agent_api.core`\n\n| capability id | `claude_code` | `codex` | `gemini_cli` | `opencode` |\n|---|---|---|---|---|\n| `agent_api.events` | ✅ | ✅ | ✅ | ✅ |\n| `agent_api.run` | ✅ | ✅ | ✅ | ✅ |\n\n## `agent_api.events`\n\n| capability id | `claude_code` | `codex` | `gemini_cli` | `opencode` |\n|---|---|---|---|---|\n| `agent_api.events.live` | ✅ | ✅ | ✅ | ✅ |\n\n## `agent_api.session`\n\n| capability id | `claude_code` | `codex` | `gemini_cli` | `opencode` |\n|---|---|---|---|---|\n| `agent_api.session.fork.v1` | ✅ | ✅ | — | ✅ |\n| `agent_api.session.resume.v1` | ✅ | ✅ | — | ✅ |\n\n## `agent_api.config`\n\n| capability id | `claude_code` | `codex` | `gemini_cli` | `opencode` |\n|---|---|---|---|---|\n| `agent_api.config.model.v1` | ✅ | ✅ | ✅ | ✅ |\n\n## `agent_api.tools.mcp`\n\n| capability id | `claude_code` | `codex` | `gemini_cli` | `opencode` |\n|---|---|---|---|---|\n| `agent_api.tools.mcp.list.v1` | ✅ | ✅ | — | — |\n".to_string()
 }
 
 fn seed_closed_governance_maintenance(root: &Path, resolved_surface: &str) {
     write_text(
         &root.join(
-            "docs/project_management/next/opencode-maintenance/governance/maintenance-closeout.json",
+            "docs/agents/lifecycle/opencode-maintenance/governance/maintenance-closeout.json",
         ),
         &serde_json::to_string_pretty(&serde_json::json!({
             "resolved_findings": [{
