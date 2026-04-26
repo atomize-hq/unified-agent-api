@@ -16,7 +16,7 @@ use xtask::workspace_mutation::{
 };
 
 const OWNERSHIP_MARKER: &str = "<!-- generated-by: xtask onboard-agent; owner: control-plane -->";
-const DOCS_NEXT_ROOT: &str = "docs/reports/agent-lifecycle";
+const DOCS_NEXT_ROOT: &str = "docs/agents/lifecycle";
 const REGISTRY_ENTRY_PATH: &str = "crates/xtask/data/agent_registry.toml";
 const RELEASE_DOC_PATH: &str = "docs/crates-io-release.md";
 const PUBLISH_WORKFLOW_PATH: &str = ".github/workflows/publish-crates.yml";
@@ -250,8 +250,8 @@ fn onboarding_pack_prefix_from_closeout_path(closeout_path: &Path) -> Result<Str
     let components = closeout_path.components().collect::<Vec<_>>();
     let expected_prefix = [
         Component::Normal("docs".as_ref()),
-        Component::Normal("reports".as_ref()),
-        Component::Normal("agent-lifecycle".as_ref()),
+        Component::Normal("agents".as_ref()),
+        Component::Normal("lifecycle".as_ref()),
     ];
     if components.len() != 6
         || components[0..3] != expected_prefix
@@ -259,7 +259,7 @@ fn onboarding_pack_prefix_from_closeout_path(closeout_path: &Path) -> Result<Str
         || components[5] != Component::Normal("proving-run-closeout.json".as_ref())
     {
         return Err(Error::Validation(format!(
-            "{} must point to docs/reports/agent-lifecycle/<prefix>/governance/proving-run-closeout.json",
+            "{} must point to docs/agents/lifecycle/<prefix>/governance/proving-run-closeout.json",
             closeout_path.display()
         )));
     }

@@ -12,9 +12,9 @@ This packet records the closed proving run for `gemini_cli`.
 
 ## Proving-run closeout
 
-- approval ref: `docs/reports/agent-lifecycle/gemini-cli-onboarding/governance/approved-agent.toml`
+- approval ref: `docs/agents/lifecycle/gemini-cli-onboarding/governance/approved-agent.toml`
 - approval source: `historical-m3-backfill`
-- approval artifact sha256: `8a9ec8996c3952b65842df77a919c76a20f05b52f6e625d82c592e63ff3ef163`
+- approval artifact sha256: `aa3f57681d108fe28b64976a18799071f921086e57ab4fa9ce518186b710bb7a`
 - manual control-plane file edits by maintainers: `0`
 - partial-write incidents: `0`
 - ambiguous ownership incidents: `0`
@@ -22,7 +22,7 @@ This packet records the closed proving run for `gemini_cli`.
 - proving-run closeout passes `make preflight`: `true`
 - recorded at: `2026-04-21T11:23:09Z`
 - commit: `6b7d5f6e9cf2bf54933659f5700bb59d1f8a95e8`
-- closeout metadata: `docs/reports/agent-lifecycle/gemini-cli-onboarding/governance/proving-run-closeout.json`
+- closeout metadata: `docs/agents/lifecycle/gemini-cli-onboarding/governance/proving-run-closeout.json`
 
 ## Residual friction
 

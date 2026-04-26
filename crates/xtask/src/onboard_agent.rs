@@ -31,7 +31,7 @@ use self::validation::{
 };
 
 const OWNERSHIP_MARKER: &str = "<!-- generated-by: xtask onboard-agent; owner: control-plane -->";
-const DOCS_NEXT_ROOT: &str = "docs/reports/agent-lifecycle";
+const DOCS_NEXT_ROOT: &str = "docs/agents/lifecycle";
 const RELEASE_DOC_PATH: &str = "docs/crates-io-release.md";
 const PUBLISH_WORKFLOW_PATH: &str = ".github/workflows/publish-crates.yml";
 const PUBLISH_SCRIPT_PATH: &str = "scripts/publish_crates.py";
@@ -54,7 +54,7 @@ pub struct Args {
     #[arg(long)]
     pub write: bool,
 
-    /// Repo-relative approved onboarding artifact under docs/reports/agent-lifecycle/**/governance/approved-agent.toml.
+    /// Repo-relative approved onboarding artifact under docs/agents/lifecycle/**/governance/approved-agent.toml.
     #[arg(long)]
     pub approval: Option<String>,
 
@@ -126,7 +126,7 @@ pub struct Args {
     #[arg(long = "docs-release-track")]
     pub docs_release_track: Option<String>,
 
-    /// Docs onboarding pack directory prefix under `docs/reports/agent-lifecycle/`.
+    /// Docs onboarding pack directory prefix under `docs/agents/lifecycle/`.
     #[arg(long = "onboarding-pack-prefix")]
     pub onboarding_pack_prefix: Option<String>,
 }

@@ -49,7 +49,7 @@ pub fn seed_opencode_basis(root: &Path) {
 
     seed_gemini_approval_artifact(
         root,
-        "docs/reports/agent-lifecycle/gemini-cli-onboarding/governance/approved-agent.toml",
+        "docs/agents/lifecycle/gemini-cli-onboarding/governance/approved-agent.toml",
         "gemini-cli-onboarding",
     );
     seed_clean_governance_closeouts(root);

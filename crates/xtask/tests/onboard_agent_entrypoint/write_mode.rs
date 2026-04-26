@@ -69,10 +69,9 @@ fn onboard_agent_write_applies_plan_and_replays_identically() {
         .expect("cursor member");
     assert!(cursor_index < wrapper_events_index);
 
-    let readme = fs::read_to_string(
-        fixture.join("docs/reports/agent-lifecycle/cursor-cli-onboarding/README.md"),
-    )
-    .expect("read docs README");
+    let readme =
+        fs::read_to_string(fixture.join("docs/agents/lifecycle/cursor-cli-onboarding/README.md"))
+            .expect("read docs README");
     assert!(readme.contains("# Cursor CLI onboarding pack"));
 
     let current_json = fs::read_to_string(fixture.join("cli_manifests/cursor/current.json"))
@@ -135,12 +134,10 @@ fn onboard_agent_write_allows_preexisting_runtime_owned_directories() {
 fn onboard_agent_closeout_packet_replays_identically_without_rewriting_manual_metrics() {
     let fixture = fixture_root("onboard-agent-closeout");
     seed_release_touchpoints(&fixture);
-    let approval_rel =
-        "docs/reports/agent-lifecycle/cursor-cli-onboarding/governance/approved-agent.toml";
+    let approval_rel = "docs/agents/lifecycle/cursor-cli-onboarding/governance/approved-agent.toml";
     let approval_path = seed_approval_artifact(&fixture, approval_rel, "cursor", "cursor", None);
-    let closeout_path = fixture.join(
-        "docs/reports/agent-lifecycle/cursor-cli-onboarding/governance/proving-run-closeout.json",
-    );
+    let closeout_path = fixture
+        .join("docs/agents/lifecycle/cursor-cli-onboarding/governance/proving-run-closeout.json");
     let approval_sha256 = sha256_hex(&fixture.join(&approval_path));
     write_text(
         &closeout_path,
@@ -162,9 +159,8 @@ fn onboard_agent_closeout_packet_replays_identically_without_rewriting_manual_me
         }))
         .expect("serialize closeout"),
     );
-    let metrics_path = fixture.join(
-        "docs/reports/agent-lifecycle/cursor-cli-onboarding/governance/proving-run-metrics.json",
-    );
+    let metrics_path = fixture
+        .join("docs/agents/lifecycle/cursor-cli-onboarding/governance/proving-run-metrics.json");
     let metrics = concat!(
         "{\n",
         "  \"manual_control_plane_edits\": 0,\n",
@@ -203,23 +199,21 @@ fn onboard_agent_closeout_packet_replays_identically_without_rewriting_manual_me
     assert_eq!(metrics_before, metrics_after_second);
     assert_eq!(after_first, after_second);
 
-    let handoff = fs::read_to_string(
-        fixture.join("docs/reports/agent-lifecycle/cursor-cli-onboarding/HANDOFF.md"),
-    )
-    .expect("read closeout handoff");
+    let handoff =
+        fs::read_to_string(fixture.join("docs/agents/lifecycle/cursor-cli-onboarding/HANDOFF.md"))
+            .expect("read closeout handoff");
     assert!(handoff.contains("This packet records the closed proving run for `cursor`."));
     assert!(handoff.contains("approval source: `governance-review`"));
     assert!(handoff.contains("manual control-plane file edits by maintainers: `0`"));
     assert!(handoff
         .contains("approved-agent to repo-ready control-plane mutation time: `missing (Exact duration not recoverable from committed evidence.)`"));
-    assert!(handoff.contains("closeout metadata: `docs/reports/agent-lifecycle/cursor-cli-onboarding/governance/proving-run-closeout.json`"));
+    assert!(handoff.contains("closeout metadata: `docs/agents/lifecycle/cursor-cli-onboarding/governance/proving-run-closeout.json`"));
     assert!(handoff.contains("No open runtime next step remains in this packet."));
 
-    let remediation =
-        fs::read_to_string(fixture.join(
-            "docs/reports/agent-lifecycle/cursor-cli-onboarding/governance/remediation-log.md",
-        ))
-        .expect("read remediation log");
+    let remediation = fs::read_to_string(
+        fixture.join("docs/agents/lifecycle/cursor-cli-onboarding/governance/remediation-log.md"),
+    )
+    .expect("read remediation log");
     assert!(
         remediation.contains("Runtime-owned evidence capture still requires a local CLI install.")
     );
@@ -236,12 +230,8 @@ fn onboard_agent_write_rejects_symlink_escape_paths() {
     let fixture = fixture_root("onboard-agent-symlink-escape");
     seed_release_touchpoints(&fixture);
     let outside = fixture_root("onboard-agent-symlink-outside");
-    fs::create_dir_all(fixture.join("docs/reports/agent-lifecycle")).expect("create docs parent");
-    symlink(
-        &outside,
-        fixture.join("docs/reports/agent-lifecycle/linked"),
-    )
-    .expect("create symlink");
+    fs::create_dir_all(fixture.join("docs/agents/lifecycle")).expect("create docs parent");
+    symlink(&outside, fixture.join("docs/agents/lifecycle/linked")).expect("create symlink");
 
     let output = run_cli(
         args_with_overrides(
@@ -258,5 +248,5 @@ fn onboard_agent_write_rejects_symlink_escape_paths() {
     assert!(output.stderr.contains("symlinked component"));
     assert!(output
         .stderr
-        .contains("docs/reports/agent-lifecycle/linked/escape-pack"));
+        .contains("docs/agents/lifecycle/linked/escape-pack"));
 }

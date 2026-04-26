@@ -372,7 +372,7 @@ impl GovernanceCheck {
                 }
                 if self.path
                     != format!(
-                        "docs/reports/agent-lifecycle/{}/governance/approved-agent.toml",
+                        "docs/agents/lifecycle/{}/governance/approved-agent.toml",
                         entry.scaffold.onboarding_pack_prefix
                     )
                 {

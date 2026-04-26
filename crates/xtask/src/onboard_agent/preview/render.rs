@@ -9,7 +9,7 @@ use super::super::{
 };
 use super::ApprovalRenderInput;
 use super::DraftEntry;
-const DOCS_NEXT_ROOT: &str = "docs/reports/agent-lifecycle";
+const DOCS_NEXT_ROOT: &str = "docs/agents/lifecycle";
 const PROVING_RUN_CLOSEOUT_RELATIVE_PATH: &str = "governance/proving-run-closeout.json";
 
 #[derive(Debug, Clone, Copy)]

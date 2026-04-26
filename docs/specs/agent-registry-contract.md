@@ -79,7 +79,7 @@ Additional rules:
 
 Use this comparison kind only for approval artifacts under:
 
-`docs/reports/agent-lifecycle/<onboarding_pack_prefix>/governance/approved-agent.toml`
+`docs/agents/lifecycle/<onboarding_pack_prefix>/governance/approved-agent.toml`
 
 Rules:
 

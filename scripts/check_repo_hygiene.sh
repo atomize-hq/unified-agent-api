@@ -89,6 +89,16 @@ check_tracked_content_pattern "docs/project_management/next/" \
   ':(exclude)crates/xtask/tests/agent_maintenance_refresh.rs'
 check_tracked_content_pattern "docs/specs/universal-agent-api/" \
   ':(exclude)scripts/check_repo_hygiene.sh'
+check_no_tracked_under "docs/reports/agent-lifecycle"
+check_no_tracked_under "docs/reports/verification"
+check_tracked_content_pattern "docs/reports/agent-lifecycle" \
+  ':(exclude).archived/**' \
+  ':(exclude)DOCS_AGENTS_MIGRATION_PLAN.md' \
+  ':(exclude)scripts/check_repo_hygiene.sh'
+check_tracked_content_pattern "docs/reports/verification/cli-agent-selection/cli-agent-selection-packet.md" \
+  ':(exclude).archived/**' \
+  ':(exclude)DOCS_AGENTS_MIGRATION_PLAN.md' \
+  ':(exclude)scripts/check_repo_hygiene.sh'
 check_duplicate_adr_numbers
 
 if [[ "$fail" -ne 0 ]]; then

@@ -6,7 +6,7 @@ This packet tracks control-plane maintenance for `opencode`.
 
 ## Request
 
-- request artifact: `docs/reports/agent-lifecycle/opencode-maintenance/governance/maintenance-request.toml`
+- request artifact: `docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml`
 - trigger kind: `drift_detected`
 - basis ref: `docs/integrations/opencode/governance/seam-2-closeout.md`
 - opened from: `docs/integrations/opencode/governance/seam-2-closeout.md`

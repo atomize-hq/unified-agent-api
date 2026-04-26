@@ -4,8 +4,8 @@
 
 ## Request
 
-- request ref: `docs/reports/agent-lifecycle/opencode-maintenance/governance/maintenance-request.toml`
-- request sha256: `74d0de0365a5007ab6c3223d5641d1d6fcee2a4a16452a438f8f5ba5cf7cad1a`
+- request ref: `docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml`
+- request sha256: `43143c88d2ed79e80f7e0f843a7e9a6e4ad60e8261522a62f3695763cf1e89ea`
 - request recorded at: `2026-04-22T00:48:19Z`
 - request commit: `8e77b59`
 
@@ -17,8 +17,8 @@
   - crates/agent_api/src/backends/opencode/backend.rs
   - docs/specs/opencode-agent-api-backend-contract.md
   - docs/specs/unified-agent-api/capability-matrix.md
-  - docs/reports/agent-lifecycle/opencode-maintenance/HANDOFF.md
-  - docs/reports/agent-lifecycle/opencode-maintenance/review_surfaces.md
+  - docs/agents/lifecycle/opencode-maintenance/HANDOFF.md
+  - docs/agents/lifecycle/opencode-maintenance/review_surfaces.md
 
 ## Deferred findings
 

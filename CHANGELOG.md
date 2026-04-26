@@ -12,7 +12,7 @@ This changelog tracks the root `VERSION` file and uses bare semantic versions (`
 
 - Added the first Gemini CLI proving-run surfaces across the workspace: `crates/gemini_cli/` for canonical headless `stream-json` execution, `cli_manifests/gemini_cli/` for committed manifest-root evidence, and the `crates/agent_api` Gemini backend with bounded event/completion redaction coverage.
 - Added registry-backed agent enrollment and governed scaffold generation for approved agents, including `xtask onboard-agent --write`, transactional workspace mutation planning, and generated Gemini onboarding packet outputs.
-- Added the M4 post-onboarding maintenance lane in `xtask`: `check-agent-drift`, `refresh-agent`, and `close-agent-maintenance`, plus the dedicated `docs/reports/agent-lifecycle/<agent>-maintenance/` packet shape and the first OpenCode maintenance proving run.
+- Added the M4 post-onboarding maintenance lane in `xtask`: `check-agent-drift`, `refresh-agent`, and `close-agent-maintenance`, plus the dedicated `docs/agents/lifecycle/<agent>-maintenance/` packet shape and the first OpenCode maintenance proving run.
 
 ### Changed
 

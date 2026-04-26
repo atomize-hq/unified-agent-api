@@ -20,7 +20,7 @@
 
 **Why:** M3 identified that the next missing truth is governance and provenance, not candidate automation. The repo should automate recommendation only after it has real approval-versus-recommendation feedback to target.
 
-**Context:** The 2026-04-21 `/autoplan` rebaseline for `PLAN.md` reframed M3 around selection-to-proof governance because `docs/reports/verification/cli-agent-selection/cli-agent-selection-packet.md` recommended `OpenCode` while the first closed M2 proving run landed `gemini_cli`. That mismatch needs explicit comparison, approval, override, and closeout truth before the repo turns recommendation into tooling.
+**Context:** The 2026-04-21 `/autoplan` rebaseline for `PLAN.md` reframed M3 around selection-to-proof governance because `docs/agents/selection/cli-agent-selection-packet.md` recommended `OpenCode` while the first closed M2 proving run landed `gemini_cli`. That mismatch needs explicit comparison, approval, override, and closeout truth before the repo turns recommendation into tooling.
 
 **Effort:** M
 **Priority:** P2

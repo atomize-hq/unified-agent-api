@@ -14,7 +14,7 @@ fn onboard_agent_approval_dry_run_matches_raw_descriptor_preview_and_writes_noth
     seed_release_touchpoints(&fixture);
     let approval_path = seed_approval_artifact(
         &fixture,
-        "docs/reports/agent-lifecycle/cursor-cli-onboarding/governance/approved-agent.toml",
+        "docs/agents/lifecycle/cursor-cli-onboarding/governance/approved-agent.toml",
         "cursor",
         "cursor",
         None,
@@ -38,23 +38,23 @@ fn onboard_agent_approval_dry_run_matches_raw_descriptor_preview_and_writes_noth
     assert!(raw.stdout.contains("agent_id: cursor"));
     assert!(approval
         .stdout
-        .contains("approval_artifact_path: docs/reports/agent-lifecycle/cursor-cli-onboarding/governance/approved-agent.toml"));
+        .contains("approval_artifact_path: docs/agents/lifecycle/cursor-cli-onboarding/governance/approved-agent.toml"));
     assert!(approval.stdout.contains("approval_artifact_sha256: "));
     assert!(approval.stdout.contains(
-        "Approval linkage: `docs/reports/agent-lifecycle/cursor-cli-onboarding/governance/approved-agent.toml` (`sha256:"
+        "Approval linkage: `docs/agents/lifecycle/cursor-cli-onboarding/governance/approved-agent.toml` (`sha256:"
     ));
     assert!(approval.stdout.contains(
-        "Approval linkage via `docs/reports/agent-lifecycle/cursor-cli-onboarding/governance/approved-agent.toml` (`sha256:"
+        "Approval linkage via `docs/agents/lifecycle/cursor-cli-onboarding/governance/approved-agent.toml` (`sha256:"
     ));
     assert!(approval.stdout.contains("## Approval provenance"));
     assert!(approval.stdout.contains(
-        "- approval ref: `docs/reports/agent-lifecycle/cursor-cli-onboarding/governance/approved-agent.toml`"
+        "- approval ref: `docs/agents/lifecycle/cursor-cli-onboarding/governance/approved-agent.toml`"
     ));
     assert!(!raw.stdout.contains("approval_artifact_path:"));
     assert!(!raw.stdout.contains("approval_artifact_sha256:"));
     assert!(!raw.stdout.contains("## Approval provenance"));
     assert!(!raw.stdout.contains(
-        "Approval linkage: `docs/reports/agent-lifecycle/cursor-cli-onboarding/governance/approved-agent.toml` (`sha256:"
+        "Approval linkage: `docs/agents/lifecycle/cursor-cli-onboarding/governance/approved-agent.toml` (`sha256:"
     ));
 }
 
@@ -64,7 +64,7 @@ fn onboard_agent_approval_write_applies_plan_and_replays_identically() {
     seed_release_touchpoints(&fixture);
     let approval_path = seed_approval_artifact(
         &fixture,
-        "docs/reports/agent-lifecycle/cursor-cli-onboarding/governance/approved-agent.toml",
+        "docs/agents/lifecycle/cursor-cli-onboarding/governance/approved-agent.toml",
         "cursor",
         "cursor",
         None,
@@ -84,34 +84,32 @@ fn onboard_agent_approval_write_applies_plan_and_replays_identically() {
     );
     assert_eq!(after_first, after_second);
     assert!(first.stdout.contains("OK: onboard-agent write complete."));
-    assert!(first.stdout.contains("approval_artifact_path: docs/reports/agent-lifecycle/cursor-cli-onboarding/governance/approved-agent.toml"));
+    assert!(first.stdout.contains("approval_artifact_path: docs/agents/lifecycle/cursor-cli-onboarding/governance/approved-agent.toml"));
     assert!(first.stdout.contains("## Approval provenance"));
     assert!(second
         .stdout
         .contains("Mutation summary: 0 written, 15 identical, 15 total planned."));
 
-    let readme = fs::read_to_string(
-        fixture.join("docs/reports/agent-lifecycle/cursor-cli-onboarding/README.md"),
-    )
-    .expect("read approval-mode readme");
+    let readme =
+        fs::read_to_string(fixture.join("docs/agents/lifecycle/cursor-cli-onboarding/README.md"))
+            .expect("read approval-mode readme");
     let scope_brief = fs::read_to_string(
-        fixture.join("docs/reports/agent-lifecycle/cursor-cli-onboarding/scope_brief.md"),
+        fixture.join("docs/agents/lifecycle/cursor-cli-onboarding/scope_brief.md"),
     )
     .expect("read approval-mode scope brief");
-    let handoff = fs::read_to_string(
-        fixture.join("docs/reports/agent-lifecycle/cursor-cli-onboarding/HANDOFF.md"),
-    )
-    .expect("read approval-mode handoff");
+    let handoff =
+        fs::read_to_string(fixture.join("docs/agents/lifecycle/cursor-cli-onboarding/HANDOFF.md"))
+            .expect("read approval-mode handoff");
 
     assert!(readme.contains(
-        "Approval linkage: `docs/reports/agent-lifecycle/cursor-cli-onboarding/governance/approved-agent.toml` (`sha256:"
+        "Approval linkage: `docs/agents/lifecycle/cursor-cli-onboarding/governance/approved-agent.toml` (`sha256:"
     ));
     assert!(scope_brief.contains(
-        "Approval linkage via `docs/reports/agent-lifecycle/cursor-cli-onboarding/governance/approved-agent.toml` (`sha256:"
+        "Approval linkage via `docs/agents/lifecycle/cursor-cli-onboarding/governance/approved-agent.toml` (`sha256:"
     ));
     assert!(handoff.contains("## Approval provenance"));
     assert!(handoff.contains(
-        "- approval ref: `docs/reports/agent-lifecycle/cursor-cli-onboarding/governance/approved-agent.toml`"
+        "- approval ref: `docs/agents/lifecycle/cursor-cli-onboarding/governance/approved-agent.toml`"
     ));
     assert!(handoff.contains("- approval artifact sha256: `"));
 }
@@ -121,7 +119,7 @@ fn onboard_agent_rejects_mixed_approval_and_descriptor_flags() {
     let fixture = fixture_root("onboard-agent-approval-mixed-flags");
     let approval_path = seed_approval_artifact(
         &fixture,
-        "docs/reports/agent-lifecycle/cursor-cli-onboarding/governance/approved-agent.toml",
+        "docs/agents/lifecycle/cursor-cli-onboarding/governance/approved-agent.toml",
         "cursor",
         "cursor",
         None,
@@ -142,7 +140,7 @@ fn onboard_agent_approval_requires_override_reason_for_nonrecommended_selection(
     let fixture = fixture_root("onboard-agent-approval-override-required");
     let approval_path = seed_approval_artifact(
         &fixture,
-        "docs/reports/agent-lifecycle/cursor-cli-onboarding/governance/approved-agent.toml",
+        "docs/agents/lifecycle/cursor-cli-onboarding/governance/approved-agent.toml",
         "codex",
         "cursor",
         None,
@@ -157,7 +155,7 @@ fn onboard_agent_approval_requires_override_reason_for_nonrecommended_selection(
 #[test]
 fn onboard_agent_approval_rejects_paths_outside_governance_roots() {
     let fixture = fixture_root("onboard-agent-approval-invalid-path");
-    let invalid_path = "docs/reports/agent-lifecycle/cursor-cli-onboarding/approved-agent.toml";
+    let invalid_path = "docs/agents/lifecycle/cursor-cli-onboarding/approved-agent.toml";
     seed_approval_artifact(&fixture, invalid_path, "cursor", "cursor", None);
 
     let output = run_cli(approval_args("--dry-run", invalid_path), &fixture);
@@ -171,7 +169,7 @@ fn onboard_agent_approval_rejects_pack_prefix_mismatch() {
     let fixture = fixture_root("onboard-agent-approval-pack-prefix-mismatch");
     let approval_path = seed_approval_artifact_with_pack_prefix(
         &fixture,
-        "docs/reports/agent-lifecycle/cursor-cli-onboarding/governance/approved-agent.toml",
+        "docs/agents/lifecycle/cursor-cli-onboarding/governance/approved-agent.toml",
         "cursor",
         "cursor",
         None,
@@ -189,7 +187,7 @@ fn onboard_agent_approval_rejects_unsupported_artifact_version() {
     let fixture = fixture_root("onboard-agent-approval-unsupported-version");
     let approval_path = seed_approval_artifact(
         &fixture,
-        "docs/reports/agent-lifecycle/cursor-cli-onboarding/governance/approved-agent.toml",
+        "docs/agents/lifecycle/cursor-cli-onboarding/governance/approved-agent.toml",
         "cursor",
         "cursor",
         None,
@@ -212,15 +210,13 @@ fn onboard_agent_approval_rejects_nonexistent_comparison_ref() {
     let fixture = fixture_root("onboard-agent-approval-missing-comparison-ref");
     let approval_path = seed_approval_artifact(
         &fixture,
-        "docs/reports/agent-lifecycle/cursor-cli-onboarding/governance/approved-agent.toml",
+        "docs/agents/lifecycle/cursor-cli-onboarding/governance/approved-agent.toml",
         "cursor",
         "cursor",
         None,
     );
-    fs::remove_file(
-        fixture.join("docs/reports/verification/cli-agent-selection/cli-agent-selection-packet.md"),
-    )
-    .expect("remove canonical comparison packet");
+    fs::remove_file(fixture.join("docs/agents/selection/cli-agent-selection-packet.md"))
+        .expect("remove canonical comparison packet");
 
     let output = run_cli(approval_args("--dry-run", &approval_path), &fixture);
 
@@ -235,13 +231,12 @@ fn onboard_agent_approval_rejects_non_file_comparison_ref() {
     let fixture = fixture_root("onboard-agent-approval-directory-comparison-ref");
     let approval_path = seed_approval_artifact(
         &fixture,
-        "docs/reports/agent-lifecycle/cursor-cli-onboarding/governance/approved-agent.toml",
+        "docs/agents/lifecycle/cursor-cli-onboarding/governance/approved-agent.toml",
         "cursor",
         "cursor",
         None,
     );
-    let comparison_path =
-        fixture.join("docs/reports/verification/cli-agent-selection/cli-agent-selection-packet.md");
+    let comparison_path = fixture.join("docs/agents/selection/cli-agent-selection-packet.md");
     fs::remove_file(&comparison_path).expect("remove comparison packet file");
     fs::create_dir_all(&comparison_path).expect("create comparison dir");
 
@@ -258,7 +253,7 @@ fn onboard_agent_approval_rejects_non_normal_comparison_ref() {
     let fixture = fixture_root("onboard-agent-approval-nonnormal-comparison-ref");
     let approval_path = seed_approval_artifact(
         &fixture,
-        "docs/reports/agent-lifecycle/cursor-cli-onboarding/governance/approved-agent.toml",
+        "docs/agents/lifecycle/cursor-cli-onboarding/governance/approved-agent.toml",
         "cursor",
         "cursor",
         None,
@@ -268,7 +263,7 @@ fn onboard_agent_approval_rejects_non_normal_comparison_ref() {
     super::harness::write_text(
         &approval_file,
         &contents.replace(
-            "docs/reports/verification/cli-agent-selection/cli-agent-selection-packet.md",
+            "docs/agents/selection/cli-agent-selection-packet.md",
             "../outside.md",
         ),
     );
@@ -284,7 +279,7 @@ fn onboard_agent_approval_rejects_invalid_approval_commit() {
     let fixture = fixture_root("onboard-agent-approval-invalid-commit");
     let approval_path = seed_approval_artifact(
         &fixture,
-        "docs/reports/agent-lifecycle/cursor-cli-onboarding/governance/approved-agent.toml",
+        "docs/agents/lifecycle/cursor-cli-onboarding/governance/approved-agent.toml",
         "cursor",
         "cursor",
         None,
@@ -312,7 +307,7 @@ fn onboard_agent_approval_rejects_invalid_approval_recorded_at() {
     let fixture = fixture_root("onboard-agent-approval-invalid-recorded-at");
     let approval_path = seed_approval_artifact(
         &fixture,
-        "docs/reports/agent-lifecycle/cursor-cli-onboarding/governance/approved-agent.toml",
+        "docs/agents/lifecycle/cursor-cli-onboarding/governance/approved-agent.toml",
         "cursor",
         "cursor",
         None,

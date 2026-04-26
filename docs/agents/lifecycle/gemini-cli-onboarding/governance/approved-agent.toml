@@ -1,5 +1,5 @@
 artifact_version = "1"
-comparison_ref = "docs/reports/verification/cli-agent-selection/cli-agent-selection-packet.md"
+comparison_ref = "docs/agents/selection/cli-agent-selection-packet.md"
 selection_mode = "factory_validation"
 recommended_agent_id = "opencode"
 approved_agent_id = "gemini_cli"

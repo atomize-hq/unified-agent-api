@@ -52,7 +52,7 @@ fn runtime_owned_actions_rejected() {
     seed_publication_inputs(&fixture);
 
     let request_path =
-        "docs/reports/agent-lifecycle/opencode-maintenance/governance/maintenance-request.toml";
+        "docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml";
     write_text(
         &fixture.join(request_path),
         &request_toml(
@@ -77,12 +77,12 @@ fn missing_basis_ref_is_rejected() {
     seed_publication_inputs(&fixture);
 
     let request_path =
-        "docs/reports/agent-lifecycle/opencode-maintenance/governance/maintenance-request.toml";
+        "docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml";
     write_text(
         &fixture.join(request_path),
         &request_toml_with_refs(
             "opencode",
-            "docs/reports/agent-lifecycle/opencode-maintenance/governance/missing-basis.md",
+            "docs/agents/lifecycle/opencode-maintenance/governance/missing-basis.md",
             "docs/integrations/opencode/governance/seam-2-closeout.md",
             &["packet_doc_refresh"],
             false,
@@ -101,13 +101,13 @@ fn missing_opened_from_is_rejected() {
     seed_publication_inputs(&fixture);
 
     let request_path =
-        "docs/reports/agent-lifecycle/opencode-maintenance/governance/maintenance-request.toml";
+        "docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml";
     write_text(
         &fixture.join(request_path),
         &request_toml_with_refs(
             "opencode",
             "docs/integrations/opencode/governance/seam-2-closeout.md",
-            "docs/reports/agent-lifecycle/opencode-maintenance/governance/missing-opened-from.md",
+            "docs/agents/lifecycle/opencode-maintenance/governance/missing-opened-from.md",
             &["packet_doc_refresh"],
             false,
             &[],
@@ -130,7 +130,7 @@ fn release_doc_refresh_uses_registry_order_instead_of_workspace_member_order() {
     );
 
     let request_path =
-        "docs/reports/agent-lifecycle/opencode-maintenance/governance/maintenance-request.toml";
+        "docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml";
     write_text(
         &fixture.join(request_path),
         &request_toml("opencode", &["release_doc_refresh"], false, &[]),
@@ -159,7 +159,7 @@ fn dry_run_write_plan_identity_and_no_write_vs_write_parity() {
     seed_publication_inputs(&fixture);
 
     let request_path =
-        "docs/reports/agent-lifecycle/opencode-maintenance/governance/maintenance-request.toml";
+        "docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml";
     write_text(
         &fixture.join(request_path),
         &request_toml(
@@ -223,7 +223,7 @@ fn onboarding_and_implementation_historical_roots_untouched() {
         fs::read_to_string(&implementation_closeout).expect("read implementation");
 
     let request_path =
-        "docs/reports/agent-lifecycle/opencode-maintenance/governance/maintenance-request.toml";
+        "docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml";
     write_text(
         &fixture.join(request_path),
         &request_toml(
@@ -257,7 +257,7 @@ fn identical_replay_is_noop() {
     seed_publication_inputs(&fixture);
 
     let request_path =
-        "docs/reports/agent-lifecycle/opencode-maintenance/governance/maintenance-request.toml";
+        "docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml";
     write_text(
         &fixture.join(request_path),
         &request_toml(

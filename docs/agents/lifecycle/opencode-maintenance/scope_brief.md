@@ -6,7 +6,7 @@ This maintenance lane is limited to control-plane docs and generated publication
 
 Allowed write envelope:
 
-- maintenance packet docs under `docs/reports/agent-lifecycle/opencode-maintenance`
+- maintenance packet docs under `docs/agents/lifecycle/opencode-maintenance`
 - `cli_manifests/support_matrix/current.json`
 - `docs/specs/unified-agent-api/support-matrix.md`
 - `docs/specs/unified-agent-api/capability-matrix.md`

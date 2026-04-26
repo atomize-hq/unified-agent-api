@@ -5,7 +5,7 @@ Source:
 - `/Users/spensermcconnell/.gstack/projects/atomize-hq-unified-agent-api/spensermcconnell-main-design-20260420-151505.md`
 - `.archived/project_management/next/opencode-cli-onboarding/next-steps-handoff.md`
 - `/Users/spensermcconnell/.gstack/projects/atomize-hq-unified-agent-api/spensermcconnell-main-test-outcome-20260420-091704.md`
-- `docs/reports/agent-lifecycle/gemini-cli-onboarding/HANDOFF.md`
+- `docs/agents/lifecycle/gemini-cli-onboarding/HANDOFF.md`
 
 Status: M1 through M4 landed on `feat/cli-agent-onboarding-factory`; M5 is the active plan-of-record on `staging`, and W4 is the narrow docs closeout lane
 Last updated (UTC): 2026-04-23
@@ -1013,8 +1013,8 @@ These are already true on `feat/fill-trust-gap` and are not M7 work:
   - `support-matrix`
   - `capability-matrix`
 - `docs/specs/cli-agent-onboarding-charter.md` already reflects the M6 ownership boundary: `onboard-agent` does not create the wrapper crate and `scaffold-wrapper-crate` does.
-- `docs/reports/agent-lifecycle/gemini-cli-onboarding/**` already provides one closed proving-run onboarding packet.
-- `docs/reports/agent-lifecycle/opencode-maintenance/**` already provides one real maintenance packet and closeout example.
+- `docs/agents/lifecycle/gemini-cli-onboarding/**` already provides one closed proving-run onboarding packet.
+- `docs/agents/lifecycle/opencode-maintenance/**` already provides one real maintenance packet and closeout example.
 - `docs/specs/agent-registry-contract.md` and `docs/specs/unified-agent-api/capabilities-schema-spec.md` already pin the narrow normative truth M5 needed.
 - `docs/crates-io-release.md` already contains the generated publish-order block emitted by the control plane.
 
@@ -1084,8 +1084,8 @@ M7 is complete only when all of these are true:
 |---|---|---|
 | command inventory | `crates/xtask/src/main.rs` | already exposes the real command set M7 must document exactly |
 | runtime-step ownership boundary | `docs/specs/cli-agent-onboarding-charter.md`, `crates/xtask/src/onboard_agent/preview.rs`, `crates/xtask/src/onboard_agent/preview/render.rs` | already encode the M6 split between `onboard-agent` and `scaffold-wrapper-crate` |
-| proving-run example | `docs/reports/agent-lifecycle/gemini-cli-onboarding/**` | already shows the create-mode packet/output shape |
-| maintenance example | `docs/reports/agent-lifecycle/opencode-maintenance/**` | already shows the maintenance lane and closeout shape |
+| proving-run example | `docs/agents/lifecycle/gemini-cli-onboarding/**` | already shows the create-mode packet/output shape |
+| maintenance example | `docs/agents/lifecycle/opencode-maintenance/**` | already shows the maintenance lane and closeout shape |
 | green-gate contract | `docs/specs/unified-agent-api/capabilities-schema-spec.md`, `README.md`, `CONTRIBUTING.md`, `docs/crates-io-release.md` | already contain fragments of the verification story M7 must unify |
 | repo entrypoints | `README.md`, `CONTRIBUTING.md`, `docs/README.md` | already act as discoverability surfaces and therefore must stop being partially stale |
 | historical provenance docs | `.archived/project_management/next/opencode-cli-onboarding/next-steps-handoff.md` and nearby hand-authored planning docs | still useful as source provenance, but need explicit framing so operators do not mistake them for current procedure |
@@ -1205,8 +1205,8 @@ Primary modules:
 - `docs/cli-agent-onboarding-factory-operator-guide.md`
 - `crates/xtask/src/main.rs`
 - `docs/specs/cli-agent-onboarding-charter.md`
-- `docs/reports/agent-lifecycle/gemini-cli-onboarding/**`
-- `docs/reports/agent-lifecycle/opencode-maintenance/**`
+- `docs/agents/lifecycle/gemini-cli-onboarding/**`
+- `docs/agents/lifecycle/opencode-maintenance/**`
 
 Exit criteria:
 - a maintainer can follow one doc to understand the full factory lifecycle

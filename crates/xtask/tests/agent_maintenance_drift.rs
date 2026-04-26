@@ -206,12 +206,10 @@ fn check_agent_drift_reports_gemini_approval_descriptor_mismatch() {
     seed_publication_inputs(&fixture);
 
     write_text(
-        &fixture.join(
-            "docs/reports/agent-lifecycle/gemini-cli-onboarding/governance/approved-agent.toml",
-        ),
+        &fixture.join("docs/agents/lifecycle/gemini-cli-onboarding/governance/approved-agent.toml"),
         concat!(
             "artifact_version = \"1\"\n",
-            "comparison_ref = \"docs/reports/verification/cli-agent-selection/cli-agent-selection-packet.md\"\n",
+            "comparison_ref = \"docs/agents/selection/cli-agent-selection-packet.md\"\n",
             "selection_mode = \"factory_validation\"\n",
             "recommended_agent_id = \"gemini_cli\"\n",
             "approved_agent_id = \"gemini_cli\"\n",
@@ -243,8 +241,7 @@ fn check_agent_drift_reports_gemini_approval_descriptor_mismatch() {
         .find(|finding| finding.category == DriftCategory::GovernanceDoc)
         .expect("governance finding");
     assert!(finding.surfaces.contains(
-        &"docs/reports/agent-lifecycle/gemini-cli-onboarding/governance/approved-agent.toml"
-            .to_string()
+        &"docs/agents/lifecycle/gemini-cli-onboarding/governance/approved-agent.toml".to_string()
     ));
     assert!(finding
         .surfaces
@@ -483,7 +480,7 @@ fn seed_publication_inputs(root: &Path) {
 
     seed_gemini_approval_artifact(
         root,
-        "docs/reports/agent-lifecycle/gemini-cli-onboarding/governance/approved-agent.toml",
+        "docs/agents/lifecycle/gemini-cli-onboarding/governance/approved-agent.toml",
         "gemini-cli-onboarding",
     );
 
@@ -528,7 +525,7 @@ fn default_capability_matrix_markdown() -> String {
 fn seed_closed_governance_maintenance(root: &Path, resolved_surface: &str) {
     write_text(
         &root.join(
-            "docs/reports/agent-lifecycle/opencode-maintenance/governance/maintenance-closeout.json",
+            "docs/agents/lifecycle/opencode-maintenance/governance/maintenance-closeout.json",
         ),
         &serde_json::to_string_pretty(&serde_json::json!({
             "resolved_findings": [{

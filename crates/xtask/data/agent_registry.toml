@@ -213,6 +213,6 @@ onboarding_pack_prefix = "gemini-cli-onboarding"
 [agents.maintenance]
 
 [[agents.maintenance.governance_checks]]
-path = "docs/reports/agent-lifecycle/gemini-cli-onboarding/governance/approved-agent.toml"
+path = "docs/agents/lifecycle/gemini-cli-onboarding/governance/approved-agent.toml"
 required = true
 comparison_kind = "approved_agent_descriptor"
