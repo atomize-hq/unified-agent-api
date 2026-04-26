@@ -33,6 +33,12 @@ release, and scaffold fields enforced by `xtask`.
 Downstream `xtask` commands that materialize wrapper-crate files MUST use the entry's `crate_path`
 directly. They MUST NOT derive a second crate-location contract from `agent_id`.
 
+When wrapper scaffolding derives the crate-local Rust `[lib].name`, it MUST use the final
+`crate_path` path component as the source basename, normalize `-` to `_`, and then require the
+normalized result to match ASCII `[A-Za-z0-9_]+`. Hyphenated crate directories are therefore
+valid location contracts, but basenames containing other punctuation, whitespace, or non-ASCII
+characters are invalid for scaffoldable registry entries.
+
 If capability publication is enabled for an agent, the registry publication block is also the
 canonical source of the target-scoped publication contract. In particular:
 

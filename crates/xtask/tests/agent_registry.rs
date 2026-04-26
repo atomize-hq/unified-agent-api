@@ -125,6 +125,26 @@ fn malformed_toml_fails_closed() {
 }
 
 #[test]
+fn hyphenated_crate_path_basename_normalizes_into_scaffold_lib_name() {
+    let raw = SEEDED_REGISTRY.replacen(
+        "crate_path = \"crates/gemini_cli\"",
+        "crate_path = \"crates/gemini-cli\"",
+        1,
+    );
+
+    let registry = AgentRegistry::parse(&raw).expect("parse registry with hyphenated crate path");
+    let gemini = registry
+        .find("gemini_cli")
+        .expect("seeded gemini_cli entry should still exist");
+
+    assert_eq!(gemini.crate_path, "crates/gemini-cli");
+    assert_eq!(
+        gemini.scaffold_lib_name().expect("normalize lib name"),
+        "gemini_cli"
+    );
+}
+
+#[test]
 fn duplicate_identity_and_path_fields_fail_closed() {
     let cases = [
         (
@@ -174,6 +194,44 @@ fn duplicate_identity_and_path_fields_fail_closed() {
         let err = AgentRegistry::parse(&raw).unwrap_err();
         let text = err.to_string();
         assert!(text.contains(expected), "{label}: {text}");
+    }
+}
+
+#[test]
+fn unsupported_crate_path_basenames_fail_closed() {
+    let cases = [
+        (
+            "dot basename",
+            SEEDED_REGISTRY.replacen(
+                "crate_path = \"crates/gemini_cli\"",
+                "crate_path = \"crates/gemini.cli\"",
+                1,
+            ),
+            "crate_path `crates/gemini.cli`",
+        ),
+        (
+            "space basename",
+            SEEDED_REGISTRY.replacen(
+                "crate_path = \"crates/gemini_cli\"",
+                "crate_path = \"crates/gemini cli\"",
+                1,
+            ),
+            "crate_path `crates/gemini cli`",
+        ),
+    ];
+
+    for (label, raw, expected_path) in cases {
+        let err = AgentRegistry::parse(&raw).expect_err("invalid crate_path basename must fail");
+        let text = err.to_string();
+        assert!(text.contains(expected_path), "{label}: {text}");
+        assert!(
+            text.contains("normalized lib name candidate"),
+            "{label}: {text}"
+        );
+        assert!(
+            text.contains("ASCII letters, digits, or `_`"),
+            "{label}: {text}"
+        );
     }
 }
 

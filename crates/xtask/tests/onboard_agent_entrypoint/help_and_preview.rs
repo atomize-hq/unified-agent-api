@@ -2,8 +2,8 @@ use clap::{CommandFactory, Parser};
 
 use super::{
     harness::{
-        base_args, base_args_with_mode, base_args_with_package_name, fixture_root,
-        seed_release_touchpoints, snapshot_files, write_text,
+        args_with_overrides, base_args, base_args_with_mode, base_args_with_package_name,
+        fixture_root, seed_release_touchpoints, snapshot_files, write_text,
     },
     run_cli, Cli,
 };
@@ -257,4 +257,37 @@ fn onboard_agent_dry_run_preview_is_deterministic_and_writes_nothing() {
     assert!(!first.stdout.contains("LICENSE-APACHE"));
     assert!(!first.stdout.contains("LICENSE-MIT"));
     assert!(!first.stdout.contains("readme = \"README.md\""));
+}
+
+#[test]
+fn onboard_agent_dry_run_accepts_hyphenated_crate_path_without_rewriting_it() {
+    let fixture = fixture_root("onboard-agent-hyphenated-crate-path");
+    seed_release_touchpoints(&fixture);
+
+    let before = snapshot_files(&fixture);
+    let output = run_cli(
+        args_with_overrides(
+            "--dry-run",
+            "cursor",
+            "unified-agent-api-cursor",
+            &[
+                ("--crate-path", "crates/cursor-cli"),
+                ("--wrapper-coverage-source-path", "crates/cursor-cli"),
+            ],
+            false,
+        ),
+        &fixture,
+    );
+    let after = snapshot_files(&fixture);
+
+    assert_eq!(output.exit_code, 0, "stderr:\n{}", output.stderr);
+    assert_eq!(before, after, "dry-run must not write any files");
+    assert!(output.stdout.contains("crate_path: crates/cursor-cli"));
+    assert!(output.stdout.contains("crate_path = \"crates/cursor-cli\""));
+    assert!(output.stdout.contains(
+        "Path: Cargo.toml will ensure workspace member `crates/cursor-cli` is enrolled."
+    ));
+    assert!(output
+        .stdout
+        .contains("create the runtime-owned wrapper crate shell at `crates/cursor-cli`"));
 }

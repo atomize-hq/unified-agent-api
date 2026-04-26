@@ -142,6 +142,8 @@ Backend-specific exec-policy knobs (pattern):
 2) Run `scaffold-wrapper-crate --agent <agent> --write` to create the wrapper crate shell at the registry-owned `crate_path` under `crates/`:
    - initial crate layout and Cargo metadata
    - initial publishability metadata owned by the scaffold, including crate-local `README.md`, `LICENSE-APACHE`, `LICENSE-MIT`, and `readme = "README.md"`
+   - hyphenated crate directories are supported; the scaffold derives `[lib].name` from the final `crate_path` component by normalizing `-` to `_`
+   - if the normalized basename contains anything outside ASCII `[A-Za-z0-9_]+`, validation fails before scaffold output is written
 3) Implement backend/runtime details in the wrapper crate and `agent_api` backend adapter:
    - builder + request types
    - streaming typed events + completion

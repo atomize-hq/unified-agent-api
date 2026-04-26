@@ -130,6 +130,10 @@ pub struct AgentRegistryEntry {
 }
 
 impl AgentRegistryEntry {
+    pub(crate) fn scaffold_lib_name(&self) -> Result<String, AgentRegistryError> {
+        scaffold_lib_name_from_crate_path(&self.crate_path)
+    }
+
     fn validate(&self) -> Result<(), AgentRegistryError> {
         validate_non_empty_scalar("agent_id", &self.agent_id)?;
         validate_non_empty_scalar("display_name", &self.display_name)?;
@@ -146,6 +150,7 @@ impl AgentRegistryEntry {
             BACKEND_MODULE_PREFIX,
         )?;
         ensure_has_prefix("manifest_root", &self.manifest_root, MANIFEST_ROOT_PREFIX)?;
+        self.scaffold_lib_name()?;
 
         let canonical_targets =
             validate_non_empty_string_array("canonical_targets", &self.canonical_targets)?;
@@ -523,6 +528,32 @@ fn validate_non_empty_scalar(field_name: &str, value: &str) -> Result<(), AgentR
         )));
     }
     Ok(())
+}
+
+pub(crate) fn scaffold_lib_name_from_crate_path(
+    crate_path: &str,
+) -> Result<String, AgentRegistryError> {
+    let Some(crate_basename) = Path::new(crate_path)
+        .file_name()
+        .and_then(|part| part.to_str())
+    else {
+        return Err(AgentRegistryError::Validation(format!(
+            "crate_path `{crate_path}` must end with a UTF-8 basename that can be normalized into an ASCII lib target name"
+        )));
+    };
+
+    let lib_name = crate_basename.replace('-', "_");
+    if lib_name.is_empty()
+        || !lib_name
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_')
+    {
+        return Err(AgentRegistryError::Validation(format!(
+            "crate_path `{crate_path}` has unsupported lib target basename `{crate_basename}`; normalized lib name candidate `{lib_name}` must contain only ASCII letters, digits, or `_` after `-` to `_` normalization"
+        )));
+    }
+
+    Ok(lib_name)
 }
 
 fn validate_repo_relative_path(field_name: &str, value: &str) -> Result<(), AgentRegistryError> {

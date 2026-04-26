@@ -8,7 +8,9 @@ use clap::{ArgGroup, Parser};
 use thiserror::Error;
 
 use crate::{
-    agent_registry::{AgentRegistry, AgentRegistryEntry, AgentRegistryError},
+    agent_registry::{
+        scaffold_lib_name_from_crate_path, AgentRegistry, AgentRegistryEntry, AgentRegistryError,
+    },
     workspace_mutation::{
         apply_mutations, ApplySummary, PlannedMutation, WorkspaceMutationError, WorkspacePathJail,
     },
@@ -185,23 +187,16 @@ fn build_plan(
     agent: &AgentRegistryEntry,
     licenses: (Vec<u8>, Vec<u8>),
 ) -> Result<WrapperScaffoldPlan, Error> {
-    let crate_dir = Path::new(&agent.crate_path)
-        .file_name()
-        .and_then(|part| part.to_str())
-        .ok_or_else(|| {
-            Error::Validation(format!(
-                "agent `{}` has invalid crate path `{}`",
-                agent.agent_id, agent.crate_path
-            ))
-        })?;
+    let lib_name =
+        scaffold_lib_name_from_crate_path(&agent.crate_path).map_err(map_registry_load_error)?;
     let primary_keyword = primary_keyword(&agent.display_name)?;
     let cargo_toml = render_cargo_toml(
         &agent.display_name,
         &agent.package_name,
-        crate_dir,
+        &lib_name,
         &primary_keyword,
     );
-    let readme = render_readme(&agent.display_name, &agent.package_name, crate_dir);
+    let readme = render_readme(&agent.display_name, &agent.package_name, &lib_name);
     let lib_rs = render_lib_rs(&agent.display_name);
 
     let mut files = Vec::with_capacity(FILE_SEQUENCE.len());

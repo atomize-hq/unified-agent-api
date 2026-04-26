@@ -85,6 +85,58 @@ fn scaffold_wrapper_crate_rejects_invalid_crate_path() {
 }
 
 #[test]
+fn scaffold_wrapper_crate_rejects_invalid_lib_target_basename_in_dry_run() {
+    let fixture = scaffold_fixture("wrapper-scaffold-invalid-lib-basename-dry-run");
+    rewrite_registry(&fixture, |registry| {
+        registry.replacen(
+            "crate_path = \"crates/gemini_cli\"\n",
+            "crate_path = \"crates/gemini.cli\"\n",
+            1,
+        )
+    });
+    let before = snapshot_files(&fixture);
+
+    let output = run_xtask(&fixture, wrapper_scaffold_args("--dry-run", "gemini_cli"));
+    let after = snapshot_files(&fixture);
+
+    assert_eq!(output.exit_code, 2, "stderr:\n{}", output.stderr);
+    assert!(
+        output
+            .stderr
+            .contains("normalized lib name candidate `gemini.cli`"),
+        "stderr did not mention invalid lib target normalization:\n{}",
+        output.stderr
+    );
+    assert_eq!(before, after, "invalid lib basename must not write files");
+}
+
+#[test]
+fn scaffold_wrapper_crate_rejects_invalid_lib_target_basename_in_write_mode() {
+    let fixture = scaffold_fixture("wrapper-scaffold-invalid-lib-basename-write");
+    rewrite_registry(&fixture, |registry| {
+        registry.replacen(
+            "crate_path = \"crates/gemini_cli\"\n",
+            "crate_path = \"crates/gemini.cli\"\n",
+            1,
+        )
+    });
+    let before = snapshot_files(&fixture);
+
+    let output = run_xtask(&fixture, wrapper_scaffold_args("--write", "gemini_cli"));
+    let after = snapshot_files(&fixture);
+
+    assert_eq!(output.exit_code, 2, "stderr:\n{}", output.stderr);
+    assert!(
+        output
+            .stderr
+            .contains("crate_path `crates/gemini.cli` has unsupported lib target basename"),
+        "stderr did not mention invalid lib target basename:\n{}",
+        output.stderr
+    );
+    assert_eq!(before, after, "invalid lib basename must not write files");
+}
+
+#[test]
 fn scaffold_wrapper_crate_rejects_path_escape() {
     let fixture = scaffold_fixture("wrapper-scaffold-path-escape");
     rewrite_registry(&fixture, |registry| {

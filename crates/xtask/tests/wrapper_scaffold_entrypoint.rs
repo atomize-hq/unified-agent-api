@@ -4,8 +4,9 @@ use std::{fs, path::Path};
 mod harness;
 
 use harness::{
-    nested_scaffold_fixture_root, run_xtask, scaffold_fixture_root, snapshot_files,
-    wrapper_scaffold_args, NESTED_GEMINI_CRATE_PATH, SEEDED_GEMINI_CRATE_PATH,
+    hyphenated_scaffold_fixture_root, nested_scaffold_fixture_root, run_xtask,
+    scaffold_fixture_root, snapshot_files, wrapper_scaffold_args, HYPHENATED_GEMINI_CRATE_PATH,
+    NESTED_GEMINI_CRATE_PATH, SEEDED_GEMINI_CRATE_PATH,
 };
 
 fn assert_scaffold_shell(root: &Path, crate_path: &str) {
@@ -194,4 +195,40 @@ fn scaffold_wrapper_crate_supports_nested_registry_crate_path() {
         before_divergence, after_divergence,
         "divergent replay must not leave partial writes"
     );
+}
+
+#[test]
+fn scaffold_wrapper_crate_normalizes_hyphenated_lib_name() {
+    let fixture = hyphenated_scaffold_fixture_root("wrapper-scaffold-hyphenated-path");
+    let before = snapshot_files(&fixture);
+
+    let dry_run = run_xtask(&fixture, wrapper_scaffold_args("--dry-run", "gemini_cli"));
+    let after_dry_run = snapshot_files(&fixture);
+
+    assert_eq!(dry_run.exit_code, 0, "stderr:\n{}", dry_run.stderr);
+    assert_eq!(before, after_dry_run, "dry-run must not mutate the fixture");
+    assert!(
+        dry_run
+            .stdout
+            .contains("crates/gemini-cli/Cargo.toml [create]"),
+        "dry-run stdout must mention the hyphenated crate path:\n{}",
+        dry_run.stdout
+    );
+
+    let write = run_xtask(&fixture, wrapper_scaffold_args("--write", "gemini_cli"));
+    assert_eq!(write.exit_code, 0, "stderr:\n{}", write.stderr);
+    assert_scaffold_shell(&fixture, HYPHENATED_GEMINI_CRATE_PATH);
+
+    let manifest = fs::read_to_string(
+        fixture
+            .join(HYPHENATED_GEMINI_CRATE_PATH)
+            .join("Cargo.toml"),
+    )
+    .expect("read hyphenated manifest");
+    assert!(manifest.contains("name = \"unified-agent-api-gemini-cli\""));
+    assert!(manifest.contains("[lib]\nname = \"gemini_cli\"\n"));
+
+    let readme = fs::read_to_string(fixture.join(HYPHENATED_GEMINI_CRATE_PATH).join("README.md"))
+        .expect("read hyphenated readme");
+    assert!(readme.contains("- Rust library crate: `gemini_cli`"));
 }

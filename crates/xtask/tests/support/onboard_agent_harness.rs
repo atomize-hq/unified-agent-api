@@ -14,6 +14,7 @@ const ROOT_LICENSE_APACHE: &str = include_str!("../../../../LICENSE-APACHE");
 const ROOT_LICENSE_MIT: &str = include_str!("../../../../LICENSE-MIT");
 pub const SEEDED_GEMINI_CRATE_PATH: &str = "crates/gemini_cli";
 pub const NESTED_GEMINI_CRATE_PATH: &str = "crates/runtime/gemini_shell";
+pub const HYPHENATED_GEMINI_CRATE_PATH: &str = "crates/gemini-cli";
 
 #[derive(Debug)]
 pub struct HarnessOutput {
@@ -336,6 +337,21 @@ pub fn nested_scaffold_fixture_root(prefix: &str) -> PathBuf {
         &fixture.join("Cargo.toml"),
         "  \"crates/gemini_cli\",\n",
         "  \"crates/runtime/gemini_shell\",\n",
+    );
+    fixture
+}
+
+pub fn hyphenated_scaffold_fixture_root(prefix: &str) -> PathBuf {
+    let fixture = scaffold_fixture_root(prefix);
+    replace_text_once(
+        &fixture.join("crates/xtask/data/agent_registry.toml"),
+        "crate_path = \"crates/gemini_cli\"\n",
+        "crate_path = \"crates/gemini-cli\"\n",
+    );
+    replace_text_once(
+        &fixture.join("Cargo.toml"),
+        "  \"crates/gemini_cli\",\n",
+        "  \"crates/gemini-cli\",\n",
     );
     fixture
 }
