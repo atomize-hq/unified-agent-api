@@ -14,17 +14,17 @@
 **Priority:** P2
 **Depends on:** M5 landing with one canonical capability projection contract and one shared local/CI check-only gate
 
-### Formalize Recommendation Automation After Two Governance-Backed Selection Cycles
+### Land The Pre-Create Recommendation Lane
 
-**What:** Revisit `recommend-agent` automation or a deterministic packet generator only after the repo completes two onboarding selections with explicit comparison, approval, and closeout linkage.
+**What:** Add the repo-local skill and deterministic runner that research next-agent candidates, apply hard onboarding-fit gates, render the fixed 3-candidate comparison packet, and draft the maintainer-facing `approved-agent.toml` input for the existing `onboard-agent` lane.
 
-**Why:** M3 identified that the next missing truth is governance and provenance, not candidate automation. The repo should automate recommendation only after it has real approval-versus-recommendation feedback to target.
+**Why:** The repo now has the core post-approval factory. The missing seam is earlier: maintainers still have to do the candidate archaeology by hand before they can run `cargo run -p xtask -- onboard-agent --approval ...`. This work turns that research step into an approval-grade control-plane lane.
 
-**Context:** The 2026-04-21 `/autoplan` rebaseline for `PLAN.md` reframed M3 around selection-to-proof governance because `docs/agents/selection/cli-agent-selection-packet.md` recommended `OpenCode` while the first closed M2 proving run landed `gemini_cli`. That mismatch needs explicit comparison, approval, override, and closeout truth before the repo turns recommendation into tooling.
+**Context:** The 2026-04-27 office-hours and `/plan-eng-review` reframe narrowed the problem from "create-mode gaps" to the pre-create recommendation lane. The repo already has `docs/agents/selection/cli-agent-selection-packet.md`, `docs/templates/agent-selection/cli-agent-selection-packet-template.md`, `crates/xtask/src/approval_artifact.rs`, and the shipped `onboard-agent` workflow. The lane should reuse those surfaces, keep the maintainer as approve-or-override HITL, pin v1 to exactly 3 candidates, and separate run-local evidence capture from explicit promotion to the canonical packet path.
 
 **Effort:** M
-**Priority:** P2
-**Depends on:** M3 landing with governance-backed approval artifacts and validated proving-run closeout artifacts
+**Priority:** P1
+**Depends on:** Current M3 governance surfaces staying the approval truth, and one committed implementation plan for the repo-local skill plus `scripts/` runner
 
 ### Compress The Runtime-Owned Onboarding Lane After Governance Truth Lands
 
