@@ -19,6 +19,10 @@ Generated packet docs are evidence and examples. Do not treat them as the proced
 
 Use the recommendation lane before create mode when the next CLI agent has not been approved yet.
 
+The normative recommendation-lane contract is:
+
+`docs/specs/cli-agent-recommendation-dossier-contract.md`
+
 ### 1. Start from the seed file
 
 The recommendation lane starts from the committed seed file:
@@ -32,13 +36,32 @@ This file owns:
 
 `onboarding_pack_prefix` is not seed-owned in v1. It is chosen at promotion time.
 
-### 2. Generate a scratch run
+### 2. Freeze the scratch research artifacts
 
-Run the deterministic recommendation generator:
+Before the deterministic runner executes, the skill-led research phase must freeze the scratch research artifacts under:
+
+`~/.gstack/projects/<repo-slug>/recommend-next-agent-research/<run_id>/`
+
+Required research artifacts:
+- `seed.snapshot.toml`
+- `research-summary.md`
+- `research-metadata.json`
+- `dossiers/<agent_id>.json` for every seeded candidate from `seed.snapshot.toml`
+
+The dossier count is exact. If the seed snapshot contains `N` candidates, the dossier directory must contain exactly `N` dossier files.
+
+The frozen `research-metadata.json` envelope, dossier schema, and evidence budgets are owned by:
+
+`docs/specs/cli-agent-recommendation-dossier-contract.md`
+
+### 3. Generate the post-research scratch run
+
+After the research artifacts exist, run the deterministic recommendation generator:
 
 ```sh
 python3 scripts/recommend_next_agent.py generate \
   --seed-file docs/agents/selection/candidate-seed.toml \
+  --research-dir ~/.gstack/projects/<repo-slug>/recommend-next-agent-research/<run_id> \
   --run-id <timestamp>-<shortlist_slug> \
   --scratch-root ~/.gstack/projects/<repo-slug>/recommend-next-agent-runs
 ```
@@ -47,35 +70,42 @@ This step writes only to:
 
 `~/.gstack/projects/<repo-slug>/recommend-next-agent-runs/<run_id>/`
 
-It does not mutate repo-tracked files.
+It does not mutate repo-tracked files, and it is post-research only.
 
-Required scratch artifacts:
+Required runner scratch artifacts:
+- `run-status.json`
+- `seed.snapshot.toml`
 - `candidate-pool.json`
 - `eligible-candidates.json`
-- `candidate-dossiers/<agent_id>.json` for exactly the shortlisted 3 candidates
 - `scorecard.json`
 - `sources.lock.json`
 - `comparison.generated.md`
 - `approval-draft.generated.toml`
 - `run-summary.md`
+- `candidate-dossiers/<agent_id>.json` for every seeded candidate
+- `candidate-validation-results/<agent_id>.json` for every seeded candidate
 
 Generation applies a hard ineligibility gate against `crates/xtask/data/agent_registry.toml` before scoring. Candidates whose `agent_id` is already onboarded in the registry remain in `candidate-pool.json` with rejection reasons, but they are never scored, shortlisted, or emitted into `eligible-candidates.json`.
 
 If fewer than 3 eligible candidates survive, stop here and expand the seed file.
 
-### 3. Review the scratch run
+The runner must not fetch new recommendation evidence after research freeze and must not replace the frozen research artifacts.
+
+### 4. Review the scratch run
 
 Review the scratch run before promotion:
+- frozen seed snapshot and research metadata
+- one dossier per seeded candidate
 - shortlisted candidates
 - rejection reasons for non-eligible candidates
-- scratch comparison packet
-- provisional approval draft for the recommended candidate
+- scratch comparison packet preview
+- provisional approval draft preview for the recommended candidate
 
 Scratch runs are never committed.
 
-### 4. Promote one reviewed run
+### 5. Promote one reviewed run
 
-Promote one scratch run into the canonical packet, a committed review run, and a final approval draft:
+Promote one scratch run into the canonical packet, a committed review run, and a final approval artifact:
 
 ```sh
 python3 scripts/recommend_next_agent.py promote \
@@ -92,24 +122,28 @@ Promotion writes:
 - `docs/agents/lifecycle/<onboarding_pack_prefix>/governance/approved-agent.toml`
 
 Required committed review artifacts under `docs/agents/selection/runs/<run_id>/`:
+- byte-copy of `seed.snapshot.toml`
 - byte-copy of `candidate-pool.json`
 - byte-copy of `eligible-candidates.json`
-- byte-copy of `candidate-dossiers/**` for exactly the shortlisted 3 candidates
+- byte-copy of `candidate-validation-results/**` for every seeded candidate
+- byte-copy of `candidate-dossiers/**` for every seeded candidate
 - byte-copy of `scorecard.json`
 - byte-copy of `sources.lock.json`
 - byte-copy of `comparison.generated.md`
 - byte-copy of `approval-draft.generated.toml`
-- byte-copy of `run-summary.md`
+- byte-copy of `run-summary.md`, except for the allowed Model B promote-time metrics / decision-summary deltas
+- byte-copy of `run-status.json`, except for the allowed Model B promote-time finalized metrics / path-bookkeeping deltas
 
 Canonical promotion rules:
+- promotion uses Model B semantics from `docs/specs/cli-agent-recommendation-dossier-contract.md`
 - `docs/agents/selection/cli-agent-selection-packet.md` is a byte-copy of scratch `comparison.generated.md`
-- committed review `comparison.generated.md` and the canonical packet are byte-identical
 - committed review `approval-draft.generated.toml` remains the scratch recommendation draft; final `docs/agents/lifecycle/<onboarding_pack_prefix>/governance/approved-agent.toml` is rendered at promote time from the maintainer-approved inputs
+- the canonical packet must conform to the no-drift template rule in `docs/templates/agent-selection/cli-agent-selection-packet-template.md`
 - promotion stages the canonical packet and final approval artifact under hidden per-run staging roots, validates the staged approval artifact with `cargo run -p xtask -- onboard-agent --approval <staged-path> --dry-run`, then swaps live surfaces
 - if validation fails, promotion removes the staging roots and leaves canonical surfaces unchanged
 - if a live swap fails after validation, promotion rolls live canonical surfaces back to their pre-promotion bytes, removes staging roots, and leaves `docs/agents/selection/runs/<run_id>/` unchanged
 
-### 5. Stop for maintainer approve-or-override
+### 6. Stop for maintainer approve-or-override
 
 The recommendation lane ends at:
 
@@ -119,7 +153,7 @@ Maintainers now either:
 - accept the recommended agent
 - override to another shortlisted candidate and provide `--override-reason`
 
-### 6. Continue with create mode unchanged
+### 7. Continue with create mode unchanged
 
 After the approval artifact exists, continue with the existing create lane exactly as documented below.
 

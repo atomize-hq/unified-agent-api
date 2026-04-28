@@ -3,8 +3,9 @@ from __future__ import annotations
 
 import argparse
 from collections.abc import Callable
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from datetime import datetime, timezone
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -13,16 +14,17 @@ import shutil
 import subprocess
 import tomllib
 from typing import Any
-import urllib.error
-import urllib.parse
-import urllib.request
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CANONICAL_PACKET_REL = "docs/agents/selection/cli-agent-selection-packet.md"
+LIVE_SEED_REL = "docs/agents/selection/candidate-seed.toml"
 REGISTRY_RELATIVE_PATH = "crates/xtask/data/agent_registry.toml"
 DEFAULT_TARGET = "darwin-arm64"
 APPROVAL_VERSION = "1"
 SELECTION_MODE = "factory_validation"
+TIMESTAMP_PATTERN = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
+HEX64_PATTERN = re.compile(r"^[0-9a-f]{64}$")
+SAFE_BINARY_PATTERN = re.compile(r"^[A-Za-z0-9._-]+$")
 PRIMARY_DIMENSIONS = (
     "Adoption & community pull",
     "CLI product maturity & release activity",
@@ -69,60 +71,87 @@ OPTIONAL_CANDIDATE_KEYS = {
     "capability_matrix_target",
     "docs_release_track",
 }
-SCRATCH_ARTIFACT_FILES = (
-    "candidate-pool.json",
-    "eligible-candidates.json",
-    "scorecard.json",
-    "sources.lock.json",
-    "comparison.generated.md",
-    "approval-draft.generated.toml",
-    "run-summary.md",
+DOSSIER_REQUIRED_KEYS = {
+    "schema_version",
+    "agent_id",
+    "display_name",
+    "generated_at",
+    "seed_snapshot_sha256",
+    "official_links",
+    "install_channels",
+    "auth_prerequisites",
+    "claims",
+    "probe_requests",
+    "blocked_steps",
+    "normalized_caveats",
+    "evidence",
+}
+CLAIM_KEYS = (
+    "non_interactive_execution",
+    "offline_strategy",
+    "observable_cli_surface",
+    "redaction_fit",
+    "crate_first_fit",
+    "reproducibility",
+    "future_leverage",
 )
-COPY_OWNED_REVIEW_FILES = (
-    "candidate-pool.json",
-    "eligible-candidates.json",
-    "scorecard.json",
-    "sources.lock.json",
-    "comparison.generated.md",
-    "approval-draft.generated.toml",
-    "run-summary.md",
+HARD_GATE_KEYS = (
+    "non_interactive_execution",
+    "offline_strategy",
+    "observable_cli_surface",
+    "redaction_fit",
+    "crate_first_fit",
+    "reproducibility",
 )
-AUTH_FRICTION_KEYWORDS = (
-    "auth",
-    "provider",
-    "credential",
-    "credentials",
-    "account",
-    "billing",
-    "paid",
-    "subscription",
-    "tier",
+CLAIM_ALLOWED_KEYS = {"state", "summary", "evidence_ids", "blocked_by", "notes"}
+EVIDENCE_REQUIRED_KEYS = {
+    "evidence_id",
+    "kind",
+    "title",
+    "captured_at",
+    "sha256",
+    "excerpt",
+}
+EVIDENCE_ALLOWED_KEYS = EVIDENCE_REQUIRED_KEYS | {"url"}
+PROBE_REQUEST_KEYS = {"probe_kind", "binary", "required_for_gate"}
+ALLOWED_CLAIM_STATES = {"verified", "blocked", "inferred", "unknown"}
+ALLOWED_EVIDENCE_KINDS = {"official_doc", "github", "package_registry", "ancillary", "probe_output"}
+ALLOWED_PROBE_KINDS = {"help", "version"}
+ALLOWED_CANDIDATE_STATUSES = {"eligible", "candidate_rejected", "candidate_error"}
+ALLOWED_RUN_STATUSES = {
+    "success",
+    "success_with_candidate_errors",
+    "insufficient_eligible_candidates",
+    "run_fatal",
+}
+ALLOWED_GATE_RESULTS = {"pass", "fail", "blocked", "unknown"}
+ALLOWED_PROBE_RESULTS = {"passed", "failed", "skipped"}
+PROBE_ARGS = {"help": "--help", "version": "--version"}
+MAX_EVIDENCE_REFS = 12
+MAX_OFFICIAL_DOC_REFS = 4
+MAX_PACKAGE_REGISTRY_REFS = 2
+MAX_GITHUB_REFS = 3
+MAX_ANCILLARY_REFS = 3
+MAX_BLOCKED_STEPS = 3
+MAX_FREEFORM_NOTE_CHARS = 1200
+MAX_PROBES_PER_CANDIDATE = 2
+PROBE_TIMEOUT_SECONDS = 5
+MAX_PROBE_OUTPUT_BYTES = 32768
+RUN_STATUS_METRIC_KEYS = (
+    "maintainer_time_to_decision_seconds",
+    "shortlist_override",
+    "predicted_blocker_count",
+    "later_discovered_blocker_count",
+    "rejected_before_scoring_count",
+    "evidence_collection_time_seconds",
+    "fetched_source_count",
 )
-ARCHITECTURE_KEYWORDS = (
-    "run",
-    "json",
-    "serve",
-    "server",
-    "headless",
-    "stdin",
-    "stdout",
-    "automation",
-    "agent",
-    "tool",
-    "terminal",
-)
-LEVERAGE_KEYWORDS = (
-    "subagent",
-    "session",
-    "fork",
-    "model",
-    "automation",
-    "tool",
-    "api",
-    "server",
-    "json",
-    "workflow",
-)
+APPROVAL_DEPENDENT_METRIC_KEYS = {
+    "maintainer_time_to_decision_seconds",
+    "shortlist_override",
+    "predicted_blocker_count",
+    "later_discovered_blocker_count",
+}
 
 
 class RecommendationError(Exception):
@@ -174,18 +203,12 @@ class CandidateSeed:
                 "package_name",
                 f"unified-agent-api-{actual_agent_id.replace('_', '-')}",
             ),
-            "canonical_targets": self.overrides.get(
-                "canonical_targets",
-                defaults.canonical_targets,
-            ),
+            "canonical_targets": self.overrides.get("canonical_targets", defaults.canonical_targets),
             "wrapper_coverage_binding_kind": self.overrides.get(
                 "wrapper_coverage_binding_kind",
                 defaults.wrapper_coverage_binding_kind,
             ),
-            "wrapper_coverage_source_path": self.overrides.get(
-                "wrapper_coverage_source_path",
-                crate_path,
-            ),
+            "wrapper_coverage_source_path": self.overrides.get("wrapper_coverage_source_path", crate_path),
             "always_on_capabilities": self.overrides.get(
                 "always_on_capabilities",
                 defaults.always_on_capabilities,
@@ -198,10 +221,7 @@ class CandidateSeed:
                 "config_gated_capabilities",
                 defaults.config_gated_capabilities,
             ),
-            "backend_extensions": self.overrides.get(
-                "backend_extensions",
-                defaults.backend_extensions,
-            ),
+            "backend_extensions": self.overrides.get("backend_extensions", defaults.backend_extensions),
             "support_matrix_enabled": self.overrides.get(
                 "support_matrix_enabled",
                 defaults.support_matrix_enabled,
@@ -210,10 +230,7 @@ class CandidateSeed:
                 "capability_matrix_enabled",
                 defaults.capability_matrix_enabled,
             ),
-            "docs_release_track": self.overrides.get(
-                "docs_release_track",
-                defaults.docs_release_track,
-            ),
+            "docs_release_track": self.overrides.get("docs_release_track", defaults.docs_release_track),
         }
         capability_matrix_target = self.overrides.get("capability_matrix_target")
         if capability_matrix_target is None:
@@ -236,29 +253,6 @@ class SeedConfig:
 
 
 @dataclass(frozen=True)
-class SourceRecord:
-    url: str
-    kind: str
-    fetched_at: str
-    final_url: str
-    summary: dict[str, Any]
-
-
-@dataclass(frozen=True)
-class CandidateEvidence:
-    install_channel_count: int
-    docs_source_count: int
-    fetched_source_count: int
-    auth_friction_hits: int
-    github_stars: int
-    package_version_count: int
-    release_age_days: int | None
-    architecture_keyword_hits: int
-    leverage_keyword_hits: int
-    corpus_excerpt: str
-
-
-@dataclass(frozen=True)
 class CandidateScore:
     scores: dict[str, int]
     notes: str
@@ -272,12 +266,27 @@ class CandidateScore:
         return sum(self.scores[dimension] for dimension in SECONDARY_DIMENSIONS)
 
 
+@dataclass
+class CandidateResult:
+    agent_id: str
+    status: str
+    schema_valid: bool
+    hard_gate_results: dict[str, dict[str, Any]]
+    probe_results: list[dict[str, Any]]
+    rejection_reasons: list[str]
+    error_reasons: list[str]
+    evidence_ids_used: list[str]
+    notes: list[str]
+    score: CandidateScore | None = None
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = NoAbbrevArgumentParser(description="Generate and promote the next CLI agent recommendation lane.")
     subparsers = parser.add_subparsers(dest="command", required=True, parser_class=NoAbbrevArgumentParser)
 
     generate = subparsers.add_parser("generate")
     generate.add_argument("--seed-file", required=True)
+    generate.add_argument("--research-dir", required=True)
     generate.add_argument("--run-id", required=True)
     generate.add_argument("--scratch-root", required=True)
 
@@ -302,6 +311,10 @@ def read_text(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 
 
+def read_json(path: Path) -> Any:
+    return json.loads(read_text(path))
+
+
 def write_text(path: Path, text: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(text, encoding="utf-8")
@@ -309,6 +322,11 @@ def write_text(path: Path, text: str) -> None:
 
 def write_json(path: Path, data: Any) -> None:
     write_text(path, json_dumps(data))
+
+
+def write_bytes(path: Path, contents: bytes) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(contents)
 
 
 def remove_path(path: Path) -> None:
@@ -322,6 +340,80 @@ def remove_path(path: Path) -> None:
 
 def canonical_packet_path(repo_root: Path) -> Path:
     return repo_root / CANONICAL_PACKET_REL
+
+
+def restore_file(path: Path, previous_bytes: bytes | None, *, repo_root: Path) -> None:
+    if previous_bytes is None:
+        remove_path(path)
+        parent = path.parent
+        while parent != repo_root and parent.exists() and not any(parent.iterdir()):
+            parent.rmdir()
+            parent = parent.parent
+        return
+    write_bytes(path, previous_bytes)
+
+
+def sha256_bytes(contents: bytes) -> str:
+    return hashlib.sha256(contents).hexdigest()
+
+
+def sha256_file(path: Path) -> str:
+    return sha256_bytes(path.read_bytes())
+
+
+def parse_timestamp(value: str) -> datetime:
+    if not isinstance(value, str) or not TIMESTAMP_PATTERN.match(value):
+        raise RecommendationError(f"timestamp `{value}` must be UTC RFC3339 with trailing Z")
+    return datetime.fromisoformat(value.replace("Z", "+00:00"))
+
+
+def ensure_string(value: Any, *, label: str) -> str:
+    if not isinstance(value, str) or not value:
+        raise RecommendationError(f"{label} must be a non-empty string")
+    return value
+
+
+def ensure_optional_string(value: Any, *, label: str) -> str | None:
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise RecommendationError(f"{label} must be a string or null")
+    return value
+
+
+def ensure_string_list(value: Any, *, label: str) -> list[str]:
+    if not isinstance(value, list):
+        raise RecommendationError(f"{label} must be an array")
+    result: list[str] = []
+    for index, entry in enumerate(value):
+        if not isinstance(entry, str):
+            raise RecommendationError(f"{label}[{index}] must be a string")
+        result.append(entry)
+    return result
+
+
+def ensure_bool(value: Any, *, label: str) -> bool:
+    if not isinstance(value, bool):
+        raise RecommendationError(f"{label} must be a boolean")
+    return value
+
+
+def ensure_int(value: Any, *, label: str) -> int:
+    if not isinstance(value, int):
+        raise RecommendationError(f"{label} must be an integer")
+    return value
+
+
+def ensure_hex64(value: Any, *, label: str) -> str:
+    if not isinstance(value, str) or not HEX64_PATTERN.match(value):
+        raise RecommendationError(f"{label} must be a lowercase 64-char SHA-256 hex string")
+    return value
+
+
+def limit_note(value: str, *, label: str) -> str:
+    if len(value) > MAX_FREEFORM_NOTE_CHARS:
+        raise RecommendationError(f"{label} exceeds the {MAX_FREEFORM_NOTE_CHARS}-char limit")
+    return value
 
 
 def load_onboarded_agent_ids(registry_path: Path) -> set[str]:
@@ -350,7 +442,12 @@ def load_onboarded_agent_ids(registry_path: Path) -> set[str]:
 
 
 def parse_seed_file(seed_path: Path) -> SeedConfig:
-    data = tomllib.loads(read_text(seed_path))
+    try:
+        data = tomllib.loads(read_text(seed_path))
+    except FileNotFoundError as exc:
+        raise RecommendationError(f"seed file `{seed_path}` does not exist") from exc
+    except tomllib.TOMLDecodeError as exc:
+        raise RecommendationError(f"seed file `{seed_path}` is not valid TOML: {exc}") from exc
     if set(data.keys()) != {"defaults", "candidate"}:
         raise RecommendationError("seed file must contain exactly `defaults` and `candidate` top-level tables")
     defaults_root = data["defaults"]
@@ -376,24 +473,25 @@ def parse_seed_file(seed_path: Path) -> SeedConfig:
         docs_release_track=defaults_data["docs_release_track"],
     )
     candidates: list[CandidateSeed] = []
-    for agent_id, candidate_data in sorted(data["candidate"].items()):
+    for agent_id, candidate_data in data["candidate"].items():
         keys = set(candidate_data.keys())
-        required_missing = REQUIRED_CANDIDATE_KEYS - keys
-        if required_missing:
+        missing = REQUIRED_CANDIDATE_KEYS - keys
+        if missing:
             raise RecommendationError(
-                f"candidate `{agent_id}` is missing required keys: {', '.join(sorted(required_missing))}"
+                f"candidate `{agent_id}` is missing required keys: {', '.join(sorted(missing))}"
             )
-        allowed = REQUIRED_CANDIDATE_KEYS | OPTIONAL_CANDIDATE_KEYS
-        unknown = keys - allowed
+        unknown = keys - (REQUIRED_CANDIDATE_KEYS | OPTIONAL_CANDIDATE_KEYS)
         if unknown:
-            raise RecommendationError(f"candidate `{agent_id}` has unsupported keys: {', '.join(sorted(unknown))}")
+            raise RecommendationError(
+                f"candidate `{agent_id}` has unsupported keys: {', '.join(sorted(unknown))}"
+            )
         candidates.append(
             CandidateSeed(
                 agent_id=agent_id,
-                display_name=candidate_data["display_name"],
+                display_name=ensure_string(candidate_data["display_name"], label=f"candidate `{agent_id}` display_name"),
                 research_urls=list(candidate_data["research_urls"]),
                 install_channels=list(candidate_data["install_channels"]),
-                auth_notes=candidate_data["auth_notes"],
+                auth_notes=ensure_string(candidate_data["auth_notes"], label=f"candidate `{agent_id}` auth_notes"),
                 overrides={key: candidate_data[key] for key in OPTIONAL_CANDIDATE_KEYS if key in candidate_data},
             )
         )
@@ -402,293 +500,503 @@ def parse_seed_file(seed_path: Path) -> SeedConfig:
     return SeedConfig(defaults=defaults, candidates=candidates)
 
 
-def fetch_url(url: str) -> SourceRecord:
-    fetched_at = utc_now()
-    parsed = urllib.parse.urlparse(url)
-    if parsed.netloc == "github.com":
-        return fetch_github_repo(url, fetched_at)
-    if parsed.netloc == "www.npmjs.com":
-        return fetch_npm_package(url, fetched_at)
-    if parsed.netloc == "pypi.org":
-        return fetch_pypi_package(url, fetched_at)
-    return fetch_generic_page(url, fetched_at)
+def build_empty_metrics() -> dict[str, Any]:
+    return {key: None for key in RUN_STATUS_METRIC_KEYS}
 
 
-def urlopen_json(url: str) -> tuple[Any, str]:
-    request = urllib.request.Request(url, headers={"User-Agent": "unified-agent-api recommend-next-agent"})
-    with urllib.request.urlopen(request, timeout=20) as response:
-        final_url = response.geturl()
-        payload = response.read().decode("utf-8")
-    return json.loads(payload), final_url
-
-
-def urlopen_text(url: str) -> tuple[str, str]:
-    request = urllib.request.Request(url, headers={"User-Agent": "unified-agent-api recommend-next-agent"})
-    with urllib.request.urlopen(request, timeout=20) as response:
-        final_url = response.geturl()
-        payload = response.read(250_000).decode("utf-8", errors="replace")
-    return payload, final_url
-
-
-def fetch_github_repo(url: str, fetched_at: str) -> SourceRecord:
-    parsed = urllib.parse.urlparse(url)
-    parts = [part for part in parsed.path.split("/") if part]
-    if len(parts) < 2:
-        raise RecommendationError(f"unsupported GitHub repo url `{url}`")
-    owner, repo = parts[0], parts[1]
-    repo_data, final_url = urlopen_json(f"https://api.github.com/repos/{owner}/{repo}")
-    release_summary: dict[str, Any] = {}
-    try:
-        release_data, _ = urlopen_json(f"https://api.github.com/repos/{owner}/{repo}/releases/latest")
-        release_summary = {
-            "latest_release_name": release_data.get("name") or release_data.get("tag_name"),
-            "latest_release_published_at": release_data.get("published_at"),
-        }
-    except urllib.error.HTTPError as exc:
-        if exc.code != 404:
-            raise
-    summary = {
-        "repo": repo_data["full_name"],
-        "description": repo_data.get("description"),
-        "stars": repo_data.get("stargazers_count", 0),
-        "forks": repo_data.get("forks_count", 0),
-        "open_issues": repo_data.get("open_issues_count", 0),
-        "updated_at": repo_data.get("updated_at"),
-        "pushed_at": repo_data.get("pushed_at"),
-        "topics": repo_data.get("topics", []),
-    }
-    summary.update(release_summary)
-    return SourceRecord(url=url, kind="github_repo", fetched_at=fetched_at, final_url=final_url, summary=summary)
-
-
-def fetch_npm_package(url: str, fetched_at: str) -> SourceRecord:
-    parsed = urllib.parse.urlparse(url)
-    match = re.search(r"/package/(.+)$", parsed.path)
-    if not match:
-        raise RecommendationError(f"unsupported npm package url `{url}`")
-    package_name = urllib.parse.unquote(match.group(1))
-    encoded = urllib.parse.quote(package_name, safe="@")
-    package_data, final_url = urlopen_json(f"https://registry.npmjs.org/{encoded}")
-    times = package_data.get("time", {})
-    summary = {
-        "package_name": package_name,
-        "latest_version": package_data.get("dist-tags", {}).get("latest"),
-        "modified": times.get("modified"),
-        "created": times.get("created"),
-        "version_count": len(package_data.get("versions", {})),
-        "description": package_data.get("description"),
-    }
-    return SourceRecord(url=url, kind="npm_package", fetched_at=fetched_at, final_url=final_url, summary=summary)
-
-
-def fetch_pypi_package(url: str, fetched_at: str) -> SourceRecord:
-    parsed = urllib.parse.urlparse(url)
-    match = re.search(r"/project/([^/]+)/?", parsed.path)
-    if not match:
-        raise RecommendationError(f"unsupported PyPI package url `{url}`")
-    package_name = urllib.parse.unquote(match.group(1))
-    package_data, final_url = urlopen_json(f"https://pypi.org/pypi/{package_name}/json")
-    release_dates = sorted(
-        item.get("upload_time_iso_8601")
-        for items in package_data.get("releases", {}).values()
-        for item in items
-        if item.get("upload_time_iso_8601")
-    )
-    summary = {
-        "package_name": package_name,
-        "latest_version": package_data.get("info", {}).get("version"),
-        "release_count": len(package_data.get("releases", {})),
-        "latest_upload_time": release_dates[-1] if release_dates else None,
-        "description": package_data.get("info", {}).get("summary"),
-    }
-    return SourceRecord(url=url, kind="pypi_package", fetched_at=fetched_at, final_url=final_url, summary=summary)
-
-
-def fetch_generic_page(url: str, fetched_at: str) -> SourceRecord:
-    html, final_url = urlopen_text(url)
-    title_match = re.search(r"<title[^>]*>(.*?)</title>", html, re.IGNORECASE | re.DOTALL)
-    title = html_unescape(strip_tags(title_match.group(1))) if title_match else None
-    text = strip_tags(html)
-    text = re.sub(r"\s+", " ", text).strip()
-    lowered = text.lower()
-    summary = {
-        "title": title,
-        "snippet": text[:500],
-        "keyword_hits": {
-            "architecture": keyword_hits(lowered, ARCHITECTURE_KEYWORDS),
-            "leverage": keyword_hits(lowered, LEVERAGE_KEYWORDS),
+def build_base_run_status(
+    *,
+    run_id: str,
+    generated_at: str,
+    research_dir: Path,
+    run_dir: Path,
+) -> dict[str, Any]:
+    return {
+        "run_id": run_id,
+        "status": "run_fatal",
+        "generated_at": generated_at,
+        "research_dir": str(research_dir),
+        "run_dir": str(run_dir),
+        "eligible_candidate_ids": [],
+        "shortlist_ids": [],
+        "recommended_agent_id": None,
+        "candidate_status_counts": {
+            "eligible": 0,
+            "candidate_rejected": 0,
+            "candidate_error": 0,
         },
+        "metrics": build_empty_metrics(),
+        "errors": [],
+        "approved_agent_id": None,
+        "approval_recorded_at": None,
+        "override_reason": None,
+        "committed_review_dir": None,
+        "committed_packet_path": None,
+        "committed_approval_artifact_path": None,
     }
-    return SourceRecord(url=url, kind="generic_page", fetched_at=fetched_at, final_url=final_url, summary=summary)
 
 
-def strip_tags(text: str) -> str:
-    return re.sub(r"<[^>]+>", " ", text)
+def candidate_status_counts(candidate_results: dict[str, CandidateResult]) -> dict[str, int]:
+    counts = {"eligible": 0, "candidate_rejected": 0, "candidate_error": 0}
+    for result in candidate_results.values():
+        counts[result.status] += 1
+    return counts
 
 
-def html_unescape(text: str) -> str:
-    return (
-        text.replace("&amp;", "&")
-        .replace("&lt;", "<")
-        .replace("&gt;", ">")
-        .replace("&quot;", '"')
-        .replace("&#39;", "'")
+def build_placeholder_gate_results() -> dict[str, dict[str, Any]]:
+    return {
+        key: {
+            "status": "unknown",
+            "evidence_ids": [],
+            "notes": "",
+        }
+        for key in HARD_GATE_KEYS
+    }
+
+
+def build_placeholder_candidate_result(agent_id: str) -> CandidateResult:
+    return CandidateResult(
+        agent_id=agent_id,
+        status="candidate_error",
+        schema_valid=False,
+        hard_gate_results=build_placeholder_gate_results(),
+        probe_results=[],
+        rejection_reasons=[],
+        error_reasons=[],
+        evidence_ids_used=[],
+        notes=[],
     )
 
 
-def keyword_hits(text: str, terms: tuple[str, ...]) -> int:
-    return sum(text.count(term) for term in terms)
+def build_run_error(*, scope: str, agent_id: str | None, code: str, message: str) -> dict[str, Any]:
+    return {
+        "scope": scope,
+        "agent_id": agent_id,
+        "code": code,
+        "message": message,
+    }
 
 
-def iso_age_days(iso_value: str | None) -> int | None:
-    if not iso_value:
-        return None
-    value = datetime.fromisoformat(iso_value.replace("Z", "+00:00"))
-    return (datetime.now(timezone.utc) - value).days
+def validate_seed_file_exists(seed_file: Path) -> None:
+    if not seed_file.exists():
+        raise RecommendationError(f"seed file `{seed_file}` does not exist")
 
 
-def collect_evidence(candidate: CandidateSeed, records: list[SourceRecord]) -> CandidateEvidence:
-    texts: list[str] = [candidate.auth_notes.lower()]
-    github_stars = 0
-    package_version_count = 0
-    release_age_days: int | None = None
-    docs_source_count = 0
-    for record in records:
-        if record.kind == "github_repo":
-            github_stars = max(github_stars, int(record.summary.get("stars") or 0))
-            pushed_days = iso_age_days(record.summary.get("pushed_at"))
-            if pushed_days is not None:
-                release_age_days = pushed_days if release_age_days is None else min(release_age_days, pushed_days)
-            texts.extend(
-                str(value).lower()
-                for value in (
-                    record.summary.get("description"),
-                    " ".join(record.summary.get("topics", [])),
-                    record.summary.get("latest_release_name"),
-                )
-                if value
+def validate_research_metadata(
+    *,
+    research_metadata_path: Path,
+    expected_run_id: str,
+    research_dir: Path,
+    run_dir: Path,
+) -> dict[str, Any]:
+    try:
+        data = read_json(research_metadata_path)
+    except FileNotFoundError as exc:
+        raise RecommendationError(f"research metadata `{research_metadata_path}` does not exist") from exc
+    except json.JSONDecodeError as exc:
+        raise RecommendationError(f"research metadata `{research_metadata_path}` is not valid JSON: {exc}") from exc
+    if not isinstance(data, dict):
+        raise RecommendationError("research metadata must be a JSON object")
+    if set(data.keys()) != {"run_id", "evidence_collection_time_seconds", "fetched_source_count"}:
+        raise RecommendationError("research metadata keys do not match the frozen contract")
+    run_id = data["run_id"]
+    evidence_collection_time_seconds = data["evidence_collection_time_seconds"]
+    fetched_source_count = data["fetched_source_count"]
+    if not isinstance(run_id, str):
+        raise RecommendationError("research metadata run_id must be a string")
+    if not isinstance(evidence_collection_time_seconds, int):
+        raise RecommendationError("research metadata evidence_collection_time_seconds must be an integer")
+    if not isinstance(fetched_source_count, int):
+        raise RecommendationError("research metadata fetched_source_count must be an integer")
+    if run_id != expected_run_id:
+        raise RecommendationError("research metadata run_id must equal CLI --run-id")
+    if research_dir.name != expected_run_id:
+        raise RecommendationError("research directory basename must equal CLI --run-id")
+    if run_dir.name != expected_run_id:
+        raise RecommendationError("run directory basename must equal CLI --run-id")
+    if run_id != research_dir.name or run_id != run_dir.name:
+        raise RecommendationError("research metadata run_id must match the directory basenames")
+    return data
+
+
+def validate_dossier_top_level(
+    dossier: dict[str, Any],
+    *,
+    agent_id: str,
+    snapshot_sha: str,
+    seeded_ids: set[str],
+) -> None:
+    if set(dossier.keys()) != DOSSIER_REQUIRED_KEYS:
+        raise RecommendationError(f"dossier `{agent_id}` top-level keys do not match the frozen contract")
+    ensure_string(dossier["schema_version"], label=f"dossier `{agent_id}` schema_version")
+    actual_agent_id = ensure_string(dossier["agent_id"], label=f"dossier `{agent_id}` agent_id")
+    if actual_agent_id != agent_id:
+        raise RecommendationError(f"dossier `{agent_id}` agent_id does not match its filename")
+    if actual_agent_id not in seeded_ids:
+        raise RecommendationError(f"dossier `{agent_id}` does not correspond to a seeded candidate")
+    ensure_string(dossier["display_name"], label=f"dossier `{agent_id}` display_name")
+    parse_timestamp(ensure_string(dossier["generated_at"], label=f"dossier `{agent_id}` generated_at"))
+    if ensure_hex64(dossier["seed_snapshot_sha256"], label=f"dossier `{agent_id}` seed_snapshot_sha256") != snapshot_sha:
+        raise RecommendationError(f"dossier `{agent_id}` seed_snapshot_sha256 does not match the run snapshot")
+    ensure_string_list(dossier["official_links"], label=f"dossier `{agent_id}` official_links")
+    ensure_string_list(dossier["install_channels"], label=f"dossier `{agent_id}` install_channels")
+    ensure_string_list(dossier["auth_prerequisites"], label=f"dossier `{agent_id}` auth_prerequisites")
+    blocked_steps = ensure_string_list(dossier["blocked_steps"], label=f"dossier `{agent_id}` blocked_steps")
+    if len(blocked_steps) > MAX_BLOCKED_STEPS:
+        raise RecommendationError(f"dossier `{agent_id}` blocked_steps exceeds the limit")
+    for index, entry in enumerate(blocked_steps):
+        limit_note(entry, label=f"dossier `{agent_id}` blocked_steps[{index}]")
+    normalized_caveats = ensure_string_list(
+        dossier["normalized_caveats"],
+        label=f"dossier `{agent_id}` normalized_caveats",
+    )
+    for index, entry in enumerate(normalized_caveats):
+        limit_note(entry, label=f"dossier `{agent_id}` normalized_caveats[{index}]")
+    validate_claims(dossier["claims"], agent_id=agent_id)
+    validate_probe_requests(dossier["probe_requests"], agent_id=agent_id)
+    validate_evidence(dossier["evidence"], agent_id=agent_id)
+
+
+def validate_claims(claims: Any, *, agent_id: str) -> None:
+    if not isinstance(claims, dict):
+        raise RecommendationError(f"dossier `{agent_id}` claims must be an object")
+    if set(claims.keys()) != set(CLAIM_KEYS):
+        raise RecommendationError(f"dossier `{agent_id}` claims keys do not match the frozen contract")
+    for claim_key in CLAIM_KEYS:
+        claim = claims[claim_key]
+        if not isinstance(claim, dict):
+            raise RecommendationError(f"dossier `{agent_id}` claim `{claim_key}` must be an object")
+        if not set(claim.keys()).issubset(CLAIM_ALLOWED_KEYS):
+            raise RecommendationError(f"dossier `{agent_id}` claim `{claim_key}` has unsupported keys")
+        for required in ("state", "summary", "evidence_ids"):
+            if required not in claim:
+                raise RecommendationError(f"dossier `{agent_id}` claim `{claim_key}` is missing `{required}`")
+        state = ensure_string(claim["state"], label=f"dossier `{agent_id}` claim `{claim_key}` state")
+        if state not in ALLOWED_CLAIM_STATES:
+            raise RecommendationError(f"dossier `{agent_id}` claim `{claim_key}` has an invalid state")
+        limit_note(
+            ensure_string(claim["summary"], label=f"dossier `{agent_id}` claim `{claim_key}` summary"),
+            label=f"dossier `{agent_id}` claim `{claim_key}` summary",
+        )
+        ensure_string_list(claim["evidence_ids"], label=f"dossier `{agent_id}` claim `{claim_key}` evidence_ids")
+        if "blocked_by" in claim:
+            ensure_string_list(claim["blocked_by"], label=f"dossier `{agent_id}` claim `{claim_key}` blocked_by")
+        if "notes" in claim:
+            limit_note(
+                ensure_string(claim["notes"], label=f"dossier `{agent_id}` claim `{claim_key}` notes"),
+                label=f"dossier `{agent_id}` claim `{claim_key}` notes",
             )
-        elif record.kind == "npm_package":
-            package_version_count = max(package_version_count, int(record.summary.get("version_count") or 0))
-            modified_days = iso_age_days(record.summary.get("modified"))
-            if modified_days is not None:
-                release_age_days = modified_days if release_age_days is None else min(release_age_days, modified_days)
-            texts.append(str(record.summary.get("description") or "").lower())
-        elif record.kind == "pypi_package":
-            package_version_count = max(package_version_count, int(record.summary.get("release_count") or 0))
-            upload_days = iso_age_days(record.summary.get("latest_upload_time"))
-            if upload_days is not None:
-                release_age_days = upload_days if release_age_days is None else min(release_age_days, upload_days)
-            texts.append(str(record.summary.get("description") or "").lower())
-        else:
-            docs_source_count += 1
-            texts.append(str(record.summary.get("title") or "").lower())
-            texts.append(str(record.summary.get("snippet") or "").lower())
-    corpus = " ".join(texts)
-    return CandidateEvidence(
-        install_channel_count=len(candidate.install_channels),
-        docs_source_count=docs_source_count,
-        fetched_source_count=len(records),
-        auth_friction_hits=keyword_hits(candidate.auth_notes.lower(), AUTH_FRICTION_KEYWORDS),
-        github_stars=github_stars,
-        package_version_count=package_version_count,
-        release_age_days=release_age_days,
-        architecture_keyword_hits=keyword_hits(corpus, ARCHITECTURE_KEYWORDS),
-        leverage_keyword_hits=keyword_hits(corpus, LEVERAGE_KEYWORDS),
-        corpus_excerpt=corpus[:500],
-    )
 
 
-def eligibility(candidate: CandidateSeed, evidence: CandidateEvidence, records: list[SourceRecord]) -> list[str]:
-    reasons: list[str] = []
-    if evidence.fetched_source_count < 2:
-        reasons.append("insufficient external evidence was captured")
-    if not any(record.kind == "github_repo" for record in records):
-        reasons.append("missing inspectable GitHub repo evidence")
-    if evidence.install_channel_count == 0:
-        reasons.append("no non-interactive install path is declared")
-    if evidence.architecture_keyword_hits == 0:
-        reasons.append("non-interactive CLI/runtime surface evidence is too weak")
-    return reasons
+def validate_probe_requests(probe_requests: Any, *, agent_id: str) -> None:
+    if not isinstance(probe_requests, list):
+        raise RecommendationError(f"dossier `{agent_id}` probe_requests must be an array")
+    if len(probe_requests) > MAX_PROBES_PER_CANDIDATE:
+        raise RecommendationError(f"dossier `{agent_id}` probe_requests exceeds the limit")
+    for index, entry in enumerate(probe_requests):
+        if not isinstance(entry, dict):
+            raise RecommendationError(f"dossier `{agent_id}` probe_requests[{index}] must be an object")
+        if set(entry.keys()) != PROBE_REQUEST_KEYS:
+            raise RecommendationError(f"dossier `{agent_id}` probe_requests[{index}] keys do not match the frozen contract")
+        probe_kind = ensure_string(entry["probe_kind"], label=f"dossier `{agent_id}` probe_requests[{index}] probe_kind")
+        if probe_kind not in ALLOWED_PROBE_KINDS:
+            raise RecommendationError(f"dossier `{agent_id}` probe_requests[{index}] has an invalid probe_kind")
+        binary = ensure_string(entry["binary"], label=f"dossier `{agent_id}` probe_requests[{index}] binary")
+        if not SAFE_BINARY_PATTERN.match(binary) or "/" in binary:
+            raise RecommendationError(f"dossier `{agent_id}` probe_requests[{index}] binary violates the allowlist")
+        ensure_bool(entry["required_for_gate"], label=f"dossier `{agent_id}` probe_requests[{index}] required_for_gate")
 
 
-def score_candidate(evidence: CandidateEvidence) -> CandidateScore:
-    scores = {
-        "Adoption & community pull": score_adoption(evidence),
-        "CLI product maturity & release activity": score_maturity(evidence),
-        "Installability & docs quality": score_installability(evidence),
-        "Reproducibility & access friction": score_reproducibility(evidence),
-        "Architecture fit for this repo": score_architecture_fit(evidence),
-        "Capability expansion / future leverage": score_future_leverage(evidence),
+def validate_evidence(evidence: Any, *, agent_id: str) -> None:
+    if not isinstance(evidence, list):
+        raise RecommendationError(f"dossier `{agent_id}` evidence must be an array")
+    if len(evidence) > MAX_EVIDENCE_REFS:
+        raise RecommendationError(f"dossier `{agent_id}` evidence exceeds the limit")
+    kind_counts = {kind: 0 for kind in ALLOWED_EVIDENCE_KINDS}
+    evidence_ids: set[str] = set()
+    for index, entry in enumerate(evidence):
+        if not isinstance(entry, dict):
+            raise RecommendationError(f"dossier `{agent_id}` evidence[{index}] must be an object")
+        if not set(entry.keys()).issubset(EVIDENCE_ALLOWED_KEYS):
+            raise RecommendationError(f"dossier `{agent_id}` evidence[{index}] has unsupported keys")
+        missing = EVIDENCE_REQUIRED_KEYS - set(entry.keys())
+        if missing:
+            raise RecommendationError(
+                f"dossier `{agent_id}` evidence[{index}] is missing required keys: {', '.join(sorted(missing))}"
+            )
+        evidence_id = ensure_string(entry["evidence_id"], label=f"dossier `{agent_id}` evidence[{index}] evidence_id")
+        if evidence_id in evidence_ids:
+            raise RecommendationError(f"dossier `{agent_id}` evidence ids must be unique")
+        evidence_ids.add(evidence_id)
+        kind = ensure_string(entry["kind"], label=f"dossier `{agent_id}` evidence[{index}] kind")
+        if kind not in ALLOWED_EVIDENCE_KINDS:
+            raise RecommendationError(f"dossier `{agent_id}` evidence[{index}] has an invalid kind")
+        if "url" in entry and entry["url"] is not None:
+            ensure_string(entry["url"], label=f"dossier `{agent_id}` evidence[{index}] url")
+        ensure_string(entry["title"], label=f"dossier `{agent_id}` evidence[{index}] title")
+        parse_timestamp(ensure_string(entry["captured_at"], label=f"dossier `{agent_id}` evidence[{index}] captured_at"))
+        ensure_hex64(entry["sha256"], label=f"dossier `{agent_id}` evidence[{index}] sha256")
+        limit_note(
+            ensure_string(entry["excerpt"], label=f"dossier `{agent_id}` evidence[{index}] excerpt"),
+            label=f"dossier `{agent_id}` evidence[{index}] excerpt",
+        )
+        kind_counts[kind] += 1
+    if kind_counts["official_doc"] > MAX_OFFICIAL_DOC_REFS:
+        raise RecommendationError(f"dossier `{agent_id}` has too many official_doc refs")
+    if kind_counts["package_registry"] > MAX_PACKAGE_REGISTRY_REFS:
+        raise RecommendationError(f"dossier `{agent_id}` has too many package_registry refs")
+    if kind_counts["github"] > MAX_GITHUB_REFS:
+        raise RecommendationError(f"dossier `{agent_id}` has too many github refs")
+    if kind_counts["ancillary"] > MAX_ANCILLARY_REFS:
+        raise RecommendationError(f"dossier `{agent_id}` has too many ancillary refs")
+
+
+def validate_claim_evidence_links(dossier: dict[str, Any], *, agent_id: str) -> None:
+    evidence_ids = {entry["evidence_id"] for entry in dossier["evidence"]}
+    for claim_key, claim in dossier["claims"].items():
+        for evidence_id in claim["evidence_ids"]:
+            if evidence_id not in evidence_ids:
+                raise RecommendationError(f"dossier `{agent_id}` claim `{claim_key}` references unknown evidence_id `{evidence_id}`")
+
+
+def load_dossier_payload(path: Path) -> dict[str, Any]:
+    try:
+        data = read_json(path)
+    except UnicodeDecodeError as exc:
+        raise RecommendationError(f"dossier `{path}` is not valid UTF-8: {exc}") from exc
+    except json.JSONDecodeError as exc:
+        raise RecommendationError(f"dossier `{path}` is not valid JSON: {exc}") from exc
+    if not isinstance(data, dict):
+        raise RecommendationError(f"dossier `{path}` must be a JSON object")
+    return data
+
+
+def redacted_text(value: str) -> str:
+    value = re.sub(r"(?i)\b(token|api[_-]?key|secret|password)=\S+", r"\1=[REDACTED]", value)
+    value = re.sub(r"(?i)\b(bearer)\s+\S+", r"\1 [REDACTED]", value)
+    value = re.sub(r"(?:(?:/Users|/home|/tmp|/var|/private|/opt|/Volumes|/Applications|/usr|/etc)[^\s]*)", "[REDACTED_PATH]", value)
+    return value
+
+
+def probe_output_ref(agent_id: str, probe_kind: str, index: int) -> str:
+    return f"{agent_id}:{probe_kind}:{index}"
+
+
+def execute_probe(
+    *,
+    agent_id: str,
+    probe_request: dict[str, Any],
+    index: int,
+) -> tuple[dict[str, Any], dict[str, Any] | None, str | None]:
+    probe_kind = probe_request["probe_kind"]
+    binary = probe_request["binary"]
+    required_for_gate = probe_request["required_for_gate"]
+    result: dict[str, Any] = {
+        "probe_kind": probe_kind,
+        "binary": binary,
+        "required_for_gate": required_for_gate,
+        "status": "skipped",
+        "exit_code": None,
+        "timed_out": False,
+        "captured_output_ref": None,
+        "notes": "",
     }
-    notes = (
-        f"stars={evidence.github_stars}, installs={evidence.install_channel_count}, "
-        f"docs={evidence.docs_source_count}, auth_hits={evidence.auth_friction_hits}, "
-        f"architecture_hits={evidence.architecture_keyword_hits}, leverage_hits={evidence.leverage_keyword_hits}"
-    )
-    return CandidateScore(scores=scores, notes=notes)
+    if probe_kind not in ALLOWED_PROBE_KINDS:
+        result["status"] = "failed"
+        result["notes"] = "invalid probe kind"
+        return result, None, "probe kind is not allowlisted"
+    if not SAFE_BINARY_PATTERN.match(binary) or "/" in binary:
+        result["status"] = "failed"
+        result["notes"] = "binary violates allowlist"
+        return result, None, "binary violates allowlist"
+    env = {key: os.environ[key] for key in ("PATH", "HOME", "TMPDIR") if key in os.environ}
+    try:
+        completed = subprocess.run(
+            [binary, PROBE_ARGS[probe_kind]],
+            capture_output=True,
+            check=False,
+            env=env,
+            text=False,
+            timeout=PROBE_TIMEOUT_SECONDS,
+        )
+    except FileNotFoundError:
+        result["status"] = "failed"
+        result["notes"] = "binary not found"
+        return result, None, "binary not found"
+    except subprocess.TimeoutExpired as exc:
+        result["status"] = "failed"
+        result["timed_out"] = True
+        captured = (exc.stdout or b"") + (exc.stderr or b"")
+        if len(captured) > MAX_PROBE_OUTPUT_BYTES:
+            result["notes"] = "timed out and exceeded output byte cap"
+        else:
+            result["notes"] = "timed out"
+        return result, None, result["notes"]
+    captured = completed.stdout + completed.stderr
+    result["exit_code"] = completed.returncode
+    if len(captured) > MAX_PROBE_OUTPUT_BYTES:
+        result["status"] = "failed"
+        result["notes"] = "captured output exceeded byte cap"
+        return result, None, "captured output exceeded byte cap"
+    if completed.returncode != 0:
+        result["status"] = "failed"
+        result["notes"] = f"probe exited with code {completed.returncode}"
+        return result, None, result["notes"]
+    output_id = probe_output_ref(agent_id, probe_kind, index)
+    result["status"] = "passed"
+    result["captured_output_ref"] = output_id
+    result["notes"] = "probe passed"
+    ref = {
+        "probe_output_ref": output_id,
+        "probe_kind": probe_kind,
+        "binary": binary,
+        "captured_at": utc_now(),
+        "exit_code": completed.returncode,
+        "excerpt": redacted_text(captured.decode("utf-8", errors="replace")),
+    }
+    return result, ref, None
 
 
-def score_adoption(evidence: CandidateEvidence) -> int:
-    if evidence.github_stars >= 20_000:
+def claim_state_allows_gate_pass(state: str) -> bool:
+    return state in {"verified", "inferred"}
+
+
+def evaluate_hard_gate(
+    *,
+    claim: dict[str, Any],
+    gate_key: str,
+    probe_results: list[dict[str, Any]],
+) -> tuple[dict[str, Any], bool, bool]:
+    state = claim["state"]
+    evidence_ids = list(claim["evidence_ids"])
+    notes = claim.get("notes", "")
+    passed_probe_ids = [
+        result["captured_output_ref"]
+        for result in probe_results
+        if result["status"] == "passed" and result["captured_output_ref"]
+    ]
+    if gate_key == "observable_cli_surface" and passed_probe_ids:
+        evidence_ids = evidence_ids + passed_probe_ids
+    if state == "blocked":
+        return {"status": "blocked", "evidence_ids": evidence_ids, "notes": notes}, True, False
+    if state == "unknown":
+        return {"status": "unknown", "evidence_ids": evidence_ids, "notes": notes}, True, False
+    if claim_state_allows_gate_pass(state) and evidence_ids:
+        return {"status": "pass", "evidence_ids": evidence_ids, "notes": notes}, False, True
+    return {"status": "fail", "evidence_ids": evidence_ids, "notes": notes}, True, False
+
+
+def claim_state_rank(state: str) -> int:
+    return {
+        "verified": 3,
+        "inferred": 2,
+        "unknown": 1,
+        "blocked": 0,
+    }[state]
+
+
+def evidence_kind_counts(dossier: dict[str, Any]) -> dict[str, int]:
+    counts = {kind: 0 for kind in ALLOWED_EVIDENCE_KINDS}
+    for entry in dossier["evidence"]:
+        counts[entry["kind"]] += 1
+    return counts
+
+
+def candidate_note(dossier: dict[str, Any], *, probe_results: list[dict[str, Any]]) -> str:
+    cited: list[str] = []
+    for claim_key in ("crate_first_fit", "reproducibility", "non_interactive_execution"):
+        cited.extend(dossier["claims"][claim_key]["evidence_ids"])
+    for result in probe_results:
+        if result["captured_output_ref"]:
+            cited.append(result["captured_output_ref"])
+    seen: list[str] = []
+    for value in cited:
+        if value not in seen:
+            seen.append(value)
+    return "refs=" + ",".join(seen[:6]) if seen else "refs=none"
+
+
+def score_adoption(dossier: dict[str, Any]) -> int:
+    counts = evidence_kind_counts(dossier)
+    leverage_rank = claim_state_rank(dossier["claims"]["future_leverage"]["state"])
+    if counts["github"] >= 1 and counts["package_registry"] >= 1 and leverage_rank >= 2:
         return 3
-    if evidence.github_stars >= 5_000:
+    if counts["github"] >= 1 and (counts["package_registry"] >= 1 or counts["official_doc"] >= 1):
         return 2
-    if evidence.github_stars >= 1_000:
+    if counts["github"] >= 1 or counts["package_registry"] >= 1:
         return 1
     return 0
 
 
-def score_maturity(evidence: CandidateEvidence) -> int:
-    if evidence.package_version_count <= 0 or evidence.release_age_days is None:
-        return 0
-    if evidence.release_age_days <= 45:
+def score_maturity(dossier: dict[str, Any]) -> int:
+    observable_rank = claim_state_rank(dossier["claims"]["observable_cli_surface"]["state"])
+    execution_rank = claim_state_rank(dossier["claims"]["non_interactive_execution"]["state"])
+    counts = evidence_kind_counts(dossier)
+    if observable_rank >= 2 and execution_rank >= 2 and counts["package_registry"] >= 1:
         return 3
-    if evidence.release_age_days <= 180:
+    if observable_rank >= 2 and (counts["official_doc"] >= 1 or counts["package_registry"] >= 1):
         return 2
-    if evidence.release_age_days <= 365:
+    if observable_rank >= 1:
         return 1
     return 0
 
 
-def score_installability(evidence: CandidateEvidence) -> int:
-    if evidence.install_channel_count >= 2 and evidence.docs_source_count >= 1 and evidence.fetched_source_count >= 3:
+def score_installability(dossier: dict[str, Any]) -> int:
+    install_count = len(dossier["install_channels"])
+    links = len(dossier["official_links"])
+    state_rank = claim_state_rank(dossier["claims"]["non_interactive_execution"]["state"])
+    if install_count >= 2 and links >= 2 and state_rank >= 2:
         return 3
-    if evidence.install_channel_count >= 1 and evidence.docs_source_count >= 1:
+    if install_count >= 1 and links >= 1 and state_rank >= 2:
         return 2
-    if evidence.install_channel_count >= 1:
+    if install_count >= 1:
         return 1
     return 0
 
 
-def score_reproducibility(evidence: CandidateEvidence) -> int:
-    if evidence.auth_friction_hits <= 1:
+def score_reproducibility(dossier: dict[str, Any]) -> int:
+    reproducibility_rank = claim_state_rank(dossier["claims"]["reproducibility"]["state"])
+    offline_rank = claim_state_rank(dossier["claims"]["offline_strategy"]["state"])
+    if reproducibility_rank == 3 and offline_rank >= 2:
         return 3
-    if evidence.auth_friction_hits <= 3:
+    if reproducibility_rank >= 2 and offline_rank >= 2:
         return 2
-    if evidence.auth_friction_hits <= 5:
+    if reproducibility_rank >= 1:
         return 1
     return 0
 
 
-def score_architecture_fit(evidence: CandidateEvidence) -> int:
-    if evidence.architecture_keyword_hits >= 16:
+def score_architecture_fit(dossier: dict[str, Any]) -> int:
+    crate_rank = claim_state_rank(dossier["claims"]["crate_first_fit"]["state"])
+    redaction_rank = claim_state_rank(dossier["claims"]["redaction_fit"]["state"])
+    if crate_rank == 3 and redaction_rank == 3:
         return 3
-    if evidence.architecture_keyword_hits >= 8:
+    if crate_rank >= 2 and redaction_rank >= 2:
         return 2
-    if evidence.architecture_keyword_hits >= 2:
+    if crate_rank >= 1 or redaction_rank >= 1:
         return 1
     return 0
 
 
-def score_future_leverage(evidence: CandidateEvidence) -> int:
-    if evidence.leverage_keyword_hits >= 16:
-        return 3
-    if evidence.leverage_keyword_hits >= 8:
-        return 2
-    if evidence.leverage_keyword_hits >= 2:
-        return 1
-    return 0
+def score_future_leverage(dossier: dict[str, Any]) -> int:
+    return {
+        3: 3,
+        2: 2,
+        1: 1,
+        0: 0,
+    }[claim_state_rank(dossier["claims"]["future_leverage"]["state"])]
+
+
+def score_candidate(dossier: dict[str, Any], *, probe_results: list[dict[str, Any]]) -> CandidateScore:
+    scores = {
+        "Adoption & community pull": score_adoption(dossier),
+        "CLI product maturity & release activity": score_maturity(dossier),
+        "Installability & docs quality": score_installability(dossier),
+        "Reproducibility & access friction": score_reproducibility(dossier),
+        "Architecture fit for this repo": score_architecture_fit(dossier),
+        "Capability expansion / future leverage": score_future_leverage(dossier),
+    }
+    return CandidateScore(scores=scores, notes=candidate_note(dossier, probe_results=probe_results))
 
 
 def shortlist_sort_key(agent_id: str, score: CandidateScore) -> tuple[int, int, int, int, int, int, str]:
@@ -818,25 +1126,13 @@ def toml_value(value: Any) -> str:
     raise RecommendationError(f"unsupported TOML value {value!r}")
 
 
-def build_candidate_pool_entry(
-    candidate: CandidateSeed,
-    *,
-    eligible: bool,
-    rejection_reasons: list[str],
-    shortlisted: bool,
-    recommended: bool,
-    score: CandidateScore | None,
-) -> dict[str, Any]:
-    return {
-        "agent_id": candidate.agent_id,
-        "display_name": candidate.display_name,
-        "eligible": eligible,
-        "rejection_reasons": rejection_reasons,
-        "shortlisted": shortlisted,
-        "recommended": recommended,
-        "score": score.scores if score else None,
-        "notes": score.notes if score else None,
-    }
+def render_metrics_lines(metrics: dict[str, Any]) -> list[str]:
+    lines = ["- metrics:"]
+    for key in RUN_STATUS_METRIC_KEYS:
+        value = metrics[key]
+        display = "pending" if value is None else str(value).lower() if isinstance(value, bool) else str(value)
+        lines.append(f"  - {key}: {display}")
+    return lines
 
 
 def render_run_summary(
@@ -844,27 +1140,33 @@ def render_run_summary(
     mode: str,
     run_id: str,
     generated_at: str,
-    recommended_agent_id: str,
+    recommended_agent_id: str | None,
+    approved_agent_id: str | None,
     shortlist_ids: list[str],
-    approved_agent_id: str | None = None,
-    onboarding_pack_prefix: str | None = None,
-    override_reason: str | None = None,
+    metrics: dict[str, Any],
+    override_reason: str | None,
 ) -> str:
+    approved_display = approved_agent_id if approved_agent_id is not None else "pending"
     lines = [
-        f"# Recommendation Run Summary",
+        "# Recommendation Run Summary",
         "",
-        f"- mode: `{mode}`",
-        f"- run_id: `{run_id}`",
-        f"- generated_at: `{generated_at}`",
-        f"- shortlist: {', '.join(f'`{agent_id}`' for agent_id in shortlist_ids)}",
-        f"- recommended_agent_id: `{recommended_agent_id}`",
+        f"- mode: {mode}",
+        f"- run_id: {run_id}",
+        f"- generated_at: {generated_at}",
+        f"- recommended_agent_id: {recommended_agent_id or 'pending'}",
+        f"- approved_agent_id: {approved_display}",
+        f"- shortlist_ids: {', '.join(shortlist_ids) if shortlist_ids else 'pending'}",
     ]
-    if approved_agent_id:
-        lines.append(f"- approved_agent_id: `{approved_agent_id}`")
-    if onboarding_pack_prefix:
-        lines.append(f"- onboarding_pack_prefix: `{onboarding_pack_prefix}`")
-    if override_reason:
-        lines.append(f"- override_reason: {override_reason}")
+    lines.extend(render_metrics_lines(metrics))
+    if approved_agent_id and recommended_agent_id and approved_agent_id != recommended_agent_id:
+        lines.extend(
+            [
+                "- override_summary:",
+                f"  - approved_agent_id: {approved_agent_id}",
+                f"  - recommended_agent_id: {recommended_agent_id}",
+                f"  - override_reason: {override_reason or 'pending'}",
+            ]
+        )
     return "\n".join(lines) + "\n"
 
 
@@ -876,24 +1178,26 @@ def render_comparison_packet(
     shortlist_ids: list[str],
     recommended_agent_id: str,
     scores: dict[str, CandidateScore],
-    records_by_agent: dict[str, list[SourceRecord]],
+    dossiers: dict[str, dict[str, Any]],
+    strategic_contenders: list[str],
 ) -> str:
     recommended = seed.candidate_by_id(recommended_agent_id)
     lines = [
         "<!-- generated-by: scripts/recommend_next_agent.py generate -->",
         "# Packet — CLI Agent Selection Recommendation",
         "",
-        f"Status: Generated",
+        "Status: Generated",
         f"Date (UTC): {generated_at}",
         f"Run id: `{run_id}`",
         "Related source docs:",
         "- `docs/specs/cli-agent-onboarding-charter.md`",
+        "- `docs/specs/cli-agent-recommendation-dossier-contract.md`",
         "- `docs/templates/agent-selection/cli-agent-selection-packet-template.md`",
         "- `docs/cli-agent-onboarding-factory-operator-guide.md`",
         "",
         "## 1. Candidate Summary",
         "",
-        "Provenance: `dated external snapshot evidence + maintainer inference encoded by the deterministic runner`",
+        "Provenance: `validated dossier evidence + deterministic runner output`",
         "",
         "Shortlisted candidates:",
     ]
@@ -913,19 +1217,20 @@ def render_comparison_packet(
             "Provenance: `committed repo evidence`",
             "",
             "- `docs/specs/cli-agent-onboarding-charter.md`",
+            "- `docs/specs/cli-agent-recommendation-dossier-contract.md`",
             "- `docs/templates/agent-selection/cli-agent-selection-packet-template.md`",
             "- `docs/cli-agent-onboarding-factory-operator-guide.md`",
             "- `crates/xtask/src/approval_artifact.rs`",
             "",
             "## 3. Selection Rubric",
             "",
-            "Provenance: `maintainer inference informed by dated external snapshot evidence`",
+            "Provenance: `deterministic runner scoring over validated dossier claims`",
             "",
-            "This packet uses the frozen score buckets and the deterministic shortlist sort order. It does not publish a weighted total column.",
+            "This packet preserves the frozen score dimensions, the 0-3 scale, and the deterministic shortlist sort order.",
             "",
             "## 4. Fixed 3-Candidate Comparison Table",
             "",
-            "Provenance: `dated external snapshot evidence + deterministic runner scoring`",
+            "Provenance: `validated dossier evidence + deterministic runner scoring`",
             "",
             "| Candidate | Adoption & community pull | CLI product maturity & release activity | Installability & docs quality | Reproducibility & access friction | Architecture fit for this repo | Capability expansion / future leverage | Notes |",
             "|---|---:|---:|---:|---:|---:|---:|---|",
@@ -951,38 +1256,46 @@ def render_comparison_packet(
             "",
             "## 5. Recommendation",
             "",
-            "Provenance: `maintainer inference grounded in the comparison table`",
+            "Provenance: `deterministic runner output grounded in dossier evidence ids and probe refs`",
             "",
             f"Recommended winner: `{recommended_agent_id}`",
             "",
-            f"`{recommended.display_name}` ranks first after deterministic tie-break ordering.",
+            f"`{recommended.display_name}` wins on the frozen shortlist ordering using refs `{scores[recommended_agent_id].notes}`.",
+            "",
+        ]
+    )
+    for agent_id in shortlist_ids:
+        if agent_id == recommended_agent_id:
+            continue
+        lines.append(f"- `{agent_id}` lost on the frozen tie-break chain despite refs `{scores[agent_id].notes}`.")
+    lines.extend(
+        [
+            "",
+            "Approve recommended agent",
+            "Override to shortlisted alternative",
+            "Stop and expand research",
             "",
             "## 6. Recommended Agent Evaluation Recipe",
             "",
-            "Provenance: `dated external snapshot evidence + seed inputs`",
+            "Provenance: `validated dossier evidence`",
             "",
-            f"Recommended agent: `{recommended.display_name}`",
-            "",
-            "Install paths:",
+            "reproducible now:",
         ]
     )
-    for channel in recommended.install_channels:
+    for channel in dossiers[recommended_agent_id]["install_channels"]:
         lines.append(f"- `{channel}`")
-    lines.extend(
-        [
-            "",
-            "Auth / access notes:",
-            f"- {recommended.auth_notes}",
-            "",
-            "## 7. Repo-Fit Analysis",
-            "",
-            "Provenance: `committed repo evidence + deterministic descriptor derivation`",
-            "",
-        ]
-    )
+    lines.extend(["", "blocked until later:"])
+    blocked_steps = dossiers[recommended_agent_id]["blocked_steps"] or ["none"]
+    for entry in blocked_steps:
+        lines.append(f"- {entry}")
     descriptor = recommended.derived_descriptor(seed.defaults)
     lines.extend(
         [
+            "",
+            "## 7. Repo-Fit Analysis",
+            "",
+            "Provenance: `validated dossier claims + deterministic descriptor derivation`",
+            "",
             f"- crate path: `{descriptor['crate_path']}`",
             f"- backend module: `{descriptor['backend_module']}`",
             f"- manifest root: `{descriptor['manifest_root']}`",
@@ -990,7 +1303,7 @@ def render_comparison_packet(
             "",
             "## 8. Required Artifacts",
             "",
-            "Provenance: `committed repo evidence + maintainer inference`",
+            "Provenance: `committed repo evidence + validated dossier evidence`",
             "",
             "- canonical comparison packet",
             "- approval artifact draft",
@@ -999,26 +1312,35 @@ def render_comparison_packet(
             "",
             "## 9. Workstreams, Deliverables, Risks, And Gates",
             "",
-            "Provenance: `maintainer inference grounded in repo constraints`",
+            "Provenance: `deterministic runner output`",
             "",
             "- workstreams: contract, runner, validation, proving, integration",
-            "- deliverables: seed file, skill, runner, tests, review run, approval draft",
-            "- risks: source drift, insufficient eligible candidates, approval validation failure",
+            "- deliverables: seed snapshot, dossiers, runner outputs, tests, review run, approval draft",
+            "- risks: drift, insufficient eligible candidates, approval validation failure",
             "- gates: exactly 3 shortlisted candidates, successful approval dry-run, green validation",
             "",
             "## 10. Dated Evidence Appendix",
             "",
-            "Provenance: `dated external snapshot evidence`",
+            "Provenance: `validated dossier evidence`",
             "",
         ]
     )
     for agent_id in shortlist_ids:
-        candidate = seed.candidate_by_id(agent_id)
+        dossier = dossiers[agent_id]
         lines.append(f"### `{agent_id}`")
         lines.append("")
-        lines.append(f"- display name: `{candidate.display_name}`")
-        for record in records_by_agent[agent_id]:
-            lines.append(f"- `{record.kind}` `{record.url}` fetched `{record.fetched_at}`")
+        lines.append(f"- display name: `{dossier['display_name']}`")
+        lines.append("- loser rationale: " + ("winner" if agent_id == recommended_agent_id else scores[agent_id].notes))
+        for entry in dossier["evidence"]:
+            lines.append(
+                f"- `{entry['evidence_id']}` `{entry['kind']}` captured `{entry['captured_at']}`"
+            )
+        lines.append("")
+    if strategic_contenders:
+        lines.append("### Strategic Contenders")
+        lines.append("")
+        for agent_id in strategic_contenders:
+            lines.append(f"- `{agent_id}`")
         lines.append("")
     lines.extend(
         [
@@ -1055,96 +1377,388 @@ def validate_approval_artifact(repo_root: Path, approval_path: Path) -> None:
         text=True,
     )
     if result.returncode != 0:
-        raise RecommendationError(
-            "approval artifact validation failed:\n"
-            + result.stdout
-            + result.stderr
+        raise RecommendationError("approval artifact validation failed:\n" + result.stdout + result.stderr)
+
+
+def serialize_candidate_validation(result: CandidateResult) -> dict[str, Any]:
+    return {
+        "agent_id": result.agent_id,
+        "status": result.status,
+        "schema_valid": result.schema_valid,
+        "hard_gate_results": result.hard_gate_results,
+        "probe_results": result.probe_results,
+        "rejection_reasons": result.rejection_reasons,
+        "error_reasons": result.error_reasons,
+        "evidence_ids_used": result.evidence_ids_used,
+        "notes": result.notes,
+    }
+
+
+def seed_snapshot_path(research_dir: Path) -> Path:
+    return research_dir / "seed.snapshot.toml"
+
+
+def research_summary_path(research_dir: Path) -> Path:
+    return research_dir / "research-summary.md"
+
+
+def research_metadata_path(research_dir: Path) -> Path:
+    return research_dir / "research-metadata.json"
+
+
+def dossier_path(research_dir: Path, agent_id: str) -> Path:
+    return research_dir / "dossiers" / f"{agent_id}.json"
+
+
+def build_candidate_pool_entry(
+    candidate: CandidateSeed,
+    *,
+    result: CandidateResult,
+    shortlisted: bool,
+    recommended: bool,
+) -> dict[str, Any]:
+    return {
+        "agent_id": candidate.agent_id,
+        "status": result.status,
+        "rejection_reasons": result.rejection_reasons,
+        "error_reasons": result.error_reasons,
+        "shortlisted": shortlisted,
+        "recommended": recommended,
+    }
+
+
+def build_initial_run_artifacts(
+    *,
+    run_id: str,
+    seed: SeedConfig,
+    candidate_results: dict[str, CandidateResult],
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    candidate_pool = {
+        "run_id": run_id,
+        "candidates": [
+            build_candidate_pool_entry(
+                candidate,
+                result=candidate_results[candidate.agent_id],
+                shortlisted=False,
+                recommended=False,
+            )
+            for candidate in seed.candidates
+        ],
+    }
+    eligible_candidates = {
+        "run_id": run_id,
+        "eligible_candidates": [],
+    }
+    return candidate_pool, eligible_candidates
+
+
+def default_scorecard() -> dict[str, Any]:
+    return {
+        "dimensions": list(DIMENSIONS),
+        "primary_dimensions": list(PRIMARY_DIMENSIONS),
+        "secondary_dimensions": list(SECONDARY_DIMENSIONS),
+        "shortlist_order": [],
+        "recommended_agent_id": None,
+        "candidates": {},
+    }
+
+
+def research_phase_fatal(
+    *,
+    message: str,
+    code: str,
+    run_status: dict[str, Any],
+    run_dir: Path,
+    seed_snapshot_bytes: bytes | None = None,
+    candidate_results: dict[str, CandidateResult] | None = None,
+    seed: SeedConfig | None = None,
+) -> None:
+    run_status["status"] = "run_fatal"
+    run_status["errors"].append(build_run_error(scope="run", agent_id=None, code=code, message=message))
+    if seed_snapshot_bytes is not None:
+        write_bytes(run_dir / "seed.snapshot.toml", seed_snapshot_bytes)
+    if seed is not None and candidate_results is not None:
+        run_status["candidate_status_counts"] = candidate_status_counts(candidate_results)
+        write_candidate_artifacts(run_dir=run_dir, seed=seed, candidate_results=candidate_results)
+        candidate_pool, eligible_candidates = build_initial_run_artifacts(
+            run_id=run_status["run_id"],
+            seed=seed,
+            candidate_results=candidate_results,
         )
+        write_json(run_dir / "candidate-pool.json", candidate_pool)
+        write_json(run_dir / "eligible-candidates.json", eligible_candidates)
+        write_json(run_dir / "scorecard.json", default_scorecard())
+        write_json(
+            run_dir / "sources.lock.json",
+            {"run_id": run_status["run_id"], "generated_at": run_status["generated_at"], "candidates": []},
+        )
+    write_json(run_dir / "run-status.json", run_status)
+    raise RecommendationError(message)
+
+
+def write_candidate_artifacts(
+    *,
+    run_dir: Path,
+    seed: SeedConfig,
+    candidate_results: dict[str, CandidateResult],
+) -> None:
+    validation_dir = run_dir / "candidate-validation-results"
+    validation_dir.mkdir(parents=True, exist_ok=True)
+    for candidate in seed.candidates:
+        write_json(validation_dir / f"{candidate.agent_id}.json", serialize_candidate_validation(candidate_results[candidate.agent_id]))
+
+
+def promote_time_seconds(*, generated_at: str, approval_recorded_at: str) -> int:
+    return int((parse_timestamp(approval_recorded_at) - parse_timestamp(generated_at)).total_seconds())
+
+
+def predicted_blocker_count_for_candidate(dossier: dict[str, Any]) -> int:
+    blocked_claims = sum(1 for claim in dossier["claims"].values() if claim["state"] == "blocked")
+    return blocked_claims + len(dossier["blocked_steps"])
 
 
 def generate_recommendation(
     *,
     seed_file: Path,
+    research_dir: Path,
     run_id: str,
     scratch_root: Path,
     registry_path: Path | None = None,
-    fetcher: Callable[[str], SourceRecord] = fetch_url,
     now_fn: Callable[[], str] = utc_now,
 ) -> Path:
-    seed = parse_seed_file(seed_file)
-    actual_registry_path = registry_path or (REPO_ROOT / REGISTRY_RELATIVE_PATH)
-    onboarded_agent_ids = load_onboarded_agent_ids(actual_registry_path)
     run_dir = scratch_root / run_id
     remove_path(run_dir)
     run_dir.mkdir(parents=True, exist_ok=True)
     generated_at = now_fn()
-    sources_lock: dict[str, Any] = {
-        "run_id": run_id,
-        "generated_at": generated_at,
-        "candidates": {},
-    }
-    scores: dict[str, CandidateScore] = {}
-    eligibility_by_agent: dict[str, list[str]] = {}
-    records_by_agent: dict[str, list[SourceRecord]] = {}
-    evidence_by_agent: dict[str, CandidateEvidence] = {}
+    run_status = build_base_run_status(
+        run_id=run_id,
+        generated_at=generated_at,
+        research_dir=research_dir,
+        run_dir=run_dir,
+    )
 
-    for candidate in seed.candidates:
-        records: list[SourceRecord] = []
-        for url in candidate.research_urls:
-            try:
-                records.append(fetcher(url))
-            except Exception as exc:
-                raise RecommendationError(f"source capture failed for `{candidate.agent_id}` url `{url}`: {exc}") from exc
-        evidence = collect_evidence(candidate, records)
-        rejection_reasons: list[str] = []
-        if candidate.agent_id in onboarded_agent_ids:
-            rejection_reasons.append(
-                f"agent_id `{candidate.agent_id}` already exists in {REGISTRY_RELATIVE_PATH} and is already onboarded"
-            )
-        rejection_reasons.extend(eligibility(candidate, evidence, records))
-        records_by_agent[candidate.agent_id] = records
-        evidence_by_agent[candidate.agent_id] = evidence
-        eligibility_by_agent[candidate.agent_id] = rejection_reasons
-        if not rejection_reasons:
-            scores[candidate.agent_id] = score_candidate(evidence)
-        sources_lock["candidates"][candidate.agent_id] = {
-            "display_name": candidate.display_name,
-            "records": [asdict(record) for record in records],
-        }
-
-    eligible_ids = sorted(agent_id for agent_id, reasons in eligibility_by_agent.items() if not reasons)
-    if len(eligible_ids) < 3:
-        write_json(run_dir / "sources.lock.json", sources_lock)
-        raise RecommendationError("fewer than 3 eligible candidates remain after gating")
-
-    shortlist_ids = sorted(eligible_ids, key=lambda agent_id: shortlist_sort_key(agent_id, scores[agent_id]))[:3]
-    recommended_agent_id = shortlist_ids[0]
-    recommended_candidate = seed.candidate_by_id(recommended_agent_id)
-
-    candidate_pool = []
-    for candidate in seed.candidates:
-        candidate_pool.append(
-            build_candidate_pool_entry(
-                candidate,
-                eligible=not eligibility_by_agent[candidate.agent_id],
-                rejection_reasons=eligibility_by_agent[candidate.agent_id],
-                shortlisted=candidate.agent_id in shortlist_ids,
-                recommended=candidate.agent_id == recommended_agent_id,
-                score=scores.get(candidate.agent_id),
-            )
+    try:
+        validate_seed_file_exists(seed_file)
+    except RecommendationError as exc:
+        research_phase_fatal(
+            message=str(exc),
+            code="seed_file_missing",
+            run_status=run_status,
+            run_dir=run_dir,
         )
 
-    eligible_candidates = [
-        {
-            "agent_id": agent_id,
-            "display_name": seed.candidate_by_id(agent_id).display_name,
-            "score": scores[agent_id].scores,
-            "primary_sum": scores[agent_id].primary_sum,
-            "secondary_sum": scores[agent_id].secondary_sum,
-        }
-        for agent_id in sorted(eligible_ids, key=lambda candidate_id: shortlist_sort_key(candidate_id, scores[candidate_id]))
-    ]
+    if not research_dir.exists():
+        research_phase_fatal(
+            message=f"research dir `{research_dir}` does not exist",
+            code="research_dir_missing",
+            run_status=run_status,
+            run_dir=run_dir,
+        )
+    if not research_summary_path(research_dir).exists():
+        research_phase_fatal(
+            message=f"research summary `{research_summary_path(research_dir)}` does not exist",
+            code="research_summary_missing",
+            run_status=run_status,
+            run_dir=run_dir,
+        )
 
+    snapshot = seed_snapshot_path(research_dir)
+    if not snapshot.exists():
+        research_phase_fatal(
+            message=f"seed snapshot `{snapshot}` does not exist",
+            code="seed_snapshot_missing",
+            run_status=run_status,
+            run_dir=run_dir,
+        )
+    try:
+        seed_snapshot_bytes = snapshot.read_bytes()
+        seed = parse_seed_file(snapshot)
+    except RecommendationError as exc:
+        research_phase_fatal(
+            message=str(exc),
+            code="seed_snapshot_invalid",
+            run_status=run_status,
+            run_dir=run_dir,
+        )
+    seed_snapshot_sha = sha256_bytes(seed_snapshot_bytes)
+    write_bytes(run_dir / "seed.snapshot.toml", seed_snapshot_bytes)
+
+    actual_registry_path = registry_path or (REPO_ROOT / REGISTRY_RELATIVE_PATH)
+    onboarded_agent_ids = load_onboarded_agent_ids(actual_registry_path)
+
+    candidate_results = {
+        candidate.agent_id: build_placeholder_candidate_result(candidate.agent_id)
+        for candidate in seed.candidates
+    }
+
+    metadata_path = research_metadata_path(research_dir)
+    try:
+        metadata = validate_research_metadata(
+            research_metadata_path=metadata_path,
+            expected_run_id=run_id,
+            research_dir=research_dir,
+            run_dir=run_dir,
+        )
+    except RecommendationError as exc:
+        research_phase_fatal(
+            message=str(exc),
+            code="research_metadata_invalid",
+            run_status=run_status,
+            run_dir=run_dir,
+            seed_snapshot_bytes=seed_snapshot_bytes,
+        )
+    run_status["metrics"]["evidence_collection_time_seconds"] = metadata["evidence_collection_time_seconds"]
+    run_status["metrics"]["fetched_source_count"] = metadata["fetched_source_count"]
+
+    dossiers: dict[str, dict[str, Any]] = {}
+    seeded_ids = {candidate.agent_id for candidate in seed.candidates}
+    run_dossier_dir = run_dir / "candidate-dossiers"
+    run_dossier_dir.mkdir(parents=True, exist_ok=True)
+    for candidate in seed.candidates:
+        candidate_path = dossier_path(research_dir, candidate.agent_id)
+        if not candidate_path.exists():
+            candidate_results[candidate.agent_id].error_reasons.append("missing required dossier")
+            candidate_results[candidate.agent_id].notes.append("dossier is required for every seeded candidate")
+            research_phase_fatal(
+                message=f"missing dossier for seeded candidate `{candidate.agent_id}`",
+                code="dossier_missing",
+                run_status=run_status,
+                run_dir=run_dir,
+                seed_snapshot_bytes=seed_snapshot_bytes,
+                candidate_results=candidate_results,
+                seed=seed,
+            )
+        write_bytes(run_dossier_dir / f"{candidate.agent_id}.json", candidate_path.read_bytes())
+        try:
+            dossier = load_dossier_payload(candidate_path)
+            validate_dossier_top_level(dossier, agent_id=candidate.agent_id, snapshot_sha=seed_snapshot_sha, seeded_ids=seeded_ids)
+            validate_claim_evidence_links(dossier, agent_id=candidate.agent_id)
+        except RecommendationError as exc:
+            result = candidate_results[candidate.agent_id]
+            result.status = "candidate_error"
+            result.schema_valid = False
+            result.error_reasons.append(str(exc))
+            result.notes.append("schema validation failed")
+            run_status["errors"].append(
+                build_run_error(
+                    scope="candidate",
+                    agent_id=candidate.agent_id,
+                    code="dossier_invalid",
+                    message=str(exc),
+                )
+            )
+            continue
+        dossiers[candidate.agent_id] = dossier
+        result = candidate_results[candidate.agent_id]
+        result.schema_valid = True
+        result.notes.append("schema validation passed")
+        evidence_ids = [entry["evidence_id"] for entry in dossier["evidence"]]
+        result.evidence_ids_used = evidence_ids
+        result.probe_results = []
+
+        probe_output_refs: list[dict[str, Any]] = []
+        required_probe_failure = False
+        for index, probe_request in enumerate(dossier["probe_requests"]):
+            probe_result, probe_ref, failure_message = execute_probe(
+                agent_id=candidate.agent_id,
+                probe_request=probe_request,
+                index=index,
+            )
+            result.probe_results.append(probe_result)
+            if probe_ref is not None:
+                probe_output_refs.append(probe_ref)
+            if failure_message is not None:
+                if probe_request["required_for_gate"]:
+                    required_probe_failure = True
+                    result.error_reasons.append(failure_message)
+                else:
+                    result.notes.append(failure_message)
+
+        gate_failed = False
+        for gate_key in HARD_GATE_KEYS:
+            gate_result, failed, evidence_sufficient = evaluate_hard_gate(
+                claim=dossier["claims"][gate_key],
+                gate_key=gate_key,
+                probe_results=result.probe_results,
+            )
+            result.hard_gate_results[gate_key] = gate_result
+            if failed:
+                gate_failed = True
+                result.rejection_reasons.append(f"{gate_key} gate status is {gate_result['status']}")
+            if evidence_sufficient:
+                for evidence_id in gate_result["evidence_ids"]:
+                    if evidence_id not in result.evidence_ids_used:
+                        result.evidence_ids_used.append(evidence_id)
+
+        if candidate.agent_id in onboarded_agent_ids:
+            gate_failed = True
+            result.rejection_reasons.append(
+                f"agent_id `{candidate.agent_id}` already exists in {REGISTRY_RELATIVE_PATH} and is already onboarded"
+            )
+
+        if required_probe_failure:
+            result.status = "candidate_error"
+            run_status["errors"].append(
+                build_run_error(
+                    scope="candidate",
+                    agent_id=candidate.agent_id,
+                    code="required_probe_failed",
+                    message="a required gate probe failed",
+                )
+            )
+            continue
+
+        if gate_failed:
+            result.status = "candidate_rejected"
+            continue
+
+        result.status = "eligible"
+        result.score = score_candidate(dossier, probe_results=result.probe_results)
+
+        dossier["_probe_output_refs"] = probe_output_refs
+
+    counts = candidate_status_counts(candidate_results)
+    run_status["candidate_status_counts"] = counts
+    run_status["metrics"]["rejected_before_scoring_count"] = counts["candidate_rejected"] + counts["candidate_error"]
+
+    eligible_ids = [
+        candidate.agent_id
+        for candidate in seed.candidates
+        if candidate_results[candidate.agent_id].status == "eligible" and candidate_results[candidate.agent_id].score is not None
+    ]
+    eligible_ids.sort(key=lambda agent_id: shortlist_sort_key(agent_id, candidate_results[agent_id].score or CandidateScore({}, "")))
+    shortlist_ids = eligible_ids[:3] if len(eligible_ids) >= 3 else []
+    recommended_agent_id = shortlist_ids[0] if shortlist_ids else None
+
+    run_status["eligible_candidate_ids"] = eligible_ids
+    run_status["shortlist_ids"] = shortlist_ids
+    run_status["recommended_agent_id"] = recommended_agent_id
+
+    candidate_pool = {
+        "run_id": run_id,
+        "candidates": [
+            build_candidate_pool_entry(
+                candidate,
+                result=candidate_results[candidate.agent_id],
+                shortlisted=candidate.agent_id in shortlist_ids,
+                recommended=candidate.agent_id == recommended_agent_id,
+            )
+            for candidate in seed.candidates
+        ],
+    }
+    eligible_candidates = {
+        "run_id": run_id,
+        "eligible_candidates": [
+            {
+                "agent_id": agent_id,
+                "scores": candidate_results[agent_id].score.scores,
+                "primary_sum": candidate_results[agent_id].score.primary_sum,
+                "secondary_sum": candidate_results[agent_id].score.secondary_sum,
+            }
+            for agent_id in eligible_ids
+            if candidate_results[agent_id].score is not None
+        ],
+    }
     scorecard = {
         "dimensions": list(DIMENSIONS),
         "primary_dimensions": list(PRIMARY_DIMENSIONS),
@@ -1153,92 +1767,165 @@ def generate_recommendation(
         "recommended_agent_id": recommended_agent_id,
         "candidates": {
             agent_id: {
-                "scores": scores[agent_id].scores,
-                "primary_sum": scores[agent_id].primary_sum,
-                "secondary_sum": scores[agent_id].secondary_sum,
-                "notes": scores[agent_id].notes,
+                "scores": candidate_results[agent_id].score.scores,
+                "primary_sum": candidate_results[agent_id].score.primary_sum,
+                "secondary_sum": candidate_results[agent_id].score.secondary_sum,
+                "notes": candidate_results[agent_id].score.notes,
             }
-            for agent_id in sorted(scores)
+            for agent_id in eligible_ids
+            if candidate_results[agent_id].score is not None
         },
     }
+    sources_lock = {
+        "run_id": run_id,
+        "generated_at": generated_at,
+        "candidates": [],
+    }
+    for candidate in seed.candidates:
+        dossier = dossiers.get(candidate.agent_id)
+        evidence_refs = []
+        probe_output_refs = []
+        if dossier:
+            evidence_refs = [
+                {
+                    "evidence_id": entry["evidence_id"],
+                    "kind": entry["kind"],
+                    **({"url": entry["url"]} if "url" in entry else {}),
+                    "title": entry["title"],
+                    "captured_at": entry["captured_at"],
+                    "sha256": entry["sha256"],
+                }
+                for entry in dossier["evidence"]
+            ]
+            probe_output_refs = dossier.get("_probe_output_refs", [])
+            dossier.pop("_probe_output_refs", None)
+        sources_lock["candidates"].append(
+            {
+                "agent_id": candidate.agent_id,
+                "evidence_refs": evidence_refs,
+                "probe_output_refs": probe_output_refs,
+            }
+        )
 
-    provisional_approval = render_approval_toml(
-        candidate=recommended_candidate,
-        defaults=seed.defaults,
-        recommended_agent_id=recommended_agent_id,
-        approved_agent_id=recommended_agent_id,
-        onboarding_pack_prefix=derived_pack_prefix(recommended_agent_id),
-        approval_commit="0000000",
-        approval_recorded_at=generated_at,
-        override_reason=None,
-    )
-    comparison_packet = render_comparison_packet(
-        run_id=run_id,
-        generated_at=generated_at,
-        seed=seed,
-        shortlist_ids=shortlist_ids,
-        recommended_agent_id=recommended_agent_id,
-        scores=scores,
-        records_by_agent=records_by_agent,
-    )
-    run_summary = render_run_summary(
-        mode="generate",
-        run_id=run_id,
-        generated_at=generated_at,
-        recommended_agent_id=recommended_agent_id,
-        shortlist_ids=shortlist_ids,
-    )
-
-    write_json(run_dir / "candidate-pool.json", {"run_id": run_id, "candidates": candidate_pool})
-    write_json(run_dir / "eligible-candidates.json", {"run_id": run_id, "eligible_candidates": eligible_candidates})
+    write_candidate_artifacts(run_dir=run_dir, seed=seed, candidate_results=candidate_results)
+    write_json(run_dir / "candidate-pool.json", candidate_pool)
+    write_json(run_dir / "eligible-candidates.json", eligible_candidates)
     write_json(run_dir / "scorecard.json", scorecard)
     write_json(run_dir / "sources.lock.json", sources_lock)
-    write_text(run_dir / "comparison.generated.md", comparison_packet)
-    write_text(run_dir / "approval-draft.generated.toml", provisional_approval)
-    write_text(run_dir / "run-summary.md", run_summary)
 
-    dossiers_dir = run_dir / "candidate-dossiers"
-    dossiers_dir.mkdir(parents=True, exist_ok=True)
-    for agent_id in shortlist_ids:
-        candidate = seed.candidate_by_id(agent_id)
-        dossier = {
-            "agent_id": agent_id,
-            "display_name": candidate.display_name,
-            "research_urls": candidate.research_urls,
-            "install_channels": candidate.install_channels,
-            "auth_notes": candidate.auth_notes,
-            "descriptor": candidate.derived_descriptor(seed.defaults),
-            "evidence": asdict(evidence_by_agent[agent_id]),
-            "score": {
-                "scores": scores[agent_id].scores,
-                "primary_sum": scores[agent_id].primary_sum,
-                "secondary_sum": scores[agent_id].secondary_sum,
-                "notes": scores[agent_id].notes,
-            },
-            "sources": [asdict(record) for record in records_by_agent[agent_id]],
-        }
-        write_json(dossiers_dir / f"{agent_id}.json", dossier)
+    if len(eligible_ids) < 3:
+        run_status["status"] = "insufficient_eligible_candidates"
+        write_json(run_dir / "run-status.json", run_status)
+        write_text(
+            run_dir / "run-summary.md",
+            render_run_summary(
+                mode="generate",
+                run_id=run_id,
+                generated_at=generated_at,
+                recommended_agent_id=None,
+                approved_agent_id=None,
+                shortlist_ids=[],
+                metrics=run_status["metrics"],
+                override_reason=None,
+            ),
+        )
+        raise RecommendationError("fewer than 3 eligible candidates remain after gating")
 
-    ensure_scratch_artifacts_complete(run_dir, shortlist_ids)
+    recommended_candidate = seed.candidate_by_id(recommended_agent_id or shortlist_ids[0])
+    run_status["status"] = "success_with_candidate_errors" if counts["candidate_error"] > 0 else "success"
+    write_json(run_dir / "run-status.json", run_status)
+    write_text(
+        run_dir / "run-summary.md",
+        render_run_summary(
+            mode="generate",
+            run_id=run_id,
+            generated_at=generated_at,
+            recommended_agent_id=recommended_agent_id,
+            approved_agent_id=None,
+            shortlist_ids=shortlist_ids,
+            metrics=run_status["metrics"],
+            override_reason=None,
+        ),
+    )
+    write_text(
+        run_dir / "comparison.generated.md",
+        render_comparison_packet(
+            run_id=run_id,
+            generated_at=generated_at,
+            seed=seed,
+            shortlist_ids=shortlist_ids,
+            recommended_agent_id=recommended_agent_id or shortlist_ids[0],
+            scores={agent_id: candidate_results[agent_id].score for agent_id in shortlist_ids if candidate_results[agent_id].score is not None},
+            dossiers=dossiers,
+            strategic_contenders=[
+                candidate.agent_id
+                for candidate in seed.candidates
+                if candidate_results[candidate.agent_id].status != "eligible" and candidate.agent_id not in shortlist_ids
+            ],
+        ),
+    )
+    write_text(
+        run_dir / "approval-draft.generated.toml",
+        render_approval_toml(
+            candidate=recommended_candidate,
+            defaults=seed.defaults,
+            recommended_agent_id=recommended_agent_id or shortlist_ids[0],
+            approved_agent_id=recommended_agent_id or shortlist_ids[0],
+            onboarding_pack_prefix=derived_pack_prefix(recommended_agent_id or shortlist_ids[0]),
+            approval_commit="0000000",
+            approval_recorded_at=generated_at,
+            override_reason=None,
+        ),
+    )
     return run_dir
 
 
-def ensure_scratch_artifacts_complete(run_dir: Path, shortlist_ids: list[str]) -> None:
-    for artifact in SCRATCH_ARTIFACT_FILES:
-        path = run_dir / artifact
-        if not path.exists():
+def ensure_promotable_run(run_dir: Path) -> None:
+    required_files = [
+        "run-status.json",
+        "seed.snapshot.toml",
+        "candidate-pool.json",
+        "eligible-candidates.json",
+        "scorecard.json",
+        "sources.lock.json",
+        "comparison.generated.md",
+        "approval-draft.generated.toml",
+        "run-summary.md",
+    ]
+    for artifact in required_files:
+        if not (run_dir / artifact).exists():
             raise RecommendationError(f"required scratch artifact `{artifact}` is missing")
-    dossiers_dir = run_dir / "candidate-dossiers"
-    actual_dossiers = sorted(path.name for path in dossiers_dir.glob("*.json"))
-    expected_dossiers = sorted(f"{agent_id}.json" for agent_id in shortlist_ids)
-    if actual_dossiers != expected_dossiers:
-        raise RecommendationError(
-            "scratch candidate dossiers do not match the shortlisted candidates"
-        )
+    for dirname in ("candidate-dossiers", "candidate-validation-results"):
+        if not (run_dir / dirname).is_dir():
+            raise RecommendationError(f"required scratch directory `{dirname}` is missing")
 
 
-def load_json(path: Path) -> Any:
-    return json.loads(read_text(path))
+def finalize_run_status_for_promote(
+    *,
+    scratch_status: dict[str, Any],
+    approved_agent_id: str,
+    approval_recorded_at: str,
+    override_reason: str | None,
+    committed_review_dir: str,
+    committed_packet_path: str,
+    committed_approval_artifact_path: str,
+    approved_dossier: dict[str, Any],
+) -> dict[str, Any]:
+    finalized = json.loads(json.dumps(scratch_status))
+    finalized["approved_agent_id"] = approved_agent_id
+    finalized["approval_recorded_at"] = approval_recorded_at
+    finalized["override_reason"] = override_reason
+    finalized["committed_review_dir"] = committed_review_dir
+    finalized["committed_packet_path"] = committed_packet_path
+    finalized["committed_approval_artifact_path"] = committed_approval_artifact_path
+    finalized["metrics"]["maintainer_time_to_decision_seconds"] = promote_time_seconds(
+        generated_at=finalized["generated_at"],
+        approval_recorded_at=approval_recorded_at,
+    )
+    finalized["metrics"]["shortlist_override"] = approved_agent_id != finalized["recommended_agent_id"]
+    finalized["metrics"]["predicted_blocker_count"] = predicted_blocker_count_for_candidate(approved_dossier)
+    finalized["metrics"]["later_discovered_blocker_count"] = None
+    return finalized
 
 
 def promote_recommendation(
@@ -1254,17 +1941,22 @@ def promote_recommendation(
     validator: Callable[[Path, Path], None] = validate_approval_artifact,
     replace_fn: Callable[[Path, Path], None] = os.replace,
 ) -> Path:
-    scorecard = load_json(run_dir / "scorecard.json")
+    ensure_promotable_run(run_dir)
+    live_seed = repo_root / LIVE_SEED_REL
+    if not live_seed.exists():
+        raise RecommendationError(f"live seed file `{live_seed}` does not exist")
+    scorecard = read_json(run_dir / "scorecard.json")
     shortlist_ids = list(scorecard["shortlist_order"])
     recommended_agent_id = scorecard["recommended_agent_id"]
-    ensure_scratch_artifacts_complete(run_dir, shortlist_ids)
     if approved_agent_id not in shortlist_ids:
         raise RecommendationError("approved_agent_id must be one of the shortlisted 3 candidates")
     if approved_agent_id != recommended_agent_id and not override_reason:
         raise RecommendationError("override_reason is required when approved_agent_id differs from recommended_agent_id")
 
-    seed = parse_seed_file(repo_root / "docs/agents/selection/candidate-seed.toml")
+    seed = parse_seed_file(run_dir / "seed.snapshot.toml")
     approved_candidate = seed.candidate_by_id(approved_agent_id)
+    approved_dossier = read_json(run_dir / "candidate-dossiers" / f"{approved_agent_id}.json")
+
     review_root = repo_root / repo_run_root_rel
     final_review_dir = review_root / run_dir.name
     if final_review_dir.exists():
@@ -1277,14 +1969,13 @@ def promote_recommendation(
     remove_path(selection_staging_root)
     remove_path(lifecycle_staging_root)
     temp_review_dir.mkdir(parents=True, exist_ok=True)
+
     try:
-        for artifact in COPY_OWNED_REVIEW_FILES:
-            shutil.copy2(run_dir / artifact, temp_review_dir / artifact)
-        source_dossiers = run_dir / "candidate-dossiers"
-        review_dossiers = temp_review_dir / "candidate-dossiers"
-        review_dossiers.mkdir(parents=True, exist_ok=True)
-        for agent_id in shortlist_ids:
-            shutil.copy2(source_dossiers / f"{agent_id}.json", review_dossiers / f"{agent_id}.json")
+        for item in run_dir.iterdir():
+            if item.is_file():
+                shutil.copy2(item, temp_review_dir / item.name)
+            elif item.is_dir() and item.name in {"candidate-dossiers", "candidate-validation-results"}:
+                shutil.copytree(item, temp_review_dir / item.name)
 
         approval_commit = git_head_fn(repo_root)
         approval_recorded_at = now_fn()
@@ -1299,7 +1990,6 @@ def promote_recommendation(
             override_reason=override_reason,
         )
         canonical_path = canonical_packet_path(repo_root)
-        canonical_bytes = (run_dir / "comparison.generated.md").read_bytes()
         staged_canonical_path = selection_staging_root / "cli-agent-selection-packet.md"
         final_approval_path = repo_root / "docs" / "agents" / "lifecycle" / onboarding_pack_prefix / "governance" / "approved-agent.toml"
         staged_approval_path = lifecycle_staging_root / onboarding_pack_prefix / "governance" / "approved-agent.toml"
@@ -1307,6 +1997,35 @@ def promote_recommendation(
         previous_canonical = canonical_path.read_bytes() if canonical_path.exists() else None
         previous_approval = final_approval_path.read_bytes() if final_approval_path.exists() else None
 
+        scratch_status = read_json(run_dir / "run-status.json")
+        final_status = finalize_run_status_for_promote(
+            scratch_status=scratch_status,
+            approved_agent_id=approved_agent_id,
+            approval_recorded_at=approval_recorded_at,
+            override_reason=override_reason,
+            committed_review_dir=str(Path(repo_run_root_rel) / run_dir.name),
+            committed_packet_path=CANONICAL_PACKET_REL,
+            committed_approval_artifact_path=str(
+                Path("docs/agents/lifecycle") / onboarding_pack_prefix / "governance" / "approved-agent.toml"
+            ),
+            approved_dossier=approved_dossier,
+        )
+        write_json(temp_review_dir / "run-status.json", final_status)
+        write_text(
+            temp_review_dir / "run-summary.md",
+            render_run_summary(
+                mode="promote",
+                run_id=final_status["run_id"],
+                generated_at=final_status["generated_at"],
+                recommended_agent_id=final_status["recommended_agent_id"],
+                approved_agent_id=approved_agent_id,
+                shortlist_ids=final_status["shortlist_ids"],
+                metrics=final_status["metrics"],
+                override_reason=override_reason,
+            ),
+        )
+
+        canonical_bytes = (run_dir / "comparison.generated.md").read_bytes()
         write_bytes(staged_canonical_path, canonical_bytes)
         write_text(staged_approval_path, final_approval_text)
         validator(repo_root, staged_approval_path)
@@ -1327,31 +2046,24 @@ def promote_recommendation(
     remove_path(selection_staging_root)
     remove_path(lifecycle_staging_root)
 
-    if (final_review_dir / "comparison.generated.md").read_bytes() != canonical_path.read_bytes():
-        raise RecommendationError("canonical packet must be byte-identical to the review comparison packet")
-    for artifact in COPY_OWNED_REVIEW_FILES:
+    if (final_review_dir / "comparison.generated.md").read_bytes() != (run_dir / "comparison.generated.md").read_bytes():
+        raise RecommendationError("committed comparison packet must be a byte-copy of scratch output")
+    if canonical_path.read_bytes() != (run_dir / "comparison.generated.md").read_bytes():
+        raise RecommendationError("canonical packet must be byte-identical to scratch comparison output")
+    for artifact in (
+        "seed.snapshot.toml",
+        "candidate-pool.json",
+        "eligible-candidates.json",
+        "scorecard.json",
+        "sources.lock.json",
+        "comparison.generated.md",
+        "approval-draft.generated.toml",
+    ):
         if (final_review_dir / artifact).read_bytes() != (run_dir / artifact).read_bytes():
             raise RecommendationError(f"committed review artifact `{artifact}` must be a byte-copy of the scratch run")
     if read_text(final_approval_path) != final_approval_text:
         raise RecommendationError("final approval artifact must match the promote-time rendered approval contents")
     return final_review_dir
-
-
-def write_bytes(path: Path, contents: bytes) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_bytes(contents)
-
-
-def restore_file(path: Path, previous_bytes: bytes | None, *, repo_root: Path) -> None:
-    if previous_bytes is None:
-        remove_path(path)
-        parent = path.parent
-        while parent != repo_root and parent.exists() and not any(parent.iterdir()):
-            parent.rmdir()
-            parent = parent.parent
-        return
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_bytes(previous_bytes)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -1361,6 +2073,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "generate":
             generate_recommendation(
                 seed_file=Path(args.seed_file),
+                research_dir=Path(os.path.expanduser(args.research_dir)),
                 run_id=args.run_id,
                 scratch_root=Path(os.path.expanduser(args.scratch_root)),
             )

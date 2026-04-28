@@ -4,9 +4,14 @@ Status: Canonical reusable template
 Date (UTC): `<fill>`  
 Owner(s): wrappers team / packet author  
 Related source docs:
+- `docs/specs/cli-agent-recommendation-dossier-contract.md`
 - `docs/specs/cli-agent-onboarding-charter.md`
 - `docs/specs/unified-agent-api/support-matrix.md`
 - `docs/specs/**` for any normative contract this packet cites
+
+Template lock:
+- generated preview packets and promoted canonical packets must preserve this template's title block shape, section numbering, section headings, section order, `Provenance:` lines, and fixed 3-candidate table shape exactly
+- content may replace prompts and placeholders, but required sections must not be renamed, reordered, or collapsed
 
 ## Purpose
 
@@ -136,6 +141,10 @@ Required outputs:
 - winning candidate
 - short rationale paragraph
 - 1-2 bullets for each non-winning candidate explaining why it lost
+- explicit decision block with:
+  - `Approve recommended agent`
+  - `Override to shortlisted alternative`
+  - `Stop and expand research`
 
 ## 6. Recommended Agent Evaluation Recipe
 
@@ -147,6 +156,8 @@ Prompt:
 - Separate what is reproducible immediately from what remains blocked.
 
 Required outputs:
+- `reproducible now` subsection
+- `blocked until later` subsection
 - install path(s)
 - auth / account / billing prerequisites
 - runnable commands
@@ -227,6 +238,10 @@ Required outputs for each candidate:
 - release activity notes
 - access prerequisites
 - normalized notes
+
+Appendix requirements:
+- include loser rationale for the two non-winning shortlisted candidates
+- include strategic contenders if any
 
 Suggested shape:
 
