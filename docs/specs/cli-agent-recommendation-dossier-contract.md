@@ -172,11 +172,15 @@ Each evidence object MUST contain:
 
 ### Probe Requests
 
+`probe_requests` MUST remain an array in the dossier schema and MAY be empty.
+
 Each probe request MUST contain:
 
 - `probe_kind`, one of `help`, `version`
 - `binary`
 - `required_for_gate`, boolean
+
+The milestone MUST NOT add a single-required-probe rule, an exactly-one-probe rule, or any other minimum-cardinality requirement for `probe_requests`.
 
 ## Evidence Budgets
 
@@ -213,9 +217,24 @@ Disallowed probe forms include:
 - authenticated commands
 - network-dependent commands
 
+The contract does not require any candidate to carry a required probe. `required_for_gate` remains per-entry metadata only.
+
 If a probe violates allowlist, times out, exceeds the byte cap, or exits non-zero, the runner MUST record it in `candidate-validation-results/<agent_id>.json`.
 
 The runner MUST escalate that probe failure to `candidate_error` only when the probe was `required_for_gate`. Otherwise, the runner MUST continue on dossier evidence alone.
+
+## Hard Gate Sufficiency Rules
+
+Hard-gate pass/fail is driven by claim state, evidence-kind coverage, and any required probe results. Generic prose in `summary` or `notes` is never sufficient on its own.
+
+| Claim key | Allowed pass states | Required evidence kinds | Required probe rule | Reject when |
+| --- | --- | --- | --- | --- |
+| `non_interactive_execution` | `verified` only | at least one `official_doc` and one of `package_registry` or `probe_output` | if any `required_for_gate` probe exists under the existing schema, it MUST pass | state is `inferred`, `unknown`, or `blocked`; required evidence kinds missing |
+| `observable_cli_surface` | `verified` only | at least one of `official_doc`, `github`, or `probe_output` | if any `required_for_gate` probe exists under the existing schema, it MUST pass | state is `inferred`, `unknown`, or `blocked`; no qualifying evidence |
+| `offline_strategy` | `verified` or `inferred` | at least one of `official_doc` or `github` | none | state is `unknown` or `blocked`; `blocked_by` present on a passing claim |
+| `redaction_fit` | `verified` or `inferred` | at least one of `github` or `probe_output` | none | state is `unknown` or `blocked`; `blocked_by` present on a passing claim |
+| `crate_first_fit` | `verified` or `inferred` | at least one of `official_doc`, `github`, or `package_registry` | none | state is `unknown` or `blocked`; `blocked_by` present on a passing claim |
+| `reproducibility` | `verified` or `inferred` | at least one `official_doc` and one `package_registry` | none | state is `unknown` or `blocked`; required evidence kinds missing; `blocked_by` present on a passing claim |
 
 ## Run Directory Contract
 
@@ -324,6 +343,8 @@ Each validation result MUST contain at least:
 Each hard-gate result MUST contain:
 
 - `status`, one of `pass`, `fail`, `blocked`, `unknown`
+- `rule_id`
+- `rejection_reason`
 - `evidence_ids`
 - `notes`
 
@@ -469,13 +490,34 @@ Additional required packet rules:
 - section 4 notes MUST reference dossier evidence ids and/or probe result ids
 - section 5 rationale MUST reference dossier evidence ids and/or probe result ids
 - freeform uncited rationale is insufficient
-- section 5 MUST end with:
+- the canonical packet is the maintainer decision surface for approve-or-override, but `approved-agent.toml` remains the normative approval artifact consumed by the create lane
+- section 5 MUST end with exactly these three non-empty lines in this order:
   - `Approve recommended agent`
   - `Override to shortlisted alternative`
   - `Stop and expand research`
-- section 6 MUST split:
+- section 6 MUST preserve exactly this split:
   - `reproducible now`
   - `blocked until later`
+- sections 7-9 are semantically required implementation-handoff sections, not merely present headings
+- section 7 MUST contain these exact subsection labels, matching PLAN.md verbatim in wording and capitalization:
+  - `Manifest root expectations`
+  - `Wrapper crate expectations`
+  - `agent_api` backend expectations
+  - `UAA promotion expectations`
+  - `Support/publication expectations`
+  - `Likely seam risks`
+- section 8 MUST contain these exact subsection labels, matching PLAN.md verbatim in wording and capitalization:
+  - `Manifest-root artifacts`
+  - `Wrapper-crate artifacts`
+  - `agent_api` artifacts
+  - `UAA promotion-gate artifacts`
+  - `Docs/spec artifacts`
+  - `Evidence/fixture artifacts`
+- section 9 MUST contain these exact subsection labels, matching PLAN.md verbatim in wording and capitalization:
+  - `Required workstreams`
+  - `Required deliverables`
+  - `Blocking risks`
+  - `Acceptance gates`
 - the appendix MUST include:
   - loser rationale for the other two shortlisted candidates
   - strategic contenders if any
@@ -491,6 +533,7 @@ If `docs/templates/agent-selection/cli-agent-selection-packet-template.md` is up
 - section order
 - all `Provenance:` lines
 - the fixed 3-candidate table shape
+- the existing packet heading names without renaming
 
 No template expansion may change section order or table shape.
 

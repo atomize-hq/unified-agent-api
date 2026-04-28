@@ -1,0 +1,128 @@
+{
+  "schema_version": "v1",
+  "agent_id": "goose",
+  "display_name": "Goose",
+  "generated_at": "2026-04-28T15:31:24Z",
+  "seed_snapshot_sha256": "884157744ca3de13b51fbec96c68bf70185b27db8b9fb6cc5d91923e01788895",
+  "official_links": [
+    "https://goose-docs.ai/docs/category/getting-started",
+    "https://github.com/aaif-goose/goose"
+  ],
+  "install_channels": [
+    "brew install block-goose-cli",
+    "curl -fsSL https://github.com/block/goose/releases/download/stable/download_cli.sh | bash"
+  ],
+  "auth_prerequisites": [
+    "Provider credentials are required for meaningful model-backed agent runs."
+  ],
+  "claims": {
+    "non_interactive_execution": {
+      "state": "verified",
+      "summary": "Public docs and repo messaging describe an installable CLI agent surface.",
+      "evidence_ids": [
+        "goose-doc",
+        "goose-repo",
+        "goose-brew"
+      ],
+      "notes": "The candidate exposes a documented external CLI entrypoint."
+    },
+    "offline_strategy": {
+      "state": "inferred",
+      "summary": "Wrapper and parser seams can be exercised with fixtures or a fake goose binary before credentialed runs.",
+      "evidence_ids": [
+        "goose-doc",
+        "goose-repo"
+      ],
+      "notes": "Recommendation only needs deterministic wrapper evidence, not live provider execution."
+    },
+    "observable_cli_surface": {
+      "state": "verified",
+      "summary": "The getting-started docs and repo present a public command-line agent surface.",
+      "evidence_ids": [
+        "goose-doc",
+        "goose-repo"
+      ],
+      "notes": "The observable CLI surface is public and reviewable."
+    },
+    "redaction_fit": {
+      "state": "inferred",
+      "summary": "Terminal-first output can be redacted at the repo boundary before persistence.",
+      "evidence_ids": [
+        "goose-repo"
+      ],
+      "notes": "This is a repo-fit inference from Goose shipping as an external CLI agent."
+    },
+    "crate_first_fit": {
+      "state": "inferred",
+      "summary": "The external CLI posture aligns with a wrapper-crate-first integration path.",
+      "evidence_ids": [
+        "goose-doc",
+        "goose-repo"
+      ],
+      "notes": "The first seam remains process invocation plus event normalization."
+    },
+    "reproducibility": {
+      "state": "inferred",
+      "summary": "Public docs support repeatable local setup while provider-backed evaluation remains a later gated step.",
+      "evidence_ids": [
+        "goose-doc",
+        "goose-brew"
+      ],
+      "notes": "Install and wrapper evidence is reproducible now; provider-backed behavior is deferred."
+    },
+    "future_leverage": {
+      "state": "inferred",
+      "summary": "Goose\u2019s open-source agent posture makes it a strategic contender despite lower packaging evidence than other finalists.",
+      "evidence_ids": [
+        "goose-repo",
+        "goose-home"
+      ],
+      "notes": "The candidate remains strategically relevant even with thinner public packaging signals."
+    }
+  },
+  "probe_requests": [],
+  "blocked_steps": [
+    "Model-backed evaluation still needs maintainer credentials after local CLI setup."
+  ],
+  "normalized_caveats": [
+    "Goose is documentable and installable now, but provider-backed behavior belongs to later proving."
+  ],
+  "evidence": [
+    {
+      "evidence_id": "goose-doc",
+      "kind": "official_doc",
+      "url": "https://goose-docs.ai/docs/category/getting-started",
+      "title": "Getting Started | goose | Your open source AI agent",
+      "captured_at": "2026-04-28T15:31:24Z",
+      "excerpt": "Goose docs expose a getting-started track under \"Getting Started | goose | Your open source AI agent,\" grounding install and evaluation guidance.",
+      "sha256": "e397d4547a83397b2ad1f1a5dcb716d261e25851da40fe2f0b017605daa6a818"
+    },
+    {
+      "evidence_id": "goose-repo",
+      "kind": "github",
+      "url": "https://github.com/aaif-goose/goose",
+      "title": "aaif-goose/goose",
+      "captured_at": "2026-04-28T15:31:24Z",
+      "excerpt": "GitHub describes goose as \"an open source, extensible AI agent that goes beyond code suggestions - install, execute, edit, and test with any LLM.\" Repo has 43453 stars and was pushed 2026-04-28T15:17:46Z.",
+      "sha256": "94b2658a40019c55ae58fa254598769151d3195358fd0035bde8ddd79d104f39"
+    },
+    {
+      "evidence_id": "goose-home",
+      "kind": "ancillary",
+      "url": "https://goose-docs.ai",
+      "title": "goose docs home",
+      "captured_at": "2026-04-28T15:31:24Z",
+      "excerpt": "The goose docs home presents goose as an open source AI agent and routes users into the public docs and getting-started flow.",
+      "sha256": "d4873c7747fe6f3ac2308f874a7e31143efa5d31ca6b05c620f6703763e3b167"
+    },
+    {
+      "evidence_id": "goose-brew",
+      "kind": "package_registry",
+      "url": "https://formulae.brew.sh/formula/block-goose-cli",
+      "title": "block-goose-cli \u2014 Homebrew Formulae",
+      "captured_at": "2026-04-28T19:06:30Z",
+      "excerpt": "Homebrew publishes block-goose-cli as the installable Goose CLI formula with a stable version and the command brew install block-goose-cli.",
+      "sha256": "54722ccf1875d76b50bcc406ef94fad89fd92c4b671cd6d7d39e16c54ee6da3c"
+    }
+  ]
+}

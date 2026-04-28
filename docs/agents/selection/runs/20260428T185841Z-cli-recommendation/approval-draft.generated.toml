@@ -3,8 +3,8 @@ comparison_ref = "docs/agents/selection/cli-agent-selection-packet.md"
 selection_mode = "factory_validation"
 recommended_agent_id = "openhands"
 approved_agent_id = "openhands"
-approval_commit = "f49e9e0960fe0a4ff0caa6e41442b65c017150ae"
-approval_recorded_at = "2026-04-28T19:06:55Z"
+approval_commit = "0000000"
+approval_recorded_at = "2026-04-28T19:05:58Z"
 
 [descriptor]
 agent_id = "openhands"

@@ -192,6 +192,35 @@ PACKET_SECTION_HEADINGS = (
 )
 PACKET_TABLE_HEADER = "| Candidate | Adoption & community pull | CLI product maturity & release activity | Installability & docs quality | Reproducibility & access friction | Architecture fit for this repo | Capability expansion / future leverage | Notes |"
 PACKET_TABLE_DIVIDER = "|---|---:|---:|---:|---:|---:|---:|---|"
+SECTION7_LABELS = (
+    "Manifest root expectations",
+    "Wrapper crate expectations",
+    "`agent_api` backend expectations",
+    "UAA promotion expectations",
+    "Support/publication expectations",
+    "Likely seam risks",
+)
+SECTION8_LABELS = (
+    "Manifest-root artifacts",
+    "Wrapper-crate artifacts",
+    "`agent_api` artifacts",
+    "UAA promotion-gate artifacts",
+    "Docs/spec artifacts",
+    "Evidence/fixture artifacts",
+)
+SECTION9_LABELS = (
+    "Required workstreams",
+    "Required deliverables",
+    "Blocking risks",
+    "Acceptance gates",
+)
+SECTION6_REPRO_NOW_LABELS = (
+    "install paths",
+    "auth / account / billing prerequisites",
+    "runnable commands",
+    "evidence gatherable without paid or elevated access",
+    "expected artifacts to save during evaluation",
+)
 
 
 class RecommendationError(Exception):
@@ -318,6 +347,31 @@ class CandidateResult:
     evidence_ids_used: list[str]
     notes: list[str]
     score: CandidateScore | None = None
+
+
+@dataclass(frozen=True)
+class HardGateRule:
+    gate_key: str
+    rule_id: str
+    passing_states: frozenset[str]
+    required_all_of_kinds: frozenset[str] = frozenset()
+    required_any_of_kinds: frozenset[str] = frozenset()
+    allow_probe_output: bool = False
+    reject_on_blocked_by: bool = False
+    require_required_probe_pass_if_present: bool = False
+
+
+@dataclass(frozen=True)
+class DecisionSurface:
+    winner_agent_id: str
+    winner_display_name: str
+    winner_rationale: str
+    loser_rationales: dict[str, list[str]]
+    section6_reproducible_now: dict[str, list[str]]
+    section6_blocked_until_later: list[str]
+    section7: dict[str, list[str]]
+    section8: dict[str, list[str]]
+    section9: dict[str, list[str]]
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -753,10 +807,15 @@ def validate_candidate_validation_payload(payload: dict[str, Any], *, expected_a
     if set(payload["hard_gate_results"].keys()) != set(HARD_GATE_KEYS):
         raise RecommendationError(f"candidate validation payload `{expected_agent_id}` hard_gate_results keys do not match the frozen contract")
     for gate_key, gate in payload["hard_gate_results"].items():
-        if set(gate.keys()) != {"status", "evidence_ids", "notes"}:
+        if set(gate.keys()) != {"status", "rule_id", "rejection_reason", "evidence_ids", "notes"}:
             raise RecommendationError(f"candidate validation payload `{expected_agent_id}` gate `{gate_key}` keys do not match the frozen contract")
         if gate["status"] not in ALLOWED_GATE_RESULTS:
             raise RecommendationError(f"candidate validation payload `{expected_agent_id}` gate `{gate_key}` has an invalid status")
+        ensure_string(gate["rule_id"], label=f"candidate validation payload `{expected_agent_id}` gate `{gate_key}` rule_id")
+        if gate["rule_id"] != HARD_GATE_RULES[gate_key].rule_id:
+            raise RecommendationError(f"candidate validation payload `{expected_agent_id}` gate `{gate_key}` has the wrong rule_id")
+        if not isinstance(gate["rejection_reason"], str):
+            raise RecommendationError(f"candidate validation payload `{expected_agent_id}` gate `{gate_key}` rejection_reason must be a string")
         ensure_string_list(gate["evidence_ids"], label=f"candidate validation payload `{expected_agent_id}` gate `{gate_key}` evidence_ids")
         if not isinstance(gate["notes"], str):
             raise RecommendationError(f"candidate validation payload `{expected_agent_id}` gate `{gate_key}` notes must be a string")
@@ -834,6 +893,12 @@ def validate_packet_contract(
     section6 = packet_section_slice(packet, PACKET_SECTION_HEADINGS[5], PACKET_SECTION_HEADINGS[6])
     if "reproducible now:" not in section6 or "blocked until later:" not in section6:
         raise RecommendationError("comparison packet section 6 must be split into reproducible now and blocked until later")
+    section7 = packet_section_slice(packet, PACKET_SECTION_HEADINGS[6], PACKET_SECTION_HEADINGS[7])
+    exact_nonempty_labeled_section(section7, SECTION7_LABELS, section_heading="comparison packet section 7")
+    section8 = packet_section_slice(packet, PACKET_SECTION_HEADINGS[7], PACKET_SECTION_HEADINGS[8])
+    exact_nonempty_labeled_section(section8, SECTION8_LABELS, section_heading="comparison packet section 8")
+    section9 = packet_section_slice(packet, PACKET_SECTION_HEADINGS[8], PACKET_SECTION_HEADINGS[9])
+    exact_nonempty_labeled_section(section9, SECTION9_LABELS, section_heading="comparison packet section 9")
 
     appendix = packet_section_slice(packet, PACKET_SECTION_HEADINGS[9], None)
     for agent_id in shortlist_ids:
@@ -1060,6 +1125,8 @@ def build_placeholder_gate_results() -> dict[str, dict[str, Any]]:
     return {
         key: {
             "status": "unknown",
+            "rule_id": HARD_GATE_RULES[key].rule_id,
+            "rejection_reason": "",
             "evidence_ids": [],
             "notes": "",
         }
@@ -1370,33 +1437,213 @@ def execute_probe(
     return result, ref, None
 
 
-def claim_state_allows_gate_pass(state: str) -> bool:
-    return state in {"verified", "inferred"}
+HARD_GATE_RULES = {
+    "non_interactive_execution": HardGateRule(
+        gate_key="non_interactive_execution",
+        rule_id="hard_gate.non_interactive_execution.verified_doc_and_package_or_probe",
+        passing_states=frozenset({"verified"}),
+        required_all_of_kinds=frozenset({"official_doc"}),
+        required_any_of_kinds=frozenset({"package_registry", "probe_output"}),
+        allow_probe_output=True,
+        require_required_probe_pass_if_present=True,
+    ),
+    "offline_strategy": HardGateRule(
+        gate_key="offline_strategy",
+        rule_id="hard_gate.offline_strategy.doc_or_repo_backed",
+        passing_states=frozenset({"verified", "inferred"}),
+        required_any_of_kinds=frozenset({"official_doc", "github"}),
+        reject_on_blocked_by=True,
+    ),
+    "observable_cli_surface": HardGateRule(
+        gate_key="observable_cli_surface",
+        rule_id="hard_gate.observable_cli_surface.verified_doc_or_repo_or_probe",
+        passing_states=frozenset({"verified"}),
+        required_any_of_kinds=frozenset({"official_doc", "github", "probe_output"}),
+        allow_probe_output=True,
+        require_required_probe_pass_if_present=True,
+    ),
+    "redaction_fit": HardGateRule(
+        gate_key="redaction_fit",
+        rule_id="hard_gate.redaction_fit.repo_or_probe_backed",
+        passing_states=frozenset({"verified", "inferred"}),
+        required_any_of_kinds=frozenset({"github", "probe_output"}),
+        allow_probe_output=True,
+        reject_on_blocked_by=True,
+    ),
+    "crate_first_fit": HardGateRule(
+        gate_key="crate_first_fit",
+        rule_id="hard_gate.crate_first_fit.doc_or_repo_or_package_backed",
+        passing_states=frozenset({"verified", "inferred"}),
+        required_any_of_kinds=frozenset({"official_doc", "github", "package_registry"}),
+        reject_on_blocked_by=True,
+    ),
+    "reproducibility": HardGateRule(
+        gate_key="reproducibility",
+        rule_id="hard_gate.reproducibility.doc_and_package",
+        passing_states=frozenset({"verified", "inferred"}),
+        required_all_of_kinds=frozenset({"official_doc", "package_registry"}),
+        reject_on_blocked_by=True,
+    ),
+}
 
 
-def evaluate_hard_gate(
+def evidence_index(dossier: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    return {entry["evidence_id"]: entry for entry in dossier["evidence"]}
+
+
+def evidence_kinds_for_ids(
+    evidence_lookup: dict[str, dict[str, Any]],
+    evidence_ids: list[str],
+) -> set[str]:
+    kinds: set[str] = set()
+    for evidence_id in evidence_ids:
+        if evidence_id in evidence_lookup:
+            kinds.add(evidence_lookup[evidence_id]["kind"])
+    return kinds
+
+
+def probe_output_ids_for_gate(
     *,
-    claim: dict[str, Any],
-    gate_key: str,
+    rule: HardGateRule,
     probe_results: list[dict[str, Any]],
-) -> tuple[dict[str, Any], bool, bool]:
-    state = claim["state"]
-    evidence_ids = list(claim["evidence_ids"])
-    notes = claim.get("notes", "")
-    passed_probe_ids = [
+) -> list[str]:
+    if not rule.allow_probe_output:
+        return []
+    return [
         result["captured_output_ref"]
         for result in probe_results
         if result["status"] == "passed" and result["captured_output_ref"]
     ]
-    if gate_key == "observable_cli_surface" and passed_probe_ids:
-        evidence_ids = evidence_ids + passed_probe_ids
+
+
+def required_probe_results(probe_results: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [result for result in probe_results if result["required_for_gate"]]
+
+
+def effective_evidence_kinds(
+    *,
+    dossier: dict[str, Any],
+    evidence_ids: list[str],
+) -> set[str]:
+    kinds = evidence_kinds_for_ids(evidence_index(dossier), evidence_ids)
+    known_evidence_ids = set(evidence_index(dossier).keys())
+    if any(evidence_id not in known_evidence_ids for evidence_id in evidence_ids):
+        kinds.add("probe_output")
+    return kinds
+
+
+def missing_required_evidence_message(
+    *,
+    rule: HardGateRule,
+    actual_kinds: set[str],
+) -> str | None:
+    missing_all = sorted(rule.required_all_of_kinds - actual_kinds)
+    if missing_all:
+        return "missing required evidence kinds: " + ", ".join(missing_all)
+    if rule.required_any_of_kinds and not actual_kinds.intersection(rule.required_any_of_kinds):
+        return "missing required evidence kinds: one of " + ", ".join(sorted(rule.required_any_of_kinds))
+    return None
+
+
+def build_gate_result(
+    *,
+    status: str,
+    rule: HardGateRule,
+    evidence_ids: list[str],
+    notes: str,
+    rejection_reason: str = "",
+) -> dict[str, Any]:
+    return {
+        "status": status,
+        "rule_id": rule.rule_id,
+        "rejection_reason": rejection_reason,
+        "evidence_ids": evidence_ids,
+        "notes": notes,
+    }
+
+
+def evaluate_hard_gate(
+    *,
+    dossier: dict[str, Any],
+    gate_key: str,
+    probe_results: list[dict[str, Any]],
+) -> tuple[dict[str, Any], bool, bool]:
+    rule = HARD_GATE_RULES[gate_key]
+    claim = dossier["claims"][gate_key]
+    state = claim["state"]
+    notes = claim.get("notes", "")
+    blocked_by = list(claim.get("blocked_by", []))
+    evidence_ids = list(claim["evidence_ids"])
+    evidence_ids.extend(
+        probe_id
+        for probe_id in probe_output_ids_for_gate(rule=rule, probe_results=probe_results)
+        if probe_id not in evidence_ids
+    )
     if state == "blocked":
-        return {"status": "blocked", "evidence_ids": evidence_ids, "notes": notes}, True, False
+        rejection_reason = "claim state is blocked"
+        return build_gate_result(
+            status="blocked",
+            rule=rule,
+            evidence_ids=evidence_ids,
+            notes=notes,
+            rejection_reason=rejection_reason,
+        ), True, False
     if state == "unknown":
-        return {"status": "unknown", "evidence_ids": evidence_ids, "notes": notes}, True, False
-    if claim_state_allows_gate_pass(state) and evidence_ids:
-        return {"status": "pass", "evidence_ids": evidence_ids, "notes": notes}, False, True
-    return {"status": "fail", "evidence_ids": evidence_ids, "notes": notes}, True, False
+        rejection_reason = "claim state is unknown"
+        return build_gate_result(
+            status="unknown",
+            rule=rule,
+            evidence_ids=evidence_ids,
+            notes=notes,
+            rejection_reason=rejection_reason,
+        ), True, False
+    if rule.reject_on_blocked_by and blocked_by:
+        rejection_reason = "claim is blocked by dossier dependencies: " + ", ".join(blocked_by)
+        return build_gate_result(
+            status="blocked",
+            rule=rule,
+            evidence_ids=evidence_ids,
+            notes=notes,
+            rejection_reason=rejection_reason,
+        ), True, False
+    if state not in rule.passing_states:
+        rejection_reason = f"claim state `{state}` does not satisfy rule `{rule.rule_id}`"
+        return build_gate_result(
+            status="fail",
+            rule=rule,
+            evidence_ids=evidence_ids,
+            notes=notes,
+            rejection_reason=rejection_reason,
+        ), True, False
+    required_results = required_probe_results(probe_results)
+    if rule.require_required_probe_pass_if_present and required_results and any(
+        result["status"] != "passed" for result in required_results
+    ):
+        rejection_reason = "required_for_gate probe did not pass"
+        return build_gate_result(
+            status="fail",
+            rule=rule,
+            evidence_ids=evidence_ids,
+            notes=notes,
+            rejection_reason=rejection_reason,
+        ), True, False
+    actual_kinds = effective_evidence_kinds(dossier=dossier, evidence_ids=evidence_ids)
+    missing_message = missing_required_evidence_message(rule=rule, actual_kinds=actual_kinds)
+    if missing_message is not None:
+        rejection_reason = missing_message
+        return build_gate_result(
+            status="fail",
+            rule=rule,
+            evidence_ids=evidence_ids,
+            notes=notes,
+            rejection_reason=rejection_reason,
+        ), True, False
+    return build_gate_result(
+        status="pass",
+        rule=rule,
+        evidence_ids=evidence_ids,
+        notes=notes,
+    ), False, True
 
 
 def claim_state_rank(state: str) -> int:
@@ -1682,6 +1929,256 @@ def render_run_summary(
     return "\n".join(lines) + "\n"
 
 
+def render_labeled_bullet_section(section: dict[str, list[str]], labels: tuple[str, ...]) -> list[str]:
+    lines: list[str] = []
+    for label in labels:
+        lines.append(f"{label}:")
+        for entry in section[label]:
+            lines.append(f"- {entry}")
+        lines.append("")
+    return lines
+
+
+def labeled_section_blocks(section_text: str, labels: tuple[str, ...]) -> dict[str, list[str]]:
+    blocks: dict[str, list[str]] = {}
+    current_label: str | None = None
+    for raw_line in section_text.splitlines():
+        line = raw_line.strip()
+        if line.startswith("## "):
+            continue
+        if not line or line.startswith("Provenance: "):
+            continue
+        matched_label = next((label for label in labels if line == f"{label}:"), None)
+        if matched_label is not None:
+            current_label = matched_label
+            blocks[current_label] = []
+            continue
+        if current_label is not None:
+            blocks[current_label].append(raw_line)
+    return blocks
+
+
+def exact_nonempty_labeled_section(section_text: str, labels: tuple[str, ...], *, section_heading: str) -> None:
+    blocks = labeled_section_blocks(section_text, labels)
+    if tuple(blocks.keys()) != labels:
+        raise RecommendationError(f"{section_heading} labels do not match the locked template")
+    for label in labels:
+        content = [line for line in blocks[label] if line.strip()]
+        if not content:
+            raise RecommendationError(f"{section_heading} subsection `{label}` must not be empty")
+
+
+def shortlist_loser_rationale(
+    *,
+    agent_id: str,
+    recommended_agent_id: str,
+    scores: dict[str, CandidateScore],
+    dossiers: dict[str, dict[str, Any]],
+) -> list[str]:
+    loser = scores[agent_id]
+    winner = scores[recommended_agent_id]
+    dossier = dossiers[agent_id]
+    if dossier["blocked_steps"]:
+        return [
+            f"`{agent_id}` ties or trails `{recommended_agent_id}` on the scorecard and still carries a blocked follow-up step: {dossier['blocked_steps'][0]}",
+        ]
+    weaker_dimensions = [
+        dimension
+        for dimension in DIMENSIONS
+        if loser.scores[dimension] < winner.scores[dimension]
+    ]
+    if weaker_dimensions:
+        cited = ", ".join(f"`{dimension}`" for dimension in weaker_dimensions[:2])
+        return [
+            f"`{agent_id}` loses because `{recommended_agent_id}` has stronger evidence-backed coverage on {cited}.",
+        ]
+    return [
+        f"`{agent_id}` loses on the frozen shortlist tie-break chain after matching the score buckets; the winner keeps the cleaner recommendation path for immediate evaluation.",
+    ]
+
+
+def build_decision_surface(
+    *,
+    seed: SeedConfig,
+    shortlist_ids: list[str],
+    recommended_agent_id: str,
+    scores: dict[str, CandidateScore],
+    dossiers: dict[str, dict[str, Any]],
+) -> DecisionSurface:
+    recommended = seed.candidate_by_id(recommended_agent_id)
+    recommended_dossier = dossiers[recommended_agent_id]
+    descriptor = recommended.derived_descriptor(seed.defaults)
+    probe_requests = recommended_dossier["probe_requests"]
+    runnable_commands = [f"`{channel}`" for channel in recommended_dossier["install_channels"]]
+    if probe_requests:
+        runnable_commands.extend(
+            f"`{probe_request['binary']} {PROBE_ARGS[probe_request['probe_kind']]}`"
+            for probe_request in probe_requests
+        )
+    else:
+        runnable_commands.extend(
+            [
+                f"`{recommended_agent_id} --help`",
+                f"`{recommended_agent_id} --version`",
+            ]
+        )
+    evidence_lines = [
+        f"`{entry['evidence_id']}` (`{entry['kind']}`): {entry['title']}"
+        for entry in recommended_dossier["evidence"]
+    ]
+    blocked_lines = list(recommended_dossier["blocked_steps"])
+    if not blocked_lines:
+        blocked_lines = [
+            "any hosted or provider-only workflow remains blocked until a maintainer validates live account, auth, and billing requirements outside the local install path",
+            "any capability that cannot be exercised from the local CLI surface remains blocked until wrapper-first evaluation artifacts are committed",
+        ]
+    winner_score = scores[recommended_agent_id]
+    loser_rationales = {
+        agent_id: shortlist_loser_rationale(
+            agent_id=agent_id,
+            recommended_agent_id=recommended_agent_id,
+            scores=scores,
+            dossiers=dossiers,
+        )
+        for agent_id in shortlist_ids
+        if agent_id != recommended_agent_id
+    }
+    return DecisionSurface(
+        winner_agent_id=recommended_agent_id,
+        winner_display_name=recommended.display_name,
+        winner_rationale=(
+            f"`{recommended.display_name}` wins because it satisfies the strict hard-gate rules with the strongest immediate repo-fit evidence (`{winner_score.notes}`), "
+            f"while preserving the best frozen shortlist position with primary score `{winner_score.primary_sum}` and secondary score `{winner_score.secondary_sum}`."
+        ),
+        loser_rationales=loser_rationales,
+        section6_reproducible_now={
+            "install paths": [f"`{channel}`" for channel in recommended_dossier["install_channels"]],
+            "auth / account / billing prerequisites": recommended_dossier["auth_prerequisites"] or ["none before local install"],
+            "runnable commands": runnable_commands,
+            "evidence gatherable without paid or elevated access": evidence_lines,
+            "expected artifacts to save during evaluation": [
+                "redacted install log",
+                "redacted `--help` output capture",
+                "redacted `--version` output capture",
+                f"notes linking saved artifacts back to `{recommended_agent_id}` dossier evidence ids",
+            ],
+        },
+        section6_blocked_until_later=blocked_lines,
+        section7={
+            "Manifest root expectations": [
+                f"keep generated manifests and review outputs aligned under `{descriptor['manifest_root']}` before backend integration work starts",
+                "preserve the canonical comparison packet and approval artifact references while manifest-root surfaces are wired up",
+            ],
+            "Wrapper crate expectations": [
+                f"start with the wrapper crate at `{descriptor['crate_path']}` as the first implementation stage",
+                "keep CLI parsing, command execution, and event normalization inside the wrapper seam until behavior is proven",
+            ],
+            "`agent_api` backend expectations": [
+                f"add backend adapter work under `{descriptor['backend_module']}` only after wrapper behavior is reviewable",
+                "map wrapper outputs into existing phase-1 seams without widening the current contracts prematurely",
+            ],
+            "UAA promotion expectations": [
+                "treat UAA promotion review as the final stage after wrapper and backend evidence exists",
+                "do not treat support or capability matrix publication as a substitute for wrapper-first proof",
+            ],
+            "Support/publication expectations": [
+                f"preserve `docs_release_track = \"{descriptor['docs_release_track']}\"` and the approved descriptor flags as the publication baseline",
+                "land support-matrix or capability-matrix updates only when the implementation artifacts justify them",
+            ],
+            "Likely seam risks": [
+                "CLI surface drift can invalidate parser assumptions between saved dossier evidence and real execution",
+                "provider-gated or hosted workflows may remain untestable until maintainer access exists, so keep them outside the wrapper-first acceptance path",
+            ],
+        },
+        section8={
+            "Manifest-root artifacts": [
+                f"committed manifest snapshots and review artifacts under `{descriptor['manifest_root']}`",
+                "validation output proving manifest-root paths and packet references stay aligned",
+            ],
+            "Wrapper-crate artifacts": [
+                f"wrapper crate code and tests under `{descriptor['crate_path']}`",
+                "fixture-backed help/version captures or parser coverage notes for the approved CLI surface",
+            ],
+            "`agent_api` artifacts": [
+                f"backend adapter code under `{descriptor['backend_module']}`",
+                "integration tests or fixtures proving wrapper outputs map cleanly into `agent_api`",
+            ],
+            "UAA promotion-gate artifacts": [
+                "dry-run approval validation via `cargo run -p xtask -- onboard-agent --approval ... --dry-run`",
+                "promotion review evidence showing wrapper and backend outputs satisfy the approved packet",
+            ],
+            "Docs/spec artifacts": [
+                "canonical packet, approval artifact, and any required `docs/specs/**` updates for real behavior changes",
+                "repo guidance updates that point future maintainers at the approved onboarding seam",
+            ],
+            "Evidence/fixture artifacts": [
+                "saved dossier evidence ids and probe output refs linked through `sources.lock.json`",
+                "redacted local evaluation captures, fixtures, and blocker notes required to reproduce acceptance decisions",
+            ],
+        },
+        section9={
+            "Required workstreams": [
+                "packet closeout and approval artifact review",
+                "wrapper crate implementation",
+                "`agent_api` backend integration",
+                "UAA promotion review and matrix/publication closeout",
+            ],
+            "Required deliverables": [
+                "approved comparison packet and governance artifact",
+                "wrapper crate code, tests, and manifest outputs",
+                "backend adapter code, tests, and updated repo evidence",
+            ],
+            "Blocking risks": [
+                "provider or account-gated flows may block parity claims after local CLI install succeeds",
+                "release drift between saved dossier evidence and current binaries can invalidate planned parsing assumptions",
+            ],
+            "Acceptance gates": [
+                "packet and approval artifacts remain byte-stable except for allowed promote-time deltas",
+                "wrapper crate proves the approved help/version/non-interactive surfaces with saved evidence",
+                "backend adapter integration does not contradict existing `docs/specs/**` contracts",
+                "at least 3 eligible candidates remain after hard gating and exactly 3 shortlisted candidates are documented",
+            ],
+        },
+    )
+
+
+def validate_decision_surface(
+    surface: DecisionSurface,
+    *,
+    shortlist_ids: list[str],
+    recommended_agent_id: str,
+) -> None:
+    if len(shortlist_ids) != 3:
+        raise RecommendationError("DecisionSurface requires exactly 3 shortlisted candidates")
+    for agent_id in shortlist_ids:
+        if agent_id == recommended_agent_id:
+            continue
+        if agent_id not in surface.loser_rationales or not any(
+            entry.strip() for entry in surface.loser_rationales[agent_id]
+        ):
+            raise RecommendationError(f"DecisionSurface missing explicit loser rationale for shortlisted non-winner `{agent_id}`")
+    if tuple(surface.section6_reproducible_now.keys()) != SECTION6_REPRO_NOW_LABELS:
+        raise RecommendationError("DecisionSurface section 6 reproducible-now labels do not match the locked template")
+    runnable_commands = surface.section6_reproducible_now["runnable commands"]
+    if not runnable_commands or not any("`" in entry and " " in entry for entry in runnable_commands):
+        raise RecommendationError("DecisionSurface section 6 must include real commands")
+    evidence_lines = surface.section6_reproducible_now["evidence gatherable without paid or elevated access"]
+    if not evidence_lines:
+        raise RecommendationError("DecisionSurface section 6 must include gatherable evidence")
+    if not surface.section6_blocked_until_later:
+        raise RecommendationError("DecisionSurface section 6 must include blocked steps")
+    for labels, section, name in (
+        (SECTION7_LABELS, surface.section7, "section 7"),
+        (SECTION8_LABELS, surface.section8, "section 8"),
+        (SECTION9_LABELS, surface.section9, "section 9"),
+    ):
+        if tuple(section.keys()) != labels:
+            raise RecommendationError(f"DecisionSurface {name} labels do not match the locked template")
+        for label in labels:
+            if not section[label]:
+                raise RecommendationError(f"DecisionSurface {name} subsection `{label}` must not be empty")
+
+
 def render_comparison_packet(
     *,
     run_id: str,
@@ -1693,9 +2190,23 @@ def render_comparison_packet(
     dossiers: dict[str, dict[str, Any]],
     candidate_results: dict[str, CandidateResult],
 ) -> str:
+    if len(shortlist_ids) != 3:
+        raise RecommendationError("comparison packet requires exactly 3 shortlisted candidates")
     recommended = seed.candidate_by_id(recommended_agent_id)
     snapshot_date = generated_at[:10]
     recommended_dossier = dossiers[recommended_agent_id]
+    decision_surface = build_decision_surface(
+        seed=seed,
+        shortlist_ids=shortlist_ids,
+        recommended_agent_id=recommended_agent_id,
+        scores=scores,
+        dossiers=dossiers,
+    )
+    validate_decision_surface(
+        decision_surface,
+        shortlist_ids=shortlist_ids,
+        recommended_agent_id=recommended_agent_id,
+    )
     lines = [
         "<!-- generated-by: scripts/recommend_next_agent.py generate -->",
         "# Packet - CLI Agent Selection Packet",
@@ -1774,16 +2285,17 @@ def render_comparison_packet(
             "",
             packet_template_provenance_line("## 5. Recommendation"),
             "",
-            f"Recommended winner: `{recommended_agent_id}`",
+            f"Recommended winner: `{decision_surface.winner_agent_id}`",
             "",
-            f"`{recommended.display_name}` wins on the frozen shortlist ordering with primary score `{scores[recommended_agent_id].primary_sum}`, secondary score `{scores[recommended_agent_id].secondary_sum}`, and cited evidence `{scores[recommended_agent_id].notes}`.",
+            decision_surface.winner_rationale,
             "",
         ]
     )
     for agent_id in shortlist_ids:
         if agent_id == recommended_agent_id:
             continue
-        lines.append(f"- `{agent_id}` lost on the frozen tie-break chain despite refs `{scores[agent_id].notes}`.")
+        for rationale in decision_surface.loser_rationales[agent_id]:
+            lines.append(f"- {rationale}")
     lines.extend(
         [
             "",
@@ -1796,38 +2308,15 @@ def render_comparison_packet(
             packet_template_provenance_line("## 6. Recommended Agent Evaluation Recipe"),
             "",
             "reproducible now:",
-            "- install paths:",
         ]
     )
-    for channel in recommended_dossier["install_channels"]:
-        lines.append(f"  - `{channel}`")
-    lines.extend(
-        [
-            "- auth / account / billing prerequisites:",
-        ]
-    )
-    for entry in recommended_dossier["auth_prerequisites"] or ["none before local install"]:
-        lines.append(f"  - {entry}")
-    lines.extend(
-        [
-            "- runnable commands:",
-            "  - install one supported package path above",
-            "  - collect local `--help` / `--version` output during maintainer evaluation when the binary is installed",
-            "- evidence gatherable without paid or elevated access:",
-            f"  - official docs refs `{', '.join(recommended_dossier['claims']['non_interactive_execution']['evidence_ids'])}`",
-            f"  - package / install refs `{', '.join(recommended_dossier['claims']['reproducibility']['evidence_ids'])}`",
-            "- expected artifacts to save during evaluation:",
-            "  - redacted install logs",
-            "  - captured help/version output",
-            "  - fixture notes describing fake-binary or parser coverage assumptions",
-            "",
-            "blocked until later:",
-        ]
-    )
-    blocked_steps = recommended_dossier["blocked_steps"] or ["none"]
-    for entry in blocked_steps:
+    for label in SECTION6_REPRO_NOW_LABELS:
+        lines.append(f"- {label}:")
+        for entry in decision_surface.section6_reproducible_now[label]:
+            lines.append(f"  - {entry}")
+    lines.extend(["", "blocked until later:"])
+    for entry in decision_surface.section6_blocked_until_later:
         lines.append(f"- {entry}")
-    descriptor = recommended.derived_descriptor(seed.defaults)
     lines.extend(
         [
             "",
@@ -1835,29 +2324,29 @@ def render_comparison_packet(
             "",
             packet_template_provenance_line("## 7. Repo-Fit Analysis"),
             "",
-            f"- crate path: `{descriptor['crate_path']}`",
-            f"- backend module: `{descriptor['backend_module']}`",
-            f"- manifest root: `{descriptor['manifest_root']}`",
-            f"- package name: `{descriptor['package_name']}`",
-            "",
+        ]
+    )
+    lines.extend(render_labeled_bullet_section(decision_surface.section7, SECTION7_LABELS))
+    lines.extend(
+        [
             "## 8. Required Artifacts",
             "",
             packet_template_provenance_line("## 8. Required Artifacts"),
             "",
-            "- canonical comparison packet",
-            "- approval artifact draft",
-            "- committed review run artifacts",
-            "- wrapper/backend follow-on surfaces after approval",
-            "",
+        ]
+    )
+    lines.extend(render_labeled_bullet_section(decision_surface.section8, SECTION8_LABELS))
+    lines.extend(
+        [
             "## 9. Workstreams, Deliverables, Risks, And Gates",
             "",
             packet_template_provenance_line("## 9. Workstreams, Deliverables, Risks, And Gates"),
             "",
-            "- workstreams: contract, runner, validation, proving, integration",
-            "- deliverables: seed snapshot, dossiers, runner outputs, tests, review run, approval draft",
-            "- risks: drift, insufficient eligible candidates, approval validation failure",
-            "- gates: exactly 3 shortlisted candidates, successful approval dry-run, green validation",
-            "",
+        ]
+    )
+    lines.extend(render_labeled_bullet_section(decision_surface.section9, SECTION9_LABELS))
+    lines.extend(
+        [
             "## 10. Dated Evidence Appendix",
             "",
             packet_template_provenance_line("## 10. Dated Evidence Appendix"),
@@ -1887,7 +2376,10 @@ def render_comparison_packet(
         lines.append("- Normalized notes:")
         for entry in dossier["normalized_caveats"]:
             lines.append(f"  - {entry}")
-        lines.append("- Loser rationale: " + ("winner" if agent_id == recommended_agent_id else score.notes))
+        if agent_id == recommended_agent_id:
+            lines.append("- Loser rationale: winner")
+        else:
+            lines.append("- Loser rationale: " + " ".join(decision_surface.loser_rationales[agent_id]))
         lines.append("")
     strategic_contenders = [
         candidate.agent_id
@@ -2226,14 +2718,17 @@ def generate_recommendation(
         gate_failed = False
         for gate_key in HARD_GATE_KEYS:
             gate_result, failed, evidence_sufficient = evaluate_hard_gate(
-                claim=dossier["claims"][gate_key],
+                dossier=dossier,
                 gate_key=gate_key,
                 probe_results=result.probe_results,
             )
             result.hard_gate_results[gate_key] = gate_result
             if failed:
                 gate_failed = True
-                result.rejection_reasons.append(f"{gate_key} gate status is {gate_result['status']}")
+                rejection_reason = gate_result["rejection_reason"] or f"{gate_key} gate status is {gate_result['status']}"
+                result.rejection_reasons.append(
+                    f"{gate_result['rule_id']}: {rejection_reason}"
+                )
             if evidence_sufficient:
                 for evidence_id in gate_result["evidence_ids"]:
                     if evidence_id not in result.evidence_ids_used:

@@ -1,0 +1,77 @@
+{
+  "agent_id": "aider",
+  "error_reasons": [],
+  "evidence_ids_used": [
+    "aider-doc",
+    "aider-repo",
+    "aider-pkg"
+  ],
+  "hard_gate_results": {
+    "crate_first_fit": {
+      "evidence_ids": [
+        "aider-doc",
+        "aider-pkg"
+      ],
+      "notes": "The wrapper can own process invocation before any deeper adapter work.",
+      "rejection_reason": "",
+      "rule_id": "hard_gate.crate_first_fit.doc_or_repo_or_package_backed",
+      "status": "pass"
+    },
+    "non_interactive_execution": {
+      "evidence_ids": [
+        "aider-doc",
+        "aider-pkg"
+      ],
+      "notes": "The terminal entrypoint is publicly documented and packaged.",
+      "rejection_reason": "",
+      "rule_id": "hard_gate.non_interactive_execution.verified_doc_and_package_or_probe",
+      "status": "pass"
+    },
+    "observable_cli_surface": {
+      "evidence_ids": [
+        "aider-doc",
+        "aider-repo"
+      ],
+      "notes": "Observable CLI surface is documented publicly.",
+      "rejection_reason": "",
+      "rule_id": "hard_gate.observable_cli_surface.verified_doc_or_repo_or_probe",
+      "status": "pass"
+    },
+    "offline_strategy": {
+      "evidence_ids": [
+        "aider-doc",
+        "aider-repo"
+      ],
+      "notes": "The recommendation lane only needs deterministic parser and wrapper proof.",
+      "rejection_reason": "",
+      "rule_id": "hard_gate.offline_strategy.doc_or_repo_backed",
+      "status": "pass"
+    },
+    "redaction_fit": {
+      "evidence_ids": [
+        "aider-repo"
+      ],
+      "notes": "Redaction fit is a repo-local inference from terminal-oriented IO.",
+      "rejection_reason": "",
+      "rule_id": "hard_gate.redaction_fit.repo_or_probe_backed",
+      "status": "pass"
+    },
+    "reproducibility": {
+      "evidence_ids": [
+        "aider-doc",
+        "aider-pkg"
+      ],
+      "notes": "Repeatable local setup is public, while provider sessions remain gated later.",
+      "rejection_reason": "",
+      "rule_id": "hard_gate.reproducibility.doc_and_package",
+      "status": "pass"
+    }
+  },
+  "notes": [
+    "schema validation passed"
+  ],
+  "probe_results": [],
+  "rejection_reasons": [],
+  "schema_valid": true,
+  "status": "eligible"
+}

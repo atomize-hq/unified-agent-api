@@ -1,0 +1,51 @@
+{
+  "candidates": [
+    {
+      "agent_id": "opencode",
+      "error_reasons": [],
+      "recommended": false,
+      "rejection_reasons": [
+        "agent_id `opencode` already exists in crates/xtask/data/agent_registry.toml and is already onboarded"
+      ],
+      "shortlisted": false,
+      "status": "candidate_rejected"
+    },
+    {
+      "agent_id": "gemini_cli",
+      "error_reasons": [],
+      "recommended": false,
+      "rejection_reasons": [
+        "hard_gate.non_interactive_execution.verified_doc_and_package_or_probe: missing required evidence kinds: official_doc",
+        "hard_gate.reproducibility.doc_and_package: missing required evidence kinds: official_doc",
+        "agent_id `gemini_cli` already exists in crates/xtask/data/agent_registry.toml and is already onboarded"
+      ],
+      "shortlisted": false,
+      "status": "candidate_rejected"
+    },
+    {
+      "agent_id": "aider",
+      "error_reasons": [],
+      "recommended": false,
+      "rejection_reasons": [],
+      "shortlisted": true,
+      "status": "eligible"
+    },
+    {
+      "agent_id": "goose",
+      "error_reasons": [],
+      "recommended": false,
+      "rejection_reasons": [],
+      "shortlisted": true,
+      "status": "eligible"
+    },
+    {
+      "agent_id": "openhands",
+      "error_reasons": [],
+      "recommended": true,
+      "rejection_reasons": [],
+      "shortlisted": true,
+      "status": "eligible"
+    }
+  ],
+  "run_id": "20260428T185841Z-cli-recommendation"
+}

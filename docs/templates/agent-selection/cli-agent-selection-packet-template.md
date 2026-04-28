@@ -12,6 +12,8 @@ Related source docs:
 Template lock:
 - generated preview packets and promoted canonical packets must preserve this template's title block shape, section numbering, section headings, section order, `Provenance:` lines, and fixed 3-candidate table shape exactly
 - content may replace prompts and placeholders, but required sections must not be renamed, reordered, or collapsed
+- this packet is the maintainer decision surface; `approved-agent.toml` remains the normative approval artifact for the create lane
+- this template must not redefine dossier schema or probe policy; `probe_requests` stays governed by the contract and no single-required-probe rule is introduced here
 
 ## Purpose
 
@@ -141,7 +143,7 @@ Required outputs:
 - winning candidate
 - short rationale paragraph
 - 1-2 bullets for each non-winning candidate explaining why it lost
-- explicit decision block with:
+- explicit decision block consisting of exactly these three lines, in this order:
   - `Approve recommended agent`
   - `Override to shortlisted alternative`
   - `Stop and expand research`
@@ -156,8 +158,8 @@ Prompt:
 - Separate what is reproducible immediately from what remains blocked.
 
 Required outputs:
-- `reproducible now` subsection
-- `blocked until later` subsection
+- exact `reproducible now` subsection
+- exact `blocked until later` subsection
 - install path(s)
 - auth / account / billing prerequisites
 - runnable commands
@@ -173,14 +175,16 @@ Prompt:
 - Explain how the recommended agent maps onto the current repo architecture.
 - Keep the wrapper crate as the first implementation stage and separate it from the later `agent_api` backend stage.
 - Call out where current phase-1 seams appear sufficient and where they might crack.
+- Use the exact subsection labels below verbatim, matching PLAN.md in wording and capitalization; do not rename them.
 
 Required outputs:
-- manifest-root expectations
-- wrapper crate expectations
-- `agent_api` backend expectations
-- UAA promotion expectations
-- support/publication expectations
-- likely seam risks
+- the section is semantically required and must contain implementation-relevant content, not heading-only placeholders
+- exact subsection heading `Manifest root expectations`
+- exact subsection heading `Wrapper crate expectations`
+- exact subsection heading `agent_api` backend expectations
+- exact subsection heading `UAA promotion expectations`
+- exact subsection heading `Support/publication expectations`
+- exact subsection heading `Likely seam risks`
 
 ## 8. Required Artifacts
 
@@ -190,14 +194,16 @@ Prompt:
 - List the concrete artifact types a real onboarding would eventually need.
 - Keep wrapper-crate artifacts explicit and prior to `agent_api` artifacts.
 - Stay shape-agnostic about downstream planning packs.
+- Use the exact subsection labels below verbatim, matching PLAN.md in wording and capitalization; do not rename them.
 
 Required outputs:
-- manifest-root artifact expectations
-- wrapper-crate artifact expectations
-- `agent_api` artifact expectations
-- UAA promotion-gate expectations
-- docs/spec artifact expectations
-- evidence/fixture expectations
+- the section is semantically required and must contain concrete artifact expectations, not heading-only placeholders
+- exact subsection heading `Manifest-root artifacts`
+- exact subsection heading `Wrapper-crate artifacts`
+- exact subsection heading `agent_api` artifacts
+- exact subsection heading `UAA promotion-gate artifacts`
+- exact subsection heading `Docs/spec artifacts`
+- exact subsection heading `Evidence/fixture artifacts`
 
 ## 9. Workstreams, Deliverables, Risks, And Gates
 
@@ -208,14 +214,16 @@ Prompt:
 - Do not prescribe one task-pack or feature-pack format.
 - Name the workstreams another maintainer would need to execute.
 - Keep the workstreams explicitly gated: packet closeout, wrapper crate, `agent_api`, then UAA promotion review.
+- Use the exact subsection labels below verbatim, matching PLAN.md in wording and capitalization; do not rename them.
 
 Required outputs:
-- required workstreams
-- required deliverables
-- blocking risks
-- acceptance gates
+- the section is semantically required and must contain executable handoff content, not heading-only placeholders
+- exact subsection heading `Required workstreams`
+- exact subsection heading `Required deliverables`
+- exact subsection heading `Blocking risks`
+- exact subsection heading `Acceptance gates`
 
-Recommended subsections:
+Required subsections:
 - `Required workstreams`
 - `Required deliverables`
 - `Blocking risks`
@@ -282,6 +290,9 @@ Required checklist:
 - [ ] The recommendation explains the winner and tie-break reasoning.
 - [ ] The recommended agent includes a concrete evaluation recipe.
 - [ ] Every judgment-heavy section has a provenance line.
+- [ ] Section 5 ends with the exact three decision lines in the required order.
+- [ ] Section 6 preserves the exact `reproducible now` / `blocked until later` split.
+- [ ] Sections 7-9 use the exact required subsection labels and contain semantic handoff content.
 - [ ] The handoff keeps registry-owned wrapper-crate-path work ahead of `agent_api` adapter work.
 - [ ] UAA promotion is treated as a later gate, not bundled into initial backend support.
 - [ ] The dated evidence appendix includes all 3 candidates.

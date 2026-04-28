@@ -204,7 +204,7 @@ class RecommendationRunnerContractTests(unittest.TestCase):
                 "non_interactive_execution": self.claim_payload(
                     state=non_interactive,
                     summary=f"{display_name} non-interactive execution",
-                    evidence_ids=[evidence_ids["doc"]],
+                    evidence_ids=[evidence_ids["doc"], evidence_ids["pkg"]],
                 ),
                 "offline_strategy": self.claim_payload(
                     state=offline,
@@ -219,7 +219,7 @@ class RecommendationRunnerContractTests(unittest.TestCase):
                 "redaction_fit": self.claim_payload(
                     state=redaction,
                     summary=f"{display_name} redaction fit",
-                    evidence_ids=[evidence_ids["doc"]],
+                    evidence_ids=[evidence_ids["repo"]],
                 ),
                 "crate_first_fit": self.claim_payload(
                     state=crate,
@@ -229,7 +229,7 @@ class RecommendationRunnerContractTests(unittest.TestCase):
                 "reproducibility": self.claim_payload(
                     state=reproducibility,
                     summary=f"{display_name} reproducibility",
-                    evidence_ids=[evidence_ids["pkg"]],
+                    evidence_ids=[evidence_ids["pkg"], evidence_ids["doc"]],
                 ),
                 "future_leverage": self.claim_payload(
                     state=future,
@@ -271,13 +271,23 @@ class RecommendationRunnerContractTests(unittest.TestCase):
             ],
         }
 
-    def claim_payload(self, *, state: str, summary: str, evidence_ids: list[str]) -> dict[str, object]:
-        return {
+    def claim_payload(
+        self,
+        *,
+        state: str,
+        summary: str,
+        evidence_ids: list[str],
+        blocked_by: list[str] | None = None,
+    ) -> dict[str, object]:
+        payload: dict[str, object] = {
             "state": state,
             "summary": summary,
             "evidence_ids": evidence_ids,
             "notes": "none",
         }
+        if blocked_by is not None:
+            payload["blocked_by"] = blocked_by
+        return payload
 
     def load_json(self, path: Path) -> object:
         return json.loads(path.read_text(encoding="utf-8"))
@@ -288,6 +298,29 @@ class RecommendationRunnerContractTests(unittest.TestCase):
             for path in root.rglob("*")
             if path.is_file()
         }
+
+    def decision_surface_bundle(
+        self,
+    ) -> tuple[tempfile.TemporaryDirectory[str], rna.SeedConfig, dict[str, dict[str, object]], dict[str, rna.CandidateScore], rna.DecisionSurface]:
+        tmpdir, root, _, _, _ = self.repo_fixture()
+        research_dir = self.research_dir(root)
+        seed = rna.parse_seed_file(research_dir / "seed.snapshot.toml")
+        dossiers = {
+            agent_id: self.load_json(research_dir / "dossiers" / f"{agent_id}.json")
+            for agent_id, _ in CANDIDATE_ORDER
+        }
+        scores = {
+            agent_id: rna.score_candidate(dossier, probe_results=[])
+            for agent_id, dossier in dossiers.items()
+        }
+        surface = rna.build_decision_surface(
+            seed=seed,
+            shortlist_ids=["alpha", "beta", "gamma"],
+            recommended_agent_id="alpha",
+            scores={agent_id: scores[agent_id] for agent_id in ("alpha", "beta", "gamma")},
+            dossiers=dossiers,
+        )
+        return tmpdir, seed, dossiers, scores, surface
 
     def assert_packet_matches_template_provenance(self, packet: str) -> None:
         for index, heading in enumerate(rna.PACKET_SECTION_HEADINGS):
@@ -347,8 +380,12 @@ class RecommendationRunnerContractTests(unittest.TestCase):
             },
         )
         self.assertEqual(set(payload["hard_gate_results"].keys()), set(rna.HARD_GATE_KEYS))
-        for gate in payload["hard_gate_results"].values():
-            self.assertEqual(set(gate.keys()), {"status", "evidence_ids", "notes"})
+        for gate_key, gate in payload["hard_gate_results"].items():
+            self.assertEqual(
+                set(gate.keys()),
+                {"status", "rule_id", "rejection_reason", "evidence_ids", "notes"},
+            )
+            self.assertEqual(gate["rule_id"], rna.HARD_GATE_RULES[gate_key].rule_id)
 
     def selection_staging_root(self, root: Path, run_id: str) -> Path:
         return root / "docs/agents/selection/.staging" / run_id
@@ -628,6 +665,306 @@ class RecommendationRunnerContractTests(unittest.TestCase):
         finally:
             tmpdir.cleanup()
 
+    def test_hard_gate_rejects_inferred_non_interactive_execution(self) -> None:
+        dossier = self.dossier_payload(
+            agent_id="alpha",
+            display_name="Alpha CLI",
+            snapshot_sha=hex64("snapshot"),
+            non_interactive="inferred",
+            offline="verified",
+            observable="verified",
+            redaction="verified",
+            crate="verified",
+            reproducibility="verified",
+            future="inferred",
+            blocked_steps=[],
+        )
+        gate_result, failed, evidence_sufficient = rna.evaluate_hard_gate(
+            dossier=dossier,
+            gate_key="non_interactive_execution",
+            probe_results=[],
+        )
+
+        self.assertTrue(failed)
+        self.assertFalse(evidence_sufficient)
+        self.assertEqual(gate_result["status"], "fail")
+        self.assertEqual(
+            gate_result["rule_id"],
+            "hard_gate.non_interactive_execution.verified_doc_and_package_or_probe",
+        )
+        self.assertEqual(
+            gate_result["rejection_reason"],
+            "claim state `inferred` does not satisfy rule `hard_gate.non_interactive_execution.verified_doc_and_package_or_probe`",
+        )
+
+    def test_hard_gate_rejects_reproducibility_without_doc_and_package_evidence(self) -> None:
+        dossier = self.dossier_payload(
+            agent_id="alpha",
+            display_name="Alpha CLI",
+            snapshot_sha=hex64("snapshot"),
+            non_interactive="verified",
+            offline="verified",
+            observable="verified",
+            redaction="verified",
+            crate="verified",
+            reproducibility="verified",
+            future="inferred",
+            blocked_steps=[],
+        )
+        dossier["claims"]["reproducibility"]["evidence_ids"] = ["alpha-pkg"]
+
+        gate_result, failed, evidence_sufficient = rna.evaluate_hard_gate(
+            dossier=dossier,
+            gate_key="reproducibility",
+            probe_results=[],
+        )
+
+        self.assertTrue(failed)
+        self.assertFalse(evidence_sufficient)
+        self.assertEqual(gate_result["status"], "fail")
+        self.assertEqual(
+            gate_result["rule_id"],
+            "hard_gate.reproducibility.doc_and_package",
+        )
+        self.assertEqual(
+            gate_result["rejection_reason"],
+            "missing required evidence kinds: official_doc",
+        )
+
+    def test_hard_gate_rejects_inferred_allowed_claim_when_blocked_by_is_present(self) -> None:
+        dossier = self.dossier_payload(
+            agent_id="gamma",
+            display_name="Gamma CLI",
+            snapshot_sha=hex64("snapshot"),
+            non_interactive="verified",
+            offline="inferred",
+            observable="verified",
+            redaction="verified",
+            crate="verified",
+            reproducibility="verified",
+            future="inferred",
+            blocked_steps=[],
+        )
+        dossier["claims"]["offline_strategy"]["blocked_by"] = ["paid hosted mode review"]
+
+        gate_result, failed, evidence_sufficient = rna.evaluate_hard_gate(
+            dossier=dossier,
+            gate_key="offline_strategy",
+            probe_results=[],
+        )
+
+        self.assertTrue(failed)
+        self.assertFalse(evidence_sufficient)
+        self.assertEqual(gate_result["status"], "blocked")
+        self.assertEqual(
+            gate_result["rule_id"],
+            "hard_gate.offline_strategy.doc_or_repo_backed",
+        )
+        self.assertEqual(
+            gate_result["rejection_reason"],
+            "claim is blocked by dossier dependencies: paid hosted mode review",
+        )
+
+    def test_generate_handles_required_probes_under_existing_schema(self) -> None:
+        tmpdir, root, live_seed, scratch_root, registry_path = self.repo_fixture()
+        try:
+            research_dir = self.research_dir(
+                root,
+                dossier_mutator=lambda agent_id, dossier: (
+                    {
+                        **dossier,
+                        "probe_requests": [
+                            {"probe_kind": "version", "binary": "python3", "required_for_gate": True},
+                            {"probe_kind": "version", "binary": "python3", "required_for_gate": False},
+                        ],
+                    }
+                    if agent_id == "alpha"
+                    else (
+                        {
+                            **dossier,
+                            "claims": {
+                                **dossier["claims"],
+                                "observable_cli_surface": {
+                                    **dossier["claims"]["observable_cli_surface"],
+                                    "evidence_ids": [],
+                                },
+                            },
+                        }
+                        if agent_id == "delta"
+                        else dossier
+                    )
+                ),
+            )
+            run_dir = rna.generate_recommendation(
+                seed_file=live_seed,
+                research_dir=research_dir,
+                run_id=RUN_ID,
+                scratch_root=scratch_root,
+                registry_path=registry_path,
+                now_fn=lambda: GENERATED_AT,
+            )
+
+            alpha_validation = self.load_json(run_dir / "candidate-validation-results" / "alpha.json")
+            self.assertEqual(alpha_validation["status"], "eligible")
+            self.assertEqual(len(alpha_validation["probe_results"]), 2)
+            self.assertEqual(alpha_validation["probe_results"][0]["status"], "passed")
+            self.assertTrue(alpha_validation["probe_results"][0]["required_for_gate"])
+            self.assertEqual(alpha_validation["probe_results"][1]["status"], "passed")
+            self.assertIn(
+                "alpha:version:0",
+                alpha_validation["hard_gate_results"]["observable_cli_surface"]["evidence_ids"],
+            )
+            self.assertIn(
+                "alpha:version:1",
+                alpha_validation["hard_gate_results"]["observable_cli_surface"]["evidence_ids"],
+            )
+        finally:
+            tmpdir.cleanup()
+
+    def test_validate_decision_surface_rejects_missing_loser_rationale(self) -> None:
+        tmpdir, _, _, _, surface = self.decision_surface_bundle()
+        try:
+            invalid = rna.DecisionSurface(
+                winner_agent_id=surface.winner_agent_id,
+                winner_display_name=surface.winner_display_name,
+                winner_rationale=surface.winner_rationale,
+                loser_rationales={"gamma": surface.loser_rationales["gamma"]},
+                section6_reproducible_now=surface.section6_reproducible_now,
+                section6_blocked_until_later=surface.section6_blocked_until_later,
+                section7=surface.section7,
+                section8=surface.section8,
+                section9=surface.section9,
+            )
+            with self.assertRaisesRegex(
+                rna.RecommendationError,
+                "missing explicit loser rationale for shortlisted non-winner `beta`",
+            ):
+                rna.validate_decision_surface(
+                    invalid,
+                    shortlist_ids=["alpha", "beta", "gamma"],
+                    recommended_agent_id="alpha",
+                )
+        finally:
+            tmpdir.cleanup()
+
+    def test_validate_decision_surface_rejects_section6_without_substance(self) -> None:
+        tmpdir, _, _, _, surface = self.decision_surface_bundle()
+        try:
+            cases = (
+                (
+                    "commands",
+                    rna.DecisionSurface(
+                        winner_agent_id=surface.winner_agent_id,
+                        winner_display_name=surface.winner_display_name,
+                        winner_rationale=surface.winner_rationale,
+                        loser_rationales=surface.loser_rationales,
+                        section6_reproducible_now={
+                            **surface.section6_reproducible_now,
+                            "runnable commands": [],
+                        },
+                        section6_blocked_until_later=surface.section6_blocked_until_later,
+                        section7=surface.section7,
+                        section8=surface.section8,
+                        section9=surface.section9,
+                    ),
+                    "section 6 must include real commands",
+                ),
+                (
+                    "evidence",
+                    rna.DecisionSurface(
+                        winner_agent_id=surface.winner_agent_id,
+                        winner_display_name=surface.winner_display_name,
+                        winner_rationale=surface.winner_rationale,
+                        loser_rationales=surface.loser_rationales,
+                        section6_reproducible_now={
+                            **surface.section6_reproducible_now,
+                            "evidence gatherable without paid or elevated access": [],
+                        },
+                        section6_blocked_until_later=surface.section6_blocked_until_later,
+                        section7=surface.section7,
+                        section8=surface.section8,
+                        section9=surface.section9,
+                    ),
+                    "section 6 must include gatherable evidence",
+                ),
+                (
+                    "blockers",
+                    rna.DecisionSurface(
+                        winner_agent_id=surface.winner_agent_id,
+                        winner_display_name=surface.winner_display_name,
+                        winner_rationale=surface.winner_rationale,
+                        loser_rationales=surface.loser_rationales,
+                        section6_reproducible_now=surface.section6_reproducible_now,
+                        section6_blocked_until_later=[],
+                        section7=surface.section7,
+                        section8=surface.section8,
+                        section9=surface.section9,
+                    ),
+                    "section 6 must include blocked steps",
+                ),
+            )
+            for name, invalid_surface, expected_message in cases:
+                with self.subTest(case=name):
+                    with self.assertRaisesRegex(rna.RecommendationError, expected_message):
+                        rna.validate_decision_surface(
+                            invalid_surface,
+                            shortlist_ids=["alpha", "beta", "gamma"],
+                            recommended_agent_id="alpha",
+                        )
+        finally:
+            tmpdir.cleanup()
+
+    def test_section7_8_9_locked_labels_and_nonempty_content_are_enforced(self) -> None:
+        tmpdir, root, live_seed, scratch_root, registry_path = self.repo_fixture()
+        try:
+            research_dir = self.research_dir(root)
+            run_dir = rna.generate_recommendation(
+                seed_file=live_seed,
+                research_dir=research_dir,
+                run_id=RUN_ID,
+                scratch_root=scratch_root,
+                registry_path=registry_path,
+                now_fn=lambda: GENERATED_AT,
+            )
+            packet = (run_dir / "comparison.generated.md").read_text(encoding="utf-8")
+            exact_label = "Manifest root expectations:"
+            self.assertIn(exact_label, packet)
+            tampered_label = packet.replace(exact_label, "Manifest-root expectations:", 1)
+            with self.assertRaisesRegex(
+                rna.RecommendationError,
+                "comparison packet section 7 labels do not match the locked template",
+            ):
+                rna.validate_packet_contract(
+                    packet=tampered_label,
+                    shortlist_ids=["alpha", "beta", "gamma"],
+                    seeded_ids=[agent_id for agent_id, _ in CANDIDATE_ORDER],
+                    candidate_results={
+                        agent_id: rna.build_placeholder_candidate_result(agent_id)
+                        for agent_id, _ in CANDIDATE_ORDER
+                    },
+                )
+
+            emptied = packet.replace(
+                "Required deliverables:\n- approved comparison packet and governance artifact\n- wrapper crate code, tests, and manifest outputs\n- backend adapter code, tests, and updated repo evidence\n",
+                "Required deliverables:\n",
+                1,
+            )
+            with self.assertRaisesRegex(
+                rna.RecommendationError,
+                "comparison packet section 9 subsection `Required deliverables` must not be empty",
+            ):
+                rna.validate_packet_contract(
+                    packet=emptied,
+                    shortlist_ids=["alpha", "beta", "gamma"],
+                    seeded_ids=[agent_id for agent_id, _ in CANDIDATE_ORDER],
+                    candidate_results={
+                        agent_id: rna.build_placeholder_candidate_result(agent_id)
+                        for agent_id, _ in CANDIDATE_ORDER
+                    },
+                )
+        finally:
+            tmpdir.cleanup()
+
     def test_generate_writes_frozen_artifacts_and_deterministic_ordering(self) -> None:
         tmpdir, root, live_seed, scratch_root, registry_path = self.repo_fixture()
         try:
@@ -666,16 +1003,16 @@ class RecommendationRunnerContractTests(unittest.TestCase):
             self.assertEqual(run_status["generated_at"], GENERATED_AT)
             self.assertEqual(run_status["research_dir"], str(research_dir))
             self.assertEqual(run_status["run_dir"], str(run_dir))
-            self.assertEqual(run_status["eligible_candidate_ids"], ["alpha", "beta", "gamma", "delta"])
+            self.assertEqual(run_status["eligible_candidate_ids"], ["alpha", "beta", "gamma"])
             self.assertEqual(run_status["shortlist_ids"], ["alpha", "beta", "gamma"])
             self.assertEqual(run_status["recommended_agent_id"], "alpha")
             self.assertEqual(
                 run_status["candidate_status_counts"],
-                {"eligible": 4, "candidate_rejected": 0, "candidate_error": 0},
+                {"eligible": 3, "candidate_rejected": 1, "candidate_error": 0},
             )
             for key in rna.APPROVAL_DEPENDENT_METRIC_KEYS:
                 self.assertIsNone(run_status["metrics"][key])
-            self.assertEqual(run_status["metrics"]["rejected_before_scoring_count"], 0)
+            self.assertEqual(run_status["metrics"]["rejected_before_scoring_count"], 1)
             self.assertEqual(run_status["metrics"]["evidence_collection_time_seconds"], 321)
             self.assertEqual(run_status["metrics"]["fetched_source_count"], 12)
             self.assertEqual(run_status["approved_agent_id"], None)
@@ -722,8 +1059,10 @@ class RecommendationRunnerContractTests(unittest.TestCase):
                     },
                     {
                         "agent_id": "delta",
-                        "status": "eligible",
-                        "rejection_reasons": [],
+                        "status": "candidate_rejected",
+                        "rejection_reasons": [
+                            "hard_gate.observable_cli_surface.verified_doc_or_repo_or_probe: claim state `inferred` does not satisfy rule `hard_gate.observable_cli_surface.verified_doc_or_repo_or_probe`",
+                        ],
                         "error_reasons": [],
                         "shortlisted": False,
                         "recommended": False,
@@ -735,7 +1074,7 @@ class RecommendationRunnerContractTests(unittest.TestCase):
             self.assertEqual(set(eligible_candidates.keys()), {"run_id", "eligible_candidates"})
             self.assertEqual(
                 [candidate["agent_id"] for candidate in eligible_candidates["eligible_candidates"]],
-                ["alpha", "beta", "gamma", "delta"],
+                ["alpha", "beta", "gamma"],
             )
             self.assertEqual(
                 eligible_candidates["eligible_candidates"][0],
@@ -810,6 +1149,7 @@ class RecommendationRunnerContractTests(unittest.TestCase):
             self.assertEqual(alpha_validation["notes"], ["schema validation passed"])
             for gate in alpha_validation["hard_gate_results"].values():
                 self.assertEqual(gate["status"], "pass")
+                self.assertEqual(gate["rejection_reason"], "")
 
             self.assertEqual(
                 (run_dir / "run-summary.md").read_text(encoding="utf-8"),
@@ -825,7 +1165,7 @@ class RecommendationRunnerContractTests(unittest.TestCase):
   - shortlist_override: pending
   - predicted_blocker_count: pending
   - later_discovered_blocker_count: pending
-  - rejected_before_scoring_count: 0
+  - rejected_before_scoring_count: 1
   - evidence_collection_time_seconds: 321
   - fetched_source_count: 12
 """,
@@ -847,7 +1187,7 @@ class RecommendationRunnerContractTests(unittest.TestCase):
             self.assertIn("reproducible now:", comparison_packet)
             self.assertIn("- auth / account / billing prerequisites:", comparison_packet)
             self.assertIn("blocked until later:", comparison_packet)
-            self.assertNotIn("### Strategic Contenders", comparison_packet)
+            self.assertIn("### Strategic Contenders", comparison_packet)
         finally:
             tmpdir.cleanup()
 
@@ -973,7 +1313,7 @@ class RecommendationRunnerContractTests(unittest.TestCase):
   - shortlist_override: pending
   - predicted_blocker_count: pending
   - later_discovered_blocker_count: pending
-  - rejected_before_scoring_count: 0
+  - rejected_before_scoring_count: 1
   - evidence_collection_time_seconds: 321
   - fetched_source_count: 12
 """,
@@ -992,7 +1332,7 @@ class RecommendationRunnerContractTests(unittest.TestCase):
   - shortlist_override: true
   - predicted_blocker_count: 1
   - later_discovered_blocker_count: pending
-  - rejected_before_scoring_count: 0
+  - rejected_before_scoring_count: 1
   - evidence_collection_time_seconds: 321
   - fetched_source_count: 12
 - override_summary:
