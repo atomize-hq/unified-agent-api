@@ -15,8 +15,8 @@ Repo: `atomize-hq/unified-agent-api`
   - `~/.gstack/projects/atomize-hq-unified-agent-api/spensermcconnell-codex-recommendation-lane-validation-20260428-071743.md`
 - Prior eng-review test artifact:
   - `~/.gstack/projects/atomize-hq-unified-agent-api/spensermcconnell-staging-eng-review-test-plan-20260427-153026.md`
-- Fresh eng-review test artifact for this follow-on:
-  - `~/.gstack/projects/atomize-hq-unified-agent-api/spensermcconnell-codex-recommend-next-agent-eng-review-test-plan-20260428-134309.md`
+- Fresh eng-review test artifact for this consolidation pass:
+  - `~/.gstack/projects/atomize-hq-unified-agent-api/spensermcconnell-codex-recommend-next-agent-eng-review-test-plan-20260428-140435.md`
 - Live repo surfaces:
   - `.codex/skills/recommend-next-agent/SKILL.md`
   - `scripts/recommend_next_agent.py`
@@ -292,12 +292,22 @@ Cons:
 
 Choose Approach B.
 
-This is the smallest plan that actually fixes the current defect.
+This remains the smallest plan that fixes the real defect without reopening lane architecture that already works.
 
-Do **not** widen this into a finalist truth sprint yet.  
-Do **not** fake it with more packet strings and `assertIn(...)`.
+Do **not** widen this into a finalist-truth sprint yet.  
+Do **not** ship a string-only patch that leaves gate semantics fuzzy.
 
-## Architecture
+## Architecture Review
+
+### Architecture decision
+
+Keep the lane in its existing shape:
+
+`research artifacts -> scripts/recommend_next_agent.py -> comparison.generated.md + approval-draft.generated.toml -> promote -> approved-agent.toml -> xtask dry-run`
+
+The fix is inside the existing runner and contract surfaces. No new command surface. No Rust schema expansion. No second packet validator.
+
+### Dependency graph
 
 ```text
 research dir
@@ -309,36 +319,102 @@ research dir
               v
       scripts/recommend_next_agent.py
               |
-              +--> validate dossier schema
+              +--> validate_dossier(...)
+              +--> validate_probe_requests(...)
+              +--> execute_probe(...)
+              +--> evaluate_gate_sufficiency(...)
+              |      - rule lookup
+              |      - allowed state check
+              |      - evidence-kind sufficiency
+              |      - required probe pass check
+              |      - blocked_by rejection
               |
-              +--> evaluate gate sufficiency
-              |      - HARD_GATE_RULES
-              |      - evidence kind checks
-              |      - required probe checks
-              |      - named rejection reasons
-              |
-              +--> score eligible candidates
-              |
-              +--> build decision surface
-              |      - recommendation rationale
-              |      - loser rationale
-              |      - reproducible-now / blocked-later
-              |      - repo-fit expectations
-              |      - artifact expectations
-              |      - workstreams / risks / gates
-              |
-              +--> validate decision surface
-              |
-              +--> render comparison.generated.md
-              +--> render approval-draft.generated.toml
+              +--> score_candidate(...)
+              +--> build_decision_surface(...)
+              +--> validate_decision_surface(...)
+              +--> render_comparison_packet(...)
+              +--> validate_packet_contract(...)
+              +--> render_approval_toml(...)
               |
               v
-      promote reviewed run
+      docs/agents/selection/runs/<run_id>/**
               |
-              +--> canonical packet byte-copy
-              +--> final approved-agent.toml render
-              +--> xtask dry-run validation
+              +--> comparison.generated.md
+              +--> approval-draft.generated.toml
+              +--> candidate-validation-results/*.json
+              |
+              v
+      promote_recommendation(...)
+              |
+              +--> docs/agents/selection/cli-agent-selection-packet.md
+              +--> docs/agents/lifecycle/<pack>/governance/approved-agent.toml
+              +--> cargo run -p xtask -- onboard-agent --approval ... --dry-run
 ```
+
+### Architecture findings resolved in this plan
+
+1. Gate truth must be rule-driven, not state-driven.
+   The current bug lives in `claim_state_allows_gate_pass(...)` plus `evaluate_hard_gate(...)`, where `inferred` plus any `evidence_ids` can pass. This plan replaces that with claim-specific sufficiency rules.
+
+2. Packet semantics must stay on the Python side.
+   The right place to enforce sections 5-9 substance is `validate_packet_contract(...)` in `scripts/recommend_next_agent.py`, not a new Rust validator. Rust remains the approval-artifact boundary only.
+
+3. The packet is the human decision surface, not the approval source of truth.
+   `crates/xtask/src/approval_artifact.rs` already hard-locks `comparison_ref` and override semantics. Keep that boundary intact.
+
+4. The runner remains script-first.
+   This slice does not justify spending an innovation token on `xtask recommend-agent`. The current Python runner already owns deterministic artifact generation and is the boring place to harden semantics.
+
+### Distribution architecture
+
+No new artifact type is introduced.
+
+This slice still distributes only:
+
+- committed review evidence under `docs/agents/selection/runs/`
+- the canonical packet at `docs/agents/selection/cli-agent-selection-packet.md`
+- the approval artifact at `docs/agents/lifecycle/<pack>/governance/approved-agent.toml`
+
+## Code Quality Review
+
+### Code-organization decisions
+
+- Keep all new logic in `scripts/recommend_next_agent.py`.
+  The file is already the deterministic control-plane implementation. Splitting one new helper and one intermediate model into another module would increase cognitive overhead without reducing risk.
+- Add new `TypedDict` shapes beside the existing typed structures.
+  Put the decision-surface types near the existing runner data types so a maintainer can read the whole recommendation pipeline in one file.
+- Reuse existing packet helpers.
+  Extend `packet_section_slice(...)`, `validate_packet_contract(...)`, and the current render path. Do not add a second markdown post-processor.
+- Reuse existing candidate-validation artifacts.
+  Strengthen `candidate-validation-results/<agent>.json` with structured rejection reasons and rule ids instead of inventing a second diagnostics file.
+
+### DRY rules for this slice
+
+- One normative gate table in `docs/specs/cli-agent-recommendation-dossier-contract.md`.
+- One executable gate table in `HARD_GATE_RULES` in `scripts/recommend_next_agent.py`.
+- One packet section-shape authority in `docs/templates/agent-selection/cli-agent-selection-packet-template.md`.
+- One runtime packet enforcer in `validate_packet_contract(...)`.
+
+The docs and runner will necessarily mirror the same concepts, but the plan must keep them line-for-line compatible so drift is test-detectable instead of review-detectable.
+
+### Minimal-diff guardrails
+
+- Remove `claim_state_allows_gate_pass(...)` entirely instead of keeping two gate paths alive.
+- Preserve `render_approval_toml(...)`, `promote_recommendation(...)`, shortlist ordering, score dimensions, and run-artifact layout.
+- Do not touch Rust unless the existing dry-run proves an actual approval-boundary defect. This plan assumes it will not.
+
+## Performance Review
+
+This slice is not performance-driven, but it still needs explicit guardrails so semantics hardening does not accidentally make the runner sloppy.
+
+- Gate evaluation must stay bounded per candidate.
+  The runner already limits probes with `MAX_PROBES_PER_CANDIDATE`. The new sufficiency logic must remain `O(claims + evidence + probes)` per dossier, not repeated rescans of the full evidence list for every rule.
+- Probe execution behavior must not expand.
+  No new probe kinds, no new binaries, no new concurrency model. The only change is how existing required probes affect pass/fail.
+- Packet rendering must stay deterministic.
+  The golden test should compare stable section slices for sections 5-9, not full-file timestamps, so reruns stay cheap and deterministic.
+
+Performance risk is low. The real requirement is to avoid accidental complexity while hardening correctness.
 
 ## Contract Changes
 
@@ -348,7 +424,7 @@ Extend `docs/specs/cli-agent-recommendation-dossier-contract.md` with one new no
 
 `## Hard Gate Sufficiency Rules`
 
-Add one table with the exact rules below:
+Add this exact rule table:
 
 | Claim key | Allowed pass states | Required evidence kinds | Required probe rule | Reject when |
 | --- | --- | --- | --- | --- |
@@ -361,13 +437,16 @@ Add one table with the exact rules below:
 
 Add one explicit rule below the table:
 
-- generic prose in `summary` or `notes` is never sufficient on its own; hard-gate pass/fail is driven by state, evidence kind coverage, and required probe results
+- generic prose in `summary` or `notes` is never sufficient on its own; hard-gate pass/fail is driven by state, evidence-kind coverage, and required probe results
 
 ### 2. Clarify packet decision-surface requirements
 
-Promote the current “recommended subsections” in sections 7-9 of the packet template to required subsection labels.
+Promote the current soft guidance in packet sections 7-9 into hard required subsection labels in both:
 
-The template and contract must require these exact subsection labels:
+- `docs/specs/cli-agent-recommendation-dossier-contract.md`
+- `docs/templates/agent-selection/cli-agent-selection-packet-template.md`
+
+Required labels:
 
 - Section 7:
   - `Manifest root expectations`
@@ -389,16 +468,25 @@ The template and contract must require these exact subsection labels:
   - `Blocking risks`
   - `Acceptance gates`
 
+### 3. Tighten packet constraints without changing packet shape
+
+Update the contract language so it is explicit that:
+
+- section numbering and order stay frozen
+- section 5 keeps the three decision lines exactly as-is
+- section 6 keeps the `reproducible now` / `blocked until later` split exactly as-is
+- sections 7-9 must now be semantically populated, not merely present
+
 ## Skill Changes
 
-Update `.codex/skills/recommend-next-agent/SKILL.md` so the research phase instructs the operator / model to:
+Update `.codex/skills/recommend-next-agent/SKILL.md` so the research phase instructs the operator or model to:
 
 - prefer `verified` for `non_interactive_execution` and `observable_cli_surface`
-- request `help` / `version` probes when public install evidence is not enough
-- use `inferred` only for repo-fit claims that are explicitly allowed by the contract
-- record blocked provider-backed proof under `blocked_steps` instead of smuggling it into a passable hard gate
+- request `help` or `version` probes when public install evidence is not enough
+- use `inferred` only for repo-fit claims explicitly allowed by the contract
+- record provider-backed blockers in `blocked_steps`, not as passable hard-gate support
 
-No new workflow stages. Just better proof discipline.
+No new workflow stages. Just stricter proof discipline.
 
 ## Runner Changes
 
@@ -406,36 +494,44 @@ No new workflow stages. Just better proof discipline.
 
 In `scripts/recommend_next_agent.py`:
 
-- remove the current `claim_state_allows_gate_pass(...)` behavior
+- delete `claim_state_allows_gate_pass(...)`
+- replace `evaluate_hard_gate(...)` with `evaluate_gate_sufficiency(...)`
 - add a module-level `HARD_GATE_RULES` constant keyed by claim name
-- add one helper: `evaluate_gate_sufficiency(...)`
 
 `evaluate_gate_sufficiency(...)` must evaluate, in order:
 
 1. state allowed by rule
 2. required evidence kinds present
-3. required probe kinds passed when applicable
-4. `blocked_by` absent for inferred-allowed passes
-5. return a typed result:
+3. required `required_for_gate` probes passed when applicable
+4. `blocked_by` absent when the rule allows inferred claims
+5. return a structured result with:
    - `status`
    - `evidence_ids`
    - `notes`
    - `rule_id`
    - `rejection_reason`
 
-`candidate-validation-results/<agent>.json` must then include named rejection reasons such as:
+`candidate-validation-results/<agent>.json` must carry named reasons such as:
 
 - `non_interactive_execution requires verified state`
 - `reproducibility missing package_registry evidence`
 - `observable_cli_surface required probe failed`
 
-### 2. Add a structured decision-surface model
+This is the core behavioral change. A dossier with vague evidence must stop at candidate validation, not make it into the shortlist.
 
-Inside `scripts/recommend_next_agent.py`, add one typed intermediate model for packet sections 5-9.
+### 2. Make evidence-kind checks explicit and cheap
 
-Use `TypedDict` definitions in the same file. No new module.
+When validating each dossier:
 
-Minimum shapes:
+- build one `evidence_by_id` map
+- build one `evidence_kind_set`
+- fold probe output refs into the gate result only when the rule allows them
+
+This avoids repeated scanning and makes rejection reasoning deterministic.
+
+### 3. Add a structured decision-surface model
+
+Inside `scripts/recommend_next_agent.py`, add `TypedDict` definitions for packet sections 5-9:
 
 - `DecisionSurface`
 - `RecommendationSection`
@@ -444,57 +540,81 @@ Minimum shapes:
 - `RequiredArtifactsSection`
 - `WorkstreamsSection`
 
-The builder function:
+Add:
 
 `build_decision_surface(seed, dossiers, scores, candidate_results, shortlist_ids, recommended_agent_id) -> DecisionSurface`
 
 It must derive:
 
-- winner rationale tied to exact evidence ids / probe refs
+- winner rationale tied to exact evidence ids or probe refs
 - loser rationale for the other two shortlisted candidates
-- reproducible-now steps
-- blocked-until-later steps
-- repo-fit expectations derived from descriptor fields and current repo architecture
+- `reproducible now` content with install paths, prerequisites, commands, evidence, and saved artifacts
+- `blocked until later` content sourced from `blocked_steps`
+- repo-fit expectations derived from `recommended.derived_descriptor(seed.defaults)` plus current repo stages
 - required artifacts grouped by onboarding stage
-- workstreams / deliverables / blocking risks / acceptance gates
+- required workstreams, deliverables, blocking risks, and acceptance gates
 
-### 3. Validate the decision surface before rendering markdown
+### 4. Validate the decision surface before rendering markdown
 
 Add:
 
 `validate_decision_surface(surface: DecisionSurface) -> None`
 
-It must fail when any required subsection is missing or empty.
+This validator must fail when any required subsection is missing or empty.
 
-Examples of invalid surface state:
+Invalid examples:
 
 - no loser rationale for a shortlisted loser
 - no runnable commands in section 6
 - section 7 missing wrapper-crate expectations
-- section 8 not grouping artifacts by onboarding stage
+- section 8 not grouped by onboarding stage
 - section 9 missing acceptance gates
 
-### 4. Render markdown from the structured model
+### 5. Render sections 5-9 from the structured model
 
-Update `render_comparison_packet(...)` so sections 5-9 are rendered from `DecisionSurface`, not hand-assembled boilerplate.
+Update `render_comparison_packet(...)` so sections 5-9 render from `DecisionSurface`, not hand-built boilerplate strings.
 
 Keep these invariants unchanged:
 
+- packet topmatter
 - section order
 - provenance lines
-- exactly-3 table shape
+- exactly-3 comparison-table shape
 - final section-5 decision block
 - section-6 split into `reproducible now` and `blocked until later`
 
-### 5. Keep approval governance unchanged
+### 6. Extend `validate_packet_contract(...)`, do not bypass it
 
-`render_approval_toml(...)` stays the same except for consuming the same shortlisted / approved candidate choices already produced by the hardened lane.
+The existing packet validator already enforces:
+
+- heading order
+- provenance lines
+- section-4 table shape
+- section-5 citation presence
+- decision block tail
+- section-6 split
+- appendix requirements
+
+Extend that same function to also reject:
+
+- missing section-7 required labels
+- missing section-8 required labels
+- missing section-9 required labels
+- semantically empty section bodies under those labels
+
+Do not add a second validator. One packet render path, one packet contract check.
+
+### 7. Keep approval governance unchanged
+
+`render_approval_toml(...)`, `promote_recommendation(...)`, and `crates/xtask/src/approval_artifact.rs` remain behaviorally unchanged except for consuming the hardened shortlist and packet outputs.
 
 No Rust schema change.  
 No `comparison_ref` change.  
-No change to override semantics.
+No override semantics change.
 
-## Test Diagram & Verification Matrix
+## Test Review
+
+### Coverage diagram
 
 ```text
 CODE PATH COVERAGE
@@ -502,24 +622,26 @@ CODE PATH COVERAGE
 [+] Gate sufficiency evaluation
     │
     ├── [GAP] strict verified-only claims reject `inferred`
-    ├── [GAP] required evidence kinds missing -> named rejection
+    ├── [GAP] required evidence kinds missing -> named rejection reason
     ├── [GAP] required probe failure -> candidate_error or reject
-    └── [GAP] fewer than 3 eligible -> insufficient_eligible_candidates
+    ├── [GAP] inferred-allowed claim with `blocked_by` still rejects
+    └── [EXISTING] fewer than 3 eligible -> `insufficient_eligible_candidates`
 
 [+] Decision surface builder
     │
     ├── [GAP] winner rationale cites exact evidence ids
     ├── [GAP] each shortlisted loser gets explicit rationale
-    ├── [GAP] section 6 split is populated with commands/artifacts/blockers
-    ├── [GAP] section 7 contains all repo-fit categories
-    ├── [GAP] section 8 contains staged artifact categories
-    └── [GAP] section 9 contains workstreams, risks, and gates
+    ├── [GAP] section 6 has real commands, evidence, blockers, and saved artifacts
+    ├── [GAP] section 7 emits all repo-fit categories
+    ├── [GAP] section 8 emits staged artifact categories
+    └── [GAP] section 9 emits workstreams, risks, and gates
 
 [+] Packet / validator alignment
     │
-    ├── [GAP] semantically empty sections 5-9 are rejected
-    ├── [GAP] template subsection labels are enforced
-    └── [EXISTING] section order / provenance lines are enforced
+    ├── [GAP] semantically empty sections 7-9 are rejected
+    ├── [GAP] required subsection labels are enforced
+    ├── [EXISTING] section order and provenance lines are enforced
+    └── [EXISTING] section 5 decision tail is enforced
 
 [+] Promote / approval path
     │
@@ -530,58 +652,59 @@ CODE PATH COVERAGE
 
 ─────────────────────────────────
 CURRENT COVERAGE
-  Strong: 4 paths
-  Shallow: 4 paths
-  Gaps: 9 paths
+  Strong: approval-boundary and immutability checks
+  Shallow: packet semantic content for sections 5-9
+  Critical gaps: 2
 
-TARGET COVERAGE AFTER THIS PLAN
-  Strong: all critical paths above
-  Shallow: 0 for sections 5-9
-  Critical gaps: 0
+CRITICAL GAPS
+  1. inferred hard-gate claims can pass silently
+  2. semantically empty decision sections can still promote
 ─────────────────────────────────
 ```
 
-## Test Plan
-
-### New / expanded tests in `scripts/test_recommend_next_agent.py`
+### Required tests in `scripts/test_recommend_next_agent.py`
 
 1. `test_generate_rejects_inferred_non_interactive_execution_even_with_evidence_ids`
-   - regression test
-   - proves the current bad behavior is gone
+   Regression test. Proves the current bug is gone.
 
 2. `test_generate_rejects_reproducibility_without_both_doc_and_package_evidence`
-   - hard-gate sufficiency test
+   Hard-gate sufficiency test for required evidence kinds.
 
 3. `test_generate_requires_required_probe_for_observable_cli_surface_when_requested`
-   - probe rule test
+   Probe rule test for required gate probes.
 
 4. `test_generate_allows_inferred_redaction_fit_only_with_allowed_evidence_kind_and_no_blocked_by`
-   - allowed-inference rule test
+   Allowed-inference rule test.
 
 5. `test_decision_surface_validation_rejects_missing_repo_fit_categories`
-   - semantic validation test
+   Semantic validation test for section 7.
 
 6. `test_decision_surface_validation_rejects_missing_artifact_or_gate_sections`
-   - semantic validation test
+   Semantic validation test for sections 8 and 9.
 
 7. `test_generated_packet_sections_5_through_9_match_expected_golden_output`
-   - golden test
-   - compare a deterministic fixture packet body or section slice, not just marker presence
+   Golden test. Compare stable section slices, not full timestamped packet bytes.
 
 8. `test_packet_contract_rejects_semantically_empty_sections_5_through_9`
-   - negative packet-contract test
+   Negative packet-contract test.
 
 9. `test_promote_preserves_scratch_outputs_and_only_changes_allowed_review_fields`
-   - keep existing regression coverage
+   Keep existing promote immutability coverage.
 
 10. `cargo test -p xtask --test recommend_next_agent_approval_artifact -- --nocapture`
-    - unchanged Rust approval boundary proof
+    Approval artifact boundary proof, unchanged.
 
 11. `cargo test -p xtask --test onboard_agent_entrypoint approval_mode -- --nocapture`
-    - unchanged create-lane handoff proof
+    Existing create-lane handoff proof, unchanged.
 
 12. `cargo run -p xtask -- onboard-agent --approval docs/agents/lifecycle/<pack>/governance/approved-agent.toml --dry-run`
-    - proving-run acceptance gate
+    Final proving-run acceptance gate.
+
+### Regression rule
+
+The current permissive hard-gate behavior is a regression in trust semantics, not a new feature gap.
+
+That means test 1 is mandatory. No deferral. No “follow-up hardening” excuse.
 
 ## Failure Modes Registry
 
@@ -589,21 +712,14 @@ TARGET COVERAGE AFTER THIS PLAN
 | --- | --- | --- | --- | --- |
 | gate sufficiency evaluator | candidate with docs-only `inferred` claims reaches shortlist | yes | named rejection reason in candidate validation result | silent false confidence in shortlist |
 | required probe handling | probe times out and lane still claims observable CLI proof | yes | `candidate_error` or rejection with explicit reason | maintainer approves a non-runnable candidate |
-| decision surface builder | packet recommends a winner but hides provider-backed blocker | yes | blocked step must be rendered in section 6 and section 9 risks | human sees an “approve” packet that should have been “stop” |
-| repo-fit render | section 7 omits wrapper/backend seam expectations | yes | `validate_decision_surface(...)` must fail | runtime onboarding starts with missing seam map |
-| artifact/workstream render | sections 8-9 are syntactically present but operationally empty | yes | packet validation must fail before promote | maintainer gets no usable handoff |
-| promote / approval path | approval TOML drifts from packet decision outcome | existing + keep | Rust dry-run validation | control-plane mutation against wrong packet |
-
-Current critical gaps before implementation:
-
-1. inferred hard-gate claims can pass silently  
-2. semantically empty decision sections can still promote
-
-This plan must close both.
+| decision surface builder | packet recommends a winner but hides provider-backed blocker | yes | blocked step must render in section 6 and section 9 risks | human sees “approve” when the right outcome is “stop” |
+| repo-fit render | section 7 omits wrapper/backend seam expectations | yes | `validate_decision_surface(...)` and `validate_packet_contract(...)` fail | onboarding starts without a usable seam map |
+| artifact/workstream render | sections 8-9 are syntactically present but operationally empty | yes | packet validation fails before promote | maintainer gets no usable handoff |
+| promote / approval path | approval TOML drifts from packet decision outcome | existing + keep | Rust dry-run validation | control-plane mutation against the wrong packet |
 
 ## Implementation Plan
 
-### Workstream 1 — Contract and template truth
+### Workstream 1 — Contract, template, and skill truth
 
 Files:
 
@@ -614,48 +730,61 @@ Files:
 Tasks:
 
 1. Add `Hard Gate Sufficiency Rules` to the dossier contract.
-2. Promote section 7-9 subsection labels from “recommended” to required.
+2. Promote section 7-9 subsection labels from recommendation text to required outputs.
 3. State explicitly that the packet is the maintainer decision surface while `approved-agent.toml` remains the normative approval artifact.
-4. Update the skill so research authors know which claims may still use `inferred`.
+4. Update the skill so research authors know exactly which claims may still use `inferred`.
 
 Acceptance gate:
 
-- contract, template, and skill say the same thing about critical claim proof and packet section content
+- contract, template, and skill say the same thing about critical-claim proof and packet-section content
 
-### Workstream 2 — Runner semantics
+### Workstream 2 — Gate sufficiency engine
 
 Files:
 
 - `scripts/recommend_next_agent.py`
 
+Owned functions:
+
+- `evaluate_hard_gate(...)` -> replaced by `evaluate_gate_sufficiency(...)`
+- generate-path gate loop around `for gate_key in HARD_GATE_KEYS`
+- candidate validation payload construction
+
 Tasks:
 
 1. Add `HARD_GATE_RULES`.
-2. Replace the current `claim_state_allows_gate_pass(...)` behavior.
-3. Add `evaluate_gate_sufficiency(...)`.
-4. Add named rejection reasons and rule ids into candidate validation output.
-5. Preserve the current shortlist order, score buckets, and promote flow.
+2. Replace permissive state-only pass logic.
+3. Emit rule ids and named rejection reasons in candidate validation output.
+4. Preserve shortlist ordering, score buckets, and promote flow.
 
 Acceptance gate:
 
 - a dossier with insufficient critical proof never reaches the eligible shortlist
 
-### Workstream 3 — Structured decision surface
+### Workstream 3 — Structured decision surface and packet validation
 
 Files:
 
 - `scripts/recommend_next_agent.py`
 
+Owned functions:
+
+- `render_comparison_packet(...)`
+- `validate_packet_contract(...)`
+- new `build_decision_surface(...)`
+- new `validate_decision_surface(...)`
+
 Tasks:
 
 1. Add `TypedDict` models for sections 5-9.
 2. Build the decision surface from shortlist data plus the recommended dossier.
-3. Add `validate_decision_surface(...)`.
+3. Validate the decision surface before markdown render.
 4. Render sections 5-9 from the validated model.
+5. Extend packet contract validation to reject missing or empty required subsection labels.
 
 Acceptance gate:
 
-- sections 5-9 are non-empty because the model is non-empty, not because strings happened to be present
+- sections 5-9 are substantive because the model is substantive, not because boilerplate strings happen to exist
 
 ### Workstream 4 — Tests and proving run
 
@@ -670,7 +799,7 @@ Tasks:
 
 1. Add the new gate sufficiency tests.
 2. Add the decision-surface validation tests.
-3. Replace marker tests with a real section-5-through-9 golden test.
+3. Replace marker assertions with a real section-5-through-9 golden test.
 4. Generate one fresh promoted run with the hardened lane.
 5. Re-run the Rust approval tests and `xtask` dry-run.
 
@@ -680,6 +809,41 @@ Acceptance gate:
 - green Rust approval tests
 - green `xtask onboard-agent --approval ... --dry-run`
 - canonical packet byte-identical to the committed run copy
+
+## Worktree Parallelization Strategy
+
+### Dependency table
+
+| Step | Modules touched | Depends on |
+| --- | --- | --- |
+| 1. Contract/template/skill truth | `docs/specs/`, `docs/templates/`, `.codex/skills/` | — |
+| 2. Gate sufficiency engine | `scripts/` | — |
+| 3. Decision surface + packet validation | `scripts/` | 2 |
+| 4. Semantic tests | `scripts/` | 2, 3 |
+| 5. Proving run + approval dry-run | `docs/agents/selection/`, `docs/agents/lifecycle/`, `scripts/`, `crates/xtask/` | 1, 4 |
+
+### Parallel lanes
+
+- Lane A: step 1
+  Docs-only lane. Safe to run independently once this plan is frozen.
+- Lane B: step 2 -> step 3 -> step 4
+  Sequential script lane. These steps all touch `scripts/recommend_next_agent.py` and `scripts/test_recommend_next_agent.py`, so keep them in one worktree.
+- Lane C: step 5
+  Validation and artifact lane. Wait until lanes A and B merge.
+
+### Execution order
+
+1. Launch lane A and lane B in parallel worktrees.
+2. Merge lane A first if it changes required labels or rule wording.
+3. Merge lane B after script and tests are green.
+4. Run lane C last to generate the fresh promoted run and final dry-run proof.
+
+### Conflict flags
+
+- Steps 2, 3, and 4 all touch `scripts/`. Do not split them across separate worktrees.
+- Step 5 rewrites canonical review artifacts. Do not start it before both earlier lanes have merged.
+
+If only one engineer is available, execute the same lane order sequentially.
 
 ## Verification Commands
 
@@ -709,36 +873,39 @@ This plan is done only when all of the following are true:
 
 1. `inferred` no longer passes `non_interactive_execution` or `observable_cli_surface`.
 2. `reproducibility` cannot pass without both doc and package evidence.
-3. allowed inferred claims have explicit evidence-kind rules.
+3. inferred-allowed claims have explicit evidence-kind and `blocked_by` rules.
 4. packet sections 5-9 are rendered from a structured model and validated before render.
-5. the packet template and contract require the exact subsection labels used by the renderer.
-6. semantically empty sections 5-9 fail tests.
+5. the packet template and contract require the exact subsection labels used by the renderer and validator.
+6. semantically empty sections 7-9 fail tests.
 7. one fresh promoted run exists and its canonical packet matches the committed run copy byte-for-byte.
-8. the final approval artifact still passes the real Rust loader and `xtask` dry-run path.
+8. the final approval artifact still passes the Rust loader and `xtask` dry-run path.
 
 ## Distribution Check
 
 No new artifact type is introduced here.
 
-The lane still publishes:
+This slice still publishes only:
 
 - committed review evidence under `docs/agents/selection/runs/`
-- one canonical comparison packet
-- one approval artifact consumed by `xtask`
+- the canonical comparison packet at `docs/agents/selection/cli-agent-selection-packet.md`
+- the approval artifact consumed by `xtask` at `docs/agents/lifecycle/<pack>/governance/approved-agent.toml`
 
-No new CI/CD channel is required for this slice.
+Target-platform packaging, release publishing, and installer distribution are not part of this milestone because the output is governance truth, not a new runtime binary.
 
-## Sequential Implementation, No Parallelization Opportunity
+## Completion Summary
 
-The semantic contract, runner logic, packet renderer, validator behavior, and tests all converge on the same primary module and the same exact section requirements.
-
-Parallel worktrees would create merge churn with almost no throughput gain. Implement this sequentially:
-
-1. contract/template/skill truth
-2. runner semantics
-3. decision-surface render + validation
-4. tests
-5. fresh proving run and dry-run validation
+- Step 0: Scope Challenge — scope accepted as-is, with the deeper finalist-truth milestone explicitly deferred
+- Architecture Review: 4 implementation-shaping issues resolved in-plan
+- Code Quality Review: 4 structure constraints locked
+- Test Review: diagram produced, 8 concrete gaps identified, 1 regression test mandated
+- Performance Review: bounded and acceptable, no new concurrency or infra
+- NOT in scope: written
+- What already exists: written
+- TODOS.md updates: 0 proposed for this slice
+- Failure modes: 2 critical gaps flagged and addressed by plan scope
+- Outside voice: prior cleared outside-review conclusion preserved, no new scope change introduced in this consolidation pass
+- Parallelization: 3 lanes total, 2 launchable in parallel, 1 final sequential validation lane
+- Lake Score: 8/8 recommendations chose the complete option over the shortcut
 
 ## Decision Audit Trail
 
@@ -751,7 +918,8 @@ Parallel worktrees would create merge churn with almost no throughput gain. Impl
 | 5 | Eng | Add a structured decision-surface model inside the existing Python runner | mechanical | P5 explicit over clever | meaningful semantics with minimal architectural churn | more regex/string validation only |
 | 6 | Eng | Keep the implementation script-first, no `xtask recommend-agent` | mechanical | P4 DRY | current Rust surfaces already solve the approval boundary | second command surface |
 | 7 | Eng | Promote section 7-9 subsection labels to required template outputs | mechanical | P1 completeness | gives tests and renderer stable anchors | leaving them as “recommended” prose |
-| 8 | Eng | Replace marker tests with golden + negative semantic tests | mechanical | P1 completeness | presence tests are too weak for a governance surface | more `assertIn(...)` |
+| 8 | Eng | Replace marker tests with golden and negative semantic tests | mechanical | P1 completeness | presence tests are too weak for a governance surface | more `assertIn(...)` |
+| 9 | Eng | Split execution into docs lane, script lane, and final proving lane | mechanical | P3 pragmatic | there is real parallel throughput if `scripts/` remains single-owner | false “no parallelization” sequentialism |
 
 ## GSTACK REVIEW REPORT
 
@@ -762,10 +930,10 @@ Parallel worktrees would create merge churn with almost no throughput gain. Impl
 | Eng Review | `/plan-eng-review` | Architecture & tests (required) | 1 | CLEAR | 2 critical gaps identified and closed in plan scope: permissive hard-gate semantics and semantically thin sections 5-9 |
 | Design Review | `/plan-design-review` | UI/UX gaps | 0 | — | skipped, no real UI scope in this follow-on |
 
-**CODEX:** Two outside passes both converged on the same warning: do not ship a string-level patch. Fix gate semantics and decision-surface structure together.
+**CODEX:** Two outside passes converged on the same warning: do not ship a string-level patch. Fix gate semantics and decision-surface structure together.
 
 **CROSS-MODEL:** Primary review and Codex agreed on the same high-confidence theme, the lane’s defect is semantic trust, not missing mechanics.
 
 **UNRESOLVED:** 0
 
-**VERDICT:** CEO + ENG CLEARED — ready to implement. This plan is intentionally narrow and fully executable without further scope decisions.
+**VERDICT:** CEO + ENG CLEARED — ready to implement. This consolidation pass tightened structure and removed execution ambiguity without changing milestone scope.
