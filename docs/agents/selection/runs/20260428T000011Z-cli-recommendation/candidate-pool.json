@@ -1,0 +1,56 @@
+{
+  "candidates": [
+    {
+      "agent_id": "aider",
+      "display_name": "aider",
+      "eligible": true,
+      "notes": "stars=44022, installs=2, docs=1, auth_hits=5, architecture_hits=5, leverage_hits=1",
+      "recommended": true,
+      "rejection_reasons": [],
+      "score": {
+        "Adoption & community pull": 3,
+        "Architecture fit for this repo": 1,
+        "CLI product maturity & release activity": 3,
+        "Capability expansion / future leverage": 0,
+        "Installability & docs quality": 3,
+        "Reproducibility & access friction": 1
+      },
+      "shortlisted": true
+    },
+    {
+      "agent_id": "gemini_cli",
+      "display_name": "Gemini CLI",
+      "eligible": true,
+      "notes": "stars=102566, installs=2, docs=0, auth_hits=4, architecture_hits=5, leverage_hits=3",
+      "recommended": false,
+      "rejection_reasons": [],
+      "score": {
+        "Adoption & community pull": 3,
+        "Architecture fit for this repo": 1,
+        "CLI product maturity & release activity": 3,
+        "Capability expansion / future leverage": 1,
+        "Installability & docs quality": 1,
+        "Reproducibility & access friction": 1
+      },
+      "shortlisted": true
+    },
+    {
+      "agent_id": "opencode",
+      "display_name": "OpenCode",
+      "eligible": true,
+      "notes": "stars=150652, installs=3, docs=2, auth_hits=4, architecture_hits=5, leverage_hits=1",
+      "recommended": false,
+      "rejection_reasons": [],
+      "score": {
+        "Adoption & community pull": 3,
+        "Architecture fit for this repo": 1,
+        "CLI product maturity & release activity": 3,
+        "Capability expansion / future leverage": 0,
+        "Installability & docs quality": 3,
+        "Reproducibility & access friction": 1
+      },
+      "shortlisted": true
+    }
+  ],
+  "run_id": "20260428T000011Z-cli-recommendation"
+}

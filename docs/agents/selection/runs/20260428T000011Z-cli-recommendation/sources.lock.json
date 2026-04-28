@@ -1,0 +1,207 @@
+{
+  "candidates": {
+    "aider": {
+      "display_name": "aider",
+      "records": [
+        {
+          "fetched_at": "2026-04-28T00:00:11Z",
+          "final_url": "https://api.github.com/repos/Aider-AI/aider",
+          "kind": "github_repo",
+          "summary": {
+            "description": "aider is AI pair programming in your terminal",
+            "forks": 4308,
+            "latest_release_name": "Aider v0.86.0",
+            "latest_release_published_at": "2025-08-09T17:42:19Z",
+            "open_issues": 1503,
+            "pushed_at": "2026-04-25T16:44:33Z",
+            "repo": "Aider-AI/aider",
+            "stars": 44022,
+            "topics": [
+              "anthropic",
+              "chatgpt",
+              "claude-3",
+              "cli",
+              "command-line",
+              "gemini",
+              "gpt-3",
+              "gpt-35-turbo",
+              "gpt-4",
+              "gpt-4o",
+              "llama",
+              "openai",
+              "sonnet"
+            ],
+            "updated_at": "2026-04-27T21:57:28Z"
+          },
+          "url": "https://github.com/Aider-AI/aider"
+        },
+        {
+          "fetched_at": "2026-04-28T00:00:12Z",
+          "final_url": "https://aider.chat/",
+          "kind": "generic_page",
+          "summary": {
+            "keyword_hits": {
+              "architecture": 10,
+              "leverage": 17
+            },
+            "snippet": "Aider - AI Pair Programming in Your Terminal aider Features Getting Started Documentation Discord GitHub AI pair programming in your terminal Aider lets you pair program with LLMs to start a new project or build on your existing codebase. Get Started Documentation Your browser does not support the video tag. \u2b50 GitHub Stars 44K \ud83d\udce6 Installs 6.8M \ud83d\udcc8 Tokens/week 15B \ud83d\udd04 Singularity 88% Features Cloud and local LLMs Aider works best with Claude 3.7 Sonnet, DeepSeek R1 & Chat V3, OpenAI o1, o3-mini & GPT-",
+            "title": "Aider - AI Pair Programming in Your Terminal"
+          },
+          "url": "https://aider.chat/"
+        },
+        {
+          "fetched_at": "2026-04-28T00:00:12Z",
+          "final_url": "https://pypi.org/pypi/aider-chat/json",
+          "kind": "pypi_package",
+          "summary": {
+            "description": "Aider is AI pair programming in your terminal",
+            "latest_upload_time": "2026-02-12T00:42:54.835777Z",
+            "latest_version": "0.86.2",
+            "package_name": "aider-chat",
+            "release_count": 174
+          },
+          "url": "https://pypi.org/project/aider-chat/"
+        }
+      ]
+    },
+    "gemini_cli": {
+      "display_name": "Gemini CLI",
+      "records": [
+        {
+          "fetched_at": "2026-04-28T00:00:12Z",
+          "final_url": "https://api.github.com/repos/google-gemini/gemini-cli",
+          "kind": "github_repo",
+          "summary": {
+            "description": "An open-source AI agent that brings the power of Gemini directly into your terminal.",
+            "forks": 13356,
+            "latest_release_name": "Release v0.39.1",
+            "latest_release_published_at": "2026-04-24T02:11:26Z",
+            "open_issues": 2881,
+            "pushed_at": "2026-04-27T23:50:01Z",
+            "repo": "google-gemini/gemini-cli",
+            "stars": 102566,
+            "topics": [
+              "ai",
+              "ai-agents",
+              "cli",
+              "gemini",
+              "gemini-api",
+              "mcp-client",
+              "mcp-server"
+            ],
+            "updated_at": "2026-04-27T23:53:28Z"
+          },
+          "url": "https://github.com/google-gemini/gemini-cli"
+        },
+        {
+          "fetched_at": "2026-04-28T00:00:12Z",
+          "final_url": "https://registry.npmjs.org/@google%2Fgemini-cli",
+          "kind": "npm_package",
+          "summary": {
+            "created": "2025-06-25T13:03:27.977Z",
+            "description": "Gemini CLI",
+            "latest_version": "0.39.1",
+            "modified": "2026-04-27T16:44:20.940Z",
+            "package_name": "@google/gemini-cli",
+            "version_count": 581
+          },
+          "url": "https://www.npmjs.com/package/@google/gemini-cli"
+        },
+        {
+          "fetched_at": "2026-04-28T00:00:13Z",
+          "final_url": "https://api.github.com/repos/google-github-actions/run-gemini-cli",
+          "kind": "github_repo",
+          "summary": {
+            "description": "A GitHub Action invoking the Gemini CLI.",
+            "forks": 246,
+            "latest_release_name": "v0.1.22",
+            "latest_release_published_at": "2026-04-24T02:30:16Z",
+            "open_issues": 69,
+            "pushed_at": "2026-04-27T17:06:52Z",
+            "repo": "google-github-actions/run-gemini-cli",
+            "stars": 1954,
+            "topics": [
+              "actions",
+              "ai",
+              "gcp",
+              "gemini",
+              "gemini-cli",
+              "github-actions",
+              "google-cloud",
+              "google-cloud-platform"
+            ],
+            "updated_at": "2026-04-27T18:08:24Z"
+          },
+          "url": "https://github.com/google-github-actions/run-gemini-cli"
+        }
+      ]
+    },
+    "opencode": {
+      "display_name": "OpenCode",
+      "records": [
+        {
+          "fetched_at": "2026-04-28T00:00:13Z",
+          "final_url": "https://api.github.com/repositories/975734319",
+          "kind": "github_repo",
+          "summary": {
+            "description": "The open source coding agent.",
+            "forks": 17314,
+            "latest_release_name": "v1.14.28",
+            "latest_release_published_at": "2026-04-27T04:23:46Z",
+            "open_issues": 6169,
+            "pushed_at": "2026-04-27T23:59:22Z",
+            "repo": "anomalyco/opencode",
+            "stars": 150652,
+            "topics": [],
+            "updated_at": "2026-04-27T23:58:53Z"
+          },
+          "url": "https://github.com/sst/opencode"
+        },
+        {
+          "fetched_at": "2026-04-28T00:00:13Z",
+          "final_url": "https://opencode.ai/docs/",
+          "kind": "generic_page",
+          "summary": {
+            "keyword_hits": {
+              "architecture": 43,
+              "leverage": 21
+            },
+            "snippet": "Intro | AI coding agent built for the terminal Intro | OpenCode window.StarlightThemeProvider = (() => { const storedTheme = typeof localStorage !== 'undefined' && localStorage.getItem('starlight-theme'); const theme = storedTheme || (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'); document.documentElement.dataset.theme = theme === 'light' ? 'light' : 'dark'; return { updatePickers(theme = storedTheme || 'auto') { document.querySelectorAll('starlight-theme-select'",
+            "title": "Intro | AI coding agent built for the terminal"
+          },
+          "url": "https://opencode.ai/docs/"
+        },
+        {
+          "fetched_at": "2026-04-28T00:00:14Z",
+          "final_url": "https://opencode.ai/docs/cli/",
+          "kind": "generic_page",
+          "summary": {
+            "keyword_hits": {
+              "architecture": 201,
+              "leverage": 133
+            },
+            "snippet": "CLI | OpenCode window.StarlightThemeProvider = (() => { const storedTheme = typeof localStorage !== 'undefined' && localStorage.getItem('starlight-theme'); const theme = storedTheme || (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'); document.documentElement.dataset.theme = theme === 'light' ? 'light' : 'dark'; return { updatePickers(theme = storedTheme || 'auto') { document.querySelectorAll('starlight-theme-select').forEach((picker) => { const select = picker.que",
+            "title": "CLI | OpenCode"
+          },
+          "url": "https://opencode.ai/docs/cli/"
+        },
+        {
+          "fetched_at": "2026-04-28T00:00:14Z",
+          "final_url": "https://registry.npmjs.org/opencode-ai",
+          "kind": "npm_package",
+          "summary": {
+            "created": "2025-05-31T00:13:32.731Z",
+            "description": null,
+            "latest_version": "1.14.28",
+            "modified": "2026-04-27T23:05:23.119Z",
+            "package_name": "opencode-ai",
+            "version_count": 8133
+          },
+          "url": "https://www.npmjs.com/package/opencode-ai"
+        }
+      ]
+    }
+  },
+  "generated_at": "2026-04-28T00:00:11Z",
+  "run_id": "20260428T000011Z-cli-recommendation"
+}

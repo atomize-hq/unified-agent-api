@@ -1,0 +1,67 @@
+{
+  "candidates": {
+    "aider": {
+      "notes": "stars=44022, installs=2, docs=1, auth_hits=5, architecture_hits=5, leverage_hits=1",
+      "primary_sum": 10,
+      "scores": {
+        "Adoption & community pull": 3,
+        "Architecture fit for this repo": 1,
+        "CLI product maturity & release activity": 3,
+        "Capability expansion / future leverage": 0,
+        "Installability & docs quality": 3,
+        "Reproducibility & access friction": 1
+      },
+      "secondary_sum": 1
+    },
+    "gemini_cli": {
+      "notes": "stars=102566, installs=2, docs=0, auth_hits=4, architecture_hits=5, leverage_hits=3",
+      "primary_sum": 8,
+      "scores": {
+        "Adoption & community pull": 3,
+        "Architecture fit for this repo": 1,
+        "CLI product maturity & release activity": 3,
+        "Capability expansion / future leverage": 1,
+        "Installability & docs quality": 1,
+        "Reproducibility & access friction": 1
+      },
+      "secondary_sum": 2
+    },
+    "opencode": {
+      "notes": "stars=150652, installs=3, docs=2, auth_hits=4, architecture_hits=5, leverage_hits=1",
+      "primary_sum": 10,
+      "scores": {
+        "Adoption & community pull": 3,
+        "Architecture fit for this repo": 1,
+        "CLI product maturity & release activity": 3,
+        "Capability expansion / future leverage": 0,
+        "Installability & docs quality": 3,
+        "Reproducibility & access friction": 1
+      },
+      "secondary_sum": 1
+    }
+  },
+  "dimensions": [
+    "Adoption & community pull",
+    "CLI product maturity & release activity",
+    "Installability & docs quality",
+    "Reproducibility & access friction",
+    "Architecture fit for this repo",
+    "Capability expansion / future leverage"
+  ],
+  "primary_dimensions": [
+    "Adoption & community pull",
+    "CLI product maturity & release activity",
+    "Installability & docs quality",
+    "Reproducibility & access friction"
+  ],
+  "recommended_agent_id": "aider",
+  "secondary_dimensions": [
+    "Architecture fit for this repo",
+    "Capability expansion / future leverage"
+  ],
+  "shortlist_order": [
+    "aider",
+    "opencode",
+    "gemini_cli"
+  ]
+}

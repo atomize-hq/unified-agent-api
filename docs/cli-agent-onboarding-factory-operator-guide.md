@@ -15,6 +15,110 @@ It documents what to run, in what order, and which artifact roots each command o
 
 Generated packet docs are evidence and examples. Do not treat them as the procedural source of truth, and do not hand-edit them for tone cleanup.
 
+## Recommendation lane
+
+Use the recommendation lane before create mode when the next CLI agent has not been approved yet.
+
+### 1. Start from the seed file
+
+The recommendation lane starts from the committed seed file:
+
+`docs/agents/selection/candidate-seed.toml`
+
+This file owns:
+- the exact candidate pool
+- shared descriptor defaults
+- allowed per-candidate descriptor overrides
+
+`onboarding_pack_prefix` is not seed-owned in v1. It is chosen at promotion time.
+
+### 2. Generate a scratch run
+
+Run the deterministic recommendation generator:
+
+```sh
+python3 scripts/recommend_next_agent.py generate \
+  --seed-file docs/agents/selection/candidate-seed.toml \
+  --run-id <timestamp>-<shortlist_slug> \
+  --scratch-root ~/.gstack/projects/<repo-slug>/recommend-next-agent-runs
+```
+
+This step writes only to:
+
+`~/.gstack/projects/<repo-slug>/recommend-next-agent-runs/<run_id>/`
+
+It does not mutate repo-tracked files.
+
+Required scratch artifacts:
+- `candidate-pool.json`
+- `eligible-candidates.json`
+- `candidate-dossiers/<agent_id>.json` for exactly the shortlisted 3 candidates
+- `scorecard.json`
+- `sources.lock.json`
+- `comparison.generated.md`
+- `approval-draft.generated.toml`
+- `run-summary.md`
+
+If fewer than 3 eligible candidates survive, stop here and expand the seed file.
+
+### 3. Review the scratch run
+
+Review the scratch run before promotion:
+- shortlisted candidates
+- rejection reasons for non-eligible candidates
+- scratch comparison packet
+- provisional approval draft for the recommended candidate
+
+Scratch runs are never committed.
+
+### 4. Promote one reviewed run
+
+Promote one scratch run into the canonical packet, a committed review run, and a final approval draft:
+
+```sh
+python3 scripts/recommend_next_agent.py promote \
+  --run-dir ~/.gstack/projects/<repo-slug>/recommend-next-agent-runs/<run_id> \
+  --repo-run-root docs/agents/selection/runs \
+  --approved-agent-id <agent_id> \
+  --onboarding-pack-prefix <kebab-case-pack-prefix> \
+  [--override-reason "<required when approved agent differs from recommended>"]
+```
+
+Promotion writes:
+- `docs/agents/selection/runs/<run_id>/`
+- `docs/agents/selection/cli-agent-selection-packet.md`
+- `docs/agents/lifecycle/<onboarding_pack_prefix>/governance/approved-agent.toml`
+
+Required committed review artifacts under `docs/agents/selection/runs/<run_id>/`:
+- byte-copy of `candidate-pool.json`
+- byte-copy of `eligible-candidates.json`
+- byte-copy of `candidate-dossiers/**` for exactly the shortlisted 3 candidates
+- byte-copy of `scorecard.json`
+- byte-copy of `sources.lock.json`
+- byte-copy of `comparison.generated.md`
+- promote-time rendered `approval-draft.generated.toml`
+- promote-time rendered `run-summary.md`
+
+Canonical promotion rules:
+- `docs/agents/selection/cli-agent-selection-packet.md` is a byte-copy of scratch `comparison.generated.md`
+- committed review `comparison.generated.md` and the canonical packet are byte-identical
+- committed review `approval-draft.generated.toml` and final `docs/agents/lifecycle/<onboarding_pack_prefix>/governance/approved-agent.toml` are rendered from the same promote-time inputs and must be byte-identical
+- promotion must validate the final approval artifact with `cargo run -p xtask -- onboard-agent --approval <path> --dry-run`
+
+### 5. Stop for maintainer approve-or-override
+
+The recommendation lane ends at:
+
+`docs/agents/lifecycle/<onboarding_pack_prefix>/governance/approved-agent.toml`
+
+Maintainers now either:
+- accept the recommended agent
+- override to another shortlisted candidate and provide `--override-reason`
+
+### 6. Continue with create mode unchanged
+
+After the approval artifact exists, continue with the existing create lane exactly as documented below.
+
 ## Naming and path rules
 
 - `agent_id` is the machine identifier used by code, manifests, registry entries, and command flags. Example: `gemini_cli`.
