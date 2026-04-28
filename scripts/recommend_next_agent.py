@@ -5,6 +5,7 @@ import argparse
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from functools import lru_cache
 import hashlib
 import json
 import os
@@ -17,6 +18,7 @@ from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CANONICAL_PACKET_REL = "docs/agents/selection/cli-agent-selection-packet.md"
+PACKET_TEMPLATE_REL = "docs/templates/agent-selection/cli-agent-selection-packet-template.md"
 LIVE_SEED_REL = "docs/agents/selection/candidate-seed.toml"
 REGISTRY_RELATIVE_PATH = "crates/xtask/data/agent_registry.toml"
 DEFAULT_TARGET = "darwin-arm64"
@@ -152,6 +154,44 @@ APPROVAL_DEPENDENT_METRIC_KEYS = {
     "predicted_blocker_count",
     "later_discovered_blocker_count",
 }
+RUN_ARTIFACT_FILES = (
+    "run-status.json",
+    "seed.snapshot.toml",
+    "candidate-pool.json",
+    "eligible-candidates.json",
+    "scorecard.json",
+    "sources.lock.json",
+    "comparison.generated.md",
+    "approval-draft.generated.toml",
+    "run-summary.md",
+)
+RUN_ARTIFACT_DIRS = ("candidate-dossiers", "candidate-validation-results")
+PACKET_TOPMATTER_PREFIX = (
+    "<!-- generated-by: scripts/recommend_next_agent.py generate -->",
+    "# Packet - CLI Agent Selection Packet",
+    "",
+    "Status: Generated",
+)
+PACKET_RELATED_DOCS = (
+    "- `docs/specs/cli-agent-recommendation-dossier-contract.md`",
+    "- `docs/specs/cli-agent-onboarding-charter.md`",
+    "- `docs/specs/unified-agent-api/support-matrix.md`",
+    "- `docs/specs/**` for any normative contract this packet cites",
+)
+PACKET_SECTION_HEADINGS = (
+    "## 1. Candidate Summary",
+    "## 2. What Already Exists",
+    "## 3. Selection Rubric",
+    "## 4. Fixed 3-Candidate Comparison Table",
+    "## 5. Recommendation",
+    "## 6. Recommended Agent Evaluation Recipe",
+    "## 7. Repo-Fit Analysis",
+    "## 8. Required Artifacts",
+    "## 9. Workstreams, Deliverables, Risks, And Gates",
+    "## 10. Dated Evidence Appendix",
+)
+PACKET_TABLE_HEADER = "| Candidate | Adoption & community pull | CLI product maturity & release activity | Installability & docs quality | Reproducibility & access friction | Architecture fit for this repo | Capability expansion / future leverage | Notes |"
+PACKET_TABLE_DIVIDER = "|---|---:|---:|---:|---:|---:|---:|---|"
 
 
 class RecommendationError(Exception):
@@ -313,6 +353,35 @@ def read_text(path: Path) -> str:
 
 def read_json(path: Path) -> Any:
     return json.loads(read_text(path))
+
+
+@lru_cache(maxsize=1)
+def packet_template_provenance_lines() -> dict[str, str]:
+    lines = read_text(REPO_ROOT / PACKET_TEMPLATE_REL).splitlines()
+    provenance_lines: dict[str, str] = {}
+    for heading in PACKET_SECTION_HEADINGS:
+        try:
+            heading_index = lines.index(heading)
+        except ValueError as exc:
+            raise RecommendationError(f"packet template is missing required heading `{heading}`") from exc
+        provenance_line = None
+        for line in lines[heading_index + 1 :]:
+            if line.startswith("## "):
+                break
+            if line.startswith("Provenance: "):
+                provenance_line = line
+                break
+        if provenance_line is None:
+            raise RecommendationError(f"packet template is missing required provenance line for `{heading}`")
+        provenance_lines[heading] = provenance_line
+    return provenance_lines
+
+
+def packet_template_provenance_line(heading: str) -> str:
+    try:
+        return packet_template_provenance_lines()[heading]
+    except KeyError as exc:
+        raise RecommendationError(f"unknown packet heading `{heading}`") from exc
 
 
 def write_text(path: Path, text: str) -> None:
@@ -541,6 +610,450 @@ def candidate_status_counts(candidate_results: dict[str, CandidateResult]) -> di
     for result in candidate_results.values():
         counts[result.status] += 1
     return counts
+
+
+def seeded_candidate_ids(seed: SeedConfig) -> list[str]:
+    return [candidate.agent_id for candidate in seed.candidates]
+
+
+def expected_run_artifact_files(seed: SeedConfig) -> list[str]:
+    expected = list(RUN_ARTIFACT_FILES)
+    expected.extend(f"candidate-dossiers/{agent_id}.json" for agent_id in seeded_candidate_ids(seed))
+    expected.extend(f"candidate-validation-results/{agent_id}.json" for agent_id in seeded_candidate_ids(seed))
+    return sorted(expected)
+
+
+def run_artifact_files(root: Path) -> list[str]:
+    return sorted(path.relative_to(root).as_posix() for path in root.rglob("*") if path.is_file())
+
+
+def ensure_run_artifact_set(run_dir: Path, seed: SeedConfig) -> None:
+    for dirname in RUN_ARTIFACT_DIRS:
+        if not (run_dir / dirname).is_dir():
+            raise RecommendationError(f"required run artifact directory `{dirname}` is missing")
+    actual = run_artifact_files(run_dir)
+    expected = expected_run_artifact_files(seed)
+    if actual != expected:
+        raise RecommendationError("run artifact set does not match the frozen contract")
+
+
+def validate_run_status_payload(
+    *,
+    payload: dict[str, Any],
+    expected_run_id: str,
+    expected_research_dir: Path,
+    expected_run_dir: Path,
+    promoted: bool,
+) -> None:
+    required_keys = {
+        "run_id",
+        "status",
+        "generated_at",
+        "research_dir",
+        "run_dir",
+        "eligible_candidate_ids",
+        "shortlist_ids",
+        "recommended_agent_id",
+        "candidate_status_counts",
+        "metrics",
+        "errors",
+        "approved_agent_id",
+        "approval_recorded_at",
+        "override_reason",
+        "committed_review_dir",
+        "committed_packet_path",
+        "committed_approval_artifact_path",
+    }
+    if set(payload.keys()) != required_keys:
+        raise RecommendationError("run-status.json keys do not match the frozen contract")
+    if payload["run_id"] != expected_run_id:
+        raise RecommendationError("run-status.json run_id does not match the expected run id")
+    if payload["research_dir"] != str(expected_research_dir):
+        raise RecommendationError("run-status.json research_dir does not match the expected research dir")
+    if payload["run_dir"] != str(expected_run_dir):
+        raise RecommendationError("run-status.json run_dir does not match the expected run dir")
+    if payload["status"] not in ALLOWED_RUN_STATUSES:
+        raise RecommendationError("run-status.json has an invalid status")
+    parse_timestamp(ensure_string(payload["generated_at"], label="run-status.json generated_at"))
+    ensure_string_list(payload["eligible_candidate_ids"], label="run-status.json eligible_candidate_ids")
+    ensure_string_list(payload["shortlist_ids"], label="run-status.json shortlist_ids")
+    if payload["recommended_agent_id"] is not None:
+        ensure_string(payload["recommended_agent_id"], label="run-status.json recommended_agent_id")
+    if set(payload["candidate_status_counts"].keys()) != set(ALLOWED_CANDIDATE_STATUSES):
+        raise RecommendationError("run-status.json candidate_status_counts keys do not match the frozen contract")
+    for key, value in payload["candidate_status_counts"].items():
+        ensure_int(value, label=f"run-status.json candidate_status_counts.{key}")
+    if set(payload["metrics"].keys()) != set(RUN_STATUS_METRIC_KEYS):
+        raise RecommendationError("run-status.json metrics keys do not match the frozen contract")
+    for key in RUN_STATUS_METRIC_KEYS:
+        value = payload["metrics"][key]
+        if key in APPROVAL_DEPENDENT_METRIC_KEYS:
+            if promoted:
+                if key != "later_discovered_blocker_count" and value is None:
+                    raise RecommendationError(f"promoted run-status.json metric `{key}` must be finalized")
+            elif value is not None:
+                raise RecommendationError(f"scratch run-status.json metric `{key}` must be null")
+        elif value is None:
+            raise RecommendationError(f"run-status.json metric `{key}` must be concrete in scratch output")
+    if not isinstance(payload["errors"], list):
+        raise RecommendationError("run-status.json errors must be an array")
+    for index, entry in enumerate(payload["errors"]):
+        if not isinstance(entry, dict):
+            raise RecommendationError(f"run-status.json errors[{index}] must be an object")
+        if set(entry.keys()) != {"scope", "agent_id", "code", "message"}:
+            raise RecommendationError(f"run-status.json errors[{index}] keys do not match the frozen contract")
+        if entry["scope"] not in {"run", "candidate"}:
+            raise RecommendationError(f"run-status.json errors[{index}] has an invalid scope")
+        ensure_optional_string(entry["agent_id"], label=f"run-status.json errors[{index}] agent_id")
+        ensure_string(entry["code"], label=f"run-status.json errors[{index}] code")
+        ensure_string(entry["message"], label=f"run-status.json errors[{index}] message")
+    bookkeeping_keys = (
+        "approved_agent_id",
+        "approval_recorded_at",
+        "override_reason",
+        "committed_review_dir",
+        "committed_packet_path",
+        "committed_approval_artifact_path",
+    )
+    if promoted:
+        ensure_string(payload["approved_agent_id"], label="run-status.json approved_agent_id")
+        parse_timestamp(ensure_string(payload["approval_recorded_at"], label="run-status.json approval_recorded_at"))
+        ensure_optional_string(payload["override_reason"], label="run-status.json override_reason")
+        ensure_string(payload["committed_review_dir"], label="run-status.json committed_review_dir")
+        ensure_string(payload["committed_packet_path"], label="run-status.json committed_packet_path")
+        ensure_string(
+            payload["committed_approval_artifact_path"],
+            label="run-status.json committed_approval_artifact_path",
+        )
+    else:
+        for key in bookkeeping_keys:
+            if payload[key] is not None:
+                raise RecommendationError(f"scratch run-status.json field `{key}` must be null")
+
+
+def validate_candidate_validation_payload(payload: dict[str, Any], *, expected_agent_id: str) -> None:
+    required_keys = {
+        "agent_id",
+        "status",
+        "schema_valid",
+        "hard_gate_results",
+        "probe_results",
+        "rejection_reasons",
+        "error_reasons",
+        "evidence_ids_used",
+        "notes",
+    }
+    if set(payload.keys()) != required_keys:
+        raise RecommendationError(f"candidate validation payload `{expected_agent_id}` keys do not match the frozen contract")
+    if payload["agent_id"] != expected_agent_id:
+        raise RecommendationError(f"candidate validation payload `{expected_agent_id}` has the wrong agent_id")
+    if payload["status"] not in ALLOWED_CANDIDATE_STATUSES:
+        raise RecommendationError(f"candidate validation payload `{expected_agent_id}` has an invalid status")
+    ensure_bool(payload["schema_valid"], label=f"candidate validation payload `{expected_agent_id}` schema_valid")
+    if set(payload["hard_gate_results"].keys()) != set(HARD_GATE_KEYS):
+        raise RecommendationError(f"candidate validation payload `{expected_agent_id}` hard_gate_results keys do not match the frozen contract")
+    for gate_key, gate in payload["hard_gate_results"].items():
+        if set(gate.keys()) != {"status", "evidence_ids", "notes"}:
+            raise RecommendationError(f"candidate validation payload `{expected_agent_id}` gate `{gate_key}` keys do not match the frozen contract")
+        if gate["status"] not in ALLOWED_GATE_RESULTS:
+            raise RecommendationError(f"candidate validation payload `{expected_agent_id}` gate `{gate_key}` has an invalid status")
+        ensure_string_list(gate["evidence_ids"], label=f"candidate validation payload `{expected_agent_id}` gate `{gate_key}` evidence_ids")
+        if not isinstance(gate["notes"], str):
+            raise RecommendationError(f"candidate validation payload `{expected_agent_id}` gate `{gate_key}` notes must be a string")
+    if not isinstance(payload["probe_results"], list):
+        raise RecommendationError(f"candidate validation payload `{expected_agent_id}` probe_results must be an array")
+    for index, probe in enumerate(payload["probe_results"]):
+        if set(probe.keys()) != {"probe_kind", "binary", "required_for_gate", "status", "exit_code", "timed_out", "captured_output_ref", "notes"}:
+            raise RecommendationError(f"candidate validation payload `{expected_agent_id}` probe_results[{index}] keys do not match the frozen contract")
+        if probe["status"] not in ALLOWED_PROBE_RESULTS:
+            raise RecommendationError(f"candidate validation payload `{expected_agent_id}` probe_results[{index}] has an invalid status")
+    ensure_string_list(payload["rejection_reasons"], label=f"candidate validation payload `{expected_agent_id}` rejection_reasons")
+    ensure_string_list(payload["error_reasons"], label=f"candidate validation payload `{expected_agent_id}` error_reasons")
+    ensure_string_list(payload["evidence_ids_used"], label=f"candidate validation payload `{expected_agent_id}` evidence_ids_used")
+    ensure_string_list(payload["notes"], label=f"candidate validation payload `{expected_agent_id}` notes")
+
+
+def packet_section_slice(packet: str, heading: str, next_heading: str | None) -> str:
+    start = packet.index(heading)
+    end = len(packet) if next_heading is None else packet.index(next_heading, start)
+    return packet[start:end]
+
+
+def validate_packet_contract(
+    *,
+    packet: str,
+    shortlist_ids: list[str],
+    seeded_ids: list[str],
+    candidate_results: dict[str, CandidateResult],
+) -> None:
+    lines = packet.splitlines()
+    if tuple(lines[:4]) != PACKET_TOPMATTER_PREFIX:
+        raise RecommendationError("comparison packet title block shape does not match the frozen template")
+    if len(lines) < 11 or not lines[4].startswith("Date (UTC): ") or lines[5] != "Owner(s): wrappers team / deterministic runner" or lines[6] != "Related source docs:" or lines[7:11] != list(PACKET_RELATED_DOCS):
+        raise RecommendationError("comparison packet related-doc shape does not match the frozen template")
+    previous_index = -1
+    for heading in PACKET_SECTION_HEADINGS:
+        try:
+            current_index = packet.index(heading)
+        except ValueError as exc:
+            raise RecommendationError(f"comparison packet is missing required heading `{heading}`") from exc
+        if current_index <= previous_index:
+            raise RecommendationError("comparison packet section order does not match the frozen template")
+        previous_index = current_index
+        required_provenance = packet_template_provenance_line(heading)
+        if required_provenance not in packet_section_slice(
+            packet,
+            heading,
+            PACKET_SECTION_HEADINGS[PACKET_SECTION_HEADINGS.index(heading) + 1] if heading != PACKET_SECTION_HEADINGS[-1] else None,
+        ):
+            raise RecommendationError(f"comparison packet is missing required provenance line for `{heading}`")
+
+    section4 = packet_section_slice(packet, PACKET_SECTION_HEADINGS[3], PACKET_SECTION_HEADINGS[4])
+    section4_lines = section4.splitlines()
+    if PACKET_TABLE_HEADER not in section4_lines or PACKET_TABLE_DIVIDER not in section4_lines:
+        raise RecommendationError("comparison packet section 4 table shape does not match the frozen template")
+    candidate_rows = [line for line in section4_lines if line.startswith("| `")]
+    if len(candidate_rows) != 3:
+        raise RecommendationError("comparison packet section 4 must contain exactly 3 candidate rows")
+    for agent_id in shortlist_ids:
+        matches = [line for line in candidate_rows if line.startswith(f"| `{agent_id}` |")]
+        if len(matches) != 1 or "refs=" not in matches[0]:
+            raise RecommendationError(f"comparison packet section 4 row for `{agent_id}` must cite dossier evidence or probe refs")
+
+    section5 = packet_section_slice(packet, PACKET_SECTION_HEADINGS[4], PACKET_SECTION_HEADINGS[5])
+    if "refs=" not in section5 and not re.search(r"`[a-z0-9_]+:(?:help|version):\d+`", section5):
+        raise RecommendationError("comparison packet section 5 rationale must cite dossier evidence ids or probe refs")
+    tail = [line for line in section5.splitlines() if line.strip()]
+    if tail[-3:] != [
+        "Approve recommended agent",
+        "Override to shortlisted alternative",
+        "Stop and expand research",
+    ]:
+        raise RecommendationError("comparison packet section 5 must end with the three decision options")
+
+    section6 = packet_section_slice(packet, PACKET_SECTION_HEADINGS[5], PACKET_SECTION_HEADINGS[6])
+    if "reproducible now:" not in section6 or "blocked until later:" not in section6:
+        raise RecommendationError("comparison packet section 6 must be split into reproducible now and blocked until later")
+
+    appendix = packet_section_slice(packet, PACKET_SECTION_HEADINGS[9], None)
+    for agent_id in shortlist_ids:
+        if f"### `{agent_id}`" not in appendix or "- Loser rationale:" not in appendix:
+            raise RecommendationError("comparison packet appendix must include loser rationale for each shortlisted candidate")
+    if "captured `" not in appendix:
+        raise RecommendationError("comparison packet appendix must include dated evidence provenance")
+    strategic_contenders = [
+        agent_id for agent_id in seeded_ids if agent_id not in shortlist_ids and candidate_results[agent_id].status != "eligible"
+    ]
+    if strategic_contenders and "### Strategic Contenders" not in appendix:
+        raise RecommendationError("comparison packet appendix must include strategic contenders when they exist")
+
+
+def validate_run_summary_delta(scratch_summary: str, promoted_summary: str) -> None:
+    allowed_prefixes = tuple(f"  - {key}:" for key in APPROVAL_DEPENDENT_METRIC_KEYS)
+
+    def filtered_lines(text: str) -> list[str]:
+        filtered: list[str] = []
+        skip_override = False
+        for line in text.splitlines():
+            if line.startswith("- approved_agent_id:"):
+                continue
+            if line.startswith(allowed_prefixes):
+                continue
+            if line == "- override_summary:":
+                skip_override = True
+                continue
+            if skip_override:
+                if line.startswith("  - "):
+                    continue
+                skip_override = False
+            filtered.append(line)
+        return filtered
+
+    if filtered_lines(scratch_summary) != filtered_lines(promoted_summary):
+        raise RecommendationError("run-summary.md includes promote-time deltas outside the legal summary classes")
+
+
+def validate_run_status_delta(scratch_status: dict[str, Any], promoted_status: dict[str, Any]) -> None:
+    for key in (
+        "run_id",
+        "status",
+        "generated_at",
+        "research_dir",
+        "run_dir",
+        "eligible_candidate_ids",
+        "shortlist_ids",
+        "recommended_agent_id",
+        "candidate_status_counts",
+        "errors",
+    ):
+        if scratch_status[key] != promoted_status[key]:
+            raise RecommendationError(f"run-status.json field `{key}` changed outside the legal promote delta classes")
+    for key in (
+        "rejected_before_scoring_count",
+        "evidence_collection_time_seconds",
+        "fetched_source_count",
+    ):
+        if scratch_status["metrics"][key] != promoted_status["metrics"][key]:
+            raise RecommendationError(f"run-status.json metric `{key}` changed outside the legal promote delta classes")
+
+
+def validate_scratch_outputs(
+    *,
+    run_dir: Path,
+    run_status: dict[str, Any],
+    seed: SeedConfig,
+    research_dir: Path,
+    candidate_pool: dict[str, Any],
+    eligible_candidates: dict[str, Any],
+    scorecard: dict[str, Any],
+    sources_lock: dict[str, Any],
+    candidate_results: dict[str, CandidateResult],
+) -> None:
+    ensure_run_artifact_set(run_dir, seed)
+    actual_status = read_json(run_dir / "run-status.json")
+    validate_run_status_payload(
+        payload=actual_status,
+        expected_run_id=run_status["run_id"],
+        expected_research_dir=research_dir,
+        expected_run_dir=run_dir,
+        promoted=False,
+    )
+    if actual_status != run_status:
+        raise RecommendationError("scratch run-status.json does not match the deterministic output")
+    if read_json(run_dir / "candidate-pool.json") != candidate_pool:
+        raise RecommendationError("candidate-pool.json does not match the deterministic output")
+    if read_json(run_dir / "eligible-candidates.json") != eligible_candidates:
+        raise RecommendationError("eligible-candidates.json does not match the deterministic output")
+    if read_json(run_dir / "scorecard.json") != scorecard:
+        raise RecommendationError("scorecard.json does not match the deterministic output")
+    if read_json(run_dir / "sources.lock.json") != sources_lock:
+        raise RecommendationError("sources.lock.json does not match the deterministic output")
+    summary_text = read_text(run_dir / "run-summary.md")
+    expected_summary = render_run_summary(
+        mode="generate",
+        run_id=run_status["run_id"],
+        generated_at=run_status["generated_at"],
+        recommended_agent_id=run_status["recommended_agent_id"],
+        approved_agent_id=None,
+        shortlist_ids=run_status["shortlist_ids"],
+        metrics=run_status["metrics"],
+        override_reason=None,
+    )
+    if summary_text != expected_summary:
+        raise RecommendationError("run-summary.md does not match the deterministic scratch summary")
+    packet_text = read_text(run_dir / "comparison.generated.md")
+    validate_packet_contract(
+        packet=packet_text,
+        shortlist_ids=run_status["shortlist_ids"],
+        seeded_ids=seeded_candidate_ids(seed),
+        candidate_results=candidate_results,
+    )
+    recommended_agent_id = run_status["recommended_agent_id"] or run_status["shortlist_ids"][0]
+    expected_approval_draft = render_approval_toml(
+        candidate=seed.candidate_by_id(recommended_agent_id),
+        defaults=seed.defaults,
+        recommended_agent_id=recommended_agent_id,
+        approved_agent_id=recommended_agent_id,
+        onboarding_pack_prefix=derived_pack_prefix(recommended_agent_id),
+        approval_commit="0000000",
+        approval_recorded_at=run_status["generated_at"],
+        override_reason=None,
+    )
+    if read_text(run_dir / "approval-draft.generated.toml") != expected_approval_draft:
+        raise RecommendationError("approval-draft.generated.toml does not match the deterministic scratch output")
+    for candidate in seed.candidates:
+        if (run_dir / "candidate-dossiers" / f"{candidate.agent_id}.json").read_bytes() != dossier_path(research_dir, candidate.agent_id).read_bytes():
+            raise RecommendationError(f"candidate dossier `{candidate.agent_id}` is not a byte-copy of the research dossier")
+        validation = read_json(run_dir / "candidate-validation-results" / f"{candidate.agent_id}.json")
+        validate_candidate_validation_payload(validation, expected_agent_id=candidate.agent_id)
+        if validation != serialize_candidate_validation(candidate_results[candidate.agent_id]):
+            raise RecommendationError(f"candidate validation result `{candidate.agent_id}` does not match the deterministic output")
+
+
+def validate_promoted_outputs(
+    *,
+    scratch_run_dir: Path,
+    scratch_status: dict[str, Any],
+    final_review_dir: Path,
+    final_status: dict[str, Any],
+    seed: SeedConfig,
+    research_dir: Path,
+    canonical_path: Path,
+    final_approval_path: Path,
+    final_approval_text: str,
+) -> None:
+    ensure_run_artifact_set(final_review_dir, seed)
+    actual_final_status = read_json(final_review_dir / "run-status.json")
+    if actual_final_status != final_status:
+        raise RecommendationError("promoted run-status.json does not match the deterministic promote output")
+    validate_run_status_payload(
+        payload=actual_final_status,
+        expected_run_id=scratch_status["run_id"],
+        expected_research_dir=research_dir,
+        expected_run_dir=scratch_run_dir,
+        promoted=True,
+    )
+    validate_run_status_delta(scratch_status, actual_final_status)
+    if (final_review_dir / "comparison.generated.md").read_bytes() != (scratch_run_dir / "comparison.generated.md").read_bytes():
+        raise RecommendationError("committed comparison packet must be a byte-copy of scratch output")
+    if canonical_path.read_bytes() != (scratch_run_dir / "comparison.generated.md").read_bytes():
+        raise RecommendationError("canonical packet must be byte-identical to scratch comparison output")
+    for artifact in (
+        "seed.snapshot.toml",
+        "candidate-pool.json",
+        "eligible-candidates.json",
+        "scorecard.json",
+        "sources.lock.json",
+        "comparison.generated.md",
+        "approval-draft.generated.toml",
+    ):
+        if (final_review_dir / artifact).read_bytes() != (scratch_run_dir / artifact).read_bytes():
+            raise RecommendationError(f"committed review artifact `{artifact}` must be a byte-copy of the scratch run")
+    for candidate in seed.candidates:
+        rel_paths = (
+            f"candidate-dossiers/{candidate.agent_id}.json",
+            f"candidate-validation-results/{candidate.agent_id}.json",
+        )
+        for rel_path in rel_paths:
+            if (final_review_dir / rel_path).read_bytes() != (scratch_run_dir / rel_path).read_bytes():
+                raise RecommendationError(f"committed review artifact `{rel_path}` must be a byte-copy of the scratch run")
+    scratch_summary = read_text(scratch_run_dir / "run-summary.md")
+    promoted_summary = read_text(final_review_dir / "run-summary.md")
+    validate_run_summary_delta(scratch_summary, promoted_summary)
+    expected_summary = render_run_summary(
+        mode="promote",
+        run_id=actual_final_status["run_id"],
+        generated_at=actual_final_status["generated_at"],
+        recommended_agent_id=actual_final_status["recommended_agent_id"],
+        approved_agent_id=actual_final_status["approved_agent_id"],
+        shortlist_ids=actual_final_status["shortlist_ids"],
+        metrics=actual_final_status["metrics"],
+        override_reason=actual_final_status["override_reason"],
+    )
+    if promoted_summary != expected_summary:
+        raise RecommendationError("promoted run-summary.md does not match the deterministic promote summary")
+    promoted_candidate_results = {
+        candidate.agent_id: CandidateResult(
+            agent_id=candidate.agent_id,
+            status=read_json(final_review_dir / "candidate-validation-results" / f"{candidate.agent_id}.json")["status"],
+            schema_valid=True,
+            hard_gate_results={},
+            probe_results=[],
+            rejection_reasons=[],
+            error_reasons=[],
+            evidence_ids_used=[],
+            notes=[],
+        )
+        for candidate in seed.candidates
+    }
+    validate_packet_contract(
+        packet=read_text(final_review_dir / "comparison.generated.md"),
+        shortlist_ids=actual_final_status["shortlist_ids"],
+        seeded_ids=seeded_candidate_ids(seed),
+        candidate_results=promoted_candidate_results,
+    )
+    if read_text(final_approval_path) != final_approval_text:
+        raise RecommendationError("final approval artifact must match the promote-time rendered approval contents")
 
 
 def build_placeholder_gate_results() -> dict[str, dict[str, Any]]:
@@ -1150,7 +1663,6 @@ def render_run_summary(
     lines = [
         "# Recommendation Run Summary",
         "",
-        f"- mode: {mode}",
         f"- run_id: {run_id}",
         f"- generated_at: {generated_at}",
         f"- recommended_agent_id: {recommended_agent_id or 'pending'}",
@@ -1186,22 +1698,22 @@ def render_comparison_packet(
     recommended_dossier = dossiers[recommended_agent_id]
     lines = [
         "<!-- generated-by: scripts/recommend_next_agent.py generate -->",
-        "# Packet — CLI Agent Selection Recommendation",
+        "# Packet - CLI Agent Selection Packet",
         "",
         "Status: Generated",
         f"Date (UTC): {generated_at}",
         "Owner(s): wrappers team / deterministic runner",
         "Related source docs:",
-        "- `docs/specs/cli-agent-onboarding-charter.md`",
         "- `docs/specs/cli-agent-recommendation-dossier-contract.md`",
-        "- `docs/templates/agent-selection/cli-agent-selection-packet-template.md`",
-        "- `docs/cli-agent-onboarding-factory-operator-guide.md`",
+        "- `docs/specs/cli-agent-onboarding-charter.md`",
+        "- `docs/specs/unified-agent-api/support-matrix.md`",
+        "- `docs/specs/**` for any normative contract this packet cites",
         "",
         f"Run id: `{run_id}`",
         "",
         "## 1. Candidate Summary",
         "",
-        "Provenance: `validated dossier evidence + deterministic runner output`",
+        packet_template_provenance_line("## 1. Candidate Summary"),
         "",
         "Shortlisted candidates:",
     ]
@@ -1218,7 +1730,7 @@ def render_comparison_packet(
             "",
             "## 2. What Already Exists",
             "",
-            "Provenance: `committed repo evidence`",
+            packet_template_provenance_line("## 2. What Already Exists"),
             "",
             "- `docs/specs/cli-agent-onboarding-charter.md`",
             "- `docs/specs/cli-agent-recommendation-dossier-contract.md`",
@@ -1228,16 +1740,16 @@ def render_comparison_packet(
             "",
             "## 3. Selection Rubric",
             "",
-            "Provenance: `deterministic runner scoring over validated dossier claims`",
+            packet_template_provenance_line("## 3. Selection Rubric"),
             "",
             "This packet preserves the frozen score dimensions, the 0-3 scale, and the deterministic shortlist sort order. Product-value signals remain primary, while architecture fit and future leverage break ties only after the primary comparison is established.",
             "",
             "## 4. Fixed 3-Candidate Comparison Table",
             "",
-            "Provenance: `validated dossier evidence + deterministic runner scoring`",
+            packet_template_provenance_line("## 4. Fixed 3-Candidate Comparison Table"),
             "",
-            "| Candidate | Adoption & community pull | CLI product maturity & release activity | Installability & docs quality | Reproducibility & access friction | Architecture fit for this repo | Capability expansion / future leverage | Notes |",
-            "|---|---:|---:|---:|---:|---:|---:|---|",
+            PACKET_TABLE_HEADER,
+            PACKET_TABLE_DIVIDER,
         ]
     )
     for agent_id in shortlist_ids:
@@ -1260,7 +1772,7 @@ def render_comparison_packet(
             "",
             "## 5. Recommendation",
             "",
-            "Provenance: `deterministic runner output grounded in dossier evidence ids and probe refs`",
+            packet_template_provenance_line("## 5. Recommendation"),
             "",
             f"Recommended winner: `{recommended_agent_id}`",
             "",
@@ -1281,7 +1793,7 @@ def render_comparison_packet(
             "",
             "## 6. Recommended Agent Evaluation Recipe",
             "",
-            "Provenance: `validated dossier evidence`",
+            packet_template_provenance_line("## 6. Recommended Agent Evaluation Recipe"),
             "",
             "reproducible now:",
             "- install paths:",
@@ -1321,7 +1833,7 @@ def render_comparison_packet(
             "",
             "## 7. Repo-Fit Analysis",
             "",
-            "Provenance: `validated dossier claims + deterministic descriptor derivation`",
+            packet_template_provenance_line("## 7. Repo-Fit Analysis"),
             "",
             f"- crate path: `{descriptor['crate_path']}`",
             f"- backend module: `{descriptor['backend_module']}`",
@@ -1330,7 +1842,7 @@ def render_comparison_packet(
             "",
             "## 8. Required Artifacts",
             "",
-            "Provenance: `committed repo evidence + validated dossier evidence`",
+            packet_template_provenance_line("## 8. Required Artifacts"),
             "",
             "- canonical comparison packet",
             "- approval artifact draft",
@@ -1339,7 +1851,7 @@ def render_comparison_packet(
             "",
             "## 9. Workstreams, Deliverables, Risks, And Gates",
             "",
-            "Provenance: `deterministic runner output`",
+            packet_template_provenance_line("## 9. Workstreams, Deliverables, Risks, And Gates"),
             "",
             "- workstreams: contract, runner, validation, proving, integration",
             "- deliverables: seed snapshot, dossiers, runner outputs, tests, review run, approval draft",
@@ -1348,7 +1860,7 @@ def render_comparison_packet(
             "",
             "## 10. Dated Evidence Appendix",
             "",
-            "Provenance: `validated dossier evidence`",
+            packet_template_provenance_line("## 10. Dated Evidence Appendix"),
             "",
         ]
     )
@@ -1910,27 +2422,24 @@ def generate_recommendation(
             override_reason=None,
         ),
     )
+    validate_scratch_outputs(
+        run_dir=run_dir,
+        run_status=run_status,
+        seed=seed,
+        research_dir=research_dir,
+        candidate_pool=candidate_pool,
+        eligible_candidates=eligible_candidates,
+        scorecard=scorecard,
+        sources_lock=sources_lock,
+        candidate_results=candidate_results,
+    )
     return run_dir
 
 
-def ensure_promotable_run(run_dir: Path) -> None:
-    required_files = [
-        "run-status.json",
-        "seed.snapshot.toml",
-        "candidate-pool.json",
-        "eligible-candidates.json",
-        "scorecard.json",
-        "sources.lock.json",
-        "comparison.generated.md",
-        "approval-draft.generated.toml",
-        "run-summary.md",
-    ]
-    for artifact in required_files:
-        if not (run_dir / artifact).exists():
-            raise RecommendationError(f"required scratch artifact `{artifact}` is missing")
-    for dirname in ("candidate-dossiers", "candidate-validation-results"):
-        if not (run_dir / dirname).is_dir():
-            raise RecommendationError(f"required scratch directory `{dirname}` is missing")
+def ensure_promotable_run(run_dir: Path) -> SeedConfig:
+    seed = parse_seed_file(run_dir / "seed.snapshot.toml")
+    ensure_run_artifact_set(run_dir, seed)
+    return seed
 
 
 def finalize_run_status_for_promote(
@@ -1974,7 +2483,7 @@ def promote_recommendation(
     validator: Callable[[Path, Path], None] = validate_approval_artifact,
     replace_fn: Callable[[Path, Path], None] = os.replace,
 ) -> Path:
-    ensure_promotable_run(run_dir)
+    seed = ensure_promotable_run(run_dir)
     live_seed = repo_root / LIVE_SEED_REL
     if not live_seed.exists():
         raise RecommendationError(f"live seed file `{live_seed}` does not exist")
@@ -1986,7 +2495,6 @@ def promote_recommendation(
     if approved_agent_id != recommended_agent_id and not override_reason:
         raise RecommendationError("override_reason is required when approved_agent_id differs from recommended_agent_id")
 
-    seed = parse_seed_file(run_dir / "seed.snapshot.toml")
     approved_candidate = seed.candidate_by_id(approved_agent_id)
     approved_dossier = read_json(run_dir / "candidate-dossiers" / f"{approved_agent_id}.json")
 
@@ -2079,23 +2587,17 @@ def promote_recommendation(
     remove_path(selection_staging_root)
     remove_path(lifecycle_staging_root)
 
-    if (final_review_dir / "comparison.generated.md").read_bytes() != (run_dir / "comparison.generated.md").read_bytes():
-        raise RecommendationError("committed comparison packet must be a byte-copy of scratch output")
-    if canonical_path.read_bytes() != (run_dir / "comparison.generated.md").read_bytes():
-        raise RecommendationError("canonical packet must be byte-identical to scratch comparison output")
-    for artifact in (
-        "seed.snapshot.toml",
-        "candidate-pool.json",
-        "eligible-candidates.json",
-        "scorecard.json",
-        "sources.lock.json",
-        "comparison.generated.md",
-        "approval-draft.generated.toml",
-    ):
-        if (final_review_dir / artifact).read_bytes() != (run_dir / artifact).read_bytes():
-            raise RecommendationError(f"committed review artifact `{artifact}` must be a byte-copy of the scratch run")
-    if read_text(final_approval_path) != final_approval_text:
-        raise RecommendationError("final approval artifact must match the promote-time rendered approval contents")
+    validate_promoted_outputs(
+        scratch_run_dir=run_dir,
+        scratch_status=scratch_status,
+        final_review_dir=final_review_dir,
+        final_status=final_status,
+        seed=seed,
+        research_dir=Path(scratch_status["research_dir"]),
+        canonical_path=canonical_path,
+        final_approval_path=final_approval_path,
+        final_approval_text=final_approval_text,
+    )
     return final_review_dir
 
 

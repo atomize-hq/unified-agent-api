@@ -1,20 +1,20 @@
 <!-- generated-by: scripts/recommend_next_agent.py generate -->
-# Packet — CLI Agent Selection Recommendation
+# Packet - CLI Agent Selection Packet
 
 Status: Generated
-Date (UTC): 2026-04-28T15:35:22Z
+Date (UTC): 2026-04-28T16:44:19Z
 Owner(s): wrappers team / deterministic runner
 Related source docs:
-- `docs/specs/cli-agent-onboarding-charter.md`
 - `docs/specs/cli-agent-recommendation-dossier-contract.md`
-- `docs/templates/agent-selection/cli-agent-selection-packet-template.md`
-- `docs/cli-agent-onboarding-factory-operator-guide.md`
+- `docs/specs/cli-agent-onboarding-charter.md`
+- `docs/specs/unified-agent-api/support-matrix.md`
+- `docs/specs/**` for any normative contract this packet cites
 
-Run id: `20260428T152555Z-cli-recommendation`
+Run id: `20260428T164358Z-cli-recommendation`
 
 ## 1. Candidate Summary
 
-Provenance: `validated dossier evidence + deterministic runner output`
+Provenance: `<committed repo evidence | dated external snapshot evidence | maintainer inference>`
 
 Shortlisted candidates:
 - `openhands`
@@ -39,13 +39,13 @@ Provenance: `committed repo evidence`
 
 ## 3. Selection Rubric
 
-Provenance: `deterministic runner scoring over validated dossier claims`
+Provenance: `maintainer inference informed by dated external snapshot evidence`
 
 This packet preserves the frozen score dimensions, the 0-3 scale, and the deterministic shortlist sort order. Product-value signals remain primary, while architecture fit and future leverage break ties only after the primary comparison is established.
 
 ## 4. Fixed 3-Candidate Comparison Table
 
-Provenance: `validated dossier evidence + deterministic runner scoring`
+Provenance: `dated external snapshot evidence + maintainer inference`
 
 | Candidate | Adoption & community pull | CLI product maturity & release activity | Installability & docs quality | Reproducibility & access friction | Architecture fit for this repo | Capability expansion / future leverage | Notes |
 |---|---:|---:|---:|---:|---:|---:|---|
@@ -55,7 +55,7 @@ Provenance: `validated dossier evidence + deterministic runner scoring`
 
 ## 5. Recommendation
 
-Provenance: `deterministic runner output grounded in dossier evidence ids and probe refs`
+Provenance: `maintainer inference grounded in the comparison table`
 
 Recommended winner: `openhands`
 
@@ -70,7 +70,7 @@ Stop and expand research
 
 ## 6. Recommended Agent Evaluation Recipe
 
-Provenance: `validated dossier evidence`
+Provenance: `dated external snapshot evidence + maintainer inference`
 
 reproducible now:
 - install paths:
@@ -94,7 +94,7 @@ blocked until later:
 
 ## 7. Repo-Fit Analysis
 
-Provenance: `validated dossier claims + deterministic descriptor derivation`
+Provenance: `committed repo evidence + maintainer inference`
 
 - crate path: `crates/openhands`
 - backend module: `crates/agent_api/src/backends/openhands`
@@ -103,7 +103,7 @@ Provenance: `validated dossier claims + deterministic descriptor derivation`
 
 ## 8. Required Artifacts
 
-Provenance: `committed repo evidence + validated dossier evidence`
+Provenance: `committed repo evidence + maintainer inference`
 
 - canonical comparison packet
 - approval artifact draft
@@ -112,7 +112,7 @@ Provenance: `committed repo evidence + validated dossier evidence`
 
 ## 9. Workstreams, Deliverables, Risks, And Gates
 
-Provenance: `deterministic runner output`
+Provenance: `maintainer inference grounded in repo constraints`
 
 - workstreams: contract, runner, validation, proving, integration
 - deliverables: seed snapshot, dossiers, runner outputs, tests, review run, approval draft
@@ -121,7 +121,7 @@ Provenance: `deterministic runner output`
 
 ## 10. Dated Evidence Appendix
 
-Provenance: `validated dossier evidence`
+Provenance: `dated external snapshot evidence`
 
 ### `openhands`
 

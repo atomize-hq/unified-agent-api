@@ -40,7 +40,7 @@ This file owns:
 
 Before the deterministic runner executes, the skill-led research phase must freeze the scratch research artifacts under:
 
-`~/.gstack/projects/<repo-slug>/recommend-next-agent-research/<run_id>/`
+`~/.gstack/projects/atomize-hq-unified-agent-api/recommend-next-agent-research/<run_id>/`
 
 Required research artifacts:
 - `seed.snapshot.toml`
@@ -61,14 +61,14 @@ After the research artifacts exist, run the deterministic recommendation generat
 ```sh
 python3 scripts/recommend_next_agent.py generate \
   --seed-file docs/agents/selection/candidate-seed.toml \
-  --research-dir ~/.gstack/projects/<repo-slug>/recommend-next-agent-research/<run_id> \
+  --research-dir ~/.gstack/projects/atomize-hq-unified-agent-api/recommend-next-agent-research/<run_id> \
   --run-id <timestamp>-<shortlist_slug> \
-  --scratch-root ~/.gstack/projects/<repo-slug>/recommend-next-agent-runs
+  --scratch-root ~/.gstack/projects/atomize-hq-unified-agent-api/recommend-next-agent-runs
 ```
 
 This step writes only to:
 
-`~/.gstack/projects/<repo-slug>/recommend-next-agent-runs/<run_id>/`
+`~/.gstack/projects/atomize-hq-unified-agent-api/recommend-next-agent-runs/<run_id>/`
 
 It does not mutate repo-tracked files, and it is post-research only.
 
@@ -109,7 +109,7 @@ Promote one scratch run into the canonical packet, a committed review run, and a
 
 ```sh
 python3 scripts/recommend_next_agent.py promote \
-  --run-dir ~/.gstack/projects/<repo-slug>/recommend-next-agent-runs/<run_id> \
+  --run-dir ~/.gstack/projects/atomize-hq-unified-agent-api/recommend-next-agent-runs/<run_id> \
   --repo-run-root docs/agents/selection/runs \
   --approved-agent-id <agent_id> \
   --onboarding-pack-prefix <kebab-case-pack-prefix> \
@@ -139,9 +139,18 @@ Canonical promotion rules:
 - `docs/agents/selection/cli-agent-selection-packet.md` is a byte-copy of scratch `comparison.generated.md`
 - committed review `approval-draft.generated.toml` remains the scratch recommendation draft; final `docs/agents/lifecycle/<onboarding_pack_prefix>/governance/approved-agent.toml` is rendered at promote time from the maintainer-approved inputs
 - the canonical packet must conform to the no-drift template rule in `docs/templates/agent-selection/cli-agent-selection-packet-template.md`
+- committed review promotion is valid only when:
+  - every committed review artifact is a byte-copy of the scratch artifact except `run-status.json` and `run-summary.md`
+  - `run-status.json` changes are limited to finalized metrics, approved/recommended decision bookkeeping, and final committed path references
+  - `run-summary.md` changes are limited to finalized metrics summary and approved/recommended decision summary
 - promotion stages the canonical packet and final approval artifact under hidden per-run staging roots, validates the staged approval artifact with `cargo run -p xtask -- onboard-agent --approval <staged-path> --dry-run`, then swaps live surfaces
 - if validation fails, promotion removes the staging roots and leaves canonical surfaces unchanged
 - if a live swap fails after validation, promotion rolls live canonical surfaces back to their pre-promotion bytes, removes staging roots, and leaves `docs/agents/selection/runs/<run_id>/` unchanged
+- never replace an existing committed review directory in place:
+  - generate a fresh `run_id`
+  - promote that fresh run
+  - verify the promoted outputs
+  - only then delete the stale committed review directory in the same commit
 
 ### 6. Stop for maintainer approve-or-override
 

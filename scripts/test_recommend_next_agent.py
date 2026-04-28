@@ -289,6 +289,19 @@ class RecommendationRunnerContractTests(unittest.TestCase):
             if path.is_file()
         }
 
+    def assert_packet_matches_template_provenance(self, packet: str) -> None:
+        for index, heading in enumerate(rna.PACKET_SECTION_HEADINGS):
+            next_heading = (
+                rna.PACKET_SECTION_HEADINGS[index + 1]
+                if index + 1 < len(rna.PACKET_SECTION_HEADINGS)
+                else None
+            )
+            self.assertIn(
+                rna.packet_template_provenance_line(heading),
+                rna.packet_section_slice(packet, heading, next_heading),
+                heading,
+            )
+
     def assert_run_status_schema(self, payload: dict[str, object]) -> None:
         self.assertEqual(
             set(payload.keys()),
@@ -511,6 +524,110 @@ class RecommendationRunnerContractTests(unittest.TestCase):
         finally:
             tmpdir.cleanup()
 
+    def test_generate_surfaces_seed_snapshot_sha_mismatch_as_candidate_error(self) -> None:
+        tmpdir, root, live_seed, scratch_root, registry_path = self.repo_fixture()
+        try:
+            research_dir = self.research_dir(
+                root,
+                dossier_mutator=lambda agent_id, dossier: (
+                    {**dossier, "seed_snapshot_sha256": hex64("wrong-snapshot")} if agent_id == "delta" else dossier
+                ),
+            )
+            run_dir = rna.generate_recommendation(
+                seed_file=live_seed,
+                research_dir=research_dir,
+                run_id=RUN_ID,
+                scratch_root=scratch_root,
+                registry_path=registry_path,
+                now_fn=lambda: GENERATED_AT,
+            )
+
+            delta_validation = self.load_json(run_dir / "candidate-validation-results" / "delta.json")
+            self.assertEqual(delta_validation["status"], "candidate_error")
+            self.assertIn("seed_snapshot_sha256 does not match the run snapshot", delta_validation["error_reasons"][0])
+        finally:
+            tmpdir.cleanup()
+
+    def test_research_metadata_rejects_run_dir_basename_mismatch(self) -> None:
+        tmpdir, root, _, _, _ = self.repo_fixture()
+        try:
+            research_dir = self.research_dir(root)
+            with self.assertRaisesRegex(
+                rna.RecommendationError,
+                "run directory basename must equal CLI --run-id",
+            ):
+                rna.validate_research_metadata(
+                    research_metadata_path=research_dir / "research-metadata.json",
+                    expected_run_id=RUN_ID,
+                    research_dir=research_dir,
+                    run_dir=root / "scratch" / "wrong-run-dir",
+                )
+        finally:
+            tmpdir.cleanup()
+
+    def test_template_parity_lock_covers_all_packet_sections(self) -> None:
+        provenance_lines = rna.packet_template_provenance_lines()
+        self.assertEqual(tuple(provenance_lines.keys()), rna.PACKET_SECTION_HEADINGS)
+        self.assertEqual(
+            provenance_lines["## 1. Candidate Summary"],
+            "Provenance: `<committed repo evidence | dated external snapshot evidence | maintainer inference>`",
+        )
+        self.assertEqual(
+            provenance_lines["## 5. Recommendation"],
+            "Provenance: `maintainer inference grounded in the comparison table`",
+        )
+
+    def test_packet_contract_rejects_missing_provenance_line(self) -> None:
+        tmpdir, root, live_seed, scratch_root, registry_path = self.repo_fixture()
+        try:
+            research_dir = self.research_dir(root)
+            run_dir = rna.generate_recommendation(
+                seed_file=live_seed,
+                research_dir=research_dir,
+                run_id=RUN_ID,
+                scratch_root=scratch_root,
+                registry_path=registry_path,
+                now_fn=lambda: GENERATED_AT,
+            )
+            packet = (run_dir / "comparison.generated.md").read_text(encoding="utf-8")
+            tampered = packet.replace(
+                rna.packet_template_provenance_line("## 5. Recommendation") + "\n",
+                "",
+                1,
+            )
+            with self.assertRaisesRegex(
+                rna.RecommendationError,
+                "missing required provenance line",
+            ):
+                rna.validate_packet_contract(
+                    packet=tampered,
+                    shortlist_ids=["alpha", "beta", "gamma"],
+                    seeded_ids=[agent_id for agent_id, _ in CANDIDATE_ORDER],
+                    candidate_results={
+                        agent_id: rna.build_placeholder_candidate_result(agent_id)
+                        for agent_id, _ in CANDIDATE_ORDER
+                    },
+                )
+        finally:
+            tmpdir.cleanup()
+
+    def test_generate_emits_template_provenance_lines_for_all_sections(self) -> None:
+        tmpdir, root, live_seed, scratch_root, registry_path = self.repo_fixture()
+        try:
+            research_dir = self.research_dir(root)
+            run_dir = rna.generate_recommendation(
+                seed_file=live_seed,
+                research_dir=research_dir,
+                run_id=RUN_ID,
+                scratch_root=scratch_root,
+                registry_path=registry_path,
+                now_fn=lambda: GENERATED_AT,
+            )
+            packet = (run_dir / "comparison.generated.md").read_text(encoding="utf-8")
+            self.assert_packet_matches_template_provenance(packet)
+        finally:
+            tmpdir.cleanup()
+
     def test_generate_writes_frozen_artifacts_and_deterministic_ordering(self) -> None:
         tmpdir, root, live_seed, scratch_root, registry_path = self.repo_fixture()
         try:
@@ -698,7 +815,6 @@ class RecommendationRunnerContractTests(unittest.TestCase):
                 (run_dir / "run-summary.md").read_text(encoding="utf-8"),
                 """# Recommendation Run Summary
 
-- mode: generate
 - run_id: 20260427-frozen-contract
 - generated_at: 2026-04-27T18:00:00Z
 - recommended_agent_id: alpha
@@ -721,7 +837,9 @@ class RecommendationRunnerContractTests(unittest.TestCase):
             self.assertIn('approval_commit = "0000000"', approval_draft)
 
             comparison_packet = (run_dir / "comparison.generated.md").read_text(encoding="utf-8")
+            self.assertIn("# Packet - CLI Agent Selection Packet", comparison_packet)
             self.assertIn("Owner(s): wrappers team / deterministic runner", comparison_packet)
+            self.assert_packet_matches_template_provenance(comparison_packet)
             self.assertIn("| `alpha` | 3 | 3 | 3 | 3 | 3 | 2 | refs=alpha-repo,alpha-pkg,alpha-doc |", comparison_packet)
             self.assertIn("Approve recommended agent", comparison_packet)
             self.assertIn("Override to shortlisted alternative", comparison_packet)
@@ -845,7 +963,6 @@ class RecommendationRunnerContractTests(unittest.TestCase):
                 scratch_summary,
                 """# Recommendation Run Summary
 
-- mode: generate
 - run_id: 20260427-frozen-contract
 - generated_at: 2026-04-27T18:00:00Z
 - recommended_agent_id: alpha
@@ -865,7 +982,6 @@ class RecommendationRunnerContractTests(unittest.TestCase):
                 (review_dir / "run-summary.md").read_text(encoding="utf-8"),
                 """# Recommendation Run Summary
 
-- mode: promote
 - run_id: 20260427-frozen-contract
 - generated_at: 2026-04-27T18:00:00Z
 - recommended_agent_id: alpha
@@ -956,7 +1072,7 @@ class RecommendationRunnerContractTests(unittest.TestCase):
             try:
                 with self.assertRaisesRegex(
                     rna.RecommendationError,
-                    "required scratch artifact `sources.lock.json` is missing",
+                    "run artifact set does not match the frozen contract",
                 ):
                     rna.promote_recommendation(
                         run_dir=run_dir,

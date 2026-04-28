@@ -4,7 +4,7 @@ selection_mode = "factory_validation"
 recommended_agent_id = "openhands"
 approved_agent_id = "openhands"
 approval_commit = "0000000"
-approval_recorded_at = "2026-04-28T15:35:22Z"
+approval_recorded_at = "2026-04-28T16:44:19Z"
 
 [descriptor]
 agent_id = "openhands"
