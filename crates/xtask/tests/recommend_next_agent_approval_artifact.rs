@@ -6,7 +6,9 @@ mod harness;
 #[path = "../src/approval_artifact.rs"]
 mod approval_artifact;
 
-use approval_artifact::{load_approval_artifact, ApprovalArtifactError};
+use approval_artifact::{
+    load_approval_artifact, load_approval_artifact_for_validation, ApprovalArtifactError,
+};
 use harness::{fixture_root, write_text};
 
 fn seed_canonical_packet(root: &std::path::Path) {
@@ -156,4 +158,54 @@ fn path_prefix_mismatch_is_rejected() {
     assert!(
         matches!(err, ApprovalArtifactError::Validation(message) if message.contains("belongs to onboarding_pack_prefix"))
     );
+}
+
+#[test]
+fn staged_path_is_rejected_by_default_loader() {
+    let fixture = fixture_root("recommend-approval-staged-default-reject");
+    seed_canonical_packet(&fixture);
+    let approval_rel =
+        "docs/agents/lifecycle/.staging/20260427-opencode/opencode-onboarding/governance/approved-agent.toml";
+    write_text(
+        &fixture.join(approval_rel),
+        &recommendation_approval(
+            "opencode",
+            "opencode",
+            "opencode-onboarding",
+            None,
+            "docs/agents/selection/cli-agent-selection-packet.md",
+        ),
+    );
+
+    let err = load_approval_artifact(&fixture, approval_rel)
+        .expect_err("default loader should reject staged path");
+    assert!(
+        matches!(err, ApprovalArtifactError::Validation(message) if message.contains("must be repo-relative and match"))
+    );
+}
+
+#[test]
+fn staged_path_is_accepted_for_validation_only() {
+    let fixture = fixture_root("recommend-approval-staged-validation");
+    seed_canonical_packet(&fixture);
+    let approval_rel =
+        "docs/agents/lifecycle/.staging/20260427-opencode/opencode-onboarding/governance/approved-agent.toml";
+    write_text(
+        &fixture.join(approval_rel),
+        &recommendation_approval(
+            "opencode",
+            "opencode",
+            "opencode-onboarding",
+            None,
+            "docs/agents/selection/cli-agent-selection-packet.md",
+        ),
+    );
+
+    let artifact = load_approval_artifact_for_validation(&fixture, approval_rel)
+        .expect("validation-only loader should accept staged path");
+    assert_eq!(
+        artifact.descriptor.onboarding_pack_prefix,
+        "opencode-onboarding"
+    );
+    assert_eq!(artifact.relative_path, approval_rel);
 }

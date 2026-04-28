@@ -11,7 +11,6 @@ from pathlib import Path
 import re
 import shutil
 import subprocess
-import tempfile
 import tomllib
 from typing import Any
 import urllib.error
@@ -84,8 +83,6 @@ COPY_OWNED_REVIEW_FILES = (
     "scorecard.json",
     "sources.lock.json",
     "comparison.generated.md",
-)
-RENDERED_REVIEW_FILES = (
     "approval-draft.generated.toml",
     "run-summary.md",
 )
@@ -1221,6 +1218,7 @@ def promote_recommendation(
     now_fn: Callable[[], str] = utc_now,
     git_head_fn: Callable[[Path], str] = git_head,
     validator: Callable[[Path, Path], None] = validate_approval_artifact,
+    replace_fn: Callable[[Path, Path], None] = os.replace,
 ) -> Path:
     scorecard = load_json(run_dir / "scorecard.json")
     shortlist_ids = list(scorecard["shortlist_order"])
@@ -1239,7 +1237,11 @@ def promote_recommendation(
         raise RecommendationError(f"review run directory `{final_review_dir}` already exists")
 
     temp_review_dir = review_root / f".tmp-{run_dir.name}"
+    selection_staging_root = repo_root / "docs" / "agents" / "selection" / ".staging" / run_dir.name
+    lifecycle_staging_root = repo_root / "docs" / "agents" / "lifecycle" / ".staging" / run_dir.name
     remove_path(temp_review_dir)
+    remove_path(selection_staging_root)
+    remove_path(lifecycle_staging_root)
     temp_review_dir.mkdir(parents=True, exist_ok=True)
     try:
         for artifact in COPY_OWNED_REVIEW_FILES:
@@ -1262,46 +1264,48 @@ def promote_recommendation(
             approval_recorded_at=approval_recorded_at,
             override_reason=override_reason,
         )
-        review_summary_text = render_run_summary(
-            mode="promote",
-            run_id=run_dir.name,
-            generated_at=approval_recorded_at,
-            recommended_agent_id=recommended_agent_id,
-            shortlist_ids=shortlist_ids,
-            approved_agent_id=approved_agent_id,
-            onboarding_pack_prefix=onboarding_pack_prefix,
-            override_reason=override_reason,
-        )
-        write_text(temp_review_dir / "approval-draft.generated.toml", final_approval_text)
-        write_text(temp_review_dir / "run-summary.md", review_summary_text)
-
         canonical_path = canonical_packet_path(repo_root)
         canonical_bytes = (run_dir / "comparison.generated.md").read_bytes()
+        staged_canonical_path = selection_staging_root / "cli-agent-selection-packet.md"
         final_approval_path = repo_root / "docs" / "agents" / "lifecycle" / onboarding_pack_prefix / "governance" / "approved-agent.toml"
+        staged_approval_path = lifecycle_staging_root / onboarding_pack_prefix / "governance" / "approved-agent.toml"
         final_approval_path.parent.mkdir(parents=True, exist_ok=True)
         previous_canonical = canonical_path.read_bytes() if canonical_path.exists() else None
         previous_approval = final_approval_path.read_bytes() if final_approval_path.exists() else None
 
-        canonical_path.write_bytes(canonical_bytes)
-        final_approval_path.write_text(final_approval_text, encoding="utf-8")
+        write_bytes(staged_canonical_path, canonical_bytes)
+        write_text(staged_approval_path, final_approval_text)
+        validator(repo_root, staged_approval_path)
+
         try:
-            validator(repo_root, final_approval_path)
+            replace_fn(staged_canonical_path, canonical_path)
+            replace_fn(staged_approval_path, final_approval_path)
+            replace_fn(temp_review_dir, final_review_dir)
         except Exception:
             restore_file(canonical_path, previous_canonical, repo_root=repo_root)
             restore_file(final_approval_path, previous_approval, repo_root=repo_root)
-            remove_path(temp_review_dir)
             raise
-
-        os.replace(temp_review_dir, final_review_dir)
     except Exception:
         remove_path(temp_review_dir)
+        remove_path(selection_staging_root)
+        remove_path(lifecycle_staging_root)
         raise
+    remove_path(selection_staging_root)
+    remove_path(lifecycle_staging_root)
 
     if (final_review_dir / "comparison.generated.md").read_bytes() != canonical_path.read_bytes():
         raise RecommendationError("canonical packet must be byte-identical to the review comparison packet")
-    if (final_review_dir / "approval-draft.generated.toml").read_text(encoding="utf-8") != read_text(final_approval_path):
-        raise RecommendationError("committed review approval draft must be byte-identical to the final approval artifact")
+    for artifact in COPY_OWNED_REVIEW_FILES:
+        if (final_review_dir / artifact).read_bytes() != (run_dir / artifact).read_bytes():
+            raise RecommendationError(f"committed review artifact `{artifact}` must be a byte-copy of the scratch run")
+    if read_text(final_approval_path) != final_approval_text:
+        raise RecommendationError("final approval artifact must match the promote-time rendered approval contents")
     return final_review_dir
+
+
+def write_bytes(path: Path, contents: bytes) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(contents)
 
 
 def restore_file(path: Path, previous_bytes: bytes | None, *, repo_root: Path) -> None:

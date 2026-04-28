@@ -59,6 +59,29 @@ fn onboard_agent_approval_dry_run_matches_raw_descriptor_preview_and_writes_noth
 }
 
 #[test]
+fn onboard_agent_approval_dry_run_accepts_staged_path() {
+    let fixture = fixture_root("onboard-agent-approval-staged-preview");
+    seed_release_touchpoints(&fixture);
+    let approval_path = seed_approval_artifact(
+        &fixture,
+        "docs/agents/lifecycle/.staging/20260427-cursor/cursor-cli-onboarding/governance/approved-agent.toml",
+        "cursor",
+        "cursor",
+        None,
+    );
+
+    let output = run_cli(approval_args("--dry-run", &approval_path), &fixture);
+
+    assert_eq!(output.exit_code, 0, "stderr:\n{}", output.stderr);
+    assert!(output
+        .stdout
+        .contains("approval_artifact_path: docs/agents/lifecycle/.staging/20260427-cursor/cursor-cli-onboarding/governance/approved-agent.toml"));
+    assert!(output
+        .stdout
+        .contains("OK: onboard-agent dry-run preview complete."));
+}
+
+#[test]
 fn onboard_agent_approval_write_applies_plan_and_replays_identically() {
     let fixture = fixture_root("onboard-agent-approval-write");
     seed_release_touchpoints(&fixture);
@@ -112,6 +135,26 @@ fn onboard_agent_approval_write_applies_plan_and_replays_identically() {
         "- approval ref: `docs/agents/lifecycle/cursor-cli-onboarding/governance/approved-agent.toml`"
     ));
     assert!(handoff.contains("- approval artifact sha256: `"));
+}
+
+#[test]
+fn onboard_agent_approval_write_rejects_staged_path() {
+    let fixture = fixture_root("onboard-agent-approval-staged-write-reject");
+    seed_release_touchpoints(&fixture);
+    let approval_path = seed_approval_artifact(
+        &fixture,
+        "docs/agents/lifecycle/.staging/20260427-cursor/cursor-cli-onboarding/governance/approved-agent.toml",
+        "cursor",
+        "cursor",
+        None,
+    );
+
+    let output = run_cli(approval_args("--write", &approval_path), &fixture);
+
+    assert_eq!(output.exit_code, 2);
+    assert!(output
+        .stderr
+        .contains("staged approval paths under `docs/agents/lifecycle/.staging/**` are only allowed with `--dry-run`"));
 }
 
 #[test]

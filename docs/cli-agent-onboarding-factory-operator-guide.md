@@ -96,14 +96,16 @@ Required committed review artifacts under `docs/agents/selection/runs/<run_id>/`
 - byte-copy of `scorecard.json`
 - byte-copy of `sources.lock.json`
 - byte-copy of `comparison.generated.md`
-- promote-time rendered `approval-draft.generated.toml`
-- promote-time rendered `run-summary.md`
+- byte-copy of `approval-draft.generated.toml`
+- byte-copy of `run-summary.md`
 
 Canonical promotion rules:
 - `docs/agents/selection/cli-agent-selection-packet.md` is a byte-copy of scratch `comparison.generated.md`
 - committed review `comparison.generated.md` and the canonical packet are byte-identical
-- committed review `approval-draft.generated.toml` and final `docs/agents/lifecycle/<onboarding_pack_prefix>/governance/approved-agent.toml` are rendered from the same promote-time inputs and must be byte-identical
-- promotion must validate the final approval artifact with `cargo run -p xtask -- onboard-agent --approval <path> --dry-run`
+- committed review `approval-draft.generated.toml` remains the scratch recommendation draft; final `docs/agents/lifecycle/<onboarding_pack_prefix>/governance/approved-agent.toml` is rendered at promote time from the maintainer-approved inputs
+- promotion stages the canonical packet and final approval artifact under hidden per-run staging roots, validates the staged approval artifact with `cargo run -p xtask -- onboard-agent --approval <staged-path> --dry-run`, then swaps live surfaces
+- if validation fails, promotion removes the staging roots and leaves canonical surfaces unchanged
+- if a live swap fails after validation, promotion rolls live canonical surfaces back to their pre-promotion bytes, removes staging roots, and leaves `docs/agents/selection/runs/<run_id>/` unchanged
 
 ### 5. Stop for maintainer approve-or-override
 

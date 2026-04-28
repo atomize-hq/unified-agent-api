@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+import os
 from pathlib import Path
 import sys
 import tempfile
@@ -179,6 +180,12 @@ class RecommendationRunnerTests(unittest.TestCase):
         scratch_root.mkdir(parents=True, exist_ok=True)
         return tmpdir, root, seed_path, scratch_root
 
+    def selection_staging_root(self, root: Path, run_id: str) -> Path:
+        return root / "docs/agents/selection/.staging" / run_id
+
+    def lifecycle_staging_root(self, root: Path, run_id: str) -> Path:
+        return root / "docs/agents/lifecycle/.staging" / run_id
+
     def test_seed_parsing_defaults(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             seed_path = Path(tmp) / "candidate-seed.toml"
@@ -306,7 +313,7 @@ class RecommendationRunnerTests(unittest.TestCase):
                 git_head_fn=lambda _: "deadbeef",
                 validator=lambda *_: None,
             )
-            for artifact in rna.COPY_OWNED_REVIEW_FILES + rna.RENDERED_REVIEW_FILES:
+            for artifact in rna.COPY_OWNED_REVIEW_FILES:
                 self.assertTrue((review_dir / artifact).exists(), artifact)
             self.assertEqual(
                 (run_dir / "comparison.generated.md").read_bytes(),
@@ -332,15 +339,21 @@ class RecommendationRunnerTests(unittest.TestCase):
                     (run_dir / "candidate-dossiers" / dossier).read_bytes(),
                     (review_dir / "candidate-dossiers" / dossier).read_bytes(),
                 )
-            final_approval = root / "docs/agents/lifecycle/opencode-onboarding/governance/approved-agent.toml"
             self.assertEqual(
-                (review_dir / "approval-draft.generated.toml").read_text(encoding="utf-8"),
-                final_approval.read_text(encoding="utf-8"),
+                (run_dir / "approval-draft.generated.toml").read_bytes(),
+                (review_dir / "approval-draft.generated.toml").read_bytes(),
             )
+            self.assertEqual(
+                (run_dir / "run-summary.md").read_bytes(),
+                (review_dir / "run-summary.md").read_bytes(),
+            )
+            final_approval = root / "docs/agents/lifecycle/opencode-onboarding/governance/approved-agent.toml"
             self.assertNotEqual(
                 (run_dir / "approval-draft.generated.toml").read_text(encoding="utf-8"),
-                (review_dir / "approval-draft.generated.toml").read_text(encoding="utf-8"),
+                final_approval.read_text(encoding="utf-8"),
             )
+            self.assertFalse(self.selection_staging_root(root, run_dir.name).exists())
+            self.assertFalse(self.lifecycle_staging_root(root, run_dir.name).exists())
         finally:
             rna.remove_path(scratch_root)
             tmpdir.cleanup()
@@ -370,11 +383,53 @@ class RecommendationRunnerTests(unittest.TestCase):
                 encoding="utf-8"
             )
             review_text = (review_dir / "approval-draft.generated.toml").read_text(encoding="utf-8")
-            self.assertEqual(review_text, final_text)
+            scratch_text = (run_dir / "approval-draft.generated.toml").read_text(encoding="utf-8")
+            self.assertEqual(review_text, scratch_text)
+            self.assertNotEqual(review_text, final_text)
             self.assertIn('approved_agent_id = "gemini_cli"', final_text)
             self.assertIn('recommended_agent_id = "opencode"', final_text)
             self.assertIn('override_reason = "Maintain the current proving-run lane."', final_text)
             self.assertIn('onboarding_pack_prefix = "gemini-cli-onboarding"', final_text)
+        finally:
+            rna.remove_path(scratch_root)
+            tmpdir.cleanup()
+
+    def test_promote_validates_staged_paths_before_any_live_swap(self) -> None:
+        tmpdir, root, seed_path, scratch_root = self.repo_fixture()
+        final_approval_path = root / "docs/agents/lifecycle/opencode-onboarding/governance/approved-agent.toml"
+        final_approval_path.parent.mkdir(parents=True, exist_ok=True)
+        final_approval_path.write_text("ORIGINAL APPROVAL\n", encoding="utf-8")
+        try:
+            run_dir = rna.generate_recommendation(
+                seed_file=seed_path,
+                run_id="20260427-opencode",
+                scratch_root=scratch_root,
+                fetcher=fake_fetcher,
+                now_fn=lambda: "2026-04-27T18:00:00Z",
+            )
+
+            def assert_validation_state(repo_root: Path, approval_path: Path) -> None:
+                self.assertEqual(repo_root, root)
+                self.assertEqual(
+                    approval_path,
+                    self.lifecycle_staging_root(root, run_dir.name)
+                    / "opencode-onboarding/governance/approved-agent.toml",
+                )
+                self.assertEqual((root / rna.CANONICAL_PACKET_REL).read_text(encoding="utf-8"), "ORIGINAL PACKET\n")
+                self.assertEqual(final_approval_path.read_text(encoding="utf-8"), "ORIGINAL APPROVAL\n")
+                self.assertFalse((root / "docs/agents/selection/runs/20260427-opencode").exists())
+
+            rna.promote_recommendation(
+                run_dir=run_dir,
+                repo_run_root_rel="docs/agents/selection/runs",
+                approved_agent_id="opencode",
+                onboarding_pack_prefix="opencode-onboarding",
+                override_reason=None,
+                repo_root=root,
+                now_fn=lambda: "2026-04-27T19:00:00Z",
+                git_head_fn=lambda _: "deadbeef",
+                validator=assert_validation_state,
+            )
         finally:
             rna.remove_path(scratch_root)
             tmpdir.cleanup()
@@ -478,6 +533,53 @@ class RecommendationRunnerTests(unittest.TestCase):
             self.assertEqual((root / rna.CANONICAL_PACKET_REL).read_text(encoding="utf-8"), "ORIGINAL PACKET\n")
             self.assertEqual(final_approval_path.read_text(encoding="utf-8"), "ORIGINAL APPROVAL\n")
             self.assertFalse((root / "docs/agents/selection/runs/20260427-opencode").exists())
+            self.assertFalse(self.selection_staging_root(root, run_dir.name).exists())
+            self.assertFalse(self.lifecycle_staging_root(root, run_dir.name).exists())
+        finally:
+            rna.remove_path(scratch_root)
+            tmpdir.cleanup()
+
+    def test_promote_swap_failure_rolls_back_live_surfaces(self) -> None:
+        tmpdir, root, seed_path, scratch_root = self.repo_fixture()
+        final_approval_path = root / "docs/agents/lifecycle/opencode-onboarding/governance/approved-agent.toml"
+        final_approval_path.parent.mkdir(parents=True, exist_ok=True)
+        final_approval_path.write_text("ORIGINAL APPROVAL\n", encoding="utf-8")
+        try:
+            run_dir = rna.generate_recommendation(
+                seed_file=seed_path,
+                run_id="20260427-opencode",
+                scratch_root=scratch_root,
+                fetcher=fake_fetcher,
+                now_fn=lambda: "2026-04-27T18:00:00Z",
+            )
+
+            replace_calls: list[tuple[Path, Path]] = []
+
+            def failing_replace(src: Path, dst: Path) -> None:
+                replace_calls.append((src, dst))
+                if len(replace_calls) == 1:
+                    os.replace(src, dst)
+                    return
+                raise OSError("replace failed")
+
+            with self.assertRaises(OSError):
+                rna.promote_recommendation(
+                    run_dir=run_dir,
+                    repo_run_root_rel="docs/agents/selection/runs",
+                    approved_agent_id="opencode",
+                    onboarding_pack_prefix="opencode-onboarding",
+                    override_reason=None,
+                    repo_root=root,
+                    now_fn=lambda: "2026-04-27T19:00:00Z",
+                    git_head_fn=lambda _: "deadbeef",
+                    validator=lambda *_: None,
+                    replace_fn=failing_replace,
+                )
+            self.assertEqual((root / rna.CANONICAL_PACKET_REL).read_text(encoding="utf-8"), "ORIGINAL PACKET\n")
+            self.assertEqual(final_approval_path.read_text(encoding="utf-8"), "ORIGINAL APPROVAL\n")
+            self.assertFalse((root / "docs/agents/selection/runs/20260427-opencode").exists())
+            self.assertFalse(self.selection_staging_root(root, run_dir.name).exists())
+            self.assertFalse(self.lifecycle_staging_root(root, run_dir.name).exists())
         finally:
             rna.remove_path(scratch_root)
             tmpdir.cleanup()

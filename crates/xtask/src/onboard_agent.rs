@@ -312,7 +312,7 @@ impl DraftEntry {
                         "--approval cannot be mixed with semantic descriptor flags".to_string(),
                     ));
                 }
-                approval::load_descriptor_input(&approval_path, workspace_root)?
+                approval::load_descriptor_input(&approval_path, workspace_root, args.dry_run)?
             }
             None => DraftDescriptorInput::from_raw_args(args)?,
         };

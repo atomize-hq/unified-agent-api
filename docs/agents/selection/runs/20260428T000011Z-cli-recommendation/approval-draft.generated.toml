@@ -3,8 +3,8 @@ comparison_ref = "docs/agents/selection/cli-agent-selection-packet.md"
 selection_mode = "factory_validation"
 recommended_agent_id = "aider"
 approved_agent_id = "aider"
-approval_commit = "ebbc04aec5f723e63b527351c5c1629d22489180"
-approval_recorded_at = "2026-04-28T00:00:35Z"
+approval_commit = "0000000"
+approval_recorded_at = "2026-04-28T00:00:11Z"
 
 [descriptor]
 agent_id = "aider"
