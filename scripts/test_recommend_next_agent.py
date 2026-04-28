@@ -16,6 +16,7 @@ import recommend_next_agent as rna
 GENERATED_AT = "2026-04-27T18:00:00Z"
 APPROVED_AT = "2026-04-27T19:00:00Z"
 RUN_ID = "20260427-frozen-contract"
+TEMP_ROOT = Path(rna.RECOMMENDATION_TEMP_ROOT_REL)
 CANDIDATE_ORDER = (
     ("gamma", "Gamma CLI"),
     ("beta", "Beta CLI"),
@@ -51,7 +52,7 @@ class RecommendationRunnerContractTests(unittest.TestCase):
         canonical_path.parent.mkdir(parents=True, exist_ok=True)
         canonical_path.write_text("ORIGINAL PACKET\n", encoding="utf-8")
 
-        scratch_root = root / "scratch"
+        scratch_root = root / rna.RECOMMENDATION_RUNS_ROOT_REL
         scratch_root.mkdir(parents=True, exist_ok=True)
         return tmpdir, root, live_seed, scratch_root, registry_path
 
@@ -93,7 +94,7 @@ class RecommendationRunnerContractTests(unittest.TestCase):
         dossier_mutator: Callable[[str, dict[str, object]], dict[str, object]] | None = None,
     ) -> Path:
         actual_dirname = dirname or run_id
-        research_dir = root / "research" / actual_dirname
+        research_dir = root / rna.RECOMMENDATION_RESEARCH_ROOT_REL / actual_dirname
         dossier_dir = research_dir / "dossiers"
         dossier_dir.mkdir(parents=True, exist_ok=True)
 
@@ -402,15 +403,18 @@ class RecommendationRunnerContractTests(unittest.TestCase):
                 "--seed-file",
                 "docs/agents/selection/candidate-seed.toml",
                 "--research-dir",
-                "research/20260427-frozen-contract",
+                "docs/agents/.uaa-temp/recommend-next-agent/research/20260427-frozen-contract",
                 "--run-id",
                 RUN_ID,
                 "--scratch-root",
-                "/tmp/recommend-next-agent-runs",
+                "docs/agents/.uaa-temp/recommend-next-agent/runs",
             ]
         )
         self.assertEqual(parsed.command, "generate")
-        self.assertEqual(parsed.research_dir, "research/20260427-frozen-contract")
+        self.assertEqual(
+            parsed.research_dir,
+            "docs/agents/.uaa-temp/recommend-next-agent/research/20260427-frozen-contract",
+        )
 
         with self.assertRaises(SystemExit):
             parser.parse_args(
@@ -421,7 +425,7 @@ class RecommendationRunnerContractTests(unittest.TestCase):
                     "--run-id",
                     RUN_ID,
                     "--scratch-root",
-                    "/tmp/recommend-next-agent-runs",
+                    "docs/agents/.uaa-temp/recommend-next-agent/runs",
                 ]
             )
         with self.assertRaises(SystemExit):
@@ -429,7 +433,7 @@ class RecommendationRunnerContractTests(unittest.TestCase):
                 [
                     "promote",
                     "--run-dir",
-                    "/tmp/recommend-next-agent-runs/run",
+                    "docs/agents/.uaa-temp/recommend-next-agent/runs/run",
                     "--repo-run-root",
                     "docs/agents/selection/runs",
                     "--approved-agent-id",

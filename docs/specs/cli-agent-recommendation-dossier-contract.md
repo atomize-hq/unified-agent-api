@@ -49,12 +49,18 @@ The runner is post-research only:
 ```sh
 python3 scripts/recommend_next_agent.py generate \
   --seed-file docs/agents/selection/candidate-seed.toml \
-  --research-dir ~/.gstack/projects/<repo-slug>/recommend-next-agent-research/<run_id> \
+  --research-dir docs/agents/.uaa-temp/recommend-next-agent/research/<run_id> \
   --run-id <run_id> \
-  --scratch-root ~/.gstack/projects/<repo-slug>/recommend-next-agent-runs
+  --scratch-root docs/agents/.uaa-temp/recommend-next-agent/runs
 ```
 
 `promote` keeps the existing shape, but MUST promote from the frozen snapshot already copied into the run and MUST NOT reread the live seed file as reviewed input.
+
+The repo-local scratch root for this lane is:
+
+`docs/agents/.uaa-temp/recommend-next-agent/`
+
+`.staging/` directories remain reserved for internal promote-time staging and MUST NOT be used as operator scratch space.
 
 ## Timestamp Format
 
@@ -70,7 +76,7 @@ This applies to:
 
 The research directory is:
 
-`~/.gstack/projects/<repo-slug>/recommend-next-agent-research/<run_id>/`
+`docs/agents/.uaa-temp/recommend-next-agent/research/<run_id>/`
 
 It MUST contain:
 
@@ -240,7 +246,7 @@ Hard-gate pass/fail is driven by claim state, evidence-kind coverage, and any re
 
 The run directory is:
 
-`~/.gstack/projects/<repo-slug>/recommend-next-agent-runs/<run_id>/`
+`docs/agents/.uaa-temp/recommend-next-agent/runs/<run_id>/`
 
 The successful run artifact set MUST include:
 

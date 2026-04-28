@@ -27,8 +27,8 @@
   },
   "override_reason": null,
   "recommended_agent_id": "openhands",
-  "research_dir": "/Users/spensermcconnell/.gstack/projects/atomize-hq-unified-agent-api/recommend-next-agent-research/20260428T185841Z-cli-recommendation",
-  "run_dir": "/Users/spensermcconnell/.gstack/projects/atomize-hq-unified-agent-api/recommend-next-agent-runs/20260428T185841Z-cli-recommendation",
+  "research_dir": "docs/agents/.uaa-temp/recommend-next-agent/research/20260428T185841Z-cli-recommendation",
+  "run_dir": "docs/agents/.uaa-temp/recommend-next-agent/runs/20260428T185841Z-cli-recommendation",
   "run_id": "20260428T185841Z-cli-recommendation",
   "shortlist_ids": [
     "openhands",

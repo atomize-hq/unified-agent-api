@@ -31,6 +31,7 @@ universal-agent-api-planning-pack_*.zip
 __pycache__/
 *.pyc
 *.pyo
+/docs/agents/.uaa-temp/
 **/logs/
 **audit.*.json
 **audit-trio**

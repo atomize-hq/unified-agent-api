@@ -40,7 +40,7 @@ This file owns:
 
 Before the deterministic runner executes, the skill-led research phase must freeze the scratch research artifacts under:
 
-`~/.gstack/projects/atomize-hq-unified-agent-api/recommend-next-agent-research/<run_id>/`
+`docs/agents/.uaa-temp/recommend-next-agent/research/<run_id>/`
 
 Required research artifacts:
 - `seed.snapshot.toml`
@@ -61,14 +61,14 @@ After the research artifacts exist, run the deterministic recommendation generat
 ```sh
 python3 scripts/recommend_next_agent.py generate \
   --seed-file docs/agents/selection/candidate-seed.toml \
-  --research-dir ~/.gstack/projects/atomize-hq-unified-agent-api/recommend-next-agent-research/<run_id> \
+  --research-dir docs/agents/.uaa-temp/recommend-next-agent/research/<run_id> \
   --run-id <timestamp>-<shortlist_slug> \
-  --scratch-root ~/.gstack/projects/atomize-hq-unified-agent-api/recommend-next-agent-runs
+  --scratch-root docs/agents/.uaa-temp/recommend-next-agent/runs
 ```
 
 This step writes only to:
 
-`~/.gstack/projects/atomize-hq-unified-agent-api/recommend-next-agent-runs/<run_id>/`
+`docs/agents/.uaa-temp/recommend-next-agent/runs/<run_id>/`
 
 It does not mutate repo-tracked files, and it is post-research only.
 
@@ -102,6 +102,8 @@ Review the scratch run before promotion:
 - provisional approval draft preview for the recommended candidate
 
 Scratch runs are never committed.
+`docs/agents/.uaa-temp/**` is ignored operator scratch space.
+`docs/agents/*/.staging/**` remains internal promote-time staging owned by the scripts and must not be used as operator scratch space.
 
 ### 5. Promote one reviewed run
 
@@ -109,7 +111,7 @@ Promote one scratch run into the canonical packet, a committed review run, and a
 
 ```sh
 python3 scripts/recommend_next_agent.py promote \
-  --run-dir ~/.gstack/projects/atomize-hq-unified-agent-api/recommend-next-agent-runs/<run_id> \
+  --run-dir docs/agents/.uaa-temp/recommend-next-agent/runs/<run_id> \
   --repo-run-root docs/agents/selection/runs \
   --approved-agent-id <agent_id> \
   --onboarding-pack-prefix <kebab-case-pack-prefix> \

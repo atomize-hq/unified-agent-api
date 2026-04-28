@@ -13,7 +13,7 @@ Normative contract:
 ## Workflow
 
 1. Prepare or review `docs/agents/selection/candidate-seed.toml`.
-2. Freeze a scratch research run before invoking the runner. The research phase owns these artifacts under `~/.gstack/projects/<repo-slug>/recommend-next-agent-research/<run_id>/`:
+2. Freeze a scratch research run before invoking the runner. The research phase owns these artifacts under `docs/agents/.uaa-temp/recommend-next-agent/research/<run_id>/`:
    - `seed.snapshot.toml`
    - `research-summary.md`
    - `research-metadata.json`
@@ -23,19 +23,19 @@ Normative contract:
 ```sh
 python3 scripts/recommend_next_agent.py generate \
   --seed-file docs/agents/selection/candidate-seed.toml \
-  --research-dir ~/.gstack/projects/<repo-slug>/recommend-next-agent-research/<run_id> \
+  --research-dir docs/agents/.uaa-temp/recommend-next-agent/research/<run_id> \
   --run-id <timestamp>-<shortlist_slug> \
-  --scratch-root ~/.gstack/projects/<repo-slug>/recommend-next-agent-runs
+  --scratch-root docs/agents/.uaa-temp/recommend-next-agent/runs
 ```
 
-4. Review the scratch artifacts under `~/.gstack/projects/<repo-slug>/recommend-next-agent-runs/<run_id>/`.
+4. Review the scratch artifacts under `docs/agents/.uaa-temp/recommend-next-agent/runs/<run_id>/`.
    - The runner is post-research only and must not replace the frozen research artifacts.
    - `comparison.generated.md` and `approval-draft.generated.toml` are preview artifacts only.
 5. Promote one reviewed fresh run into repo-owned review artifacts, the canonical packet, and a create-lane approval artifact:
 
 ```sh
 python3 scripts/recommend_next_agent.py promote \
-  --run-dir ~/.gstack/projects/<repo-slug>/recommend-next-agent-runs/<run_id> \
+  --run-dir docs/agents/.uaa-temp/recommend-next-agent/runs/<run_id> \
   --repo-run-root docs/agents/selection/runs \
   --approved-agent-id <agent_id> \
   --onboarding-pack-prefix <kebab-case-pack-prefix> \
@@ -52,7 +52,9 @@ cargo run -p xtask -- onboard-agent --approval docs/agents/lifecycle/<onboarding
 
 ## Artifact Roots
 
-- Scratch runs live only under `~/.gstack/projects/<repo-slug>/recommend-next-agent-runs/<run_id>/` and are never committed.
+- Scratch runs live only under `docs/agents/.uaa-temp/recommend-next-agent/runs/<run_id>/` and are never committed.
+- `docs/agents/.uaa-temp/**` is operator-owned scratch space.
+- `docs/agents/*/.staging/**` remains internal promote-time staging owned by the scripts.
 - Promoted review evidence lives under `docs/agents/selection/runs/<run_id>/`.
 - The canonical comparison packet is `docs/agents/selection/cli-agent-selection-packet.md`; it is the maintainer decision surface for approve-or-override.
 - The create-lane approval artifact is `docs/agents/lifecycle/<onboarding_pack_prefix>/governance/approved-agent.toml`; it remains the normative approval artifact consumed by `xtask onboard-agent`.

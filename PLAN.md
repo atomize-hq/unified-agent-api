@@ -1,4 +1,4 @@
-<!-- /autoplan restore point: /Users/spensermcconnell/.gstack/projects/atomize-hq-unified-agent-api/codex-recommend-next-agent-autoplan-restore-20260428-133720.md -->
+<!-- /autoplan restore point intentionally omitted from committed repo docs -->
 # PLAN — Recommendation Lane Trust Surface Hardening
 
 Status: ready for implementation  
@@ -10,13 +10,13 @@ Repo: `atomize-hq/unified-agent-api`
 ## Source Inputs
 
 - Prior approved design artifact:
-  - `~/.gstack/projects/atomize-hq-unified-agent-api/spensermcconnell-staging-design-20260427-151419.md`
+  - external gstack project design artifact `spensermcconnell-staging-design-20260427-151419.md`
 - Validation artifact for the landed lane:
-  - `~/.gstack/projects/atomize-hq-unified-agent-api/spensermcconnell-codex-recommendation-lane-validation-20260428-071743.md`
+  - external gstack project validation artifact `spensermcconnell-codex-recommendation-lane-validation-20260428-071743.md`
 - Prior eng-review test artifact:
-  - `~/.gstack/projects/atomize-hq-unified-agent-api/spensermcconnell-staging-eng-review-test-plan-20260427-153026.md`
+  - external gstack project eng-review artifact `spensermcconnell-staging-eng-review-test-plan-20260427-153026.md`
 - Fresh eng-review test artifact for this consolidation pass:
-  - `~/.gstack/projects/atomize-hq-unified-agent-api/spensermcconnell-codex-recommend-next-agent-eng-review-test-plan-20260428-140435.md`
+  - external gstack project eng-review artifact `spensermcconnell-codex-recommend-next-agent-eng-review-test-plan-20260428-140435.md`
 - Live repo surfaces:
   - `.codex/skills/recommend-next-agent/SKILL.md`
   - `scripts/recommend_next_agent.py`
@@ -855,11 +855,11 @@ cargo test -p xtask --test recommend_next_agent_approval_artifact -- --nocapture
 cargo test -p xtask --test onboard_agent_entrypoint approval_mode -- --nocapture
 python3 scripts/recommend_next_agent.py generate \
   --seed-file docs/agents/selection/candidate-seed.toml \
-  --research-dir ~/.gstack/projects/atomize-hq-unified-agent-api/recommend-next-agent-research/<fresh-run-id> \
+  --research-dir docs/agents/.uaa-temp/recommend-next-agent/research/<fresh-run-id> \
   --run-id <fresh-run-id> \
-  --scratch-root ~/.gstack/projects/atomize-hq-unified-agent-api/recommend-next-agent-runs
+  --scratch-root docs/agents/.uaa-temp/recommend-next-agent/runs
 python3 scripts/recommend_next_agent.py promote \
-  --run-dir ~/.gstack/projects/atomize-hq-unified-agent-api/recommend-next-agent-runs/<fresh-run-id> \
+  --run-dir docs/agents/.uaa-temp/recommend-next-agent/runs/<fresh-run-id> \
   --repo-run-root docs/agents/selection/runs \
   --approved-agent-id <agent_id> \
   --onboarding-pack-prefix <pack-prefix> \

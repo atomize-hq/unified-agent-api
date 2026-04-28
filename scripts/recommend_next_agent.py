@@ -21,6 +21,9 @@ CANONICAL_PACKET_REL = "docs/agents/selection/cli-agent-selection-packet.md"
 PACKET_TEMPLATE_REL = "docs/templates/agent-selection/cli-agent-selection-packet-template.md"
 LIVE_SEED_REL = "docs/agents/selection/candidate-seed.toml"
 REGISTRY_RELATIVE_PATH = "crates/xtask/data/agent_registry.toml"
+RECOMMENDATION_TEMP_ROOT_REL = "docs/agents/.uaa-temp/recommend-next-agent"
+RECOMMENDATION_RESEARCH_ROOT_REL = f"{RECOMMENDATION_TEMP_ROOT_REL}/research"
+RECOMMENDATION_RUNS_ROOT_REL = f"{RECOMMENDATION_TEMP_ROOT_REL}/runs"
 DEFAULT_TARGET = "darwin-arm64"
 APPROVAL_VERSION = "1"
 SELECTION_MODE = "factory_validation"
@@ -380,12 +383,24 @@ def build_parser() -> argparse.ArgumentParser:
 
     generate = subparsers.add_parser("generate")
     generate.add_argument("--seed-file", required=True)
-    generate.add_argument("--research-dir", required=True)
+    generate.add_argument(
+        "--research-dir",
+        required=True,
+        help=f"repo-local frozen research root, e.g. {RECOMMENDATION_RESEARCH_ROOT_REL}/<run-id>",
+    )
     generate.add_argument("--run-id", required=True)
-    generate.add_argument("--scratch-root", required=True)
+    generate.add_argument(
+        "--scratch-root",
+        required=True,
+        help=f"repo-local scratch run root, e.g. {RECOMMENDATION_RUNS_ROOT_REL}",
+    )
 
     promote = subparsers.add_parser("promote")
-    promote.add_argument("--run-dir", required=True)
+    promote.add_argument(
+        "--run-dir",
+        required=True,
+        help=f"repo-local scratch run directory, e.g. {RECOMMENDATION_RUNS_ROOT_REL}/<run-id>",
+    )
     promote.add_argument("--repo-run-root", required=True)
     promote.add_argument("--approved-agent-id", required=True)
     promote.add_argument("--onboarding-pack-prefix", required=True)

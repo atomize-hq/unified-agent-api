@@ -59,7 +59,7 @@
 
 **Why:** `onboard-agent` is the create-mode bridge for new agents. Once an agent is already in the repo, maintainers still need a boring way to detect and repair drift across registry truth, publication outputs, release docs, and closed packet/governance docs without reopening new-agent onboarding.
 
-**Context:** The 2026-04-21 M4 `/autoplan` for the CLI agent onboarding factory reframed this work as a separate post-onboarding lifecycle milestone. The plan anchors the proving run on OpenCode because `/Users/spensermcconnell/.gstack/projects/atomize-hq-unified-agent-api/spensermcconnell-main-test-outcome-20260420-091704.md` already documents a real stale closeout claim in `.archived/project_management/next/opencode-implementation/governance/seam-2-closeout.md`.
+**Context:** The 2026-04-21 M4 `/autoplan` for the CLI agent onboarding factory reframed this work as a separate post-onboarding lifecycle milestone. The plan anchors the proving run on OpenCode because a prior external test outcome artifact from 2026-04-20 already documented a real stale closeout claim in `.archived/project_management/next/opencode-implementation/governance/seam-2-closeout.md`.
 
 **Effort:** M
 **Priority:** P2
