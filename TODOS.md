@@ -2,6 +2,18 @@
 
 ## Pending
 
+### Land The LLM-Guided Research Layer For The Recommendation Lane
+
+**What:** Replace the thin repo-local `recommend-next-agent` skill with a real AI research workflow that gathers explicit proof for candidate charter fit, then feed that structured research into the existing deterministic runner for validation, rendering, promotion, and approval-artifact drafting.
+
+**Why:** The shipped recommendation lane now works mechanically, but it still ranks candidates from heuristic signals in `scripts/recommend_next_agent.py` instead of using the skill as the actual research layer. That misses the intended product. Maintainers need a recommendation packet they can trust because an AI agent did the research and the runner enforced the contract.
+
+**Context:** The 2026-04-28 validation on `codex/recommend-next-agent` found that the landed lane is valid for promotion mechanics but not for full intent. The missing next step is narrower than "more runner logic": the skill must perform web/docs/package/GitHub research plus safe local non-mutating probes when available, write structured proof fields, and let the runner reject incomplete candidates before scoring. The existing `approved-agent.toml` handoff and promote-time dry-run validation should stay unchanged.
+
+**Effort:** M
+**Priority:** P1
+**Depends on:** The current deterministic runner, packet template, approval-artifact contract, and operator guide remaining the control-plane truth
+
 ### Decide Whether Capability Matrix Markdown Stays Canonical After M5
 
 **What:** After M5 lands, decide whether `docs/specs/unified-agent-api/capability-matrix.md` remains the canonical published truth surface or becomes a rendered view over a more structured canonical artifact.
@@ -13,18 +25,6 @@
 **Effort:** S
 **Priority:** P2
 **Depends on:** M5 landing with one canonical capability projection contract and one shared local/CI check-only gate
-
-### Land The Pre-Create Recommendation Lane
-
-**What:** Add the repo-local skill and deterministic runner that research next-agent candidates, apply hard onboarding-fit gates, render the fixed 3-candidate comparison packet, and draft the maintainer-facing `approved-agent.toml` input for the existing `onboard-agent` lane.
-
-**Why:** The repo now has the core post-approval factory. The missing seam is earlier: maintainers still have to do the candidate archaeology by hand before they can run `cargo run -p xtask -- onboard-agent --approval ...`. This work turns that research step into an approval-grade control-plane lane.
-
-**Context:** The 2026-04-27 office-hours and `/plan-eng-review` reframe narrowed the problem from "create-mode gaps" to the pre-create recommendation lane. The repo already has `docs/agents/selection/cli-agent-selection-packet.md`, `docs/templates/agent-selection/cli-agent-selection-packet-template.md`, `crates/xtask/src/approval_artifact.rs`, and the shipped `onboard-agent` workflow. The lane should reuse those surfaces, keep the maintainer as approve-or-override HITL, pin v1 to exactly 3 candidates, and separate run-local evidence capture from explicit promotion to the canonical packet path.
-
-**Effort:** M
-**Priority:** P1
-**Depends on:** Current M3 governance surfaces staying the approval truth, and one committed implementation plan for the repo-local skill plus `scripts/` runner
 
 ### Compress The Runtime-Owned Onboarding Lane After Governance Truth Lands
 
@@ -39,6 +39,19 @@
 **Depends on:** M3 governance artifacts plus one post-M3 onboarding cycle with recorded duration and residual friction truth
 
 ## Completed
+
+### Land The Deterministic Recommendation Engine v1
+
+**What:** Add the repo-local `recommend-next-agent` skill, the deterministic `scripts/recommend_next_agent.py` runner, the candidate seed file, the canonical packet promotion flow, and the approval-artifact draft handoff into `xtask onboard-agent`.
+
+**Why:** This closed the mechanical pre-create gap. Maintainers can now produce a promoted run, a canonical selection packet, and a valid `approved-agent.toml` handoff instead of authoring those artifacts by hand.
+
+**Context:** The 2026-04-28 validation on `codex/recommend-next-agent` found that this milestone landed correctly for promotion mechanics, byte-identity guarantees, and approval-artifact validation, but it also showed the next gap: the skill is still too thin and the runner still relies on heuristic proof. That follow-on is now the active milestone above.
+
+**Effort:** M
+**Priority:** P1
+**Depends on:** Current M3 governance surfaces staying the approval truth, and one committed implementation plan for the repo-local skill plus `scripts/` runner
+**Completed:** v0.4.0 (2026-04-28)
 
 ### Implement The M4 Post-Onboarding Maintenance Lane
 

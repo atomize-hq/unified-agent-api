@@ -1,236 +1,267 @@
-# PLAN — Recommendation Lane For The Next CLI Agent
+<!-- /autoplan restore point: /Users/spensermcconnell/.gstack/projects/atomize-hq-unified-agent-api/codex-recommend-next-agent-autoplan-restore-20260428-073823.md -->
+# PLAN — LLM-Guided Research Orchestration For The Next CLI Agent
 
 Status: ready for implementation  
-Date: 2026-04-27  
-Branch: `staging`  
+Date: 2026-04-28  
+Branch: `codex/recommend-next-agent`  
 Repo: `atomize-hq/unified-agent-api`
 
 ## Source Inputs
 
-- Approved design artifact: `~/.gstack/projects/atomize-hq-unified-agent-api/spensermcconnell-staging-design-20260427-151419.md`
-- Eng-review test artifact: `~/.gstack/projects/atomize-hq-unified-agent-api/spensermcconnell-staging-eng-review-test-plan-20260427-153026.md`
+- Prior approved design artifact:
+  - `~/.gstack/projects/atomize-hq-unified-agent-api/spensermcconnell-staging-design-20260427-151419.md`
+- Validation artifact for the shipped lane:
+  - `~/.gstack/projects/atomize-hq-unified-agent-api/spensermcconnell-codex-recommendation-lane-validation-20260428-071743.md`
+- Eng-review test artifact for the shipped lane:
+  - `~/.gstack/projects/atomize-hq-unified-agent-api/spensermcconnell-staging-eng-review-test-plan-20260427-153026.md`
+- Live repo surfaces:
+  - `.codex/skills/recommend-next-agent/SKILL.md`
+  - `scripts/recommend_next_agent.py`
+  - `docs/agents/selection/candidate-seed.toml`
+  - `docs/agents/selection/cli-agent-selection-packet.md`
+  - `docs/cli-agent-onboarding-factory-operator-guide.md`
 - Normative contracts:
   - `docs/specs/cli-agent-onboarding-charter.md`
   - `docs/templates/agent-selection/cli-agent-selection-packet-template.md`
-  - `docs/cli-agent-onboarding-factory-operator-guide.md`
   - `crates/xtask/src/approval_artifact.rs`
+  - new doc to add in this milestone: `docs/specs/cli-agent-recommendation-dossier-contract.md`
 
 ## Outcome
 
-Build the missing pre-create recommendation lane for onboarding a new CLI agent.
+Build the next milestone of the recommendation lane so the repo-local skill becomes the real research workflow and the Python runner becomes the deterministic normalization, validation, render, and promotion engine.
 
-The lane starts from maintainer seed hints, gathers dated evidence, hard-rejects ineligible candidates, compares exactly 3 eligible candidates, promotes one canonical selection packet, drafts `approved-agent.toml`, then stops for maintainer approve-or-override before the existing `cargo run -p xtask -- onboard-agent --approval ...` lane begins.
+The intended maintainer experience is:
 
-This plan does not reopen the shipped create-mode factory. It feeds it.
+1. Provide seed hints and shortlist intent.
+2. Invoke the repo-local skill.
+3. The LLM agent performs bounded candidate research using web search, official docs, package registries, GitHub metadata, and repo-fit reasoning.
+4. The skill writes structured research proof for each candidate.
+5. The deterministic runner optionally executes only allowlisted non-mutating local probes, validates the proof fields, rejects incomplete candidates before scoring, renders the canonical packet, drafts the approval artifact, and promotes the approved run.
+6. The existing `cargo run -p xtask -- onboard-agent --approval ...` lane begins unchanged.
+
+This plan does not add runtime wrapper/backend implementation for a chosen new agent. It makes the recommendation lane trustworthy enough that the eventual winner is backed by actual research rather than keyword heuristics.
+
+## Challenge Resolution
+
+The outside strategy review challenged whether a lighter finalist viability sprint should come first.
+
+User decision on 2026-04-28:
+
+- stay on the requested path
+- implement the LLM-guided research milestone now
+- keep the lighter finalist sprint as a documented alternative, not the active plan
+
+## Premises
+
+1. The missing product is not a better heuristic scorer. It is an LLM-guided research workflow that captures approval-grade proof before the deterministic engine runs.
+2. The skill should own exploration and qualitative synthesis. The script should own contract enforcement, stable serialization, and repo mutation.
+3. Human approve-or-override remains the product boundary. The system should make that decision obvious, not automatic.
+4. The recommendation lane should stay pre-create and non-mutating until explicit promotion.
+5. Full candidate CLI execution is not required for this milestone. Safe, allowlisted, non-mutating local probes are enough when available; provider-backed integration belongs to the later onboarding proving run.
 
 ## Scope Lock
 
 ### In scope
 
-- One committed repo-local skill at `.codex/skills/recommend-next-agent/SKILL.md`
-- One deterministic runner at `scripts/recommend_next_agent.py`
-- One committed Python test module for runner logic and golden rendering
-- One committed validation path that proves the generated approval draft satisfies the existing Rust approval-artifact contract
-- One canonical promotion flow into `docs/agents/selection/cli-agent-selection-packet.md`
-- One approval-draft flow that ends at `docs/agents/lifecycle/<onboarding_pack_prefix>/governance/approved-agent.toml`
-- One proving run against a real candidate set
+- Rewrite `.codex/skills/recommend-next-agent/SKILL.md` into a true research workflow for AI agents
+- Add one normative dossier contract at `docs/specs/cli-agent-recommendation-dossier-contract.md`
+- Add a structured research-proof contract that the skill must populate before the runner scores candidates
+- Narrow `scripts/recommend_next_agent.py` to deterministic validation, scoring, rendering, and promotion over structured research inputs
+- Upgrade the eligibility gate so candidates fail before scoring when proof is missing for non-interactive execution, fixture/offline strategy, redaction fit, crate-first fit, or reproducibility
+- Upgrade the canonical packet renderer so the packet itself becomes the maintainer decision document
+- Preserve the current `generate` / `promote` split and the existing `approved-agent.toml` handoff
+- Freeze seed/default snapshots into each run so promote cannot drift from what was reviewed
+- Add durable run-status artifacts for fatal and partial failures
+- Add source budgets, size caps, and caching rules for research evidence
+- Add tests that prove the richer packet shape and the proof-backed gate
+- Add one proving run using the new research-assisted workflow
 
 ### Out of scope
 
+- Full live provider-backed candidate execution during recommendation
 - `xtask recommend-agent`
-- Wrapper or `agent_api` implementation for the eventual winning agent
-- Generalized cross-repo recommendation tooling
+- New control-plane crates
 - Dynamic candidate-count configuration
-- Upgrade-lane or maintenance-lane redesign
+- Wrapper or `agent_api` implementation for the eventual winning agent
+- Post-onboarding maintenance or upgrade-lane redesign
 
-## Step 0: Scope Challenge
+## What Already Exists
 
-### What already exists
+- The shipped skill exists, but it is thin orchestration around shell commands.
+- The shipped runner already owns fetch, normalization, scoring, packet rendering, approval draft rendering, dry-run validation, and promote-time swap safety.
+- The repo already has a canonical packet path and a packet template with the exact section contract.
+- The repo already has a strict approval artifact loader and a stable create-mode handoff through `onboard-agent`.
+- The current proving run already showed the real gap: the recommendation lane can promote artifacts mechanically, but it still makes judgments from heuristic signals instead of explicit research proof.
 
-The repo already owns the post-approval create lane.
+## NOT In Scope
 
-- `docs/cli-agent-onboarding-factory-operator-guide.md` is the live operator procedure.
-- `docs/specs/cli-agent-onboarding-charter.md` defines the onboarding gates.
-- `docs/agents/selection/cli-agent-selection-packet.md` is the canonical comparison packet path.
-- `docs/templates/agent-selection/cli-agent-selection-packet-template.md` already fixes the packet shape around exactly 3 candidates.
-- `crates/xtask/src/approval_artifact.rs` already defines the approval-artifact contract and hard-codes `comparison_ref = "docs/agents/selection/cli-agent-selection-packet.md"`.
-- `crates/xtask/src/onboard_agent.rs` and `crates/xtask/src/onboard_agent/approval.rs` already own the post-approval control-plane enrollment.
-- `crates/xtask/src/wrapper_scaffold.rs` already owns the runtime shell step after onboarding.
+- Solving the eventual winner's wrapper architecture
+- Solving the eventual winner's backend mapping
+- Solving candidate ranking for arbitrary external repos
+- Solving upgrade recommendations for already-onboarded agents
+- Solving live auth-gated evaluation before the onboarding proving run
 
-### Minimum diff that achieves the goal
+## Existing Code Leverage Map
 
-The smallest complete version is:
+| Sub-problem | Existing surface to reuse | Why it stays |
+| --- | --- | --- |
+| Approval contract | `crates/xtask/src/approval_artifact.rs` | Already owns path, schema, and dry-run validation truth |
+| Post-approval create lane | `crates/xtask/src/onboard_agent.rs` and `docs/cli-agent-onboarding-factory-operator-guide.md` | Already landed, do not reopen |
+| Canonical packet shape | `docs/templates/agent-selection/cli-agent-selection-packet-template.md` | Already encodes the maintainer-facing packet contract |
+| Seed pool and descriptor defaults | `docs/agents/selection/candidate-seed.toml` | Already the right place for repo-owned defaults and shortlist hints |
+| Promote-time safety | `scripts/recommend_next_agent.py` current staging + rollback flow | Already good, preserve it |
+| Review evidence roots | `docs/agents/selection/runs/<run_id>/` and `~/.gstack/projects/.../recommend-next-agent-runs/<run_id>/` | Already the right split between scratch and committed evidence |
 
-1. Add one repo-local skill.
-2. Add one script-first deterministic runner.
-3. Reuse the existing canonical packet path and approval-artifact schema.
-4. Validate the generated approval draft by running the existing `xtask` approval flow in dry-run mode.
+## Dream State
 
-Anything bigger is premature.
+```text
+CURRENT
+  Thin skill -> heuristic runner -> canonical packet/approval draft
+  Good mechanics, weak research truth
 
-### Complexity call
+THIS PLAN
+  LLM research skill -> structured proof -> deterministic engine
+  Stronger eligibility gate, stronger packet, same create-lane handoff
 
-This plan intentionally stays below a new-control-plane threshold.
+12-MONTH IDEAL
+  Recommendation lane + proving-run telemetry + upgrade intelligence
+  One shared evidence model for recommend, onboard, and maintain
+```
 
-- New primary implementation surfaces: `.codex/skills/`, `scripts/`, and a narrow set of docs/test touchpoints
-- No new crate
-- No new `xtask` command
-- No `agent_api` churn
+## Alternatives
 
-That keeps the blast radius small enough to land as one focused slice.
+### Approach A: Harden Script-Only Heuristics
 
-## Locked Decisions
+Summary: Keep the current skill thin and just add more scoring knobs and more fetch sources to the runner.
 
-| Decision | Why it is locked |
-| --- | --- |
-| V1 compares exactly 3 candidates | The canonical packet template already assumes exactly 3 rows. |
-| Eligibility gating happens before scoring | Ranking infeasible candidates creates fake confidence and wasted maintainer review. |
-| Run-local artifacts and canonical promotion are separate steps | `approved-agent.toml` points at one canonical packet path, so promotion must be explicit. |
-| The runner is script-first, not `xtask`-first | External evidence collection will change faster than the stable control-plane contract. |
-| The lane must emit an approval draft, not just a packet | The create-mode input is `approved-agent.toml`, not a narrative summary. |
-| Maintainer override is first-class | Override is part of the product, not an error condition. |
-| The skill is the orchestration surface and the script is the deterministic engine | This preserves discoverability while keeping evidence capture replayable. |
+Effort: S  
+Risk: High
+
+Pros:
+- smallest code diff
+- easiest to ship fast
+
+Cons:
+- still makes judgment from proxies instead of proof
+- keeps the skill from doing the actual work the user intended
+- does not solve the maintainer-trust problem
+
+### Approach B: Skill-Led Research + Deterministic Engine
+
+Summary: Make the skill perform real candidate research and write structured proof. Keep the runner deterministic and boring.
+
+Effort: M  
+Risk: Medium
+
+Pros:
+- matches the original product intent
+- preserves replayability and approval-artifact rigor
+- makes the packet better without forcing the runner to become an LLM host
+
+Cons:
+- adds one more contract between skill output and runner input
+- requires clearer prompt discipline and test fixtures
+
+### Approach C: Full Candidate Execution Harness In The Recommendation Lane
+
+Summary: Install and probe each candidate in isolated local environments before any recommendation is allowed.
+
+Effort: L  
+Risk: High
+
+Pros:
+- strongest empirical signal
+- could catch docs-vs-reality gaps earlier
+
+Cons:
+- drags auth, platform, install, and sandbox complexity into the recommendation lane
+- turns a pre-create research step into a mini proving run
+- wrong milestone ordering
+
+### Approach D: Operator-Led Finalist Sprint
+
+Summary: Keep the current lane mostly manual for another cycle, use lightweight doc triage, then run a tiny executable viability spike on the top 1-2 finalists before automating more.
+
+Effort: S  
+Risk: Medium
+
+Pros:
+- fastest way to learn whether research is actually the bottleneck
+- uses implementation evidence instead of recommendation prose
+
+Cons:
+- does not satisfy the user's explicit goal for a stronger skill-led workflow
+- leaves the current thin skill in place longer
+- still requires human archaeology every cycle
+
+## Recommendation
+
+Choose Approach B.
+
+That is the active plan because it matches the user's intended product direction and fixes the thin-skill gap without dragging live provider execution into the wrong phase.
+
+Both outside strategy voices challenged this choice and argued for a lighter executable viability sprint before more research infrastructure. That challenge remains documented below as rejected-for-now context, not as an open blocker.
 
 ## Architecture
 
 ```text
-maintainer seed / optional shortlist hints
-                |
-                v
-  .codex/skills/recommend-next-agent/SKILL.md
-                |
-                v
-     scripts/recommend_next_agent.py
-                |
-                +------------------------------+
-                |                              |
-                v                              v
-       discovery candidate pool         dated raw source capture
-                |                              |
-                +--------------+---------------+
-                               |
-                               v
-                      hard eligibility gate
-                               |
-                  +------------+------------+
-                  |                         |
-                  v                         v
-        rejected candidates log      eligible candidates
-                                            |
-                                            v
-                                 fixed exactly-3 evaluation
-                                            |
-                                            v
-                            run-local dossiers + scorecard + packet
-                                            |
-                                  explicit promotion step
-                                            |
-                    +-----------------------+----------------------+
-                    |                                              |
-                    v                                              v
-  docs/agents/selection/cli-agent-selection-packet.md   approval-draft.generated.toml
-                                                                    |
-                                                                    v
-                                       docs/agents/lifecycle/<pack>/governance/approved-agent.toml
-                                                                    |
-                                                                    v
-                                         maintainer approve or override
-                                                                    |
-                                                                    v
-                         cargo run -p xtask -- onboard-agent --approval ...
+maintainer seed file + optional shortlist hints
+                    |
+                    v
+   .codex/skills/recommend-next-agent/SKILL.md
+                    |
+                    +-------------------------------+
+                    |                               |
+                    v                               v
+        web/doc/package/GitHub research        structured probe requests
+                    |                               |
+                    +---------------+---------------+
+                                    |
+                                    v
+                 structured candidate research proof
+                    (one dossier per candidate)
+                                    |
+                                    v
+                   scripts/recommend_next_agent.py
+                                    |
+         +-------------+-------------+-------------+-----------+
+         |             |                           |           |
+         v             v                           v           v
+ schema validation  allowlisted probes      deterministic scoring  packet + approval render
+         |             |                           |           |
+         +-------------+-------------+-------------+-----------+
+                                    |
+                                    v
+                     explicit promote and dry-run validation
+                                    |
+                                    v
+     docs/agents/selection/cli-agent-selection-packet.md
+     docs/agents/selection/runs/<run_id>/**
+     docs/agents/lifecycle/<pack>/governance/approved-agent.toml
 ```
 
-## Artifact Contract
+## Execution Contract Freeze
 
-### Committed source surfaces
+The milestone is implementable only if the execution contract is frozen up front.
 
-| Path | Owner | Purpose |
-| --- | --- | --- |
-| `.codex/skills/recommend-next-agent/SKILL.md` | repo | operator workflow and maintainer decision framing |
-| `scripts/recommend_next_agent.py` | repo | deterministic evidence capture, gating, scoring, rendering, promotion |
-| `scripts/test_recommend_next_agent.py` | repo | unit and golden coverage for runner behavior |
-| `docs/agents/selection/candidate-seed.toml` | repo | exact candidate pool plus descriptor defaults and per-candidate overrides |
-| `docs/cli-agent-onboarding-factory-operator-guide.md` | repo | operator-procedure update for the new pre-create lane |
+### Skill and runner interface
 
-### Scratch outputs
+The skill must become a two-phase workflow:
 
-Root: `~/.gstack/projects/<repo-slug>/recommend-next-agent-runs/<run_id>/`
+1. Research phase
+2. Deterministic runner phase
 
-| Path | Purpose |
-| --- | --- |
-| `candidate-pool.json` | full discovered pool, including rejected candidates and rejection reasons |
-| `eligible-candidates.json` | candidates that survive hard gating |
-| `candidate-dossiers/<agent_id>.json` | normalized per-candidate evidence |
-| `scorecard.json` | fixed-dimension scores for the exactly-3 comparison set |
-| `sources.lock.json` | dated source provenance and fetch metadata |
-| `comparison.generated.md` | run-local comparison packet render |
-| `approval-draft.generated.toml` | run-local approval artifact draft before canonical promotion |
-| `run-summary.md` | human-readable summary of what happened and why |
+The skill owns research and dossier authoring. The runner owns validation, optional probes, scoring, packet rendering, approval drafting, and promotion.
 
-### Committed review outputs
-
-Root: `docs/agents/selection/runs/<run_id>/`
-
-This root exists only for the promoted run that supports the merged recommendation.
-
-- copy of `candidate-pool.json`
-- copy of `eligible-candidates.json`
-- copy of `candidate-dossiers/**`
-- copy of `scorecard.json`
-- copy of `sources.lock.json`
-- copy of `comparison.generated.md`
-- copy of `approval-draft.generated.toml`
-- copy of `run-summary.md`
-
-### Canonical promoted outputs
-
-| Path | Purpose |
-| --- | --- |
-| `docs/agents/selection/cli-agent-selection-packet.md` | one canonical comparison packet referenced by approval artifacts |
-| `docs/agents/lifecycle/<onboarding_pack_prefix>/governance/approved-agent.toml` | maintainer-approved create-mode input |
-
-### Commit policy
-
-The commit policy is strict.
-
-1. Scratch runs under `~/.gstack/projects/**` are never committed.
-2. `docs/agents/selection/runs/<run_id>/` is committed only for the one promoted run that backs the current recommendation.
-3. Unpromoted or superseded repo-local run directories must be deleted before merge.
-4. A PR for this slice must contain exactly one canonical packet update and exactly one matching committed review run directory.
-5. The committed review run directory, canonical packet update, and approval draft must all describe the same `recommended_agent_id`.
-
-## Runner CLI Contract
-
-The runner uses two subcommands. No hidden modes.
-
-### Generate
+The runner CLI contract for this milestone is:
 
 ```sh
 python3 scripts/recommend_next_agent.py generate \
   --seed-file docs/agents/selection/candidate-seed.toml \
-  --run-id <timestamp>-<shortlist_slug> \
+  --research-dir ~/.gstack/projects/<repo-slug>/recommend-next-agent-research/<run_id> \
+  --run-id <run_id> \
   --scratch-root ~/.gstack/projects/<repo-slug>/recommend-next-agent-runs
-```
 
-Behavior:
-
-- reads one seed file
-- performs discovery and evidence capture
-- applies the hard eligibility gate
-- scores only eligible candidates
-- selects exactly 3 candidates
-- writes a complete scratch run under `~/.gstack/projects/<repo-slug>/recommend-next-agent-runs/<run_id>/`
-- does not mutate any repo-tracked file
-
-Exit rules:
-
-- exit `0` only when exactly 3 eligible candidates were selected and all scratch artifacts were written
-- non-zero if fewer than 3 eligible candidates remain after gating
-- non-zero if any required source capture or normalization step fails
-
-### Promote
-
-```sh
 python3 scripts/recommend_next_agent.py promote \
   --run-dir ~/.gstack/projects/<repo-slug>/recommend-next-agent-runs/<run_id> \
   --repo-run-root docs/agents/selection/runs \
@@ -239,473 +270,538 @@ python3 scripts/recommend_next_agent.py promote \
   [--override-reason "<required when approved agent differs from recommended>"]
 ```
 
-Behavior:
+`generate` must not perform open-ended candidate research. It may only:
 
-- reads one previously generated scratch run
-- copies that run into `docs/agents/selection/runs/<run_id>/`
-- promotes `comparison.generated.md` into `docs/agents/selection/cli-agent-selection-packet.md`
-- writes `docs/agents/lifecycle/<onboarding_pack_prefix>/governance/approved-agent.toml`
-- validates the generated approval artifact by running `cargo run -p xtask -- onboard-agent --approval <path> --dry-run`
+- load the frozen seed snapshot from the research directory
+- validate dossiers
+- execute allowlisted probes
+- compute scores over validated dossiers
+- write deterministic outputs into the run directory
 
-Promotion guards:
+### Research directory layout
 
-- fail if `docs/agents/selection/runs/<run_id>/` already exists
-- fail if the scratch run is missing any required artifact
-- fail if `approved_agent_id` is not one of the 3 shortlisted candidates
-- fail if `approved_agent_id != recommended_agent_id` and `--override-reason` is absent
-- fail if the approval dry-run validation fails
+The skill must create exactly one research directory per run at:
 
-Write ordering:
+`~/.gstack/projects/<repo-slug>/recommend-next-agent-research/<run_id>/`
 
-1. copy scratch run into repo review root
-2. write approval artifact to a temp path
-3. validate approval artifact with `xtask --dry-run`
-4. replace canonical packet and final approval artifact atomically via rename
+Required contents:
 
-This keeps canonical surfaces unchanged when validation fails.
+- `seed.snapshot.toml`
+- `research-summary.md`
+- `dossiers/<agent_id>.json`
 
-### Seed file contract
+Optional contents:
 
-Path:
+- `evidence-cache/`
+- `screenshots/`
+- `notes/`
 
-- `docs/agents/selection/candidate-seed.toml`
+`seed.snapshot.toml` is the full reviewed snapshot of `docs/agents/selection/candidate-seed.toml` used for the run. The runner must validate that the live seed file still exists, but it must score and promote only from `seed.snapshot.toml`.
 
-The seed file is required. It provides the exact candidate pool plus descriptor defaults that research cannot infer safely.
+### Scratch run directory layout
 
-Required top-level tables:
+The runner must write exactly these top-level outputs under:
 
-- `[defaults.descriptor]`
-- `[candidate.<agent_id>]` for each seed candidate
+`~/.gstack/projects/<repo-slug>/recommend-next-agent-runs/<run_id>/`
 
-Required `[defaults.descriptor]` keys:
+- `run-status.json`
+- `seed.snapshot.toml`
+- `candidate-pool.json`
+- `eligible-candidates.json`
+- `scorecard.json`
+- `sources.lock.json`
+- `comparison.generated.md`
+- `approval-draft.generated.toml`
+- `run-summary.md`
+- `candidate-dossiers/<agent_id>.json`
+- `candidate-validation-results/<agent_id>.json`
 
-- `canonical_targets = ["darwin-arm64"]`
-- `wrapper_coverage_binding_kind = "generated_from_wrapper_crate"`
-- `always_on_capabilities = ["agent_api.config.model.v1", "agent_api.events", "agent_api.events.live", "agent_api.run"]`
-- `target_gated_capabilities = []`
-- `config_gated_capabilities = []`
-- `backend_extensions = []`
-- `support_matrix_enabled = true`
-- `capability_matrix_enabled = true`
-- `capability_matrix_target = ""`
-- `docs_release_track = "crates-io"`
+The committed review directory under `docs/agents/selection/runs/<run_id>/` must contain a byte-copy of every run artifact except `run-status.json`, which may differ only in top-level `mode` and final file paths if needed for promotion bookkeeping.
 
-Required `[candidate.<agent_id>]` keys:
+### Status enums
 
-- `display_name`
-- `research_urls`
-- `install_channels`
-- `auth_notes`
+The runner must use these candidate statuses:
 
-Allowed optional `[candidate.<agent_id>]` override keys:
+- `eligible`
+- `candidate_rejected`
+- `candidate_error`
 
-- `crate_path`
-- `backend_module`
-- `manifest_root`
-- `package_name`
-- `canonical_targets`
-- `wrapper_coverage_binding_kind`
-- `wrapper_coverage_source_path`
-- `always_on_capabilities`
-- `target_gated_capabilities`
-- `config_gated_capabilities`
-- `backend_extensions`
-- `support_matrix_enabled`
-- `capability_matrix_enabled`
-- `capability_matrix_target`
-- `docs_release_track`
-- `onboarding_pack_prefix`
+The runner must use these run statuses:
 
-Derived defaults when omitted:
+- `success`
+- `success_with_candidate_errors`
+- `insufficient_eligible_candidates`
+- `run_fatal`
 
-- `crate_path = "crates/<agent_id>"`
-- `backend_module = "crates/agent_api/src/backends/<agent_id>"`
-- `manifest_root = "cli_manifests/<agent_id>"`
-- `package_name = "unified-agent-api-<agent_id with underscores replaced by hyphens>"`
-- `onboarding_pack_prefix = "<agent_id with underscores replaced by hyphens>-onboarding"`
+`candidate_rejected` means the dossier was valid enough to evaluate but failed a hard gate.
 
-## Eligibility Gate
+`candidate_error` means the runner could not safely evaluate the dossier because of malformed input, fetch failure on a runner-owned step, or probe failure that prevents evaluation.
 
-Every candidate must pass these checks before it can enter the 3-row comparison:
+`generate` exits `0` only for:
 
-1. It exposes a plausible deterministic non-interactive CLI surface.
-2. It has a credible offline parser, fixture, or fake-binary strategy.
-3. It can fit the repo's redaction posture without raw backend leakage.
-4. It supports a crate-first onboarding path without forcing `agent_api` design churn up front.
-5. Its external evidence is inspectable and reproducible enough for future maintainers.
+- `success`
+- `success_with_candidate_errors`, but only when at least 3 candidates remain eligible
 
-Candidates that fail are recorded in `candidate-pool.json` with rejection reasons. They never appear in the final comparison table.
+`generate` exits non-zero for:
 
-## Scoring Contract
+- `insufficient_eligible_candidates`
+- `run_fatal`
 
-Only eligible candidates are scored.
+### Selection invariant
 
-### Fixed dimensions
+The packet still compares exactly 3 candidates.
 
-Primary dimensions:
+Selection rules are frozen:
+
+- candidates already onboarded in `crates/xtask/data/agent_registry.toml` are always `candidate_rejected`
+- only `eligible` candidates may be scored
+- exactly 3 scored candidates enter the comparison table
+- if fewer than 3 `eligible` candidates remain, `generate` must fail closed after writing `run-status.json`, `candidate-pool.json`, `sources.lock.json`, and every available validation result
+
+### Scoring contract freeze
+
+This milestone does not redesign the public scorecard shape.
+
+Keep these existing dimensions, score range, primary/secondary split, and shortlist ordering contract from `scripts/recommend_next_agent.py`:
 
 - `Adoption & community pull`
 - `CLI product maturity & release activity`
 - `Installability & docs quality`
 - `Reproducibility & access friction`
-
-Secondary dimensions:
-
 - `Architecture fit for this repo`
 - `Capability expansion / future leverage`
 
-### Score buckets
+Keep the existing 0-3 bucket scale.
 
-- `0` = weak, missing, or materially blocked
-- `1` = partial, with notable caveats
-- `2` = solid, usable with caveats
-- `3` = strong, clearly favorable
+Keep the existing shortlist tie-break order.
 
-### Deterministic shortlist algorithm
+What changes in this milestone is not the public scorecard shape. What changes is the evidence source:
 
-If more than 3 candidates survive eligibility gating, sort eligible candidates by this exact tuple:
+- no dimension may be scored from keyword hits alone when a typed dossier claim exists
+- repo-fit and reproducibility dimensions must read dossier claims first
+- the packet notes must cite dossier evidence or probe output ids, not just synthesized prose
 
-1. primary-dimension sum, descending
-2. `Architecture fit for this repo`, descending
-3. `Reproducibility & access friction`, descending
-4. secondary-dimension sum, descending
-5. `CLI product maturity & release activity`, descending
-6. `Adoption & community pull`, descending
-7. `agent_id`, ascending lexical
+### Probe contract freeze
 
-Take the first 3 after sorting.
+V1 probe support is intentionally narrow.
 
-### Recommendation algorithm
+Allowed probe kinds:
 
-The `recommended_agent_id` is candidate rank 1 from the deterministic shortlist algorithm above.
+- `help`
+- `version`
 
-The published packet must not show a weighted total column, but the runner may store per-candidate aggregate numbers in `scorecard.json` for deterministic ordering and replay.
+Allowed binary token pattern:
 
-### Tie policy
+- `^[A-Za-z0-9._-]+$`
 
-If two candidates tie across all ordering fields above, lexical `agent_id` order wins. No human tie-break at generation time.
+Disallowed:
+
+- shell strings
+- paths containing `/`
+- environment-variable expansion
+- redirection
+- pipes
+- candidate-authenticated commands
+- network-dependent commands
+
+Runner-owned probe execution limits:
+
+- timeout: 5 seconds per probe
+- max probes: 2 per candidate
+- max captured stdout+stderr: 32768 bytes per probe
+- inherited environment: `PATH`, `HOME`, `TMPDIR` only
+
+If a probe exceeds limits or violates policy, record it in `candidate-validation-results/<agent_id>.json` and treat it as `candidate_error` only when the dossier required that probe to satisfy a hard gate. Otherwise, keep the candidate on dossier evidence alone.
+
+### Evidence budget freeze
+
+The skill may research broadly, but the dossier contract must stay small enough to review and test.
+
+Per candidate dossier limits:
+
+- max 12 evidence refs
+- max 4 official-doc refs
+- max 2 package-registry refs
+- max 3 GitHub refs
+- max 3 ancillary refs
+- max 3 blocked steps
+- max 1200 characters per freeform note field
+
+The runner stores evidence metadata, hashes, and bounded excerpts. It does not persist full remote page bodies into committed review artifacts.
+
+## Proposed Contract Changes
+
+### Skill contract
+
+The skill must stop being a shell wrapper.
+
+It should explicitly instruct the AI agent to:
+
+- read the seed file and shortlist intent
+- research each candidate from official docs, GitHub, package registries, and repo-fit constraints
+- capture proof for:
+  - deterministic non-interactive execution surface
+  - offline parser / fixture / fake-binary strategy
+  - redaction and raw-output risk
+  - crate-first onboarding fit
+  - reproducibility caveats and blocked steps
+- emit structured probe requests, not executable shell strings
+- write structured research dossiers before calling the runner
+- stop and fail closed when proof is insufficient
+
+### Runner contract
+
+The runner should no longer infer charter fit from loose keyword counts alone.
+
+The runner should:
+
+- load one versioned dossier schema owned by `docs/specs/cli-agent-recommendation-dossier-contract.md`
+- accept structured research dossier inputs from the skill phase
+- freeze the reviewed seed/default snapshot into the run directory and promote only from that frozen snapshot
+- execute only allowlisted non-mutating probe argv recipes that are runner-owned, never source-derived shell text
+- validate required proof fields
+- reject candidates with named reasons before scoring
+- score only over candidates with complete proof
+- render the canonical packet and approval draft from proof-backed data
+- write durable `run-status.json` plus per-candidate validation results on every failure path
+- preserve current staging, rollback, byte-identity, and dry-run validation guarantees
+
+### Research dossier contract
+
+Each dossier must be one JSON object with this top-level shape:
+
+- `schema_version`
+- `agent_id`
+- `display_name`
+- `generated_at`
+- `seed_snapshot_sha256`
+- `official_links`
+- `install_channels`
+- `auth_prerequisites`
+- `claims`
+- `probe_requests`
+- `blocked_steps`
+- `normalized_caveats`
+- `evidence`
+
+`claims` must contain exactly these keys:
+
+- `non_interactive_execution`
+- `offline_strategy`
+- `observable_cli_surface`
+- `redaction_fit`
+- `crate_first_fit`
+- `reproducibility`
+- `future_leverage`
+
+Each claim object must contain:
+
+- `state`, one of `verified`, `blocked`, `inferred`, `unknown`
+- `summary`
+- `evidence_ids`
+- `blocked_by`, optional
+- `notes`, optional
+
+Each evidence object must contain:
+
+- `evidence_id`
+- `kind`, one of `official_doc`, `github`, `package_registry`, `ancillary`, `probe_output`
+- `url`, optional for `probe_output`
+- `title`
+- `captured_at`
+- `sha256`
+- `excerpt`
+
+Each probe request must contain:
+
+- `probe_kind`, one of `help`, `version`
+- `binary`
+- `required_for_gate`, boolean
+
+No dossier may contain raw shell commands, inline HTML bodies, or unbounded notes.
+
+## Eligibility Gate
+
+Every candidate must pass these externally observable checks before it can enter the 3-row comparison:
+
+1. There is explicit proof of a plausible deterministic non-interactive execution surface.
+2. There is explicit proof of a credible offline parser, fixture, or fake-binary strategy.
+3. There is externally grounded evidence or a runner probe result for the observable parts of the candidate's execution surface.
+4. The repo-specific claims about redaction fit and crate-first onboarding fit are marked as `verified`, `inferred`, `blocked`, or `unknown`, never implied by prose alone.
+5. The research evidence is reproducible enough that another maintainer can repeat the reasoning later.
+
+Candidates that fail any hard check remain in `candidate-pool.json` with named rejection reasons and do not appear in `eligible-candidates.json`, the scorecard shortlist, or the final packet.
+
+Candidates that are strategically important but only partially proven may still appear in the packet appendix as `strategic contenders` with explicit implementation risks, but they are not eligible for automated recommendation.
+
+## Packet Contract Freeze
+
+The canonical packet must keep the existing section numbering and exactly-3 comparison table shape from the current renderer and the template.
+
+This milestone adds exact requirements, not a new structure:
+
+- section 1 still identifies the shortlist and recommendation
+- section 4 still contains exactly 3 candidate rows
+- section 5 must end with one explicit maintainer decision block:
+  - `Approve recommended agent`
+  - `Override to shortlisted alternative`
+  - `Stop and expand research`
+- section 6 must split:
+  - reproducible now
+  - blocked until later
+- the appendix must include:
+  - loser rationale for the two non-winning shortlisted candidates
+  - strategic contenders that failed hard gating, if any
+  - dated evidence provenance for all shortlisted candidates
+
+The packet is the maintainer decision surface. A separate narrative memo is not required for approval.
 
 ## Workstreams
 
-### Workstream 1: Lock the contract surfaces
-
-Modules touched:
-
-- `.codex/skills/`
-- `docs/cli-agent-onboarding-factory-operator-guide.md`
-- `docs/agents/selection/`
+### Workstream 1: Replace Thin Skill With Research Workflow
 
 Deliverables:
+- rewritten `.codex/skills/recommend-next-agent/SKILL.md`
+- explicit research steps, stop conditions, and dossier output contract
+- clear distinction between research phase and runner phase
 
-- Skill contract committed at `.codex/skills/recommend-next-agent/SKILL.md`
-- Seed-file contract committed at `docs/agents/selection/candidate-seed.toml`
-- Operator guide updated to describe the pre-create recommendation lane
-- Artifact-root rules documented, including run-local root versus canonical promoted outputs
-
-Acceptance:
-
-- A maintainer can read one committed skill and understand when to run it, what artifacts it produces, and where approve-or-override happens.
-
-### Workstream 2: Implement deterministic runner core
-
-Modules touched:
-
-- `scripts/`
+### Workstream 2: Add Structured Research Inputs
 
 Deliverables:
+- dossier schema documented in one normative spec plus the skill and runner
+- scratch-root artifact layout for AI-produced research files
+- stable serialization for proof-backed candidate dossiers
+- frozen seed/default snapshot copied into the run directory
 
-- `scripts/recommend_next_agent.py`
-- explicit typed data model for candidate pool, dossier, scorecard, and source lock
-- deterministic ordering and stable serialization
-- hard eligibility gate
-- fixed exactly-3 shortlist selection
-
-Implementation notes:
-
-- Keep the runner explicit and boring. Plain Python, standard library where possible.
-- Use one normalization path for all candidates. No candidate-specific ad hoc formatting branches unless proven necessary.
-- Fail closed when required evidence is missing.
-
-Acceptance:
-
-- Re-running the same inputs against the same source snapshots produces byte-stable JSON and markdown outputs.
-
-### Workstream 3: Render, promote, and draft approval artifacts
-
-Modules touched:
-
-- `scripts/`
-- `docs/agents/selection/`
-- `docs/agents/lifecycle/`
+### Workstream 3: Narrow And Harden The Runner
 
 Deliverables:
+- runner-owned probe allowlist and capture policy
+- validation of required proof fields before scoring
+- named rejection reasons for missing proof
+- deterministic scoring over proof-backed candidates only
+- durable `run-status.json` and per-candidate validation results
+- preserve current promote-time safety behavior
 
-- canonical packet renderer that preserves the 3-candidate contract
-- explicit promotion step from `comparison.generated.md` to `docs/agents/selection/cli-agent-selection-packet.md`
-- approval-draft renderer that emits a valid `approved-agent.toml` shape
-- override path that requires `override_reason` when `approved_agent_id != recommended_agent_id`
-
-Implementation notes:
-
-- The approval draft must reuse the real repo rules from `crates/xtask/src/approval_artifact.rs`.
-- Do not duplicate the Rust schema by hand in multiple places if one shared output builder can keep fields aligned.
-
-Acceptance:
-
-- `cargo run -p xtask -- onboard-agent --approval <generated approval path> --dry-run` succeeds on the proving-run output.
-
-### Approval artifact field mapping
-
-The generated `docs/agents/lifecycle/<onboarding_pack_prefix>/governance/approved-agent.toml` must map fields exactly as follows:
-
-| Field | Source |
-| --- | --- |
-| `artifact_version` | literal `"1"` |
-| `comparison_ref` | literal `"docs/agents/selection/cli-agent-selection-packet.md"` |
-| `selection_mode` | literal `"factory_validation"` for v1 |
-| `recommended_agent_id` | rank-1 candidate from the deterministic shortlist |
-| `approved_agent_id` | `--approved-agent-id` from `promote` |
-| `approval_commit` | `git rev-parse HEAD` at promotion time |
-| `approval_recorded_at` | UTC RFC3339 timestamp at promotion time |
-| `override_reason` | required `--override-reason` when `approved_agent_id != recommended_agent_id`; otherwise omitted |
-| `descriptor.agent_id` | `approved_agent_id` |
-| `descriptor.display_name` | `[candidate.<approved_agent_id>].display_name` from seed file |
-| `descriptor.crate_path` | `[candidate.<approved_agent_id>].crate_path` if present, else default derived path |
-| `descriptor.backend_module` | `[candidate.<approved_agent_id>].backend_module` if present, else default derived path |
-| `descriptor.manifest_root` | `[candidate.<approved_agent_id>].manifest_root` if present, else default derived path |
-| `descriptor.package_name` | `[candidate.<approved_agent_id>].package_name` if present, else default derived package name |
-| `descriptor.canonical_targets` | `[candidate.<approved_agent_id>].canonical_targets` if present, else `[defaults.descriptor].canonical_targets` |
-| `descriptor.wrapper_coverage_binding_kind` | candidate override if present, else `[defaults.descriptor].wrapper_coverage_binding_kind` |
-| `descriptor.wrapper_coverage_source_path` | `[candidate.<approved_agent_id>].wrapper_coverage_source_path` if present, else `descriptor.crate_path` |
-| `descriptor.always_on_capabilities` | candidate override if present, else `[defaults.descriptor].always_on_capabilities` |
-| `descriptor.target_gated_capabilities` | candidate override if present, else `[defaults.descriptor].target_gated_capabilities` |
-| `descriptor.config_gated_capabilities` | candidate override if present, else `[defaults.descriptor].config_gated_capabilities` |
-| `descriptor.backend_extensions` | candidate override if present, else `[defaults.descriptor].backend_extensions` |
-| `descriptor.support_matrix_enabled` | candidate override if present, else `[defaults.descriptor].support_matrix_enabled` |
-| `descriptor.capability_matrix_enabled` | candidate override if present, else `[defaults.descriptor].capability_matrix_enabled` |
-| `descriptor.capability_matrix_target` | candidate override if present; else omit when empty-string default is supplied |
-| `descriptor.docs_release_track` | candidate override if present, else `[defaults.descriptor].docs_release_track` |
-| `descriptor.onboarding_pack_prefix` | `--onboarding-pack-prefix` from `promote` |
-
-Validation rules:
-
-- `descriptor.agent_id` must equal `approved_agent_id`
-- `descriptor.onboarding_pack_prefix` must equal the `<onboarding_pack_prefix>` path segment in the output path
-- `comparison_ref` must point to the canonical packet path and that file must exist
-- when `approved_agent_id != recommended_agent_id`, `override_reason` is required and must be non-empty
-
-### Workstream 4: Add proving-run and validation coverage
-
-Modules touched:
-
-- `scripts/`
-- `crates/xtask/tests/`
-- `docs/agents/selection/`
+### Workstream 4: Upgrade The Maintainer Packet
 
 Deliverables:
+- richer section 5 recommendation rationale
+- richer section 6 evaluation recipe
+- explicit approve / override / stop decision block
+- loser rationale for the non-winning shortlisted candidates
 
-- Python unit and golden tests for gating, scoring, ordering, rendering, and promotion guards
-- Rust-side validation or integration coverage that proves generated approval drafts satisfy the real approval contract
-- one real proving run committed as reviewable evidence
+### Workstream 5: Test And Prove It
 
-Acceptance:
+Deliverables:
+- Python tests for dossier validation and fail-closed eligibility behavior
+- Python tests for seed/default snapshot freeze between `generate` and `promote`
+- Python tests for malformed, oversized, invalid-utf, and invalid-json dossier inputs
+- Python tests for runner-owned probe timeout, non-zero exit, and capture redaction
+- transaction tests for partial promote failure and rollback guarantees
+- golden packet tests for the richer packet shape
+- Rust validation coverage remains green for generated approval artifacts
+- one proving run using the real research-assisted skill workflow
 
-- The proving run leaves one timestamped run directory, one canonical packet update, and one valid approval draft.
+## Required Artifacts
 
-## Code Quality Guardrails
+- updated skill file
+- proof-backed scratch dossiers
+- updated scorecard and candidate-pool outputs
+- richer canonical packet
+- approval draft and final approval artifact
+- one committed promoted run directory
+- one test-plan artifact for this milestone
 
-- Keep discovery and evaluation separate. Discovery may inspect a wider seed set. Evaluation is the narrow exactly-3 path.
-- Do not split the scoring rubric across the skill and the runner. The skill orchestrates. The runner computes.
-- Keep output formats textual and diff-friendly. No binary captures.
-- Keep the first version script-first. If the proving run reveals stable repetition, then consider `xtask recommend-agent`.
-- Reuse existing packet/docs contracts instead of creating a second comparison or approval shape.
+## Blocking Risks
 
-## Performance And Reliability
+| Risk | Why it matters | Mitigation |
+| --- | --- | --- |
+| The skill still behaves like a command wrapper | The product intent is still missed | Make dossier creation mandatory before runner invocation |
+| Research proof fields become too loose | The gate regresses to prose theater | Keep runner-side required fields strict and fail closed |
+| Local probe steps become a security hole | Research can execute source-derived commands or leak env-sensitive output | Move probes under runner control, enforce argv allowlist, cap bytes, redact tokens and paths |
+| Packet grows without becoming clearer | Maintainer still cannot decide quickly | Add explicit decision block and loser rationale |
+| Script and skill duplicate logic | Drift and contradictory behavior | Skill owns research, runner owns validation/render/promotion only |
+| Generate/promote drift | Reviewed inputs differ from promoted inputs | Freeze seed/default snapshot into the run directory and promote from that snapshot only |
+| Evidence blow-up or rate limits | Slow or flaky research runs | Add per-run budgets, caching, retries, and summary-first committed artifacts |
 
-- Candidate count is intentionally small. Latency is dominated by external evidence capture, not local computation.
-- Prefer bounded or serial fetches over complex async orchestration. This lane is review-path tooling, not a throughput system.
-- Persist `sources.lock.json` so the run can explain why repeated executions differ after upstream drift.
-- Time out evidence collection per source and fail closed with a clear rejection or incomplete-run error.
-- Promotion must be atomic enough that the repo never claims a canonical packet refresh when only run-local artifacts were written.
+## Error & Rescue Registry
 
-## Test Strategy
-
-### Primary commands
-
-- `python3 scripts/recommend_next_agent.py generate --seed-file docs/agents/selection/candidate-seed.toml --run-id <timestamp>-<shortlist_slug> --scratch-root ~/.gstack/projects/<repo-slug>/recommend-next-agent-runs`
-- `python3 scripts/recommend_next_agent.py promote --run-dir ~/.gstack/projects/<repo-slug>/recommend-next-agent-runs/<run_id> --repo-run-root docs/agents/selection/runs --approved-agent-id <agent_id> --onboarding-pack-prefix <pack-prefix> [--override-reason "..."]`
-- `python3 -m unittest scripts.test_recommend_next_agent`
-- targeted Rust validation coverage for generated approval artifacts
-- `cargo run -p xtask -- onboard-agent --approval <generated approval path> --dry-run`
-- `make preflight` before merge
-
-### Code path coverage
-
-```text
-CODE PATH COVERAGE
-===========================
-[+] scripts/recommend_next_agent.py
-    │
-    ├── parse_seed_input()
-    │   └── unit: stable defaults, explicit shortlist hints, bad input rejection
-    │
-    ├── capture_sources()
-    │   └── integration: dated source capture + reproducible sources.lock.json
-    │
-    ├── apply_eligibility_gate()
-    │   └── unit: reject missing non-interactive, fixture, or evidence story
-    │
-    ├── select_exactly_three()
-    │   └── unit: deterministic ordering, hard fail on 2-or-4 candidate output
-    │
-    ├── render_candidate_dossiers()
-    │   └── unit/golden: stable dossier JSON shape
-    │
-    ├── render_comparison_packet()
-    │   └── golden: markdown matches canonical 3-row packet contract
-    │
-    ├── promote_canonical_packet()
-    │   └── integration: writes docs/agents/selection/cli-agent-selection-packet.md explicitly
-    │
-    └── render_approval_draft()
-        └── integration: generated approved-agent.toml passes xtask dry-run validation
-```
-
-### Maintainer-flow coverage
-
-```text
-USER FLOW COVERAGE
-===========================
-[+] Clean recommendation run
-    ├── seed -> discovery -> gate -> shortlist -> score -> packet -> approval draft
-    └── integration: one end-to-end dry run with durable artifacts
-
-[+] Candidate rejection path
-    ├── ineligible candidate recorded with rejection reason
-    └── unit/integration: rejection reason survives into candidate-pool.json and run-summary.md
-
-[+] Canonical promotion path
-    ├── run-local artifacts exist
-    └── integration: canonical packet refresh is explicit, reproducible, and never implicit
-
-[+] Maintainer override path
-    ├── approved candidate differs from recommended candidate
-    └── integration: override_reason required and copied into approval artifact
-```
-
-### Required test additions
-
-- `scripts/test_recommend_next_agent.py`
-  - seed parsing defaults
-  - hard gate rejection reasons
-  - deterministic exactly-3 ordering
-  - golden render for `comparison.generated.md`
-  - promotion guard when canonical target is missing or stale
-  - override draft generation requiring `override_reason`
-- Rust validation coverage in `crates/xtask/tests/`
-  - generated approval draft accepted by the existing approval loader
-  - generated override artifact rejected when `override_reason` is absent
-  - generated comparison ref must match `docs/agents/selection/cli-agent-selection-packet.md`
-- proving-run validation
-  - one committed end-to-end run against real candidate inputs
-  - `cargo run -p xtask -- onboard-agent --approval ... --dry-run` passes
-
-### QA handoff artifact
-
-Primary QA input for this slice already exists at:
-
-`~/.gstack/projects/atomize-hq-unified-agent-api/spensermcconnell-staging-eng-review-test-plan-20260427-153026.md`
-
-The implementation should keep that artifact in sync if the execution flow changes materially.
+| Failure | User-visible impact | Rescue |
+| --- | --- | --- |
+| Skill cannot gather enough public proof | Candidate set looks under-specified | Fail closed, keep candidate in rejection log, expand seed set or gather more evidence |
+| A candidate needs auth for all meaningful probes | Recommendation may overstate confidence | Record blocked steps explicitly and downgrade reproducibility confidence |
+| Runner receives malformed dossier | Packet cannot be trusted | Validation error before scoring or promotion |
+| Packet promotion fails after research succeeds | Maintainer loses time and trust | Preserve current staging + rollback flow |
+| Live seed file changes between generate and promote | Final approval artifact no longer matches the reviewed run | Promote only from the frozen run snapshot and fail on drift |
+| One candidate errors while others validate | Entire run becomes opaque | Write `run-status.json`, per-candidate validation results, and distinguish `candidate_rejected`, `candidate_error`, and `run_fatal` |
 
 ## Failure Modes Registry
 
-| Codepath | Likely failure | Required test | Required handling | Visible outcome |
-| --- | --- | --- | --- | --- |
-| Discovery | upstream page or API shape drift | integration fixture for source parsing | fail closed with source citation | clear "source changed" error |
-| Eligibility gate | ineligible candidate reaches scoring | unit per rejection reason | reject before scoring | clear rejection summary |
-| Exactly-3 selection | runner emits 2 or 4 comparison rows | unit on count invariant | hard fail before render | clear invariant failure |
-| Dossier normalization | per-candidate JSON shapes drift | golden tests | fail before packet render | clear normalization failure |
-| Packet rendering | packet shape drifts from canonical template | golden tests | block promotion | clear render-drift failure |
-| Canonical promotion | run-local packet exists but canonical packet stays stale | integration on target-path write | fail before approval draft finalization | clear stale-canonical failure |
-| Approval draft | descriptor fields wrong or incomplete | integration through real approval loader | block handoff | clear validation error |
-| Override path | approved candidate differs without rationale | integration on override branch | block artifact finalization | clear override-contract error |
-
-Critical gap rule:
-
-Any path that can silently produce a stale canonical packet or an invalid approval artifact is a release blocker.
+| Area | Critical failure mode | Guard |
+| --- | --- | --- |
+| Skill research | LLM invents proof without source backing | Every proof field must carry source refs or explicit local-probe output |
+| Eligibility gate | Incomplete candidates still get scored | Runner validates required proof fields and fails closed |
+| Packet quality | Packet lists scores but not decisions | Required explicit decision block and loser rationale |
+| Scope creep | Recommendation lane tries to become proving run | Runner-owned safe local probes only, no provider-backed execution |
+| Determinism | Same dossier yields different packet shape | Stable serialization and golden tests |
+| Contract drift | Prompt text and runner expectations diverge | One normative dossier contract doc plus versioned schema |
+| Security | Research can execute injected commands or capture sensitive output | Explicit probe allowlist, byte caps, redaction, domain allowlist |
 
 ## Acceptance Gates
 
-The slice is complete only when all of the following are true:
+1. The skill file clearly instructs an AI agent to perform research before invoking the runner.
+2. The runner requires structured proof fields before a candidate can be scored.
+3. A candidate missing offline-parser / fixture proof is rejected before scoring.
+4. The canonical packet includes winner rationale, loser rationale, reproducible-now vs blocked-later steps, and an explicit maintainer decision block.
+5. `cargo run -p xtask -- onboard-agent --approval ... --dry-run` still validates the promoted approval artifact.
+6. One proving run demonstrates the research-assisted flow end to end.
+7. A normative dossier contract exists at `docs/specs/cli-agent-recommendation-dossier-contract.md` and is referenced by the skill, runner, and packet expectations.
+8. `generate` freezes the reviewed seed/default snapshot into the run directory and `promote` consumes that frozen snapshot instead of re-reading live defaults.
+9. Runner probe execution is bounded to runner-owned allowlisted argv recipes, never source-derived shell text.
+10. One proving run records outcome metrics so the repo can compare this milestone against the lighter finalist-sprint alternative.
 
-1. The skill exists at `.codex/skills/recommend-next-agent/SKILL.md`.
-2. The seed file exists at `docs/agents/selection/candidate-seed.toml`.
-3. The runner exists at `scripts/recommend_next_agent.py`.
-4. `generate` writes the full scratch artifact set under `~/.gstack/projects/<repo-slug>/recommend-next-agent-runs/<run_id>/`.
-5. `promote` writes exactly one committed review run under `docs/agents/selection/runs/<run_id>/`.
-6. The final comparison packet contains exactly 3 candidates.
-7. Rejected candidates are preserved with rejection reasons.
-8. The canonical packet update is explicit and reproducible.
-9. The generated approval artifact passes the real `xtask` approval dry run.
-10. The override path is supported and requires `override_reason`.
-11. Python unit/golden tests pass.
-12. Targeted Rust validation coverage passes.
-13. `make preflight` passes before merge.
+## Success Metrics
 
-## NOT In Scope
+The milestone is only worth keeping if it improves decision quality or maintainer speed, not just packet sophistication.
 
-- `xtask recommend-agent`
-  The contract needs one proving run before it deserves a new Rust command surface.
-- Runtime onboarding for the selected agent
-  This slice ends before wrapper/backend implementation begins.
-- Generalized recommendation-service work
-  The problem is repo-local approvability, not global discovery infrastructure.
-- Candidate-count configurability
-  V1 stays fixed at 3 to match the canonical packet shape.
-- Maintenance or upgrade-lane automation
-  That is a later lifecycle concern.
+Record these metrics in the first proving run:
 
-## Worktree Parallelization Strategy
+- maintainer time-to-decision from skill invocation to approve-or-override
+- shortlist override rate
+- count of blockers predicted in the packet versus blockers discovered later in onboarding
+- count of candidates rejected before scoring due to missing proof
+- evidence collection time and total fetched-source count
 
-This plan has real parallelization value once the artifact contract is fixed.
+Success looks like:
 
-### Dependency table
+- the packet reduces manual archaeology enough that the maintainer can decide from the packet and appendix
+- at least one pre-score rejection catches a candidate that the heuristic lane would have let through
+- the proving run leaves a durable evidence chain another maintainer can replay without live memory
 
-| Step | Modules touched | Depends on |
+## Test Diagram
+
+| New codepath / behavior | Coverage type | Required proof |
 | --- | --- | --- |
-| Lock skill + operator contract | `.codex/skills/`, `docs/cli-agent-onboarding-factory-operator-guide.md`, `docs/agents/selection/` | — |
-| Build runner core | `scripts/` | contract lock |
-| Add packet promotion + approval drafting | `scripts/`, `docs/agents/selection/`, `docs/agents/lifecycle/` | runner core |
-| Add proving-run validation | `scripts/`, `crates/xtask/tests/`, `docs/agents/selection/` | runner core + promotion/drafting |
+| Skill research writes dossier inputs | manual proving run + fixture-backed golden example | skill-generated dossier files exist and are consumable |
+| Runner validates required proof fields | Python unit tests | missing proof fails before scoring |
+| Candidate rejection reasons survive to outputs | Python unit tests | `candidate-pool.json` contains named rejection reasons |
+| Richer packet rendering | golden tests | required sections and decision block present |
+| Promote-time approval validation | existing Rust + dry-run path | promoted approval artifact still passes real loader |
+| Generate/promote snapshot freeze | Python unit tests | promoted outputs match the frozen seed/default snapshot, not later live edits |
+| Probe security boundary | Python unit tests | only allowlisted argv recipes execute, captured output is capped and redacted |
+| Partial run and promotion failure | Python + transaction tests | per-candidate failures survive to status artifacts and rollback remains intact |
 
-### Parallel lanes
+## Initial Test Plan Artifact
 
-- Lane A: lock skill contract and operator-doc updates
-- Lane B: runner core and normalization schema
-- Lane C: promotion and approval drafting, after Lane B
-- Lane D: proving-run validation, after Lanes B and C
+`~/.gstack/projects/atomize-hq-unified-agent-api/spensermcconnell-codex-recommend-next-agent-test-plan-20260428-074000.md`
 
-### Execution order
+## Cross-Phase Themes
 
-1. Launch Lane A and Lane B in parallel worktrees.
-2. Merge Lane B first because it establishes the real runner contract.
-3. Run Lane C next.
-4. Run Lane D last because it depends on the real runner outputs and the real promoted packet path.
+- Trust beats cleverness. The repo already has the clever part. The missing product value is evidence quality and maintainer confidence.
+- The next milestone should tighten the human decision surface, not invent a second recommender.
+- Both outside strategy voices challenged whether this should be the next milestone at all. That is a real product challenge, not a formatting nit.
 
-### Conflict flags
+## Historical Challenge
 
-- Lanes A and C both touch docs under `docs/agents/selection/`, so do not run them in parallel.
-- Lanes B and C both touch `scripts/`, so they must stay sequential.
-- Lane D will read real outputs from B and C, so it should not start until both are merged.
+The outside strategy review did not agree that more recommendation infrastructure was obviously the right next move.
 
-## Definition Of Done
+That challenge was:
 
-- Maintainer can run one repo-local workflow and get:
-  - one timestamped run directory with durable evidence
-  - one exactly-3 comparison packet
-  - one canonical packet promotion step
-  - one valid `approved-agent.toml` draft
-  - one explicit approve-or-override decision point
-- The existing `onboard-agent` lane starts unchanged after approval.
-- No new control-plane abstraction was added prematurely.
+- maybe the real bottleneck is not recommendation quality, it is late discovery during actual onboarding
+- maybe the right next step is a lighter operator-led finalist sprint plus a tiny executable viability spike on the top 1-2 candidates
+- maybe a heavy research-proof system overfits to current repo assumptions and still misses the real integration pain
+
+Resolution:
+
+- documented
+- considered
+- rejected for this milestone by user decision on 2026-04-28
+
+## CEO Dual Voices
+
+CEO DUAL VOICES — CONSENSUS TABLE:
+
+| Topic | Codex CEO voice | Claude CEO voice | Consensus |
+| --- | --- | --- | --- |
+| Is the currently requested milestone directionally coherent? | Yes, but it may optimize the paperwork around selection instead of the true bottleneck | Yes, but it may be solving the wrong problem first | Partial |
+| Is the current thin skill the real gap? | Yes, the skill does not do real research today | Yes, that gap is real | Yes |
+| Should research proof alone be trusted? | No, proof may still fail to predict integration reality | No, LLM proof can still mislead | Yes |
+| Is there a better lighter alternative? | Yes, shortlist plus tiny viability spike deserves real consideration | Yes, manual-first finalist sprint is the strongest omitted option | Yes |
+| Should the repo keep human approval as the boundary? | Yes | Yes | Yes |
+| Should this user challenge be auto-decided away? | No, it is a product choice for the user | No, preserve it for user decision | Yes |
+
+CEO completion summary:
+
+- The requested milestone is coherent, but it is not uncontested.
+- The strongest challenge is not "the plan is bad," it is "the repo may be automating the wrong part first."
+- The user-directed default remains Approach B, with the finalist-sprint alternative preserved explicitly.
+
+## Design Review
+
+Skipped, no UI scope.
+
+Reason:
+
+- this milestone changes a repo-local skill, a deterministic runner, and packet artifacts
+- it does not introduce a new product surface that needs interaction or visual design review
+
+## Eng Dual Voices
+
+ENG DUAL VOICES — CONSENSUS TABLE:
+
+| Topic | Codex eng voice | Claude eng voice | Consensus |
+| --- | --- | --- | --- |
+| Should dossier inputs be typed and versioned? | Yes, prose-heavy dossiers will drift | Yes, the schema needs typed claim states and evidence refs | Yes |
+| Is generate/promote drift acceptable? | No, promote must use a frozen reviewed snapshot | No, re-reading live defaults breaks review integrity | Yes |
+| Can the skill emit shell commands for probes? | No, that is not a real security boundary | No, probes must be runner-owned and allowlisted | Yes |
+| Are durable failure artifacts required? | Yes, partial failures need explicit status surfaces | Yes, distinguish `candidate_rejected`, `candidate_error`, and `run_fatal` | Yes |
+| Does the test plan need more failure coverage? | Yes, add malformed dossiers, utf/json errors, 429/500s, rollback, redaction | Yes, current coverage is too thin | Yes |
+| Is there a measurable success criterion today? | Not yet, add outcome metrics | Not yet, artifact completion alone is not success | Yes |
+
+Eng completion summary:
+
+- The architecture direction is sound only if the research contract becomes explicit and versioned.
+- Probe execution must move fully under runner control.
+- This milestone needs outcome metrics, not just greener tests and bigger packets.
+
+## Decision Audit Trail
+
+| # | Phase | Decision | Classification | Principle | Rationale | Rejected |
+|---|-------|----------|----------------|-----------|-----------|----------|
+| 1 | CEO | Replace the current plan-of-record instead of appending to the landed milestone | Mechanical | P3 Pragmatic | The current `PLAN.md` describes already-landed work and is now misleading | Leaving the stale milestone as active |
+| 2 | CEO | Recommend skill-led research plus deterministic engine | Mechanical | P1 Completeness | It matches the intended product and fixes the actual trust gap | More heuristic scoring, or full execution harness now |
+| 3 | CEO | Keep human approve-or-override as the product boundary | Mechanical | P5 Explicit over clever | The repo already depends on maintainer judgment and approval artifacts | Auto-approving winners |
+| 4 | CEO | Keep live provider-backed execution out of this milestone | Mechanical | P3 Pragmatic | That belongs to the later proving run, not pre-create recommendation | Turning recommendation into a proving run |
+| 5 | Eng | Add a normative dossier contract doc | Mechanical | P5 Explicit over clever | The skill and runner need one versioned truth surface for research claims | Freehand prompt-only dossier expectations |
+| 6 | Eng | Move local probes under runner control | Mechanical | P5 Explicit over clever | Source-derived shell text is not a defensible security boundary | Skill-emitted shell snippets |
+| 7 | Eng | Freeze seed/default snapshots per run | Mechanical | P3 Pragmatic | Reviewed inputs and promoted outputs must stay identical | Re-reading live `candidate-seed.toml` during promote |
+| 8 | Eng | Add durable run-status outputs and per-candidate results | Mechanical | P1 Completeness | Partial failure needs explicit artifacts or the run becomes opaque | Fatal-only exit behavior |
+| 9 | Eng | Add outcome metrics to the proving run | Taste | P2 Boil the lake | The repo needs evidence that this milestone beats the lighter alternative | Declaring success from artifact completion alone |
+
+## Completion Summary
+
+STATUS: DONE_WITH_CONCERNS
+
+What changed:
+
+- `PLAN.md` now treats the LLM-guided research skill as the next milestone, not the already-landed deterministic lane
+- `TODOS.md` now names that work as the active pending milestone and marks the deterministic recommendation engine as completed
+- the milestone contract now includes a versioned dossier spec, frozen reviewed snapshots, runner-owned probes, durable failure artifacts, and measurable success metrics
+
+Concerns:
+
+- the plan intentionally adds one new runner input contract, `--research-dir`, to keep the skill phase and runner phase separated cleanly
+- the proving run still has to demonstrate that this heavier recommendation lane beats the lighter finalist-sprint alternative on real maintainer time and decision quality
+- implementation should not start changing score dimensions or packet section numbering beyond what this plan freezes
+
+## GSTACK REVIEW REPORT
+
+| Review | Trigger | Why | Runs | Status | Findings |
+|--------|---------|-----|------|--------|----------|
+| CEO Review | `/autoplan` | Scope and strategy challenge | 2 | completed | Both voices agreed the thin skill is real, but challenged whether recommendation infrastructure is the true bottleneck |
+| Codex Review | `/autoplan` | Independent external challenge | 2 | completed | Outside Codex reviews pushed the lighter finalist-sprint alternative and explicit success metrics |
+| Eng Review | `/autoplan` | Architecture and test hardening | 2 | completed | Both voices required typed dossier schema, frozen snapshots, runner-owned probes, durable failure artifacts, and broader negative-path tests |
+| Design Review | `/autoplan` | UI/UX gaps | 0 | skipped | No UI scope in this milestone |
+
+**VERDICT:** NEXT MILESTONE READY FOR IMPLEMENTATION. The requested LLM-guided research direction is fully planned and technically hardened. The lighter finalist-sprint alternative remains documented as a rejected-for-now option, and the proving run must measure whether that rejection was correct.
