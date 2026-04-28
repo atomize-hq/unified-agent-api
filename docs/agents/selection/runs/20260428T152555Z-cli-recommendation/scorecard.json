@@ -1,43 +1,43 @@
 {
   "candidates": {
     "aider": {
-      "notes": "stars=44029, installs=2, docs=1, auth_hits=5, architecture_hits=5, leverage_hits=1",
-      "primary_sum": 10,
-      "scores": {
-        "Adoption & community pull": 3,
-        "Architecture fit for this repo": 1,
-        "CLI product maturity & release activity": 3,
-        "Capability expansion / future leverage": 0,
-        "Installability & docs quality": 3,
-        "Reproducibility & access friction": 1
-      },
-      "secondary_sum": 1
-    },
-    "goose": {
-      "notes": "stars=43414, installs=2, docs=2, auth_hits=3, architecture_hits=4, leverage_hits=1",
-      "primary_sum": 8,
-      "scores": {
-        "Adoption & community pull": 3,
-        "Architecture fit for this repo": 1,
-        "CLI product maturity & release activity": 0,
-        "Capability expansion / future leverage": 0,
-        "Installability & docs quality": 3,
-        "Reproducibility & access friction": 2
-      },
-      "secondary_sum": 1
-    },
-    "openhands": {
-      "notes": "stars=72210, installs=2, docs=1, auth_hits=3, architecture_hits=4, leverage_hits=2",
+      "notes": "refs=aider-doc,aider-pkg",
       "primary_sum": 11,
       "scores": {
         "Adoption & community pull": 3,
-        "Architecture fit for this repo": 1,
+        "Architecture fit for this repo": 2,
         "CLI product maturity & release activity": 3,
-        "Capability expansion / future leverage": 1,
+        "Capability expansion / future leverage": 2,
         "Installability & docs quality": 3,
         "Reproducibility & access friction": 2
       },
-      "secondary_sum": 2
+      "secondary_sum": 4
+    },
+    "goose": {
+      "notes": "refs=goose-doc,goose-repo,goose-home",
+      "primary_sum": 9,
+      "scores": {
+        "Adoption & community pull": 2,
+        "Architecture fit for this repo": 2,
+        "CLI product maturity & release activity": 2,
+        "Capability expansion / future leverage": 2,
+        "Installability & docs quality": 3,
+        "Reproducibility & access friction": 2
+      },
+      "secondary_sum": 4
+    },
+    "openhands": {
+      "notes": "refs=openhands-doc,openhands-pkg",
+      "primary_sum": 11,
+      "scores": {
+        "Adoption & community pull": 3,
+        "Architecture fit for this repo": 2,
+        "CLI product maturity & release activity": 3,
+        "Capability expansion / future leverage": 3,
+        "Installability & docs quality": 3,
+        "Reproducibility & access friction": 2
+      },
+      "secondary_sum": 5
     }
   },
   "dimensions": [

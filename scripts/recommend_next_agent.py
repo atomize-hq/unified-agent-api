@@ -1179,21 +1179,25 @@ def render_comparison_packet(
     recommended_agent_id: str,
     scores: dict[str, CandidateScore],
     dossiers: dict[str, dict[str, Any]],
-    strategic_contenders: list[str],
+    candidate_results: dict[str, CandidateResult],
 ) -> str:
     recommended = seed.candidate_by_id(recommended_agent_id)
+    snapshot_date = generated_at[:10]
+    recommended_dossier = dossiers[recommended_agent_id]
     lines = [
         "<!-- generated-by: scripts/recommend_next_agent.py generate -->",
         "# Packet — CLI Agent Selection Recommendation",
         "",
         "Status: Generated",
         f"Date (UTC): {generated_at}",
-        f"Run id: `{run_id}`",
+        "Owner(s): wrappers team / deterministic runner",
         "Related source docs:",
         "- `docs/specs/cli-agent-onboarding-charter.md`",
         "- `docs/specs/cli-agent-recommendation-dossier-contract.md`",
         "- `docs/templates/agent-selection/cli-agent-selection-packet-template.md`",
         "- `docs/cli-agent-onboarding-factory-operator-guide.md`",
+        "",
+        f"Run id: `{run_id}`",
         "",
         "## 1. Candidate Summary",
         "",
@@ -1226,7 +1230,7 @@ def render_comparison_packet(
             "",
             "Provenance: `deterministic runner scoring over validated dossier claims`",
             "",
-            "This packet preserves the frozen score dimensions, the 0-3 scale, and the deterministic shortlist sort order.",
+            "This packet preserves the frozen score dimensions, the 0-3 scale, and the deterministic shortlist sort order. Product-value signals remain primary, while architecture fit and future leverage break ties only after the primary comparison is established.",
             "",
             "## 4. Fixed 3-Candidate Comparison Table",
             "",
@@ -1260,7 +1264,7 @@ def render_comparison_packet(
             "",
             f"Recommended winner: `{recommended_agent_id}`",
             "",
-            f"`{recommended.display_name}` wins on the frozen shortlist ordering using refs `{scores[recommended_agent_id].notes}`.",
+            f"`{recommended.display_name}` wins on the frozen shortlist ordering with primary score `{scores[recommended_agent_id].primary_sum}`, secondary score `{scores[recommended_agent_id].secondary_sum}`, and cited evidence `{scores[recommended_agent_id].notes}`.",
             "",
         ]
     )
@@ -1280,12 +1284,35 @@ def render_comparison_packet(
             "Provenance: `validated dossier evidence`",
             "",
             "reproducible now:",
+            "- install paths:",
         ]
     )
-    for channel in dossiers[recommended_agent_id]["install_channels"]:
-        lines.append(f"- `{channel}`")
-    lines.extend(["", "blocked until later:"])
-    blocked_steps = dossiers[recommended_agent_id]["blocked_steps"] or ["none"]
+    for channel in recommended_dossier["install_channels"]:
+        lines.append(f"  - `{channel}`")
+    lines.extend(
+        [
+            "- auth / account / billing prerequisites:",
+        ]
+    )
+    for entry in recommended_dossier["auth_prerequisites"] or ["none before local install"]:
+        lines.append(f"  - {entry}")
+    lines.extend(
+        [
+            "- runnable commands:",
+            "  - install one supported package path above",
+            "  - collect local `--help` / `--version` output during maintainer evaluation when the binary is installed",
+            "- evidence gatherable without paid or elevated access:",
+            f"  - official docs refs `{', '.join(recommended_dossier['claims']['non_interactive_execution']['evidence_ids'])}`",
+            f"  - package / install refs `{', '.join(recommended_dossier['claims']['reproducibility']['evidence_ids'])}`",
+            "- expected artifacts to save during evaluation:",
+            "  - redacted install logs",
+            "  - captured help/version output",
+            "  - fixture notes describing fake-binary or parser coverage assumptions",
+            "",
+            "blocked until later:",
+        ]
+    )
+    blocked_steps = recommended_dossier["blocked_steps"] or ["none"]
     for entry in blocked_steps:
         lines.append(f"- {entry}")
     descriptor = recommended.derived_descriptor(seed.defaults)
@@ -1327,32 +1354,42 @@ def render_comparison_packet(
     )
     for agent_id in shortlist_ids:
         dossier = dossiers[agent_id]
+        score = scores[agent_id]
         lines.append(f"### `{agent_id}`")
         lines.append("")
-        lines.append(f"- display name: `{dossier['display_name']}`")
-        lines.append("- loser rationale: " + ("winner" if agent_id == recommended_agent_id else scores[agent_id].notes))
+        lines.append(f"- Snapshot date: `{snapshot_date}`")
+        lines.append("- Official links:")
+        for link in dossier["official_links"]:
+            lines.append(f"  - `{link}`")
+        lines.append("- Install / distribution:")
+        for channel in dossier["install_channels"]:
+            lines.append(f"  - `{channel}`")
+        lines.append("- Adoption / community:")
+        lines.append(f"  - refs `{score.notes}`")
+        lines.append("- Release activity:")
         for entry in dossier["evidence"]:
-            lines.append(
-                f"- `{entry['evidence_id']}` `{entry['kind']}` captured `{entry['captured_at']}`"
-            )
+            lines.append(f"  - `{entry['evidence_id']}` `{entry['kind']}` captured `{entry['captured_at']}`")
+        lines.append("- Access prerequisites:")
+        for entry in dossier["auth_prerequisites"] or ["none"]:
+            lines.append(f"  - {entry}")
+        lines.append("- Normalized notes:")
+        for entry in dossier["normalized_caveats"]:
+            lines.append(f"  - {entry}")
+        lines.append("- Loser rationale: " + ("winner" if agent_id == recommended_agent_id else score.notes))
         lines.append("")
+    strategic_contenders = [
+        candidate.agent_id
+        for candidate in seed.candidates
+        if candidate_results[candidate.agent_id].status != "eligible" and candidate.agent_id not in shortlist_ids
+    ]
     if strategic_contenders:
         lines.append("### Strategic Contenders")
         lines.append("")
         for agent_id in strategic_contenders:
-            lines.append(f"- `{agent_id}`")
+            rejection_reasons = candidate_results[agent_id].rejection_reasons or candidate_results[agent_id].error_reasons
+            reason = rejection_reasons[0] if rejection_reasons else "see candidate validation result"
+            lines.append(f"- `{agent_id}`: {reason}")
         lines.append("")
-    lines.extend(
-        [
-            "## 11. Acceptance Checklist",
-            "",
-            "Provenance: `deterministic runner output`",
-            "",
-            "- [x] The packet compares exactly 3 candidates.",
-            "- [x] The packet names one deterministic recommendation.",
-            "- [x] The appendix preserves dated source provenance for each shortlisted candidate.",
-        ]
-    )
     return "\n".join(lines) + "\n"
 
 
@@ -1857,11 +1894,7 @@ def generate_recommendation(
             recommended_agent_id=recommended_agent_id or shortlist_ids[0],
             scores={agent_id: candidate_results[agent_id].score for agent_id in shortlist_ids if candidate_results[agent_id].score is not None},
             dossiers=dossiers,
-            strategic_contenders=[
-                candidate.agent_id
-                for candidate in seed.candidates
-                if candidate_results[candidate.agent_id].status != "eligible" and candidate.agent_id not in shortlist_ids
-            ],
+            candidate_results=candidate_results,
         ),
     )
     write_text(

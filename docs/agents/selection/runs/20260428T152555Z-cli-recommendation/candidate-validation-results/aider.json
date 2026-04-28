@@ -1,0 +1,65 @@
+{
+  "agent_id": "aider",
+  "error_reasons": [],
+  "evidence_ids_used": [
+    "aider-doc",
+    "aider-repo",
+    "aider-pkg"
+  ],
+  "hard_gate_results": {
+    "crate_first_fit": {
+      "evidence_ids": [
+        "aider-doc",
+        "aider-pkg"
+      ],
+      "notes": "The wrapper can own process invocation before any deeper adapter work.",
+      "status": "pass"
+    },
+    "non_interactive_execution": {
+      "evidence_ids": [
+        "aider-doc",
+        "aider-pkg"
+      ],
+      "notes": "The terminal entrypoint is publicly documented and packaged.",
+      "status": "pass"
+    },
+    "observable_cli_surface": {
+      "evidence_ids": [
+        "aider-doc",
+        "aider-repo"
+      ],
+      "notes": "Observable CLI surface is documented publicly.",
+      "status": "pass"
+    },
+    "offline_strategy": {
+      "evidence_ids": [
+        "aider-doc",
+        "aider-repo"
+      ],
+      "notes": "The recommendation lane only needs deterministic parser and wrapper proof.",
+      "status": "pass"
+    },
+    "redaction_fit": {
+      "evidence_ids": [
+        "aider-repo"
+      ],
+      "notes": "Redaction fit is a repo-local inference from terminal-oriented IO.",
+      "status": "pass"
+    },
+    "reproducibility": {
+      "evidence_ids": [
+        "aider-doc",
+        "aider-pkg"
+      ],
+      "notes": "Repeatable local setup is public, while provider sessions remain gated later.",
+      "status": "pass"
+    }
+  },
+  "notes": [
+    "schema validation passed"
+  ],
+  "probe_results": [],
+  "rejection_reasons": [],
+  "schema_valid": true,
+  "status": "eligible"
+}

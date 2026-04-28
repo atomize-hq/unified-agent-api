@@ -1,0 +1,65 @@
+{
+  "agent_id": "goose",
+  "error_reasons": [],
+  "evidence_ids_used": [
+    "goose-doc",
+    "goose-repo",
+    "goose-home"
+  ],
+  "hard_gate_results": {
+    "crate_first_fit": {
+      "evidence_ids": [
+        "goose-doc",
+        "goose-repo"
+      ],
+      "notes": "The first seam remains process invocation plus event normalization.",
+      "status": "pass"
+    },
+    "non_interactive_execution": {
+      "evidence_ids": [
+        "goose-doc",
+        "goose-repo"
+      ],
+      "notes": "The candidate exposes a documented external CLI entrypoint.",
+      "status": "pass"
+    },
+    "observable_cli_surface": {
+      "evidence_ids": [
+        "goose-doc",
+        "goose-repo"
+      ],
+      "notes": "The observable CLI surface is public and reviewable.",
+      "status": "pass"
+    },
+    "offline_strategy": {
+      "evidence_ids": [
+        "goose-doc",
+        "goose-repo"
+      ],
+      "notes": "Recommendation only needs deterministic wrapper evidence, not live provider execution.",
+      "status": "pass"
+    },
+    "redaction_fit": {
+      "evidence_ids": [
+        "goose-repo"
+      ],
+      "notes": "This is a repo-fit inference from Goose shipping as an external CLI agent.",
+      "status": "pass"
+    },
+    "reproducibility": {
+      "evidence_ids": [
+        "goose-doc",
+        "goose-home"
+      ],
+      "notes": "Install and wrapper evidence is reproducible now; provider-backed behavior is deferred.",
+      "status": "pass"
+    }
+  },
+  "notes": [
+    "schema validation passed"
+  ],
+  "probe_results": [],
+  "rejection_reasons": [],
+  "schema_valid": true,
+  "status": "eligible"
+}

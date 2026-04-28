@@ -719,6 +719,17 @@ class RecommendationRunnerContractTests(unittest.TestCase):
             self.assertIn('recommended_agent_id = "alpha"', approval_draft)
             self.assertIn('approved_agent_id = "alpha"', approval_draft)
             self.assertIn('approval_commit = "0000000"', approval_draft)
+
+            comparison_packet = (run_dir / "comparison.generated.md").read_text(encoding="utf-8")
+            self.assertIn("Owner(s): wrappers team / deterministic runner", comparison_packet)
+            self.assertIn("| `alpha` | 3 | 3 | 3 | 3 | 3 | 2 | refs=alpha-repo,alpha-pkg,alpha-doc |", comparison_packet)
+            self.assertIn("Approve recommended agent", comparison_packet)
+            self.assertIn("Override to shortlisted alternative", comparison_packet)
+            self.assertIn("Stop and expand research", comparison_packet)
+            self.assertIn("reproducible now:", comparison_packet)
+            self.assertIn("- auth / account / billing prerequisites:", comparison_packet)
+            self.assertIn("blocked until later:", comparison_packet)
+            self.assertNotIn("### Strategic Contenders", comparison_packet)
         finally:
             tmpdir.cleanup()
 

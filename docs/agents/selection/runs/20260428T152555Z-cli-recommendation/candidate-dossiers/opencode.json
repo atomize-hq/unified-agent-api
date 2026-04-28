@@ -1,0 +1,119 @@
+{
+  "schema_version": "v1",
+  "agent_id": "opencode",
+  "display_name": "OpenCode",
+  "generated_at": "2026-04-28T15:31:24Z",
+  "seed_snapshot_sha256": "884157744ca3de13b51fbec96c68bf70185b27db8b9fb6cc5d91923e01788895",
+  "official_links": [
+    "https://opencode.ai/docs/cli/",
+    "https://www.npmjs.com/package/opencode-ai"
+  ],
+  "install_channels": [
+    "curl -fsSL https://opencode.ai/install | bash",
+    "npm install -g opencode-ai",
+    "brew install sst/tap/opencode"
+  ],
+  "auth_prerequisites": [
+    "Provider-backed evaluation requires configuring a supported model provider after install."
+  ],
+  "claims": {
+    "non_interactive_execution": {
+      "state": "verified",
+      "summary": "Public CLI docs and the published package show a deterministic installable terminal entrypoint.",
+      "evidence_ids": [
+        "opencode-doc",
+        "opencode-pkg"
+      ],
+      "notes": "Documented CLI install surface is public and stable enough for wrapper invocation."
+    },
+    "offline_strategy": {
+      "state": "inferred",
+      "summary": "A wrapper can validate parser behavior with captured fixtures or a fake opencode binary before provider-backed runs.",
+      "evidence_ids": [
+        "opencode-doc",
+        "opencode-repo"
+      ],
+      "notes": "The recommendation lane only needs fixture and fake-binary coverage, not live provider execution."
+    },
+    "observable_cli_surface": {
+      "state": "verified",
+      "summary": "The repo and CLI docs expose a terminal-facing command surface that is externally observable.",
+      "evidence_ids": [
+        "opencode-doc",
+        "opencode-repo"
+      ],
+      "notes": "Observable CLI surface is grounded in public docs and repo presentation."
+    },
+    "redaction_fit": {
+      "state": "inferred",
+      "summary": "Text-stream terminal IO can pass through the repo redaction boundary before persistence.",
+      "evidence_ids": [
+        "opencode-repo"
+      ],
+      "notes": "Repo-fit inference is based on the agent shipping as an external terminal program."
+    },
+    "crate_first_fit": {
+      "state": "inferred",
+      "summary": "Documented CLI install channels support a wrapper-crate-first integration before any agent_api adapter work.",
+      "evidence_ids": [
+        "opencode-doc",
+        "opencode-pkg"
+      ],
+      "notes": "Installable external CLI posture matches the repo crate-first onboarding ladder."
+    },
+    "reproducibility": {
+      "state": "inferred",
+      "summary": "Public docs and npm distribution allow repeatable local setup, with provider auth deferred as a later step.",
+      "evidence_ids": [
+        "opencode-doc",
+        "opencode-pkg"
+      ],
+      "notes": "Local reproducibility is public; provider-backed evaluation remains a later gated step."
+    },
+    "future_leverage": {
+      "state": "verified",
+      "summary": "Active upstream velocity and broad adoption make opencode strategically relevant even though it is already onboarded here.",
+      "evidence_ids": [
+        "opencode-repo",
+        "opencode-pkg"
+      ],
+      "notes": "Current adoption and release activity make it a credible strategic contender."
+    }
+  },
+  "probe_requests": [],
+  "blocked_steps": [
+    "Provider-backed evaluation still needs maintainer credentials after local CLI install."
+  ],
+  "normalized_caveats": [
+    "Use public install/docs evidence for recommendation; defer paid-provider behavior to onboarding proving."
+  ],
+  "evidence": [
+    {
+      "evidence_id": "opencode-doc",
+      "kind": "official_doc",
+      "url": "https://opencode.ai/docs/cli/",
+      "title": "CLI | OpenCode",
+      "captured_at": "2026-04-28T15:31:24Z",
+      "excerpt": "CLI | OpenCode documents a terminal-first CLI surface and official installation guidance for the coding agent.",
+      "sha256": "a09b9e7fa3476a03b282b0925db5879e5fb5393b8aca95fd059f81e059541a70"
+    },
+    {
+      "evidence_id": "opencode-repo",
+      "kind": "github",
+      "url": "https://github.com/anomalyco/opencode",
+      "title": "anomalyco/opencode",
+      "captured_at": "2026-04-28T15:31:24Z",
+      "excerpt": "GitHub describes opencode as \"The open source coding agent.\" Repo full_name anomalyco/opencode, 151166 stars, pushed 2026-04-28T15:21:40Z.",
+      "sha256": "5ced71423a09368b2c586382868d0b915cbcf01cd7b8e33946fe76a3bb5c80d7"
+    },
+    {
+      "evidence_id": "opencode-pkg",
+      "kind": "package_registry",
+      "url": "https://www.npmjs.com/package/opencode-ai",
+      "title": "opencode-ai npm package",
+      "captured_at": "2026-04-28T15:31:24Z",
+      "excerpt": "npm registry latest tag for opencode-ai is 1.14.28, modified 2026-04-28T15:14:24.099Z, confirming an active published CLI distribution.",
+      "sha256": "dd530f8ffbe98b49bc65576131c223558514c6628fb8fb2f37e7c24b6b8d4323"
+    }
+  ]
+}

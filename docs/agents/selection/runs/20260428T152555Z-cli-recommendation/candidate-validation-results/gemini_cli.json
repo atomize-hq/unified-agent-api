@@ -1,0 +1,65 @@
+{
+  "agent_id": "gemini_cli",
+  "error_reasons": [],
+  "evidence_ids_used": [
+    "gemini-repo",
+    "gemini-pkg"
+  ],
+  "hard_gate_results": {
+    "crate_first_fit": {
+      "evidence_ids": [
+        "gemini-repo",
+        "gemini-pkg"
+      ],
+      "notes": "The integration seam remains an installed external binary, not an embedded runtime.",
+      "status": "pass"
+    },
+    "non_interactive_execution": {
+      "evidence_ids": [
+        "gemini-repo",
+        "gemini-pkg"
+      ],
+      "notes": "The execution surface is public and installable without private artifacts.",
+      "status": "pass"
+    },
+    "observable_cli_surface": {
+      "evidence_ids": [
+        "gemini-repo",
+        "gemini-pkg"
+      ],
+      "notes": "Public repo and package metadata provide enough observable CLI proof.",
+      "status": "pass"
+    },
+    "offline_strategy": {
+      "evidence_ids": [
+        "gemini-repo",
+        "gemini-pkg"
+      ],
+      "notes": "Recommendation needs wrapper-seam evidence, not live provider interaction.",
+      "status": "pass"
+    },
+    "redaction_fit": {
+      "evidence_ids": [
+        "gemini-repo"
+      ],
+      "notes": "Repo-fit claim is an inference from terminal-oriented CLI behavior.",
+      "status": "pass"
+    },
+    "reproducibility": {
+      "evidence_ids": [
+        "gemini-pkg"
+      ],
+      "notes": "Account-backed behavior is deferred, but install and wrapper seams are repeatable now.",
+      "status": "pass"
+    }
+  },
+  "notes": [
+    "schema validation passed"
+  ],
+  "probe_results": [],
+  "rejection_reasons": [
+    "agent_id `gemini_cli` already exists in crates/xtask/data/agent_registry.toml and is already onboarded"
+  ],
+  "schema_valid": true,
+  "status": "candidate_rejected"
+}
