@@ -1,0 +1,117 @@
+{
+  "agent_id": "goose",
+  "auth_notes": "Provider credentials are required for full model-backed evaluation, but local CLI install and configuration flows are documented.",
+  "descriptor": {
+    "agent_id": "goose",
+    "always_on_capabilities": [
+      "agent_api.config.model.v1",
+      "agent_api.events",
+      "agent_api.events.live",
+      "agent_api.run"
+    ],
+    "backend_extensions": [],
+    "backend_module": "crates/agent_api/src/backends/goose",
+    "canonical_targets": [
+      "darwin-arm64"
+    ],
+    "capability_matrix_enabled": true,
+    "config_gated_capabilities": [],
+    "crate_path": "crates/goose",
+    "display_name": "Goose",
+    "docs_release_track": "crates-io",
+    "manifest_root": "cli_manifests/goose",
+    "package_name": "unified-agent-api-goose",
+    "support_matrix_enabled": true,
+    "target_gated_capabilities": [],
+    "wrapper_coverage_binding_kind": "generated_from_wrapper_crate",
+    "wrapper_coverage_source_path": "crates/goose"
+  },
+  "display_name": "Goose",
+  "evidence": {
+    "architecture_keyword_hits": 4,
+    "auth_friction_hits": 3,
+    "corpus_excerpt": "provider credentials are required for full model-backed evaluation, but local cli install and configuration flows are documented. an open source, extensible ai agent that goes beyond code suggestions - install, execute, edit, and test with any llm acp ai ai-agents mcp v1.32.0 goose | your open source ai agent goose | your open source ai agent function insertbanner(){var n=document.createelement(\"div\");n.id=\"__docusaurus-base-url-issue-banner-container\";n.innerhtml='\\n \\n your docusaurus site did",
+    "docs_source_count": 2,
+    "fetched_source_count": 3,
+    "github_stars": 43414,
+    "install_channel_count": 2,
+    "leverage_keyword_hits": 1,
+    "package_version_count": 0,
+    "release_age_days": 0
+  },
+  "install_channels": [
+    "brew install block/goose/goose",
+    "curl -fsSL https://github.com/block/goose/releases/latest/download/download_cli.sh | bash"
+  ],
+  "research_urls": [
+    "https://github.com/block/goose",
+    "https://goose-docs.ai",
+    "https://goose-docs.ai/docs/"
+  ],
+  "score": {
+    "notes": "stars=43414, installs=2, docs=2, auth_hits=3, architecture_hits=4, leverage_hits=1",
+    "primary_sum": 8,
+    "scores": {
+      "Adoption & community pull": 3,
+      "Architecture fit for this repo": 1,
+      "CLI product maturity & release activity": 0,
+      "Capability expansion / future leverage": 0,
+      "Installability & docs quality": 3,
+      "Reproducibility & access friction": 2
+    },
+    "secondary_sum": 1
+  },
+  "sources": [
+    {
+      "fetched_at": "2026-04-28T03:35:35Z",
+      "final_url": "https://api.github.com/repositories/846698999",
+      "kind": "github_repo",
+      "summary": {
+        "description": "an open source, extensible AI agent that goes beyond code suggestions - install, execute, edit, and test with any LLM",
+        "forks": 4423,
+        "latest_release_name": "v1.32.0",
+        "latest_release_published_at": "2026-04-23T07:45:24Z",
+        "open_issues": 381,
+        "pushed_at": "2026-04-28T03:28:05Z",
+        "repo": "aaif-goose/goose",
+        "stars": 43414,
+        "topics": [
+          "acp",
+          "ai",
+          "ai-agents",
+          "mcp"
+        ],
+        "updated_at": "2026-04-28T03:17:43Z"
+      },
+      "url": "https://github.com/block/goose"
+    },
+    {
+      "fetched_at": "2026-04-28T03:35:36Z",
+      "final_url": "https://goose-docs.ai",
+      "kind": "generic_page",
+      "summary": {
+        "keyword_hits": {
+          "architecture": 29,
+          "leverage": 20
+        },
+        "snippet": "goose | Your open source AI agent function insertBanner(){var n=document.createElement(\"div\");n.id=\"__docusaurus-base-url-issue-banner-container\";n.innerHTML='\\n \\n Your Docusaurus site did not load properly. \\n A very common reason is a wrong site baseUrl configuration . \\n Current configured baseUrl = / (default value) \\n We suggest trying baseUrl = \\n \\n',document.body.prepend(n);var e=document.getElementById(\"__docusaurus-base-url-issue-banner-suggestion-container\"),s=window.location.pathnam",
+        "title": "goose | Your open source AI agent"
+      },
+      "url": "https://goose-docs.ai"
+    },
+    {
+      "fetched_at": "2026-04-28T03:35:36Z",
+      "final_url": "https://goose-docs.ai/docs/",
+      "kind": "generic_page",
+      "summary": {
+        "keyword_hits": {
+          "architecture": 0,
+          "leverage": 0
+        },
+        "snippet": "window.location.href = '/docs/category/getting-started' + window.location.search + window.location.hash;",
+        "title": null
+      },
+      "url": "https://goose-docs.ai/docs/"
+    }
+  ]
+}

@@ -33,7 +33,7 @@
     "corpus_excerpt": "requires model/provider credentials or service access for realistic evaluation. local install and help surfaces are available before paid provider validation. aider is ai pair programming in your terminal anthropic chatgpt claude-3 cli command-line gemini gpt-3 gpt-35-turbo gpt-4 gpt-4o llama openai sonnet aider v0.86.0 aider - ai pair programming in your terminal aider - ai pair programming in your terminal aider features getting started documentation discord github ai pair programming in your ",
     "docs_source_count": 1,
     "fetched_source_count": 3,
-    "github_stars": 44022,
+    "github_stars": 44029,
     "install_channel_count": 2,
     "leverage_keyword_hits": 1,
     "package_version_count": 174,
@@ -49,7 +49,7 @@
     "https://pypi.org/project/aider-chat/"
   ],
   "score": {
-    "notes": "stars=44022, installs=2, docs=1, auth_hits=5, architecture_hits=5, leverage_hits=1",
+    "notes": "stars=44029, installs=2, docs=1, auth_hits=5, architecture_hits=5, leverage_hits=1",
     "primary_sum": 10,
     "scores": {
       "Adoption & community pull": 3,
@@ -63,18 +63,18 @@
   },
   "sources": [
     {
-      "fetched_at": "2026-04-28T00:00:11Z",
+      "fetched_at": "2026-04-28T03:35:33Z",
       "final_url": "https://api.github.com/repos/Aider-AI/aider",
       "kind": "github_repo",
       "summary": {
         "description": "aider is AI pair programming in your terminal",
-        "forks": 4308,
+        "forks": 4310,
         "latest_release_name": "Aider v0.86.0",
         "latest_release_published_at": "2025-08-09T17:42:19Z",
         "open_issues": 1503,
         "pushed_at": "2026-04-25T16:44:33Z",
         "repo": "Aider-AI/aider",
-        "stars": 44022,
+        "stars": 44029,
         "topics": [
           "anthropic",
           "chatgpt",
@@ -90,12 +90,12 @@
           "openai",
           "sonnet"
         ],
-        "updated_at": "2026-04-27T21:57:28Z"
+        "updated_at": "2026-04-28T02:46:15Z"
       },
       "url": "https://github.com/Aider-AI/aider"
     },
     {
-      "fetched_at": "2026-04-28T00:00:12Z",
+      "fetched_at": "2026-04-28T03:35:33Z",
       "final_url": "https://aider.chat/",
       "kind": "generic_page",
       "summary": {
@@ -109,7 +109,7 @@
       "url": "https://aider.chat/"
     },
     {
-      "fetched_at": "2026-04-28T00:00:12Z",
+      "fetched_at": "2026-04-28T03:35:33Z",
       "final_url": "https://pypi.org/pypi/aider-chat/json",
       "kind": "pypi_package",
       "summary": {

@@ -55,3 +55,29 @@ install_channels = [
   "python -m pip install aider-chat",
 ]
 auth_notes = "Requires model/provider credentials or service access for realistic evaluation. Local install and help surfaces are available before paid provider validation."
+
+[candidate.goose]
+display_name = "Goose"
+research_urls = [
+  "https://github.com/block/goose",
+  "https://goose-docs.ai",
+  "https://goose-docs.ai/docs/",
+]
+install_channels = [
+  "brew install block/goose/goose",
+  "curl -fsSL https://github.com/block/goose/releases/latest/download/download_cli.sh | bash",
+]
+auth_notes = "Provider credentials are required for full model-backed evaluation, but local CLI install and configuration flows are documented."
+
+[candidate.openhands]
+display_name = "OpenHands"
+research_urls = [
+  "https://github.com/All-Hands-AI/OpenHands",
+  "https://docs.all-hands.dev/",
+  "https://pypi.org/project/openhands-ai/",
+]
+install_channels = [
+  "python -m pip install openhands-ai",
+  "uv tool install openhands-ai",
+]
+auth_notes = "Provider credentials may be required for full automation runs; install and local startup documentation are public."

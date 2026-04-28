@@ -2,8 +2,8 @@
 # Packet — CLI Agent Selection Recommendation
 
 Status: Generated
-Date (UTC): 2026-04-28T00:00:11Z
-Run id: `20260428T000011Z-cli-recommendation`
+Date (UTC): 2026-04-28T03:35:33Z
+Run id: `20260428T033528Z-cli-recommendation`
 Related source docs:
 - `docs/specs/cli-agent-onboarding-charter.md`
 - `docs/templates/agent-selection/cli-agent-selection-packet-template.md`
@@ -14,15 +14,15 @@ Related source docs:
 Provenance: `dated external snapshot evidence + maintainer inference encoded by the deterministic runner`
 
 Shortlisted candidates:
+- `openhands`
 - `aider`
-- `opencode`
-- `gemini_cli`
+- `goose`
 
 Why these 3:
 - they are the highest-ranked eligible candidates under the frozen shortlist algorithm
 
 Recommendation in one sentence:
-- `aider` (`aider`) ranks first under the deterministic shortlist contract.
+- `OpenHands` (`openhands`) ranks first under the deterministic shortlist contract.
 
 ## 2. What Already Exists
 
@@ -45,39 +45,39 @@ Provenance: `dated external snapshot evidence + deterministic runner scoring`
 
 | Candidate | Adoption & community pull | CLI product maturity & release activity | Installability & docs quality | Reproducibility & access friction | Architecture fit for this repo | Capability expansion / future leverage | Notes |
 |---|---:|---:|---:|---:|---:|---:|---|
-| `aider` | 3 | 3 | 3 | 1 | 1 | 0 | stars=44022, installs=2, docs=1, auth_hits=5, architecture_hits=5, leverage_hits=1 |
-| `opencode` | 3 | 3 | 3 | 1 | 1 | 0 | stars=150652, installs=3, docs=2, auth_hits=4, architecture_hits=5, leverage_hits=1 |
-| `gemini_cli` | 3 | 3 | 1 | 1 | 1 | 1 | stars=102566, installs=2, docs=0, auth_hits=4, architecture_hits=5, leverage_hits=3 |
+| `openhands` | 3 | 3 | 3 | 2 | 1 | 1 | stars=72210, installs=2, docs=1, auth_hits=3, architecture_hits=4, leverage_hits=2 |
+| `aider` | 3 | 3 | 3 | 1 | 1 | 0 | stars=44029, installs=2, docs=1, auth_hits=5, architecture_hits=5, leverage_hits=1 |
+| `goose` | 3 | 0 | 3 | 2 | 1 | 0 | stars=43414, installs=2, docs=2, auth_hits=3, architecture_hits=4, leverage_hits=1 |
 
 ## 5. Recommendation
 
 Provenance: `maintainer inference grounded in the comparison table`
 
-Recommended winner: `aider`
+Recommended winner: `openhands`
 
-`aider` ranks first after deterministic tie-break ordering.
+`OpenHands` ranks first after deterministic tie-break ordering.
 
 ## 6. Recommended Agent Evaluation Recipe
 
 Provenance: `dated external snapshot evidence + seed inputs`
 
-Recommended agent: `aider`
+Recommended agent: `OpenHands`
 
 Install paths:
-- `python -m pip install aider-install`
-- `python -m pip install aider-chat`
+- `python -m pip install openhands-ai`
+- `uv tool install openhands-ai`
 
 Auth / access notes:
-- Requires model/provider credentials or service access for realistic evaluation. Local install and help surfaces are available before paid provider validation.
+- Provider credentials may be required for full automation runs; install and local startup documentation are public.
 
 ## 7. Repo-Fit Analysis
 
 Provenance: `committed repo evidence + deterministic descriptor derivation`
 
-- crate path: `crates/aider`
-- backend module: `crates/agent_api/src/backends/aider`
-- manifest root: `cli_manifests/aider`
-- package name: `unified-agent-api-aider`
+- crate path: `crates/openhands`
+- backend module: `crates/agent_api/src/backends/openhands`
+- manifest root: `cli_manifests/openhands`
+- package name: `unified-agent-api-openhands`
 
 ## 8. Required Artifacts
 
@@ -101,27 +101,26 @@ Provenance: `maintainer inference grounded in repo constraints`
 
 Provenance: `dated external snapshot evidence`
 
+### `openhands`
+
+- display name: `OpenHands`
+- `github_repo` `https://github.com/All-Hands-AI/OpenHands` fetched `2026-04-28T03:35:37Z`
+- `generic_page` `https://docs.all-hands.dev/` fetched `2026-04-28T03:35:38Z`
+- `pypi_package` `https://pypi.org/project/openhands-ai/` fetched `2026-04-28T03:35:39Z`
+
 ### `aider`
 
 - display name: `aider`
-- `github_repo` `https://github.com/Aider-AI/aider` fetched `2026-04-28T00:00:11Z`
-- `generic_page` `https://aider.chat/` fetched `2026-04-28T00:00:12Z`
-- `pypi_package` `https://pypi.org/project/aider-chat/` fetched `2026-04-28T00:00:12Z`
+- `github_repo` `https://github.com/Aider-AI/aider` fetched `2026-04-28T03:35:33Z`
+- `generic_page` `https://aider.chat/` fetched `2026-04-28T03:35:33Z`
+- `pypi_package` `https://pypi.org/project/aider-chat/` fetched `2026-04-28T03:35:33Z`
 
-### `opencode`
+### `goose`
 
-- display name: `OpenCode`
-- `github_repo` `https://github.com/sst/opencode` fetched `2026-04-28T00:00:13Z`
-- `generic_page` `https://opencode.ai/docs/` fetched `2026-04-28T00:00:13Z`
-- `generic_page` `https://opencode.ai/docs/cli/` fetched `2026-04-28T00:00:14Z`
-- `npm_package` `https://www.npmjs.com/package/opencode-ai` fetched `2026-04-28T00:00:14Z`
-
-### `gemini_cli`
-
-- display name: `Gemini CLI`
-- `github_repo` `https://github.com/google-gemini/gemini-cli` fetched `2026-04-28T00:00:12Z`
-- `npm_package` `https://www.npmjs.com/package/@google/gemini-cli` fetched `2026-04-28T00:00:12Z`
-- `github_repo` `https://github.com/google-github-actions/run-gemini-cli` fetched `2026-04-28T00:00:13Z`
+- display name: `Goose`
+- `github_repo` `https://github.com/block/goose` fetched `2026-04-28T03:35:35Z`
+- `generic_page` `https://goose-docs.ai` fetched `2026-04-28T03:35:36Z`
+- `generic_page` `https://goose-docs.ai/docs/` fetched `2026-04-28T03:35:36Z`
 
 ## 11. Acceptance Checklist
 

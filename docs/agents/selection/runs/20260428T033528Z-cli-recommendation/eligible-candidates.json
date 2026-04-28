@@ -1,6 +1,20 @@
 {
   "eligible_candidates": [
     {
+      "agent_id": "openhands",
+      "display_name": "OpenHands",
+      "primary_sum": 11,
+      "score": {
+        "Adoption & community pull": 3,
+        "Architecture fit for this repo": 1,
+        "CLI product maturity & release activity": 3,
+        "Capability expansion / future leverage": 1,
+        "Installability & docs quality": 3,
+        "Reproducibility & access friction": 2
+      },
+      "secondary_sum": 2
+    },
+    {
       "agent_id": "aider",
       "display_name": "aider",
       "primary_sum": 10,
@@ -15,33 +29,19 @@
       "secondary_sum": 1
     },
     {
-      "agent_id": "opencode",
-      "display_name": "OpenCode",
-      "primary_sum": 10,
-      "score": {
-        "Adoption & community pull": 3,
-        "Architecture fit for this repo": 1,
-        "CLI product maturity & release activity": 3,
-        "Capability expansion / future leverage": 0,
-        "Installability & docs quality": 3,
-        "Reproducibility & access friction": 1
-      },
-      "secondary_sum": 1
-    },
-    {
-      "agent_id": "gemini_cli",
-      "display_name": "Gemini CLI",
+      "agent_id": "goose",
+      "display_name": "Goose",
       "primary_sum": 8,
       "score": {
         "Adoption & community pull": 3,
         "Architecture fit for this repo": 1,
-        "CLI product maturity & release activity": 3,
-        "Capability expansion / future leverage": 1,
-        "Installability & docs quality": 1,
-        "Reproducibility & access friction": 1
+        "CLI product maturity & release activity": 0,
+        "Capability expansion / future leverage": 0,
+        "Installability & docs quality": 3,
+        "Reproducibility & access friction": 2
       },
-      "secondary_sum": 2
+      "secondary_sum": 1
     }
   ],
-  "run_id": "20260428T000011Z-cli-recommendation"
+  "run_id": "20260428T033528Z-cli-recommendation"
 }

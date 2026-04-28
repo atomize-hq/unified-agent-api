@@ -19,6 +19,7 @@ import urllib.request
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CANONICAL_PACKET_REL = "docs/agents/selection/cli-agent-selection-packet.md"
+REGISTRY_RELATIVE_PATH = "crates/xtask/data/agent_registry.toml"
 DEFAULT_TARGET = "darwin-arm64"
 APPROVAL_VERSION = "1"
 SELECTION_MODE = "factory_validation"
@@ -321,6 +322,31 @@ def remove_path(path: Path) -> None:
 
 def canonical_packet_path(repo_root: Path) -> Path:
     return repo_root / CANONICAL_PACKET_REL
+
+
+def load_onboarded_agent_ids(registry_path: Path) -> set[str]:
+    try:
+        data = tomllib.loads(read_text(registry_path))
+    except FileNotFoundError as exc:
+        raise RecommendationError(f"registry file `{registry_path}` does not exist") from exc
+    except tomllib.TOMLDecodeError as exc:
+        raise RecommendationError(f"registry file `{registry_path}` is not valid TOML: {exc}") from exc
+    agents = data.get("agents")
+    if not isinstance(agents, list):
+        raise RecommendationError(f"registry file `{registry_path}` must define an `agents` array")
+    onboarded_ids: set[str] = set()
+    for index, agent in enumerate(agents):
+        if not isinstance(agent, dict):
+            raise RecommendationError(
+                f"registry file `{registry_path}` has a non-table agent entry at index {index}"
+            )
+        agent_id = agent.get("agent_id")
+        if not isinstance(agent_id, str) or not agent_id:
+            raise RecommendationError(
+                f"registry file `{registry_path}` has an invalid `agent_id` at index {index}"
+            )
+        onboarded_ids.add(agent_id)
+    return onboarded_ids
 
 
 def parse_seed_file(seed_path: Path) -> SeedConfig:
@@ -1041,10 +1067,13 @@ def generate_recommendation(
     seed_file: Path,
     run_id: str,
     scratch_root: Path,
+    registry_path: Path | None = None,
     fetcher: Callable[[str], SourceRecord] = fetch_url,
     now_fn: Callable[[], str] = utc_now,
 ) -> Path:
     seed = parse_seed_file(seed_file)
+    actual_registry_path = registry_path or (REPO_ROOT / REGISTRY_RELATIVE_PATH)
+    onboarded_agent_ids = load_onboarded_agent_ids(actual_registry_path)
     run_dir = scratch_root / run_id
     remove_path(run_dir)
     run_dir.mkdir(parents=True, exist_ok=True)
@@ -1067,7 +1096,12 @@ def generate_recommendation(
             except Exception as exc:
                 raise RecommendationError(f"source capture failed for `{candidate.agent_id}` url `{url}`: {exc}") from exc
         evidence = collect_evidence(candidate, records)
-        rejection_reasons = eligibility(candidate, evidence, records)
+        rejection_reasons: list[str] = []
+        if candidate.agent_id in onboarded_agent_ids:
+            rejection_reasons.append(
+                f"agent_id `{candidate.agent_id}` already exists in {REGISTRY_RELATIVE_PATH} and is already onboarded"
+            )
+        rejection_reasons.extend(eligibility(candidate, evidence, records))
         records_by_agent[candidate.agent_id] = records
         evidence_by_agent[candidate.agent_id] = evidence
         eligibility_by_agent[candidate.agent_id] = rejection_reasons

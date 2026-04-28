@@ -59,6 +59,8 @@ Required scratch artifacts:
 - `approval-draft.generated.toml`
 - `run-summary.md`
 
+Generation applies a hard ineligibility gate against `crates/xtask/data/agent_registry.toml` before scoring. Candidates whose `agent_id` is already onboarded in the registry remain in `candidate-pool.json` with rejection reasons, but they are never scored, shortlisted, or emitted into `eligible-candidates.json`.
+
 If fewer than 3 eligible candidates survive, stop here and expand the seed file.
 
 ### 3. Review the scratch run

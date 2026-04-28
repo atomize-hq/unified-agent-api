@@ -1,0 +1,80 @@
+{
+  "candidates": [
+    {
+      "agent_id": "aider",
+      "display_name": "aider",
+      "eligible": true,
+      "notes": "stars=44029, installs=2, docs=1, auth_hits=5, architecture_hits=5, leverage_hits=1",
+      "recommended": false,
+      "rejection_reasons": [],
+      "score": {
+        "Adoption & community pull": 3,
+        "Architecture fit for this repo": 1,
+        "CLI product maturity & release activity": 3,
+        "Capability expansion / future leverage": 0,
+        "Installability & docs quality": 3,
+        "Reproducibility & access friction": 1
+      },
+      "shortlisted": true
+    },
+    {
+      "agent_id": "gemini_cli",
+      "display_name": "Gemini CLI",
+      "eligible": false,
+      "notes": null,
+      "recommended": false,
+      "rejection_reasons": [
+        "agent_id `gemini_cli` already exists in crates/xtask/data/agent_registry.toml and is already onboarded"
+      ],
+      "score": null,
+      "shortlisted": false
+    },
+    {
+      "agent_id": "goose",
+      "display_name": "Goose",
+      "eligible": true,
+      "notes": "stars=43414, installs=2, docs=2, auth_hits=3, architecture_hits=4, leverage_hits=1",
+      "recommended": false,
+      "rejection_reasons": [],
+      "score": {
+        "Adoption & community pull": 3,
+        "Architecture fit for this repo": 1,
+        "CLI product maturity & release activity": 0,
+        "Capability expansion / future leverage": 0,
+        "Installability & docs quality": 3,
+        "Reproducibility & access friction": 2
+      },
+      "shortlisted": true
+    },
+    {
+      "agent_id": "opencode",
+      "display_name": "OpenCode",
+      "eligible": false,
+      "notes": null,
+      "recommended": false,
+      "rejection_reasons": [
+        "agent_id `opencode` already exists in crates/xtask/data/agent_registry.toml and is already onboarded"
+      ],
+      "score": null,
+      "shortlisted": false
+    },
+    {
+      "agent_id": "openhands",
+      "display_name": "OpenHands",
+      "eligible": true,
+      "notes": "stars=72210, installs=2, docs=1, auth_hits=3, architecture_hits=4, leverage_hits=2",
+      "recommended": true,
+      "rejection_reasons": [],
+      "score": {
+        "Adoption & community pull": 3,
+        "Architecture fit for this repo": 1,
+        "CLI product maturity & release activity": 3,
+        "Capability expansion / future leverage": 1,
+        "Installability & docs quality": 3,
+        "Reproducibility & access friction": 2
+      },
+      "shortlisted": true
+    }
+  ],
+  "run_id": "20260428T033528Z-cli-recommendation"
+}
