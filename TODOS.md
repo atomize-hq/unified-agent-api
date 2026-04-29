@@ -26,17 +26,29 @@
 **Priority:** P2
 **Depends on:** M5 landing with one canonical capability projection contract and one shared local/CI check-only gate
 
-### Compress The Runtime-Owned Onboarding Lane After Governance Truth Lands
+### Enclose The Runtime Follow-On In A Codex Exec Runner
 
-**What:** Identify and reduce the dominant wrapper/backend/manual evidence steps that still control lead time after M3 makes selection and approval provenance explicit.
+**What:** Add a bounded runtime-lane execution path for create-mode onboarding that starts from the control-plane packet and scaffolding output, then drives the operator-guide "Finish the runtime follow-on" work through Codex with explicit file targets, baseline expectations, and required evidence outputs.
 
-**Why:** M2 solved control-plane mutation. M3 solves governance truth. The next likely bottleneck is the runtime-owned lane, but the repo should name that only after the governance chain is trustworthy enough to measure it cleanly.
+**Why:** The recommendation lane now closes the pre-create gap, and the control-plane commands already own enrollment, scaffolding, publication refresh, and packet closeout. The remaining high-friction seam is the runtime follow-on itself: wrapper/backend implementation, wrapper coverage source-of-truth, and committed runtime evidence. That lane still depends on human interpretation of examples instead of a repo-owned execution recipe.
 
-**Context:** The 2026-04-21 `/autoplan` for the CLI agent onboarding factory explicitly deferred runtime-lane compression because the current repo still cannot say why `gemini_cli` was approved after `OpenCode` was recommended, or what residual friction the first proving run actually exposed. Once M3 closes that gap, the runtime lane becomes the right next target.
+**Context:** The repo has now landed on a concrete baseline for new agent support. The expected default tier is `opencode`-level support, because it exercises the backend harness plus session controls. `gemini_cli` remains a minimal exception path only when the implementation packet records a justification for why the agent is shipping below the default tier. `codex` and `claude_code` stay feature-rich references for optional surfaces such as add-dirs, external sandbox policy, MCP management, and richer session handling. Publication refresh automation after runtime evidence exists remains a follow-up milestone, not part of this narrower runtime-lane closure.
+
+**Effort:** M
+**Priority:** P1
+**Depends on:** The shipped M6 control-plane boundary, the backend-harness path in `agent_api`, and a backlog-only milestone spec that pins the runtime-lane tiering and runner contract
+
+### Enclose The Publication Refresh Follow-On After The Runtime Runner
+
+**What:** Add the next bounded automation seam after `uaa-0022`: deterministic refresh of runtime-derived manifest evidence into publication-owned support and capability surfaces, validation gates, and proving-run-closeout readiness.
+
+**Why:** The runtime runner milestone deliberately stops before publication refresh so the runtime seam stays boilable. But the real create-lane done-state still requires support/capability refresh, green validation, and closeout. If this follow-on is not captured explicitly, the runtime runner risks becoming a well-documented island instead of a step toward a full green lane.
+
+**Context:** The 2026-04-29 `/autoplan` review for `uaa-0022` accepted a green-lane handoff contract into scope but kept publication automation deferred. This follow-on should define the machine-readable handoff artifact, the exact runtime-owned versus publication-owned `cli_manifests/<agent_id>/` split, and the validation contract for `support-matrix --check`, `capability-matrix --check`, `capability-matrix-audit`, and `make preflight`.
 
 **Effort:** M
 **Priority:** P2
-**Depends on:** M3 governance artifacts plus one post-M3 onboarding cycle with recorded duration and residual friction truth
+**Depends on:** `uaa-0022` landing with a structured runtime summary and explicit handoff into publication refresh
 
 ## Completed
 

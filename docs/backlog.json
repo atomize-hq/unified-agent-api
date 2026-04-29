@@ -1,7 +1,54 @@
 {
   "schema_version": 1,
-  "updated_at_utc": "2026-03-06T13:49:01Z",
+  "updated_at_utc": "2026-04-29T16:51:28Z",
   "items": [
+    {
+      "id": "uaa-0022",
+      "title": "Codex-exec runner for the onboarding runtime follow-on",
+      "status": "todo",
+      "bucket": "agent_api.onboarding",
+      "type": "design",
+      "kickoff": {
+        "prompt": [
+          "Work item: uaa-0022 — Codex-exec runner for the onboarding runtime follow-on.",
+          "Goal: replace the current manual translation of the operator-guide runtime lane with a bounded Codex execution recipe that starts after `onboard-agent` and `scaffold-wrapper-crate`.",
+          "Key decisions already made:",
+          "- Default baseline is `opencode`-level support.",
+          "- `gemini_cli` is a minimal exception path only and requires explicit justification.",
+          "- `codex` and `claude_code` remain feature-rich references for optional richer surfaces.",
+          "Steps:",
+          "1) Define the runtime-lane input contract: which packet files, registry fields, and scaffold outputs the runner reads.",
+          "2) Define the output contract: runtime code, wrapper coverage source-of-truth, committed manifest evidence, and an achieved-tier summary.",
+          "3) Define the instruction recipe so Codex defaults to the `opencode` template and only pulls in `gemini_cli` / `codex` / `claude_code` patterns when justified.",
+          "4) Define the review requirement for `minimal` outcomes: explicit justification plus follow-up work to reach `default`.",
+          "Output: a repo-owned runner plan ready for implementation, without reopening the operator guide or folding in publication-refresh follow-on work."
+        ],
+        "files_to_read": [
+          "docs/cli-agent-onboarding-factory-operator-guide.md",
+          "docs/specs/cli-agent-onboarding-charter.md",
+          "docs/adr/0013-agent-api-backend-harness.md",
+          "docs/backlog/uaa-0022-runtime-follow-on-codex-runner.md",
+          "crates/agent_api/src/backends/opencode/mod.rs",
+          "crates/agent_api/src/backends/opencode/backend.rs",
+          "crates/agent_api/src/backends/opencode/harness.rs",
+          "crates/agent_api/src/backends/gemini_cli/harness.rs",
+          "crates/agent_api/src/backends/codex/mod.rs",
+          "crates/agent_api/src/backends/claude_code/mod.rs",
+          "crates/opencode/src/lib.rs"
+        ],
+        "deliverables": [
+          "Pinned runtime-lane runner input/output contract",
+          "Pinned tiering policy for default/minimal/feature-rich runtime implementations",
+          "Implementation-ready execution recipe for Codex to complete the runtime follow-on"
+        ]
+      },
+      "notes": [
+        "This is the next create-mode automation seam after the recommendation lane and M6 control-plane boundary.",
+        "The runner should start from the operator-guide runtime follow-on, not from an open-ended request to 'copy existing backends'.",
+        "Default means `opencode`-level support. Minimal means `gemini_cli`-level support and requires explicit justification. Feature-rich means selectively borrowing richer patterns from `codex` and `claude_code`.",
+        "Keep publication refresh automation after runtime evidence exists as a separate follow-up milestone."
+      ]
+    },
     {
       "id": "uaa-0013",
       "title": "Tooling/spec updates for agent_api.session bucket",
