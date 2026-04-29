@@ -48,7 +48,7 @@ mod capability_matrix {
                     command(&["mcp", "add"], &["win32-x64"]),
                     command(&["mcp", "remove"], &["win32-x64"]),
                 ],
-                "opencode" | "gemini_cli" => Vec::new(),
+                "opencode" | "gemini_cli" | "aider" => Vec::new(),
                 other => panic!("unexpected agent `{other}`"),
             };
 
@@ -71,6 +71,7 @@ mod capability_matrix {
             assert!(inventory.backends.contains_key("claude_code"));
             assert!(inventory.backends.contains_key("opencode"));
             assert!(inventory.backends.contains_key("gemini_cli"));
+            assert!(inventory.backends.contains_key("aider"));
         }
 
         #[test]

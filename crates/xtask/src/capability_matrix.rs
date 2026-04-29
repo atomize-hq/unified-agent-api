@@ -12,6 +12,7 @@ use crate::capability_projection::{
 };
 use agent_api::{
     backends::{
+        aider::{AiderBackend, AiderBackendConfig},
         claude_code::{ClaudeCodeBackend, ClaudeCodeBackendConfig},
         codex::{CodexBackend, CodexBackendConfig},
         gemini_cli::{GeminiCliBackend, GeminiCliBackendConfig},
@@ -330,6 +331,10 @@ fn runtime_backend_capabilities(
     agent_id: &str,
 ) -> Result<(String, AgentWrapperCapabilities), String> {
     match agent_id {
+        "aider" => {
+            let backend = AiderBackend::new(AiderBackendConfig::default());
+            Ok((backend.kind().as_str().to_string(), backend.capabilities()))
+        }
         "codex" => {
             let backend = CodexBackend::new(CodexBackendConfig::default());
             Ok((backend.kind().as_str().to_string(), backend.capabilities()))

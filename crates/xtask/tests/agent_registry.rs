@@ -23,7 +23,7 @@ fn seeded_registry_parses_successfully() {
         .collect();
     assert_eq!(
         agent_ids,
-        vec!["codex", "claude_code", "opencode", "gemini_cli"]
+        vec!["codex", "claude_code", "opencode", "gemini_cli", "aider"]
     );
 
     let support_ids: Vec<&str> = registry
@@ -32,7 +32,7 @@ fn seeded_registry_parses_successfully() {
         .collect();
     assert_eq!(
         support_ids,
-        vec!["codex", "claude_code", "opencode", "gemini_cli"]
+        vec!["codex", "claude_code", "opencode", "gemini_cli", "aider"]
     );
 
     let capability_ids: Vec<&str> = registry
@@ -41,7 +41,7 @@ fn seeded_registry_parses_successfully() {
         .collect();
     assert_eq!(
         capability_ids,
-        vec!["codex", "claude_code", "opencode", "gemini_cli"]
+        vec!["codex", "claude_code", "opencode", "gemini_cli", "aider"]
     );
 
     let codex = registry.find("codex").expect("seeded codex entry");
@@ -109,7 +109,7 @@ fn workspace_loader_reads_seeded_registry() {
             .iter()
             .map(|agent| agent.agent_id.as_str())
             .collect::<Vec<_>>(),
-        vec!["codex", "claude_code", "opencode", "gemini_cli"]
+        vec!["codex", "claude_code", "opencode", "gemini_cli", "aider"]
     );
     assert_eq!(
         workspace_root.join(REGISTRY_RELATIVE_PATH),

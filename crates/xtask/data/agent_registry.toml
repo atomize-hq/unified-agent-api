@@ -216,3 +216,29 @@ onboarding_pack_prefix = "gemini-cli-onboarding"
 path = "docs/agents/lifecycle/gemini-cli-onboarding/governance/approved-agent.toml"
 required = true
 comparison_kind = "approved_agent_descriptor"
+
+[[agents]]
+agent_id = "aider"
+display_name = "aider"
+crate_path = "crates/aider"
+backend_module = "crates/agent_api/src/backends/aider"
+manifest_root = "cli_manifests/aider"
+package_name = "unified-agent-api-aider"
+canonical_targets = ["darwin-arm64"]
+
+[agents.wrapper_coverage]
+binding_kind = "generated_from_wrapper_crate"
+source_path = "crates/aider"
+
+[agents.capability_declaration]
+always_on = ["agent_api.config.model.v1", "agent_api.events", "agent_api.events.live", "agent_api.run"]
+backend_extensions = []
+[agents.publication]
+support_matrix_enabled = true
+capability_matrix_enabled = true
+
+[agents.release]
+docs_release_track = "crates-io"
+
+[agents.scaffold]
+onboarding_pack_prefix = "aider-onboarding"

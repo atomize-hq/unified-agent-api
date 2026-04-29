@@ -100,6 +100,11 @@ fn materialize_committed_gemini_dir(gemini_dir: &Path) {
     copy_dir_recursive(&src, gemini_dir);
 }
 
+fn materialize_committed_aider_dir(aider_dir: &Path) {
+    let src = workspace_root().join("cli_manifests").join("aider");
+    copy_dir_recursive(&src, aider_dir);
+}
+
 fn support_rows_for_agent_from_repo(agent: &str) -> Vec<Value> {
     let artifact_path = workspace_root()
         .join("cli_manifests")
@@ -397,7 +402,8 @@ fn codex_report_exists(codex_dir: &Path, version: &str, target: &str) -> bool {
 
 fn write_support_matrix_artifact(workspace_root: &Path) {
     let codex_dir = workspace_root.join("cli_manifests").join("codex");
-    let mut rows = vec![
+    let mut rows = support_rows_for_agent_from_repo("aider");
+    rows.extend([
         support_row(SupportRowSpec {
             agent: "claude_code",
             version: VERSION,
@@ -438,7 +444,7 @@ fn write_support_matrix_artifact(workspace_root: &Path) {
             pointer_promotion: "latest_supported_and_validated",
             evidence_notes: &[],
         }),
-    ];
+    ]);
 
     if codex_dir
         .join("versions")
@@ -446,7 +452,7 @@ fn write_support_matrix_artifact(workspace_root: &Path) {
         .exists()
     {
         rows.insert(
-            2,
+            3,
             support_row(SupportRowSpec {
                 agent: "codex",
                 version: REPORTED_VERSION,
@@ -463,7 +469,7 @@ fn write_support_matrix_artifact(workspace_root: &Path) {
             }),
         );
         rows.insert(
-            4,
+            5,
             support_row(SupportRowSpec {
                 agent: "codex",
                 version: REPORTED_VERSION,
@@ -482,7 +488,7 @@ fn write_support_matrix_artifact(workspace_root: &Path) {
         let reported_linux_backend_supported =
             codex_report_exists(&codex_dir, REPORTED_VERSION, REQUIRED_TARGET);
         rows.insert(
-            6,
+            7,
             support_row(SupportRowSpec {
                 agent: "codex",
                 version: REPORTED_VERSION,
@@ -524,12 +530,14 @@ fn materialize_minimal_valid_workspace(workspace_root: &Path) -> PathBuf {
     let claude_dir = workspace_root.join("cli_manifests").join("claude_code");
     let gemini_dir = workspace_root.join("cli_manifests").join("gemini_cli");
     let opencode_dir = workspace_root.join("cli_manifests").join("opencode");
+    let aider_dir = workspace_root.join("cli_manifests").join("aider");
 
     write_workspace_manifest(workspace_root);
     materialize_minimal_valid_codex_dir(&codex_dir);
     materialize_minimal_valid_claude_dir(&claude_dir);
     materialize_committed_gemini_dir(&gemini_dir);
     materialize_committed_opencode_dir(&opencode_dir);
+    materialize_committed_aider_dir(&aider_dir);
     write_support_matrix_artifact(workspace_root);
 
     codex_dir

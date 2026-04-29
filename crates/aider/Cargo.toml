@@ -1,0 +1,23 @@
+[package]
+name = "unified-agent-api-aider"
+version.workspace = true
+edition = "2021"
+rust-version = "1.78"
+description = "Wrapper scaffold for aider; runtime/backend implementation pending"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/atomize-hq/unified-agent-api"
+homepage = "https://github.com/atomize-hq/unified-agent-api"
+documentation = "https://docs.rs/unified-agent-api-aider"
+keywords = ["aider", "cli", "wrapper", "agent"]
+categories = ["api-bindings", "command-line-interface"]
+readme = "README.md"
+
+[lib]
+name = "aider"
+
+[dependencies]
+futures-core = "0.3"
+tokio = { workspace = true, features = ["process", "io-util", "io-std", "macros", "rt", "rt-multi-thread", "time", "sync", "fs"] }
+thiserror = { workspace = true }
+serde_json = { workspace = true }
+serde = { workspace = true }

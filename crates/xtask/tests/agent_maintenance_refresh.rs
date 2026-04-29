@@ -126,7 +126,7 @@ fn release_doc_refresh_uses_registry_order_instead_of_workspace_member_order() {
     seed_publication_inputs(&fixture);
     write_text(
         &fixture.join("Cargo.toml"),
-        "[workspace]\nmembers = [\n  \"crates/agent_api\",\n  \"crates/opencode\",\n  \"crates/codex\",\n  \"crates/claude_code\",\n  \"crates/gemini_cli\",\n  \"crates/wrapper_events\",\n  \"crates/xtask\",\n]\n",
+        "[workspace]\nmembers = [\n  \"crates/agent_api\",\n  \"crates/opencode\",\n  \"crates/codex\",\n  \"crates/claude_code\",\n  \"crates/gemini_cli\",\n  \"crates/aider\",\n  \"crates/wrapper_events\",\n  \"crates/xtask\",\n]\n",
     );
 
     let request_path =
@@ -334,6 +334,7 @@ fn seed_publication_inputs(root: &Path) {
         &[],
     );
     seed_cli_manifest_root(root, "cli_manifests/gemini_cli", &["darwin-arm64"], &[]);
+    seed_cli_manifest_root(root, "cli_manifests/aider", &["darwin-arm64"], &[]);
 }
 
 fn seed_publishable_workspace_member(root: &Path, member_path: &str, package_name: &str) {

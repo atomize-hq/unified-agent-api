@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
-  "updated_at_utc": "2026-04-29T16:51:28Z",
+  "updated_at_utc": "2026-04-29T22:30:00Z",
   "items": [
     {
       "id": "uaa-0022",
       "title": "Codex-exec runner for the onboarding runtime follow-on",
-      "status": "todo",
+      "status": "done",
       "bucket": "agent_api.onboarding",
       "type": "design",
       "kickoff": {
@@ -46,7 +46,8 @@
         "This is the next create-mode automation seam after the recommendation lane and M6 control-plane boundary.",
         "The runner should start from the operator-guide runtime follow-on, not from an open-ended request to 'copy existing backends'.",
         "Default means `opencode`-level support. Minimal means `gemini_cli`-level support and requires explicit justification. Feature-rich means selectively borrowing richer patterns from `codex` and `claude_code`.",
-        "Keep publication refresh automation after runtime evidence exists as a separate follow-up milestone."
+        "Keep publication refresh automation after runtime evidence exists as a separate follow-up milestone.",
+        "Implemented on 2026-04-29: `xtask runtime-follow-on` landed, the create-mode operator guide now uses the bounded runtime packet, and the runner emits a validated handoff into the publication and green gates."
       ]
     },
     {

@@ -138,6 +138,19 @@ fn materialize_gemini_root(workspace: &Path) {
     );
 }
 
+fn materialize_aider_root(workspace: &Path) {
+    materialize_root(
+        &workspace.join("cli_manifests/aider"),
+        &["darwin-arm64"],
+        "0.0.0",
+        &["darwin-arm64"],
+        &[("0.0.0", &["darwin-arm64"])],
+        &[("darwin-arm64", "0.0.0")],
+        &[("darwin-arm64", "0.0.0")],
+        &[],
+    );
+}
+
 #[test]
 fn derives_target_scoped_rows_with_sparse_caveats_and_pointer_state() {
     let workspace = make_temp_dir("support-matrix-derivation");
@@ -241,15 +254,26 @@ fn derives_target_scoped_rows_with_sparse_caveats_and_pointer_state() {
     );
 
     materialize_gemini_root(&workspace);
+    materialize_aider_root(&workspace);
 
     let rows = derive_rows(&workspace).expect("derive rows");
     validate_publication_consistency(&workspace, &rows)
         .expect("derived rows should satisfy the shared consistency helper");
     assert_eq!(
         rows.len(),
-        7,
-        "expected two codex versions x two targets + one claude row + one opencode row + one gemini row"
+        8,
+        "expected aider + two codex versions x two targets + one claude row + one opencode row + one gemini row"
     );
+
+    let aider_row = find_row(&rows, "aider", "0.0.0", "darwin-arm64");
+    assert_eq!(aider_row.manifest_support, ManifestSupportState::Supported);
+    assert_eq!(aider_row.backend_support, BackendSupportState::Unsupported);
+    assert_eq!(aider_row.uaa_support, UaaSupportState::Unsupported);
+    assert_eq!(
+        aider_row.pointer_promotion,
+        PointerPromotionState::LatestSupportedAndValidated
+    );
+    assert!(aider_row.evidence_notes.is_empty());
 
     let claude_row = find_row(&rows, "claude_code", "2.0.0", "linux-x64");
     assert_eq!(claude_row.manifest_support, ManifestSupportState::Supported);
@@ -344,13 +368,14 @@ fn derives_target_scoped_rows_with_sparse_caveats_and_pointer_state() {
     assert_eq!(gemini_row.pointer_promotion, PointerPromotionState::None);
     assert!(gemini_row.evidence_notes.is_empty());
 
-    assert_eq!(rows[0].agent, "claude_code");
-    assert_eq!(rows[1].agent, "codex");
-    assert_eq!(rows[1].target, "linux-x64");
-    assert_eq!(rows[1].version, "1.0.0");
-    assert_eq!(rows[2].version, "0.9.0");
-    assert_eq!(rows[5].agent, "gemini_cli");
-    assert_eq!(rows[6].agent, "opencode");
+    assert_eq!(rows[0].agent, "aider");
+    assert_eq!(rows[1].agent, "claude_code");
+    assert_eq!(rows[2].agent, "codex");
+    assert_eq!(rows[2].target, "linux-x64");
+    assert_eq!(rows[2].version, "1.0.0");
+    assert_eq!(rows[3].version, "0.9.0");
+    assert_eq!(rows[6].agent, "gemini_cli");
+    assert_eq!(rows[7].agent, "opencode");
 }
 
 #[test]

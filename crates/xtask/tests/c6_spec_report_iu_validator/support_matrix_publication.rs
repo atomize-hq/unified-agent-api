@@ -84,10 +84,12 @@ fn c6_validator_detects_support_matrix_consistency_drift_for_claude_root() {
     let claude_dir = temp.join("cli_manifests").join("claude_code");
     let gemini_dir = temp.join("cli_manifests").join("gemini_cli");
     let opencode_dir = temp.join("cli_manifests").join("opencode");
+    let aider_dir = temp.join("cli_manifests").join("aider");
     materialize_minimal_valid_codex_dir(&codex_dir);
     materialize_minimal_valid_claude_dir(&claude_dir);
     materialize_committed_gemini_dir(&gemini_dir);
     materialize_committed_opencode_dir(&opencode_dir);
+    materialize_committed_aider_dir(&aider_dir);
     write_complete_support_matrix_artifact(&temp);
 
     let artifact_path = temp
@@ -155,10 +157,12 @@ fn c6_validator_detects_support_state_drift_in_support_matrix_publication() {
     let claude_dir = temp.join("cli_manifests").join("claude_code");
     let gemini_dir = temp.join("cli_manifests").join("gemini_cli");
     let opencode_dir = temp.join("cli_manifests").join("opencode");
+    let aider_dir = temp.join("cli_manifests").join("aider");
     materialize_minimal_valid_codex_dir(&codex_dir);
     materialize_minimal_valid_claude_dir(&claude_dir);
     materialize_committed_gemini_dir(&gemini_dir);
     materialize_committed_opencode_dir(&opencode_dir);
+    materialize_committed_aider_dir(&aider_dir);
     write_complete_support_matrix_artifact(&temp);
 
     let artifact_path = temp
@@ -194,10 +198,12 @@ fn c6_validator_detects_non_canonical_support_matrix_row_order() {
     let claude_dir = temp.join("cli_manifests").join("claude_code");
     let gemini_dir = temp.join("cli_manifests").join("gemini_cli");
     let opencode_dir = temp.join("cli_manifests").join("opencode");
+    let aider_dir = temp.join("cli_manifests").join("aider");
     materialize_minimal_valid_codex_dir(&codex_dir);
     materialize_minimal_valid_claude_dir(&claude_dir);
     materialize_committed_gemini_dir(&gemini_dir);
     materialize_committed_opencode_dir(&opencode_dir);
+    materialize_committed_aider_dir(&aider_dir);
     write_complete_support_matrix_artifact(&temp);
 
     let artifact_path = temp

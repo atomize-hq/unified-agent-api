@@ -249,25 +249,38 @@ The create lane begins from the approved onboarding artifact:
 
 `docs/agents/lifecycle/<onboarding_pack_prefix>/governance/approved-agent.toml`
 
-Preview first, then write:
+Preview first:
 
 ```sh
 cargo run -p xtask -- onboard-agent --approval docs/agents/lifecycle/<onboarding_pack_prefix>/governance/approved-agent.toml --dry-run
-cargo run -p xtask -- onboard-agent --approval docs/agents/lifecycle/<onboarding_pack_prefix>/governance/approved-agent.toml --write
 ```
 
 `onboard-agent` is the control-plane enrollment step. It writes the registry/docs/manifest/release touchpoints and the onboarding packet. It does not create the wrapper crate.
 
-### 2. Hand off to the runtime shell step
+### 2. Bootstrap the execution context
 
-Once the agent is enrolled, create the publishable wrapper shell from registry truth:
+Before create-mode mutates `workspace.members`, build `xtask` once and use the direct binary for
+the rest of the create lane:
 
 ```sh
-cargo run -p xtask -- scaffold-wrapper-crate --agent <agent_id> --dry-run
-cargo run -p xtask -- scaffold-wrapper-crate --agent <agent_id> --write
+cargo build -p xtask
+XTASK_BIN="$PWD/target/debug/xtask"
 ```
 
-`scaffold-wrapper-crate` owns only the registry-owned `crate_path/**` package shell. It writes the minimal publishable file set under the wrapper crate root:
+All later gate commands in create mode must run from the repo root.
+
+### 3. Hand off to the runtime shell step
+
+After the execution context is bootstrapped, enroll the agent and create the publishable wrapper
+shell from registry truth:
+
+```sh
+"$XTASK_BIN" onboard-agent --approval docs/agents/lifecycle/<onboarding_pack_prefix>/governance/approved-agent.toml --write
+"$XTASK_BIN" scaffold-wrapper-crate --agent <agent_id> --write
+```
+
+`scaffold-wrapper-crate` owns only the registry-owned `crate_path/**` package shell. It writes the
+minimal publishable file set under the wrapper crate root:
 
 - `Cargo.toml`
 - `README.md`
@@ -275,25 +288,83 @@ cargo run -p xtask -- scaffold-wrapper-crate --agent <agent_id> --write
 - `LICENSE-MIT`
 - `src/lib.rs`
 
-This is the hard boundary from M6: `onboard-agent` enrolls the control plane; `scaffold-wrapper-crate` creates the runtime-owned wrapper shell.
+This is the hard boundary from M6 and UAA-0022: `onboard-agent` enrolls the control plane;
+`scaffold-wrapper-crate` creates the runtime-owned wrapper shell; the runtime follow-on owns the
+bounded implementation lane after that point.
 
-### 3. Finish the runtime follow-on
+### 4. Finish the runtime follow-on
 
-After scaffolding, finish the runtime-owned work outside the control-plane commands:
+After scaffolding, materialize the runtime packet:
 
+```sh
+"$XTASK_BIN" runtime-follow-on \
+  --approval docs/agents/lifecycle/<onboarding_pack_prefix>/governance/approved-agent.toml \
+  --dry-run \
+  --run-id <run_id>
+```
+
+`runtime-follow-on --dry-run` writes the bounded scratch packet under:
+
+`docs/agents/.uaa-temp/runtime-follow-on/runs/<run_id>/`
+
+Required scratch artifacts:
+- `input-contract.json`
+- `codex-prompt.md`
+- `run-status.json`
+- `run-summary.md`
+- `validation-report.json`
+- `written-paths.json`
+- `handoff.json`
+
+The runtime lane then executes only the runtime-owned work described by that packet:
 - implement the wrapper/runtime details in `crates/<agent_id>` and `crates/agent_api/src/backends/<agent_id>`
-- author the wrapper coverage input at the registry-owned wrapper coverage source path
-- populate manifest evidence under `cli_manifests/<agent_id>/` from committed runtime outputs
+- author wrapper-coverage source-of-truth only under the registry-owned wrapper coverage source path
+- populate committed runtime evidence only under the runtime-owned `cli_manifests/<agent_id>/snapshots/**` and `cli_manifests/<agent_id>/supplement/**` roots
 
-The onboarding packet examples show this as the runtime lane, but the procedural source of truth is this guide.
+The expected baseline is `default`. Use the optional runner inputs only when justified:
+- `--requested-tier minimal` requires `--minimal-justification-file <path>`
+- `--requested-tier feature-rich` may be paired with repeatable `--allow-rich-surface <surface>`
 
-### 4. Refresh publication surfaces
+After the runtime-owned changes exist, validate the lane against the frozen packet:
+
+```sh
+"$XTASK_BIN" runtime-follow-on \
+  --approval docs/agents/lifecycle/<onboarding_pack_prefix>/governance/approved-agent.toml \
+  --write \
+  --run-id <run_id>
+```
+
+`runtime-follow-on --write` must reject:
+- writes outside the runtime-owned boundary
+- publication-owned manifest edits
+- direct edits to generated `cli_manifests/<agent_id>/wrapper_coverage.json`
+- missing or malformed `handoff.json`
+
+The write run is only successful when `handoff.json` passes the minimum schema and semantic checks,
+including:
+- `runtime_lane_complete = true`
+- `publication_refresh_required = true`
+- `required_commands` includes:
+  - `support-matrix --check`
+  - `capability-matrix --check`
+  - `capability-matrix-audit`
+  - `make preflight`
+
+### 5. Run post-proof target validation
+
+After `runtime-follow-on --write` succeeds, validate the enrolled backend wiring:
+
+```sh
+cargo test -p unified-agent-api --all-features
+```
+
+### 6. Refresh publication surfaces
 
 After committed runtime evidence exists, refresh the published control-plane outputs:
 
 ```sh
-cargo run -p xtask -- support-matrix
-cargo run -p xtask -- capability-matrix
+"$XTASK_BIN" support-matrix
+"$XTASK_BIN" capability-matrix
 ```
 
 This refreshes the published support/capability surfaces from repo truth. The relevant published files are:
@@ -302,18 +373,18 @@ This refreshes the published support/capability surfaces from repo truth. The re
 - `docs/specs/unified-agent-api/support-matrix.md`
 - `docs/specs/unified-agent-api/capability-matrix.md`
 
-### 5. Run the green gate
+### 7. Run the green gate
 
 The create lane is only green when all of the following pass:
 
 ```sh
-cargo run -p xtask -- support-matrix --check
-cargo run -p xtask -- capability-matrix --check
-cargo run -p xtask -- capability-matrix-audit
+"$XTASK_BIN" support-matrix --check
+"$XTASK_BIN" capability-matrix --check
+"$XTASK_BIN" capability-matrix-audit
 make preflight
 ```
 
-### 6. Record proving-run closeout
+### 8. Record proving-run closeout
 
 When the proving run is complete, record the create-mode closeout in:
 
@@ -322,7 +393,7 @@ When the proving run is complete, record the create-mode closeout in:
 Then refresh the generated onboarding packet to its closed state:
 
 ```sh
-cargo run -p xtask -- close-proving-run --approval docs/agents/lifecycle/<onboarding_pack_prefix>/governance/approved-agent.toml --closeout docs/agents/lifecycle/<onboarding_pack_prefix>/governance/proving-run-closeout.json
+"$XTASK_BIN" close-proving-run --approval docs/agents/lifecycle/<onboarding_pack_prefix>/governance/approved-agent.toml --closeout docs/agents/lifecycle/<onboarding_pack_prefix>/governance/proving-run-closeout.json
 ```
 
 `close-proving-run` updates the generated packet docs under `docs/agents/lifecycle/<onboarding_pack_prefix>/` from the recorded closeout evidence.

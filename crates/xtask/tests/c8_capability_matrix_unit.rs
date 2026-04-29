@@ -149,7 +149,8 @@ mod capability_matrix {
                 "codex".to_string(),
                 "claude_code".to_string(),
                 "opencode".to_string(),
-                "gemini_cli".to_string()
+                "gemini_cli".to_string(),
+                "aider".to_string()
             ]
         );
     }
@@ -172,7 +173,7 @@ mod capability_matrix {
 
         assert_eq!(
             render_canonical_target_header(&entries).expect("render header"),
-            "Canonical target profile: `codex=x86_64-unknown-linux-musl`, `claude_code=linux-x64`; `opencode`, `gemini_cli` use the default built-in backend config.\n"
+            "Canonical target profile: `codex=x86_64-unknown-linux-musl`, `claude_code=linux-x64`; `opencode`, `gemini_cli`, `aider` use the default built-in backend config.\n"
         );
     }
 

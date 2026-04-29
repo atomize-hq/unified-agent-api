@@ -49,6 +49,7 @@ fn seed_fixture_workspace(fixture_root: &Path) {
     copy_repo_file(fixture_root, "cli_manifests/claude_code/current.json");
     copy_repo_file(fixture_root, "cli_manifests/opencode/current.json");
     copy_repo_file(fixture_root, "cli_manifests/gemini_cli/current.json");
+    copy_repo_file(fixture_root, "cli_manifests/aider/current.json");
 }
 
 #[test]

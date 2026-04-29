@@ -179,6 +179,7 @@ fn materialize_baseline_workspace(workspace: &Path) {
     );
 
     materialize_gemini_root(workspace);
+    materialize_aider_root(workspace);
 }
 
 fn materialize_opencode_root(workspace: &Path) {
@@ -203,6 +204,19 @@ fn materialize_gemini_root(workspace: &Path) {
         &[("0.38.2", &[])],
         &[],
         &[],
+        &[],
+    );
+}
+
+fn materialize_aider_root(workspace: &Path) {
+    materialize_root(
+        &workspace.join("cli_manifests/aider"),
+        &["darwin-arm64"],
+        "0.0.0",
+        &["darwin-arm64"],
+        &[("0.0.0", &["darwin-arm64"])],
+        &[("darwin-arm64", "0.0.0")],
+        &[("darwin-arm64", "0.0.0")],
         &[],
     );
 }
@@ -370,6 +384,7 @@ fn publication_consistency_rejects_missing_committed_row() {
     );
     materialize_opencode_root(&workspace);
     materialize_gemini_root(&workspace);
+    materialize_aider_root(&workspace);
 
     let mut rows = derive_rows(&workspace).expect("derive rows");
     rows.retain(|row| {
@@ -437,6 +452,7 @@ fn publication_consistency_rejects_duplicate_row() {
     );
     materialize_opencode_root(&workspace);
     materialize_gemini_root(&workspace);
+    materialize_aider_root(&workspace);
 
     let mut rows = derive_rows(&workspace).expect("derive rows");
     let duplicate = rows
@@ -487,6 +503,7 @@ fn publication_consistency_rejects_unexpected_row() {
     );
     materialize_opencode_root(&workspace);
     materialize_gemini_root(&workspace);
+    materialize_aider_root(&workspace);
 
     let mut rows = derive_rows(&workspace).expect("derive rows");
     let unexpected = rows
@@ -540,6 +557,7 @@ fn publication_consistency_rejects_pointer_promotion_drift() {
     );
     materialize_opencode_root(&workspace);
     materialize_gemini_root(&workspace);
+    materialize_aider_root(&workspace);
 
     let mut rows = derive_rows(&workspace).expect("derive rows");
     let row = rows
@@ -586,6 +604,7 @@ fn publication_consistency_rejects_omission_claim_and_note_drift() {
     );
     materialize_opencode_root(&workspace);
     materialize_gemini_root(&workspace);
+    materialize_aider_root(&workspace);
 
     let mut rows = derive_rows(&workspace).expect("derive rows");
     let row = rows
@@ -652,6 +671,7 @@ fn publication_consistency_rejects_status_drift_for_latest_validated_rows() {
     );
     materialize_opencode_root(&workspace);
     materialize_gemini_root(&workspace);
+    materialize_aider_root(&workspace);
 
     let rows = derive_rows(&workspace).expect("derive rows");
     let issues = validate_publication_consistency(&workspace, &rows)

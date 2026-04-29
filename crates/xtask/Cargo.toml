@@ -11,7 +11,7 @@ name = "xtask"
 path = "src/main.rs"
 
 [dependencies]
-agent_api = { package = "unified-agent-api", path = "../agent_api", features = ["codex", "claude_code", "gemini_cli", "opencode"] }
+agent_api = { package = "unified-agent-api", path = "../agent_api", features = ["aider", "codex", "claude_code", "gemini_cli", "opencode"] }
 clap = { version = "4.5", features = ["derive"] }
 codex = { package = "unified-agent-api-codex", path = "../codex" }
 claude_code = { package = "unified-agent-api-claude-code", path = "../claude_code" }

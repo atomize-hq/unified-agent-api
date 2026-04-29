@@ -7,6 +7,7 @@ mod termination;
 #[cfg(any(
     feature = "codex",
     feature = "claude_code",
+    feature = "aider",
     feature = "gemini_cli",
     feature = "opencode",
     test
@@ -24,6 +25,9 @@ pub mod claude_code;
 
 #[cfg(feature = "gemini_cli")]
 pub mod gemini_cli;
+
+#[cfg(feature = "aider")]
+pub mod aider;
 
 #[cfg(feature = "opencode")]
 pub mod opencode;

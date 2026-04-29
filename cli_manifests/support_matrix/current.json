@@ -2,6 +2,16 @@
   "schema_version": 1,
   "rows": [
     {
+      "agent": "aider",
+      "version": "0.0.0",
+      "target": "darwin-arm64",
+      "manifest_support": "supported",
+      "backend_support": "unsupported",
+      "uaa_support": "unsupported",
+      "pointer_promotion": "latest_supported_and_validated",
+      "evidence_notes": []
+    },
+    {
       "agent": "claude_code",
       "version": "2.1.29",
       "target": "darwin-arm64",

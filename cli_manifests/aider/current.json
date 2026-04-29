@@ -1,0 +1,23 @@
+{
+  "snapshot_schema_version": 2,
+  "tool": "aider",
+  "mode": "union",
+  "collected_at": "2026-04-29T00:00:00Z",
+  "expected_targets": [
+    "darwin-arm64"
+  ],
+  "complete": true,
+  "missing_targets": [],
+  "inputs": [
+    {
+      "target_triple": "darwin-arm64",
+      "collected_at": "2026-04-29T00:00:00Z",
+      "binary": {
+        "target_triple": "darwin-arm64",
+        "semantic_version": "0.0.0",
+        "version_output": "0.0.0"
+      }
+    }
+  ],
+  "commands": []
+}

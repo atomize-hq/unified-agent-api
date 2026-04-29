@@ -99,6 +99,11 @@ fn materialize_committed_gemini_dir(gemini_dir: &Path) {
     copy_dir_recursive(&src, gemini_dir);
 }
 
+fn materialize_committed_aider_dir(aider_dir: &Path) {
+    let src = repo_root().join("cli_manifests").join("aider");
+    copy_dir_recursive(&src, aider_dir);
+}
+
 fn materialize_minimal_valid_codex_dir(codex_dir: &Path) {
     fs::create_dir_all(codex_dir).expect("mkdir codex dir");
 

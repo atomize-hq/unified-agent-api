@@ -1,7 +1,7 @@
 <!-- /autoplan restore point: /Users/spensermcconnell/.gstack/projects/atomize-hq-unified-agent-api/codex-recommend-next-agent-autoplan-restore-20260429-132103.md -->
 # uaa-0022 — Runtime follow-on milestone: enclose the implementation lane in Codex
 
-Status: Approved for implementation planning (backlog-only; not part of canonical onboarding procedure yet)
+Status: Implemented on 2026-04-29. The shipped operator procedure now lives in `docs/cli-agent-onboarding-factory-operator-guide.md`.
 
 This note is the milestone definition for the next onboarding automation seam.
 
@@ -12,11 +12,16 @@ to translate repo patterns into real wrapper and backend code.
 
 That is the seam.
 
-Why backlog-only:
-- The shipped procedure in `docs/cli-agent-onboarding-factory-operator-guide.md` remains the live
-  source of truth until this milestone is actually implemented.
-- This note is a decision record plus milestone scope, not a claim that the operator flow already
-  changed.
+Implementation outcome:
+- `xtask` now owns `runtime-follow-on --approval <path> --dry-run` and `--write`.
+- The runtime lane writes and validates a bounded scratch packet under
+  `docs/agents/.uaa-temp/runtime-follow-on/runs/<run_id>/`.
+- The shipped runner validates `handoff.json` schema and semantics before publication refresh.
+- The live create-mode procedure now uses the direct `xtask` binary for post-bootstrap gates and
+  records the runtime lane before support/capability publication refresh.
+
+This note remains useful as the planning and design record for the milestone, but it is no longer
+the live procedure.
 
 ## Why this milestone matters
 
