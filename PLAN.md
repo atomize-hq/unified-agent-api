@@ -484,9 +484,21 @@ Exact MVP shape:
 Rules:
 
 - every field is optional
+- `preferred_licenses` may contain only `oss` and `commercial_ok`
 - `include_candidates` and `exclude_candidates` must be unique
-- `notes` is advisory only
+- if the same candidate appears in both `include_candidates` and `exclude_candidates`, `exclude_candidates` wins
+- `include_candidates` may bypass soft discovery preferences, but must not bypass hard discovery rejections
+- `exclude_candidates` is absolute for the current invocation, even if the candidate would otherwise be nominated by search
+- `notes` is advisory only and must never be parsed into scoring, ranking, or hidden inclusion rules
 - hints influence discovery inclusion, not evaluation scoring
+
+Strict schema rules:
+
+- unknown top-level keys are a validation error
+- non-array values for `preferred_licenses`, `include_candidates`, or `exclude_candidates` are a validation error
+- non-boolean values for `avoid_account_gated` or `prefer_observable_cli` are a validation error
+- non-string entries inside any array field are a validation error
+- empty strings are invalid in `include_candidates`, `exclude_candidates`, and `notes`
 
 #### `candidate-seed.generated.toml`
 
@@ -510,7 +522,7 @@ Required top section:
 
 - discovery run id
 - discovery pass number
-- query families used
+- exact query strings used
 - source classes consulted
 - hints file used or `none`
 - candidate ids nominated by web-search frontier signals
@@ -542,6 +554,56 @@ For `web_search_result` entries only, also require:
 
 - `query`
 - `rank`
+
+Hashing rule:
+
+- `sha256` must be the SHA-256 of a canonical UTF-8 serialization of exactly this per-entry object, with keys sorted and no extra whitespace:
+  - `candidate_id`
+  - `source_kind`
+  - `url`
+  - `title`
+  - `captured_at`
+  - `role`
+  - plus `query` and `rank` when `source_kind = web_search_result`
+- the hash must not be computed from live page bodies, screenshots, or fetched HTML
+- two identical logical source entries must therefore produce the same `sha256` across reruns
+
+### Discovery nomination rules
+
+Pass 1 exact query set:
+
+- `best AI coding CLI`
+- `AI agent CLI tools`
+- `developer agent command line`
+
+Pass 1 nomination algorithm:
+
+1. Collect candidates from the first-page results for the three fixed queries above.
+2. Normalize candidate ids to the upstream project / CLI identity used in the repo.
+3. Deduplicate by normalized candidate id.
+4. Drop candidates rejected by any hard discovery rejection rule.
+5. Apply `exclude_candidates`.
+6. Force-add valid `include_candidates` that are not already present.
+7. Sort remaining candidates by:
+   - highest count of distinct source entries
+   - then presence of both docs and install surfaces
+   - then alphabetical `candidate_id`
+8. Emit exactly 5 candidates unless fewer than 5 survive hard rejection. This is a hard cap, not guidance.
+
+Pass 2 widening query set:
+
+- `alternatives to <top surviving candidate>`
+- `top coding agent CLI open source`
+- `CLI coding assistant blog`
+
+Pass 2 nomination algorithm:
+
+1. Start from the pass 1 rejection summary.
+2. Search only the fixed widening query family above.
+3. Exclude every candidate already seen in pass 1, whether accepted or rejected.
+4. Apply the same hard discovery rejection rules.
+5. Allow soft-preference relaxation only as already defined in this plan.
+6. Emit at most 3 new candidates. This is a hard cap.
 
 ### Architecture findings resolved in this plan
 
@@ -590,8 +652,8 @@ For `web_search_result` entries only, also require:
 This slice adds search and artifact validation, so the performance risks are mostly about not letting discovery sprawl.
 
 - Cap discovery to 2 passes per invocation.
-- Pass 1 should emit 5 unique candidates.
-- Pass 2 may add at most 3 new unique candidates.
+- Pass 1 must emit at most 5 unique candidates.
+- Pass 2 must add at most 3 new unique candidates.
 - Hard cap the reviewed seed at 8 candidates before research freeze.
 - `freeze-discovery` validation must stay linear in candidate count and source-lock entries.
 - `generate` must continue to operate in `O(candidates + dossiers + evidence)` time with no network calls.
@@ -657,6 +719,8 @@ Exact MVP rule:
 - pass 1 uses default discovery
 - pass 2 widens using adjacent candidates and relaxed soft preferences only
 - if fewer than 3 eligible candidates survive after pass 2, stop with `evaluation_insufficient_candidates`
+- if pass 1 yields fewer than 3 discovered candidates after hard rejection, pass 2 is still allowed once
+- no pass may mutate or delete prior-pass discovery artifacts; each pass must write its own `<run_id>`-scoped discovery directory
 
 ### 6. Extend the promoted review artifact set
 
@@ -677,13 +741,13 @@ That keeps the why-this-pool evidence next to the why-this-shortlist evidence.
 Update `.codex/skills/recommend-next-agent/SKILL.md` so the default workflow becomes:
 
 1. read optional `docs/agents/selection/discovery-hints.json`
-2. run discovery pass 1 against allowed public sources
+2. run discovery pass 1 against the fixed MVP query set and allowed public sources
 3. write scratch discovery artifacts
 4. stop for maintainer review or light edit of `candidate-seed.generated.toml`
 5. run `freeze-discovery`
 6. complete research dossiers against the frozen seed snapshot
 7. run `generate`
-8. if `generate` returns `insufficient_eligible_candidates`, run one widened discovery pass and repeat steps 3-7 once
+8. if `generate` returns `insufficient_eligible_candidates`, run one widened discovery pass using the fixed pass 2 query family and repeat steps 3-7 once
 9. if still insufficient, stop and report structured failure
 10. otherwise review, promote, and hand off to approval
 
@@ -736,6 +800,24 @@ When fewer than 3 eligible candidates survive, `generate` must write:
 - `run-status.json.next_action = "expand_discovery"`
 - `run-summary.md` rejection summary grouped by reason
 
+Required artifact behavior in the insufficiency case:
+
+- must write:
+  - `run-status.json`
+  - `seed.snapshot.toml`
+  - `candidate-pool.json`
+  - `eligible-candidates.json`
+  - `candidate-validation-results/<agent_id>.json` for every seeded candidate
+  - `candidate-dossiers/<agent_id>.json` for every seeded candidate
+  - `run-summary.md`
+  - `discovery/` copied from `research/discovery-input/`
+- must not write:
+  - `scorecard.json`
+  - `sources.lock.json` at the evaluation-run root
+  - `comparison.generated.md`
+  - `approval-draft.generated.toml`
+- the absence of those four success-only artifacts is part of the contract, not an incidental implementation detail
+
 Required grouped reasons:
 
 - `already_onboarded`
@@ -747,7 +829,7 @@ Required grouped reasons:
 
 ### 4. Copy discovery provenance into the scratch run
 
-When `generate` succeeds, copy:
+When `generate` runs, regardless of success or insufficiency, copy:
 
 - `research/discovery-input/candidate-seed.generated.toml`
 - `research/discovery-input/discovery-summary.md`
@@ -762,6 +844,13 @@ This makes promotion a straight byte-copy for discovery provenance just like the
 ### 5. Extend `promote`
 
 `promote` must now copy `runs/<run_id>/discovery/**` into the committed review run at the same relative path.
+
+Backward-compatibility rule:
+
+- discovery provenance is required for all v2 runs created from this plan onward
+- legacy committed runs created before this plan remain valid without `discovery/`
+- `promote` must fail if asked to promote a v2 scratch run without `runs/<run_id>/discovery/**`
+- tests must distinguish legacy-fixture runs from v2 runs explicitly rather than relying on file absence by accident
 
 Promotion invariants remain:
 
