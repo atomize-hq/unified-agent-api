@@ -1,0 +1,118 @@
+{
+  "schema_version": "v1",
+  "agent_id": "openhands",
+  "display_name": "OpenHands",
+  "generated_at": "2026-04-28T15:31:24Z",
+  "seed_snapshot_sha256": "d8d4c3d27236efa00b378c569bd0fbbeaec1f73eb76524df9a6438f24ee098ec",
+  "official_links": [
+    "https://docs.all-hands.dev/",
+    "https://pypi.org/project/openhands-ai/"
+  ],
+  "install_channels": [
+    "python -m pip install openhands-ai",
+    "uv tool install openhands-ai"
+  ],
+  "auth_prerequisites": [
+    "Provider credentials may be required for full automation runs after local install."
+  ],
+  "claims": {
+    "non_interactive_execution": {
+      "state": "verified",
+      "summary": "Public docs and PyPI distribution show a documented CLI install surface for OpenHands.",
+      "evidence_ids": [
+        "openhands-doc",
+        "openhands-pkg"
+      ],
+      "notes": "The package and docs provide a public execution entrypoint."
+    },
+    "offline_strategy": {
+      "state": "inferred",
+      "summary": "Wrapper tests can use fixtures or a fake OpenHands binary before any provider-backed automation run.",
+      "evidence_ids": [
+        "openhands-doc",
+        "openhands-repo"
+      ],
+      "notes": "The recommendation lane only needs deterministic wrapper proof before later onboarding."
+    },
+    "observable_cli_surface": {
+      "state": "verified",
+      "summary": "The docs and repo expose a public terminal-facing OpenHands surface.",
+      "evidence_ids": [
+        "openhands-doc",
+        "openhands-repo"
+      ],
+      "notes": "Observable CLI behavior is grounded in public docs and upstream messaging."
+    },
+    "redaction_fit": {
+      "state": "inferred",
+      "summary": "Terminal output can traverse the repo redaction boundary before persistence.",
+      "evidence_ids": [
+        "openhands-repo"
+      ],
+      "notes": "Redaction fit is a repo-local inference from the external CLI posture."
+    },
+    "crate_first_fit": {
+      "state": "verified",
+      "summary": "The installable external CLI maps directly onto a wrapper-crate-first onboarding stage.",
+      "evidence_ids": [
+        "openhands-doc",
+        "openhands-pkg"
+      ],
+      "notes": "The repo can onboard the external CLI before any deeper backend work."
+    },
+    "reproducibility": {
+      "state": "inferred",
+      "summary": "Public docs and PyPI distribution make local setup reproducible before provider credentials are added.",
+      "evidence_ids": [
+        "openhands-doc",
+        "openhands-pkg"
+      ],
+      "notes": "Local reproducibility is public even though full automation still needs credentials."
+    },
+    "future_leverage": {
+      "state": "verified",
+      "summary": "OpenHands combines high adoption and active upstream movement, making it the strongest future-leverage finalist in this run.",
+      "evidence_ids": [
+        "openhands-repo",
+        "openhands-pkg"
+      ],
+      "notes": "The upstream surface suggests the most strategic expansion potential among eligible finalists."
+    }
+  },
+  "probe_requests": [],
+  "blocked_steps": [
+    "Full provider-backed automation still needs maintainer credentials after local CLI setup."
+  ],
+  "normalized_caveats": [
+    "Local install evidence is public now; provider-backed automation should be proven in onboarding."
+  ],
+  "evidence": [
+    {
+      "evidence_id": "openhands-doc",
+      "kind": "official_doc",
+      "url": "https://docs.all-hands.dev/",
+      "title": "Introduction - OpenHands Docs",
+      "captured_at": "2026-04-28T15:31:24Z",
+      "excerpt": "OpenHands docs publish an introduction page under \"Introduction - OpenHands Docs,\" providing public installation and evaluation guidance.",
+      "sha256": "828234f609aa686010bb8a5ecff52ca7a40004c68052f210c2e08fe3ab8e6db3"
+    },
+    {
+      "evidence_id": "openhands-repo",
+      "kind": "github",
+      "url": "https://github.com/OpenHands/OpenHands",
+      "title": "OpenHands/OpenHands",
+      "captured_at": "2026-04-28T15:31:24Z",
+      "excerpt": "GitHub describes OpenHands as \"OpenHands: AI-Driven Development.\" Repo has 72264 stars and was pushed 2026-04-28T15:19:22Z.",
+      "sha256": "e603139f9db5f41b0d3816b02eb08230e22a70aef7b78cf57ecd08b53527a257"
+    },
+    {
+      "evidence_id": "openhands-pkg",
+      "kind": "package_registry",
+      "url": "https://pypi.org/project/openhands-ai/",
+      "title": "openhands-ai PyPI package",
+      "captured_at": "2026-04-28T15:31:24Z",
+      "excerpt": "PyPI lists openhands-ai 1.6.0 uploaded 2026-03-30T14:29:39.035799Z with summary \"OpenHands: Code Less, Make More.\"",
+      "sha256": "4e6043231eb3874e9f6f6b220a08ce7ea1ff0f0aadedf4078796b78964922dc1"
+    }
+  ]
+}

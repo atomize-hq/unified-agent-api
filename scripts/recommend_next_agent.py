@@ -24,12 +24,34 @@ REGISTRY_RELATIVE_PATH = "crates/xtask/data/agent_registry.toml"
 RECOMMENDATION_TEMP_ROOT_REL = "docs/agents/.uaa-temp/recommend-next-agent"
 RECOMMENDATION_RESEARCH_ROOT_REL = f"{RECOMMENDATION_TEMP_ROOT_REL}/research"
 RECOMMENDATION_RUNS_ROOT_REL = f"{RECOMMENDATION_TEMP_ROOT_REL}/runs"
+DISCOVERY_INPUT_DIRNAME = "discovery-input"
+DISCOVERY_DIRNAME = "discovery"
+DISCOVERY_REQUIRED_FILENAMES = (
+    "candidate-seed.generated.toml",
+    "discovery-summary.md",
+    "sources.lock.json",
+)
 DEFAULT_TARGET = "darwin-arm64"
 APPROVAL_VERSION = "1"
 SELECTION_MODE = "factory_validation"
 TIMESTAMP_PATTERN = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
 HEX64_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 SAFE_BINARY_PATTERN = re.compile(r"^[A-Za-z0-9._-]+$")
+CANDIDATE_SECTION_PATTERN = re.compile(r"^\[candidate\.([A-Za-z0-9_-]+)\]\s*$")
+DISCOVERY_SOURCE_KINDS = {
+    "web_search_result",
+    "official_doc",
+    "github",
+    "package_registry",
+}
+DISCOVERY_SOURCE_ROLES = {
+    "frontier_signal",
+    "discovery_seed",
+    "install_surface",
+    "docs_surface",
+}
+WORKFLOW_VERSION_V2_DISCOVERY = "discovery_enabled_v2"
+ALLOWED_NEXT_ACTIONS = {None, "expand_discovery", "stop"}
 PRIMARY_DIMENSIONS = (
     "Adoption & community pull",
     "CLI product maturity & release activity",
@@ -169,6 +191,14 @@ RUN_ARTIFACT_FILES = (
     "run-summary.md",
 )
 RUN_ARTIFACT_DIRS = ("candidate-dossiers", "candidate-validation-results")
+INSUFFICIENCY_REASON_GROUPS = (
+    "already_onboarded",
+    "missing_public_install_surface",
+    "missing_public_cli_surface",
+    "sdk_not_cli_product",
+    "insufficient_dossier_proof",
+    "other_candidate_error",
+)
 PACKET_TOPMATTER_PREFIX = (
     "<!-- generated-by: scripts/recommend_next_agent.py generate -->",
     "# Packet - CLI Agent Selection Packet",
@@ -381,8 +411,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser = NoAbbrevArgumentParser(description="Generate and promote the next CLI agent recommendation lane.")
     subparsers = parser.add_subparsers(dest="command", required=True, parser_class=NoAbbrevArgumentParser)
 
+    freeze = subparsers.add_parser("freeze-discovery")
+    freeze.add_argument("--discovery-dir", required=True)
+    freeze.add_argument("--research-dir", required=True)
+
     generate = subparsers.add_parser("generate")
-    generate.add_argument("--seed-file", required=True)
     generate.add_argument(
         "--research-dir",
         required=True,
@@ -638,6 +671,154 @@ def parse_seed_file(seed_path: Path) -> SeedConfig:
     return SeedConfig(defaults=defaults, candidates=candidates)
 
 
+def duplicate_candidate_ids_in_seed_text(seed_text: str) -> list[str]:
+    seen: set[str] = set()
+    duplicates: list[str] = []
+    for raw_line in seed_text.splitlines():
+        match = CANDIDATE_SECTION_PATTERN.match(raw_line.strip())
+        if match is None:
+            continue
+        agent_id = match.group(1)
+        if agent_id in seen and agent_id not in duplicates:
+            duplicates.append(agent_id)
+        seen.add(agent_id)
+    return duplicates
+
+
+def validate_no_duplicate_candidate_ids(seed_path: Path) -> None:
+    duplicates = duplicate_candidate_ids_in_seed_text(read_text(seed_path))
+    if duplicates:
+        joined = ", ".join(sorted(duplicates))
+        raise RecommendationError(f"discovery seed has duplicate candidate ids: {joined}")
+
+
+def validate_discovery_summary(summary_path: Path, *, run_id: str, seed: SeedConfig) -> None:
+    summary = read_text(summary_path)
+    if not summary.strip():
+        raise RecommendationError("discovery summary must not be empty")
+    if run_id not in summary:
+        raise RecommendationError("discovery summary must mention the discovery run id")
+    for candidate in seed.candidates:
+        if candidate.agent_id not in summary:
+            raise RecommendationError(f"discovery summary must mention candidate id `{candidate.agent_id}`")
+        if candidate.display_name not in summary:
+            raise RecommendationError(f"discovery summary must mention display name `{candidate.display_name}`")
+
+
+def canonical_discovery_source_entry(entry: dict[str, Any]) -> dict[str, Any]:
+    canonical = {
+        "candidate_id": entry["candidate_id"],
+        "captured_at": entry["captured_at"],
+        "role": entry["role"],
+        "source_kind": entry["source_kind"],
+        "title": entry["title"],
+        "url": entry["url"],
+    }
+    if entry["source_kind"] == "web_search_result":
+        canonical["query"] = entry["query"]
+        canonical["rank"] = entry["rank"]
+    return canonical
+
+
+def canonical_json_bytes(data: Any) -> bytes:
+    return json.dumps(data, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+
+
+def validate_discovery_sources_lock(
+    sources_lock_path: Path,
+    *,
+    run_id: str,
+    seeded_ids: set[str],
+) -> None:
+    try:
+        data = read_json(sources_lock_path)
+    except FileNotFoundError as exc:
+        raise RecommendationError(f"discovery sources lock `{sources_lock_path}` does not exist") from exc
+    except json.JSONDecodeError as exc:
+        raise RecommendationError(f"discovery sources lock `{sources_lock_path}` is not valid JSON: {exc}") from exc
+    if not isinstance(data, dict):
+        raise RecommendationError("discovery sources lock must be a JSON object")
+    if set(data.keys()) != {"run_id", "sources"}:
+        raise RecommendationError("discovery sources lock keys do not match the frozen contract")
+    if ensure_string(data["run_id"], label="discovery sources lock run_id") != run_id:
+        raise RecommendationError("discovery sources lock run_id must match the discovery run id")
+    sources = data["sources"]
+    if not isinstance(sources, list):
+        raise RecommendationError("discovery sources lock sources must be an array")
+    for index, entry in enumerate(sources):
+        if not isinstance(entry, dict):
+            raise RecommendationError(f"discovery sources lock sources[{index}] must be an object")
+        source_kind = ensure_string(entry.get("source_kind"), label=f"discovery sources lock sources[{index}].source_kind")
+        if source_kind not in DISCOVERY_SOURCE_KINDS:
+            raise RecommendationError(f"discovery sources lock sources[{index}] has unsupported source_kind `{source_kind}`")
+        required_keys = {
+            "candidate_id",
+            "source_kind",
+            "url",
+            "title",
+            "captured_at",
+            "sha256",
+            "role",
+        }
+        if source_kind == "web_search_result":
+            required_keys |= {"query", "rank"}
+        if set(entry.keys()) != required_keys:
+            raise RecommendationError(
+                f"discovery sources lock sources[{index}] keys do not match the frozen contract"
+            )
+        candidate_id = ensure_string(entry["candidate_id"], label=f"discovery sources lock sources[{index}].candidate_id")
+        if candidate_id not in seeded_ids:
+            raise RecommendationError(
+                f"discovery sources lock sources[{index}] references unknown candidate_id `{candidate_id}`"
+            )
+        ensure_string(entry["url"], label=f"discovery sources lock sources[{index}].url")
+        ensure_string(entry["title"], label=f"discovery sources lock sources[{index}].title")
+        parse_timestamp(ensure_string(entry["captured_at"], label=f"discovery sources lock sources[{index}].captured_at"))
+        role = ensure_string(entry["role"], label=f"discovery sources lock sources[{index}].role")
+        if role not in DISCOVERY_SOURCE_ROLES:
+            raise RecommendationError(f"discovery sources lock sources[{index}] has unsupported role `{role}`")
+        if source_kind == "web_search_result":
+            ensure_string(entry["query"], label=f"discovery sources lock sources[{index}].query")
+            rank = ensure_int(entry["rank"], label=f"discovery sources lock sources[{index}].rank")
+            if rank <= 0:
+                raise RecommendationError(f"discovery sources lock sources[{index}].rank must be greater than zero")
+        expected_sha = sha256_bytes(canonical_json_bytes(canonical_discovery_source_entry(entry)))
+        actual_sha = ensure_hex64(entry["sha256"], label=f"discovery sources lock sources[{index}].sha256")
+        if actual_sha != expected_sha:
+            raise RecommendationError(
+                f"discovery sources lock sources[{index}] sha256 does not match the canonical entry object"
+            )
+
+
+def discovery_artifact_names(root: Path) -> set[str]:
+    return {path.name for path in root.iterdir() if path.is_file()} if root.exists() else set()
+
+
+def ensure_discovery_artifact_set(root: Path) -> None:
+    if not root.is_dir():
+        raise RecommendationError(f"required discovery artifact directory `{root}` is missing")
+    actual = discovery_artifact_names(root)
+    expected = set(DISCOVERY_REQUIRED_FILENAMES)
+    if actual != expected:
+        raise RecommendationError("discovery artifact set does not match the frozen contract")
+
+
+def copy_discovery_artifacts(source_root: Path, destination_root: Path) -> None:
+    ensure_discovery_artifact_set(source_root)
+    remove_path(destination_root)
+    destination_root.mkdir(parents=True, exist_ok=True)
+    for filename in DISCOVERY_REQUIRED_FILENAMES:
+        shutil.copy2(source_root / filename, destination_root / filename)
+
+
+def workflow_version_for_research_dir(research_dir: Path) -> str | None:
+    discovery_root = research_discovery_input_dir(research_dir)
+    if not discovery_root.exists():
+        return None
+    ensure_discovery_artifact_set(discovery_root)
+    return WORKFLOW_VERSION_V2_DISCOVERY
+
+
 def build_empty_metrics() -> dict[str, Any]:
     return {key: None for key in RUN_STATUS_METRIC_KEYS}
 
@@ -665,6 +846,8 @@ def build_base_run_status(
         },
         "metrics": build_empty_metrics(),
         "errors": [],
+        "workflow_version": None,
+        "next_action": None,
         "approved_agent_id": None,
         "approval_recorded_at": None,
         "override_reason": None,
@@ -685,8 +868,10 @@ def seeded_candidate_ids(seed: SeedConfig) -> list[str]:
     return [candidate.agent_id for candidate in seed.candidates]
 
 
-def expected_run_artifact_files(seed: SeedConfig) -> list[str]:
+def expected_run_artifact_files(seed: SeedConfig, *, workflow_version: str | None) -> list[str]:
     expected = list(RUN_ARTIFACT_FILES)
+    if workflow_version == WORKFLOW_VERSION_V2_DISCOVERY:
+        expected.extend(f"{DISCOVERY_DIRNAME}/{filename}" for filename in DISCOVERY_REQUIRED_FILENAMES)
     expected.extend(f"candidate-dossiers/{agent_id}.json" for agent_id in seeded_candidate_ids(seed))
     expected.extend(f"candidate-validation-results/{agent_id}.json" for agent_id in seeded_candidate_ids(seed))
     return sorted(expected)
@@ -696,14 +881,22 @@ def run_artifact_files(root: Path) -> list[str]:
     return sorted(path.relative_to(root).as_posix() for path in root.rglob("*") if path.is_file())
 
 
-def ensure_run_artifact_set(run_dir: Path, seed: SeedConfig) -> None:
+def ensure_run_artifact_set(run_dir: Path, seed: SeedConfig, *, workflow_version: str | None) -> None:
     for dirname in RUN_ARTIFACT_DIRS:
         if not (run_dir / dirname).is_dir():
             raise RecommendationError(f"required run artifact directory `{dirname}` is missing")
+    if workflow_version == WORKFLOW_VERSION_V2_DISCOVERY:
+        ensure_discovery_artifact_set(run_discovery_dir(run_dir))
     actual = run_artifact_files(run_dir)
-    expected = expected_run_artifact_files(seed)
+    expected = expected_run_artifact_files(seed, workflow_version=workflow_version)
     if actual != expected:
         raise RecommendationError("run artifact set does not match the frozen contract")
+
+
+def insufficiency_next_action_for_run_id(run_id: str) -> str:
+    if re.search(r"(?:^|[-_])pass2$", run_id):
+        return "stop"
+    return "expand_discovery"
 
 
 def validate_run_status_payload(
@@ -726,6 +919,8 @@ def validate_run_status_payload(
         "candidate_status_counts",
         "metrics",
         "errors",
+        "workflow_version",
+        "next_action",
         "approved_agent_id",
         "approval_recorded_at",
         "override_reason",
@@ -746,6 +941,18 @@ def validate_run_status_payload(
     parse_timestamp(ensure_string(payload["generated_at"], label="run-status.json generated_at"))
     ensure_string_list(payload["eligible_candidate_ids"], label="run-status.json eligible_candidate_ids")
     ensure_string_list(payload["shortlist_ids"], label="run-status.json shortlist_ids")
+    workflow_version = ensure_optional_string(payload["workflow_version"], label="run-status.json workflow_version")
+    if workflow_version not in {None, WORKFLOW_VERSION_V2_DISCOVERY}:
+        raise RecommendationError("run-status.json workflow_version has an invalid value")
+    next_action = ensure_optional_string(payload["next_action"], label="run-status.json next_action")
+    if next_action not in ALLOWED_NEXT_ACTIONS:
+        raise RecommendationError("run-status.json next_action has an invalid value")
+    if payload["status"] == "insufficient_eligible_candidates":
+        expected_next_action = insufficiency_next_action_for_run_id(expected_run_id)
+        if next_action != expected_next_action:
+            raise RecommendationError(f"insufficient run-status.json must set next_action={expected_next_action}")
+    elif next_action is not None:
+        raise RecommendationError("non-insufficient run-status.json must leave next_action null")
     if payload["recommended_agent_id"] is not None:
         ensure_string(payload["recommended_agent_id"], label="run-status.json recommended_agent_id")
     if set(payload["candidate_status_counts"].keys()) != set(ALLOWED_CANDIDATE_STATUSES):
@@ -965,6 +1172,8 @@ def validate_run_status_delta(scratch_status: dict[str, Any], promoted_status: d
         "recommended_agent_id",
         "candidate_status_counts",
         "errors",
+        "workflow_version",
+        "next_action",
     ):
         if scratch_status[key] != promoted_status[key]:
             raise RecommendationError(f"run-status.json field `{key}` changed outside the legal promote delta classes")
@@ -989,8 +1198,8 @@ def validate_scratch_outputs(
     sources_lock: dict[str, Any],
     candidate_results: dict[str, CandidateResult],
 ) -> None:
-    ensure_run_artifact_set(run_dir, seed)
-    actual_status = read_json(run_dir / "run-status.json")
+    ensure_run_artifact_set(run_dir, seed, workflow_version=run_status["workflow_version"])
+    actual_status = normalize_run_status_payload(read_json(run_dir / "run-status.json"))
     validate_run_status_payload(
         payload=actual_status,
         expected_run_id=run_status["run_id"],
@@ -1062,8 +1271,8 @@ def validate_promoted_outputs(
     final_approval_path: Path,
     final_approval_text: str,
 ) -> None:
-    ensure_run_artifact_set(final_review_dir, seed)
-    actual_final_status = read_json(final_review_dir / "run-status.json")
+    ensure_run_artifact_set(final_review_dir, seed, workflow_version=final_status["workflow_version"])
+    actual_final_status = normalize_run_status_payload(read_json(final_review_dir / "run-status.json"))
     if actual_final_status != final_status:
         raise RecommendationError("promoted run-status.json does not match the deterministic promote output")
     validate_run_status_payload(
@@ -1089,6 +1298,11 @@ def validate_promoted_outputs(
     ):
         if (final_review_dir / artifact).read_bytes() != (scratch_run_dir / artifact).read_bytes():
             raise RecommendationError(f"committed review artifact `{artifact}` must be a byte-copy of the scratch run")
+    if actual_final_status["workflow_version"] == WORKFLOW_VERSION_V2_DISCOVERY:
+        for filename in DISCOVERY_REQUIRED_FILENAMES:
+            rel_path = f"{DISCOVERY_DIRNAME}/{filename}"
+            if (final_review_dir / rel_path).read_bytes() != (scratch_run_dir / rel_path).read_bytes():
+                raise RecommendationError(f"committed review artifact `{rel_path}` must be a byte-copy of the scratch run")
     for candidate in seed.candidates:
         rel_paths = (
             f"candidate-dossiers/{candidate.agent_id}.json",
@@ -1170,11 +1384,6 @@ def build_run_error(*, scope: str, agent_id: str | None, code: str, message: str
         "code": code,
         "message": message,
     }
-
-
-def validate_seed_file_exists(seed_file: Path) -> None:
-    if not seed_file.exists():
-        raise RecommendationError(f"seed file `{seed_file}` does not exist")
 
 
 def validate_research_metadata(
@@ -1920,6 +2129,8 @@ def render_run_summary(
     shortlist_ids: list[str],
     metrics: dict[str, Any],
     override_reason: str | None,
+    next_action: str | None = None,
+    insufficiency_groups: dict[str, list[str]] | None = None,
 ) -> str:
     approved_display = approved_agent_id if approved_agent_id is not None else "pending"
     lines = [
@@ -1932,6 +2143,14 @@ def render_run_summary(
         f"- shortlist_ids: {', '.join(shortlist_ids) if shortlist_ids else 'pending'}",
     ]
     lines.extend(render_metrics_lines(metrics))
+    if next_action is not None:
+        lines.append(f"- next_action: {next_action}")
+    if insufficiency_groups is not None:
+        lines.append("- insufficiency_groups:")
+        for key in INSUFFICIENCY_REASON_GROUPS:
+            members = insufficiency_groups.get(key, [])
+            rendered = ", ".join(members) if members else "none"
+            lines.append(f"  - {key}: {rendered}")
     if approved_agent_id and recommended_agent_id and approved_agent_id != recommended_agent_id:
         lines.extend(
             [
@@ -2454,6 +2673,26 @@ def seed_snapshot_path(research_dir: Path) -> Path:
     return research_dir / "seed.snapshot.toml"
 
 
+def discovery_seed_path(root: Path) -> Path:
+    return root / "candidate-seed.generated.toml"
+
+
+def discovery_summary_path(root: Path) -> Path:
+    return root / "discovery-summary.md"
+
+
+def discovery_sources_lock_path(root: Path) -> Path:
+    return root / "sources.lock.json"
+
+
+def research_discovery_input_dir(research_dir: Path) -> Path:
+    return research_dir / DISCOVERY_INPUT_DIRNAME
+
+
+def run_discovery_dir(run_dir: Path) -> Path:
+    return run_dir / DISCOVERY_DIRNAME
+
+
 def research_summary_path(research_dir: Path) -> Path:
     return research_dir / "research-summary.md"
 
@@ -2481,6 +2720,13 @@ def build_candidate_pool_entry(
         "shortlisted": shortlisted,
         "recommended": recommended,
     }
+
+
+def normalize_run_status_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    normalized = json.loads(json.dumps(payload))
+    normalized.setdefault("workflow_version", None)
+    normalized.setdefault("next_action", None)
+    return normalized
 
 
 def build_initial_run_artifacts(
@@ -2552,6 +2798,39 @@ def research_phase_fatal(
     raise RecommendationError(message)
 
 
+def freeze_discovery(
+    *,
+    discovery_dir: Path,
+    research_dir: Path,
+    registry_path: Path | None = None,
+) -> Path:
+    if discovery_dir.name != research_dir.name:
+        raise RecommendationError("discovery and research directory basenames must match")
+    ensure_discovery_artifact_set(discovery_dir)
+    seed_path = discovery_seed_path(discovery_dir)
+    validate_no_duplicate_candidate_ids(seed_path)
+    seed = parse_seed_file(seed_path)
+    validate_discovery_summary(discovery_summary_path(discovery_dir), run_id=discovery_dir.name, seed=seed)
+    validate_discovery_sources_lock(
+        discovery_sources_lock_path(discovery_dir),
+        run_id=discovery_dir.name,
+        seeded_ids={candidate.agent_id for candidate in seed.candidates},
+    )
+    actual_registry_path = registry_path or (REPO_ROOT / REGISTRY_RELATIVE_PATH)
+    onboarded_agent_ids = load_onboarded_agent_ids(actual_registry_path)
+    duplicates = sorted(
+        candidate.agent_id for candidate in seed.candidates if candidate.agent_id in onboarded_agent_ids
+    )
+    if duplicates:
+        raise RecommendationError(
+            "discovery seed includes already onboarded agent ids: " + ", ".join(duplicates)
+        )
+    research_dir.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(seed_path, seed_snapshot_path(research_dir))
+    copy_discovery_artifacts(discovery_dir, research_discovery_input_dir(research_dir))
+    return research_dir
+
+
 def write_candidate_artifacts(
     *,
     run_dir: Path,
@@ -2568,6 +2847,32 @@ def promote_time_seconds(*, generated_at: str, approval_recorded_at: str) -> int
     return int((parse_timestamp(approval_recorded_at) - parse_timestamp(generated_at)).total_seconds())
 
 
+def classify_insufficiency_reason(result: CandidateResult) -> str:
+    reasons = result.rejection_reasons + result.error_reasons
+    joined = " ".join(reasons)
+    if "already onboarded" in joined:
+        return "already_onboarded"
+    if "package_registry" in joined:
+        return "missing_public_install_surface"
+    if "observable_cli_surface" in joined:
+        return "missing_public_cli_surface"
+    if "crate_first_fit" in joined:
+        return "sdk_not_cli_product"
+    if result.status == "candidate_error" or "claim state is unknown" in joined or "claim is blocked" in joined:
+        return "other_candidate_error" if result.status == "candidate_error" else "insufficient_dossier_proof"
+    return "insufficient_dossier_proof"
+
+
+def build_insufficiency_groups(candidate_results: dict[str, CandidateResult]) -> dict[str, list[str]]:
+    groups = {key: [] for key in INSUFFICIENCY_REASON_GROUPS}
+    for agent_id in sorted(candidate_results):
+        result = candidate_results[agent_id]
+        if result.status == "eligible":
+            continue
+        groups[classify_insufficiency_reason(result)].append(agent_id)
+    return groups
+
+
 def predicted_blocker_count_for_candidate(dossier: dict[str, Any]) -> int:
     blocked_claims = sum(1 for claim in dossier["claims"].values() if claim["state"] == "blocked")
     return blocked_claims + len(dossier["blocked_steps"])
@@ -2575,7 +2880,6 @@ def predicted_blocker_count_for_candidate(dossier: dict[str, Any]) -> int:
 
 def generate_recommendation(
     *,
-    seed_file: Path,
     research_dir: Path,
     run_id: str,
     scratch_root: Path,
@@ -2592,16 +2896,6 @@ def generate_recommendation(
         research_dir=research_dir,
         run_dir=run_dir,
     )
-
-    try:
-        validate_seed_file_exists(seed_file)
-    except RecommendationError as exc:
-        research_phase_fatal(
-            message=str(exc),
-            code="seed_file_missing",
-            run_status=run_status,
-            run_dir=run_dir,
-        )
 
     if not research_dir.exists():
         research_phase_fatal(
@@ -2638,6 +2932,16 @@ def generate_recommendation(
         )
     seed_snapshot_sha = sha256_bytes(seed_snapshot_bytes)
     write_bytes(run_dir / "seed.snapshot.toml", seed_snapshot_bytes)
+    try:
+        run_status["workflow_version"] = workflow_version_for_research_dir(research_dir)
+    except RecommendationError as exc:
+        research_phase_fatal(
+            message=str(exc),
+            code="discovery_input_invalid",
+            run_status=run_status,
+            run_dir=run_dir,
+            seed_snapshot_bytes=seed_snapshot_bytes,
+        )
 
     actual_registry_path = registry_path or (REPO_ROOT / REGISTRY_RELATIVE_PATH)
     onboarded_agent_ids = load_onboarded_agent_ids(actual_registry_path)
@@ -2665,6 +2969,8 @@ def generate_recommendation(
         )
     run_status["metrics"]["evidence_collection_time_seconds"] = metadata["evidence_collection_time_seconds"]
     run_status["metrics"]["fetched_source_count"] = metadata["fetched_source_count"]
+    if run_status["workflow_version"] == WORKFLOW_VERSION_V2_DISCOVERY:
+        copy_discovery_artifacts(research_discovery_input_dir(research_dir), run_discovery_dir(run_dir))
 
     dossiers: dict[str, dict[str, Any]] = {}
     seeded_ids = {candidate.agent_id for candidate in seed.candidates}
@@ -2869,11 +3175,11 @@ def generate_recommendation(
     write_candidate_artifacts(run_dir=run_dir, seed=seed, candidate_results=candidate_results)
     write_json(run_dir / "candidate-pool.json", candidate_pool)
     write_json(run_dir / "eligible-candidates.json", eligible_candidates)
-    write_json(run_dir / "scorecard.json", scorecard)
-    write_json(run_dir / "sources.lock.json", sources_lock)
 
     if len(eligible_ids) < 3:
         run_status["status"] = "insufficient_eligible_candidates"
+        run_status["next_action"] = insufficiency_next_action_for_run_id(run_id)
+        insufficiency_groups = build_insufficiency_groups(candidate_results)
         write_json(run_dir / "run-status.json", run_status)
         write_text(
             run_dir / "run-summary.md",
@@ -2886,10 +3192,14 @@ def generate_recommendation(
                 shortlist_ids=[],
                 metrics=run_status["metrics"],
                 override_reason=None,
+                next_action=run_status["next_action"],
+                insufficiency_groups=insufficiency_groups,
             ),
         )
         raise RecommendationError("fewer than 3 eligible candidates remain after gating")
 
+    write_json(run_dir / "scorecard.json", scorecard)
+    write_json(run_dir / "sources.lock.json", sources_lock)
     recommended_candidate = seed.candidate_by_id(recommended_agent_id or shortlist_ids[0])
     run_status["status"] = "success_with_candidate_errors" if counts["candidate_error"] > 0 else "success"
     write_json(run_dir / "run-status.json", run_status)
@@ -2946,10 +3256,11 @@ def generate_recommendation(
     return run_dir
 
 
-def ensure_promotable_run(run_dir: Path) -> SeedConfig:
+def ensure_promotable_run(run_dir: Path) -> tuple[SeedConfig, dict[str, Any]]:
     seed = parse_seed_file(run_dir / "seed.snapshot.toml")
-    ensure_run_artifact_set(run_dir, seed)
-    return seed
+    scratch_status = normalize_run_status_payload(read_json(run_dir / "run-status.json"))
+    ensure_run_artifact_set(run_dir, seed, workflow_version=scratch_status["workflow_version"])
+    return seed, scratch_status
 
 
 def finalize_run_status_for_promote(
@@ -2993,10 +3304,7 @@ def promote_recommendation(
     validator: Callable[[Path, Path], None] = validate_approval_artifact,
     replace_fn: Callable[[Path, Path], None] = os.replace,
 ) -> Path:
-    seed = ensure_promotable_run(run_dir)
-    live_seed = repo_root / LIVE_SEED_REL
-    if not live_seed.exists():
-        raise RecommendationError(f"live seed file `{live_seed}` does not exist")
+    seed, scratch_status = ensure_promotable_run(run_dir)
     scorecard = read_json(run_dir / "scorecard.json")
     shortlist_ids = list(scorecard["shortlist_order"])
     recommended_agent_id = scorecard["recommended_agent_id"]
@@ -3025,8 +3333,11 @@ def promote_recommendation(
         for item in run_dir.iterdir():
             if item.is_file():
                 shutil.copy2(item, temp_review_dir / item.name)
-            elif item.is_dir() and item.name in {"candidate-dossiers", "candidate-validation-results"}:
+            elif item.is_dir() and item.name in {"candidate-dossiers", "candidate-validation-results", DISCOVERY_DIRNAME}:
                 shutil.copytree(item, temp_review_dir / item.name)
+
+        if scratch_status["workflow_version"] == WORKFLOW_VERSION_V2_DISCOVERY:
+            ensure_discovery_artifact_set(run_discovery_dir(run_dir))
 
         approval_commit = git_head_fn(repo_root)
         approval_recorded_at = now_fn()
@@ -3048,7 +3359,6 @@ def promote_recommendation(
         previous_canonical = canonical_path.read_bytes() if canonical_path.exists() else None
         previous_approval = final_approval_path.read_bytes() if final_approval_path.exists() else None
 
-        scratch_status = read_json(run_dir / "run-status.json")
         final_status = finalize_run_status_for_promote(
             scratch_status=scratch_status,
             approved_agent_id=approved_agent_id,
@@ -3115,9 +3425,13 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
     try:
-        if args.command == "generate":
+        if args.command == "freeze-discovery":
+            freeze_discovery(
+                discovery_dir=Path(os.path.expanduser(args.discovery_dir)),
+                research_dir=Path(os.path.expanduser(args.research_dir)),
+            )
+        elif args.command == "generate":
             generate_recommendation(
-                seed_file=Path(args.seed_file),
                 research_dir=Path(os.path.expanduser(args.research_dir)),
                 run_id=args.run_id,
                 scratch_root=Path(os.path.expanduser(args.scratch_root)),

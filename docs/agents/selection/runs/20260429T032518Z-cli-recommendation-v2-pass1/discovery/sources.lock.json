@@ -1,0 +1,92 @@
+{
+  "run_id": "20260429T032518Z-cli-recommendation-v2-pass1",
+  "sources": [
+    {
+      "candidate_id": "openhands",
+      "source_kind": "web_search_result",
+      "url": "https://search.example.test/openhands",
+      "title": "OpenHands search result",
+      "captured_at": "2026-04-29T03:25:18Z",
+      "role": "frontier_signal",
+      "query": "best AI coding CLI",
+      "rank": 1,
+      "sha256": "a86e2a3c9a1ed06b6f6d2335b462b934841d0c3db94ad39284502d11a4e31e96"
+    },
+    {
+      "candidate_id": "openhands",
+      "source_kind": "official_doc",
+      "url": "https://docs.all-hands.dev/",
+      "title": "OpenHands docs",
+      "captured_at": "2026-04-29T03:25:18Z",
+      "role": "docs_surface",
+      "sha256": "8c02c2d5cf4fb33da3fdc5219cf96d3dc93a93d7436bc343f1a4b05568dc96f3"
+    },
+    {
+      "candidate_id": "openhands",
+      "source_kind": "package_registry",
+      "url": "https://pypi.org/project/openhands-ai/",
+      "title": "OpenHands PyPI",
+      "captured_at": "2026-04-29T03:25:18Z",
+      "role": "install_surface",
+      "sha256": "8640e9d40f91916790b10ab80f854e0f8b7daa88d237175d5faee3491d345de4"
+    },
+    {
+      "candidate_id": "aider",
+      "source_kind": "web_search_result",
+      "url": "https://search.example.test/aider",
+      "title": "aider search result",
+      "captured_at": "2026-04-29T03:25:18Z",
+      "role": "frontier_signal",
+      "query": "best AI coding CLI",
+      "rank": 2,
+      "sha256": "cc46a1726329e4d31b57d15390dba66264565279ef196487a3dfdb14281a85e8"
+    },
+    {
+      "candidate_id": "aider",
+      "source_kind": "official_doc",
+      "url": "https://aider.chat/",
+      "title": "aider docs",
+      "captured_at": "2026-04-29T03:25:18Z",
+      "role": "docs_surface",
+      "sha256": "badafc146b52ef227637525df2059b99d94a1899abeb281a665415b198acb5c6"
+    },
+    {
+      "candidate_id": "aider",
+      "source_kind": "package_registry",
+      "url": "https://pypi.org/project/aider-chat/",
+      "title": "aider PyPI",
+      "captured_at": "2026-04-29T03:25:18Z",
+      "role": "install_surface",
+      "sha256": "fb5467e4acdc4a7f2c07aea5f3c2fa86410560e7bfd59d8821aa526d853db05d"
+    },
+    {
+      "candidate_id": "goose",
+      "source_kind": "web_search_result",
+      "url": "https://search.example.test/goose",
+      "title": "Goose search result",
+      "captured_at": "2026-04-29T03:25:18Z",
+      "role": "frontier_signal",
+      "query": "best AI coding CLI",
+      "rank": 3,
+      "sha256": "578f5cca06531313ea0b29dcaff713d8cf7c237ab4fc38ab6cff10e7bcbf47d7"
+    },
+    {
+      "candidate_id": "goose",
+      "source_kind": "official_doc",
+      "url": "https://goose-docs.ai/docs/category/getting-started",
+      "title": "Goose docs",
+      "captured_at": "2026-04-29T03:25:18Z",
+      "role": "docs_surface",
+      "sha256": "42d3047cd1d89074cd56453d7c7280b48c7f957672d2c23b8b1113d5a0df4f2b"
+    },
+    {
+      "candidate_id": "goose",
+      "source_kind": "github",
+      "url": "https://github.com/aaif-goose/goose",
+      "title": "Goose GitHub",
+      "captured_at": "2026-04-29T03:25:18Z",
+      "role": "install_surface",
+      "sha256": "d7f29e179524131145a60d026b87f44efc36e94cd1fdfcd95807d21ca1a2bb8a"
+    }
+  ]
+}

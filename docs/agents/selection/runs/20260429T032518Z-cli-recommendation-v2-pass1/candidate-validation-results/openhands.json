@@ -1,0 +1,77 @@
+{
+  "agent_id": "openhands",
+  "error_reasons": [],
+  "evidence_ids_used": [
+    "openhands-doc",
+    "openhands-repo",
+    "openhands-pkg"
+  ],
+  "hard_gate_results": {
+    "crate_first_fit": {
+      "evidence_ids": [
+        "openhands-doc",
+        "openhands-pkg"
+      ],
+      "notes": "The repo can onboard the external CLI before any deeper backend work.",
+      "rejection_reason": "",
+      "rule_id": "hard_gate.crate_first_fit.doc_or_repo_or_package_backed",
+      "status": "pass"
+    },
+    "non_interactive_execution": {
+      "evidence_ids": [
+        "openhands-doc",
+        "openhands-pkg"
+      ],
+      "notes": "The package and docs provide a public execution entrypoint.",
+      "rejection_reason": "",
+      "rule_id": "hard_gate.non_interactive_execution.verified_doc_and_package_or_probe",
+      "status": "pass"
+    },
+    "observable_cli_surface": {
+      "evidence_ids": [
+        "openhands-doc",
+        "openhands-repo"
+      ],
+      "notes": "Observable CLI behavior is grounded in public docs and upstream messaging.",
+      "rejection_reason": "",
+      "rule_id": "hard_gate.observable_cli_surface.verified_doc_or_repo_or_probe",
+      "status": "pass"
+    },
+    "offline_strategy": {
+      "evidence_ids": [
+        "openhands-doc",
+        "openhands-repo"
+      ],
+      "notes": "The recommendation lane only needs deterministic wrapper proof before later onboarding.",
+      "rejection_reason": "",
+      "rule_id": "hard_gate.offline_strategy.doc_or_repo_backed",
+      "status": "pass"
+    },
+    "redaction_fit": {
+      "evidence_ids": [
+        "openhands-repo"
+      ],
+      "notes": "Redaction fit is a repo-local inference from the external CLI posture.",
+      "rejection_reason": "",
+      "rule_id": "hard_gate.redaction_fit.repo_or_probe_backed",
+      "status": "pass"
+    },
+    "reproducibility": {
+      "evidence_ids": [
+        "openhands-doc",
+        "openhands-pkg"
+      ],
+      "notes": "Local reproducibility is public even though full automation still needs credentials.",
+      "rejection_reason": "",
+      "rule_id": "hard_gate.reproducibility.doc_and_package",
+      "status": "pass"
+    }
+  },
+  "notes": [
+    "schema validation passed"
+  ],
+  "probe_results": [],
+  "rejection_reasons": [],
+  "schema_valid": true,
+  "status": "eligible"
+}

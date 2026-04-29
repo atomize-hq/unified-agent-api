@@ -83,6 +83,76 @@ class RecommendationRunnerContractTests(unittest.TestCase):
             )
         return "\n".join(blocks) + "\n"
 
+    def discovery_summary_text(self, *, run_id: str = RUN_ID) -> str:
+        lines = [
+            f"# Discovery Summary {run_id}",
+            "",
+            f"Discovery run id: {run_id}",
+            "Discovery pass number: 1",
+            "Queries used: best AI coding CLI; AI agent CLI tools; developer agent command line",
+            "Source classes consulted: web_search_result, official_doc, github, package_registry",
+            "Hints file used: none",
+            "Web frontier nominations: alpha, beta, gamma, delta",
+            "Official-source nominations: alpha, beta, gamma, delta",
+            "",
+        ]
+        for agent_id, display_name in CANDIDATE_ORDER:
+            lines.extend(
+                [
+                    f"## {agent_id} - {display_name}",
+                    f"Why it entered the pool: {display_name} appeared in bounded discovery results.",
+                    f"First source: https://sources.example.test/{agent_id}/search",
+                    "Policy effect: default inclusion policy only.",
+                    f"Known caveat: {display_name} still needs research freeze validation.",
+                    "",
+                ]
+            )
+        return "\n".join(lines)
+
+    def discovery_sources_lock(self, *, run_id: str = RUN_ID) -> dict[str, object]:
+        sources: list[dict[str, object]] = []
+        for index, (agent_id, display_name) in enumerate(CANDIDATE_ORDER, start=1):
+            web_entry = {
+                "candidate_id": agent_id,
+                "source_kind": "web_search_result",
+                "url": f"https://search.example.test/{agent_id}",
+                "title": f"{display_name} search result",
+                "captured_at": GENERATED_AT,
+                "role": "frontier_signal",
+                "query": "best AI coding CLI",
+                "rank": index,
+            }
+            web_entry["sha256"] = rna.sha256_bytes(rna.canonical_json_bytes(rna.canonical_discovery_source_entry(web_entry)))
+            sources.append(web_entry)
+
+            doc_entry = {
+                "candidate_id": agent_id,
+                "source_kind": "official_doc",
+                "url": f"https://docs.example.test/{agent_id}",
+                "title": f"{display_name} docs",
+                "captured_at": GENERATED_AT,
+                "role": "docs_surface",
+            }
+            doc_entry["sha256"] = rna.sha256_bytes(rna.canonical_json_bytes(rna.canonical_discovery_source_entry(doc_entry)))
+            sources.append(doc_entry)
+        return {"run_id": run_id, "sources": sources}
+
+    def discovery_dir(
+        self,
+        root: Path,
+        *,
+        run_id: str = RUN_ID,
+        seed_text: str | None = None,
+        summary_text: str | None = None,
+        sources_lock: dict[str, object] | None = None,
+    ) -> Path:
+        discovery_dir = root / rna.RECOMMENDATION_TEMP_ROOT_REL / "discovery" / run_id
+        discovery_dir.mkdir(parents=True, exist_ok=True)
+        rna.write_text(rna.discovery_seed_path(discovery_dir), seed_text or self.seed_text())
+        rna.write_text(rna.discovery_summary_path(discovery_dir), summary_text or self.discovery_summary_text(run_id=run_id))
+        rna.write_json(rna.discovery_sources_lock_path(discovery_dir), sources_lock or self.discovery_sources_lock(run_id=run_id))
+        return discovery_dir
+
     def research_dir(
         self,
         root: Path,
@@ -92,6 +162,7 @@ class RecommendationRunnerContractTests(unittest.TestCase):
         metadata_run_id: str | None = None,
         metadata_override: dict[str, object] | None = None,
         dossier_mutator: Callable[[str, dict[str, object]], dict[str, object]] | None = None,
+        include_discovery: bool = True,
     ) -> Path:
         actual_dirname = dirname or run_id
         research_dir = root / rna.RECOMMENDATION_RESEARCH_ROOT_REL / actual_dirname
@@ -111,6 +182,11 @@ class RecommendationRunnerContractTests(unittest.TestCase):
         if metadata_override is not None:
             metadata = metadata_override
         rna.write_json(research_dir / "research-metadata.json", metadata)
+        if include_discovery:
+            discovery_input_dir = rna.research_discovery_input_dir(research_dir)
+            rna.write_text(rna.discovery_seed_path(discovery_input_dir), self.seed_text())
+            rna.write_text(rna.discovery_summary_path(discovery_input_dir), self.discovery_summary_text(run_id=run_id))
+            rna.write_json(rna.discovery_sources_lock_path(discovery_input_dir), self.discovery_sources_lock(run_id=run_id))
 
         dossier_specs = {
             "alpha": dict(
@@ -351,6 +427,8 @@ class RecommendationRunnerContractTests(unittest.TestCase):
                 "candidate_status_counts",
                 "metrics",
                 "errors",
+                "workflow_version",
+                "next_action",
                 "approved_agent_id",
                 "approval_recorded_at",
                 "override_reason",
@@ -400,8 +478,6 @@ class RecommendationRunnerContractTests(unittest.TestCase):
         parsed = parser.parse_args(
             [
                 "generate",
-                "--seed-file",
-                "docs/agents/selection/candidate-seed.toml",
                 "--research-dir",
                 "docs/agents/.uaa-temp/recommend-next-agent/research/20260427-frozen-contract",
                 "--run-id",
@@ -420,12 +496,24 @@ class RecommendationRunnerContractTests(unittest.TestCase):
             parser.parse_args(
                 [
                     "generate",
-                    "--seed-file",
-                    "docs/agents/selection/candidate-seed.toml",
                     "--run-id",
                     RUN_ID,
                     "--scratch-root",
                     "docs/agents/.uaa-temp/recommend-next-agent/runs",
+                ]
+            )
+        with self.assertRaises(SystemExit):
+            parser.parse_args(
+                [
+                    "generate",
+                    "--research-dir",
+                    "docs/agents/.uaa-temp/recommend-next-agent/research/20260427-frozen-contract",
+                    "--run-id",
+                    RUN_ID,
+                    "--scratch-root",
+                    "docs/agents/.uaa-temp/recommend-next-agent/runs",
+                    "--seed-file",
+                    "docs/agents/selection/candidate-seed.toml",
                 ]
             )
         with self.assertRaises(SystemExit):
@@ -440,6 +528,119 @@ class RecommendationRunnerContractTests(unittest.TestCase):
                     "alpha",
                 ]
             )
+
+    def test_freeze_discovery_accepts_valid_sources_lock_hashes(self) -> None:
+        tmpdir, root, _, _, registry_path = self.repo_fixture()
+        try:
+            discovery_dir = self.discovery_dir(root)
+            research_dir = root / rna.RECOMMENDATION_RESEARCH_ROOT_REL / RUN_ID
+            rna.freeze_discovery(discovery_dir=discovery_dir, research_dir=research_dir, registry_path=registry_path)
+            self.assertEqual(
+                self.load_json(rna.discovery_sources_lock_path(rna.research_discovery_input_dir(research_dir))),
+                self.discovery_sources_lock(),
+            )
+        finally:
+            tmpdir.cleanup()
+
+    def test_freeze_discovery_rejects_mismatched_sources_lock_hash(self) -> None:
+        tmpdir, root, _, _, registry_path = self.repo_fixture()
+        try:
+            sources_lock = self.discovery_sources_lock()
+            sources_lock["sources"][0]["sha256"] = hex64("wrong-hash")
+            discovery_dir = self.discovery_dir(root, sources_lock=sources_lock)
+            research_dir = root / rna.RECOMMENDATION_RESEARCH_ROOT_REL / RUN_ID
+            with self.assertRaisesRegex(rna.RecommendationError, "sha256 does not match the canonical entry object"):
+                rna.freeze_discovery(discovery_dir=discovery_dir, research_dir=research_dir, registry_path=registry_path)
+        finally:
+            tmpdir.cleanup()
+
+    def test_freeze_discovery_rejects_duplicate_candidate_ids(self) -> None:
+        tmpdir, root, _, _, registry_path = self.repo_fixture()
+        try:
+            duplicate_seed = self.seed_text() + '\n[candidate.alpha]\ndisplay_name = "Alpha Duplicate"\nresearch_urls = ["https://dupe.example"]\ninstall_channels = ["brew install alpha"]\nauth_notes = "dupe"\n'
+            discovery_dir = self.discovery_dir(root, seed_text=duplicate_seed)
+            research_dir = root / rna.RECOMMENDATION_RESEARCH_ROOT_REL / RUN_ID
+            with self.assertRaisesRegex(rna.RecommendationError, "duplicate candidate ids"):
+                rna.freeze_discovery(discovery_dir=discovery_dir, research_dir=research_dir, registry_path=registry_path)
+        finally:
+            tmpdir.cleanup()
+
+    def test_freeze_discovery_rejects_onboarded_agent_ids(self) -> None:
+        tmpdir, root, _, _, registry_path = self.repo_fixture()
+        try:
+            onboarded_seed = self.seed_text().replace("[candidate.delta]", "[candidate.codex]")
+            onboarded_seed = onboarded_seed.replace('display_name = "Delta CLI"', 'display_name = "Codex CLI"')
+            onboarded_seed = onboarded_seed.replace("delta", "codex")
+            onboarded_summary = self.discovery_summary_text().replace("delta", "codex").replace("Delta CLI", "Codex CLI")
+            onboarded_sources = self.discovery_sources_lock()
+            for entry in onboarded_sources["sources"]:
+                if entry["candidate_id"] == "delta":
+                    entry["candidate_id"] = "codex"
+                    entry["url"] = str(entry["url"]).replace("delta", "codex")
+                    entry["title"] = str(entry["title"]).replace("Delta CLI", "Codex CLI")
+                    if entry["source_kind"] == "web_search_result":
+                        entry["sha256"] = rna.sha256_bytes(rna.canonical_json_bytes(rna.canonical_discovery_source_entry(entry)))
+                    else:
+                        entry["sha256"] = rna.sha256_bytes(rna.canonical_json_bytes(rna.canonical_discovery_source_entry(entry)))
+            discovery_dir = self.discovery_dir(
+                root,
+                seed_text=onboarded_seed,
+                summary_text=onboarded_summary,
+                sources_lock=onboarded_sources,
+            )
+            research_dir = root / rna.RECOMMENDATION_RESEARCH_ROOT_REL / RUN_ID
+            with self.assertRaisesRegex(rna.RecommendationError, "already onboarded agent ids: codex"):
+                rna.freeze_discovery(discovery_dir=discovery_dir, research_dir=research_dir, registry_path=registry_path)
+        finally:
+            tmpdir.cleanup()
+
+    def test_freeze_discovery_rejects_unsupported_source_kind(self) -> None:
+        tmpdir, root, _, _, registry_path = self.repo_fixture()
+        try:
+            sources_lock = self.discovery_sources_lock()
+            sources_lock["sources"][0]["source_kind"] = "reddit"
+            sources_lock["sources"][0].pop("query")
+            sources_lock["sources"][0].pop("rank")
+            discovery_dir = self.discovery_dir(root, sources_lock=sources_lock)
+            research_dir = root / rna.RECOMMENDATION_RESEARCH_ROOT_REL / RUN_ID
+            with self.assertRaisesRegex(rna.RecommendationError, "unsupported source_kind `reddit`"):
+                rna.freeze_discovery(discovery_dir=discovery_dir, research_dir=research_dir, registry_path=registry_path)
+        finally:
+            tmpdir.cleanup()
+
+    def test_freeze_discovery_copies_reviewed_seed_and_provenance(self) -> None:
+        tmpdir, root, _, _, registry_path = self.repo_fixture()
+        try:
+            discovery_dir = self.discovery_dir(root)
+            research_dir = root / rna.RECOMMENDATION_RESEARCH_ROOT_REL / RUN_ID
+            rna.freeze_discovery(discovery_dir=discovery_dir, research_dir=research_dir, registry_path=registry_path)
+            self.assertEqual(
+                rna.seed_snapshot_path(research_dir).read_bytes(),
+                rna.discovery_seed_path(discovery_dir).read_bytes(),
+            )
+            for filename in rna.DISCOVERY_REQUIRED_FILENAMES:
+                self.assertEqual(
+                    (rna.research_discovery_input_dir(research_dir) / filename).read_bytes(),
+                    (discovery_dir / filename).read_bytes(),
+                )
+        finally:
+            tmpdir.cleanup()
+
+    def test_generate_reads_research_seed_snapshot_instead_of_live_candidate_seed(self) -> None:
+        tmpdir, root, live_seed, scratch_root, registry_path = self.repo_fixture()
+        try:
+            live_seed.write_text("not valid toml\n", encoding="utf-8")
+            research_dir = self.research_dir(root)
+            run_dir = rna.generate_recommendation(
+                research_dir=research_dir,
+                run_id=RUN_ID,
+                scratch_root=scratch_root,
+                registry_path=registry_path,
+                now_fn=lambda: GENERATED_AT,
+            )
+            self.assertEqual(self.load_json(run_dir / "run-status.json")["status"], "success")
+        finally:
+            tmpdir.cleanup()
 
     def test_generate_rejects_missing_and_mismatched_research_inputs(self) -> None:
         cases = (
@@ -500,7 +701,6 @@ class RecommendationRunnerContractTests(unittest.TestCase):
 
                     with self.assertRaises(rna.RecommendationError):
                         rna.generate_recommendation(
-                            seed_file=live_seed,
                             research_dir=research_dir,
                             run_id=RUN_ID,
                             scratch_root=scratch_root,
@@ -534,7 +734,6 @@ class RecommendationRunnerContractTests(unittest.TestCase):
                 ),
             )
             run_dir = rna.generate_recommendation(
-                seed_file=live_seed,
                 research_dir=research_dir,
                 run_id=RUN_ID,
                 scratch_root=scratch_root,
@@ -575,7 +774,6 @@ class RecommendationRunnerContractTests(unittest.TestCase):
                 ),
             )
             run_dir = rna.generate_recommendation(
-                seed_file=live_seed,
                 research_dir=research_dir,
                 run_id=RUN_ID,
                 scratch_root=scratch_root,
@@ -623,7 +821,6 @@ class RecommendationRunnerContractTests(unittest.TestCase):
         try:
             research_dir = self.research_dir(root)
             run_dir = rna.generate_recommendation(
-                seed_file=live_seed,
                 research_dir=research_dir,
                 run_id=RUN_ID,
                 scratch_root=scratch_root,
@@ -657,7 +854,6 @@ class RecommendationRunnerContractTests(unittest.TestCase):
         try:
             research_dir = self.research_dir(root)
             run_dir = rna.generate_recommendation(
-                seed_file=live_seed,
                 research_dir=research_dir,
                 run_id=RUN_ID,
                 scratch_root=scratch_root,
@@ -800,7 +996,6 @@ class RecommendationRunnerContractTests(unittest.TestCase):
                 ),
             )
             run_dir = rna.generate_recommendation(
-                seed_file=live_seed,
                 research_dir=research_dir,
                 run_id=RUN_ID,
                 scratch_root=scratch_root,
@@ -923,7 +1118,6 @@ class RecommendationRunnerContractTests(unittest.TestCase):
         try:
             research_dir = self.research_dir(root)
             run_dir = rna.generate_recommendation(
-                seed_file=live_seed,
                 research_dir=research_dir,
                 run_id=RUN_ID,
                 scratch_root=scratch_root,
@@ -974,7 +1168,6 @@ class RecommendationRunnerContractTests(unittest.TestCase):
         try:
             research_dir = self.research_dir(root)
             run_dir = rna.generate_recommendation(
-                seed_file=live_seed,
                 research_dir=research_dir,
                 run_id=RUN_ID,
                 scratch_root=scratch_root,
@@ -991,6 +1184,7 @@ class RecommendationRunnerContractTests(unittest.TestCase):
                         "candidate-pool.json",
                         "candidate-validation-results",
                         "comparison.generated.md",
+                        "discovery",
                         "eligible-candidates.json",
                         "run-status.json",
                         "run-summary.md",
@@ -1007,6 +1201,8 @@ class RecommendationRunnerContractTests(unittest.TestCase):
             self.assertEqual(run_status["generated_at"], GENERATED_AT)
             self.assertEqual(run_status["research_dir"], str(research_dir))
             self.assertEqual(run_status["run_dir"], str(run_dir))
+            self.assertEqual(run_status["workflow_version"], rna.WORKFLOW_VERSION_V2_DISCOVERY)
+            self.assertIsNone(run_status["next_action"])
             self.assertEqual(run_status["eligible_candidate_ids"], ["alpha", "beta", "gamma"])
             self.assertEqual(run_status["shortlist_ids"], ["alpha", "beta", "gamma"])
             self.assertEqual(run_status["recommended_agent_id"], "alpha")
@@ -1137,6 +1333,11 @@ class RecommendationRunnerContractTests(unittest.TestCase):
                 set(sources_lock["candidates"][0]["evidence_refs"][0].keys()),
                 {"evidence_id", "kind", "url", "title", "captured_at", "sha256"},
             )
+            for filename in rna.DISCOVERY_REQUIRED_FILENAMES:
+                self.assertEqual(
+                    (run_dir / rna.DISCOVERY_DIRNAME / filename).read_bytes(),
+                    (rna.research_discovery_input_dir(research_dir) / filename).read_bytes(),
+                )
 
             validation_dir = run_dir / "candidate-validation-results"
             self.assertEqual(
@@ -1195,12 +1396,262 @@ class RecommendationRunnerContractTests(unittest.TestCase):
         finally:
             tmpdir.cleanup()
 
+    def test_generate_emits_next_action_expand_discovery_on_insufficiency(self) -> None:
+        tmpdir, root, _, scratch_root, registry_path = self.repo_fixture()
+        try:
+            research_dir = self.research_dir(
+                root,
+                dossier_mutator=lambda agent_id, dossier: (
+                    {
+                        **dossier,
+                        "claims": {
+                            **dossier["claims"],
+                            "observable_cli_surface": {
+                                **dossier["claims"]["observable_cli_surface"],
+                                "state": "inferred",
+                            },
+                        },
+                    }
+                    if agent_id in {"beta", "gamma"}
+                    else dossier
+                ),
+            )
+            with self.assertRaisesRegex(rna.RecommendationError, "fewer than 3 eligible candidates remain after gating"):
+                rna.generate_recommendation(
+                    research_dir=research_dir,
+                    run_id=RUN_ID,
+                    scratch_root=scratch_root,
+                    registry_path=registry_path,
+                    now_fn=lambda: GENERATED_AT,
+                )
+            run_status = self.load_json(scratch_root / RUN_ID / "run-status.json")
+            self.assertEqual(run_status["status"], "insufficient_eligible_candidates")
+            self.assertEqual(run_status["next_action"], "expand_discovery")
+            self.assertEqual(run_status["workflow_version"], rna.WORKFLOW_VERSION_V2_DISCOVERY)
+        finally:
+            tmpdir.cleanup()
+
+    def test_generate_emits_next_action_stop_on_pass2_insufficiency(self) -> None:
+        pass2_run_id = f"{RUN_ID}-pass2"
+        tmpdir, root, _, scratch_root, registry_path = self.repo_fixture()
+        try:
+            research_dir = self.research_dir(
+                root,
+                run_id=pass2_run_id,
+                dossier_mutator=lambda agent_id, dossier: (
+                    {
+                        **dossier,
+                        "claims": {
+                            **dossier["claims"],
+                            "observable_cli_surface": {
+                                **dossier["claims"]["observable_cli_surface"],
+                                "state": "inferred",
+                            },
+                        },
+                    }
+                    if agent_id in {"beta", "gamma"}
+                    else dossier
+                ),
+            )
+            with self.assertRaisesRegex(rna.RecommendationError, "fewer than 3 eligible candidates remain after gating"):
+                rna.generate_recommendation(
+                    research_dir=research_dir,
+                    run_id=pass2_run_id,
+                    scratch_root=scratch_root,
+                    registry_path=registry_path,
+                    now_fn=lambda: GENERATED_AT,
+                )
+            run_status = self.load_json(scratch_root / pass2_run_id / "run-status.json")
+            self.assertEqual(run_status["status"], "insufficient_eligible_candidates")
+            self.assertEqual(run_status["next_action"], "stop")
+        finally:
+            tmpdir.cleanup()
+
+    def test_generate_copies_discovery_provenance_into_scratch_run_on_insufficiency(self) -> None:
+        tmpdir, root, _, scratch_root, registry_path = self.repo_fixture()
+        try:
+            research_dir = self.research_dir(
+                root,
+                dossier_mutator=lambda agent_id, dossier: (
+                    {
+                        **dossier,
+                        "claims": {
+                            **dossier["claims"],
+                            "observable_cli_surface": {
+                                **dossier["claims"]["observable_cli_surface"],
+                                "state": "inferred",
+                            },
+                        },
+                    }
+                    if agent_id in {"beta", "gamma"}
+                    else dossier
+                ),
+            )
+            with self.assertRaises(rna.RecommendationError):
+                rna.generate_recommendation(
+                    research_dir=research_dir,
+                    run_id=RUN_ID,
+                    scratch_root=scratch_root,
+                    registry_path=registry_path,
+                    now_fn=lambda: GENERATED_AT,
+                )
+            run_dir = scratch_root / RUN_ID
+            for filename in rna.DISCOVERY_REQUIRED_FILENAMES:
+                self.assertEqual(
+                    (run_dir / rna.DISCOVERY_DIRNAME / filename).read_bytes(),
+                    (rna.research_discovery_input_dir(research_dir) / filename).read_bytes(),
+                )
+        finally:
+            tmpdir.cleanup()
+
+    def test_insufficiency_run_writes_required_and_omits_forbidden_artifacts(self) -> None:
+        tmpdir, root, _, scratch_root, registry_path = self.repo_fixture()
+        try:
+            research_dir = self.research_dir(
+                root,
+                dossier_mutator=lambda agent_id, dossier: (
+                    {
+                        **dossier,
+                        "claims": {
+                            **dossier["claims"],
+                            "observable_cli_surface": {
+                                **dossier["claims"]["observable_cli_surface"],
+                                "state": "inferred",
+                            },
+                        },
+                    }
+                    if agent_id in {"beta", "gamma"}
+                    else dossier
+                ),
+            )
+            with self.assertRaises(rna.RecommendationError):
+                rna.generate_recommendation(
+                    research_dir=research_dir,
+                    run_id=RUN_ID,
+                    scratch_root=scratch_root,
+                    registry_path=registry_path,
+                    now_fn=lambda: GENERATED_AT,
+                )
+            run_dir = scratch_root / RUN_ID
+            for required in (
+                "run-status.json",
+                "seed.snapshot.toml",
+                "candidate-pool.json",
+                "eligible-candidates.json",
+                "run-summary.md",
+            ):
+                self.assertTrue((run_dir / required).exists(), required)
+            self.assertTrue((run_dir / "candidate-validation-results").is_dir())
+            self.assertTrue((run_dir / "candidate-dossiers").is_dir())
+            self.assertTrue((run_dir / rna.DISCOVERY_DIRNAME).is_dir())
+            for agent_id, _ in CANDIDATE_ORDER:
+                self.assertTrue((run_dir / "candidate-validation-results" / f"{agent_id}.json").exists())
+                self.assertTrue((run_dir / "candidate-dossiers" / f"{agent_id}.json").exists())
+            for forbidden in (
+                "scorecard.json",
+                "sources.lock.json",
+                "comparison.generated.md",
+                "approval-draft.generated.toml",
+            ):
+                self.assertFalse((run_dir / forbidden).exists(), forbidden)
+            summary = (run_dir / "run-summary.md").read_text(encoding="utf-8")
+            self.assertIn("- next_action: expand_discovery", summary)
+            self.assertIn("already_onboarded: none", summary)
+            self.assertIn("missing_public_cli_surface: beta, delta, gamma", summary)
+        finally:
+            tmpdir.cleanup()
+
+    def test_promote_copies_discovery_provenance_into_committed_review_run(self) -> None:
+        tmpdir, root, _, scratch_root, registry_path = self.repo_fixture()
+        try:
+            research_dir = self.research_dir(root)
+            run_dir = rna.generate_recommendation(
+                research_dir=research_dir,
+                run_id=RUN_ID,
+                scratch_root=scratch_root,
+                registry_path=registry_path,
+                now_fn=lambda: GENERATED_AT,
+            )
+            review_dir = rna.promote_recommendation(
+                run_dir=run_dir,
+                repo_run_root_rel="docs/agents/selection/runs",
+                approved_agent_id="alpha",
+                onboarding_pack_prefix="alpha-onboarding",
+                override_reason=None,
+                repo_root=root,
+                now_fn=lambda: APPROVED_AT,
+                git_head_fn=lambda _: "deadbeef",
+                validator=lambda *_: None,
+            )
+            for filename in rna.DISCOVERY_REQUIRED_FILENAMES:
+                self.assertEqual(
+                    (review_dir / rna.DISCOVERY_DIRNAME / filename).read_bytes(),
+                    (run_dir / rna.DISCOVERY_DIRNAME / filename).read_bytes(),
+                )
+        finally:
+            tmpdir.cleanup()
+
+    def test_promote_fails_for_v2_marked_run_missing_discovery(self) -> None:
+        tmpdir, root, _, scratch_root, registry_path = self.repo_fixture()
+        try:
+            research_dir = self.research_dir(root)
+            run_dir = rna.generate_recommendation(
+                research_dir=research_dir,
+                run_id=RUN_ID,
+                scratch_root=scratch_root,
+                registry_path=registry_path,
+                now_fn=lambda: GENERATED_AT,
+            )
+            rna.remove_path(run_dir / rna.DISCOVERY_DIRNAME)
+            with self.assertRaisesRegex(rna.RecommendationError, "discovery artifact directory"):
+                rna.promote_recommendation(
+                    run_dir=run_dir,
+                    repo_run_root_rel="docs/agents/selection/runs",
+                    approved_agent_id="alpha",
+                    onboarding_pack_prefix="alpha-onboarding",
+                    override_reason=None,
+                    repo_root=root,
+                    now_fn=lambda: APPROVED_AT,
+                    git_head_fn=lambda _: "deadbeef",
+                    validator=lambda *_: None,
+                )
+        finally:
+            tmpdir.cleanup()
+
+    def test_legacy_run_without_v2_marker_remains_promotable(self) -> None:
+        tmpdir, root, _, scratch_root, registry_path = self.repo_fixture()
+        try:
+            research_dir = self.research_dir(root, include_discovery=False)
+            run_dir = rna.generate_recommendation(
+                research_dir=research_dir,
+                run_id=RUN_ID,
+                scratch_root=scratch_root,
+                registry_path=registry_path,
+                now_fn=lambda: GENERATED_AT,
+            )
+            run_status = self.load_json(run_dir / "run-status.json")
+            self.assertIsNone(run_status["workflow_version"])
+            self.assertFalse((run_dir / rna.DISCOVERY_DIRNAME).exists())
+            review_dir = rna.promote_recommendation(
+                run_dir=run_dir,
+                repo_run_root_rel="docs/agents/selection/runs",
+                approved_agent_id="alpha",
+                onboarding_pack_prefix="alpha-onboarding",
+                override_reason=None,
+                repo_root=root,
+                now_fn=lambda: APPROVED_AT,
+                git_head_fn=lambda _: "deadbeef",
+                validator=lambda *_: None,
+            )
+            self.assertFalse((review_dir / rna.DISCOVERY_DIRNAME).exists())
+        finally:
+            tmpdir.cleanup()
+
     def test_promote_updates_only_allowed_review_fields_and_preserves_other_bytes(self) -> None:
         tmpdir, root, live_seed, scratch_root, registry_path = self.repo_fixture()
         try:
             research_dir = self.research_dir(root)
             run_dir = rna.generate_recommendation(
-                seed_file=live_seed,
                 research_dir=research_dir,
                 run_id=RUN_ID,
                 scratch_root=scratch_root,
@@ -1257,6 +1708,9 @@ class RecommendationRunnerContractTests(unittest.TestCase):
                     scratch_bytes[artifact],
                     artifact,
                 )
+            for filename in rna.DISCOVERY_REQUIRED_FILENAMES:
+                rel = f"{rna.DISCOVERY_DIRNAME}/{filename}"
+                self.assertEqual((review_dir / rel).read_bytes(), scratch_bytes[rel], rel)
             for dirname in ("candidate-dossiers", "candidate-validation-results"):
                 for path in (run_dir / dirname).glob("*.json"):
                     rel = path.relative_to(run_dir).as_posix()
@@ -1275,6 +1729,8 @@ class RecommendationRunnerContractTests(unittest.TestCase):
                 "recommended_agent_id",
                 "candidate_status_counts",
                 "errors",
+                "workflow_version",
+                "next_action",
             ):
                 self.assertEqual(review_status[key], scratch_status[key], key)
             for key in (
@@ -1370,7 +1826,6 @@ class RecommendationRunnerContractTests(unittest.TestCase):
         try:
             research_dir = self.research_dir(root)
             run_dir = rna.generate_recommendation(
-                seed_file=live_seed,
                 research_dir=research_dir,
                 run_id=RUN_ID,
                 scratch_root=scratch_root,

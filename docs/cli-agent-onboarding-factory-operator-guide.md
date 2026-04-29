@@ -23,46 +23,79 @@ The normative recommendation-lane contract is:
 
 `docs/specs/cli-agent-recommendation-dossier-contract.md`
 
-### 1. Start from the seed file
+### 1. Run discovery pass 1
 
-The recommendation lane starts from the committed seed file:
+The v2 recommendation lane starts from discovery, not from the committed fallback seed.
 
-`docs/agents/selection/candidate-seed.toml`
+Optional discovery control input:
 
-This file owns:
-- the exact candidate pool
-- shared descriptor defaults
-- allowed per-candidate descriptor overrides
+`docs/agents/selection/discovery-hints.json`
 
-`onboarding_pack_prefix` is not seed-owned in v1. It is chosen at promotion time.
+Discovery pass 1 writes only to:
 
-### 2. Freeze the scratch research artifacts
+`docs/agents/.uaa-temp/recommend-next-agent/discovery/<run_id>/`
 
-Before the deterministic runner executes, the skill-led research phase must freeze the scratch research artifacts under:
+Required pass 1 artifacts:
+- `candidate-seed.generated.toml`
+- `discovery-summary.md`
+- `sources.lock.json`
+
+Pass 1 uses the fixed query family from the normative contract:
+- `best AI coding CLI`
+- `AI agent CLI tools`
+- `developer agent command line`
+
+Pass 1 emits at most 5 surviving candidates after hard rejection.
+
+Discovery-hint precedence is fixed:
+- hard discovery rejections win first
+- `exclude_candidates` beats `include_candidates`
+- `include_candidates` may bypass soft preferences only
+- soft preferences do not affect evaluation scoring
+
+The committed `docs/agents/selection/candidate-seed.toml` remains a fallback curated pool and example. It is not the reviewed v2 runtime input.
+
+### 2. Review and freeze the discovery output
+
+Review or lightly edit `candidate-seed.generated.toml`, then freeze the reviewed discovery artifacts:
+
+```sh
+python3 scripts/recommend_next_agent.py freeze-discovery \
+  --discovery-dir docs/agents/.uaa-temp/recommend-next-agent/discovery/<run_id> \
+  --research-dir docs/agents/.uaa-temp/recommend-next-agent/research/<run_id>
+```
+
+`freeze-discovery` is the only step that creates the reviewed seed authority.
+
+The research root after freeze is:
 
 `docs/agents/.uaa-temp/recommend-next-agent/research/<run_id>/`
 
-Required research artifacts:
+Required artifacts after freeze:
 - `seed.snapshot.toml`
+- `discovery-input/candidate-seed.generated.toml`
+- `discovery-input/discovery-summary.md`
+- `discovery-input/sources.lock.json`
+
+### 3. Author research against the frozen seed
+
+Research must proceed only from `research/<run_id>/seed.snapshot.toml`.
+
+Required research artifacts:
 - `research-summary.md`
 - `research-metadata.json`
-- `dossiers/<agent_id>.json` for every seeded candidate from `seed.snapshot.toml`
+- `dossiers/<agent_id>.json` for every candidate in `seed.snapshot.toml`
 
 The dossier count is exact. If the seed snapshot contains `N` candidates, the dossier directory must contain exactly `N` dossier files.
 
-The frozen `research-metadata.json` envelope, dossier schema, and evidence budgets are owned by:
-
-`docs/specs/cli-agent-recommendation-dossier-contract.md`
-
-### 3. Generate the post-research scratch run
+### 4. Generate the deterministic evaluation run
 
 After the research artifacts exist, run the deterministic recommendation generator:
 
 ```sh
 python3 scripts/recommend_next_agent.py generate \
-  --seed-file docs/agents/selection/candidate-seed.toml \
   --research-dir docs/agents/.uaa-temp/recommend-next-agent/research/<run_id> \
-  --run-id <timestamp>-<shortlist_slug> \
+  --run-id <run_id> \
   --scratch-root docs/agents/.uaa-temp/recommend-next-agent/runs
 ```
 
@@ -72,7 +105,7 @@ This step writes only to:
 
 It does not mutate repo-tracked files, and it is post-research only.
 
-Required runner scratch artifacts:
+Required success-path scratch artifacts:
 - `run-status.json`
 - `seed.snapshot.toml`
 - `candidate-pool.json`
@@ -84,18 +117,37 @@ Required runner scratch artifacts:
 - `run-summary.md`
 - `candidate-dossiers/<agent_id>.json` for every seeded candidate
 - `candidate-validation-results/<agent_id>.json` for every seeded candidate
+- `discovery/candidate-seed.generated.toml`
+- `discovery/discovery-summary.md`
+- `discovery/sources.lock.json`
 
-Generation applies a hard ineligibility gate against `crates/xtask/data/agent_registry.toml` before scoring. Candidates whose `agent_id` is already onboarded in the registry remain in `candidate-pool.json` with rejection reasons, but they are never scored, shortlisted, or emitted into `eligible-candidates.json`.
+Generation still applies a hard ineligibility gate against `crates/xtask/data/agent_registry.toml` before scoring.
 
-If fewer than 3 eligible candidates survive, stop here and expand the seed file.
+### 5. Handle insufficiency exactly once
 
-The runner must not fetch new recommendation evidence after research freeze and must not replace the frozen research artifacts.
+If fewer than 3 eligible candidates survive generation:
+- `run-status.json.status` is `insufficient_eligible_candidates`
+- pass 1 returns `next_action = expand_discovery`
+- pass 2 returns `next_action = stop`
 
-### 4. Review the scratch run
+The widening rule is fixed:
+- at most one widening retry per invocation
+- pass 2 uses the fixed widening query family:
+  - `alternatives to <top surviving candidate>`
+  - `top coding agent CLI open source`
+  - `CLI coding assistant blog`
+- if pass 1 has zero surviving candidates after hard rejection, omit the candidate-relative widening query and use only the two generic widening queries
+- pass 2 adds at most 3 new candidates
+- pass 2 must use a new `run_id` and must not overwrite pass 1 artifacts
+
+Do not patch the frozen seed in place. Start pass 2 discovery, freeze the new reviewed seed, rerun research, and rerun `generate` once.
+
+### 6. Review the scratch run
 
 Review the scratch run before promotion:
-- frozen seed snapshot and research metadata
-- one dossier per seeded candidate
+- reviewed seed snapshot
+- discovery provenance under `discovery/**`
+- research metadata and one dossier per seeded candidate
 - shortlisted candidates
 - rejection reasons for non-eligible candidates
 - scratch comparison packet preview
@@ -105,7 +157,7 @@ Scratch runs are never committed.
 `docs/agents/.uaa-temp/**` is ignored operator scratch space.
 `docs/agents/*/.staging/**` remains internal promote-time staging owned by the scripts and must not be used as operator scratch space.
 
-### 5. Promote one reviewed run
+### 7. Promote one reviewed run
 
 Promote one scratch run into the canonical packet, a committed review run, and a final approval artifact:
 
@@ -124,6 +176,9 @@ Promotion writes:
 - `docs/agents/lifecycle/<onboarding_pack_prefix>/governance/approved-agent.toml`
 
 Required committed review artifacts under `docs/agents/selection/runs/<run_id>/`:
+- byte-copy of `discovery/candidate-seed.generated.toml`
+- byte-copy of `discovery/discovery-summary.md`
+- byte-copy of `discovery/sources.lock.json`
 - byte-copy of `seed.snapshot.toml`
 - byte-copy of `candidate-pool.json`
 - byte-copy of `eligible-candidates.json`
@@ -141,6 +196,7 @@ Canonical promotion rules:
 - `docs/agents/selection/cli-agent-selection-packet.md` is a byte-copy of scratch `comparison.generated.md`
 - committed review `approval-draft.generated.toml` remains the scratch recommendation draft; final `docs/agents/lifecycle/<onboarding_pack_prefix>/governance/approved-agent.toml` is rendered at promote time from the maintainer-approved inputs
 - the canonical packet must conform to the no-drift template rule in `docs/templates/agent-selection/cli-agent-selection-packet-template.md`
+- discovery-enabled v2 promote branching is driven by `run-status.json.workflow_version = "discovery_enabled_v2"`, not by guessing from missing files
 - committed review promotion is valid only when:
   - every committed review artifact is a byte-copy of the scratch artifact except `run-status.json` and `run-summary.md`
   - `run-status.json` changes are limited to finalized metrics, approved/recommended decision bookkeeping, and final committed path references
@@ -154,7 +210,11 @@ Canonical promotion rules:
   - verify the promoted outputs
   - only then delete the stale committed review directory in the same commit
 
-### 6. Stop for maintainer approve-or-override
+Template audit result:
+- no update to `docs/templates/agent-selection/cli-agent-selection-packet-template.md` is required for v2
+- discovery changes provenance and reviewed-input flow, not the stable packet structure or decision lines
+
+### 8. Stop for maintainer approve-or-override
 
 The recommendation lane ends at:
 
@@ -164,7 +224,7 @@ Maintainers now either:
 - accept the recommended agent
 - override to another shortlisted candidate and provide `--override-reason`
 
-### 7. Continue with create mode unchanged
+### 9. Continue with create mode unchanged
 
 After the approval artifact exists, continue with the existing create lane exactly as documented below.
 
