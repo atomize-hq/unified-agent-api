@@ -7,14 +7,16 @@ Base branch: `main`
 Repo: `atomize-hq/unified-agent-api`
 Work item: `uaa-0022`
 
+## Objective
+
+Keep the shipped `xtask runtime-follow-on` lane exactly where it is on execution ownership and write-boundary control, then widen the thin part that remains: the maintainer-facing review contract.
+
+The deliverable is not a new runner. The deliverable is a stronger machine-readable summary that tells reviewers and the next lane what actually landed, what tier it landed at, what richer surfaces were deferred, and whether publication refresh is truly ready.
+
 ## Source Inputs
 
-- Existing design artifact, still sufficient:
-  - `/Users/spensermcconnell/.gstack/projects/atomize-hq-unified-agent-api/spensermcconnell-codex-recommend-next-agent-design-20260429-131949.md`
-- Gap report driving this refresh:
-  - `docs/backlog/uaa-0022-runtime-follow-on-narrowness-report.md`
-- Original milestone definition and intent:
-  - `docs/backlog/uaa-0022-runtime-follow-on-codex-runner.md`
+- Gap report: `docs/backlog/uaa-0022-runtime-follow-on-narrowness-report.md`
+- Original milestone note: `docs/backlog/uaa-0022-runtime-follow-on-codex-runner.md`
 - Live runtime-follow-on implementation:
   - `crates/xtask/src/runtime_follow_on.rs`
   - `crates/xtask/src/runtime_follow_on/models.rs`
@@ -26,61 +28,59 @@ Work item: `uaa-0022`
   - `docs/cli-agent-onboarding-factory-operator-guide.md`
   - `docs/specs/cli-agent-onboarding-charter.md`
   - `docs/adr/0013-agent-api-backend-harness.md`
-- Existing queue context:
-  - `TODOS.md`
+- Queue context: `TODOS.md`
 
 ## Outcome
 
-Keep the shipped runtime-follow-on lane exactly where it is on control and ownership, then widen only the thin part:
+After this plan lands:
 
-1. add a machine-validated implementation summary that tells reviewers what actually landed
-2. make the richer summary part of `handoff.json`, not just prose in `run-summary.md`
-3. keep publication refresh as a separate later lane
-
-This is not a new runtime runner. It is the missing reviewer-facing contract on the runner that already exists.
+1. `handoff.json` carries a typed implementation summary, not just completion booleans.
+2. `run-summary.md` is rendered from validated structured data, not from thin prose.
+3. `run-status.json` exposes the small set of extra fields needed for dashboards and replay.
+4. `validate_handoff` enforces semantic rules for tier reporting, template lineage, deferred surfaces, and publication readiness.
+5. Publication refresh remains a separate lane. This plan only makes that handoff trustworthy.
 
 ## Problem Statement
 
-`xtask runtime-follow-on` now does the hard boring part correctly:
+The current runtime-follow-on lane proves the control seam:
 
 - it owns the Codex execution step
 - it freezes the dry-run packet
 - it rejects out-of-bounds writes
-- it requires real runtime-owned output changes
-- it validates a minimum handoff into publication refresh
+- it rejects publication-owned manifest edits
+- it rejects no-op write runs
+- it requires a minimally valid `handoff.json`
 
-That closed the execution seam.
-
-What is still too thin is the review surface after a successful run. Today the repo can tell that Codex stayed in bounds and wrote something real. It still cannot tell, in a crisp machine-checked way:
+What it does not prove yet is the reviewer-facing meaning of a successful run. Today the repo can tell that Codex stayed in bounds and changed runtime-owned files. It still cannot tell, in a machine-checked way:
 
 - what tier actually landed
-- which template lineage was used
-- whether richer surfaces were intentionally deferred
-- why a minimal result is acceptable when minimal was requested
-- whether the publication lane is merely required or actually ready
+- which baseline template was used
+- which richer surfaces were intentionally deferred
+- why a minimal result is acceptable when `minimal` was requested
+- whether the next publication lane is merely required or truly ready
 
-The current artifacts prove control. They do not yet give maintainers the stronger summary language the plan originally called for.
+That is the gap this plan closes.
 
-## Scope Lock
+## Scope
 
 ### In scope
 
-- Enrich the runtime lane's machine-readable summary contract.
-- Extend `handoff.json` so publication refresh receives richer runtime context.
-- Generate `run-summary.md` from validated structured data instead of thin ad hoc prose.
-- Extend `run-status.json` only where it helps operators and review tooling.
-- Tighten runner validation around tier reporting, template lineage, deferred rich surfaces, and publication readiness.
-- Add regression tests for the new schema and failure modes.
-- Update the operator guide so the shipped procedure matches the stronger contract.
+- Add a typed implementation summary to the runtime-follow-on model layer.
+- Extend `handoff.json` with semantic fields that publication refresh can trust.
+- Render `run-summary.md` from validated structured fields.
+- Mirror only the minimal extra status fields into `run-status.json`.
+- Extend `validate_handoff` and `validate_write_mode` with semantic checks.
+- Extend the fake Codex fixture and entrypoint tests to lock the new contract.
+- Update the operator guide to match the strengthened runtime handoff.
 
 ### Out of scope
 
-- Replacing `xtask runtime-follow-on` with a different host surface.
+- Replacing `xtask runtime-follow-on` with a new command or host surface.
 - Reopening the runtime/publication ownership boundary.
-- Auto-grading backend quality by reading Rust semantics or AST shape.
-- Folding publication refresh, support/capability publication, or proving-run closeout into this command.
-- Introducing a new crate, new binary, or new external service.
-- Creating a new design doc. The existing design artifact already covers the feature seam well enough.
+- Adding a new crate, binary, service, or scratch artifact family.
+- Auto-inferring achieved tier by reading Rust semantics or AST shape.
+- Merging publication refresh or proving-run closeout into runtime-follow-on.
+- Rewriting the existing design doc. The current inputs are sufficient.
 
 ## Step 0 Scope Challenge
 
@@ -88,207 +88,62 @@ The current artifacts prove control. They do not yet give maintainers the strong
 
 | Sub-problem | Existing surface to reuse | Reuse decision |
 | --- | --- | --- |
-| Runner entrypoint and frozen packet | `crates/xtask/src/runtime_follow_on.rs` | Reuse directly. Do not create a second runtime lane. |
-| Runtime contract models | `crates/xtask/src/runtime_follow_on/models.rs` | Extend in place. Keep one typed schema surface. |
-| Human-readable run artifact | `crates/xtask/src/runtime_follow_on/render.rs` | Reuse, but drive it from validated structured fields. |
-| Prompt ownership | `crates/xtask/templates/runtime_follow_on_codex_prompt.md` | Reuse. Expand the required summary/handoff instructions there. |
-| Boundary and manifest validation | `validate_write_mode`, `validate_handoff` in `crates/xtask/src/runtime_follow_on.rs` | Reuse. Add semantic checks instead of parallel validators. |
-| Procedural truth | `docs/cli-agent-onboarding-factory-operator-guide.md` | Reuse and update. The guide must match the stronger schema. |
-| Regression harness | `crates/xtask/tests/runtime_follow_on_entrypoint.rs`, `crates/xtask/tests/fixtures/fake_codex.sh` | Reuse and extend. No new harness layer needed. |
-| Deferred next lane | `TODOS.md` publication-refresh follow-on entry | Reuse. This plan should strengthen the handoff into that existing follow-on, not invent a new TODO. |
+| Runner entrypoint and packet lifecycle | `crates/xtask/src/runtime_follow_on.rs` | Reuse directly. Keep one runtime lane. |
+| Typed JSON models | `crates/xtask/src/runtime_follow_on/models.rs` | Extend in place. Do not create a second schema surface. |
+| Human-readable summary rendering | `crates/xtask/src/runtime_follow_on/render.rs` | Reuse, but drive it from validated fields. |
+| Prompt ownership | `crates/xtask/templates/runtime_follow_on_codex_prompt.md` | Reuse. Expand required handoff instructions there. |
+| Validation harness | `validate_write_mode`, `validate_handoff` in `crates/xtask/src/runtime_follow_on.rs` | Reuse. Add semantic checks instead of parallel validators. |
+| Regression harness | `crates/xtask/tests/runtime_follow_on_entrypoint.rs`, `crates/xtask/tests/fixtures/fake_codex.sh` | Reuse and extend. No new harness layer. |
+| Live operator procedure | `docs/cli-agent-onboarding-factory-operator-guide.md` | Reuse and update. The guide must match the strengthened contract. |
+| Downstream follow-on | `TODOS.md` entry "Enclose The Publication Refresh Follow-On After The Runtime Runner" | Reuse. This plan feeds that TODO instead of replacing it. |
 
-### Minimum change set
+### Minimum complete change set
 
 The smallest complete version of this work is:
 
-1. add one new typed summary object to the runtime-follow-on models
-2. embed that summary inside `handoff.json`
-3. render `run-summary.md` from the validated summary object
-4. add publication-readiness semantics beyond the current `publication_refresh_required = true`
-5. add test coverage for success and schema failures
-6. update the operator guide
+1. add one canonical `ImplementationSummary` object to the runtime-follow-on model layer
+2. embed that object inside `handoff.json`
+3. add `publication_refresh_ready` semantics to the handoff
+4. render `run-summary.md` from the validated summary object plus the validation report
+5. mirror a small subset of those fields into `run-status.json`
+6. add regression tests for success and failure semantics
+7. update the operator guide
 
-No new subcommand. No new crate. No second summary file unless the existing artifacts prove too cramped during implementation.
+No new subcommand. No second handoff format. No standalone `implementation-summary.json`.
 
 ### Complexity check
 
-This should stay under the smell threshold for architecture churn even though it touches more than 8 files.
+This work touches one Rust module cluster, one prompt template, one test harness, and one operator doc set. That is comfortably inside "engineered enough" territory.
 
-Expected file set:
+Expected touched files:
 
 - `PLAN.md`
+- `crates/xtask/src/runtime_follow_on.rs`
 - `crates/xtask/src/runtime_follow_on/models.rs`
 - `crates/xtask/src/runtime_follow_on/render.rs`
-- `crates/xtask/src/runtime_follow_on.rs`
 - `crates/xtask/templates/runtime_follow_on_codex_prompt.md`
 - `crates/xtask/tests/runtime_follow_on_entrypoint.rs`
 - `crates/xtask/tests/fixtures/fake_codex.sh`
 - `docs/cli-agent-onboarding-factory-operator-guide.md`
 
-That is still one module cluster, one template, one test harness, one operator doc. Engineered enough, not sprawling.
-
-### Search check
-
-No new external framework or concurrency pattern is being introduced here. This is a schema-tightening pass over an internal Rust command.
-
-- **[Layer 1]** Reuse existing `serde`-backed typed JSON models instead of inventing a looser dynamic schema layer.
-- **[Layer 1]** Reuse the current dry-run/write packet flow instead of creating a second summary pipeline.
-- **[Layer 1]** Reuse current entrypoint tests and fake Codex fixture instead of adding a new integration harness.
-
 ### TODOS cross-reference
 
-`TODOS.md` already has the correct downstream follow-on:
+`TODOS.md` already contains the correct downstream item for publication refresh. No new TODO is required. This plan should make that existing follow-on easier by handing it a richer and stricter `handoff.json`.
 
-- "Enclose The Publication Refresh Follow-On After The Runtime Runner"
+### Completeness decision
 
-This plan should make that TODO easier to execute by producing a better handoff. No new TODO is required if this plan lands as written.
+The shortcut version would be "add more prose to `run-summary.md`."
 
-### Completeness check
+That is not acceptable. It would improve readability but not enforceability. The complete version is still cheap here because the runner already has a typed model layer and a test harness. This is a boilable lake:
 
-The shortcut version would be "add a few extra markdown bullets to `run-summary.md`."
-
-That is not enough. It stays human-readable but still not machine-checkable. With the current runner architecture, the complete version is cheap:
-
-- typed summary fields
-- typed handoff fields
+- typed fields
+- typed validation
 - generated markdown from the same source
-- tests that lock the contract
-
-That is a boilable lake.
-
-### Distribution check
-
-No new user-facing artifact type is being introduced.
-
-This remains an internal repo workflow shipped through `xtask`. Distribution work is only:
-
-- keep the CLI surface stable
-- keep the operator guide accurate
-- keep the tests green
-
-## Decision Record
-
-### 1. Keep one runtime lane
-
-The normative host surface remains:
-
-```sh
-cargo run -p xtask -- runtime-follow-on --approval <path> --dry-run
-cargo run -p xtask -- runtime-follow-on --approval <path> --write --run-id <id>
-```
-
-The plan strengthens artifacts emitted by that command. It does not replace the command.
-
-### 2. Add one canonical implementation summary object
-
-Introduce one typed summary object inside runtime-follow-on models. Do not maintain parallel freeform summary fields across files.
-
-Proposed object:
-
-```json
-{
-  "achieved_tier": "default | minimal | feature-rich",
-  "primary_template": "opencode | gemini_cli | codex | claude_code",
-  "template_lineage": ["opencode"],
-  "landed_surfaces": [
-    "wrapper_runtime",
-    "backend_harness",
-    "agent_api_onboarding_test",
-    "wrapper_coverage_source",
-    "runtime_manifest_evidence"
-  ],
-  "deferred_surfaces": [
-    {
-      "surface": "mcp_management",
-      "reason": "not requested for this lane"
-    }
-  ],
-  "minimal_tier_justification": null
-}
-```
-
-This object is the review contract. `run-summary.md` should render from it, and `handoff.json` should carry it.
-
-### 3. Strengthen `handoff.json`, do not create a second handoff format
-
-The publication-refresh lane already expects `handoff.json`. Reuse that file and expand it.
-
-Proposed minimum shape:
-
-```json
-{
-  "agent_id": "example_agent",
-  "manifest_root": "cli_manifests/example_agent",
-  "runtime_lane_complete": true,
-  "publication_refresh_required": true,
-  "publication_refresh_ready": true,
-  "required_commands": [
-    "support-matrix --check",
-    "capability-matrix --check",
-    "capability-matrix-audit",
-    "make preflight"
-  ],
-  "blockers": [],
-  "implementation_summary": {
-    "achieved_tier": "default",
-    "primary_template": "opencode",
-    "template_lineage": ["opencode"],
-    "landed_surfaces": [
-      "wrapper_runtime",
-      "backend_harness",
-      "agent_api_onboarding_test",
-      "wrapper_coverage_source",
-      "runtime_manifest_evidence"
-    ],
-    "deferred_surfaces": [],
-    "minimal_tier_justification": null
-  }
-}
-```
-
-Why this shape:
-
-- next-lane orchestration still reads one file
-- maintainers still review one machine-readable handoff
-- runtime semantics and publication readiness are locked together
-
-### 4. `run-summary.md` becomes a render target, not a second source of truth
-
-`run-summary.md` should be regenerated from the validated typed summary and validation report. Do not allow Codex-authored prose to become the canonical review summary.
-
-That avoids drift between:
-
-- what Codex claims
-- what the validator proved
-- what the next lane consumes
-
-### 5. Semantic validation stays explicit and shallow on purpose
-
-This increment should validate declared semantics, not pretend to infer them from Rust code shape.
-
-The validator must check:
-
-- `implementation_summary` exists
-- `achieved_tier` is a known enum value
-- `primary_template` is a known enum value
-- `template_lineage` is non-empty and includes `primary_template`
-- `achieved_tier = minimal` requires `minimal_tier_justification`
-- every requested rich surface is either landed or explicitly deferred
-- `publication_refresh_ready = true` only when blockers are empty and runtime lane completion checks passed
-
-The validator should not try to prove that backend code is "truly default-tier" by analyzing source structure. That would spend an innovation token in the wrong place.
-
-### 6. Default-tier and minimal-tier rules stay boring
-
-- `requested_tier = default` continues to require the target onboarding test file.
-- `requested_tier = minimal` continues to require explicit justification input.
-- For this increment, require `implementation_summary.achieved_tier == requested_tier`.
-
-That last rule is intentionally strict. It keeps the first semantic pass honest and simple. If the repo later wants downgrade reporting, that can be a separate follow-on.
+- regression tests that lock behavior
 
 ## Architecture
 
-### End-to-end flow
+### Current to target flow
 
 ```text
 approved-agent.toml + agent_registry.toml + dry-run packet
@@ -298,7 +153,7 @@ approved-agent.toml + agent_registry.toml + dry-run packet
                 │
                 ├──────────────▶ input-contract.json
                 ├──────────────▶ codex-prompt.md
-                └──────────────▶ expected tier / template / rich-surface inputs
+                └──────────────▶ requested tier / allowed rich surfaces / required test
                                    │
                                    ▼
                             codex exec --write
@@ -314,7 +169,7 @@ approved-agent.toml + agent_registry.toml + dry-run packet
                                    │
            ┌───────────────────────┼────────────────────────┐
            ▼                       ▼                        ▼
-   boundary + manifest      summary semantics      test + handoff readiness
+   boundary + manifest      summary semantics      test + publication readiness
            │                       │                        │
            └───────────────────────┴──────────────┬─────────┘
                                                   ▼
@@ -324,49 +179,250 @@ approved-agent.toml + agent_registry.toml + dry-run packet
                     run-status.json + run-summary.md + validation-report.json
                                                   │
                                                   ▼
-                               publication refresh lane consumes handoff.json
+                          publication refresh consumes the same handoff.json
 ```
 
-### Module plan
+### Canonical model changes
 
-| Module | Change |
-| --- | --- |
-| `crates/xtask/src/runtime_follow_on/models.rs` | Add `ImplementationSummary`, `DeferredSurface`, and any minimal-justification summary shape needed in `handoff.json` / `run-status.json`. |
-| `crates/xtask/src/runtime_follow_on.rs` | Extend dry-run defaults, parse richer handoff payload, validate semantic fields, compute publication readiness rules, and keep current boundary checks untouched. |
-| `crates/xtask/src/runtime_follow_on/render.rs` | Render `run-summary.md` from the typed summary object plus the validation report. |
-| `crates/xtask/templates/runtime_follow_on_codex_prompt.md` | Tell Codex exactly which summary fields and handoff semantics it must populate. |
-| `crates/xtask/tests/runtime_follow_on_entrypoint.rs` | Add success/failure tests for richer summary semantics. |
-| `crates/xtask/tests/fixtures/fake_codex.sh` | Emit the richer `handoff.json` for fixture scenarios. |
-| `docs/cli-agent-onboarding-factory-operator-guide.md` | Update required scratch artifacts and handoff semantics. |
+All new semantics live in `crates/xtask/src/runtime_follow_on/models.rs`.
 
-### Data contract details
+Add these Rust types:
 
-#### `input-contract.json`
+- `AchievedTier` enum with exactly: `default`, `minimal`, `feature-rich`
+- `TemplateId` enum with exactly: `opencode`, `gemini_cli`, `codex`, `claude_code`
+- `SurfaceId` enum with exactly:
+  - `wrapper_runtime`
+  - `backend_harness`
+  - `agent_api_onboarding_test`
+  - `wrapper_coverage_source`
+  - `runtime_manifest_evidence`
+  - `add_dirs`
+  - `external_sandbox_policy`
+  - `mcp_management`
+  - `richer_session_runtime`
+- `DeferredSurface { surface: SurfaceId, reason: String }`
+- `ImplementationSummary`
 
-Extend the packet just enough to validate the richer output:
+`ImplementationSummary` shape:
 
-- `requested_tier`
-- `allow_rich_surface`
-- `required_agent_api_test`
-- `expected_default_surfaces`
-- `known_template_ids`
+```json
+{
+  "achieved_tier": "default",
+  "primary_template": "opencode",
+  "template_lineage": ["opencode"],
+  "landed_surfaces": [
+    "wrapper_runtime",
+    "backend_harness",
+    "agent_api_onboarding_test",
+    "wrapper_coverage_source",
+    "runtime_manifest_evidence"
+  ],
+  "deferred_surfaces": [
+    {
+      "surface": "mcp_management",
+      "reason": "not approved for this runtime lane"
+    }
+  ],
+  "minimal_tier_justification": null
+}
+```
 
-This keeps validation deterministic without introducing another config file.
+Serialization rules for every new enum in this section:
 
-#### `run-status.json`
+- Use `serde` string enums with `kebab-case` values.
+- JSON must never contain numeric discriminants.
+- Validation failures must name the offending field.
 
-Keep it operator-focused. Add only small mirrored fields that help dashboards and replay:
+### Exact artifact contract changes
 
-- `tier_achieved`
-- `primary_template`
-- `publication_refresh_ready`
-- `deferred_surface_count`
+#### `InputContract`
 
-Do not copy the full summary blob into `run-status.json` unless implementation pressure proves that duplication is worth it.
+Add these fields:
 
-#### `run-summary.md`
+- `expected_default_surfaces: Vec<SurfaceId>`
+- `known_template_ids: Vec<TemplateId>`
+- `known_rich_surfaces: Vec<SurfaceId>`
 
-Required sections:
+Populate them in `build_context`. Do not derive them from prompt text at validation time.
+
+`expected_default_surfaces` must contain exactly:
+
+- `wrapper_runtime`
+- `backend_harness`
+- `agent_api_onboarding_test`
+- `wrapper_coverage_source`
+- `runtime_manifest_evidence`
+
+`known_template_ids` must contain exactly:
+
+- `opencode`
+- `gemini_cli`
+- `codex`
+- `claude_code`
+
+`known_rich_surfaces` must contain exactly:
+
+- `add_dirs`
+- `external_sandbox_policy`
+- `mcp_management`
+- `richer_session_runtime`
+
+#### `HandoffContract`
+
+Keep existing fields and add exactly:
+
+- `publication_refresh_ready: bool`
+- `implementation_summary: ImplementationSummary`
+
+Dry-run `handoff.json` must still be emitted, but it must now contain:
+
+- `runtime_lane_complete = false`
+- `publication_refresh_required = true`
+- `publication_refresh_ready = false`
+- `blockers = ["Pending runtime follow-on implementation."]`
+- a placeholder `implementation_summary` with this exact shape:
+
+```json
+{
+  "achieved_tier": "<requested_tier>",
+  "primary_template": "opencode",
+  "template_lineage": [],
+  "landed_surfaces": [],
+  "deferred_surfaces": [],
+  "minimal_tier_justification": null
+}
+```
+
+The dry-run placeholder is intentionally parseable but not semantically sufficient for write-mode success.
+
+Successful write-mode `handoff.json` must contain all legacy fields plus the new fields in the same object. No second machine-readable summary file is allowed.
+
+#### `RunStatus`
+
+Add only these mirrored fields:
+
+- `tier_achieved: Option<AchievedTier>`
+- `primary_template: Option<TemplateId>`
+- `publication_refresh_ready: bool`
+- `deferred_surface_count: Option<usize>`
+
+`RunStatus` remains operator-focused. It must not duplicate the full summary object.
+
+Field population rules:
+
+- dry-run:
+  - `tier_achieved = null`
+  - `primary_template = null`
+  - `publication_refresh_ready = false`
+  - `deferred_surface_count = null`
+- write success:
+  - `tier_achieved = implementation_summary.achieved_tier`
+  - `primary_template = implementation_summary.primary_template`
+  - `publication_refresh_ready = handoff.publication_refresh_ready`
+  - `deferred_surface_count = implementation_summary.deferred_surfaces.len()`
+- write failure:
+  - `tier_achieved = null`
+  - `primary_template = null`
+  - `publication_refresh_ready = false`
+  - `deferred_surface_count = null`
+
+#### `ValidationReport`
+
+Keep the current shape. Add new `ValidationCheck` entries; do not add a new report format.
+
+Required new check names:
+
+- `implementation_summary_present`
+- `implementation_summary_semantics`
+- `publication_refresh_readiness`
+
+`ValidationReport.status` remains:
+
+- `prepared` for dry-run
+- `pass` for write success
+- `fail` for write failure
+
+### Validation rules
+
+`validate_handoff` becomes the semantic gate. It must enforce all of the following:
+
+1. `implementation_summary` exists and parses into the typed model.
+2. `achieved_tier` is a known enum value.
+3. `primary_template` is a known enum value.
+4. `template_lineage` is non-empty.
+5. `template_lineage` contains `primary_template`.
+6. `achieved_tier == requested_tier` for this milestone.
+7. `achieved_tier = minimal` requires non-empty `minimal_tier_justification`.
+8. `achieved_tier != minimal` requires `minimal_tier_justification = null`.
+9. Every surface in `allow_rich_surface` is accounted for in either `landed_surfaces` or `deferred_surfaces`.
+10. Every `deferred_surfaces[].reason` is non-empty after trim.
+11. `publication_refresh_ready = true` is allowed only when:
+    - `runtime_lane_complete = true`
+    - `blockers` is empty
+    - the canonical publication command set is present
+12. `required_commands` must match the canonical set after normalization:
+    - `support-matrix --check`
+    - `capability-matrix --check`
+    - `capability-matrix-audit`
+    - `make preflight`
+13. `landed_surfaces` must be unique.
+14. `deferred_surfaces[].surface` must be unique.
+15. A surface cannot appear in both `landed_surfaces` and `deferred_surfaces`.
+16. Every surface in `landed_surfaces` must be either:
+    - one of `expected_default_surfaces`, or
+    - one of `known_rich_surfaces`
+17. Every surface in `deferred_surfaces` must be one of `known_rich_surfaces`.
+18. A rich surface may appear in `landed_surfaces` or `deferred_surfaces` only if it was explicitly requested through `allow_rich_surface`.
+19. Tier-to-surface rules are fixed:
+    - `default` requires all `expected_default_surfaces` in `landed_surfaces`
+    - `minimal` requires at least:
+      - `wrapper_runtime`
+      - `wrapper_coverage_source`
+      - `runtime_manifest_evidence`
+    - `feature-rich` requires all `expected_default_surfaces` plus every surface from `allow_rich_surface` in `landed_surfaces`
+20. For `minimal`, any omitted default surface must appear in `deferred_surfaces` with a non-empty reason.
+
+Normalization rules for `required_commands`:
+
+- Trim leading and trailing ASCII whitespace on each command.
+- Drop empty strings after trim.
+- Compare as a deduplicated `BTreeSet<String>`.
+- Keep command strings case-sensitive.
+- The normalized set must equal the canonical set exactly. Superset and subset both fail.
+
+Surface classification rules:
+
+- Default surfaces:
+  - `wrapper_runtime`
+  - `backend_harness`
+  - `agent_api_onboarding_test`
+  - `wrapper_coverage_source`
+  - `runtime_manifest_evidence`
+- Rich surfaces:
+  - `add_dirs`
+  - `external_sandbox_policy`
+  - `mcp_management`
+  - `richer_session_runtime`
+
+Template-lineage rules:
+
+- `primary_template` must appear exactly once in `template_lineage`.
+- `template_lineage` order is meaningful: nearest baseline first, additional references after it.
+- Empty `template_lineage` is allowed only in the dry-run placeholder handoff. It is forbidden in write-mode validation.
+
+What the validator must not do:
+
+- inspect Rust code to "prove" the landed tier
+- infer template lineage from file diffs
+- decide whether the implementation quality is good enough beyond the declared summary contract
+
+This is explicit validation, not clever inference.
+
+### Rendering rules
+
+`render_run_summary` must render from validated structured data plus the existing validation report. It must not invent semantics and it must not parse `handoff.json` a second time.
+
+Required sections in `run-summary.md`:
 
 1. Outcome
 2. Implementation summary
@@ -376,74 +432,204 @@ Required sections:
 6. Written paths
 7. Errors, when present
 
-This should read like a maintainer review note, but every substantive claim comes from validated fields.
+Required content in "Implementation summary":
 
-## Code Quality Review
+- requested tier
+- achieved tier
+- primary template
+- template lineage
+- landed surfaces
+- minimal-tier justification when applicable
 
-### Opinionated recommendations
+Required content in "Publication refresh handoff":
 
-1. Keep one typed schema surface.
-   Recommendation: add summary structs to `models.rs` and route every artifact through them.
-   Why: DRY matters here. A second ad hoc JSON writer or markdown-only schema is how this plan regresses in two months.
+- `publication_refresh_required`
+- `publication_refresh_ready`
+- blockers
+- required commands
 
-2. Do not let `render.rs` invent semantics.
-   Recommendation: `render.rs` formats validated data only.
-   Why: explicit over clever. Validators decide truth, renderers only present it.
+Ordering rules for `run-summary.md`:
 
-3. Avoid a new `implementation-summary.json` file unless forced.
-   Recommendation: start with richer `handoff.json` plus generated `run-summary.md`.
-   Why: minimal diff. One more artifact means one more thing to drift, test, and explain.
+- `landed_surfaces` render in enum declaration order.
+- `deferred_surfaces` render in enum declaration order by `surface`.
+- `required_commands` render in canonical command order.
+- validation checks render in the order they were appended in `validate_write_mode`.
 
-4. Keep enum vocabulary repo-owned and small.
-   Recommendation: normalize template ids and surface ids in code, not freeform strings from Codex.
-   Why: review tooling gets worse fast when prompt-authored strings become API surface.
+### Prompt contract
 
-## Test Review
+Update `crates/xtask/templates/runtime_follow_on_codex_prompt.md` so Codex is told to write the richer `handoff.json` contract directly.
 
-100 percent coverage for the new contract is realistic here because the surface is a bounded Rust command with an existing fixture harness.
+The prompt must state:
 
-### CODE PATH COVERAGE
+- `handoff.json` is the only machine-readable handoff artifact
+- `implementation_summary` is required
+- all summary values must use the repo-owned enums from the packet
+- every requested rich surface must be either landed or explicitly deferred
+- `publication_refresh_ready` must remain `false` when blockers exist
+- `template_lineage` must be an ordered array of repo-owned template ids
+- rich surfaces not approved through `allow_rich_surface` are forbidden
+
+The prompt packet must expose the exact enum vocabularies and tier-to-surface rules above so Codex is not guessing strings.
+
+## Implementation Plan
+
+### Phase 1 - Schema
+
+Files:
+
+- `crates/xtask/src/runtime_follow_on/models.rs`
+- `crates/xtask/src/runtime_follow_on.rs`
+
+Work:
+
+1. Add the new enums and structs.
+2. Extend `InputContract`, `HandoffContract`, and `RunStatus`.
+3. Seed `expected_default_surfaces`, `known_template_ids`, and `known_rich_surfaces` in `build_context`.
+4. Extend dry-run `handoff.json` defaults so the placeholder shape already matches the new contract.
+5. Extend prompt rendering so the enum vocabularies and tier-to-surface rules are visible in the packet.
+
+Exit condition:
+
+- dry-run artifacts serialize successfully with the new schema
+- no write-mode behavior changes yet beyond compile-safe model updates
+
+### Phase 2 - Semantic validation
+
+Files:
+
+- `crates/xtask/src/runtime_follow_on.rs`
+
+Work:
+
+1. Extend `validate_handoff` with the 20 rules above.
+2. Record distinct `ValidationCheck` entries for summary presence, summary semantics, and publication readiness.
+3. Keep all existing boundary, manifest-split, and non-zero-write checks unchanged.
+4. Populate the new `RunStatus` fields only on write success.
+
+Exit condition:
+
+- malformed or contradictory summary semantics fail before a run can be treated as successful
+
+### Phase 3 - Rendering and prompt alignment
+
+Files:
+
+- `crates/xtask/src/runtime_follow_on/render.rs`
+- `crates/xtask/templates/runtime_follow_on_codex_prompt.md`
+
+Work:
+
+1. Make `render_run_summary` output the new maintainer-facing sections from validated data.
+2. Mirror the minimal extra fields into `RunStatus`.
+3. Update the prompt so fake Codex and real Codex are both aiming at the same handoff contract.
+4. Keep render ordering deterministic using the ordering rules above.
+
+Exit condition:
+
+- summary markdown and status JSON are both deterministic projections of validated data
+
+### Phase 4 - Regression harness
+
+Files:
+
+- `crates/xtask/tests/runtime_follow_on_entrypoint.rs`
+- `crates/xtask/tests/fixtures/fake_codex.sh`
+
+Work:
+
+1. Extend the fixture script to emit the richer success path.
+2. Add explicit failure scenarios for missing summary, contradictory readiness, tier mismatch, required-command mismatch, duplicate surfaces, unauthorized rich surfaces, and unaccounted rich surfaces.
+3. Add or extend tests to lock the rendered markdown output.
+
+Exit condition:
+
+- success path proves the richer summary contract
+- every new semantic failure mode has a regression test
+
+### Phase 5 - Docs
+
+Files:
+
+- `docs/cli-agent-onboarding-factory-operator-guide.md`
+
+Work:
+
+1. Update the required runtime scratch artifacts description.
+2. Document the richer `handoff.json` contract and `publication_refresh_ready`.
+3. State that publication refresh still consumes the same handoff artifact and remains the next lane.
+
+Exit condition:
+
+- the live operator guide matches the shipped schema and validation behavior
+
+## Test Plan
+
+Project test framework: Rust workspace tests under `cargo test`.
+
+Target verification commands:
+
+```sh
+cargo test -p xtask --test runtime_follow_on_entrypoint
+cargo test -p xtask runtime_follow_on
+make fmt-check
+make clippy
+```
+
+### Code path coverage
 
 ```text
 CODE PATH COVERAGE
 ===========================
 [+] crates/xtask/src/runtime_follow_on/models.rs
     │
-    ├── ImplementationSummary serde round-trip
-    │   ├── [GAP] valid default summary parses and serializes
-    │   ├── [GAP] minimal summary requires justification payload
-    │   └── [GAP] unknown template / surface values fail validation
+    ├── ImplementationSummary serde contract
+    │   ├── [GAP] valid default summary round-trips
+    │   ├── [GAP] minimal summary requires justification
+    │   └── [GAP] invalid enum values are rejected
     │
 [+] crates/xtask/src/runtime_follow_on.rs
+    │
+    ├── build_context()
+    │   ├── [GAP] expected_default_surfaces are populated
+    │   └── [GAP] known template and rich-surface ids are populated
     │
     ├── validate_handoff()
     │   ├── [★★ TESTED] missing required legacy field fails
     │   ├── [GAP] missing implementation_summary fails
     │   ├── [GAP] publication_refresh_ready=true with blockers fails
     │   ├── [GAP] achieved_tier != requested_tier fails
-    │   └── [GAP] requested rich surface neither landed nor deferred fails
+    │   ├── [GAP] minimal without summary justification fails
+    │   ├── [GAP] requested rich surface omitted from landed/deferred fails
+    │   ├── [GAP] unapproved rich surface in landed_surfaces fails
+    │   ├── [GAP] duplicate landed/deferred surfaces fail
+    │   └── [GAP] required_commands set mismatch fails
     │
     ├── validate_write_mode()
     │   ├── [★★★ TESTED] out-of-bounds path rejection
     │   ├── [★★★ TESTED] generated wrapper_coverage.json rejection
-    │   ├── [★★ TESTED] missing required default-tier test fails
-    │   └── [GAP] validated summary fields feed run-summary render
+    │   ├── [★★ TESTED] no-op runtime run rejection
+    │   └── [GAP] successful semantic summary feeds status + markdown
     │
 [+] crates/xtask/src/runtime_follow_on/render.rs
     │
     ├── render_run_summary()
-    │   ├── [GAP] success summary shows achieved tier / template / deferred surfaces
+    │   ├── [GAP] success summary shows achieved tier, template lineage, deferred surfaces
     │   └── [GAP] failure summary still shows partial semantic context
 ```
 
-### USER FLOW COVERAGE
+### User flow coverage
 
 ```text
 USER FLOW COVERAGE
 ===========================
-[+] Dry-run to write success
+[+] Dry-run packet preparation
     │
-    ├── [★★ TESTED] packet prepares and write validates
+    ├── [★★ TESTED] bounded scratch packet is written
+    └── [GAP] placeholder implementation_summary is emitted in dry-run handoff
+
+[+] Default-tier write success
+    │
+    ├── [★★ TESTED] write path requires real runtime-owned changes
     └── [GAP] [→INTEG] successful run emits rich handoff + rich markdown summary
 
 [+] Minimal-tier exception run
@@ -458,170 +644,103 @@ USER FLOW COVERAGE
 
 [+] Publication handoff review
     │
-    ├── [★★ TESTED] required_commands presence
-    └── [GAP] publication_refresh_ready semantics are enforced
-
-─────────────────────────────────
-COVERAGE: 5/14 paths tested today
-GAPS: 9 paths need tests
-  - integration-style command tests: 7
-  - render-focused unit tests: 2
-─────────────────────────────────
+    ├── [★★ TESTED] required command presence is enforced today
+    └── [GAP] [→INTEG] publication_refresh_ready semantics are enforced
 ```
 
 ### Required tests to add
 
-1. `runtime_follow_on_write_accepts_rich_implementation_summary`
-   - File: `crates/xtask/tests/runtime_follow_on_entrypoint.rs`
-   - Assert: success scenario writes `implementation_summary`, `publication_refresh_ready = true`, and `run-summary.md` includes achieved tier, template lineage, and deferred-surface section.
+Add these tests in `crates/xtask/tests/runtime_follow_on_entrypoint.rs` unless a narrower unit test is clearly simpler:
 
-2. `runtime_follow_on_write_rejects_missing_implementation_summary`
-   - File: `crates/xtask/tests/runtime_follow_on_entrypoint.rs`
-   - Assert: write fails when `handoff.json` omits the summary object.
+1. `runtime_follow_on_dry_run_emits_placeholder_implementation_summary`
+2. `runtime_follow_on_write_accepts_rich_implementation_summary`
+3. `runtime_follow_on_write_rejects_missing_implementation_summary`
+4. `runtime_follow_on_write_rejects_publication_ready_with_blockers`
+5. `runtime_follow_on_write_rejects_tier_mismatch`
+6. `runtime_follow_on_write_rejects_minimal_summary_without_justification`
+7. `runtime_follow_on_write_rejects_unaccounted_rich_surface`
+8. `runtime_follow_on_write_rejects_unapproved_rich_surface`
+9. `runtime_follow_on_write_rejects_duplicate_surface_entries`
+10. `runtime_follow_on_write_rejects_required_command_set_mismatch`
+11. `runtime_follow_on_write_records_status_fields_from_validated_summary`
+12. `render_run_summary_renders_validated_semantic_fields`
 
-3. `runtime_follow_on_write_rejects_publication_ready_with_blockers`
-   - File: `crates/xtask/tests/runtime_follow_on_entrypoint.rs`
-   - Assert: contradictory readiness fields fail validation.
+Each test must assert exact operator-visible behavior, not just non-throw behavior.
 
-4. `runtime_follow_on_write_rejects_tier_mismatch`
-   - File: `crates/xtask/tests/runtime_follow_on_entrypoint.rs`
-   - Assert: `achieved_tier != requested_tier` fails for this increment.
+## Failure Modes Registry
 
-5. `runtime_follow_on_write_rejects_unaccounted_rich_surface`
-   - File: `crates/xtask/tests/runtime_follow_on_entrypoint.rs`
-   - Assert: requested rich surface must be in `landed_surfaces` or `deferred_surfaces`.
-
-6. `render_run_summary_renders_validated_semantic_fields`
-   - File: either a new focused unit test alongside `render.rs` or a command test if that is simpler in this repo
-   - Assert: markdown output is deterministic from the typed summary.
-
-### Failure modes registry
-
-| Codepath | Realistic failure | Test cover required | Error handling required | User experience if missed |
+| Codepath | Realistic failure | Test required | Error handling required | Operator-visible impact if missed |
 | --- | --- | --- | --- | --- |
-| `validate_handoff` | Codex writes legacy handoff without new summary fields | yes | yes, hard fail | silent semantic downgrade in review |
-| publication readiness logic | handoff says ready while blockers still exist | yes | yes, hard fail | next lane starts from a false green state |
-| rich surface accounting | requested feature-rich surface disappears from output summary | yes | yes, hard fail | reviewers think omission was intentional when it was not |
-| render path | markdown omits deferred surfaces even though JSON captured them | yes | yes, deterministic render | human reviewer misses the real scope cut |
-| minimal-tier summary | justification exists in input but is not carried into output summary | yes | yes, hard fail | exception ships with no rationale |
+| `validate_handoff` | Codex writes the legacy handoff shape with no `implementation_summary` | yes | hard fail | semantic downgrade looks like a valid success |
+| publication readiness logic | handoff says ready while blockers still exist | yes | hard fail | publication lane starts from a false green state |
+| rich surface accounting | approved rich surface disappears from the output summary | yes | hard fail | reviewers think omission was intentional |
+| minimal-tier exception flow | justification exists in input but is absent from the handoff summary | yes | hard fail | exception-tier ship has no rationale |
+| renderer | markdown omits deferred surfaces while JSON includes them | yes | deterministic render fix | reviewer misses the real scope cut |
+| status projection | `run-status.json` claims readiness without matching handoff semantics | yes | hard fail or projection fix | dashboards show a false-ready run |
 
-Critical gap rule: any path that loses semantic context without failing validation is a critical gap. This plan removes those.
+Critical gap rule: any path that loses semantic context without failing validation is a release-blocking defect for this milestone.
 
-## Performance Review
+## Worktree Parallelization Strategy
 
-This is a tiny performance surface, but there are still two boring rules worth locking in:
-
-1. Parse `handoff.json` once.
-   Recommendation: validate and render from the same typed object.
-   Why: no duplicate parse/transform branches.
-
-2. Keep semantic checks linear.
-   Recommendation: validate surfaces and templates with set membership, not extra filesystem scans.
-   Why: the runtime lane already does enough IO. The summary layer should be cheap.
-
-No caching, concurrency, or new background work is justified here.
-
-## Workstreams
-
-### Workstream 1 - Schema and validation
-
-- extend runtime-follow-on typed models
-- extend `validate_handoff`
-- extend `validate_write_mode`
-- add publication readiness rules
-
-### Workstream 2 - Rendering and prompt contract
-
-- update prompt template
-- update markdown renderer
-- keep run status aligned
-
-### Workstream 3 - Test harness and docs
-
-- extend fake Codex fixture
-- add entrypoint regressions
-- update operator guide
-
-## Dependency table
+### Dependency table
 
 | Step | Modules touched | Depends on |
 | --- | --- | --- |
-| Define implementation summary schema | `crates/xtask/src/runtime_follow_on*` | — |
-| Enforce richer handoff validation | `crates/xtask/src/runtime_follow_on*` | Define implementation summary schema |
-| Render richer run summary | `crates/xtask/src/runtime_follow_on/render.rs` | Define implementation summary schema |
-| Extend fake Codex fixture and entrypoint tests | `crates/xtask/tests/**` | Enforce richer handoff validation |
-| Update operator guide | `docs/` | Define implementation summary schema |
+| Define summary enums and structs | `crates/xtask/src/runtime_follow_on/` | — |
+| Populate packet defaults and known value sets | `crates/xtask/src/runtime_follow_on/` | Define summary enums and structs |
+| Enforce richer handoff validation | `crates/xtask/src/runtime_follow_on/` | Populate packet defaults and known value sets |
+| Render richer summary and status projection | `crates/xtask/src/runtime_follow_on/` | Define summary enums and structs |
+| Extend fake Codex scenarios and entrypoint tests | `crates/xtask/tests/` | Enforce richer handoff validation |
+| Update operator guide | `docs/` | Define summary enums and structs |
 
-## Parallel lanes
+### Parallel lanes
 
-- Lane A: schema definition -> validator changes -> renderer changes
-- Lane B: operator-guide updates after schema freeze
-- Lane C: fake Codex fixture -> runtime-follow-on entrypoint tests, after validator expectations are stable
+- Lane A: define summary enums and structs -> populate packet defaults and known value sets -> enforce richer handoff validation -> render richer summary and status projection
+- Lane B: update operator guide after Lane A freezes the schema vocabulary
+- Lane C: extend fake Codex scenarios -> add entrypoint regressions after Lane A freezes validator expectations
 
-Execution order:
+### Execution order
 
-1. Launch Lane A first. It owns the contract.
-2. Once the JSON shape is stable, Lane B and Lane C can run in parallel.
-3. Merge B + C, then run final test and doc verification.
+1. Launch Lane A first. It owns the contract and the validator.
+2. Once Lane A has frozen field names and validation rules, launch Lane B and Lane C in parallel worktrees.
+3. Merge B and C.
+4. Run the targeted xtask tests, then the formatting and clippy gates.
 
-Conflict flags:
+### Conflict flags
 
-- Lane A and Lane C both depend on `runtime_follow_on` field names. Do not run them in parallel before the schema is frozen.
+- Lane A and Lane C both depend on exact field names in `handoff.json`. Do not run them in parallel before the schema is frozen.
+- Lane A and Lane B both depend on the final terminology for `publication_refresh_ready` and surface ids. Freeze names before updating docs.
 
 ## NOT in scope
 
-- Auto-infer achieved tier from code shape.
-  Rationale: too clever for this seam, weak verification value for the effort.
-- Teach publication refresh to consume more than `handoff.json`.
-  Rationale: one handoff artifact is enough for this increment.
-- Add support for `achieved_tier` downgrade reporting.
-  Rationale: keep v1 semantics simple with equality to requested tier.
-- Create or update publication-owned manifest files.
+- Auto-grading whether backend code is "truly default-tier" by inspecting implementation shape.
+  Rationale: too clever, low signal, and not needed to close the review-contract seam.
+- Adding a second machine-readable artifact beside `handoff.json`.
+  Rationale: one handoff file is enough for this increment.
+- Allowing `achieved_tier` to differ from `requested_tier`.
+  Rationale: keep v1 semantics strict and reviewable.
+- Updating publication-owned manifest outputs.
   Rationale: still the next lane.
 
-## What already exists
+## Definition of Done
 
-- `runtime-follow-on` already freezes the input packet and owns `codex exec`.
-- The validator already proves boundary ownership, generated wrapper-coverage discipline, and non-zero runtime writes.
-- `run-summary.md` and `handoff.json` already exist, they are just too lean.
-- `requested_tier`, minimal-justification input, and allowed rich surfaces are already present in the runtime input contract.
-- The test harness already simulates success, invalid handoff, no-op runtime writes, and boundary violations.
+This plan is complete only when all of the following are true:
 
-This means the repo is not missing plumbing. It is missing summary semantics.
-
-## Implementation Steps
-
-1. Add typed summary structs to `models.rs`.
-2. Extend dry-run artifact generation so `handoff.json` defaults include the richer shape.
-3. Extend the prompt template so Codex must populate the richer handoff fields.
-4. Extend `validate_handoff` with semantic checks for implementation summary and publication readiness.
-5. Extend `render_run_summary` to present validated semantic fields.
-6. Update the fake Codex success and failure scenarios to emit the richer handoff.
-7. Add regression tests for the new success and failure modes.
-8. Update the operator guide examples and required artifact descriptions.
+1. `handoff.json` includes `publication_refresh_ready` and a typed `implementation_summary`.
+2. `validate_handoff` rejects missing, contradictory, incomplete, duplicated, or unauthorized summary semantics.
+3. `run-summary.md` renders achieved tier, template lineage, landed surfaces, deferred surfaces, blockers, and required commands from validated data.
+4. `run-status.json` exposes the agreed mirrored fields and nothing more.
+5. The fake Codex fixture can emit both valid and invalid richer handoff scenarios.
+6. The entrypoint regression suite covers every new semantic failure mode listed above.
+7. `docs/cli-agent-onboarding-factory-operator-guide.md` documents the strengthened runtime handoff accurately.
+8. `cargo test -p xtask --test runtime_follow_on_entrypoint`, `cargo test -p xtask runtime_follow_on`, `make fmt-check`, and `make clippy` all pass.
 
 ## Completion Summary
 
-- Step 0: Scope Challenge — scope accepted, narrowed to review-contract widening only
-- Architecture Review: 4 concrete recommendations
-- Code Quality Review: 4 concrete recommendations
-- Test Review: diagram produced, 9 gaps identified
-- Performance Review: 2 concrete recommendations
-- NOT in scope: written
-- What already exists: written
-- TODOS.md updates: 0 new items needed
-- Failure modes: 0 unresolved critical gaps if the required tests land
-- Outside voice: skipped, not needed for this backend-only contract-tightening pass
-- Parallelization: 3 workstreams, 2 follow after schema freeze
-- Lake Score: 6/6 recommendations chose the complete option
-
-## GSTACK REVIEW REPORT
-
-| Review | Trigger | Why | Runs | Status | Findings |
-|--------|---------|-----|------|--------|----------|
-| CEO Review | `/plan-ceo-review` | Scope & strategy | 0 | — | — |
-| Codex Review | `/codex review` | Independent 2nd opinion | 0 | — | — |
-| Eng Review | `/plan-eng-review` | Architecture & tests (required) | 1 | issues_open | focus narrowed to reviewer-summary contract widening; test and schema gaps enumerated in this plan |
-| Design Review | `/plan-design-review` | UI/UX gaps | 0 | skipped | backend-only scope, existing design artifact remains sufficient |
-
-**VERDICT:** ENG REVIEW COMPLETE FOR THIS PLANNING PASS. Implement from this plan. No new design doc required.
+- Scope: accepted as-is, narrowed to review-contract widening only
+- Architecture: one runtime lane, one handoff artifact, one typed summary model
+- Code quality: no new abstraction layer, no duplicate schema writer, no second handoff file
+- Tests: success and failure semantics are fully specified
+- Failure modes: all silent semantic-downgrade paths are explicitly blocked
+- Parallelization: 3 lanes, with docs and tests parallelized after schema freeze
+- Follow-on: publication refresh remains a separate milestone fed by the richer handoff
