@@ -1,7 +1,7 @@
-# PLAN - UAA-0022 Runtime Follow-On Codex Runner
+# PLAN - UAA-0022 Runtime Follow-On Review Contract Widening
 
 Status: ready for implementation
-Date: 2026-04-29
+Date: 2026-04-30
 Branch: `codex/recommend-next-agent`
 Base branch: `main`
 Repo: `atomize-hq/unified-agent-api`
@@ -9,68 +9,78 @@ Work item: `uaa-0022`
 
 ## Source Inputs
 
-- Design artifact:
+- Existing design artifact, still sufficient:
   - `/Users/spensermcconnell/.gstack/projects/atomize-hq-unified-agent-api/spensermcconnell-codex-recommend-next-agent-design-20260429-131949.md`
-- CEO plan:
-  - `/Users/spensermcconnell/.gstack/projects/atomize-hq-unified-agent-api/ceo-plans/2026-04-29-runtime-follow-on-codex-lane.md`
-- Eng review test-plan artifact:
-  - `/Users/spensermcconnell/.gstack/projects/atomize-hq-unified-agent-api/spensermcconnell-codex-recommend-next-agent-eng-review-test-plan-20260429-135452.md`
-- Canonical repo surfaces:
+- Gap report driving this refresh:
+  - `docs/backlog/uaa-0022-runtime-follow-on-narrowness-report.md`
+- Original milestone definition and intent:
   - `docs/backlog/uaa-0022-runtime-follow-on-codex-runner.md`
-  - `docs/backlog.json`
+- Live runtime-follow-on implementation:
+  - `crates/xtask/src/runtime_follow_on.rs`
+  - `crates/xtask/src/runtime_follow_on/models.rs`
+  - `crates/xtask/src/runtime_follow_on/render.rs`
+  - `crates/xtask/templates/runtime_follow_on_codex_prompt.md`
+  - `crates/xtask/tests/runtime_follow_on_entrypoint.rs`
+  - `crates/xtask/tests/fixtures/fake_codex.sh`
+- Canonical procedure and contracts:
   - `docs/cli-agent-onboarding-factory-operator-guide.md`
   - `docs/specs/cli-agent-onboarding-charter.md`
   - `docs/adr/0013-agent-api-backend-harness.md`
-  - `crates/xtask/src/main.rs`
-  - `crates/xtask/src/onboard_agent/preview/render.rs`
-  - `crates/xtask/data/agent_registry.toml`
-  - `crates/codex/src/wrapper_coverage_manifest.rs`
-  - `crates/claude_code/src/wrapper_coverage_manifest.rs`
-  - `crates/agent_api/src/backends/opencode/**`
-  - `crates/opencode/**`
-  - `crates/agent_api/src/backends/gemini_cli/**`
-  - `crates/gemini_cli/**`
+- Existing queue context:
+  - `TODOS.md`
 
 ## Outcome
 
-Land one repo-owned runtime lane after `onboard-agent --write` and `scaffold-wrapper-crate --write`.
+Keep the shipped runtime-follow-on lane exactly where it is on control and ownership, then widen only the thin part:
 
-The lane must start from approval and registry truth, invoke Codex through a bounded repo command, write only runtime-owned surfaces, emit reviewable artifacts, and hand off cleanly into the later publication-refresh and proving-run-closeout lane.
+1. add a machine-validated implementation summary that tells reviewers what actually landed
+2. make the richer summary part of `handoff.json`, not just prose in `run-summary.md`
+3. keep publication refresh as a separate later lane
 
-This does not reopen the recommendation lane. It does not merge runtime implementation into `onboard-agent`. It does not silently absorb publication refresh into the same milestone.
+This is not a new runtime runner. It is the missing reviewer-facing contract on the runner that already exists.
 
 ## Problem Statement
 
-The front half of onboarding is now boring in the good way.
+`xtask runtime-follow-on` now does the hard boring part correctly:
 
-Recommendation can end in a valid `approved-agent.toml`. `onboard-agent` can enroll the control plane. `scaffold-wrapper-crate` can create the wrapper shell at the registry-owned `crate_path`.
+- it owns the Codex execution step
+- it freezes the dry-run packet
+- it rejects out-of-bounds writes
+- it requires real runtime-owned output changes
+- it validates a minimum handoff into publication refresh
 
-The remaining gap is the middle seam. A maintainer still has to translate repo patterns into real wrapper code, real `agent_api` backend code, real wrapper-coverage source updates, real `agent_api` tests, and real manifest evidence. Today that step depends on memory, taste, and archaeology across existing agents.
+That closed the execution seam.
 
-That is the bottleneck this plan removes.
+What is still too thin is the review surface after a successful run. Today the repo can tell that Codex stayed in bounds and wrote something real. It still cannot tell, in a crisp machine-checked way:
+
+- what tier actually landed
+- which template lineage was used
+- whether richer surfaces were intentionally deferred
+- why a minimal result is acceptable when minimal was requested
+- whether the publication lane is merely required or actually ready
+
+The current artifacts prove control. They do not yet give maintainers the stronger summary language the plan originally called for.
 
 ## Scope Lock
 
 ### In scope
 
-- Add one new repo-owned `xtask` subcommand for the runtime follow-on lane.
-- Make that command the only normative host surface for the new Codex-driven runtime runner.
-- Default the lane to `opencode`-level support.
-- Allow `gemini_cli`-level support only as an explicit `minimal` exception with required justification.
-- Allow richer patterns from `codex` and `claude_code` only through explicit opt-in fields.
-- Define the exact machine-owned inputs, scratch artifacts, write allowlist, forbidden writes, validation checks, and handoff artifact.
-- Require `agent_api` backend tests as part of the default-tier runtime lane.
-- Keep the operator guide as the canonical shipped procedure until one real proving run validates this lane.
+- Enrich the runtime lane's machine-readable summary contract.
+- Extend `handoff.json` so publication refresh receives richer runtime context.
+- Generate `run-summary.md` from validated structured data instead of thin ad hoc prose.
+- Extend `run-status.json` only where it helps operators and review tooling.
+- Tighten runner validation around tier reporting, template lineage, deferred rich surfaces, and publication readiness.
+- Add regression tests for the new schema and failure modes.
+- Update the operator guide so the shipped procedure matches the stronger contract.
 
 ### Out of scope
 
-- Folding runtime generation into `onboard-agent`.
-- Making generated onboarding packet markdown an executable source of truth.
-- Automating publication refresh in the same command.
-- Automating proving-run closeout in the same command.
-- Redefining capability promotion policy or the onboarding charter.
-- Adding a new artifact-publishing pipeline or a new end-user binary outside `xtask`.
-- Broad portfolio policy for which agents should or should not be onboarded.
+- Replacing `xtask runtime-follow-on` with a different host surface.
+- Reopening the runtime/publication ownership boundary.
+- Auto-grading backend quality by reading Rust semantics or AST shape.
+- Folding publication refresh, support/capability publication, or proving-run closeout into this command.
+- Introducing a new crate, new binary, or new external service.
+- Creating a new design doc. The existing design artifact already covers the feature seam well enough.
 
 ## Step 0 Scope Challenge
 
@@ -78,790 +88,540 @@ That is the bottleneck this plan removes.
 
 | Sub-problem | Existing surface to reuse | Reuse decision |
 | --- | --- | --- |
-| Control-plane enrollment | `cargo run -p xtask -- onboard-agent --approval ... --write` | Reuse unchanged. Do not collapse runtime generation into it. |
-| Wrapper shell creation | `cargo run -p xtask -- scaffold-wrapper-crate --agent <id> --write` | Reuse unchanged. It remains the hard boundary before runtime work starts. |
-| Approval truth and path ownership | `crates/xtask/src/approval_artifact.rs`, `crates/xtask/data/agent_registry.toml`, `crates/xtask/src/agent_registry.rs` | Reuse as the machine-owned truth for crate path, backend path, manifest root, and wrapper-coverage source path. |
-| Runtime handoff wording | `crates/xtask/src/onboard_agent/preview/render.rs` | Reuse as reviewer evidence only. Do not promote generated markdown into executable authority. |
-| Default implementation baseline | `crates/agent_api/src/backends/opencode/**`, `crates/opencode/**` | Reuse as the default runtime template. |
-| Minimal exception baseline | `crates/agent_api/src/backends/gemini_cli/**`, `crates/gemini_cli/**` | Reuse only when `minimal` is explicitly requested and justified. |
-| Feature-rich references | `crates/agent_api/src/backends/codex/**`, `crates/codex/**`, `crates/agent_api/src/backends/claude_code/**`, `crates/claude_code/**` | Reuse only for explicit richer-surface opt-ins. |
-| Wrapper coverage source-of-truth pattern | `crates/codex/src/wrapper_coverage_manifest.rs`, `crates/claude_code/src/wrapper_coverage_manifest.rs` | Reuse directly. Runtime lane edits source-of-truth Rust, never generated `wrapper_coverage.json`. |
-| Path-jail and safe mutation patterns | `crates/xtask/src/workspace_mutation.rs` | Reuse the same discipline for runner-managed writes and validations. |
+| Runner entrypoint and frozen packet | `crates/xtask/src/runtime_follow_on.rs` | Reuse directly. Do not create a second runtime lane. |
+| Runtime contract models | `crates/xtask/src/runtime_follow_on/models.rs` | Extend in place. Keep one typed schema surface. |
+| Human-readable run artifact | `crates/xtask/src/runtime_follow_on/render.rs` | Reuse, but drive it from validated structured fields. |
+| Prompt ownership | `crates/xtask/templates/runtime_follow_on_codex_prompt.md` | Reuse. Expand the required summary/handoff instructions there. |
+| Boundary and manifest validation | `validate_write_mode`, `validate_handoff` in `crates/xtask/src/runtime_follow_on.rs` | Reuse. Add semantic checks instead of parallel validators. |
+| Procedural truth | `docs/cli-agent-onboarding-factory-operator-guide.md` | Reuse and update. The guide must match the stronger schema. |
+| Regression harness | `crates/xtask/tests/runtime_follow_on_entrypoint.rs`, `crates/xtask/tests/fixtures/fake_codex.sh` | Reuse and extend. No new harness layer needed. |
+| Deferred next lane | `TODOS.md` publication-refresh follow-on entry | Reuse. This plan should strengthen the handoff into that existing follow-on, not invent a new TODO. |
 
 ### Minimum change set
 
-Keep the control-plane boundary intact and add the smallest complete runtime lane:
+The smallest complete version of this work is:
 
-1. Add a new `xtask` subcommand:
-   - `cargo run -p xtask -- runtime-follow-on --approval <path> --dry-run`
-   - `cargo run -p xtask -- runtime-follow-on --approval <path> --write`
-2. Add a runtime prompt payload that the command bakes in or explicitly loads from a repo-owned path.
-3. Add deterministic scratch artifacts under one `.uaa-temp` root.
-4. Add exact boundary validation for allowed writes and required outputs.
-5. Add runner contract tests plus default-tier `agent_api` onboarding test requirements.
-6. Add a thin repo-local skill wrapper that invokes the command but does not own the contract.
+1. add one new typed summary object to the runtime-follow-on models
+2. embed that summary inside `handoff.json`
+3. render `run-summary.md` from the validated summary object
+4. add publication-readiness semantics beyond the current `publication_refresh_required = true`
+5. add test coverage for success and schema failures
+6. update the operator guide
 
-No new crate. No new service. No new external workflow runner.
+No new subcommand. No new crate. No second summary file unless the existing artifacts prove too cramped during implementation.
 
 ### Complexity check
 
-This will touch more than 8 files and more than 2 modules. That is acceptable here.
+This should stay under the smell threshold for architecture churn even though it touches more than 8 files.
 
-This milestone spans:
-- `xtask` command wiring
-- prompt payload ownership
-- backend/template selection logic
-- runtime-owned manifest evidence rules
-- `agent_api` onboarding test requirements
-- one proving-run target
+Expected file set:
 
-Trying to fake a smaller seam would only hide the real work and create plan debt.
+- `PLAN.md`
+- `crates/xtask/src/runtime_follow_on/models.rs`
+- `crates/xtask/src/runtime_follow_on/render.rs`
+- `crates/xtask/src/runtime_follow_on.rs`
+- `crates/xtask/templates/runtime_follow_on_codex_prompt.md`
+- `crates/xtask/tests/runtime_follow_on_entrypoint.rs`
+- `crates/xtask/tests/fixtures/fake_codex.sh`
+- `docs/cli-agent-onboarding-factory-operator-guide.md`
+
+That is still one module cluster, one template, one test harness, one operator doc. Engineered enough, not sprawling.
+
+### Search check
+
+No new external framework or concurrency pattern is being introduced here. This is a schema-tightening pass over an internal Rust command.
+
+- **[Layer 1]** Reuse existing `serde`-backed typed JSON models instead of inventing a looser dynamic schema layer.
+- **[Layer 1]** Reuse the current dry-run/write packet flow instead of creating a second summary pipeline.
+- **[Layer 1]** Reuse current entrypoint tests and fake Codex fixture instead of adding a new integration harness.
 
 ### TODOS cross-reference
 
-`TODOS.md` already captures the publication-refresh follow-on after this runtime lane.
+`TODOS.md` already has the correct downstream follow-on:
 
-This plan does not add a new strategic TODO. It closes the current runtime-runner planning gap and explicitly hands off to the already-captured publication-refresh follow-on.
+- "Enclose The Publication Refresh Follow-On After The Runtime Runner"
+
+This plan should make that TODO easier to execute by producing a better handoff. No new TODO is required if this plan lands as written.
 
 ### Completeness check
 
-The shortcut version would be:
-- tell Codex to "copy opencode"
-- let it write anywhere in the repo
-- trust a prose summary
-- clean up by hand afterward
+The shortcut version would be "add a few extra markdown bullets to `run-summary.md`."
 
-That saves almost no time with Codex and guarantees weak reviewability.
+That is not enough. It stays human-readable but still not machine-checkable. With the current runner architecture, the complete version is cheap:
 
-The complete version is still a boilable lake:
-- one command
-- one machine-owned input contract
-- one write allowlist
-- one explicit tier policy
-- one structured output contract
-- one proving target
+- typed summary fields
+- typed handoff fields
+- generated markdown from the same source
+- tests that lock the contract
+
+That is a boilable lake.
 
 ### Distribution check
 
-No new end-user distribution artifact is introduced.
+No new user-facing artifact type is being introduced.
 
-This milestone ships an internal repo workflow surface through `xtask`. The only required "distribution" work is:
-- add the command to `xtask`
-- document it in the repo
-- prove it on one real onboarding target
+This remains an internal repo workflow shipped through `xtask`. Distribution work is only:
 
-## Decisions Locked
+- keep the CLI surface stable
+- keep the operator guide accurate
+- keep the tests green
 
-### 1. Host surface
+## Decision Record
 
-The normative host surface is a repo-owned `xtask` command that invokes `codex exec`.
+### 1. Keep one runtime lane
 
-Exact command family:
+The normative host surface remains:
 
 ```sh
-cargo run -p xtask -- runtime-follow-on --approval docs/agents/lifecycle/<pack>/governance/approved-agent.toml --dry-run
-cargo run -p xtask -- runtime-follow-on --approval docs/agents/lifecycle/<pack>/governance/approved-agent.toml --write
+cargo run -p xtask -- runtime-follow-on --approval <path> --dry-run
+cargo run -p xtask -- runtime-follow-on --approval <path> --write --run-id <id>
 ```
 
-The thin skill wrapper exists for ergonomics only. The command owns the contract.
+The plan strengthens artifacts emitted by that command. It does not replace the command.
 
-### 2. Machine truth precedence
+### 2. Add one canonical implementation summary object
 
-Executable truth comes from:
+Introduce one typed summary object inside runtime-follow-on models. Do not maintain parallel freeform summary fields across files.
 
-1. `docs/agents/lifecycle/<pack>/governance/approved-agent.toml`
-2. `crates/xtask/data/agent_registry.toml`
-3. the scaffolded wrapper crate root under the registry-owned `crate_path`
+Proposed object:
 
-Generated packet docs under `docs/agents/lifecycle/<pack>/**` remain reviewer evidence only.
+```json
+{
+  "achieved_tier": "default | minimal | feature-rich",
+  "primary_template": "opencode | gemini_cli | codex | claude_code",
+  "template_lineage": ["opencode"],
+  "landed_surfaces": [
+    "wrapper_runtime",
+    "backend_harness",
+    "agent_api_onboarding_test",
+    "wrapper_coverage_source",
+    "runtime_manifest_evidence"
+  ],
+  "deferred_surfaces": [
+    {
+      "surface": "mcp_management",
+      "reason": "not requested for this lane"
+    }
+  ],
+  "minimal_tier_justification": null
+}
+```
 
-The runner must reject the approval artifact before any write if these fields do not exactly match the registry entry for the same `agent_id`:
+This object is the review contract. `run-summary.md` should render from it, and `handoff.json` should carry it.
 
-- `agent_id`
-- `crate_path`
-- `backend_module`
-- `manifest_root`
-- `wrapper_coverage_binding_kind`
-- `wrapper_coverage_source_path`
-- `onboarding_pack_prefix`
+### 3. Strengthen `handoff.json`, do not create a second handoff format
 
-The runner may surface `display_name`, `package_name`, and capability declarations in summaries, but path ownership and write allowlist decisions come only from the exact-match fields above.
+The publication-refresh lane already expects `handoff.json`. Reuse that file and expand it.
 
-### 3. Tier policy
+Proposed minimum shape:
 
-- `default`: `opencode`-level baseline, required unless explicitly overridden.
-- `minimal`: `gemini_cli`-level exception path, allowed only when the runner receives explicit justification and follow-up work to reach `default`.
-- `feature-rich`: additive opt-in path that may borrow selected patterns from `codex` and `claude_code`.
+```json
+{
+  "agent_id": "example_agent",
+  "manifest_root": "cli_manifests/example_agent",
+  "runtime_lane_complete": true,
+  "publication_refresh_required": true,
+  "publication_refresh_ready": true,
+  "required_commands": [
+    "support-matrix --check",
+    "capability-matrix --check",
+    "capability-matrix-audit",
+    "make preflight"
+  ],
+  "blockers": [],
+  "implementation_summary": {
+    "achieved_tier": "default",
+    "primary_template": "opencode",
+    "template_lineage": ["opencode"],
+    "landed_surfaces": [
+      "wrapper_runtime",
+      "backend_harness",
+      "agent_api_onboarding_test",
+      "wrapper_coverage_source",
+      "runtime_manifest_evidence"
+    ],
+    "deferred_surfaces": [],
+    "minimal_tier_justification": null
+  }
+}
+```
 
-### 4. Write boundary
+Why this shape:
 
-Allowed write targets for `--write`:
+- next-lane orchestration still reads one file
+- maintainers still review one machine-readable handoff
+- runtime semantics and publication readiness are locked together
 
-- `crates/<agent_id>/**`
-- `crates/agent_api/src/backends/<agent_id>/**`
-- `crates/agent_api/tests/**` for target-specific onboarding tests
-- the registry-owned wrapper coverage source path resolved from `agent_registry.toml`
-- `cli_manifests/<agent_id>/snapshots/**`
-- `cli_manifests/<agent_id>/supplement/**`
-- scratch artifacts under `docs/agents/.uaa-temp/runtime-follow-on/runs/<run_id>/`
+### 4. `run-summary.md` becomes a render target, not a second source of truth
 
-Everything else is read-only for this milestone.
+`run-summary.md` should be regenerated from the validated typed summary and validation report. Do not allow Codex-authored prose to become the canonical review summary.
 
-### 5. Manifest split
+That avoids drift between:
 
-Runtime-owned manifest evidence is in scope. Publication-owned manifest state is not.
+- what Codex claims
+- what the validator proved
+- what the next lane consumes
 
-Runtime-owned examples:
-- `cli_manifests/<agent_id>/snapshots/**`
-- `cli_manifests/<agent_id>/supplement/**`
+### 5. Semantic validation stays explicit and shallow on purpose
 
-This milestone does not introduce any new runner-owned manifest subtree beyond `snapshots/**` and `supplement/**`.
+This increment should validate declared semantics, not pretend to infer them from Rust code shape.
 
-Publication-owned and therefore forbidden in this milestone:
-- `cli_manifests/<agent_id>/current.json`
-- `cli_manifests/<agent_id>/latest_validated.txt`
-- `cli_manifests/<agent_id>/min_supported.txt`
-- `cli_manifests/<agent_id>/pointers/**`
-- `cli_manifests/<agent_id>/reports/**`
-- `cli_manifests/<agent_id>/versions/**`
-- `cli_manifests/<agent_id>/wrapper_coverage.json`
-- `cli_manifests/support_matrix/**`
-- `docs/specs/unified-agent-api/support-matrix.md`
-- `docs/specs/unified-agent-api/capability-matrix.md`
+The validator must check:
 
-### 6. Dry-run and write semantics
+- `implementation_summary` exists
+- `achieved_tier` is a known enum value
+- `primary_template` is a known enum value
+- `template_lineage` is non-empty and includes `primary_template`
+- `achieved_tier = minimal` requires `minimal_tier_justification`
+- every requested rich surface is either landed or explicitly deferred
+- `publication_refresh_ready = true` only when blockers are empty and runtime lane completion checks passed
 
-- `--dry-run` resolves machine truth, validates input consistency, materializes scratch packet artifacts, prints the exact planned write boundary, and does not invoke `codex exec`.
-- `--write` does everything from `--dry-run`, invokes `codex exec`, validates produced outputs, records scratch artifacts, and exits non-zero if the run violates boundary or output contract rules.
+The validator should not try to prove that backend code is "truly default-tier" by analyzing source structure. That would spend an innovation token in the wrong place.
 
-No automatic repo rollback is attempted after a failed `--write`. The runner preserves the failure summary and offending-path list for review.
+### 6. Default-tier and minimal-tier rules stay boring
 
-### 7. Handoff contract
+- `requested_tier = default` continues to require the target onboarding test file.
+- `requested_tier = minimal` continues to require explicit justification input.
+- For this increment, require `implementation_summary.achieved_tier == requested_tier`.
 
-The runtime lane is complete only when it emits a machine-readable handoff artifact that tells the next lane:
-- what runtime evidence now exists
-- what publication-refresh commands remain
-- whether the lane is ready for publication refresh
-- what blockers remain if it is not ready
+That last rule is intentionally strict. It keeps the first semantic pass honest and simple. If the repo later wants downgrade reporting, that can be a separate follow-on.
 
 ## Architecture
 
 ### End-to-end flow
 
 ```text
-approved-agent.toml + agent_registry.toml
-                │
-                ├──────────────▶ path / tier / capability truth
+approved-agent.toml + agent_registry.toml + dry-run packet
                 │
                 ▼
-      runtime-follow-on input assembly
+      runtime_follow_on::build_context
                 │
-                ├──────────────▶ operator guide + charter + ADR-0013
-                │
-                ├──────────────▶ baked-in runtime prompt payload
-                │
-                ▼
-      xtask runtime-follow-on --write
-                │
-                ▼
-            codex exec
-                │
-     ┌──────────┼──────────┬──────────────┬────────────────────┐
-     │          │          │              │                    │
-     ▼          ▼          ▼              ▼                    ▼
-crates/<id>  crates/agent_api/   crates/agent_api/   wrapper coverage   cli_manifests/<id>/
-runtime      src/backends/<id>/  tests/**            source path        runtime-owned evidence
-code         backend code        target onboarding   Rust source        only
-                                 tests
-     │
-     ▼
-run-status.json + run-summary.md + handoff.json + validation-report.json
-     │
-     ▼
-publication refresh / validation / closeout
-(next milestone, separate owner seam)
+                ├──────────────▶ input-contract.json
+                ├──────────────▶ codex-prompt.md
+                └──────────────▶ expected tier / template / rich-surface inputs
+                                   │
+                                   ▼
+                            codex exec --write
+                                   │
+                     ┌─────────────┴─────────────┐
+                     ▼                           ▼
+              repo runtime writes         handoff.json
+                                          implementation_summary{}
+                     │                           │
+                     └─────────────┬─────────────┘
+                                   ▼
+                         validate_write_mode()
+                                   │
+           ┌───────────────────────┼────────────────────────┐
+           ▼                       ▼                        ▼
+   boundary + manifest      summary semantics      test + handoff readiness
+           │                       │                        │
+           └───────────────────────┴──────────────┬─────────┘
+                                                  ▼
+                                 render_run_summary() from validated data
+                                                  │
+                                                  ▼
+                    run-status.json + run-summary.md + validation-report.json
+                                                  │
+                                                  ▼
+                               publication refresh lane consumes handoff.json
 ```
 
-### Input contract
-
-Required reads:
-
-- `docs/agents/lifecycle/<pack>/governance/approved-agent.toml`
-- `crates/xtask/data/agent_registry.toml`
-- `docs/cli-agent-onboarding-factory-operator-guide.md`
-- `docs/specs/cli-agent-onboarding-charter.md`
-- `docs/adr/0013-agent-api-backend-harness.md`
-- `crates/xtask/src/onboard_agent/preview/render.rs`
-- `crates/xtask/templates/runtime_follow_on_codex_prompt.md`
-- `crates/agent_api/src/backends/opencode/**`
-- `crates/opencode/**`
-
-Conditional reads:
-
-- `crates/agent_api/src/backends/gemini_cli/**`
-- `crates/gemini_cli/**`
-- `crates/agent_api/src/backends/codex/**`
-- `crates/codex/**`
-- `crates/agent_api/src/backends/claude_code/**`
-- `crates/claude_code/**`
-- wrapper coverage source files in existing wrapper crates when richer coverage declarations are needed
-
-Command inputs:
-
-- `--approval <repo-relative-path>` required
-- `--requested-tier default|minimal|feature-rich` optional, default `default`
-- `--minimal-justification-file <repo-relative-path>` required when `--requested-tier minimal`
-- `--allow-rich-surface <surface>` repeatable, optional
-- `--run-id <id>` optional, default timestamped
-- exactly one of `--dry-run` or `--write`
-
-`--minimal-justification-file` must point to:
-
-- `docs/agents/lifecycle/<pack>/governance/minimal-tier-justification.json`
-
-Required JSON fields:
-
-```json
-{
-  "schema_version": 1,
-  "agent_id": "example_agent",
-  "reason_default_is_not_viable_yet": "one short paragraph",
-  "blocking_gaps": ["gap 1", "gap 2"],
-  "required_follow_up_to_reach_default": ["step 1", "step 2"],
-  "publication_refresh_blocked": true
-}
-```
-
-The runner must reject:
-
-- missing file
-- malformed JSON
-- `agent_id` mismatch with the approval artifact
-- `publication_refresh_blocked = false`
-- empty `blocking_gaps`
-- empty `required_follow_up_to_reach_default`
-
-Allowed richer surfaces for `--allow-rich-surface`:
-
-- `add_dirs`
-- `mcp_management`
-- `external_sandbox_policy`
-- `advanced_session_controls`
-
-Unknown richer-surface values fail closed.
+### Module plan
 
-### Output contract
+| Module | Change |
+| --- | --- |
+| `crates/xtask/src/runtime_follow_on/models.rs` | Add `ImplementationSummary`, `DeferredSurface`, and any minimal-justification summary shape needed in `handoff.json` / `run-status.json`. |
+| `crates/xtask/src/runtime_follow_on.rs` | Extend dry-run defaults, parse richer handoff payload, validate semantic fields, compute publication readiness rules, and keep current boundary checks untouched. |
+| `crates/xtask/src/runtime_follow_on/render.rs` | Render `run-summary.md` from the typed summary object plus the validation report. |
+| `crates/xtask/templates/runtime_follow_on_codex_prompt.md` | Tell Codex exactly which summary fields and handoff semantics it must populate. |
+| `crates/xtask/tests/runtime_follow_on_entrypoint.rs` | Add success/failure tests for richer summary semantics. |
+| `crates/xtask/tests/fixtures/fake_codex.sh` | Emit the richer `handoff.json` for fixture scenarios. |
+| `docs/cli-agent-onboarding-factory-operator-guide.md` | Update required scratch artifacts and handoff semantics. |
 
-Scratch root:
+### Data contract details
 
-`docs/agents/.uaa-temp/runtime-follow-on/runs/<run_id>/`
+#### `input-contract.json`
 
-Required scratch artifacts for both `--dry-run` and `--write`:
+Extend the packet just enough to validate the richer output:
 
-- `input-contract.json`
-- `codex-prompt.md`
-- `run-status.json`
-- `run-summary.md`
-- `validation-report.json`
-- `written-paths.json`
-- `handoff.json`
+- `requested_tier`
+- `allow_rich_surface`
+- `required_agent_api_test`
+- `expected_default_surfaces`
+- `known_template_ids`
 
-Required additional artifacts for `--write`:
+This keeps validation deterministic without introducing another config file.
 
-- `logs/codex-exec.stdout.log`
-- `logs/codex-exec.stderr.log`
+#### `run-status.json`
 
-`run-status.json` minimum schema:
+Keep it operator-focused. Add only small mirrored fields that help dashboards and replay:
 
-```json
-{
-  "run_id": "20260429T000000Z-example",
-  "workflow_version": "runtime_follow_on_v1",
-  "status": "dry_run_ok | write_ok | write_failed_validation | write_failed_exec",
-  "approval_artifact_path": "docs/agents/lifecycle/example/governance/approved-agent.toml",
-  "agent_id": "example_agent",
-  "host_surface": "xtask.runtime-follow-on",
-  "loaded_prompt_source": "embedded",
-  "tier_requested": "default",
-  "tier_achieved": "default",
-  "primary_template": "opencode",
-  "written_paths": [],
-  "validation_checks": [],
-  "deferred_richer_surfaces": [],
-  "handoff_ready": false,
-  "errors": []
-}
-```
+- `tier_achieved`
+- `primary_template`
+- `publication_refresh_ready`
+- `deferred_surface_count`
 
-`handoff.json` minimum schema:
+Do not copy the full summary blob into `run-status.json` unless implementation pressure proves that duplication is worth it.
 
-```json
-{
-  "agent_id": "example_agent",
-  "manifest_root": "cli_manifests/example_agent",
-  "runtime_lane_complete": false,
-  "publication_refresh_required": true,
-  "required_commands": [
-    "cargo run -p xtask -- support-matrix --check",
-    "cargo run -p xtask -- capability-matrix --check",
-    "cargo run -p xtask -- capability-matrix-audit",
-    "make preflight"
-  ],
-  "blockers": []
-}
-```
-
-### Tier policy details
-
-#### Default
+#### `run-summary.md`
 
-`default` means the run must land all of:
+Required sections:
 
-- wrapper runtime code under `crates/<agent_id>/`
-- harnessed backend integration under `crates/agent_api/src/backends/<agent_id>/`
-- target onboarding tests under `crates/agent_api/tests/**`
-- wrapper coverage source-of-truth updates at the registry-owned source path
-- runtime-owned manifest evidence under `cli_manifests/<agent_id>/snapshots/**` and `cli_manifests/<agent_id>/supplement/**`
-- achieved-tier summary and green-lane handoff artifact
+1. Outcome
+2. Implementation summary
+3. Validation checks
+4. Deferred surfaces
+5. Publication refresh handoff
+6. Written paths
+7. Errors, when present
 
-Primary template: `opencode`
+This should read like a maintainer review note, but every substantive claim comes from validated fields.
 
-#### Minimal
+## Code Quality Review
 
-`minimal` is allowed only when the run also records:
+### Opinionated recommendations
 
-- explicit reason `default` was not chosen
-- exact missing work to reach `default`
-- confirmation that publication refresh is blocked on those missing pieces
+1. Keep one typed schema surface.
+   Recommendation: add summary structs to `models.rs` and route every artifact through them.
+   Why: DRY matters here. A second ad hoc JSON writer or markdown-only schema is how this plan regresses in two months.
 
-Primary template: `gemini_cli`
+2. Do not let `render.rs` invent semantics.
+   Recommendation: `render.rs` formats validated data only.
+   Why: explicit over clever. Validators decide truth, renderers only present it.
 
-#### Feature-rich
+3. Avoid a new `implementation-summary.json` file unless forced.
+   Recommendation: start with richer `handoff.json` plus generated `run-summary.md`.
+   Why: minimal diff. One more artifact means one more thing to drift, test, and explain.
 
-`feature-rich` is additive. It may borrow selective surfaces from `codex` and `claude_code`, but only for the opt-ins requested through `--allow-rich-surface`.
-
-Primary template: `opencode` plus explicit richer references as needed.
-
-### Wrapper coverage source-path resolution
-
-Current registry entries use:
-
-- `wrapper_coverage.binding_kind = "generated_from_wrapper_crate"`
-- `wrapper_coverage.source_path = "crates/<agent_id>"`
-
-For this binding kind, the runner must interpret the registry-owned coverage source-of-truth as:
-
-- writable Rust source only under `<source_path>/src/**`
-- preferred canonical file: `<source_path>/src/wrapper_coverage_manifest.rs`
-- creating that file is allowed if the target wrapper shell does not yet contain it
-
-The runner must reject:
-
-- direct edits to `cli_manifests/<agent_id>/wrapper_coverage.json`
-- direct edits outside `<source_path>/src/**` that are justified only as wrapper-coverage work
-
-### Write allowlist
-
-The runner must validate every changed path after `codex exec` and reject any path outside this allowlist:
-
-- `crates/<agent_id>/`
-- `crates/agent_api/src/backends/<agent_id>/`
-- `crates/agent_api/tests/`
-- registry-owned wrapper coverage source path
-- `cli_manifests/<agent_id>/snapshots/`
-- `cli_manifests/<agent_id>/supplement/`
-- `docs/agents/.uaa-temp/runtime-follow-on/runs/<run_id>/`
-
-Special rule:
-- generated onboarding packet docs are never writable by this command
-- generated publication outputs are never writable by this command
-- generated `wrapper_coverage.json` is never writable by this command
-- `versions/**` is never writable by this command
-
-### Failure and rerun semantics
-
-- Every invocation gets a fresh `run_id`.
-- Prior scratch runs remain untouched.
-- A failed `--write` preserves logs and summary artifacts under its own scratch root.
-- The runner exits non-zero for any boundary violation, missing required output, missing test output, or missing summary field.
-- Reruns do not delete previous scratch runs and do not silently overwrite prior evidence.
-
-## NOT in scope
-
-- Extending `onboard-agent` to write runtime code.
-  Rationale: breaks the control-plane/runtime boundary.
-- Treating generated packet docs as executable input.
-  Rationale: creates dual truth systems.
-- Writing publication-owned manifest pointers, current snapshots, or reports.
-  Rationale: belongs to the next lane.
-- Regenerating support or capability matrices inside this runner.
-  Rationale: publication refresh remains deferred.
-- Closing the proving run from this command.
-  Rationale: closeout remains a later gate after green validation.
-- Auto-choosing richer surfaces from `codex` or `claude_code` without explicit opt-in.
-  Rationale: that is how a bounded lane turns back into a scavenger hunt.
-
-## What already exists
-
-- `onboard-agent` already owns approval-linked control-plane enrollment.
-- `scaffold-wrapper-crate` already owns publishable wrapper-crate shell creation.
-- `onboard_agent` preview renderers already describe the remaining runtime checklist.
-- `agent_registry.toml` already pins `crate_path`, `backend_module`, `manifest_root`, and wrapper-coverage source ownership.
-- `opencode` already provides the default baseline for wrapper + backend harness integration.
-- `gemini_cli` already shows the reduced exception shape.
-- `codex` and `claude_code` already show richer optional surfaces.
-- wrapper coverage source-of-truth is already a Rust-owned pattern, not a handwritten JSON pattern.
-
-The new lane should reuse all of that. It should not invent parallel truth surfaces.
-
-## Workstreams
-
-### Workstream 1 - Runner entrypoint and contract assembly
-
-Modules:
-
-- `crates/xtask/src/main.rs`
-- `crates/xtask/src/runtime_follow_on.rs`
-- `crates/xtask/src/runtime_follow_on/input.rs`
-- `crates/xtask/src/runtime_follow_on/output.rs`
-
-Tasks:
-
-1. Register `RuntimeFollowOn` in `xtask`.
-2. Parse `--approval`, `--requested-tier`, `--minimal-justification-file`, `--allow-rich-surface`, `--run-id`, `--dry-run`, and `--write`.
-3. Resolve approval artifact and registry truth into one normalized `input-contract.json`.
-4. Fail fast on path mismatches, missing scaffold roots, or invalid tier requests.
-
-Acceptance gate:
-
-- `--dry-run` produces a complete `input-contract.json` and planned write set without invoking Codex.
-
-### Workstream 2 - Embedded prompt payload and thin skill wrapper
-
-Modules:
-
-- `crates/xtask/src/runtime_follow_on/prompt.rs`
-- `.codex/skills/runtime-follow-on/SKILL.md`
-
-Tasks:
-
-1. Store the canonical runtime prompt payload at `crates/xtask/templates/runtime_follow_on_codex_prompt.md` and embed it into the runner with compile-time inclusion.
-2. Ensure the command writes the exact resolved prompt payload to `codex-prompt.md`.
-3. Add a thin skill wrapper that calls the command and does not duplicate the contract.
-
-Acceptance gate:
-
-- the runner works even if no ambient local runtime-follow-on skill is discoverable
-- the exact prompt payload used in a run is reviewable on disk
-
-### Workstream 3 - Write boundary, manifest split, and validation
-
-Modules:
-
-- `crates/xtask/src/runtime_follow_on/validate.rs`
-- `crates/xtask/src/runtime_follow_on/write_boundary.rs`
-- `crates/xtask/src/runtime_follow_on/manifest_split.rs`
-
-Tasks:
-
-1. Enforce the allowed write boundary.
-2. Reject generated `wrapper_coverage.json` edits and require source-path Rust edits instead.
-3. Enforce runtime-owned vs publication-owned manifest split.
-4. Emit `validation-report.json` and `written-paths.json`.
-
-Acceptance gate:
-
-- any write outside the boundary fails the run with offending paths listed explicitly
-
-### Workstream 4 - Summary and handoff artifacts
-
-Modules:
-
-- `crates/xtask/src/runtime_follow_on/summary.rs`
-
-Tasks:
-
-1. Emit `run-status.json`.
-2. Emit `run-summary.md`.
-3. Emit `handoff.json`.
-4. Require `tier_achieved`, `primary_template`, deferred richer surfaces, and blocker lists.
-
-Acceptance gate:
-
-- no successful run exits without all three artifacts present and schema-valid
-
-### Workstream 5 - Tests
-
-Modules:
-
-- `crates/xtask/tests/runtime_follow_on_entrypoint.rs`
-- `crates/xtask/tests/runtime_follow_on_contract.rs`
-- `crates/xtask/tests/runtime_follow_on_boundary.rs`
-- `crates/agent_api/tests/**`
-
-Tasks:
-
-1. Add entrypoint tests for dry-run/write mode parsing.
-2. Add contract tests for approval/registry mismatch rejection.
-3. Add boundary tests for forbidden writes and manifest split enforcement.
-4. Add tests proving explicit prompt embedding or loading.
-5. Add default-tier onboarding tests under `agent_api`.
-
-Required naming convention for new target-level `agent_api` tests:
-
-- primary test file: `crates/agent_api/tests/c1_<agent_id>_runtime_follow_on.rs`
-- optional helper module directory: `crates/agent_api/tests/c1_<agent_id>_runtime_follow_on/`
-
-Acceptance gate:
-
-- the runner contract is testable without a real CLI and default-tier onboarding proves the required `agent_api` test posture
-
-### Workstream 6 - Proving run on one real target
-
-Modules:
-
-- `crates/<target_agent>/`
-- `crates/agent_api/src/backends/<target_agent>/`
-- `crates/agent_api/tests/**`
-- `cli_manifests/<target_agent>/snapshots/**`
-- `cli_manifests/<target_agent>/supplement/**`
-
-Tasks:
-
-1. Use the exact agent referenced by the approval artifact passed to `runtime-follow-on`.
-2. For the first real proving run after `uaa-0022` lands, that approval artifact must reference the next newly approved real target agent, not an already-onboarded built-in agent.
-3. If no newly approved real target exists yet, stop after contract tests and fixture validation. Do not promote this lane into the operator guide.
-4. Run `onboard-agent --write`.
-5. Run `scaffold-wrapper-crate --write`.
-6. Run `runtime-follow-on --dry-run`, then `--write`.
-7. Review boundary output, summary artifacts, and produced runtime evidence.
-
-Acceptance gate:
-
-- one real target proves the lane end to end without using generated packet docs as machine truth
+4. Keep enum vocabulary repo-owned and small.
+   Recommendation: normalize template ids and surface ids in code, not freeform strings from Codex.
+   Why: review tooling gets worse fast when prompt-authored strings become API surface.
 
 ## Test Review
 
-### Code path coverage diagram
+100 percent coverage for the new contract is realistic here because the surface is a bounded Rust command with an existing fixture harness.
+
+### CODE PATH COVERAGE
 
 ```text
-NEW OPERATOR FLOWS
+CODE PATH COVERAGE
 ===========================
-[+] Runtime runner after onboard + scaffold
-    ├── [GAP] Happy path default-tier onboarding
-    ├── [GAP] Minimal-tier request rejected without justification
-    ├── [GAP] Rerun after partial failure preserves prior summary
-    └── [GAP] Handoff artifact marks publication lane readiness
-
-NEW DATA FLOWS
-===========================
-[+] approval artifact + registry -> runner input assembly
-    ├── [GAP] Path mismatch rejected
-    ├── [GAP] Pack-prefix mismatch rejected
-    └── [GAP] Capability and tier contract materialized into summary
-
-[+] runner -> codex exec with embedded prompt payload
-    ├── [GAP] Prompt payload is persisted to scratch artifacts
-    └── [GAP] Ambient local skill discovery is not required
-
-[+] runner -> runtime-owned writes
-    ├── [GAP] wrapper crate writes allowed
-    ├── [GAP] backend adapter writes allowed
-    ├── [GAP] `agent_api` onboarding tests allowed
-    ├── [GAP] wrapper coverage source path allowed
-    └── [GAP] publication-owned files rejected
-
-NEW CODEPATHS / BRANCHES
-===========================
-[+] Tier policy
-    ├── [GAP] default -> opencode template
-    ├── [GAP] minimal -> explicit exception
-    └── [GAP] feature-rich -> explicit opt-in only
-
-[+] Manifest evidence split
-    ├── [GAP] runtime-owned evidence accepted
-    └── [GAP] publication-owned state rejected
-
-NEW ERROR / RESCUE PATHS
-===========================
-[+] MissingInput
-    └── [GAP] exact missing-path error
-[+] WriteBoundaryViolation
-    └── [GAP] offending-path rejection
-[+] TierPolicyViolation
-    └── [GAP] missing-justification rejection
-[+] CoverageSourceViolation
-    └── [GAP] generated JSON edit rejection
-[+] SummaryContractViolation
-    └── [GAP] incomplete summary rejection
+[+] crates/xtask/src/runtime_follow_on/models.rs
+    │
+    ├── ImplementationSummary serde round-trip
+    │   ├── [GAP] valid default summary parses and serializes
+    │   ├── [GAP] minimal summary requires justification payload
+    │   └── [GAP] unknown template / surface values fail validation
+    │
+[+] crates/xtask/src/runtime_follow_on.rs
+    │
+    ├── validate_handoff()
+    │   ├── [★★ TESTED] missing required legacy field fails
+    │   ├── [GAP] missing implementation_summary fails
+    │   ├── [GAP] publication_refresh_ready=true with blockers fails
+    │   ├── [GAP] achieved_tier != requested_tier fails
+    │   └── [GAP] requested rich surface neither landed nor deferred fails
+    │
+    ├── validate_write_mode()
+    │   ├── [★★★ TESTED] out-of-bounds path rejection
+    │   ├── [★★★ TESTED] generated wrapper_coverage.json rejection
+    │   ├── [★★ TESTED] missing required default-tier test fails
+    │   └── [GAP] validated summary fields feed run-summary render
+    │
+[+] crates/xtask/src/runtime_follow_on/render.rs
+    │
+    ├── render_run_summary()
+    │   ├── [GAP] success summary shows achieved tier / template / deferred surfaces
+    │   └── [GAP] failure summary still shows partial semantic context
 ```
 
-### Required tests
+### USER FLOW COVERAGE
 
-Unit tests:
+```text
+USER FLOW COVERAGE
+===========================
+[+] Dry-run to write success
+    │
+    ├── [★★ TESTED] packet prepares and write validates
+    └── [GAP] [→INTEG] successful run emits rich handoff + rich markdown summary
 
-- approval artifact path resolution
-- registry/approval mismatch rejection
-- tier-policy parsing
-- richer-surface allowlist parsing
-- scratch artifact schema validation
+[+] Minimal-tier exception run
+    │
+    ├── [★★ TESTED] minimal without justification is rejected at arg validation
+    └── [GAP] [→INTEG] minimal with justification produces structured exception summary
 
-Integration tests:
+[+] Feature-rich opt-in run
+    │
+    ├── [GAP] [→INTEG] requested rich surface marked as landed passes
+    └── [GAP] [→INTEG] requested rich surface omitted without defer reason fails
 
-- dry-run emits all required scratch artifacts
-- write boundary rejects out-of-scope paths
-- manifest split rejects publication-owned writes
-- embedded prompt payload is written to `codex-prompt.md`
-- `minimal` fails without justification
-- `default` requires target onboarding tests
-- target onboarding tests follow the `c1_<agent_id>_runtime_follow_on.rs` naming rule
+[+] Publication handoff review
+    │
+    ├── [★★ TESTED] required_commands presence
+    └── [GAP] publication_refresh_ready semantics are enforced
 
-Target onboarding tests:
+─────────────────────────────────
+COVERAGE: 5/14 paths tested today
+GAPS: 9 paths need tests
+  - integration-style command tests: 7
+  - render-focused unit tests: 2
+─────────────────────────────────
+```
 
-- backend contract behavior
-- event mapping
-- completion behavior
-- validation boundary behavior
-- redaction and bounded output behavior
+### Required tests to add
 
-## Failure Modes Registry
+1. `runtime_follow_on_write_accepts_rich_implementation_summary`
+   - File: `crates/xtask/tests/runtime_follow_on_entrypoint.rs`
+   - Assert: success scenario writes `implementation_summary`, `publication_refresh_ready = true`, and `run-summary.md` includes achieved tier, template lineage, and deferred-surface section.
 
-| Codepath | Failure mode | Rescued? | Test required? | User sees | Logged? |
-| --- | --- | ---: | ---: | --- | ---: |
-| runner input assembly | missing approval artifact | Y | Y | exact missing path error | Y |
-| runner input assembly | approval artifact and registry disagree on path ownership | Y | Y | machine-truth precedence error | Y |
-| tier policy | `minimal` requested without justification | Y | Y | explicit policy rejection | Y |
-| prompt loading | runner depends on ambient local skill discovery | Y | Y | explicit prompt-source failure | Y |
-| write boundary | Codex writes outside allowed runtime targets | Y | Y | offending-path rejection | Y |
-| coverage update | generated `wrapper_coverage.json` edited instead of source Rust | Y | Y | source-path violation | Y |
-| test posture | default-tier run omits required `agent_api` tests | Y | Y | lane incomplete, not handoff-ready | Y |
-| manifest evidence | publication-owned manifest state edited by runtime lane | Y | Y | seam-violation error | Y |
-| summary emission | missing `run-status.json`, `run-summary.md`, or `handoff.json` | Y | Y | unreviewable-run failure | Y |
-| proving-run promotion | no newly approved real target exists yet | Y | Y | plan stays backlog-only, no operator-guide promotion | Y |
+2. `runtime_follow_on_write_rejects_missing_implementation_summary`
+   - File: `crates/xtask/tests/runtime_follow_on_entrypoint.rs`
+   - Assert: write fails when `handoff.json` omits the summary object.
 
-No silent partial success is accepted.
+3. `runtime_follow_on_write_rejects_publication_ready_with_blockers`
+   - File: `crates/xtask/tests/runtime_follow_on_entrypoint.rs`
+   - Assert: contradictory readiness fields fail validation.
 
-## Success Metrics
+4. `runtime_follow_on_write_rejects_tier_mismatch`
+   - File: `crates/xtask/tests/runtime_follow_on_entrypoint.rs`
+   - Assert: `achieved_tier != requested_tier` fails for this increment.
 
-This milestone is only successful if it improves throughput, not just wording.
+5. `runtime_follow_on_write_rejects_unaccounted_rich_surface`
+   - File: `crates/xtask/tests/runtime_follow_on_entrypoint.rs`
+   - Assert: requested rich surface must be in `landed_surfaces` or `deferred_surfaces`.
 
-Track in `run-status.json` or related runner metrics:
+6. `render_run_summary_renders_validated_semantic_fields`
+   - File: either a new focused unit test alongside `render.rs` or a command test if that is simpler in this repo
+   - Assert: markdown output is deterministic from the typed summary.
 
-- time from `approved-agent.toml` + scaffold to first runnable runtime packet
-- maintainer review time for one runtime-runner output
-- number of boundary violations caught before review
-- number of reruns needed before a handoff-ready output
-- whether the first proving target reached `default`, `minimal`, or `feature-rich`
-- whether publication refresh was blocked by missing runtime evidence
+### Failure modes registry
 
-Success bar for the first proving run:
+| Codepath | Realistic failure | Test cover required | Error handling required | User experience if missed |
+| --- | --- | --- | --- | --- |
+| `validate_handoff` | Codex writes legacy handoff without new summary fields | yes | yes, hard fail | silent semantic downgrade in review |
+| publication readiness logic | handoff says ready while blockers still exist | yes | yes, hard fail | next lane starts from a false green state |
+| rich surface accounting | requested feature-rich surface disappears from output summary | yes | yes, hard fail | reviewers think omission was intentional when it was not |
+| render path | markdown omits deferred surfaces even though JSON captured them | yes | yes, deterministic render | human reviewer misses the real scope cut |
+| minimal-tier summary | justification exists in input but is not carried into output summary | yes | yes, hard fail | exception ships with no rationale |
 
-- zero silent boundary violations
-- one reviewable runtime summary with exact deferred surfaces
-- no archaeology needed to start the publication-refresh follow-on
+Critical gap rule: any path that loses semantic context without failing validation is a critical gap. This plan removes those.
 
-## Worktree Parallelization Strategy
+## Performance Review
 
-### Dependency table
+This is a tiny performance surface, but there are still two boring rules worth locking in:
+
+1. Parse `handoff.json` once.
+   Recommendation: validate and render from the same typed object.
+   Why: no duplicate parse/transform branches.
+
+2. Keep semantic checks linear.
+   Recommendation: validate surfaces and templates with set membership, not extra filesystem scans.
+   Why: the runtime lane already does enough IO. The summary layer should be cheap.
+
+No caching, concurrency, or new background work is justified here.
+
+## Workstreams
+
+### Workstream 1 - Schema and validation
+
+- extend runtime-follow-on typed models
+- extend `validate_handoff`
+- extend `validate_write_mode`
+- add publication readiness rules
+
+### Workstream 2 - Rendering and prompt contract
+
+- update prompt template
+- update markdown renderer
+- keep run status aligned
+
+### Workstream 3 - Test harness and docs
+
+- extend fake Codex fixture
+- add entrypoint regressions
+- update operator guide
+
+## Dependency table
 
 | Step | Modules touched | Depends on |
 | --- | --- | --- |
-| 1. Runner entrypoint and contract assembly | `crates/xtask/src/`, `crates/xtask/tests/` | — |
-| 2. Embedded prompt payload and thin skill wrapper | `crates/xtask/src/`, `.codex/skills/` | 1 |
-| 3. Write boundary, manifest split, and validation | `crates/xtask/src/`, `crates/xtask/tests/` | 1 |
-| 4. Summary and handoff artifacts | `crates/xtask/src/`, `crates/xtask/tests/` | 1, 3 |
-| 5. Default-tier onboarding tests | `crates/agent_api/tests/`, `crates/agent_api/src/backends/` | 3 |
-| 6. Real target proving run | `crates/<target>/`, `crates/agent_api/src/backends/<target>/`, `cli_manifests/<target>/` | 2, 4, 5 |
-| 7. Operator-guide promotion after proof | `docs/cli-agent-onboarding-factory-operator-guide.md`, `docs/backlog/` | 6 |
+| Define implementation summary schema | `crates/xtask/src/runtime_follow_on*` | — |
+| Enforce richer handoff validation | `crates/xtask/src/runtime_follow_on*` | Define implementation summary schema |
+| Render richer run summary | `crates/xtask/src/runtime_follow_on/render.rs` | Define implementation summary schema |
+| Extend fake Codex fixture and entrypoint tests | `crates/xtask/tests/**` | Enforce richer handoff validation |
+| Update operator guide | `docs/` | Define implementation summary schema |
 
-### Parallel lanes
+## Parallel lanes
 
-- Lane A: step 1 -> step 3 -> step 4
-  Core runner lane. Keep all `xtask` contract and validation work together because these modules will overlap heavily.
-- Lane B: step 2
-  Prompt-payload and skill-wrapper lane. It can run once the command surface from step 1 is named and stable.
-- Lane C: step 5
-  Test lane. It can start after step 3 locks the boundary and tier rules.
-- Lane D: step 6
-  Proving lane. Wait for A, B, and C.
-- Lane E: step 7
-  Procedure-promotion lane. Wait for the proving lane.
+- Lane A: schema definition -> validator changes -> renderer changes
+- Lane B: operator-guide updates after schema freeze
+- Lane C: fake Codex fixture -> runtime-follow-on entrypoint tests, after validator expectations are stable
 
-### Execution order
+Execution order:
 
-1. Launch lane A first.
-2. Once the command name and scratch schema are stable, launch lane B in parallel.
-3. Once boundary and manifest-split rules are stable, launch lane C in parallel with late lane-A cleanup.
-4. Launch lane D only after A, B, and C merge cleanly.
-5. Launch lane E last if the proving run validates the lane.
+1. Launch Lane A first. It owns the contract.
+2. Once the JSON shape is stable, Lane B and Lane C can run in parallel.
+3. Merge B + C, then run final test and doc verification.
 
-### Conflict flags
+Conflict flags:
 
-- Steps 1, 3, and 4 all touch `crates/xtask/src/runtime_follow_on*` and `crates/xtask/tests/**`. Keep them in one lane.
-- Step 5 touches `crates/agent_api/tests/**` and may also touch backend modules for shared test helpers. Do not overlap it with proving-run backend edits unless ownership is explicit.
-- Step 6 will touch one real target backend plus `cli_manifests/<target>/`. Do not start it until the runner boundary is final.
+- Lane A and Lane C both depend on `runtime_follow_on` field names. Do not run them in parallel before the schema is frozen.
 
-If only one engineer is available, follow the same order sequentially.
+## NOT in scope
 
-## Verification Commands
+- Auto-infer achieved tier from code shape.
+  Rationale: too clever for this seam, weak verification value for the effort.
+- Teach publication refresh to consume more than `handoff.json`.
+  Rationale: one handoff artifact is enough for this increment.
+- Add support for `achieved_tier` downgrade reporting.
+  Rationale: keep v1 semantics simple with equality to requested tier.
+- Create or update publication-owned manifest files.
+  Rationale: still the next lane.
 
-Run in this order:
+## What already exists
 
-```sh
-cargo test -p xtask runtime_follow_on -- --nocapture
-cargo test -p agent_api --all-features
-cargo run -p xtask -- onboard-agent --approval docs/agents/lifecycle/<pack>/governance/approved-agent.toml --write
-cargo run -p xtask -- scaffold-wrapper-crate --agent <agent_id> --write
-cargo run -p xtask -- runtime-follow-on --approval docs/agents/lifecycle/<pack>/governance/approved-agent.toml --dry-run
-cargo run -p xtask -- runtime-follow-on --approval docs/agents/lifecycle/<pack>/governance/approved-agent.toml --write
-cargo run -p xtask -- support-matrix --check
-cargo run -p xtask -- capability-matrix --check
-cargo run -p xtask -- capability-matrix-audit
-make preflight
-```
+- `runtime-follow-on` already freezes the input packet and owns `codex exec`.
+- The validator already proves boundary ownership, generated wrapper-coverage discipline, and non-zero runtime writes.
+- `run-summary.md` and `handoff.json` already exist, they are just too lean.
+- `requested_tier`, minimal-justification input, and allowed rich surfaces are already present in the runtime input contract.
+- The test harness already simulates success, invalid handoff, no-op runtime writes, and boundary violations.
 
-If the runtime lane is not yet supposed to touch publication refresh, the last four commands are still required for the proving run. They are not part of the runner's write set.
+This means the repo is not missing plumbing. It is missing summary semantics.
 
-## Acceptance Criteria
+## Implementation Steps
 
-This plan is done only when all of the following are true:
-
-1. `xtask` exposes a new `runtime-follow-on` command with `--dry-run` and `--write`.
-2. The command defaults to `default` tier and uses `opencode` as the baseline template.
-3. `minimal` is rejected unless explicit justification is provided.
-4. Richer `codex` and `claude_code` surfaces are used only through explicit opt-ins.
-5. Approval artifact and registry truth are the only executable machine-owned inputs.
-6. The runtime prompt payload is embedded or explicitly loaded by the runner and written to scratch artifacts for review.
-7. The runner enforces the exact write allowlist and rejects any out-of-scope path.
-8. The runner rejects generated `wrapper_coverage.json` edits and requires source-of-truth Rust edits instead.
-9. The runner writes only `cli_manifests/<agent_id>/snapshots/**` and `cli_manifests/<agent_id>/supplement/**`, and rejects publication-owned manifest state changes.
-10. A successful run emits `input-contract.json`, `run-status.json`, `run-summary.md`, `validation-report.json`, `written-paths.json`, and `handoff.json`.
-11. Default-tier runs include target onboarding tests under `agent_api`.
-12. One real onboarding target proves the lane end to end.
-13. The operator guide remains the shipped truth until the proving run succeeds and the lane is intentionally promoted.
+1. Add typed summary structs to `models.rs`.
+2. Extend dry-run artifact generation so `handoff.json` defaults include the richer shape.
+3. Extend the prompt template so Codex must populate the richer handoff fields.
+4. Extend `validate_handoff` with semantic checks for implementation summary and publication readiness.
+5. Extend `render_run_summary` to present validated semantic fields.
+6. Update the fake Codex success and failure scenarios to emit the richer handoff.
+7. Add regression tests for the new success and failure modes.
+8. Update the operator guide examples and required artifact descriptions.
 
 ## Completion Summary
 
-- Step 0: Scope Challenge - accepted; the runtime seam is the right seam, but it now has an exact host surface and boundary contract
-- Architecture Review: resolved around one `xtask` command, machine-truth inputs, and scratch artifacts
-- Code Quality Review: dual-authority drift removed, prompt ownership pinned, summary schema pinned
-- Test Review: coverage diagram produced, required unit/integration/onboarding tests named
-- Performance Review: bounded and acceptable; maintainer-time waste is the main thing to avoid
+- Step 0: Scope Challenge — scope accepted, narrowed to review-contract widening only
+- Architecture Review: 4 concrete recommendations
+- Code Quality Review: 4 concrete recommendations
+- Test Review: diagram produced, 9 gaps identified
+- Performance Review: 2 concrete recommendations
 - NOT in scope: written
 - What already exists: written
-- Failure modes: written, no silent partial-success path accepted
-- Parallelization: 5 lanes total, 3 technical lanes before proving, 1 proving lane, 1 procedure-promotion lane
-- Lake Score: complete version selected over the shortcut at every major decision point
+- TODOS.md updates: 0 new items needed
+- Failure modes: 0 unresolved critical gaps if the required tests land
+- Outside voice: skipped, not needed for this backend-only contract-tightening pass
+- Parallelization: 3 workstreams, 2 follow after schema freeze
+- Lake Score: 6/6 recommendations chose the complete option
 
-## Decision Audit Trail
+## GSTACK REVIEW REPORT
 
-| # | Phase | Decision | Classification | Principle | Rationale | Rejected |
-| --- | --- | --- | --- | --- | --- | --- |
-| 1 | CEO | Keep the seam after `onboard-agent` and `scaffold-wrapper-crate` | mechanical | P2 + P3 | preserves the existing boundary while fixing the actual bottleneck | end-to-end create-lane rewrite |
-| 2 | CEO | Use a repo-owned `xtask` runner that invokes `codex exec` | taste | P5 | contract surfaces belong in repo-owned code, not only in prompt text | skill-only orchestrator |
-| 3 | CEO | Treat `opencode` as the default implementation baseline | mechanical | P1 + P5 | it exercises the backend harness without dragging in optional richness | defaulting to `codex` or `claude_code` |
-| 4 | CEO | Keep publication refresh out of this milestone but require a handoff artifact | mechanical | P1 + P2 | keeps the seam bounded without creating an automation island | bundling refresh into the same runner |
-| 5 | Eng | Use approval artifact and registry as executable truth | mechanical | P4 + P5 | avoids dual-authority drift with generated packet markdown | generated packet docs as machine input |
-| 6 | Eng | Expand the write boundary to include `crates/agent_api/tests/**` | mechanical | P1 | default-tier onboarding is incomplete without required tests | runtime code only |
-| 7 | Eng | Split runtime-owned manifest evidence from publication-owned state | mechanical | P1 + P5 | keeps the seam explicit and reviewable | whole-root manifest writes |
-| 8 | Eng | Require machine-readable scratch artifacts and handoff output | mechanical | P5 | review and replay must be deterministic | freeform prose summary only |
+| Review | Trigger | Why | Runs | Status | Findings |
+|--------|---------|-----|------|--------|----------|
+| CEO Review | `/plan-ceo-review` | Scope & strategy | 0 | — | — |
+| Codex Review | `/codex review` | Independent 2nd opinion | 0 | — | — |
+| Eng Review | `/plan-eng-review` | Architecture & tests (required) | 1 | issues_open | focus narrowed to reviewer-summary contract widening; test and schema gaps enumerated in this plan |
+| Design Review | `/plan-design-review` | UI/UX gaps | 0 | skipped | backend-only scope, existing design artifact remains sufficient |
+
+**VERDICT:** ENG REVIEW COMPLETE FOR THIS PLANNING PASS. Implement from this plan. No new design doc required.
