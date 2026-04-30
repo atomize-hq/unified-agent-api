@@ -455,8 +455,10 @@ pub(super) fn build_manual_follow_up(
                 "Next executable runtime step: run `cargo run -p xtask -- scaffold-wrapper-crate --agent {} --write` to create the runtime-owned wrapper crate shell at `{}`; `onboard-agent` does not create the wrapper crate.",
                 draft.agent_id, draft.crate_path
             ),
+            "Then materialize the bounded runtime packet with `runtime-follow-on --dry-run`."
+                .to_string(),
             format!(
-                "Then implement backend/runtime details in `{}` and `{}`.",
+                "Implement backend/runtime details in `{}` and `{}`.",
                 draft.crate_path, draft.backend_module
             ),
             format!(
@@ -464,10 +466,10 @@ pub(super) fn build_manual_follow_up(
                 draft.wrapper_coverage_source_path, draft.wrapper_coverage_binding_kind
             ),
             format!(
-                "Populate `{}/current.json`, pointers, versions, and reports from committed runtime evidence.",
-                draft.manifest_root
+                "Populate committed runtime evidence only under `{}/snapshots/**` and `{}/supplement/**`.",
+                draft.manifest_root, draft.manifest_root
             ),
-            "Regenerate support and capability publication artifacts, then run `make preflight`."
+            "Complete `runtime-follow-on --write`; publication refresh and `make preflight` stay in the next lane."
                 .to_string(),
         ],
     }

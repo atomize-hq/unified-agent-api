@@ -86,6 +86,19 @@ pub(super) struct HandoffContract {
     pub(super) blockers: Vec<String>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub(super) struct CodexExecutionEvidence {
+    pub(super) workflow_version: String,
+    pub(super) generated_at: String,
+    pub(super) run_id: String,
+    pub(super) binary: String,
+    pub(super) argv: Vec<String>,
+    pub(super) prompt_path: String,
+    pub(super) stdout_path: String,
+    pub(super) stderr_path: String,
+    pub(super) exit_code: i32,
+}
+
 #[derive(Debug)]
 pub(super) struct RuntimeContext {
     pub(super) approval: ApprovalArtifact,

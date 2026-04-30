@@ -1,7 +1,7 @@
 use std::io::Write;
 
 use super::{
-    models::{RunStatus, RuntimeContext, ValidationReport},
+    models::{CodexExecutionEvidence, RunStatus, RuntimeContext, ValidationReport},
     Error, HANDOFF_FILE_NAME, PROMPT_FILE_NAME, PROMPT_TEMPLATE, SKILL_PATH, WORKFLOW_VERSION,
     WRAPPER_COVERAGE_MANIFEST_PATH,
 };
@@ -83,11 +83,20 @@ pub(super) fn render_run_summary(
     context: &RuntimeContext,
     report: &ValidationReport,
     written_paths: &[String],
+    codex_execution: Option<&CodexExecutionEvidence>,
 ) -> String {
     let mut text = format!(
         "# Runtime Follow-On Validation\n\n- run_id: `{}`\n- status: `{}`\n- agent_id: `{}`\n- requested_tier: `{}`\n",
         context.run_id, report.status, context.approval.descriptor.agent_id, context.input_contract.requested_tier
     );
+    if let Some(execution) = codex_execution {
+        text.push_str("\n## Codex Execution\n");
+        text.push_str(&format!("- binary: `{}`\n", execution.binary));
+        text.push_str(&format!("- exit_code: `{}`\n", execution.exit_code));
+        text.push_str(&format!("- prompt: `{}`\n", execution.prompt_path));
+        text.push_str(&format!("- stdout log: `{}`\n", execution.stdout_path));
+        text.push_str(&format!("- stderr log: `{}`\n", execution.stderr_path));
+    }
     text.push_str("\n## Checks\n");
     for check in &report.checks {
         text.push_str(&format!(

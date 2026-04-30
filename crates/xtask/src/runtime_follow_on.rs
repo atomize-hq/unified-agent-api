@@ -3,6 +3,7 @@ use std::{
     fmt, fs,
     io::{stdout, Write},
     path::{Path, PathBuf},
+    process::{Command, Stdio},
 };
 
 use clap::{ArgGroup, Parser, ValueEnum};
@@ -19,10 +20,13 @@ mod render;
 
 use self::{
     io::{
-        diff_snapshots, generate_run_id, load_json, now_rfc3339, snapshot_workspace, write_json,
-        write_string,
+        diff_snapshots, generate_run_id, load_json, now_rfc3339, read_string, snapshot_workspace,
+        write_json, write_string,
     },
-    models::{HandoffContract, InputContract, RuntimeContext, ValidationCheck, ValidationReport},
+    models::{
+        CodexExecutionEvidence, HandoffContract, InputContract, RuntimeContext, ValidationCheck,
+        ValidationReport,
+    },
     render::{
         render_dry_run_summary, render_prompt, render_run_status, render_run_summary, write_header,
     },
@@ -32,12 +36,16 @@ const RUNTIME_RUNS_ROOT: &str = "docs/agents/.uaa-temp/runtime-follow-on/runs";
 const SKILL_PATH: &str = ".codex/skills/runtime-follow-on/SKILL.md";
 const HANDOFF_FILE_NAME: &str = "handoff.json";
 const INPUT_CONTRACT_FILE_NAME: &str = "input-contract.json";
+const CODEX_EXECUTION_FILE_NAME: &str = "codex-execution.json";
+const CODEX_STDOUT_FILE_NAME: &str = "codex-stdout.log";
+const CODEX_STDERR_FILE_NAME: &str = "codex-stderr.log";
 const PROMPT_FILE_NAME: &str = "codex-prompt.md";
 const RUN_STATUS_FILE_NAME: &str = "run-status.json";
 const RUN_SUMMARY_FILE_NAME: &str = "run-summary.md";
 const VALIDATION_REPORT_FILE_NAME: &str = "validation-report.json";
 const WRITTEN_PATHS_FILE_NAME: &str = "written-paths.json";
 const WORKFLOW_VERSION: &str = "runtime_follow_on_v1";
+const CODEX_BINARY_ENV: &str = "XTASK_RUNTIME_FOLLOW_ON_CODEX_BINARY";
 const WRAPPER_COVERAGE_MANIFEST_PATH: &str = "src/wrapper_coverage_manifest.rs";
 const REQUIRED_PUBLICATION_COMMANDS: [&str; 4] = [
     "support-matrix --check",
@@ -82,6 +90,10 @@ pub struct Args {
     /// Stable run identifier. Required for `--write`; optional for `--dry-run`.
     #[arg(long)]
     pub run_id: Option<String>,
+
+    /// Explicit `codex` binary path. Falls back to XTASK_RUNTIME_FOLLOW_ON_CODEX_BINARY, then `codex`.
+    #[arg(long)]
+    pub codex_binary: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ValueEnum)]
@@ -160,14 +172,18 @@ pub fn run_in_workspace<W: Write>(
         return Ok(());
     }
 
-    let report = validate_write_mode(workspace_root, &context)?;
+    let prior_contract =
+        load_json::<InputContract>(&context.run_dir.join(INPUT_CONTRACT_FILE_NAME))?;
+    let prompt = read_string(&context.run_dir.join(PROMPT_FILE_NAME))?;
+    let codex_execution = execute_codex_write(workspace_root, &context, &args, &prompt)?;
+    write_json(
+        &context.run_dir.join(CODEX_EXECUTION_FILE_NAME),
+        &codex_execution,
+    )?;
+    let (report, written_paths) =
+        validate_write_mode(workspace_root, &context, &prior_contract, &codex_execution)?;
     write_json(&context.run_dir.join(VALIDATION_REPORT_FILE_NAME), &report)?;
     let passed = report.status == "pass";
-    let written_paths = if passed {
-        detect_written_paths(workspace_root, &context.input_contract)?
-    } else {
-        Vec::new()
-    };
     let status = render_run_status(
         &context,
         "write",
@@ -188,7 +204,7 @@ pub fn run_in_workspace<W: Write>(
     )?;
     write_string(
         &context.run_dir.join(RUN_SUMMARY_FILE_NAME),
-        &render_run_summary(&context, &report, &written_paths),
+        &render_run_summary(&context, &report, &written_paths, Some(&codex_execution)),
     )?;
 
     if !passed {
@@ -364,13 +380,34 @@ fn persist_dry_run_artifacts(context: &RuntimeContext) -> Result<(), Error> {
 fn validate_write_mode(
     workspace_root: &Path,
     context: &RuntimeContext,
-) -> Result<ValidationReport, Error> {
-    let prior_contract =
-        load_json::<InputContract>(&context.run_dir.join(INPUT_CONTRACT_FILE_NAME))?;
+    prior_contract: &InputContract,
+    codex_execution: &CodexExecutionEvidence,
+) -> Result<(ValidationReport, Vec<String>), Error> {
     let current_snapshot = snapshot_workspace(workspace_root, &[Path::new(RUNTIME_RUNS_ROOT)])?;
     let changed_paths = diff_snapshots(&prior_contract.baseline, &current_snapshot);
     let mut checks = Vec::new();
     let mut errors = Vec::new();
+
+    if codex_execution.exit_code == 0 {
+        checks.push(ValidationCheck {
+            name: "codex_exec".to_string(),
+            ok: true,
+            message: format!("codex exec completed via `{}`", codex_execution.binary),
+        });
+    } else {
+        errors.push(format!(
+            "codex exec failed with exit code {} (see {})",
+            codex_execution.exit_code, codex_execution.stderr_path
+        ));
+        checks.push(ValidationCheck {
+            name: "codex_exec".to_string(),
+            ok: false,
+            message: format!(
+                "codex exec exited non-zero; stderr captured at {}",
+                codex_execution.stderr_path
+            ),
+        });
+    }
 
     let boundary_violations = changed_paths
         .iter()
@@ -426,6 +463,32 @@ fn validate_write_mode(
         });
     }
 
+    let written_paths = changed_paths
+        .iter()
+        .filter(|path| is_allowed_write_path(path, &approval_descriptor_view(prior_contract)))
+        .cloned()
+        .collect::<Vec<_>>();
+    if written_paths.is_empty() {
+        errors.push(
+            "runtime-follow-on write produced no runtime-owned output changes from the prepared baseline"
+                .to_string(),
+        );
+        checks.push(ValidationCheck {
+            name: "runtime_owned_writes".to_string(),
+            ok: false,
+            message: "no runtime-owned output changes were detected after codex exec".to_string(),
+        });
+    } else {
+        checks.push(ValidationCheck {
+            name: "runtime_owned_writes".to_string(),
+            ok: true,
+            message: format!(
+                "detected {} runtime-owned output change(s)",
+                written_paths.len()
+            ),
+        });
+    }
+
     let generated_wrapper_coverage_path = format!(
         "{}/wrapper_coverage.json",
         context.approval.descriptor.manifest_root
@@ -452,8 +515,8 @@ fn validate_write_mode(
         });
     }
 
-    let required_test = workspace_root.join(&context.input_contract.required_agent_api_test);
-    let requires_default_test = matches!(context.input_contract.requested_tier.as_str(), "default");
+    let required_test = workspace_root.join(&prior_contract.required_agent_api_test);
+    let requires_default_test = matches!(prior_contract.requested_tier.as_str(), "default");
     if !requires_default_test || required_test.is_file() {
         checks.push(ValidationCheck {
             name: "required_agent_api_test".to_string(),
@@ -463,14 +526,14 @@ fn validate_write_mode(
     } else {
         errors.push(format!(
             "default-tier run requires `{}`",
-            context.input_contract.required_agent_api_test
+            prior_contract.required_agent_api_test
         ));
         checks.push(ValidationCheck {
             name: "required_agent_api_test".to_string(),
             ok: false,
             message: format!(
                 "missing required test `{}`",
-                context.input_contract.required_agent_api_test
+                prior_contract.required_agent_api_test
             ),
         });
     }
@@ -492,18 +555,21 @@ fn validate_write_mode(
         }
     }
 
-    Ok(ValidationReport {
-        workflow_version: WORKFLOW_VERSION.to_string(),
-        generated_at: now_rfc3339()?,
-        run_id: context.run_id.clone(),
-        status: if errors.is_empty() {
-            "pass".to_string()
-        } else {
-            "fail".to_string()
+    Ok((
+        ValidationReport {
+            workflow_version: WORKFLOW_VERSION.to_string(),
+            generated_at: now_rfc3339()?,
+            run_id: context.run_id.clone(),
+            status: if errors.is_empty() {
+                "pass".to_string()
+            } else {
+                "fail".to_string()
+            },
+            checks,
+            errors,
         },
-        checks,
-        errors,
-    })
+        written_paths,
+    ))
 }
 
 fn validate_handoff(path: &Path, context: &RuntimeContext) -> Result<(), String> {
@@ -660,16 +726,67 @@ fn allowed_write_paths(descriptor: &crate::approval_artifact::ApprovalDescriptor
     ]
 }
 
-fn detect_written_paths(
+fn execute_codex_write(
     workspace_root: &Path,
-    input_contract: &InputContract,
-) -> Result<Vec<String>, Error> {
-    let current_snapshot = snapshot_workspace(workspace_root, &[Path::new(RUNTIME_RUNS_ROOT)])?;
-    let changed = diff_snapshots(&input_contract.baseline, &current_snapshot);
-    Ok(changed
-        .into_iter()
-        .filter(|path| is_allowed_write_path(path, &approval_descriptor_view(input_contract)))
-        .collect())
+    context: &RuntimeContext,
+    args: &Args,
+    prompt: &str,
+) -> Result<CodexExecutionEvidence, Error> {
+    let binary = resolve_codex_binary(args);
+    let argv = vec![
+        "exec".to_string(),
+        "--skip-git-repo-check".to_string(),
+        "--dangerously-bypass-approvals-and-sandbox".to_string(),
+        "--cd".to_string(),
+        workspace_root.to_string_lossy().into_owned(),
+    ];
+    let mut child = Command::new(&binary)
+        .current_dir(workspace_root)
+        .args(&argv)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|err| Error::Internal(format!("spawn codex binary `{binary}`: {err}")))?;
+    {
+        let stdin = child
+            .stdin
+            .as_mut()
+            .ok_or_else(|| Error::Internal("codex exec stdin was not captured".to_string()))?;
+        stdin
+            .write_all(prompt.as_bytes())
+            .map_err(|err| Error::Internal(format!("write codex prompt to stdin: {err}")))?;
+    }
+    let output = child
+        .wait_with_output()
+        .map_err(|err| Error::Internal(format!("wait for codex exec: {err}")))?;
+    let stdout_path = context.run_dir.join(CODEX_STDOUT_FILE_NAME);
+    let stderr_path = context.run_dir.join(CODEX_STDERR_FILE_NAME);
+    write_string(&stdout_path, &String::from_utf8_lossy(&output.stdout))?;
+    write_string(&stderr_path, &String::from_utf8_lossy(&output.stderr))?;
+
+    Ok(CodexExecutionEvidence {
+        workflow_version: WORKFLOW_VERSION.to_string(),
+        generated_at: now_rfc3339()?,
+        run_id: context.run_id.clone(),
+        binary,
+        argv,
+        prompt_path: context
+            .run_dir
+            .join(PROMPT_FILE_NAME)
+            .to_string_lossy()
+            .into_owned(),
+        stdout_path: stdout_path.to_string_lossy().into_owned(),
+        stderr_path: stderr_path.to_string_lossy().into_owned(),
+        exit_code: output.status.code().unwrap_or(1),
+    })
+}
+
+fn resolve_codex_binary(args: &Args) -> String {
+    args.codex_binary
+        .clone()
+        .or_else(|| std::env::var(CODEX_BINARY_ENV).ok())
+        .unwrap_or_else(|| "codex".to_string())
 }
 
 fn approval_descriptor_view(

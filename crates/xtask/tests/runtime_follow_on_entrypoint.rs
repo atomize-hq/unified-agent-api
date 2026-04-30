@@ -1,7 +1,11 @@
-use std::{collections::BTreeMap, fs, path::Path};
+use std::{
+    collections::BTreeMap,
+    fs,
+    path::{Path, PathBuf},
+};
 
 use clap::{CommandFactory, Parser, Subcommand};
-use serde_json::json;
+use serde_json::Value;
 use xtask::runtime_follow_on;
 
 #[path = "support/onboard_agent_harness.rs"]
@@ -13,6 +17,9 @@ use harness::{
 };
 
 const RUNTIME_RUNS_ROOT: &str = "docs/agents/.uaa-temp/runtime-follow-on/runs";
+const WRITE_RUN_ID: &str = "rtfo-write";
+const FAKE_CODEX_SCENARIO_FILE: &str = "fake-codex-scenario.txt";
+const FAKE_CODEX_LOG_FILE: &str = "fake-codex-invocations.log";
 
 #[derive(Debug, Parser)]
 #[command(name = "xtask")]
@@ -91,7 +98,37 @@ fn prepare_runtime_fixture(prefix: &str) -> (std::path::PathBuf, String) {
     (fixture, approval_path)
 }
 
-fn runtime_args(mode_flag: &str, approval_path: &str) -> Vec<String> {
+fn fake_codex_fixture_source() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/fake_codex.sh")
+}
+
+fn fake_codex_binary(fixture: &Path) -> PathBuf {
+    let binary = fixture
+        .join(RUNTIME_RUNS_ROOT)
+        .join(WRITE_RUN_ID)
+        .join("fake_codex.sh");
+    if !binary.is_file() {
+        fs::copy(fake_codex_fixture_source(), &binary).expect("copy fake codex fixture");
+        mark_fixture_executable(&binary);
+    }
+    binary
+}
+
+#[cfg(unix)]
+fn mark_fixture_executable(path: &Path) {
+    use std::os::unix::fs::PermissionsExt;
+
+    let mut permissions = fs::metadata(path)
+        .expect("stat fake codex fixture")
+        .permissions();
+    permissions.set_mode(0o755);
+    fs::set_permissions(path, permissions).expect("chmod fake codex fixture");
+}
+
+#[cfg(not(unix))]
+fn mark_fixture_executable(_path: &Path) {}
+
+fn runtime_args(mode_flag: &str, approval_path: &str, fixture: &Path) -> Vec<String> {
     let mut args = vec![
         "xtask".to_string(),
         "runtime-follow-on".to_string(),
@@ -100,42 +137,34 @@ fn runtime_args(mode_flag: &str, approval_path: &str) -> Vec<String> {
         approval_path.to_string(),
     ];
     if mode_flag == "--write" {
-        args.extend(["--run-id".to_string(), "rtfo-write".to_string()]);
+        args.extend([
+            "--run-id".to_string(),
+            WRITE_RUN_ID.to_string(),
+            "--codex-binary".to_string(),
+            fake_codex_binary(fixture).display().to_string(),
+        ]);
     }
     args
 }
 
-fn write_valid_handoff(fixture: &Path, run_id: &str) {
-    let handoff = json!({
-        "agent_id": "cursor",
-        "manifest_root": "cli_manifests/cursor",
-        "runtime_lane_complete": true,
-        "publication_refresh_required": true,
-        "required_commands": [
-            "support-matrix --check",
-            "capability-matrix --check",
-            "capability-matrix-audit",
-            "make preflight"
-        ],
-        "blockers": []
-    });
-    let path = fixture
-        .join(RUNTIME_RUNS_ROOT)
-        .join(run_id)
-        .join("handoff.json");
+fn write_fake_codex_scenario(fixture: &Path, scenario: &str) {
     fs::write(
-        &path,
-        serde_json::to_vec_pretty(&handoff).expect("serialize handoff"),
+        fixture
+            .join(RUNTIME_RUNS_ROOT)
+            .join(WRITE_RUN_ID)
+            .join(FAKE_CODEX_SCENARIO_FILE),
+        format!("{scenario}\n"),
     )
-    .expect("write handoff");
+    .expect("write fake codex scenario");
 }
 
-fn write_required_test(fixture: &Path) {
-    let test_path = fixture.join("crates/agent_api/tests/c1_cursor_runtime_follow_on.rs");
-    if let Some(parent) = test_path.parent() {
-        fs::create_dir_all(parent).expect("create parent");
-    }
-    fs::write(&test_path, "#[test]\nfn runtime_follow_on_smoke() {}\n").expect("write test");
+fn read_codex_execution(fixture: &Path, run_id: &str) -> Value {
+    let execution_path = fixture
+        .join(RUNTIME_RUNS_ROOT)
+        .join(run_id)
+        .join("codex-execution.json");
+    serde_json::from_slice(&fs::read(execution_path).expect("read codex execution"))
+        .expect("parse codex execution")
 }
 
 fn snapshot_without_runtime_runs(root: &Path) -> BTreeMap<String, Vec<u8>> {
@@ -161,6 +190,7 @@ fn runtime_follow_on_help_text_includes_required_surface() {
     assert!(help_text.contains("--minimal-justification-file"));
     assert!(help_text.contains("--allow-rich-surface"));
     assert!(help_text.contains("--run-id"));
+    assert!(help_text.contains("--codex-binary"));
 }
 
 #[test]
@@ -261,16 +291,15 @@ fn runtime_follow_on_write_rejects_out_of_bounds_paths() {
             "--approval",
             &approval_path,
             "--run-id",
-            "rtfo-write",
+            WRITE_RUN_ID,
         ],
         &fixture,
     );
     assert_eq!(dry_run.exit_code, 0, "stderr:\n{}", dry_run.stderr);
-    write_valid_handoff(&fixture, "rtfo-write");
-    write_required_test(&fixture);
+    write_fake_codex_scenario(&fixture, "success");
     fs::write(fixture.join("docs/unowned.md"), "not allowed\n").expect("write unowned");
 
-    let output = run_cli(runtime_args("--write", &approval_path), &fixture);
+    let output = run_cli(runtime_args("--write", &approval_path, &fixture), &fixture);
 
     assert_eq!(output.exit_code, 2);
     assert!(output.stderr.contains("write boundary violation"));
@@ -288,20 +317,19 @@ fn runtime_follow_on_write_rejects_generated_wrapper_coverage_json_edit() {
             "--approval",
             &approval_path,
             "--run-id",
-            "rtfo-write",
+            WRITE_RUN_ID,
         ],
         &fixture,
     );
     assert_eq!(dry_run.exit_code, 0, "stderr:\n{}", dry_run.stderr);
-    write_valid_handoff(&fixture, "rtfo-write");
-    write_required_test(&fixture);
+    write_fake_codex_scenario(&fixture, "success");
     fs::write(
         fixture.join("cli_manifests/cursor/wrapper_coverage.json"),
         "{\n  \"schema_version\": 1\n}\n",
     )
     .expect("write generated wrapper coverage");
 
-    let output = run_cli(runtime_args("--write", &approval_path), &fixture);
+    let output = run_cli(runtime_args("--write", &approval_path, &fixture), &fixture);
 
     assert_eq!(output.exit_code, 2);
     assert!(output
@@ -320,30 +348,14 @@ fn runtime_follow_on_write_requires_semantically_valid_handoff() {
             "--approval",
             &approval_path,
             "--run-id",
-            "rtfo-write",
+            WRITE_RUN_ID,
         ],
         &fixture,
     );
     assert_eq!(dry_run.exit_code, 0, "stderr:\n{}", dry_run.stderr);
-    write_required_test(&fixture);
-    let handoff_path = fixture
-        .join(RUNTIME_RUNS_ROOT)
-        .join("rtfo-write")
-        .join("handoff.json");
-    fs::write(
-        &handoff_path,
-        serde_json::to_vec_pretty(&json!({
-            "agent_id": "cursor",
-            "manifest_root": "cli_manifests/cursor",
-            "publication_refresh_required": true,
-            "required_commands": ["support-matrix --check"],
-            "blockers": []
-        }))
-        .expect("serialize malformed handoff"),
-    )
-    .expect("write malformed handoff");
+    write_fake_codex_scenario(&fixture, "invalid_handoff");
 
-    let output = run_cli(runtime_args("--write", &approval_path), &fixture);
+    let output = run_cli(runtime_args("--write", &approval_path, &fixture), &fixture);
 
     assert_eq!(output.exit_code, 2);
     assert!(output
@@ -352,7 +364,39 @@ fn runtime_follow_on_write_requires_semantically_valid_handoff() {
 }
 
 #[test]
-fn runtime_follow_on_write_succeeds_with_valid_handoff_and_allowed_paths() {
+fn runtime_follow_on_write_rejects_noop_runtime_execution() {
+    let (fixture, approval_path) = prepare_runtime_fixture("runtime-follow-on-noop");
+    let required_test = fixture.join("crates/agent_api/tests/c1_cursor_runtime_follow_on.rs");
+    if let Some(parent) = required_test.parent() {
+        fs::create_dir_all(parent).expect("create required test parent");
+    }
+    fs::write(&required_test, "#[test]\nfn runtime_follow_on_smoke() {}\n")
+        .expect("write baseline required test");
+    let dry_run = run_cli(
+        [
+            "xtask",
+            "runtime-follow-on",
+            "--dry-run",
+            "--approval",
+            &approval_path,
+            "--run-id",
+            WRITE_RUN_ID,
+        ],
+        &fixture,
+    );
+    assert_eq!(dry_run.exit_code, 0, "stderr:\n{}", dry_run.stderr);
+    write_fake_codex_scenario(&fixture, "handoff_only");
+
+    let output = run_cli(runtime_args("--write", &approval_path, &fixture), &fixture);
+
+    assert_eq!(output.exit_code, 2);
+    assert!(output
+        .stderr
+        .contains("produced no runtime-owned output changes from the prepared baseline"));
+}
+
+#[test]
+fn runtime_follow_on_write_spawns_configured_codex_binary_and_requires_real_writes() {
     let (fixture, approval_path) = prepare_runtime_fixture("runtime-follow-on-success");
     let dry_run = run_cli(
         [
@@ -362,41 +406,50 @@ fn runtime_follow_on_write_succeeds_with_valid_handoff_and_allowed_paths() {
             "--approval",
             &approval_path,
             "--run-id",
-            "rtfo-write",
+            WRITE_RUN_ID,
         ],
         &fixture,
     );
     assert_eq!(dry_run.exit_code, 0, "stderr:\n{}", dry_run.stderr);
-    write_valid_handoff(&fixture, "rtfo-write");
-    write_required_test(&fixture);
-    let backend_path = fixture.join("crates/agent_api/src/backends/cursor/mod.rs");
-    if let Some(parent) = backend_path.parent() {
-        fs::create_dir_all(parent).expect("create backend parent");
-    }
-    fs::write(&backend_path, "pub fn runtime_follow_on() {}\n").expect("write backend");
-    let fake_bin_path =
-        fixture.join("crates/agent_api/src/bin/fake_cursor_stream_json_agent_api.rs");
-    if let Some(parent) = fake_bin_path.parent() {
-        fs::create_dir_all(parent).expect("create fake binary parent");
-    }
-    fs::write(&fake_bin_path, "fn main() {}\n").expect("write fake binary");
-    fs::create_dir_all(fixture.join("cli_manifests/cursor/snapshots")).expect("create snapshots");
-    fs::write(
-        fixture.join("cli_manifests/cursor/snapshots/default.json"),
-        "{\n  \"snapshot\": true\n}\n",
-    )
-    .expect("write snapshot");
-    fs::write(fixture.join("Cargo.lock"), "# synthetic lockfile delta\n").expect("write lockfile");
+    write_fake_codex_scenario(&fixture, "success");
 
-    let output = run_cli(runtime_args("--write", &approval_path), &fixture);
+    let output = run_cli(runtime_args("--write", &approval_path, &fixture), &fixture);
 
     assert_eq!(output.exit_code, 0, "stderr:\n{}", output.stderr);
+    let execution = read_codex_execution(&fixture, WRITE_RUN_ID);
+    assert_eq!(
+        execution.get("binary").and_then(Value::as_str),
+        Some(fake_codex_binary(&fixture).to_string_lossy().as_ref())
+    );
+    assert_eq!(execution.get("exit_code").and_then(Value::as_i64), Some(0));
+    let argv = execution
+        .get("argv")
+        .and_then(Value::as_array)
+        .expect("argv array");
+    assert_eq!(argv.first().and_then(Value::as_str), Some("exec"));
+    assert!(argv.iter().any(|value| value.as_str() == Some("--cd")));
+    assert!(argv
+        .iter()
+        .any(|value| value.as_str() == Some("--dangerously-bypass-approvals-and-sandbox")));
+    let invocation_log = fs::read_to_string(
+        fixture
+            .join(RUNTIME_RUNS_ROOT)
+            .join(WRITE_RUN_ID)
+            .join(FAKE_CODEX_LOG_FILE),
+    )
+    .expect("read fake codex invocation log");
+    assert!(invocation_log.contains("--skip-git-repo-check"));
+    assert!(invocation_log.contains("--cd"));
     let written_paths = fs::read_to_string(
         fixture
             .join(RUNTIME_RUNS_ROOT)
-            .join("rtfo-write")
+            .join(WRITE_RUN_ID)
             .join("written-paths.json"),
     )
     .expect("read written paths");
-    let _: Vec<String> = serde_json::from_str(&written_paths).expect("parse written paths");
+    let parsed: Vec<String> = serde_json::from_str(&written_paths).expect("parse written paths");
+    assert!(
+        !parsed.is_empty(),
+        "success path must record runtime-owned writes"
+    );
 }

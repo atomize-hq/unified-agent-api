@@ -23,6 +23,11 @@ pub(super) fn write_string(path: &Path, value: &str) -> Result<(), Error> {
     write_bytes(path, value.as_bytes())
 }
 
+pub(super) fn read_string(path: &Path) -> Result<String, Error> {
+    fs::read_to_string(path)
+        .map_err(|err| Error::Validation(format!("read {}: {err}", path.display())))
+}
+
 fn write_bytes(path: &Path, bytes: &[u8]) -> Result<(), Error> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)

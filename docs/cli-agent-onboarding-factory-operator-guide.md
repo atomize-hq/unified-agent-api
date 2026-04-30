@@ -325,13 +325,14 @@ The expected baseline is `default`. Use the optional runner inputs only when jus
 - `--requested-tier minimal` requires `--minimal-justification-file <path>`
 - `--requested-tier feature-rich` may be paired with repeatable `--allow-rich-surface <surface>`
 
-After the runtime-owned changes exist, validate the lane against the frozen packet:
+Then let the runner own the Codex execution and validation step against the frozen packet:
 
 ```sh
 "$XTASK_BIN" runtime-follow-on \
   --approval docs/agents/lifecycle/<onboarding_pack_prefix>/governance/approved-agent.toml \
   --write \
-  --run-id <run_id>
+  --run-id <run_id> \
+  [--codex-binary /absolute/path/to/codex]
 ```
 
 `runtime-follow-on --write` must reject:
@@ -339,6 +340,7 @@ After the runtime-owned changes exist, validate the lane against the frozen pack
 - publication-owned manifest edits
 - direct edits to generated `cli_manifests/<agent_id>/wrapper_coverage.json`
 - missing or malformed `handoff.json`
+- runs where Codex produced no runtime-owned output changes beyond the prepared baseline
 
 The write run is only successful when `handoff.json` passes the minimum schema and semantic checks,
 including:

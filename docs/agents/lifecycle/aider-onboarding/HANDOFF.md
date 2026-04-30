@@ -23,7 +23,8 @@ Run `cargo run -p xtask -- scaffold-wrapper-crate --agent aider --write` to crea
 
 ## Remaining runtime checklist
 
+- After scaffolding, materialize the bounded runtime packet with `runtime-follow-on --dry-run` for this approval artifact.
 - Implement backend/runtime details in `crates/aider` and `crates/agent_api/src/backends/aider`.
 - Author wrapper coverage input at `crates/aider` for binding kind `generated_from_wrapper_crate`.
-- Populate `cli_manifests/aider/current.json`, pointers, versions, and reports from committed runtime evidence.
-- Regenerate support and capability publication artifacts, then run `make preflight`.
+- Populate committed runtime evidence only under `cli_manifests/aider/snapshots/**` and `cli_manifests/aider/supplement/**`.
+- Complete `runtime-follow-on --write`; publication refresh and proving-run closeout stay in the next lane.

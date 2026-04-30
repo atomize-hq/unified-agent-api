@@ -73,6 +73,15 @@ fn onboard_agent_write_applies_plan_and_replays_identically() {
         fs::read_to_string(fixture.join("docs/agents/lifecycle/cursor-cli-onboarding/README.md"))
             .expect("read docs README");
     assert!(readme.contains("# Cursor CLI onboarding pack"));
+    let handoff =
+        fs::read_to_string(fixture.join("docs/agents/lifecycle/cursor-cli-onboarding/HANDOFF.md"))
+            .expect("read handoff");
+    assert!(handoff.contains("runtime-follow-on --dry-run"));
+    assert!(handoff.contains(
+        "Populate committed runtime evidence only under `cli_manifests/cursor/snapshots/**` and `cli_manifests/cursor/supplement/**`."
+    ));
+    assert!(!handoff.contains("current.json`, pointers, versions, and reports"));
+    assert!(!handoff.contains("Regenerate support and capability publication artifacts"));
 
     let current_json = fs::read_to_string(fixture.join("cli_manifests/cursor/current.json"))
         .expect("read current");

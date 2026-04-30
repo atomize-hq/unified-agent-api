@@ -206,8 +206,13 @@ fn render_seam_map_body(draft: &DraftEntry, docs_root_display: &str) -> String {
 fn render_threading_body(draft: &DraftEntry, phase: PacketPhase<'_>) -> String {
     match phase {
         PacketPhase::Execution => format!(
-            "# Threading\n\n1. Apply the control-plane onboarding packet with `onboard-agent --write`.\n2. Run `cargo run -p xtask -- scaffold-wrapper-crate --agent {} --write` to create the runtime-owned wrapper crate shell at `{}`; `onboard-agent` does not create the wrapper crate.\n3. Implement backend/runtime details in `{}` and `{}`.\n4. Populate manifest evidence under `{}` from committed runtime outputs, regenerate support/capability publication artifacts, and close the proving run with `make preflight`.\n",
-            draft.agent_id, draft.crate_path, draft.crate_path, draft.backend_module, draft.manifest_root
+            "# Threading\n\n1. Apply the control-plane onboarding packet with `onboard-agent --write`.\n2. Run `cargo run -p xtask -- scaffold-wrapper-crate --agent {} --write` to create the runtime-owned wrapper crate shell at `{}`; `onboard-agent` does not create the wrapper crate.\n3. Materialize the bounded runtime packet with `runtime-follow-on --dry-run`, then implement backend/runtime details in `{}` and `{}`.\n4. Keep runtime evidence inside `{}/snapshots/**` and `{}/supplement/**`, complete `runtime-follow-on --write`, then hand publication refresh and proving-run closeout to the next lane.\n",
+            draft.agent_id,
+            draft.crate_path,
+            draft.crate_path,
+            draft.backend_module,
+            draft.manifest_root,
+            draft.manifest_root
         ),
         PacketPhase::Closeout(_) => format!(
             "# Threading\n\n1. Control-plane onboarding writes for `{}` landed without follow-up packet drift.\n2. Runtime-owned wrapper and backend work landed at `{}` and `{}`.\n3. Manifest evidence and publication artifacts were regenerated from committed runtime outputs.\n4. The proving run closed with `make preflight`.\n",
@@ -256,7 +261,7 @@ fn render_handoff_body(
 ) -> String {
     match phase {
         PacketPhase::Execution => format!(
-            "# Handoff\n\nThis packet captures the next executable onboarding step for `{}`.\n\n## Release touchpoints\n\n{}\n\n{}\n## Next executable runtime step\n\nRun `cargo run -p xtask -- scaffold-wrapper-crate --agent {} --write` to create the runtime-owned wrapper crate shell at `{}`. `onboard-agent` does not create the wrapper crate.\n\n## Remaining runtime checklist\n\n- Implement backend/runtime details in `{}` and `{}`.\n- Author wrapper coverage input at `{}` for binding kind `{}`.\n- Populate `{}/current.json`, pointers, versions, and reports from committed runtime evidence.\n- Regenerate support and capability publication artifacts, then run `make preflight`.\n",
+            "# Handoff\n\nThis packet captures the next executable onboarding step for `{}`.\n\n## Release touchpoints\n\n{}\n\n{}\n## Next executable runtime step\n\nRun `cargo run -p xtask -- scaffold-wrapper-crate --agent {} --write` to create the runtime-owned wrapper crate shell at `{}`. `onboard-agent` does not create the wrapper crate.\n\n## Remaining runtime checklist\n\n- After scaffolding, materialize the bounded runtime packet with `runtime-follow-on --dry-run` for this approval artifact.\n- Implement backend/runtime details in `{}` and `{}`.\n- Author wrapper coverage input at `{}` for binding kind `{}`.\n- Populate committed runtime evidence only under `{}/snapshots/**` and `{}/supplement/**`.\n- Complete `runtime-follow-on --write`; publication refresh and proving-run closeout stay in the next lane.\n",
             draft.agent_id,
             release_touchpoints,
             render_execution_handoff_approval(closeout_path, approval),
@@ -266,6 +271,7 @@ fn render_handoff_body(
             draft.backend_module,
             draft.wrapper_coverage_source_path,
             draft.wrapper_coverage_binding_kind,
+            draft.manifest_root,
             draft.manifest_root
         ),
         PacketPhase::Closeout(closeout) => format!(

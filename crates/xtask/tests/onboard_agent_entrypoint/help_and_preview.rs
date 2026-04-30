@@ -238,6 +238,10 @@ fn onboard_agent_dry_run_preview_is_deterministic_and_writes_nothing() {
     assert!(first
         .stdout
         .contains("cargo run -p xtask -- scaffold-wrapper-crate --agent cursor --write"));
+    assert!(first.stdout.contains("runtime-follow-on --dry-run"));
+    assert!(first
+        .stdout
+        .contains("Populate committed runtime evidence only under `cli_manifests/cursor/snapshots/**` and `cli_manifests/cursor/supplement/**`."));
     assert!(first
         .stdout
         .contains("`onboard-agent` does not create the wrapper crate."));
@@ -251,6 +255,12 @@ fn onboard_agent_dry_run_preview_is_deterministic_and_writes_nothing() {
     assert!(!first
         .stdout
         .contains("Next executable runtime step: implement the runtime-owned wrapper crate"));
+    assert!(!first
+        .stdout
+        .contains("current.json`, pointers, versions, and reports"));
+    assert!(!first
+        .stdout
+        .contains("Regenerate support and capability publication artifacts"));
     assert!(!first
         .stdout
         .contains("When the wrapper crate is crates.io-publishable"));
