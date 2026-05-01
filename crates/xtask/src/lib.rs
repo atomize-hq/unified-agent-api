@@ -1,5 +1,6 @@
 #![forbid(unsafe_code)]
 
+pub mod agent_lifecycle;
 pub mod agent_maintenance;
 pub mod agent_registry;
 pub mod approval_artifact;

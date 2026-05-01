@@ -1,0 +1,51 @@
+{
+  "schema_version": "1",
+  "agent_id": "opencode",
+  "onboarding_pack_prefix": "opencode-cli-onboarding",
+  "approval_artifact_path": "docs/agents/lifecycle/opencode-cli-onboarding/governance/approved-agent.toml",
+  "approval_artifact_sha256": "83d7a804eb96578458c946419bfc1219b69029d824797b3342c65d9bddec3cdf",
+  "lifecycle_stage": "closed_baseline",
+  "support_tier": "publication_backed",
+  "side_states": [],
+  "current_owner_command": "close-proving-run --write",
+  "expected_next_command": "check-agent-drift --agent opencode",
+  "last_transition_at": "2026-04-18T19:31:24-05:00",
+  "last_transition_by": "historical-lifecycle-backfill",
+  "required_evidence": [
+    "registry_entry",
+    "docs_pack",
+    "manifest_root_skeleton",
+    "runtime_write_complete",
+    "implementation_summary_present"
+  ],
+  "satisfied_evidence": [
+    "registry_entry",
+    "docs_pack",
+    "manifest_root_skeleton",
+    "runtime_write_complete",
+    "implementation_summary_present"
+  ],
+  "blocking_issues": [],
+  "retryable_failures": [],
+  "implementation_summary": {
+    "requested_runtime_profile": "default",
+    "achieved_runtime_profile": "default",
+    "primary_template": "opencode",
+    "template_lineage": [
+      "opencode"
+    ],
+    "landed_surfaces": [
+      "wrapper_runtime",
+      "backend_harness",
+      "wrapper_coverage_source",
+      "runtime_manifest_evidence",
+      "session_resume",
+      "session_fork"
+    ],
+    "deferred_surfaces": [],
+    "minimal_profile_justification": null
+  },
+  "publication_packet_path": null,
+  "publication_packet_sha256": null,
+  "closeout_baseline_path": null
+}

@@ -1,0 +1,65 @@
+artifact_version = "1"
+comparison_ref = "docs/agents/selection/cli-agent-selection-packet.md"
+selection_mode = "factory_validation"
+recommended_agent_id = "codex"
+approved_agent_id = "codex"
+approval_commit = "8c2607b451727a39392f6f6d3afe34328b969919"
+approval_recorded_at = "2025-11-23T13:26:12-05:00"
+
+[descriptor]
+agent_id = "codex"
+display_name = "Codex CLI"
+crate_path = "crates/codex"
+backend_module = "crates/agent_api/src/backends/codex"
+manifest_root = "cli_manifests/codex"
+package_name = "unified-agent-api-codex"
+canonical_targets = ["x86_64-unknown-linux-musl"]
+wrapper_coverage_binding_kind = "generated_from_wrapper_crate"
+wrapper_coverage_source_path = "crates/codex"
+always_on_capabilities = [
+  "agent_api.run",
+  "agent_api.events",
+  "agent_api.events.live",
+  "agent_api.control.cancel.v1",
+  "agent_api.tools.structured.v1",
+  "agent_api.tools.results.v1",
+  "agent_api.artifacts.final_text.v1",
+  "agent_api.session.handle.v1",
+  "agent_api.session.fork.v1",
+  "agent_api.session.resume.v1",
+  "agent_api.config.model.v1",
+  "agent_api.exec.add_dirs.v1",
+  "agent_api.exec.non_interactive",
+]
+backend_extensions = [
+  "backend.codex.exec.approval_policy",
+  "backend.codex.exec.sandbox_mode",
+  "backend.codex.exec_stream",
+]
+support_matrix_enabled = true
+capability_matrix_enabled = true
+capability_matrix_target = "x86_64-unknown-linux-musl"
+docs_release_track = "crates-io"
+onboarding_pack_prefix = "codex-cli-onboarding"
+
+[[descriptor.target_gated_capabilities]]
+capability_id = "agent_api.tools.mcp.list.v1"
+targets = ["x86_64-unknown-linux-musl"]
+
+[[descriptor.target_gated_capabilities]]
+capability_id = "agent_api.tools.mcp.get.v1"
+targets = ["x86_64-unknown-linux-musl"]
+
+[[descriptor.config_gated_capabilities]]
+capability_id = "agent_api.tools.mcp.add.v1"
+config_key = "allow_mcp_write"
+targets = ["x86_64-unknown-linux-musl"]
+
+[[descriptor.config_gated_capabilities]]
+capability_id = "agent_api.tools.mcp.remove.v1"
+config_key = "allow_mcp_write"
+targets = ["x86_64-unknown-linux-musl"]
+
+[[descriptor.config_gated_capabilities]]
+capability_id = "agent_api.exec.external_sandbox.v1"
+config_key = "allow_external_sandbox_exec"

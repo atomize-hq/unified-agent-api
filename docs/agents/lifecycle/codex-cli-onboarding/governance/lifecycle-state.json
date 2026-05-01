@@ -1,0 +1,56 @@
+{
+  "schema_version": "1",
+  "agent_id": "codex",
+  "onboarding_pack_prefix": "codex-cli-onboarding",
+  "approval_artifact_path": "docs/agents/lifecycle/codex-cli-onboarding/governance/approved-agent.toml",
+  "approval_artifact_sha256": "25d51601e4aa9ca18bc72326e1448097a8648cd5e5e1d6018d517b116a58b892",
+  "lifecycle_stage": "closed_baseline",
+  "support_tier": "first_class",
+  "side_states": [],
+  "current_owner_command": "close-proving-run --write",
+  "expected_next_command": "check-agent-drift --agent codex",
+  "last_transition_at": "2025-11-23T13:26:12-05:00",
+  "last_transition_by": "historical-lifecycle-backfill",
+  "required_evidence": [
+    "registry_entry",
+    "docs_pack",
+    "manifest_root_skeleton",
+    "runtime_write_complete",
+    "implementation_summary_present"
+  ],
+  "satisfied_evidence": [
+    "registry_entry",
+    "docs_pack",
+    "manifest_root_skeleton",
+    "runtime_write_complete",
+    "implementation_summary_present"
+  ],
+  "blocking_issues": [],
+  "retryable_failures": [],
+  "implementation_summary": {
+    "requested_runtime_profile": "feature_rich",
+    "achieved_runtime_profile": "feature_rich",
+    "primary_template": "codex",
+    "template_lineage": [
+      "codex"
+    ],
+    "landed_surfaces": [
+      "wrapper_runtime",
+      "backend_harness",
+      "agent_api_onboarding_test",
+      "wrapper_coverage_source",
+      "runtime_manifest_evidence",
+      "add_dirs",
+      "external_sandbox_policy",
+      "mcp_management",
+      "session_resume",
+      "session_fork",
+      "structured_tools"
+    ],
+    "deferred_surfaces": [],
+    "minimal_profile_justification": null
+  },
+  "publication_packet_path": null,
+  "publication_packet_sha256": null,
+  "closeout_baseline_path": null
+}

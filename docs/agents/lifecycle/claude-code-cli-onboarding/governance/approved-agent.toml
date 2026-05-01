@@ -1,0 +1,63 @@
+artifact_version = "1"
+comparison_ref = "docs/agents/selection/cli-agent-selection-packet.md"
+selection_mode = "factory_validation"
+recommended_agent_id = "claude_code"
+approved_agent_id = "claude_code"
+approval_commit = "aacbbe83213b3d221e90e4427ce72127918d4879"
+approval_recorded_at = "2026-02-12T09:34:04-05:00"
+
+[descriptor]
+agent_id = "claude_code"
+display_name = "Claude Code"
+crate_path = "crates/claude_code"
+backend_module = "crates/agent_api/src/backends/claude_code"
+manifest_root = "cli_manifests/claude_code"
+package_name = "unified-agent-api-claude-code"
+canonical_targets = ["linux-x64", "darwin-arm64", "win32-x64"]
+wrapper_coverage_binding_kind = "generated_from_wrapper_crate"
+wrapper_coverage_source_path = "crates/claude_code"
+always_on_capabilities = [
+  "agent_api.run",
+  "agent_api.events",
+  "agent_api.events.live",
+  "agent_api.control.cancel.v1",
+  "agent_api.tools.structured.v1",
+  "agent_api.tools.results.v1",
+  "agent_api.artifacts.final_text.v1",
+  "agent_api.session.handle.v1",
+  "agent_api.config.model.v1",
+  "agent_api.exec.add_dirs.v1",
+  "agent_api.exec.non_interactive",
+  "agent_api.session.resume.v1",
+  "agent_api.session.fork.v1",
+]
+backend_extensions = [
+  "backend.claude_code.print_stream_json",
+]
+support_matrix_enabled = true
+capability_matrix_enabled = true
+capability_matrix_target = "linux-x64"
+docs_release_track = "crates-io"
+onboarding_pack_prefix = "claude-code-cli-onboarding"
+
+[[descriptor.target_gated_capabilities]]
+capability_id = "agent_api.tools.mcp.list.v1"
+targets = ["linux-x64", "darwin-arm64", "win32-x64"]
+
+[[descriptor.target_gated_capabilities]]
+capability_id = "agent_api.tools.mcp.get.v1"
+targets = ["win32-x64"]
+
+[[descriptor.config_gated_capabilities]]
+capability_id = "agent_api.tools.mcp.add.v1"
+config_key = "allow_mcp_write"
+targets = ["win32-x64"]
+
+[[descriptor.config_gated_capabilities]]
+capability_id = "agent_api.tools.mcp.remove.v1"
+config_key = "allow_mcp_write"
+targets = ["win32-x64"]
+
+[[descriptor.config_gated_capabilities]]
+capability_id = "agent_api.exec.external_sandbox.v1"
+config_key = "allow_external_sandbox_exec"

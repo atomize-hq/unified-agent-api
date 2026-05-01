@@ -133,6 +133,12 @@ Backend-specific exec-policy knobs (pattern):
 
 ## Onboarding checklist (new CLI agent)
 
+Canonical lifecycle record:
+- `docs/agents/lifecycle/<onboarding_pack_prefix>/governance/lifecycle-state.json`
+- this file owns committed lifecycle stage, support tier, evidence satisfaction, and next-command truth for create mode
+- generated packet docs and handoff prose are evidence, not lifecycle authority
+- maintenance comparisons must anchor to the committed lifecycle record rather than reconstructing state from scattered packet artifacts
+
 1) Run `onboard-agent --write` to enroll the control-plane surfaces:
    - registry entry
    - docs pack
@@ -160,6 +166,10 @@ Backend-specific exec-policy knobs (pattern):
    - exec-policy default behavior (non-interactive) and override levers if applicable
 6) Populate manifest evidence and regenerate publication outputs from committed runtime evidence.
 7) Ensure required CI workflows pass (see below).
+
+Publication handoff rule:
+- `docs/agents/lifecycle/<onboarding_pack_prefix>/governance/publication-ready.json` is the only committed publication handoff packet
+- scratch runtime `handoff.json` files remain run evidence only
 
 ## CI expectations (must stay green)
 

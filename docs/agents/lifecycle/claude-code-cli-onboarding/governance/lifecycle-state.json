@@ -1,0 +1,56 @@
+{
+  "schema_version": "1",
+  "agent_id": "claude_code",
+  "onboarding_pack_prefix": "claude-code-cli-onboarding",
+  "approval_artifact_path": "docs/agents/lifecycle/claude-code-cli-onboarding/governance/approved-agent.toml",
+  "approval_artifact_sha256": "9bd2dc39909499598791fcdd84a2c0960f68d70f167e05fc98264b5099397fc3",
+  "lifecycle_stage": "closed_baseline",
+  "support_tier": "first_class",
+  "side_states": [],
+  "current_owner_command": "close-proving-run --write",
+  "expected_next_command": "check-agent-drift --agent claude_code",
+  "last_transition_at": "2026-02-12T09:34:04-05:00",
+  "last_transition_by": "historical-lifecycle-backfill",
+  "required_evidence": [
+    "registry_entry",
+    "docs_pack",
+    "manifest_root_skeleton",
+    "runtime_write_complete",
+    "implementation_summary_present"
+  ],
+  "satisfied_evidence": [
+    "registry_entry",
+    "docs_pack",
+    "manifest_root_skeleton",
+    "runtime_write_complete",
+    "implementation_summary_present"
+  ],
+  "blocking_issues": [],
+  "retryable_failures": [],
+  "implementation_summary": {
+    "requested_runtime_profile": "feature_rich",
+    "achieved_runtime_profile": "feature_rich",
+    "primary_template": "claude_code",
+    "template_lineage": [
+      "claude_code"
+    ],
+    "landed_surfaces": [
+      "wrapper_runtime",
+      "backend_harness",
+      "agent_api_onboarding_test",
+      "wrapper_coverage_source",
+      "runtime_manifest_evidence",
+      "add_dirs",
+      "external_sandbox_policy",
+      "mcp_management",
+      "session_resume",
+      "session_fork",
+      "structured_tools"
+    ],
+    "deferred_surfaces": [],
+    "minimal_profile_justification": null
+  },
+  "publication_packet_path": null,
+  "publication_packet_sha256": null,
+  "closeout_baseline_path": null
+}

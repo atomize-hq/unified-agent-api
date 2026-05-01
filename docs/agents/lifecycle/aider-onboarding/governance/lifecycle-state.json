@@ -1,0 +1,49 @@
+{
+  "schema_version": "1",
+  "agent_id": "aider",
+  "onboarding_pack_prefix": "aider-onboarding",
+  "approval_artifact_path": "docs/agents/lifecycle/aider-onboarding/governance/approved-agent.toml",
+  "approval_artifact_sha256": "bc02f5f9b7fe7880446c4cb04b33a9f7c419008755b2229a8243ba878441a854",
+  "lifecycle_stage": "runtime_integrated",
+  "support_tier": "baseline_runtime",
+  "side_states": [],
+  "current_owner_command": "runtime-follow-on --write",
+  "expected_next_command": "prepare-publication --approval docs/agents/lifecycle/aider-onboarding/governance/approved-agent.toml --write",
+  "last_transition_at": "2026-04-29T19:38:47-04:00",
+  "last_transition_by": "historical-lifecycle-backfill",
+  "required_evidence": [
+    "registry_entry",
+    "docs_pack",
+    "manifest_root_skeleton",
+    "runtime_write_complete",
+    "implementation_summary_present"
+  ],
+  "satisfied_evidence": [
+    "registry_entry",
+    "docs_pack",
+    "manifest_root_skeleton",
+    "runtime_write_complete",
+    "implementation_summary_present"
+  ],
+  "blocking_issues": [],
+  "retryable_failures": [],
+  "implementation_summary": {
+    "requested_runtime_profile": "default",
+    "achieved_runtime_profile": "default",
+    "primary_template": "aider",
+    "template_lineage": [
+      "aider"
+    ],
+    "landed_surfaces": [
+      "wrapper_runtime",
+      "backend_harness",
+      "wrapper_coverage_source",
+      "runtime_manifest_evidence"
+    ],
+    "deferred_surfaces": [],
+    "minimal_profile_justification": null
+  },
+  "publication_packet_path": null,
+  "publication_packet_sha256": null,
+  "closeout_baseline_path": null
+}
