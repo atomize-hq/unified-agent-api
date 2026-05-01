@@ -49,6 +49,42 @@ pub(super) fn render_prompt(context: &RuntimeContext) -> String {
             "{{REQUIRED_TEST_PATH}}",
             &context.input_contract.required_agent_api_test,
         )
+        .replace(
+            "{{CANONICAL_TARGETS}}",
+            &render_bulleted_list(&context.input_contract.canonical_targets),
+        )
+        .replace(
+            "{{ALWAYS_ON_CAPABILITIES}}",
+            &render_bulleted_list(&context.input_contract.always_on_capabilities),
+        )
+        .replace(
+            "{{TARGET_GATED_CAPABILITIES}}",
+            &render_bulleted_list(&context.input_contract.target_gated_capabilities),
+        )
+        .replace(
+            "{{CONFIG_GATED_CAPABILITIES}}",
+            &render_bulleted_list(&context.input_contract.config_gated_capabilities),
+        )
+        .replace(
+            "{{BACKEND_EXTENSIONS}}",
+            &render_bulleted_list(&context.input_contract.backend_extensions),
+        )
+        .replace(
+            "{{SUPPORT_MATRIX_ENABLED}}",
+            &context.input_contract.support_matrix_enabled.to_string(),
+        )
+        .replace(
+            "{{CAPABILITY_MATRIX_ENABLED}}",
+            &context.input_contract.capability_matrix_enabled.to_string(),
+        )
+        .replace(
+            "{{CAPABILITY_MATRIX_TARGET}}",
+            context
+                .input_contract
+                .capability_matrix_target
+                .as_deref()
+                .unwrap_or("none"),
+        )
         .replace("{{RUN_DIR}}", &context.run_dir.to_string_lossy())
         .replace(
             "{{DOCS_TO_READ}}",
@@ -65,6 +101,14 @@ pub(super) fn render_prompt(context: &RuntimeContext) -> String {
                 .required_handoff_commands
                 .join("\n- "),
         )
+}
+
+fn render_bulleted_list(values: &[String]) -> String {
+    if values.is_empty() {
+        "none".to_string()
+    } else {
+        values.join("\n- ")
+    }
 }
 
 pub(super) fn render_dry_run_summary(context: &RuntimeContext) -> String {
