@@ -18,6 +18,12 @@ use harness::{
 
 const RUNTIME_RUNS_ROOT: &str = "docs/agents/.uaa-temp/runtime-follow-on/runs";
 const RUN_ID: &str = "rtfo-publication";
+const LEGACY_REQUIRED_PUBLICATION_COMMANDS: [&str; 4] = [
+    "support-matrix --check",
+    "capability-matrix --check",
+    "capability-matrix-audit",
+    "make preflight",
+];
 
 #[derive(Debug, Parser)]
 #[command(name = "xtask")]
@@ -385,6 +391,74 @@ fn prepare_publication_rejects_missing_runtime_evidence() {
     assert!(output
         .stderr
         .contains("no successful runtime-follow-on evidence run"));
+    assert_eq!(
+        read_json(&lifecycle_state_path(&fixture))
+            .get("lifecycle_stage")
+            .and_then(Value::as_str),
+        Some("runtime_integrated")
+    );
+    assert!(!publication_packet_path(&fixture).exists());
+}
+
+#[test]
+fn prepare_publication_rejects_legacy_runtime_input_commands_with_repair_guidance() {
+    let (fixture, approval_path) = prepare_fixture("prepare-publication-legacy-input-commands");
+    let input_contract_path = fixture
+        .join(RUNTIME_RUNS_ROOT)
+        .join(RUN_ID)
+        .join("input-contract.json");
+    let mut input_contract = read_json(&input_contract_path);
+    input_contract["required_handoff_commands"] = Value::Array(
+        LEGACY_REQUIRED_PUBLICATION_COMMANDS
+            .iter()
+            .map(|value| Value::String((*value).to_string()))
+            .collect(),
+    );
+    write_json(&input_contract_path, &input_contract);
+
+    let output = run_cli(publication_args("--write", &approval_path), &fixture);
+
+    assert_eq!(output.exit_code, 2);
+    assert!(output.stderr.contains(
+        "runtime input-contract required_handoff_commands must match the frozen publication command set exactly"
+    ));
+    assert!(output.stderr.contains(
+        "cargo run -p xtask -- repair-runtime-evidence --approval docs/agents/lifecycle/gemini-cli-onboarding/governance/approved-agent.toml --write"
+    ));
+    assert_eq!(
+        read_json(&lifecycle_state_path(&fixture))
+            .get("lifecycle_stage")
+            .and_then(Value::as_str),
+        Some("runtime_integrated")
+    );
+    assert!(!publication_packet_path(&fixture).exists());
+}
+
+#[test]
+fn prepare_publication_rejects_legacy_runtime_handoff_commands_with_repair_guidance() {
+    let (fixture, approval_path) = prepare_fixture("prepare-publication-legacy-handoff-commands");
+    let handoff_path = fixture
+        .join(RUNTIME_RUNS_ROOT)
+        .join(RUN_ID)
+        .join("handoff.json");
+    let mut handoff = read_json(&handoff_path);
+    handoff["required_commands"] = Value::Array(
+        LEGACY_REQUIRED_PUBLICATION_COMMANDS
+            .iter()
+            .map(|value| Value::String((*value).to_string()))
+            .collect(),
+    );
+    write_json(&handoff_path, &handoff);
+
+    let output = run_cli(publication_args("--write", &approval_path), &fixture);
+
+    assert_eq!(output.exit_code, 2);
+    assert!(output.stderr.contains(
+        "runtime handoff required_commands must match the frozen publication command set exactly"
+    ));
+    assert!(output.stderr.contains(
+        "cargo run -p xtask -- repair-runtime-evidence --approval docs/agents/lifecycle/gemini-cli-onboarding/governance/approved-agent.toml --write"
+    ));
     assert_eq!(
         read_json(&lifecycle_state_path(&fixture))
             .get("lifecycle_stage")

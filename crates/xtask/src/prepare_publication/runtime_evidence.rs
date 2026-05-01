@@ -108,16 +108,22 @@ fn inspect_runtime_run(
         return Ok(None);
     }
     if status.status != "write_validated" || !status.validation_passed || !status.handoff_ready {
-        return Err(Error::Validation(format!(
-            "runtime evidence run `{run_id}` is not a validated runtime handoff"
-        )));
+        return Err(stale_runtime_evidence_error(
+            approval,
+            run_id,
+            "is not a validated runtime handoff",
+        ));
     }
     if status.run_dir != absolute_run_root.to_string_lossy() {
-        return Err(Error::Validation(format!(
-            "runtime evidence run `{run_id}` recorded run_dir `{}` but expected `{}`",
-            status.run_dir,
-            absolute_run_root.display()
-        )));
+        return Err(stale_runtime_evidence_error(
+            approval,
+            run_id,
+            &format!(
+                "recorded run_dir `{}` but expected `{}`",
+                status.run_dir,
+                absolute_run_root.display()
+            ),
+        ));
     }
 
     let input_contract: RuntimeInputContract =
@@ -127,71 +133,89 @@ fn inspect_runtime_run(
         || input_contract.agent_id != approval.descriptor.agent_id
         || input_contract.manifest_root != approval.descriptor.manifest_root
     {
-        return Err(Error::Validation(format!(
-            "runtime evidence run `{run_id}` no longer matches the approval artifact continuity"
-        )));
+        return Err(stale_runtime_evidence_error(
+            approval,
+            run_id,
+            "no longer matches the approval artifact continuity",
+        ));
     }
     validate_required_commands(
         "runtime input-contract required_handoff_commands",
         &input_contract.required_handoff_commands,
-    )?;
+    )
+    .map_err(|err| stale_runtime_evidence_error(approval, run_id, &err.to_string()))?;
 
     let report: RuntimeValidationReport =
         read_json(&absolute_run_root.join("validation-report.json"))?;
     if report.status != "pass" {
-        return Err(Error::Validation(format!(
-            "runtime evidence run `{run_id}` validation-report.json is not green"
-        )));
+        return Err(stale_runtime_evidence_error(
+            approval,
+            run_id,
+            "validation-report.json is not green",
+        ));
     }
 
     let handoff: RuntimeHandoff = read_json(&absolute_run_root.join("handoff.json"))?;
     if handoff.agent_id != approval.descriptor.agent_id
         || handoff.manifest_root != approval.descriptor.manifest_root
     {
-        return Err(Error::Validation(format!(
-            "runtime evidence run `{run_id}` handoff.json no longer matches the approval artifact continuity"
-        )));
+        return Err(stale_runtime_evidence_error(
+            approval,
+            run_id,
+            "handoff.json no longer matches the approval artifact continuity",
+        ));
     }
     if !handoff.runtime_lane_complete || !handoff.publication_refresh_required {
-        return Err(Error::Validation(format!(
-            "runtime evidence run `{run_id}` handoff.json is not publication-ready"
-        )));
+        return Err(stale_runtime_evidence_error(
+            approval,
+            run_id,
+            "handoff.json is not publication-ready",
+        ));
     }
     if handoff
         .blockers
         .iter()
         .any(|blocker| !blocker.trim().is_empty())
     {
-        return Err(Error::Validation(format!(
-            "runtime evidence run `{run_id}` handoff.json still carries blocker text"
-        )));
+        return Err(stale_runtime_evidence_error(
+            approval,
+            run_id,
+            "handoff.json still carries blocker text",
+        ));
     }
     validate_required_commands(
         "runtime handoff required_commands",
         &handoff.required_commands,
-    )?;
+    )
+    .map_err(|err| stale_runtime_evidence_error(approval, run_id, &err.to_string()))?;
 
     let written_paths: Vec<String> = read_json(&absolute_run_root.join("written-paths.json"))?;
     if written_paths.is_empty() {
-        return Err(Error::Validation(format!(
-            "runtime evidence run `{run_id}` did not record any written paths"
-        )));
+        return Err(stale_runtime_evidence_error(
+            approval,
+            run_id,
+            "did not record any written paths",
+        ));
     }
 
     let summary_path = absolute_run_root.join("run-summary.md");
     let summary = fs::read_to_string(&summary_path)
         .map_err(|err| Error::Validation(format!("read {}: {err}", summary_path.display())))?;
     if summary.trim().is_empty() {
-        return Err(Error::Validation(format!(
-            "runtime evidence run `{run_id}` run-summary.md is empty"
-        )));
+        return Err(stale_runtime_evidence_error(
+            approval,
+            run_id,
+            "run-summary.md is empty",
+        ));
     }
 
     for name in REQUIRED_RUNTIME_EVIDENCE_FILES {
         if !absolute_run_root.join(name).is_file() {
-            return Err(Error::Validation(format!(
-                "runtime evidence run `{run_id}` is missing required file `{name}`"
-            )));
+            return Err(stale_runtime_evidence_error(
+                approval,
+                run_id,
+                &format!("is missing required file `{name}`"),
+            ));
         }
     }
 
@@ -202,4 +226,11 @@ fn inspect_runtime_run(
             .map(|name| format!("{relative_run_root}/{name}"))
             .collect(),
     }))
+}
+
+fn stale_runtime_evidence_error(approval: &ApprovalArtifact, run_id: &str, detail: &str) -> Error {
+    Error::Validation(format!(
+        "runtime evidence run `{run_id}` {detail}; rerun `cargo run -p xtask -- repair-runtime-evidence --approval {} --check` to inspect or `cargo run -p xtask -- repair-runtime-evidence --approval {} --write` to repair the runtime evidence bundle",
+        approval.relative_path, approval.relative_path
+    ))
 }
