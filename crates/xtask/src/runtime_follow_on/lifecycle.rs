@@ -13,7 +13,7 @@ use crate::{
 use super::io::now_rfc3339;
 use super::{
     models::{HandoffContract, InputContract, RuntimeContext, ValidationReport},
-    Error, HANDOFF_FILE_NAME, LEGACY_REQUIRED_PUBLICATION_COMMANDS,
+    Error, HANDOFF_FILE_NAME,
 };
 
 pub(super) fn validate_handoff(path: &Path, context: &RuntimeContext) -> Result<(), String> {
@@ -67,22 +67,13 @@ pub(super) fn validate_handoff(path: &Path, context: &RuntimeContext) -> Result<
     }
     let required = agent_lifecycle::REQUIRED_PUBLICATION_COMMANDS
         .iter()
-        .copied()
-        .collect::<BTreeSet<_>>();
-    let legacy_required = LEGACY_REQUIRED_PUBLICATION_COMMANDS
-        .iter()
-        .copied()
-        .collect::<BTreeSet<_>>();
-    let actual = handoff
-        .required_commands
-        .iter()
-        .map(String::as_str)
-        .collect::<BTreeSet<_>>();
-    if !required.is_subset(&actual) && !legacy_required.is_subset(&actual) {
-        return Err(format!(
-            "handoff.json required_commands must include {}",
-            agent_lifecycle::REQUIRED_PUBLICATION_COMMANDS.join(", ")
-        ));
+        .map(|value| (*value).to_string())
+        .collect::<Vec<_>>();
+    if handoff.required_commands != required {
+        return Err(
+            "handoff.json required_commands must match the frozen publication command set exactly"
+                .to_string(),
+        );
     }
     Ok(())
 }

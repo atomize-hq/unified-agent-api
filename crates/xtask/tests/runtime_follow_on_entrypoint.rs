@@ -148,6 +148,33 @@ fn fake_codex_binary(fixture: &Path) -> PathBuf {
     binary
 }
 
+fn fake_codex_binary_with_exact_commands(fixture: &Path) -> PathBuf {
+    let binary = fixture
+        .join(RUNTIME_RUNS_ROOT)
+        .join(WRITE_RUN_ID)
+        .join("fake_codex-exact-commands.sh");
+    if !binary.is_file() {
+        fs::copy(fake_codex_fixture_source(), &binary).expect("copy exact-command fake codex");
+        let script = fs::read_to_string(&binary).expect("read exact-command fake codex");
+        let script = script
+            .replace(
+                "\"support-matrix --check\"",
+                "\"cargo run -p xtask -- support-matrix --check\"",
+            )
+            .replace(
+                "\"capability-matrix --check\"",
+                "\"cargo run -p xtask -- capability-matrix --check\"",
+            )
+            .replace(
+                "\"capability-matrix-audit\"",
+                "\"cargo run -p xtask -- capability-matrix-audit\"",
+            );
+        fs::write(&binary, script).expect("write exact-command fake codex");
+        mark_fixture_executable(&binary);
+    }
+    binary
+}
+
 #[cfg(unix)]
 fn mark_fixture_executable(path: &Path) {
     use std::os::unix::fs::PermissionsExt;
@@ -163,6 +190,14 @@ fn mark_fixture_executable(path: &Path) {
 fn mark_fixture_executable(_path: &Path) {}
 
 fn runtime_args(mode_flag: &str, approval_path: &str, fixture: &Path) -> Vec<String> {
+    runtime_args_with_binary(mode_flag, approval_path, &fake_codex_binary(fixture))
+}
+
+fn runtime_args_with_binary(
+    mode_flag: &str,
+    approval_path: &str,
+    codex_binary: &Path,
+) -> Vec<String> {
     let mut args = vec![
         "xtask".to_string(),
         "runtime-follow-on".to_string(),
@@ -175,7 +210,7 @@ fn runtime_args(mode_flag: &str, approval_path: &str, fixture: &Path) -> Vec<Str
             "--run-id".to_string(),
             WRITE_RUN_ID.to_string(),
             "--codex-binary".to_string(),
-            fake_codex_binary(fixture).display().to_string(),
+            codex_binary.display().to_string(),
         ]);
     }
     args
@@ -521,8 +556,8 @@ fn runtime_follow_on_write_rejects_noop_runtime_execution() {
 }
 
 #[test]
-fn runtime_follow_on_write_spawns_configured_codex_binary_and_requires_real_writes() {
-    let (fixture, approval_path) = prepare_runtime_fixture("runtime-follow-on-success");
+fn runtime_follow_on_write_rejects_legacy_short_form_publication_commands() {
+    let (fixture, approval_path) = prepare_runtime_fixture("runtime-follow-on-legacy-commands");
     let dry_run = run_cli(
         [
             "xtask",
@@ -540,11 +575,55 @@ fn runtime_follow_on_write_spawns_configured_codex_binary_and_requires_real_writ
 
     let output = run_cli(runtime_args("--write", &approval_path, &fixture), &fixture);
 
+    assert_eq!(output.exit_code, 2);
+    assert!(output.stderr.contains(
+        "handoff.json required_commands must match the frozen publication command set exactly"
+    ));
+    let lifecycle_state = read_json(&lifecycle_state_path(&fixture));
+    assert_eq!(
+        lifecycle_state
+            .get("lifecycle_stage")
+            .and_then(Value::as_str),
+        Some("enrolled")
+    );
+    assert_eq!(
+        lifecycle_state
+            .get("side_states")
+            .and_then(Value::as_array)
+            .map(|values| values.iter().filter_map(Value::as_str).collect::<Vec<_>>()),
+        Some(vec!["failed_retryable"])
+    );
+}
+
+#[test]
+fn runtime_follow_on_write_spawns_configured_codex_binary_and_requires_real_writes() {
+    let (fixture, approval_path) = prepare_runtime_fixture("runtime-follow-on-success");
+    let dry_run = run_cli(
+        [
+            "xtask",
+            "runtime-follow-on",
+            "--dry-run",
+            "--approval",
+            &approval_path,
+            "--run-id",
+            WRITE_RUN_ID,
+        ],
+        &fixture,
+    );
+    assert_eq!(dry_run.exit_code, 0, "stderr:\n{}", dry_run.stderr);
+    write_fake_codex_scenario(&fixture, "success");
+
+    let exact_command_binary = fake_codex_binary_with_exact_commands(&fixture);
+    let output = run_cli(
+        runtime_args_with_binary("--write", &approval_path, &exact_command_binary),
+        &fixture,
+    );
+
     assert_eq!(output.exit_code, 0, "stderr:\n{}", output.stderr);
     let execution = read_codex_execution(&fixture, WRITE_RUN_ID);
     assert_eq!(
         execution.get("binary").and_then(Value::as_str),
-        Some(fake_codex_binary(&fixture).to_string_lossy().as_ref())
+        Some(exact_command_binary.to_string_lossy().as_ref())
     );
     assert_eq!(execution.get("exit_code").and_then(Value::as_i64), Some(0));
     let argv = execution
