@@ -34,6 +34,7 @@ fn onboard_agent_write_applies_plan_and_replays_identically() {
         "== INPUT SUMMARY ==",
         "== REGISTRY ENTRY PREVIEW ==",
         "== DOCS SCAFFOLD PREVIEW ==",
+        "== LIFECYCLE STATE PREVIEW ==",
         "== MANIFEST ROOT PREVIEW ==",
         "== RELEASE/PUBLICATION TOUCHPOINTS ==",
         "== MANUAL FOLLOW-UP ==",
@@ -48,11 +49,11 @@ fn onboard_agent_write_applies_plan_and_replays_identically() {
     assert!(first.stdout.contains("OK: onboard-agent write complete."));
     assert!(first
         .stdout
-        .contains("Mutation summary: 15 written, 0 identical, 15 total planned."));
+        .contains("Mutation summary: 16 written, 0 identical, 16 total planned."));
     assert!(second.stdout.contains("OK: onboard-agent write complete."));
     assert!(second
         .stdout
-        .contains("Mutation summary: 0 written, 15 identical, 15 total planned."));
+        .contains("Mutation summary: 0 written, 16 identical, 16 total planned."));
 
     let registry = fs::read_to_string(fixture.join("crates/xtask/data/agent_registry.toml"))
         .expect("read registry");
@@ -86,6 +87,15 @@ fn onboard_agent_write_applies_plan_and_replays_identically() {
     let current_json = fs::read_to_string(fixture.join("cli_manifests/cursor/current.json"))
         .expect("read current");
     assert!(current_json.contains("\"expected_targets\": ["));
+    let lifecycle_state = fs::read_to_string(
+        fixture.join("docs/agents/lifecycle/cursor-cli-onboarding/governance/lifecycle-state.json"),
+    )
+    .expect("read lifecycle state");
+    assert!(lifecycle_state.contains("\"lifecycle_stage\": \"enrolled\""));
+    assert!(lifecycle_state.contains("\"support_tier\": \"bootstrap\""));
+    assert!(lifecycle_state.contains("\"current_owner_command\": \"onboard-agent --write\""));
+    assert!(lifecycle_state
+        .contains("\"expected_next_command\": \"scaffold-wrapper-crate --agent cursor --write\""));
     let release_doc =
         fs::read_to_string(fixture.join("docs/crates-io-release.md")).expect("read release doc");
     assert!(release_doc
@@ -122,6 +132,34 @@ fn onboard_agent_write_rejects_divergent_replay_without_mutating_other_files() {
     assert_eq!(
         before, after,
         "divergent replay must not leave partial writes"
+    );
+}
+
+#[test]
+fn onboard_agent_write_rejects_divergent_lifecycle_state_without_mutating_other_files() {
+    let fixture = fixture_root("onboard-agent-divergent-lifecycle-state");
+    seed_release_touchpoints(&fixture);
+
+    let first = run_cli(write_args("cursor"), &fixture);
+    assert_eq!(first.exit_code, 0, "stderr:\n{}", first.stderr);
+
+    write_text(
+        &fixture
+            .join("docs/agents/lifecycle/cursor-cli-onboarding/governance/lifecycle-state.json"),
+        "{\n  \"tampered\": true\n}\n",
+    );
+    let before = snapshot_files(&fixture);
+    let second = run_cli(write_args("cursor"), &fixture);
+    let after = snapshot_files(&fixture);
+
+    assert_eq!(second.exit_code, 2);
+    assert!(second
+        .stderr
+        .contains("docs/agents/lifecycle/cursor-cli-onboarding/governance/lifecycle-state.json"));
+    assert!(second.stderr.contains("divergent"));
+    assert_eq!(
+        before, after,
+        "divergent lifecycle replay must not leave partial writes"
     );
 }
 
@@ -200,10 +238,10 @@ fn onboard_agent_closeout_packet_replays_identically_without_rewriting_manual_me
     assert_eq!(second.exit_code, 0, "stderr:\n{}", second.stderr);
     assert!(first
         .stdout
-        .contains("Mutation summary: 15 written, 0 identical, 15 total planned."));
+        .contains("Mutation summary: 16 written, 0 identical, 16 total planned."));
     assert!(second
         .stdout
-        .contains("Mutation summary: 0 written, 15 identical, 15 total planned."));
+        .contains("Mutation summary: 0 written, 16 identical, 16 total planned."));
     assert_eq!(metrics_before, metrics_after_first);
     assert_eq!(metrics_before, metrics_after_second);
     assert_eq!(after_first, after_second);

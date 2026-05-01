@@ -73,6 +73,7 @@ impl From<approval_artifact::ApprovalArtifact> for DraftDescriptorInput {
             approval_provenance: Some(ApprovalProvenance {
                 artifact_path: artifact.relative_path,
                 artifact_sha256: artifact.sha256,
+                approval_recorded_at: String::new(),
             }),
         }
     }
