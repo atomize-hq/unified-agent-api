@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
-use crate::approval_artifact::ApprovalArtifact;
+use crate::{agent_lifecycle::LifecycleState, approval_artifact::ApprovalArtifact};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(super) struct InputContract {
@@ -17,6 +17,14 @@ pub(super) struct InputContract {
     pub(super) backend_module: String,
     pub(super) manifest_root: String,
     pub(super) wrapper_coverage_source_path: String,
+    pub(super) canonical_targets: Vec<String>,
+    pub(super) always_on_capabilities: Vec<String>,
+    pub(super) target_gated_capabilities: Vec<String>,
+    pub(super) config_gated_capabilities: Vec<String>,
+    pub(super) backend_extensions: Vec<String>,
+    pub(super) support_matrix_enabled: bool,
+    pub(super) capability_matrix_enabled: bool,
+    pub(super) capability_matrix_target: Option<String>,
     pub(super) requested_tier: String,
     pub(super) minimal_justification_file: Option<String>,
     pub(super) minimal_justification_text: Option<String>,
@@ -103,6 +111,8 @@ pub(super) struct CodexExecutionEvidence {
 pub(super) struct RuntimeContext {
     pub(super) approval: ApprovalArtifact,
     pub(super) input_contract: InputContract,
+    pub(super) lifecycle_state: LifecycleState,
+    pub(super) lifecycle_state_path: String,
     pub(super) run_id: String,
     pub(super) run_dir: PathBuf,
 }

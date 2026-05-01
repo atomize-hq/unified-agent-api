@@ -13,7 +13,7 @@ mod harness;
 
 use harness::{
     fixture_root, replace_text_once, run_xtask, seed_approval_artifact, seed_release_touchpoints,
-    snapshot_files, wrapper_scaffold_args, HarnessOutput,
+    sha256_hex, snapshot_files, wrapper_scaffold_args, HarnessOutput,
 };
 
 const RUNTIME_RUNS_ROOT: &str = "docs/agents/.uaa-temp/runtime-follow-on/runs";
@@ -95,6 +95,40 @@ fn prepare_runtime_fixture(prefix: &str) -> (std::path::PathBuf, String) {
     assert_eq!(onboard.exit_code, 0, "stderr:\n{}", onboard.stderr);
     let scaffold = run_xtask(&fixture, wrapper_scaffold_args("--write", "cursor"));
     assert_eq!(scaffold.exit_code, 0, "stderr:\n{}", scaffold.stderr);
+    write_json(
+        &fixture
+            .join("docs/agents/lifecycle/cursor-cli-onboarding/governance/lifecycle-state.json"),
+        &serde_json::json!({
+            "schema_version": "1",
+            "agent_id": "cursor",
+            "onboarding_pack_prefix": "cursor-cli-onboarding",
+            "approval_artifact_path": approval_path,
+            "approval_artifact_sha256": sha256_hex(&fixture.join(&approval_path)),
+            "lifecycle_stage": "enrolled",
+            "support_tier": "bootstrap",
+            "side_states": [],
+            "current_owner_command": "runtime-follow-on --write",
+            "expected_next_command": format!("runtime-follow-on --approval {approval_path} --dry-run"),
+            "last_transition_at": "2026-05-01T00:00:00Z",
+            "last_transition_by": "runtime-follow-on-entrypoint-test",
+            "required_evidence": [
+                "registry_entry",
+                "docs_pack",
+                "manifest_root_skeleton"
+            ],
+            "satisfied_evidence": [
+                "registry_entry",
+                "docs_pack",
+                "manifest_root_skeleton"
+            ],
+            "blocking_issues": [],
+            "retryable_failures": [],
+            "implementation_summary": Value::Null,
+            "publication_packet_path": Value::Null,
+            "publication_packet_sha256": Value::Null,
+            "closeout_baseline_path": Value::Null
+        }),
+    );
     (fixture, approval_path)
 }
 
@@ -174,6 +208,20 @@ fn snapshot_without_runtime_runs(root: &Path) -> BTreeMap<String, Vec<u8>> {
         .collect()
 }
 
+fn lifecycle_state_path(fixture: &Path) -> PathBuf {
+    fixture.join("docs/agents/lifecycle/cursor-cli-onboarding/governance/lifecycle-state.json")
+}
+
+fn read_json(path: &Path) -> Value {
+    serde_json::from_slice(&fs::read(path).expect("read json")).expect("parse json")
+}
+
+fn write_json(path: &Path, value: &Value) {
+    let mut bytes = serde_json::to_vec_pretty(value).expect("serialize json");
+    bytes.push(b'\n');
+    fs::write(path, bytes).expect("write json");
+}
+
 #[test]
 fn runtime_follow_on_help_text_includes_required_surface() {
     let top_help = Cli::command().render_help().to_string();
@@ -230,8 +278,34 @@ fn runtime_follow_on_dry_run_writes_full_packet_without_touching_other_paths() {
         assert!(run_dir.join(name).is_file(), "missing {name}");
     }
     let prompt = fs::read_to_string(run_dir.join("codex-prompt.md")).expect("read prompt");
+    let input_contract = read_json(&run_dir.join("input-contract.json"));
     assert!(prompt.contains("Do not edit generated `cli_manifests/cursor/wrapper_coverage.json`."));
     assert!(prompt.contains("crates/agent_api/tests/c1_cursor_runtime_follow_on.rs"));
+    assert!(prompt.contains("canonical targets:"));
+    assert!(prompt.contains("linux-x64"));
+    assert!(prompt.contains("agent_api.tools.mcp.list.v1:linux-x64"));
+    assert!(prompt.contains("agent_api.exec.external_sandbox.v1:allow_external_sandbox_exec"));
+    assert!(prompt.contains("cargo run -p xtask -- support-matrix --check"));
+    assert_eq!(
+        input_contract
+            .get("canonical_targets")
+            .and_then(Value::as_array)
+            .and_then(|values| values.first())
+            .and_then(Value::as_str),
+        Some("linux-x64")
+    );
+    assert_eq!(
+        input_contract
+            .get("support_matrix_enabled")
+            .and_then(Value::as_bool),
+        Some(true)
+    );
+    assert_eq!(
+        input_contract
+            .get("capability_matrix_enabled")
+            .and_then(Value::as_bool),
+        Some(true)
+    );
 }
 
 #[test]
@@ -278,6 +352,33 @@ fn runtime_follow_on_rejects_approval_registry_mismatch() {
 
     assert_eq!(output.exit_code, 2);
     assert!(output.stderr.contains("approval/registry mismatch"));
+}
+
+#[test]
+fn runtime_follow_on_requires_enrolled_lifecycle_state() {
+    let (fixture, approval_path) = prepare_runtime_fixture("runtime-follow-on-lifecycle-stage");
+    let lifecycle_path = lifecycle_state_path(&fixture);
+    let mut lifecycle_state = read_json(&lifecycle_path);
+    lifecycle_state["lifecycle_stage"] = Value::String("approved".to_string());
+    write_json(&lifecycle_path, &lifecycle_state);
+
+    let output = run_cli(
+        [
+            "xtask",
+            "runtime-follow-on",
+            "--dry-run",
+            "--approval",
+            &approval_path,
+            "--run-id",
+            "rtfo-stage-check",
+        ],
+        &fixture,
+    );
+
+    assert_eq!(output.exit_code, 2);
+    assert!(output
+        .stderr
+        .contains("requires lifecycle stage `enrolled`"));
 }
 
 #[test]
@@ -361,6 +462,30 @@ fn runtime_follow_on_write_requires_semantically_valid_handoff() {
     assert!(output
         .stderr
         .contains("handoff.json is missing required field `runtime_lane_complete`"));
+    let lifecycle_state = read_json(&lifecycle_state_path(&fixture));
+    assert_eq!(
+        lifecycle_state
+            .get("lifecycle_stage")
+            .and_then(Value::as_str),
+        Some("enrolled")
+    );
+    assert_eq!(
+        lifecycle_state
+            .get("side_states")
+            .and_then(Value::as_array)
+            .map(|values| values.iter().filter_map(Value::as_str).collect::<Vec<_>>()),
+        Some(vec!["failed_retryable"])
+    );
+    assert!(lifecycle_state
+        .get("retryable_failures")
+        .and_then(Value::as_array)
+        .expect("retryable_failures array")
+        .iter()
+        .any(|value| value.as_str()
+            == Some("handoff.json is missing required field `runtime_lane_complete`")));
+    assert!(lifecycle_state
+        .get("implementation_summary")
+        .is_some_and(Value::is_null));
 }
 
 #[test]
@@ -452,4 +577,104 @@ fn runtime_follow_on_write_spawns_configured_codex_binary_and_requires_real_writ
         !parsed.is_empty(),
         "success path must record runtime-owned writes"
     );
+    let lifecycle_state = read_json(&lifecycle_state_path(&fixture));
+    assert_eq!(
+        lifecycle_state
+            .get("lifecycle_stage")
+            .and_then(Value::as_str),
+        Some("runtime_integrated")
+    );
+    assert_eq!(
+        lifecycle_state.get("support_tier").and_then(Value::as_str),
+        Some("baseline_runtime")
+    );
+    assert_eq!(
+        lifecycle_state
+            .get("expected_next_command")
+            .and_then(Value::as_str),
+        Some(
+            "prepare-publication --approval docs/agents/lifecycle/cursor-cli-onboarding/governance/approved-agent.toml --write"
+        )
+    );
+    assert!(lifecycle_state
+        .get("satisfied_evidence")
+        .and_then(Value::as_array)
+        .expect("satisfied_evidence array")
+        .iter()
+        .any(|value| value.as_str() == Some("runtime_write_complete")));
+    assert!(lifecycle_state
+        .get("satisfied_evidence")
+        .and_then(Value::as_array)
+        .expect("satisfied_evidence array")
+        .iter()
+        .any(|value| value.as_str() == Some("implementation_summary_present")));
+    assert!(lifecycle_state
+        .get("implementation_summary")
+        .and_then(Value::as_object)
+        .is_some());
+    assert!(!fixture
+        .join("docs/agents/lifecycle/cursor-cli-onboarding/governance/publication-ready.json")
+        .exists());
+}
+
+#[test]
+fn runtime_follow_on_write_marks_blocked_when_handoff_reports_exact_blockers() {
+    let (fixture, approval_path) = prepare_runtime_fixture("runtime-follow-on-blocked");
+    let dry_run = run_cli(
+        [
+            "xtask",
+            "runtime-follow-on",
+            "--dry-run",
+            "--approval",
+            &approval_path,
+            "--run-id",
+            WRITE_RUN_ID,
+        ],
+        &fixture,
+    );
+    assert_eq!(dry_run.exit_code, 0, "stderr:\n{}", dry_run.stderr);
+    write_fake_codex_scenario(&fixture, "exec_fail");
+    write_json(
+        &fixture
+            .join(RUNTIME_RUNS_ROOT)
+            .join(WRITE_RUN_ID)
+            .join("handoff.json"),
+        &serde_json::json!({
+            "agent_id": "cursor",
+            "manifest_root": "cli_manifests/cursor",
+            "runtime_lane_complete": false,
+            "publication_refresh_required": true,
+            "required_commands": [
+                "cargo run -p xtask -- support-matrix --check",
+                "cargo run -p xtask -- capability-matrix --check",
+                "cargo run -p xtask -- capability-matrix-audit",
+                "make preflight"
+            ],
+            "blockers": ["Upstream runtime dependency is not yet available."]
+        }),
+    );
+
+    let output = run_cli(runtime_args("--write", &approval_path, &fixture), &fixture);
+
+    assert_eq!(output.exit_code, 2);
+    let lifecycle_state = read_json(&lifecycle_state_path(&fixture));
+    assert_eq!(
+        lifecycle_state
+            .get("lifecycle_stage")
+            .and_then(Value::as_str),
+        Some("enrolled")
+    );
+    assert_eq!(
+        lifecycle_state
+            .get("side_states")
+            .and_then(Value::as_array)
+            .map(|values| values.iter().filter_map(Value::as_str).collect::<Vec<_>>()),
+        Some(vec!["blocked"])
+    );
+    assert!(lifecycle_state
+        .get("blocking_issues")
+        .and_then(Value::as_array)
+        .expect("blocking_issues array")
+        .iter()
+        .any(|value| value.as_str() == Some("Upstream runtime dependency is not yet available.")));
 }

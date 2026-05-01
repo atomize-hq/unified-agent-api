@@ -21,6 +21,21 @@ Target-owned runtime surfaces:
 - preferred wrapper coverage file: `{{WRAPPER_COVERAGE_MANIFEST_PATH}}`
 - required agent_api onboarding test: `{{REQUIRED_TEST_PATH}}`
 
+Approval capability and publication truth:
+- canonical targets:
+  - {{CANONICAL_TARGETS}}
+- always-on capabilities:
+  - {{ALWAYS_ON_CAPABILITIES}}
+- target-gated capabilities:
+  - {{TARGET_GATED_CAPABILITIES}}
+- config-gated capabilities:
+  - {{CONFIG_GATED_CAPABILITIES}}
+- backend extensions:
+  - {{BACKEND_EXTENSIONS}}
+- support matrix enabled: `{{SUPPORT_MATRIX_ENABLED}}`
+- capability matrix enabled: `{{CAPABILITY_MATRIX_ENABLED}}`
+- capability matrix target: `{{CAPABILITY_MATRIX_TARGET}}`
+
 Hard rules:
 - Do not edit generated `{{MANIFEST_ROOT}}/wrapper_coverage.json`.
 - Keep wrapper coverage truth under `{{WRAPPER_COVERAGE_SOURCE_PATH}}/src/**`.

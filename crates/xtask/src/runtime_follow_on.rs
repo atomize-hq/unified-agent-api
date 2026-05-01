@@ -10,6 +10,11 @@ use clap::{ArgGroup, Parser, ValueEnum};
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    agent_lifecycle::{
+        self, load_lifecycle_state, write_lifecycle_state, DeferredSurface, EvidenceId,
+        ImplementationSummary, LandedSurface, LifecycleStage, LifecycleState, RuntimeProfile,
+        SideState, SupportTier, TemplateId,
+    },
     agent_registry::{AgentRegistry, AgentRegistryEntry},
     approval_artifact::{load_approval_artifact, ApprovalArtifact, ApprovalArtifactError},
 };
@@ -47,7 +52,7 @@ const WRITTEN_PATHS_FILE_NAME: &str = "written-paths.json";
 const WORKFLOW_VERSION: &str = "runtime_follow_on_v1";
 const CODEX_BINARY_ENV: &str = "XTASK_RUNTIME_FOLLOW_ON_CODEX_BINARY";
 const WRAPPER_COVERAGE_MANIFEST_PATH: &str = "src/wrapper_coverage_manifest.rs";
-const REQUIRED_PUBLICATION_COMMANDS: [&str; 4] = [
+const LEGACY_REQUIRED_PUBLICATION_COMMANDS: [&str; 4] = [
     "support-matrix --check",
     "capability-matrix --check",
     "capability-matrix-audit",
@@ -182,8 +187,18 @@ pub fn run_in_workspace<W: Write>(
     )?;
     let (report, written_paths) =
         validate_write_mode(workspace_root, &context, &prior_contract, &codex_execution)?;
-    write_json(&context.run_dir.join(VALIDATION_REPORT_FILE_NAME), &report)?;
     let passed = report.status == "pass";
+    if passed {
+        persist_successful_runtime_integration(
+            workspace_root,
+            &context,
+            &prior_contract,
+            &written_paths,
+        )?;
+    } else {
+        persist_failed_runtime_integration(workspace_root, &context, &report)?;
+    }
+    write_json(&context.run_dir.join(VALIDATION_REPORT_FILE_NAME), &report)?;
     let status = render_run_status(
         &context,
         "write",
@@ -260,6 +275,8 @@ fn build_context(workspace_root: &Path, args: &Args) -> Result<RuntimeContext, E
             ))
         })?;
     validate_registry_alignment(&approval, &registry_entry)?;
+    let (lifecycle_state_path, lifecycle_state) =
+        load_enrolled_lifecycle_state(workspace_root, &approval)?;
 
     let run_id = args.run_id.clone().unwrap_or_else(generate_run_id);
     let run_dir = workspace_root.join(RUNTIME_RUNS_ROOT).join(&run_id);
@@ -284,15 +301,20 @@ fn build_context(workspace_root: &Path, args: &Args) -> Result<RuntimeContext, E
         backend_module: approval.descriptor.backend_module.clone(),
         manifest_root: approval.descriptor.manifest_root.clone(),
         wrapper_coverage_source_path: approval.descriptor.wrapper_coverage_source_path.clone(),
+        canonical_targets: approval.descriptor.canonical_targets.clone(),
+        always_on_capabilities: approval.descriptor.always_on_capabilities.clone(),
+        target_gated_capabilities: approval.descriptor.target_gated_capabilities.clone(),
+        config_gated_capabilities: approval.descriptor.config_gated_capabilities.clone(),
+        backend_extensions: approval.descriptor.backend_extensions.clone(),
+        support_matrix_enabled: approval.descriptor.support_matrix_enabled,
+        capability_matrix_enabled: approval.descriptor.capability_matrix_enabled,
+        capability_matrix_target: approval.descriptor.capability_matrix_target.clone(),
         requested_tier: args.requested_tier.as_str().to_string(),
         minimal_justification_file: args.minimal_justification_file.clone(),
         minimal_justification_text,
         allow_rich_surface: args.allow_rich_surface.clone(),
         required_agent_api_test,
-        required_handoff_commands: REQUIRED_PUBLICATION_COMMANDS
-            .iter()
-            .map(|value| (*value).to_string())
-            .collect(),
+        required_handoff_commands: required_publication_commands(),
         docs_to_read: docs_to_read(&approval.descriptor.agent_id),
         allowed_write_paths: allowed_write_paths(&approval.descriptor),
         ignored_diff_roots: vec![RUNTIME_RUNS_ROOT.to_string()],
@@ -302,6 +324,8 @@ fn build_context(workspace_root: &Path, args: &Args) -> Result<RuntimeContext, E
     Ok(RuntimeContext {
         approval,
         input_contract,
+        lifecycle_state,
+        lifecycle_state_path,
         run_id,
         run_dir,
     })
@@ -367,10 +391,7 @@ fn persist_dry_run_artifacts(context: &RuntimeContext) -> Result<(), Error> {
             manifest_root: context.approval.descriptor.manifest_root.clone(),
             runtime_lane_complete: false,
             publication_refresh_required: true,
-            required_commands: REQUIRED_PUBLICATION_COMMANDS
-                .iter()
-                .map(|value| (*value).to_string())
-                .collect(),
+            required_commands: required_publication_commands(),
             blockers: vec!["Pending runtime follow-on implementation.".to_string()],
         },
     )?;
@@ -621,7 +642,11 @@ fn validate_handoff(path: &Path, context: &RuntimeContext) -> Result<(), String>
     if !handoff.publication_refresh_required {
         return Err("handoff.json publication_refresh_required must be true".to_string());
     }
-    let required = REQUIRED_PUBLICATION_COMMANDS
+    let required = agent_lifecycle::REQUIRED_PUBLICATION_COMMANDS
+        .iter()
+        .copied()
+        .collect::<BTreeSet<_>>();
+    let legacy_required = LEGACY_REQUIRED_PUBLICATION_COMMANDS
         .iter()
         .copied()
         .collect::<BTreeSet<_>>();
@@ -630,13 +655,287 @@ fn validate_handoff(path: &Path, context: &RuntimeContext) -> Result<(), String>
         .iter()
         .map(String::as_str)
         .collect::<BTreeSet<_>>();
-    if !required.is_subset(&actual) {
+    if !required.is_subset(&actual) && !legacy_required.is_subset(&actual) {
         return Err(format!(
             "handoff.json required_commands must include {}",
-            REQUIRED_PUBLICATION_COMMANDS.join(", ")
+            agent_lifecycle::REQUIRED_PUBLICATION_COMMANDS.join(", ")
         ));
     }
     Ok(())
+}
+
+fn load_enrolled_lifecycle_state(
+    workspace_root: &Path,
+    approval: &ApprovalArtifact,
+) -> Result<(String, LifecycleState), Error> {
+    let lifecycle_state_path =
+        agent_lifecycle::lifecycle_state_path(&approval.descriptor.onboarding_pack_prefix);
+    let lifecycle_state = load_lifecycle_state(workspace_root, &lifecycle_state_path)
+        .map_err(|err| Error::Validation(err.to_string()))?;
+    if lifecycle_state.lifecycle_stage != LifecycleStage::Enrolled {
+        return Err(Error::Validation(format!(
+            "runtime-follow-on requires lifecycle stage `enrolled` at `{}` (found `{}`)",
+            lifecycle_state_path,
+            lifecycle_state.lifecycle_stage.as_str()
+        )));
+    }
+    Ok((lifecycle_state_path, lifecycle_state))
+}
+
+fn persist_successful_runtime_integration(
+    workspace_root: &Path,
+    context: &RuntimeContext,
+    prior_contract: &InputContract,
+    written_paths: &[String],
+) -> Result<(), Error> {
+    let mut lifecycle_state = context.lifecycle_state.clone();
+    lifecycle_state.lifecycle_stage = LifecycleStage::RuntimeIntegrated;
+    lifecycle_state.support_tier = SupportTier::BaselineRuntime;
+    lifecycle_state.current_owner_command = "runtime-follow-on --write".to_string();
+    lifecycle_state.expected_next_command = format!(
+        "prepare-publication --approval {} --write",
+        context.approval.relative_path
+    );
+    lifecycle_state.last_transition_at = now_rfc3339()?;
+    lifecycle_state.last_transition_by = "xtask runtime-follow-on --write".to_string();
+    lifecycle_state.required_evidence =
+        required_evidence_strings(LifecycleStage::RuntimeIntegrated);
+    lifecycle_state.satisfied_evidence =
+        required_evidence_strings(LifecycleStage::RuntimeIntegrated);
+    lifecycle_state.side_states = lifecycle_state
+        .side_states
+        .into_iter()
+        .filter(|state| !matches!(state, SideState::Blocked | SideState::FailedRetryable))
+        .collect();
+    lifecycle_state.blocking_issues.clear();
+    lifecycle_state.retryable_failures.clear();
+    lifecycle_state.implementation_summary = Some(build_implementation_summary(
+        context,
+        prior_contract,
+        written_paths,
+    ));
+    lifecycle_state.publication_packet_path = None;
+    lifecycle_state.publication_packet_sha256 = None;
+
+    write_lifecycle_state(
+        workspace_root,
+        &context.lifecycle_state_path,
+        &lifecycle_state,
+    )
+    .map_err(|err| Error::Internal(format!("write lifecycle state: {err}")))
+}
+
+fn persist_failed_runtime_integration(
+    workspace_root: &Path,
+    context: &RuntimeContext,
+    report: &ValidationReport,
+) -> Result<(), Error> {
+    let mut lifecycle_state = context.lifecycle_state.clone();
+    let blockers = best_effort_handoff_blockers(&context.run_dir.join(HANDOFF_FILE_NAME));
+    let (side_state, issues) = if blockers.is_empty() {
+        (SideState::FailedRetryable, report.errors.clone())
+    } else {
+        (SideState::Blocked, blockers)
+    };
+
+    lifecycle_state.current_owner_command = "runtime-follow-on --write".to_string();
+    lifecycle_state.last_transition_at = now_rfc3339()?;
+    lifecycle_state.last_transition_by = "xtask runtime-follow-on --write".to_string();
+    lifecycle_state.side_states = lifecycle_state
+        .side_states
+        .into_iter()
+        .filter(|state| !matches!(state, SideState::Blocked | SideState::FailedRetryable))
+        .collect();
+    lifecycle_state.side_states.push(side_state);
+    lifecycle_state.side_states.sort();
+    lifecycle_state.side_states.dedup();
+    match side_state {
+        SideState::Blocked => {
+            lifecycle_state.blocking_issues = issues;
+            lifecycle_state.retryable_failures.clear();
+        }
+        SideState::FailedRetryable => {
+            lifecycle_state.retryable_failures = issues;
+            lifecycle_state.blocking_issues.clear();
+        }
+        SideState::Drifted | SideState::Deprecated => {}
+    }
+
+    write_lifecycle_state(
+        workspace_root,
+        &context.lifecycle_state_path,
+        &lifecycle_state,
+    )
+    .map_err(|err| Error::Internal(format!("write lifecycle state: {err}")))
+}
+
+fn required_evidence_strings(stage: LifecycleStage) -> Vec<EvidenceId> {
+    agent_lifecycle::required_evidence_for_stage(stage).to_vec()
+}
+
+fn build_implementation_summary(
+    context: &RuntimeContext,
+    prior_contract: &InputContract,
+    written_paths: &[String],
+) -> ImplementationSummary {
+    let requested_runtime_profile = requested_runtime_profile(prior_contract);
+    let primary_template = primary_template(context, prior_contract, requested_runtime_profile);
+    let mut landed_surfaces = BTreeSet::new();
+    landed_surfaces.insert(LandedSurface::WrapperRuntime);
+    landed_surfaces.insert(LandedSurface::BackendHarness);
+    landed_surfaces.insert(LandedSurface::WrapperCoverageSource);
+    landed_surfaces.insert(LandedSurface::RuntimeManifestEvidence);
+
+    if wrote_agent_api_onboarding_test(prior_contract, written_paths) {
+        landed_surfaces.insert(LandedSurface::AgentApiOnboardingTest);
+    }
+
+    for capability in all_capability_and_extension_entries(prior_contract) {
+        match rich_surface_from_entry(capability) {
+            Some(surface) => {
+                landed_surfaces.insert(surface);
+            }
+            None => {}
+        }
+    }
+
+    let deferred_surfaces = prior_contract
+        .allow_rich_surface
+        .iter()
+        .filter_map(|surface| {
+            let mapped = rich_surface_from_entry(surface)?;
+            if landed_surfaces.contains(&mapped) {
+                None
+            } else {
+                Some(DeferredSurface {
+                    surface: mapped,
+                    reason: "Allowed for this run but not landed in the runtime integration delta."
+                        .to_string(),
+                })
+            }
+        })
+        .collect::<Vec<_>>();
+
+    ImplementationSummary {
+        requested_runtime_profile,
+        achieved_runtime_profile: requested_runtime_profile,
+        primary_template,
+        template_lineage: vec![template_name(primary_template).to_string()],
+        landed_surfaces: landed_surfaces.into_iter().collect(),
+        deferred_surfaces,
+        minimal_profile_justification: prior_contract.minimal_justification_text.clone(),
+    }
+}
+
+fn requested_runtime_profile(prior_contract: &InputContract) -> RuntimeProfile {
+    match prior_contract.requested_tier.as_str() {
+        "minimal" => RuntimeProfile::Minimal,
+        "feature-rich" => RuntimeProfile::FeatureRich,
+        _ => RuntimeProfile::Default,
+    }
+}
+
+fn primary_template(
+    context: &RuntimeContext,
+    _prior_contract: &InputContract,
+    requested_runtime_profile: RuntimeProfile,
+) -> TemplateId {
+    match context.approval.descriptor.agent_id.as_str() {
+        "opencode" => TemplateId::Opencode,
+        "gemini_cli" => TemplateId::GeminiCli,
+        "codex" => TemplateId::Codex,
+        "claude_code" => TemplateId::ClaudeCode,
+        "aider" => TemplateId::Aider,
+        _ => match requested_runtime_profile {
+            RuntimeProfile::Minimal => TemplateId::GeminiCli,
+            RuntimeProfile::FeatureRich => TemplateId::Codex,
+            RuntimeProfile::Default => TemplateId::Opencode,
+        },
+    }
+}
+
+fn template_name(template: TemplateId) -> &'static str {
+    match template {
+        TemplateId::Opencode => "opencode",
+        TemplateId::GeminiCli => "gemini_cli",
+        TemplateId::Codex => "codex",
+        TemplateId::ClaudeCode => "claude_code",
+        TemplateId::Aider => "aider",
+    }
+}
+
+fn wrote_agent_api_onboarding_test(
+    prior_contract: &InputContract,
+    written_paths: &[String],
+) -> bool {
+    written_paths.iter().any(|path| {
+        path == &prior_contract.required_agent_api_test
+            || path.starts_with(&format!(
+                "crates/agent_api/tests/c1_{}_runtime_follow_on/",
+                prior_contract.agent_id
+            ))
+    })
+}
+
+fn all_capability_and_extension_entries(prior_contract: &InputContract) -> Vec<&str> {
+    prior_contract
+        .always_on_capabilities
+        .iter()
+        .chain(prior_contract.target_gated_capabilities.iter())
+        .chain(prior_contract.config_gated_capabilities.iter())
+        .chain(prior_contract.backend_extensions.iter())
+        .map(String::as_str)
+        .collect()
+}
+
+fn rich_surface_from_entry(entry: &str) -> Option<LandedSurface> {
+    let normalized = entry.replace('_', "-");
+    if normalized.contains("agent-api-exec-add-dirs-v1") || normalized == "add-dirs" {
+        Some(LandedSurface::AddDirs)
+    } else if normalized.contains("agent-api-exec-external-sandbox-v1")
+        || normalized == "external-sandbox-policy"
+    {
+        Some(LandedSurface::ExternalSandboxPolicy)
+    } else if normalized.contains("agent-api-tools-mcp-") || normalized == "mcp-management" {
+        Some(LandedSurface::McpManagement)
+    } else if normalized.contains("agent-api-session-resume-v1") || normalized == "session-resume" {
+        Some(LandedSurface::SessionResume)
+    } else if normalized.contains("agent-api-session-fork-v1") || normalized == "session-fork" {
+        Some(LandedSurface::SessionFork)
+    } else if normalized.contains("agent-api-tools-structured-v1")
+        || normalized == "structured-tools"
+    {
+        Some(LandedSurface::StructuredTools)
+    } else {
+        None
+    }
+}
+
+fn best_effort_handoff_blockers(path: &Path) -> Vec<String> {
+    let Ok(payload) = fs::read_to_string(path) else {
+        return Vec::new();
+    };
+    let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&payload) else {
+        return Vec::new();
+    };
+    let Some(blockers) = parsed.get("blockers").and_then(|value| value.as_array()) else {
+        return Vec::new();
+    };
+    blockers
+        .iter()
+        .filter_map(|value| value.as_str())
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .filter(|value| *value != "Pending runtime follow-on implementation.")
+        .map(ToOwned::to_owned)
+        .collect()
+}
+
+fn required_publication_commands() -> Vec<String> {
+    agent_lifecycle::REQUIRED_PUBLICATION_COMMANDS
+        .iter()
+        .map(|value| (*value).to_string())
+        .collect()
 }
 
 fn validate_registry_alignment(
@@ -799,16 +1098,16 @@ fn approval_descriptor_view(
         backend_module: input_contract.backend_module.clone(),
         manifest_root: input_contract.manifest_root.clone(),
         package_name: String::new(),
-        canonical_targets: Vec::new(),
+        canonical_targets: input_contract.canonical_targets.clone(),
         wrapper_coverage_binding_kind: String::new(),
         wrapper_coverage_source_path: input_contract.wrapper_coverage_source_path.clone(),
-        always_on_capabilities: Vec::new(),
-        target_gated_capabilities: Vec::new(),
-        config_gated_capabilities: Vec::new(),
-        backend_extensions: Vec::new(),
-        support_matrix_enabled: true,
-        capability_matrix_enabled: true,
-        capability_matrix_target: None,
+        always_on_capabilities: input_contract.always_on_capabilities.clone(),
+        target_gated_capabilities: input_contract.target_gated_capabilities.clone(),
+        config_gated_capabilities: input_contract.config_gated_capabilities.clone(),
+        backend_extensions: input_contract.backend_extensions.clone(),
+        support_matrix_enabled: input_contract.support_matrix_enabled,
+        capability_matrix_enabled: input_contract.capability_matrix_enabled,
+        capability_matrix_target: input_contract.capability_matrix_target.clone(),
         docs_release_track: String::new(),
         onboarding_pack_prefix: String::new(),
     }
