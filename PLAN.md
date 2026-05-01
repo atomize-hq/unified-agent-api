@@ -1,924 +1,640 @@
-# PLAN - Unified Agent Lifecycle Support Maturity Model
+# PLAN - Runtime Evidence Repair And Publication Seam Hardening
 
-Status: implementation-ready
-Date: 2026-05-01
-Branch: `codex/recommend-next-agent`
-Base branch: `main`
-Repo: `atomize-hq/unified-agent-api`
-Work item: `Unified agent lifecycle support maturity model`
+Status: implementation-ready  
+Date: 2026-05-01  
+Branch: `codex/recommend-next-agent`  
+Base branch: `main`  
+Repo: `atomize-hq/unified-agent-api`  
+Work item: `Repair stale runtime_integrated evidence and harden the runtime -> publication seam`
 
 ## Objective
 
-Make agent support maturity explicit, committed, and machine-checked from approval through maintenance.
-
-This repo already has the pieces: approval artifacts, control-plane onboarding, wrapper scaffolding, bounded runtime implementation, publication generators, create-mode closeout, and maintenance drift checks. What it still lacks is one canonical lifecycle record that every stage can read, validate, and advance. This plan adds that record, adds the missing `prepare-publication` seam, and turns the current create and maintenance lanes into one deterministic lifecycle without inventing a new orchestration system.
-
-## Source Inputs
-
-- Design doc:
-  - `/Users/spensermcconnell/.gstack/projects/atomize-hq-unified-agent-api/spensermcconnell-codex-recommend-next-agent-design-20260430-214712.md`
-- Gap memo:
-  - `docs/backlog/cli-agent-onboarding-lifecycle-unification-gap-memo.md`
-- Normative and operator docs:
-  - `docs/specs/cli-agent-onboarding-charter.md`
-  - `docs/cli-agent-onboarding-factory-operator-guide.md`
-  - `docs/specs/unified-agent-api/support-matrix.md`
-  - `docs/specs/unified-agent-api/capability-matrix.md`
-  - `docs/specs/agent-registry-contract.md`
-- Current lifecycle owners:
-  - `crates/xtask/src/approval_artifact.rs`
-  - `crates/xtask/src/agent_registry.rs`
-  - `crates/xtask/src/onboard_agent.rs`
-  - `crates/xtask/src/wrapper_scaffold.rs`
-  - `crates/xtask/src/runtime_follow_on.rs`
-  - `crates/xtask/src/runtime_follow_on/models.rs`
-  - `crates/xtask/src/runtime_follow_on/render.rs`
-  - `crates/xtask/src/capability_matrix.rs`
-  - `crates/xtask/src/support_matrix.rs`
-  - `crates/xtask/src/close_proving_run.rs`
-  - `crates/xtask/src/agent_maintenance/drift/publication.rs`
-  - `crates/xtask/src/agent_maintenance/closeout.rs`
-- Existing tests and fixtures:
-  - `crates/xtask/tests/onboard_agent_entrypoint/**`
-  - `crates/xtask/tests/runtime_follow_on_entrypoint.rs`
-  - `crates/xtask/tests/onboard_agent_closeout_preview/**`
-  - `crates/xtask/tests/agent_maintenance_closeout.rs`
-  - `crates/xtask/tests/agent_maintenance_drift.rs`
-  - `crates/xtask/tests/fixtures/fake_codex.sh`
-- Queue context:
-  - `TODOS.md`
-
-## Outcome
+Land one repo-owned repair seam for already-committed `runtime_integrated` agents whose runtime evidence is stale or malformed, use it to repair `aider`, and close the validation gap that currently lets a bad runtime bundle look green until `prepare-publication` consumes it.
 
 After this plan lands:
 
-1. Every onboarded agent has one committed lifecycle record at `docs/agents/lifecycle/<onboarding_pack_prefix>/governance/lifecycle-state.json`.
-2. `onboard-agent` seeds lifecycle state, `runtime-follow-on` advances it to `runtime_integrated`, `prepare-publication` advances it to `publication_ready`, and `close-proving-run` seals the create-mode baseline.
-3. The runtime lane still owns runtime code only, but it now emits enough committed truth for publication and maintenance to proceed without archaeology.
-4. The publication seam becomes explicit: `prepare-publication` validates readiness and writes the only committed publication handoff packet.
-5. Maintenance drift checks compare published truth against the committed lifecycle baseline instead of inferring state from scattered artifacts.
+1. `repair-runtime-evidence --check` can tell an operator whether a `runtime_integrated` agent is repairable from committed runtime-owned outputs.
+2. `repair-runtime-evidence --write` can reconstruct a truthful runtime evidence bundle without hand-editing JSON.
+3. `prepare-publication --check` passes for `aider`.
+4. `runtime-follow-on` no longer tolerates legacy short-form publication commands.
+5. `check-agent-drift` surfaces stale runtime evidence as an explicit operator-facing failure, not a vague governance mismatch.
+
+## Source Inputs
+
+- Plan artifact:
+  - `~/.gstack/projects/atomize-hq-unified-agent-api/ceo-plans/2026-05-01-runtime-integrated-evidence-repair-plan.md`
+- Test artifact:
+  - `~/.gstack/projects/atomize-hq-unified-agent-api/spensermcconnell-codex-recommend-next-agent-test-plan-20260501-184500.md`
+- Upstream design context:
+  - `~/.gstack/projects/atomize-hq-unified-agent-api/spensermcconnell-codex-recommend-next-agent-design-20260430-214712.md`
+- Verified live failure:
+  - `cargo run -p xtask -- prepare-publication --approval docs/agents/lifecycle/aider-onboarding/governance/approved-agent.toml --check`
+  - current stderr: `runtime input-contract required_handoff_commands must match the frozen publication command set exactly`
+- Relevant code owners:
+  - `crates/xtask/src/main.rs`
+  - `crates/xtask/src/lib.rs`
+  - `crates/xtask/src/historical_lifecycle_backfill.rs`
+  - `crates/xtask/src/runtime_follow_on.rs`
+  - `crates/xtask/src/runtime_follow_on/lifecycle.rs`
+  - `crates/xtask/src/prepare_publication.rs`
+  - `crates/xtask/src/prepare_publication/runtime_evidence.rs`
+  - `crates/xtask/src/agent_maintenance/drift/mod.rs`
+  - `crates/xtask/tests/runtime_follow_on_entrypoint.rs`
+  - `crates/xtask/tests/prepare_publication_entrypoint.rs`
+  - `crates/xtask/tests/agent_maintenance_drift.rs`
+- Broken committed `aider` evidence:
+  - `docs/agents/lifecycle/aider-onboarding/governance/lifecycle-state.json`
+  - `docs/agents/.uaa-temp/runtime-follow-on/runs/aider-runtime-follow-on-rerun/input-contract.json`
+  - `docs/agents/.uaa-temp/runtime-follow-on/runs/aider-runtime-follow-on-rerun/handoff.json`
+  - `docs/agents/.uaa-temp/runtime-follow-on/runs/aider-runtime-follow-on-rerun/run-status.json`
+  - `docs/agents/.uaa-temp/runtime-follow-on/runs/aider-runtime-follow-on-rerun/validation-report.json`
+  - `docs/agents/.uaa-temp/runtime-follow-on/runs/aider-runtime-follow-on-rerun/written-paths.json`
+  - `docs/agents/.uaa-temp/runtime-follow-on/runs/aider-runtime-follow-on-rerun/run-summary.md`
+
+## Verified Current State
+
+These facts are verified from the current branch, not inferred:
+
+1. `docs/agents/lifecycle/aider-onboarding/governance/lifecycle-state.json` says `aider` is `runtime_integrated` with `baseline_runtime` support and `prepare-publication` as the next command.
+2. `docs/agents/.uaa-temp/runtime-follow-on/runs/aider-runtime-follow-on-rerun/input-contract.json` and `handoff.json` still use the legacy short-form command set:
+   - `support-matrix --check`
+   - `capability-matrix --check`
+   - `capability-matrix-audit`
+   - `make preflight`
+3. `docs/agents/.uaa-temp/runtime-follow-on/runs/aider-runtime-follow-on-rerun/written-paths.json` is empty.
+4. `docs/agents/.uaa-temp/runtime-follow-on/runs/aider-runtime-follow-on-rerun/run-status.json` still claims `write_validated`.
+5. `prepare-publication` is stricter than the old runtime bundle and rejects it exactly as it should.
+6. The forward runtime path is already partially hardened:
+   - `crates/xtask/src/runtime_follow_on.rs` now rejects `written_paths.is_empty()`.
+   - `crates/xtask/tests/runtime_follow_on_entrypoint.rs` already contains `runtime_follow_on_write_rejects_noop_runtime_execution`.
+7. The remaining gap is historical and operator-facing:
+   - stale committed runtime bundles can still exist on disk
+   - `prepare-publication` rejects them late
+   - `check-agent-drift --agent aider` reports generic governance drift, not a targeted runtime-evidence repair instruction
 
 ## Problem Statement
 
-The repo has multiple truthful subsystems and no single truthful lifecycle.
+The branch has a truthful publication consumer and a stale committed producer artifact.
 
-Approval artifacts know what an agent claims to be. The registry knows where it lives and whether it is enrolled for publication. `onboard-agent` knows how to register it. `runtime-follow-on` knows how to bound runtime work. `support-matrix` and `capability-matrix` know how to publish derived surfaces. `close-proving-run` and maintenance commands know how to record or compare evidence.
+This is not a broad lifecycle redesign problem anymore. The lifecycle schema, `prepare-publication`, and runtime write validation are already in the repo. The bug is narrower and more dangerous:
 
-What is missing is the state machine that answers these questions in one place:
+- old runtime evidence can remain committed after the contract tightened
+- the current repo has no explicit repair seam for that state
+- the operator only learns the bundle is bad when the next lifecycle command rejects it
 
-- what support level the agent has actually reached
-- what evidence is still missing
-- which command is legal to run next
-- whether publication claims are legitimate yet
-- what future maintenance must compare against
+That is why `aider` looks close to done in lifecycle state but is still blocked in practice.
 
-Without that lifecycle record, the repo can truthfully say an agent is enrolled while still not having publication-backed or first-class support semantics. That is the gap this plan closes.
+## Decision Summary
+
+These choices are now locked. They are not open questions.
+
+1. Add a new explicit command: `repair-runtime-evidence`.
+2. Extract shared runtime evidence reconstruction and writing helpers from `historical_lifecycle_backfill.rs` instead of building a second ad hoc reconstruction path.
+3. Keep `prepare-publication` strict. Do not widen legacy tolerance there.
+4. Remove legacy short-form command tolerance from `runtime_follow_on/lifecycle.rs`.
+5. Write repaired evidence to a deterministic repair run directory:
+   - `docs/agents/.uaa-temp/runtime-follow-on/runs/repair-<agent_id>-runtime-follow-on/`
+   - for this slice: `repair-aider-runtime-follow-on`
+6. Do not mutate lifecycle stage during repair. `repair-runtime-evidence` fixes runtime evidence only. `prepare-publication` remains the owner of the `runtime_integrated -> publication_ready` transition.
+7. Surface stale runtime evidence in drift output as a first-class finding, not buried under generic governance text.
 
 ## Scope
 
-### In scope
+### In Scope
 
-- Add a canonical lifecycle record under `docs/agents/lifecycle/<onboarding_pack_prefix>/governance/lifecycle-state.json`.
-- Add one shared `xtask` lifecycle module for schema, loading, validation, and path helpers.
-- Backfill lifecycle records for every agent in `crates/xtask/data/agent_registry.toml`.
-- Teach `onboard-agent` to seed lifecycle state.
-- Teach `runtime-follow-on` to read lifecycle state, carry approval capability and publication truth forward, and update lifecycle state on success or failure.
-- Add `xtask prepare-publication` as the explicit `runtime_integrated -> publication_ready` seam.
-- Teach `close-proving-run` and maintenance drift logic to consume lifecycle state.
-- Update the operator guide and charter to reflect the new lifecycle contract.
-- Add regression tests for every new transition and every new rejection path.
+- add `xtask repair-runtime-evidence --check/--write`
+- add one shared runtime evidence bundle helper used by repair and historical backfill
+- use the shared helper to derive truthful non-empty runtime-owned writes from committed outputs
+- repair `aider` into a consumable runtime evidence bundle
+- remove legacy short-form command tolerance from runtime handoff validation
+- add explicit stale-runtime-evidence drift detection
+- add targeted tests for repair, drift, and strict command continuity
+- update operator docs for the new repair seam
 
-### Out of scope
+### Out Of Scope
 
-- A new crate or service for lifecycle orchestration.
-- Folding runtime implementation, publication refresh, and closeout into one giant command.
-- Rewriting `support-matrix` or `capability-matrix` derivation from scratch.
-- Dynamic backend discovery for capability publication.
-- Automatic `first_class` promotion for future agents.
-- Reworking every maintenance command into a new abstraction family.
-- Expanding CI posture for every enrolled agent beyond lifecycle correctness checks in this milestone.
+- redesigning the lifecycle schema
+- changing `prepare-publication` packet shape
+- changing the bounded runtime ownership model
+- deleting every old stale runtime run directory in the repo
+- turning repair into a generic maintenance framework
+- expanding CI with new global workflows beyond existing test and `make preflight` coverage
 
 ## Step 0 Scope Challenge
 
-### What already exists
+### What Already Exists
 
-| Sub-problem | Existing surface to reuse | Reuse decision |
+| Sub-problem | Existing surface | Reuse decision |
 | --- | --- | --- |
-| Approval truth | `crates/xtask/src/approval_artifact.rs` | Reuse directly. Approval remains frozen upstream truth. |
-| Registry truth | `crates/xtask/src/agent_registry.rs` and `crates/xtask/data/agent_registry.toml` | Reuse directly. Do not duplicate repo location, manifest root, targets, or publication booleans. |
-| Control-plane enrollment | `crates/xtask/src/onboard_agent.rs` | Reuse and extend. Seed lifecycle state here. |
-| Wrapper shell generation | `crates/xtask/src/wrapper_scaffold.rs` | Reuse unchanged. It still owns shell scaffolding only. |
-| Runtime lane | `crates/xtask/src/runtime_follow_on.rs` plus `models.rs` and `render.rs` | Reuse and widen. Keep runtime write boundaries where they are now. |
-| Publication truth derivation | `crates/xtask/src/support_matrix.rs`, `crates/xtask/src/capability_matrix.rs` | Reuse. Add lifecycle continuity checks around them, not a rewrite. |
-| Create-mode closeout | `crates/xtask/src/close_proving_run.rs` | Reuse and extend so closeout records lifecycle baseline. |
-| Maintenance drift | `crates/xtask/src/agent_maintenance/drift/publication.rs` and `closeout.rs` | Reuse and extend so drift compares against lifecycle baseline. |
-| Operator procedure | `docs/cli-agent-onboarding-factory-operator-guide.md` | Reuse and update in place. |
-| Existing backlog intent | `TODOS.md` | Reuse. This plan is the implementation contract behind the existing runtime and publication follow-ons. |
+| lifecycle truth | `crates/xtask/src/agent_lifecycle.rs` | Reuse directly. No schema redesign. |
+| runtime bundle discovery and strict consumption | `crates/xtask/src/prepare_publication/runtime_evidence.rs` | Reuse directly. Repair must produce bundles this code already accepts. |
+| forward runtime write validation | `crates/xtask/src/runtime_follow_on.rs` | Reuse directly. Empty runtime writes are already rejected for new runs. |
+| handoff semantic validation | `crates/xtask/src/runtime_follow_on/lifecycle.rs` | Reuse but tighten. Remove legacy command tolerance. |
+| historical runtime bundle reconstruction | `crates/xtask/src/historical_lifecycle_backfill.rs` | Extract and reuse. This is the right starting point for repair logic. |
+| drift reporting framework | `crates/xtask/src/agent_maintenance/drift/mod.rs` | Reuse and extend with a specific runtime evidence finding. |
+| test harnesses | `crates/xtask/tests/*_entrypoint.rs` | Reuse and extend. No new harness family. |
 
-### Minimum complete change set
+### Minimum Complete Change Set
 
 The smallest complete version of this work is:
 
-1. add one shared lifecycle schema module in `xtask`
-2. commit one lifecycle-state file per onboarded agent
-3. seed lifecycle state in `onboard-agent`
-4. update `runtime-follow-on` to read and advance lifecycle state
-5. add one new `prepare-publication` command and one committed `publication-ready.json` packet
-6. update `close-proving-run` and maintenance drift checks to consume lifecycle state
-7. add tests and doc updates for every transition
+1. add `repair-runtime-evidence`
+2. extract shared bundle reconstruction and writer helpers
+3. remove legacy short-form command tolerance in `runtime_follow_on/lifecycle.rs`
+4. add runtime-evidence drift detection
+5. repair `aider`
+6. add regression tests for all of the above
 
 Anything smaller leaves the repo with split truth again.
 
-### Complexity check
+### Complexity Check
 
-This plan touches more than 8 files and more than 2 modules. That would normally be a smell. Here it is justified because the lifecycle truth already spans five shipped owners:
+This work will touch more than 8 files, but it is still the minimal complete slice because the problem spans:
 
-- approval
-- onboarding
-- runtime
-- publication and closeout
-- maintenance
+- command wiring
+- shared helper extraction
+- runtime handoff validation
+- publication consumption
+- drift reporting
+- committed `aider` artifacts
+- tests
+- docs
 
-The scope reduction decision is:
+The complexity control is not “touch fewer files.” The complexity control is “one shared reconstruction helper, one repair command, one deterministic repair directory, zero schema changes.”
 
-- keep one new shared module: `crates/xtask/src/agent_lifecycle.rs`
-- keep one new command: `prepare-publication`
-- keep one new committed packet: `publication-ready.json`
-- keep lifecycle state embedded in one file, not a new family of per-stage governance docs
-- keep runtime write boundaries unchanged
-- keep publication generators as derived-output writers, not lifecycle authorities
+### Search / Build Decision
 
-### Search/build check
+This is a Layer 1 reuse problem, not a new architecture problem.
 
-The repo already contains the right primitives. Reuse them.
+- **[Layer 1]** Reuse the existing `xtask` command pattern in `crates/xtask/src/main.rs`.
+- **[Layer 1]** Reuse strict command validation from `agent_lifecycle::REQUIRED_PUBLICATION_COMMANDS`.
+- **[Layer 1]** Reuse discovery and consumption rules from `prepare_publication/runtime_evidence.rs`.
+- **[Layer 1]** Reuse committed-output derivation from `historical_lifecycle_backfill.rs`.
+- **[Layer 3]** Keep repair outside lifecycle-stage mutation. The repo needs a repair seam, not another stage owner.
 
-- Use the existing `xtask` subcommand pattern in `crates/xtask/src/main.rs`.
-- Use the existing `serde` JSON model pattern from `runtime_follow_on/models.rs`.
-- Use existing path validation and repo-root resolution patterns from `approval_artifact.rs`, `onboard_agent.rs`, and `close_proving_run.rs`.
-- Use existing publication consistency checks in `support_matrix.rs` and drift inspection logic in `agent_maintenance/drift/publication.rs`.
-- Keep the current explicit backend capability inventory in `capability_matrix.rs`; add lifecycle-aware validation around it instead of spending an innovation token on dynamic backend loading.
+### TODOS Cross-Reference
 
-Layer judgment:
+No new `TODOS.md` entry is required for this slice.
 
-- **[Layer 1]** Reuse existing `xtask` CLI wiring, `serde` JSON models, path normalization, and publication checks.
-- **[Layer 1]** Reuse `agent_registry.toml` as the source of backfill targets and publication enrollment truth.
-- **[Layer 3]** The repo needs one explicit lifecycle record. Another richer scratch handoff file would encode the wrong model.
+This plan closes an implementation gap inside the already-active lifecycle and publication follow-on work. A follow-up cleanup for pruning superseded stale run directories is intentionally deferred and does not block this repair milestone.
 
-### TODOS cross-reference
-
-This plan does not need a new backlog theme.
-
-It turns the current diagnosis into an implementation path behind these existing TODOs:
-
-- `Enclose The Runtime Follow-On In A Codex Exec Runner`
-- `Enclose The Publication Refresh Follow-On After The Runtime Runner`
-
-No new TODO entry is required in this milestone. The plan itself is the missing contract.
-
-### Completeness decision
+### Completeness Decision
 
 The shortcut version would be:
 
-- add more prose to `HANDOFF.md`
-- widen `handoff.json`
-- keep lifecycle truth split across commands
+- hand-edit the broken `aider` JSON files
+- leave legacy tolerance in runtime handoff validation
+- rely on `prepare-publication` to keep catching the problem late
 
-That is not acceptable. The repo already has deterministic machinery. With AI-assisted coding, the extra cost of a real lifecycle record, real transition validation, and real regression tests is low. This is a boilable lake.
-
-### Distribution check
-
-No new distributed artifact type is introduced. This is an internal `xtask` and committed-governance change.
-
-- no new binary distribution pipeline
-- no new package manager surface
-- no container or service rollout
-
-The only new machine-readable artifacts are committed repo governance files:
-
-- `lifecycle-state.json`
-- `publication-ready.json`
+That is not acceptable. The complete version is still a small lake. Build the real repair command and the real guardrail now.
 
 ## Architecture
 
-### Current to target flow
+### Current Failure Flow
 
 ```text
-recommend-next-agent
-  -> approved-agent.toml
-  -> onboard-agent --write
-       creates lifecycle-state.json
-       writes stage=enrolled tier=bootstrap
-  -> scaffold-wrapper-crate --write
-       writes crate shell only
-  -> runtime-follow-on --dry-run
-       freezes packet from approval + registry + lifecycle state
-  -> runtime-follow-on --write
-       writes runtime-owned code/evidence
-       updates lifecycle-state.json to stage=runtime_integrated tier=baseline_runtime
-  -> prepare-publication --check/--write
-       validates runtime continuity
-       writes publication-ready.json
-       updates lifecycle-state.json to stage=publication_ready
-  -> support-matrix --check
-  -> capability-matrix --check
-  -> capability-matrix-audit
-  -> make preflight
-       refreshes and validates published surfaces
-  -> close-proving-run --write
-       validates publication surfaces against publication-ready.json
-       writes create-mode baseline
-       updates lifecycle-state.json to stage=closed_baseline tier=publication_backed
-  -> check-agent-drift / refresh-agent / close-agent-maintenance
-       compare future repo truth against lifecycle baseline
+lifecycle-state.json
+  stage = runtime_integrated
+  next = prepare-publication
+        |
+        v
+stale runtime bundle on disk
+  - legacy short-form commands
+  - empty written-paths.json
+  - run-status still says write_validated
+        |
+        v
+prepare-publication --check
+  rejects exact command mismatch
 ```
 
-### Authority and precedence
+### Target Flow
 
-| Domain | Authoritative source | Writers | Consumers |
-| --- | --- | --- | --- |
-| Approval truth | `approved-agent.toml` | recommendation and promotion flow | onboard-agent, runtime-follow-on, prepare-publication |
-| Registry truth | `crates/xtask/data/agent_registry.toml` | onboard-agent and registry maintenance | runtime-follow-on, publication generators, maintenance |
-| Lifecycle progression | `docs/agents/lifecycle/<onboarding_pack_prefix>/governance/lifecycle-state.json` | onboard-agent, runtime-follow-on, prepare-publication, close-proving-run, maintenance closeout | all lifecycle commands |
-| Runtime implementation summary | `lifecycle-state.json` `implementation_summary` | runtime-follow-on | prepare-publication, close-proving-run, maintenance |
-| Publication handoff | `docs/agents/lifecycle/<onboarding_pack_prefix>/governance/publication-ready.json` | prepare-publication | publication checks, close-proving-run |
-| Published support and capability surfaces | support-matrix and capability-matrix outputs | publication commands | close-proving-run, maintenance drift |
-| Maintenance drift baseline | `lifecycle-state.json` plus closeout artifacts | close-proving-run and maintenance closeout | drift checks |
+```text
+runtime_integrated lifecycle state
+        |
+        v
+repair-runtime-evidence --check
+  - load approval + registry + lifecycle
+  - derive runtime-owned writes from committed outputs
+  - synthesize exact command set
+  - validate bundle with publication consumer rules
+        |
+        v
+repair-runtime-evidence --write
+  - write deterministic repair run dir
+  - revalidate the written bundle
+  - leave lifecycle stage unchanged
+        |
+        v
+prepare-publication --check
+  passes
+        |
+        v
+prepare-publication --write
+  advances lifecycle to publication_ready
+```
 
-Precedence rules:
+### Command Contract
 
-1. `approved-agent.toml` owns approval declaration truth. Lifecycle state may reference it, never override it.
-2. `agent_registry.toml` owns repo placement, manifest root, target list, and publication enrollment booleans. Lifecycle state may validate continuity, never shadow those fields.
-3. `lifecycle-state.json` owns lifecycle stage, support tier, side-state, evidence satisfaction, and next-command truth.
-4. `publication-ready.json` is the only committed publication handoff artifact. Scratch `handoff.json` stays run evidence only.
-5. Published support and capability surfaces remain derived outputs, not lifecycle authority.
+New command surface:
 
-### Important terminology decision
+```bash
+cargo run -p xtask -- repair-runtime-evidence --approval <path> --check
+cargo run -p xtask -- repair-runtime-evidence --approval <path> --write
+```
 
-There are two different "tier" concepts in the repo today. They must stay separate.
+Arguments:
 
-1. `runtime profile`
-   - current `runtime-follow-on` vocabulary
-   - values: `minimal`, `default`, `feature_rich`
-   - meaning: how much runtime implementation was requested and landed
+- `--approval <repo-relative path>` required
+- exactly one of `--check` or `--write`
+- no `--run-id` in v1
 
-2. `support tier`
-   - new lifecycle overlay
-   - values: `bootstrap`, `baseline_runtime`, `publication_backed`, `first_class`
-   - meaning: how trustworthy and complete the repo's end-to-end support posture is
+Run directory:
 
-Do not overload one for the other. `runtime-follow-on` summary fields use runtime profile terms. `lifecycle-state.json` top-level fields use support tier terms.
+- `docs/agents/.uaa-temp/runtime-follow-on/runs/repair-<agent_id>-runtime-follow-on/`
+- example: `repair-aider-runtime-follow-on`
+- `--write` replaces this deterministic repair directory atomically if it already exists
 
-### Lifecycle state contract
+`--check` behavior:
 
-File:
+1. require lifecycle stage `runtime_integrated`
+2. require approval and registry continuity
+3. derive committed runtime-owned writes from the repo, not from the stale runtime packet
+4. fail if derived writes are empty
+5. synthesize the exact frozen publication command set
+6. validate the would-be bundle with the same semantic rules `prepare-publication` uses
+7. print whether repair is needed and whether repair is possible
 
-- `docs/agents/lifecycle/<onboarding_pack_prefix>/governance/lifecycle-state.json`
+`--write` behavior:
 
-Serialization rules:
+1. run the same validations as `--check`
+2. write these six files into the deterministic repair run directory:
+   - `input-contract.json`
+   - `run-status.json`
+   - `validation-report.json`
+   - `handoff.json`
+   - `written-paths.json`
+   - `run-summary.md`
+3. write exact full publication commands, never short-form aliases
+4. write non-empty `written-paths.json`
+5. immediately re-read the written bundle through the shared validation path
+6. exit non-zero if `prepare-publication --check` would still reject the repaired bundle
+7. do not advance lifecycle stage
 
-- JSON only
-- `schema_version = "1"`
-- string enums only
-- `snake_case` enum values only
-- command names stored as literal command strings
-- repo-relative paths only, never absolute paths
+### Shared Helper Extraction
 
-Top-level fields:
+Add one shared helper module:
 
-- `schema_version: "1"`
-- `agent_id: string`
-- `onboarding_pack_prefix: string`
-- `approval_artifact_path: string`
-- `approval_artifact_sha256: string`
-- `lifecycle_stage: approved | enrolled | runtime_integrated | publication_ready | published | closed_baseline`
-- `support_tier: bootstrap | baseline_runtime | publication_backed | first_class`
-- `side_states: string[]`
-  - allowed: `blocked`, `failed_retryable`, `drifted`, `deprecated`
-- `current_owner_command: string`
-- `expected_next_command: string`
-- `last_transition_at: RFC3339 string`
-- `last_transition_by: string`
-- `required_evidence: string[]`
-- `satisfied_evidence: string[]`
-- `blocking_issues: string[]`
-- `retryable_failures: string[]`
-- `implementation_summary: object | null`
-- `publication_packet_path: string | null`
-- `publication_packet_sha256: string | null`
-- `closeout_baseline_path: string | null`
+- new: `crates/xtask/src/runtime_evidence_bundle.rs`
 
-`implementation_summary` fields:
+This module owns:
 
-- `requested_runtime_profile: minimal | default | feature_rich`
-- `achieved_runtime_profile: minimal | default | feature_rich`
-- `primary_template: opencode | gemini_cli | codex | claude_code | aider`
-- `template_lineage: string[]`
-- `landed_surfaces: string[]`
-- `deferred_surfaces: { surface: string, reason: string }[]`
-- `minimal_profile_justification: string | null`
+- committed-output derivation for runtime-owned writes
+- runtime evidence JSON writer helpers
+- repair run directory naming
+- `run-summary.md` rendering for reconstructed bundles
+- semantic validation glue used by repair and historical backfill
 
-Allowed `landed_surfaces` and `deferred_surfaces.surface` values:
+Callers:
 
-- `wrapper_runtime`
-- `backend_harness`
-- `agent_api_onboarding_test`
-- `wrapper_coverage_source`
-- `runtime_manifest_evidence`
-- `add_dirs`
-- `external_sandbox_policy`
-- `mcp_management`
-- `session_resume`
-- `session_fork`
-- `structured_tools`
+- `repair_runtime_evidence.rs` uses it directly
+- `historical_lifecycle_backfill.rs` migrates to it
+- `prepare_publication/runtime_evidence.rs` stays the read-side consumer
 
-### Stable evidence vocabulary
+This avoids a second reconstruction system.
 
-`required_evidence` and `satisfied_evidence` use a fixed core vocabulary in v1:
+### Aider Repair Strategy
 
-- `registry_entry`
-- `docs_pack`
-- `manifest_root_skeleton`
-- `runtime_write_complete`
-- `implementation_summary_present`
-- `publication_packet_written`
-- `support_matrix_check_green`
-- `capability_matrix_check_green`
-- `capability_matrix_audit_green`
-- `preflight_green`
-- `proving_run_closeout_written`
-- `maintenance_closeout_written`
+Repair `aider` by writing a new deterministic repair bundle, not by hand-editing the stale rerun directory.
 
-Rules:
+Runtime-owned outputs to derive from committed repo state:
 
-1. `onboard-agent --write` must seed the first three evidence ids.
-2. `runtime-follow-on --write` must satisfy `runtime_write_complete` and `implementation_summary_present`.
-3. `prepare-publication --write` must satisfy `publication_packet_written`.
-4. `close-proving-run --write` must only succeed after the four publication checks are satisfied.
-5. `close-agent-maintenance` must satisfy `maintenance_closeout_written` when clearing `drifted`.
+- `crates/aider/src/lib.rs`
+- `crates/aider/src/wrapper_coverage_manifest.rs`
+- `crates/agent_api/src/backends/aider/backend.rs`
+- `crates/agent_api/src/backends/aider/harness.rs`
+- `crates/agent_api/src/backends/aider/mapping.rs`
+- `crates/agent_api/src/backends/aider/mod.rs`
+- `crates/agent_api/tests/c1_aider_runtime_follow_on.rs`
+- first file under `cli_manifests/aider/supplement/`
+- first file under `cli_manifests/aider/snapshots/`
 
-This keeps lifecycle evidence machine-checkable without creating another artifact family.
+The repair command must derive these paths from approval and committed repo state, not from handwritten agent-specific code.
 
-### Resting versus transitional stages
+### Validation Hardening
 
-The current plan had one ambiguity: it defined `published` as a lifecycle stage, then had `close-proving-run` jump straight to `closed_baseline`.
+Harden the seam in three places:
 
-Resolve that ambiguity as follows:
+1. `runtime_follow_on/lifecycle.rs`
+   - remove `LEGACY_REQUIRED_PUBLICATION_COMMANDS`
+   - require exact equality with `agent_lifecycle::REQUIRED_PUBLICATION_COMMANDS`
+2. `prepare_publication/runtime_evidence.rs`
+   - keep strict exact-match validation
+   - improve error text to point operators at `repair-runtime-evidence` when stale bundle shape is detected
+3. drift reporting
+   - add a specific runtime-evidence drift finding for `runtime_integrated` agents whose committed bundle cannot pass publication consumption
 
-- Persisted resting stages in v1 are `enrolled`, `runtime_integrated`, `publication_ready`, and `closed_baseline`.
-- `approved` remains an allowed enum value for schema compatibility and dry-run reasoning, but no v1 command writes a committed lifecycle file in `approved`.
-- `published` remains an allowed enum value for schema compatibility and future split publication/closeout flows, but no v1 command writes it as a resting state.
-- `close-proving-run --write` may accept input lifecycle state `publication_ready` or a legacy/manual `published`, but on success it writes `closed_baseline` directly in one atomic lifecycle update.
+## Code Quality Plan
 
-That keeps the schema forward-compatible while removing the current implementation ambiguity.
+### Module Ownership
 
-### Legal stage and support-tier combinations
-
-| Stage | Allowed support tier(s) | Persisted in v1 |
+| Area | Files | Responsibility |
 | --- | --- | --- |
-| `approved` | `bootstrap` | no |
-| `enrolled` | `bootstrap` | yes |
-| `runtime_integrated` | `bootstrap`, `baseline_runtime` | yes |
-| `publication_ready` | `baseline_runtime` | yes |
-| `published` | `publication_backed`, `first_class` | no |
-| `closed_baseline` | `publication_backed`, `first_class` | yes |
+| command wiring | `crates/xtask/src/main.rs`, `crates/xtask/src/lib.rs` | expose the new subcommand cleanly |
+| repair command | `crates/xtask/src/repair_runtime_evidence.rs` | CLI args, check/write flow, stdout |
+| shared helper | `crates/xtask/src/runtime_evidence_bundle.rs` | bundle reconstruction, deterministic path derivation, bundle writing |
+| forward runtime validation | `crates/xtask/src/runtime_follow_on/lifecycle.rs` | exact command set only |
+| publication consumer | `crates/xtask/src/prepare_publication/runtime_evidence.rs` | consume repaired bundles without special cases |
+| drift surfacing | `crates/xtask/src/agent_maintenance/drift/mod.rs`, `crates/xtask/src/agent_maintenance/drift/runtime_evidence.rs` | explicit stale-runtime-evidence finding |
+| historical repair reuse | `crates/xtask/src/historical_lifecycle_backfill.rs` | call shared helper, stop owning private reconstruction logic |
+| docs | `docs/cli-agent-onboarding-factory-operator-guide.md` | operator flow for repair |
 
-Illegal combinations that must fail validation:
+### Code Quality Rules
 
-- `approved` with anything above `bootstrap`
-- `publication_ready` with anything other than `baseline_runtime`
-- `closed_baseline` with `bootstrap`
-- `first_class` before publication truth exists
+1. No agent-specific branching for `aider`.
+2. No second hardcoded command set. All writers and validators must use `agent_lifecycle::REQUIRED_PUBLICATION_COMMANDS`.
+3. No lifecycle stage mutation inside repair.
+4. No workspace-wide diff or snapshot scan in repair. Use explicit path derivation from approval plus manifest child directories.
+5. Keep the repair helper boring and explicit. This is state repair code. Cleverness is a bug source here.
 
-### Backfill targets and exact lifecycle paths
+## Detailed File Plan
 
-Backfill targets are derived from `crates/xtask/data/agent_registry.toml`, not hand-authored guesses.
+### New Files
 
-| Agent | `onboarding_pack_prefix` | Lifecycle state path | Initial state |
-| --- | --- | --- | --- |
-| `codex` | `codex-cli-onboarding` | `docs/agents/lifecycle/codex-cli-onboarding/governance/lifecycle-state.json` | `closed_baseline`, `first_class` |
-| `claude_code` | `claude-code-cli-onboarding` | `docs/agents/lifecycle/claude-code-cli-onboarding/governance/lifecycle-state.json` | `closed_baseline`, `first_class` |
-| `opencode` | `opencode-cli-onboarding` | `docs/agents/lifecycle/opencode-cli-onboarding/governance/lifecycle-state.json` | `closed_baseline`, `publication_backed` |
-| `gemini_cli` | `gemini-cli-onboarding` | `docs/agents/lifecycle/gemini-cli-onboarding/governance/lifecycle-state.json` | `closed_baseline`, `publication_backed` |
-| `aider` | `aider-onboarding` | `docs/agents/lifecycle/aider-onboarding/governance/lifecycle-state.json` | `runtime_integrated`, `baseline_runtime` |
+- `crates/xtask/src/repair_runtime_evidence.rs`
+- `crates/xtask/src/runtime_evidence_bundle.rs`
+- `crates/xtask/tests/repair_runtime_evidence_entrypoint.rs`
+- `docs/agents/.uaa-temp/runtime-follow-on/runs/repair-aider-runtime-follow-on/input-contract.json`
+- `docs/agents/.uaa-temp/runtime-follow-on/runs/repair-aider-runtime-follow-on/run-status.json`
+- `docs/agents/.uaa-temp/runtime-follow-on/runs/repair-aider-runtime-follow-on/validation-report.json`
+- `docs/agents/.uaa-temp/runtime-follow-on/runs/repair-aider-runtime-follow-on/handoff.json`
+- `docs/agents/.uaa-temp/runtime-follow-on/runs/repair-aider-runtime-follow-on/written-paths.json`
+- `docs/agents/.uaa-temp/runtime-follow-on/runs/repair-aider-runtime-follow-on/run-summary.md`
 
-Notes:
+### Updated Files
 
-1. `opencode-maintenance` stays a maintenance pack. It is not the create-mode lifecycle state location.
-2. If implementation finds committed evidence that contradicts the initial table, the code trusts committed evidence and the plan table is updated in the same PR.
-3. Backfill creates only the governance JSON required by this plan. It does not fabricate missing historical onboarding prose.
-
-### Publication-ready packet contract
-
-File:
-
-- `docs/agents/lifecycle/<onboarding_pack_prefix>/governance/publication-ready.json`
-
-Producer:
-
-- `cargo run -p xtask -- prepare-publication --approval <path> --write`
-
-Validator:
-
-- `cargo run -p xtask -- prepare-publication --approval <path> --check`
-
-Fields:
-
-- `schema_version: "1"`
-- `agent_id: string`
-- `approval_artifact_path: string`
-- `approval_artifact_sha256: string`
-- `lifecycle_state_path: string`
-- `lifecycle_state_sha256: string`
-- `lifecycle_stage: "publication_ready"`
-- `support_tier_at_emit: "baseline_runtime"`
-- `manifest_root: string`
-- `expected_targets: string[]`
-- `capability_publication_enabled: bool`
-- `support_publication_enabled: bool`
-- `capability_matrix_target: string | null`
-- `required_commands: string[]`
-- `required_publication_outputs: string[]`
-- `runtime_evidence_paths: string[]`
-- `publication_owned_paths: string[]`
-- `blocking_issues: string[]`
-- `implementation_summary: object`
-
-This packet is the only committed publication handoff. `handoff.json` remains runtime run evidence only.
-
-### Command responsibility matrix
-
-| Command | Allowed input state | Output state | Responsibilities |
-| --- | --- | --- | --- |
-| `onboard-agent --write` | approval artifact only | `enrolled`, `bootstrap` | create lifecycle state, seed initial evidence, point to scaffold step |
-| `scaffold-wrapper-crate --write` | any enrolled agent | none | no lifecycle write |
-| `runtime-follow-on --dry-run` | `enrolled` | none | refuse to prepare without lifecycle state, carry approval and publication truth into packet and prompt |
-| `runtime-follow-on --write` | `enrolled` | `runtime_integrated`, usually `baseline_runtime` | validate bounded writes, persist implementation summary, record runtime evidence, record retryable or blocking failures |
-| `prepare-publication --check` | `runtime_integrated` or `publication_ready` | none | re-validate continuity and publication readiness without writing |
-| `prepare-publication --write` | `runtime_integrated` | `publication_ready` | validate approval continuity, runtime evidence completeness, command requirements, write `publication-ready.json` |
-| `support-matrix --check` | `publication_ready` | none | derived-output validation only |
-| `capability-matrix --check` | `publication_ready` | none | derived-output validation only |
-| `capability-matrix-audit` | `publication_ready` | none | publication audit only |
-| `make preflight` | `publication_ready` | none | final green gate only |
-| `close-proving-run --write` | `publication_ready` or legacy/manual `published` | `closed_baseline`, default `publication_backed` | validate green publication state, record baseline continuity, write final closeout |
-| `check-agent-drift` | `closed_baseline` | none | compare current published truth against lifecycle baseline, read-only |
-| `close-agent-maintenance` | `closed_baseline` with `drifted` or fresh maintenance request | `closed_baseline` | clear `drifted`, update evidence, keep approval truth frozen |
-
-Command rejection rules:
-
-- `onboard-agent` rejects divergent existing lifecycle files and approval or registry mismatches.
-- `runtime-follow-on` rejects missing lifecycle state, wrong stage, or write sets outside runtime-owned paths.
-- `prepare-publication` rejects missing runtime evidence, missing implementation summary, capability inventory mismatches, or approval SHA/path drift.
-- `close-proving-run` rejects stale support or capability outputs, missing publication packet continuity, or unresolved blockers.
-
-## Implementation Plan
-
-### Milestone 1 - Shared lifecycle schema and backfill
-
-Goal: land the shared contract first, without changing runtime or publication behavior yet.
-
-#### Files
-
-- New:
-  - `crates/xtask/src/agent_lifecycle.rs`
-  - `crates/xtask/tests/agent_lifecycle_state.rs`
-  - `docs/agents/lifecycle/codex-cli-onboarding/governance/lifecycle-state.json`
-  - `docs/agents/lifecycle/claude-code-cli-onboarding/governance/lifecycle-state.json`
-  - `docs/agents/lifecycle/opencode-cli-onboarding/governance/lifecycle-state.json`
-  - `docs/agents/lifecycle/gemini-cli-onboarding/governance/lifecycle-state.json`
-  - `docs/agents/lifecycle/aider-onboarding/governance/lifecycle-state.json`
-- Updated:
-  - `crates/xtask/src/lib.rs`
-  - `docs/cli-agent-onboarding-factory-operator-guide.md`
-  - `docs/specs/cli-agent-onboarding-charter.md`
-
-#### Work
-
-1. Add `agent_lifecycle.rs` with:
-   - lifecycle state structs
-   - publication packet structs
-   - enum validation
-   - stage and support-tier compatibility validation
-   - repo-relative path helpers
-   - load and write helpers
-   - transition helpers so commands describe transitions instead of hand-rolling JSON mutations
-2. Backfill lifecycle state for the five registry agents using the exact path table above.
-3. Encode the `published` rule exactly once in the shared lifecycle module so every command shares the same behavior.
-4. Update the charter and operator guide so lifecycle state is described as authoritative create-mode and maintenance truth.
-
-#### Acceptance
-
-- `cargo test -p xtask --test agent_lifecycle_state`
-- `cargo test -p xtask --test agent_registry`
-- `make check`
-
-### Milestone 2 - Onboarding and runtime integration
-
-Goal: make lifecycle state part of the create lane before publication.
-
-#### Files
-
-- Updated:
-  - `crates/xtask/src/onboard_agent.rs`
-  - `crates/xtask/src/runtime_follow_on.rs`
-  - `crates/xtask/src/runtime_follow_on/models.rs`
-  - `crates/xtask/src/runtime_follow_on/render.rs`
-  - `crates/xtask/templates/runtime_follow_on_codex_prompt.md`
-  - `crates/xtask/tests/onboard_agent_entrypoint/write_mode.rs`
-  - `crates/xtask/tests/runtime_follow_on_entrypoint.rs`
-  - `docs/cli-agent-onboarding-factory-operator-guide.md`
-
-#### Work
-
-1. `onboard-agent --dry-run`
-   - preview the exact lifecycle-state file contents
-   - show `current_owner_command = "onboard-agent --write"`
-   - show `expected_next_command = "scaffold-wrapper-crate --agent <agent_id> --write"`
-2. `onboard-agent --write`
-   - create `lifecycle-state.json`
-   - set:
-     - `lifecycle_stage = enrolled`
-     - `support_tier = bootstrap`
-     - `required_evidence = ["registry_entry", "docs_pack", "manifest_root_skeleton"]`
-     - `satisfied_evidence = ["registry_entry", "docs_pack", "manifest_root_skeleton"]`
-3. `runtime-follow-on --dry-run`
-   - require `lifecycle_stage = enrolled`
-   - load approval artifact, registry entry, and lifecycle state together
-   - extend `InputContract` with approval capability and publication truth:
-     - `canonical_targets`
-     - `always_on_capabilities`
-     - `target_gated_capabilities`
-     - `config_gated_capabilities`
-     - `backend_extensions`
-     - `support_matrix_enabled`
-     - `capability_matrix_enabled`
-     - `capability_matrix_target`
-   - render those fields into `codex-prompt.md`
-4. `runtime-follow-on --write`
-   - on success:
-    - update lifecycle state to `runtime_integrated`
-    - set support tier to `baseline_runtime`
-     - write `implementation_summary`
-     - satisfy `runtime_write_complete` and `implementation_summary_present`
-     - set `expected_next_command = "prepare-publication --approval <path> --write"`
-   - on validation failure:
-     - append `failed_retryable` or `blocked` to `side_states`
-     - append exact blocker text
-     - keep lifecycle stage unchanged if the write did not complete
-   - never write `publication-ready.json`
-5. Keep scratch artifacts (`handoff.json`, `run-status.json`, `run-summary.md`) as evidence only.
-
-#### Acceptance
-
-- `cargo test -p xtask --test onboard_agent_entrypoint`
-- `cargo test -p xtask --test runtime_follow_on_entrypoint`
-- targeted lifecycle creation and update coverage in dry-run and write-mode fixtures
-
-### Milestone 3 - Prepare-publication seam
-
-Goal: add the missing deterministic bridge between runtime truth and publication refresh.
-
-#### Files
-
-- New:
-  - `crates/xtask/src/prepare_publication.rs`
-  - `crates/xtask/tests/prepare_publication_entrypoint.rs`
-- Updated:
-  - `crates/xtask/src/lib.rs`
-  - `crates/xtask/src/main.rs`
-  - `crates/xtask/src/capability_matrix.rs`
-  - `crates/xtask/src/support_matrix.rs`
-  - `docs/cli-agent-onboarding-factory-operator-guide.md`
-  - `docs/specs/cli-agent-onboarding-charter.md`
-
-#### Command contract
-
-```sh
-cargo run -p xtask -- prepare-publication --approval docs/agents/lifecycle/<onboarding_pack_prefix>/governance/approved-agent.toml --write
-cargo run -p xtask -- prepare-publication --approval docs/agents/lifecycle/<onboarding_pack_prefix>/governance/approved-agent.toml --check
-```
-
-#### Work
-
-1. Add `PreparePublication` subcommand wiring in `main.rs`.
-2. `prepare-publication --write` must:
-   - load approval artifact
-   - load lifecycle state
-   - require `lifecycle_stage = runtime_integrated`
-   - validate approval SHA and path continuity
-   - validate runtime evidence paths exist
-   - validate `implementation_summary` is explicit and non-empty
-   - validate required publication commands are exactly:
-     - `cargo run -p xtask -- support-matrix --check`
-     - `cargo run -p xtask -- capability-matrix --check`
-     - `cargo run -p xtask -- capability-matrix-audit`
-     - `make preflight`
-   - write `publication-ready.json`
-   - update lifecycle state to:
-     - `lifecycle_stage = publication_ready`
-     - `support_tier = baseline_runtime`
-     - `expected_next_command = "support-matrix --check && capability-matrix --check && capability-matrix-audit && make preflight && close-proving-run --write"`
-     - satisfy `publication_packet_written`
-3. `prepare-publication --check` must re-validate the packet against current lifecycle, approval, and runtime truth without rewriting.
-4. Add a capability inventory continuity check:
-   - if an agent has `capability_matrix_enabled = true` but `capability_matrix.rs` cannot construct runtime capabilities for it, fail `prepare-publication` with an explicit error
-   - do not refactor backend loading dynamically in this milestone
-5. Do not let `prepare-publication` write any support-matrix or capability-matrix outputs.
-
-#### Acceptance
-
-- `cargo test -p xtask --test prepare_publication_entrypoint`
-- `cargo test -p xtask --test runtime_follow_on_entrypoint`
-- `make check`
-
-### Milestone 4 - Closeout and maintenance continuity
-
-Goal: make create-mode closeout the baseline that future maintenance compares against.
-
-#### Files
-
-- Updated:
-  - `crates/xtask/src/close_proving_run.rs`
-  - `crates/xtask/src/agent_maintenance/closeout.rs`
-  - `crates/xtask/src/agent_maintenance/drift/publication.rs`
-  - `crates/xtask/tests/onboard_agent_closeout_preview/close_proving_run_paths.rs`
-  - `crates/xtask/tests/onboard_agent_closeout_preview/close_proving_run_write.rs`
-  - `crates/xtask/tests/agent_maintenance_closeout.rs`
-  - `crates/xtask/tests/agent_maintenance_drift.rs`
-  - `docs/cli-agent-onboarding-factory-operator-guide.md`
-
-#### Work
-
-1. `close-proving-run`
-   - require `lifecycle_stage = publication_ready` or legacy/manual `published`
-   - validate the published support and capability surfaces are green for the agent named by the lifecycle state
-   - validate `publication-ready.json` continuity against lifecycle and approval state
-   - update lifecycle state to:
-     - `lifecycle_stage = closed_baseline`
-     - `support_tier = publication_backed` for new create-lane agents
-     - `publication_packet_path = ...`
-     - `publication_packet_sha256 = ...`
-     - `closeout_baseline_path = ...`
-     - satisfy:
-       - `support_matrix_check_green`
-       - `capability_matrix_check_green`
-       - `capability_matrix_audit_green`
-       - `preflight_green`
-       - `proving_run_closeout_written`
-     - clear `blocked`, `failed_retryable`, and `drifted`
-     - preserve `deprecated` if already present
-2. Keep `first_class` auto-promotion out of scope.
-   - legacy backfills for `codex` and `claude_code` may remain `first_class`
-   - new agents default to `publication_backed`
-3. `check-agent-drift`
-   - stay read-only
-   - compare published support and capability outputs against lifecycle baseline
-   - report `closed_baseline + drifted` semantics without mutating files
-4. `close-agent-maintenance`
-   - clear `drifted`
-   - update evidence fields
-   - record maintenance closeout continuity without rewriting approval truth
-
-#### Acceptance
-
-- `cargo test -p xtask --test onboard_agent_closeout_preview`
-- `cargo test -p xtask --test agent_maintenance_closeout`
-- `cargo test -p xtask --test agent_maintenance_drift`
-- `make test`
-
-## Code Quality Rules
-
-1. Keep all lifecycle schema code in `crates/xtask/src/agent_lifecycle.rs`. Do not duplicate stage or support-tier enums across commands.
-2. Keep JSON enums explicit and string-backed. No numeric discriminants.
-3. Keep lifecycle write logic behind one helper API. Commands describe transitions; they do not hand-roll JSON mutations.
-4. Keep scratch runtime artifacts and committed lifecycle artifacts separate.
-5. Do not add a second committed runtime summary file. `implementation_summary` belongs inside `lifecycle-state.json`.
-6. Do not build a generic workflow engine. One shared module plus explicit command logic is enough.
-7. Update nearby ASCII diagrams if the flow changes during implementation. Stale diagrams are a bug.
+- `crates/xtask/src/main.rs`
+- `crates/xtask/src/lib.rs`
+- `crates/xtask/src/historical_lifecycle_backfill.rs`
+- `crates/xtask/src/runtime_follow_on/lifecycle.rs`
+- `crates/xtask/src/prepare_publication/runtime_evidence.rs`
+- `crates/xtask/src/agent_maintenance/drift/mod.rs`
+- `crates/xtask/src/agent_maintenance/drift/runtime_evidence.rs`
+- `crates/xtask/tests/runtime_follow_on_entrypoint.rs`
+- `crates/xtask/tests/prepare_publication_entrypoint.rs`
+- `crates/xtask/tests/agent_maintenance_drift.rs`
+- `docs/cli-agent-onboarding-factory-operator-guide.md`
 
 ## Test Review
 
-### Test framework
+### Test Framework
 
-This repo is a Rust workspace.
+This repo is Rust-first. The relevant test framework is the existing `cargo test -p xtask --test ...` integration harness under `crates/xtask/tests/`.
 
-- primary test runner: `cargo test`
-- repo gate: `make test`
-- targeted crate gate: `cargo test -p xtask`
-
-### Code path coverage plan
+### Code Path Coverage Diagram
 
 ```text
-CODE PATH COVERAGE PLAN
+RUNTIME EVIDENCE REPAIR
 =======================
-[+] agent_lifecycle.rs
-    ├── [NEW TEST] legal stage+tier matrix
-    ├── [NEW TEST] persisted-vs-transitional stage rules
-    ├── [NEW TEST] invalid side-state strings
-    ├── [NEW TEST] lifecycle-state path validation
-    └── [NEW TEST] publication-ready packet validation
+[+] xtask CLI surface
+    ├── [GAP] repair-runtime-evidence help and arg validation
+    └── [GAP] mutually exclusive --check / --write behavior
 
-[+] onboard_agent::run
-    ├── [UPDATE TEST] dry-run previews lifecycle-state.json
-    ├── [UPDATE TEST] write seeds enrolled/bootstrap state
-    ├── [UPDATE TEST] duplicate or divergent lifecycle-state seed rejected
-    └── [UPDATE TEST] exact evidence ids are populated
+[+] repair-runtime-evidence --check
+    ├── [GAP] rejects lifecycle stage != runtime_integrated
+    ├── [GAP] rejects approval / registry / lifecycle continuity drift
+    ├── [GAP] rejects empty derived written paths
+    ├── [GAP] reports repair-needed when legacy short-form commands are present
+    └── [GAP] reports repair-not-needed when bundle is already truthful
 
-[+] runtime_follow_on::{build_context, validate_write_mode, persist_dry_run_artifacts}
-    ├── [UPDATE TEST] input contract carries approval capability/publication truth
-    ├── [UPDATE TEST] prompt renders that truth
-    ├── [UPDATE TEST] dry-run requires enrolled lifecycle state
-    ├── [UPDATE TEST] success advances lifecycle to runtime_integrated
-    ├── [UPDATE TEST] failure writes failed_retryable or blocked without claiming success
-    ├── [UPDATE TEST] implementation_summary is required
-    └── [UPDATE TEST] publication-ready packet is not written here
+[+] repair-runtime-evidence --write
+    ├── [GAP] writes all six runtime evidence files
+    ├── [GAP] writes exact frozen command set
+    ├── [GAP] writes non-empty written-paths.json
+    ├── [GAP] remains lifecycle-stage neutral
+    └── [GAP] repaired bundle is consumable by prepare-publication
 
-[+] prepare_publication::run
-    ├── [NEW TEST] write requires runtime_integrated state
-    ├── [NEW TEST] write rejects approval SHA/path drift
-    ├── [NEW TEST] write rejects missing runtime evidence
-    ├── [NEW TEST] write rejects capability inventory mismatch
-    ├── [NEW TEST] write emits publication-ready.json
-    └── [NEW TEST] check mode detects stale or inconsistent packet
+[+] runtime-follow-on forward validation
+    ├── [TESTED] rejects noop runtime execution
+    └── [GAP] rejects legacy short-form handoff commands exactly
 
-[+] close_proving_run::run
-    ├── [UPDATE TEST] requires publication_ready or legacy published state
-    ├── [UPDATE TEST] rejects stale published surfaces
-    ├── [UPDATE TEST] writes closed_baseline and baseline path
-    ├── [UPDATE TEST] satisfies green publication evidence ids
-    └── [UPDATE TEST] does not auto-promote to first_class
+[+] prepare-publication consumption
+    ├── [TESTED] rejects missing runtime evidence
+    ├── [TESTED] rejects capability continuity drift
+    └── [GAP] accepts repaired aider-style bundle end to end
 
-[+] agent_maintenance drift + closeout
-    ├── [UPDATE TEST] drift reads lifecycle baseline
-    ├── [UPDATE TEST] drift reports lifecycle continuity mismatch
-    ├── [UPDATE TEST] maintenance closeout clears drifted
-    └── [UPDATE TEST] maintenance closeout does not rewrite approval truth
+[+] drift detection
+    ├── [GAP] runtime_integrated stale evidence becomes explicit drift finding
+    └── [GAP] clean repaired bundle no longer reports that finding
 ```
 
-### User flow coverage plan
+### Planned Tests
 
-```text
-USER FLOW COVERAGE
-==================
-[+] New agent create lane
-    ├── approval -> onboard-agent -> scaffold-wrapper-crate -> runtime-follow-on
-    ├── runtime-follow-on -> prepare-publication -> publication checks
-    └── publication checks -> close-proving-run -> closed_baseline
+| Flow | Existing coverage | Required new coverage | Planned test file |
+| --- | --- | --- | --- |
+| CLI help and mode validation for repair command | none | yes | `crates/xtask/tests/repair_runtime_evidence_entrypoint.rs` |
+| `--check` rejects non-`runtime_integrated` lifecycle | nearby coverage exists in runtime/publication entrypoint tests | yes | `repair_runtime_evidence_entrypoint.rs` |
+| `--check` rejects empty derivation of committed runtime-owned writes | none | yes | `repair_runtime_evidence_entrypoint.rs` |
+| `--check` detects legacy short-form command set as repair-needed | none | yes | `repair_runtime_evidence_entrypoint.rs` |
+| `--write` emits full six-file bundle | none | yes | `repair_runtime_evidence_entrypoint.rs` |
+| `--write` emits non-empty truthful written paths | none | yes | `repair_runtime_evidence_entrypoint.rs` |
+| repaired bundle passes `prepare-publication --check` | no chained repair coverage | yes | `prepare_publication_entrypoint.rs` or `repair_runtime_evidence_entrypoint.rs` |
+| runtime handoff validation rejects legacy short-form commands | current code still tolerates them in one path | yes | `runtime_follow_on_entrypoint.rs` |
+| drift reports stale runtime evidence explicitly | no specific runtime-evidence drift coverage | yes | `agent_maintenance_drift.rs` |
+| repaired `aider` artifacts stay consumable | live repo only | yes | one repository-level smoke command in verification section |
 
-[+] Runtime retry flow
-    ├── runtime-follow-on write fails validation
-    ├── lifecycle marks failed_retryable or blocked
-    └── second write succeeds and clears retryable state
+### Required Test Commands
 
-[+] Publication blocked flow
-    ├── runtime lane succeeds
-    ├── prepare-publication rejects missing evidence or inventory mismatch
-    └── operator gets exact blocker and no publication-ready packet
-
-[+] Maintenance drift flow
-    ├── closed baseline exists
-    ├── published support or capability surface drifts
-    └── drift command reports lifecycle mismatch without mutating files
+```bash
+cargo test -p xtask --test repair_runtime_evidence_entrypoint
+cargo test -p xtask --test runtime_follow_on_entrypoint
+cargo test -p xtask --test prepare_publication_entrypoint
+cargo test -p xtask --test agent_maintenance_drift
+make check
 ```
 
-### Regression rules
+### Verification Commands
 
-These are mandatory regression tests:
-
-1. `runtime-follow-on` must not regress its write-boundary protections while adding lifecycle writes.
-2. `support-matrix` and `capability-matrix` must continue generating their current outputs for existing agents unless this plan explicitly changes those outputs.
-3. `close-proving-run` must keep its current path-validation behavior while adding lifecycle updates.
-4. `opencode-maintenance` must remain a maintenance pack; the new create-mode lifecycle state for `opencode` must live under `opencode-cli-onboarding`.
-
-### Required test files
-
-- New:
-  - `crates/xtask/tests/agent_lifecycle_state.rs`
-  - `crates/xtask/tests/prepare_publication_entrypoint.rs`
-- Updated:
-  - `crates/xtask/tests/onboard_agent_entrypoint/write_mode.rs`
-  - `crates/xtask/tests/runtime_follow_on_entrypoint.rs`
-  - `crates/xtask/tests/onboard_agent_closeout_preview/close_proving_run_paths.rs`
-  - `crates/xtask/tests/onboard_agent_closeout_preview/close_proving_run_write.rs`
-  - `crates/xtask/tests/agent_maintenance_closeout.rs`
-  - `crates/xtask/tests/agent_maintenance_drift.rs`
-
-## Performance Review
-
-This is not a request-path performance project. The risks are repo-tooling latency and repeated file parsing.
-
-Rules:
-
-1. Parse approval artifact and lifecycle state once per command invocation.
-2. Do not rescan all lifecycle packs from `runtime-follow-on` or `prepare-publication`.
-3. Keep publication validation agent-scoped where possible. If a global generator must run, reuse existing derivation instead of adding a second pass.
-4. Do not hash large trees repeatedly inside one command. Hash the specific lifecycle and packet files being validated.
-5. Keep backfill manual and committed. Do not add a repo-wide migration runner that walks everything on every invocation.
-
-Potential slow paths to watch:
-
-- repeated full support and capability derivations during `prepare-publication`
-- repeated `fs::canonicalize` and JSON parsing in hot loops
-- double-reading the same lifecycle file from command code and validator helpers
+```bash
+cargo run -p xtask -- repair-runtime-evidence --approval docs/agents/lifecycle/aider-onboarding/governance/approved-agent.toml --check
+cargo run -p xtask -- repair-runtime-evidence --approval docs/agents/lifecycle/aider-onboarding/governance/approved-agent.toml --write
+cargo run -p xtask -- prepare-publication --approval docs/agents/lifecycle/aider-onboarding/governance/approved-agent.toml --check
+cargo run -p xtask -- check-agent-drift --agent aider
+```
 
 ## Failure Modes Registry
 
-| Codepath | Realistic failure | Test required | Error handling required | User-visible result |
+| Failure mode | Detection | Handling | Test required | Critical gap today |
 | --- | --- | --- | --- | --- |
-| `onboard-agent` lifecycle seed | lifecycle path already exists with divergent approval or registry truth | yes | reject write with exact file path and mismatch field | clear validation error |
-| `runtime-follow-on` lifecycle read | runtime packet prepared against missing or non-enrolled state | yes | reject dry-run and write | clear error, no scratch ambiguity |
-| `runtime-follow-on` lifecycle update | runtime writes succeed but lifecycle write fails | yes | fail command and do not claim success | explicit failure, no silent partial close |
-| `prepare-publication` capability continuity | agent is publication-enabled but capability inventory cannot construct runtime capabilities | yes | reject packet creation | explicit blocker naming `capability_matrix.rs` gap |
-| `prepare-publication` missing evidence | runtime stage is set but required runtime evidence or summary is absent | yes | reject packet creation | explicit blocker list |
-| `close-proving-run` stale publication surfaces | packet exists but published surfaces are stale or contradictory | yes | reject closeout | agent cannot reach closed baseline falsely |
-| maintenance drift | published surface changes but lifecycle baseline is ignored | yes | report drift mismatch | actionable drift finding |
+| approval path or sha drift | repair and publication continuity validation | fail fast, no write | yes | no |
+| lifecycle stage is not `runtime_integrated` | repair `--check` and `--write` | fail fast, no write | yes | no |
+| committed runtime-owned outputs cannot produce a non-empty write set | repair derivation step | fail fast, no write | yes | yes |
+| bundle still uses short-form commands | exact command validation | rewrite exact full commands, otherwise fail | yes | yes |
+| bundle writes but still cannot pass publication consumption | post-write validation | fail command, keep lifecycle unchanged | yes | yes |
+| drift remains invisible until publication | drift inspection | explicit runtime evidence finding | yes | yes |
+| forward runtime path regresses and accepts legacy commands again | runtime handoff validation test | exact-match assertion in runtime tests | yes | yes |
 
-Critical gaps that must not ship:
+Critical gap definition for this slice:
 
-- lifecycle update failure with command success
-- publication-ready packet emitted without runtime evidence
-- closeout succeeding without green published surfaces
-- maintenance drift check ignoring lifecycle baseline
+- any path that allows a `runtime_integrated` bundle to remain committed while `prepare-publication --check` would reject it is a critical gap
 
-## NOT in scope
+## Performance Review
 
-- Dynamic backend loading for `capability_matrix.rs`
-- Automatic first-class promotion rules for future agents
-- A one-command create lane from approval through closeout
-- Moving maintenance artifacts out of `docs/agents/lifecycle/<agent>-maintenance/**`
-- Replacing `runtime-follow-on` scratch artifacts with committed governance artifacts
-- Deleting `support_matrix_enabled` or `capability_matrix_enabled` from the registry in this milestone
+This feature is small and repo-local. The real performance risk is accidental over-scanning.
+
+Rules:
+
+1. Repair derivation must stay bounded to known runtime-owned candidate paths plus `manifest_root/supplement` and `manifest_root/snapshots`.
+2. Do not snapshot or hash the full workspace to reconstruct repair output.
+3. Reuse existing JSON serializers and file writers. No extra process spawning inside repair except the human-run verification commands.
+4. `prepare-publication` remains the only place that reasons about publication consumption. Repair should call the shared validator path, not shell out to a second `cargo run`.
+
+Expected runtime cost is trivial compared to existing `xtask` integration tests.
+
+## Implementation Steps
+
+### Step 1 - Add shared runtime evidence helper
+
+1. Create `crates/xtask/src/runtime_evidence_bundle.rs`.
+2. Move committed-output derivation out of `historical_lifecycle_backfill.rs`.
+3. Add shared writers for:
+   - `input-contract.json`
+   - `run-status.json`
+   - `validation-report.json`
+   - `handoff.json`
+   - `written-paths.json`
+   - `run-summary.md`
+4. Keep the helper generic over approval, lifecycle state, run id, and host surface string.
+
+### Step 2 - Add `repair-runtime-evidence`
+
+1. Export the module from `crates/xtask/src/lib.rs`.
+2. Wire the new subcommand in `crates/xtask/src/main.rs`.
+3. Implement `Args`, `run`, and `run_in_workspace` in `crates/xtask/src/repair_runtime_evidence.rs`.
+4. Add `--check` and `--write` flows exactly as specified above.
+
+### Step 3 - Tighten forward validation
+
+1. Remove `LEGACY_REQUIRED_PUBLICATION_COMMANDS` from `runtime_follow_on.rs` and `runtime_follow_on/lifecycle.rs`.
+2. Make `validate_handoff` require exact command equality.
+3. Improve repair guidance in publication-consumer errors when the bundle is stale.
+
+### Step 4 - Add drift surfacing
+
+1. Extend drift inspection for `runtime_integrated` agents.
+2. If runtime evidence discovery or validation fails, emit an explicit runtime evidence finding that includes the repair command the operator should run.
+3. Keep existing governance drift logic intact for other lifecycle states.
+
+### Step 5 - Repair `aider`
+
+1. Run the new repair command for `aider`.
+2. Commit the deterministic repair bundle under `repair-aider-runtime-follow-on`.
+3. Verify `prepare-publication --check` passes.
+4. Leave the stale `aider-runtime-follow-on-rerun` directory untouched in this slice.
+
+### Step 6 - Update docs
+
+Update `docs/cli-agent-onboarding-factory-operator-guide.md` with:
+
+- when to run `repair-runtime-evidence`
+- expected failure message shape
+- the `aider`-style stale-bundle scenario
+- the sequence:
+  - `repair-runtime-evidence --check`
+  - `repair-runtime-evidence --write`
+  - `prepare-publication --check`
+  - `prepare-publication --write`
+
+## Acceptance Criteria
+
+1. `repair-runtime-evidence --check` fails clearly when repair is impossible.
+2. `repair-runtime-evidence --write` emits a complete six-file bundle with non-empty written paths.
+3. `repair-runtime-evidence --write` never advances lifecycle stage.
+4. `prepare-publication --check` passes for `aider` after repair.
+5. `runtime_follow_on/lifecycle.rs` no longer accepts legacy short-form command sets.
+6. `check-agent-drift --agent aider` emits an explicit runtime-evidence finding before repair, and that specific finding disappears after repair even if non-runtime governance notes still remain until `prepare-publication --write`.
+7. `historical_lifecycle_backfill.rs` uses the shared runtime evidence helper instead of owning private bundle reconstruction logic.
 
 ## Worktree Parallelization Strategy
 
-### Dependency table
+This work has some parallelization opportunity, but only after the shared helper contract lands.
+
+### Dependency Table
 
 | Step | Modules touched | Depends on |
 | --- | --- | --- |
-| M1 schema core | `crates/xtask/src/`, `crates/xtask/tests/` | — |
-| M1 lifecycle backfill | `docs/agents/lifecycle/` | M1 schema core |
-| M1 docs sync | `docs/specs/`, `docs/cli-agent-onboarding-factory-operator-guide.md` | M1 schema core |
-| M2 onboard-agent integration | `crates/xtask/src/onboard_agent*`, `crates/xtask/tests/onboard_agent_entrypoint/**` | M1 schema core |
-| M2 runtime-follow-on integration | `crates/xtask/src/runtime_follow_on*`, `crates/xtask/templates/`, `crates/xtask/tests/runtime_follow_on_entrypoint.rs` | M1 schema core |
-| M3 prepare-publication seam | `crates/xtask/src/main.rs`, `crates/xtask/src/prepare_publication.rs`, `crates/xtask/src/{support_matrix,capability_matrix}.rs`, `crates/xtask/tests/` | M2 onboard + runtime merged |
-| M4 closeout + maintenance continuity | `crates/xtask/src/close_proving_run.rs`, `crates/xtask/src/agent_maintenance/**`, `crates/xtask/tests/` | M3 |
+| shared helper extraction | `crates/xtask/src/`, `crates/xtask/src/historical_lifecycle_backfill.rs` | — |
+| repair command wiring | `crates/xtask/src/`, `crates/xtask/src/main.rs`, `crates/xtask/src/lib.rs` | shared helper extraction |
+| forward validation hardening | `crates/xtask/src/runtime_follow_on/`, `crates/xtask/src/prepare_publication/` | shared helper extraction |
+| drift surfacing | `crates/xtask/src/agent_maintenance/drift/` | shared helper extraction |
+| tests | `crates/xtask/tests/` | repair command wiring, forward validation hardening, drift surfacing |
+| aider artifact repair | `docs/agents/.uaa-temp/runtime-follow-on/runs/` | repair command wiring |
+| docs update | `docs/` | repair command semantics stable |
 
-### Parallel lanes
+### Parallel Lanes
 
-- Lane A: M1 schema core -> M2 onboard-agent integration
-  - sequential, shared lifecycle and onboarding ownership
-- Lane B: M1 schema core -> M2 runtime-follow-on integration
-  - parallel with Lane A after schema freeze, separate primary command surface
-- Lane C: M1 schema core -> lifecycle backfill + charter/operator-guide sync
-  - parallel with Lanes A and B after schema freeze, docs and governance only
-- Lane D: M3 -> M4
-  - sequential, shared `main.rs`, publication seam, closeout, and maintenance ownership
+- Lane A: shared helper extraction -> repair command wiring
+  - sequential, shared `crates/xtask/src/`
+- Lane B: forward validation hardening
+  - can start after Lane A defines helper interfaces
+- Lane C: drift surfacing
+  - can start after Lane A defines helper interfaces
+- Lane D: tests
+  - starts after B and C, because tests need final behavior
+- Lane E: aider artifact repair + operator docs
+  - starts after A, but should finish after D so the committed artifacts reflect final behavior
 
-### Execution order
+### Execution Order
 
-1. Land M1 schema core first. Nothing else starts until the lifecycle schema, path rules, and stage semantics are frozen.
-2. After M1 freezes, launch in parallel:
-   - Lane A for `onboard-agent`
-   - Lane B for `runtime-follow-on`
-   - Lane C for backfill JSONs and doc sync
-3. Merge A + B + C, then run full create-lane fixture coverage.
-4. Launch Lane D for `prepare-publication`, then continue Lane D for closeout and maintenance continuity.
+1. Launch Lane A first.
+2. Once A lands, launch B and C in parallel.
+3. Merge B and C.
+4. Run D.
+5. Run E last, then full verification.
 
-### Conflict flags
+### Conflict Flags
 
-- `crates/xtask/src/main.rs` is a conflict magnet. Only one lane should own it at a time.
-- `crates/xtask/src/agent_lifecycle.rs` must freeze before parallel lanes branch.
-- `crates/xtask/src/runtime_follow_on.rs`, `models.rs`, and `render.rs` stay in one lane.
-- `docs/cli-agent-onboarding-factory-operator-guide.md` needs one docs owner during schema freeze.
-- `crates/xtask/tests/runtime_follow_on_entrypoint.rs` and `onboard_agent_entrypoint/**` can evolve in parallel, but integration assertions that span both commands belong in the merge lane after A + B converge.
+- Lanes A and B both touch `crates/xtask/src/`. They cannot safely run in parallel.
+- Lanes B and C are mostly isolated.
+- Lane D touches shared test harnesses and should stay sequential after behavior stabilizes.
+- Lane E touches committed runtime artifacts and docs only, but it depends on the final semantics from A-D.
 
-Practical answer:
+## NOT In Scope
 
-- parallelize onboarding, runtime integration, and doc/backfill work after the shared schema is frozen
-- keep publication, closeout, and maintenance lifecycle logic sequential
+- delete or rewrite `docs/agents/.uaa-temp/runtime-follow-on/runs/aider-runtime-follow-on-rerun/`
+- change `prepare-publication` to accept legacy command aliases
+- add a lifecycle field for “repaired by”
+- make repair handle `closed_baseline` or `publication_ready` repair paths
+- generalize repair into a multi-agent batch maintenance command
+- update `TODOS.md` for stale-run cleanup
 
-## Completion Summary
+## What Already Exists
 
-- Step 0: Scope Challenge — accepted with one shared module, one new command, and no new crate
-- Architecture Review: lifecycle truth unified without inventing a workflow engine
-- Code Quality Review: duplicate state vocabularies explicitly forbidden
-- Test Review: coverage diagram produced, all transitions mapped to tests
-- Performance Review: repo-tooling slow paths identified and bounded
-- NOT in scope: written
-- What already exists: written
-- Failure modes: critical gaps identified and blocked from shipping
-- Parallelization: 4 lanes total, 3 parallel after schema freeze, 1 final sequential lane
-- Lake Score: 8/8 major recommendations chose the complete option over the shortcut
+The new plan reuses these existing truths instead of rebuilding them:
 
-## Implementation Order
+| Need | Existing implementation | Plan action |
+| --- | --- | --- |
+| exact publication command contract | `agent_lifecycle::REQUIRED_PUBLICATION_COMMANDS` | use everywhere |
+| runtime bundle read-side validation | `prepare_publication/runtime_evidence.rs` | keep strict |
+| forward rejection of empty runtime writes | `runtime_follow_on.rs` | keep and test |
+| historical derivation of runtime-owned outputs | `historical_lifecycle_backfill.rs` | extract to shared helper |
+| drift report rendering | `agent_maintenance/drift/mod.rs` | extend with explicit runtime evidence finding |
+| integration test harnesses | existing `crates/xtask/tests/*_entrypoint.rs` | extend, do not replace |
 
-Execute the work in this order:
+## Completion Checklist
 
-1. M1 schema core
-2. M1 backfill and doc sync
-3. M2 onboard-agent integration
-4. M2 runtime-follow-on integration
-5. Merge and re-run full create-lane tests
-6. M3 prepare-publication seam
-7. M4 closeout and maintenance continuity
+- [ ] `repair-runtime-evidence` command exists and is wired into `xtask`
+- [ ] shared runtime evidence helper extracted and reused by historical backfill
+- [ ] runtime handoff validation requires exact full publication commands
+- [ ] drift inspection surfaces stale runtime evidence explicitly
+- [ ] repaired `aider` runtime bundle committed under `repair-aider-runtime-follow-on`
+- [ ] `prepare-publication --check` passes for `aider`
+- [ ] targeted xtask integration tests added and passing
+- [ ] operator guide updated
 
-Do not start with publication generators. The lifecycle contract has to exist first or the rest of the work turns into another thin handoff file.
+## Final Recommendation
+
+Build the explicit repair seam. Do not patch `aider` by hand, and do not relax publication validation.
+
+The repo already has the right model. What it lacks is the boring repair tool that turns old malformed runtime evidence back into truthful committed state and tells operators exactly what to do before they hit the next seam.
