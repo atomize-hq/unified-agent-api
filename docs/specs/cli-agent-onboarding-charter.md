@@ -164,8 +164,12 @@ Canonical lifecycle record:
    - “live event before completion”
    - redaction (no raw line leakage)
    - exec-policy default behavior (non-interactive) and override levers if applicable
-6) Populate manifest evidence and regenerate publication outputs from committed runtime evidence.
-7) Ensure required CI workflows pass (see below).
+6) Run `prepare-publication --approval docs/agents/lifecycle/<onboarding_pack_prefix>/governance/approved-agent.toml --write` after committed runtime evidence exists:
+   - validate approval SHA continuity, runtime evidence presence, implementation-summary completeness, and capability publication continuity
+   - write `docs/agents/lifecycle/<onboarding_pack_prefix>/governance/publication-ready.json`
+   - advance the committed lifecycle record to `publication_ready`
+7) Regenerate publication outputs from committed runtime evidence.
+8) Ensure required CI workflows pass (see below).
 
 Publication handoff rule:
 - `docs/agents/lifecycle/<onboarding_pack_prefix>/governance/publication-ready.json` is the only committed publication handoff packet

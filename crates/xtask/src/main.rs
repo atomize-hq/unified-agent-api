@@ -22,6 +22,7 @@ use xtask::agent_maintenance::{
 };
 use xtask::capability_matrix;
 pub use xtask::onboard_agent;
+pub use xtask::prepare_publication;
 pub use xtask::runtime_follow_on;
 pub use xtask::support_matrix;
 pub use xtask::wrapper_scaffold;
@@ -69,6 +70,8 @@ enum Command {
     ScaffoldWrapperCrate(wrapper_scaffold::Args),
     /// Prepare or validate the bounded runtime follow-on lane for an onboarded agent.
     RuntimeFollowOn(runtime_follow_on::Args),
+    /// Prepare the committed publication handoff from runtime-integrated evidence.
+    PreparePublication(prepare_publication::Args),
     /// Generate or verify the universal agent capability matrix markdown.
     CapabilityMatrix(capability_matrix::Args),
     /// Audit the capability matrix for orthogonality invariants.
@@ -184,6 +187,13 @@ fn main() {
             }
         },
         Command::RuntimeFollowOn(args) => match runtime_follow_on::run(args) {
+            Ok(()) => 0,
+            Err(err) => {
+                eprintln!("{err}");
+                err.exit_code()
+            }
+        },
+        Command::PreparePublication(args) => match prepare_publication::run(args) {
             Ok(()) => 0,
             Err(err) => {
                 eprintln!("{err}");

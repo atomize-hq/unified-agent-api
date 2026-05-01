@@ -9,6 +9,10 @@ mod agent_registry {
     pub use xtask::agent_registry::*;
 }
 
+mod agent_lifecycle {
+    pub use xtask::agent_lifecycle::*;
+}
+
 #[path = "../src/agent_maintenance/finding_signature.rs"]
 mod finding_signature;
 

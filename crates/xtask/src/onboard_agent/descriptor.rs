@@ -2,10 +2,7 @@ use std::collections::BTreeMap;
 
 use crate::{approval_artifact, capability_projection::requires_explicit_publication_target};
 
-use super::{
-    validate_gate_scalar, ApprovalProvenance, Args, ConfigGate, DraftDescriptorInput, Error,
-    TargetGate,
-};
+use super::{ApprovalProvenance, Args, ConfigGate, DraftDescriptorInput, Error, TargetGate};
 
 impl DraftDescriptorInput {
     pub(super) fn from_raw_args(args: Args) -> Result<Self, Error> {
@@ -79,6 +76,117 @@ impl From<approval_artifact::ApprovalArtifact> for DraftDescriptorInput {
     }
 }
 
+pub(super) fn normalize_ordered_unique(
+    values: Vec<String>,
+    flag_name: &str,
+    require_non_empty: bool,
+) -> Result<Vec<String>, Error> {
+    if require_non_empty && values.is_empty() {
+        return Err(Error::Validation(format!(
+            "{flag_name} must be provided at least once"
+        )));
+    }
+    let mut seen = std::collections::BTreeSet::new();
+    let mut out = Vec::with_capacity(values.len());
+    for value in values {
+        let trimmed = value.trim().to_string();
+        if trimmed.is_empty() {
+            return Err(Error::Validation(format!(
+                "{flag_name} must not contain empty values"
+            )));
+        }
+        if !seen.insert(trimmed.clone()) {
+            return Err(Error::Validation(format!(
+                "{flag_name} contains duplicate value `{trimmed}`"
+            )));
+        }
+        out.push(trimmed);
+    }
+    Ok(out)
+}
+
+pub(super) fn normalize_sorted_unique(
+    values: Vec<String>,
+    flag_name: &str,
+) -> Result<Vec<String>, Error> {
+    let mut out = normalize_ordered_unique(values, flag_name, false)?;
+    out.sort();
+    Ok(out)
+}
+
+pub(super) fn parse_target_gates(
+    values: Vec<String>,
+    flag_name: &str,
+    canonical_index: &BTreeMap<String, usize>,
+) -> Result<Vec<TargetGate>, Error> {
+    let mut seen = std::collections::BTreeSet::new();
+    let mut out = Vec::with_capacity(values.len());
+    for value in values {
+        let (capability_id, raw_targets) = value.split_once(':').ok_or_else(|| {
+            Error::Validation(format!(
+                "{flag_name} must be formatted as <capability-id>:<target>[,<target>...] (got `{value}`)"
+            ))
+        })?;
+        let capability_id = validate_gate_scalar(capability_id, flag_name, &value)?;
+        let mut targets = parse_gate_targets(raw_targets, flag_name, &value, canonical_index)?;
+        if !seen.insert((capability_id.clone(), targets.clone())) {
+            return Err(Error::Validation(format!(
+                "{flag_name} contains duplicate entry `{value}`"
+            )));
+        }
+        targets.sort_by_key(|target| canonical_index[target]);
+        out.push(TargetGate {
+            capability_id,
+            targets,
+        });
+    }
+    Ok(out)
+}
+
+pub(super) fn parse_config_gates(
+    values: Vec<String>,
+    flag_name: &str,
+    canonical_index: &BTreeMap<String, usize>,
+) -> Result<Vec<ConfigGate>, Error> {
+    let mut seen = std::collections::BTreeSet::new();
+    let mut out = Vec::with_capacity(values.len());
+    for value in values {
+        let mut parts = value.splitn(3, ':');
+        let capability_id =
+            validate_gate_scalar(parts.next().unwrap_or_default(), flag_name, &value)?;
+        let config_key = validate_gate_scalar(parts.next().unwrap_or_default(), flag_name, &value)?;
+        let targets = match parts.next() {
+            Some(raw_targets) => {
+                let mut targets =
+                    parse_gate_targets(raw_targets, flag_name, &value, canonical_index)?;
+                targets.sort_by_key(|target| canonical_index[target]);
+                Some(targets)
+            }
+            None => None,
+        };
+        let signature = format!(
+            "{}:{}:{}",
+            capability_id,
+            config_key,
+            targets
+                .as_ref()
+                .map(|targets| targets.join(","))
+                .unwrap_or_default()
+        );
+        if !seen.insert(signature) {
+            return Err(Error::Validation(format!(
+                "{flag_name} contains duplicate entry `{value}`"
+            )));
+        }
+        out.push(ConfigGate {
+            capability_id,
+            config_key,
+            targets,
+        });
+    }
+    Ok(out)
+}
+
 pub(super) fn normalize_capability_matrix_target(
     value: Option<String>,
     canonical_targets: &[String],
@@ -131,6 +239,20 @@ pub(super) fn canonical_index(canonical_targets: &[String]) -> BTreeMap<String, 
         .collect()
 }
 
+pub(super) fn validate_gate_scalar(
+    value: &str,
+    flag_name: &str,
+    original: &str,
+) -> Result<String, Error> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        return Err(Error::Validation(format!(
+            "{flag_name} contains an empty field in `{original}`"
+        )));
+    }
+    Ok(trimmed.to_string())
+}
+
 fn required_arg(value: Option<String>, flag_name: &str) -> Result<String, Error> {
     let value = value.ok_or_else(|| {
         Error::Validation(format!(
@@ -152,4 +274,38 @@ fn required_bool(value: Option<bool>, flag_name: &str) -> Result<bool, Error> {
             "{flag_name} must be provided when --approval is not used"
         ))
     })
+}
+
+fn parse_gate_targets(
+    raw_targets: &str,
+    flag_name: &str,
+    original: &str,
+    canonical_index: &BTreeMap<String, usize>,
+) -> Result<Vec<String>, Error> {
+    let targets = raw_targets
+        .split(',')
+        .map(str::trim)
+        .filter(|target| !target.is_empty())
+        .map(ToOwned::to_owned)
+        .collect::<Vec<_>>();
+    if targets.is_empty() {
+        return Err(Error::Validation(format!(
+            "{flag_name} must declare at least one target in `{original}`"
+        )));
+    }
+
+    let mut seen = std::collections::BTreeSet::new();
+    for target in &targets {
+        if !seen.insert(target.clone()) {
+            return Err(Error::Validation(format!(
+                "{flag_name} contains duplicate target `{target}` in `{original}`"
+            )));
+        }
+        if !canonical_index.contains_key(target) {
+            return Err(Error::Validation(format!(
+                "{flag_name} target `{target}` is not present in --canonical-target"
+            )));
+        }
+    }
+    Ok(targets)
 }

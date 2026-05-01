@@ -1,26 +1,25 @@
 mod approval;
 mod descriptor;
+mod lifecycle;
 mod mutation;
 mod preview;
 mod validation;
 
 use std::{
-    collections::{BTreeMap, BTreeSet},
     fs,
     io::{self, Write},
     path::{Path, PathBuf},
-    time::{SystemTime, UNIX_EPOCH},
 };
 
-use crate::agent_lifecycle::{
-    approval_artifact_path, required_evidence_for_stage, write_lifecycle_state, LifecycleStage,
-    LifecycleState, SupportTier, LIFECYCLE_SCHEMA_VERSION,
-};
 use crate::agent_registry::{AgentRegistry, REGISTRY_RELATIVE_PATH};
 use clap::{ArgGroup, Parser};
 use thiserror::Error;
 use toml_edit::DocumentMut;
 
+use self::descriptor::{
+    normalize_ordered_unique, normalize_sorted_unique, parse_config_gates, parse_target_gates,
+};
+use self::lifecycle::build_lifecycle_state_preview;
 use self::mutation::WorkspaceMutationError;
 use self::mutation::{apply_mutations, ApplySummary, PlannedMutation, WorkspacePathJail};
 use self::preview::{
@@ -537,125 +536,6 @@ fn preview_writes(previews: &[(String, Option<String>)]) -> Vec<PlannedMutation>
         .collect()
 }
 
-fn build_lifecycle_state_preview(
-    workspace_root: &Path,
-    draft: &DraftEntry,
-) -> Result<LifecycleStatePreview, Error> {
-    let path = crate::agent_lifecycle::lifecycle_state_path(&draft.onboarding_pack_prefix);
-    let state = seeded_lifecycle_state(workspace_root, draft)?;
-    let contents = render_lifecycle_state_contents(&path, &state)?;
-    Ok(LifecycleStatePreview { path, contents })
-}
-
-fn seeded_lifecycle_state(
-    workspace_root: &Path,
-    draft: &DraftEntry,
-) -> Result<LifecycleState, Error> {
-    let (approval_path, approval_sha256, last_transition_at) =
-        lifecycle_seed_provenance(workspace_root, draft)?;
-    let required_evidence = required_evidence_for_stage(LifecycleStage::Enrolled).to_vec();
-
-    Ok(LifecycleState {
-        schema_version: LIFECYCLE_SCHEMA_VERSION.to_string(),
-        agent_id: draft.agent_id.clone(),
-        onboarding_pack_prefix: draft.onboarding_pack_prefix.clone(),
-        approval_artifact_path: approval_path,
-        approval_artifact_sha256: approval_sha256,
-        lifecycle_stage: LifecycleStage::Enrolled,
-        support_tier: SupportTier::Bootstrap,
-        side_states: Vec::new(),
-        current_owner_command: CURRENT_OWNER_COMMAND.to_string(),
-        expected_next_command: format!("scaffold-wrapper-crate --agent {} --write", draft.agent_id),
-        last_transition_at,
-        last_transition_by: LAST_TRANSITION_BY.to_string(),
-        required_evidence: required_evidence.clone(),
-        satisfied_evidence: required_evidence,
-        blocking_issues: Vec::new(),
-        retryable_failures: Vec::new(),
-        implementation_summary: None,
-        publication_packet_path: None,
-        publication_packet_sha256: None,
-        closeout_baseline_path: None,
-    })
-}
-
-fn lifecycle_seed_provenance(
-    workspace_root: &Path,
-    draft: &DraftEntry,
-) -> Result<(String, String, String), Error> {
-    if let Some(provenance) = draft.approval_provenance.as_ref() {
-        return Ok((
-            provenance.artifact_path.clone(),
-            provenance.artifact_sha256.clone(),
-            provenance.approval_recorded_at.clone(),
-        ));
-    }
-
-    let approval_path = approval_artifact_path(&draft.onboarding_pack_prefix);
-    let approval_sha256 = if workspace_root.join(&approval_path).is_file() {
-        sha256_hex(&workspace_root.join(&approval_path))?
-    } else {
-        RAW_APPROVAL_SHA256_PLACEHOLDER.to_string()
-    };
-
-    Ok((
-        approval_path,
-        approval_sha256,
-        RAW_LAST_TRANSITION_AT_PLACEHOLDER.to_string(),
-    ))
-}
-
-fn render_lifecycle_state_contents(
-    relative_path: &str,
-    state: &LifecycleState,
-) -> Result<String, Error> {
-    let temp_root = std::env::temp_dir().join(format!(
-        "xtask-onboard-agent-lifecycle-{}-{}",
-        std::process::id(),
-        SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map_err(|err| Error::Internal(format!("system time before unix epoch: {err}")))?
-            .as_nanos()
-    ));
-    fs::create_dir(&temp_root)
-        .map_err(|err| Error::Internal(format!("create {}: {err}", temp_root.display())))?;
-
-    let rendered = (|| -> Result<String, Error> {
-        write_lifecycle_state(&temp_root, relative_path, state).map_err(map_lifecycle_error)?;
-        let rendered_path = temp_root.join(relative_path);
-        let bytes = fs::read(&rendered_path)
-            .map_err(|err| Error::Internal(format!("read {}: {err}", rendered_path.display())))?;
-        String::from_utf8(bytes).map_err(|err| {
-            Error::Internal(format!(
-                "decode {} as utf-8: {err}",
-                rendered_path.display()
-            ))
-        })
-    })();
-
-    let cleanup_result = fs::remove_dir_all(&temp_root)
-        .map_err(|err| Error::Internal(format!("remove {}: {err}", temp_root.display())));
-
-    let rendered = rendered?;
-    cleanup_result?;
-    Ok(rendered)
-}
-
-fn map_lifecycle_error(err: crate::agent_lifecycle::LifecycleError) -> Error {
-    match err {
-        crate::agent_lifecycle::LifecycleError::Validation(message) => Error::Validation(message),
-        crate::agent_lifecycle::LifecycleError::Internal(message) => Error::Internal(message),
-    }
-}
-
-fn sha256_hex(path: &Path) -> Result<String, Error> {
-    use sha2::{Digest, Sha256};
-
-    let bytes =
-        fs::read(path).map_err(|err| Error::Internal(format!("read {}: {err}", path.display())))?;
-    Ok(hex::encode(Sha256::digest(bytes)))
-}
-
 fn write_apply_result<W: Write>(writer: &mut W, summary: ApplySummary) -> Result<(), Error> {
     writeln!(writer, "OK: onboard-agent write complete.")
         .map_err(|err| Error::Internal(format!("write stdout: {err}")))?;
@@ -688,156 +568,4 @@ fn workspace_members(root_doc: &DocumentMut) -> Result<Vec<PathBuf>, Error> {
             Ok(PathBuf::from(member))
         })
         .collect()
-}
-
-fn normalize_ordered_unique(
-    values: Vec<String>,
-    flag_name: &str,
-    require_non_empty: bool,
-) -> Result<Vec<String>, Error> {
-    if require_non_empty && values.is_empty() {
-        return Err(Error::Validation(format!(
-            "{flag_name} must be provided at least once"
-        )));
-    }
-    let mut seen = BTreeSet::new();
-    let mut out = Vec::with_capacity(values.len());
-    for value in values {
-        let trimmed = value.trim().to_string();
-        if trimmed.is_empty() {
-            return Err(Error::Validation(format!(
-                "{flag_name} must not contain empty values"
-            )));
-        }
-        if !seen.insert(trimmed.clone()) {
-            return Err(Error::Validation(format!(
-                "{flag_name} contains duplicate value `{trimmed}`"
-            )));
-        }
-        out.push(trimmed);
-    }
-    Ok(out)
-}
-
-fn normalize_sorted_unique(values: Vec<String>, flag_name: &str) -> Result<Vec<String>, Error> {
-    let mut out = normalize_ordered_unique(values, flag_name, false)?;
-    out.sort();
-    Ok(out)
-}
-
-fn parse_target_gates(
-    values: Vec<String>,
-    flag_name: &str,
-    canonical_index: &BTreeMap<String, usize>,
-) -> Result<Vec<TargetGate>, Error> {
-    let mut seen = BTreeSet::new();
-    let mut out = Vec::with_capacity(values.len());
-    for value in values {
-        let (capability_id, raw_targets) = value.split_once(':').ok_or_else(|| {
-            Error::Validation(format!(
-                "{flag_name} must be formatted as <capability-id>:<target>[,<target>...] (got `{value}`)"
-            ))
-        })?;
-        let capability_id = validate_gate_scalar(capability_id, flag_name, &value)?;
-        let mut targets = parse_gate_targets(raw_targets, flag_name, &value, canonical_index)?;
-        if !seen.insert((capability_id.clone(), targets.clone())) {
-            return Err(Error::Validation(format!(
-                "{flag_name} contains duplicate entry `{value}`"
-            )));
-        }
-        targets.sort_by_key(|target| canonical_index[target]);
-        out.push(TargetGate {
-            capability_id,
-            targets,
-        });
-    }
-    Ok(out)
-}
-
-fn parse_config_gates(
-    values: Vec<String>,
-    flag_name: &str,
-    canonical_index: &BTreeMap<String, usize>,
-) -> Result<Vec<ConfigGate>, Error> {
-    let mut seen = BTreeSet::new();
-    let mut out = Vec::with_capacity(values.len());
-    for value in values {
-        let mut parts = value.splitn(3, ':');
-        let capability_id =
-            validate_gate_scalar(parts.next().unwrap_or_default(), flag_name, &value)?;
-        let config_key = validate_gate_scalar(parts.next().unwrap_or_default(), flag_name, &value)?;
-        let targets = match parts.next() {
-            Some(raw_targets) => {
-                let mut targets =
-                    parse_gate_targets(raw_targets, flag_name, &value, canonical_index)?;
-                targets.sort_by_key(|target| canonical_index[target]);
-                Some(targets)
-            }
-            None => None,
-        };
-        let signature = format!(
-            "{}:{}:{}",
-            capability_id,
-            config_key,
-            targets
-                .as_ref()
-                .map(|targets| targets.join(","))
-                .unwrap_or_default()
-        );
-        if !seen.insert(signature) {
-            return Err(Error::Validation(format!(
-                "{flag_name} contains duplicate entry `{value}`"
-            )));
-        }
-        out.push(ConfigGate {
-            capability_id,
-            config_key,
-            targets,
-        });
-    }
-    Ok(out)
-}
-
-fn validate_gate_scalar(value: &str, flag_name: &str, original: &str) -> Result<String, Error> {
-    let trimmed = value.trim();
-    if trimmed.is_empty() {
-        return Err(Error::Validation(format!(
-            "{flag_name} contains an empty field in `{original}`"
-        )));
-    }
-    Ok(trimmed.to_string())
-}
-
-fn parse_gate_targets(
-    raw_targets: &str,
-    flag_name: &str,
-    original: &str,
-    canonical_index: &BTreeMap<String, usize>,
-) -> Result<Vec<String>, Error> {
-    let targets = raw_targets
-        .split(',')
-        .map(str::trim)
-        .filter(|target| !target.is_empty())
-        .map(ToOwned::to_owned)
-        .collect::<Vec<_>>();
-    if targets.is_empty() {
-        return Err(Error::Validation(format!(
-            "{flag_name} must declare at least one target in `{original}`"
-        )));
-    }
-
-    let mut seen = BTreeSet::new();
-    for target in &targets {
-        if !seen.insert(target.clone()) {
-            return Err(Error::Validation(format!(
-                "{flag_name} contains duplicate target `{target}` in `{original}`"
-            )));
-        }
-        if !canonical_index.contains_key(target) {
-            return Err(Error::Validation(format!(
-                "{flag_name} target `{target}` is not present in --canonical-target"
-            )));
-        }
-    }
-    Ok(targets)
 }

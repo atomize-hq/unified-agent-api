@@ -54,6 +54,55 @@ pub fn collect_builtin_backend_capabilities(
     collect_builtin_backend_inventory().map(|inventory| inventory.backends)
 }
 
+pub fn validate_agent_publication_continuity(
+    workspace_root: &Path,
+    entry: &AgentRegistryEntry,
+) -> Result<(), String> {
+    if !entry.publication.capability_matrix_enabled {
+        return Ok(());
+    }
+
+    let manifest_path = workspace_root
+        .join(&entry.manifest_root)
+        .join(CURRENT_MANIFEST_FILENAME);
+    let manifest = read_union_manifest(&manifest_path)?;
+    if manifest.expected_targets.is_empty() {
+        return Err(format!(
+            "capability-matrix manifest `{}{}` must declare at least one expected target",
+            entry.manifest_root, "/current.json"
+        ));
+    }
+
+    let missing_targets = entry
+        .canonical_targets
+        .iter()
+        .filter(|target| {
+            !manifest
+                .expected_targets
+                .iter()
+                .any(|candidate| candidate == *target)
+        })
+        .cloned()
+        .collect::<Vec<_>>();
+    if !missing_targets.is_empty() {
+        return Err(format!(
+            "capability-matrix manifest `{}{}` is missing registry canonical target(s): {}",
+            entry.manifest_root,
+            "/current.json",
+            missing_targets.join(", ")
+        ));
+    }
+
+    validate_capability_publication_target(entry, &manifest)?;
+    let modeled_runtime_truth = modeled_runtime_capability_truth(entry, &manifest)?;
+    let advertised_ids = projected_advertised_capabilities(entry, &manifest)?;
+    validate_declared_capabilities_do_not_exceed_runtime(
+        entry,
+        &advertised_ids,
+        &modeled_runtime_truth,
+    )
+}
+
 pub fn generate_markdown() -> Result<String, String> {
     let inventory = collect_builtin_backend_inventory()?;
     Ok(render_matrix(

@@ -266,6 +266,7 @@ cargo run -p xtask -- onboard-agent --approval docs/agents/lifecycle/<onboarding
 ```
 
 `onboard-agent` is the control-plane enrollment step. It writes the registry/docs/manifest/release touchpoints and the onboarding packet. It does not create the wrapper crate.
+Its dry-run preview now includes the exact `lifecycle-state.json` seed that write mode will materialize for the enrolled agent.
 
 ### 2. Bootstrap the execution context
 
@@ -302,6 +303,15 @@ This is the hard boundary from M6 and UAA-0022: `onboard-agent` enrolls the cont
 `scaffold-wrapper-crate` creates the runtime-owned wrapper shell; the runtime follow-on owns the
 bounded implementation lane after that point.
 
+On successful enrollment, `onboard-agent --write` also seeds the committed lifecycle record with:
+- `lifecycle_stage = enrolled`
+- `support_tier = bootstrap`
+- `current_owner_command = "onboard-agent --write"`
+- `expected_next_command = "scaffold-wrapper-crate --agent <agent_id> --write"`
+- `required_evidence = ["registry_entry", "docs_pack", "manifest_root_skeleton"]`
+
+If a pre-existing `lifecycle-state.json` diverges from the seeded control-plane truth, `onboard-agent --write` fails closed instead of silently rewriting it.
+
 ### 4. Finish the runtime follow-on
 
 After scaffolding, materialize the runtime packet:
@@ -325,6 +335,8 @@ Required scratch artifacts:
 - `validation-report.json`
 - `written-paths.json`
 - `handoff.json`
+
+`runtime-follow-on` now requires an enrolled lifecycle record before either `--dry-run` or `--write` will proceed.
 
 The runtime lane then executes only the runtime-owned work described by that packet:
 - implement the wrapper/runtime details in `crates/<agent_id>` and `crates/agent_api/src/backends/<agent_id>`
@@ -357,10 +369,18 @@ including:
 - `runtime_lane_complete = true`
 - `publication_refresh_required = true`
 - `required_commands` includes:
-  - `support-matrix --check`
-  - `capability-matrix --check`
-  - `capability-matrix-audit`
+  - `cargo run -p xtask -- support-matrix --check`
+  - `cargo run -p xtask -- capability-matrix --check`
+  - `cargo run -p xtask -- capability-matrix-audit`
   - `make preflight`
+
+On successful write, `runtime-follow-on` advances the committed lifecycle record to:
+- `lifecycle_stage = runtime_integrated`
+- `support_tier = baseline_runtime`
+- `satisfied_evidence` including `runtime_write_complete` and `implementation_summary_present`
+- `expected_next_command = "prepare-publication --approval <path> --write"`
+
+On validation failure, the command keeps the lifecycle stage unchanged and records exact retryable or blocking issues in the lifecycle side-state fields. `handoff.json`, `run-status.json`, and `run-summary.md` remain `.uaa-temp` evidence only and are not committed publication handoff artifacts.
 
 ### 5. Run post-proof target validation
 
@@ -370,7 +390,32 @@ After `runtime-follow-on --write` succeeds, validate the enrolled backend wiring
 cargo test -p unified-agent-api --all-features
 ```
 
-### 6. Refresh publication surfaces
+### 6. Prepare the committed publication handoff
+
+Once runtime-integrated state and `.uaa-temp` runtime evidence both exist, emit the only committed publication handoff packet:
+
+```sh
+"$XTASK_BIN" prepare-publication \
+  --approval docs/agents/lifecycle/<onboarding_pack_prefix>/governance/approved-agent.toml \
+  --write
+```
+
+`prepare-publication --write` requires:
+- lifecycle stage `runtime_integrated`
+- approval path and SHA continuity against the committed lifecycle record
+- explicit, non-empty `implementation_summary`
+- a successful runtime-follow-on evidence run under `docs/agents/.uaa-temp/runtime-follow-on/runs/*`
+- capability publication continuity from registry truth and `cli_manifests/<agent_id>/current.json`
+
+On success it:
+- writes `docs/agents/lifecycle/<onboarding_pack_prefix>/governance/publication-ready.json`
+- advances the committed lifecycle record to `lifecycle_stage = publication_ready`
+- satisfies `publication_packet_written`
+- sets `expected_next_command = "support-matrix --check && capability-matrix --check && capability-matrix-audit && make preflight && close-proving-run --write"`
+
+`prepare-publication --check` revalidates the same seam without rewriting either governance file.
+
+### 7. Refresh publication surfaces
 
 After committed runtime evidence exists, refresh the published control-plane outputs:
 
@@ -385,7 +430,9 @@ This refreshes the published support/capability surfaces from repo truth. The re
 - `docs/specs/unified-agent-api/support-matrix.md`
 - `docs/specs/unified-agent-api/capability-matrix.md`
 
-### 7. Run the green gate
+`prepare-publication` never writes these support/capability outputs directly. It only records the committed publication handoff packet and the lifecycle transition that points to the green gate.
+
+### 8. Run the green gate
 
 The create lane is only green when all of the following pass:
 
@@ -396,7 +443,7 @@ The create lane is only green when all of the following pass:
 make preflight
 ```
 
-### 8. Record proving-run closeout
+### 9. Record proving-run closeout
 
 When the proving run is complete, record the create-mode closeout in:
 
@@ -408,7 +455,19 @@ Then refresh the generated onboarding packet to its closed state:
 "$XTASK_BIN" close-proving-run --approval docs/agents/lifecycle/<onboarding_pack_prefix>/governance/approved-agent.toml --closeout docs/agents/lifecycle/<onboarding_pack_prefix>/governance/proving-run-closeout.json
 ```
 
-`close-proving-run` updates the generated packet docs under `docs/agents/lifecycle/<onboarding_pack_prefix>/` from the recorded closeout evidence.
+`close-proving-run` now requires:
+- lifecycle stage `publication_ready` or legacy/manual `published`
+- a coherent committed `publication-ready.json` packet for the same approval artifact
+- green published surfaces for registry/manifest continuity, support publication, capability publication, and capability-matrix audit
+- `preflight_passed = true` in the recorded proving-run closeout
+
+On success it:
+- updates the generated packet docs under `docs/agents/lifecycle/<onboarding_pack_prefix>/`
+- advances the committed lifecycle record to `lifecycle_stage = closed_baseline`
+- promotes `support_tier` to `publication_backed` unless the agent was already `first_class`
+- records `publication_packet_path`, `publication_packet_sha256`, and `closeout_baseline_path`
+- clears `blocked`, `failed_retryable`, and `drifted` while preserving `deprecated`
+- sets the next maintenance checkpoint to `check-agent-drift --agent <agent_id>`
 
 ## Maintenance mode
 
@@ -423,6 +482,8 @@ Start with the detector:
 ```sh
 cargo run -p xtask -- check-agent-drift --agent <agent_id>
 ```
+
+`check-agent-drift` reads the committed lifecycle baseline first. It uses the lifecycle record plus the linked `publication-ready.json` packet as the maintenance anchor before comparing current support/capability/governance truth.
 
 If drift is reported, open the maintenance lane for that already-onboarded agent.
 
@@ -464,7 +525,7 @@ Then close the run:
 cargo run -p xtask -- close-agent-maintenance --request docs/agents/lifecycle/<agent_id>-maintenance/governance/maintenance-request.toml --closeout docs/agents/lifecycle/<agent_id>-maintenance/governance/maintenance-closeout.json
 ```
 
-`close-agent-maintenance` refreshes the maintenance closeout surfaces from the request and closeout evidence.
+`close-agent-maintenance` refreshes the maintenance closeout surfaces from the request and closeout evidence, then clears lifecycle `drifted` state when the committed lifecycle baseline exists. It records `maintenance_closeout_written` without rewriting approval truth.
 
 ### 5. Run the same green gate
 

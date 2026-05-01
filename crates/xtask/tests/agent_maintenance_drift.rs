@@ -9,6 +9,10 @@ use std::{
 #[path = "support/onboard_agent_harness.rs"]
 mod harness;
 
+mod agent_lifecycle {
+    pub use xtask::agent_lifecycle::*;
+}
+
 #[path = "../src/agent_registry.rs"]
 mod agent_registry;
 #[path = "../src/approval_artifact.rs"]

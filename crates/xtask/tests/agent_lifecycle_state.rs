@@ -3,8 +3,8 @@ use std::path::{Path, PathBuf};
 use xtask::{
     agent_lifecycle::{
         approval_artifact_path_for_entry, is_resting_stage_v1, lifecycle_state_path_for_entry,
-        load_lifecycle_state, required_evidence_for_stage, validate_stage_support_tier,
-        EvidenceId, LifecycleStage, SupportTier, REQUIRED_PUBLICATION_COMMANDS,
+        load_lifecycle_state, required_evidence_for_stage, validate_stage_support_tier, EvidenceId,
+        LifecycleStage, SupportTier, REQUIRED_PUBLICATION_COMMANDS,
     },
     agent_registry::AgentRegistry,
 };
@@ -33,33 +33,24 @@ fn stage_support_tier_matrix_matches_plan() {
     assert!(validate_stage_support_tier(LifecycleStage::Approved, SupportTier::Bootstrap).is_ok());
     assert!(validate_stage_support_tier(LifecycleStage::Enrolled, SupportTier::Bootstrap).is_ok());
     assert!(
-        validate_stage_support_tier(
-            LifecycleStage::RuntimeIntegrated,
-            SupportTier::Bootstrap
-        )
-        .is_ok()
+        validate_stage_support_tier(LifecycleStage::RuntimeIntegrated, SupportTier::Bootstrap)
+            .is_ok()
     );
-    assert!(
-        validate_stage_support_tier(
-            LifecycleStage::RuntimeIntegrated,
-            SupportTier::BaselineRuntime
-        )
-        .is_ok()
-    );
-    assert!(
-        validate_stage_support_tier(
-            LifecycleStage::PublicationReady,
-            SupportTier::BaselineRuntime
-        )
-        .is_ok()
-    );
-    assert!(
-        validate_stage_support_tier(
-            LifecycleStage::ClosedBaseline,
-            SupportTier::PublicationBacked
-        )
-        .is_ok()
-    );
+    assert!(validate_stage_support_tier(
+        LifecycleStage::RuntimeIntegrated,
+        SupportTier::BaselineRuntime
+    )
+    .is_ok());
+    assert!(validate_stage_support_tier(
+        LifecycleStage::PublicationReady,
+        SupportTier::BaselineRuntime
+    )
+    .is_ok());
+    assert!(validate_stage_support_tier(
+        LifecycleStage::ClosedBaseline,
+        SupportTier::PublicationBacked
+    )
+    .is_ok());
     assert!(
         validate_stage_support_tier(LifecycleStage::ClosedBaseline, SupportTier::FirstClass)
             .is_ok()
@@ -68,13 +59,11 @@ fn stage_support_tier_matrix_matches_plan() {
     assert!(
         validate_stage_support_tier(LifecycleStage::Approved, SupportTier::FirstClass).is_err()
     );
-    assert!(
-        validate_stage_support_tier(
-            LifecycleStage::PublicationReady,
-            SupportTier::PublicationBacked
-        )
-        .is_err()
-    );
+    assert!(validate_stage_support_tier(
+        LifecycleStage::PublicationReady,
+        SupportTier::PublicationBacked
+    )
+    .is_err());
     assert!(
         validate_stage_support_tier(LifecycleStage::ClosedBaseline, SupportTier::Bootstrap)
             .is_err()
@@ -133,7 +122,11 @@ fn backfilled_lifecycle_states_validate_for_registry_targets() {
     let registry = AgentRegistry::load(&workspace_root).expect("load agent registry");
 
     let expectations = [
-        ("codex", LifecycleStage::ClosedBaseline, SupportTier::FirstClass),
+        (
+            "codex",
+            LifecycleStage::ClosedBaseline,
+            SupportTier::FirstClass,
+        ),
         (
             "claude_code",
             LifecycleStage::ClosedBaseline,

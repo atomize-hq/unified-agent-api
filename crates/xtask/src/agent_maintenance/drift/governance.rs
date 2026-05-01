@@ -1,6 +1,7 @@
 use std::{collections::BTreeSet, fs, path::Path};
 
 use crate::{
+    agent_lifecycle::{self, load_lifecycle_state, LifecycleStage, PublicationReadyPacket},
     agent_registry::{
         AgentRegistryEntry, GovernanceCheck, GovernanceComparisonKind, MarkdownExtractionMode,
         REGISTRY_RELATIVE_PATH,
@@ -54,6 +55,12 @@ pub(super) fn inspect_governance_docs(
         }
     }
 
+    let lifecycle_result = inspect_lifecycle_baseline(entry, workspace_root);
+    if !lifecycle_result.issues.is_empty() {
+        issues.extend(lifecycle_result.issues);
+        surfaces.extend(lifecycle_result.authoritative_surfaces);
+    }
+
     if issues.is_empty() {
         None
     } else {
@@ -64,6 +71,123 @@ pub(super) fn inspect_governance_docs(
             surfaces.into_iter().collect(),
         ))
     }
+}
+
+fn inspect_lifecycle_baseline(
+    entry: &AgentRegistryEntry,
+    workspace_root: &Path,
+) -> GovernanceInspectionResult {
+    let mut result = GovernanceInspectionResult::default();
+    let lifecycle_state_path =
+        agent_lifecycle::lifecycle_state_path(&entry.scaffold.onboarding_pack_prefix);
+    let lifecycle_absolute = workspace_root.join(&lifecycle_state_path);
+    if !lifecycle_absolute.is_file() {
+        return result;
+    }
+
+    result
+        .authoritative_surfaces
+        .insert(lifecycle_state_path.clone());
+    let lifecycle_state = match load_lifecycle_state(workspace_root, &lifecycle_state_path) {
+        Ok(state) => state,
+        Err(err) => {
+            result.issues.push(format!(
+                "{} failed lifecycle baseline validation ({err})",
+                lifecycle_state_path
+            ));
+            return result;
+        }
+    };
+
+    match lifecycle_state.lifecycle_stage {
+        LifecycleStage::ClosedBaseline | LifecycleStage::Published => {}
+        other => {
+            result.issues.push(format!(
+                "{} is not yet a maintenance baseline (`{}`)",
+                lifecycle_state_path,
+                other.as_str()
+            ));
+        }
+    }
+
+    let Some(packet_path) = lifecycle_state.publication_packet_path.as_deref() else {
+        result.issues.push(format!(
+            "{} does not record publication_packet_path",
+            lifecycle_state_path
+        ));
+        return result;
+    };
+    let Some(packet_sha) = lifecycle_state.publication_packet_sha256.as_deref() else {
+        result.issues.push(format!(
+            "{} does not record publication_packet_sha256",
+            lifecycle_state_path
+        ));
+        return result;
+    };
+    result
+        .authoritative_surfaces
+        .insert(packet_path.to_string());
+    match agent_lifecycle::file_sha256(workspace_root, packet_path) {
+        Ok(actual_sha) if actual_sha == packet_sha => {}
+        Ok(_) => result.issues.push(format!(
+            "{} publication packet sha no longer matches {}",
+            lifecycle_state_path, packet_path
+        )),
+        Err(err) => result.issues.push(format!("{}: {}", packet_path, err)),
+    }
+
+    let packet_bytes = match fs::read(workspace_root.join(packet_path)) {
+        Ok(bytes) => bytes,
+        Err(err) => {
+            result.issues.push(format!("read {}: {err}", packet_path));
+            return result;
+        }
+    };
+    let packet: PublicationReadyPacket = match serde_json::from_slice(&packet_bytes) {
+        Ok(packet) => packet,
+        Err(err) => {
+            result.issues.push(format!("parse {}: {err}", packet_path));
+            return result;
+        }
+    };
+    if let Err(err) = packet.validate() {
+        result
+            .issues
+            .push(format!("{} failed packet validation ({err})", packet_path));
+        return result;
+    }
+    if packet.approval_artifact_path != lifecycle_state.approval_artifact_path
+        || packet.approval_artifact_sha256 != lifecycle_state.approval_artifact_sha256
+    {
+        result.issues.push(format!(
+            "{} no longer matches lifecycle approval continuity in {}",
+            packet_path, lifecycle_state_path
+        ));
+    }
+    if packet.agent_id != entry.agent_id {
+        result.issues.push(format!(
+            "{} agent_id `{}` does not match registry agent `{}`",
+            packet_path, packet.agent_id, entry.agent_id
+        ));
+    }
+    if packet.manifest_root != entry.manifest_root {
+        result.issues.push(format!(
+            "{} manifest_root `{}` does not match registry manifest_root `{}`",
+            packet_path, packet.manifest_root, entry.manifest_root
+        ));
+    }
+    if let Some(closeout_path) = lifecycle_state.closeout_baseline_path.as_deref() {
+        result
+            .authoritative_surfaces
+            .insert(closeout_path.to_string());
+    } else {
+        result.issues.push(format!(
+            "{} does not record closeout_baseline_path",
+            lifecycle_state_path
+        ));
+    }
+
+    result
 }
 
 #[derive(Default)]

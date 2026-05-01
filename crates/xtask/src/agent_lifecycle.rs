@@ -1,14 +1,19 @@
-use std::{
-    collections::BTreeSet,
-    fs,
-    path::{Component, Path, PathBuf},
-};
+mod storage;
+mod validation;
+
+use std::path::Path;
 
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
 use thiserror::Error;
-use time::{format_description::well_known::Rfc3339, OffsetDateTime};
 
+use self::validation::{
+    ensure_repo_relative_file_exists, landed_surface_name, validate_deferred_surfaces,
+    validate_non_empty, validate_optional_path_pair, validate_optional_repo_relative_path,
+    validate_pack_prefix, validate_path_hash_pair, validate_repo_relative_path,
+    validate_required_publication_commands, validate_rfc3339, validate_schema_version,
+    validate_sha256, validate_side_state_issues, validate_string_list, validate_subset,
+    validate_template_lineage, validate_unique_copy,
+};
 use crate::agent_registry::AgentRegistryEntry;
 
 pub const LIFECYCLE_SCHEMA_VERSION: &str = "1";
@@ -301,8 +306,16 @@ impl LifecycleState {
         validate_non_empty("expected_next_command", &self.expected_next_command)?;
         validate_non_empty("last_transition_by", &self.last_transition_by)?;
         validate_rfc3339("last_transition_at", &self.last_transition_at)?;
-        validate_unique_copy("required_evidence", &self.required_evidence, EvidenceId::as_str)?;
-        validate_unique_copy("satisfied_evidence", &self.satisfied_evidence, EvidenceId::as_str)?;
+        validate_unique_copy(
+            "required_evidence",
+            &self.required_evidence,
+            EvidenceId::as_str,
+        )?;
+        validate_unique_copy(
+            "satisfied_evidence",
+            &self.satisfied_evidence,
+            EvidenceId::as_str,
+        )?;
         validate_subset(
             "satisfied_evidence",
             &self.satisfied_evidence,
@@ -319,13 +332,17 @@ impl LifecycleState {
             "publication_packet_sha256",
             &self.publication_packet_sha256,
         )?;
-        validate_optional_repo_relative_path("closeout_baseline_path", &self.closeout_baseline_path)?;
+        validate_optional_repo_relative_path(
+            "closeout_baseline_path",
+            &self.closeout_baseline_path,
+        )?;
 
         match self.lifecycle_stage {
             LifecycleStage::Approved | LifecycleStage::Enrolled => {
                 if self.implementation_summary.is_some() {
                     return Err(LifecycleError::Validation(
-                        "implementation_summary must be null before runtime integration".to_string(),
+                        "implementation_summary must be null before runtime integration"
+                            .to_string(),
                     ));
                 }
             }
@@ -430,14 +447,20 @@ impl PublicationReadyPacket {
         validate_repo_relative_path("manifest_root", &self.manifest_root)?;
         validate_string_list("expected_targets", &self.expected_targets)?;
         validate_required_publication_commands(&self.required_commands)?;
-        validate_string_list("required_publication_outputs", &self.required_publication_outputs)?;
+        validate_string_list(
+            "required_publication_outputs",
+            &self.required_publication_outputs,
+        )?;
         validate_string_list("runtime_evidence_paths", &self.runtime_evidence_paths)?;
         validate_string_list("publication_owned_paths", &self.publication_owned_paths)?;
         validate_string_list("blocking_issues", &self.blocking_issues)?;
         self.implementation_summary.validate()?;
 
         for (field, values) in [
-            ("required_publication_outputs", &self.required_publication_outputs),
+            (
+                "required_publication_outputs",
+                &self.required_publication_outputs,
+            ),
             ("runtime_evidence_paths", &self.runtime_evidence_paths),
             ("publication_owned_paths", &self.publication_owned_paths),
         ] {
@@ -474,9 +497,7 @@ impl PublicationReadyPacket {
 }
 
 pub fn lifecycle_state_path(pack_prefix: &str) -> String {
-    format!(
-        "{LIFECYCLE_DOCS_ROOT}/{pack_prefix}/{GOVERNANCE_DIR_NAME}/{LIFECYCLE_STATE_FILE_NAME}"
-    )
+    format!("{LIFECYCLE_DOCS_ROOT}/{pack_prefix}/{GOVERNANCE_DIR_NAME}/{LIFECYCLE_STATE_FILE_NAME}")
 }
 
 pub fn publication_ready_path(pack_prefix: &str) -> String {
@@ -486,9 +507,7 @@ pub fn publication_ready_path(pack_prefix: &str) -> String {
 }
 
 pub fn approval_artifact_path(pack_prefix: &str) -> String {
-    format!(
-        "{LIFECYCLE_DOCS_ROOT}/{pack_prefix}/{GOVERNANCE_DIR_NAME}/{APPROVED_AGENT_FILE_NAME}"
-    )
+    format!("{LIFECYCLE_DOCS_ROOT}/{pack_prefix}/{GOVERNANCE_DIR_NAME}/{APPROVED_AGENT_FILE_NAME}")
 }
 
 pub fn proving_run_closeout_path(pack_prefix: &str) -> String {
@@ -539,7 +558,10 @@ pub fn validate_stage_support_tier(
         }
         LifecycleStage::PublicationReady => matches!(tier, SupportTier::BaselineRuntime),
         LifecycleStage::Published | LifecycleStage::ClosedBaseline => {
-            matches!(tier, SupportTier::PublicationBacked | SupportTier::FirstClass)
+            matches!(
+                tier,
+                SupportTier::PublicationBacked | SupportTier::FirstClass
+            )
         }
     };
 
@@ -565,16 +587,11 @@ pub fn is_resting_stage_v1(stage: LifecycleStage) -> bool {
 }
 
 pub fn now_rfc3339() -> Result<String, LifecycleError> {
-    OffsetDateTime::now_utc()
-        .format(&Rfc3339)
-        .map_err(|err| LifecycleError::Internal(format!("format timestamp: {err}")))
+    storage::now_rfc3339()
 }
 
 pub fn file_sha256(workspace_root: &Path, relative_path: &str) -> Result<String, LifecycleError> {
-    let resolved = resolve_repo_relative_path(workspace_root, relative_path)?;
-    let bytes = fs::read(&resolved)
-        .map_err(|err| LifecycleError::Internal(format!("read {}: {err}", resolved.display())))?;
-    Ok(hex::encode(Sha256::digest(bytes)))
+    storage::file_sha256(workspace_root, relative_path)
 }
 
 pub fn write_lifecycle_state(
@@ -583,14 +600,14 @@ pub fn write_lifecycle_state(
     state: &LifecycleState,
 ) -> Result<(), LifecycleError> {
     state.validate()?;
-    write_json_file(workspace_root, relative_path, state)
+    storage::write_json_file(workspace_root, relative_path, state)
 }
 
 pub fn load_lifecycle_state(
     workspace_root: &Path,
     relative_path: &str,
 ) -> Result<LifecycleState, LifecycleError> {
-    let state: LifecycleState = load_json_file(workspace_root, relative_path)?;
+    let state: LifecycleState = storage::load_json_file(workspace_root, relative_path)?;
     state.validate_in_workspace(workspace_root)?;
     Ok(state)
 }
@@ -601,334 +618,14 @@ pub fn write_publication_ready_packet(
     packet: &PublicationReadyPacket,
 ) -> Result<(), LifecycleError> {
     packet.validate()?;
-    write_json_file(workspace_root, relative_path, packet)
+    storage::write_json_file(workspace_root, relative_path, packet)
 }
 
 pub fn load_publication_ready_packet(
     workspace_root: &Path,
     relative_path: &str,
 ) -> Result<PublicationReadyPacket, LifecycleError> {
-    let packet: PublicationReadyPacket = load_json_file(workspace_root, relative_path)?;
+    let packet: PublicationReadyPacket = storage::load_json_file(workspace_root, relative_path)?;
     packet.validate_in_workspace(workspace_root)?;
     Ok(packet)
-}
-
-fn load_json_file<T: for<'de> Deserialize<'de>>(
-    workspace_root: &Path,
-    relative_path: &str,
-) -> Result<T, LifecycleError> {
-    let resolved = resolve_repo_relative_path(workspace_root, relative_path)?;
-    let bytes = fs::read(&resolved)
-        .map_err(|err| LifecycleError::Validation(format!("read {}: {err}", resolved.display())))?;
-    serde_json::from_slice(&bytes)
-        .map_err(|err| LifecycleError::Validation(format!("parse {}: {err}", resolved.display())))
-}
-
-fn write_json_file<T: Serialize>(
-    workspace_root: &Path,
-    relative_path: &str,
-    value: &T,
-) -> Result<(), LifecycleError> {
-    let resolved = resolve_repo_relative_path_for_write(workspace_root, relative_path)?;
-    if let Some(parent) = resolved.parent() {
-        fs::create_dir_all(parent).map_err(|err| {
-            LifecycleError::Internal(format!("create {}: {err}", parent.display()))
-        })?;
-    }
-    let mut json = serde_json::to_vec_pretty(value)
-        .map_err(|err| LifecycleError::Internal(format!("serialize {relative_path}: {err}")))?;
-    json.push(b'\n');
-    fs::write(&resolved, json)
-        .map_err(|err| LifecycleError::Internal(format!("write {}: {err}", resolved.display())))
-}
-
-fn validate_schema_version(value: &str, surface: &str) -> Result<(), LifecycleError> {
-    if value == LIFECYCLE_SCHEMA_VERSION {
-        Ok(())
-    } else {
-        Err(LifecycleError::Validation(format!(
-            "{surface} schema_version must equal `{LIFECYCLE_SCHEMA_VERSION}`"
-        )))
-    }
-}
-
-fn validate_pack_prefix(field: &str, value: &str) -> Result<(), LifecycleError> {
-    validate_non_empty(field, value)?;
-    if value.contains('/') || value.contains('\\') {
-        return Err(LifecycleError::Validation(format!(
-            "{field} must be a pack prefix, not a nested path"
-        )));
-    }
-    Ok(())
-}
-
-fn validate_optional_path_pair(
-    path_field: &str,
-    path: &Option<String>,
-    sha_field: &str,
-    sha: &Option<String>,
-) -> Result<(), LifecycleError> {
-    match (path.as_deref(), sha.as_deref()) {
-        (Some(path), Some(sha)) => {
-            validate_repo_relative_path(path_field, path)?;
-            validate_sha256(sha_field, sha)?;
-            Ok(())
-        }
-        (None, None) => Ok(()),
-        _ => Err(LifecycleError::Validation(format!(
-            "{path_field} and {sha_field} must either both be present or both be null"
-        ))),
-    }
-}
-
-fn validate_optional_repo_relative_path(
-    field: &str,
-    value: &Option<String>,
-) -> Result<(), LifecycleError> {
-    if let Some(value) = value {
-        validate_repo_relative_path(field, value)?;
-    }
-    Ok(())
-}
-
-fn validate_path_hash_pair(
-    workspace_root: &Path,
-    path_field: &str,
-    relative_path: &str,
-    sha_field: &str,
-    expected_sha: &str,
-) -> Result<(), LifecycleError> {
-    ensure_repo_relative_file_exists(workspace_root, path_field, relative_path)?;
-    let actual_sha = file_sha256(workspace_root, relative_path)?;
-    if actual_sha == expected_sha {
-        Ok(())
-    } else {
-        Err(LifecycleError::Validation(format!(
-            "{sha_field} does not match {path_field}"
-        )))
-    }
-}
-
-fn ensure_repo_relative_file_exists(
-    workspace_root: &Path,
-    field: &str,
-    relative_path: &str,
-) -> Result<(), LifecycleError> {
-    let resolved = resolve_repo_relative_path(workspace_root, relative_path)?;
-    if resolved.is_file() {
-        Ok(())
-    } else {
-        Err(LifecycleError::Validation(format!(
-            "{field} `{relative_path}` does not exist"
-        )))
-    }
-}
-
-fn resolve_repo_relative_path(
-    workspace_root: &Path,
-    relative_path: &str,
-) -> Result<PathBuf, LifecycleError> {
-    validate_repo_relative_path("path", relative_path)?;
-    Ok(workspace_root.join(relative_path))
-}
-
-fn resolve_repo_relative_path_for_write(
-    workspace_root: &Path,
-    relative_path: &str,
-) -> Result<PathBuf, LifecycleError> {
-    validate_repo_relative_path("path", relative_path)?;
-    Ok(workspace_root.join(relative_path))
-}
-
-fn validate_repo_relative_path(field: &str, value: &str) -> Result<(), LifecycleError> {
-    validate_non_empty(field, value)?;
-    let path = Path::new(value);
-    if path.is_absolute() {
-        return Err(LifecycleError::Validation(format!(
-            "{field} must be repo-relative, not absolute"
-        )));
-    }
-    if value.contains('\\') {
-        return Err(LifecycleError::Validation(format!(
-            "{field} must use `/` separators"
-        )));
-    }
-    for component in path.components() {
-        match component {
-            Component::Normal(_) => {}
-            Component::CurDir => {}
-            Component::ParentDir => {
-                return Err(LifecycleError::Validation(format!(
-                    "{field} must not contain `..`"
-                )))
-            }
-            Component::RootDir | Component::Prefix(_) => {
-                return Err(LifecycleError::Validation(format!(
-                    "{field} must be repo-relative"
-                )))
-            }
-        }
-    }
-    Ok(())
-}
-
-fn validate_sha256(field: &str, value: &str) -> Result<(), LifecycleError> {
-    if value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase()) {
-        Ok(())
-    } else {
-        Err(LifecycleError::Validation(format!(
-            "{field} must be 64 lowercase hex characters"
-        )))
-    }
-}
-
-fn validate_non_empty(field: &str, value: &str) -> Result<(), LifecycleError> {
-    if value.trim().is_empty() {
-        Err(LifecycleError::Validation(format!("{field} must not be empty")))
-    } else {
-        Ok(())
-    }
-}
-
-fn validate_rfc3339(field: &str, value: &str) -> Result<(), LifecycleError> {
-    OffsetDateTime::parse(value, &Rfc3339)
-        .map(|_| ())
-        .map_err(|err| LifecycleError::Validation(format!("{field} must be RFC3339: {err}")))
-}
-
-fn validate_string_list(field: &str, values: &[String]) -> Result<(), LifecycleError> {
-    let mut seen = BTreeSet::new();
-    for value in values {
-        validate_non_empty(field, value)?;
-        if !seen.insert(value) {
-            return Err(LifecycleError::Validation(format!(
-                "{field} contains duplicate value `{value}`"
-            )));
-        }
-    }
-    Ok(())
-}
-
-fn validate_unique_copy<T: Copy + Ord>(
-    field: &str,
-    values: &[T],
-    render: fn(T) -> &'static str,
-) -> Result<(), LifecycleError> {
-    let mut seen = BTreeSet::new();
-    for value in values {
-        if !seen.insert(*value) {
-            return Err(LifecycleError::Validation(format!(
-                "{field} contains duplicate value `{}`",
-                render(*value)
-            )));
-        }
-    }
-    Ok(())
-}
-
-fn validate_subset<T: Copy + Ord>(
-    field: &str,
-    values: &[T],
-    allowed_field: &str,
-    allowed: &[T],
-    render: fn(T) -> &'static str,
-) -> Result<(), LifecycleError> {
-    let allowed = allowed.iter().copied().collect::<BTreeSet<_>>();
-    for value in values {
-        if !allowed.contains(value) {
-            return Err(LifecycleError::Validation(format!(
-                "{field} value `{}` is not present in {allowed_field}",
-                render(*value)
-            )));
-        }
-    }
-    Ok(())
-}
-
-fn validate_side_state_issues(state: &LifecycleState) -> Result<(), LifecycleError> {
-    let side_states = state.side_states.iter().copied().collect::<BTreeSet<_>>();
-    if side_states.contains(&SideState::Blocked) != !state.blocking_issues.is_empty() {
-        return Err(LifecycleError::Validation(
-            "side_state `blocked` must appear if and only if blocking_issues is non-empty"
-                .to_string(),
-        ));
-    }
-    if side_states.contains(&SideState::FailedRetryable) != !state.retryable_failures.is_empty() {
-        return Err(LifecycleError::Validation(
-            "side_state `failed_retryable` must appear if and only if retryable_failures is non-empty"
-                .to_string(),
-        ));
-    }
-    if side_states.contains(&SideState::Drifted)
-        && !matches!(
-            state.lifecycle_stage,
-            LifecycleStage::Published | LifecycleStage::ClosedBaseline
-        )
-    {
-        return Err(LifecycleError::Validation(
-            "side_state `drifted` is only valid after publication truth exists".to_string(),
-        ));
-    }
-    Ok(())
-}
-
-fn validate_template_lineage(values: &[String]) -> Result<(), LifecycleError> {
-    validate_string_list("template_lineage", values)?;
-    if values.is_empty() {
-        return Err(LifecycleError::Validation(
-            "template_lineage must contain at least one entry".to_string(),
-        ));
-    }
-    Ok(())
-}
-
-fn validate_deferred_surfaces(values: &[DeferredSurface]) -> Result<(), LifecycleError> {
-    let mut seen = BTreeSet::new();
-    for value in values {
-        if !seen.insert(value.surface) {
-            return Err(LifecycleError::Validation(format!(
-                "deferred_surfaces contains duplicate surface `{}`",
-                landed_surface_name(value.surface)
-            )));
-        }
-        validate_non_empty("deferred_surfaces.reason", &value.reason)?;
-    }
-    Ok(())
-}
-
-fn validate_required_publication_commands(values: &[String]) -> Result<(), LifecycleError> {
-    if values.len() != REQUIRED_PUBLICATION_COMMANDS.len() {
-        return Err(LifecycleError::Validation(format!(
-            "required_commands must contain exactly {} entries",
-            REQUIRED_PUBLICATION_COMMANDS.len()
-        )));
-    }
-    let expected = REQUIRED_PUBLICATION_COMMANDS
-        .iter()
-        .map(|value| value.to_string())
-        .collect::<Vec<_>>();
-    if values == expected {
-        Ok(())
-    } else {
-        Err(LifecycleError::Validation(
-            "required_commands must match the frozen publication command set exactly"
-                .to_string(),
-        ))
-    }
-}
-
-fn landed_surface_name(value: LandedSurface) -> &'static str {
-    match value {
-        LandedSurface::WrapperRuntime => "wrapper_runtime",
-        LandedSurface::BackendHarness => "backend_harness",
-        LandedSurface::AgentApiOnboardingTest => "agent_api_onboarding_test",
-        LandedSurface::WrapperCoverageSource => "wrapper_coverage_source",
-        LandedSurface::RuntimeManifestEvidence => "runtime_manifest_evidence",
-        LandedSurface::AddDirs => "add_dirs",
-        LandedSurface::ExternalSandboxPolicy => "external_sandbox_policy",
-        LandedSurface::McpManagement => "mcp_management",
-        LandedSurface::SessionResume => "session_resume",
-        LandedSurface::SessionFork => "session_fork",
-        LandedSurface::StructuredTools => "structured_tools",
-    }
 }
