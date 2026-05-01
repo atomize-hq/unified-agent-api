@@ -1,86 +1,94 @@
-# PLAN - UAA-0022 Runtime Follow-On Review Contract Widening
+# PLAN - Unified Agent Lifecycle Support Maturity Model
 
 Status: ready for implementation
-Date: 2026-04-30
+Date: 2026-05-01
 Branch: `codex/recommend-next-agent`
 Base branch: `main`
 Repo: `atomize-hq/unified-agent-api`
-Work item: `uaa-0022`
+Work item: `Unified agent lifecycle support maturity model`
 
 ## Objective
 
-Keep the shipped `xtask runtime-follow-on` lane exactly where it is on execution ownership and write-boundary control, then widen the thin part that remains: the maintainer-facing review contract.
+Make agent support maturity explicit, committed, and machine-checked from approval through maintenance.
 
-The deliverable is not a new runner. The deliverable is a stronger machine-readable summary that tells reviewers and the next lane what actually landed, what tier it landed at, what richer surfaces were deferred, and whether publication refresh is truly ready.
+The repo already has the pieces: approval artifacts, control-plane onboarding, wrapper scaffolding, bounded runtime implementation, publication generators, closeout, and maintenance drift checks. What it does not have is one canonical lifecycle record that all of those stages can read, advance, and validate. This plan adds that record, adds the missing `prepare-publication` seam, and wires the current commands into one deterministic lifecycle without rewriting the factory.
 
 ## Source Inputs
 
-- Gap report: `docs/backlog/uaa-0022-runtime-follow-on-narrowness-report.md`
-- Original milestone note: `docs/backlog/uaa-0022-runtime-follow-on-codex-runner.md`
-- Live runtime-follow-on implementation:
+- Design doc:
+  - `/Users/spensermcconnell/.gstack/projects/atomize-hq-unified-agent-api/spensermcconnell-codex-recommend-next-agent-design-20260430-214712.md`
+- Gap memo:
+  - `docs/backlog/cli-agent-onboarding-lifecycle-unification-gap-memo.md`
+- Normative and operator docs:
+  - `docs/specs/cli-agent-onboarding-charter.md`
+  - `docs/cli-agent-onboarding-factory-operator-guide.md`
+  - `docs/specs/unified-agent-api/support-matrix.md`
+  - `docs/specs/unified-agent-api/capability-matrix.md`
+- Current lifecycle owners:
+  - `crates/xtask/src/approval_artifact.rs`
+  - `crates/xtask/src/agent_registry.rs`
+  - `crates/xtask/src/onboard_agent.rs`
+  - `crates/xtask/src/wrapper_scaffold.rs`
   - `crates/xtask/src/runtime_follow_on.rs`
   - `crates/xtask/src/runtime_follow_on/models.rs`
   - `crates/xtask/src/runtime_follow_on/render.rs`
-  - `crates/xtask/templates/runtime_follow_on_codex_prompt.md`
+  - `crates/xtask/src/capability_matrix.rs`
+  - `crates/xtask/src/support_matrix.rs`
+  - `crates/xtask/src/close_proving_run.rs`
+  - `crates/xtask/src/agent_maintenance/drift/publication.rs`
+- Existing tests and fixtures:
   - `crates/xtask/tests/runtime_follow_on_entrypoint.rs`
+  - `crates/xtask/tests/onboard_agent_entrypoint/**`
+  - `crates/xtask/tests/close_proving_run_paths.rs`
+  - `crates/xtask/tests/close_proving_run_write.rs`
+  - `crates/xtask/tests/agent_maintenance_drift.rs`
   - `crates/xtask/tests/fixtures/fake_codex.sh`
-- Canonical procedure and contracts:
-  - `docs/cli-agent-onboarding-factory-operator-guide.md`
-  - `docs/specs/cli-agent-onboarding-charter.md`
-  - `docs/adr/0013-agent-api-backend-harness.md`
-- Queue context: `TODOS.md`
+- Queue context:
+  - `TODOS.md`
 
 ## Outcome
 
 After this plan lands:
 
-1. `handoff.json` carries a typed implementation summary, not just completion booleans.
-2. `run-summary.md` is rendered from validated structured data, not from thin prose.
-3. `run-status.json` exposes the small set of extra fields needed for dashboards and replay.
-4. `validate_handoff` enforces semantic rules for tier reporting, template lineage, deferred surfaces, and publication readiness.
-5. Publication refresh remains a separate lane. This plan only makes that handoff trustworthy.
+1. Every onboarded agent has one committed lifecycle record at `docs/agents/lifecycle/<pack>/governance/lifecycle-state.json`.
+2. `onboard-agent` seeds lifecycle state, `runtime-follow-on` advances it to runtime-integrated, `prepare-publication` advances it to publication-ready, and `close-proving-run` closes the baseline.
+3. The runtime lane still owns runtime code only, but it now emits enough committed truth for publication and maintenance to proceed without archaeology.
+4. The publication seam is explicit: `prepare-publication` validates readiness and writes the only committed publication handoff packet.
+5. Maintenance drift checks compare published truth against the committed lifecycle baseline instead of inferring state from scattered artifacts.
 
 ## Problem Statement
 
-The current runtime-follow-on lane proves the control seam:
+The repo currently has multiple truthful subsystems and no single truthful lifecycle.
 
-- it owns the Codex execution step
-- it freezes the dry-run packet
-- it rejects out-of-bounds writes
-- it rejects publication-owned manifest edits
-- it rejects no-op write runs
-- it requires a minimally valid `handoff.json`
+Approval artifacts know what an agent claims to be. The registry knows where it lives. `onboard-agent` knows how to enroll it. `runtime-follow-on` knows how to bound runtime work. `support-matrix` and `capability-matrix` know how to publish derived surfaces. `close-proving-run` and maintenance commands know how to close and compare evidence.
 
-What it does not prove yet is the reviewer-facing meaning of a successful run. Today the repo can tell that Codex stayed in bounds and changed runtime-owned files. It still cannot tell, in a machine-checked way:
+What is missing is the state machine that says what support level an agent has actually reached, what evidence is still missing, which command is allowed to run next, and whether publication or maintenance claims are legitimate yet.
 
-- what tier actually landed
-- which baseline template was used
-- which richer surfaces were intentionally deferred
-- why a minimal result is acceptable when `minimal` was requested
-- whether the next publication lane is merely required or truly ready
-
-That is the gap this plan closes.
+That is why the repo can truthfully say an agent is enrolled while still not having first-class or even publication-backed support semantics. The lifecycle model needs to become an explicit contract, not a mental model spread across commands and docs.
 
 ## Scope
 
 ### In scope
 
-- Add a typed implementation summary to the runtime-follow-on model layer.
-- Extend `handoff.json` with semantic fields that publication refresh can trust.
-- Render `run-summary.md` from validated structured fields.
-- Mirror only the minimal extra status fields into `run-status.json`.
-- Extend `validate_handoff` and `validate_write_mode` with semantic checks.
-- Extend the fake Codex fixture and entrypoint tests to lock the new contract.
-- Update the operator guide to match the strengthened runtime handoff.
+- Add a canonical lifecycle record under `docs/agents/lifecycle/<pack>/governance/lifecycle-state.json`.
+- Add one shared `xtask` lifecycle module for schema, loading, validation, and path helpers.
+- Backfill lifecycle records for existing onboarded agents.
+- Teach `onboard-agent` to seed lifecycle state.
+- Teach `runtime-follow-on` to read lifecycle state, carry approval capability/publication truth forward, and update lifecycle state on success.
+- Add `xtask prepare-publication` as the explicit `runtime_integrated -> publication_ready` seam.
+- Teach `close-proving-run` and maintenance drift logic to consume lifecycle state.
+- Update the operator guide and charter to reflect the new lifecycle contract.
+- Add regression tests for every new transition and every new rejection path.
 
 ### Out of scope
 
-- Replacing `xtask runtime-follow-on` with a new command or host surface.
-- Reopening the runtime/publication ownership boundary.
-- Adding a new crate, binary, service, or scratch artifact family.
-- Auto-inferring achieved tier by reading Rust semantics or AST shape.
-- Merging publication refresh or proving-run closeout into runtime-follow-on.
-- Rewriting the existing design doc. The current inputs are sufficient.
+- A new crate or service for lifecycle orchestration.
+- Folding runtime implementation, publication refresh, and closeout into one giant command.
+- Rewriting support-matrix or capability-matrix derivation from scratch.
+- Dynamic backend plugin discovery for capability publication.
+- Automatic first-class promotion for future agents.
+- Reworking every existing maintenance command into a new abstraction family.
+- Expanding CI posture for every enrolled agent beyond lifecycle correctness checks.
 
 ## Step 0 Scope Challenge
 
@@ -88,597 +96,673 @@ That is the gap this plan closes.
 
 | Sub-problem | Existing surface to reuse | Reuse decision |
 | --- | --- | --- |
-| Runner entrypoint and packet lifecycle | `crates/xtask/src/runtime_follow_on.rs` | Reuse directly. Keep one runtime lane. |
-| Typed JSON models | `crates/xtask/src/runtime_follow_on/models.rs` | Extend in place. Do not create a second schema surface. |
-| Human-readable summary rendering | `crates/xtask/src/runtime_follow_on/render.rs` | Reuse, but drive it from validated fields. |
-| Prompt ownership | `crates/xtask/templates/runtime_follow_on_codex_prompt.md` | Reuse. Expand required handoff instructions there. |
-| Validation harness | `validate_write_mode`, `validate_handoff` in `crates/xtask/src/runtime_follow_on.rs` | Reuse. Add semantic checks instead of parallel validators. |
-| Regression harness | `crates/xtask/tests/runtime_follow_on_entrypoint.rs`, `crates/xtask/tests/fixtures/fake_codex.sh` | Reuse and extend. No new harness layer. |
-| Live operator procedure | `docs/cli-agent-onboarding-factory-operator-guide.md` | Reuse and update. The guide must match the strengthened contract. |
-| Downstream follow-on | `TODOS.md` entry "Enclose The Publication Refresh Follow-On After The Runtime Runner" | Reuse. This plan feeds that TODO instead of replacing it. |
+| Approval truth | `crates/xtask/src/approval_artifact.rs` | Reuse directly. Approval remains frozen upstream truth. |
+| Registry truth | `crates/xtask/src/agent_registry.rs` | Reuse directly. Do not duplicate agent location or publication flags. |
+| Control-plane enrollment | `crates/xtask/src/onboard_agent.rs` | Reuse and extend. Seed lifecycle state here. |
+| Wrapper shell generation | `crates/xtask/src/wrapper_scaffold.rs` | Reuse unchanged except docs/help text references if needed. |
+| Runtime lane | `crates/xtask/src/runtime_follow_on.rs` + `models.rs` + `render.rs` | Reuse and widen. Keep runtime write boundary exactly where it is. |
+| Publication truth derivation | `crates/xtask/src/support_matrix.rs`, `crates/xtask/src/capability_matrix.rs` | Reuse. Add lifecycle continuity checks around them, not a rewrite. |
+| Proving-run closeout | `crates/xtask/src/close_proving_run.rs` | Reuse and extend so closeout records lifecycle baseline. |
+| Maintenance drift | `crates/xtask/src/agent_maintenance/drift/publication.rs` | Reuse and extend so drift compares against lifecycle baseline. |
+| Operator procedure | `docs/cli-agent-onboarding-factory-operator-guide.md` | Reuse and update in place. |
+| Existing backlog intent | `TODOS.md` | Reuse. This plan closes the lifecycle truth gap behind the existing runtime/publication follow-ons. |
 
 ### Minimum complete change set
 
 The smallest complete version of this work is:
 
-1. add one canonical `ImplementationSummary` object to the runtime-follow-on model layer
-2. embed that object inside `handoff.json`
-3. add `publication_refresh_ready` semantics to the handoff
-4. render `run-summary.md` from the validated summary object plus the validation report
-5. mirror a small subset of those fields into `run-status.json`
-6. add regression tests for success and failure semantics
-7. update the operator guide
+1. add one shared lifecycle schema module in `xtask`
+2. commit one lifecycle-state file per onboarded agent
+3. seed lifecycle state in `onboard-agent`
+4. update `runtime-follow-on` to read and advance lifecycle state
+5. add one new `prepare-publication` command and one committed `publication-ready.json` packet
+6. update `close-proving-run` and maintenance drift checks to consume lifecycle state
+7. add tests and doc updates for every transition
 
-No new subcommand. No second handoff format. No standalone `implementation-summary.json`.
+Anything smaller leaves the repo with partial truth again.
 
 ### Complexity check
 
-This work touches one Rust module cluster, one prompt template, one test harness, and one operator doc set. That is comfortably inside "engineered enough" territory.
+This plan touches more than 8 files and more than 2 modules. That is a smell by default. Here it is justified because the change crosses five already-shipped lifecycle owners:
 
-Expected touched files:
+- approval
+- onboarding
+- runtime
+- publication/closeout
+- maintenance
 
-- `PLAN.md`
-- `crates/xtask/src/runtime_follow_on.rs`
-- `crates/xtask/src/runtime_follow_on/models.rs`
-- `crates/xtask/src/runtime_follow_on/render.rs`
-- `crates/xtask/templates/runtime_follow_on_codex_prompt.md`
-- `crates/xtask/tests/runtime_follow_on_entrypoint.rs`
-- `crates/xtask/tests/fixtures/fake_codex.sh`
-- `docs/cli-agent-onboarding-factory-operator-guide.md`
+The scope reduction decision is:
+
+- keep one new shared module: `crates/xtask/src/agent_lifecycle.rs`
+- keep one new command: `xtask prepare-publication`
+- do not add a second handoff artifact family beyond `lifecycle-state.json` and `publication-ready.json`
+- do not create a new crate
+- do not change runtime write boundaries
+
+### Search/build check
+
+Repo search already shows the right primitives. Reuse them.
+
+- Use the existing `xtask` subcommand pattern in `crates/xtask/src/main.rs`.
+- Use the existing `serde` JSON model pattern from `runtime_follow_on/models.rs`.
+- Use existing path validation and repo-root resolution patterns from `approval_artifact.rs`, `onboard_agent.rs`, and `close_proving_run.rs`.
+- Use existing publication consistency checks in `support_matrix.rs` and drift inspection logic in `agent_maintenance/drift/publication.rs`.
+- Keep the current explicit backend capability inventory in `capability_matrix.rs`; add lifecycle-aware validation around it instead of spending an innovation token on dynamic backend loading.
 
 ### TODOS cross-reference
 
-`TODOS.md` already contains the correct downstream item for publication refresh. No new TODO is required. This plan should make that existing follow-on easier by handing it a richer and stricter `handoff.json`.
+This plan does not require a new backlog theme.
+
+It turns the current diagnosis into an implementation path behind these existing TODOs:
+
+- `Enclose The Runtime Follow-On In A Codex Exec Runner`
+- `Enclose The Publication Refresh Follow-On After The Runtime Runner`
+
+No new TODO entry is required in this milestone. The plan itself is the missing contract.
 
 ### Completeness decision
 
-The shortcut version would be "add more prose to `run-summary.md`."
+The shortcut version would be:
 
-That is not acceptable. It would improve readability but not enforceability. The complete version is still cheap here because the runner already has a typed model layer and a test harness. This is a boilable lake:
+- add more prose to `HANDOFF.md`
+- maybe widen `handoff.json`
+- keep lifecycle truth split across commands
 
-- typed fields
-- typed validation
-- generated markdown from the same source
-- regression tests that lock behavior
+That is not acceptable. The repo already has deterministic machinery. With AI-assisted coding, the extra cost of a real lifecycle record, real transition validation, and real regression tests is low. This is a boilable lake.
+
+### Distribution check
+
+No new distributed artifact type is introduced. This is an internal `xtask` and committed-governance change.
+
+- no new binary distribution pipeline
+- no new package manager surface
+- no container or service rollout
+
+The only new machine-readable artifacts are committed repo governance files:
+
+- `lifecycle-state.json`
+- `publication-ready.json`
 
 ## Architecture
 
 ### Current to target flow
 
 ```text
-approved-agent.toml + agent_registry.toml + dry-run packet
-                │
-                ▼
-      runtime_follow_on::build_context
-                │
-                ├──────────────▶ input-contract.json
-                ├──────────────▶ codex-prompt.md
-                └──────────────▶ requested tier / allowed rich surfaces / required test
-                                   │
-                                   ▼
-                            codex exec --write
-                                   │
-                     ┌─────────────┴─────────────┐
-                     ▼                           ▼
-              repo runtime writes         handoff.json
-                                          implementation_summary{}
-                     │                           │
-                     └─────────────┬─────────────┘
-                                   ▼
-                         validate_write_mode()
-                                   │
-           ┌───────────────────────┼────────────────────────┐
-           ▼                       ▼                        ▼
-   boundary + manifest      summary semantics      test + publication readiness
-           │                       │                        │
-           └───────────────────────┴──────────────┬─────────┘
-                                                  ▼
-                                 render_run_summary() from validated data
-                                                  │
-                                                  ▼
-                    run-status.json + run-summary.md + validation-report.json
-                                                  │
-                                                  ▼
-                          publication refresh consumes the same handoff.json
+recommend-next-agent
+  -> approved-agent.toml
+  -> onboard-agent --write
+       seeds lifecycle-state.json as enrolled/bootstrap
+  -> scaffold-wrapper-crate --write
+       writes crate shell only
+  -> runtime-follow-on --dry-run
+       freezes packet from approval + registry + lifecycle state
+  -> runtime-follow-on --write
+       writes runtime-owned code/evidence
+       updates lifecycle-state.json to runtime_integrated
+  -> prepare-publication --write
+       validates publication continuity
+       writes publication-ready.json
+       updates lifecycle-state.json to publication_ready
+  -> support-matrix / capability-matrix / capability-matrix-audit / preflight
+       refresh and verify published surfaces
+  -> close-proving-run --write
+       validates green publication state
+       advances lifecycle state to closed_baseline
+  -> check-agent-drift / refresh-agent / close-agent-maintenance
+       compare future repo truth against lifecycle baseline
 ```
 
-### Canonical model changes
+### Authority and precedence
 
-All new semantics live in `crates/xtask/src/runtime_follow_on/models.rs`.
+| Domain | Authoritative source | Writers | Consumers |
+| --- | --- | --- | --- |
+| Approval truth | `approved-agent.toml` | recommendation/promotion flow | onboard-agent, runtime-follow-on, prepare-publication |
+| Registry truth | `crates/xtask/data/agent_registry.toml` | onboard-agent | runtime-follow-on, publication generators, maintenance |
+| Lifecycle progression | `docs/agents/lifecycle/<pack>/governance/lifecycle-state.json` | onboard-agent, runtime-follow-on, prepare-publication, close-proving-run, maintenance closeout | all lifecycle commands |
+| Runtime implementation summary | `lifecycle-state.json` `implementation_summary` | runtime-follow-on | prepare-publication, close-proving-run, maintenance |
+| Publication handoff | `docs/agents/lifecycle/<pack>/governance/publication-ready.json` | prepare-publication | operator workflow, close-proving-run |
+| Published support/capability surfaces | `support-matrix`, `capability-matrix`, `capability-matrix-audit` outputs | publication commands | close-proving-run, maintenance drift |
+| Maintenance drift baseline | `lifecycle-state.json` + create/maintenance closeout artifacts | close-proving-run, maintenance closeout | drift checks |
 
-Add these Rust types:
+Precedence rules:
 
-- `AchievedTier` enum with exactly: `default`, `minimal`, `feature-rich`
-- `TemplateId` enum with exactly: `opencode`, `gemini_cli`, `codex`, `claude_code`
-- `SurfaceId` enum with exactly:
-  - `wrapper_runtime`
-  - `backend_harness`
-  - `agent_api_onboarding_test`
-  - `wrapper_coverage_source`
-  - `runtime_manifest_evidence`
-  - `add_dirs`
-  - `external_sandbox_policy`
-  - `mcp_management`
-  - `richer_session_runtime`
-- `DeferredSurface { surface: SurfaceId, reason: String }`
-- `ImplementationSummary`
+1. `approved-agent.toml` owns approval declaration truth. Lifecycle state may reference it, never override it.
+2. `agent_registry.toml` owns repo placement and publication enrollment flags. Lifecycle state may validate continuity, never shadow those fields.
+3. `lifecycle-state.json` owns stage, tier, side-state, evidence satisfaction, and next-command truth.
+4. `publication-ready.json` is the only committed publication handoff artifact. Scratch `handoff.json` stays run evidence only.
+5. Published support/capability surfaces remain derived outputs, not lifecycle authority.
 
-`ImplementationSummary` shape:
+### Important terminology decision
 
-```json
-{
-  "achieved_tier": "default",
-  "primary_template": "opencode",
-  "template_lineage": ["opencode"],
-  "landed_surfaces": [
-    "wrapper_runtime",
-    "backend_harness",
-    "agent_api_onboarding_test",
-    "wrapper_coverage_source",
-    "runtime_manifest_evidence"
-  ],
-  "deferred_surfaces": [
-    {
-      "surface": "mcp_management",
-      "reason": "not approved for this runtime lane"
-    }
-  ],
-  "minimal_tier_justification": null
-}
-```
+There are two different "tier" concepts in this repo today. They must stay separate.
 
-Serialization rules for every new enum in this section:
+1. `runtime profile`
+   - current `runtime-follow-on` vocabulary
+   - values: `minimal`, `default`, `feature_rich`
+   - meaning: how much runtime implementation was requested/landed
 
-- Use `serde` string enums with `kebab-case` values.
-- JSON must never contain numeric discriminants.
-- Validation failures must name the offending field.
+2. `support tier`
+   - new lifecycle overlay
+   - values: `bootstrap`, `baseline_runtime`, `publication_backed`, `first_class`
+   - meaning: how trustworthy and complete the repo's end-to-end support posture is
 
-### Exact artifact contract changes
+Do not overload one for the other. `runtime-follow-on` summary fields use runtime profile terms. `lifecycle-state.json` top-level uses support tier terms.
 
-#### `InputContract`
+### Lifecycle state contract
 
-Add these fields:
+File:
 
-- `expected_default_surfaces: Vec<SurfaceId>`
-- `known_template_ids: Vec<TemplateId>`
-- `known_rich_surfaces: Vec<SurfaceId>`
+- `docs/agents/lifecycle/<onboarding_pack_prefix>/governance/lifecycle-state.json`
 
-Populate them in `build_context`. Do not derive them from prompt text at validation time.
+Serialization rules:
 
-`expected_default_surfaces` must contain exactly:
+- JSON only
+- `schema_version = "1"`
+- string enums only, no numeric discriminants
+- lifecycle and side-state enums use `snake_case`
+- command names are stored as literal command strings
+
+Top-level fields:
+
+- `schema_version: "1"`
+- `agent_id: string`
+- `onboarding_pack_prefix: string`
+- `approval_artifact_path: string`
+- `approval_artifact_sha256: string`
+- `lifecycle_stage: approved | enrolled | runtime_integrated | publication_ready | published | closed_baseline`
+- `support_tier: bootstrap | baseline_runtime | publication_backed | first_class`
+- `side_states: string[]`
+  - allowed: `blocked`, `failed_retryable`, `drifted`, `deprecated`
+- `current_owner_command: string`
+- `expected_next_command: string`
+- `last_transition_at: RFC3339 string`
+- `last_transition_by: string`
+- `required_evidence: string[]`
+- `satisfied_evidence: string[]`
+- `blocking_issues: string[]`
+- `retryable_failures: string[]`
+- `implementation_summary: object | null`
+- `publication_packet_path: string | null`
+- `publication_packet_sha256: string | null`
+- `closeout_baseline_path: string | null`
+
+`implementation_summary` fields:
+
+- `requested_runtime_profile: minimal | default | feature_rich`
+- `achieved_runtime_profile: minimal | default | feature_rich`
+- `primary_template: opencode | gemini_cli | codex | claude_code | aider`
+- `template_lineage: string[]`
+- `landed_surfaces: string[]`
+- `deferred_surfaces: { surface: string, reason: string }[]`
+- `minimal_profile_justification: string | null`
+
+Allowed `landed_surfaces` / `deferred_surfaces.surface` values:
 
 - `wrapper_runtime`
 - `backend_harness`
 - `agent_api_onboarding_test`
 - `wrapper_coverage_source`
 - `runtime_manifest_evidence`
-
-`known_template_ids` must contain exactly:
-
-- `opencode`
-- `gemini_cli`
-- `codex`
-- `claude_code`
-
-`known_rich_surfaces` must contain exactly:
-
 - `add_dirs`
 - `external_sandbox_policy`
 - `mcp_management`
-- `richer_session_runtime`
+- `session_resume`
+- `session_fork`
+- `structured_tools`
 
-#### `HandoffContract`
+Writer rules:
 
-Keep existing fields and add exactly:
+- `onboard-agent`: may create the file and set `approved -> enrolled`
+- `scaffold-wrapper-crate`: must not mutate lifecycle state
+- `runtime-follow-on`: may advance `enrolled -> runtime_integrated`
+- `prepare-publication`: may advance `runtime_integrated -> publication_ready`
+- `close-proving-run`: may atomically validate `published` state and write final `closed_baseline`
+- maintenance closeout: may clear `drifted`, update satisfied evidence, and keep stage at `closed_baseline`
 
-- `publication_refresh_ready: bool`
-- `implementation_summary: ImplementationSummary`
+### Legal stage and support-tier combinations
 
-Dry-run `handoff.json` must still be emitted, but it must now contain:
+| Stage | Allowed support tier(s) |
+| --- | --- |
+| `approved` | `bootstrap` |
+| `enrolled` | `bootstrap` |
+| `runtime_integrated` | `bootstrap`, `baseline_runtime` |
+| `publication_ready` | `baseline_runtime` |
+| `published` | `publication_backed`, `first_class` |
+| `closed_baseline` | `baseline_runtime`, `publication_backed`, `first_class` |
 
-- `runtime_lane_complete = false`
-- `publication_refresh_required = true`
-- `publication_refresh_ready = false`
-- `blockers = ["Pending runtime follow-on implementation."]`
-- a placeholder `implementation_summary` with this exact shape:
+Illegal combinations that must fail validation:
 
-```json
-{
-  "achieved_tier": "<requested_tier>",
-  "primary_template": "opencode",
-  "template_lineage": [],
-  "landed_surfaces": [],
-  "deferred_surfaces": [],
-  "minimal_tier_justification": null
-}
-```
+- `approved` with anything above `bootstrap`
+- `published` with `bootstrap`
+- `first_class` before `published`
+- `closed_baseline` with `bootstrap`
 
-The dry-run placeholder is intentionally parseable but not semantically sufficient for write-mode success.
+### Publication-ready packet contract
 
-Successful write-mode `handoff.json` must contain all legacy fields plus the new fields in the same object. No second machine-readable summary file is allowed.
+File:
 
-#### `RunStatus`
+- `docs/agents/lifecycle/<onboarding_pack_prefix>/governance/publication-ready.json`
 
-Add only these mirrored fields:
+Producer:
 
-- `tier_achieved: Option<AchievedTier>`
-- `primary_template: Option<TemplateId>`
-- `publication_refresh_ready: bool`
-- `deferred_surface_count: Option<usize>`
+- `cargo run -p xtask -- prepare-publication --approval <path> --write`
 
-`RunStatus` remains operator-focused. It must not duplicate the full summary object.
+Validator:
 
-Field population rules:
+- `cargo run -p xtask -- prepare-publication --approval <path> --check`
 
-- dry-run:
-  - `tier_achieved = null`
-  - `primary_template = null`
-  - `publication_refresh_ready = false`
-  - `deferred_surface_count = null`
-- write success:
-  - `tier_achieved = implementation_summary.achieved_tier`
-  - `primary_template = implementation_summary.primary_template`
-  - `publication_refresh_ready = handoff.publication_refresh_ready`
-  - `deferred_surface_count = implementation_summary.deferred_surfaces.len()`
-- write failure:
-  - `tier_achieved = null`
-  - `primary_template = null`
-  - `publication_refresh_ready = false`
-  - `deferred_surface_count = null`
+Fields:
 
-#### `ValidationReport`
+- `schema_version: "1"`
+- `agent_id: string`
+- `approval_artifact_path: string`
+- `approval_artifact_sha256: string`
+- `lifecycle_state_path: string`
+- `lifecycle_state_sha256: string`
+- `lifecycle_stage: "publication_ready"`
+- `support_tier_at_emit: "baseline_runtime"`
+- `manifest_root: string`
+- `expected_targets: string[]`
+- `capability_publication_enabled: bool`
+- `support_publication_enabled: bool`
+- `capability_matrix_target: string | null`
+- `required_commands: string[]`
+- `required_publication_outputs: string[]`
+- `runtime_evidence_paths: string[]`
+- `publication_owned_paths: string[]`
+- `blocking_issues: string[]`
+- `implementation_summary: object`
 
-Keep the current shape. Add new `ValidationCheck` entries; do not add a new report format.
+This packet is the only committed publication handoff. Keep `handoff.json` as run evidence, not as long-lived lifecycle truth.
 
-Required new check names:
+### Command responsibility matrix
 
-- `implementation_summary_present`
-- `implementation_summary_semantics`
-- `publication_refresh_readiness`
-
-`ValidationReport.status` remains:
-
-- `prepared` for dry-run
-- `pass` for write success
-- `fail` for write failure
-
-### Validation rules
-
-`validate_handoff` becomes the semantic gate. It must enforce all of the following:
-
-1. `implementation_summary` exists and parses into the typed model.
-2. `achieved_tier` is a known enum value.
-3. `primary_template` is a known enum value.
-4. `template_lineage` is non-empty.
-5. `template_lineage` contains `primary_template`.
-6. `achieved_tier == requested_tier` for this milestone.
-7. `achieved_tier = minimal` requires non-empty `minimal_tier_justification`.
-8. `achieved_tier != minimal` requires `minimal_tier_justification = null`.
-9. Every surface in `allow_rich_surface` is accounted for in either `landed_surfaces` or `deferred_surfaces`.
-10. Every `deferred_surfaces[].reason` is non-empty after trim.
-11. `publication_refresh_ready = true` is allowed only when:
-    - `runtime_lane_complete = true`
-    - `blockers` is empty
-    - the canonical publication command set is present
-12. `required_commands` must match the canonical set after normalization:
-    - `support-matrix --check`
-    - `capability-matrix --check`
-    - `capability-matrix-audit`
-    - `make preflight`
-13. `landed_surfaces` must be unique.
-14. `deferred_surfaces[].surface` must be unique.
-15. A surface cannot appear in both `landed_surfaces` and `deferred_surfaces`.
-16. Every surface in `landed_surfaces` must be either:
-    - one of `expected_default_surfaces`, or
-    - one of `known_rich_surfaces`
-17. Every surface in `deferred_surfaces` must be one of `known_rich_surfaces`.
-18. A rich surface may appear in `landed_surfaces` or `deferred_surfaces` only if it was explicitly requested through `allow_rich_surface`.
-19. Tier-to-surface rules are fixed:
-    - `default` requires all `expected_default_surfaces` in `landed_surfaces`
-    - `minimal` requires at least:
-      - `wrapper_runtime`
-      - `wrapper_coverage_source`
-      - `runtime_manifest_evidence`
-    - `feature-rich` requires all `expected_default_surfaces` plus every surface from `allow_rich_surface` in `landed_surfaces`
-20. For `minimal`, any omitted default surface must appear in `deferred_surfaces` with a non-empty reason.
-
-Normalization rules for `required_commands`:
-
-- Trim leading and trailing ASCII whitespace on each command.
-- Drop empty strings after trim.
-- Compare as a deduplicated `BTreeSet<String>`.
-- Keep command strings case-sensitive.
-- The normalized set must equal the canonical set exactly. Superset and subset both fail.
-
-Surface classification rules:
-
-- Default surfaces:
-  - `wrapper_runtime`
-  - `backend_harness`
-  - `agent_api_onboarding_test`
-  - `wrapper_coverage_source`
-  - `runtime_manifest_evidence`
-- Rich surfaces:
-  - `add_dirs`
-  - `external_sandbox_policy`
-  - `mcp_management`
-  - `richer_session_runtime`
-
-Template-lineage rules:
-
-- `primary_template` must appear exactly once in `template_lineage`.
-- `template_lineage` order is meaningful: nearest baseline first, additional references after it.
-- Empty `template_lineage` is allowed only in the dry-run placeholder handoff. It is forbidden in write-mode validation.
-
-What the validator must not do:
-
-- inspect Rust code to "prove" the landed tier
-- infer template lineage from file diffs
-- decide whether the implementation quality is good enough beyond the declared summary contract
-
-This is explicit validation, not clever inference.
-
-### Rendering rules
-
-`render_run_summary` must render from validated structured data plus the existing validation report. It must not invent semantics and it must not parse `handoff.json` a second time.
-
-Required sections in `run-summary.md`:
-
-1. Outcome
-2. Implementation summary
-3. Validation checks
-4. Deferred surfaces
-5. Publication refresh handoff
-6. Written paths
-7. Errors, when present
-
-Required content in "Implementation summary":
-
-- requested tier
-- achieved tier
-- primary template
-- template lineage
-- landed surfaces
-- minimal-tier justification when applicable
-
-Required content in "Publication refresh handoff":
-
-- `publication_refresh_required`
-- `publication_refresh_ready`
-- blockers
-- required commands
-
-Ordering rules for `run-summary.md`:
-
-- `landed_surfaces` render in enum declaration order.
-- `deferred_surfaces` render in enum declaration order by `surface`.
-- `required_commands` render in canonical command order.
-- validation checks render in the order they were appended in `validate_write_mode`.
-
-### Prompt contract
-
-Update `crates/xtask/templates/runtime_follow_on_codex_prompt.md` so Codex is told to write the richer `handoff.json` contract directly.
-
-The prompt must state:
-
-- `handoff.json` is the only machine-readable handoff artifact
-- `implementation_summary` is required
-- all summary values must use the repo-owned enums from the packet
-- every requested rich surface must be either landed or explicitly deferred
-- `publication_refresh_ready` must remain `false` when blockers exist
-- `template_lineage` must be an ordered array of repo-owned template ids
-- rich surfaces not approved through `allow_rich_surface` are forbidden
-
-The prompt packet must expose the exact enum vocabularies and tier-to-surface rules above so Codex is not guessing strings.
+| Command | Transition | New responsibilities |
+| --- | --- | --- |
+| `onboard-agent` | `approved -> enrolled` | Seed lifecycle state, set bootstrap tier, define required evidence, define next command |
+| `scaffold-wrapper-crate` | none | No lifecycle write. Still shell only. |
+| `runtime-follow-on --dry-run` | none | Refuse to prepare without enrolled lifecycle state; carry approval + publication truth into frozen packet |
+| `runtime-follow-on --write` | `enrolled -> runtime_integrated` | Validate runtime-owned writes, write `implementation_summary`, mark satisfied runtime evidence |
+| `prepare-publication --write` | `runtime_integrated -> publication_ready` | Validate approval continuity, runtime evidence completeness, publication command requirements, write packet |
+| `support-matrix` / `capability-matrix` | none | Keep deriving global published surfaces; no lifecycle writes |
+| `close-proving-run` | `publication_ready -> published -> closed_baseline` | Validate green publication state, record baseline path, finalize support tier |
+| `check-agent-drift` | none | Compare published surfaces against lifecycle baseline; read-only |
+| `close-agent-maintenance` | `closed_baseline + drifted -> closed_baseline` | Clear drift and update evidence after maintenance closeout |
 
 ## Implementation Plan
 
-### Phase 1 - Schema
+### Milestone 1 - Shared lifecycle schema and backfill
 
-Files:
+Goal: land the shared contract first, without changing the runtime/publication boundary yet.
 
-- `crates/xtask/src/runtime_follow_on/models.rs`
-- `crates/xtask/src/runtime_follow_on.rs`
+#### Files
 
-Work:
+- New:
+  - `crates/xtask/src/agent_lifecycle.rs`
+  - `crates/xtask/tests/agent_lifecycle_state.rs`
+  - `docs/agents/lifecycle/codex-cli-onboarding/governance/lifecycle-state.json`
+  - `docs/agents/lifecycle/claude-code-cli-onboarding/governance/lifecycle-state.json`
+  - `docs/agents/lifecycle/opencode-cli-onboarding/governance/lifecycle-state.json`
+  - `docs/agents/lifecycle/gemini-cli-onboarding/governance/lifecycle-state.json`
+  - `docs/agents/lifecycle/aider-onboarding/governance/lifecycle-state.json`
+- Updated:
+  - `crates/xtask/src/lib.rs`
+  - `docs/cli-agent-onboarding-factory-operator-guide.md`
+  - `docs/specs/cli-agent-onboarding-charter.md`
 
-1. Add the new enums and structs.
-2. Extend `InputContract`, `HandoffContract`, and `RunStatus`.
-3. Seed `expected_default_surfaces`, `known_template_ids`, and `known_rich_surfaces` in `build_context`.
-4. Extend dry-run `handoff.json` defaults so the placeholder shape already matches the new contract.
-5. Extend prompt rendering so the enum vocabularies and tier-to-surface rules are visible in the packet.
+#### Work
 
-Exit condition:
+1. Add `agent_lifecycle.rs` with:
+   - state and packet structs
+   - enum validation
+   - path helpers
+   - load/write helpers
+   - stage/tier compatibility validation
+2. Backfill lifecycle state for existing agents.
+3. Do not fabricate historical onboarding packet docs for legacy agents. Backfill only the governance JSON where the pack is missing today.
+4. Add tests for:
+   - legal/illegal stage+tier combinations
+   - invalid side-state strings
+   - path validation
+   - sha/path round-trip behavior
 
-- dry-run artifacts serialize successfully with the new schema
-- no write-mode behavior changes yet beyond compile-safe model updates
+#### Initial backfill targets
 
-### Phase 2 - Semantic validation
+Use these exact initial states unless the implementing diff finds committed evidence that contradicts them:
 
-Files:
+| Agent | Lifecycle stage | Support tier | Reason |
+| --- | --- | --- | --- |
+| `codex` | `closed_baseline` | `first_class` | strongest current wrapper, capability, and support posture |
+| `claude_code` | `closed_baseline` | `first_class` | same category as codex |
+| `opencode` | `closed_baseline` | `publication_backed` | published support/capability evidence exists, but not first-class |
+| `gemini_cli` | `closed_baseline` | `publication_backed` | proving-run closeout exists and publication surfaces are enrolled |
+| `aider` | `runtime_integrated` | `baseline_runtime` | wrapper/backend landed, but no closed create-mode baseline yet |
 
-- `crates/xtask/src/runtime_follow_on.rs`
+If an audit during implementation contradicts this table, the code should trust committed evidence and update the table in the same PR.
 
-Work:
+#### Acceptance
 
-1. Extend `validate_handoff` with the 20 rules above.
-2. Record distinct `ValidationCheck` entries for summary presence, summary semantics, and publication readiness.
-3. Keep all existing boundary, manifest-split, and non-zero-write checks unchanged.
-4. Populate the new `RunStatus` fields only on write success.
+- `cargo test -p xtask --test agent_lifecycle_state`
+- `make check`
 
-Exit condition:
+### Milestone 2 - Onboarding and runtime integration
 
-- malformed or contradictory summary semantics fail before a run can be treated as successful
+Goal: make lifecycle state part of the create lane before publication.
 
-### Phase 3 - Rendering and prompt alignment
+#### Files
 
-Files:
+- Updated:
+  - `crates/xtask/src/onboard_agent.rs`
+  - `crates/xtask/src/runtime_follow_on.rs`
+  - `crates/xtask/src/runtime_follow_on/models.rs`
+  - `crates/xtask/src/runtime_follow_on/render.rs`
+  - `crates/xtask/templates/runtime_follow_on_codex_prompt.md`
+  - `crates/xtask/tests/onboard_agent_entrypoint/write_mode.rs`
+  - `crates/xtask/tests/runtime_follow_on_entrypoint.rs`
+  - `docs/cli-agent-onboarding-factory-operator-guide.md`
 
-- `crates/xtask/src/runtime_follow_on/render.rs`
-- `crates/xtask/templates/runtime_follow_on_codex_prompt.md`
+#### Work
 
-Work:
+1. `onboard-agent --dry-run`
+   - preview the new `lifecycle-state.json`
+   - show `current_owner_command = "onboard-agent"`
+   - show `expected_next_command = "scaffold-wrapper-crate --agent <agent_id> --write"`
+2. `onboard-agent --write`
+   - create `lifecycle-state.json`
+   - set:
+     - `lifecycle_stage = enrolled`
+     - `support_tier = bootstrap`
+     - `required_evidence = [registry_entry, docs_pack, manifest_root_skeleton]`
+3. `runtime-follow-on --dry-run`
+   - require enrolled lifecycle state
+   - extend `InputContract` with approval capability/publication fields:
+     - `canonical_targets`
+     - `always_on_capabilities`
+     - `target_gated_capabilities`
+     - `config_gated_capabilities`
+     - `backend_extensions`
+     - `support_matrix_enabled`
+     - `capability_matrix_enabled`
+     - `capability_matrix_target`
+   - render those into `codex-prompt.md`
+4. `runtime-follow-on --write`
+   - on success, update `lifecycle-state.json`
+   - set:
+     - `lifecycle_stage = runtime_integrated`
+     - `support_tier = baseline_runtime`
+     - `implementation_summary = ...`
+     - `expected_next_command = "prepare-publication --approval <path> --write"`
+   - on validation failure:
+     - add `failed_retryable` or `blocked`
+     - append exact blocker text
+   - do not write `publication-ready.json`
+5. Keep scratch artifacts (`handoff.json`, `run-status.json`, `run-summary.md`) as evidence only.
 
-1. Make `render_run_summary` output the new maintainer-facing sections from validated data.
-2. Mirror the minimal extra fields into `RunStatus`.
-3. Update the prompt so fake Codex and real Codex are both aiming at the same handoff contract.
-4. Keep render ordering deterministic using the ordering rules above.
+#### Acceptance
 
-Exit condition:
+- `cargo test -p xtask --test onboard_agent_entrypoint`
+- `cargo test -p xtask --test runtime_follow_on_entrypoint`
+- targeted dry-run/write fixture coverage for lifecycle state creation and update
 
-- summary markdown and status JSON are both deterministic projections of validated data
+### Milestone 3 - Prepare-publication seam
 
-### Phase 4 - Regression harness
+Goal: add the missing deterministic bridge between runtime truth and publication refresh.
 
-Files:
+#### Files
 
-- `crates/xtask/tests/runtime_follow_on_entrypoint.rs`
-- `crates/xtask/tests/fixtures/fake_codex.sh`
+- New:
+  - `crates/xtask/src/prepare_publication.rs`
+  - `crates/xtask/tests/prepare_publication_entrypoint.rs`
+- Updated:
+  - `crates/xtask/src/lib.rs`
+  - `crates/xtask/src/main.rs`
+  - `crates/xtask/src/capability_matrix.rs`
+  - `crates/xtask/src/support_matrix.rs`
+  - `docs/cli-agent-onboarding-factory-operator-guide.md`
+  - `docs/specs/cli-agent-onboarding-charter.md`
 
-Work:
-
-1. Extend the fixture script to emit the richer success path.
-2. Add explicit failure scenarios for missing summary, contradictory readiness, tier mismatch, required-command mismatch, duplicate surfaces, unauthorized rich surfaces, and unaccounted rich surfaces.
-3. Add or extend tests to lock the rendered markdown output.
-
-Exit condition:
-
-- success path proves the richer summary contract
-- every new semantic failure mode has a regression test
-
-### Phase 5 - Docs
-
-Files:
-
-- `docs/cli-agent-onboarding-factory-operator-guide.md`
-
-Work:
-
-1. Update the required runtime scratch artifacts description.
-2. Document the richer `handoff.json` contract and `publication_refresh_ready`.
-3. State that publication refresh still consumes the same handoff artifact and remains the next lane.
-
-Exit condition:
-
-- the live operator guide matches the shipped schema and validation behavior
-
-## Test Plan
-
-Project test framework: Rust workspace tests under `cargo test`.
-
-Target verification commands:
+#### Command contract
 
 ```sh
-cargo test -p xtask --test runtime_follow_on_entrypoint
-cargo test -p xtask runtime_follow_on
-make fmt-check
-make clippy
+cargo run -p xtask -- prepare-publication --approval docs/agents/lifecycle/<pack>/governance/approved-agent.toml --write
+cargo run -p xtask -- prepare-publication --approval docs/agents/lifecycle/<pack>/governance/approved-agent.toml --check
 ```
 
-### Code path coverage
+#### Work
+
+1. Add `PreparePublication` subcommand wiring in `main.rs`.
+2. `prepare-publication --write` must:
+   - load approval artifact
+   - load lifecycle state
+   - require `lifecycle_stage = runtime_integrated`
+   - validate approval sha/path continuity
+   - validate runtime evidence paths exist
+   - validate runtime summary is explicit
+   - validate required publication commands are exactly:
+     - `support-matrix --check`
+     - `capability-matrix --check`
+     - `capability-matrix-audit`
+     - `make preflight`
+   - write `publication-ready.json`
+   - update lifecycle state to:
+     - `lifecycle_stage = publication_ready`
+     - `expected_next_command = "support-matrix && capability-matrix && capability-matrix-audit && make preflight"`
+3. `prepare-publication --check` must re-validate the packet against current lifecycle/approval/runtime truth without rewriting.
+4. Add a capability inventory continuity check:
+   - if an agent has `capability_matrix_enabled = true` but `capability_matrix.rs` cannot construct runtime capabilities for it, fail `prepare-publication` with an explicit error
+   - do not refactor backend loading dynamically in this milestone
+5. Do not let `prepare-publication` write any published support/capability outputs.
+
+#### Acceptance
+
+- `cargo test -p xtask --test prepare_publication_entrypoint`
+- `cargo test -p xtask --test runtime_follow_on_entrypoint`
+- `make check`
+
+### Milestone 4 - Closeout and maintenance continuity
+
+Goal: make create-mode closeout the baseline that future maintenance compares against.
+
+#### Files
+
+- Updated:
+  - `crates/xtask/src/close_proving_run.rs`
+  - `crates/xtask/src/agent_maintenance/closeout.rs`
+  - `crates/xtask/src/agent_maintenance/drift/publication.rs`
+  - `crates/xtask/tests/onboard_agent_closeout_preview/close_proving_run_paths.rs`
+  - `crates/xtask/tests/onboard_agent_closeout_preview/close_proving_run_write.rs`
+  - `crates/xtask/tests/agent_maintenance_closeout.rs`
+  - `crates/xtask/tests/agent_maintenance_drift.rs`
+  - `docs/cli-agent-onboarding-factory-operator-guide.md`
+
+#### Work
+
+1. `close-proving-run`
+   - require `lifecycle_stage = publication_ready`
+   - validate the published support/capability surfaces are green for the agent
+   - record `publication-ready.json` continuity
+   - update lifecycle state to:
+     - `lifecycle_stage = closed_baseline`
+     - `publication_packet_path = ...`
+     - `closeout_baseline_path = ...`
+     - `side_states` cleared except `deprecated`
+   - default future-agent tier outcome to `publication_backed`
+2. Keep `first_class` auto-promotion out of scope.
+   - Existing legacy backfills may stay `first_class`
+   - Future automatic first-class elevation is deferred
+3. `check-agent-drift`
+   - stay read-only
+   - compare published support/capability outputs against lifecycle baseline
+   - when drift is found, report that the agent should be treated as `closed_baseline + drifted`
+4. `close-agent-maintenance`
+   - clear `drifted`
+   - update evidence fields in lifecycle state
+
+#### Acceptance
+
+- `cargo test -p xtask --test onboard_agent_closeout_preview`
+- `cargo test -p xtask --test agent_maintenance_closeout`
+- `cargo test -p xtask --test agent_maintenance_drift`
+- `make test`
+
+## Code Quality Rules
+
+1. Keep all lifecycle schema code in `crates/xtask/src/agent_lifecycle.rs`. Do not duplicate stage or tier enums in multiple commands.
+2. Keep JSON enums explicit and string-backed. No numeric discriminants.
+3. Keep lifecycle write logic behind one helper API. Commands should describe transitions, not hand-roll file mutations.
+4. Keep scratch runtime artifacts and committed lifecycle artifacts separate.
+5. Do not add a second committed runtime summary file. `implementation_summary` belongs inside `lifecycle-state.json`.
+6. Do not build a generic workflow engine. One shared module plus explicit command logic is enough.
+7. Update nearby ASCII diagrams if the flow changes during implementation. Stale diagrams are a bug.
+
+## Test Review
+
+### Test framework
+
+This repo is a Rust workspace.
+
+- primary test runner: `cargo test`
+- repo gate: `make test`
+- targeted crate gate: `cargo test -p xtask`
+
+### Code path coverage plan
 
 ```text
-CODE PATH COVERAGE
-===========================
-[+] crates/xtask/src/runtime_follow_on/models.rs
-    │
-    ├── ImplementationSummary serde contract
-    │   ├── [GAP] valid default summary round-trips
-    │   ├── [GAP] minimal summary requires justification
-    │   └── [GAP] invalid enum values are rejected
-    │
-[+] crates/xtask/src/runtime_follow_on.rs
-    │
-    ├── build_context()
-    │   ├── [GAP] expected_default_surfaces are populated
-    │   └── [GAP] known template and rich-surface ids are populated
-    │
-    ├── validate_handoff()
-    │   ├── [★★ TESTED] missing required legacy field fails
-    │   ├── [GAP] missing implementation_summary fails
-    │   ├── [GAP] publication_refresh_ready=true with blockers fails
-    │   ├── [GAP] achieved_tier != requested_tier fails
-    │   ├── [GAP] minimal without summary justification fails
-    │   ├── [GAP] requested rich surface omitted from landed/deferred fails
-    │   ├── [GAP] unapproved rich surface in landed_surfaces fails
-    │   ├── [GAP] duplicate landed/deferred surfaces fail
-    │   └── [GAP] required_commands set mismatch fails
-    │
-    ├── validate_write_mode()
-    │   ├── [★★★ TESTED] out-of-bounds path rejection
-    │   ├── [★★★ TESTED] generated wrapper_coverage.json rejection
-    │   ├── [★★ TESTED] no-op runtime run rejection
-    │   └── [GAP] successful semantic summary feeds status + markdown
-    │
-[+] crates/xtask/src/runtime_follow_on/render.rs
-    │
-    ├── render_run_summary()
-    │   ├── [GAP] success summary shows achieved tier, template lineage, deferred surfaces
-    │   └── [GAP] failure summary still shows partial semantic context
+CODE PATH COVERAGE PLAN
+=======================
+[+] agent_lifecycle.rs
+    ├── [NEW TEST] legal stage+tier matrix
+    ├── [NEW TEST] illegal stage+tier combinations
+    ├── [NEW TEST] lifecycle-state path validation
+    └── [NEW TEST] publication-ready packet validation
+
+[+] onboard_agent::run
+    ├── [UPDATE TEST] dry-run previews lifecycle-state.json
+    ├── [UPDATE TEST] write seeds enrolled/bootstrap state
+    └── [GAP TODAY -> PLAN] duplicate or conflicting lifecycle-state seed rejected
+
+[+] runtime_follow_on::build_context / persist_dry_run_artifacts
+    ├── [UPDATE TEST] input-contract carries approval capability/publication truth
+    ├── [UPDATE TEST] prompt renders that truth
+    ├── [UPDATE TEST] dry-run requires enrolled lifecycle state
+    └── [UPDATE TEST] scratch handoff remains non-authoritative
+
+[+] runtime_follow_on::validate_write_mode
+    ├── [UPDATE TEST] success advances lifecycle to runtime_integrated
+    ├── [UPDATE TEST] failure writes failed_retryable or blocked state
+    ├── [UPDATE TEST] implementation_summary required
+    └── [UPDATE TEST] publication-ready packet is not written here
+
+[+] prepare_publication::run
+    ├── [NEW TEST] write requires runtime_integrated state
+    ├── [NEW TEST] write rejects missing runtime evidence
+    ├── [NEW TEST] write rejects capability inventory mismatch
+    ├── [NEW TEST] write emits publication-ready.json
+    └── [NEW TEST] check mode detects stale or inconsistent packet
+
+[+] close_proving_run::run
+    ├── [UPDATE TEST] requires publication_ready state
+    ├── [UPDATE TEST] rejects stale published surfaces
+    ├── [UPDATE TEST] writes closed_baseline and baseline path
+    └── [UPDATE TEST] does not auto-promote to first_class
+
+[+] agent_maintenance drift + closeout
+    ├── [UPDATE TEST] drift reads lifecycle baseline
+    ├── [UPDATE TEST] drift reports lifecycle continuity mismatch
+    └── [UPDATE TEST] maintenance closeout clears drifted
 ```
 
-### User flow coverage
+### User flow coverage plan
 
 ```text
 USER FLOW COVERAGE
-===========================
-[+] Dry-run packet preparation
-    │
-    ├── [★★ TESTED] bounded scratch packet is written
-    └── [GAP] placeholder implementation_summary is emitted in dry-run handoff
+==================
+[+] New agent create lane
+    ├── approval -> onboard-agent -> scaffold-wrapper-crate -> runtime-follow-on -> prepare-publication -> publication -> close-proving-run
+    └── [→E2E-ish fixture flow] cover with xtask fixture integration across commands
 
-[+] Default-tier write success
-    │
-    ├── [★★ TESTED] write path requires real runtime-owned changes
-    └── [GAP] [→INTEG] successful run emits rich handoff + rich markdown summary
+[+] Runtime retry flow
+    ├── runtime-follow-on write fails validation
+    ├── lifecycle marks failed_retryable
+    └── second write succeeds and clears retryable failure
 
-[+] Minimal-tier exception run
-    │
-    ├── [★★ TESTED] minimal without justification is rejected at arg validation
-    └── [GAP] [→INTEG] minimal with justification produces structured exception summary
+[+] Publication blocked flow
+    ├── runtime lane succeeds
+    ├── prepare-publication rejects missing evidence or inventory mismatch
+    └── operator gets exact blocker and no publication-ready packet
 
-[+] Feature-rich opt-in run
-    │
-    ├── [GAP] [→INTEG] requested rich surface marked as landed passes
-    └── [GAP] [→INTEG] requested rich surface omitted without defer reason fails
-
-[+] Publication handoff review
-    │
-    ├── [★★ TESTED] required command presence is enforced today
-    └── [GAP] [→INTEG] publication_refresh_ready semantics are enforced
+[+] Maintenance drift flow
+    ├── closed baseline exists
+    ├── published support/capability surface drifts
+    └── drift command reports lifecycle mismatch without mutating files
 ```
 
-### Required tests to add
+### Regression rules
 
-Add these tests in `crates/xtask/tests/runtime_follow_on_entrypoint.rs` unless a narrower unit test is clearly simpler:
+These are mandatory regression tests:
 
-1. `runtime_follow_on_dry_run_emits_placeholder_implementation_summary`
-2. `runtime_follow_on_write_accepts_rich_implementation_summary`
-3. `runtime_follow_on_write_rejects_missing_implementation_summary`
-4. `runtime_follow_on_write_rejects_publication_ready_with_blockers`
-5. `runtime_follow_on_write_rejects_tier_mismatch`
-6. `runtime_follow_on_write_rejects_minimal_summary_without_justification`
-7. `runtime_follow_on_write_rejects_unaccounted_rich_surface`
-8. `runtime_follow_on_write_rejects_unapproved_rich_surface`
-9. `runtime_follow_on_write_rejects_duplicate_surface_entries`
-10. `runtime_follow_on_write_rejects_required_command_set_mismatch`
-11. `runtime_follow_on_write_records_status_fields_from_validated_summary`
-12. `render_run_summary_renders_validated_semantic_fields`
+1. `runtime-follow-on` must not regress its write boundary protections while adding lifecycle writes.
+2. `support-matrix` and `capability-matrix` must continue generating their current outputs for existing agents unless the lifecycle plan explicitly changes those outputs.
+3. `close-proving-run` must keep its current path validation behavior while adding lifecycle updates.
 
-Each test must assert exact operator-visible behavior, not just non-throw behavior.
+### Required test files
+
+- New:
+  - `crates/xtask/tests/agent_lifecycle_state.rs`
+  - `crates/xtask/tests/prepare_publication_entrypoint.rs`
+- Updated:
+  - `crates/xtask/tests/onboard_agent_entrypoint/write_mode.rs`
+  - `crates/xtask/tests/runtime_follow_on_entrypoint.rs`
+  - `crates/xtask/tests/onboard_agent_closeout_preview/close_proving_run_paths.rs`
+  - `crates/xtask/tests/onboard_agent_closeout_preview/close_proving_run_write.rs`
+  - `crates/xtask/tests/agent_maintenance_closeout.rs`
+  - `crates/xtask/tests/agent_maintenance_drift.rs`
+
+## Performance Review
+
+This is not a request-path performance project. The risks are repo-tooling latency and repeated file parsing.
+
+Rules:
+
+1. Parse approval artifact and lifecycle state once per command invocation.
+2. Do not rescan all lifecycle packs from runtime-follow-on or prepare-publication.
+3. Keep publication validation agent-scoped where possible. If a global generator must run, reuse existing derivation instead of adding a second pass.
+4. Do not hash large trees repeatedly inside one command. Hash the specific lifecycle/packet files being validated.
+5. Keep backfill manual and committed. Do not add a repo-wide migration runner that walks everything on every invocation.
+
+Potential slow paths to watch:
+
+- repeated `support_matrix` and `capability_matrix` full derivations during `prepare-publication`
+- repeated `fs::canonicalize` and JSON parsing in hot loops
+- double-reading the same lifecycle file from command and validator helper
 
 ## Failure Modes Registry
 
-| Codepath | Realistic failure | Test required | Error handling required | Operator-visible impact if missed |
+| Codepath | Realistic failure | Test required | Error handling required | User-visible result |
 | --- | --- | --- | --- | --- |
-| `validate_handoff` | Codex writes the legacy handoff shape with no `implementation_summary` | yes | hard fail | semantic downgrade looks like a valid success |
-| publication readiness logic | handoff says ready while blockers still exist | yes | hard fail | publication lane starts from a false green state |
-| rich surface accounting | approved rich surface disappears from the output summary | yes | hard fail | reviewers think omission was intentional |
-| minimal-tier exception flow | justification exists in input but is absent from the handoff summary | yes | hard fail | exception-tier ship has no rationale |
-| renderer | markdown omits deferred surfaces while JSON includes them | yes | deterministic render fix | reviewer misses the real scope cut |
-| status projection | `run-status.json` claims readiness without matching handoff semantics | yes | hard fail or projection fix | dashboards show a false-ready run |
+| `onboard-agent` lifecycle seed | pack path exists but lifecycle file is malformed or divergent | yes | reject write with exact path and field | clear validation error |
+| `runtime-follow-on` lifecycle read | runtime packet prepared against missing or non-enrolled state | yes | reject dry-run/write | clear error, no scratch ambiguity |
+| `runtime-follow-on` lifecycle update | runtime writes succeed but lifecycle write fails | yes | fail command, leave scratch evidence, do not claim success | explicit failure, no silent partial close |
+| `prepare-publication` capability continuity | agent enrolled for capability publication but inventory cannot construct runtime backend capabilities | yes | reject packet creation | explicit blocker naming `capability_matrix.rs` gap |
+| `prepare-publication` missing evidence | runtime stage set but wrapper coverage/report evidence absent | yes | reject packet creation | explicit blocker list |
+| `close-proving-run` stale publication surfaces | packet exists but published surfaces are stale or contradictory | yes | reject closeout | agent cannot reach closed baseline falsely |
+| maintenance drift | published surface changes but lifecycle baseline not consulted | yes | report drift mismatch | actionable drift finding |
 
-Critical gap rule: any path that loses semantic context without failing validation is a release-blocking defect for this milestone.
+Critical gaps that must not ship:
+
+- lifecycle update failure with command success
+- publication-ready packet emitted without runtime evidence
+- closeout succeeding without green published surfaces
+- maintenance drift check ignoring lifecycle baseline
+
+## NOT in scope
+
+- Dynamic backend loading for `capability_matrix.rs`
+- Automatic first-class promotion rules for future agents
+- A one-command create lane from approval through closeout
+- Moving maintenance artifacts out of `docs/agents/lifecycle/<agent>-maintenance/**`
+- Replacing `runtime-follow-on` scratch artifacts with committed governance artifacts
+- Deleting `support_matrix_enabled` or `capability_matrix_enabled` from the registry in this milestone
 
 ## Worktree Parallelization Strategy
 
@@ -686,61 +770,61 @@ Critical gap rule: any path that loses semantic context without failing validati
 
 | Step | Modules touched | Depends on |
 | --- | --- | --- |
-| Define summary enums and structs | `crates/xtask/src/runtime_follow_on/` | — |
-| Populate packet defaults and known value sets | `crates/xtask/src/runtime_follow_on/` | Define summary enums and structs |
-| Enforce richer handoff validation | `crates/xtask/src/runtime_follow_on/` | Populate packet defaults and known value sets |
-| Render richer summary and status projection | `crates/xtask/src/runtime_follow_on/` | Define summary enums and structs |
-| Extend fake Codex scenarios and entrypoint tests | `crates/xtask/tests/` | Enforce richer handoff validation |
-| Update operator guide | `docs/` | Define summary enums and structs |
+| M1 shared lifecycle schema + backfill | `crates/xtask/src/`, `crates/xtask/tests/`, `docs/agents/lifecycle/` | — |
+| M2 onboard + runtime integration | `crates/xtask/src/`, `crates/xtask/tests/`, `crates/xtask/templates/` | M1 |
+| M3 prepare-publication seam | `crates/xtask/src/`, `crates/xtask/tests/`, `docs/` | M2 |
+| M4 closeout + maintenance continuity | `crates/xtask/src/`, `crates/xtask/tests/`, `docs/` | M3 |
+| Docs polish and contract sync | `docs/specs/`, `docs/cli-agent-onboarding-factory-operator-guide.md` | M1 schema freeze, then parallel with M2/M3 code |
 
 ### Parallel lanes
 
-- Lane A: define summary enums and structs -> populate packet defaults and known value sets -> enforce richer handoff validation -> render richer summary and status projection
-- Lane B: update operator guide after Lane A freezes the schema vocabulary
-- Lane C: extend fake Codex scenarios -> add entrypoint regressions after Lane A freezes validator expectations
+- Lane A: M1 shared lifecycle schema -> M2 onboard/runtime integration -> M3 prepare-publication -> M4 closeout/maintenance
+  - sequential, shared `crates/xtask/src/`
+- Lane B: docs and lifecycle backfill content after M1 schema freeze
+  - can run in parallel with M2 and M3 if it avoids parent-owned command logic
+- Lane C: test-file updates after each milestone freeze
+  - can run in parallel with docs lane, but not with active edits to the same command module
 
 ### Execution order
 
-1. Launch Lane A first. It owns the contract and the validator.
-2. Once Lane A has frozen field names and validation rules, launch Lane B and Lane C in parallel worktrees.
-3. Merge B and C.
-4. Run the targeted xtask tests, then the formatting and clippy gates.
+1. Land M1 schema and backfill first.
+2. Once the lifecycle schema is frozen, launch:
+   - Lane A code work for M2
+   - Lane B docs/backfill polish
+3. After M2 code freeze, run Lane C test updates in parallel with remaining docs work.
+4. Repeat the same pattern for M3 and M4.
 
 ### Conflict flags
 
-- Lane A and Lane C both depend on exact field names in `handoff.json`. Do not run them in parallel before the schema is frozen.
-- Lane A and Lane B both depend on the final terminology for `publication_refresh_ready` and surface ids. Freeze names before updating docs.
+- `crates/xtask/src/main.rs` is a conflict magnet. Only one lane should own it at a time.
+- `crates/xtask/src/runtime_follow_on.rs`, `models.rs`, and `render.rs` should stay in one lane.
+- `docs/cli-agent-onboarding-factory-operator-guide.md` will conflict with any lane rewriting the workflow steps. Keep one docs owner.
 
-## NOT in scope
+Practical answer:
 
-- Auto-grading whether backend code is "truly default-tier" by inspecting implementation shape.
-  Rationale: too clever, low signal, and not needed to close the review-contract seam.
-- Adding a second machine-readable artifact beside `handoff.json`.
-  Rationale: one handoff file is enough for this increment.
-- Allowing `achieved_tier` to differ from `requested_tier`.
-  Rationale: keep v1 semantics strict and reviewable.
-- Updating publication-owned manifest outputs.
-  Rationale: still the next lane.
-
-## Definition of Done
-
-This plan is complete only when all of the following are true:
-
-1. `handoff.json` includes `publication_refresh_ready` and a typed `implementation_summary`.
-2. `validate_handoff` rejects missing, contradictory, incomplete, duplicated, or unauthorized summary semantics.
-3. `run-summary.md` renders achieved tier, template lineage, landed surfaces, deferred surfaces, blockers, and required commands from validated data.
-4. `run-status.json` exposes the agreed mirrored fields and nothing more.
-5. The fake Codex fixture can emit both valid and invalid richer handoff scenarios.
-6. The entrypoint regression suite covers every new semantic failure mode listed above.
-7. `docs/cli-agent-onboarding-factory-operator-guide.md` documents the strengthened runtime handoff accurately.
-8. `cargo test -p xtask --test runtime_follow_on_entrypoint`, `cargo test -p xtask runtime_follow_on`, `make fmt-check`, and `make clippy` all pass.
+- parallelize docs and tests after each command-contract freeze
+- keep lifecycle command logic sequential
 
 ## Completion Summary
 
-- Scope: accepted as-is, narrowed to review-contract widening only
-- Architecture: one runtime lane, one handoff artifact, one typed summary model
-- Code quality: no new abstraction layer, no duplicate schema writer, no second handoff file
-- Tests: success and failure semantics are fully specified
-- Failure modes: all silent semantic-downgrade paths are explicitly blocked
-- Parallelization: 3 lanes, with docs and tests parallelized after schema freeze
-- Follow-on: publication refresh remains a separate milestone fed by the richer handoff
+- Step 0: Scope Challenge — accepted with one shared module and one new command
+- Architecture Review: lifecycle truth unified without a new crate
+- Code Quality Review: duplicate state vocabularies explicitly forbidden
+- Test Review: coverage diagram produced, all new transitions mapped to tests
+- Performance Review: repo-tooling slow paths identified and bounded
+- NOT in scope: written
+- What already exists: written
+- Failure modes: critical gaps identified and blocked from shipping
+- Parallelization: 3 lanes, 1 primary sequential lane plus 2 safe side lanes
+- Lake Score: 8/8 major recommendations chose the complete option over the shortcut
+
+## Implementation Order
+
+Do the work in this order:
+
+1. M1 schema + backfill
+2. M2 onboard/runtime integration
+3. M3 prepare-publication
+4. M4 closeout/maintenance continuity
+
+Do not start with publication generators. The lifecycle contract has to exist first or the rest of the work turns into another thin handoff file.
