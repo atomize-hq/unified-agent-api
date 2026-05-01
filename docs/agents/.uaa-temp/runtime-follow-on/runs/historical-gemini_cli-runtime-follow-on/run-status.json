@@ -1,0 +1,21 @@
+{
+  "agent_id": "gemini_cli",
+  "approval_artifact_path": "docs/agents/lifecycle/gemini-cli-onboarding/governance/approved-agent.toml",
+  "errors": [],
+  "generated_at": "2026-04-21T11:23:09Z",
+  "handoff_ready": true,
+  "host_surface": "xtask historical-lifecycle-backfill",
+  "loaded_skill_ref": "historical-lifecycle-backfill",
+  "mode": "historical_backfill",
+  "requested_tier": "default",
+  "run_dir": "/Users/spensermcconnell/__Active_Code/atomize-hq/unified-agent-api/docs/agents/.uaa-temp/runtime-follow-on/runs/historical-gemini_cli-runtime-follow-on",
+  "run_id": "historical-gemini_cli-runtime-follow-on",
+  "status": "write_validated",
+  "validation_passed": true,
+  "workflow_version": "runtime_follow_on_v1",
+  "written_paths": [
+    "crates/agent_api/src/backends/gemini_cli/backend.rs",
+    "crates/agent_api/src/backends/gemini_cli/mod.rs",
+    "crates/gemini_cli/src/lib.rs"
+  ]
+}

@@ -16,14 +16,26 @@
     "docs_pack",
     "manifest_root_skeleton",
     "runtime_write_complete",
-    "implementation_summary_present"
+    "implementation_summary_present",
+    "publication_packet_written",
+    "support_matrix_check_green",
+    "capability_matrix_check_green",
+    "capability_matrix_audit_green",
+    "preflight_green",
+    "proving_run_closeout_written"
   ],
   "satisfied_evidence": [
     "registry_entry",
     "docs_pack",
     "manifest_root_skeleton",
     "runtime_write_complete",
-    "implementation_summary_present"
+    "implementation_summary_present",
+    "publication_packet_written",
+    "support_matrix_check_green",
+    "capability_matrix_check_green",
+    "capability_matrix_audit_green",
+    "preflight_green",
+    "proving_run_closeout_written"
   ],
   "blocking_issues": [],
   "retryable_failures": [],
@@ -50,7 +62,7 @@
     "deferred_surfaces": [],
     "minimal_profile_justification": null
   },
-  "publication_packet_path": null,
-  "publication_packet_sha256": null,
-  "closeout_baseline_path": null
+  "publication_packet_path": "docs/agents/lifecycle/claude-code-cli-onboarding/governance/publication-ready.json",
+  "publication_packet_sha256": "670a05ce3696e6cb33af86afbc4ef6be011220f196a13e4e8ba2030b85bc473e",
+  "closeout_baseline_path": "docs/agents/lifecycle/claude-code-cli-onboarding/governance/proving-run-closeout.json"
 }

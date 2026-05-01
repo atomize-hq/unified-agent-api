@@ -13,6 +13,7 @@ mod codex_union;
 mod codex_validate;
 mod codex_version_metadata;
 mod codex_wrapper_coverage;
+mod historical_lifecycle_backfill;
 mod version_bump;
 mod wrapper_coverage_shared;
 
@@ -82,6 +83,8 @@ enum Command {
     RefreshAgent(agent_maintenance_refresh::Args),
     /// Validate and close an agent maintenance run.
     CloseAgentMaintenance(agent_maintenance_closeout::Args),
+    /// Backfill truthful historical lifecycle maintenance artifacts for known malformed baselines.
+    HistoricalLifecycleBackfill(historical_lifecycle_backfill::Args),
     /// Generate support publication JSON and Markdown outputs from committed manifest evidence.
     SupportMatrix(support_matrix::Args),
     /// Bump the workspace release version and exact inter-crate publish pins.
@@ -236,6 +239,15 @@ fn main() {
                 err.exit_code()
             }
         },
+        Command::HistoricalLifecycleBackfill(args) => {
+            match historical_lifecycle_backfill::run(args) {
+                Ok(()) => 0,
+                Err(err) => {
+                    eprintln!("{err}");
+                    err.exit_code()
+                }
+            }
+        }
         Command::SupportMatrix(args) => match support_matrix::run(args) {
             Ok(()) => 0,
             Err(err) => {

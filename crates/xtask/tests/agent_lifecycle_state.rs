@@ -1,12 +1,20 @@
-use std::path::{Path, PathBuf};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
 
+use sha2::Digest;
 use xtask::{
     agent_lifecycle::{
-        approval_artifact_path_for_entry, is_resting_stage_v1, lifecycle_state_path_for_entry,
-        load_lifecycle_state, required_evidence_for_stage, validate_stage_support_tier, EvidenceId,
-        LifecycleStage, SupportTier, REQUIRED_PUBLICATION_COMMANDS,
+        approval_artifact_path_for_entry, file_sha256, is_resting_stage_v1,
+        lifecycle_state_path_for_entry, load_lifecycle_state,
+        reconstruct_publication_ready_state_from_closed_baseline, required_evidence_for_stage,
+        validate_stage_support_tier, EvidenceId, LifecycleStage, LifecycleState,
+        PublicationReadyPacket, SupportTier, REQUIRED_PUBLICATION_COMMANDS,
     },
     agent_registry::AgentRegistry,
+    approval_artifact::load_approval_artifact,
+    prepare_publication::discover_runtime_evidence_for_approval,
 };
 
 fn repo_root() -> PathBuf {
@@ -160,5 +168,118 @@ fn backfilled_lifecycle_states_validate_for_registry_targets() {
         assert_eq!(state.lifecycle_stage, expected_stage);
         assert_eq!(state.support_tier, expected_tier);
         assert_eq!(state.approval_artifact_path, approval_path);
+
+        if expected_stage != LifecycleStage::ClosedBaseline {
+            continue;
+        }
+
+        assert_eq!(
+            state.required_evidence,
+            required_evidence_for_stage(LifecycleStage::ClosedBaseline)
+        );
+        assert_eq!(
+            state.satisfied_evidence,
+            required_evidence_for_stage(LifecycleStage::ClosedBaseline)
+        );
+
+        let packet_path = state
+            .publication_packet_path
+            .as_ref()
+            .expect("closed baseline publication_packet_path");
+        let packet_sha = state
+            .publication_packet_sha256
+            .as_ref()
+            .expect("closed baseline publication_packet_sha256");
+        let closeout_path = state
+            .closeout_baseline_path
+            .as_ref()
+            .expect("closed baseline closeout_baseline_path");
+        assert!(
+            workspace_root.join(closeout_path).is_file(),
+            "missing {closeout_path}"
+        );
+        assert_eq!(
+            file_sha256(&workspace_root, packet_path).expect("hash packet"),
+            *packet_sha
+        );
+
+        let packet_bytes = fs::read(workspace_root.join(packet_path)).expect("read packet bytes");
+        let packet: PublicationReadyPacket =
+            serde_json::from_slice(&packet_bytes).expect("parse packet");
+        packet.validate().expect("packet schema validation");
+
+        let approval = load_approval_artifact(&workspace_root, &state.approval_artifact_path)
+            .expect("approval");
+        let runtime_evidence = discover_runtime_evidence_for_approval(&workspace_root, &approval)
+            .expect("discover runtime evidence");
+        assert_eq!(
+            packet.runtime_evidence_paths,
+            runtime_evidence.runtime_evidence_paths
+        );
+        assert_eq!(
+            packet.publication_owned_paths,
+            vec![lifecycle_path.clone(), packet_path.clone()]
+        );
+
+        let historical_publication_state =
+            reconstruct_publication_ready_state_from_closed_baseline(&state);
+        historical_publication_state
+            .validate()
+            .expect("historical publication-ready state validates");
+        assert_eq!(
+            packet.lifecycle_state_sha256,
+            pretty_json_sha(&historical_publication_state)
+        );
     }
+}
+
+#[test]
+fn closed_baseline_requires_publication_continuity_fields() {
+    let mut state = sample_closed_baseline_state();
+    state.publication_packet_path = None;
+    state.publication_packet_sha256 = None;
+    let err = state
+        .validate()
+        .expect_err("missing packet continuity should fail");
+    assert!(err.to_string().contains("publication_packet_path"));
+
+    let mut state = sample_closed_baseline_state();
+    state.closeout_baseline_path = None;
+    let err = state
+        .validate()
+        .expect_err("missing closeout baseline should fail");
+    assert!(err.to_string().contains("closeout_baseline_path"));
+}
+
+#[test]
+fn closed_baseline_requires_stage_minimum_evidence() {
+    let mut state = sample_closed_baseline_state();
+    state
+        .required_evidence
+        .retain(|evidence| *evidence != EvidenceId::PublicationPacketWritten);
+    state
+        .satisfied_evidence
+        .retain(|evidence| *evidence != EvidenceId::PublicationPacketWritten);
+    let err = state
+        .validate()
+        .expect_err("closed baseline missing stage minimum evidence should fail");
+    assert!(
+        err.to_string().contains("publication_packet_written"),
+        "{}",
+        err
+    );
+}
+
+fn sample_closed_baseline_state() -> LifecycleState {
+    let workspace_root = repo_root();
+    let registry = AgentRegistry::load(&workspace_root).expect("load registry");
+    let entry = registry.find("gemini_cli").expect("gemini entry");
+    let lifecycle_path = lifecycle_state_path_for_entry(entry);
+    load_lifecycle_state(&workspace_root, &lifecycle_path).expect("load sample lifecycle state")
+}
+
+fn pretty_json_sha<T: serde::Serialize>(value: &T) -> String {
+    let mut bytes = serde_json::to_vec_pretty(value).expect("serialize json");
+    bytes.push(b'\n');
+    hex::encode(sha2::Sha256::digest(bytes))
 }

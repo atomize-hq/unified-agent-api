@@ -1,0 +1,61 @@
+{
+  "schema_version": "1",
+  "agent_id": "opencode",
+  "approval_artifact_path": "docs/agents/lifecycle/opencode-cli-onboarding/governance/approved-agent.toml",
+  "approval_artifact_sha256": "83d7a804eb96578458c946419bfc1219b69029d824797b3342c65d9bddec3cdf",
+  "lifecycle_state_path": "docs/agents/lifecycle/opencode-cli-onboarding/governance/lifecycle-state.json",
+  "lifecycle_state_sha256": "c374617c366da1ae436777ba2ee7dddbc44bcaee0672c1339913e5ed22109f94",
+  "lifecycle_stage": "publication_ready",
+  "support_tier_at_emit": "baseline_runtime",
+  "manifest_root": "cli_manifests/opencode",
+  "expected_targets": [
+    "linux-x64",
+    "darwin-arm64",
+    "win32-x64"
+  ],
+  "capability_publication_enabled": true,
+  "support_publication_enabled": true,
+  "capability_matrix_target": null,
+  "required_commands": [
+    "cargo run -p xtask -- support-matrix --check",
+    "cargo run -p xtask -- capability-matrix --check",
+    "cargo run -p xtask -- capability-matrix-audit",
+    "make preflight"
+  ],
+  "required_publication_outputs": [
+    "cli_manifests/support_matrix/current.json",
+    "docs/specs/unified-agent-api/support-matrix.md",
+    "docs/specs/unified-agent-api/capability-matrix.md"
+  ],
+  "runtime_evidence_paths": [
+    "docs/agents/.uaa-temp/runtime-follow-on/runs/historical-opencode-runtime-follow-on/input-contract.json",
+    "docs/agents/.uaa-temp/runtime-follow-on/runs/historical-opencode-runtime-follow-on/run-status.json",
+    "docs/agents/.uaa-temp/runtime-follow-on/runs/historical-opencode-runtime-follow-on/run-summary.md",
+    "docs/agents/.uaa-temp/runtime-follow-on/runs/historical-opencode-runtime-follow-on/validation-report.json",
+    "docs/agents/.uaa-temp/runtime-follow-on/runs/historical-opencode-runtime-follow-on/written-paths.json",
+    "docs/agents/.uaa-temp/runtime-follow-on/runs/historical-opencode-runtime-follow-on/handoff.json"
+  ],
+  "publication_owned_paths": [
+    "docs/agents/lifecycle/opencode-cli-onboarding/governance/lifecycle-state.json",
+    "docs/agents/lifecycle/opencode-cli-onboarding/governance/publication-ready.json"
+  ],
+  "blocking_issues": [],
+  "implementation_summary": {
+    "requested_runtime_profile": "default",
+    "achieved_runtime_profile": "default",
+    "primary_template": "opencode",
+    "template_lineage": [
+      "opencode"
+    ],
+    "landed_surfaces": [
+      "wrapper_runtime",
+      "backend_harness",
+      "wrapper_coverage_source",
+      "runtime_manifest_evidence",
+      "session_resume",
+      "session_fork"
+    ],
+    "deferred_surfaces": [],
+    "minimal_profile_justification": null
+  }
+}

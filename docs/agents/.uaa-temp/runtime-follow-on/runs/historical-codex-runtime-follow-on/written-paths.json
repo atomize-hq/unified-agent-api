@@ -1,0 +1,8 @@
+[
+  "cli_manifests/codex/snapshots/0.61.0/union.json",
+  "cli_manifests/codex/supplement/commands.example.json",
+  "crates/agent_api/src/backends/codex/backend.rs",
+  "crates/agent_api/src/backends/codex/mod.rs",
+  "crates/codex/src/lib.rs",
+  "crates/codex/src/wrapper_coverage_manifest.rs"
+]

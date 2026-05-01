@@ -16,14 +16,26 @@
     "docs_pack",
     "manifest_root_skeleton",
     "runtime_write_complete",
-    "implementation_summary_present"
+    "implementation_summary_present",
+    "publication_packet_written",
+    "support_matrix_check_green",
+    "capability_matrix_check_green",
+    "capability_matrix_audit_green",
+    "preflight_green",
+    "proving_run_closeout_written"
   ],
   "satisfied_evidence": [
     "registry_entry",
     "docs_pack",
     "manifest_root_skeleton",
     "runtime_write_complete",
-    "implementation_summary_present"
+    "implementation_summary_present",
+    "publication_packet_written",
+    "support_matrix_check_green",
+    "capability_matrix_check_green",
+    "capability_matrix_audit_green",
+    "preflight_green",
+    "proving_run_closeout_written"
   ],
   "blocking_issues": [],
   "retryable_failures": [],
@@ -45,7 +57,7 @@
     "deferred_surfaces": [],
     "minimal_profile_justification": null
   },
-  "publication_packet_path": null,
-  "publication_packet_sha256": null,
-  "closeout_baseline_path": null
+  "publication_packet_path": "docs/agents/lifecycle/opencode-cli-onboarding/governance/publication-ready.json",
+  "publication_packet_sha256": "c7f95dc690a409275ed5ecb0951d56920650c689ba02c90898b5e2b73aa59c76",
+  "closeout_baseline_path": "docs/agents/lifecycle/opencode-cli-onboarding/governance/proving-run-closeout.json"
 }

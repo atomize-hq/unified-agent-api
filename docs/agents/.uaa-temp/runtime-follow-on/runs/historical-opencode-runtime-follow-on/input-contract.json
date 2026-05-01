@@ -1,0 +1,15 @@
+{
+  "agent_id": "opencode",
+  "approval_artifact_path": "docs/agents/lifecycle/opencode-cli-onboarding/governance/approved-agent.toml",
+  "approval_artifact_sha256": "83d7a804eb96578458c946419bfc1219b69029d824797b3342c65d9bddec3cdf",
+  "generated_at": "2026-04-18T19:31:24-05:00",
+  "manifest_root": "cli_manifests/opencode",
+  "required_handoff_commands": [
+    "cargo run -p xtask -- support-matrix --check",
+    "cargo run -p xtask -- capability-matrix --check",
+    "cargo run -p xtask -- capability-matrix-audit",
+    "make preflight"
+  ],
+  "run_id": "historical-opencode-runtime-follow-on",
+  "workflow_version": "runtime_follow_on_v1"
+}

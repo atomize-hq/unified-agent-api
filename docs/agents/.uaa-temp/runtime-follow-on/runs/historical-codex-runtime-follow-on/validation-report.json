@@ -1,0 +1,14 @@
+{
+  "checks": [
+    {
+      "message": "historical runtime evidence was reconstructed from committed runtime-owned outputs",
+      "name": "historical_runtime_evidence",
+      "ok": true
+    }
+  ],
+  "errors": [],
+  "generated_at": "2025-11-23T13:26:12-05:00",
+  "run_id": "historical-codex-runtime-follow-on",
+  "status": "pass",
+  "workflow_version": "runtime_follow_on_v1"
+}

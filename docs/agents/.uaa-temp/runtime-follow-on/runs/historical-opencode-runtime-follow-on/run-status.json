@@ -1,0 +1,23 @@
+{
+  "agent_id": "opencode",
+  "approval_artifact_path": "docs/agents/lifecycle/opencode-cli-onboarding/governance/approved-agent.toml",
+  "errors": [],
+  "generated_at": "2026-04-18T19:31:24-05:00",
+  "handoff_ready": true,
+  "host_surface": "xtask historical-lifecycle-backfill",
+  "loaded_skill_ref": "historical-lifecycle-backfill",
+  "mode": "historical_backfill",
+  "requested_tier": "default",
+  "run_dir": "/Users/spensermcconnell/__Active_Code/atomize-hq/unified-agent-api/docs/agents/.uaa-temp/runtime-follow-on/runs/historical-opencode-runtime-follow-on",
+  "run_id": "historical-opencode-runtime-follow-on",
+  "status": "write_validated",
+  "validation_passed": true,
+  "workflow_version": "runtime_follow_on_v1",
+  "written_paths": [
+    "cli_manifests/opencode/snapshots/1.4.11/linux-x64.json",
+    "cli_manifests/opencode/supplement/commands.example.json",
+    "crates/agent_api/src/backends/opencode/backend.rs",
+    "crates/agent_api/src/backends/opencode/mod.rs",
+    "crates/opencode/src/lib.rs"
+  ]
+}

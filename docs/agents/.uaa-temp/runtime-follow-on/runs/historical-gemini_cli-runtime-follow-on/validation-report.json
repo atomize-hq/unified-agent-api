@@ -1,0 +1,14 @@
+{
+  "checks": [
+    {
+      "message": "historical runtime evidence was reconstructed from committed runtime-owned outputs",
+      "name": "historical_runtime_evidence",
+      "ok": true
+    }
+  ],
+  "errors": [],
+  "generated_at": "2026-04-21T11:23:09Z",
+  "run_id": "historical-gemini_cli-runtime-follow-on",
+  "status": "pass",
+  "workflow_version": "runtime_follow_on_v1"
+}

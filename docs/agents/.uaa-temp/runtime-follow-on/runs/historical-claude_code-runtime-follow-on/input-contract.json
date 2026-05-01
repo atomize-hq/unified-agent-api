@@ -1,0 +1,15 @@
+{
+  "agent_id": "claude_code",
+  "approval_artifact_path": "docs/agents/lifecycle/claude-code-cli-onboarding/governance/approved-agent.toml",
+  "approval_artifact_sha256": "9bd2dc39909499598791fcdd84a2c0960f68d70f167e05fc98264b5099397fc3",
+  "generated_at": "2026-02-12T09:34:04-05:00",
+  "manifest_root": "cli_manifests/claude_code",
+  "required_handoff_commands": [
+    "cargo run -p xtask -- support-matrix --check",
+    "cargo run -p xtask -- capability-matrix --check",
+    "cargo run -p xtask -- capability-matrix-audit",
+    "make preflight"
+  ],
+  "run_id": "historical-claude_code-runtime-follow-on",
+  "workflow_version": "runtime_follow_on_v1"
+}

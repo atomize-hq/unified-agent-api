@@ -1,0 +1,57 @@
+{
+  "schema_version": "1",
+  "agent_id": "gemini_cli",
+  "approval_artifact_path": "docs/agents/lifecycle/gemini-cli-onboarding/governance/approved-agent.toml",
+  "approval_artifact_sha256": "aa3f57681d108fe28b64976a18799071f921086e57ab4fa9ce518186b710bb7a",
+  "lifecycle_state_path": "docs/agents/lifecycle/gemini-cli-onboarding/governance/lifecycle-state.json",
+  "lifecycle_state_sha256": "ff8633643047974f13c239508b01edea2544e6149f38047da40308e564e11c74",
+  "lifecycle_stage": "publication_ready",
+  "support_tier_at_emit": "baseline_runtime",
+  "manifest_root": "cli_manifests/gemini_cli",
+  "expected_targets": [
+    "darwin-arm64"
+  ],
+  "capability_publication_enabled": true,
+  "support_publication_enabled": true,
+  "capability_matrix_target": null,
+  "required_commands": [
+    "cargo run -p xtask -- support-matrix --check",
+    "cargo run -p xtask -- capability-matrix --check",
+    "cargo run -p xtask -- capability-matrix-audit",
+    "make preflight"
+  ],
+  "required_publication_outputs": [
+    "cli_manifests/support_matrix/current.json",
+    "docs/specs/unified-agent-api/support-matrix.md",
+    "docs/specs/unified-agent-api/capability-matrix.md"
+  ],
+  "runtime_evidence_paths": [
+    "docs/agents/.uaa-temp/runtime-follow-on/runs/historical-gemini_cli-runtime-follow-on/input-contract.json",
+    "docs/agents/.uaa-temp/runtime-follow-on/runs/historical-gemini_cli-runtime-follow-on/run-status.json",
+    "docs/agents/.uaa-temp/runtime-follow-on/runs/historical-gemini_cli-runtime-follow-on/run-summary.md",
+    "docs/agents/.uaa-temp/runtime-follow-on/runs/historical-gemini_cli-runtime-follow-on/validation-report.json",
+    "docs/agents/.uaa-temp/runtime-follow-on/runs/historical-gemini_cli-runtime-follow-on/written-paths.json",
+    "docs/agents/.uaa-temp/runtime-follow-on/runs/historical-gemini_cli-runtime-follow-on/handoff.json"
+  ],
+  "publication_owned_paths": [
+    "docs/agents/lifecycle/gemini-cli-onboarding/governance/lifecycle-state.json",
+    "docs/agents/lifecycle/gemini-cli-onboarding/governance/publication-ready.json"
+  ],
+  "blocking_issues": [],
+  "implementation_summary": {
+    "requested_runtime_profile": "default",
+    "achieved_runtime_profile": "default",
+    "primary_template": "gemini_cli",
+    "template_lineage": [
+      "gemini_cli"
+    ],
+    "landed_surfaces": [
+      "wrapper_runtime",
+      "backend_harness",
+      "wrapper_coverage_source",
+      "runtime_manifest_evidence"
+    ],
+    "deferred_surfaces": [],
+    "minimal_profile_justification": null
+  }
+}

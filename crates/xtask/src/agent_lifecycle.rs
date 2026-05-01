@@ -11,7 +11,8 @@ use self::validation::{
     validate_non_empty, validate_optional_path_pair, validate_optional_repo_relative_path,
     validate_pack_prefix, validate_path_hash_pair, validate_repo_relative_path,
     validate_required_publication_commands, validate_rfc3339, validate_schema_version,
-    validate_sha256, validate_side_state_issues, validate_string_list, validate_subset,
+    validate_sha256, validate_side_state_issues, validate_stage_field_presence,
+    validate_stage_minimum_evidence, validate_string_list, validate_subset,
     validate_template_lineage, validate_unique_copy,
 };
 use crate::agent_registry::AgentRegistryEntry;
@@ -23,6 +24,8 @@ pub const LIFECYCLE_STATE_FILE_NAME: &str = "lifecycle-state.json";
 pub const APPROVED_AGENT_FILE_NAME: &str = "approved-agent.toml";
 pub const PUBLICATION_READY_FILE_NAME: &str = "publication-ready.json";
 pub const PROVING_RUN_CLOSEOUT_FILE_NAME: &str = "proving-run-closeout.json";
+pub const PUBLICATION_READY_NEXT_COMMAND: &str =
+    "support-matrix --check && capability-matrix --check && capability-matrix-audit && make preflight && close-proving-run --write";
 
 pub const REQUIRED_PUBLICATION_COMMANDS: [&str; 4] = [
     "cargo run -p xtask -- support-matrix --check",
@@ -316,6 +319,16 @@ impl LifecycleState {
             &self.satisfied_evidence,
             EvidenceId::as_str,
         )?;
+        validate_stage_minimum_evidence(
+            self.lifecycle_stage,
+            "required_evidence",
+            &self.required_evidence,
+        )?;
+        validate_stage_minimum_evidence(
+            self.lifecycle_stage,
+            "satisfied_evidence",
+            &self.satisfied_evidence,
+        )?;
         validate_subset(
             "satisfied_evidence",
             &self.satisfied_evidence,
@@ -335,6 +348,24 @@ impl LifecycleState {
         validate_optional_repo_relative_path(
             "closeout_baseline_path",
             &self.closeout_baseline_path,
+        )?;
+        validate_stage_field_presence(
+            self.lifecycle_stage,
+            "publication_packet_path",
+            self.publication_packet_path.is_some(),
+            &[LifecycleStage::Published, LifecycleStage::ClosedBaseline],
+        )?;
+        validate_stage_field_presence(
+            self.lifecycle_stage,
+            "publication_packet_sha256",
+            self.publication_packet_sha256.is_some(),
+            &[LifecycleStage::Published, LifecycleStage::ClosedBaseline],
+        )?;
+        validate_stage_field_presence(
+            self.lifecycle_stage,
+            "closeout_baseline_path",
+            self.closeout_baseline_path.is_some(),
+            &[LifecycleStage::ClosedBaseline],
         )?;
 
         match self.lifecycle_stage {
@@ -584,6 +615,32 @@ pub fn is_resting_stage_v1(stage: LifecycleStage) -> bool {
             | LifecycleStage::PublicationReady
             | LifecycleStage::ClosedBaseline
     )
+}
+
+pub fn reconstruct_publication_ready_state_from_closed_baseline(
+    state: &LifecycleState,
+) -> LifecycleState {
+    let mut historical = state.clone();
+    historical.lifecycle_stage = LifecycleStage::PublicationReady;
+    historical.support_tier = SupportTier::BaselineRuntime;
+    historical.current_owner_command = "prepare-publication --write".to_string();
+    historical.expected_next_command = PUBLICATION_READY_NEXT_COMMAND.to_string();
+    historical.required_evidence =
+        required_evidence_for_stage(LifecycleStage::PublicationReady).to_vec();
+    historical.satisfied_evidence =
+        required_evidence_for_stage(LifecycleStage::PublicationReady).to_vec();
+    historical.side_states.retain(|side_state| {
+        !matches!(
+            side_state,
+            SideState::Blocked | SideState::FailedRetryable | SideState::Drifted
+        )
+    });
+    historical.blocking_issues.clear();
+    historical.retryable_failures.clear();
+    historical.publication_packet_path = None;
+    historical.publication_packet_sha256 = None;
+    historical.closeout_baseline_path = None;
+    historical
 }
 
 pub fn now_rfc3339() -> Result<String, LifecycleError> {

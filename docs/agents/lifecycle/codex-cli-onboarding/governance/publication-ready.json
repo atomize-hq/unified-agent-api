@@ -1,0 +1,64 @@
+{
+  "schema_version": "1",
+  "agent_id": "codex",
+  "approval_artifact_path": "docs/agents/lifecycle/codex-cli-onboarding/governance/approved-agent.toml",
+  "approval_artifact_sha256": "25d51601e4aa9ca18bc72326e1448097a8648cd5e5e1d6018d517b116a58b892",
+  "lifecycle_state_path": "docs/agents/lifecycle/codex-cli-onboarding/governance/lifecycle-state.json",
+  "lifecycle_state_sha256": "daf568b495ab648477923f5a0e9981c7cdf4f5bbbfa6bbc0e5b66a43e41ba790",
+  "lifecycle_stage": "publication_ready",
+  "support_tier_at_emit": "baseline_runtime",
+  "manifest_root": "cli_manifests/codex",
+  "expected_targets": [
+    "x86_64-unknown-linux-musl"
+  ],
+  "capability_publication_enabled": true,
+  "support_publication_enabled": true,
+  "capability_matrix_target": "x86_64-unknown-linux-musl",
+  "required_commands": [
+    "cargo run -p xtask -- support-matrix --check",
+    "cargo run -p xtask -- capability-matrix --check",
+    "cargo run -p xtask -- capability-matrix-audit",
+    "make preflight"
+  ],
+  "required_publication_outputs": [
+    "cli_manifests/support_matrix/current.json",
+    "docs/specs/unified-agent-api/support-matrix.md",
+    "docs/specs/unified-agent-api/capability-matrix.md"
+  ],
+  "runtime_evidence_paths": [
+    "docs/agents/.uaa-temp/runtime-follow-on/runs/historical-codex-runtime-follow-on/input-contract.json",
+    "docs/agents/.uaa-temp/runtime-follow-on/runs/historical-codex-runtime-follow-on/run-status.json",
+    "docs/agents/.uaa-temp/runtime-follow-on/runs/historical-codex-runtime-follow-on/run-summary.md",
+    "docs/agents/.uaa-temp/runtime-follow-on/runs/historical-codex-runtime-follow-on/validation-report.json",
+    "docs/agents/.uaa-temp/runtime-follow-on/runs/historical-codex-runtime-follow-on/written-paths.json",
+    "docs/agents/.uaa-temp/runtime-follow-on/runs/historical-codex-runtime-follow-on/handoff.json"
+  ],
+  "publication_owned_paths": [
+    "docs/agents/lifecycle/codex-cli-onboarding/governance/lifecycle-state.json",
+    "docs/agents/lifecycle/codex-cli-onboarding/governance/publication-ready.json"
+  ],
+  "blocking_issues": [],
+  "implementation_summary": {
+    "requested_runtime_profile": "feature_rich",
+    "achieved_runtime_profile": "feature_rich",
+    "primary_template": "codex",
+    "template_lineage": [
+      "codex"
+    ],
+    "landed_surfaces": [
+      "wrapper_runtime",
+      "backend_harness",
+      "agent_api_onboarding_test",
+      "wrapper_coverage_source",
+      "runtime_manifest_evidence",
+      "add_dirs",
+      "external_sandbox_policy",
+      "mcp_management",
+      "session_resume",
+      "session_fork",
+      "structured_tools"
+    ],
+    "deferred_surfaces": [],
+    "minimal_profile_justification": null
+  }
+}

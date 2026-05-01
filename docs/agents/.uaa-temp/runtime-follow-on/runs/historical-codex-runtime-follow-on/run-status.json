@@ -1,0 +1,24 @@
+{
+  "agent_id": "codex",
+  "approval_artifact_path": "docs/agents/lifecycle/codex-cli-onboarding/governance/approved-agent.toml",
+  "errors": [],
+  "generated_at": "2025-11-23T13:26:12-05:00",
+  "handoff_ready": true,
+  "host_surface": "xtask historical-lifecycle-backfill",
+  "loaded_skill_ref": "historical-lifecycle-backfill",
+  "mode": "historical_backfill",
+  "requested_tier": "feature-rich",
+  "run_dir": "/Users/spensermcconnell/__Active_Code/atomize-hq/unified-agent-api/docs/agents/.uaa-temp/runtime-follow-on/runs/historical-codex-runtime-follow-on",
+  "run_id": "historical-codex-runtime-follow-on",
+  "status": "write_validated",
+  "validation_passed": true,
+  "workflow_version": "runtime_follow_on_v1",
+  "written_paths": [
+    "cli_manifests/codex/snapshots/0.61.0/union.json",
+    "cli_manifests/codex/supplement/commands.example.json",
+    "crates/agent_api/src/backends/codex/backend.rs",
+    "crates/agent_api/src/backends/codex/mod.rs",
+    "crates/codex/src/lib.rs",
+    "crates/codex/src/wrapper_coverage_manifest.rs"
+  ]
+}

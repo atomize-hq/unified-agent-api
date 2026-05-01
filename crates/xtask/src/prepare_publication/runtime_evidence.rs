@@ -44,9 +44,9 @@ struct RuntimeHandoff {
 }
 
 #[derive(Debug, Clone)]
-pub(super) struct RuntimeEvidenceBundle {
-    pub(super) run_id: String,
-    pub(super) runtime_evidence_paths: Vec<String>,
+pub struct RuntimeEvidenceBundle {
+    pub run_id: String,
+    pub runtime_evidence_paths: Vec<String>,
 }
 
 pub(super) fn discover_runtime_evidence(

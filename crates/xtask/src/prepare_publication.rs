@@ -10,7 +10,8 @@ use clap::{ArgGroup, Parser};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-use self::runtime_evidence::{discover_runtime_evidence, RuntimeEvidenceBundle};
+use self::runtime_evidence::discover_runtime_evidence;
+pub use self::runtime_evidence::RuntimeEvidenceBundle;
 use crate::{
     agent_lifecycle::{
         self, file_sha256, load_lifecycle_state, load_publication_ready_packet, now_rfc3339,
@@ -24,7 +25,6 @@ use crate::{
 };
 
 const RUNTIME_RUNS_ROOT: &str = "docs/agents/.uaa-temp/runtime-follow-on/runs";
-const CHECKPOINT_NEXT_COMMAND: &str = "support-matrix --check && capability-matrix --check && capability-matrix-audit && make preflight && close-proving-run --write";
 const REQUIRED_RUNTIME_EVIDENCE_FILES: [&str; 6] = [
     "input-contract.json",
     "run-status.json",
@@ -146,7 +146,7 @@ pub fn run_in_workspace<W: Write>(
     next_state.lifecycle_stage = LifecycleStage::PublicationReady;
     next_state.support_tier = SupportTier::BaselineRuntime;
     next_state.current_owner_command = "prepare-publication --write".to_string();
-    next_state.expected_next_command = CHECKPOINT_NEXT_COMMAND.to_string();
+    next_state.expected_next_command = agent_lifecycle::PUBLICATION_READY_NEXT_COMMAND.to_string();
     next_state.last_transition_at =
         now_rfc3339().map_err(|err| Error::Internal(err.to_string()))?;
     next_state.last_transition_by = "xtask prepare-publication --write".to_string();
@@ -167,11 +167,15 @@ pub fn run_in_workspace<W: Write>(
         .map_err(|err| Error::Validation(err.to_string()))?;
 
     let lifecycle_state_sha256 = sha256_json(&next_state)?;
-    let packet = build_packet(
-        &context,
-        &next_state,
+    let packet = build_publication_ready_packet(
+        &context.approval,
+        &context.entry,
+        &context.lifecycle_state_path,
         &lifecycle_state_sha256,
+        context.publication_packet_path.clone(),
         implementation_summary,
+        context.runtime_evidence.runtime_evidence_paths.clone(),
+        next_state.blocking_issues.clone(),
     )?;
     packet
         .validate()
@@ -193,6 +197,13 @@ pub fn run_in_workspace<W: Write>(
     )
     .map_err(|err| Error::Internal(format!("write stdout: {err}")))?;
     Ok(())
+}
+
+pub fn discover_runtime_evidence_for_approval(
+    workspace_root: &Path,
+    approval: &ApprovalArtifact,
+) -> Result<RuntimeEvidenceBundle, Error> {
+    discover_runtime_evidence(workspace_root, approval)
 }
 
 fn build_context(workspace_root: &Path, args: &Args) -> Result<PublicationContext, Error> {
@@ -220,7 +231,7 @@ fn build_context(workspace_root: &Path, args: &Args) -> Result<PublicationContex
         .map_err(|err| Error::Validation(err.to_string()))?;
     validate_approval_continuity(&lifecycle_state, &lifecycle_state_path, &approval)?;
 
-    let runtime_evidence = discover_runtime_evidence(workspace_root, &approval)?;
+    let runtime_evidence = discover_runtime_evidence_for_approval(workspace_root, &approval)?;
     let publication_packet_path = publication_ready_path_for_entry(&entry);
     Ok(PublicationContext {
         approval,
@@ -258,7 +269,9 @@ fn validate_check_mode(workspace_root: &Path, context: &PublicationContext) -> R
                 LifecycleStage::PublicationReady,
                 &context.lifecycle_state_path,
             )?;
-            if context.lifecycle_state.expected_next_command != CHECKPOINT_NEXT_COMMAND {
+            if context.lifecycle_state.expected_next_command
+                != agent_lifecycle::PUBLICATION_READY_NEXT_COMMAND
+            {
                 return Err(Error::Validation(format!(
                     "`{}` has stale expected_next_command `{}`",
                     context.lifecycle_state_path,
@@ -270,15 +283,19 @@ fn validate_check_mode(workspace_root: &Path, context: &PublicationContext) -> R
                     .map_err(|err| Error::Validation(err.to_string()))?;
             let lifecycle_sha = file_sha256(workspace_root, &context.lifecycle_state_path)
                 .map_err(|err| Error::Validation(err.to_string()))?;
-            let expected_packet = build_packet(
-                context,
-                &context.lifecycle_state,
+            let expected_packet = build_publication_ready_packet(
+                &context.approval,
+                &context.entry,
+                &context.lifecycle_state_path,
                 &lifecycle_sha,
+                context.publication_packet_path.clone(),
                 require_explicit_implementation_summary(
                     &context.lifecycle_state,
                     &context.lifecycle_state_path,
                 )?
                 .clone(),
+                context.runtime_evidence.runtime_evidence_paths.clone(),
+                context.lifecycle_state.blocking_issues.clone(),
             )?;
             if packet != expected_packet {
                 return Err(Error::Validation(format!(
@@ -296,34 +313,35 @@ fn validate_check_mode(workspace_root: &Path, context: &PublicationContext) -> R
     }
 }
 
-fn build_packet(
-    context: &PublicationContext,
-    lifecycle_state: &LifecycleState,
+pub fn build_publication_ready_packet(
+    approval: &ApprovalArtifact,
+    entry: &AgentRegistryEntry,
+    lifecycle_state_path: &str,
     lifecycle_state_sha256: &str,
+    publication_packet_path: String,
     implementation_summary: crate::agent_lifecycle::ImplementationSummary,
+    runtime_evidence_paths: Vec<String>,
+    blocking_issues: Vec<String>,
 ) -> Result<PublicationReadyPacket, Error> {
     Ok(PublicationReadyPacket {
         schema_version: LIFECYCLE_SCHEMA_VERSION.to_string(),
-        agent_id: context.approval.descriptor.agent_id.clone(),
-        approval_artifact_path: context.approval.relative_path.clone(),
-        approval_artifact_sha256: context.approval.sha256.clone(),
-        lifecycle_state_path: context.lifecycle_state_path.clone(),
+        agent_id: approval.descriptor.agent_id.clone(),
+        approval_artifact_path: approval.relative_path.clone(),
+        approval_artifact_sha256: approval.sha256.clone(),
+        lifecycle_state_path: lifecycle_state_path.to_string(),
         lifecycle_state_sha256: lifecycle_state_sha256.to_string(),
         lifecycle_stage: LifecycleStage::PublicationReady,
         support_tier_at_emit: SupportTier::BaselineRuntime,
-        manifest_root: context.approval.descriptor.manifest_root.clone(),
-        expected_targets: context.approval.descriptor.canonical_targets.clone(),
-        capability_publication_enabled: context.approval.descriptor.capability_matrix_enabled,
-        support_publication_enabled: context.approval.descriptor.support_matrix_enabled,
-        capability_matrix_target: context.approval.descriptor.capability_matrix_target.clone(),
+        manifest_root: approval.descriptor.manifest_root.clone(),
+        expected_targets: approval.descriptor.canonical_targets.clone(),
+        capability_publication_enabled: approval.descriptor.capability_matrix_enabled,
+        support_publication_enabled: approval.descriptor.support_matrix_enabled,
+        capability_matrix_target: approval.descriptor.capability_matrix_target.clone(),
         required_commands: required_publication_commands(),
-        required_publication_outputs: required_publication_outputs(&context.entry),
-        runtime_evidence_paths: context.runtime_evidence.runtime_evidence_paths.clone(),
-        publication_owned_paths: vec![
-            context.lifecycle_state_path.clone(),
-            context.publication_packet_path.clone(),
-        ],
-        blocking_issues: lifecycle_state.blocking_issues.clone(),
+        required_publication_outputs: required_publication_outputs(entry),
+        runtime_evidence_paths,
+        publication_owned_paths: vec![lifecycle_state_path.to_string(), publication_packet_path],
+        blocking_issues,
         implementation_summary,
     })
 }

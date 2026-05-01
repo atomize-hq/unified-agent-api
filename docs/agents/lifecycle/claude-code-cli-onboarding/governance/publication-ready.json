@@ -1,0 +1,66 @@
+{
+  "schema_version": "1",
+  "agent_id": "claude_code",
+  "approval_artifact_path": "docs/agents/lifecycle/claude-code-cli-onboarding/governance/approved-agent.toml",
+  "approval_artifact_sha256": "9bd2dc39909499598791fcdd84a2c0960f68d70f167e05fc98264b5099397fc3",
+  "lifecycle_state_path": "docs/agents/lifecycle/claude-code-cli-onboarding/governance/lifecycle-state.json",
+  "lifecycle_state_sha256": "e129d67d806a6400f9d454e6319c012f03c0a6199c822e4ca63d2e335c9d9d68",
+  "lifecycle_stage": "publication_ready",
+  "support_tier_at_emit": "baseline_runtime",
+  "manifest_root": "cli_manifests/claude_code",
+  "expected_targets": [
+    "linux-x64",
+    "darwin-arm64",
+    "win32-x64"
+  ],
+  "capability_publication_enabled": true,
+  "support_publication_enabled": true,
+  "capability_matrix_target": "linux-x64",
+  "required_commands": [
+    "cargo run -p xtask -- support-matrix --check",
+    "cargo run -p xtask -- capability-matrix --check",
+    "cargo run -p xtask -- capability-matrix-audit",
+    "make preflight"
+  ],
+  "required_publication_outputs": [
+    "cli_manifests/support_matrix/current.json",
+    "docs/specs/unified-agent-api/support-matrix.md",
+    "docs/specs/unified-agent-api/capability-matrix.md"
+  ],
+  "runtime_evidence_paths": [
+    "docs/agents/.uaa-temp/runtime-follow-on/runs/historical-claude_code-runtime-follow-on/input-contract.json",
+    "docs/agents/.uaa-temp/runtime-follow-on/runs/historical-claude_code-runtime-follow-on/run-status.json",
+    "docs/agents/.uaa-temp/runtime-follow-on/runs/historical-claude_code-runtime-follow-on/run-summary.md",
+    "docs/agents/.uaa-temp/runtime-follow-on/runs/historical-claude_code-runtime-follow-on/validation-report.json",
+    "docs/agents/.uaa-temp/runtime-follow-on/runs/historical-claude_code-runtime-follow-on/written-paths.json",
+    "docs/agents/.uaa-temp/runtime-follow-on/runs/historical-claude_code-runtime-follow-on/handoff.json"
+  ],
+  "publication_owned_paths": [
+    "docs/agents/lifecycle/claude-code-cli-onboarding/governance/lifecycle-state.json",
+    "docs/agents/lifecycle/claude-code-cli-onboarding/governance/publication-ready.json"
+  ],
+  "blocking_issues": [],
+  "implementation_summary": {
+    "requested_runtime_profile": "feature_rich",
+    "achieved_runtime_profile": "feature_rich",
+    "primary_template": "claude_code",
+    "template_lineage": [
+      "claude_code"
+    ],
+    "landed_surfaces": [
+      "wrapper_runtime",
+      "backend_harness",
+      "agent_api_onboarding_test",
+      "wrapper_coverage_source",
+      "runtime_manifest_evidence",
+      "add_dirs",
+      "external_sandbox_policy",
+      "mcp_management",
+      "session_resume",
+      "session_fork",
+      "structured_tools"
+    ],
+    "deferred_surfaces": [],
+    "minimal_profile_justification": null
+  }
+}

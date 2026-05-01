@@ -219,6 +219,38 @@ pub(super) fn validate_subset<T: Copy + Ord>(
     Ok(())
 }
 
+pub(super) fn validate_stage_minimum_evidence(
+    stage: LifecycleStage,
+    field: &str,
+    values: &[super::EvidenceId],
+) -> Result<(), LifecycleError> {
+    for required in super::required_evidence_for_stage(stage) {
+        if !values.contains(required) {
+            return Err(LifecycleError::Validation(format!(
+                "{field} is missing required evidence `{}` for lifecycle_stage `{}`",
+                required.as_str(),
+                stage.as_str()
+            )));
+        }
+    }
+    Ok(())
+}
+
+pub(super) fn validate_stage_field_presence(
+    stage: LifecycleStage,
+    field: &str,
+    is_present: bool,
+    required_stages: &[LifecycleStage],
+) -> Result<(), LifecycleError> {
+    if required_stages.contains(&stage) && !is_present {
+        return Err(LifecycleError::Validation(format!(
+            "{field} is required when lifecycle_stage is `{}`",
+            stage.as_str()
+        )));
+    }
+    Ok(())
+}
+
 pub(super) fn validate_side_state_issues(state: &LifecycleState) -> Result<(), LifecycleError> {
     let side_states = state.side_states.iter().copied().collect::<BTreeSet<_>>();
     if side_states.contains(&SideState::Blocked) == state.blocking_issues.is_empty() {

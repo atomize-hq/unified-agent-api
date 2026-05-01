@@ -31,7 +31,9 @@ mod root_intake_layout;
 mod support_matrix;
 
 use drift::{check_agent_drift, DriftCategory, DriftCheckError};
-use harness::{fixture_root, seed_gemini_approval_artifact, seed_release_touchpoints, write_text};
+use harness::{
+    fixture_root, seed_gemini_approval_artifact, seed_release_touchpoints, sha256_hex, write_text,
+};
 
 #[test]
 fn check_agent_drift_reports_clean_agent() {
@@ -40,6 +42,82 @@ fn check_agent_drift_reports_clean_agent() {
 
     let report = check_agent_drift(&fixture, "gemini_cli").expect("clean report");
     assert!(report.is_clean(), "{}", report.render());
+}
+
+#[test]
+fn check_agent_drift_reports_missing_lifecycle_publication_packet_path() {
+    let fixture = fixture_root("agent-maintenance-drift-missing-packet-path");
+    seed_publication_inputs(&fixture);
+    seed_gemini_lifecycle_baseline(&fixture, LifecycleBaselineGap::MissingPublicationPacketPath);
+
+    let report = check_agent_drift(&fixture, "gemini_cli").expect("drift report");
+    let finding = report
+        .findings
+        .iter()
+        .find(|finding| finding.category == DriftCategory::GovernanceDoc)
+        .expect("governance doc finding");
+    assert!(finding
+        .summary
+        .contains("historical governance surfaces no longer match"));
+    assert!(
+        finding.summary.contains("publication_packet_path"),
+        "{}",
+        finding.summary
+    );
+}
+
+#[test]
+fn check_agent_drift_reports_missing_lifecycle_publication_packet_sha() {
+    let fixture = fixture_root("agent-maintenance-drift-missing-packet-sha");
+    seed_publication_inputs(&fixture);
+    seed_gemini_lifecycle_baseline(&fixture, LifecycleBaselineGap::MissingPublicationPacketSha);
+
+    let report = check_agent_drift(&fixture, "gemini_cli").expect("drift report");
+    let finding = report
+        .findings
+        .iter()
+        .find(|finding| finding.category == DriftCategory::GovernanceDoc)
+        .expect("governance doc finding");
+    assert!(finding.summary.contains("publication_packet_sha256"));
+}
+
+#[test]
+fn check_agent_drift_reports_missing_lifecycle_closeout_path() {
+    let fixture = fixture_root("agent-maintenance-drift-missing-closeout-path");
+    seed_publication_inputs(&fixture);
+    seed_gemini_lifecycle_baseline(&fixture, LifecycleBaselineGap::MissingCloseoutBaselinePath);
+
+    let report = check_agent_drift(&fixture, "gemini_cli").expect("drift report");
+    let finding = report
+        .findings
+        .iter()
+        .find(|finding| finding.category == DriftCategory::GovernanceDoc)
+        .expect("governance doc finding");
+    assert!(finding.summary.contains("closeout_baseline_path"));
+}
+
+#[test]
+fn check_agent_drift_entrypoint_recovers_after_lifecycle_baseline_repair() {
+    let fixture = fixture_root("agent-maintenance-drift-lifecycle-repair");
+    seed_publication_inputs(&fixture);
+    seed_gemini_lifecycle_baseline(&fixture, LifecycleBaselineGap::MissingPublicationPacketPath);
+
+    let before = run_xtask_check_agent_drift(&fixture, "gemini_cli");
+    assert_eq!(before.status.code(), Some(2));
+    let before_stdout = String::from_utf8_lossy(&before.stdout);
+    assert!(before_stdout.contains("status: drift_detected"));
+    assert!(before_stdout.contains("publication_packet_path"));
+
+    seed_gemini_lifecycle_baseline(&fixture, LifecycleBaselineGap::None);
+
+    let after = run_xtask_check_agent_drift(&fixture, "gemini_cli");
+    assert!(
+        after.status.success(),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&after.stdout),
+        String::from_utf8_lossy(&after.stderr)
+    );
+    assert!(String::from_utf8_lossy(&after.stdout).contains("status: clean"));
 }
 
 #[test]
@@ -491,6 +569,191 @@ fn seed_publication_inputs(root: &Path) {
 
     let release_doc = release_doc::render_release_doc(root).expect("render release doc");
     write_text(&root.join(release_doc::RELEASE_DOC_PATH), &release_doc);
+}
+
+#[derive(Clone, Copy)]
+enum LifecycleBaselineGap {
+    None,
+    MissingPublicationPacketPath,
+    MissingPublicationPacketSha,
+    MissingCloseoutBaselinePath,
+}
+
+fn seed_gemini_lifecycle_baseline(root: &Path, gap: LifecycleBaselineGap) {
+    let approval_path =
+        "docs/agents/lifecycle/gemini-cli-onboarding/governance/approved-agent.toml";
+    let approval_sha = sha256_hex(&root.join(approval_path));
+    let lifecycle_path =
+        root.join("docs/agents/lifecycle/gemini-cli-onboarding/governance/lifecycle-state.json");
+    let packet_path =
+        root.join("docs/agents/lifecycle/gemini-cli-onboarding/governance/publication-ready.json");
+    let closeout_path = root
+        .join("docs/agents/lifecycle/gemini-cli-onboarding/governance/proving-run-closeout.json");
+
+    write_text(
+        &packet_path,
+        &format!(
+            "{}\n",
+            serde_json::to_string_pretty(&serde_json::json!({
+                "schema_version": "1",
+                "agent_id": "gemini_cli",
+                "approval_artifact_path": approval_path,
+                "approval_artifact_sha256": approval_sha,
+                "lifecycle_state_path": "docs/agents/lifecycle/gemini-cli-onboarding/governance/lifecycle-state.json",
+                "lifecycle_state_sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+                "lifecycle_stage": "publication_ready",
+                "support_tier_at_emit": "baseline_runtime",
+                "manifest_root": "cli_manifests/gemini_cli",
+                "expected_targets": ["darwin-arm64"],
+                "capability_publication_enabled": true,
+                "support_publication_enabled": true,
+                "capability_matrix_target": serde_json::Value::Null,
+                "required_commands": [
+                    "cargo run -p xtask -- support-matrix --check",
+                    "cargo run -p xtask -- capability-matrix --check",
+                    "cargo run -p xtask -- capability-matrix-audit",
+                    "make preflight"
+                ],
+                "required_publication_outputs": [
+                    "cli_manifests/support_matrix/current.json",
+                    "docs/specs/unified-agent-api/support-matrix.md",
+                    "docs/specs/unified-agent-api/capability-matrix.md"
+                ],
+                "runtime_evidence_paths": [
+                    "docs/agents/.uaa-temp/runtime-follow-on/runs/historical-gemini_cli-runtime-follow-on/input-contract.json",
+                    "docs/agents/.uaa-temp/runtime-follow-on/runs/historical-gemini_cli-runtime-follow-on/run-status.json",
+                    "docs/agents/.uaa-temp/runtime-follow-on/runs/historical-gemini_cli-runtime-follow-on/run-summary.md",
+                    "docs/agents/.uaa-temp/runtime-follow-on/runs/historical-gemini_cli-runtime-follow-on/validation-report.json",
+                    "docs/agents/.uaa-temp/runtime-follow-on/runs/historical-gemini_cli-runtime-follow-on/written-paths.json",
+                    "docs/agents/.uaa-temp/runtime-follow-on/runs/historical-gemini_cli-runtime-follow-on/handoff.json"
+                ],
+                "publication_owned_paths": [
+                    "docs/agents/lifecycle/gemini-cli-onboarding/governance/lifecycle-state.json",
+                    "docs/agents/lifecycle/gemini-cli-onboarding/governance/publication-ready.json"
+                ],
+                "blocking_issues": [],
+                "implementation_summary": {
+                    "requested_runtime_profile": "default",
+                    "achieved_runtime_profile": "default",
+                    "primary_template": "gemini_cli",
+                    "template_lineage": ["gemini_cli"],
+                    "landed_surfaces": [
+                        "wrapper_runtime",
+                        "backend_harness",
+                        "runtime_manifest_evidence"
+                    ],
+                    "deferred_surfaces": [],
+                    "minimal_profile_justification": serde_json::Value::Null
+                }
+            }))
+            .expect("serialize publication-ready packet")
+        ),
+    );
+    write_text(
+        &closeout_path,
+        &format!(
+            "{}\n",
+            serde_json::to_string_pretty(&serde_json::json!({
+                "state": "closed",
+                "approval_ref": approval_path,
+                "approval_sha256": approval_sha,
+                "approval_source": "historical-lifecycle-backfill",
+                "manual_control_plane_edits": 0,
+                "partial_write_incidents": 0,
+                "ambiguous_ownership_incidents": 0,
+                "duration_missing_reason": "Exact duration not recoverable from committed evidence.",
+                "explicit_none_reason": "No residual friction remained in the committed proving-run evidence.",
+                "preflight_passed": true,
+                "recorded_at": "2026-04-21T11:23:09Z",
+                "commit": "6b7d5f6e9cf2bf54933659f5700bb59d1f8a95e8"
+            }))
+            .expect("serialize closeout")
+        ),
+    );
+    let packet_sha = sha256_hex(&packet_path);
+    let publication_packet_path = match gap {
+        LifecycleBaselineGap::MissingPublicationPacketPath => serde_json::Value::Null,
+        _ => serde_json::Value::String(
+            "docs/agents/lifecycle/gemini-cli-onboarding/governance/publication-ready.json"
+                .to_string(),
+        ),
+    };
+    let publication_packet_sha = match gap {
+        LifecycleBaselineGap::MissingPublicationPacketSha => serde_json::Value::Null,
+        _ => serde_json::Value::String(packet_sha),
+    };
+    let closeout_baseline_path = match gap {
+        LifecycleBaselineGap::MissingCloseoutBaselinePath => serde_json::Value::Null,
+        _ => serde_json::Value::String(
+            "docs/agents/lifecycle/gemini-cli-onboarding/governance/proving-run-closeout.json"
+                .to_string(),
+        ),
+    };
+    write_text(
+        &lifecycle_path,
+        &format!(
+            "{}\n",
+            serde_json::to_string_pretty(&serde_json::json!({
+                "schema_version": "1",
+                "agent_id": "gemini_cli",
+                "onboarding_pack_prefix": "gemini-cli-onboarding",
+                "approval_artifact_path": approval_path,
+                "approval_artifact_sha256": approval_sha,
+                "lifecycle_stage": "closed_baseline",
+                "support_tier": "publication_backed",
+                "side_states": [],
+                "current_owner_command": "close-proving-run --write",
+                "expected_next_command": "check-agent-drift --agent gemini_cli",
+                "last_transition_at": "2026-04-21T11:23:09Z",
+                "last_transition_by": "historical-lifecycle-backfill",
+                "required_evidence": [
+                    "registry_entry",
+                    "docs_pack",
+                    "manifest_root_skeleton",
+                    "runtime_write_complete",
+                    "implementation_summary_present",
+                    "publication_packet_written",
+                    "support_matrix_check_green",
+                    "capability_matrix_check_green",
+                    "capability_matrix_audit_green",
+                    "preflight_green",
+                    "proving_run_closeout_written"
+                ],
+                "satisfied_evidence": [
+                    "registry_entry",
+                    "docs_pack",
+                    "manifest_root_skeleton",
+                    "runtime_write_complete",
+                    "implementation_summary_present",
+                    "publication_packet_written",
+                    "support_matrix_check_green",
+                    "capability_matrix_check_green",
+                    "capability_matrix_audit_green",
+                    "preflight_green",
+                    "proving_run_closeout_written"
+                ],
+                "blocking_issues": [],
+                "retryable_failures": [],
+                "implementation_summary": {
+                    "requested_runtime_profile": "default",
+                    "achieved_runtime_profile": "default",
+                    "primary_template": "gemini_cli",
+                    "template_lineage": ["gemini_cli"],
+                    "landed_surfaces": [
+                        "wrapper_runtime",
+                        "backend_harness",
+                        "runtime_manifest_evidence"
+                    ],
+                    "deferred_surfaces": [],
+                    "minimal_profile_justification": serde_json::Value::Null
+                },
+                "publication_packet_path": publication_packet_path,
+                "publication_packet_sha256": publication_packet_sha,
+                "closeout_baseline_path": closeout_baseline_path
+            }))
+            .expect("serialize lifecycle state")
+        ),
+    );
 }
 
 fn seed_governance_closeouts(

@@ -1,0 +1,15 @@
+# Runtime Follow-On Validation
+
+- run_id: `historical-codex-runtime-follow-on`
+- status: `pass`
+- agent_id: `codex`
+- source: `historical-lifecycle-backfill`
+- run_dir: `docs/agents/.uaa-temp/runtime-follow-on/runs/historical-codex-runtime-follow-on`
+
+## Written Paths
+- `cli_manifests/codex/snapshots/0.61.0/union.json`
+- `cli_manifests/codex/supplement/commands.example.json`
+- `crates/agent_api/src/backends/codex/backend.rs`
+- `crates/agent_api/src/backends/codex/mod.rs`
+- `crates/codex/src/lib.rs`
+- `crates/codex/src/wrapper_coverage_manifest.rs`

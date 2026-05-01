@@ -1,0 +1,7 @@
+[
+  "cli_manifests/opencode/snapshots/1.4.11/linux-x64.json",
+  "cli_manifests/opencode/supplement/commands.example.json",
+  "crates/agent_api/src/backends/opencode/backend.rs",
+  "crates/agent_api/src/backends/opencode/mod.rs",
+  "crates/opencode/src/lib.rs"
+]

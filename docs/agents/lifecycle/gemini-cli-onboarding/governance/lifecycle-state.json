@@ -17,6 +17,11 @@
     "manifest_root_skeleton",
     "runtime_write_complete",
     "implementation_summary_present",
+    "publication_packet_written",
+    "support_matrix_check_green",
+    "capability_matrix_check_green",
+    "capability_matrix_audit_green",
+    "preflight_green",
     "proving_run_closeout_written"
   ],
   "satisfied_evidence": [
@@ -25,6 +30,11 @@
     "manifest_root_skeleton",
     "runtime_write_complete",
     "implementation_summary_present",
+    "publication_packet_written",
+    "support_matrix_check_green",
+    "capability_matrix_check_green",
+    "capability_matrix_audit_green",
+    "preflight_green",
     "proving_run_closeout_written"
   ],
   "blocking_issues": [],
@@ -45,7 +55,7 @@
     "deferred_surfaces": [],
     "minimal_profile_justification": null
   },
-  "publication_packet_path": null,
-  "publication_packet_sha256": null,
+  "publication_packet_path": "docs/agents/lifecycle/gemini-cli-onboarding/governance/publication-ready.json",
+  "publication_packet_sha256": "16e39d5c5fc5c99461ba3d9998d94952ad62c90ed4d9a99526eda35d4b46680c",
   "closeout_baseline_path": "docs/agents/lifecycle/gemini-cli-onboarding/governance/proving-run-closeout.json"
 }
