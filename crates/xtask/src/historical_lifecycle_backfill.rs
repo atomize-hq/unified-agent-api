@@ -1,5 +1,4 @@
 use std::{
-    collections::BTreeSet,
     fs,
     io::{self, Write},
     path::{Path, PathBuf},
@@ -21,10 +20,12 @@ use xtask::{
         build_publication_ready_packet, discover_runtime_evidence_for_approval,
         RuntimeEvidenceBundle,
     },
+    runtime_evidence_bundle::{
+        self, historical_run_id, write_runtime_evidence_bundle, RuntimeEvidenceBundleSpec,
+    },
 };
 
 const HISTORICAL_AGENTS: [&str; 4] = ["codex", "claude_code", "opencode", "gemini_cli"];
-const RUNTIME_RUNS_ROOT: &str = "docs/agents/.uaa-temp/runtime-follow-on/runs";
 const APPROVAL_SOURCE: &str = "historical-lifecycle-backfill";
 const DURATION_MISSING_REASON: &str = "Exact duration not recoverable from committed evidence.";
 const EXPLICIT_NONE_REASON: &str =
@@ -214,198 +215,28 @@ fn write_runtime_evidence(
     approval: &ApprovalArtifact,
     lifecycle_state: &LifecycleState,
 ) -> Result<RuntimeEvidenceBundle, Error> {
-    let run_id = format!(
-        "historical-{}-runtime-follow-on",
-        approval.descriptor.agent_id
-    );
-    let run_relative = format!("{RUNTIME_RUNS_ROOT}/{run_id}");
-    let run_root = workspace_root.join(&run_relative);
-    fs::create_dir_all(&run_root)
-        .map_err(|err| Error::Internal(format!("create {}: {err}", run_root.display())))?;
-
-    let written_paths = derive_runtime_written_paths(workspace_root, approval, lifecycle_state)?;
-    let generated_at = lifecycle_state.last_transition_at.clone();
-    write_json(
-        &run_root.join("input-contract.json"),
-        &json!({
-            "workflow_version": "runtime_follow_on_v1",
-            "generated_at": generated_at,
-            "run_id": run_id,
-            "approval_artifact_path": approval.relative_path,
-            "approval_artifact_sha256": approval.sha256,
-            "agent_id": approval.descriptor.agent_id,
-            "manifest_root": approval.descriptor.manifest_root,
-            "required_handoff_commands": agent_lifecycle::REQUIRED_PUBLICATION_COMMANDS,
-        }),
-    )?;
-    write_json(
-        &run_root.join("run-status.json"),
-        &json!({
-            "workflow_version": "runtime_follow_on_v1",
-            "generated_at": generated_at,
-            "run_id": run_id,
-            "approval_artifact_path": approval.relative_path,
-            "agent_id": approval.descriptor.agent_id,
-            "requested_tier": runtime_requested_tier(lifecycle_state),
-            "host_surface": "xtask historical-lifecycle-backfill",
-            "loaded_skill_ref": "historical-lifecycle-backfill",
-            "mode": "historical_backfill",
-            "status": "write_validated",
-            "validation_passed": true,
-            "handoff_ready": true,
-            "run_dir": run_root.display().to_string(),
-            "written_paths": written_paths,
-            "errors": [],
-        }),
-    )?;
-    write_json(
-        &run_root.join("validation-report.json"),
-        &json!({
-            "workflow_version": "runtime_follow_on_v1",
-            "generated_at": generated_at,
-            "run_id": run_id,
-            "status": "pass",
-            "checks": [{
-                "name": "historical_runtime_evidence",
-                "ok": true,
-                "message": "historical runtime evidence was reconstructed from committed runtime-owned outputs"
-            }],
-            "errors": [],
-        }),
-    )?;
-    write_json(
-        &run_root.join("handoff.json"),
-        &json!({
-            "agent_id": approval.descriptor.agent_id,
-            "manifest_root": approval.descriptor.manifest_root,
-            "runtime_lane_complete": true,
-            "publication_refresh_required": true,
-            "required_commands": agent_lifecycle::REQUIRED_PUBLICATION_COMMANDS,
-            "blockers": [],
-        }),
-    )?;
-    write_json(&run_root.join("written-paths.json"), &json!(written_paths))?;
-    fs::write(
-        run_root.join("run-summary.md"),
-        render_runtime_summary(approval, &run_relative, &written_paths),
+    let bundle = write_runtime_evidence_bundle(
+        workspace_root,
+        approval,
+        lifecycle_state,
+        &RuntimeEvidenceBundleSpec {
+            run_id: &historical_run_id(&approval.descriptor.agent_id),
+            host_surface: "xtask historical-lifecycle-backfill",
+            loaded_skill_ref: "historical-lifecycle-backfill",
+            mode: "historical_backfill",
+            source_label: "historical-lifecycle-backfill",
+            summary_title: "Runtime Follow-On Validation",
+            validation_check_name: "historical_runtime_evidence",
+            validation_message:
+                "historical runtime evidence was reconstructed from committed runtime-owned outputs",
+        },
     )
-    .map_err(|err| Error::Internal(format!("write run-summary.md: {err}")))?;
+    .map_err(map_runtime_evidence_bundle_error)?;
 
     Ok(RuntimeEvidenceBundle {
-        run_id,
-        runtime_evidence_paths: vec![
-            format!("{run_relative}/input-contract.json"),
-            format!("{run_relative}/run-status.json"),
-            format!("{run_relative}/run-summary.md"),
-            format!("{run_relative}/validation-report.json"),
-            format!("{run_relative}/written-paths.json"),
-            format!("{run_relative}/handoff.json"),
-        ],
+        run_id: bundle.run_id,
+        runtime_evidence_paths: bundle.runtime_evidence_paths,
     })
-}
-
-fn derive_runtime_written_paths(
-    workspace_root: &Path,
-    approval: &ApprovalArtifact,
-    lifecycle_state: &LifecycleState,
-) -> Result<Vec<String>, Error> {
-    let mut written = BTreeSet::new();
-    for candidate in [
-        format!("{}/src/lib.rs", approval.descriptor.crate_path),
-        format!("{}/backend.rs", approval.descriptor.backend_module),
-        format!("{}/mod.rs", approval.descriptor.backend_module),
-        format!(
-            "{}/src/wrapper_coverage_manifest.rs",
-            approval.descriptor.wrapper_coverage_source_path
-        ),
-        format!(
-            "crates/agent_api/tests/c1_{}_runtime_follow_on.rs",
-            approval.descriptor.agent_id
-        ),
-    ] {
-        if workspace_root.join(&candidate).is_file() {
-            written.insert(candidate);
-        }
-    }
-
-    if let Some(path) = first_file_under(
-        workspace_root,
-        &approval.descriptor.manifest_root,
-        "supplement",
-    )? {
-        written.insert(path);
-    }
-    if let Some(path) = first_file_under(
-        workspace_root,
-        &approval.descriptor.manifest_root,
-        "snapshots",
-    )? {
-        written.insert(path);
-    }
-
-    if lifecycle_state
-        .implementation_summary
-        .as_ref()
-        .is_some_and(|summary| {
-            summary
-                .landed_surfaces
-                .contains(&agent_lifecycle::LandedSurface::AgentApiOnboardingTest)
-        })
-    {
-        let agent_test = format!(
-            "crates/agent_api/tests/c1_{}_runtime_follow_on.rs",
-            approval.descriptor.agent_id
-        );
-        if workspace_root.join(&agent_test).is_file() {
-            written.insert(agent_test);
-        }
-    }
-
-    if written.is_empty() {
-        return Err(Error::Validation(format!(
-            "could not derive any committed runtime-owned outputs for `{}`",
-            approval.descriptor.agent_id
-        )));
-    }
-
-    Ok(written.into_iter().collect())
-}
-
-fn first_file_under(
-    workspace_root: &Path,
-    manifest_root: &str,
-    child: &str,
-) -> Result<Option<String>, Error> {
-    let dir = workspace_root.join(manifest_root).join(child);
-    if !dir.is_dir() {
-        return Ok(None);
-    }
-    let mut stack = vec![dir];
-    let mut files = Vec::new();
-    while let Some(dir) = stack.pop() {
-        for entry in fs::read_dir(&dir)
-            .map_err(|err| Error::Internal(format!("read {}: {err}", dir.display())))?
-        {
-            let entry = entry.map_err(|err| {
-                Error::Internal(format!("read dir entry under {}: {err}", dir.display()))
-            })?;
-            let path = entry.path();
-            let file_type = entry
-                .file_type()
-                .map_err(|err| Error::Internal(format!("stat {}: {err}", path.display())))?;
-            if file_type.is_dir() {
-                stack.push(path);
-            } else if file_type.is_file() {
-                files.push(path);
-            }
-        }
-    }
-    files.sort();
-    Ok(files
-        .into_iter()
-        .next()
-        .and_then(|path| path.strip_prefix(workspace_root).ok().map(PathBuf::from))
-        .map(|path| path.to_string_lossy().replace('\\', "/")))
 }
 
 fn ensure_closeout(
@@ -460,36 +291,6 @@ fn git_first_add_metadata(workspace_root: &Path, relative_path: &str) -> Option<
     let line = stdout.lines().find(|line| !line.trim().is_empty())?;
     let (commit, recorded_at) = line.split_once(' ')?;
     Some((commit.to_string(), recorded_at.to_string()))
-}
-
-fn render_runtime_summary(
-    approval: &ApprovalArtifact,
-    run_relative: &str,
-    written_paths: &[String],
-) -> String {
-    let mut summary = format!(
-        "# Runtime Follow-On Validation\n\n- run_id: `{}`\n- status: `pass`\n- agent_id: `{}`\n- source: `historical-lifecycle-backfill`\n- run_dir: `{}`\n",
-        run_relative.rsplit('/').next().unwrap_or(run_relative),
-        approval.descriptor.agent_id,
-        run_relative
-    );
-    summary.push_str("\n## Written Paths\n");
-    for path in written_paths {
-        summary.push_str(&format!("- `{path}`\n"));
-    }
-    summary
-}
-
-fn runtime_requested_tier(lifecycle_state: &LifecycleState) -> &'static str {
-    match lifecycle_state
-        .implementation_summary
-        .as_ref()
-        .map(|summary| summary.requested_runtime_profile)
-    {
-        Some(agent_lifecycle::RuntimeProfile::Minimal) => "minimal",
-        Some(agent_lifecycle::RuntimeProfile::FeatureRich) => "feature-rich",
-        _ => "default",
-    }
 }
 
 fn read_raw_lifecycle_state(
@@ -548,5 +349,12 @@ fn map_approval_error(err: xtask::approval_artifact::ApprovalArtifactError) -> E
         xtask::approval_artifact::ApprovalArtifactError::Internal(message) => {
             Error::Internal(message)
         }
+    }
+}
+
+fn map_runtime_evidence_bundle_error(err: runtime_evidence_bundle::Error) -> Error {
+    match err {
+        runtime_evidence_bundle::Error::Validation(message) => Error::Validation(message),
+        runtime_evidence_bundle::Error::Internal(message) => Error::Internal(message),
     }
 }
