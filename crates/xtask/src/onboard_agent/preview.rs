@@ -14,7 +14,7 @@ use self::render::{
     build_docs_preview as render_docs_preview, closeout_relative_path, release_touchpoint_lines,
     PacketPhase,
 };
-use super::{ConfigGate, DraftEntry, Error, TargetGate, RELEASE_DOC_PATH};
+use super::{ConfigGate, DraftEntry, Error, LifecycleStatePreview, TargetGate, RELEASE_DOC_PATH};
 
 const RELEASE_DOC_START_MARKER: &str =
     "<!-- generated-by: xtask onboard-agent; section: crates-io-release -->";
@@ -229,6 +229,19 @@ pub(super) fn write_manifest_preview<W: Write>(
                 .map_err(|err| Error::Internal(format!("write stdout: {err}")))?;
         }
     }
+    writeln!(writer).map_err(|err| Error::Internal(format!("write stdout: {err}")))?;
+    Ok(())
+}
+
+pub(super) fn write_lifecycle_state_preview<W: Write>(
+    writer: &mut W,
+    preview: &LifecycleStatePreview,
+) -> Result<(), Error> {
+    writeln!(writer, "== LIFECYCLE STATE PREVIEW ==")
+        .map_err(|err| Error::Internal(format!("write stdout: {err}")))?;
+    writeln!(writer, "Path: {}", preview.path)
+        .map_err(|err| Error::Internal(format!("write stdout: {err}")))?;
+    write_code_block(writer, "json", &preview.contents)?;
     writeln!(writer).map_err(|err| Error::Internal(format!("write stdout: {err}")))?;
     Ok(())
 }

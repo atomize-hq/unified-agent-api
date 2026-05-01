@@ -111,7 +111,7 @@ fn onboard_agent_approval_write_applies_plan_and_replays_identically() {
     assert!(first.stdout.contains("## Approval provenance"));
     assert!(second
         .stdout
-        .contains("Mutation summary: 0 written, 15 identical, 15 total planned."));
+        .contains("Mutation summary: 0 written, 16 identical, 16 total planned."));
 
     let readme =
         fs::read_to_string(fixture.join("docs/agents/lifecycle/cursor-cli-onboarding/README.md"))
@@ -135,6 +135,14 @@ fn onboard_agent_approval_write_applies_plan_and_replays_identically() {
         "- approval ref: `docs/agents/lifecycle/cursor-cli-onboarding/governance/approved-agent.toml`"
     ));
     assert!(handoff.contains("- approval artifact sha256: `"));
+    let lifecycle_state = fs::read_to_string(
+        fixture.join("docs/agents/lifecycle/cursor-cli-onboarding/governance/lifecycle-state.json"),
+    )
+    .expect("read approval-mode lifecycle state");
+    assert!(lifecycle_state.contains(
+        "\"approval_artifact_path\": \"docs/agents/lifecycle/cursor-cli-onboarding/governance/approved-agent.toml\""
+    ));
+    assert!(lifecycle_state.contains("\"lifecycle_stage\": \"enrolled\""));
 }
 
 #[test]
