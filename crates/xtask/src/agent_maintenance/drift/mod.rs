@@ -1,5 +1,6 @@
 mod governance;
 mod publication;
+mod runtime_evidence;
 mod shared;
 
 use std::{
@@ -39,6 +40,7 @@ pub enum DriftCategory {
     GovernanceDoc,
     RegistryManifest,
     ReleaseDoc,
+    RuntimeEvidence,
     SupportPublication,
 }
 
@@ -50,6 +52,7 @@ impl DriftCategory {
             Self::SupportPublication => "support_publication_drift",
             Self::ReleaseDoc => "release_doc_drift",
             Self::GovernanceDoc => "governance_doc_drift",
+            Self::RuntimeEvidence => "runtime_evidence_drift",
         }
     }
 }
@@ -209,13 +212,19 @@ pub fn check_agent_drift(
     if let Some(finding) = publication::inspect_release_doc(entry, workspace_root, &registry) {
         findings.push(finding);
     }
-    if let Some(finding) = governance::inspect_governance_docs(
-        entry,
-        workspace_root,
-        capability_truth.as_ref(),
-        expected_support_rows.as_ref(),
-    ) {
+    let runtime_integrated = runtime_evidence::has_runtime_integrated_lifecycle(entry, workspace_root);
+    if let Some(finding) = runtime_evidence::inspect_runtime_evidence(entry, workspace_root) {
         findings.push(finding);
+    }
+    if !runtime_integrated {
+        if let Some(finding) = governance::inspect_governance_docs(
+            entry,
+            workspace_root,
+            capability_truth.as_ref(),
+            expected_support_rows.as_ref(),
+        ) {
+            findings.push(finding);
+        }
     }
 
     findings.sort_by(|left, right| left.category_id().cmp(right.category_id()));
