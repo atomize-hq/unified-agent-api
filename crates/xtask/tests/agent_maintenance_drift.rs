@@ -13,10 +13,15 @@ mod agent_lifecycle {
     pub use xtask::agent_lifecycle::*;
 }
 
+mod prepare_publication {
+    pub use xtask::prepare_publication::*;
+}
+
 #[path = "../src/agent_registry.rs"]
 mod agent_registry;
-#[path = "../src/approval_artifact.rs"]
-mod approval_artifact;
+mod approval_artifact {
+    pub use xtask::approval_artifact::*;
+}
 #[path = "../src/capability_projection.rs"]
 mod capability_projection;
 #[path = "../src/agent_maintenance/drift/mod.rs"]
@@ -331,6 +336,62 @@ fn check_agent_drift_reports_gemini_approval_descriptor_mismatch() {
 }
 
 #[test]
+fn check_agent_drift_reports_stale_runtime_evidence_for_runtime_integrated_agent() {
+    let fixture = fixture_root("agent-maintenance-drift-runtime-evidence-stale");
+    seed_publication_inputs(&fixture);
+    seed_gemini_runtime_integrated_state(&fixture);
+    seed_runtime_evidence_run(&fixture, RuntimeEvidenceTruth::Stale);
+
+    let report = check_agent_drift(&fixture, "gemini_cli").expect("drift report");
+    let finding = report
+        .findings
+        .iter()
+        .find(|finding| finding.category == DriftCategory::RuntimeEvidence)
+        .expect("runtime evidence finding");
+    assert!(finding.summary.contains("repair-runtime-evidence"));
+    assert!(finding.summary.contains("runtime evidence run"));
+    assert!(finding.surfaces.contains(
+        &"docs/agents/.uaa-temp/runtime-follow-on/runs/repair-gemini_cli-runtime-follow-on"
+            .to_string()
+    ));
+    assert!(
+        report
+            .findings
+            .iter()
+            .all(|finding| finding.category != DriftCategory::GovernanceDoc),
+        "{}",
+        report.render()
+    );
+}
+
+#[test]
+fn check_agent_drift_clears_runtime_evidence_finding_after_truthful_repair() {
+    let fixture = fixture_root("agent-maintenance-drift-runtime-evidence-repaired");
+    seed_publication_inputs(&fixture);
+    seed_gemini_runtime_integrated_state(&fixture);
+    seed_runtime_evidence_run(&fixture, RuntimeEvidenceTruth::Stale);
+
+    let before = check_agent_drift(&fixture, "gemini_cli").expect("stale drift report");
+    assert!(before
+        .findings
+        .iter()
+        .any(|finding| finding.category == DriftCategory::RuntimeEvidence));
+
+    seed_runtime_evidence_run(&fixture, RuntimeEvidenceTruth::Truthful);
+
+    let after = check_agent_drift(&fixture, "gemini_cli").expect("repaired report");
+    assert!(
+        after
+            .findings
+            .iter()
+            .all(|finding| finding.category != DriftCategory::RuntimeEvidence),
+        "{}",
+        after.render()
+    );
+    assert!(after.is_clean(), "{}", after.render());
+}
+
+#[test]
 fn check_agent_drift_reports_recurring_closed_governance_surface() {
     let fixture = fixture_root("agent-maintenance-drift-governance-closed");
     seed_publication_inputs(&fixture);
@@ -579,6 +640,12 @@ enum LifecycleBaselineGap {
     MissingCloseoutBaselinePath,
 }
 
+#[derive(Clone, Copy)]
+enum RuntimeEvidenceTruth {
+    Stale,
+    Truthful,
+}
+
 fn seed_gemini_lifecycle_baseline(root: &Path, gap: LifecycleBaselineGap) {
     let approval_path =
         "docs/agents/lifecycle/gemini-cli-onboarding/governance/approved-agent.toml";
@@ -753,6 +820,151 @@ fn seed_gemini_lifecycle_baseline(root: &Path, gap: LifecycleBaselineGap) {
             }))
             .expect("serialize lifecycle state")
         ),
+    );
+}
+
+fn seed_gemini_runtime_integrated_state(root: &Path) {
+    let approval_path =
+        "docs/agents/lifecycle/gemini-cli-onboarding/governance/approved-agent.toml";
+    let approval_sha = sha256_hex(&root.join(approval_path));
+    write_text(
+        &root.join("docs/agents/lifecycle/gemini-cli-onboarding/governance/lifecycle-state.json"),
+        &format!(
+            "{}\n",
+            serde_json::to_string_pretty(&serde_json::json!({
+                "schema_version": "1",
+                "agent_id": "gemini_cli",
+                "onboarding_pack_prefix": "gemini-cli-onboarding",
+                "approval_artifact_path": approval_path,
+                "approval_artifact_sha256": approval_sha,
+                "lifecycle_stage": "runtime_integrated",
+                "support_tier": "baseline_runtime",
+                "side_states": [],
+                "current_owner_command": "runtime-follow-on --write",
+                "expected_next_command": "prepare-publication --approval docs/agents/lifecycle/gemini-cli-onboarding/governance/approved-agent.toml --write",
+                "last_transition_at": "2026-05-01T00:00:00Z",
+                "last_transition_by": "agent-maintenance-drift-test",
+                "required_evidence": [
+                    "registry_entry",
+                    "docs_pack",
+                    "manifest_root_skeleton",
+                    "runtime_write_complete",
+                    "implementation_summary_present"
+                ],
+                "satisfied_evidence": [
+                    "registry_entry",
+                    "docs_pack",
+                    "manifest_root_skeleton",
+                    "runtime_write_complete",
+                    "implementation_summary_present"
+                ],
+                "blocking_issues": [],
+                "retryable_failures": [],
+                "implementation_summary": {
+                    "requested_runtime_profile": "default",
+                    "achieved_runtime_profile": "default",
+                    "primary_template": "gemini_cli",
+                    "template_lineage": ["gemini_cli"],
+                    "landed_surfaces": [
+                        "wrapper_runtime",
+                        "backend_harness",
+                        "runtime_manifest_evidence"
+                    ],
+                    "deferred_surfaces": [],
+                    "minimal_profile_justification": serde_json::Value::Null
+                },
+                "publication_packet_path": serde_json::Value::Null,
+                "publication_packet_sha256": serde_json::Value::Null,
+                "closeout_baseline_path": serde_json::Value::Null
+            }))
+            .expect("serialize runtime integrated lifecycle state")
+        ),
+    );
+}
+
+fn seed_runtime_evidence_run(root: &Path, truth: RuntimeEvidenceTruth) {
+    let approval_path =
+        "docs/agents/lifecycle/gemini-cli-onboarding/governance/approved-agent.toml";
+    let approval_sha = sha256_hex(&root.join(approval_path));
+    let run_root =
+        root.join("docs/agents/.uaa-temp/runtime-follow-on/runs/repair-gemini_cli-runtime-follow-on");
+    let input_sha = match truth {
+        RuntimeEvidenceTruth::Stale => {
+            "deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef"
+        }
+        RuntimeEvidenceTruth::Truthful => &approval_sha,
+    };
+
+    write_text(
+        &run_root.join("run-status.json"),
+        &format!(
+            "{}\n",
+            serde_json::to_string_pretty(&serde_json::json!({
+                "approval_artifact_path": approval_path,
+                "agent_id": "gemini_cli",
+                "status": "write_validated",
+                "validation_passed": true,
+                "handoff_ready": true,
+                "run_dir": run_root.to_string_lossy(),
+            }))
+            .expect("serialize runtime run status")
+        ),
+    );
+    write_text(
+        &run_root.join("input-contract.json"),
+        &format!(
+            "{}\n",
+            serde_json::to_string_pretty(&serde_json::json!({
+                "approval_artifact_path": approval_path,
+                "approval_artifact_sha256": input_sha,
+                "agent_id": "gemini_cli",
+                "manifest_root": "cli_manifests/gemini_cli",
+                "required_handoff_commands": [
+                    "cargo run -p xtask -- support-matrix --check",
+                    "cargo run -p xtask -- capability-matrix --check",
+                    "cargo run -p xtask -- capability-matrix-audit",
+                    "make preflight"
+                ]
+            }))
+            .expect("serialize runtime input contract")
+        ),
+    );
+    write_text(
+        &run_root.join("validation-report.json"),
+        "{\n  \"status\": \"pass\"\n}\n",
+    );
+    write_text(
+        &run_root.join("handoff.json"),
+        &format!(
+            "{}\n",
+            serde_json::to_string_pretty(&serde_json::json!({
+                "agent_id": "gemini_cli",
+                "manifest_root": "cli_manifests/gemini_cli",
+                "runtime_lane_complete": true,
+                "publication_refresh_required": true,
+                "required_commands": [
+                    "cargo run -p xtask -- support-matrix --check",
+                    "cargo run -p xtask -- capability-matrix --check",
+                    "cargo run -p xtask -- capability-matrix-audit",
+                    "make preflight"
+                ],
+                "blockers": []
+            }))
+            .expect("serialize runtime handoff")
+        ),
+    );
+    write_text(
+        &run_root.join("written-paths.json"),
+        concat!(
+            "[\n",
+            "  \"crates/gemini_cli/src/lib.rs\",\n",
+            "  \"cli_manifests/gemini_cli/snapshots/default.json\"\n",
+            "]\n"
+        ),
+    );
+    write_text(
+        &run_root.join("run-summary.md"),
+        "# Runtime follow-on\n\nCommitted runtime evidence recorded.\n",
     );
 }
 
