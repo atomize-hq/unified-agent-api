@@ -1,0 +1,25 @@
+{
+  "agent_id": "aider",
+  "approval_artifact_path": "docs/agents/lifecycle/aider-onboarding/governance/approved-agent.toml",
+  "errors": [],
+  "generated_at": "2026-04-29T19:38:47-04:00",
+  "handoff_ready": true,
+  "host_surface": "xtask repair-runtime-evidence",
+  "loaded_skill_ref": "repair-runtime-evidence",
+  "mode": "repair",
+  "requested_tier": "default",
+  "run_dir": "/Users/spensermcconnell/__Active_Code/atomize-hq/unified-agent-api/docs/agents/.uaa-temp/runtime-follow-on/runs/repair-aider-runtime-follow-on",
+  "run_id": "repair-aider-runtime-follow-on",
+  "status": "write_validated",
+  "validation_passed": true,
+  "workflow_version": "runtime_follow_on_v1",
+  "written_paths": [
+    "cli_manifests/aider/snapshots/0.0.0/union.json",
+    "cli_manifests/aider/supplement/runtime-follow-on-proof.md",
+    "crates/agent_api/src/backends/aider/backend.rs",
+    "crates/agent_api/src/backends/aider/mod.rs",
+    "crates/agent_api/tests/c1_aider_runtime_follow_on.rs",
+    "crates/aider/src/lib.rs",
+    "crates/aider/src/wrapper_coverage_manifest.rs"
+  ]
+}

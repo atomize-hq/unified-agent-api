@@ -368,7 +368,7 @@ The write run is only successful when `handoff.json` passes the minimum schema a
 including:
 - `runtime_lane_complete = true`
 - `publication_refresh_required = true`
-- `required_commands` includes:
+- `required_commands` matches exactly:
   - `cargo run -p xtask -- support-matrix --check`
   - `cargo run -p xtask -- capability-matrix --check`
   - `cargo run -p xtask -- capability-matrix-audit`
@@ -382,7 +382,51 @@ On successful write, `runtime-follow-on` advances the committed lifecycle record
 
 On validation failure, the command keeps the lifecycle stage unchanged and records exact retryable or blocking issues in the lifecycle side-state fields. `handoff.json`, `run-status.json`, and `run-summary.md` remain `.uaa-temp` evidence only and are not committed publication handoff artifacts.
 
-### 5. Run post-proof target validation
+### 5. Repair stale runtime evidence when needed
+
+Use the repair seam only for agents that are already at `lifecycle_stage = runtime_integrated` but whose committed runtime evidence no longer satisfies the frozen publication contract.
+
+Inspect repairability first:
+
+```sh
+"$XTASK_BIN" repair-runtime-evidence \
+  --approval docs/agents/lifecycle/<onboarding_pack_prefix>/governance/approved-agent.toml \
+  --check
+```
+
+Write the deterministic repaired bundle only when the check succeeds:
+
+```sh
+"$XTASK_BIN" repair-runtime-evidence \
+  --approval docs/agents/lifecycle/<onboarding_pack_prefix>/governance/approved-agent.toml \
+  --write
+```
+
+`repair-runtime-evidence`:
+- reconstructs runtime evidence only from committed runtime-owned outputs
+- writes exactly one deterministic run directory under `docs/agents/.uaa-temp/runtime-follow-on/runs/repair-<agent_id>-runtime-follow-on/`
+- emits the full six-file bundle: `input-contract.json`, `run-status.json`, `validation-report.json`, `handoff.json`, `written-paths.json`, and `run-summary.md`
+- does not advance lifecycle stage or rewrite `lifecycle-state.json`
+
+The expected stale-bundle failure shape is now explicit. Operators will see either:
+- `prepare-publication --check` fail with a message like `runtime input-contract required_handoff_commands must match the frozen publication command set exactly`, plus direct `repair-runtime-evidence` guidance
+- `check-agent-drift --agent <agent_id>` report `category_id: runtime_evidence_drift` with the exact repair commands and deterministic repair run directory
+
+Concrete `aider` repair sequence:
+
+```sh
+cargo run -p xtask -- check-agent-drift --agent aider
+cargo run -p xtask -- repair-runtime-evidence --approval docs/agents/lifecycle/aider-onboarding/governance/approved-agent.toml --check
+cargo run -p xtask -- repair-runtime-evidence --approval docs/agents/lifecycle/aider-onboarding/governance/approved-agent.toml --write
+cargo run -p xtask -- prepare-publication --approval docs/agents/lifecycle/aider-onboarding/governance/approved-agent.toml --check
+cargo run -p xtask -- check-agent-drift --agent aider
+```
+
+For the committed `aider` repair run, the bundle lives at:
+
+`docs/agents/.uaa-temp/runtime-follow-on/runs/repair-aider-runtime-follow-on/`
+
+### 6. Run post-proof target validation
 
 After `runtime-follow-on --write` succeeds, validate the enrolled backend wiring:
 
@@ -390,7 +434,7 @@ After `runtime-follow-on --write` succeeds, validate the enrolled backend wiring
 cargo test -p unified-agent-api --all-features
 ```
 
-### 6. Prepare the committed publication handoff
+### 7. Prepare the committed publication handoff
 
 Once runtime-integrated state and `.uaa-temp` runtime evidence both exist, emit the only committed publication handoff packet:
 
@@ -415,7 +459,7 @@ On success it:
 
 `prepare-publication --check` revalidates the same seam without rewriting either governance file.
 
-### 7. Refresh publication surfaces
+### 8. Refresh publication surfaces
 
 After committed runtime evidence exists, refresh the published control-plane outputs:
 
@@ -432,7 +476,7 @@ This refreshes the published support/capability surfaces from repo truth. The re
 
 `prepare-publication` never writes these support/capability outputs directly. It only records the committed publication handoff packet and the lifecycle transition that points to the green gate.
 
-### 8. Run the green gate
+### 9. Run the green gate
 
 The create lane is only green when all of the following pass:
 

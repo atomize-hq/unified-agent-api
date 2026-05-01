@@ -1,0 +1,15 @@
+{
+  "agent_id": "aider",
+  "approval_artifact_path": "docs/agents/lifecycle/aider-onboarding/governance/approved-agent.toml",
+  "approval_artifact_sha256": "bc02f5f9b7fe7880446c4cb04b33a9f7c419008755b2229a8243ba878441a854",
+  "generated_at": "2026-04-29T19:38:47-04:00",
+  "manifest_root": "cli_manifests/aider",
+  "required_handoff_commands": [
+    "cargo run -p xtask -- support-matrix --check",
+    "cargo run -p xtask -- capability-matrix --check",
+    "cargo run -p xtask -- capability-matrix-audit",
+    "make preflight"
+  ],
+  "run_id": "repair-aider-runtime-follow-on",
+  "workflow_version": "runtime_follow_on_v1"
+}

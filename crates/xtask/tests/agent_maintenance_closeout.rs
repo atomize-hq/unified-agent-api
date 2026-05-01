@@ -13,6 +13,10 @@ mod agent_lifecycle {
     pub use xtask::agent_lifecycle::*;
 }
 
+mod prepare_publication {
+    pub use xtask::prepare_publication::*;
+}
+
 #[path = "../src/agent_maintenance/finding_signature.rs"]
 mod finding_signature;
 
@@ -20,8 +24,9 @@ mod workspace_mutation {
     pub use xtask::workspace_mutation::*;
 }
 
-#[path = "../src/approval_artifact.rs"]
-mod approval_artifact;
+mod approval_artifact {
+    pub use xtask::approval_artifact::*;
+}
 #[path = "../src/capability_projection.rs"]
 mod capability_projection;
 #[path = "../src/agent_maintenance/closeout.rs"]
