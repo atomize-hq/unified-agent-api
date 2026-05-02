@@ -452,7 +452,9 @@ Once runtime-integrated state and `.uaa-temp` runtime evidence both exist, emit 
 - approval path and SHA continuity against the committed lifecycle record
 - explicit, non-empty `implementation_summary`
 - a successful runtime-evidence bundle selected by `lifecycle-state.json.active_runtime_evidence_run_id`
-- capability publication continuity from registry truth and `cli_manifests/<agent_id>/current.json`
+- capability publication continuity from registry truth and `cli_manifests/<agent_id>/current.json`,
+  including approval/registry continuity and lifecycle/approval continuity before publication truth
+  is accepted
 
 On success it:
 - writes `docs/agents/lifecycle/<onboarding_pack_prefix>/governance/publication-ready.json`
@@ -477,6 +479,10 @@ This refreshes the published support/capability surfaces from repo truth. The re
 - `cli_manifests/support_matrix/current.json`
 - `docs/specs/unified-agent-api/support-matrix.md`
 - `docs/specs/unified-agent-api/capability-matrix.md`
+
+For capability publication, `capability-matrix` reads lifecycle-backed publication truth. Agents
+without an explicit publication target appear under their default lifecycle-backed target profile in
+the generated header.
 
 `prepare-publication` never writes these support/capability outputs directly. It only records the committed publication handoff packet and the lifecycle transition that points to the green gate.
 

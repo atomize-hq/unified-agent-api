@@ -81,7 +81,8 @@ Rules are owned by:
 ### Capability promotion rule
 
 To keep the universal facade orthogonal, any new `agent_api.*` capability id (except the allowlist
-below) is only considered “promoted” once it is supported by **≥2 built-in backends**.
+below) is only considered “promoted” once it is supported by **≥2 lifecycle-eligible agent
+backends in capability publication truth**.
 
 This is CI-enforced by:
 - regenerating and diff-checking `docs/specs/unified-agent-api/capability-matrix.md`
