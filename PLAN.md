@@ -1,11 +1,19 @@
 # PLAN - Runtime Evidence Repair And Publication Seam Hardening
 
-Status: implementation-ready  
-Date: 2026-05-01  
+Status: implemented  
+Date: 2026-05-02  
 Branch: `codex/recommend-next-agent`  
 Base branch: `main`  
 Repo: `atomize-hq/unified-agent-api`  
 Work item: `Repair stale runtime_integrated evidence and harden the runtime -> publication seam`
+
+## Implementation Notes
+
+- `repair-runtime-evidence --check` now stages a temporary runtime-evidence bundle and validates it through the same runtime-evidence semantic rules `prepare-publication` uses, via an explicit-run-root validator.
+- `repair-runtime-evidence --write` remains on the canonical promote -> validate -> rollback path so the committed `run_dir` metadata stays truthful for the canonical repair run id.
+- Shared runtime-owned backend derivation now includes all direct files under `descriptor.backend_module` and still excludes nested backend files.
+- Historical refreshes are intentionally targeted per agent. Those commands primarily regenerate runtime-evidence run directories, but downstream governance artifacts may also change if the targeted backfill rewrites them mechanically.
+- The lifecycle still lacks an explicit pointer to the active runtime-evidence run. That lifecycle-pointer redesign is a follow-on item, not part of this bounded fix.
 
 ## Objective
 

@@ -101,6 +101,30 @@ pub(super) fn validate_runtime_evidence_run(
     })
 }
 
+pub(super) fn validate_runtime_evidence_directory(
+    workspace_root: &Path,
+    approval: &ApprovalArtifact,
+    run_id: &str,
+    run_root: &Path,
+) -> Result<RuntimeEvidenceBundle, Error> {
+    let relative_run_root = run_root
+        .strip_prefix(workspace_root)
+        .map_err(|_| {
+            Error::Internal(format!(
+                "runtime evidence run root `{}` must stay inside workspace `{}`",
+                run_root.display(),
+                workspace_root.display()
+            ))
+        })?
+        .to_string_lossy()
+        .replace('\\', "/");
+    inspect_runtime_run_at(approval, run_id, &relative_run_root, run_root)?.ok_or_else(|| {
+        Error::Validation(format!(
+            "runtime evidence run `{run_id}` is missing required runtime evidence files under `{relative_run_root}`"
+        ))
+    })
+}
+
 fn inspect_runtime_run(
     workspace_root: &Path,
     approval: &ApprovalArtifact,
@@ -108,6 +132,15 @@ fn inspect_runtime_run(
 ) -> Result<Option<RuntimeEvidenceBundle>, Error> {
     let relative_run_root = format!("{RUNTIME_RUNS_ROOT}/{run_id}");
     let absolute_run_root = workspace_root.join(&relative_run_root);
+    inspect_runtime_run_at(approval, run_id, &relative_run_root, &absolute_run_root)
+}
+
+fn inspect_runtime_run_at(
+    approval: &ApprovalArtifact,
+    run_id: &str,
+    relative_run_root: &str,
+    absolute_run_root: &Path,
+) -> Result<Option<RuntimeEvidenceBundle>, Error> {
     let status_path = absolute_run_root.join("run-status.json");
     if !status_path.is_file() {
         return Ok(None);

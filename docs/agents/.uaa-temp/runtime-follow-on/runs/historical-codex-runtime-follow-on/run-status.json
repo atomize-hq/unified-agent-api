@@ -25,7 +25,12 @@
     "cli_manifests/codex/supplement/commands.example.json",
     "cli_manifests/codex/supplement/commands.json",
     "crates/agent_api/src/backends/codex/backend.rs",
+    "crates/agent_api/src/backends/codex/exec.rs",
+    "crates/agent_api/src/backends/codex/fork.rs",
+    "crates/agent_api/src/backends/codex/harness.rs",
+    "crates/agent_api/src/backends/codex/mapping.rs",
     "crates/agent_api/src/backends/codex/mod.rs",
+    "crates/agent_api/src/backends/codex/policy.rs",
     "crates/codex/src/lib.rs",
     "crates/codex/src/wrapper_coverage_manifest.rs"
   ]

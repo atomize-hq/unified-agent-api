@@ -153,6 +153,22 @@ fn prepare_fixture(prefix: &str) -> (PathBuf, String) {
         "#![forbid(unsafe_code)]\n",
     );
     write_text(
+        &fixture.join("crates/agent_api/src/backends/gemini_cli/harness.rs"),
+        "#![forbid(unsafe_code)]\n",
+    );
+    write_text(
+        &fixture.join("crates/agent_api/src/backends/gemini_cli/mapping.rs"),
+        "#![forbid(unsafe_code)]\n",
+    );
+    write_text(
+        &fixture.join("crates/agent_api/src/backends/gemini_cli/util.rs"),
+        "#![forbid(unsafe_code)]\n",
+    );
+    write_text(
+        &fixture.join("crates/agent_api/src/backends/gemini_cli/internal/ignored.rs"),
+        "#![forbid(unsafe_code)]\n",
+    );
+    write_text(
         &fixture.join("crates/gemini_cli/src/wrapper_coverage_manifest.rs"),
         "#![forbid(unsafe_code)]\n",
     );
@@ -203,6 +219,19 @@ fn historical_lifecycle_backfill_rebuilds_multi_file_runtime_evidence_and_downst
         &fs::read(run_root.join("written-paths.json")).expect("read written paths"),
     )
     .expect("parse written paths");
+    assert!(
+        written_paths.contains(&"crates/agent_api/src/backends/gemini_cli/backend.rs".to_string())
+    );
+    assert!(written_paths.contains(&"crates/agent_api/src/backends/gemini_cli/mod.rs".to_string()));
+    assert!(
+        written_paths.contains(&"crates/agent_api/src/backends/gemini_cli/harness.rs".to_string())
+    );
+    assert!(
+        written_paths.contains(&"crates/agent_api/src/backends/gemini_cli/mapping.rs".to_string())
+    );
+    assert!(written_paths.contains(&"crates/agent_api/src/backends/gemini_cli/util.rs".to_string()));
+    assert!(!written_paths
+        .contains(&"crates/agent_api/src/backends/gemini_cli/internal/ignored.rs".to_string()));
     assert!(written_paths.contains(&"cli_manifests/gemini_cli/snapshots/default.json".to_string()));
     assert!(written_paths.contains(&"cli_manifests/gemini_cli/snapshots/union.json".to_string()));
     assert!(written_paths.contains(&"cli_manifests/gemini_cli/supplement/notes.md".to_string()));

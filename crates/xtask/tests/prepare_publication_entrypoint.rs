@@ -491,6 +491,27 @@ fn validate_runtime_evidence_run_rejects_path_sensitive_run_dir_mismatch() {
 }
 
 #[test]
+fn validate_runtime_evidence_directory_rejects_path_sensitive_run_dir_mismatch() {
+    let (fixture, approval_path) =
+        prepare_fixture("prepare-publication-explicit-run-root-run-dir-mismatch");
+    let run_root = fixture.join(RUNTIME_RUNS_ROOT).join(RUN_ID);
+    let run_status_path = run_root.join("run-status.json");
+    let mut run_status = read_json(&run_status_path);
+    run_status["run_dir"] = Value::String("/tmp/not-the-real-run-root".to_string());
+    write_json(&run_status_path, &run_status);
+
+    let approval = xtask::approval_artifact::load_approval_artifact(&fixture, &approval_path)
+        .expect("approval");
+    let err = prepare_publication::validate_runtime_evidence_directory_for_approval(
+        &fixture, &approval, RUN_ID, &run_root,
+    )
+    .expect_err("run_dir mismatch should fail");
+    assert!(err
+        .to_string()
+        .contains("recorded run_dir `/tmp/not-the-real-run-root`"));
+}
+
+#[test]
 fn prepare_publication_rejects_capability_continuity_drift() {
     let (fixture, approval_path) = prepare_fixture("prepare-publication-capability-drift");
     write_json(

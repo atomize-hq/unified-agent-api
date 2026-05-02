@@ -11,7 +11,9 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 pub use self::runtime_evidence::RuntimeEvidenceBundle;
-use self::runtime_evidence::{discover_runtime_evidence, validate_runtime_evidence_run};
+use self::runtime_evidence::{
+    discover_runtime_evidence, validate_runtime_evidence_directory, validate_runtime_evidence_run,
+};
 use crate::{
     agent_lifecycle::{
         self, file_sha256, load_lifecycle_state, load_publication_ready_packet, now_rfc3339,
@@ -212,6 +214,15 @@ pub fn validate_runtime_evidence_run_for_approval(
     run_id: &str,
 ) -> Result<RuntimeEvidenceBundle, Error> {
     validate_runtime_evidence_run(workspace_root, approval, run_id)
+}
+
+pub fn validate_runtime_evidence_directory_for_approval(
+    workspace_root: &Path,
+    approval: &ApprovalArtifact,
+    run_id: &str,
+    run_root: &Path,
+) -> Result<RuntimeEvidenceBundle, Error> {
+    validate_runtime_evidence_directory(workspace_root, approval, run_id, run_root)
 }
 
 fn build_context(workspace_root: &Path, args: &Args) -> Result<PublicationContext, Error> {

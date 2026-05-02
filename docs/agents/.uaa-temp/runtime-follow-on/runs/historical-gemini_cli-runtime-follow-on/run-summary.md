@@ -8,5 +8,7 @@
 
 ## Written Paths
 - `crates/agent_api/src/backends/gemini_cli/backend.rs`
+- `crates/agent_api/src/backends/gemini_cli/harness.rs`
+- `crates/agent_api/src/backends/gemini_cli/mapping.rs`
 - `crates/agent_api/src/backends/gemini_cli/mod.rs`
 - `crates/gemini_cli/src/lib.rs`

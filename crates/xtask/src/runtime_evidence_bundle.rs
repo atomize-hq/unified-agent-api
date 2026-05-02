@@ -196,8 +196,6 @@ fn derive_runtime_written_paths(
     let mut written = BTreeSet::new();
     for candidate in [
         format!("{}/src/lib.rs", approval.descriptor.crate_path),
-        format!("{}/backend.rs", approval.descriptor.backend_module),
-        format!("{}/mod.rs", approval.descriptor.backend_module),
         format!(
             "{}/src/wrapper_coverage_manifest.rs",
             approval.descriptor.wrapper_coverage_source_path
@@ -210,6 +208,9 @@ fn derive_runtime_written_paths(
         if workspace_root.join(&candidate).is_file() {
             written.insert(candidate);
         }
+    }
+    for path in collect_direct_files(workspace_root, &approval.descriptor.backend_module)? {
+        written.insert(path);
     }
 
     for path in collect_files_under(
@@ -253,6 +254,36 @@ fn derive_runtime_written_paths(
     }
 
     Ok(written.into_iter().collect())
+}
+
+fn collect_direct_files(workspace_root: &Path, root: &str) -> Result<Vec<String>, Error> {
+    let dir = workspace_root.join(root);
+    if !dir.is_dir() {
+        return Ok(Vec::new());
+    }
+
+    let mut files = Vec::new();
+    for entry in fs::read_dir(&dir)
+        .map_err(|err| Error::Internal(format!("read {}: {err}", dir.display())))?
+    {
+        let entry = entry.map_err(|err| {
+            Error::Internal(format!("read dir entry under {}: {err}", dir.display()))
+        })?;
+        let path = entry.path();
+        let file_type = entry
+            .file_type()
+            .map_err(|err| Error::Internal(format!("stat {}: {err}", path.display())))?;
+        if file_type.is_file() {
+            files.push(path);
+        }
+    }
+    files.sort();
+
+    Ok(files
+        .into_iter()
+        .filter_map(|path| path.strip_prefix(workspace_root).ok().map(PathBuf::from))
+        .map(|path| path.to_string_lossy().replace('\\', "/"))
+        .collect())
 }
 
 fn collect_files_under(

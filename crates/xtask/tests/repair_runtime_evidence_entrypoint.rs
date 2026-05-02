@@ -142,6 +142,26 @@ fn prepare_fixture(prefix: &str) -> (PathBuf, String) {
         "#![forbid(unsafe_code)]\n",
     );
     write_text(
+        &fixture.join("crates/agent_api/src/backends/gemini_cli/mod.rs"),
+        "#![forbid(unsafe_code)]\n",
+    );
+    write_text(
+        &fixture.join("crates/agent_api/src/backends/gemini_cli/harness.rs"),
+        "#![forbid(unsafe_code)]\n",
+    );
+    write_text(
+        &fixture.join("crates/agent_api/src/backends/gemini_cli/mapping.rs"),
+        "#![forbid(unsafe_code)]\n",
+    );
+    write_text(
+        &fixture.join("crates/agent_api/src/backends/gemini_cli/util.rs"),
+        "#![forbid(unsafe_code)]\n",
+    );
+    write_text(
+        &fixture.join("crates/agent_api/src/backends/gemini_cli/internal/ignored.rs"),
+        "#![forbid(unsafe_code)]\n",
+    );
+    write_text(
         &fixture.join("crates/gemini_cli/src/wrapper_coverage_manifest.rs"),
         "#![forbid(unsafe_code)]\n",
     );
@@ -212,7 +232,8 @@ fn repair_runtime_evidence_check_reports_repairable_bundle() {
     assert!(output
         .stdout
         .contains("run_id: repair-gemini_cli-runtime-follow-on"));
-    assert!(output.stdout.contains("written_paths: 8"));
+    assert!(output.stdout.contains("written_paths: 12"));
+    assert_no_staging_dirs(&fixture);
 }
 
 #[test]
@@ -241,11 +262,24 @@ fn repair_runtime_evidence_write_emits_bundle_without_advancing_lifecycle() {
         &fs::read(repair_root.join("written-paths.json")).expect("read written paths"),
     )
     .expect("parse written paths");
-    assert_eq!(written_paths.len(), 8);
+    assert_eq!(written_paths.len(), 12);
     assert!(written_paths.contains(&"cli_manifests/gemini_cli/snapshots/default.json".to_string()));
     assert!(written_paths.contains(&"cli_manifests/gemini_cli/snapshots/union.json".to_string()));
     assert!(written_paths.contains(&"cli_manifests/gemini_cli/supplement/notes.md".to_string()));
     assert!(written_paths.contains(&"cli_manifests/gemini_cli/supplement/commands.md".to_string()));
+    assert!(
+        written_paths.contains(&"crates/agent_api/src/backends/gemini_cli/backend.rs".to_string())
+    );
+    assert!(written_paths.contains(&"crates/agent_api/src/backends/gemini_cli/mod.rs".to_string()));
+    assert!(
+        written_paths.contains(&"crates/agent_api/src/backends/gemini_cli/harness.rs".to_string())
+    );
+    assert!(
+        written_paths.contains(&"crates/agent_api/src/backends/gemini_cli/mapping.rs".to_string())
+    );
+    assert!(written_paths.contains(&"crates/agent_api/src/backends/gemini_cli/util.rs".to_string()));
+    assert!(!written_paths
+        .contains(&"crates/agent_api/src/backends/gemini_cli/internal/ignored.rs".to_string()));
 
     let run_status: Value = serde_json::from_slice(
         &fs::read(repair_root.join("run-status.json")).expect("read run status"),
@@ -303,11 +337,37 @@ fn repair_runtime_evidence_write_replaces_existing_canonical_bundle_without_stag
 }
 
 #[test]
+fn repair_runtime_evidence_check_uses_runtime_evidence_validator_and_cleans_up_staging() {
+    fn corrupt_run_dir(run_root: &Path) -> Result<(), String> {
+        let run_status_path = run_root.join("run-status.json");
+        let mut run_status = read_json(&run_status_path);
+        run_status["run_dir"] = Value::String("/tmp/not-the-real-run-root".to_string());
+        write_json(&run_status_path, &run_status);
+        Ok(())
+    }
+
+    let (fixture, approval_path) = prepare_fixture("repair-runtime-evidence-check-validator");
+    repair_runtime_evidence::set_test_stage_mutator(Some(corrupt_run_dir));
+    let output = run_cli(repair_args("--check", &approval_path), &fixture);
+    repair_runtime_evidence::set_test_stage_mutator(None);
+
+    assert_eq!(output.exit_code, 2, "stderr:\n{}", output.stderr);
+    assert!(output
+        .stderr
+        .contains("recorded run_dir `/tmp/not-the-real-run-root`"));
+    assert_no_staging_dirs(&fixture);
+}
+
+#[test]
 fn repair_runtime_evidence_check_fails_when_runtime_outputs_cannot_be_derived() {
     let (fixture, approval_path) = prepare_fixture("repair-runtime-evidence-missing-outputs");
     for path in [
         "crates/gemini_cli/src/lib.rs",
         "crates/agent_api/src/backends/gemini_cli/backend.rs",
+        "crates/agent_api/src/backends/gemini_cli/mod.rs",
+        "crates/agent_api/src/backends/gemini_cli/harness.rs",
+        "crates/agent_api/src/backends/gemini_cli/mapping.rs",
+        "crates/agent_api/src/backends/gemini_cli/util.rs",
         "crates/gemini_cli/src/wrapper_coverage_manifest.rs",
         "crates/agent_api/tests/c1_gemini_cli_runtime_follow_on.rs",
         "cli_manifests/gemini_cli/snapshots/default.json",
@@ -323,6 +383,21 @@ fn repair_runtime_evidence_check_fails_when_runtime_outputs_cannot_be_derived() 
     assert!(output
         .stderr
         .contains("could not derive any committed runtime-owned outputs"));
+}
+
+fn assert_no_staging_dirs(fixture: &Path) {
+    let runs_root = fixture.join("docs/agents/.uaa-temp/runtime-follow-on/runs");
+    let leaked = fs::read_dir(&runs_root)
+        .expect("read runs root")
+        .filter_map(|entry| entry.ok())
+        .map(|entry| entry.file_name().to_string_lossy().into_owned())
+        .filter(|name| name.starts_with(".tmp-repair-gemini_cli"))
+        .collect::<Vec<_>>();
+    assert!(leaked.is_empty(), "unexpected staging dirs: {leaked:?}");
+}
+
+fn read_json(path: &Path) -> Value {
+    serde_json::from_slice(&fs::read(path).expect("read json")).expect("parse json")
 }
 
 fn write_json(path: &Path, value: &Value) {

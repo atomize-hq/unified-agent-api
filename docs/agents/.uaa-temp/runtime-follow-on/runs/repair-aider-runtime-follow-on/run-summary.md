@@ -10,6 +10,8 @@
 - `cli_manifests/aider/snapshots/0.0.0/union.json`
 - `cli_manifests/aider/supplement/runtime-follow-on-proof.md`
 - `crates/agent_api/src/backends/aider/backend.rs`
+- `crates/agent_api/src/backends/aider/harness.rs`
+- `crates/agent_api/src/backends/aider/mapping.rs`
 - `crates/agent_api/src/backends/aider/mod.rs`
 - `crates/agent_api/tests/c1_aider_runtime_follow_on.rs`
 - `crates/aider/src/lib.rs`

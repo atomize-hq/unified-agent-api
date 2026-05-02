@@ -15,6 +15,8 @@
   "workflow_version": "runtime_follow_on_v1",
   "written_paths": [
     "crates/agent_api/src/backends/gemini_cli/backend.rs",
+    "crates/agent_api/src/backends/gemini_cli/harness.rs",
+    "crates/agent_api/src/backends/gemini_cli/mapping.rs",
     "crates/agent_api/src/backends/gemini_cli/mod.rs",
     "crates/gemini_cli/src/lib.rs"
   ]

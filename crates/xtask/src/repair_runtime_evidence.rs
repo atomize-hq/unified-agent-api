@@ -1,4 +1,5 @@
 use std::{
+    cell::RefCell,
     fs,
     io::{self, Write},
     path::{Path, PathBuf},
@@ -11,15 +12,22 @@ use crate::{
     agent_lifecycle::{self, load_lifecycle_state, LifecycleStage, LifecycleState},
     agent_registry::{AgentRegistry, AgentRegistryEntry},
     approval_artifact::{load_approval_artifact, ApprovalArtifact, ApprovalArtifactError},
-    prepare_publication::validate_runtime_evidence_run_for_approval,
+    prepare_publication::{
+        validate_runtime_evidence_directory_for_approval,
+        validate_runtime_evidence_run_for_approval,
+    },
     runtime_evidence_bundle::{
-        self, check_repairable_runtime_evidence, repair_run_id, write_runtime_evidence_bundle_at,
-        RuntimeEvidenceBundleSpec, RUNTIME_RUNS_ROOT,
+        self, repair_run_id, write_runtime_evidence_bundle_at, RuntimeEvidenceBundleSpec,
+        RUNTIME_RUNS_ROOT,
     },
 };
 
 const HOST_SURFACE: &str = "xtask repair-runtime-evidence";
 const LOADED_SKILL_REF: &str = "repair-runtime-evidence";
+type StageMutator = fn(&Path) -> Result<(), String>;
+thread_local! {
+    static TEST_STAGE_MUTATOR: RefCell<Option<StageMutator>> = RefCell::new(None);
+}
 
 #[derive(Debug, Parser, Clone)]
 #[command(group(
@@ -97,12 +105,7 @@ pub fn run_in_workspace<W: Write>(
     write_header(writer, &context, &run_id, args.write)?;
 
     if args.check {
-        let written_paths = check_repairable_runtime_evidence(
-            workspace_root,
-            &context.approval,
-            &context.lifecycle_state,
-        )
-        .map_err(map_bundle_error)?;
+        let written_paths = run_check_mode(workspace_root, &context, &run_id)?;
         writeln!(writer, "OK: repair-runtime-evidence check passed.")
             .map_err(|err| Error::Internal(format!("write stdout: {err}")))?;
         writeln!(writer, "run_id: {run_id}")
@@ -168,6 +171,62 @@ pub fn run_in_workspace<W: Write>(
     writeln!(writer, "written_paths: {}", bundle.written_paths.len())
         .map_err(|err| Error::Internal(format!("write stdout: {err}")))?;
     Ok(())
+}
+
+#[doc(hidden)]
+pub fn set_test_stage_mutator(mutator: Option<StageMutator>) {
+    TEST_STAGE_MUTATOR.with(|slot| *slot.borrow_mut() = mutator);
+}
+
+fn run_check_mode(
+    workspace_root: &Path,
+    context: &RepairContext,
+    run_id: &str,
+) -> Result<Vec<String>, Error> {
+    let suffix = unique_suffix()?;
+    let temp_run_relative = format!("{RUNTIME_RUNS_ROOT}/.tmp-{run_id}-{suffix}");
+    let temp_run_root = workspace_root.join(&temp_run_relative);
+    remove_dir_if_exists(&temp_run_root)?;
+
+    let result = (|| {
+        let bundle = write_runtime_evidence_bundle_at(
+            workspace_root,
+            &temp_run_root,
+            &temp_run_relative,
+            &temp_run_root,
+            &context.approval,
+            &context.lifecycle_state,
+            &RuntimeEvidenceBundleSpec {
+                run_id,
+                host_surface: HOST_SURFACE,
+                loaded_skill_ref: LOADED_SKILL_REF,
+                mode: "repair",
+                source_label: "repair-runtime-evidence",
+                summary_title: "Runtime Evidence Repair",
+                validation_check_name: "runtime_evidence_repair",
+                validation_message:
+                    "runtime evidence was reconstructed from committed runtime-owned outputs",
+            },
+        )
+        .map_err(map_bundle_error)?;
+        maybe_mutate_staged_bundle(&temp_run_root)?;
+        validate_runtime_evidence_directory_for_approval(
+            workspace_root,
+            &context.approval,
+            run_id,
+            &temp_run_root,
+        )
+        .map_err(|err| Error::Validation(err.to_string()))?;
+        Ok(bundle.written_paths)
+    })();
+
+    let cleanup_result = remove_dir_if_exists(&temp_run_root);
+    match (result, cleanup_result) {
+        (Ok(written_paths), Ok(())) => Ok(written_paths),
+        (Err(err), Ok(())) => Err(err),
+        (Ok(_), Err(cleanup_err)) => Err(cleanup_err),
+        (Err(err), Err(_cleanup_err)) => Err(err),
+    }
 }
 
 fn promote_repair_bundle(
@@ -237,6 +296,16 @@ fn remove_dir_if_exists(path: &Path) -> Result<(), Error> {
         fs::remove_dir_all(path)
             .map_err(|err| Error::Internal(format!("remove {}: {err}", path.display())))?;
     }
+    Ok(())
+}
+
+fn maybe_mutate_staged_bundle(run_root: &Path) -> Result<(), Error> {
+    TEST_STAGE_MUTATOR.with(|slot| {
+        if let Some(mutator) = *slot.borrow() {
+            mutator(run_root).map_err(Error::Internal)?;
+        }
+        Ok(())
+    })?;
     Ok(())
 }
 

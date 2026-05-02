@@ -6,7 +6,10 @@
   "cli_manifests/claude_code/supplement/commands.example.json",
   "cli_manifests/claude_code/supplement/commands.json",
   "crates/agent_api/src/backends/claude_code/backend.rs",
+  "crates/agent_api/src/backends/claude_code/harness.rs",
+  "crates/agent_api/src/backends/claude_code/mapping.rs",
   "crates/agent_api/src/backends/claude_code/mod.rs",
+  "crates/agent_api/src/backends/claude_code/util.rs",
   "crates/claude_code/src/lib.rs",
   "crates/claude_code/src/wrapper_coverage_manifest.rs"
 ]

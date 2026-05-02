@@ -6,6 +6,8 @@
   "cli_manifests/opencode/supplement/commands.example.json",
   "cli_manifests/opencode/supplement/commands.json",
   "crates/agent_api/src/backends/opencode/backend.rs",
+  "crates/agent_api/src/backends/opencode/harness.rs",
+  "crates/agent_api/src/backends/opencode/mapping.rs",
   "crates/agent_api/src/backends/opencode/mod.rs",
   "crates/opencode/src/lib.rs"
 ]
