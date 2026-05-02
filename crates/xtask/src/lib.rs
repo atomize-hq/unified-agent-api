@@ -5,6 +5,7 @@ pub mod agent_maintenance;
 pub mod agent_registry;
 pub mod approval_artifact;
 pub mod capability_matrix;
+pub mod capability_publication;
 pub mod capability_projection;
 pub mod onboard_agent;
 pub mod prepare_publication;

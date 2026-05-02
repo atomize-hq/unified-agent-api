@@ -4,27 +4,25 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::agent_registry::{AgentRegistry, AgentRegistryEntry};
-use crate::capability_projection::{
-    manifest_projected_capability_path, project_advertised_capabilities,
-    resolve_capability_publication_target, CapabilityCommandView, CapabilityManifestView,
-    CapabilityPublicationTarget,
-};
-use agent_api::{
-    backends::{
-        aider::{AiderBackend, AiderBackendConfig},
-        claude_code::{ClaudeCodeBackend, ClaudeCodeBackendConfig},
-        codex::{CodexBackend, CodexBackendConfig},
-        gemini_cli::{GeminiCliBackend, GeminiCliBackendConfig},
-        opencode::{OpencodeBackend, OpencodeBackendConfig},
-    },
-    AgentWrapperBackend, AgentWrapperCapabilities,
-};
+use crate::agent_registry::AgentRegistryEntry;
+use agent_api::AgentWrapperCapabilities;
 use clap::Parser;
+
+#[cfg(test)]
+use crate::agent_registry::AgentRegistry;
+#[cfg(test)]
+use crate::capability_projection::{
+    resolve_capability_publication_target, CapabilityPublicationTarget,
+};
+#[cfg(test)]
 use serde::Deserialize;
 
+#[cfg(not(test))]
+use crate::capability_publication as capability_publication_mod;
+#[cfg(test)]
+use xtask::capability_publication as capability_publication_mod;
+
 pub const DEFAULT_OUT_PATH: &str = "docs/specs/unified-agent-api/capability-matrix.md";
-const CURRENT_MANIFEST_FILENAME: &str = "current.json";
 
 #[derive(Debug, Parser)]
 pub struct Args {
@@ -51,60 +49,19 @@ pub fn run(args: Args) -> Result<(), String> {
 
 pub fn collect_builtin_backend_capabilities(
 ) -> Result<BTreeMap<String, AgentWrapperCapabilities>, String> {
-    collect_builtin_backend_inventory().map(|inventory| inventory.backends)
+    capability_publication_mod::collect_published_backend_capabilities(&resolve_workspace_root()?)
 }
 
 pub fn validate_agent_publication_continuity(
     workspace_root: &Path,
     entry: &AgentRegistryEntry,
 ) -> Result<(), String> {
-    if !entry.publication.capability_matrix_enabled {
-        return Ok(());
-    }
-
-    let manifest_path = workspace_root
-        .join(&entry.manifest_root)
-        .join(CURRENT_MANIFEST_FILENAME);
-    let manifest = read_union_manifest(&manifest_path)?;
-    if manifest.expected_targets.is_empty() {
-        return Err(format!(
-            "capability-matrix manifest `{}{}` must declare at least one expected target",
-            entry.manifest_root, "/current.json"
-        ));
-    }
-
-    let missing_targets = entry
-        .canonical_targets
-        .iter()
-        .filter(|target| {
-            !manifest
-                .expected_targets
-                .iter()
-                .any(|candidate| candidate == *target)
-        })
-        .cloned()
-        .collect::<Vec<_>>();
-    if !missing_targets.is_empty() {
-        return Err(format!(
-            "capability-matrix manifest `{}{}` is missing registry canonical target(s): {}",
-            entry.manifest_root,
-            "/current.json",
-            missing_targets.join(", ")
-        ));
-    }
-
-    validate_capability_publication_target(entry, &manifest)?;
-    let modeled_runtime_truth = modeled_runtime_capability_truth(entry, &manifest)?;
-    let advertised_ids = projected_advertised_capabilities(entry, &manifest)?;
-    validate_declared_capabilities_do_not_exceed_runtime(
-        entry,
-        &advertised_ids,
-        &modeled_runtime_truth,
-    )
+    capability_publication_mod::validate_agent_publication_continuity(workspace_root, entry)
 }
 
 pub fn generate_markdown() -> Result<String, String> {
-    let inventory = collect_builtin_backend_inventory()?;
+    let inventory =
+        capability_publication_mod::collect_capability_publication_inventory(&resolve_workspace_root()?)?;
     Ok(render_matrix(
         &inventory.backends,
         &inventory.canonical_target_header,
@@ -270,74 +227,20 @@ fn bucket_order(backend_ids: &[String]) -> Vec<String> {
     out
 }
 
-fn collect_builtin_backend_inventory() -> Result<BuiltinBackendInventory, String> {
-    let registry = load_agent_registry()?;
-    collect_builtin_backend_inventory_from_registry(&registry, load_union_manifest_for_entry)
-}
-
-fn collect_builtin_backend_inventory_from_registry<F>(
-    registry: &AgentRegistry,
-    mut manifest_loader: F,
-) -> Result<BuiltinBackendInventory, String>
-where
-    F: FnMut(&AgentRegistryEntry) -> Result<UnionManifest, String>,
-{
-    let enrolled_entries: Vec<&AgentRegistryEntry> = registry.capability_matrix_entries().collect();
-
-    let mut backends = BTreeMap::<String, AgentWrapperCapabilities>::new();
-    for entry in enrolled_entries.iter().copied() {
-        let manifest = manifest_loader(entry)?;
-        validate_capability_publication_target(entry, &manifest)?;
-
-        let (backend_kind, mut capabilities) = runtime_backend_capabilities(&entry.agent_id)?;
-        if backend_kind != entry.agent_id {
-            return Err(format!(
-                "capability-matrix registry entry `{}` does not match runtime backend kind `{backend_kind}`",
-                entry.agent_id
-            ));
-        }
-
-        let modeled_runtime_truth = modeled_runtime_capability_truth(entry, &manifest)?;
-        let advertised_ids = projected_advertised_capabilities(entry, &manifest)?;
-        validate_declared_capabilities_do_not_exceed_runtime(
-            entry,
-            &advertised_ids,
-            &modeled_runtime_truth,
-        )?;
-
-        capabilities.ids = advertised_ids;
-        backends.insert(backend_kind, capabilities);
-    }
-
-    Ok(BuiltinBackendInventory {
-        backends,
-        canonical_target_header: render_canonical_target_header(&enrolled_entries)?,
-    })
-}
-
+#[cfg(test)]
 fn command_available_on_target(manifest: &UnionManifest, path: &[&str], target: &str) -> bool {
-    manifest
-        .commands
-        .iter()
-        .find(|command| {
-            command
-                .path
-                .iter()
-                .map(String::as_str)
-                .eq(path.iter().copied())
-        })
-        .is_some_and(|command| command.available_on.iter().any(|item| item == target))
+    capability_publication_mod::manifest_command_available_on_target(
+        &manifest.as_publication_manifest(),
+        path,
+        target,
+    )
 }
 
 fn resolve_output_path(explicit: Option<&Path>) -> Result<PathBuf, String> {
     match explicit {
         Some(path) => Ok(path.to_path_buf()),
-        None => resolve_workspace_path(Path::new(DEFAULT_OUT_PATH)),
+        None => Ok(resolve_workspace_root()?.join(Path::new(DEFAULT_OUT_PATH))),
     }
-}
-
-fn resolve_workspace_path(path: &Path) -> Result<PathBuf, String> {
-    Ok(resolve_workspace_root()?.join(path))
 }
 
 fn resolve_workspace_root() -> Result<PathBuf, String> {
@@ -358,176 +261,44 @@ fn resolve_workspace_root() -> Result<PathBuf, String> {
     ))
 }
 
-fn read_union_manifest(path: &Path) -> Result<UnionManifest, String> {
-    let text = fs::read_to_string(path).map_err(|err| format!("read({path:?}): {err}"))?;
-    serde_json::from_str(&text).map_err(|err| format!("parse({path:?}): {err}"))
-}
-
-fn load_union_manifest_for_entry(
-    registry_entry: &AgentRegistryEntry,
-) -> Result<UnionManifest, String> {
-    let manifest_path = resolve_workspace_path(
-        &PathBuf::from(&registry_entry.manifest_root).join(CURRENT_MANIFEST_FILENAME),
-    )?;
-    read_union_manifest(&manifest_path)
-}
-
-fn load_agent_registry() -> Result<AgentRegistry, String> {
-    AgentRegistry::load(&resolve_workspace_root()?).map_err(|err| err.to_string())
-}
-
+#[cfg(test)]
 fn runtime_backend_capabilities(
     agent_id: &str,
 ) -> Result<(String, AgentWrapperCapabilities), String> {
-    match agent_id {
-        "aider" => {
-            let backend = AiderBackend::new(AiderBackendConfig::default());
-            Ok((backend.kind().as_str().to_string(), backend.capabilities()))
-        }
-        "codex" => {
-            let backend = CodexBackend::new(CodexBackendConfig::default());
-            Ok((backend.kind().as_str().to_string(), backend.capabilities()))
-        }
-        "claude_code" => {
-            let backend = ClaudeCodeBackend::new(ClaudeCodeBackendConfig::default());
-            Ok((backend.kind().as_str().to_string(), backend.capabilities()))
-        }
-        "gemini_cli" => {
-            let backend = GeminiCliBackend::new(GeminiCliBackendConfig::default());
-            Ok((backend.kind().as_str().to_string(), backend.capabilities()))
-        }
-        "opencode" => {
-            let backend = OpencodeBackend::new(OpencodeBackendConfig::default());
-            Ok((backend.kind().as_str().to_string(), backend.capabilities()))
-        }
-        other => Err(format!(
-            "capability-matrix registry enrolled unsupported backend `{other}`"
-        )),
-    }
+    capability_publication_mod::collect_agent_capabilities(&resolve_workspace_root()?, agent_id)
+        .map(|capabilities| (agent_id.to_string(), capabilities))
 }
 
-fn modeled_runtime_capability_truth(
-    registry_entry: &AgentRegistryEntry,
-    manifest: &UnionManifest,
-) -> Result<BTreeSet<String>, String> {
-    let (_, capabilities) = runtime_backend_capabilities(&registry_entry.agent_id)?;
-    let mut modeled = capabilities.ids;
-
-    match resolve_capability_publication_target(registry_entry)? {
-        CapabilityPublicationTarget::DefaultBuiltInConfig => {
-            for gate in &registry_entry.capability_declaration.target_gated {
-                modeled.remove(&gate.capability_id);
-            }
-        }
-        CapabilityPublicationTarget::Explicit(target) => {
-            for gate in &registry_entry.capability_declaration.target_gated {
-                if !gate.targets.iter().any(|candidate| candidate == target) {
-                    modeled.remove(&gate.capability_id);
-                    continue;
-                }
-
-                if let Some(path) = manifest_projected_capability_path(&gate.capability_id) {
-                    if command_available_on_target(manifest, path, target) {
-                        modeled.insert(gate.capability_id.clone());
-                    } else {
-                        modeled.remove(&gate.capability_id);
-                    }
-                } else {
-                    modeled.insert(gate.capability_id.clone());
-                }
-            }
-        }
-    }
-
-    Ok(modeled)
-}
-
+#[cfg(test)]
 fn projected_advertised_capabilities(
     registry_entry: &AgentRegistryEntry,
     manifest: &UnionManifest,
 ) -> Result<BTreeSet<String>, String> {
-    let command_views = manifest
-        .commands
-        .iter()
-        .map(|command| CapabilityCommandView {
-            path: command.path.as_slice(),
-            available_on: command.available_on.as_slice(),
-        })
-        .collect::<Vec<_>>();
-    project_advertised_capabilities(
+    capability_publication_mod::project_manifest_advertised_capabilities(
         registry_entry,
-        CapabilityManifestView {
-            expected_targets: &manifest.expected_targets,
-            commands: &command_views,
-        },
+        &manifest.as_publication_manifest(),
     )
-    .map_err(|err| {
-        format!(
-            "capability-matrix registry entry `{}` has invalid publication projection: {err}",
-            registry_entry.agent_id
-        )
-    })
 }
 
-fn validate_declared_capabilities_do_not_exceed_runtime(
-    registry_entry: &AgentRegistryEntry,
-    advertised_truth: &BTreeSet<String>,
-    runtime_truth: &BTreeSet<String>,
-) -> Result<(), String> {
-    let unexpected = advertised_truth
-        .difference(runtime_truth)
-        .cloned()
-        .collect::<Vec<_>>();
-    if unexpected.is_empty() {
-        return Ok(());
-    }
-
-    Err(format!(
-        "capability-matrix registry entry `{}` advertises capabilities beyond modeled runtime truth on {}: {}",
-        registry_entry.agent_id,
-        render_publication_target_description(registry_entry)?,
-        unexpected.join(", ")
-    ))
-}
-
+#[cfg(test)]
 fn validate_capability_publication_target(
     registry_entry: &AgentRegistryEntry,
     manifest: &UnionManifest,
 ) -> Result<(), String> {
-    match resolve_capability_publication_target(registry_entry)? {
-        CapabilityPublicationTarget::DefaultBuiltInConfig => Ok(()),
-        CapabilityPublicationTarget::Explicit(target) => {
-            if manifest
-                .expected_targets
-                .iter()
-                .any(|candidate| candidate == target)
-            {
-                return Ok(());
-            }
-
-            Err(format!(
-                "capability-matrix manifest `{}{}` missing publication.capability_matrix_target `{target}` in expected_targets",
-                registry_entry.manifest_root, "/current.json"
-            ))
-        }
-    }
-}
-
-fn render_publication_target_description(
-    registry_entry: &AgentRegistryEntry,
-) -> Result<String, String> {
-    Ok(
-        match resolve_capability_publication_target(registry_entry)? {
-            CapabilityPublicationTarget::DefaultBuiltInConfig => {
-                "the default built-in backend config".to_string()
-            }
-            CapabilityPublicationTarget::Explicit(target) => {
-                format!("publication.capability_matrix_target `{target}`")
-            }
-        },
+    capability_publication_mod::validate_capability_publication_target(
+        registry_entry,
+        &manifest.as_publication_manifest(),
     )
 }
 
+#[cfg(test)]
+fn render_publication_target_description(
+    registry_entry: &AgentRegistryEntry,
+) -> Result<String, String> {
+    capability_publication_mod::render_publication_target_description(registry_entry)
+}
+
+#[cfg(test)]
 fn render_canonical_target_header(entries: &[&AgentRegistryEntry]) -> Result<String, String> {
     let mut canonical_targets = Vec::<String>::new();
     let mut default_backends = Vec::<String>::new();
@@ -564,6 +335,7 @@ fn render_canonical_target_header(entries: &[&AgentRegistryEntry]) -> Result<Str
     Ok(out)
 }
 
+#[cfg(test)]
 #[derive(Debug, Deserialize)]
 struct UnionManifest {
     #[serde(default)]
@@ -571,14 +343,26 @@ struct UnionManifest {
     commands: Vec<UnionCommand>,
 }
 
+#[cfg(test)]
 #[derive(Debug, Deserialize)]
 struct UnionCommand {
     path: Vec<String>,
     available_on: Vec<String>,
 }
 
-#[derive(Debug)]
-struct BuiltinBackendInventory {
-    backends: BTreeMap<String, AgentWrapperCapabilities>,
-    canonical_target_header: String,
+#[cfg(test)]
+impl UnionManifest {
+    fn as_publication_manifest(&self) -> capability_publication_mod::ManifestCurrent {
+        capability_publication_mod::ManifestCurrent {
+            expected_targets: self.expected_targets.clone(),
+            commands: self
+                .commands
+                .iter()
+                .map(|command| capability_publication_mod::ManifestCommand {
+                    path: command.path.clone(),
+                    available_on: command.available_on.clone(),
+                })
+                .collect(),
+        }
+    }
 }
