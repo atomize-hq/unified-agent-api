@@ -9,6 +9,7 @@ use super::{
     file_sha256, DeferredSurface, LandedSurface, LifecycleError, LifecycleStage, LifecycleState,
     SideState, LIFECYCLE_SCHEMA_VERSION, REQUIRED_PUBLICATION_COMMANDS,
 };
+use crate::runtime_evidence_run;
 
 pub(super) fn validate_schema_version(value: &str, surface: &str) -> Result<(), LifecycleError> {
     if value == LIFECYCLE_SCHEMA_VERSION {
@@ -57,6 +58,35 @@ pub(super) fn validate_optional_repo_relative_path(
         validate_repo_relative_path(field, value)?;
     }
     Ok(())
+}
+
+pub(super) fn validate_runtime_evidence_run_id(
+    stage: LifecycleStage,
+    value: &Option<String>,
+) -> Result<(), LifecycleError> {
+    match (stage, value.as_deref()) {
+        (LifecycleStage::RuntimeIntegrated, Some(run_id)) => {
+            runtime_evidence_run::validate_run_id(run_id)
+                .map_err(LifecycleError::Validation)?;
+            Ok(())
+        }
+        (LifecycleStage::RuntimeIntegrated, None) => Err(LifecycleError::Validation(
+            "active_runtime_evidence_run_id is required when lifecycle_stage is `runtime_integrated`"
+                .to_string(),
+        )),
+        (
+            LifecycleStage::Approved
+            | LifecycleStage::Enrolled
+            | LifecycleStage::PublicationReady
+            | LifecycleStage::Published
+            | LifecycleStage::ClosedBaseline,
+            Some(_),
+        ) => Err(LifecycleError::Validation(
+            "active_runtime_evidence_run_id is only valid when lifecycle_stage is `runtime_integrated`"
+                .to_string(),
+        )),
+        _ => Ok(()),
+    }
 }
 
 pub(super) fn validate_path_hash_pair(

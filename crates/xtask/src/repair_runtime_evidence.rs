@@ -9,7 +9,10 @@ use std::{
 use clap::{ArgGroup, Parser};
 
 use crate::{
-    agent_lifecycle::{self, load_lifecycle_state, LifecycleStage, LifecycleState},
+    agent_lifecycle::{
+        self, load_lifecycle_state, now_rfc3339, write_lifecycle_state, LifecycleStage,
+        LifecycleState,
+    },
     agent_registry::{AgentRegistry, AgentRegistryEntry},
     approval_artifact::{load_approval_artifact, ApprovalArtifact, ApprovalArtifactError},
     prepare_publication::{
@@ -18,15 +21,17 @@ use crate::{
     },
     runtime_evidence_bundle::{
         self, repair_run_id, write_runtime_evidence_bundle_at, RuntimeEvidenceBundleSpec,
-        RUNTIME_RUNS_ROOT,
     },
+    runtime_evidence_run::RUNTIME_RUNS_ROOT,
 };
 
 const HOST_SURFACE: &str = "xtask repair-runtime-evidence";
 const LOADED_SKILL_REF: &str = "repair-runtime-evidence";
 type StageMutator = fn(&Path) -> Result<(), String>;
+type LifecyclePersistMutator = fn(&Path, &str, &LifecycleState) -> Result<(), String>;
 thread_local! {
     static TEST_STAGE_MUTATOR: RefCell<Option<StageMutator>> = RefCell::new(None);
+    static TEST_LIFECYCLE_PERSIST_MUTATOR: RefCell<Option<LifecyclePersistMutator>> = RefCell::new(None);
 }
 
 #[derive(Debug, Parser, Clone)]
@@ -144,7 +149,11 @@ pub fn run_in_workspace<W: Write>(
         },
     )
     .map_err(map_bundle_error)?;
-    promote_repair_bundle(
+    let lifecycle_state_path = workspace_root.join(&context.lifecycle_state_path);
+    let prior_lifecycle_bytes = fs::read(&lifecycle_state_path).map_err(|err| {
+        Error::Internal(format!("read {}: {err}", lifecycle_state_path.display()))
+    })?;
+    let had_existing_canonical = promote_repair_bundle(
         workspace_root,
         &context.approval,
         &run_id,
@@ -152,15 +161,46 @@ pub fn run_in_workspace<W: Write>(
         &temp_run_root,
         &backup_run_root,
     )?;
-    let reloaded_lifecycle_state =
-        load_lifecycle_state(workspace_root, &context.lifecycle_state_path)
-            .map_err(|err| Error::Internal(format!("reload lifecycle state: {err}")))?;
+    let persist_result =
+        persist_repair_authority(workspace_root, &context, &run_id).and_then(|_| {
+            load_lifecycle_state(workspace_root, &context.lifecycle_state_path)
+                .map_err(|err| Error::Internal(format!("reload lifecycle state: {err}")))
+        });
+    let reloaded_lifecycle_state = match persist_result {
+        Ok(state) => state,
+        Err(err) => {
+            fs::write(&lifecycle_state_path, &prior_lifecycle_bytes).map_err(|write_err| {
+                Error::Internal(format!(
+                    "restore {} after repair lifecycle failure: {write_err}",
+                    lifecycle_state_path.display()
+                ))
+            })?;
+            restore_backup(
+                &canonical_run_root,
+                &backup_run_root,
+                had_existing_canonical,
+            )?;
+            return Err(err);
+        }
+    };
     if reloaded_lifecycle_state.lifecycle_stage != context.lifecycle_state.lifecycle_stage {
+        fs::write(&lifecycle_state_path, &prior_lifecycle_bytes).map_err(|write_err| {
+            Error::Internal(format!(
+                "restore {} after repair lifecycle reload mismatch: {write_err}",
+                lifecycle_state_path.display()
+            ))
+        })?;
+        restore_backup(
+            &canonical_run_root,
+            &backup_run_root,
+            had_existing_canonical,
+        )?;
         return Err(Error::Internal(format!(
             "`{}` changed lifecycle stage during repair",
             context.lifecycle_state_path
         )));
     }
+    remove_dir_if_exists(&backup_run_root)?;
 
     writeln!(writer, "OK: repair-runtime-evidence write complete.")
         .map_err(|err| Error::Internal(format!("write stdout: {err}")))?;
@@ -176,6 +216,11 @@ pub fn run_in_workspace<W: Write>(
 #[doc(hidden)]
 pub fn set_test_stage_mutator(mutator: Option<StageMutator>) {
     TEST_STAGE_MUTATOR.with(|slot| *slot.borrow_mut() = mutator);
+}
+
+#[doc(hidden)]
+pub fn set_test_lifecycle_persist_mutator(mutator: Option<LifecyclePersistMutator>) {
+    TEST_LIFECYCLE_PERSIST_MUTATOR.with(|slot| *slot.borrow_mut() = mutator);
 }
 
 fn run_check_mode(
@@ -236,7 +281,7 @@ fn promote_repair_bundle(
     canonical_run_root: &Path,
     temp_run_root: &Path,
     backup_run_root: &Path,
-) -> Result<(), Error> {
+) -> Result<bool, Error> {
     let had_existing_canonical = canonical_run_root.exists();
     if had_existing_canonical {
         fs::rename(canonical_run_root, backup_run_root).map_err(|err| {
@@ -264,8 +309,7 @@ fn promote_repair_bundle(
         return Err(Error::Validation(err.to_string()));
     }
 
-    remove_dir_if_exists(backup_run_root)?;
-    Ok(())
+    Ok(had_existing_canonical)
 }
 
 fn restore_backup(
@@ -274,6 +318,9 @@ fn restore_backup(
     had_existing_canonical: bool,
 ) -> Result<(), Error> {
     if !had_existing_canonical {
+        if canonical_run_root.exists() {
+            remove_dir_if_exists(canonical_run_root)?;
+        }
         return Ok(());
     }
     if canonical_run_root.exists() {
@@ -307,6 +354,29 @@ fn maybe_mutate_staged_bundle(run_root: &Path) -> Result<(), Error> {
         Ok(())
     })?;
     Ok(())
+}
+
+fn persist_repair_authority(
+    workspace_root: &Path,
+    context: &RepairContext,
+    run_id: &str,
+) -> Result<(), Error> {
+    let mut next_state = context.lifecycle_state.clone();
+    next_state.current_owner_command = "repair-runtime-evidence --write".to_string();
+    next_state.last_transition_at =
+        now_rfc3339().map_err(|err| Error::Internal(err.to_string()))?;
+    next_state.last_transition_by = "xtask repair-runtime-evidence --write".to_string();
+    next_state.active_runtime_evidence_run_id = Some(run_id.to_string());
+
+    TEST_LIFECYCLE_PERSIST_MUTATOR.with(|slot| {
+        if let Some(mutator) = *slot.borrow() {
+            mutator(workspace_root, &context.lifecycle_state_path, &next_state)
+                .map_err(Error::Internal)
+        } else {
+            write_lifecycle_state(workspace_root, &context.lifecycle_state_path, &next_state)
+                .map_err(|err| Error::Internal(format!("write lifecycle state: {err}")))
+        }
+    })
 }
 
 fn unique_suffix() -> Result<String, Error> {

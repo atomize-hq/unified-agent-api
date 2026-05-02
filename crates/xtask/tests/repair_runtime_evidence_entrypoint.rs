@@ -7,7 +7,7 @@ use clap::{Parser, Subcommand};
 use serde_json::Value;
 use xtask::{
     approval_artifact::load_approval_artifact,
-    prepare_publication::discover_runtime_evidence_for_approval, repair_runtime_evidence,
+    prepare_publication::validate_runtime_evidence_run_for_approval, repair_runtime_evidence,
 };
 
 #[path = "support/onboard_agent_harness.rs"]
@@ -112,6 +112,7 @@ fn prepare_fixture(prefix: &str) -> (PathBuf, String) {
             ],
             "blocking_issues": [],
             "retryable_failures": [],
+            "active_runtime_evidence_run_id": "gemini-cli-runtime-follow-on-rerun",
             "implementation_summary": {
                 "requested_runtime_profile": "default",
                 "achieved_runtime_profile": "default",
@@ -241,7 +242,7 @@ fn repair_runtime_evidence_write_emits_bundle_without_advancing_lifecycle() {
     let (fixture, approval_path) = prepare_fixture("repair-runtime-evidence-write");
     let lifecycle_path =
         fixture.join("docs/agents/lifecycle/gemini-cli-onboarding/governance/lifecycle-state.json");
-    let before_lifecycle = fs::read(&lifecycle_path).expect("read lifecycle before write");
+    let before_lifecycle = read_json(&lifecycle_path);
 
     let output = run_cli(repair_args("--write", &approval_path), &fixture);
     assert_eq!(output.exit_code, 0, "stderr:\n{}", output.stderr);
@@ -290,16 +291,63 @@ fn repair_runtime_evidence_write_emits_bundle_without_advancing_lifecycle() {
         Some(repair_root.to_string_lossy().as_ref())
     );
 
-    let after_lifecycle = fs::read(&lifecycle_path).expect("read lifecycle after write");
+    let after_lifecycle = read_json(&lifecycle_path);
     assert_eq!(
-        after_lifecycle, before_lifecycle,
-        "repair should not mutate lifecycle state"
+        after_lifecycle
+            .get("lifecycle_stage")
+            .and_then(Value::as_str),
+        before_lifecycle
+            .get("lifecycle_stage")
+            .and_then(Value::as_str),
+        "repair should not advance lifecycle stage"
+    );
+    assert_eq!(
+        after_lifecycle.get("support_tier").and_then(Value::as_str),
+        before_lifecycle.get("support_tier").and_then(Value::as_str),
+    );
+    assert_eq!(
+        after_lifecycle
+            .get("expected_next_command")
+            .and_then(Value::as_str),
+        before_lifecycle
+            .get("expected_next_command")
+            .and_then(Value::as_str),
+    );
+    assert_eq!(
+        after_lifecycle
+            .get("active_runtime_evidence_run_id")
+            .and_then(Value::as_str),
+        Some("repair-gemini_cli-runtime-follow-on")
+    );
+    assert_eq!(
+        after_lifecycle
+            .get("current_owner_command")
+            .and_then(Value::as_str),
+        Some("repair-runtime-evidence --write")
+    );
+    assert_eq!(
+        after_lifecycle
+            .get("last_transition_by")
+            .and_then(Value::as_str),
+        Some("xtask repair-runtime-evidence --write")
+    );
+    assert_ne!(
+        after_lifecycle
+            .get("last_transition_at")
+            .and_then(Value::as_str),
+        before_lifecycle
+            .get("last_transition_at")
+            .and_then(Value::as_str),
     );
 
     let approval =
         load_approval_artifact(&fixture, &approval_path).expect("load approval after repair");
-    let discovered = discover_runtime_evidence_for_approval(&fixture, &approval)
-        .expect("discover repaired runtime evidence");
+    let discovered = validate_runtime_evidence_run_for_approval(
+        &fixture,
+        &approval,
+        "repair-gemini_cli-runtime-follow-on",
+    )
+    .expect("validate repaired runtime evidence");
     assert_eq!(discovered.run_id, "repair-gemini_cli-runtime-follow-on");
     assert_eq!(discovered.runtime_evidence_paths.len(), 6);
 }
@@ -334,6 +382,56 @@ fn repair_runtime_evidence_write_replaces_existing_canonical_bundle_without_stag
         })
         .collect::<Vec<_>>();
     assert!(leaked.is_empty(), "unexpected staging dirs: {leaked:?}");
+}
+
+#[test]
+fn repair_runtime_evidence_write_rolls_back_bundle_when_lifecycle_persist_fails() {
+    fn fail_lifecycle_persist(
+        _workspace_root: &Path,
+        _relative_path: &str,
+        _state: &xtask::agent_lifecycle::LifecycleState,
+    ) -> Result<(), String> {
+        Err("simulated lifecycle persist failure".to_string())
+    }
+
+    let (fixture, approval_path) = prepare_fixture("repair-runtime-evidence-lifecycle-failure");
+    let lifecycle_path =
+        fixture.join("docs/agents/lifecycle/gemini-cli-onboarding/governance/lifecycle-state.json");
+    let before_lifecycle = fs::read(&lifecycle_path).expect("read lifecycle before failure");
+
+    let repair_root = repair_run_root(&fixture);
+    write_text(
+        &repair_root.join("run-summary.md"),
+        "# Existing Repair Bundle\n\nMust survive rollback.\n",
+    );
+    write_json(
+        &repair_root.join("written-paths.json"),
+        &serde_json::json!(["preserved/path.txt"]),
+    );
+
+    repair_runtime_evidence::set_test_lifecycle_persist_mutator(Some(fail_lifecycle_persist));
+    let output = run_cli(repair_args("--write", &approval_path), &fixture);
+    repair_runtime_evidence::set_test_lifecycle_persist_mutator(None);
+
+    assert_eq!(output.exit_code, 1, "stderr:\n{}", output.stderr);
+    assert!(output
+        .stderr
+        .contains("simulated lifecycle persist failure"));
+
+    let after_lifecycle = fs::read(&lifecycle_path).expect("read lifecycle after failure");
+    assert_eq!(
+        after_lifecycle, before_lifecycle,
+        "lifecycle should be restored"
+    );
+
+    let summary = fs::read_to_string(repair_root.join("run-summary.md")).expect("read summary");
+    assert!(summary.contains("Existing Repair Bundle"));
+    let written_paths: Vec<String> = serde_json::from_slice(
+        &fs::read(repair_root.join("written-paths.json")).expect("read written paths"),
+    )
+    .expect("parse written paths");
+    assert_eq!(written_paths, vec!["preserved/path.txt".to_string()]);
+    assert_no_staging_dirs(&fixture);
 }
 
 #[test]
@@ -391,7 +489,9 @@ fn assert_no_staging_dirs(fixture: &Path) {
         .expect("read runs root")
         .filter_map(|entry| entry.ok())
         .map(|entry| entry.file_name().to_string_lossy().into_owned())
-        .filter(|name| name.starts_with(".tmp-repair-gemini_cli"))
+        .filter(|name| {
+            name.starts_with(".tmp-repair-gemini_cli") || name.starts_with(".bak-repair-gemini_cli")
+        })
         .collect::<Vec<_>>();
     assert!(leaked.is_empty(), "unexpected staging dirs: {leaked:?}");
 }

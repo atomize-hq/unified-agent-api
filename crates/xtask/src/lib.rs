@@ -13,6 +13,7 @@ pub mod release_doc;
 pub mod repair_runtime_evidence;
 mod root_intake_layout;
 pub mod runtime_evidence_bundle;
+pub mod runtime_evidence_run;
 pub mod runtime_follow_on;
 pub mod support_matrix;
 pub mod workspace_mutation;

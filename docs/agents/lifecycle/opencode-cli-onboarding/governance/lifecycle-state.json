@@ -39,6 +39,7 @@
   ],
   "blocking_issues": [],
   "retryable_failures": [],
+  "active_runtime_evidence_run_id": null,
   "implementation_summary": {
     "requested_runtime_profile": "default",
     "achieved_runtime_profile": "default",
@@ -58,6 +59,6 @@
     "minimal_profile_justification": null
   },
   "publication_packet_path": "docs/agents/lifecycle/opencode-cli-onboarding/governance/publication-ready.json",
-  "publication_packet_sha256": "c7f95dc690a409275ed5ecb0951d56920650c689ba02c90898b5e2b73aa59c76",
+  "publication_packet_sha256": "60c2a17498cb12fb5e94ec45809c0acae32c39050e278dbaa06123ba59ba5c21",
   "closeout_baseline_path": "docs/agents/lifecycle/opencode-cli-onboarding/governance/proving-run-closeout.json"
 }

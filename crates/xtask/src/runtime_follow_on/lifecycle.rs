@@ -121,6 +121,7 @@ pub(super) fn persist_successful_runtime_integration(
         .retain(|state| !matches!(state, SideState::Blocked | SideState::FailedRetryable));
     lifecycle_state.blocking_issues.clear();
     lifecycle_state.retryable_failures.clear();
+    lifecycle_state.active_runtime_evidence_run_id = Some(context.run_id.clone());
     lifecycle_state.implementation_summary = Some(build_implementation_summary(
         context,
         prior_contract,
@@ -153,6 +154,7 @@ pub(super) fn persist_failed_runtime_integration(
     lifecycle_state.current_owner_command = "runtime-follow-on --write".to_string();
     lifecycle_state.last_transition_at = now_rfc3339()?;
     lifecycle_state.last_transition_by = "xtask runtime-follow-on --write".to_string();
+    lifecycle_state.active_runtime_evidence_run_id = None;
     lifecycle_state
         .side_states
         .retain(|state| !matches!(state, SideState::Blocked | SideState::FailedRetryable));

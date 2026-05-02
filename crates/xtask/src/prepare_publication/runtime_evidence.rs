@@ -2,12 +2,13 @@ use std::{fs, path::Path};
 
 use serde::Deserialize;
 
-use crate::approval_artifact::ApprovalArtifact;
-
-use super::{
-    read_json, validate_required_commands, Error, REQUIRED_RUNTIME_EVIDENCE_FILES,
-    RUNTIME_RUNS_ROOT,
+use crate::{
+    agent_lifecycle::{LifecycleState, PublicationReadyPacket},
+    approval_artifact::ApprovalArtifact,
+    runtime_evidence_run,
 };
+
+use super::{read_json, validate_required_commands, Error};
 
 #[derive(Debug, Deserialize)]
 struct RuntimeInputContract {
@@ -49,44 +50,47 @@ pub struct RuntimeEvidenceBundle {
     pub runtime_evidence_paths: Vec<String>,
 }
 
-pub(super) fn discover_runtime_evidence(
+pub(super) fn resolve_runtime_integrated_runtime_evidence(
     workspace_root: &Path,
     approval: &ApprovalArtifact,
+    lifecycle_state: &LifecycleState,
 ) -> Result<RuntimeEvidenceBundle, Error> {
-    let runs_root = workspace_root.join(RUNTIME_RUNS_ROOT);
-    let entries = fs::read_dir(&runs_root).map_err(|err| {
-        Error::Validation(format!(
-            "runtime evidence root `{}` is missing or unreadable: {err}",
-            runs_root.display()
-        ))
-    })?;
-    let mut candidates = entries
-        .filter_map(|entry| entry.ok())
-        .filter(|entry| entry.file_type().map(|ty| ty.is_dir()).unwrap_or(false))
-        .map(|entry| entry.file_name().to_string_lossy().into_owned())
-        .collect::<Vec<_>>();
-    candidates.sort();
-    candidates.reverse();
+    let run_id = lifecycle_state
+        .active_runtime_evidence_run_id
+        .as_deref()
+        .ok_or_else(|| {
+            Error::Validation(
+                "runtime_integrated lifecycle state is missing active_runtime_evidence_run_id"
+                    .to_string(),
+            )
+        })?;
+    validate_runtime_evidence_run(workspace_root, approval, run_id)
+}
 
-    let mut best_error = None;
-    for run_id in candidates {
-        match inspect_runtime_run(workspace_root, approval, &run_id) {
-            Ok(Some(bundle)) => return Ok(bundle),
-            Ok(None) => {}
-            Err(err) => {
-                if best_error.is_none() {
-                    best_error = Some(err);
-                }
-            }
-        }
+pub(super) fn validate_packet_pinned_runtime_evidence(
+    workspace_root: &Path,
+    approval: &ApprovalArtifact,
+    packet: &PublicationReadyPacket,
+) -> Result<RuntimeEvidenceBundle, Error> {
+    let run_id =
+        runtime_evidence_run::validate_runtime_evidence_paths_shape(&packet.runtime_evidence_paths)
+            .map_err(|err| {
+                Error::Validation(format!(
+                    "publication-ready packet `{}` carries invalid runtime_evidence_paths: {err}",
+                    packet.lifecycle_state_path.replace(
+                        crate::agent_lifecycle::LIFECYCLE_STATE_FILE_NAME,
+                        crate::agent_lifecycle::PUBLICATION_READY_FILE_NAME,
+                    )
+                ))
+            })?;
+    let bundle = validate_runtime_evidence_run(workspace_root, approval, &run_id)?;
+    if bundle.runtime_evidence_paths != packet.runtime_evidence_paths {
+        return Err(Error::Validation(
+            "publication-ready packet runtime_evidence_paths no longer match the canonical runtime evidence bundle"
+                .to_string(),
+        ));
     }
-
-    Err(best_error.unwrap_or_else(|| {
-        Error::Validation(format!(
-            "no successful runtime-follow-on evidence run was found for `{}` under `{RUNTIME_RUNS_ROOT}`",
-            approval.descriptor.agent_id
-        ))
-    }))
+    Ok(bundle)
 }
 
 pub(super) fn validate_runtime_evidence_run(
@@ -94,11 +98,18 @@ pub(super) fn validate_runtime_evidence_run(
     approval: &ApprovalArtifact,
     run_id: &str,
 ) -> Result<RuntimeEvidenceBundle, Error> {
-    inspect_runtime_run(workspace_root, approval, run_id)?.ok_or_else(|| {
-        Error::Validation(format!(
-            "runtime evidence run `{run_id}` is missing required runtime evidence files under `{RUNTIME_RUNS_ROOT}`"
-        ))
-    })
+    runtime_evidence_run::validate_run_id(run_id).map_err(Error::Validation)?;
+    let relative_run_root =
+        runtime_evidence_run::run_relative_root(run_id).map_err(Error::Validation)?;
+    let absolute_run_root = workspace_root.join(&relative_run_root);
+    inspect_runtime_run_at(approval, run_id, &relative_run_root, &absolute_run_root)?.ok_or_else(
+        || {
+            Error::Validation(format!(
+                "runtime evidence run `{run_id}` is missing required runtime evidence files under `{}`",
+                runtime_evidence_run::RUNTIME_RUNS_ROOT
+            ))
+        },
+    )
 }
 
 pub(super) fn validate_runtime_evidence_directory(
@@ -107,6 +118,7 @@ pub(super) fn validate_runtime_evidence_directory(
     run_id: &str,
     run_root: &Path,
 ) -> Result<RuntimeEvidenceBundle, Error> {
+    runtime_evidence_run::validate_run_id(run_id).map_err(Error::Validation)?;
     let relative_run_root = run_root
         .strip_prefix(workspace_root)
         .map_err(|_| {
@@ -125,20 +137,10 @@ pub(super) fn validate_runtime_evidence_directory(
     })
 }
 
-fn inspect_runtime_run(
-    workspace_root: &Path,
-    approval: &ApprovalArtifact,
-    run_id: &str,
-) -> Result<Option<RuntimeEvidenceBundle>, Error> {
-    let relative_run_root = format!("{RUNTIME_RUNS_ROOT}/{run_id}");
-    let absolute_run_root = workspace_root.join(&relative_run_root);
-    inspect_runtime_run_at(approval, run_id, &relative_run_root, &absolute_run_root)
-}
-
 fn inspect_runtime_run_at(
     approval: &ApprovalArtifact,
     run_id: &str,
-    relative_run_root: &str,
+    _relative_run_root: &str,
     absolute_run_root: &Path,
 ) -> Result<Option<RuntimeEvidenceBundle>, Error> {
     let status_path = absolute_run_root.join("run-status.json");
@@ -254,7 +256,7 @@ fn inspect_runtime_run_at(
         ));
     }
 
-    for name in REQUIRED_RUNTIME_EVIDENCE_FILES {
+    for name in runtime_evidence_run::REQUIRED_RUNTIME_EVIDENCE_FILES {
         if !absolute_run_root.join(name).is_file() {
             return Err(stale_runtime_evidence_error(
                 approval,
@@ -266,10 +268,8 @@ fn inspect_runtime_run_at(
 
     Ok(Some(RuntimeEvidenceBundle {
         run_id: run_id.to_string(),
-        runtime_evidence_paths: REQUIRED_RUNTIME_EVIDENCE_FILES
-            .iter()
-            .map(|name| format!("{relative_run_root}/{name}"))
-            .collect(),
+        runtime_evidence_paths: runtime_evidence_run::runtime_evidence_paths_for_run(run_id)
+            .map_err(Error::Validation)?,
     }))
 }
 

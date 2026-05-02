@@ -39,6 +39,7 @@
   ],
   "blocking_issues": [],
   "retryable_failures": [],
+  "active_runtime_evidence_run_id": null,
   "implementation_summary": {
     "requested_runtime_profile": "feature_rich",
     "achieved_runtime_profile": "feature_rich",
@@ -63,6 +64,6 @@
     "minimal_profile_justification": null
   },
   "publication_packet_path": "docs/agents/lifecycle/codex-cli-onboarding/governance/publication-ready.json",
-  "publication_packet_sha256": "9384c6bdce882e094e09ad4a92baa782ce76a46891a54aee4d2f3b46fd311147",
+  "publication_packet_sha256": "8dedd01022269268a9bbb0092925da5f0d0d74859535d95ddd4da352167e6195",
   "closeout_baseline_path": "docs/agents/lifecycle/codex-cli-onboarding/governance/proving-run-closeout.json"
 }

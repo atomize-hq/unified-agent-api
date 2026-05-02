@@ -12,7 +12,8 @@ use sha2::{Digest, Sha256};
 
 pub use self::runtime_evidence::RuntimeEvidenceBundle;
 use self::runtime_evidence::{
-    discover_runtime_evidence, validate_runtime_evidence_directory, validate_runtime_evidence_run,
+    resolve_runtime_integrated_runtime_evidence, validate_packet_pinned_runtime_evidence,
+    validate_runtime_evidence_directory, validate_runtime_evidence_run,
 };
 use crate::{
     agent_lifecycle::{
@@ -25,16 +26,6 @@ use crate::{
     approval_artifact::{load_approval_artifact, ApprovalArtifact, ApprovalArtifactError},
     capability_matrix, support_matrix,
 };
-
-const RUNTIME_RUNS_ROOT: &str = "docs/agents/.uaa-temp/runtime-follow-on/runs";
-const REQUIRED_RUNTIME_EVIDENCE_FILES: [&str; 6] = [
-    "input-contract.json",
-    "run-status.json",
-    "run-summary.md",
-    "validation-report.json",
-    "written-paths.json",
-    "handoff.json",
-];
 
 #[derive(Debug, Parser, Clone)]
 #[command(group(
@@ -161,6 +152,7 @@ pub fn run_in_workspace<W: Write>(
         .retain(|state| !matches!(state, SideState::Blocked | SideState::FailedRetryable));
     next_state.blocking_issues.clear();
     next_state.retryable_failures.clear();
+    next_state.active_runtime_evidence_run_id = None;
     next_state.implementation_summary = Some(implementation_summary.clone());
     next_state.publication_packet_path = None;
     next_state.publication_packet_sha256 = None;
@@ -201,11 +193,20 @@ pub fn run_in_workspace<W: Write>(
     Ok(())
 }
 
-pub fn discover_runtime_evidence_for_approval(
+pub fn resolve_runtime_integrated_runtime_evidence_for_approval(
     workspace_root: &Path,
     approval: &ApprovalArtifact,
+    lifecycle_state: &LifecycleState,
 ) -> Result<RuntimeEvidenceBundle, Error> {
-    discover_runtime_evidence(workspace_root, approval)
+    resolve_runtime_integrated_runtime_evidence(workspace_root, approval, lifecycle_state)
+}
+
+pub fn validate_packet_pinned_runtime_evidence_for_approval(
+    workspace_root: &Path,
+    approval: &ApprovalArtifact,
+    packet: &PublicationReadyPacket,
+) -> Result<RuntimeEvidenceBundle, Error> {
+    validate_packet_pinned_runtime_evidence(workspace_root, approval, packet)
 }
 
 pub fn validate_runtime_evidence_run_for_approval(
@@ -250,8 +251,29 @@ fn build_context(workspace_root: &Path, args: &Args) -> Result<PublicationContex
         .map_err(|err| Error::Validation(err.to_string()))?;
     validate_approval_continuity(&lifecycle_state, &lifecycle_state_path, &approval)?;
 
-    let runtime_evidence = discover_runtime_evidence_for_approval(workspace_root, &approval)?;
     let publication_packet_path = publication_ready_path_for_entry(&entry);
+    let runtime_evidence = match lifecycle_state.lifecycle_stage {
+        LifecycleStage::RuntimeIntegrated => {
+            resolve_runtime_integrated_runtime_evidence_for_approval(
+                workspace_root,
+                &approval,
+                &lifecycle_state,
+            )?
+        }
+        LifecycleStage::PublicationReady => {
+            let packet = load_publication_ready_packet(workspace_root, &publication_packet_path)
+                .map_err(|err| Error::Validation(err.to_string()))?;
+            validate_packet_pinned_runtime_evidence_for_approval(
+                workspace_root,
+                &approval,
+                &packet,
+            )?
+        }
+        _ => RuntimeEvidenceBundle {
+            run_id: String::new(),
+            runtime_evidence_paths: Vec::new(),
+        },
+    };
     Ok(PublicationContext {
         approval,
         entry,
@@ -300,6 +322,11 @@ fn validate_check_mode(workspace_root: &Path, context: &PublicationContext) -> R
             let packet =
                 load_publication_ready_packet(workspace_root, &context.publication_packet_path)
                     .map_err(|err| Error::Validation(err.to_string()))?;
+            let packet_runtime_evidence = validate_packet_pinned_runtime_evidence_for_approval(
+                workspace_root,
+                &context.approval,
+                &packet,
+            )?;
             let lifecycle_sha = file_sha256(workspace_root, &context.lifecycle_state_path)
                 .map_err(|err| Error::Validation(err.to_string()))?;
             let expected_packet = build_publication_ready_packet(
@@ -313,7 +340,7 @@ fn validate_check_mode(workspace_root: &Path, context: &PublicationContext) -> R
                     &context.lifecycle_state_path,
                 )?
                 .clone(),
-                context.runtime_evidence.runtime_evidence_paths.clone(),
+                packet_runtime_evidence.runtime_evidence_paths,
                 context.lifecycle_state.blocking_issues.clone(),
             )?;
             if packet != expected_packet {

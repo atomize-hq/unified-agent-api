@@ -7,10 +7,10 @@
   "lifecycle_stage": "runtime_integrated",
   "support_tier": "baseline_runtime",
   "side_states": [],
-  "current_owner_command": "runtime-follow-on --write",
+  "current_owner_command": "repair-runtime-evidence --write",
   "expected_next_command": "prepare-publication --approval docs/agents/lifecycle/aider-onboarding/governance/approved-agent.toml --write",
-  "last_transition_at": "2026-04-29T19:38:47-04:00",
-  "last_transition_by": "historical-lifecycle-backfill",
+  "last_transition_at": "2026-05-02T16:21:01.028888Z",
+  "last_transition_by": "xtask repair-runtime-evidence --write",
   "required_evidence": [
     "registry_entry",
     "docs_pack",
@@ -27,6 +27,7 @@
   ],
   "blocking_issues": [],
   "retryable_failures": [],
+  "active_runtime_evidence_run_id": "repair-aider-runtime-follow-on",
   "implementation_summary": {
     "requested_runtime_profile": "default",
     "achieved_runtime_profile": "default",

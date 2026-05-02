@@ -39,6 +39,7 @@
   ],
   "blocking_issues": [],
   "retryable_failures": [],
+  "active_runtime_evidence_run_id": null,
   "implementation_summary": {
     "requested_runtime_profile": "feature_rich",
     "achieved_runtime_profile": "feature_rich",
@@ -63,6 +64,6 @@
     "minimal_profile_justification": null
   },
   "publication_packet_path": "docs/agents/lifecycle/claude-code-cli-onboarding/governance/publication-ready.json",
-  "publication_packet_sha256": "670a05ce3696e6cb33af86afbc4ef6be011220f196a13e4e8ba2030b85bc473e",
+  "publication_packet_sha256": "08ea7d615ca1f45f8cf2f386f9a9155f9c263d287083c48a92c7509d45394703",
   "closeout_baseline_path": "docs/agents/lifecycle/claude-code-cli-onboarding/governance/proving-run-closeout.json"
 }

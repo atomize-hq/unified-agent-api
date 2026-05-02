@@ -4,7 +4,7 @@ use crate::{
     agent_lifecycle::{self, load_lifecycle_state, LifecycleStage},
     agent_registry::AgentRegistryEntry,
     approval_artifact::load_approval_artifact,
-    prepare_publication::discover_runtime_evidence_for_approval,
+    prepare_publication::resolve_runtime_integrated_runtime_evidence_for_approval,
 };
 
 use super::{build_finding, DriftCategory, DriftFinding};
@@ -42,7 +42,11 @@ pub(super) fn inspect_runtime_evidence(
     let approval =
         load_approval_artifact(workspace_root, &lifecycle_state.approval_artifact_path).ok()?;
     let approval_path = approval.relative_path.clone();
-    match discover_runtime_evidence_for_approval(workspace_root, &approval) {
+    match resolve_runtime_integrated_runtime_evidence_for_approval(
+        workspace_root,
+        &approval,
+        &lifecycle_state,
+    ) {
         Ok(_) => None,
         Err(err) => {
             let repair_run_dir = repair_run_dir(&entry.agent_id);

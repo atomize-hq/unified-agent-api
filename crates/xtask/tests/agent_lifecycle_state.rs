@@ -14,7 +14,7 @@ use xtask::{
     },
     agent_registry::AgentRegistry,
     approval_artifact::load_approval_artifact,
-    prepare_publication::discover_runtime_evidence_for_approval,
+    prepare_publication::validate_packet_pinned_runtime_evidence_for_approval,
 };
 
 fn repo_root() -> PathBuf {
@@ -169,6 +169,11 @@ fn backfilled_lifecycle_states_validate_for_registry_targets() {
         assert_eq!(state.support_tier, expected_tier);
         assert_eq!(state.approval_artifact_path, approval_path);
 
+        if expected_stage == LifecycleStage::RuntimeIntegrated {
+            assert!(state.active_runtime_evidence_run_id.is_some());
+            continue;
+        }
+
         if expected_stage != LifecycleStage::ClosedBaseline {
             continue;
         }
@@ -210,8 +215,12 @@ fn backfilled_lifecycle_states_validate_for_registry_targets() {
 
         let approval = load_approval_artifact(&workspace_root, &state.approval_artifact_path)
             .expect("approval");
-        let runtime_evidence = discover_runtime_evidence_for_approval(&workspace_root, &approval)
-            .expect("discover runtime evidence");
+        let runtime_evidence = validate_packet_pinned_runtime_evidence_for_approval(
+            &workspace_root,
+            &approval,
+            &packet,
+        )
+        .expect("validate packet-pinned runtime evidence");
         assert_eq!(
             packet.runtime_evidence_paths,
             runtime_evidence.runtime_evidence_paths
@@ -270,12 +279,53 @@ fn closed_baseline_requires_stage_minimum_evidence() {
     );
 }
 
+#[test]
+fn runtime_integrated_requires_active_runtime_evidence_run_id() {
+    let mut state = sample_runtime_integrated_state();
+    state.active_runtime_evidence_run_id = None;
+    let err = state
+        .validate()
+        .expect_err("runtime_integrated missing selector should fail");
+    assert!(err.to_string().contains("active_runtime_evidence_run_id"));
+}
+
+#[test]
+fn non_runtime_integrated_forbids_active_runtime_evidence_run_id() {
+    let mut state = sample_closed_baseline_state();
+    state.active_runtime_evidence_run_id =
+        Some("historical-gemini_cli-runtime-follow-on".to_string());
+    let err = state
+        .validate()
+        .expect_err("closed_baseline selector should fail");
+    assert!(err
+        .to_string()
+        .contains("only valid when lifecycle_stage is `runtime_integrated`"));
+}
+
+#[test]
+fn runtime_integrated_rejects_invalid_active_runtime_evidence_run_id_shape() {
+    let mut state = sample_runtime_integrated_state();
+    state.active_runtime_evidence_run_id = Some("../escape".to_string());
+    let err = state
+        .validate()
+        .expect_err("invalid runtime evidence run id should fail");
+    assert!(err.to_string().contains("single path segment"));
+}
+
 fn sample_closed_baseline_state() -> LifecycleState {
     let workspace_root = repo_root();
     let registry = AgentRegistry::load(&workspace_root).expect("load registry");
     let entry = registry.find("gemini_cli").expect("gemini entry");
     let lifecycle_path = lifecycle_state_path_for_entry(entry);
     load_lifecycle_state(&workspace_root, &lifecycle_path).expect("load sample lifecycle state")
+}
+
+fn sample_runtime_integrated_state() -> LifecycleState {
+    let workspace_root = repo_root();
+    let registry = AgentRegistry::load(&workspace_root).expect("load registry");
+    let entry = registry.find("aider").expect("aider entry");
+    let lifecycle_path = lifecycle_state_path_for_entry(entry);
+    load_lifecycle_state(&workspace_root, &lifecycle_path).expect("load runtime_integrated state")
 }
 
 fn pretty_json_sha<T: serde::Serialize>(value: &T) -> String {

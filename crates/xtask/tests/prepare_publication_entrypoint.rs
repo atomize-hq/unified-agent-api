@@ -122,6 +122,7 @@ fn prepare_fixture(prefix: &str) -> (PathBuf, String) {
             ],
             "blocking_issues": [],
             "retryable_failures": [],
+            "active_runtime_evidence_run_id": RUN_ID,
             "implementation_summary": {
                 "requested_runtime_profile": "default",
                 "achieved_runtime_profile": "default",
@@ -390,7 +391,10 @@ fn prepare_publication_rejects_missing_runtime_evidence() {
     assert_eq!(output.exit_code, 2);
     assert!(output
         .stderr
-        .contains("no successful runtime-follow-on evidence run"));
+        .contains("runtime evidence run `rtfo-publication`"));
+    assert!(output
+        .stderr
+        .contains("missing required runtime evidence files"));
     assert_eq!(
         read_json(&lifecycle_state_path(&fixture))
             .get("lifecycle_stage")
@@ -398,6 +402,20 @@ fn prepare_publication_rejects_missing_runtime_evidence() {
         Some("runtime_integrated")
     );
     assert!(!publication_packet_path(&fixture).exists());
+}
+
+#[test]
+fn prepare_publication_rejects_runtime_integrated_lifecycle_without_active_selector() {
+    let (fixture, approval_path) = prepare_fixture("prepare-publication-missing-selector");
+    let lifecycle_path = lifecycle_state_path(&fixture);
+    let mut lifecycle = read_json(&lifecycle_path);
+    lifecycle["active_runtime_evidence_run_id"] = Value::Null;
+    write_json(&lifecycle_path, &lifecycle);
+
+    let output = run_cli(publication_args("--write", &approval_path), &fixture);
+
+    assert_eq!(output.exit_code, 2);
+    assert!(output.stderr.contains("active_runtime_evidence_run_id"));
 }
 
 #[test]
@@ -509,6 +527,38 @@ fn validate_runtime_evidence_directory_rejects_path_sensitive_run_dir_mismatch()
     assert!(err
         .to_string()
         .contains("recorded run_dir `/tmp/not-the-real-run-root`"));
+}
+
+#[test]
+fn prepare_publication_check_ignores_newer_valid_sibling_runs_after_publication() {
+    let (fixture, approval_path) = prepare_fixture("prepare-publication-publication-ready-pinned");
+    let write_output = run_cli(publication_args("--write", &approval_path), &fixture);
+    assert_eq!(
+        write_output.exit_code, 0,
+        "stderr:\n{}",
+        write_output.stderr
+    );
+
+    let source_root = fixture.join(RUNTIME_RUNS_ROOT).join(RUN_ID);
+    let sibling_root = fixture.join(RUNTIME_RUNS_ROOT).join("zz-newer-runtime-run");
+    fs::create_dir_all(&sibling_root).expect("create sibling runtime run");
+    for name in [
+        "input-contract.json",
+        "run-status.json",
+        "validation-report.json",
+        "handoff.json",
+        "written-paths.json",
+        "run-summary.md",
+    ] {
+        fs::copy(source_root.join(name), sibling_root.join(name))
+            .expect("copy runtime evidence file");
+    }
+    let mut run_status = read_json(&sibling_root.join("run-status.json"));
+    run_status["run_dir"] = Value::String(sibling_root.to_string_lossy().into_owned());
+    write_json(&sibling_root.join("run-status.json"), &run_status);
+
+    let output = run_cli(publication_args("--check", &approval_path), &fixture);
+    assert_eq!(output.exit_code, 0, "stderr:\n{}", output.stderr);
 }
 
 #[test]

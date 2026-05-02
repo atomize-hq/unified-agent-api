@@ -378,6 +378,7 @@ On successful write, `runtime-follow-on` advances the committed lifecycle record
 - `lifecycle_stage = runtime_integrated`
 - `support_tier = baseline_runtime`
 - `satisfied_evidence` including `runtime_write_complete` and `implementation_summary_present`
+- `active_runtime_evidence_run_id = <run_id>`
 - `expected_next_command = "prepare-publication --approval <path> --write"`
 
 On validation failure, the command keeps the lifecycle stage unchanged and records exact retryable or blocking issues in the lifecycle side-state fields. `handoff.json`, `run-status.json`, and `run-summary.md` remain `.uaa-temp` evidence only and are not committed publication handoff artifacts.
@@ -406,7 +407,9 @@ Write the deterministic repaired bundle only when the check succeeds:
 - reconstructs runtime evidence only from committed runtime-owned outputs
 - writes exactly one deterministic run directory under `docs/agents/.uaa-temp/runtime-follow-on/runs/repair-<agent_id>-runtime-follow-on/`
 - emits the full six-file bundle: `input-contract.json`, `run-status.json`, `validation-report.json`, `handoff.json`, `written-paths.json`, and `run-summary.md`
-- does not advance lifecycle stage or rewrite `lifecycle-state.json`
+- does not advance lifecycle stage
+- repoints `active_runtime_evidence_run_id` to the deterministic repair run and updates lifecycle provenance fields to show that authority selection changed
+- must succeed transactionally across the canonical repair bundle and `lifecycle-state.json`; if lifecycle persistence fails, the canonical repair bundle is rolled back too
 
 The expected stale-bundle failure shape is now explicit. Operators will see either:
 - `prepare-publication --check` fail with a message like `runtime input-contract required_handoff_commands must match the frozen publication command set exactly`, plus direct `repair-runtime-evidence` guidance
@@ -448,16 +451,17 @@ Once runtime-integrated state and `.uaa-temp` runtime evidence both exist, emit 
 - lifecycle stage `runtime_integrated`
 - approval path and SHA continuity against the committed lifecycle record
 - explicit, non-empty `implementation_summary`
-- a successful runtime-follow-on evidence run under `docs/agents/.uaa-temp/runtime-follow-on/runs/*`
+- a successful runtime-evidence bundle selected by `lifecycle-state.json.active_runtime_evidence_run_id`
 - capability publication continuity from registry truth and `cli_manifests/<agent_id>/current.json`
 
 On success it:
 - writes `docs/agents/lifecycle/<onboarding_pack_prefix>/governance/publication-ready.json`
 - advances the committed lifecycle record to `lifecycle_stage = publication_ready`
+- clears `active_runtime_evidence_run_id`
 - satisfies `publication_packet_written`
 - sets `expected_next_command = "support-matrix --check && capability-matrix --check && capability-matrix-audit && make preflight && close-proving-run --write"`
 
-`prepare-publication --check` revalidates the same seam without rewriting either governance file.
+`prepare-publication --check` revalidates the same seam without rewriting either governance file. At `publication_ready`, it validates only the packet-pinned `runtime_evidence_paths`; newer sibling `.uaa-temp` runs do not change authority.
 
 ### 8. Refresh publication surfaces
 

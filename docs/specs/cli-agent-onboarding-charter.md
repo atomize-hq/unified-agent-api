@@ -136,6 +136,7 @@ Backend-specific exec-policy knobs (pattern):
 Canonical lifecycle record:
 - `docs/agents/lifecycle/<onboarding_pack_prefix>/governance/lifecycle-state.json`
 - this file owns committed lifecycle stage, support tier, evidence satisfaction, and next-command truth for create mode
+- at `lifecycle_stage = runtime_integrated`, this file also owns `active_runtime_evidence_run_id`, the only canonical selector for the authoritative runtime-evidence run under `docs/agents/.uaa-temp/runtime-follow-on/runs/<run_id>/`
 - generated packet docs and handoff prose are evidence, not lifecycle authority
 - maintenance comparisons must anchor to the committed lifecycle record rather than reconstructing state from scattered packet artifacts
 
@@ -165,15 +166,22 @@ Canonical lifecycle record:
    - redaction (no raw line leakage)
    - exec-policy default behavior (non-interactive) and override levers if applicable
 6) Run `prepare-publication --approval docs/agents/lifecycle/<onboarding_pack_prefix>/governance/approved-agent.toml --write` after committed runtime evidence exists:
-   - validate approval SHA continuity, runtime evidence presence, implementation-summary completeness, and capability publication continuity
+   - validate approval SHA continuity, implementation-summary completeness, capability publication continuity, and the exact runtime-evidence bundle selected by `active_runtime_evidence_run_id`
    - write `docs/agents/lifecycle/<onboarding_pack_prefix>/governance/publication-ready.json`
    - advance the committed lifecycle record to `publication_ready`
+   - clear `active_runtime_evidence_run_id` as part of that stage transition
 7) Regenerate publication outputs from committed runtime evidence.
 8) Ensure required CI workflows pass (see below).
 
 Publication handoff rule:
 - `docs/agents/lifecycle/<onboarding_pack_prefix>/governance/publication-ready.json` is the only committed publication handoff packet
+- once `publication-ready.json` exists, its `runtime_evidence_paths` become the only frozen committed authority for runtime evidence; sibling `.uaa-temp` runs are never authoritative by sort order
 - scratch runtime `handoff.json` files remain run evidence only
+
+Runtime evidence repair rule:
+- `repair-runtime-evidence --write` may repoint `active_runtime_evidence_run_id` while leaving lifecycle stage unchanged
+- that selector change is a lifecycle mutation and must update lifecycle provenance fields (`current_owner_command`, `last_transition_at`, `last_transition_by`)
+- repair must be transactional across the canonical repair bundle and lifecycle state: on failure, neither authoritative surface may change
 
 ## CI expectations (must stay green)
 

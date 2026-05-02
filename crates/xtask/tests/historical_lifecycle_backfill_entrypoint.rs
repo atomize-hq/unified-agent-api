@@ -8,7 +8,7 @@ use serde_json::Value;
 use xtask::{
     agent_lifecycle::{load_lifecycle_state, LifecycleStage, PublicationReadyPacket},
     approval_artifact::load_approval_artifact,
-    prepare_publication::discover_runtime_evidence_for_approval,
+    prepare_publication::validate_runtime_evidence_run_for_approval,
 };
 
 #[allow(dead_code)]
@@ -121,6 +121,7 @@ fn prepare_fixture(prefix: &str) -> (PathBuf, String) {
             ],
             "blocking_issues": [],
             "retryable_failures": [],
+            "active_runtime_evidence_run_id": Value::Null,
             "implementation_summary": {
                 "requested_runtime_profile": "default",
                 "achieved_runtime_profile": "default",
@@ -208,8 +209,12 @@ fn historical_lifecycle_backfill_rebuilds_multi_file_runtime_evidence_and_downst
 
     let approval =
         load_approval_artifact(&fixture, &approval_path).expect("load approval after backfill");
-    let runtime = discover_runtime_evidence_for_approval(&fixture, &approval)
-        .expect("discover rebuilt runtime evidence");
+    let runtime = validate_runtime_evidence_run_for_approval(
+        &fixture,
+        &approval,
+        "historical-gemini_cli-runtime-follow-on",
+    )
+    .expect("validate rebuilt runtime evidence");
     assert_eq!(runtime.run_id, "historical-gemini_cli-runtime-follow-on");
 
     let run_root = fixture.join(

@@ -4,7 +4,7 @@
   "approval_artifact_path": "docs/agents/lifecycle/codex-cli-onboarding/governance/approved-agent.toml",
   "approval_artifact_sha256": "25d51601e4aa9ca18bc72326e1448097a8648cd5e5e1d6018d517b116a58b892",
   "lifecycle_state_path": "docs/agents/lifecycle/codex-cli-onboarding/governance/lifecycle-state.json",
-  "lifecycle_state_sha256": "daf568b495ab648477923f5a0e9981c7cdf4f5bbbfa6bbc0e5b66a43e41ba790",
+  "lifecycle_state_sha256": "6954c82869b245c0b9598562aa5d4e270dd8d68cd5e9040dd890947c8a91bc2c",
   "lifecycle_stage": "publication_ready",
   "support_tier_at_emit": "baseline_runtime",
   "manifest_root": "cli_manifests/codex",

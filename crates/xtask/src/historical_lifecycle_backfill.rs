@@ -17,7 +17,7 @@ use xtask::{
     agent_registry::AgentRegistry,
     approval_artifact::ApprovalArtifact,
     prepare_publication::{
-        build_publication_ready_packet, discover_runtime_evidence_for_approval,
+        build_publication_ready_packet, validate_runtime_evidence_run_for_approval,
         RuntimeEvidenceBundle,
     },
     runtime_evidence_bundle::{
@@ -152,8 +152,8 @@ fn backfill_agent(
         )));
     }
 
-    write_runtime_evidence(workspace_root, &approval, &raw_state)?;
-    let runtime_evidence = discover_runtime_evidence_for_approval(workspace_root, &approval)
+    let runtime_evidence = write_runtime_evidence(workspace_root, &approval, &raw_state)?;
+    validate_runtime_evidence_run_for_approval(workspace_root, &approval, &runtime_evidence.run_id)
         .map_err(|err| Error::Validation(err.to_string()))?;
     let historical_publication_state =
         reconstruct_publication_ready_state_from_closed_baseline(&raw_state);
@@ -198,6 +198,7 @@ fn backfill_agent(
         required_evidence_for_stage(LifecycleStage::ClosedBaseline).to_vec();
     repaired_state.satisfied_evidence =
         required_evidence_for_stage(LifecycleStage::ClosedBaseline).to_vec();
+    repaired_state.active_runtime_evidence_run_id = None;
     repaired_state.publication_packet_path = Some(packet_path.clone());
     repaired_state.publication_packet_sha256 = Some(
         file_sha256(workspace_root, &packet_path)

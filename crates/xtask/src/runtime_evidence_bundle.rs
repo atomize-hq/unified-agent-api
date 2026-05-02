@@ -9,9 +9,8 @@ use serde_json::json;
 use crate::{
     agent_lifecycle::{self, LifecycleState},
     approval_artifact::ApprovalArtifact,
+    runtime_evidence_run,
 };
-
-pub const RUNTIME_RUNS_ROOT: &str = "docs/agents/.uaa-temp/runtime-follow-on/runs";
 const WORKFLOW_VERSION: &str = "runtime_follow_on_v1";
 
 #[derive(Debug, Clone)]
@@ -70,7 +69,8 @@ pub fn write_runtime_evidence_bundle(
     lifecycle_state: &LifecycleState,
     spec: &RuntimeEvidenceBundleSpec<'_>,
 ) -> Result<GeneratedRuntimeEvidenceBundle, Error> {
-    let run_relative = format!("{RUNTIME_RUNS_ROOT}/{}", spec.run_id);
+    let run_relative =
+        runtime_evidence_run::run_relative_root(spec.run_id).map_err(Error::Validation)?;
     let run_root = workspace_root.join(&run_relative);
     write_runtime_evidence_bundle_at(
         workspace_root,
@@ -176,14 +176,8 @@ pub fn write_runtime_evidence_bundle_at(
     Ok(GeneratedRuntimeEvidenceBundle {
         run_id: spec.run_id.to_string(),
         run_relative: run_relative.to_string(),
-        runtime_evidence_paths: vec![
-            format!("{run_relative}/input-contract.json"),
-            format!("{run_relative}/run-status.json"),
-            format!("{run_relative}/run-summary.md"),
-            format!("{run_relative}/validation-report.json"),
-            format!("{run_relative}/written-paths.json"),
-            format!("{run_relative}/handoff.json"),
-        ],
+        runtime_evidence_paths: runtime_evidence_run::runtime_evidence_paths_for_run(spec.run_id)
+            .map_err(Error::Validation)?,
         written_paths,
     })
 }

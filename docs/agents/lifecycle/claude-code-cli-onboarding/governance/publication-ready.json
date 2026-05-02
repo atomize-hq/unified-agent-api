@@ -4,7 +4,7 @@
   "approval_artifact_path": "docs/agents/lifecycle/claude-code-cli-onboarding/governance/approved-agent.toml",
   "approval_artifact_sha256": "9bd2dc39909499598791fcdd84a2c0960f68d70f167e05fc98264b5099397fc3",
   "lifecycle_state_path": "docs/agents/lifecycle/claude-code-cli-onboarding/governance/lifecycle-state.json",
-  "lifecycle_state_sha256": "e129d67d806a6400f9d454e6319c012f03c0a6199c822e4ca63d2e335c9d9d68",
+  "lifecycle_state_sha256": "082f08bb6e48eea4f7c54d85e19cb5bd2beb4c2a2ad67125253a0ba33fd93075",
   "lifecycle_stage": "publication_ready",
   "support_tier_at_emit": "baseline_runtime",
   "manifest_root": "cli_manifests/claude_code",

@@ -49,6 +49,7 @@ fn seeded_lifecycle_state(
         satisfied_evidence: required_evidence,
         blocking_issues: Vec::new(),
         retryable_failures: Vec::new(),
+        active_runtime_evidence_run_id: None,
         implementation_summary: None,
         publication_packet_path: None,
         publication_packet_sha256: None,

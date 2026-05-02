@@ -147,6 +147,7 @@ fn seed_publication_ready_baseline(root: &std::path::Path, approval_path: &str) 
             ],
             "blocking_issues": [],
             "retryable_failures": [],
+            "active_runtime_evidence_run_id": serde_json::Value::Null,
             "implementation_summary": {
                 "requested_runtime_profile": "default",
                 "achieved_runtime_profile": "default",
@@ -195,6 +196,11 @@ fn seed_publication_ready_baseline(root: &std::path::Path, approval_path: &str) 
                 "docs/specs/unified-agent-api/capability-matrix.md"
             ],
             "runtime_evidence_paths": [
+                "docs/agents/.uaa-temp/runtime-follow-on/runs/rtfo-publication/input-contract.json",
+                "docs/agents/.uaa-temp/runtime-follow-on/runs/rtfo-publication/run-status.json",
+                "docs/agents/.uaa-temp/runtime-follow-on/runs/rtfo-publication/run-summary.md",
+                "docs/agents/.uaa-temp/runtime-follow-on/runs/rtfo-publication/validation-report.json",
+                "docs/agents/.uaa-temp/runtime-follow-on/runs/rtfo-publication/written-paths.json",
                 "docs/agents/.uaa-temp/runtime-follow-on/runs/rtfo-publication/handoff.json"
             ],
             "publication_owned_paths": [

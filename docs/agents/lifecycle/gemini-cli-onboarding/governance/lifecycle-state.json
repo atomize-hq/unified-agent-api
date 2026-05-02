@@ -39,6 +39,7 @@
   ],
   "blocking_issues": [],
   "retryable_failures": [],
+  "active_runtime_evidence_run_id": null,
   "implementation_summary": {
     "requested_runtime_profile": "default",
     "achieved_runtime_profile": "default",
@@ -56,6 +57,6 @@
     "minimal_profile_justification": null
   },
   "publication_packet_path": "docs/agents/lifecycle/gemini-cli-onboarding/governance/publication-ready.json",
-  "publication_packet_sha256": "16e39d5c5fc5c99461ba3d9998d94952ad62c90ed4d9a99526eda35d4b46680c",
+  "publication_packet_sha256": "8fe6e6204d371f6ab634a88439c01eb05bd93ca76cc72372bc770f0af1fb2b9d",
   "closeout_baseline_path": "docs/agents/lifecycle/gemini-cli-onboarding/governance/proving-run-closeout.json"
 }

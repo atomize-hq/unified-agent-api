@@ -10,10 +10,10 @@ use self::validation::{
     ensure_repo_relative_file_exists, landed_surface_name, validate_deferred_surfaces,
     validate_non_empty, validate_optional_path_pair, validate_optional_repo_relative_path,
     validate_pack_prefix, validate_path_hash_pair, validate_repo_relative_path,
-    validate_required_publication_commands, validate_rfc3339, validate_schema_version,
-    validate_sha256, validate_side_state_issues, validate_stage_field_presence,
-    validate_stage_minimum_evidence, validate_string_list, validate_subset,
-    validate_template_lineage, validate_unique_copy,
+    validate_required_publication_commands, validate_rfc3339, validate_runtime_evidence_run_id,
+    validate_schema_version, validate_sha256, validate_side_state_issues,
+    validate_stage_field_presence, validate_stage_minimum_evidence, validate_string_list,
+    validate_subset, validate_template_lineage, validate_unique_copy,
 };
 use crate::agent_registry::AgentRegistryEntry;
 
@@ -267,6 +267,7 @@ pub struct LifecycleState {
     pub satisfied_evidence: Vec<EvidenceId>,
     pub blocking_issues: Vec<String>,
     pub retryable_failures: Vec<String>,
+    pub active_runtime_evidence_run_id: Option<String>,
     pub implementation_summary: Option<ImplementationSummary>,
     pub publication_packet_path: Option<String>,
     pub publication_packet_sha256: Option<String>,
@@ -339,6 +340,10 @@ impl LifecycleState {
         validate_string_list("blocking_issues", &self.blocking_issues)?;
         validate_string_list("retryable_failures", &self.retryable_failures)?;
         validate_side_state_issues(self)?;
+        validate_runtime_evidence_run_id(
+            self.lifecycle_stage,
+            &self.active_runtime_evidence_run_id,
+        )?;
         validate_optional_path_pair(
             "publication_packet_path",
             &self.publication_packet_path,
@@ -637,6 +642,7 @@ pub fn reconstruct_publication_ready_state_from_closed_baseline(
     });
     historical.blocking_issues.clear();
     historical.retryable_failures.clear();
+    historical.active_runtime_evidence_run_id = None;
     historical.publication_packet_path = None;
     historical.publication_packet_sha256 = None;
     historical.closeout_baseline_path = None;
