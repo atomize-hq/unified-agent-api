@@ -1,132 +1,122 @@
-# PLAN - Runtime Evidence Repair And Publication Seam Hardening
+<!-- /autoplan restore point: /Users/spensermcconnell/.gstack/projects/unified-agent-api/PLAN-autoplan-restore-20260502-151831.md -->
+# PLAN - Generic Capability Publication Foundation
 
-Status: implemented  
+Status: planned  
 Date: 2026-05-02  
 Branch: `codex/recommend-next-agent`  
 Base branch: `main`  
 Repo: `atomize-hq/unified-agent-api`  
-Work item: `Repair stale runtime_integrated evidence and harden the runtime -> publication seam`
+Work item: `Land The Generic Capability Publication Foundation`  
+Plan commit baseline: `9daea9f`
 
-## Implementation Notes
-
-- `repair-runtime-evidence --check` now stages a temporary runtime-evidence bundle and validates it through the same runtime-evidence semantic rules `prepare-publication` uses, via an explicit-run-root validator.
-- `repair-runtime-evidence --write` remains on the canonical promote -> validate -> rollback path so the committed `run_dir` metadata stays truthful for the canonical repair run id.
-- Shared runtime-owned backend derivation now includes all direct files under `descriptor.backend_module` and still excludes nested backend files.
-- Historical refreshes are intentionally targeted per agent. Those commands primarily regenerate runtime-evidence run directories, but downstream governance artifacts may also change if the targeted backfill rewrites them mechanically.
-- The lifecycle still lacks an explicit pointer to the active runtime-evidence run. That lifecycle-pointer redesign is a follow-on item, not part of this bounded fix.
+Separate design doc: not required for this slice. This is a backend-only control-plane change,
+and this `PLAN.md` is the design record.
 
 ## Objective
 
-Land one repo-owned repair seam for already-committed `runtime_integrated` agents whose runtime evidence is stale or malformed, use it to repair `aider`, and close the validation gap that currently lets a bad runtime bundle look green until `prepare-publication` consumes it.
+Make capability publication truthful, generic, and boring.
 
 After this plan lands:
 
-1. `repair-runtime-evidence --check` can tell an operator whether a `runtime_integrated` agent is repairable from committed runtime-owned outputs.
-2. `repair-runtime-evidence --write` can reconstruct a truthful runtime evidence bundle without hand-editing JSON.
-3. `prepare-publication --check` passes for `aider`.
-4. `runtime-follow-on` no longer tolerates legacy short-form publication commands.
-5. `check-agent-drift` surfaces stale runtime evidence as an explicit operator-facing failure, not a vague governance mismatch.
+1. A newly onboarded agent that has reached `runtime_integrated` or later can participate in
+   capability publication without any new hardcoded backend `match` arm in
+   `crates/xtask/src/capability_matrix.rs`.
+2. `capability-matrix`, `capability-matrix-audit`, `prepare-publication`,
+   `check-agent-drift`, and `close-proving-run` all reason from the same publication truth model.
+3. The repo has one pinned answer to "why is this agent allowed to publish these capability ids on
+   this target?"
+4. The capability-matrix specs and generated markdown stop describing publication as built-in
+   backend inventory when the repo actually wants lifecycle-backed control-plane truth.
+
+## Implementation Notes
+
+- Capability publication must stop discovering truth from hardcoded runtime backend construction in
+  `xtask`.
+- The shared publication model must be metadata-driven. It must reuse committed registry,
+  lifecycle, approval, and manifest artifacts that already exist in the repo.
+- Lifecycle gates publication eligibility. Registry enrollment alone is not sufficient.
+- The shared projection contract in `crates/xtask/src/capability_projection.rs` remains the only
+  place that decides which capability ids are advertised for a target.
+- This slice does not introduce plugin discovery, runtime reflection, or any new artifact family.
 
 ## Source Inputs
 
-- Plan artifact:
-  - `~/.gstack/projects/atomize-hq-unified-agent-api/ceo-plans/2026-05-01-runtime-integrated-evidence-repair-plan.md`
-- Test artifact:
-  - `~/.gstack/projects/atomize-hq-unified-agent-api/spensermcconnell-codex-recommend-next-agent-test-plan-20260501-184500.md`
-- Upstream design context:
-  - `~/.gstack/projects/atomize-hq-unified-agent-api/spensermcconnell-codex-recommend-next-agent-design-20260430-214712.md`
-- Verified live failure:
-  - `cargo run -p xtask -- prepare-publication --approval docs/agents/lifecycle/aider-onboarding/governance/approved-agent.toml --check`
-  - current stderr: `runtime input-contract required_handoff_commands must match the frozen publication command set exactly`
-- Relevant code owners:
-  - `crates/xtask/src/main.rs`
-  - `crates/xtask/src/lib.rs`
-  - `crates/xtask/src/historical_lifecycle_backfill.rs`
-  - `crates/xtask/src/runtime_follow_on.rs`
-  - `crates/xtask/src/runtime_follow_on/lifecycle.rs`
+- Backlog source:
+  - `TODOS.md`
+  - `docs/backlog/cli-agent-onboarding-lifecycle-unification-gap-memo.md`
+- Normative contracts:
+  - `docs/specs/agent-registry-contract.md`
+  - `docs/specs/unified-agent-api/capabilities-schema-spec.md`
+  - `docs/specs/unified-agent-api/capability-matrix.md`
+  - `docs/specs/unified-agent-api/support-matrix.md`
+  - `docs/specs/cli-agent-onboarding-charter.md`
+- Current implementation surfaces:
+  - `crates/xtask/src/capability_matrix.rs`
+  - `crates/xtask/src/capability_matrix_audit.rs`
+  - `crates/xtask/src/capability_projection.rs`
   - `crates/xtask/src/prepare_publication.rs`
-  - `crates/xtask/src/prepare_publication/runtime_evidence.rs`
-  - `crates/xtask/src/agent_maintenance/drift/mod.rs`
-  - `crates/xtask/tests/runtime_follow_on_entrypoint.rs`
-  - `crates/xtask/tests/prepare_publication_entrypoint.rs`
+  - `crates/xtask/src/close_proving_run.rs`
+  - `crates/xtask/src/agent_maintenance/drift/shared.rs`
+  - `crates/xtask/src/agent_maintenance/drift/publication.rs`
+  - `crates/xtask/data/agent_registry.toml`
+- Current tests:
+  - `crates/xtask/tests/c8_capability_matrix_unit.rs`
+  - `crates/xtask/tests/c8_spec_capability_matrix_paths.rs`
   - `crates/xtask/tests/agent_maintenance_drift.rs`
-- Broken committed `aider` evidence:
-  - `docs/agents/lifecycle/aider-onboarding/governance/lifecycle-state.json`
-  - `docs/agents/.uaa-temp/runtime-follow-on/runs/aider-runtime-follow-on-rerun/input-contract.json`
-  - `docs/agents/.uaa-temp/runtime-follow-on/runs/aider-runtime-follow-on-rerun/handoff.json`
-  - `docs/agents/.uaa-temp/runtime-follow-on/runs/aider-runtime-follow-on-rerun/run-status.json`
-  - `docs/agents/.uaa-temp/runtime-follow-on/runs/aider-runtime-follow-on-rerun/validation-report.json`
-  - `docs/agents/.uaa-temp/runtime-follow-on/runs/aider-runtime-follow-on-rerun/written-paths.json`
-  - `docs/agents/.uaa-temp/runtime-follow-on/runs/aider-runtime-follow-on-rerun/run-summary.md`
+  - `crates/xtask/tests/prepare_publication_entrypoint.rs`
+  - `crates/xtask/tests/onboard_agent_closeout_preview/close_proving_run_write.rs`
 
 ## Verified Current State
 
 These facts are verified from the current branch, not inferred:
 
-1. `docs/agents/lifecycle/aider-onboarding/governance/lifecycle-state.json` says `aider` is `runtime_integrated` with `baseline_runtime` support and `prepare-publication` as the next command.
-2. `docs/agents/.uaa-temp/runtime-follow-on/runs/aider-runtime-follow-on-rerun/input-contract.json` and `handoff.json` still use the legacy short-form command set:
-   - `support-matrix --check`
-   - `capability-matrix --check`
-   - `capability-matrix-audit`
-   - `make preflight`
-3. `docs/agents/.uaa-temp/runtime-follow-on/runs/aider-runtime-follow-on-rerun/written-paths.json` is empty.
-4. `docs/agents/.uaa-temp/runtime-follow-on/runs/aider-runtime-follow-on-rerun/run-status.json` still claims `write_validated`.
-5. `prepare-publication` is stricter than the old runtime bundle and rejects it exactly as it should.
-6. The forward runtime path is already partially hardened:
-   - `crates/xtask/src/runtime_follow_on.rs` now rejects `written_paths.is_empty()`.
-   - `crates/xtask/tests/runtime_follow_on_entrypoint.rs` already contains `runtime_follow_on_write_rejects_noop_runtime_execution`.
-7. The remaining gap is historical and operator-facing:
-   - stale committed runtime bundles can still exist on disk
-   - `prepare-publication` rejects them late
-   - `check-agent-drift --agent aider` reports generic governance drift, not a targeted runtime-evidence repair instruction
+1. `crates/xtask/src/capability_matrix.rs` imports concrete backend types from `agent_api` and
+   hardcodes runtime inventory in `runtime_backend_capabilities(agent_id)`.
+2. `collect_builtin_backend_inventory()` and
+   `collect_builtin_backend_inventory_from_registry(...)` still combine registry entries with
+   built-in backend constructor truth before rendering markdown.
+3. `validate_agent_publication_continuity(...)` in `capability_matrix.rs` validates manifest and
+   projection continuity today, but it still depends on modeled runtime truth derived from the same
+   hardcoded backend inventory path.
+4. `crates/xtask/src/capability_matrix_audit.rs` calls
+   `crate::capability_matrix::collect_builtin_backend_capabilities()` and therefore inherits the
+   same hardcoded inventory boundary.
+5. `crates/xtask/src/close_proving_run.rs` duplicates the audit allowlist and audit logic locally
+   in `validate_capability_matrix_audit_green()` instead of reusing the CLI audit implementation.
+6. `crates/xtask/src/prepare_publication.rs` currently calls
+   `capability_matrix::validate_agent_publication_continuity(...)`, so the publication continuity
+   gate is still anchored to the generator module instead of a dedicated shared source.
+7. `crates/xtask/src/agent_maintenance/drift/shared.rs` already derives capability truth from
+   registry declaration plus manifest projection via `project_advertised_capabilities(...)`, which
+   is closer to the desired model than the generator path.
+8. `docs/specs/unified-agent-api/capability-matrix.md` still publishes the header
+   "`opencode`, `gemini_cli`, `aider` use the default built-in backend config", which is the
+   wrong control-plane explanation for a lifecycle-backed publication lane.
 
 ## Problem Statement
 
-The branch has a truthful publication consumer and a stale committed producer artifact.
+Capability publication has split brain.
 
-This is not a broad lifecycle redesign problem anymore. The lifecycle schema, `prepare-publication`, and runtime write validation are already in the repo. The bug is narrower and more dangerous:
+The repo already has the right control-plane ingredients:
 
-- old runtime evidence can remain committed after the contract tightened
-- the current repo has no explicit repair seam for that state
-- the operator only learns the bundle is bad when the next lifecycle command rejects it
+- registry-owned capability declarations
+- lifecycle-owned eligibility and continuity evidence
+- lifecycle-linked approval descriptors
+- manifest-root target availability
+- shared projection logic for advertised capabilities
 
-That is why `aider` looks close to done in lifecycle state but is still blocked in practice.
+But the publication lane still asks a second, wrong question:
 
-## Decision Summary
+- "Can `xtask` instantiate this backend from a hardcoded built-in list?"
 
-These choices are now locked. They are not open questions.
+That creates three concrete failures:
 
-1. Add a new explicit command: `repair-runtime-evidence`.
-2. Extract shared runtime evidence reconstruction and writing helpers from `historical_lifecycle_backfill.rs` instead of building a second ad hoc reconstruction path.
-3. Keep `prepare-publication` strict. Do not widen legacy tolerance there.
-4. Remove legacy short-form command tolerance from `runtime_follow_on/lifecycle.rs`.
-5. Write repaired evidence to a deterministic repair run directory:
-   - `docs/agents/.uaa-temp/runtime-follow-on/runs/repair-<agent_id>-runtime-follow-on/`
-   - for this slice: `repair-aider-runtime-follow-on`
-6. Do not mutate lifecycle stage during repair. `repair-runtime-evidence` fixes runtime evidence only. `prepare-publication` remains the owner of the `runtime_integrated -> publication_ready` transition.
-7. Surface stale runtime evidence in drift output as a first-class finding, not buried under generic governance text.
-
-## Scope
-
-### In Scope
-
-- add `xtask repair-runtime-evidence --check/--write`
-- add one shared runtime evidence bundle helper used by repair and historical backfill
-- use the shared helper to derive truthful non-empty runtime-owned writes from committed outputs
-- repair `aider` into a consumable runtime evidence bundle
-- remove legacy short-form command tolerance from runtime handoff validation
-- add explicit stale-runtime-evidence drift detection
-- add targeted tests for repair, drift, and strict command continuity
-- update operator docs for the new repair seam
-
-### Out Of Scope
-
-- redesigning the lifecycle schema
-- changing `prepare-publication` packet shape
-- changing the bounded runtime ownership model
-- deleting every old stale runtime run directory in the repo
-- turning repair into a generic maintenance framework
-- expanding CI with new global workflows beyond existing test and `make preflight` coverage
+1. A newly enrolled agent still needs hidden Rust edits before publication becomes truthful.
+2. Different consumers reason about capability truth differently:
+   - generator and closeout gate use compiled backend inventory
+   - drift already leans on registry plus manifest projection
+3. The specs describe built-in backend semantics even though the onboarding lifecycle wants
+   publication to follow committed lifecycle and approval artifacts.
 
 ## Step 0 Scope Challenge
 
@@ -134,515 +124,660 @@ These choices are now locked. They are not open questions.
 
 | Sub-problem | Existing surface | Reuse decision |
 | --- | --- | --- |
-| lifecycle truth | `crates/xtask/src/agent_lifecycle.rs` | Reuse directly. No schema redesign. |
-| runtime bundle discovery and strict consumption | `crates/xtask/src/prepare_publication/runtime_evidence.rs` | Reuse directly. Repair must produce bundles this code already accepts. |
-| forward runtime write validation | `crates/xtask/src/runtime_follow_on.rs` | Reuse directly. Empty runtime writes are already rejected for new runs. |
-| handoff semantic validation | `crates/xtask/src/runtime_follow_on/lifecycle.rs` | Reuse but tighten. Remove legacy command tolerance. |
-| historical runtime bundle reconstruction | `crates/xtask/src/historical_lifecycle_backfill.rs` | Extract and reuse. This is the right starting point for repair logic. |
-| drift reporting framework | `crates/xtask/src/agent_maintenance/drift/mod.rs` | Reuse and extend with a specific runtime evidence finding. |
-| test harnesses | `crates/xtask/tests/*_entrypoint.rs` | Reuse and extend. No new harness family. |
+| capability declaration ownership | `crates/xtask/data/agent_registry.toml`, `docs/specs/agent-registry-contract.md` | Reuse directly. Registry remains the committed declaration source. |
+| frozen onboarding declaration | `approved-agent.toml`, `crates/xtask/src/approval_artifact.rs` | Reuse directly. Publication truth must validate registry against this frozen descriptor. |
+| lifecycle eligibility | `crates/xtask/src/agent_lifecycle.rs` | Reuse directly. Lifecycle stage decides whether an agent can enter publication inventory. |
+| target-scoped capability projection | `crates/xtask/src/capability_projection.rs` | Reuse directly. Do not rebuild projection rules in consumers. |
+| per-agent manifest availability | `cli_manifests/<agent>/current.json` | Reuse directly. This remains the manifest availability input. |
+| drift reporting framework | `crates/xtask/src/agent_maintenance/drift/*` | Reuse, but point it at the same shared publication source used by generation and closeout. |
+| closeout gate wiring | `crates/xtask/src/close_proving_run.rs` | Reuse, but remove the duplicated audit semantics. |
+| capability matrix rendering | `crates/xtask/src/capability_matrix.rs` | Reuse render and check/write flow. Replace only the inventory builder and header semantics. |
 
 ### Minimum Complete Change Set
 
-The smallest complete version of this work is:
+The smallest complete version of this milestone is:
 
-1. add `repair-runtime-evidence`
-2. extract shared bundle reconstruction and writer helpers
-3. remove legacy short-form command tolerance in `runtime_follow_on/lifecycle.rs`
-4. add runtime-evidence drift detection
-5. repair `aider`
-6. add regression tests for all of the above
+1. add one shared publication-capability source module
+2. move publication continuity validation into that module
+3. make generator inventory come from that module
+4. make `capability-matrix-audit` call a shared audit over that same inventory
+5. make `close-proving-run` call that same shared audit instead of cloning it
+6. make drift capability truth and `prepare-publication` reuse the same source module
+7. update specs and generated wording so the repo no longer describes the old built-in-only model
 
-Anything smaller leaves the repo with split truth again.
+Anything smaller leaves split truth in place.
 
 ### Complexity Check
 
-This work will touch more than 8 files, but it is still the minimal complete slice because the problem spans:
+This plan touches more than 8 files. That is still the minimal complete version because the bug
+spans:
 
-- command wiring
-- shared helper extraction
-- runtime handoff validation
-- publication consumption
-- drift reporting
-- committed `aider` artifacts
+- shared inventory construction
+- generator
+- audit
+- closeout gate
+- prepare-publication continuity
+- drift truth
+- specs and generated wording
 - tests
-- docs
 
-The complexity control is not “touch fewer files.” The complexity control is “one shared reconstruction helper, one repair command, one deterministic repair directory, zero schema changes.”
+Complexity control for this slice:
+
+- one new source module only
+- no new lifecycle stage
+- no new artifact type
+- no new plugin or reflection system
+- no support-matrix refactor
 
 ### Search / Build Decision
 
 This is a Layer 1 reuse problem, not a new architecture problem.
 
-- **[Layer 1]** Reuse the existing `xtask` command pattern in `crates/xtask/src/main.rs`.
-- **[Layer 1]** Reuse strict command validation from `agent_lifecycle::REQUIRED_PUBLICATION_COMMANDS`.
-- **[Layer 1]** Reuse discovery and consumption rules from `prepare_publication/runtime_evidence.rs`.
-- **[Layer 1]** Reuse committed-output derivation from `historical_lifecycle_backfill.rs`.
-- **[Layer 3]** Keep repair outside lifecycle-stage mutation. The repo needs a repair seam, not another stage owner.
+- **[Layer 1]** Reuse `approval_artifact.rs` as the frozen capability declaration surface.
+- **[Layer 1]** Reuse `agent_lifecycle.rs` for publication eligibility and lifecycle lookup.
+- **[Layer 1]** Reuse `capability_projection.rs` for advertised capability derivation.
+- **[Layer 1]** Reuse `cli_manifests/<agent>/current.json` as the target/command availability
+  surface instead of inventing a second target registry.
+- **[Layer 3]** Stop asking compiled backend constructors for publication truth. Lifecycle,
+  approval, registry, and manifest artifacts are already the right control-plane abstraction.
 
 ### TODOS Cross-Reference
 
-No new `TODOS.md` entry is required for this slice.
+This plan closes exactly one pending TODO:
 
-This plan closes an implementation gap inside the already-active lifecycle and publication follow-on work. A follow-up cleanup for pruning superseded stale run directories is intentionally deferred and does not block this repair milestone.
+- `Land The Generic Capability Publication Foundation`
+
+It explicitly unblocks, but does not implement:
+
+- `Enclose The Publication Lane End To End`
+- `Make The Published State Honest In The Lifecycle Model`
+- `Decide Whether Capability Matrix Markdown Stays Canonical After M5`
 
 ### Completeness Decision
 
-The shortcut version would be:
+The shortcut version would keep the hardcoded runtime backend inventory and just spread a slightly
+cleaner helper around the same false model. That is not acceptable.
 
-- hand-edit the broken `aider` JSON files
-- leave legacy tolerance in runtime handoff validation
-- rely on `prepare-publication` to keep catching the problem late
+The complete version is still a boilable lake:
 
-That is not acceptable. The complete version is still a small lake. Build the real repair command and the real guardrail now.
+- one metadata-driven source of publication truth
+- one shared audit implementation
+- one lifecycle-based eligibility rule
+- one set of tests that prove the generic lane works
 
-## Architecture
+### Distribution Check
 
-### Current Failure Flow
+No new binary, package, container, or artifact family is introduced here. Distribution pipeline
+changes are not part of this slice.
+
+## Locked Decisions
+
+These decisions are locked for this plan.
+
+1. Add one shared source module:
+   - `crates/xtask/src/capability_publication.rs`
+2. Publication eligibility is lifecycle-driven. Include an agent only when:
+   - `publication.capability_matrix_enabled = true`
+   - lifecycle state exists for `scaffold.onboarding_pack_prefix`
+   - lifecycle stage is one of:
+     - `runtime_integrated`
+     - `publication_ready`
+     - `published`
+     - `closed_baseline`
+3. Capability declaration truth for publication comes from the lifecycle-linked approval artifact,
+   but current registry truth must still match it exactly. Any drift is a validation failure.
+4. Advertised capability projection remains owned by the existing projection contract:
+   - `crates/xtask/src/capability_projection.rs`
+   - `cli_manifests/<agent>/current.json`
+5. `capability-matrix-audit` and `close-proving-run` must call one shared audit function over one
+   shared inventory. No duplicated allowlists.
+6. `capability-matrix` generation must omit pre-runtime agents instead of failing on them.
+7. This slice does not add runtime plugin loading, backend reflection, or dynamic factory
+   discovery. The generic source is metadata-driven, not constructor-driven.
+
+## Architecture Review
+
+### Current Split-Brain Flow
 
 ```text
+agent_registry.toml
+        +
+cli_manifests/<agent>/current.json
+        |
+        +--> capability_projection.rs
+        |       |
+        |       +--> drift modeled truth
+        |
+        +--> capability_matrix.rs
+                |
+                +--> runtime_backend_capabilities(agent_id)
+                        |
+                        +--> hardcoded built-in backend inventory
+                                |
+                                +--> capability-matrix markdown
+                                +--> capability-matrix-audit
+                                +--> prepare-publication continuity
+                                +--> close-proving-run audit clone
+```
+
+What is broken:
+
+- drift truth is already artifact-driven
+- generator, audit, continuity, and closeout are still constructor-driven
+- new agent onboarding has to satisfy both worlds
+
+### Target Architecture
+
+```text
+agent_registry.toml
+        +
 lifecycle-state.json
-  stage = runtime_integrated
-  next = prepare-publication
+        +
+approved-agent.toml
+        +
+cli_manifests/<agent>/current.json
         |
         v
-stale runtime bundle on disk
-  - legacy short-form commands
-  - empty written-paths.json
-  - run-status still says write_validated
+capability_publication.rs
+  - load eligible entries
+  - resolve lifecycle state
+  - validate approval <-> registry continuity
+  - resolve publication target
+  - project advertised capabilities
+  - build shared publication inventory
+  - audit orthogonality over that inventory
         |
-        v
-prepare-publication --check
-  rejects exact command mismatch
+        +--> capability-matrix render/check
+        +--> capability-matrix-audit
+        +--> prepare-publication continuity
+        +--> check-agent-drift capability truth
+        +--> close-proving-run gate
 ```
 
-### Target Flow
+### Shared Source Contract
+
+`capability_publication.rs` becomes the only place allowed to answer:
+
+- is this agent publication-eligible right now?
+- which target is publication truth scoped to?
+- which capability ids are advertised for publication?
+- does registry truth still match the frozen approval descriptor?
+- does the union manifest satisfy the publication target contract?
+
+Recommended core types:
 
 ```text
-runtime_integrated lifecycle state
-        |
-        v
-repair-runtime-evidence --check
-  - load approval + registry + lifecycle
-  - derive runtime-owned writes from committed outputs
-  - synthesize exact command set
-  - validate bundle with publication consumer rules
-        |
-        v
-repair-runtime-evidence --write
-  - write deterministic repair run dir
-  - revalidate the written bundle
-  - leave lifecycle stage unchanged
-        |
-        v
-prepare-publication --check
-  passes
-        |
-        v
-prepare-publication --write
-  advances lifecycle to publication_ready
+PublicationCapabilityRecord
+  - agent_id
+  - display_name
+  - backend_module
+  - manifest_root
+  - onboarding_pack_prefix
+  - lifecycle_stage
+  - approval_artifact_path
+  - approval_artifact_sha256
+  - publication_target
+  - canonical_targets
+  - advertised_capability_ids
+
+PublicationInventory
+  - records[]
+  - header_profiles[]
+
+CapabilityAuditViolation
+  - capability_id
+  - supported_by[]
 ```
 
-### Command Contract
+Recommended public entrypoints:
 
-New command surface:
+1. `collect_publication_inventory(workspace_root) -> Result<PublicationInventory, String>`
+2. `collect_publication_capabilities(workspace_root) -> Result<BTreeMap<String, AgentWrapperCapabilities>, String>`
+3. `validate_agent_publication_continuity(workspace_root, entry) -> Result<(), String>`
+4. `audit_publication_capabilities(inventory) -> Result<(), String>`
 
-```bash
-cargo run -p xtask -- repair-runtime-evidence --approval <path> --check
-cargo run -p xtask -- repair-runtime-evidence --approval <path> --write
-```
+The generator can keep its current render model if the shared module returns
+`BTreeMap<String, AgentWrapperCapabilities>`, but the source of that map must move out of
+`capability_matrix.rs`.
 
-Arguments:
+### Required Validation Pipeline
 
-- `--approval <repo-relative path>` required
-- exactly one of `--check` or `--write`
-- no `--run-id` in v1
+For each `registry.capability_matrix_entries()` candidate:
 
-Run directory:
+1. Read the registry entry.
+2. Resolve the lifecycle-state path from `scaffold.onboarding_pack_prefix`.
+3. If lifecycle state is missing, fail validation for direct continuity checks and skip the entry
+   when building generated publication inventory.
+4. If lifecycle stage is earlier than `runtime_integrated`, exclude the entry from publication
+   inventory without error.
+5. Load the lifecycle-linked `approved-agent.toml`.
+6. Require exact continuity for:
+   - `agent_id`
+   - `display_name`
+   - `backend_module`
+   - `manifest_root`
+   - capability declarations
+   - publication flags
+   - `capability_matrix_target`
+7. Load `cli_manifests/<agent>/current.json`.
+8. Resolve publication target with `resolve_capability_publication_target(entry)`.
+9. Derive advertised capability ids only through `project_advertised_capabilities(...)`.
+10. Emit one shared record used by all publication consumers.
 
-- `docs/agents/.uaa-temp/runtime-follow-on/runs/repair-<agent_id>-runtime-follow-on/`
-- example: `repair-aider-runtime-follow-on`
-- `--write` replaces this deterministic repair directory atomically if it already exists
+### Consumer Migration Rules
 
-`--check` behavior:
+#### `capability_matrix.rs`
 
-1. require lifecycle stage `runtime_integrated`
-2. require approval and registry continuity
-3. derive committed runtime-owned writes from the repo, not from the stale runtime packet
-4. fail if derived writes are empty
-5. synthesize the exact frozen publication command set
-6. validate the would-be bundle with the same semantic rules `prepare-publication` uses
-7. print whether repair is needed and whether repair is possible
+- Keep CLI args, output path handling, stale-check flow, bucketing, and markdown rendering here.
+- Delete the concrete backend imports from `agent_api`.
+- Delete `runtime_backend_capabilities(...)`.
+- Delete `collect_builtin_backend_inventory()` and replace it with a call into the shared module.
+- Replace header text so it explains lifecycle-backed publication targets, not built-in config.
 
-`--write` behavior:
+#### `capability_matrix_audit.rs`
 
-1. run the same validations as `--check`
-2. write these six files into the deterministic repair run directory:
-   - `input-contract.json`
-   - `run-status.json`
-   - `validation-report.json`
-   - `handoff.json`
-   - `written-paths.json`
-   - `run-summary.md`
-3. write exact full publication commands, never short-form aliases
-4. write non-empty `written-paths.json`
-5. immediately re-read the written bundle through the shared validation path
-6. exit non-zero if `prepare-publication --check` would still reject the repaired bundle
-7. do not advance lifecycle stage
+- Keep only the CLI entrypoint and report rendering here.
+- Move the orthogonality allowlist out of this file.
+- Replace direct calls to `collect_builtin_backend_capabilities()` with the shared audit function.
 
-### Shared Helper Extraction
+#### `prepare_publication.rs`
 
-Add one shared helper module:
+- Keep publication packet and lifecycle transition logic untouched.
+- Replace the `capability_matrix::validate_agent_publication_continuity(...)` dependency with
+  `capability_publication::validate_agent_publication_continuity(...)`.
+- Do not duplicate capability projection or continuity rules here.
 
-- new: `crates/xtask/src/runtime_evidence_bundle.rs`
+#### `agent_maintenance/drift/shared.rs` and `publication.rs`
 
-This module owns:
+- Keep support-matrix logic unchanged.
+- Replace local capability truth derivation with the same publication record or shared capability
+  set used by the generator.
+- Drift must compare published markdown against the exact same modeled truth as generation.
 
-- committed-output derivation for runtime-owned writes
-- runtime evidence JSON writer helpers
-- repair run directory naming
-- `run-summary.md` rendering for reconstructed bundles
-- semantic validation glue used by repair and historical backfill
+#### `close_proving_run.rs`
 
-Callers:
+- Delete the local orthogonality allowlist constant.
+- Delete local `supported_backends(...)` audit cloning.
+- Replace `validate_capability_matrix_audit_green()` internals with a call into the shared audit.
+- Keep closeout write flow and docs regeneration untouched.
 
-- `repair_runtime_evidence.rs` uses it directly
-- `historical_lifecycle_backfill.rs` migrates to it
-- `prepare_publication/runtime_evidence.rs` stays the read-side consumer
+### Architecture Invariants
 
-This avoids a second reconstruction system.
+These are non-negotiable:
 
-### Aider Repair Strategy
+1. No agent-name `match` is allowed anywhere in publication truth derivation.
+2. No consumer may restate capability projection, lifecycle eligibility, or approval continuity
+   independently.
+3. Pre-runtime agents must be invisible to generated capability publication.
+4. A publication-eligible agent must be able to enter the matrix with no code changes outside
+   registry, lifecycle, approval, manifest, and tests.
+5. Generated docs may explain publication target shape, but they may not claim built-in backend
+   construction is the source of truth.
 
-Repair `aider` by writing a new deterministic repair bundle, not by hand-editing the stale rerun directory.
+### Inline Diagram Targets
 
-Runtime-owned outputs to derive from committed repo state:
+If implementation adds or restructures these files, keep local ASCII diagrams accurate:
 
-- `crates/aider/src/lib.rs`
-- `crates/aider/src/wrapper_coverage_manifest.rs`
-- `crates/agent_api/src/backends/aider/backend.rs`
-- `crates/agent_api/src/backends/aider/harness.rs`
-- `crates/agent_api/src/backends/aider/mapping.rs`
-- `crates/agent_api/src/backends/aider/mod.rs`
-- `crates/agent_api/tests/c1_aider_runtime_follow_on.rs`
-- first file under `cli_manifests/aider/supplement/`
-- first file under `cli_manifests/aider/snapshots/`
+- `crates/xtask/src/capability_publication.rs`
+- `crates/xtask/src/capability_matrix.rs`
+- `crates/xtask/src/close_proving_run.rs`
 
-The repair command must derive these paths from approval and committed repo state, not from handwritten agent-specific code.
-
-### Validation Hardening
-
-Harden the seam in three places:
-
-1. `runtime_follow_on/lifecycle.rs`
-   - remove `LEGACY_REQUIRED_PUBLICATION_COMMANDS`
-   - require exact equality with `agent_lifecycle::REQUIRED_PUBLICATION_COMMANDS`
-2. `prepare_publication/runtime_evidence.rs`
-   - keep strict exact-match validation
-   - improve error text to point operators at `repair-runtime-evidence` when stale bundle shape is detected
-3. drift reporting
-   - add a specific runtime-evidence drift finding for `runtime_integrated` agents whose committed bundle cannot pass publication consumption
-
-## Code Quality Plan
+## Code Quality Review
 
 ### Module Ownership
 
 | Area | Files | Responsibility |
 | --- | --- | --- |
-| command wiring | `crates/xtask/src/main.rs`, `crates/xtask/src/lib.rs` | expose the new subcommand cleanly |
-| repair command | `crates/xtask/src/repair_runtime_evidence.rs` | CLI args, check/write flow, stdout |
-| shared helper | `crates/xtask/src/runtime_evidence_bundle.rs` | bundle reconstruction, deterministic path derivation, bundle writing |
-| forward runtime validation | `crates/xtask/src/runtime_follow_on/lifecycle.rs` | exact command set only |
-| publication consumer | `crates/xtask/src/prepare_publication/runtime_evidence.rs` | consume repaired bundles without special cases |
-| drift surfacing | `crates/xtask/src/agent_maintenance/drift/mod.rs`, `crates/xtask/src/agent_maintenance/drift/runtime_evidence.rs` | explicit stale-runtime-evidence finding |
-| historical repair reuse | `crates/xtask/src/historical_lifecycle_backfill.rs` | call shared helper, stop owning private reconstruction logic |
-| docs | `docs/cli-agent-onboarding-factory-operator-guide.md` | operator flow for repair |
+| shared publication source | `crates/xtask/src/capability_publication.rs` | eligibility, continuity, inventory construction, audit entrypoint |
+| capability-matrix render entrypoint | `crates/xtask/src/capability_matrix.rs` | CLI args, render, check/write path handling |
+| semantic audit entrypoint | `crates/xtask/src/capability_matrix_audit.rs` | CLI surface only, no truth derivation |
+| publication continuity | `crates/xtask/src/prepare_publication.rs` | validate one agent's readiness through the shared source |
+| drift capability truth | `crates/xtask/src/agent_maintenance/drift/shared.rs`, `publication.rs` | compare published matrix against shared modeled truth |
+| closeout gate | `crates/xtask/src/close_proving_run.rs` | reuse shared audit result, stop cloning audit semantics |
+| docs/specs | `docs/specs/**`, `docs/cli-agent-onboarding-factory-operator-guide.md` | explain lifecycle-backed publication truth clearly |
 
 ### Code Quality Rules
 
-1. No agent-specific branching for `aider`.
-2. No second hardcoded command set. All writers and validators must use `agent_lifecycle::REQUIRED_PUBLICATION_COMMANDS`.
-3. No lifecycle stage mutation inside repair.
-4. No workspace-wide diff or snapshot scan in repair. Use explicit path derivation from approval plus manifest child directories.
-5. Keep the repair helper boring and explicit. This is state repair code. Cleverness is a bug source here.
+1. Rendering stays dumb. Truth lives in `capability_publication.rs`, not in render or CLI files.
+2. `capability-matrix-audit` and `close-proving-run` must share one allowlist constant and one
+   audit implementation.
+3. `prepare-publication` must not depend on the generator module for publication truth.
+4. Drift must not model capabilities independently once the shared source exists.
+5. No runtime backend constructors may remain in publication logic after this slice.
+6. Keep the diff small: one new module, surgical rewires, no new abstraction stack beyond the
+   shared source.
 
 ## Detailed File Plan
 
-### New Files
+### New File
 
-- `crates/xtask/src/repair_runtime_evidence.rs`
-- `crates/xtask/src/runtime_evidence_bundle.rs`
-- `crates/xtask/tests/repair_runtime_evidence_entrypoint.rs`
-- `docs/agents/.uaa-temp/runtime-follow-on/runs/repair-aider-runtime-follow-on/input-contract.json`
-- `docs/agents/.uaa-temp/runtime-follow-on/runs/repair-aider-runtime-follow-on/run-status.json`
-- `docs/agents/.uaa-temp/runtime-follow-on/runs/repair-aider-runtime-follow-on/validation-report.json`
-- `docs/agents/.uaa-temp/runtime-follow-on/runs/repair-aider-runtime-follow-on/handoff.json`
-- `docs/agents/.uaa-temp/runtime-follow-on/runs/repair-aider-runtime-follow-on/written-paths.json`
-- `docs/agents/.uaa-temp/runtime-follow-on/runs/repair-aider-runtime-follow-on/run-summary.md`
+- `crates/xtask/src/capability_publication.rs`
 
 ### Updated Files
 
-- `crates/xtask/src/main.rs`
 - `crates/xtask/src/lib.rs`
-- `crates/xtask/src/historical_lifecycle_backfill.rs`
-- `crates/xtask/src/runtime_follow_on/lifecycle.rs`
-- `crates/xtask/src/prepare_publication/runtime_evidence.rs`
-- `crates/xtask/src/agent_maintenance/drift/mod.rs`
-- `crates/xtask/src/agent_maintenance/drift/runtime_evidence.rs`
-- `crates/xtask/tests/runtime_follow_on_entrypoint.rs`
-- `crates/xtask/tests/prepare_publication_entrypoint.rs`
+- `crates/xtask/src/capability_matrix.rs`
+- `crates/xtask/src/capability_matrix_audit.rs`
+- `crates/xtask/src/prepare_publication.rs`
+- `crates/xtask/src/close_proving_run.rs`
+- `crates/xtask/src/agent_maintenance/drift/shared.rs`
+- `crates/xtask/src/agent_maintenance/drift/publication.rs`
+- `crates/xtask/tests/c8_capability_matrix_unit.rs`
+- `crates/xtask/tests/c8_spec_capability_matrix_paths.rs`
 - `crates/xtask/tests/agent_maintenance_drift.rs`
+- `crates/xtask/tests/prepare_publication_entrypoint.rs`
+- `crates/xtask/tests/onboard_agent_closeout_preview/close_proving_run_write.rs`
+- `crates/xtask/tests/support/agent_maintenance_drift_harness.rs`
+- `docs/specs/unified-agent-api/capabilities-schema-spec.md`
+- `docs/specs/unified-agent-api/README.md`
+- `docs/specs/cli-agent-onboarding-charter.md`
 - `docs/cli-agent-onboarding-factory-operator-guide.md`
+- `docs/specs/unified-agent-api/capability-matrix.md`
+
+## Implementation Steps
+
+### Step 1 - Add the shared publication source
+
+1. Create `crates/xtask/src/capability_publication.rs`.
+2. Move these responsibilities into it:
+   - lifecycle eligibility lookup
+   - lifecycle-linked approval loading
+   - approval-to-registry continuity validation
+   - publication target resolution
+   - manifest projection
+   - shared inventory collection
+   - orthogonality audit over that inventory
+3. Export the module from `crates/xtask/src/lib.rs`.
+
+Definition of done:
+
+- the new module can build publication records without importing any concrete backend type
+- the module exposes a reusable audit path
+- the module has unit tests for eligibility and continuity edge cases
+
+### Step 2 - Migrate capability-matrix generation
+
+1. Remove concrete `agent_api` backend imports from `capability_matrix.rs`.
+2. Remove `runtime_backend_capabilities(...)`.
+3. Replace `collect_builtin_backend_inventory()` with a call into the shared module.
+4. Keep `render_matrix(...)`, bucket logic, and file output flow in place.
+5. Update the generated header text so it describes lifecycle-backed publication targets instead of
+   "default built-in backend config".
+
+Definition of done:
+
+- `cargo run -p xtask -- capability-matrix --check` passes using only shared publication truth
+- no publication inventory path in `capability_matrix.rs` instantiates a backend
+
+### Step 3 - Centralize the semantic audit
+
+1. Move the orthogonality allowlist into the shared module.
+2. Expose one shared `audit_publication_capabilities(...)` entrypoint.
+3. Make `capability_matrix_audit.rs` call it.
+4. Make `close_proving_run.rs` call it instead of its local duplicate.
+
+Definition of done:
+
+- `capability-matrix-audit` and `close-proving-run` fail on the same violation set
+- there is exactly one allowlist definition in the codebase for this audit
+
+### Step 4 - Align prepare-publication and drift
+
+1. Replace `prepare_publication` capability continuity wiring with the shared module.
+2. Replace drift capability truth derivation with the shared module.
+3. Keep support-matrix and runtime-evidence logic untouched.
+
+Definition of done:
+
+- drift, continuity validation, and generation all talk about the same published capability set
+- no publication consumer in scope computes capability truth independently
+
+### Step 5 - Update tests to prove generic behavior
+
+1. Add a synthetic publication-eligible agent fixture by extending seeded registry, lifecycle,
+   approval, and manifest inputs inside test harnesses.
+2. Assert the synthetic agent appears in capability publication without editing any hardcoded
+   backend inventory list.
+3. Assert the same synthetic agent is excluded before `runtime_integrated`.
+4. Assert closeout and drift consume the same truth.
+
+Definition of done:
+
+- each regression in the test review section is covered
+- the synthetic fixture proves generic publication behavior instead of another built-in case
+
+### Step 6 - Update specs and operator docs
+
+1. Rewrite capability-matrix semantics in `capabilities-schema-spec.md`.
+2. Update `docs/specs/unified-agent-api/README.md`.
+3. Update `docs/specs/cli-agent-onboarding-charter.md` wherever it still frames capability
+   publication as built-in-only.
+4. Update `docs/cli-agent-onboarding-factory-operator-guide.md` so the create lane says
+   publication eligibility is lifecycle-backed.
+5. Regenerate `docs/specs/unified-agent-api/capability-matrix.md`.
+
+Definition of done:
+
+- docs and generated markdown describe the same truth model the code enforces
+- no spec in scope claims backend constructor inventory is canonical
 
 ## Test Review
 
 ### Test Framework
 
-This repo is Rust-first. The relevant test framework is the existing `cargo test -p xtask --test ...` integration harness under `crates/xtask/tests/`.
+This repo is Rust-first. The relevant coverage lives in `cargo test -p xtask --test ...`
+integration tests plus the capability unit/spec tests under `crates/xtask/tests/`.
 
 ### Code Path Coverage Diagram
 
 ```text
-RUNTIME EVIDENCE REPAIR
-=======================
-[+] xtask CLI surface
-    ├── [GAP] repair-runtime-evidence help and arg validation
-    └── [GAP] mutually exclusive --check / --write behavior
+GENERIC CAPABILITY PUBLICATION
+==============================
+[+] capability_publication.rs
+    ├── [GAP] lifecycle gate excludes enrolled / approved agents
+    ├── [GAP] runtime_integrated agent is included without hardcoded match arm
+    ├── [GAP] approval <-> registry capability drift fails fast
+    ├── [GAP] manifest missing required publication target fails fast
+    ├── [GAP] publication target resolves through capability_projection.rs only
+    └── [GAP] shared audit reports orthogonality violations over shared inventory
 
-[+] repair-runtime-evidence --check
-    ├── [GAP] rejects lifecycle stage != runtime_integrated
-    ├── [GAP] rejects approval / registry / lifecycle continuity drift
-    ├── [GAP] rejects empty derived written paths
-    ├── [GAP] reports repair-needed when legacy short-form commands are present
-    └── [GAP] reports repair-not-needed when bundle is already truthful
+[+] capability-matrix
+    ├── [TESTED] render path / output path handling
+    ├── [GAP] inventory comes from shared source, not runtime_backend_capabilities()
+    └── [GAP] header text reflects lifecycle-backed publication semantics
 
-[+] repair-runtime-evidence --write
-    ├── [GAP] writes all six runtime evidence files
-    ├── [GAP] writes exact frozen command set
-    ├── [GAP] writes non-empty written-paths.json
-    ├── [GAP] remains lifecycle-stage neutral
-    └── [GAP] repaired bundle is consumable by prepare-publication
+[+] capability-matrix-audit
+    ├── [TESTED] orthogonality semantics
+    └── [GAP] uses shared audit implementation and shared inventory
 
-[+] runtime-follow-on forward validation
-    ├── [TESTED] rejects noop runtime execution
-    └── [GAP] rejects legacy short-form handoff commands exactly
+[+] prepare-publication
+    ├── [TESTED] approval / lifecycle continuity checks
+    └── [GAP] capability publication continuity comes from shared source module
 
-[+] prepare-publication consumption
-    ├── [TESTED] rejects missing runtime evidence
-    ├── [TESTED] rejects capability continuity drift
-    └── [GAP] accepts repaired aider-style bundle end to end
+[+] check-agent-drift
+    ├── [TESTED] published capability mismatch detection
+    └── [GAP] compares published markdown against the same shared modeled truth as generation
 
-[+] drift detection
-    ├── [GAP] runtime_integrated stale evidence becomes explicit drift finding
-    └── [GAP] clean repaired bundle no longer reports that finding
+[+] close-proving-run
+    ├── [TESTED] publication gate path exists
+    └── [GAP] reuses shared audit instead of local clone
 ```
 
-### Planned Tests
+### Required Tests
 
 | Flow | Existing coverage | Required new coverage | Planned test file |
 | --- | --- | --- | --- |
-| CLI help and mode validation for repair command | none | yes | `crates/xtask/tests/repair_runtime_evidence_entrypoint.rs` |
-| `--check` rejects non-`runtime_integrated` lifecycle | nearby coverage exists in runtime/publication entrypoint tests | yes | `repair_runtime_evidence_entrypoint.rs` |
-| `--check` rejects empty derivation of committed runtime-owned writes | none | yes | `repair_runtime_evidence_entrypoint.rs` |
-| `--check` detects legacy short-form command set as repair-needed | none | yes | `repair_runtime_evidence_entrypoint.rs` |
-| `--write` emits full six-file bundle | none | yes | `repair_runtime_evidence_entrypoint.rs` |
-| `--write` emits non-empty truthful written paths | none | yes | `repair_runtime_evidence_entrypoint.rs` |
-| repaired bundle passes `prepare-publication --check` | no chained repair coverage | yes | `prepare_publication_entrypoint.rs` or `repair_runtime_evidence_entrypoint.rs` |
-| runtime handoff validation rejects legacy short-form commands | current code still tolerates them in one path | yes | `runtime_follow_on_entrypoint.rs` |
-| drift reports stale runtime evidence explicitly | no specific runtime-evidence drift coverage | yes | `agent_maintenance_drift.rs` |
-| repaired `aider` artifacts stay consumable | live repo only | yes | one repository-level smoke command in verification section |
+| synthetic runtime-integrated agent publishes without a new `xtask` match arm | none | yes | `crates/xtask/tests/c8_capability_matrix_unit.rs` |
+| pre-runtime enrolled agent is excluded from generated inventory | none | yes | `c8_capability_matrix_unit.rs` |
+| approval capability declaration drift fails shared source construction | none | yes | `c8_capability_matrix_unit.rs` |
+| lifecycle-linked approval path mismatch fails continuity validation | none | yes | `c8_capability_matrix_unit.rs` |
+| `capability-matrix-audit` uses shared audit and shared inventory | partial | yes | `c8_capability_matrix_unit.rs` or `c8_spec_capability_matrix_paths.rs` |
+| `prepare-publication` continuity uses shared source | partial | yes | `prepare_publication_entrypoint.rs` |
+| drift truth matches generator truth | partial | yes | `agent_maintenance_drift.rs` |
+| `close-proving-run` audit gate reuses shared logic | partial | yes | `onboard_agent_closeout_preview/close_proving_run_write.rs` |
+
+### Regression Rules
+
+These regressions are mandatory to cover:
+
+- adding a new publication-eligible agent must not require editing a hardcoded backend list
+- changing capability publication semantics in one consumer must not silently diverge from the
+  other consumers
+- pre-runtime agents must not start appearing in the generated matrix
+- approval, registry, and manifest drift must fail at the shared continuity boundary before any
+  consumer can publish contradictory truth
 
 ### Required Test Commands
 
 ```bash
-cargo test -p xtask --test repair_runtime_evidence_entrypoint
-cargo test -p xtask --test runtime_follow_on_entrypoint
+cargo test -p xtask --test c8_capability_matrix_unit
+cargo test -p xtask --test c8_spec_capability_matrix_paths
 cargo test -p xtask --test prepare_publication_entrypoint
 cargo test -p xtask --test agent_maintenance_drift
+cargo test -p xtask --test onboard_agent_closeout_preview
 make check
 ```
 
 ### Verification Commands
 
 ```bash
-cargo run -p xtask -- repair-runtime-evidence --approval docs/agents/lifecycle/aider-onboarding/governance/approved-agent.toml --check
-cargo run -p xtask -- repair-runtime-evidence --approval docs/agents/lifecycle/aider-onboarding/governance/approved-agent.toml --write
-cargo run -p xtask -- prepare-publication --approval docs/agents/lifecycle/aider-onboarding/governance/approved-agent.toml --check
-cargo run -p xtask -- check-agent-drift --agent aider
+cargo run -p xtask -- capability-matrix --check
+cargo run -p xtask -- capability-matrix-audit
+cargo run -p xtask -- check-agent-drift --agent codex
+cargo run -p xtask -- prepare-publication --approval docs/agents/lifecycle/codex-cli-onboarding/governance/approved-agent.toml --check
 ```
 
 ## Failure Modes Registry
 
 | Failure mode | Detection | Handling | Test required | Critical gap today |
 | --- | --- | --- | --- | --- |
-| approval path or sha drift | repair and publication continuity validation | fail fast, no write | yes | no |
-| lifecycle stage is not `runtime_integrated` | repair `--check` and `--write` | fail fast, no write | yes | no |
-| committed runtime-owned outputs cannot produce a non-empty write set | repair derivation step | fail fast, no write | yes | yes |
-| bundle still uses short-form commands | exact command validation | rewrite exact full commands, otherwise fail | yes | yes |
-| bundle writes but still cannot pass publication consumption | post-write validation | fail command, keep lifecycle unchanged | yes | yes |
-| drift remains invisible until publication | drift inspection | explicit runtime evidence finding | yes | yes |
-| forward runtime path regresses and accepts legacy commands again | runtime handoff validation test | exact-match assertion in runtime tests | yes | yes |
+| newly enrolled runtime-integrated agent is omitted until `xtask` code is hand-edited | synthetic publication fixture | fail current branch, then fix shared source | yes | yes |
+| pre-runtime agent appears in matrix too early | lifecycle-gating test | exclude from publication inventory | yes | yes |
+| registry and frozen approval capability declarations drift | shared source continuity validation | fail fast, no publication truth | yes | yes |
+| lifecycle state exists, but approval path does not match that pack prefix | shared continuity validation | fail fast, no publication truth | yes | yes |
+| `current.json` misses the required publication target | shared continuity validation | fail fast, no publication truth | yes | no |
+| drift compares against a different truth source than generator | drift parity test | route drift through shared source | yes | yes |
+| closeout passes while CLI audit would fail | shared audit reuse test | remove duplicate audit code | yes | yes |
+| spec wording still claims built-in-inventory semantics after code changes | doc diff + review | update spec in the same change | yes | yes |
 
 Critical gap definition for this slice:
 
-- any path that allows a `runtime_integrated` bundle to remain committed while `prepare-publication --check` would reject it is a critical gap
+- any state where one publication consumer says an agent/capability set is valid and another says
+  it is invalid, without a real artifact change
 
 ## Performance Review
 
-This feature is small and repo-local. The real performance risk is accidental over-scanning.
+Performance is not the product risk here. Consistency is.
 
-Rules:
+Still, the shared source must stay bounded:
 
-1. Repair derivation must stay bounded to known runtime-owned candidate paths plus `manifest_root/supplement` and `manifest_root/snapshots`.
-2. Do not snapshot or hash the full workspace to reconstruct repair output.
-3. Reuse existing JSON serializers and file writers. No extra process spawning inside repair except the human-run verification commands.
-4. `prepare-publication` remains the only place that reasons about publication consumption. Repair should call the shared validator path, not shell out to a second `cargo run`.
+1. one registry scan over `capability_matrix_entries()` per command
+2. one lifecycle load, one approval load, and one `current.json` load per eligible candidate
+3. no runtime backend constructor instantiation
+4. no shelling out between publication consumers
 
-Expected runtime cost is trivial compared to existing `xtask` integration tests.
-
-## Implementation Steps
-
-### Step 1 - Add shared runtime evidence helper
-
-1. Create `crates/xtask/src/runtime_evidence_bundle.rs`.
-2. Move committed-output derivation out of `historical_lifecycle_backfill.rs`.
-3. Add shared writers for:
-   - `input-contract.json`
-   - `run-status.json`
-   - `validation-report.json`
-   - `handoff.json`
-   - `written-paths.json`
-   - `run-summary.md`
-4. Keep the helper generic over approval, lifecycle state, run id, and host surface string.
-
-### Step 2 - Add `repair-runtime-evidence`
-
-1. Export the module from `crates/xtask/src/lib.rs`.
-2. Wire the new subcommand in `crates/xtask/src/main.rs`.
-3. Implement `Args`, `run`, and `run_in_workspace` in `crates/xtask/src/repair_runtime_evidence.rs`.
-4. Add `--check` and `--write` flows exactly as specified above.
-
-### Step 3 - Tighten forward validation
-
-1. Remove `LEGACY_REQUIRED_PUBLICATION_COMMANDS` from `runtime_follow_on.rs` and `runtime_follow_on/lifecycle.rs`.
-2. Make `validate_handoff` require exact command equality.
-3. Improve repair guidance in publication-consumer errors when the bundle is stale.
-
-### Step 4 - Add drift surfacing
-
-1. Extend drift inspection for `runtime_integrated` agents.
-2. If runtime evidence discovery or validation fails, emit an explicit runtime evidence finding that includes the repair command the operator should run.
-3. Keep existing governance drift logic intact for other lifecycle states.
-
-### Step 5 - Repair `aider`
-
-1. Run the new repair command for `aider`.
-2. Commit the deterministic repair bundle under `repair-aider-runtime-follow-on`.
-3. Verify `prepare-publication --check` passes.
-4. Leave the stale `aider-runtime-follow-on-rerun` directory untouched in this slice.
-
-### Step 6 - Update docs
-
-Update `docs/cli-agent-onboarding-factory-operator-guide.md` with:
-
-- when to run `repair-runtime-evidence`
-- expected failure message shape
-- the `aider`-style stale-bundle scenario
-- the sequence:
-  - `repair-runtime-evidence --check`
-  - `repair-runtime-evidence --write`
-  - `prepare-publication --check`
-  - `prepare-publication --write`
-
-## Acceptance Criteria
-
-1. `repair-runtime-evidence --check` fails clearly when repair is impossible.
-2. `repair-runtime-evidence --write` emits a complete six-file bundle with non-empty written paths.
-3. `repair-runtime-evidence --write` never advances lifecycle stage.
-4. `prepare-publication --check` passes for `aider` after repair.
-5. `runtime_follow_on/lifecycle.rs` no longer accepts legacy short-form command sets.
-6. `check-agent-drift --agent aider` emits an explicit runtime-evidence finding before repair, and that specific finding disappears after repair even if non-runtime governance notes still remain until `prepare-publication --write`.
-7. `historical_lifecycle_backfill.rs` uses the shared runtime evidence helper instead of owning private bundle reconstruction logic.
+Expected runtime cost is trivial relative to current `xtask` integration tests.
 
 ## Worktree Parallelization Strategy
 
-This work has some parallelization opportunity, but only after the shared helper contract lands.
+This plan has useful parallelization only after the shared source API is frozen. Before that,
+everything is stacked on the same seam.
 
 ### Dependency Table
 
 | Step | Modules touched | Depends on |
 | --- | --- | --- |
-| shared helper extraction | `crates/xtask/src/`, `crates/xtask/src/historical_lifecycle_backfill.rs` | — |
-| repair command wiring | `crates/xtask/src/`, `crates/xtask/src/main.rs`, `crates/xtask/src/lib.rs` | shared helper extraction |
-| forward validation hardening | `crates/xtask/src/runtime_follow_on/`, `crates/xtask/src/prepare_publication/` | shared helper extraction |
-| drift surfacing | `crates/xtask/src/agent_maintenance/drift/` | shared helper extraction |
-| tests | `crates/xtask/tests/` | repair command wiring, forward validation hardening, drift surfacing |
-| aider artifact repair | `docs/agents/.uaa-temp/runtime-follow-on/runs/` | repair command wiring |
-| docs update | `docs/` | repair command semantics stable |
+| shared publication source | `crates/xtask/src/` | — |
+| generator migration | `crates/xtask/src/` | shared publication source |
+| audit + closeout reuse | `crates/xtask/src/`, `crates/xtask/tests/onboard_agent_closeout_preview/` | shared publication source |
+| drift + prepare-publication alignment | `crates/xtask/src/agent_maintenance/drift/`, `crates/xtask/src/prepare_publication.rs` | shared publication source |
+| docs/spec updates | `docs/specs/`, `docs/` | shared publication source semantics stable |
+| tests and final verification | `crates/xtask/tests/` | generator migration, audit + closeout reuse, drift + prepare-publication alignment |
 
 ### Parallel Lanes
 
-- Lane A: shared helper extraction -> repair command wiring
+- Lane A: shared source module -> generator migration
   - sequential, shared `crates/xtask/src/`
-- Lane B: forward validation hardening
-  - can start after Lane A defines helper interfaces
-- Lane C: drift surfacing
-  - can start after Lane A defines helper interfaces
-- Lane D: tests
-  - starts after B and C, because tests need final behavior
-- Lane E: aider artifact repair + operator docs
-  - starts after A, but should finish after D so the committed artifacts reflect final behavior
+- Lane B: audit + closeout reuse
+  - starts after Lane A freezes the shared API
+- Lane C: drift + prepare-publication alignment
+  - starts after Lane A freezes the shared API
+- Lane D: docs/spec updates
+  - can start after Lane A, but should finish after behavior is locked
+- Lane E: tests and verification
+  - starts after B and C merge because it exercises final semantics
 
 ### Execution Order
 
 1. Launch Lane A first.
-2. Once A lands, launch B and C in parallel.
-3. Merge B and C.
-4. Run D.
-5. Run E last, then full verification.
+2. Once the shared source API is stable, launch Lanes B, C, and D in parallel.
+3. Merge B and C before starting Lane E.
+4. Run Lane E and the verification commands.
+5. Regenerate and re-check docs last.
 
 ### Conflict Flags
 
-- Lanes A and B both touch `crates/xtask/src/`. They cannot safely run in parallel.
-- Lanes B and C are mostly isolated.
-- Lane D touches shared test harnesses and should stay sequential after behavior stabilizes.
-- Lane E touches committed runtime artifacts and docs only, but it depends on the final semantics from A-D.
+- Lanes A and B both touch `crates/xtask/src/`. Do not run them in parallel.
+- Lanes A and C both touch shared source imports and signatures. Do not run them in parallel.
+- Lanes B and C are the best true parallel split.
+- Lane D will churn if semantics are still moving. Start it only after Lane A decisions are frozen.
 
 ## NOT In Scope
 
-- delete or rewrite `docs/agents/.uaa-temp/runtime-follow-on/runs/aider-runtime-follow-on-rerun/`
-- change `prepare-publication` to accept legacy command aliases
-- add a lifecycle field for “repaired by”
-- make repair handle `closed_baseline` or `publication_ready` repair paths
-- generalize repair into a multi-agent batch maintenance command
-- update `TODOS.md` for stale-run cleanup
+- new publication write commands
+- support-matrix refactors
+- published-stage lifecycle redesign
+- backend plugin discovery
+- dynamic runtime reflection
+- changing the orthogonality rule itself
+- changing capability declarations for existing agents
 
-## What Already Exists
+## Acceptance Criteria
 
-The new plan reuses these existing truths instead of rebuilding them:
+1. `cargo run -p xtask -- capability-matrix --check` succeeds without any hardcoded
+   `runtime_backend_capabilities()` agent inventory.
+2. `cargo run -p xtask -- capability-matrix-audit` and `close-proving-run` use the same audit
+   implementation.
+3. A synthetic publication-eligible agent fixture can enter capability publication without adding a
+   new `xtask` backend `match` arm.
+4. A synthetic pre-runtime agent fixture is excluded from publication output.
+5. `check-agent-drift` compares published capability truth against the same shared modeled truth as
+   the generator.
+6. The capability-matrix spec and generated header no longer describe the publication surface as a
+   built-in backend inventory.
+7. No consumer in scope restates publication-capability derivation independently.
 
-| Need | Existing implementation | Plan action |
-| --- | --- | --- |
-| exact publication command contract | `agent_lifecycle::REQUIRED_PUBLICATION_COMMANDS` | use everywhere |
-| runtime bundle read-side validation | `prepare_publication/runtime_evidence.rs` | keep strict |
-| forward rejection of empty runtime writes | `runtime_follow_on.rs` | keep and test |
-| historical derivation of runtime-owned outputs | `historical_lifecycle_backfill.rs` | extract to shared helper |
-| drift report rendering | `agent_maintenance/drift/mod.rs` | extend with explicit runtime evidence finding |
-| integration test harnesses | existing `crates/xtask/tests/*_entrypoint.rs` | extend, do not replace |
+## What Success Looks Like
 
-## Completion Checklist
+When this lands, adding the next agent to capability publication should look like this:
 
-- [ ] `repair-runtime-evidence` command exists and is wired into `xtask`
-- [ ] shared runtime evidence helper extracted and reused by historical backfill
-- [ ] runtime handoff validation requires exact full publication commands
-- [ ] drift inspection surfaces stale runtime evidence explicitly
-- [ ] repaired `aider` runtime bundle committed under `repair-aider-runtime-follow-on`
-- [ ] `prepare-publication --check` passes for `aider`
-- [ ] targeted xtask integration tests added and passing
-- [ ] operator guide updated
+1. registry entry is enrolled with `capability_matrix_enabled = true`
+2. lifecycle reaches `runtime_integrated`
+3. approval artifact and `current.json` are present and internally consistent
+4. shared publication source picks the agent up automatically
+5. generator, audit, drift, prepare-publication, and closeout all agree on the result
 
-## Final Recommendation
+No hidden Rust edit. No second truth system. No surprise audit failure from a different model.
 
-Build the explicit repair seam. Do not patch `aider` by hand, and do not relax publication validation.
+## TODO Relation
 
-The repo already has the right model. What it lacks is the boring repair tool that turns old malformed runtime evidence back into truthful committed state and tells operators exactly what to do before they hit the next seam.
+`TODOS.md` does not need a new item for this slice.
+
+This plan is the implementation plan for:
+
+- `Land The Generic Capability Publication Foundation`
+
+The remaining pending TODOs stay deferred as written.
+
+## Completion Summary
+
+- Step 0: Scope Challenge — scope accepted as-is; this is the minimum complete slice
+- Architecture Review: one shared source module, five publication consumers rewired
+- Code Quality Review: duplicate truth derivation removed from generator, audit, closeout, and drift
+- Test Review: coverage diagram produced, 12 concrete gaps enumerated
+- Performance Review: bounded metadata reads, zero runtime backend construction
+- NOT in scope: written
+- What already exists: written
+- Failure modes: 8 failure modes listed, 7 critical gaps flagged on the current branch
+- Parallelization: 5 lanes total, 3 launchable after Lane A, 2 strictly sequential gates
+- Lake Score: complete option chosen for every major decision in this slice

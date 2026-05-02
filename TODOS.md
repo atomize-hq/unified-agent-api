@@ -2,6 +2,54 @@
 
 ## Pending
 
+### Land The Generic Capability Publication Foundation
+
+**What:** Replace the hardcoded built-in backend inventory in capability publication with one registry- and lifecycle-driven model that all publication consumers share: `capability-matrix`, `capability-matrix-audit`, `check-agent-drift`, and `close-proving-run`.
+
+**Why:** A newly enrolled agent still cannot flow generically through capability publication today. The current generator knows only the backends compiled into `crates/xtask/src/capability_matrix.rs`, so adding an agent to `agent_registry.toml` is not enough. Hidden Rust edits are still required before publication can become truthful.
+
+**Context:** The remaining create-lane hole is larger than one hardcoded `match`. The built-in-backend assumption also appears in the capability-matrix spec, audit logic, and closeout gating. This milestone should define one authoritative publication-capability source, decide how runtime capability truth is derived for newly enrolled agents, and remove the need to manually “teach” the generator about each backend in separate code paths.
+
+**Effort:** M
+**Priority:** P1
+**Depends on:** The current lifecycle record, approval artifact capability declarations, and manifest-root capability projection contract staying authoritative inputs during the transition
+
+### Enclose The Publication Lane End To End
+
+**What:** Add one repo-owned publication command that consumes `publication-ready.json`, writes the required publication-owned support/capability outputs, runs the green publication checks, and fails transactionally if any required surface cannot be made green.
+
+**Why:** `prepare-publication` currently records the handoff into `publication_ready`, but it does not actually write the published support/capability surfaces. That leaves the operator packet with a check-only next step while the real write commands still live outside the committed handoff contract.
+
+**Context:** Today the repo can verify green publication surfaces, but the act of materializing them is still a loose seam split across the operator guide and separate commands. This milestone should make publication refresh a first-class lifecycle consumer, define the exact write set for publication-owned surfaces, and ensure the create lane cannot drift into “handoff prepared but publication still implicit.”
+
+**Effort:** M
+**Priority:** P1
+**Depends on:** The capability publication foundation above so publication refresh can reason about any enrolled agent without hidden backend-specific code edits
+
+### Make The Published State Honest In The Lifecycle Model
+
+**What:** Resolve the mismatch between the lifecycle schema and the live lane by either making `published` a real committed transition or removing/replacing it so the state machine matches the actual path from runtime integration to closeout.
+
+**Why:** The repo currently talks about green published state, but the live create lane does not appear to write `LifecycleStage::Published`. It transitions from `runtime_integrated` to `publication_ready` and then to `closed_baseline`, which means “published” is more of a validated condition than a committed lifecycle state.
+
+**Context:** This is a control-plane truth problem, not just naming polish. As long as the schema advertises a state with no real writer, operators and future automation have to reason about historical compatibility instead of one honest machine. This milestone should define the canonical post-publication stage semantics, update the operator guide and charter, and align closeout/maintenance logic to the chosen model.
+
+**Effort:** S
+**Priority:** P1
+**Depends on:** The publication lane being enclosed enough to define exactly when publication is complete and what lifecycle evidence that completion owns
+
+### Enclose Create-Mode Closeout Without Ad Hoc Authoring
+
+**What:** Add a repo-owned closeout preparation flow that materializes or scaffolds `proving-run-closeout.json` from machine-known lifecycle facts plus the minimal remaining human inputs, so the create lane can advance from green publication to `closed_baseline` without freehand artifact authoring.
+
+**Why:** `close-proving-run` is already a strong validator and packet refresher, but it still depends on a separately authored closeout JSON artifact. That means the lifecycle machine is still not fully enclosed even after publication is green.
+
+**Context:** The goal is not to remove the human signal from closeout metrics like residual friction or manual edits. The goal is to stop requiring humans to hand-build the whole artifact shape. This milestone should define which fields are machine-owned, which are human-owned, how the closeout draft is created transactionally from lifecycle/publication truth, and how the final closeout handoff becomes boring enough to run every time.
+
+**Effort:** S
+**Priority:** P1
+**Depends on:** A truthful enclosed publication lane and an explicit decision on the canonical post-publication lifecycle state
+
 ### Land The LLM-Guided Research Layer For The Recommendation Lane
 
 **What:** Replace the thin repo-local `recommend-next-agent` skill with a real AI research workflow that gathers explicit proof for candidate charter fit, then feed that structured research into the existing deterministic runner for validation, rendering, promotion, and approval-artifact drafting.
