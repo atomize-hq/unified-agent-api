@@ -9,18 +9,9 @@ use agent_api::AgentWrapperCapabilities;
 use clap::Parser;
 
 #[cfg(test)]
-use crate::agent_registry::AgentRegistry;
-#[cfg(test)]
-use crate::capability_projection::{
-    resolve_capability_publication_target, CapabilityPublicationTarget,
-};
-#[cfg(test)]
 use serde::Deserialize;
 
-#[cfg(not(test))]
 use crate::capability_publication as capability_publication_mod;
-#[cfg(test)]
-use xtask::capability_publication as capability_publication_mod;
 
 pub const DEFAULT_OUT_PATH: &str = "docs/specs/unified-agent-api/capability-matrix.md";
 
@@ -300,39 +291,7 @@ fn render_publication_target_description(
 
 #[cfg(test)]
 fn render_canonical_target_header(entries: &[&AgentRegistryEntry]) -> Result<String, String> {
-    let mut canonical_targets = Vec::<String>::new();
-    let mut default_backends = Vec::<String>::new();
-
-    for entry in entries.iter().copied() {
-        match resolve_capability_publication_target(entry)? {
-            CapabilityPublicationTarget::Explicit(target) => {
-                canonical_targets.push(format!("`{}={target}`", entry.agent_id));
-            }
-            CapabilityPublicationTarget::DefaultBuiltInConfig => {
-                default_backends.push(format!("`{}`", entry.agent_id));
-            }
-        }
-    }
-
-    let mut out = String::from("Canonical target profile: ");
-    if !canonical_targets.is_empty() {
-        out.push_str(&canonical_targets.join(", "));
-    }
-    if !canonical_targets.is_empty() && !default_backends.is_empty() {
-        out.push_str("; ");
-    }
-    if !default_backends.is_empty() {
-        out.push_str(&default_backends.join(", "));
-        out.push(' ');
-        out.push_str(if default_backends.len() == 1 {
-            "uses"
-        } else {
-            "use"
-        });
-        out.push_str(" the default built-in backend config");
-    }
-    out.push_str(".\n");
-    Ok(out)
+    capability_publication_mod::render_canonical_target_header(entries)
 }
 
 #[cfg(test)]

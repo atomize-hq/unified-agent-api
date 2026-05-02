@@ -17,6 +17,10 @@ mod prepare_publication {
     pub use xtask::prepare_publication::*;
 }
 
+mod capability_publication {
+    pub use xtask::capability_publication::*;
+}
+
 #[path = "../src/agent_maintenance/finding_signature.rs"]
 mod finding_signature;
 

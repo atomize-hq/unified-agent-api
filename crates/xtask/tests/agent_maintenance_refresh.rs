@@ -5,8 +5,12 @@ use std::{collections::BTreeSet, fs, path::Path};
 #[path = "support/onboard_agent_harness.rs"]
 mod harness;
 
-#[path = "../src/agent_registry.rs"]
-mod agent_registry;
+mod agent_registry {
+    pub use xtask::agent_registry::*;
+}
+mod capability_publication {
+    pub use xtask::capability_publication::*;
+}
 #[path = "../src/capability_matrix.rs"]
 mod capability_matrix;
 #[path = "../src/capability_projection.rs"]

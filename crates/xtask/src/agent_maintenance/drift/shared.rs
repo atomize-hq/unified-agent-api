@@ -6,17 +6,13 @@ use std::{
 
 use crate::{
     agent_registry::AgentRegistryEntry,
+    capability_publication as capability_publication_mod,
     support_matrix::{
         BackendSupportState, ManifestSupportState, PointerPromotionState, SupportRow,
         UaaSupportState,
     },
 };
 use serde::Deserialize;
-
-#[cfg(not(test))]
-use crate::capability_publication as capability_publication_mod;
-#[cfg(test)]
-use xtask::capability_publication as capability_publication_mod;
 
 use super::{
     RELEASE_DOC_END_MARKER, RELEASE_DOC_START_MARKER, SUPPORT_MARKDOWN_END_MARKER,
@@ -56,13 +52,13 @@ fn project_capability_truth(
     workspace_root: &Path,
     manifest: &capability_publication_mod::ManifestCurrent,
 ) -> Result<BTreeSet<String>, String> {
-    let registry = xtask::agent_registry::AgentRegistry::load(workspace_root)
+    let registry = crate::agent_registry::AgentRegistry::load(workspace_root)
         .map_err(|err| format!("load agent registry: {err}"))?;
     let publication_entry = registry.find(&entry.agent_id).ok_or_else(|| {
         format!(
             "capability truth for `{}` is invalid: registry entry is missing from {}",
             entry.agent_id,
-            xtask::agent_registry::REGISTRY_RELATIVE_PATH
+            crate::agent_registry::REGISTRY_RELATIVE_PATH
         )
     })?;
     capability_publication_mod::project_manifest_advertised_capabilities(

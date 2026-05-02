@@ -15,8 +15,12 @@ mod prepare_publication {
     pub use xtask::prepare_publication::*;
 }
 
-#[path = "../src/agent_registry.rs"]
-mod agent_registry;
+mod agent_registry {
+    pub use xtask::agent_registry::*;
+}
+mod capability_publication {
+    pub use xtask::capability_publication::*;
+}
 mod approval_artifact {
     pub use xtask::approval_artifact::*;
 }

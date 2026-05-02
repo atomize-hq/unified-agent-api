@@ -81,6 +81,50 @@ fn seed_cli_manifest_root(root: &std::path::Path, manifest_root: &str, canonical
     }
 }
 
+fn seed_lifecycle_eligible_audit_peers(root: &std::path::Path) {
+    write_text(
+        &root.join("cli_manifests/codex/current.json"),
+        include_str!("../../../../cli_manifests/codex/current.json"),
+    );
+    write_text(
+        &root.join("cli_manifests/claude_code/current.json"),
+        include_str!("../../../../cli_manifests/claude_code/current.json"),
+    );
+    write_text(
+        &root.join("docs/agents/lifecycle/codex-cli-onboarding/governance/approved-agent.toml"),
+        include_str!("../../../../docs/agents/lifecycle/codex-cli-onboarding/governance/approved-agent.toml"),
+    );
+    write_text(
+        &root.join("docs/agents/lifecycle/codex-cli-onboarding/governance/lifecycle-state.json"),
+        include_str!("../../../../docs/agents/lifecycle/codex-cli-onboarding/governance/lifecycle-state.json"),
+    );
+    write_text(
+        &root.join("docs/agents/lifecycle/codex-cli-onboarding/governance/publication-ready.json"),
+        include_str!("../../../../docs/agents/lifecycle/codex-cli-onboarding/governance/publication-ready.json"),
+    );
+    write_text(
+        &root.join("docs/agents/lifecycle/codex-cli-onboarding/governance/proving-run-closeout.json"),
+        include_str!("../../../../docs/agents/lifecycle/codex-cli-onboarding/governance/proving-run-closeout.json"),
+    );
+
+    write_text(
+        &root.join("docs/agents/lifecycle/claude-code-cli-onboarding/governance/approved-agent.toml"),
+        include_str!("../../../../docs/agents/lifecycle/claude-code-cli-onboarding/governance/approved-agent.toml"),
+    );
+    write_text(
+        &root.join("docs/agents/lifecycle/claude-code-cli-onboarding/governance/lifecycle-state.json"),
+        include_str!("../../../../docs/agents/lifecycle/claude-code-cli-onboarding/governance/lifecycle-state.json"),
+    );
+    write_text(
+        &root.join("docs/agents/lifecycle/claude-code-cli-onboarding/governance/publication-ready.json"),
+        include_str!("../../../../docs/agents/lifecycle/claude-code-cli-onboarding/governance/publication-ready.json"),
+    );
+    write_text(
+        &root.join("docs/agents/lifecycle/claude-code-cli-onboarding/governance/proving-run-closeout.json"),
+        include_str!("../../../../docs/agents/lifecycle/claude-code-cli-onboarding/governance/proving-run-closeout.json"),
+    );
+}
+
 fn seed_green_publication_surfaces(root: &std::path::Path) {
     write_text(
         &root.join("docs/specs/unified-agent-api/support-matrix.md"),
@@ -110,6 +154,7 @@ fn seed_green_publication_surfaces(root: &std::path::Path) {
         &root.join("docs/specs/unified-agent-api/capability-matrix.md"),
         include_str!("../../../../docs/specs/unified-agent-api/capability-matrix.md"),
     );
+    seed_lifecycle_eligible_audit_peers(root);
 }
 
 fn seed_publication_ready_baseline(root: &std::path::Path, approval_path: &str) {

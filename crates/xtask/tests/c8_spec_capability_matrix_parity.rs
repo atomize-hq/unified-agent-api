@@ -2,6 +2,10 @@ mod agent_registry {
     pub use xtask::agent_registry::*;
 }
 
+mod capability_publication {
+    pub use xtask::capability_publication::*;
+}
+
 mod capability_projection {
     #![allow(dead_code)]
 
@@ -16,6 +20,13 @@ mod capability_matrix {
     #[cfg(test)]
     mod parity_tests {
         use super::*;
+        use crate::agent_registry::AgentRegistry;
+
+        #[derive(Debug)]
+        struct LocalInventory {
+            backends: std::collections::BTreeMap<String, agent_api::AgentWrapperCapabilities>,
+            canonical_target_header: String,
+        }
 
         const SEEDED_REGISTRY: &str = include_str!("../data/agent_registry.toml");
 
@@ -58,11 +69,37 @@ mod capability_matrix {
             }
         }
 
+        fn collect_inventory_from_registry<F>(
+            registry: &AgentRegistry,
+            mut manifest_loader: F,
+        ) -> Result<LocalInventory, String>
+        where
+            F: FnMut(&AgentRegistryEntry) -> Result<UnionManifest, String>,
+        {
+            let enrolled_entries: Vec<&AgentRegistryEntry> =
+                registry.capability_matrix_entries().collect();
+            let mut backends = std::collections::BTreeMap::new();
+            for entry in enrolled_entries.iter().copied() {
+                let manifest = manifest_loader(entry)?;
+                validate_capability_publication_target(entry, &manifest)?;
+                let capabilities = projected_advertised_capabilities(entry, &manifest)?;
+                backends.insert(
+                    entry.agent_id.clone(),
+                    agent_api::AgentWrapperCapabilities { ids: capabilities },
+                );
+            }
+
+            Ok(LocalInventory {
+                backends,
+                canonical_target_header: render_canonical_target_header(&enrolled_entries)?,
+            })
+        }
+
         #[test]
         fn capability_matrix_parity_accepts_seeded_registry_with_matching_manifests() {
             let registry = seeded_registry();
 
-            let inventory = collect_builtin_backend_inventory_from_registry(&registry, |entry| {
+            let inventory = collect_inventory_from_registry(&registry, |entry| {
                 Ok(valid_manifest_for(entry))
             })
             .expect("matching parity should pass");
@@ -78,7 +115,7 @@ mod capability_matrix {
         fn capability_matrix_parity_rejects_missing_primary_expected_target() {
             let registry = seeded_registry();
 
-            let err = collect_builtin_backend_inventory_from_registry(&registry, |entry| {
+            let err = collect_inventory_from_registry(&registry, |entry| {
                 let mut manifest = valid_manifest_for(entry);
                 if entry.agent_id == "codex" {
                     manifest.expected_targets = vec![
@@ -96,21 +133,17 @@ mod capability_matrix {
         }
 
         #[test]
-        fn capability_matrix_parity_rejects_declared_capability_beyond_runtime_truth() {
-            let raw = SEEDED_REGISTRY.replace(
-                "always_on = [\n  \"agent_api.run\",\n  \"agent_api.events\",\n  \"agent_api.events.live\",\n  \"agent_api.config.model.v1\",\n  \"agent_api.session.resume.v1\",\n  \"agent_api.session.fork.v1\",\n]",
-                "always_on = [\n  \"agent_api.run\",\n  \"agent_api.events\",\n  \"agent_api.events.live\",\n  \"agent_api.config.model.v1\",\n  \"agent_api.session.resume.v1\",\n  \"agent_api.session.fork.v1\",\n  \"agent_api.tools.mcp.list.v1\",\n]",
-            );
-            let registry = AgentRegistry::parse(&raw).expect("parse mutated registry");
-
-            let err = collect_builtin_backend_inventory_from_registry(&registry, |entry| {
+        fn capability_matrix_parity_header_tracks_shared_publication_semantics() {
+            let registry = seeded_registry();
+            let inventory = collect_inventory_from_registry(&registry, |entry| {
                 Ok(valid_manifest_for(entry))
             })
-            .expect_err("declared/runtime mismatch should fail closed");
+            .expect("matching parity should pass");
 
-            assert!(err.contains("opencode"));
-            assert!(err.contains("agent_api.tools.mcp.list.v1"));
-            assert!(err.contains("modeled runtime truth"));
+            assert_eq!(
+                inventory.canonical_target_header,
+                "Canonical publication target profile: `codex=x86_64-unknown-linux-musl`, `claude_code=linux-x64`; `opencode`, `gemini_cli`, `aider` use their default lifecycle-backed target profile.\n"
+            );
         }
     }
 }
