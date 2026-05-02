@@ -24,7 +24,7 @@ use crate::{
     },
     agent_registry::{AgentRegistry, AgentRegistryEntry},
     approval_artifact::{load_approval_artifact, ApprovalArtifact, ApprovalArtifactError},
-    capability_matrix, support_matrix,
+    capability_matrix, capability_publication, support_matrix,
 };
 
 #[derive(Debug, Parser, Clone)]
@@ -241,8 +241,9 @@ fn build_context(workspace_root: &Path, args: &Args) -> Result<PublicationContex
                 crate::agent_registry::REGISTRY_RELATIVE_PATH
             ))
         })?;
-    validate_registry_alignment(&approval, &entry)?;
-    capability_matrix::validate_agent_publication_continuity(workspace_root, &entry)
+    capability_publication::validate_registry_approval_alignment(&approval, &entry)
+        .map_err(Error::Validation)?;
+    capability_publication::validate_agent_publication_continuity(workspace_root, &entry)
         .map_err(Error::Validation)?;
 
     let lifecycle_state_path =
@@ -431,66 +432,6 @@ fn write_publication_transition(
     }
 
     Ok(())
-}
-
-fn validate_registry_alignment(
-    approval: &ApprovalArtifact,
-    registry_entry: &AgentRegistryEntry,
-) -> Result<(), Error> {
-    let descriptor = &approval.descriptor;
-    let publication_packet_path = publication_ready_path_for_entry(registry_entry);
-    let approval_packet_path =
-        agent_lifecycle::approval_artifact_path(&registry_entry.scaffold.onboarding_pack_prefix);
-    let mismatches = [
-        (
-            "crate_path",
-            descriptor.crate_path.as_str(),
-            registry_entry.crate_path.as_str(),
-        ),
-        (
-            "backend_module",
-            descriptor.backend_module.as_str(),
-            registry_entry.backend_module.as_str(),
-        ),
-        (
-            "manifest_root",
-            descriptor.manifest_root.as_str(),
-            registry_entry.manifest_root.as_str(),
-        ),
-        (
-            "package_name",
-            descriptor.package_name.as_str(),
-            registry_entry.package_name.as_str(),
-        ),
-        (
-            "wrapper_coverage_source_path",
-            descriptor.wrapper_coverage_source_path.as_str(),
-            registry_entry.wrapper_coverage.source_path.as_str(),
-        ),
-        (
-            "approved_agent_path",
-            approval.relative_path.as_str(),
-            approval_packet_path.as_str(),
-        ),
-        (
-            "publication_ready_path",
-            publication_ready_path_for_entry(registry_entry).as_str(),
-            publication_packet_path.as_str(),
-        ),
-    ]
-    .into_iter()
-    .filter(|(_, expected, actual)| expected != actual)
-    .map(|(field, expected, actual)| format!("{field}: approval=`{expected}` registry=`{actual}`"))
-    .collect::<Vec<_>>();
-
-    if mismatches.is_empty() {
-        Ok(())
-    } else {
-        Err(Error::Validation(format!(
-            "approval/registry mismatch: {}",
-            mismatches.join("; ")
-        )))
-    }
 }
 
 fn validate_approval_continuity(

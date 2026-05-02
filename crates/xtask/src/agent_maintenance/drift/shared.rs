@@ -6,15 +6,17 @@ use std::{
 
 use crate::{
     agent_registry::AgentRegistryEntry,
-    capability_projection::{
-        project_advertised_capabilities, CapabilityCommandView, CapabilityManifestView,
-    },
     support_matrix::{
         BackendSupportState, ManifestSupportState, PointerPromotionState, SupportRow,
         UaaSupportState,
     },
 };
 use serde::Deserialize;
+
+#[cfg(not(test))]
+use crate::capability_publication as capability_publication_mod;
+#[cfg(test)]
+use xtask::capability_publication as capability_publication_mod;
 
 use super::{
     RELEASE_DOC_END_MARKER, RELEASE_DOC_START_MARKER, SUPPORT_MARKDOWN_END_MARKER,
@@ -28,22 +30,44 @@ pub(super) fn collect_capability_truth(
     let manifest_path = workspace_root
         .join(&entry.manifest_root)
         .join("current.json");
-    let manifest: ManifestCurrent = read_json(&manifest_path)?;
-    let command_views = manifest
-        .commands
-        .iter()
-        .map(|command| CapabilityCommandView {
-            path: command.path.as_slice(),
-            available_on: command.available_on.as_slice(),
-        })
-        .collect::<Vec<_>>();
+    let manifest = capability_publication_mod::read_manifest_current(&manifest_path)?;
+    project_capability_truth(entry, workspace_root, &manifest)
+}
 
-    project_advertised_capabilities(
-        entry,
-        CapabilityManifestView {
-            expected_targets: &manifest.expected_targets,
-            commands: &command_views,
+#[cfg(not(test))]
+fn project_capability_truth(
+    entry: &AgentRegistryEntry,
+    _workspace_root: &Path,
+    manifest: &capability_publication_mod::ManifestCurrent,
+) -> Result<BTreeSet<String>, String> {
+    capability_publication_mod::project_manifest_advertised_capabilities(entry, manifest).map_err(
+        |err| {
+            format!(
+                "capability truth for `{}` is invalid: {err}",
+                entry.agent_id
+            )
         },
+    )
+}
+
+#[cfg(test)]
+fn project_capability_truth(
+    entry: &AgentRegistryEntry,
+    workspace_root: &Path,
+    manifest: &capability_publication_mod::ManifestCurrent,
+) -> Result<BTreeSet<String>, String> {
+    let registry = xtask::agent_registry::AgentRegistry::load(workspace_root)
+        .map_err(|err| format!("load agent registry: {err}"))?;
+    let publication_entry = registry.find(&entry.agent_id).ok_or_else(|| {
+        format!(
+            "capability truth for `{}` is invalid: registry entry is missing from {}",
+            entry.agent_id,
+            xtask::agent_registry::REGISTRY_RELATIVE_PATH
+        )
+    })?;
+    capability_publication_mod::project_manifest_advertised_capabilities(
+        publication_entry,
+        manifest,
     )
     .map_err(|err| {
         format!(
@@ -283,20 +307,7 @@ where
     serde_json::from_str(&text).map_err(|err| format!("parse({}): {err}", path.display()))
 }
 
-#[derive(Debug, Deserialize)]
-pub(super) struct ManifestCurrent {
-    #[serde(default)]
-    pub expected_targets: Vec<String>,
-    #[serde(default)]
-    pub commands: Vec<ManifestCommand>,
-}
-
-#[derive(Debug, Deserialize)]
-pub(super) struct ManifestCommand {
-    pub path: Vec<String>,
-    #[serde(default)]
-    pub available_on: Vec<String>,
-}
+pub(super) type ManifestCurrent = capability_publication_mod::ManifestCurrent;
 
 #[derive(Debug)]
 pub(super) struct ReleaseDocPackages {
