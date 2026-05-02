@@ -1,11 +1,9 @@
 use std::{
-    collections::{BTreeMap, BTreeSet},
     fs,
     io::{self, Write},
     path::{Component, Path, PathBuf},
 };
 
-use agent_api::AgentWrapperCapabilities;
 use clap::Parser;
 use thiserror::Error;
 use xtask::workspace_mutation::{
@@ -35,16 +33,6 @@ const PUBLISH_SCRIPT_PATH: &str = "scripts/publish_crates.py";
 const VALIDATE_PUBLISH_SCRIPT_PATH: &str = "scripts/validate_publish_versions.py";
 const CHECK_PUBLISH_READINESS_SCRIPT_PATH: &str = "scripts/check_publish_readiness.py";
 const NEXT_MAINTENANCE_COMMAND_TEMPLATE: &str = "check-agent-drift --agent {agent_id}";
-const AGENT_API_ORTHOGONALITY_ALLOWLIST: [&str; 8] = [
-    "agent_api.run",
-    "agent_api.events",
-    "agent_api.events.live",
-    "agent_api.exec.non_interactive",
-    "agent_api.tools.mcp.list.v1",
-    "agent_api.tools.mcp.get.v1",
-    "agent_api.tools.mcp.add.v1",
-    "agent_api.tools.mcp.remove.v1",
-];
 
 #[derive(Debug, Parser, Clone)]
 pub struct Args {
@@ -325,7 +313,7 @@ fn validate_closeout_prerequisites(
                 .join(" | ")
         )));
     }
-    validate_capability_matrix_audit_green()?;
+    validate_capability_matrix_audit_green(workspace_root)?;
     Ok(())
 }
 
@@ -447,56 +435,9 @@ fn update_lifecycle_baseline(
         .map_err(|err| Error::Internal(format!("write lifecycle state: {err}")))
 }
 
-fn validate_capability_matrix_audit_green() -> Result<(), Error> {
-    let backends = xtask::capability_matrix::collect_builtin_backend_capabilities()
-        .map_err(Error::Validation)?;
-    let all_capability_ids = backends
-        .values()
-        .flat_map(|caps| caps.ids.iter().cloned())
-        .collect::<BTreeSet<_>>();
-
-    let mut violations = Vec::new();
-    for capability_id in &all_capability_ids {
-        if !capability_id.starts_with("agent_api.") {
-            continue;
-        }
-        if AGENT_API_ORTHOGONALITY_ALLOWLIST.contains(&capability_id.as_str()) {
-            continue;
-        }
-        let supported_by = supported_backends(&backends, capability_id);
-        if supported_by.len() < 2 {
-            violations.push(format!(
-                "{capability_id}: supported by {} backend(s): [{}]",
-                supported_by.len(),
-                supported_by.join(", ")
-            ));
-        }
-    }
-
-    if violations.is_empty() {
-        Ok(())
-    } else {
-        Err(Error::Validation(format!(
-            "capability-matrix-audit failed: {}",
-            violations.join(" | ")
-        )))
-    }
-}
-
-fn supported_backends(
-    backends: &BTreeMap<String, AgentWrapperCapabilities>,
-    capability_id: &str,
-) -> Vec<String> {
-    backends
-        .iter()
-        .filter_map(|(backend_id, capabilities)| {
-            if capabilities.contains(capability_id) {
-                Some(backend_id.clone())
-            } else {
-                None
-            }
-        })
-        .collect()
+fn validate_capability_matrix_audit_green(workspace_root: &Path) -> Result<(), Error> {
+    xtask::capability_publication::audit_current_capability_publication(workspace_root)
+        .map_err(Error::Validation)
 }
 
 fn load_validated_closeout(
