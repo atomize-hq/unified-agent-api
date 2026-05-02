@@ -54,12 +54,6 @@ const WRITTEN_PATHS_FILE_NAME: &str = "written-paths.json";
 const WORKFLOW_VERSION: &str = "runtime_follow_on_v1";
 const CODEX_BINARY_ENV: &str = "XTASK_RUNTIME_FOLLOW_ON_CODEX_BINARY";
 const WRAPPER_COVERAGE_MANIFEST_PATH: &str = "src/wrapper_coverage_manifest.rs";
-const LEGACY_REQUIRED_PUBLICATION_COMMANDS: [&str; 4] = [
-    "support-matrix --check",
-    "capability-matrix --check",
-    "capability-matrix-audit",
-    "make preflight",
-];
 const PROMPT_TEMPLATE: &str = include_str!("../templates/runtime_follow_on_codex_prompt.md");
 
 #[derive(Debug, Parser, Clone)]

@@ -73,7 +73,5 @@ fn repair_run_dir(agent_id: &str) -> String {
 }
 
 fn repair_command(mode_flag: &str, approval_path: &str) -> String {
-    format!(
-        "cargo run -p xtask -- repair-runtime-evidence --approval {approval_path} {mode_flag}"
-    )
+    format!("cargo run -p xtask -- repair-runtime-evidence --approval {approval_path} {mode_flag}")
 }

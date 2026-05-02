@@ -212,7 +212,8 @@ pub fn check_agent_drift(
     if let Some(finding) = publication::inspect_release_doc(entry, workspace_root, &registry) {
         findings.push(finding);
     }
-    let runtime_integrated = runtime_evidence::has_runtime_integrated_lifecycle(entry, workspace_root);
+    let runtime_integrated =
+        runtime_evidence::has_runtime_integrated_lifecycle(entry, workspace_root);
     if let Some(finding) = runtime_evidence::inspect_runtime_evidence(entry, workspace_root) {
         findings.push(finding);
     }

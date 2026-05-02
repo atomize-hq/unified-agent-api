@@ -886,8 +886,8 @@ fn seed_runtime_evidence_run(root: &Path, truth: RuntimeEvidenceTruth) {
     let approval_path =
         "docs/agents/lifecycle/gemini-cli-onboarding/governance/approved-agent.toml";
     let approval_sha = sha256_hex(&root.join(approval_path));
-    let run_root =
-        root.join("docs/agents/.uaa-temp/runtime-follow-on/runs/repair-gemini_cli-runtime-follow-on");
+    let run_root = root
+        .join("docs/agents/.uaa-temp/runtime-follow-on/runs/repair-gemini_cli-runtime-follow-on");
     let input_sha = match truth {
         RuntimeEvidenceTruth::Stale => {
             "deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef"
