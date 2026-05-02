@@ -1,144 +1,220 @@
-# Runtime Evidence Repair Orchestration Plan
+# Generic Capability Publication Foundation Orchestration Plan
 
 ## Summary
 
-- Execute on the live implementation branch `codex/recommend-next-agent`. Treat `main` only as the review base branch, never as the worker fork point.
-- Plan authority is `PLAN.md` at the repo root. If `PLAN.md`, current code, and older orchestration notes disagree, `PLAN.md` wins unless it conflicts with `docs/specs/**`; a spec conflict is a stop-and-escalate condition.
-- This run replaces the older broad lifecycle-maturity orchestration on this branch. The scope here is only the narrow runtime evidence repair milestone.
-- Parent agent is the only integrator, merger, rebasing authority, repair operator, and final verifier.
-- Current worktree dirt is expected. `PLAN.md` is already modified and must be recorded, not reverted.
+- Execute only against the current milestone in repo-root `PLAN.md`: `PLAN - Generic Capability Publication Foundation`.
+- Integration branch is the live implementation branch `codex/recommend-next-agent`. `main` is review base only, never the worker fork point.
+- Parent agent is the only integrator, merger, rebase authority, API-freeze owner, and final verifier.
 - Worker model for delegated lanes:
   - model: GPT-5.4
   - reasoning: high
 - Keep the critical path local to the parent for:
-  - kickoff and dirty-state baseline capture
-  - shared runtime evidence helper extraction
-  - `repair-runtime-evidence` command wiring
-  - `historical_lifecycle_backfill.rs` migration onto the shared helper
-  - deterministic `aider` repair artifact generation
-  - operator-guide updates
-  - final integration and final verification
-- Launch parallel workers only after the helper and command contract freeze commit exists.
-- Use only 2 concurrent workers.
-  - Worker 1: forward validation hardening
-  - Worker 2: drift surfacing
-- Do not launch a docs worker.
-  - `docs/cli-agent-onboarding-factory-operator-guide.md` depends on final command semantics and should stay parent-owned.
-- Do not launch an evidence worker.
-  - `docs/agents/.uaa-temp/**` are generated evidence and committed run artifacts, not authored source.
-- Integration surface is explicit and intentionally local:
-  - the parent integrates directly onto `codex/recommend-next-agent` in the primary repo worktree at `REPO_ROOT`
-  - there is no separate integration branch for this run
-- No human approval gates are planned for this run.
-- Canonical orchestration state owned only by the parent:
-  - `REPO_ROOT=/Users/spensermcconnell/__Active_Code/atomize-hq/unified-agent-api`
-  - `WORKTREE_ROOT=/Users/spensermcconnell/__Active_Code/atomize-hq/.worktrees/unified-agent-api-runtime-evidence-repair`
-  - `ORCH_RUN_ROOT=$REPO_ROOT/.runs/runtime-evidence-repair`
-  - `RUNTIME_EVIDENCE_ROOT=$REPO_ROOT/docs/agents/.uaa-temp/runtime-follow-on/runs`
-- Concrete live proof target:
-  - `docs/agents/lifecycle/aider-onboarding/governance/approved-agent.toml`
-  - `docs/agents/.uaa-temp/runtime-follow-on/runs/repair-aider-runtime-follow-on/`
-
-## Approval Gates
-
-- This plan has zero human approval gates.
-- The only intentional pauses are:
-  - hard stop conditions
-  - worker bounce-backs
-  - helper-freeze reopen handling
-  - final verification failures that require narrowing back to the touched scope
-
-## Worker Model
-
-- Parent agent owns all integration, orchestration state, freeze decisions, merge sequencing, repair execution, and acceptance decisions.
-- Workers may edit only their assigned files and must return:
-  - changed files
-  - commands run
-  - exit codes
-  - blockers or assumptions
-- Workers do not merge branches.
-- Workers do not edit `$ORCH_RUN_ROOT/**`.
-- Workers do not edit `PLAN.md`.
-- Workers do not author or hand-edit `.uaa-temp` runtime evidence.
-- Any worker that needs a parent-owned file must stop and bounce the request back.
+  - baseline capture against current repo state
+  - shared seam freeze in `crates/xtask/src/capability_publication.rs`
+  - `crates/xtask/src/lib.rs` export wiring
+  - generator migration in `crates/xtask/src/capability_matrix.rs`
+  - final convergence
+  - test lane
+  - final generated `docs/specs/unified-agent-api/capability-matrix.md`
+- Maximum worker concurrency is `3`, and only after the parent freezes Lane A. This matches the justified post-freeze lanes in `PLAN.md`:
+  - Lane B: audit + closeout reuse
+  - Lane C: drift + prepare-publication alignment
+  - Lane D: docs/spec updates
+- No human approval gates are planned for this run. Stop only for hard guards, stale-lane reopen, or verification failure.
+- This document replaces the old runtime-evidence orchestration plan entirely. That older plan is not authoritative for this milestone.
 
 ## Hard Guards
 
-- Scope is locked to the current `PLAN.md` milestone:
-  - add repo-owned `repair-runtime-evidence --check/--write`
-  - extract shared runtime evidence bundle helpers from `historical_lifecycle_backfill.rs`
-  - repair stale `aider` runtime evidence
-  - remove legacy short-form publication command tolerance from `runtime_follow_on/lifecycle.rs`
-  - add explicit stale-runtime-evidence drift detection
-  - add tests
-  - update operator docs
-- Do not widen scope into lifecycle redesign, publication packet redesign, or maintenance framework expansion.
-- Do not add a new crate.
-- Do not add a new service.
-- Keep `prepare-publication` strict.
-- Do not add legacy tolerance to `prepare-publication`.
-- Do not add a second hardcoded publication command set.
-- The required publication commands remain exactly:
-  - `cargo run -p xtask -- support-matrix --check`
-  - `cargo run -p xtask -- capability-matrix --check`
-  - `cargo run -p xtask -- capability-matrix-audit`
-  - `make preflight`
-- `repair-runtime-evidence` must not advance lifecycle stage.
-- The deterministic repair run directory is fixed:
-  - `docs/agents/.uaa-temp/runtime-follow-on/runs/repair-<agent_id>-runtime-follow-on/`
-  - concrete target for this run: `repair-aider-runtime-follow-on`
-- Leave `docs/agents/.uaa-temp/runtime-follow-on/runs/aider-runtime-follow-on-rerun/` untouched in this milestone.
-- Treat `docs/agents/.uaa-temp/**` as generated evidence and committed run artifacts, not authored source.
-- Keep the helper extraction boring and explicit. No agent-specific `aider` branching is allowed in core logic.
-- Do not overbuild a generic batch repair system.
-- Stop conditions for the full run:
-  - `PLAN.md` conflicts with `docs/specs/**`
-  - helper extraction requires schema or lifecycle-stage redesign
-  - `repair-runtime-evidence` cannot reuse a single shared helper path with `historical_lifecycle_backfill.rs`
-  - a lane requires hand-authoring `.uaa-temp` JSON rather than producing it through command behavior
-  - a lane requires relaxing `prepare-publication` strictness to pass
+- Scope is locked to the current `PLAN.md` milestone only.
+- Do not widen into:
+  - support-matrix refactors
+  - lifecycle-stage redesign
+  - new binary/package/container artifact families
+  - plugin discovery
+  - dynamic runtime reflection
+  - backend constructor discovery
+  - orthogonality-rule redesign
+- Locked implementation decisions from `PLAN.md` must remain intact:
+  - lifecycle-driven publication eligibility
+  - approval-registry continuity validation
+  - shared projection ownership stays in `crates/xtask/src/capability_projection.rs`
+  - one shared audit implementation
+  - pre-runtime agents omitted from generated publication
+  - no plugin/reflection architecture
+- No consumer in scope may derive publication capability truth independently after this run.
+- Parent and workers must adjust to the repo’s actual state at launch time. Never assume a clean worktree.
+- Never revert someone else’s edits.
+- Stop the run immediately if any of the following become true:
+  - `PLAN.md` conflicts with a normative contract in `docs/specs/**`
+  - the shared publication seam requires a lifecycle-model redesign
+  - the shared publication seam requires introducing plugin/reflection discovery
+  - a worker needs to edit a parent-owned file to finish its lane
+  - a worker lane can no longer stay disjoint after the freeze point
 
 ## Orchestration State
 
-Canonical parent-owned files under `$ORCH_RUN_ROOT`:
+Parent-owned local orchestration state lives under:
+
+- `RUN_ROOT=/Users/spensermcconnell/__Active_Code/atomize-hq/unified-agent-api/.runs/generic-capability-publication`
+
+Canonical parent-owned state files:
 
 - `baseline.json`
+  - current branch
+  - current HEAD SHA
+  - review base branch
+  - dirty-file summary at launch
+  - lane ownership snapshot against actual dirty state
+  - note of any lane delayed because of pre-existing dirt
 - `tasks.json`
+  - ordered task list
+  - task owner
+  - task status
+  - dependencies
+  - restart count if a lane is reopened
 - `session-log.md`
-- `helper-freeze.json`
+  - chronological parent decisions
+  - worker launch notes
+  - relaunch reasons
+  - deviations resolved without widening scope
+- `freeze.json`
+  - freeze commit SHA
+  - frozen public functions and public types in `crates/xtask/src/capability_publication.rs`
+  - expected `crates/xtask/src/capability_matrix.rs` header semantics
+  - any signature changes in `crates/xtask/src/capability_projection.rs`
+  - lane ownership map
+  - forbidden touch surfaces by lane
 - `merge-log.md`
+  - merge order
+  - merge commit / fast-forward result
+  - post-merge smoke command results
+  - relaunch reason if a lane is rejected
 - `acceptance.md`
+  - final command sequence
+  - exit codes
+  - pass/fail status against each acceptance criterion
+  - unresolved unrelated repo-state blockers, if any
 
-Per-task sentinels under `$REPO_ROOT/.runs/<task-id>/`:
+Per-task sentinels live under:
 
-- `started.json`
-- `status.json`
-- `done.json` or `blocked.json`
+- `REPO_ROOT/.runs/<task-id>/started.json`
+- `REPO_ROOT/.runs/<task-id>/status.json`
+- `REPO_ROOT/.runs/<task-id>/done.json`
+- `REPO_ROOT/.runs/<task-id>/blocked.json`
 
-`baseline.json` must record:
+Sentinel rules:
 
-- current branch
-- current sha
-- review base branch
-- dirty-file summary
-- explicit note that `PLAN.md` is modified before orchestration starts
-- the currently failing `prepare-publication --check` condition for `aider`
-- the currently empty `written-paths.json` fact for the old `aider` rerun bundle
-- the current `check-agent-drift --agent aider` behavior before repair
+- one directory per task ID
+- parent creates `started.json` before work begins
+- parent updates `status.json` during long-running work or after worker returns
+- parent writes exactly one terminal sentinel: `done.json` or `blocked.json`
+- workers do not edit orchestration state directly
 
-`helper-freeze.json` must record:
+## Worker Model
 
-- `freeze_commit`
-- `repair_command_surface`
-- `required_publication_commands`
-- `repair_run_dir_pattern`
-- `parent_owned_generated_surfaces`
-- `worker_lane_file_ownership`
-- `historical_backfill_shared_helper_rule`
+- Parent owns all integration, orchestration state, freeze decisions, merge sequencing, and acceptance decisions.
+- Workers edit only their assigned lane surfaces.
+- Workers do not merge branches.
+- Workers do not rebase.
+- Workers do not modify `PLAN.md`.
+- Workers do not modify orchestration state under `.runs/**`.
+- Workers do not touch any parent-owned surface.
 
-Workers consume `helper-freeze.json` and do not redefine any of its contract locally.
+Worker return contract is fixed. Each worker returns only:
 
-## Worktree Plan
+- changed files
+- commands run
+- exit codes
+- blockers or assumptions
+
+If a worker needs a parent-owned file changed, or needs the freeze contract changed, it stops and returns a blocker instead of guessing.
+
+## Context-Control Rules
+
+Parent active context stays narrow. The parent keeps only:
+
+- `PLAN.md`
+- `ORCH_PLAN.md`
+- `RUN_ROOT/baseline.json`
+- `RUN_ROOT/tasks.json`
+- `RUN_ROOT/freeze.json` after freeze
+- `RUN_ROOT/session-log.md`
+- the latest integration diff summary
+
+Worker prompts contain only:
+
+- the owned files
+- forbidden touch surfaces
+- the relevant `PLAN.md` excerpt
+- the current `freeze.json` contract
+- the required commands
+- the acceptance target for that lane
+
+Workers are closed immediately after merge or rejection. Do not keep idle worker lanes open after their result is consumed.
+
+## Parent vs Worker Ownership Model
+
+### Parent-only ownership
+
+The parent keeps these surfaces local from kickoff through final verification:
+
+- `ORCH_PLAN.md`
+- `crates/xtask/src/capability_publication.rs`
+- `crates/xtask/src/capability_matrix.rs`
+- `crates/xtask/src/lib.rs`
+- `crates/xtask/src/capability_projection.rs` only if a signature change is required to support the shared publication seam
+- all merge/rebase/conflict resolution
+- all test-lane edits under `crates/xtask/tests/**`
+- final generated `docs/specs/unified-agent-api/capability-matrix.md`
+- `.runs/generic-capability-publication/**`
+
+Parent responsibilities:
+
+- capture baseline branch / SHA / dirty state
+- snapshot lane ownership against actual dirty files before worker launch
+- freeze the shared source contract before any worker starts
+- launch workers from the freeze commit only
+- reject stale worker output
+- merge in order
+- run all final commands and decide acceptance
+
+### Worker lane ownership
+
+Workers own only their disjoint lane files.
+
+Lane B: audit + closeout reuse
+
+- `crates/xtask/src/capability_matrix_audit.rs`
+- `crates/xtask/src/close_proving_run.rs`
+
+Lane C: drift + prepare-publication alignment
+
+- `crates/xtask/src/prepare_publication.rs`
+- `crates/xtask/src/agent_maintenance/drift/shared.rs`
+- `crates/xtask/src/agent_maintenance/drift/publication.rs`
+
+Lane D: docs/spec prose alignment
+
+- `docs/specs/unified-agent-api/capabilities-schema-spec.md`
+- `docs/specs/unified-agent-api/README.md`
+- `docs/specs/cli-agent-onboarding-charter.md`
+- `docs/cli-agent-onboarding-factory-operator-guide.md`
+
+Workers do not own:
+
+- `crates/xtask/src/capability_publication.rs`
+- `crates/xtask/src/capability_matrix.rs`
+- `crates/xtask/src/lib.rs`
+- `crates/xtask/tests/**`
+- generated `docs/specs/unified-agent-api/capability-matrix.md`
+- `.runs/**`
+
+## Worktree/Branch Plan With Concrete Names
+
+Canonical paths:
+
+- `REPO_ROOT=/Users/spensermcconnell/__Active_Code/atomize-hq/unified-agent-api`
+- `WORKTREE_ROOT=/Users/spensermcconnell/__Active_Code/atomize-hq/.worktrees/unified-agent-api-generic-capability-publication`
 
 Integration surface:
 
@@ -146,546 +222,448 @@ Integration surface:
 - worktree: `REPO_ROOT`
 - owner: parent only
 
-Worker worktrees created only after helper freeze:
+Worker branches and worktrees, created only after the parent records the freeze commit:
 
-- validation worker:
-  - branch: `codex/recommend-next-agent-validation-hardening`
-  - worktree: `$WORKTREE_ROOT/validation-hardening`
-- drift worker:
-  - branch: `codex/recommend-next-agent-drift-surfacing`
-  - worktree: `$WORKTREE_ROOT/drift-surfacing`
+- Lane B:
+  - branch: `codex/recommend-next-agent-publication-audit-closeout`
+  - worktree: `$WORKTREE_ROOT/publication-audit-closeout`
+- Lane C:
+  - branch: `codex/recommend-next-agent-publication-drift-prepare`
+  - worktree: `$WORKTREE_ROOT/publication-drift-prepare`
+- Lane D:
+  - branch: `codex/recommend-next-agent-publication-docs-specs`
+  - worktree: `$WORKTREE_ROOT/publication-docs-specs`
 
-Creation commands from `REPO_ROOT` after `helper-freeze.json` exists:
+Creation commands from `REPO_ROOT` after freeze:
 
 ```bash
-mkdir -p "$WORKTREE_ROOT" "$ORCH_RUN_ROOT"
-FREEZE_SHA=$(jq -r '.freeze_commit' "$ORCH_RUN_ROOT/helper-freeze.json")
+mkdir -p "$WORKTREE_ROOT" "$RUN_ROOT"
+FREEZE_SHA=$(jq -r '.freeze_commit_sha' "$RUN_ROOT/freeze.json")
 
-git worktree add -b codex/recommend-next-agent-validation-hardening "$WORKTREE_ROOT/validation-hardening" "$FREEZE_SHA"
-git worktree add -b codex/recommend-next-agent-drift-surfacing "$WORKTREE_ROOT/drift-surfacing" "$FREEZE_SHA"
+git worktree add -b codex/recommend-next-agent-publication-audit-closeout \
+  "$WORKTREE_ROOT/publication-audit-closeout" \
+  "$FREEZE_SHA"
+
+git worktree add -b codex/recommend-next-agent-publication-drift-prepare \
+  "$WORKTREE_ROOT/publication-drift-prepare" \
+  "$FREEZE_SHA"
+
+git worktree add -b codex/recommend-next-agent-publication-docs-specs \
+  "$WORKTREE_ROOT/publication-docs-specs" \
+  "$FREEZE_SHA"
 ```
 
 Worktree rules:
 
-- Never fork workers from `main`.
-- Never fork workers from anything other than `freeze_commit`.
-- Never reuse a dirty worker worktree.
-- Parent integrates only in `REPO_ROOT` on `codex/recommend-next-agent`.
-- There is no dedicated integration branch for this run.
+- never fork workers from `main`
+- never fork workers before freeze completes
+- never reuse a dirty worker worktree
+- never let workers merge back into the integration branch themselves
 
-## Restart And Reopen Rule
+## Freeze Artifact And Restart Rule
 
-- If the parent changes any helper-freeze semantic surface after either worker launches, both workers are stale.
-- Helper-freeze semantic surfaces are:
-  - `crates/xtask/src/runtime_evidence_bundle.rs`
-  - `crates/xtask/src/repair_runtime_evidence.rs`
-  - `crates/xtask/src/historical_lifecycle_backfill.rs`
-  - `crates/xtask/src/main.rs`
-  - `crates/xtask/src/lib.rs`
-  - the exact repair run directory convention
-  - the exact publication command-string contract
-- If the parent changes only validation-owned files after the validation worker launches, only that worker is stale.
-- If the parent changes only drift-owned files after the drift worker launches, only that worker is stale.
-- Stale worker handling is mandatory:
-  1. Mark the worker sentinel as stale or blocked.
-  2. Discard the worker branch and worktree.
-  3. Regenerate `helper-freeze.json` if the freeze changed.
-  4. Recreate the worker worktree from the new `freeze_commit`.
-  5. Relaunch the worker with the new freeze context.
-- Never merge stale worker output.
-- Never cherry-pick stale worker commits into `codex/recommend-next-agent`.
+The freeze point is the first parent commit where these are simultaneously true:
+
+- `crates/xtask/src/capability_publication.rs` exists and exposes the parent-approved contract
+- `crates/xtask/src/capability_matrix.rs` reads publication truth from that shared module
+- `crates/xtask/src/lib.rs` exports the shared module
+- `RUN_ROOT/freeze.json` exists and is complete
+
+`freeze.json` is the authoritative worker contract. The parent must record:
+
+- `freeze_commit_sha`
+- frozen public functions in `crates/xtask/src/capability_publication.rs`
+- frozen public types in `crates/xtask/src/capability_publication.rs`
+- expected `capability_matrix.rs` header semantics
+- any signature changes in `capability_projection.rs`
+- lane ownership map
+- forbidden touch surfaces per lane
+
+Shared-seam change definition after worker launch:
+
+- any public signature, type, or error-contract change in `crates/xtask/src/capability_publication.rs`
+- any export change in `crates/xtask/src/lib.rs` that affects worker imports
+- any parent change in `crates/xtask/src/capability_projection.rs` required by the shared publication contract
+- any semantic change in how `crates/xtask/src/capability_matrix.rs` expects the shared publication inventory to behave
+- any lane ownership or forbidden-surface change in `freeze.json`
+
+Mandatory stale-worker rule:
+
+1. If the shared seam changes after any worker starts, all open worker lanes are stale.
+2. Stale worker output must not be merged, cherry-picked, or manually reconciled.
+3. Parent must:
+   - update `freeze.json`
+   - record the new freeze SHA
+   - mark affected task sentinels stale / blocked
+   - delete stale worker worktrees and branches
+   - relaunch fresh worktrees from the new freeze commit
+4. Restart from the first downstream task affected by the change.
+
+Lane-local reopen rule:
+
+- If only a worker-owned file changes after launch, only that lane is stale.
+- Parent should avoid touching worker-owned files after launch except to reject and relaunch the lane.
 
 ## Merge Policy
 
-- Parent merges worker branches only into the explicit integration surface:
-  - `REPO_ROOT` on branch `codex/recommend-next-agent`
-- Parent merges from branch heads only.
-- Parent does not ask workers to rebase themselves.
-- Parent merges the validation worker first.
-- Parent reruns the validation gate after that merge.
-- Parent merges the drift worker second.
-- Parent reruns the combined gate after both merges.
-- If a worker changed a forbidden file, reject the lane and relaunch or finish it locally.
-- Mechanical conflict resolution is allowed locally.
-- Semantic conflict resolution that changes the frozen repair contract is a stop-and-reopen event.
+- Parent is the only merger.
+- Parent merges only into `codex/recommend-next-agent` in `REPO_ROOT`.
+- Parent does not ask workers to rebase.
+- Parent may do local mechanical conflict resolution during merge.
+- Any conflict that changes the frozen shared seam is a stop-and-reopen event.
+
+Merge order:
+
+1. Parent completes the freeze task locally and records `freeze.json`.
+2. Launch Lanes B, C, and D from `freeze_commit_sha`.
+3. Merge Lane B first.
+4. Rerun Lane B smoke commands locally before merging anything else.
+5. Merge Lane C second.
+6. Rerun Lane C smoke commands locally before merging anything else.
+7. Merge Lane D third.
+8. If B or C changed semantics after the first docs draft, reject or relaunch Lane D from the current freeze before continuing.
+9. Parent runs the test lane locally.
+10. Parent runs regeneration and final verification locally.
+
+Reject a worker lane immediately if it:
+
+- edits a file outside its ownership set
+- depends on changing the shared seam after launch
+- assumes a clean tree and drops unrelated local state
+- returns results without the required command / exit-code accounting
 
 ## Task Graph
 
-Critical path:
-
-1. `task/runtime-evidence-00-baseline`
-2. `task/runtime-evidence-01-helper-freeze`
-3. launch in parallel:
-   - `task/runtime-evidence-02a-validation-hardening`
-   - `task/runtime-evidence-02b-drift-surfacing`
-4. `task/runtime-evidence-02c-converge`
-5. `task/runtime-evidence-03-repair-aider-docs`
-6. `task/runtime-evidence-04-final-verify`
-
-Parallel-safe tasks:
-
-- `task/runtime-evidence-02a-validation-hardening`
-- `task/runtime-evidence-02b-drift-surfacing`
-
-Deliberately serialized tasks:
-
-- `task/runtime-evidence-00-baseline`
-- `task/runtime-evidence-01-helper-freeze`
-- `task/runtime-evidence-02c-converge`
-- `task/runtime-evidence-03-repair-aider-docs`
-- `task/runtime-evidence-04-final-verify`
+```text
+task/gcp-00-baseline
+  ->
+task/gcp-01-freeze
+  ->
+parallel:
+  task/gcp-02-audit-closeout
+  task/gcp-03-drift-prepare
+  task/gcp-04-docs-specs
+  ->
+task/gcp-05-converge-tests
+  ->
+task/gcp-06-final-verify
+```
 
 ## Workstream Plan
 
-### WS-BASELINE
+### task/gcp-00-baseline
 
-#### `task/runtime-evidence-00-baseline` — parent only
+Owner:
 
-Existing required files that must already exist:
+- parent
 
-- `PLAN.md`
-- `crates/xtask/src/main.rs`
-- `crates/xtask/src/lib.rs`
-- `crates/xtask/src/historical_lifecycle_backfill.rs`
-- `crates/xtask/src/runtime_follow_on/lifecycle.rs`
-- `crates/xtask/src/prepare_publication/runtime_evidence.rs`
-- `crates/xtask/src/agent_maintenance/drift/mod.rs`
-- `crates/xtask/tests/runtime_follow_on_entrypoint.rs`
-- `crates/xtask/tests/prepare_publication_entrypoint.rs`
-- `crates/xtask/tests/agent_maintenance_drift.rs`
-- `docs/cli-agent-onboarding-factory-operator-guide.md`
-- `docs/agents/lifecycle/aider-onboarding/governance/approved-agent.toml`
-- `docs/agents/.uaa-temp/runtime-follow-on/runs/aider-runtime-follow-on-rerun/input-contract.json`
-- `docs/agents/.uaa-temp/runtime-follow-on/runs/aider-runtime-follow-on-rerun/handoff.json`
-- `docs/agents/.uaa-temp/runtime-follow-on/runs/aider-runtime-follow-on-rerun/written-paths.json`
+Owned surfaces:
 
-Expected files that do not need to exist yet:
+- `RUN_ROOT/baseline.json`
+- `RUN_ROOT/tasks.json`
+- `RUN_ROOT/session-log.md`
+- `REPO_ROOT/.runs/task-gcp-00-baseline/**`
 
-- `crates/xtask/src/repair_runtime_evidence.rs`
-- `crates/xtask/src/runtime_evidence_bundle.rs`
-- `crates/xtask/src/agent_maintenance/drift/runtime_evidence.rs`
-- `crates/xtask/tests/repair_runtime_evidence_entrypoint.rs`
-- `docs/agents/.uaa-temp/runtime-follow-on/runs/repair-aider-runtime-follow-on/input-contract.json`
-- `docs/agents/.uaa-temp/runtime-follow-on/runs/repair-aider-runtime-follow-on/run-status.json`
-- `docs/agents/.uaa-temp/runtime-follow-on/runs/repair-aider-runtime-follow-on/validation-report.json`
-- `docs/agents/.uaa-temp/runtime-follow-on/runs/repair-aider-runtime-follow-on/handoff.json`
-- `docs/agents/.uaa-temp/runtime-follow-on/runs/repair-aider-runtime-follow-on/written-paths.json`
-- `docs/agents/.uaa-temp/runtime-follow-on/runs/repair-aider-runtime-follow-on/run-summary.md`
+Required work:
 
-Owned files:
-
-- `$ORCH_RUN_ROOT/baseline.json`
-- `$ORCH_RUN_ROOT/tasks.json`
-- `$ORCH_RUN_ROOT/session-log.md`
-- `$REPO_ROOT/.runs/task-runtime-evidence-00-baseline/*`
-
-Forbidden files:
-
-- all product source files
+- capture current branch, HEAD SHA, and dirty-state summary
+- confirm `PLAN.md` is the current milestone source of truth
+- snapshot lane ownership against actual dirty state
+- detect whether any worker-owned surface is already dirty and must be absorbed or delayed
 
 Required commands:
 
 ```bash
-git rev-parse --abbrev-ref HEAD
+git branch --show-current
 git rev-parse HEAD
 git status --short
-test -f PLAN.md
-test -f crates/xtask/src/main.rs
-test -f crates/xtask/src/lib.rs
-test -f crates/xtask/src/historical_lifecycle_backfill.rs
-test -f crates/xtask/src/runtime_follow_on/lifecycle.rs
-test -f crates/xtask/src/prepare_publication/runtime_evidence.rs
-test -f crates/xtask/src/agent_maintenance/drift/mod.rs
-test -f crates/xtask/tests/runtime_follow_on_entrypoint.rs
-test -f crates/xtask/tests/prepare_publication_entrypoint.rs
-test -f crates/xtask/tests/agent_maintenance_drift.rs
-test -f docs/cli-agent-onboarding-factory-operator-guide.md
-test -f docs/agents/lifecycle/aider-onboarding/governance/approved-agent.toml
-test -f docs/agents/.uaa-temp/runtime-follow-on/runs/aider-runtime-follow-on-rerun/input-contract.json
-test -f docs/agents/.uaa-temp/runtime-follow-on/runs/aider-runtime-follow-on-rerun/handoff.json
-test -f docs/agents/.uaa-temp/runtime-follow-on/runs/aider-runtime-follow-on-rerun/written-paths.json
 ```
 
 Acceptance:
 
-- current branch is `codex/recommend-next-agent`
-- `PLAN.md` is present and is the run authority
-- the dirty worktree summary is recorded, including the modified `PLAN.md`
-- baseline captures real current failures and does not assume a clean tree
-- unrelated dirt is recorded, not reverted
+- baseline reflects actual repo state at launch time
+- lane ownership snapshot exists in `baseline.json`
+- parent has identified whether any lane must be delayed because of pre-existing dirt
 
-### WS-CORE
+### task/gcp-01-freeze
 
-#### `task/runtime-evidence-01-helper-freeze` — parent only
+Owner:
 
-Owned files:
+- parent
 
-- `crates/xtask/src/repair_runtime_evidence.rs`
-- `crates/xtask/src/runtime_evidence_bundle.rs`
-- `crates/xtask/src/historical_lifecycle_backfill.rs`
-- `crates/xtask/src/main.rs`
+Owned surfaces:
+
+- `crates/xtask/src/capability_publication.rs`
+- `crates/xtask/src/capability_matrix.rs`
 - `crates/xtask/src/lib.rs`
-- `crates/xtask/tests/repair_runtime_evidence_entrypoint.rs`
-- `$ORCH_RUN_ROOT/helper-freeze.json`
-- `$ORCH_RUN_ROOT/session-log.md`
-- `$REPO_ROOT/.runs/task-runtime-evidence-01-helper-freeze/*`
+- `crates/xtask/src/capability_projection.rs` only if required
+- `RUN_ROOT/freeze.json`
+- `REPO_ROOT/.runs/task-gcp-01-freeze/**`
 
-Forbidden files:
+Forbidden surfaces:
 
-- `crates/xtask/src/runtime_follow_on/lifecycle.rs`
-- `crates/xtask/src/prepare_publication/runtime_evidence.rs`
-- `crates/xtask/src/agent_maintenance/drift/**`
-- `crates/xtask/tests/runtime_follow_on_entrypoint.rs`
-- `crates/xtask/tests/prepare_publication_entrypoint.rs`
-- `crates/xtask/tests/agent_maintenance_drift.rs`
-- `docs/cli-agent-onboarding-factory-operator-guide.md`
-- `docs/agents/.uaa-temp/**`
+- worker-owned lane files
+- `crates/xtask/tests/**`
+- authored docs/specs except generated semantics review notes in `session-log.md`
 
 Required work:
 
-1. Add the shared runtime evidence bundle helper module.
-2. Move bundle reconstruction and writer helpers out of `historical_lifecycle_backfill.rs`.
-3. Add `repair-runtime-evidence` command wiring in `main.rs` and `lib.rs`.
-4. Implement `--check` and `--write` argument flow for the new command.
-5. Keep repair lifecycle-stage neutral.
-6. Keep the deterministic repair directory naming fixed.
-7. Add focused entrypoint coverage for command surface and core repair behavior.
-8. Write `helper-freeze.json` from the exact head commit that contains the finished parent-owned core.
+- add `crates/xtask/src/capability_publication.rs`
+- export it from `crates/xtask/src/lib.rs`
+- move publication eligibility, continuity validation, inventory construction, and shared audit entrypoints into the new module
+- migrate `crates/xtask/src/capability_matrix.rs` to consume the shared publication source
+- remove generator dependence on hardcoded runtime backend construction
+- record the frozen contract in `freeze.json`
 
 Required commands:
 
 ```bash
-cargo test -p xtask --test repair_runtime_evidence_entrypoint
+cargo test -p xtask --test c8_capability_matrix_unit
+cargo run -p xtask -- capability-matrix --check
 ```
 
 Acceptance:
 
-- shared helper exists and is the only reconstruction path for repair and historical backfill
-- `repair-runtime-evidence` is wired into `xtask`
-- helper-freeze records the frozen repair contract and launch commit
-- worker lanes do not launch until this task is complete on `codex/recommend-next-agent`
+- `capability_matrix.rs` no longer owns publication truth derivation
+- the parent can state the frozen shared interface concretely in `freeze.json`
+- freeze is stable enough that downstream lanes can proceed independently
 
-### WS-VALIDATION
+### task/gcp-02-audit-closeout
 
-#### `task/runtime-evidence-02a-validation-hardening` — worker 1
+Owner:
 
-Owned files:
+- worker B
 
-- `crates/xtask/src/runtime_follow_on/lifecycle.rs`
-- `crates/xtask/src/prepare_publication/runtime_evidence.rs`
-- `crates/xtask/tests/runtime_follow_on_entrypoint.rs`
-- `crates/xtask/tests/prepare_publication_entrypoint.rs`
+Owned surfaces:
 
-Forbidden files:
+- `crates/xtask/src/capability_matrix_audit.rs`
+- `crates/xtask/src/close_proving_run.rs`
 
-- `crates/xtask/src/repair_runtime_evidence.rs`
-- `crates/xtask/src/runtime_evidence_bundle.rs`
-- `crates/xtask/src/historical_lifecycle_backfill.rs`
-- `crates/xtask/src/main.rs`
+Forbidden surfaces:
+
+- `crates/xtask/src/capability_publication.rs`
+- `crates/xtask/src/capability_matrix.rs`
 - `crates/xtask/src/lib.rs`
-- `crates/xtask/src/agent_maintenance/drift/**`
-- `crates/xtask/tests/repair_runtime_evidence_entrypoint.rs`
-- `crates/xtask/tests/agent_maintenance_drift.rs`
-- `docs/cli-agent-onboarding-factory-operator-guide.md`
-- `docs/agents/.uaa-temp/**`
-- `$ORCH_RUN_ROOT/**`
+- `crates/xtask/tests/**`
+- docs/specs
+- `.runs/**`
 
 Required work:
 
-1. Remove legacy short-form publication command tolerance from `runtime_follow_on/lifecycle.rs`.
-2. Require exact equality with `agent_lifecycle::REQUIRED_PUBLICATION_COMMANDS`.
-3. Keep `prepare-publication` strict.
-4. Improve stale-bundle consumer errors so operators are pointed to `repair-runtime-evidence`.
-5. Add regression coverage for legacy short-form rejection.
-6. Add regression coverage for strict repaired-bundle consumption semantics.
+- move the audit CLI entrypoint in `crates/xtask/src/capability_matrix_audit.rs` onto the shared publication audit
+- remove duplicated audit logic and allowlist ownership from `crates/xtask/src/close_proving_run.rs`
+- keep closeout write flow unchanged except for shared-audit reuse
 
 Required commands:
 
 ```bash
-cargo test -p xtask --test runtime_follow_on_entrypoint
-cargo test -p xtask --test prepare_publication_entrypoint
+cargo test -p xtask --test onboard_agent_closeout_preview
+cargo run -p xtask -- capability-matrix-audit
 ```
 
 Acceptance:
 
-- forward runtime validation no longer accepts short-form command sets
-- publication consumption remains strict and does not gain legacy aliases
-- validation tests cover both rejection and truthful-bundle acceptance
-- no drift, repair-core, docs, or `.uaa-temp` files are changed
+- `capability-matrix-audit` and `close-proving-run` use one audit implementation
+- no local allowlist clone remains in `close_proving_run.rs`
+- no publication truth derivation is reintroduced in the lane
 
-Bounce-back rules:
+### task/gcp-03-drift-prepare
 
-- if the worker needs a new repair helper interface, stop and return the requested `helper-freeze.json` delta
-- if the worker needs to touch `main.rs` or `lib.rs`, stop and bounce back
+Owner:
 
-### WS-DRIFT
+- worker C
 
-#### `task/runtime-evidence-02b-drift-surfacing` — worker 2
+Owned surfaces:
 
-Owned files:
+- `crates/xtask/src/prepare_publication.rs`
+- `crates/xtask/src/agent_maintenance/drift/shared.rs`
+- `crates/xtask/src/agent_maintenance/drift/publication.rs`
 
-- `crates/xtask/src/agent_maintenance/drift/mod.rs`
-- `crates/xtask/src/agent_maintenance/drift/runtime_evidence.rs`
-- `crates/xtask/src/agent_maintenance/drift/shared.rs` when mechanically required
-- `crates/xtask/tests/agent_maintenance_drift.rs`
+Forbidden surfaces:
 
-Forbidden files:
-
-- `crates/xtask/src/repair_runtime_evidence.rs`
-- `crates/xtask/src/runtime_evidence_bundle.rs`
-- `crates/xtask/src/historical_lifecycle_backfill.rs`
-- `crates/xtask/src/main.rs`
+- `crates/xtask/src/capability_publication.rs`
+- `crates/xtask/src/capability_matrix.rs`
 - `crates/xtask/src/lib.rs`
-- `crates/xtask/src/runtime_follow_on/**`
-- `crates/xtask/src/prepare_publication/**`
-- `crates/xtask/tests/repair_runtime_evidence_entrypoint.rs`
-- `crates/xtask/tests/runtime_follow_on_entrypoint.rs`
-- `crates/xtask/tests/prepare_publication_entrypoint.rs`
-- `docs/cli-agent-onboarding-factory-operator-guide.md`
-- `docs/agents/.uaa-temp/**`
-- `$ORCH_RUN_ROOT/**`
+- `crates/xtask/tests/**`
+- docs/specs
+- `.runs/**`
 
 Required work:
 
-1. Add explicit stale-runtime-evidence drift detection for `runtime_integrated` agents.
-2. Emit a targeted repair instruction that references `repair-runtime-evidence`.
-3. Keep existing governance drift logic intact for other lifecycle states.
-4. Add regression coverage proving the explicit runtime-evidence finding appears for stale bundles.
-5. Add regression coverage proving that finding disappears once the runtime evidence is truthful.
+- replace `prepare_publication.rs` continuity dependency on `capability_matrix` with the shared publication source
+- route drift capability truth through the shared publication source
+- keep support-matrix logic unchanged
 
 Required commands:
 
 ```bash
-cargo test -p xtask --test agent_maintenance_drift
-```
-
-Acceptance:
-
-- drift output includes a first-class runtime-evidence finding instead of only vague governance drift
-- the finding is scoped to the runtime evidence seam and includes the repair command
-- no repair-core, validation, docs, or `.uaa-temp` files are changed
-
-Bounce-back rules:
-
-- if the worker needs a change to the frozen repair command contract, stop and return the exact freeze delta
-- if the worker needs to touch `prepare_publication/runtime_evidence.rs`, stop and bounce back
-
-### WS-CONVERGE
-
-#### `task/runtime-evidence-02c-converge` — parent only
-
-Owned files:
-
-- `$ORCH_RUN_ROOT/merge-log.md`
-- `$ORCH_RUN_ROOT/session-log.md`
-- `$REPO_ROOT/.runs/task-runtime-evidence-02c-converge/*`
-
-Required integration sequence:
-
-1. Merge `codex/recommend-next-agent-validation-hardening` into `codex/recommend-next-agent`.
-2. Run the validation gate.
-3. Merge `codex/recommend-next-agent-drift-surfacing` into `codex/recommend-next-agent`.
-4. Run the combined gate.
-5. Do not reopen helper-freeze semantics here.
-
-Required commands:
-
-```bash
-cargo test -p xtask --test repair_runtime_evidence_entrypoint
-cargo test -p xtask --test runtime_follow_on_entrypoint
 cargo test -p xtask --test prepare_publication_entrypoint
 cargo test -p xtask --test agent_maintenance_drift
+cargo run -p xtask -- prepare-publication --approval docs/agents/lifecycle/codex-cli-onboarding/governance/approved-agent.toml --check
 ```
 
 Acceptance:
 
-- both delegated lanes are merged on the live integration surface
-- frozen repair semantics remain intact
-- no worker-authored `.uaa-temp` evidence exists
+- `prepare-publication`, drift, and generator all reason from the same publication truth
+- no local capability-truth derivation remains in drift or `prepare_publication.rs`
 
-### WS-REPAIR
+### task/gcp-04-docs-specs
 
-#### `task/runtime-evidence-03-repair-aider-docs` — parent only
+Owner:
 
-Owned files:
+- worker D
 
-- `docs/agents/.uaa-temp/runtime-follow-on/runs/repair-aider-runtime-follow-on/input-contract.json`
-- `docs/agents/.uaa-temp/runtime-follow-on/runs/repair-aider-runtime-follow-on/run-status.json`
-- `docs/agents/.uaa-temp/runtime-follow-on/runs/repair-aider-runtime-follow-on/validation-report.json`
-- `docs/agents/.uaa-temp/runtime-follow-on/runs/repair-aider-runtime-follow-on/handoff.json`
-- `docs/agents/.uaa-temp/runtime-follow-on/runs/repair-aider-runtime-follow-on/written-paths.json`
-- `docs/agents/.uaa-temp/runtime-follow-on/runs/repair-aider-runtime-follow-on/run-summary.md`
+Owned surfaces:
+
+- `docs/specs/unified-agent-api/capabilities-schema-spec.md`
+- `docs/specs/unified-agent-api/README.md`
+- `docs/specs/cli-agent-onboarding-charter.md`
 - `docs/cli-agent-onboarding-factory-operator-guide.md`
-- `$ORCH_RUN_ROOT/session-log.md`
-- `$REPO_ROOT/.runs/task-runtime-evidence-03-repair-aider-docs/*`
 
-Forbidden files:
+Forbidden surfaces:
 
-- `PLAN.md`
-- `docs/agents/.uaa-temp/runtime-follow-on/runs/aider-runtime-follow-on-rerun/**`
+- generated `docs/specs/unified-agent-api/capability-matrix.md`
+- all `crates/xtask/src/**`
+- all `crates/xtask/tests/**`
+- `.runs/**`
 
 Required work:
 
-1. Run the explicit drift check for `aider` before repair and record the result.
-2. Run `repair-runtime-evidence --check` for `aider`.
-3. Run `repair-runtime-evidence --write` for `aider`.
-4. Commit only the deterministic repair bundle under `repair-aider-runtime-follow-on`.
-5. Re-run `prepare-publication --check` for `aider`.
-6. Re-run `check-agent-drift --agent aider` and verify the specific runtime-evidence finding is gone.
-7. Update the operator guide with:
-   - when to run `repair-runtime-evidence`
-   - expected stale-bundle failure shape
-   - the `aider` repair sequence
-   - the fact that repair does not advance lifecycle stage
+- update the authored docs/specs to describe lifecycle-backed publication truth
+- remove built-in-backend-inventory wording from the in-scope docs
+- align prose with the frozen Lane A semantics only
 
 Required commands:
 
 ```bash
-cargo run -p xtask -- check-agent-drift --agent aider
-cargo run -p xtask -- repair-runtime-evidence --approval docs/agents/lifecycle/aider-onboarding/governance/approved-agent.toml --check
-cargo run -p xtask -- repair-runtime-evidence --approval docs/agents/lifecycle/aider-onboarding/governance/approved-agent.toml --write
-cargo run -p xtask -- prepare-publication --approval docs/agents/lifecycle/aider-onboarding/governance/approved-agent.toml --check
-cargo run -p xtask -- check-agent-drift --agent aider
+rg -n "built-in backend|built-in backend config|default built-in backend config" docs/specs/unified-agent-api docs/cli-agent-onboarding-factory-operator-guide.md
 ```
 
 Acceptance:
 
-- repaired `aider` bundle is generated through command behavior, not by hand editing JSON
-- repaired `written-paths.json` is non-empty
-- repair leaves lifecycle stage unchanged
-- `prepare-publication --check` passes for `aider` after repair
-- the explicit runtime-evidence drift finding exists before repair and is absent after repair
-- the stale rerun directory remains untouched
+- no in-scope authored doc claims hardcoded backend constructor inventory is the publication truth source
+- prose matches the frozen code semantics
+- lane is eligible for relaunch if B/C semantics changed after docs draft started
 
-### WS-VERIFY
+### task/gcp-05-converge-tests
 
-#### `task/runtime-evidence-04-final-verify` — parent only
+Owner:
 
-Owned files:
+- parent
 
-- the full milestone touch set
-- `$ORCH_RUN_ROOT/acceptance.md`
-- `$ORCH_RUN_ROOT/merge-log.md`
-- `$ORCH_RUN_ROOT/session-log.md`
-- `$REPO_ROOT/.runs/task-runtime-evidence-04-final-verify/*`
+Owned surfaces:
 
-Final verification sequence:
+- merged integration branch state
+- `crates/xtask/tests/**`
+- `RUN_ROOT/merge-log.md`
+- `RUN_ROOT/session-log.md`
+- `REPO_ROOT/.runs/task-gcp-05-converge-tests/**`
 
-1. Replay the repair command gate:
-   ```bash
-   cargo test -p xtask --test repair_runtime_evidence_entrypoint
-   ```
-2. Replay the forward validation gate:
-   ```bash
-   cargo test -p xtask --test runtime_follow_on_entrypoint
-   cargo test -p xtask --test prepare_publication_entrypoint
-   ```
-3. Replay the drift gate:
-   ```bash
-   cargo test -p xtask --test agent_maintenance_drift
-   ```
-4. Replay the live `aider` proof sequence:
-   ```bash
-   cargo run -p xtask -- repair-runtime-evidence --approval docs/agents/lifecycle/aider-onboarding/governance/approved-agent.toml --check
-   cargo run -p xtask -- repair-runtime-evidence --approval docs/agents/lifecycle/aider-onboarding/governance/approved-agent.toml --write
-   cargo run -p xtask -- prepare-publication --approval docs/agents/lifecycle/aider-onboarding/governance/approved-agent.toml --check
-   cargo run -p xtask -- check-agent-drift --agent aider
-   ```
-5. Run the workspace typecheck gate last:
-   ```bash
-   make check
-   ```
+Required work:
 
-Verification rules:
+- merge B, then rerun Lane B smoke locally
+- merge C, then rerun Lane C smoke locally
+- merge D only after B/C semantics are confirmed stable, otherwise relaunch D
+- add or finish shared regression coverage in `crates/xtask/tests/**`
+- prove the generic behavior with a synthetic publication-eligible fixture
+- prove pre-runtime omission
+- prove continuity drift failures
+- prove shared audit reuse and drift/generator parity
 
-- Run the verification sequence in the listed order.
-- Treat `make check` as the final whole-workspace gate only after the narrower xtask tests and live `aider` proof commands are green.
-- If a failure is caused by this milestone’s files, patch inside the milestone touch set and rerun from the first failed step.
-- If a failure is caused by unrelated pre-existing repo state outside the touch set, record it in `acceptance.md` and stop instead of widening scope.
-- Do not author `.uaa-temp` evidence during final verification except through the repair command itself.
-- Do not mutate lifecycle stage as part of verification.
+Required commands:
+
+```bash
+cargo test -p xtask --test onboard_agent_closeout_preview
+cargo run -p xtask -- capability-matrix-audit
+cargo test -p xtask --test prepare_publication_entrypoint
+cargo test -p xtask --test agent_maintenance_drift
+cargo run -p xtask -- prepare-publication --approval docs/agents/lifecycle/codex-cli-onboarding/governance/approved-agent.toml --check
+cargo test -p xtask --test c8_capability_matrix_unit
+cargo test -p xtask --test c8_spec_capability_matrix_paths
+cargo test -p xtask --test prepare_publication_entrypoint
+cargo test -p xtask --test agent_maintenance_drift
+cargo test -p xtask --test onboard_agent_closeout_preview
+make check
+```
 
 Acceptance:
 
-- the live branch `codex/recommend-next-agent` contains the full milestone
-- the explicit integration surface remained `REPO_ROOT` on `codex/recommend-next-agent`
-- the shared helper owns reconstruction logic used by repair and historical backfill
-- `repair-runtime-evidence` exists and is repo-owned
-- forward runtime validation rejects legacy short-form publication commands
-- `prepare-publication` remains strict
-- drift output gives an explicit repair path for stale runtime evidence
-- repaired `aider` runtime evidence is committed under the deterministic repair directory
-- `$ORCH_RUN_ROOT` contains:
-  - `baseline.json`
-  - `tasks.json`
-  - `session-log.md`
-  - `helper-freeze.json`
-  - `merge-log.md`
-  - `acceptance.md`
+- required test files in `PLAN.md` cover the locked regressions
+- no consumer in scope still restates publication-capability derivation independently
+- merge checkpoints are recorded in `merge-log.md`
 
-## Context-Control Rules
+### task/gcp-06-final-verify
 
-- Parent keeps only these materials active in working context:
-  - `PLAN.md`
-  - this `ORCH_PLAN.md`
-  - `$ORCH_RUN_ROOT/tasks.json`
-  - `$ORCH_RUN_ROOT/helper-freeze.json` after WS-CORE
-  - the latest live-branch diff summary
-- Worker prompts contain only:
-  - owned files
-  - forbidden files
-  - the exact relevant `PLAN.md` excerpt
-  - the frozen repair contract from `helper-freeze.json`
-  - required commands
-  - bounce-back rules
-- Workers return narrow summaries only.
-- Parent records decisions in `$ORCH_RUN_ROOT/session-log.md`.
-- Close worker lanes immediately after merge or rejection.
-- Do not ingest full worker transcripts back into parent context unless a specific failure excerpt is required.
+Owner:
+
+- parent
+
+Owned surfaces:
+
+- merged integration branch state
+- generated `docs/specs/unified-agent-api/capability-matrix.md`
+- `RUN_ROOT/acceptance.md`
+- `REPO_ROOT/.runs/task-gcp-06-final-verify/**`
+
+Required work:
+
+- regenerate `docs/specs/unified-agent-api/capability-matrix.md` from merged code
+- rerun the full ordered final verification sequence
+- record command results and acceptance in `acceptance.md`
+
+Required final ordered sequence:
+
+1. Regenerate the matrix:
+   ```bash
+   cargo run -p xtask -- capability-matrix
+   ```
+2. Verify the regenerated matrix is clean:
+   ```bash
+   cargo run -p xtask -- capability-matrix --check
+   ```
+3. Verify the shared audit:
+   ```bash
+   cargo run -p xtask -- capability-matrix-audit
+   ```
+4. Verify drift against the merged truth:
+   ```bash
+   cargo run -p xtask -- check-agent-drift --agent codex
+   ```
+5. Verify publication continuity through the shared source path:
+   ```bash
+   cargo run -p xtask -- prepare-publication --approval docs/agents/lifecycle/codex-cli-onboarding/governance/approved-agent.toml --check
+   ```
+
+Failure handling:
+
+- If a failure is caused by files in touched scope for this milestone, patch within the milestone touch set and rerun from the first failed step.
+- If a failure is caused by unrelated pre-existing repo state outside the touch set, record it in `acceptance.md`, leave scope unchanged, and stop instead of widening the run.
+
+Acceptance:
+
+- generated capability publication matches the merged shared source
+- all final gates pass, or any unrelated blocker is explicitly recorded as out of scope
+- the branch is ready for review without hidden follow-up edits
 
 ## Tests And Acceptance
 
-Parent gates by phase:
+The run is accepted only if all of the following are true:
 
-- WS-CORE:
-  - `cargo test -p xtask --test repair_runtime_evidence_entrypoint`
-- WS-VALIDATION:
-  - `cargo test -p xtask --test runtime_follow_on_entrypoint`
-  - `cargo test -p xtask --test prepare_publication_entrypoint`
-- WS-DRIFT:
-  - `cargo test -p xtask --test agent_maintenance_drift`
-- WS-CONVERGE:
-  - `cargo test -p xtask --test repair_runtime_evidence_entrypoint`
-  - `cargo test -p xtask --test runtime_follow_on_entrypoint`
-  - `cargo test -p xtask --test prepare_publication_entrypoint`
-  - `cargo test -p xtask --test agent_maintenance_drift`
-- WS-REPAIR:
-  - `cargo run -p xtask -- check-agent-drift --agent aider`
-  - `cargo run -p xtask -- repair-runtime-evidence --approval docs/agents/lifecycle/aider-onboarding/governance/approved-agent.toml --check`
-  - `cargo run -p xtask -- repair-runtime-evidence --approval docs/agents/lifecycle/aider-onboarding/governance/approved-agent.toml --write`
-  - `cargo run -p xtask -- prepare-publication --approval docs/agents/lifecycle/aider-onboarding/governance/approved-agent.toml --check`
-  - `cargo run -p xtask -- check-agent-drift --agent aider`
-- Final:
-  - `make check`
-
-Final acceptance checklist:
-
-- `repair-runtime-evidence --check` clearly fails when repair is impossible
-- `repair-runtime-evidence --write` emits the full six-file bundle with non-empty written paths
-- repair never advances lifecycle stage
-- `historical_lifecycle_backfill.rs` uses the shared helper instead of private reconstruction logic
-- forward runtime validation no longer accepts legacy short-form publication commands
-- `prepare-publication --check` passes for `aider` after repair
-- `check-agent-drift --agent aider` surfaces an explicit runtime-evidence repair finding before repair and that specific finding disappears after repair
-- `make check` runs last as the final whole-workspace gate
+1. `cargo run -p xtask -- capability-matrix --check` passes without any hardcoded runtime backend inventory path in `capability_matrix.rs`.
+2. `capability-matrix-audit` and `close-proving-run` use the same shared audit implementation.
+3. A synthetic publication-eligible agent fixture can enter publication truth without a new `xtask` hardcoded backend arm.
+4. A synthetic pre-runtime fixture is omitted from generated publication output.
+5. `check-agent-drift` compares against the same shared publication truth used by the generator.
+6. `prepare-publication` uses the shared continuity path, not the generator module.
+7. In-scope authored docs and the generated matrix header no longer describe publication as built-in backend inventory.
+8. No consumer in scope restates publication-capability derivation independently.
 
 ## Assumptions
 
-- `codex/recommend-next-agent` is the correct live implementation branch for this run.
-- `main` remains only the review base branch.
-- The modified `PLAN.md` is intentional authority text and must not be reverted during orchestration.
-- Existing xtask integration harnesses are sufficient; this milestone does not require a new test harness family beyond `repair_runtime_evidence_entrypoint.rs`.
-- Helper extraction can freeze a small shared contract before workers launch.
-- The `aider` repair can be derived from committed repo state without agent-specific special casing.
-- Keeping docs and `.uaa-temp` repair artifacts parent-owned is faster and safer than splitting them into another lane.
-- The parent can complete final integration and verification without widening scope beyond the PLAN milestone.
+- `PLAN.md` remains the current milestone source of truth for the full run.
+- No human approval gate is required before merge; ordinary review happens after branch completion.
+- Parent can create local worker worktrees under `/Users/spensermcconnell/__Active_Code/atomize-hq/.worktrees/`.
+- The shared seam can be frozen with one parent-owned source module and surgical rewires, not a broader architecture rewrite.
+- The generated `docs/specs/unified-agent-api/capability-matrix.md` should be refreshed only after the merged code is stable.
+- Current repo dirt may overlap with lane-owned files; the parent must snapshot and honor that actual dirty state before launching workers, even if it forces a lane delay or ownership rebalance.
+- If repo state changes under active work, the parent will re-evaluate ownership and relaunch stale lanes rather than forcing merges across moving semantics.
