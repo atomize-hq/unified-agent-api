@@ -3,6 +3,9 @@
 
 Status: Implemented on 2026-04-29. The shipped operator procedure now lives in `docs/cli-agent-onboarding-factory-operator-guide.md`.
 
+Successor status: the remaining create-lane gap is no longer the runtime runner itself. The open
+follow-on is publication/maintenance wiring after runtime-owned evidence exists.
+
 This note is the milestone definition for the next onboarding automation seam.
 
 The recommendation lane is now good enough to get to approval. The control-plane commands are now

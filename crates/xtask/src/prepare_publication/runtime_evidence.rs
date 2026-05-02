@@ -89,6 +89,18 @@ pub(super) fn discover_runtime_evidence(
     }))
 }
 
+pub(super) fn validate_runtime_evidence_run(
+    workspace_root: &Path,
+    approval: &ApprovalArtifact,
+    run_id: &str,
+) -> Result<RuntimeEvidenceBundle, Error> {
+    inspect_runtime_run(workspace_root, approval, run_id)?.ok_or_else(|| {
+        Error::Validation(format!(
+            "runtime evidence run `{run_id}` is missing required runtime evidence files under `{RUNTIME_RUNS_ROOT}`"
+        ))
+    })
+}
+
 fn inspect_runtime_run(
     workspace_root: &Path,
     approval: &ApprovalArtifact,

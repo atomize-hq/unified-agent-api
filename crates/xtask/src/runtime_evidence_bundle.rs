@@ -72,14 +72,34 @@ pub fn write_runtime_evidence_bundle(
 ) -> Result<GeneratedRuntimeEvidenceBundle, Error> {
     let run_relative = format!("{RUNTIME_RUNS_ROOT}/{}", spec.run_id);
     let run_root = workspace_root.join(&run_relative);
-    fs::create_dir_all(&run_root)
-        .map_err(|err| Error::Internal(format!("create {}: {err}", run_root.display())))?;
+    write_runtime_evidence_bundle_at(
+        workspace_root,
+        &run_root,
+        &run_relative,
+        &run_root,
+        approval,
+        lifecycle_state,
+        spec,
+    )
+}
+
+pub fn write_runtime_evidence_bundle_at(
+    workspace_root: &Path,
+    actual_run_root: &Path,
+    run_relative: &str,
+    metadata_run_root: &Path,
+    approval: &ApprovalArtifact,
+    lifecycle_state: &LifecycleState,
+    spec: &RuntimeEvidenceBundleSpec<'_>,
+) -> Result<GeneratedRuntimeEvidenceBundle, Error> {
+    fs::create_dir_all(actual_run_root)
+        .map_err(|err| Error::Internal(format!("create {}: {err}", actual_run_root.display())))?;
 
     let written_paths = derive_runtime_written_paths(workspace_root, approval, lifecycle_state)?;
     let generated_at = lifecycle_state.last_transition_at.clone();
 
     write_json(
-        &run_root.join("input-contract.json"),
+        &actual_run_root.join("input-contract.json"),
         &json!({
             "workflow_version": WORKFLOW_VERSION,
             "generated_at": generated_at,
@@ -92,7 +112,7 @@ pub fn write_runtime_evidence_bundle(
         }),
     )?;
     write_json(
-        &run_root.join("run-status.json"),
+        &actual_run_root.join("run-status.json"),
         &json!({
             "workflow_version": WORKFLOW_VERSION,
             "generated_at": generated_at,
@@ -106,13 +126,13 @@ pub fn write_runtime_evidence_bundle(
             "status": "write_validated",
             "validation_passed": true,
             "handoff_ready": true,
-            "run_dir": run_root.display().to_string(),
+            "run_dir": metadata_run_root.display().to_string(),
             "written_paths": written_paths,
             "errors": [],
         }),
     )?;
     write_json(
-        &run_root.join("validation-report.json"),
+        &actual_run_root.join("validation-report.json"),
         &json!({
             "workflow_version": WORKFLOW_VERSION,
             "generated_at": generated_at,
@@ -127,7 +147,7 @@ pub fn write_runtime_evidence_bundle(
         }),
     )?;
     write_json(
-        &run_root.join("handoff.json"),
+        &actual_run_root.join("handoff.json"),
         &json!({
             "agent_id": approval.descriptor.agent_id,
             "manifest_root": approval.descriptor.manifest_root,
@@ -137,12 +157,15 @@ pub fn write_runtime_evidence_bundle(
             "blockers": [],
         }),
     )?;
-    write_json(&run_root.join("written-paths.json"), &json!(written_paths))?;
+    write_json(
+        &actual_run_root.join("written-paths.json"),
+        &json!(written_paths),
+    )?;
     fs::write(
-        run_root.join("run-summary.md"),
+        actual_run_root.join("run-summary.md"),
         render_runtime_summary(
             approval,
-            &run_relative,
+            run_relative,
             &written_paths,
             spec.summary_title,
             spec.source_label,
@@ -152,7 +175,7 @@ pub fn write_runtime_evidence_bundle(
 
     Ok(GeneratedRuntimeEvidenceBundle {
         run_id: spec.run_id.to_string(),
-        run_relative: run_relative.clone(),
+        run_relative: run_relative.to_string(),
         runtime_evidence_paths: vec![
             format!("{run_relative}/input-contract.json"),
             format!("{run_relative}/run-status.json"),
@@ -189,14 +212,14 @@ fn derive_runtime_written_paths(
         }
     }
 
-    if let Some(path) = first_file_under(
+    for path in collect_files_under(
         workspace_root,
         &approval.descriptor.manifest_root,
         "supplement",
     )? {
         written.insert(path);
     }
-    if let Some(path) = first_file_under(
+    for path in collect_files_under(
         workspace_root,
         &approval.descriptor.manifest_root,
         "snapshots",
@@ -232,14 +255,14 @@ fn derive_runtime_written_paths(
     Ok(written.into_iter().collect())
 }
 
-fn first_file_under(
+fn collect_files_under(
     workspace_root: &Path,
     manifest_root: &str,
     child: &str,
-) -> Result<Option<String>, Error> {
+) -> Result<Vec<String>, Error> {
     let dir = workspace_root.join(manifest_root).join(child);
     if !dir.is_dir() {
-        return Ok(None);
+        return Ok(Vec::new());
     }
     let mut stack = vec![dir];
     let mut files = Vec::new();
@@ -264,9 +287,9 @@ fn first_file_under(
     files.sort();
     Ok(files
         .into_iter()
-        .next()
-        .and_then(|path| path.strip_prefix(workspace_root).ok().map(PathBuf::from))
-        .map(|path| path.to_string_lossy().replace('\\', "/")))
+        .filter_map(|path| path.strip_prefix(workspace_root).ok().map(PathBuf::from))
+        .map(|path| path.to_string_lossy().replace('\\', "/"))
+        .collect())
 }
 
 fn render_runtime_summary(

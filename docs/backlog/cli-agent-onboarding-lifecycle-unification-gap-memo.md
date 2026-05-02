@@ -11,11 +11,11 @@ lane against the repo's existing deterministic capability publication and mainte
 
 The short version:
 
-- `xtask runtime-follow-on --write` is a legitimate bounded Codex execution runner.
+- `xtask runtime-follow-on --write` is already landed as a legitimate bounded Codex execution runner.
 - It is good enough to implement runtime-owned code and evidence.
-- It is **not** yet wired into the repo's full deterministic create-mode done-state.
+- The remaining lifecycle hole is publication/maintenance wiring after that runtime-owned evidence exists.
 
-That missing wiring is now the highest-leverage onboarding gap.
+That missing publication/maintenance wiring is now the highest-leverage onboarding gap.
 
 ## Bottom line
 

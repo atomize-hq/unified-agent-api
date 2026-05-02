@@ -154,8 +154,16 @@ fn prepare_fixture(prefix: &str) -> (PathBuf, String) {
         "{}\n",
     );
     write_text(
+        &fixture.join("cli_manifests/gemini_cli/snapshots/union.json"),
+        "{}\n",
+    );
+    write_text(
         &fixture.join("cli_manifests/gemini_cli/supplement/notes.md"),
         "# Supplement\n",
+    );
+    write_text(
+        &fixture.join("cli_manifests/gemini_cli/supplement/commands.md"),
+        "# Commands\n",
     );
 
     (fixture, approval_path)
@@ -204,7 +212,7 @@ fn repair_runtime_evidence_check_reports_repairable_bundle() {
     assert!(output
         .stdout
         .contains("run_id: repair-gemini_cli-runtime-follow-on"));
-    assert!(output.stdout.contains("written_paths: 6"));
+    assert!(output.stdout.contains("written_paths: 8"));
 }
 
 #[test]
@@ -233,7 +241,20 @@ fn repair_runtime_evidence_write_emits_bundle_without_advancing_lifecycle() {
         &fs::read(repair_root.join("written-paths.json")).expect("read written paths"),
     )
     .expect("parse written paths");
-    assert!(!written_paths.is_empty());
+    assert_eq!(written_paths.len(), 8);
+    assert!(written_paths.contains(&"cli_manifests/gemini_cli/snapshots/default.json".to_string()));
+    assert!(written_paths.contains(&"cli_manifests/gemini_cli/snapshots/union.json".to_string()));
+    assert!(written_paths.contains(&"cli_manifests/gemini_cli/supplement/notes.md".to_string()));
+    assert!(written_paths.contains(&"cli_manifests/gemini_cli/supplement/commands.md".to_string()));
+
+    let run_status: Value = serde_json::from_slice(
+        &fs::read(repair_root.join("run-status.json")).expect("read run status"),
+    )
+    .expect("parse run status");
+    assert_eq!(
+        run_status.get("run_dir").and_then(Value::as_str),
+        Some(repair_root.to_string_lossy().as_ref())
+    );
 
     let after_lifecycle = fs::read(&lifecycle_path).expect("read lifecycle after write");
     assert_eq!(
@@ -250,6 +271,38 @@ fn repair_runtime_evidence_write_emits_bundle_without_advancing_lifecycle() {
 }
 
 #[test]
+fn repair_runtime_evidence_write_replaces_existing_canonical_bundle_without_staging_leaks() {
+    let (fixture, approval_path) = prepare_fixture("repair-runtime-evidence-replace-existing");
+    let repair_root = repair_run_root(&fixture);
+    write_text(
+        &repair_root.join("run-summary.md"),
+        "# Old Repair Bundle\n\nThis should be replaced.\n",
+    );
+    write_json(
+        &repair_root.join("written-paths.json"),
+        &serde_json::json!(["stale/path.txt"]),
+    );
+
+    let output = run_cli(repair_args("--write", &approval_path), &fixture);
+    assert_eq!(output.exit_code, 0, "stderr:\n{}", output.stderr);
+
+    let summary = fs::read_to_string(repair_root.join("run-summary.md")).expect("read summary");
+    assert!(summary.contains("Runtime Evidence Repair"));
+    assert!(!summary.contains("Old Repair Bundle"));
+
+    let runs_root = fixture.join("docs/agents/.uaa-temp/runtime-follow-on/runs");
+    let leaked = fs::read_dir(&runs_root)
+        .expect("read runs root")
+        .filter_map(|entry| entry.ok())
+        .map(|entry| entry.file_name().to_string_lossy().into_owned())
+        .filter(|name| {
+            name.starts_with(".tmp-repair-gemini_cli") || name.starts_with(".bak-repair-gemini_cli")
+        })
+        .collect::<Vec<_>>();
+    assert!(leaked.is_empty(), "unexpected staging dirs: {leaked:?}");
+}
+
+#[test]
 fn repair_runtime_evidence_check_fails_when_runtime_outputs_cannot_be_derived() {
     let (fixture, approval_path) = prepare_fixture("repair-runtime-evidence-missing-outputs");
     for path in [
@@ -258,7 +311,9 @@ fn repair_runtime_evidence_check_fails_when_runtime_outputs_cannot_be_derived() 
         "crates/gemini_cli/src/wrapper_coverage_manifest.rs",
         "crates/agent_api/tests/c1_gemini_cli_runtime_follow_on.rs",
         "cli_manifests/gemini_cli/snapshots/default.json",
+        "cli_manifests/gemini_cli/snapshots/union.json",
         "cli_manifests/gemini_cli/supplement/notes.md",
+        "cli_manifests/gemini_cli/supplement/commands.md",
     ] {
         fs::remove_file(fixture.join(path)).expect("remove runtime-owned output");
     }

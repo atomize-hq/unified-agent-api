@@ -8,7 +8,11 @@
 
 ## Written Paths
 - `cli_manifests/claude_code/snapshots/2.1.29/darwin-arm64.json`
+- `cli_manifests/claude_code/snapshots/2.1.29/linux-x64.json`
+- `cli_manifests/claude_code/snapshots/2.1.29/union.json`
+- `cli_manifests/claude_code/snapshots/2.1.29/win32-x64.json`
 - `cli_manifests/claude_code/supplement/commands.example.json`
+- `cli_manifests/claude_code/supplement/commands.json`
 - `crates/agent_api/src/backends/claude_code/backend.rs`
 - `crates/agent_api/src/backends/claude_code/mod.rs`
 - `crates/claude_code/src/lib.rs`

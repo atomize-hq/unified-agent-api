@@ -10,8 +10,8 @@ use clap::{ArgGroup, Parser};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-use self::runtime_evidence::discover_runtime_evidence;
 pub use self::runtime_evidence::RuntimeEvidenceBundle;
+use self::runtime_evidence::{discover_runtime_evidence, validate_runtime_evidence_run};
 use crate::{
     agent_lifecycle::{
         self, file_sha256, load_lifecycle_state, load_publication_ready_packet, now_rfc3339,
@@ -206,6 +206,14 @@ pub fn discover_runtime_evidence_for_approval(
     discover_runtime_evidence(workspace_root, approval)
 }
 
+pub fn validate_runtime_evidence_run_for_approval(
+    workspace_root: &Path,
+    approval: &ApprovalArtifact,
+    run_id: &str,
+) -> Result<RuntimeEvidenceBundle, Error> {
+    validate_runtime_evidence_run(workspace_root, approval, run_id)
+}
+
 fn build_context(workspace_root: &Path, args: &Args) -> Result<PublicationContext, Error> {
     let approval =
         load_approval_artifact(workspace_root, &args.approval).map_err(map_approval_error)?;
@@ -313,6 +321,7 @@ fn validate_check_mode(workspace_root: &Path, context: &PublicationContext) -> R
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn build_publication_ready_packet(
     approval: &ApprovalArtifact,
     entry: &AgentRegistryEntry,

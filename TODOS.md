@@ -26,18 +26,6 @@
 **Priority:** P2
 **Depends on:** M5 landing with one canonical capability projection contract and one shared local/CI check-only gate
 
-### Enclose The Runtime Follow-On In A Codex Exec Runner
-
-**What:** Add a bounded runtime-lane execution path for create-mode onboarding that starts from the control-plane packet and scaffolding output, then drives the operator-guide "Finish the runtime follow-on" work through Codex with explicit file targets, baseline expectations, and required evidence outputs.
-
-**Why:** The recommendation lane now closes the pre-create gap, and the control-plane commands already own enrollment, scaffolding, publication refresh, and packet closeout. The remaining high-friction seam is the runtime follow-on itself: wrapper/backend implementation, wrapper coverage source-of-truth, and committed runtime evidence. That lane still depends on human interpretation of examples instead of a repo-owned execution recipe.
-
-**Context:** The repo has now landed on a concrete baseline for new agent support. The expected default tier is `opencode`-level support, because it exercises the backend harness plus session controls. `gemini_cli` remains a minimal exception path only when the implementation packet records a justification for why the agent is shipping below the default tier. `codex` and `claude_code` stay feature-rich references for optional surfaces such as add-dirs, external sandbox policy, MCP management, and richer session handling. Publication refresh automation after runtime evidence exists remains a follow-up milestone, not part of this narrower runtime-lane closure.
-
-**Effort:** M
-**Priority:** P1
-**Depends on:** The shipped M6 control-plane boundary, the backend-harness path in `agent_api`, and a backlog-only milestone spec that pins the runtime-lane tiering and runner contract
-
 ### Enclose The Publication Refresh Follow-On After The Runtime Runner
 
 **What:** Add the next bounded automation seam after `uaa-0022`: deterministic refresh of runtime-derived manifest evidence into publication-owned support and capability surfaces, validation gates, and proving-run-closeout readiness.
@@ -51,6 +39,19 @@
 **Depends on:** `uaa-0022` landing with a structured runtime summary and explicit handoff into publication refresh
 
 ## Completed
+
+### Enclose The Runtime Follow-On In A Codex Exec Runner
+
+**What:** Add a bounded runtime-lane execution path for create-mode onboarding that starts from the control-plane packet and scaffolding output, then drives the operator-guide "Finish the runtime follow-on" work through Codex with explicit file targets, baseline expectations, and required evidence outputs.
+
+**Why:** The recommendation lane now closes the pre-create gap, and the control-plane commands already own enrollment, scaffolding, packet closeout, and now the runtime execution seam itself. The next remaining create-lane gap is not runtime implementation anymore; it is deterministic publication refresh and maintenance wiring after runtime-owned evidence exists.
+
+**Context:** The runtime runner landed on 2026-04-29 and now owns `runtime-follow-on --approval <path> --dry-run/--write`, bounded runtime evidence, and handoff validation ahead of publication refresh. `opencode` remains the default baseline template. Publication refresh automation stays deferred to the pending follow-on above.
+
+**Effort:** M
+**Priority:** P1
+**Depends on:** The shipped M6 control-plane boundary, the backend-harness path in `agent_api`, and a backlog-only milestone spec that pinned the runtime-lane tiering and runner contract
+**Completed:** landed on 2026-04-29
 
 ### Land The Deterministic Recommendation Engine v1
 

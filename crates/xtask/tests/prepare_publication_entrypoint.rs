@@ -469,6 +469,28 @@ fn prepare_publication_rejects_legacy_runtime_handoff_commands_with_repair_guida
 }
 
 #[test]
+fn validate_runtime_evidence_run_rejects_path_sensitive_run_dir_mismatch() {
+    let (fixture, approval_path) = prepare_fixture("prepare-publication-run-dir-mismatch");
+    let run_status_path = fixture
+        .join(RUNTIME_RUNS_ROOT)
+        .join(RUN_ID)
+        .join("run-status.json");
+    let mut run_status = read_json(&run_status_path);
+    run_status["run_dir"] = Value::String("/tmp/not-the-real-run-root".to_string());
+    write_json(&run_status_path, &run_status);
+
+    let approval = xtask::approval_artifact::load_approval_artifact(&fixture, &approval_path)
+        .expect("approval");
+    let err = prepare_publication::validate_runtime_evidence_run_for_approval(
+        &fixture, &approval, RUN_ID,
+    )
+    .expect_err("run_dir mismatch should fail");
+    assert!(err
+        .to_string()
+        .contains("recorded run_dir `/tmp/not-the-real-run-root`"));
+}
+
+#[test]
 fn prepare_publication_rejects_capability_continuity_drift() {
     let (fixture, approval_path) = prepare_fixture("prepare-publication-capability-drift");
     write_json(
