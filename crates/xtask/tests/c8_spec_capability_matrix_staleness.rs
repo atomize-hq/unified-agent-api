@@ -99,9 +99,13 @@ fn c8_spec_capability_matrix_check_passes_when_fresh_and_fails_without_rewriting
     );
 
     let mutated = baseline.replacen(
-        "| `agent_api.run` |",
-        "| `agent_api.run.local-mutation` |",
+        "# Capability matrix",
+        "# Capability matrix (locally mutated)",
         1,
+    );
+    assert_ne!(
+        mutated, baseline,
+        "deliberate local mutation must change the generated capability matrix fixture"
     );
     fs::write(&checked_in, &mutated).expect("write deliberate local mutation");
 

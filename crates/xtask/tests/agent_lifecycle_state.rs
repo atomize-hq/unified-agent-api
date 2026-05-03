@@ -33,7 +33,7 @@ fn resting_stage_rule_matches_v1_contract() {
     assert!(is_resting_stage_v1(LifecycleStage::Enrolled));
     assert!(is_resting_stage_v1(LifecycleStage::RuntimeIntegrated));
     assert!(is_resting_stage_v1(LifecycleStage::PublicationReady));
-    assert!(!is_resting_stage_v1(LifecycleStage::Published));
+    assert!(is_resting_stage_v1(LifecycleStage::Published));
     assert!(is_resting_stage_v1(LifecycleStage::ClosedBaseline));
 }
 
@@ -145,11 +145,7 @@ fn backfilled_lifecycle_states_validate_for_registry_targets() {
     let registry = AgentRegistry::load(&workspace_root).expect("load agent registry");
 
     let expectations = [
-        (
-            "codex",
-            LifecycleStage::ClosedBaseline,
-            SupportTier::FirstClass,
-        ),
+        ("codex", LifecycleStage::Published, SupportTier::FirstClass),
         (
             "claude_code",
             LifecycleStage::ClosedBaseline,
@@ -167,7 +163,7 @@ fn backfilled_lifecycle_states_validate_for_registry_targets() {
         ),
         (
             "aider",
-            LifecycleStage::RuntimeIntegrated,
+            LifecycleStage::PublicationReady,
             SupportTier::BaselineRuntime,
         ),
     ];
@@ -184,78 +180,105 @@ fn backfilled_lifecycle_states_validate_for_registry_targets() {
         assert_eq!(state.support_tier, expected_tier);
         assert_eq!(state.approval_artifact_path, approval_path);
 
-        if expected_stage == LifecycleStage::RuntimeIntegrated {
-            assert!(state.active_runtime_evidence_run_id.is_some());
-            continue;
+        match expected_stage {
+            LifecycleStage::PublicationReady => {
+                assert_eq!(
+                    state.required_evidence,
+                    required_evidence_for_stage(LifecycleStage::PublicationReady)
+                );
+                assert_eq!(
+                    state.satisfied_evidence,
+                    required_evidence_for_stage(LifecycleStage::PublicationReady)
+                );
+                assert!(state.publication_packet_path.is_none());
+                assert!(state.publication_packet_sha256.is_none());
+                assert!(state.closeout_baseline_path.is_none());
+            }
+            LifecycleStage::Published | LifecycleStage::ClosedBaseline => {
+                assert_eq!(
+                    state.required_evidence,
+                    required_evidence_for_stage(expected_stage)
+                );
+                assert_eq!(
+                    state.satisfied_evidence,
+                    required_evidence_for_stage(expected_stage)
+                );
+
+                let packet_path = state
+                    .publication_packet_path
+                    .as_ref()
+                    .expect("publication continuity packet path");
+                let packet_sha = state
+                    .publication_packet_sha256
+                    .as_ref()
+                    .expect("publication continuity packet sha");
+                assert_eq!(
+                    file_sha256(&workspace_root, packet_path).expect("hash packet"),
+                    *packet_sha
+                );
+
+                match expected_stage {
+                    LifecycleStage::Published => {
+                        assert!(state.closeout_baseline_path.is_none());
+                    }
+                    LifecycleStage::ClosedBaseline => {
+                        let closeout_path = state
+                            .closeout_baseline_path
+                            .as_ref()
+                            .expect("closed baseline closeout_baseline_path");
+                        assert!(
+                            workspace_root.join(closeout_path).is_file(),
+                            "missing {closeout_path}"
+                        );
+                    }
+                    _ => unreachable!("covered by outer match"),
+                }
+
+                let packet_bytes =
+                    fs::read(workspace_root.join(packet_path)).expect("read packet bytes");
+                let packet: PublicationReadyPacket =
+                    serde_json::from_slice(&packet_bytes).expect("parse packet");
+                packet.validate().expect("packet schema validation");
+
+                let approval =
+                    load_approval_artifact(&workspace_root, &state.approval_artifact_path)
+                        .expect("approval");
+                let runtime_validation_root =
+                    runtime_evidence_validation_root(&workspace_root, &packet)
+                        .unwrap_or_else(|| workspace_root.clone());
+                let runtime_evidence = validate_packet_pinned_runtime_evidence_for_approval(
+                    &runtime_validation_root,
+                    &approval,
+                    &packet,
+                )
+                .expect("validate packet-pinned runtime evidence");
+                assert_eq!(
+                    packet.runtime_evidence_paths,
+                    runtime_evidence.runtime_evidence_paths
+                );
+                assert_eq!(
+                    packet.publication_owned_paths,
+                    vec![lifecycle_path.clone(), packet_path.clone()]
+                );
+
+                if expected_stage == LifecycleStage::ClosedBaseline {
+                    let historical_publication_state =
+                        reconstruct_publication_ready_state_from_closed_baseline(&state);
+                    historical_publication_state
+                        .validate()
+                        .expect("historical publication-ready state validates");
+                    assert_eq!(
+                        packet.lifecycle_state_sha256,
+                        pretty_json_sha(&historical_publication_state)
+                    );
+                }
+            }
+            LifecycleStage::Approved
+            | LifecycleStage::Enrolled
+            | LifecycleStage::RuntimeIntegrated => {
+                unreachable!("unexpected registry target stage for this validation test")
+            }
         }
-
-        if expected_stage != LifecycleStage::ClosedBaseline {
-            continue;
-        }
-
-        assert_eq!(
-            state.required_evidence,
-            required_evidence_for_stage(LifecycleStage::ClosedBaseline)
-        );
-        assert_eq!(
-            state.satisfied_evidence,
-            required_evidence_for_stage(LifecycleStage::ClosedBaseline)
-        );
-
-        let packet_path = state
-            .publication_packet_path
-            .as_ref()
-            .expect("closed baseline publication_packet_path");
-        let packet_sha = state
-            .publication_packet_sha256
-            .as_ref()
-            .expect("closed baseline publication_packet_sha256");
-        let closeout_path = state
-            .closeout_baseline_path
-            .as_ref()
-            .expect("closed baseline closeout_baseline_path");
-        assert!(
-            workspace_root.join(closeout_path).is_file(),
-            "missing {closeout_path}"
-        );
-        assert_eq!(
-            file_sha256(&workspace_root, packet_path).expect("hash packet"),
-            *packet_sha
-        );
-
-        let packet_bytes = fs::read(workspace_root.join(packet_path)).expect("read packet bytes");
-        let packet: PublicationReadyPacket =
-            serde_json::from_slice(&packet_bytes).expect("parse packet");
-        packet.validate().expect("packet schema validation");
-
-        let approval = load_approval_artifact(&workspace_root, &state.approval_artifact_path)
-            .expect("approval");
-        let runtime_validation_root = runtime_evidence_validation_root(&workspace_root, &packet)
-            .unwrap_or_else(|| workspace_root.clone());
-        let runtime_evidence = validate_packet_pinned_runtime_evidence_for_approval(
-            &runtime_validation_root,
-            &approval,
-            &packet,
-        )
-        .expect("validate packet-pinned runtime evidence");
-        assert_eq!(
-            packet.runtime_evidence_paths,
-            runtime_evidence.runtime_evidence_paths
-        );
-        assert_eq!(
-            packet.publication_owned_paths,
-            vec![lifecycle_path.clone(), packet_path.clone()]
-        );
-
-        let historical_publication_state =
-            reconstruct_publication_ready_state_from_closed_baseline(&state);
-        historical_publication_state
-            .validate()
-            .expect("historical publication-ready state validates");
-        assert_eq!(
-            packet.lifecycle_state_sha256,
-            pretty_json_sha(&historical_publication_state)
-        );
     }
 }
 
@@ -360,7 +383,24 @@ fn sample_runtime_integrated_state() -> LifecycleState {
     let registry = AgentRegistry::load(&workspace_root).expect("load registry");
     let entry = registry.find("aider").expect("aider entry");
     let lifecycle_path = lifecycle_state_path_for_entry(entry);
-    load_lifecycle_state(&workspace_root, &lifecycle_path).expect("load runtime_integrated state")
+    let mut state =
+        load_lifecycle_state(&workspace_root, &lifecycle_path).expect("load aider lifecycle");
+    state.lifecycle_stage = LifecycleStage::RuntimeIntegrated;
+    state.support_tier = SupportTier::BaselineRuntime;
+    state.current_owner_command = "runtime-follow-on --write".to_string();
+    state.expected_next_command = format!(
+        "prepare-publication --approval {} --write",
+        state.approval_artifact_path
+    );
+    state.required_evidence =
+        required_evidence_for_stage(LifecycleStage::RuntimeIntegrated).to_vec();
+    state.satisfied_evidence =
+        required_evidence_for_stage(LifecycleStage::RuntimeIntegrated).to_vec();
+    state.active_runtime_evidence_run_id = Some("synthetic-runtime-integrated".to_string());
+    state.publication_packet_path = None;
+    state.publication_packet_sha256 = None;
+    state.closeout_baseline_path = None;
+    state
 }
 
 fn pretty_json_sha<T: serde::Serialize>(value: &T) -> String {

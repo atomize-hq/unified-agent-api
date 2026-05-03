@@ -99,10 +99,9 @@ mod capability_matrix {
         fn capability_matrix_parity_accepts_seeded_registry_with_matching_manifests() {
             let registry = seeded_registry();
 
-            let inventory = collect_inventory_from_registry(&registry, |entry| {
-                Ok(valid_manifest_for(entry))
-            })
-            .expect("matching parity should pass");
+            let inventory =
+                collect_inventory_from_registry(&registry, |entry| Ok(valid_manifest_for(entry)))
+                    .expect("matching parity should pass");
 
             assert!(inventory.backends.contains_key("codex"));
             assert!(inventory.backends.contains_key("claude_code"));
@@ -135,10 +134,9 @@ mod capability_matrix {
         #[test]
         fn capability_matrix_parity_header_tracks_shared_publication_semantics() {
             let registry = seeded_registry();
-            let inventory = collect_inventory_from_registry(&registry, |entry| {
-                Ok(valid_manifest_for(entry))
-            })
-            .expect("matching parity should pass");
+            let inventory =
+                collect_inventory_from_registry(&registry, |entry| Ok(valid_manifest_for(entry)))
+                    .expect("matching parity should pass");
 
             assert_eq!(
                 inventory.canonical_target_header,

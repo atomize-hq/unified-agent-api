@@ -329,7 +329,11 @@ fn refresh_publication_write_advances_to_closeout_and_refreshes_outputs() {
         lifecycle_state
             .get("lifecycle_stage")
             .and_then(Value::as_str),
-        Some("publication_ready")
+        Some("published")
+    );
+    assert_eq!(
+        lifecycle_state.get("support_tier").and_then(Value::as_str),
+        Some("publication_backed")
     );
     assert_eq!(
         lifecycle_state
@@ -355,12 +359,28 @@ fn refresh_publication_write_advances_to_closeout_and_refreshes_outputs() {
             .and_then(Value::as_str),
         Some("xtask refresh-publication --write")
     );
+    assert_eq!(
+        lifecycle_state
+            .get("publication_packet_path")
+            .and_then(Value::as_str),
+        Some(PUBLICATION_PACKET_PATH)
+    );
+    assert_eq!(
+        lifecycle_state.get("closeout_baseline_path"),
+        Some(&Value::Null)
+    );
 
-    let lifecycle_sha = sha256_hex(&lifecycle_state_path(&fixture));
+    let packet_sha = sha256_hex(&publication_packet_path(&fixture));
     let packet = read_json(&publication_packet_path(&fixture));
     assert_eq!(
-        packet.get("lifecycle_state_sha256").and_then(Value::as_str),
-        Some(lifecycle_sha.as_str())
+        lifecycle_state
+            .get("publication_packet_sha256")
+            .and_then(Value::as_str),
+        Some(packet_sha.as_str())
+    );
+    assert_eq!(
+        packet.get("lifecycle_stage").and_then(Value::as_str),
+        Some("publication_ready")
     );
     assert_eq!(
         packet
@@ -550,7 +570,7 @@ fn refresh_publication_write_rolls_back_lifecycle_updates_when_gate_fails() {
 }
 
 #[test]
-fn refresh_publication_write_is_idempotent_after_closeout_handoff_is_set() {
+fn refresh_publication_rejects_rerun_after_published_handoff_is_set() {
     let fixture =
         prepare_publication_ready_fixture("refresh-publication-idempotent", SUPPORT_AND_CAPABILITY);
     seed_publication_output_state(&fixture, SUPPORT_AND_CAPABILITY);
@@ -568,7 +588,10 @@ fn refresh_publication_write_is_idempotent_after_closeout_handoff_is_set() {
 
     let second = run_cli(refresh_args("--write"), &fixture);
 
-    assert_eq!(second.exit_code, 0, "stderr:\n{}", second.stderr);
+    assert_eq!(second.exit_code, 2, "stderr:\n{}", second.stderr);
+    assert!(second
+        .stderr
+        .contains("requires lifecycle stage `publication_ready`"));
     let lifecycle_state = read_json(&lifecycle_state_path(&fixture));
     assert_eq!(
         lifecycle_state
@@ -589,7 +612,4 @@ fn refresh_publication_write_is_idempotent_after_closeout_handoff_is_set() {
             "output drifted on rerun: {path}"
         );
     }
-
-    let check = run_cli(refresh_args("--check"), &fixture);
-    assert_eq!(check.exit_code, 0, "stderr:\n{}", check.stderr);
 }

@@ -74,7 +74,10 @@ pub fn collect_capability_publication_inventory(
         };
         let advertised = project_manifest_advertised_capabilities(entry, &context.manifest)?;
         validate_projected_capabilities_against_approval(entry, &context.approval, &advertised)?;
-        backends.insert(entry.agent_id.clone(), AgentWrapperCapabilities { ids: advertised });
+        backends.insert(
+            entry.agent_id.clone(),
+            AgentWrapperCapabilities { ids: advertised },
+        );
         eligible_entries.push(entry);
     }
 
@@ -403,9 +406,7 @@ pub fn validate_capability_publication_target(
     }
 }
 
-pub fn render_publication_target_description(
-    entry: &AgentRegistryEntry,
-) -> Result<String, String> {
+pub fn render_publication_target_description(entry: &AgentRegistryEntry) -> Result<String, String> {
     Ok(match resolve_capability_publication_target(entry)? {
         CapabilityPublicationTarget::DefaultBuiltInConfig => {
             "the default publication target profile".to_string()
@@ -661,7 +662,9 @@ fn is_publication_eligible_stage(stage: LifecycleStage) -> bool {
 
 fn push_mismatch(mismatches: &mut Vec<String>, field: &str, expected: &str, actual: &str) {
     if expected != actual {
-        mismatches.push(format!("{field}: approval=`{expected}` registry=`{actual}`"));
+        mismatches.push(format!(
+            "{field}: approval=`{expected}` registry=`{actual}`"
+        ));
     }
 }
 

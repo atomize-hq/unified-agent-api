@@ -180,7 +180,10 @@ fn inspect_lifecycle_baseline(
         result
             .authoritative_surfaces
             .insert(closeout_path.to_string());
-    } else if matches!(lifecycle_state.lifecycle_stage, LifecycleStage::ClosedBaseline) {
+    } else if matches!(
+        lifecycle_state.lifecycle_stage,
+        LifecycleStage::ClosedBaseline
+    ) {
         result.issues.push(format!(
             "{} does not record closeout_baseline_path",
             lifecycle_state_path

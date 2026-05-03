@@ -41,9 +41,9 @@ use drift::{check_agent_drift, DriftCategory, DriftCheckError};
 use drift_harness::{
     release_doc_with_packages, run_xtask_check_agent_drift, seed_cli_manifest_root,
     seed_closed_governance_maintenance, seed_gemini_lifecycle_baseline,
-    seed_gemini_runtime_integrated_state, seed_governance_closeouts, seed_publication_inputs,
-    seed_runtime_evidence_run, set_support_matrix_enabled, LifecycleBaselineGap,
-    RuntimeEvidenceTruth,
+    seed_gemini_published_baseline, seed_gemini_runtime_integrated_state,
+    seed_governance_closeouts, seed_publication_inputs, seed_runtime_evidence_run,
+    set_support_matrix_enabled, LifecycleBaselineGap, RuntimeEvidenceTruth,
 };
 use harness::{fixture_root, write_text};
 
@@ -106,6 +106,16 @@ fn check_agent_drift_reports_missing_lifecycle_closeout_path() {
         .find(|finding| finding.category == DriftCategory::GovernanceDoc)
         .expect("governance doc finding");
     assert!(finding.summary.contains("closeout_baseline_path"));
+}
+
+#[test]
+fn check_agent_drift_accepts_published_without_closeout_path() {
+    let fixture = fixture_root("agent-maintenance-drift-published-no-closeout");
+    seed_publication_inputs(&fixture);
+    seed_gemini_published_baseline(&fixture);
+
+    let report = check_agent_drift(&fixture, "gemini_cli").expect("published report");
+    assert!(report.is_clean(), "{}", report.render());
 }
 
 #[test]

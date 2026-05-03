@@ -51,8 +51,9 @@ pub fn validate_agent_publication_continuity(
 }
 
 pub fn generate_markdown() -> Result<String, String> {
-    let inventory =
-        capability_publication_mod::collect_capability_publication_inventory(&resolve_workspace_root()?)?;
+    let inventory = capability_publication_mod::collect_capability_publication_inventory(
+        &resolve_workspace_root()?,
+    )?;
     Ok(render_matrix(
         &inventory.backends,
         &inventory.canonical_target_header,
@@ -219,6 +220,7 @@ fn bucket_order(backend_ids: &[String]) -> Vec<String> {
 }
 
 #[cfg(test)]
+#[allow(dead_code)]
 fn command_available_on_target(manifest: &UnionManifest, path: &[&str], target: &str) -> bool {
     capability_publication_mod::manifest_command_available_on_target(
         &manifest.as_publication_manifest(),
@@ -253,6 +255,7 @@ fn resolve_workspace_root() -> Result<PathBuf, String> {
 }
 
 #[cfg(test)]
+#[allow(dead_code)]
 fn runtime_backend_capabilities(
     agent_id: &str,
 ) -> Result<(String, AgentWrapperCapabilities), String> {
@@ -261,6 +264,7 @@ fn runtime_backend_capabilities(
 }
 
 #[cfg(test)]
+#[allow(dead_code)]
 fn projected_advertised_capabilities(
     registry_entry: &AgentRegistryEntry,
     manifest: &UnionManifest,
@@ -272,6 +276,7 @@ fn projected_advertised_capabilities(
 }
 
 #[cfg(test)]
+#[allow(dead_code)]
 fn validate_capability_publication_target(
     registry_entry: &AgentRegistryEntry,
     manifest: &UnionManifest,
@@ -283,6 +288,7 @@ fn validate_capability_publication_target(
 }
 
 #[cfg(test)]
+#[allow(dead_code)]
 fn render_publication_target_description(
     registry_entry: &AgentRegistryEntry,
 ) -> Result<String, String> {
@@ -290,11 +296,13 @@ fn render_publication_target_description(
 }
 
 #[cfg(test)]
+#[allow(dead_code)]
 fn render_canonical_target_header(entries: &[&AgentRegistryEntry]) -> Result<String, String> {
     capability_publication_mod::render_canonical_target_header(entries)
 }
 
 #[cfg(test)]
+#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 struct UnionManifest {
     #[serde(default)]
@@ -303,6 +311,7 @@ struct UnionManifest {
 }
 
 #[cfg(test)]
+#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 struct UnionCommand {
     path: Vec<String>,
@@ -310,6 +319,7 @@ struct UnionCommand {
 }
 
 #[cfg(test)]
+#[allow(dead_code)]
 impl UnionManifest {
     fn as_publication_manifest(&self) -> capability_publication_mod::ManifestCurrent {
         capability_publication_mod::ManifestCurrent {
