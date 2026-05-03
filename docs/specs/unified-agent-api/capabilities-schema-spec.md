@@ -85,6 +85,9 @@ Semantics (pinned):
 - The matrix is derived from lifecycle-backed publication truth, not from a built-in backend constructor inventory.
 - Only lifecycle-eligible agents participate in publication truth. In v1, eligibility requires lifecycle stage
   `runtime_integrated`, `publication_ready`, `published`, or `closed_baseline`.
+- The canonical committed create-mode publication path is `publication_ready -> published -> closed_baseline`.
+- In that path, `publication_ready` is the pre-refresh handoff stage only, `published` is committed only after `refresh-publication --write` succeeds, and `closed_baseline` is the post-closeout steady state.
+- Any remaining use of `publication_ready` as a publication-eligible compatibility branch is narrow and transitional, not a second steady-state meaning of published truth.
 - Before an agent's advertised capability set is accepted into publication truth, generation validates approval/registry
   continuity, lifecycle/approval continuity, and manifest target continuity for that agent.
 - The matrix lists only capability ids published by at least one lifecycle-eligible agent at generation time.

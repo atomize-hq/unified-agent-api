@@ -458,7 +458,7 @@ Once runtime-integrated state and `.uaa-temp` runtime evidence both exist, emit 
 
 On success it:
 - writes `docs/agents/lifecycle/<onboarding_pack_prefix>/governance/publication-ready.json`
-- advances the committed lifecycle record to `lifecycle_stage = publication_ready`
+- advances the committed lifecycle record to `lifecycle_stage = publication_ready`, the pre-refresh-only stage in the canonical path `publication_ready -> published -> closed_baseline`
 - clears `active_runtime_evidence_run_id`
 - satisfies `publication_packet_written`
 - sets `expected_next_command = "refresh-publication --approval <path> --write"`
@@ -502,6 +502,8 @@ The required publication command inventory inside `refresh-publication` remains:
 
 On success, `refresh-publication --write` sets:
 
+- `lifecycle_stage = published`
+- packet continuity fields in `lifecycle-state.json` while leaving `publication-ready.json` in place as the pre-refresh handoff packet
 - `expected_next_command = "close-proving-run --approval <path> --closeout docs/agents/lifecycle/<prefix>/governance/proving-run-closeout.json"`
 
 ### 9. Record proving-run closeout
@@ -517,7 +519,8 @@ Then refresh the generated onboarding packet to its closed state:
 ```
 
 `close-proving-run` now requires:
-- lifecycle stage `publication_ready` or legacy/manual `published`
+- lifecycle stage `published` on the normal path
+- a narrow transitional compatibility branch for legacy/manual records still parked at `publication_ready`
 - a coherent committed `publication-ready.json` packet for the same approval artifact
 - green published surfaces for registry/manifest continuity, support publication, capability publication, and capability-matrix audit
 - `preflight_passed = true` in the recorded proving-run closeout
@@ -535,6 +538,7 @@ On success it:
 Use maintenance mode for an already-onboarded agent when drift is detected or a control-plane refresh is needed.
 
 Maintenance reads the committed lifecycle baseline first. Generated packet docs and historical handoff text remain detector inputs, not the lifecycle authority.
+Maintenance accepts committed `published` records as valid baselines even before `closeout_baseline_path` exists; `closed_baseline` remains the post-closeout steady state.
 
 ### 1. Detect drift
 
