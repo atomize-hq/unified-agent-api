@@ -1,225 +1,180 @@
-# Enclose The Publication Lane End To End Orchestration Plan
+# Make The Published State Honest In The Lifecycle Model Orchestration Plan
 
 ## Summary
 
-- Execute only against the current repo-root milestone in `PLAN.md`: `Enclose The Publication Lane End To End`.
-- Integration branch is the live implementation branch `codex/recommend-next-agent`.
-- Execution baseline for this orchestration is current HEAD `000aa69` on `2026-05-02`.
-- `PLAN.md` still records `Plan commit baseline: bfd6fd4`; treat that as milestone-history metadata only, never as the worker fork point.
-- Parent agent is the only integrator, merger, rebase authority, canonical stale-sweep owner, committed artifact normalizer, and final verifier.
-- Worker model for delegated lanes:
-  - model: GPT-5.4
-  - reasoning_effort: high
-- Maximum worker concurrency is `3`, and only after the parent freezes the command contract and completes the stale-string/hash normalization sweep.
-- No human approval pause is planned. Stop only for hard guards, stale-lane invalidation, or verification failure.
-- This document supersedes the prior branch-local orchestration draft for this milestone.
+- This orchestration plan executes only the current `PLAN.md` milestone: `Make The Published State Honest In The Lifecycle Model`.
+- Integration branch: `codex/recommend-next-agent`.
+- Execution baseline: HEAD `07a0ce9259b8` on `2026-05-03`.
+- The parent agent keeps the semantic authority lane local:
+  - `refresh-publication --write` becomes the only committed writer of `LifecycleStage::Published`
+  - the normal path becomes `publication_ready -> published -> closed_baseline`
+  - `close-proving-run` consumes `published` on the normal path
+  - the legacy `publication_ready` compatibility branch stays narrow and transitional
+- After the parent freezes the semantics, three worker lanes may run in parallel:
+  - tests
+  - narrative docs
+  - seeded lifecycle fixtures
+- Final integration, merge decisions, and full verification return to the parent.
 
 ## Hard Guards
 
-- Scope is locked to the `PLAN.md` slice only.
-- Do not widen into:
-  - `LifecycleStage::Published` redesign
-  - new lifecycle stages
-  - support-matrix semantics changes
-  - capability-matrix semantics changes
-  - maintenance request schema changes
-  - runtime-follow-on redesign
-  - repair-runtime-evidence redesign
-  - new artifact families beyond the required command and its lifecycle/docs/test fallout
-  - generic JSON-driven command execution
-- Locked implementation decisions from `PLAN.md` must remain intact:
-  - add `refresh-publication --approval <path> --check|--write`
-  - keep `prepare-publication` as handoff writer only
-  - consume `publication-ready.json` as the only create-mode publication packet
-  - keep `PublicationReadyPacket.required_publication_outputs` as the authoritative write set
-  - share support/capability publication planning between create-mode and maintenance-mode
-  - make `refresh-publication --write` transactional for publication-owned committed surfaces
-  - keep `make preflight` inside the green gate
-  - do not solve `LifecycleStage::Published` in this slice
-- Any fixture or committed lifecycle artifact whose `expected_next_command` or reconstructed packet content depends on `PUBLICATION_READY_NEXT_COMMAND` must be swept and normalized before the downstream test worker launches.
-- Workers do not touch parent-owned files.
-- Workers do not merge, rebase, regenerate final publication outputs, or run the live aider verification flow.
-- Never revert someone else’s edits. Baseline task must capture actual dirty state before worker launch.
+- Scope is locked to the current milestone only.
+- Do not preserve or reintroduce any publication-lane orchestration from the prior milestone.
+- Do not add or redesign commands in this slice.
+- Do not invent a new lifecycle stage, packet type, or post-refresh artifact model.
+- `refresh-publication --write` is the only allowed writer for `LifecycleStage::Published`.
+- `prepare-publication --write` remains the writer for `publication_ready` only.
+- `publication_ready` must mean only: the handoff packet exists and refresh is next.
+- `close-proving-run` must treat `published` as the normal closeout input.
+- Compatibility for `publication_ready` exists only for legacy post-refresh states that were never lifecycle-promoted.
+- Docs, fixtures, and tests do not start until the parent freeze is recorded.
+- The parent is the only merge authority and the only lane allowed to change semantic code after freeze.
+- No worker may touch files outside its assigned ownership set.
+- No lane may widen into closeout redesign, maintenance workflow redesign, or support/capability publication redesign beyond what `PLAN.md` already requires for lifecycle honesty.
 
 ## Orchestration State
 
 Parent-owned orchestration state lives under:
 
-- `RUN_ROOT=/Users/spensermcconnell/__Active_Code/atomize-hq/unified-agent-api/.runs/enclose-publication-lane-e2e`
+- `RUN_ROOT=/Users/spensermcconnell/__Active_Code/atomize-hq/unified-agent-api/.runs/published-state-honesty`
 
-Canonical parent-owned state files:
+State files:
 
 - `baseline.json`
-  - branch, HEAD SHA, dirty-state summary, launch timestamp
-  - note that execution baseline is `000aa69`
-  - note that `PLAN.md` historical baseline is `bfd6fd4`
-  - note of any lane delayed because of pre-existing dirt
+  - branch
+  - head sha
+  - dirty-state summary
+  - launch timestamp
+- `freeze.json`
+  - freeze sha
+  - frozen stage sequence
+  - frozen refresh writer contract
+  - frozen closeout compatibility rule
+  - worker ownership map
+  - stale-lane triggers
 - `tasks.json`
-  - ordered tasks
+  - task id
   - owner
   - status
   - dependencies
   - restart count
-- `session-log.md`
-  - launch notes
-  - freeze decisions
-  - stale-sweep findings
-  - worker prompts issued
-  - relaunch reasons
-  - merge and verification notes
-- `freeze.json`
-  - freeze commit SHA
-  - frozen CLI contract for `refresh-publication`
-  - frozen lifecycle next-command templates
-  - frozen shared publication planning seam
-  - stale-sweep invariants
-  - lane ownership map
-  - forbidden touch surfaces
 - `merge-log.md`
   - merge order
-  - smoke-command results after each merge
-  - rejection/relaunch reasons
+  - lane validation result
+  - post-merge smoke result
 - `acceptance.md`
-  - final ordered command sequence
+  - final command matrix
   - exit codes
-  - pass/fail per acceptance criterion
-  - stale-string sweep results
-  - unrelated blockers, if any
+  - acceptance checklist
 
-Per-task sentinels live under:
+Task sentinels:
 
-- `.runs/task-epl-00-baseline/**`
-- `.runs/task-epl-01-freeze-core/**`
-- `.runs/task-epl-02-parent-stale-sweep/**`
-- `.runs/task-epl-03-maintenance-alignment/**`
-- `.runs/task-epl-04-authored-docs/**`
-- `.runs/task-epl-05-tests-fixtures/**`
-- `.runs/task-epl-06-converge/**`
-- `.runs/task-epl-07-final-verify/**`
+- `.runs/task-honest-00-baseline/`
+- `.runs/task-honest-10-parent-semantics/`
+- `.runs/task-honest-20-freeze/`
+- `.runs/task-honest-30-tests/`
+- `.runs/task-honest-40-docs/`
+- `.runs/task-honest-50-fixtures/`
+- `.runs/task-honest-60-merge/`
+- `.runs/task-honest-70-verify/`
 
 Sentinel rules:
 
-- parent creates `started.json` before work begins
-- parent updates `status.json` during long tasks or after worker return
-- parent writes exactly one terminal sentinel: `done.json` or `blocked.json`
-- workers do not write orchestration state
+- The parent writes `started.json` before each task begins.
+- The parent writes exactly one terminal file per task: `done.json` or `blocked.json`.
+- Workers do not write orchestration state.
 
 ## Worker Model
 
-- Parent owns all orchestration, integration, freeze decisions, stale-string normalization, hash fallout normalization, merge sequencing, live verification, and acceptance decisions.
-- Workers edit only their assigned lane files.
-- Workers do not merge branches.
-- Workers do not rebase.
-- Workers do not edit `PLAN.md` or `.runs/**`.
-- Workers do not regenerate final publication outputs or committed lifecycle docs.
-- Workers return only:
-  - changed files
-  - commands run
-  - exit codes
-  - blockers or assumptions
-- If a worker needs a parent-owned file changed, it stops and returns a blocker.
+- Parent lane:
+  - owns all semantic code
+  - defines freeze
+  - launches workers
+  - invalidates stale lanes
+  - merges completed lanes
+  - runs final verification
+- Worker lanes:
+  - launch only from the recorded freeze sha
+  - edit only assigned files
+  - do not merge, rebase, or resolve cross-lane conflicts
+  - return changed files, commands run, exit codes, and blockers only
+- Maximum worker concurrency: `3`
+- Worker lane set is fixed for this milestone:
+  - Lane T: tests
+  - Lane D: docs
+  - Lane F: seeded fixtures
 
 ## Context-Control Rules
 
-Parent active context stays narrow:
-
-- `PLAN.md`
-- this orchestration plan
-- `freeze.json`
-- `tasks.json`
-- `session-log.md`
-- latest integration diff summary
-- only the files for the current task
-
-Worker prompts contain only:
-
-- owned files
-- forbidden touch surfaces
-- relevant `PLAN.md` excerpt
-- frozen command/lifecycle templates from `freeze.json`
-- the stale-sweep findings relevant to that lane
-- required commands
-- lane-local acceptance target
-
-Workers are closed immediately after merge or rejection. No idle worker remains open after its result is consumed.
+- Parent context stays limited to:
+  - `PLAN.md`
+  - `ORCH_PLAN.md`
+  - current integration diff
+  - parent-owned semantic files
+  - `freeze.json`
+- Worker prompts contain only:
+  - owned files
+  - the relevant `PLAN.md` excerpt
+  - the frozen lifecycle sequence
+  - the frozen compatibility rule
+  - lane-local acceptance checks
+  - forbidden touch surfaces
+- Workers are disposable:
+  - if a lane goes stale, discard it and relaunch from the newest freeze sha
+  - do not manually salvage stale output into the integration branch
 
 ## Parent vs Worker Ownership Model
 
 ### Parent-only ownership
 
-The parent keeps these surfaces local from kickoff through final verification:
+The parent owns the root semantic lane and any lifecycle-contract fallout in:
 
 - `crates/xtask/src/publication_refresh.rs`
-- `crates/xtask/src/main.rs`
-- `crates/xtask/src/lib.rs`
 - `crates/xtask/src/agent_lifecycle.rs`
-- `crates/xtask/src/prepare_publication.rs`
-- `crates/xtask/src/workspace_mutation.rs` only if rollback support needs a shared helper
-- all merge/rebase/conflict resolution
-- all stale-string sweep edits across authored docs, lifecycle artifacts, and impacted tests
-- all fixture/hash normalization caused by `PUBLICATION_READY_NEXT_COMMAND` changes
-- final generated publication outputs:
-  - `cli_manifests/support_matrix/current.json`
-  - `docs/specs/unified-agent-api/support-matrix.md`
-  - `docs/specs/unified-agent-api/capability-matrix.md`
-- committed lifecycle and packet artifacts affected by next-command or reconstructed-hash fallout:
-  - `docs/agents/lifecycle/codex-cli-onboarding/governance/lifecycle-state.json`
-  - `docs/agents/lifecycle/codex-cli-onboarding/governance/publication-ready.json`
-  - `docs/agents/lifecycle/claude-code-cli-onboarding/governance/lifecycle-state.json`
-  - `docs/agents/lifecycle/claude-code-cli-onboarding/governance/publication-ready.json`
-  - `docs/agents/lifecycle/gemini-cli-onboarding/governance/lifecycle-state.json`
-  - `docs/agents/lifecycle/gemini-cli-onboarding/governance/publication-ready.json`
-  - `docs/agents/lifecycle/opencode-cli-onboarding/governance/lifecycle-state.json`
-  - `docs/agents/lifecycle/opencode-cli-onboarding/governance/publication-ready.json`
-  - `docs/agents/lifecycle/aider-onboarding/governance/lifecycle-state.json`
-- live create-mode verification artifacts for aider:
-  - `docs/agents/lifecycle/aider-onboarding/governance/publication-ready.json`
-- `.runs/enclose-publication-lane-e2e/**`
+- `crates/xtask/src/agent_lifecycle/validation.rs`
+- `crates/xtask/src/close_proving_run.rs`
+- `crates/xtask/src/capability_publication.rs`
+- `crates/xtask/src/agent_maintenance/drift/governance.rs`
+- `crates/xtask/src/prepare_publication.rs` only if needed to keep `publication_ready` explicitly pre-refresh
 
 Parent responsibilities:
 
-- capture baseline and actual dirty state
-- freeze the command contract and shared planning seam
-- run the authored-doc/test/lifecycle stale-string sweep immediately after freeze
-- normalize any historical or fixture hash fallout before test worker launch
-- launch workers only from the post-sweep parent commit
-- reject stale worker output
-- merge in order
-- run targeted tests, search sweeps, live verification, and final acceptance
+- make refresh commit `published`
+- write published-stage evidence and continuity fields during refresh
+- promote support tier during refresh to `publication_backed` unless already `first_class`
+- keep `publication_ready` pre-refresh only
+- implement the narrow compatibility branch for legacy post-refresh `publication_ready`
+- make closeout consume `published` on the normal path
+- align maintenance and capability publication semantics with the honest post-refresh stage
+- freeze the contract before any worker launches
+- integrate all follow-on lanes and run final verification
 
-### Worker lane ownership
+### Worker ownership
 
-Lane B: maintenance alignment
+Lane T: tests
 
-- `crates/xtask/src/agent_maintenance/refresh.rs`
-- `crates/xtask/tests/agent_maintenance_refresh.rs`
-
-Lane C: authored docs
-
-- `docs/cli-agent-onboarding-factory-operator-guide.md`
-- `docs/specs/cli-agent-onboarding-charter.md`
-
-Lane D: tests and fixture-facing regression coverage
-
+- `crates/xtask/tests/agent_lifecycle_state.rs`
 - `crates/xtask/tests/refresh_publication_entrypoint.rs`
 - `crates/xtask/tests/prepare_publication_entrypoint.rs`
-- `crates/xtask/tests/agent_lifecycle_state.rs`
-- `crates/xtask/tests/runtime_follow_on_entrypoint.rs`
-- `crates/xtask/tests/repair_runtime_evidence_entrypoint.rs`
 - `crates/xtask/tests/onboard_agent_closeout_preview/close_proving_run_write.rs`
 - `crates/xtask/tests/onboard_agent_closeout_preview/close_proving_run_paths.rs`
 - `crates/xtask/tests/support/agent_maintenance_drift_harness.rs`
-- `crates/xtask/tests/support/onboard_agent_harness.rs` only if required by the new entrypoint tests
 
-Workers do not own:
+Lane D: narrative docs
 
-- `crates/xtask/src/publication_refresh.rs`
-- `crates/xtask/src/main.rs`
-- `crates/xtask/src/lib.rs`
-- `crates/xtask/src/agent_lifecycle.rs`
-- `crates/xtask/src/prepare_publication.rs`
-- committed lifecycle docs under `docs/agents/lifecycle/**`
-- generated publication outputs
+- `docs/specs/cli-agent-onboarding-charter.md`
+- `docs/specs/unified-agent-api/capabilities-schema-spec.md`
+- `docs/cli-agent-onboarding-factory-operator-guide.md`
+
+Lane F: seeded lifecycle fixtures
+
+- `docs/agents/lifecycle/**`
+
+Workers never own:
+
+- any `crates/xtask/src/**` file
+- `PLAN.md`
+- `ORCH_PLAN.md`
 - `.runs/**`
 
 ## Worktree/Branch Plan With Concrete Names
@@ -227,596 +182,418 @@ Workers do not own:
 Canonical paths:
 
 - `REPO_ROOT=/Users/spensermcconnell/__Active_Code/atomize-hq/unified-agent-api`
-- `WORKTREE_ROOT=/Users/spensermcconnell/__Active_Code/atomize-hq/.worktrees/unified-agent-api-enclose-publication-lane`
+- `WORKTREE_ROOT=/Users/spensermcconnell/__Active_Code/atomize-hq/.worktrees/unified-agent-api-published-state-honesty`
 
-Integration surface:
+Integration lane:
 
 - branch: `codex/recommend-next-agent`
 - worktree: `REPO_ROOT`
-- owner: parent only
+- owner: parent
 
-Worker branches and worktrees, created only after the parent records the post-sweep freeze commit:
+Worker lanes, created only from the recorded freeze sha:
 
-- Lane B:
-  - branch: `codex/recommend-next-agent-maintenance-publication-align`
-  - worktree: `$WORKTREE_ROOT/maintenance-publication-align`
-- Lane C:
-  - branch: `codex/recommend-next-agent-publication-docs`
-  - worktree: `$WORKTREE_ROOT/publication-docs`
-- Lane D:
-  - branch: `codex/recommend-next-agent-publication-tests`
-  - worktree: `$WORKTREE_ROOT/publication-tests`
+- Lane T
+  - branch: `codex/recommend-next-agent-honest-published-tests`
+  - worktree: `$WORKTREE_ROOT/tests`
+- Lane D
+  - branch: `codex/recommend-next-agent-honest-published-docs`
+  - worktree: `$WORKTREE_ROOT/docs`
+- Lane F
+  - branch: `codex/recommend-next-agent-honest-published-fixtures`
+  - worktree: `$WORKTREE_ROOT/fixtures`
 
-Creation commands after `task/epl-02-parent-stale-sweep`:
+Creation pattern after freeze:
 
 ```bash
 mkdir -p "$WORKTREE_ROOT" "$RUN_ROOT"
-POST_SWEEP_SHA=$(jq -r '.post_sweep_commit_sha' "$RUN_ROOT/freeze.json")
+FREEZE_SHA=$(jq -r '.freeze_sha' "$RUN_ROOT/freeze.json")
 
-git worktree add -b codex/recommend-next-agent-maintenance-publication-align \
-  "$WORKTREE_ROOT/maintenance-publication-align" \
-  "$POST_SWEEP_SHA"
+git worktree add -b codex/recommend-next-agent-honest-published-tests \
+  "$WORKTREE_ROOT/tests" \
+  "$FREEZE_SHA"
 
-git worktree add -b codex/recommend-next-agent-publication-docs \
-  "$WORKTREE_ROOT/publication-docs" \
-  "$POST_SWEEP_SHA"
+git worktree add -b codex/recommend-next-agent-honest-published-docs \
+  "$WORKTREE_ROOT/docs" \
+  "$FREEZE_SHA"
 
-git worktree add -b codex/recommend-next-agent-publication-tests \
-  "$WORKTREE_ROOT/publication-tests" \
-  "$POST_SWEEP_SHA"
+git worktree add -b codex/recommend-next-agent-honest-published-fixtures \
+  "$WORKTREE_ROOT/fixtures" \
+  "$FREEZE_SHA"
 ```
 
-Worktree rules:
+## Freeze / Restart / Stale-Lane Invalidation Rules
 
-- never fork workers from `main`
-- never fork workers before the parent stale sweep and hash normalization complete
-- never reuse a stale worker worktree
-- workers never merge back themselves
+Freeze point:
 
-## Freeze Artifact And Restart Rule
+- Workers launch only after the parent completes the root semantic lane and records `freeze_sha`.
+- Freeze means these statements are locked for downstream lanes:
+  - refresh is the only writer of `published`
+  - the normal path is `publication_ready -> published -> closed_baseline`
+  - closeout consumes `published` on the normal path
+  - the legacy `publication_ready` compatibility branch definition is stable enough for docs, fixtures, and tests
 
-The initial freeze point is the first parent commit where these are simultaneously true:
+Stale-lane invalidation triggers:
 
-- `refresh-publication` exists and parses `--approval <path> --check|--write`
-- `main.rs` wires the new subcommand
-- `lib.rs` exports the new module if needed by tests
-- `prepare_publication.rs` points `publication_ready` next-step semantics at `refresh-publication`
-- `agent_lifecycle.rs` contains the frozen pre-refresh and post-refresh next-command templates
-- the shared publication planning seam used by create-mode is callable and parent-approved
-- `freeze.json` exists and is complete
+- The parent edits any of these files after worker launch:
+  - `crates/xtask/src/publication_refresh.rs`
+  - `crates/xtask/src/agent_lifecycle.rs`
+  - `crates/xtask/src/agent_lifecycle/validation.rs`
+  - `crates/xtask/src/close_proving_run.rs`
+  - `crates/xtask/src/capability_publication.rs`
+  - `crates/xtask/src/agent_maintenance/drift/governance.rs`
+  - `crates/xtask/src/prepare_publication.rs` if it was part of the freeze
+- The parent changes frozen wording that docs or fixtures were told to mirror.
+- A worker edits outside its ownership set.
+- A worker returns assumptions that conflict with `freeze.json`.
 
-`freeze.json` must record:
+Restart rules:
 
-- `freeze_commit_sha`
-- `post_sweep_commit_sha`
-- `refresh_publication_cli`:
-  - `approval` required
-  - mutually exclusive `check` / `write`
-- `prepare_publication_next_command_template`:
-  - `refresh-publication --approval <path> --write`
-- `post_refresh_next_command_template`:
-  - `close-proving-run --approval <path> --closeout docs/agents/lifecycle/<prefix>/governance/proving-run-closeout.json`
-- `required_publication_commands`:
-  - still the four green-gate commands ending in `make preflight`
-- frozen shared planning seam:
-  - exact function names/signatures exposed for maintenance reuse
-  - exact file owning the seam
-- stale-sweep invariants:
-  - exact raw shell-chain string that must no longer remain canonical in authored workflow docs, committed lifecycle artifacts, or impacted `crates/xtask/tests/**` fixtures
-  - valid contexts where `prepare-publication --approval .* --write` still remains canonical
-  - contexts where `refresh-publication` must now appear
-- lane ownership map
-- forbidden surfaces per lane
-
-A worker becomes stale if any of these change after launch:
-
-- CLI flags or their meaning
-- lifecycle next-command template strings
-- shared publication planning function signatures or semantics
-- rollback contract over publication-owned files
-- stale-sweep invariants
-- lane ownership map
-
-Stale-worker rule:
-
-1. stale output is not merged or hand-reconciled
-2. parent updates `freeze.json`
-3. parent deletes stale worker worktree and branch
-4. parent relaunches from the new post-sweep freeze commit
-5. restart from the first downstream affected task
+- If one worker lane is stale, discard and relaunch only that lane from the newest freeze sha.
+- If the parent semantic lane changes after freeze, all worker lanes are stale by default.
+- Do not rebase stale lanes for this milestone; relaunch them cleanly.
 
 ## Merge Policy
 
-- Parent is the only merger.
-- Parent merges only into `codex/recommend-next-agent` in `REPO_ROOT`.
-- Parent does not ask workers to rebase.
-- Parent may perform local mechanical conflict resolution only if it does not alter the frozen seam.
-- Any conflict that changes the frozen seam or stale-sweep invariants is a stop-and-relaunch event.
-
-Merge order:
-
-1. parent completes `task/epl-01-freeze-core`
-2. parent completes `task/epl-02-parent-stale-sweep`
-3. launch and merge Lane B first
-4. rerun Lane B smoke commands locally
-5. merge Lane C second
-6. rerun docs/search smoke locally
-7. merge Lane D third
-8. parent runs convergence and final verification locally
+- The parent is the only merge authority.
+- Merge preconditions for any worker lane:
+  - ownership boundaries are clean
+  - lane-local validation passed
+  - no stale trigger fired since lane launch
+- Merge order is fixed:
+  1. Lane F: seeded fixtures
+  2. Lane D: docs
+  3. Lane T: tests
+- Reason for this order:
+  - fixtures must reflect the frozen lifecycle truth before final test integration
+  - docs should match the same frozen lifecycle story before the final verification sweep
+  - tests land last so they validate the near-final tree
+- If a worker diff conflicts with parent-owned semantic files, reject and relaunch the lane.
+- If integration reveals new semantic work, return to the parent lane, write a new freeze sha, and relaunch affected workers.
 
 ## Task Graph
 
 ```text
-task/epl-00-baseline
-  ->
-task/epl-01-freeze-core
-  ->
-task/epl-02-parent-stale-sweep
-  ->
-parallel:
-  task/epl-03-maintenance-alignment
-  task/epl-04-authored-docs
-  task/epl-05-tests-fixtures
-  ->
-task/epl-06-converge
-  ->
-task/epl-07-final-verify
+HONEST-00 Baseline
+  -> HONEST-10 Parent Semantic Authority Lane
+  -> HONEST-20 Freeze
+       -> HONEST-30 Tests Lane
+       -> HONEST-40 Docs Lane
+       -> HONEST-50 Fixtures Lane
+  -> HONEST-60 Parent Integration
+  -> HONEST-70 Final Verification
 ```
+
+Critical path:
+
+- `HONEST-10 -> HONEST-20 -> HONEST-60 -> HONEST-70`
+
+Parallel window:
+
+- `HONEST-30`, `HONEST-40`, and `HONEST-50` only, after `HONEST-20`
 
 ## Workstream Plan
 
-### task/epl-00-baseline
+### HONEST-00 Baseline
 
-Owner:
+Owner: parent
+Depends on: none
 
-- parent
+Actions:
 
-Required work:
+- record branch, head sha, dirty state, and launch timestamp
+- confirm the milestone title in `PLAN.md`
+- confirm no unrelated in-flight edits make the parent semantic lane ambiguous
 
-- capture current branch, HEAD SHA, and dirty-state summary
-- record that live execution baseline is `000aa69`
-- note that `PLAN.md` still cites `bfd6fd4`
-- snapshot lane ownership against actual dirty files
-- block worker launch if any worker-owned surface is already dirty
+Exit:
 
-Required commands:
+- baseline recorded
+- task registry initialized
 
-```bash
-git branch --show-current
-git rev-parse --short HEAD
-git status --short
-```
+### HONEST-10 Parent Semantic Authority Lane
 
-Acceptance:
+Owner: parent
+Depends on: `HONEST-00`
 
-- `baseline.json` reflects actual launch state
-- any overlap between existing dirt and lane ownership is resolved before freeze
-
-### task/epl-01-freeze-core
-
-Owner:
-
-- parent
-
-Owned surfaces:
+Files:
 
 - `crates/xtask/src/publication_refresh.rs`
-- `crates/xtask/src/main.rs`
-- `crates/xtask/src/lib.rs`
 - `crates/xtask/src/agent_lifecycle.rs`
-- `crates/xtask/src/prepare_publication.rs`
-- `crates/xtask/src/workspace_mutation.rs` only if required
+- `crates/xtask/src/agent_lifecycle/validation.rs`
+- `crates/xtask/src/close_proving_run.rs`
+- `crates/xtask/src/capability_publication.rs`
+- `crates/xtask/src/agent_maintenance/drift/governance.rs`
+- `crates/xtask/src/prepare_publication.rs` if required
 
-Required work:
+Required outcomes:
 
-- add the new `refresh-publication` command
-- wire CLI registration and public exports
-- freeze lifecycle next-command semantics
-- keep `prepare-publication` as handoff writer only
-- implement the parent-owned shared publication planning seam that maintenance will reuse
-- implement transactional write + gate + rollback behavior for create-mode publication refresh
-- freeze command output expectations enough for docs/tests/search normalization to proceed
+- successful refresh commits `lifecycle_stage = published`
+- refresh becomes the only committed writer of `published`
+- refresh writes published-stage evidence and continuity fields
+- refresh promotes support tier correctly
+- closeout consumes `published` on the normal path
+- legacy post-refresh `publication_ready` compatibility is explicit and narrow
+- plain prepare-time `publication_ready` is not closable
 
-Required commands:
+Freeze gate:
 
-```bash
-cargo run -p xtask -- refresh-publication --help
-cargo test -p xtask --test prepare_publication_entrypoint
-cargo test -p xtask --test agent_lifecycle_state
-```
+- the parent must finish the semantic code and any immediate lifecycle validation adjustments before worker launch
+- the parent must capture the final compatibility rule in `freeze.json`
+- workers do not start while the semantic contract is still moving
 
-Acceptance:
+Exit:
 
-- new command is wired and runnable
-- frozen lifecycle strings are recorded in `freeze.json`
-- shared publication planning seam is stable enough for maintenance reuse without further parent edits
+- semantic contract is frozen enough for downstream lanes
 
-### task/epl-02-parent-stale-sweep
+### HONEST-20 Freeze
 
-Owner:
+Owner: parent
+Depends on: `HONEST-10`
 
-- parent
+Actions:
 
-Owned surfaces:
+- write `freeze.json`
+- record:
+  - freeze sha
+  - frozen stage sequence
+  - frozen refresh writer contract
+  - frozen closeout compatibility rule
+  - worker ownership boundaries
+  - stale triggers
 
-- all parent-owned committed lifecycle artifacts
-- any test/doc/fixture file requiring purely mechanical stale-string or hash normalization before worker launch
+Exit:
 
-Required work:
+- workers may fork from the freeze sha
 
-- run a targeted sweep for command-string fallout across:
-  - `docs/cli-agent-onboarding-factory-operator-guide.md`
-  - `docs/specs/cli-agent-onboarding-charter.md`
-  - `docs/agents/lifecycle/**/*.json`
-  - impacted `crates/xtask/tests/**` fixtures
-- replace stale `publication_ready` next-step shell-chain references with the new `refresh-publication` canonical form where required
-- preserve valid `prepare-publication --approval .* --write` references in runtime-integrated contexts only
-- normalize any committed lifecycle artifact, packet, or test fixture whose expected hash or reconstructed publication-ready content changed because `PUBLICATION_READY_NEXT_COMMAND` changed
-- ensure this normalization is complete before any worker launches
+### HONEST-30 Tests Lane
 
-Required search commands:
+Owner: worker
+Depends on: `HONEST-20`
 
-```bash
-rg -n 'support-matrix --check && capability-matrix --check && capability-matrix-audit && make preflight && close-proving-run --write' \
-  docs/cli-agent-onboarding-factory-operator-guide.md \
-  docs/specs/cli-agent-onboarding-charter.md \
-  docs/agents/lifecycle \
-  crates/xtask/tests
-rg -n 'prepare-publication --approval .* --write' \
-  docs/cli-agent-onboarding-factory-operator-guide.md \
-  docs/specs/cli-agent-onboarding-charter.md \
-  docs/agents/lifecycle \
-  crates/xtask/tests
-rg -n 'refresh-publication' \
-  docs/cli-agent-onboarding-factory-operator-guide.md \
-  docs/specs/cli-agent-onboarding-charter.md \
-  docs/agents/lifecycle \
-  crates/xtask/tests \
-  crates/xtask/src
-rg -n 'PUBLICATION_READY_NEXT_COMMAND|expected_next_command|publication-ready.json' \
-  crates/xtask/tests \
-  docs/agents/lifecycle \
-  crates/xtask/src/agent_lifecycle.rs
-```
+Files:
 
-Normalization rules:
-
-- raw shell-chain matches are invalid in the authored docs, committed lifecycle artifacts, and impacted tests whenever they are serving as the canonical `publication_ready` next step
-- raw shell-chain matches remain valid only as the green-gate command inventory in code or packet `required_commands`, not as the lifecycle’s single next command
-- `prepare-publication --approval .* --write` remains valid in runtime-integrated contexts, runtime-follow-on expectations, repair-runtime-evidence expectations, and docs describing the pre-refresh step
-- `prepare-publication --approval .* --write` is invalid as the canonical next command once lifecycle stage is `publication_ready`
-- `refresh-publication` must appear in the new CLI, in publication-ready lifecycle expectations, in authored docs for the create lane, and in the affected regression tests
-
-Required commands:
-
-```bash
-cargo test -p xtask --test agent_lifecycle_state
-cargo test -p xtask --test runtime_follow_on_entrypoint
-cargo test -p xtask --test repair_runtime_evidence_entrypoint
-```
-
-Acceptance:
-
-- no stale canonical raw shell-chain references remain in the swept scopes
-- all historical/fixture hash fallout tied to `PUBLICATION_READY_NEXT_COMMAND` is normalized
-- `freeze.json` records `post_sweep_commit_sha`
-- downstream workers can launch from the normalized parent state without inheriting mechanical fallout
-
-### task/epl-03-maintenance-alignment
-
-Owner:
-
-- worker B
-
-Owned surfaces:
-
-- `crates/xtask/src/agent_maintenance/refresh.rs`
-- `crates/xtask/tests/agent_maintenance_refresh.rs`
-
-Required work:
-
-- replace maintenance-local support/capability publication planning with the frozen shared seam
-- keep `refresh-agent` behavior unchanged except for shared planner reuse
-- add parity/regression coverage proving maintenance refresh and create-mode publication derive the same publication bytes for the same surfaces
-
-Forbidden surfaces:
-
-- all parent-owned files
-- docs
-- committed lifecycle docs
-- `.runs/**`
-
-Required commands:
-
-```bash
-cargo test -p xtask --test agent_maintenance_refresh
-cargo run -p xtask -- refresh-agent --request docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml --dry-run
-```
-
-Acceptance:
-
-- `refresh-agent` no longer owns a duplicate support/capability publication plan
-- maintenance refresh tests prove parity against the frozen shared seam
-
-### task/epl-04-authored-docs
-
-Owner:
-
-- worker C
-
-Owned surfaces:
-
-- `docs/cli-agent-onboarding-factory-operator-guide.md`
-- `docs/specs/cli-agent-onboarding-charter.md`
-
-Required work:
-
-- replace the manual publication command choreography with the one-command refresh story
-- document that `prepare-publication` writes only the handoff packet
-- document that `refresh-publication` owns publication output writes, green gate, and rollback
-- keep charter/operator wording aligned to the frozen command strings exactly
-
-Forbidden surfaces:
-
-- code
-- tests
-- committed lifecycle docs under `docs/agents/lifecycle/**`
-- generated publication outputs
-- `.runs/**`
-
-Required commands:
-
-```bash
-rg -n 'prepare-publication|refresh-publication|support-matrix --check && capability-matrix --check && capability-matrix-audit && make preflight && close-proving-run --write' \
-  docs/cli-agent-onboarding-factory-operator-guide.md \
-  docs/specs/cli-agent-onboarding-charter.md
-```
-
-Acceptance:
-
-- authored docs describe one publication consumer command, not a manual checklist
-- wording matches the frozen CLI and lifecycle templates exactly
-
-### task/epl-05-tests-fixtures
-
-Owner:
-
-- worker D
-
-Owned surfaces:
-
+- `crates/xtask/tests/agent_lifecycle_state.rs`
 - `crates/xtask/tests/refresh_publication_entrypoint.rs`
 - `crates/xtask/tests/prepare_publication_entrypoint.rs`
-- `crates/xtask/tests/agent_lifecycle_state.rs`
-- `crates/xtask/tests/runtime_follow_on_entrypoint.rs`
-- `crates/xtask/tests/repair_runtime_evidence_entrypoint.rs`
 - `crates/xtask/tests/onboard_agent_closeout_preview/close_proving_run_write.rs`
 - `crates/xtask/tests/onboard_agent_closeout_preview/close_proving_run_paths.rs`
 - `crates/xtask/tests/support/agent_maintenance_drift_harness.rs`
-- `crates/xtask/tests/support/onboard_agent_harness.rs` only if necessary
 
-Required work:
+Required assertions:
 
-- add new entrypoint coverage for `refresh-publication`
-- cover happy path, stale check behavior, support-only, capability-only, support+capability, rollback-on-gate-failure, lifecycle-update rollback, and idempotent rerun
-- update `prepare-publication --check` coverage for both allowed `publication_ready` next-command states
-- update runtime-follow-on and repair-runtime-evidence coverage where they assert the prepare-publication handoff string
-- keep `close-proving-run` coverage proving unchanged behavior against post-refresh `publication_ready`
-- update harness expectations if they validate `required_commands`, `expected_next_command`, or committed lifecycle packet linkage
-- assume the parent already normalized any mechanical next-command/hash fallout before this lane starts; this lane owns only behavior-focused regressions after that point
+- `refresh-publication --write` leaves `lifecycle_stage = "published"`
+- refresh writes published-stage evidence and continuity fields
+- refresh promotes support tier to `publication_backed` unless already `first_class`
+- refresh failure does not leave fake committed `published`
+- `prepare-publication --write` still leaves `publication_ready`, never `published`
+- closeout succeeds from canonical `published`
+- ordinary prepare-time `publication_ready` is rejected
+- only the explicit legacy compatibility shape may close from `publication_ready`
+- maintenance accepts `published` and rejects pre-refresh `publication_ready` as a post-publication baseline
 
-Forbidden surfaces:
+Lane-local validation:
 
-- all code under `crates/xtask/src/**`
-- docs
-- committed lifecycle docs
-- generated publication outputs
-- `.runs/**`
+- `cargo test -p xtask --test refresh_publication_entrypoint`
+- `cargo test -p xtask --test agent_lifecycle_state`
+- `cargo test -p xtask --test prepare_publication_entrypoint`
+- `cargo test -p xtask --test onboard_agent_closeout_preview -- --nocapture`
+- `cargo test -p xtask --test agent_maintenance_drift`
 
-Required commands:
+Exit:
+
+- every changed branch in the lifecycle seam has direct regression coverage
+
+### HONEST-40 Docs Lane
+
+Owner: worker
+Depends on: `HONEST-20`
+
+Files:
+
+- `docs/specs/cli-agent-onboarding-charter.md`
+- `docs/specs/unified-agent-api/capabilities-schema-spec.md`
+- `docs/cli-agent-onboarding-factory-operator-guide.md`
+
+Required changes:
+
+- restate the canonical path as `publication_ready -> published -> closed_baseline`
+- describe `publication_ready` as pre-refresh only
+- describe refresh success as committing `published`
+- describe closeout as consuming `published` on the normal path
+- describe the compatibility branch as transitional, not a second steady-state meaning
+
+Lane-local validation:
+
+- absence check:
+
+```bash
+! rg -n 'refresh-publication.*publication_ready|close-proving-run.*publication_ready' \
+  docs/specs/cli-agent-onboarding-charter.md \
+  docs/specs/unified-agent-api/capabilities-schema-spec.md \
+  docs/cli-agent-onboarding-factory-operator-guide.md
+```
+
+- presence check:
+
+```bash
+rg -n 'publication_ready -> published -> closed_baseline|refresh-publication.*published|close-proving-run.*published' \
+  docs/specs/cli-agent-onboarding-charter.md \
+  docs/specs/unified-agent-api/capabilities-schema-spec.md \
+  docs/cli-agent-onboarding-factory-operator-guide.md
+```
+
+Exit:
+
+- normative and operator docs tell one lifecycle story
+
+### HONEST-50 Fixtures Lane
+
+Owner: worker
+Depends on: `HONEST-20`
+
+Files:
+
+- `docs/agents/lifecycle/**`
+
+Required changes:
+
+- update only those seeded examples that represent post-refresh truth
+- keep pre-refresh examples at `publication_ready` when they are intentionally pre-refresh
+- ensure seeded lifecycle examples reflect `published` after successful refresh
+
+Lane-local validation:
+
+- absence check for closable or post-refresh `publication_ready` lifecycle fixtures:
+
+```bash
+! rg -n --multiline -P '"lifecycle_stage": "publication_ready"[\\s\\S]*"expected_next_command": "close-proving-run' \
+  docs/agents/lifecycle/**/governance/lifecycle-state.json
+```
+
+- presence check for legitimate pre-refresh examples:
+
+```bash
+rg -n --multiline -P '"lifecycle_stage": "publication_ready"[\\s\\S]*"expected_next_command": "refresh-publication' \
+  docs/agents/lifecycle/**/governance/lifecycle-state.json
+```
+
+- presence check for post-refresh truth:
+
+```bash
+rg -n --multiline -P '"lifecycle_stage": "published"[\\s\\S]*"expected_next_command": "close-proving-run' \
+  docs/agents/lifecycle/**/governance/lifecycle-state.json
+```
+
+Exit:
+
+- seeded lifecycle fixtures match the frozen lifecycle model
+
+### HONEST-60 Parent Integration
+
+Owner: parent
+Depends on: `HONEST-30`, `HONEST-40`, `HONEST-50`
+
+Actions:
+
+- verify worker ownership boundaries
+- merge Lane F, then Lane D, then Lane T
+- run post-merge smoke checks after each merge
+- reject and relaunch any stale or cross-boundary lane instead of hand-correcting it
+
+Post-merge smoke:
+
+- after Lane F: lifecycle fixture consistency sweep
+- after Lane D: doc wording sweep
+- after Lane T:
+  - `cargo test -p xtask --test refresh_publication_entrypoint`
+  - `cargo test -p xtask --test agent_lifecycle_state`
+  - `cargo test -p xtask --test agent_maintenance_drift`
+
+Exit:
+
+- follow-on work is integrated on the parent branch
+
+### HONEST-70 Final Verification
+
+Owner: parent
+Depends on: `HONEST-60`
+
+Required command matrix:
 
 ```bash
 cargo test -p xtask --test refresh_publication_entrypoint
-cargo test -p xtask --test prepare_publication_entrypoint
 cargo test -p xtask --test agent_lifecycle_state
-cargo test -p xtask --test runtime_follow_on_entrypoint
-cargo test -p xtask --test repair_runtime_evidence_entrypoint
-cargo test -p xtask --test onboard_agent_closeout_preview
+cargo test -p xtask --test prepare_publication_entrypoint
+cargo test -p xtask --test onboard_agent_closeout_preview -- --nocapture
 cargo test -p xtask --test agent_maintenance_drift
+make test
+make preflight
 ```
 
-Acceptance:
+Targeted proof mapping for the four milestone verification outcomes:
 
-- the new command boundary and rollback path are covered
-- `prepare-publication` check-mode compatibility is covered
-- runtime-follow-on and repair-runtime-evidence remain aligned with the frozen handoff contract
-- `close-proving-run` remains valid against the post-refresh baseline
+- refresh success writes `published`:
+  - `cargo test -p xtask --test refresh_publication_entrypoint`
+- refresh failure rolls back to the pre-refresh state:
+  - `cargo test -p xtask --test refresh_publication_entrypoint`
+- closeout consumes `published` on the normal path:
+  - `cargo test -p xtask --test onboard_agent_closeout_preview -- --nocapture`
+- compatibility `publication_ready` is explicit and narrow:
+  - `cargo test -p xtask --test onboard_agent_closeout_preview -- --nocapture`
+- maintenance-drift post-publication truth remains aligned with the honest lifecycle stage:
+  - `cargo test -p xtask --test agent_maintenance_drift`
 
-### task/epl-06-converge
+Required acceptance checks:
 
-Owner:
+- a successful refresh leaves:
 
-- parent
-
-Required work:
-
-- merge Lane B, rerun its smoke commands locally
-- merge Lane C, rerun docs/search smoke locally
-- merge Lane D, rerun the widened regression stack locally
-- rerun the stale-string sweep and prove no newly merged stale references reappeared
-- run the full targeted verification stack before the live aider flow
-
-Required commands:
-
-```bash
-cargo test -p xtask --test agent_maintenance_refresh
-cargo test -p xtask --test refresh_publication_entrypoint
-cargo test -p xtask --test prepare_publication_entrypoint
-cargo test -p xtask --test agent_lifecycle_state
-cargo test -p xtask --test runtime_follow_on_entrypoint
-cargo test -p xtask --test repair_runtime_evidence_entrypoint
-cargo test -p xtask --test onboard_agent_closeout_preview
-cargo test -p xtask --test agent_maintenance_drift
-make check
-rg -n 'support-matrix --check && capability-matrix --check && capability-matrix-audit && make preflight && close-proving-run --write' \
-  docs/cli-agent-onboarding-factory-operator-guide.md \
-  docs/specs/cli-agent-onboarding-charter.md \
-  docs/agents/lifecycle \
-  crates/xtask/tests
-rg -n 'prepare-publication --approval .* --write' \
-  docs/cli-agent-onboarding-factory-operator-guide.md \
-  docs/specs/cli-agent-onboarding-charter.md \
-  docs/agents/lifecycle \
-  crates/xtask/tests
-rg -n 'refresh-publication' \
-  docs/cli-agent-onboarding-factory-operator-guide.md \
-  docs/specs/cli-agent-onboarding-charter.md \
-  docs/agents/lifecycle \
-  crates/xtask/tests \
-  crates/xtask/src
+```json
+{ "lifecycle_stage": "published" }
 ```
 
-Acceptance:
+- `refresh-publication --write` is the only committed writer of `published`
+- closeout consumes `published` on the normal path
+- legacy `publication_ready` compatibility remains narrow and transitional
+- the named targeted tests above are the direct proof that:
+  - refresh success writes `published`
+  - refresh failure rolls back to the pre-refresh state
+  - closeout consumes `published` on the normal path
+  - compatibility `publication_ready` remains explicit and narrow
+- published-stage evidence and continuity fields are present when `published` is committed
+- docs, fixtures, and tests all tell the same lifecycle story
 
-- merged branch is internally green before live repo-state verification
-- no worker-owned duplicate logic survives in maintenance refresh
-- no stale canonical raw shell-chain references reappear in the swept scopes
+Exit:
 
-### task/epl-07-final-verify
-
-Owner:
-
-- parent
-
-Owned surfaces:
-
-- merged integration branch
-- live aider lifecycle docs
-- final generated publication outputs
-- `acceptance.md`
-
-Required work:
-
-- run the real create-mode publication flow against aider
-- allow `refresh-publication --check` to act as the pre-write stale detector, then prove `--write` makes the lane green
-- keep `close-proving-run` verification at the test level only; do not widen into live closeout authoring for aider
-- run the final targeted search sweeps and classify remaining matches as valid or invalid
-
-Required final ordered sequence:
-
-1. Verify pre-refresh search state:
-   ```bash
-   rg -n 'support-matrix --check && capability-matrix --check && capability-matrix-audit && make preflight && close-proving-run --write' \
-     docs/cli-agent-onboarding-factory-operator-guide.md \
-     docs/specs/cli-agent-onboarding-charter.md \
-     docs/agents/lifecycle \
-     crates/xtask/tests
-   rg -n 'prepare-publication --approval .* --write' \
-     docs/cli-agent-onboarding-factory-operator-guide.md \
-     docs/specs/cli-agent-onboarding-charter.md \
-     docs/agents/lifecycle \
-     crates/xtask/tests
-   rg -n 'refresh-publication' \
-     docs/cli-agent-onboarding-factory-operator-guide.md \
-     docs/specs/cli-agent-onboarding-charter.md \
-     docs/agents/lifecycle \
-     crates/xtask/tests \
-     crates/xtask/src
-   ```
-2. Write the committed handoff:
-   ```bash
-   cargo run -p xtask -- prepare-publication --approval docs/agents/lifecycle/aider-onboarding/governance/approved-agent.toml --write
-   ```
-3. Run the stale/green detector:
-   ```bash
-   cargo run -p xtask -- refresh-publication --approval docs/agents/lifecycle/aider-onboarding/governance/approved-agent.toml --check
-   ```
-4. If step 3 reports stale publication outputs, repair them:
-   ```bash
-   cargo run -p xtask -- refresh-publication --approval docs/agents/lifecycle/aider-onboarding/governance/approved-agent.toml --write
-   ```
-5. Prove the post-write state is green:
-   ```bash
-   cargo run -p xtask -- refresh-publication --approval docs/agents/lifecycle/aider-onboarding/governance/approved-agent.toml --check
-   ```
-6. Verify semantic publication truth:
-   ```bash
-   cargo run -p xtask -- capability-matrix-audit
-   ```
-7. Run the full repo gate:
-   ```bash
-   make preflight
-   ```
-8. Re-run the targeted search sweeps and classify matches:
-   ```bash
-   rg -n 'support-matrix --check && capability-matrix --check && capability-matrix-audit && make preflight && close-proving-run --write' \
-     docs/cli-agent-onboarding-factory-operator-guide.md \
-     docs/specs/cli-agent-onboarding-charter.md \
-     docs/agents/lifecycle \
-     crates/xtask/tests
-   rg -n 'prepare-publication --approval .* --write' \
-     docs/cli-agent-onboarding-factory-operator-guide.md \
-     docs/specs/cli-agent-onboarding-charter.md \
-     docs/agents/lifecycle \
-     crates/xtask/tests
-   rg -n 'refresh-publication' \
-     docs/cli-agent-onboarding-factory-operator-guide.md \
-     docs/specs/cli-agent-onboarding-charter.md \
-     docs/agents/lifecycle \
-     crates/xtask/tests \
-     crates/xtask/src
-   ```
-
-Final search classification rules:
-
-- raw shell-chain matches:
-  - invalid anywhere in the authored docs, committed lifecycle artifacts, or impacted tests when used as the lifecycle’s canonical next command
-  - valid only in code or packet contexts that are intentionally describing the green-gate command inventory itself
-- `prepare-publication --approval .* --write` matches:
-  - valid in runtime-integrated contexts, runtime-follow-on expectations, repair-runtime-evidence expectations, and docs describing the pre-refresh step
-  - invalid as the canonical next step after `publication_ready`
-- `refresh-publication` matches:
-  - must exist in `crates/xtask/src/**`, in publication-ready workflow docs, and in the updated regression tests
-  - absence from those canonical contexts is a blocker
-
-Failure handling:
-
-- if step 3 or step 5 fails because surfaces are stale or miscomputed, fix within touched scope and rerun from step 3
-- if step 4 fails, the new command must restore publication-owned committed surfaces; rollback failure is a hard blocker
-- if `make preflight` fails for a touched-scope regression, fix within scope and rerun from the first failed step
-- if `make preflight` fails for an unrelated pre-existing blocker, record it in `acceptance.md` and stop without widening
-
-Acceptance:
-
-- aider transitions from `runtime_integrated` to `publication_ready` through the new command path
-- `refresh-publication --write` leaves committed publication outputs green and checkable
-- final search sweeps show no stale canonical shell-chain references in the swept scopes
-- final publication surfaces and lifecycle docs are review-ready on `codex/recommend-next-agent`
+- acceptance log is complete
+- the milestone is ready for branch closeout
 
 ## Tests And Acceptance
 
-The run is accepted only if all of the following are true:
+Minimum verification commands:
 
-1. `prepare-publication --write` points to `refresh-publication --approval ... --write`.
-2. `prepare-publication --check` accepts both valid `publication_ready` next-command states:
-  - pre-refresh `refresh-publication --approval ... --write`
-  - post-refresh `close-proving-run --approval ... --closeout ...`
-3. `refresh-publication --write` consumes `publication-ready.json` and writes only the packet’s required publication outputs.
-4. `refresh-publication --write` rolls back publication-owned committed surfaces on gate failure.
-5. maintenance refresh and create-mode publication use the same support/capability planning seam.
-6. runtime-follow-on and repair-runtime-evidence remain aligned with the frozen pre-publication handoff contract.
-7. `close-proving-run` works unchanged against a post-refresh `publication_ready` baseline.
-8. authored docs describe one publication consumer command, not a manual checklist.
-9. all historical or fixture hash fallout tied to `PUBLICATION_READY_NEXT_COMMAND` is normalized before the test worker launches.
-10. final ordered verification through aider plus `make preflight` passes.
-11. targeted `rg` sweeps prove no stale canonical raw shell-chain references remain in the authored docs, committed lifecycle artifacts, or impacted `crates/xtask/tests/**` scopes.
+```bash
+cargo test -p xtask --test refresh_publication_entrypoint
+cargo test -p xtask --test agent_lifecycle_state
+cargo test -p xtask --test prepare_publication_entrypoint
+cargo test -p xtask --test onboard_agent_closeout_preview -- --nocapture
+cargo test -p xtask --test agent_maintenance_drift
+make test
+make preflight
+```
+
+Acceptance fails if any of these remain false:
+
+- `published` is not a reachable committed stage
+- refresh can still finish normally while leaving steady-state `publication_ready`
+- closeout still accepts ordinary prepare-time `publication_ready` as normal input
+- the compatibility branch is broader than the frozen rule
+- docs or seeded fixtures contradict the new stage sequence
+- test coverage misses a changed lifecycle branch
 
 ## Assumptions
 
-- current live execution baseline remains `000aa69` until the run starts
-- worker launch happens only after the parent has frozen CLI strings and completed the stale-string/hash normalization sweep
-- `REQUIRED_PUBLICATION_COMMANDS` remains the four-command green gate and does not become `refresh-publication`
-- historical closed-baseline packet hashes may need committed doc refresh because `reconstruct_publication_ready_state_from_closed_baseline()` uses `PUBLICATION_READY_NEXT_COMMAND`
-- test and fixture fallout is broader than the first narrow lane draft, so the widened test lane plus parent stale sweep are both required
-- live final verification is allowed to leave aider at `publication_ready` on the branch
-- no unrelated repo dirt overlaps with worker-owned files at launch; if it does, the parent rebalance happens before worker creation
+- `PLAN.md` remains the canonical milestone design for this slice.
+- The current integration branch remains `codex/recommend-next-agent`.
+- The current execution baseline remains HEAD `07a0ce9259b8` until work begins.
+- The parent semantic lane can be contained to the named `crates/xtask/src/**` files.
+- Narrative docs, seeded fixtures, and regression tests can safely wait until after freeze.
+- Three follow-on worker lanes are the maximum useful concurrency for this milestone; more would add merge risk without reducing the true critical path.
