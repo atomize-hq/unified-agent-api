@@ -24,8 +24,6 @@ pub const LIFECYCLE_STATE_FILE_NAME: &str = "lifecycle-state.json";
 pub const APPROVED_AGENT_FILE_NAME: &str = "approved-agent.toml";
 pub const PUBLICATION_READY_FILE_NAME: &str = "publication-ready.json";
 pub const PROVING_RUN_CLOSEOUT_FILE_NAME: &str = "proving-run-closeout.json";
-pub const PUBLICATION_READY_NEXT_COMMAND: &str =
-    "support-matrix --check && capability-matrix --check && capability-matrix-audit && make preflight && close-proving-run --write";
 
 pub const REQUIRED_PUBLICATION_COMMANDS: [&str; 4] = [
     "cargo run -p xtask -- support-matrix --check",
@@ -33,6 +31,30 @@ pub const REQUIRED_PUBLICATION_COMMANDS: [&str; 4] = [
     "cargo run -p xtask -- capability-matrix-audit",
     "make preflight",
 ];
+
+pub fn publication_ready_refresh_command(approval_artifact_path: &str) -> String {
+    format!("refresh-publication --approval {approval_artifact_path} --write")
+}
+
+pub fn publication_ready_closeout_command(
+    approval_artifact_path: &str,
+    onboarding_pack_prefix: &str,
+) -> String {
+    format!(
+        "close-proving-run --approval {approval_artifact_path} --closeout {}",
+        proving_run_closeout_path(onboarding_pack_prefix)
+    )
+}
+
+pub fn publication_ready_expected_next_commands(
+    approval_artifact_path: &str,
+    onboarding_pack_prefix: &str,
+) -> [String; 2] {
+    [
+        publication_ready_refresh_command(approval_artifact_path),
+        publication_ready_closeout_command(approval_artifact_path, onboarding_pack_prefix),
+    ]
+}
 
 #[derive(Debug, Error)]
 pub enum LifecycleError {
@@ -628,8 +650,11 @@ pub fn reconstruct_publication_ready_state_from_closed_baseline(
     let mut historical = state.clone();
     historical.lifecycle_stage = LifecycleStage::PublicationReady;
     historical.support_tier = SupportTier::BaselineRuntime;
-    historical.current_owner_command = "prepare-publication --write".to_string();
-    historical.expected_next_command = PUBLICATION_READY_NEXT_COMMAND.to_string();
+    historical.current_owner_command = "refresh-publication --write".to_string();
+    historical.expected_next_command = publication_ready_closeout_command(
+        &state.approval_artifact_path,
+        &state.onboarding_pack_prefix,
+    );
     historical.required_evidence =
         required_evidence_for_stage(LifecycleStage::PublicationReady).to_vec();
     historical.satisfied_evidence =

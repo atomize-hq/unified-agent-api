@@ -24,7 +24,7 @@ use crate::{
     },
     agent_registry::{AgentRegistry, AgentRegistryEntry},
     approval_artifact::{load_approval_artifact, ApprovalArtifact, ApprovalArtifactError},
-    capability_matrix, capability_publication, support_matrix,
+    capability_publication, publication_refresh,
 };
 
 #[derive(Debug, Parser, Clone)]
@@ -139,7 +139,8 @@ pub fn run_in_workspace<W: Write>(
     next_state.lifecycle_stage = LifecycleStage::PublicationReady;
     next_state.support_tier = SupportTier::BaselineRuntime;
     next_state.current_owner_command = "prepare-publication --write".to_string();
-    next_state.expected_next_command = agent_lifecycle::PUBLICATION_READY_NEXT_COMMAND.to_string();
+    next_state.expected_next_command =
+        agent_lifecycle::publication_ready_refresh_command(&context.approval.relative_path);
     next_state.last_transition_at =
         now_rfc3339().map_err(|err| Error::Internal(err.to_string()))?;
     next_state.last_transition_by = "xtask prepare-publication --write".to_string();
@@ -311,13 +312,20 @@ fn validate_check_mode(workspace_root: &Path, context: &PublicationContext) -> R
                 LifecycleStage::PublicationReady,
                 &context.lifecycle_state_path,
             )?;
-            if context.lifecycle_state.expected_next_command
-                != agent_lifecycle::PUBLICATION_READY_NEXT_COMMAND
+            let expected_commands = agent_lifecycle::publication_ready_expected_next_commands(
+                &context.approval.relative_path,
+                &context.entry.scaffold.onboarding_pack_prefix,
+            );
+            if !expected_commands
+                .iter()
+                .any(|expected| expected == &context.lifecycle_state.expected_next_command)
             {
                 return Err(Error::Validation(format!(
-                    "`{}` has stale expected_next_command `{}`",
+                    "`{}` has stale expected_next_command `{}`; expected one of `{}` or `{}`",
                     context.lifecycle_state_path,
-                    context.lifecycle_state.expected_next_command
+                    context.lifecycle_state.expected_next_command,
+                    expected_commands[0],
+                    expected_commands[1]
                 )));
             }
             let packet =
@@ -503,15 +511,10 @@ fn required_publication_commands() -> Vec<String> {
 }
 
 fn required_publication_outputs(entry: &AgentRegistryEntry) -> Vec<String> {
-    let mut outputs = Vec::new();
-    if entry.publication.support_matrix_enabled {
-        outputs.push(support_matrix::JSON_OUTPUT_PATH.to_string());
-        outputs.push(support_matrix::MARKDOWN_OUTPUT_PATH.to_string());
-    }
-    if entry.publication.capability_matrix_enabled {
-        outputs.push(capability_matrix::DEFAULT_OUT_PATH.to_string());
-    }
-    outputs
+    publication_refresh::expected_publication_output_paths(
+        entry.publication.support_matrix_enabled,
+        entry.publication.capability_matrix_enabled,
+    )
 }
 
 fn validate_required_commands(field: &str, commands: &[String]) -> Result<(), Error> {

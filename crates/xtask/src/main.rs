@@ -24,6 +24,7 @@ use xtask::agent_maintenance::{
 use xtask::capability_matrix;
 pub use xtask::onboard_agent;
 pub use xtask::prepare_publication;
+pub use xtask::publication_refresh;
 pub use xtask::repair_runtime_evidence;
 pub use xtask::runtime_follow_on;
 pub use xtask::support_matrix;
@@ -74,6 +75,8 @@ enum Command {
     RuntimeFollowOn(runtime_follow_on::Args),
     /// Prepare the committed publication handoff from runtime-integrated evidence.
     PreparePublication(prepare_publication::Args),
+    /// Refresh publication-owned outputs from a committed publication-ready packet.
+    RefreshPublication(publication_refresh::Args),
     /// Repair a stale runtime evidence bundle without advancing lifecycle stage.
     RepairRuntimeEvidence(repair_runtime_evidence::Args),
     /// Generate or verify the universal agent capability matrix markdown.
@@ -200,6 +203,13 @@ fn main() {
             }
         },
         Command::PreparePublication(args) => match prepare_publication::run(args) {
+            Ok(()) => 0,
+            Err(err) => {
+                eprintln!("{err}");
+                err.exit_code()
+            }
+        },
+        Command::RefreshPublication(args) => match publication_refresh::run(args) {
             Ok(()) => 0,
             Err(err) => {
                 eprintln!("{err}");
