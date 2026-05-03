@@ -1,43 +1,35 @@
-<!-- /autoplan restore point: /Users/spensermcconnell/.gstack/projects/unified-agent-api/PLAN-autoplan-restore-20260502-151831.md -->
-# PLAN - Generic Capability Publication Foundation
+# PLAN - Enclose The Publication Lane End To End
 
 Status: planned  
 Date: 2026-05-02  
 Branch: `codex/recommend-next-agent`  
 Base branch: `main`  
 Repo: `atomize-hq/unified-agent-api`  
-Work item: `Land The Generic Capability Publication Foundation`  
-Plan commit baseline: `9daea9f`
+Work item: `Enclose The Publication Lane End To End`  
+Plan commit baseline: `bfd6fd4`
 
-Separate design doc: not required for this slice. This is a backend-only control-plane change,
-and this `PLAN.md` is the design record.
+Separate design doc: not required for this slice. This is a backend-only control-plane and CLI
+workflow change. `PLAN.md` is the design record.
 
 ## Objective
 
-Make capability publication truthful, generic, and boring.
+Make publication refresh one repo-owned command instead of an operator choreography.
 
 After this plan lands:
 
-1. A newly onboarded agent that has reached `runtime_integrated` or later can participate in
-   capability publication without any new hardcoded backend `match` arm in
-   `crates/xtask/src/capability_matrix.rs`.
-2. `capability-matrix`, `capability-matrix-audit`, `prepare-publication`,
-   `check-agent-drift`, and `close-proving-run` all reason from the same publication truth model.
-3. The repo has one pinned answer to "why is this agent allowed to publish these capability ids on
-   this target?"
-4. The capability-matrix specs and generated markdown stop describing publication as built-in
-   backend inventory when the repo actually wants lifecycle-backed control-plane truth.
+1. `prepare-publication --write` will still freeze runtime evidence and emit
+   `publication-ready.json`, but its next-step contract will point to one publication consumer.
+2. A new `xtask` command will consume `publication-ready.json`, materialize the publication-owned
+   support and capability surfaces, run the green publication gate, and roll back on failure.
+3. The operator will move from `prepare-publication` to one command, then to `close-proving-run`,
+   instead of manually composing `support-matrix`, `capability-matrix`, `capability-matrix-audit`,
+   and `make preflight`.
+4. The repo will have one explicit answer to "what writes publication truth, what verifies it, and
+   what happens if the gate is not green?"
 
-## Implementation Notes
-
-- Capability publication must stop discovering truth from hardcoded runtime backend construction in
-  `xtask`.
-- The shared publication model must be metadata-driven. It must reuse committed registry,
-  lifecycle, approval, and manifest artifacts that already exist in the repo.
-- Lifecycle gates publication eligibility. Registry enrollment alone is not sufficient.
-- The shared projection contract in `crates/xtask/src/capability_projection.rs` remains the only
-  place that decides which capability ids are advertised for a target.
-- This slice does not introduce plugin discovery, runtime reflection, or any new artifact family.
+This matters because the current lane is mechanically possible but operationally sloppy. The user
+here is the maintainer running create-mode onboarding. Right now they get a frozen handoff packet,
+then a loose shell checklist. That is where partial writes and archaeology creep in.
 
 ## Source Inputs
 
@@ -45,78 +37,108 @@ After this plan lands:
   - `TODOS.md`
   - `docs/backlog/cli-agent-onboarding-lifecycle-unification-gap-memo.md`
 - Normative contracts:
+  - `docs/specs/cli-agent-onboarding-charter.md`
   - `docs/specs/agent-registry-contract.md`
+  - `docs/specs/unified-agent-api/support-matrix.md`
   - `docs/specs/unified-agent-api/capabilities-schema-spec.md`
   - `docs/specs/unified-agent-api/capability-matrix.md`
-  - `docs/specs/unified-agent-api/support-matrix.md`
-  - `docs/specs/cli-agent-onboarding-charter.md`
+- Procedure source:
+  - `docs/cli-agent-onboarding-factory-operator-guide.md`
 - Current implementation surfaces:
+  - `crates/xtask/src/prepare_publication.rs`
+  - `crates/xtask/src/agent_lifecycle.rs`
+  - `crates/xtask/src/support_matrix.rs`
   - `crates/xtask/src/capability_matrix.rs`
   - `crates/xtask/src/capability_matrix_audit.rs`
-  - `crates/xtask/src/capability_projection.rs`
-  - `crates/xtask/src/prepare_publication.rs`
+  - `crates/xtask/src/capability_publication.rs`
   - `crates/xtask/src/close_proving_run.rs`
-  - `crates/xtask/src/agent_maintenance/drift/shared.rs`
-  - `crates/xtask/src/agent_maintenance/drift/publication.rs`
-  - `crates/xtask/data/agent_registry.toml`
-- Current tests:
-  - `crates/xtask/tests/c8_capability_matrix_unit.rs`
-  - `crates/xtask/tests/c8_spec_capability_matrix_paths.rs`
-  - `crates/xtask/tests/agent_maintenance_drift.rs`
+  - `crates/xtask/src/agent_maintenance/refresh.rs`
+  - `crates/xtask/src/workspace_mutation.rs`
+- Current tests and fixtures:
   - `crates/xtask/tests/prepare_publication_entrypoint.rs`
+  - `crates/xtask/tests/agent_lifecycle_state.rs`
+  - `crates/xtask/tests/agent_maintenance_refresh.rs`
   - `crates/xtask/tests/onboard_agent_closeout_preview/close_proving_run_write.rs`
+  - `crates/xtask/tests/onboard_agent_closeout_preview/close_proving_run_paths.rs`
 
 ## Verified Current State
 
-These facts are verified from the current branch, not inferred:
+These facts are verified from the current branch, not inferred.
 
-1. `crates/xtask/src/capability_matrix.rs` imports concrete backend types from `agent_api` and
-   hardcodes runtime inventory in `runtime_backend_capabilities(agent_id)`.
-2. `collect_builtin_backend_inventory()` and
-   `collect_builtin_backend_inventory_from_registry(...)` still combine registry entries with
-   built-in backend constructor truth before rendering markdown.
-3. `validate_agent_publication_continuity(...)` in `capability_matrix.rs` validates manifest and
-   projection continuity today, but it still depends on modeled runtime truth derived from the same
-   hardcoded backend inventory path.
-4. `crates/xtask/src/capability_matrix_audit.rs` calls
-   `crate::capability_matrix::collect_builtin_backend_capabilities()` and therefore inherits the
-   same hardcoded inventory boundary.
-5. `crates/xtask/src/close_proving_run.rs` duplicates the audit allowlist and audit logic locally
-   in `validate_capability_matrix_audit_green()` instead of reusing the CLI audit implementation.
-6. `crates/xtask/src/prepare_publication.rs` currently calls
-   `capability_matrix::validate_agent_publication_continuity(...)`, so the publication continuity
-   gate is still anchored to the generator module instead of a dedicated shared source.
-7. `crates/xtask/src/agent_maintenance/drift/shared.rs` already derives capability truth from
-   registry declaration plus manifest projection via `project_advertised_capabilities(...)`, which
-   is closer to the desired model than the generator path.
-8. `docs/specs/unified-agent-api/capability-matrix.md` still publishes the header
-   "`opencode`, `gemini_cli`, `aider` use the default built-in backend config", which is the
-   wrong control-plane explanation for a lifecycle-backed publication lane.
+1. `prepare_publication::build_publication_ready_packet(...)` already writes an explicit
+   `required_publication_outputs` list derived from registry publication flags. Today that list is:
+   - `cli_manifests/support_matrix/current.json`
+   - `docs/specs/unified-agent-api/support-matrix.md`
+   - `docs/specs/unified-agent-api/capability-matrix.md`
+2. `prepare-publication --write` advances lifecycle state only to `publication_ready`, writes
+   `publication-ready.json`, clears the active runtime evidence selector, and stops there.
+3. `agent_lifecycle::PUBLICATION_READY_NEXT_COMMAND` is still the raw shell chain:
+   `support-matrix --check && capability-matrix --check && capability-matrix-audit && make preflight && close-proving-run --write`.
+4. The operator guide still tells maintainers to run:
+   - `support-matrix`
+   - `capability-matrix`
+   - `support-matrix --check`
+   - `capability-matrix --check`
+   - `capability-matrix-audit`
+   - `make preflight`
+   as separate steps after `prepare-publication`.
+5. `agent_maintenance::refresh::build_refresh_plan(...)` already knows how to render publication
+   surfaces in memory using:
+   - `support_matrix::generate_publication_artifacts(...)`
+   - `capability_matrix::generate_markdown()`
+   and then apply those writes through `workspace_mutation`.
+6. `close-proving-run` already treats green publication as a prerequisite. It re-runs drift checks,
+   re-runs the shared capability audit, and refuses closeout when published support/capability
+   truth is stale.
+7. `make preflight` is broader than publication freshness. It already includes:
+   - `support-matrix --check`
+   - `capability-matrix --check`
+   - `capability-matrix-audit`
+   plus hygiene, fmt, clippy, check, test, LOC, publish guards, and security.
+8. No branch-local design doc was found under `~/.gstack/projects/unified-agent-api/` for
+   `codex-recommend-next-agent`. That is acceptable here because this slice is backend-only and
+   the plan itself is the design artifact.
 
 ## Problem Statement
 
-Capability publication has split brain.
+The publication lane has a frozen handoff, but not a real owner.
 
-The repo already has the right control-plane ingredients:
+Current shape:
 
-- registry-owned capability declarations
-- lifecycle-owned eligibility and continuity evidence
-- lifecycle-linked approval descriptors
-- manifest-root target availability
-- shared projection logic for advertised capabilities
+```text
+runtime-follow-on --write
+  -> prepare-publication --write
+       writes publication-ready.json
+       sets lifecycle_stage = publication_ready
+       points operator at a shell checklist
+  -> operator manually runs publication writers
+  -> operator manually runs publication checks
+  -> close-proving-run --write
+```
 
-But the publication lane still asks a second, wrong question:
+That creates three concrete problems:
 
-- "Can `xtask` instantiate this backend from a hardcoded built-in list?"
+1. The write set exists in the packet, but the repo does not own the act of materializing it.
+2. Publication refresh is not transactional. A maintainer can update one published surface, fail
+   later in the gate, and be left with a dirty repo plus an ambiguous next step.
+3. The lifecycle says "publication_ready", but the next command is not really one command. It is a
+   prose instruction disguised as lifecycle truth.
 
-That creates three concrete failures:
+Target shape:
 
-1. A newly enrolled agent still needs hidden Rust edits before publication becomes truthful.
-2. Different consumers reason about capability truth differently:
-   - generator and closeout gate use compiled backend inventory
-   - drift already leans on registry plus manifest projection
-3. The specs describe built-in backend semantics even though the onboarding lifecycle wants
-   publication to follow committed lifecycle and approval artifacts.
+```text
+runtime-follow-on --write
+  -> prepare-publication --write
+       writes publication-ready.json
+       sets expected_next_command = refresh-publication --approval ... --write
+  -> refresh-publication --write
+       reads publication-ready.json
+       writes required publication outputs
+       runs the green publication gate
+       rolls back on failure
+       narrows next step to close-proving-run
+  -> close-proving-run --write
+```
 
 ## Step 0 Scope Challenge
 
@@ -124,516 +146,366 @@ That creates three concrete failures:
 
 | Sub-problem | Existing surface | Reuse decision |
 | --- | --- | --- |
-| capability declaration ownership | `crates/xtask/data/agent_registry.toml`, `docs/specs/agent-registry-contract.md` | Reuse directly. Registry remains the committed declaration source. |
-| frozen onboarding declaration | `approved-agent.toml`, `crates/xtask/src/approval_artifact.rs` | Reuse directly. Publication truth must validate registry against this frozen descriptor. |
-| lifecycle eligibility | `crates/xtask/src/agent_lifecycle.rs` | Reuse directly. Lifecycle stage decides whether an agent can enter publication inventory. |
-| target-scoped capability projection | `crates/xtask/src/capability_projection.rs` | Reuse directly. Do not rebuild projection rules in consumers. |
-| per-agent manifest availability | `cli_manifests/<agent>/current.json` | Reuse directly. This remains the manifest availability input. |
-| drift reporting framework | `crates/xtask/src/agent_maintenance/drift/*` | Reuse, but point it at the same shared publication source used by generation and closeout. |
-| closeout gate wiring | `crates/xtask/src/close_proving_run.rs` | Reuse, but remove the duplicated audit semantics. |
-| capability matrix rendering | `crates/xtask/src/capability_matrix.rs` | Reuse render and check/write flow. Replace only the inventory builder and header semantics. |
+| frozen publication handoff | `prepare_publication.rs`, `publication-ready.json`, `agent_lifecycle.rs` | Reuse directly. Do not invent a second handoff packet. |
+| required publication outputs | `PublicationReadyPacket.required_publication_outputs` | Reuse directly. This remains the write contract. |
+| support publication rendering | `support_matrix::generate_publication_artifacts(...)` | Reuse directly. No shell-out for write generation. |
+| capability publication rendering | `capability_matrix::generate_markdown()` | Reuse directly. No duplicate markdown builder. |
+| capability publication audit | `capability_publication::audit_current_capability_publication(...)` | Reuse directly. Do not clone audit rules into the new command. |
+| safe file writes and rollback-friendly snapshots | `workspace_mutation.rs` | Reuse for publication-owned file writes. |
+| publication refresh planning | `agent_maintenance::refresh::build_refresh_plan(...)` | Reuse by extraction. Create-mode and maintenance should not diverge. |
+| closeout publication validation | `close_proving_run.rs` | Reuse the same green-surface contract. Do not redefine closeout prerequisites. |
 
 ### Minimum Complete Change Set
 
 The smallest complete version of this milestone is:
 
-1. add one shared publication-capability source module
-2. move publication continuity validation into that module
-3. make generator inventory come from that module
-4. make `capability-matrix-audit` call a shared audit over that same inventory
-5. make `close-proving-run` call that same shared audit instead of cloning it
-6. make drift capability truth and `prepare-publication` reuse the same source module
-7. update specs and generated wording so the repo no longer describes the old built-in-only model
+1. add one new `xtask` publication consumer command
+2. extract one shared publication-output planning helper so create-mode and maintenance-mode use
+   the same render/write set
+3. repoint `prepare-publication` and lifecycle next-step text at the new command
+4. teach the new command to write, verify, and roll back publication-owned surfaces
+5. update docs and lifecycle fixtures so the new contract is the only create-mode story
 
-Anything smaller leaves split truth in place.
+Anything smaller leaves the repo with a packet that still delegates real publication ownership to
+the operator.
 
 ### Complexity Check
 
-This plan touches more than 8 files. That is still the minimal complete version because the bug
-spans:
+This slice will touch more than 8 files. That is still the minimal complete version because the
+seam spans:
 
-- shared inventory construction
-- generator
-- audit
-- closeout gate
-- prepare-publication continuity
-- drift truth
-- specs and generated wording
-- tests
+- CLI wiring in `xtask`
+- lifecycle next-command semantics
+- shared publication rendering/planning
+- operator docs and charter wording
+- publication-ready fixtures and lifecycle tests
 
-Complexity control for this slice:
+Complexity control:
 
-- one new source module only
+- one new command only
+- one shared planner extraction only
 - no new lifecycle stage
-- no new artifact type
-- no new plugin or reflection system
-- no support-matrix refactor
+- no new artifact family
+- no support or capability semantics rewrite
+- no closeout schema expansion
 
 ### Search / Build Decision
 
-This is a Layer 1 reuse problem, not a new architecture problem.
+This is a Layer 1 reuse problem with one Layer 3 control-plane correction.
 
-- **[Layer 1]** Reuse `approval_artifact.rs` as the frozen capability declaration surface.
-- **[Layer 1]** Reuse `agent_lifecycle.rs` for publication eligibility and lifecycle lookup.
-- **[Layer 1]** Reuse `capability_projection.rs` for advertised capability derivation.
-- **[Layer 1]** Reuse `cli_manifests/<agent>/current.json` as the target/command availability
-  surface instead of inventing a second target registry.
-- **[Layer 3]** Stop asking compiled backend constructors for publication truth. Lifecycle,
-  approval, registry, and manifest artifacts are already the right control-plane abstraction.
+- **[Layer 1]** Reuse `publication-ready.json` as the publication contract.
+- **[Layer 1]** Reuse `support_matrix::generate_publication_artifacts(...)`.
+- **[Layer 1]** Reuse `capability_matrix::generate_markdown()`.
+- **[Layer 1]** Reuse `capability_publication::audit_current_capability_publication(...)`.
+- **[Layer 1]** Reuse `workspace_mutation` instead of inventing a second file-apply path.
+- **[Layer 1]** Reuse maintenance refresh planning logic by extraction, not copy/paste.
+- **[Layer 3]** Treat publication as a lifecycle-owned command boundary, not as prose plus four
+  shell commands.
 
 ### TODOS Cross-Reference
 
 This plan closes exactly one pending TODO:
 
-- `Land The Generic Capability Publication Foundation`
+- `Enclose The Publication Lane End To End`
 
 It explicitly unblocks, but does not implement:
 
-- `Enclose The Publication Lane End To End`
 - `Make The Published State Honest In The Lifecycle Model`
-- `Decide Whether Capability Matrix Markdown Stays Canonical After M5`
+- `Enclose Create-Mode Closeout Without Ad Hoc Authoring`
 
 ### Completeness Decision
 
-The shortcut version would keep the hardcoded runtime backend inventory and just spread a slightly
-cleaner helper around the same false model. That is not acceptable.
+The shortcut version would add a doc alias or shell wrapper and still leave the repo with split
+write logic and non-transactional behavior. That is not good enough.
 
 The complete version is still a boilable lake:
 
-- one metadata-driven source of publication truth
-- one shared audit implementation
-- one lifecycle-based eligibility rule
-- one set of tests that prove the generic lane works
+- one command
+- one packet contract
+- one write plan
+- one green gate
+- one rollback story
 
 ### Distribution Check
 
-No new binary, package, container, or artifact family is introduced here. Distribution pipeline
-changes are not part of this slice.
+No new binary, package, container image, or release track is introduced here.
 
 ## Locked Decisions
 
-These decisions are locked for this plan.
-
-1. Add one shared source module:
-   - `crates/xtask/src/capability_publication.rs`
-2. Publication eligibility is lifecycle-driven. Include an agent only when:
-   - `publication.capability_matrix_enabled = true`
-   - lifecycle state exists for `scaffold.onboarding_pack_prefix`
-   - lifecycle stage is one of:
-     - `runtime_integrated`
-     - `publication_ready`
-     - `published`
-     - `closed_baseline`
-3. Capability declaration truth for publication comes from the lifecycle-linked approval artifact,
-   but current registry truth must still match it exactly. Any drift is a validation failure.
-4. Advertised capability projection remains owned by the existing projection contract:
-   - `crates/xtask/src/capability_projection.rs`
-   - `cli_manifests/<agent>/current.json`
-5. `capability-matrix-audit` and `close-proving-run` must call one shared audit function over one
-   shared inventory. No duplicated allowlists.
-6. `capability-matrix` generation must omit pre-runtime agents instead of failing on them.
-7. This slice does not add runtime plugin loading, backend reflection, or dynamic factory
-   discovery. The generic source is metadata-driven, not constructor-driven.
+1. Add a new `xtask` subcommand:  
+   `cargo run -p xtask -- refresh-publication --approval <path> --check|--write`
+2. `prepare-publication` stays a handoff writer. It does not start writing support/capability
+   outputs directly.
+3. `refresh-publication` consumes `publication-ready.json` as the only committed create-mode
+   publication packet.
+4. `PublicationReadyPacket.required_publication_outputs` remains the authoritative write set. The
+   new command does not invent a second list.
+5. Extract shared publication-output planning so create-mode `refresh-publication` and maintenance
+   `refresh-agent` render the same support/capability surfaces from the same helper.
+6. `refresh-publication --write` is transactional over publication-owned committed surfaces and any
+   lifecycle metadata it updates. On gate failure, those committed files must be restored.
+7. `make preflight` remains part of the publication green gate in this slice. Do not replace it
+   with a narrower custom gate yet.
+8. This slice does not resolve `LifecycleStage::Published`. Green publication remains a validated
+   condition while lifecycle stage semantics stay on the current `publication_ready` path.
+9. `refresh-publication --check|--write` requires lifecycle stage `publication_ready`. It consumes
+   `publication-ready.json` and may update `lifecycle-state.json`, but it does not rewrite the
+   packet itself.
 
 ## Architecture Review
 
-### Current Split-Brain Flow
+### Command Boundary
+
+The new command should be a true consumer, not a thin shell alias.
+
+Recommended module shape:
+
+| Responsibility | File |
+| --- | --- |
+| CLI args + top-level orchestration | `crates/xtask/src/publication_refresh.rs` |
+| CLI registration | `crates/xtask/src/main.rs` |
+| public exports | `crates/xtask/src/lib.rs` |
+| shared publication output planning | extracted from `crates/xtask/src/agent_maintenance/refresh.rs` |
+| lifecycle next-command helpers | `crates/xtask/src/agent_lifecycle.rs` |
+| publication handoff producer alignment | `crates/xtask/src/prepare_publication.rs` |
+
+### Target Flow
 
 ```text
-agent_registry.toml
-        +
-cli_manifests/<agent>/current.json
-        |
-        +--> capability_projection.rs
-        |       |
-        |       +--> drift modeled truth
-        |
-        +--> capability_matrix.rs
-                |
-                +--> runtime_backend_capabilities(agent_id)
-                        |
-                        +--> hardcoded built-in backend inventory
-                                |
-                                +--> capability-matrix markdown
-                                +--> capability-matrix-audit
-                                +--> prepare-publication continuity
-                                +--> close-proving-run audit clone
+publication-ready.json
+  │
+  ├── validate approval / lifecycle / packet continuity
+  ├── derive publication output plan
+  │     ├── support-matrix JSON + Markdown, when enabled
+  │     └── capability-matrix Markdown, when enabled
+  ├── snapshot current committed publication surfaces
+  ├── write candidate surfaces
+  ├── run green gate
+  │     ├── support-matrix --check
+  │     ├── capability-matrix --check
+  │     ├── capability-matrix-audit
+  │     └── make preflight
+  ├── on failure: restore snapshots, keep lifecycle pre-refresh
+  └── on success: keep written surfaces, update lifecycle next-step text
 ```
 
-What is broken:
+### Transaction Model
 
-- drift truth is already artifact-driven
-- generator, audit, continuity, and closeout are still constructor-driven
-- new agent onboarding has to satisfy both worlds
+This is the main landmine. The repo already writes files atomically, but the gate is broader than
+the file writes.
 
-### Target Architecture
+Implementation rule:
 
-```text
-agent_registry.toml
-        +
-lifecycle-state.json
-        +
-approved-agent.toml
-        +
-cli_manifests/<agent>/current.json
-        |
-        v
-capability_publication.rs
-  - load eligible entries
-  - resolve lifecycle state
-  - validate approval <-> registry continuity
-  - resolve publication target
-  - project advertised capabilities
-  - build shared publication inventory
-  - audit orthogonality over that inventory
-        |
-        +--> capability-matrix render/check
-        +--> capability-matrix-audit
-        +--> prepare-publication continuity
-        +--> check-agent-drift capability truth
-        +--> close-proving-run gate
-```
+1. Build candidate publication outputs in memory.
+2. Snapshot the current bytes for every `required_publication_output`.
+3. Apply the candidate committed files.
+4. Run the green gate.
+5. If any gate step fails:
+   - restore all snapped publication outputs
+   - restore any lifecycle file touched by the command
+   - surface the exact failing command and keep the repo in pre-refresh committed state
+6. If all gate steps pass:
+   - persist the new committed publication surfaces
+   - narrow lifecycle `expected_next_command` to closeout
 
-### Shared Source Contract
+This is engineered enough. It does not require a temp worktree or a repo clone. It only needs
+explicit snapshots for the small committed write set.
 
-`capability_publication.rs` becomes the only place allowed to answer:
+### Lifecycle Behavior
 
-- is this agent publication-eligible right now?
-- which target is publication truth scoped to?
-- which capability ids are advertised for publication?
-- does registry truth still match the frozen approval descriptor?
-- does the union manifest satisfy the publication target contract?
+Before refresh success:
 
-Recommended core types:
+- `prepare-publication --write` should set:
+  - `current_owner_command = "prepare-publication --write"`
+  - `expected_next_command = "refresh-publication --approval <path> --write"`
 
-```text
-PublicationCapabilityRecord
-  - agent_id
-  - display_name
-  - backend_module
-  - manifest_root
-  - onboarding_pack_prefix
-  - lifecycle_stage
-  - approval_artifact_path
-  - approval_artifact_sha256
-  - publication_target
-  - canonical_targets
-  - advertised_capability_ids
+After refresh success:
 
-PublicationInventory
-  - records[]
-  - header_profiles[]
+- lifecycle stage remains `publication_ready`
+- `current_owner_command = "refresh-publication --write"`
+- `expected_next_command = "close-proving-run --approval <path> --closeout docs/agents/lifecycle/<prefix>/governance/proving-run-closeout.json"`
 
-CapabilityAuditViolation
-  - capability_id
-  - supported_by[]
-```
+Why keep the stage unchanged:
 
-Recommended public entrypoints:
+- the repo already has a separate TODO for honest `published` state semantics
+- mixing that lifecycle redesign into this slice spends an innovation token for no reason
+- `close-proving-run` already revalidates green publication truth, so we do not need a stage
+  redesign just to own the refresh lane
 
-1. `collect_publication_inventory(workspace_root) -> Result<PublicationInventory, String>`
-2. `collect_publication_capabilities(workspace_root) -> Result<BTreeMap<String, AgentWrapperCapabilities>, String>`
-3. `validate_agent_publication_continuity(workspace_root, entry) -> Result<(), String>`
-4. `audit_publication_capabilities(inventory) -> Result<(), String>`
+### Prepare-Publication Check Compatibility
 
-The generator can keep its current render model if the shared module returns
-`BTreeMap<String, AgentWrapperCapabilities>`, but the source of that map must move out of
-`capability_matrix.rs`.
+`prepare-publication --check` currently rejects any `publication_ready` lifecycle state whose
+`expected_next_command` is not the old raw shell chain.
 
-### Required Validation Pipeline
+That must be updated.
 
-For each `registry.capability_matrix_entries()` candidate:
+New rule:
 
-1. Read the registry entry.
-2. Resolve the lifecycle-state path from `scaffold.onboarding_pack_prefix`.
-3. If lifecycle state is missing, fail validation for direct continuity checks and skip the entry
-   when building generated publication inventory.
-4. If lifecycle stage is earlier than `runtime_integrated`, exclude the entry from publication
-   inventory without error.
-5. Load the lifecycle-linked `approved-agent.toml`.
-6. Require exact continuity for:
-   - `agent_id`
-   - `display_name`
-   - `backend_module`
-   - `manifest_root`
-   - capability declarations
-   - publication flags
-   - `capability_matrix_target`
-7. Load `cli_manifests/<agent>/current.json`.
-8. Resolve publication target with `resolve_capability_publication_target(entry)`.
-9. Derive advertised capability ids only through `project_advertised_capabilities(...)`.
-10. Emit one shared record used by all publication consumers.
+- at `runtime_integrated`, `prepare-publication --check` still expects the future next step to be
+  `refresh-publication --approval ... --write`
+- at `publication_ready`, it must accept both:
+  - pre-refresh state: `refresh-publication --approval ... --write`
+  - post-refresh state: `close-proving-run --approval ... --closeout ...`
 
-### Consumer Migration Rules
-
-#### `capability_matrix.rs`
-
-- Keep CLI args, output path handling, stale-check flow, bucketing, and markdown rendering here.
-- Delete the concrete backend imports from `agent_api`.
-- Delete `runtime_backend_capabilities(...)`.
-- Delete `collect_builtin_backend_inventory()` and replace it with a call into the shared module.
-- Replace header text so it explains lifecycle-backed publication targets, not built-in config.
-
-#### `capability_matrix_audit.rs`
-
-- Keep only the CLI entrypoint and report rendering here.
-- Move the orthogonality allowlist out of this file.
-- Replace direct calls to `collect_builtin_backend_capabilities()` with the shared audit function.
-
-#### `prepare_publication.rs`
-
-- Keep publication packet and lifecycle transition logic untouched.
-- Replace the `capability_matrix::validate_agent_publication_continuity(...)` dependency with
-  `capability_publication::validate_agent_publication_continuity(...)`.
-- Do not duplicate capability projection or continuity rules here.
-
-#### `agent_maintenance/drift/shared.rs` and `publication.rs`
-
-- Keep support-matrix logic unchanged.
-- Replace local capability truth derivation with the same publication record or shared capability
-  set used by the generator.
-- Drift must compare published markdown against the exact same modeled truth as generation.
-
-#### `close_proving_run.rs`
-
-- Delete the local orthogonality allowlist constant.
-- Delete local `supported_backends(...)` audit cloning.
-- Replace `validate_capability_matrix_audit_green()` internals with a call into the shared audit.
-- Keep closeout write flow and docs regeneration untouched.
-
-### Architecture Invariants
-
-These are non-negotiable:
-
-1. No agent-name `match` is allowed anywhere in publication truth derivation.
-2. No consumer may restate capability projection, lifecycle eligibility, or approval continuity
-   independently.
-3. Pre-runtime agents must be invisible to generated capability publication.
-4. A publication-eligible agent must be able to enter the matrix with no code changes outside
-   registry, lifecycle, approval, manifest, and tests.
-5. Generated docs may explain publication target shape, but they may not claim built-in backend
-   construction is the source of truth.
-
-### Inline Diagram Targets
-
-If implementation adds or restructures these files, keep local ASCII diagrams accurate:
-
-- `crates/xtask/src/capability_publication.rs`
-- `crates/xtask/src/capability_matrix.rs`
-- `crates/xtask/src/close_proving_run.rs`
+This keeps the handoff checker useful without making it a second publication freshness gate.
 
 ## Code Quality Review
 
-### Module Ownership
+### DRY Boundaries
 
-| Area | Files | Responsibility |
-| --- | --- | --- |
-| shared publication source | `crates/xtask/src/capability_publication.rs` | eligibility, continuity, inventory construction, audit entrypoint |
-| capability-matrix render entrypoint | `crates/xtask/src/capability_matrix.rs` | CLI args, render, check/write path handling |
-| semantic audit entrypoint | `crates/xtask/src/capability_matrix_audit.rs` | CLI surface only, no truth derivation |
-| publication continuity | `crates/xtask/src/prepare_publication.rs` | validate one agent's readiness through the shared source |
-| drift capability truth | `crates/xtask/src/agent_maintenance/drift/shared.rs`, `publication.rs` | compare published matrix against shared modeled truth |
-| closeout gate | `crates/xtask/src/close_proving_run.rs` | reuse shared audit result, stop cloning audit semantics |
-| docs/specs | `docs/specs/**`, `docs/cli-agent-onboarding-factory-operator-guide.md` | explain lifecycle-backed publication truth clearly |
+The repo already has two partial write paths for publication surfaces:
 
-### Code Quality Rules
+- create-mode intent in `prepare_publication.rs`
+- maintenance-mode refresh planning in `agent_maintenance/refresh.rs`
 
-1. Rendering stays dumb. Truth lives in `capability_publication.rs`, not in render or CLI files.
-2. `capability-matrix-audit` and `close-proving-run` must share one allowlist constant and one
-   audit implementation.
-3. `prepare-publication` must not depend on the generator module for publication truth.
-4. Drift must not model capabilities independently once the shared source exists.
-5. No runtime backend constructors may remain in publication logic after this slice.
-6. Keep the diff small: one new module, surgical rewires, no new abstraction stack beyond the
-   shared source.
+Do not add a third.
 
-## Detailed File Plan
+Recommendation:
 
-### New File
+- extract a shared publication output planner that returns the support/capability files implied by
+  a publication contract
+- let `refresh-publication` call that helper directly
+- make `refresh-agent` call the same helper for `support_matrix_refresh` and
+  `capability_matrix_refresh`
 
-- `crates/xtask/src/capability_publication.rs`
+That keeps maintenance and create-mode aligned. It also makes the next bug obvious instead of
+duplicated.
 
-### Updated Files
+### Explicit Over Clever
 
-- `crates/xtask/src/lib.rs`
-- `crates/xtask/src/capability_matrix.rs`
-- `crates/xtask/src/capability_matrix_audit.rs`
-- `crates/xtask/src/prepare_publication.rs`
-- `crates/xtask/src/close_proving_run.rs`
-- `crates/xtask/src/agent_maintenance/drift/shared.rs`
-- `crates/xtask/src/agent_maintenance/drift/publication.rs`
-- `crates/xtask/tests/c8_capability_matrix_unit.rs`
-- `crates/xtask/tests/c8_spec_capability_matrix_paths.rs`
-- `crates/xtask/tests/agent_maintenance_drift.rs`
-- `crates/xtask/tests/prepare_publication_entrypoint.rs`
-- `crates/xtask/tests/onboard_agent_closeout_preview/close_proving_run_write.rs`
-- `crates/xtask/tests/support/agent_maintenance_drift_harness.rs`
-- `docs/specs/unified-agent-api/capabilities-schema-spec.md`
-- `docs/specs/unified-agent-api/README.md`
-- `docs/specs/cli-agent-onboarding-charter.md`
-- `docs/cli-agent-onboarding-factory-operator-guide.md`
-- `docs/specs/unified-agent-api/capability-matrix.md`
+Do not build a generic "run arbitrary required commands from JSON" executor.
 
-## Implementation Steps
+The packet's `required_commands` list is a validation contract, not a scripting engine. The new
+command should call the known gate steps explicitly in Rust:
 
-### Step 1 - Add the shared publication source
+- `support_matrix::run(Args { check: true })`
+- `capability_matrix::run(Args { check: true, out: None })`
+- `capability_publication::audit_current_capability_publication(...)`
+- a subprocess call for `make preflight`
 
-1. Create `crates/xtask/src/capability_publication.rs`.
-2. Move these responsibilities into it:
-   - lifecycle eligibility lookup
-   - lifecycle-linked approval loading
-   - approval-to-registry continuity validation
-   - publication target resolution
-   - manifest projection
-   - shared inventory collection
-   - orthogonality audit over that inventory
-3. Export the module from `crates/xtask/src/lib.rs`.
+That is boring and readable. Good.
 
-Definition of done:
+### Minimal Diff Guardrails
 
-- the new module can build publication records without importing any concrete backend type
-- the module exposes a reusable audit path
-- the module has unit tests for eligibility and continuity edge cases
+Do not:
 
-### Step 2 - Migrate capability-matrix generation
+- teach `prepare-publication` to generate published outputs
+- route create-mode publication through a synthetic maintenance request artifact
+- add a new packet schema just to carry the same output list twice
+- change support/capability semantics while solving ownership
 
-1. Remove concrete `agent_api` backend imports from `capability_matrix.rs`.
-2. Remove `runtime_backend_capabilities(...)`.
-3. Replace `collect_builtin_backend_inventory()` with a call into the shared module.
-4. Keep `render_matrix(...)`, bucket logic, and file output flow in place.
-5. Update the generated header text so it describes lifecycle-backed publication targets instead of
-   "default built-in backend config".
+## DX / Operator Experience
 
-Definition of done:
+This is a developer-facing command, so the UX matters.
 
-- `cargo run -p xtask -- capability-matrix --check` passes using only shared publication truth
-- no publication inventory path in `capability_matrix.rs` instantiates a backend
+Success criteria for the maintainer:
 
-### Step 3 - Centralize the semantic audit
+1. After `prepare-publication --write`, the next step is exactly one command.
+2. `refresh-publication --check` tells them whether current publication surfaces already satisfy
+   the frozen packet.
+3. `refresh-publication --write` prints:
+   - approval path
+   - packet path
+   - agent id
+   - planned publication outputs
+   - gate steps it ran
+   - whether rollback occurred
+4. A failure message names the exact failing gate and leaves the committed repo state where it was
+   before the command started.
 
-1. Move the orthogonality allowlist into the shared module.
-2. Expose one shared `audit_publication_capabilities(...)` entrypoint.
-3. Make `capability_matrix_audit.rs` call it.
-4. Make `close_proving_run.rs` call it instead of its local duplicate.
+Target operator time-to-green after runtime evidence exists:
 
-Definition of done:
-
-- `capability-matrix-audit` and `close-proving-run` fail on the same violation set
-- there is exactly one allowlist definition in the codebase for this audit
-
-### Step 4 - Align prepare-publication and drift
-
-1. Replace `prepare_publication` capability continuity wiring with the shared module.
-2. Replace drift capability truth derivation with the shared module.
-3. Keep support-matrix and runtime-evidence logic untouched.
-
-Definition of done:
-
-- drift, continuity validation, and generation all talk about the same published capability set
-- no publication consumer in scope computes capability truth independently
-
-### Step 5 - Update tests to prove generic behavior
-
-1. Add a synthetic publication-eligible agent fixture by extending seeded registry, lifecycle,
-   approval, and manifest inputs inside test harnesses.
-2. Assert the synthetic agent appears in capability publication without editing any hardcoded
-   backend inventory list.
-3. Assert the same synthetic agent is excluded before `runtime_integrated`.
-4. Assert closeout and drift consume the same truth.
-
-Definition of done:
-
-- each regression in the test review section is covered
-- the synthetic fixture proves generic publication behavior instead of another built-in case
-
-### Step 6 - Update specs and operator docs
-
-1. Rewrite capability-matrix semantics in `capabilities-schema-spec.md`.
-2. Update `docs/specs/unified-agent-api/README.md`.
-3. Update `docs/specs/cli-agent-onboarding-charter.md` wherever it still frames capability
-   publication as built-in-only.
-4. Update `docs/cli-agent-onboarding-factory-operator-guide.md` so the create lane says
-   publication eligibility is lifecycle-backed.
-5. Regenerate `docs/specs/unified-agent-api/capability-matrix.md`.
-
-Definition of done:
-
-- docs and generated markdown describe the same truth model the code enforces
-- no spec in scope claims backend constructor inventory is canonical
+- today: multiple commands plus manual sequencing
+- target: one command to refresh and verify, one command to close out
 
 ## Test Review
 
-### Test Framework
+100% coverage is the bar for the new command boundary and its failure paths.
 
-This repo is Rust-first. The relevant coverage lives in `cargo test -p xtask --test ...`
-integration tests plus the capability unit/spec tests under `crates/xtask/tests/`.
-
-### Code Path Coverage Diagram
+### Code Path Coverage
 
 ```text
-GENERIC CAPABILITY PUBLICATION
-==============================
-[+] capability_publication.rs
-    ├── [GAP] lifecycle gate excludes enrolled / approved agents
-    ├── [GAP] runtime_integrated agent is included without hardcoded match arm
-    ├── [GAP] approval <-> registry capability drift fails fast
-    ├── [GAP] manifest missing required publication target fails fast
-    ├── [GAP] publication target resolves through capability_projection.rs only
-    └── [GAP] shared audit reports orthogonality violations over shared inventory
+CODE PATH COVERAGE
+===========================
+[GAP] publication_refresh::run_in_workspace()
+  ├── publication_ready happy path
+  ├── packet / approval / lifecycle mismatch
+  ├── support-only publication agent
+  ├── capability-only publication agent
+  ├── support+capability publication agent
+  ├── gate failure after writes -> rollback
+  ├── lifecycle update failure after green gate -> rollback
+  └── idempotent re-run when outputs are already fresh
 
-[+] capability-matrix
-    ├── [TESTED] render path / output path handling
-    ├── [GAP] inventory comes from shared source, not runtime_backend_capabilities()
-    └── [GAP] header text reflects lifecycle-backed publication semantics
+[GAP] prepare_publication::validate_check_mode()
+  ├── pre-refresh publication_ready next command accepted
+  └── post-refresh closeout next command accepted
 
-[+] capability-matrix-audit
-    ├── [TESTED] orthogonality semantics
-    └── [GAP] uses shared audit implementation and shared inventory
+[GAP] shared publication output planner
+  ├── create-mode and maintenance-mode produce identical support outputs
+  └── create-mode and maintenance-mode produce identical capability outputs
+```
 
-[+] prepare-publication
-    ├── [TESTED] approval / lifecycle continuity checks
-    └── [GAP] capability publication continuity comes from shared source module
+### User Flow Coverage
 
-[+] check-agent-drift
-    ├── [TESTED] published capability mismatch detection
-    └── [GAP] compares published markdown against the same shared modeled truth as generation
+```text
+USER FLOW COVERAGE
+===========================
+[GAP] prepare-publication --write
+  -> refresh-publication --write
+  -> close-proving-run --write
 
-[+] close-proving-run
-    ├── [TESTED] publication gate path exists
-    └── [GAP] reuses shared audit instead of local clone
+[GAP] refresh-publication --check
+  -> detects stale support matrix only
+
+[GAP] refresh-publication --check
+  -> detects stale capability matrix only
+
+[GAP] refresh-publication --write
+  -> make preflight fails
+  -> publication files restored
+  -> lifecycle next step unchanged
+
+[GAP] refresh-publication --write
+  -> success
+  -> close-proving-run sees green publication truth without extra manual steps
 ```
 
 ### Required Tests
 
-| Flow | Existing coverage | Required new coverage | Planned test file |
-| --- | --- | --- | --- |
-| synthetic runtime-integrated agent publishes without a new `xtask` match arm | none | yes | `crates/xtask/tests/c8_capability_matrix_unit.rs` |
-| pre-runtime enrolled agent is excluded from generated inventory | none | yes | `c8_capability_matrix_unit.rs` |
-| approval capability declaration drift fails shared source construction | none | yes | `c8_capability_matrix_unit.rs` |
-| lifecycle-linked approval path mismatch fails continuity validation | none | yes | `c8_capability_matrix_unit.rs` |
-| `capability-matrix-audit` uses shared audit and shared inventory | partial | yes | `c8_capability_matrix_unit.rs` or `c8_spec_capability_matrix_paths.rs` |
-| `prepare-publication` continuity uses shared source | partial | yes | `prepare_publication_entrypoint.rs` |
-| drift truth matches generator truth | partial | yes | `agent_maintenance_drift.rs` |
-| `close-proving-run` audit gate reuses shared logic | partial | yes | `onboard_agent_closeout_preview/close_proving_run_write.rs` |
+Add or update these test surfaces:
+
+1. New entrypoint suite:
+   - `crates/xtask/tests/refresh_publication_entrypoint.rs`
+2. Shared planner parity:
+   - extend `crates/xtask/tests/agent_maintenance_refresh.rs`
+3. Lifecycle contract updates:
+   - extend `crates/xtask/tests/prepare_publication_entrypoint.rs`
+   - extend `crates/xtask/tests/agent_lifecycle_state.rs`
+4. Create-lane closeout integration:
+   - extend `crates/xtask/tests/onboard_agent_closeout_preview/close_proving_run_write.rs`
+   - extend `crates/xtask/tests/onboard_agent_closeout_preview/close_proving_run_paths.rs`
 
 ### Regression Rules
 
 These regressions are mandatory to cover:
 
-- adding a new publication-eligible agent must not require editing a hardcoded backend list
-- changing capability publication semantics in one consumer must not silently diverge from the
-  other consumers
-- pre-runtime agents must not start appearing in the generated matrix
-- approval, registry, and manifest drift must fail at the shared continuity boundary before any
-  consumer can publish contradictory truth
+- a publication-ready packet exists, but the repo still requires manual `support-matrix` and
+  `capability-matrix` invocation to become green
+- `refresh-publication --write` updates one published surface, then fails later and leaves the repo
+  half-refreshed
+- create-mode publication and maintenance refresh generate different bytes for the same support or
+  capability surface
+- `prepare-publication --check` starts failing legitimate post-refresh `publication_ready` states
+  because lifecycle next-command text changed
 
 ### Required Test Commands
 
 ```bash
-cargo test -p xtask --test c8_capability_matrix_unit
-cargo test -p xtask --test c8_spec_capability_matrix_paths
 cargo test -p xtask --test prepare_publication_entrypoint
-cargo test -p xtask --test agent_maintenance_drift
+cargo test -p xtask --test refresh_publication_entrypoint
+cargo test -p xtask --test agent_maintenance_refresh
+cargo test -p xtask --test agent_lifecycle_state
 cargo test -p xtask --test onboard_agent_closeout_preview
 make check
 ```
@@ -641,123 +513,125 @@ make check
 ### Verification Commands
 
 ```bash
-cargo run -p xtask -- capability-matrix --check
+cargo run -p xtask -- prepare-publication --approval docs/agents/lifecycle/aider-onboarding/governance/approved-agent.toml --write
+cargo run -p xtask -- refresh-publication --approval docs/agents/lifecycle/aider-onboarding/governance/approved-agent.toml --check
+cargo run -p xtask -- refresh-publication --approval docs/agents/lifecycle/aider-onboarding/governance/approved-agent.toml --write
 cargo run -p xtask -- capability-matrix-audit
-cargo run -p xtask -- check-agent-drift --agent codex
-cargo run -p xtask -- prepare-publication --approval docs/agents/lifecycle/aider-onboarding/governance/approved-agent.toml --check
+make preflight
 ```
 
 ## Failure Modes Registry
 
 | Failure mode | Detection | Handling | Test required | Critical gap today |
 | --- | --- | --- | --- | --- |
-| newly enrolled runtime-integrated agent is omitted until `xtask` code is hand-edited | synthetic publication fixture | fail current branch, then fix shared source | yes | yes |
-| pre-runtime agent appears in matrix too early | lifecycle-gating test | exclude from publication inventory | yes | yes |
-| registry and frozen approval capability declarations drift | shared source continuity validation | fail fast, no publication truth | yes | yes |
-| lifecycle state exists, but approval path does not match that pack prefix | shared continuity validation | fail fast, no publication truth | yes | yes |
-| `current.json` misses the required publication target | shared continuity validation | fail fast, no publication truth | yes | no |
-| drift compares against a different truth source than generator | drift parity test | route drift through shared source | yes | yes |
-| closeout passes while CLI audit would fail | shared audit reuse test | remove duplicate audit code | yes | yes |
-| spec wording still claims built-in-inventory semantics after code changes | doc diff + review | update spec in the same change | yes | yes |
+| `publication-ready.json` exists, but no repo-owned command consumes it | missing CLI entrypoint | add `refresh-publication` | yes | yes |
+| support matrix writes succeed, but capability or preflight fails later | integration failure after file write | restore snapped publication outputs | yes | yes |
+| lifecycle next command still points at raw shell chain after refresh lands | lifecycle test + operator guide diff | update lifecycle helper and docs together | yes | yes |
+| create-mode refresh and maintenance refresh drift to different render logic | shared planner parity test | extract one helper | yes | yes |
+| packet output list and actual write set diverge | packet-driven write-plan validation | fail before write | yes | yes |
+| `make preflight` fails after publication files are updated | rollback integration test | restore files, surface failing gate | yes | yes |
+| closeout path is still ambiguous after green publication | lifecycle next-step test | set exact closeout command template | yes | no |
+| future `published` lifecycle redesign leaks into this slice | review + test boundary | defer to next TODO | no | no |
 
 Critical gap definition for this slice:
 
-- any state where one publication consumer says an agent/capability set is valid and another says
-  it is invalid, without a real artifact change
+- any state where publication surfaces were changed in commit-worthy files, but the publication gate
+  did not go green and the repo did not restore pre-command committed publication truth
 
 ## Performance Review
 
-Performance is not the product risk here. Consistency is.
+Performance is not the product risk here. Correctness is.
 
-Still, the shared source must stay bounded:
+Still, the command should stay boring:
 
-1. one registry scan over `capability_matrix_entries()` per command
-2. one lifecycle load, one approval load, and one `current.json` load per eligible candidate
-3. no runtime backend constructor instantiation
-4. no shelling out between publication consumers
+1. generate publication files in process, not via shell nesting
+2. touch only the packet-required publication outputs
+3. run one `make preflight`, not a custom second copy of the preflight pipeline
+4. avoid a temp repo clone or temp worktree unless rollback-on-failure proves insufficient
 
-Expected runtime cost is trivial relative to current `xtask` integration tests.
+Expected cost:
+
+- publication render time is trivial
+- `make preflight` dominates runtime, and that is acceptable because the command is explicitly the
+  green publication gate
 
 ## Worktree Parallelization Strategy
 
-This plan has useful parallelization only after the shared source API is frozen. Before that,
-everything is stacked on the same seam.
+There is real parallelization here, but only after the command contract is frozen.
 
 ### Dependency Table
 
 | Step | Modules touched | Depends on |
 | --- | --- | --- |
-| shared publication source | `crates/xtask/src/` | — |
-| generator migration | `crates/xtask/src/` | shared publication source |
-| audit + closeout reuse | `crates/xtask/src/`, `crates/xtask/tests/onboard_agent_closeout_preview/` | shared publication source |
-| drift + prepare-publication alignment | `crates/xtask/src/agent_maintenance/drift/`, `crates/xtask/src/prepare_publication.rs` | shared publication source |
-| docs/spec updates | `docs/specs/`, `docs/` | shared publication source semantics stable |
-| tests and final verification | `crates/xtask/tests/` | generator migration, audit + closeout reuse, drift + prepare-publication alignment |
+| command contract + lifecycle next-step helpers | `crates/xtask/src/`, `docs/cli-agent-onboarding-factory-operator-guide.md`, `docs/specs/cli-agent-onboarding-charter.md` | — |
+| shared publication output planner extraction | `crates/xtask/src/`, `crates/xtask/src/agent_maintenance/` | command contract |
+| create-mode command implementation | `crates/xtask/src/`, `crates/xtask/tests/` | command contract, shared planner |
+| docs and fixture updates | `docs/`, `docs/agents/lifecycle/**`, `crates/xtask/tests/` | command contract |
+| final verification and closeout-path regression tests | `crates/xtask/tests/`, repo root `Makefile` gate usage | create-mode command, docs and fixture updates |
 
 ### Parallel Lanes
 
-- Lane A: shared source module -> generator migration
+- Lane A: command contract + lifecycle next-step helpers
   - sequential, shared `crates/xtask/src/`
-- Lane B: audit + closeout reuse
-  - starts after Lane A freezes the shared API
-- Lane C: drift + prepare-publication alignment
-  - starts after Lane A freezes the shared API
-- Lane D: docs/spec updates
-  - can start after Lane A, but should finish after behavior is locked
-- Lane E: tests and verification
-  - starts after B and C merge because it exercises final semantics
+- Lane B: shared publication output planner extraction
+  - starts after Lane A
+- Lane C: create-mode command implementation and rollback logic
+  - starts after Lane B
+- Lane D: docs and fixture updates
+  - starts after Lane A once command naming is frozen
+- Lane E: final verification and regression tests
+  - starts after C and D merge
 
 ### Execution Order
 
 1. Launch Lane A first.
-2. Once the shared source API is stable, launch Lanes B, C, and D in parallel.
-3. Merge B and C before starting Lane E.
-4. Run Lane E and the verification commands.
-5. Regenerate and re-check docs last.
+2. Once naming and lifecycle semantics are locked, launch Lanes B and D in parallel.
+3. Launch Lane C after B freezes the shared planner API.
+4. Merge C and D.
+5. Run Lane E and the full verification chain.
 
 ### Conflict Flags
 
-- Lanes A and B both touch `crates/xtask/src/`. Do not run them in parallel.
-- Lanes A and C both touch shared source imports and signatures. Do not run them in parallel.
-- Lanes B and C are the best true parallel split.
-- Lane D will churn if semantics are still moving. Start it only after Lane A decisions are frozen.
+- Lanes A, B, and C all touch `crates/xtask/src/`. Do not run them in the same worktree.
+- Lane D touches fixtures and operator docs that reference command names. Do not start it until
+  Lane A freezes those names.
+- Lane E is sequential. It depends on final behavior, not draft wiring.
 
 ## NOT In Scope
 
-- new publication write commands
-- support-matrix refactors
-- published-stage lifecycle redesign
-- backend plugin discovery
-- dynamic runtime reflection
-- changing the orthogonality rule itself
-- changing capability declarations for existing agents
+- redesigning `LifecycleStage::Published`
+- adding new lifecycle evidence ids for green publication
+- scaffolding `proving-run-closeout.json`
+- teaching create-mode publication to refresh release docs
+- replacing `make preflight` with a narrower custom publication gate
+- rewriting support-matrix or capability-matrix semantics
+- changing maintenance request scope beyond reusing the shared planner
 
 ## Acceptance Criteria
 
-1. `cargo run -p xtask -- capability-matrix --check` succeeds without any hardcoded
-   `runtime_backend_capabilities()` agent inventory.
-2. `cargo run -p xtask -- capability-matrix-audit` and `close-proving-run` use the same audit
-   implementation.
-3. A synthetic publication-eligible agent fixture can enter capability publication without adding a
-   new `xtask` backend `match` arm.
-4. A synthetic pre-runtime agent fixture is excluded from publication output.
-5. `check-agent-drift` compares published capability truth against the same shared modeled truth as
-   the generator.
-6. The capability-matrix spec and generated header no longer describe the publication surface as a
-   built-in backend inventory.
-7. No consumer in scope restates publication-capability derivation independently.
+1. `prepare-publication --write` points to `refresh-publication --approval ... --write`, not to a
+   raw shell chain.
+2. `refresh-publication --write` consumes `publication-ready.json` and writes exactly the packet's
+   `required_publication_outputs`.
+3. `refresh-publication --write` runs the publication gate and restores committed publication files
+   on failure.
+4. `refresh-publication --check` can validate an already-green publication state without rewriting
+   files.
+5. Create-mode publication and maintenance refresh use the same support/capability render logic.
+6. `close-proving-run` works unchanged against a post-refresh `publication_ready` baseline.
+7. The operator guide and charter describe one publication consumer command, not a loose checklist.
 
 ## What Success Looks Like
 
-When this lands, adding the next agent to capability publication should look like this:
+When this lands, the maintainer flow becomes:
 
-1. registry entry is enrolled with `capability_matrix_enabled = true`
-2. lifecycle reaches `runtime_integrated`
-3. approval artifact and `current.json` are present and internally consistent
-4. shared publication source picks the agent up automatically
-5. generator, audit, drift, prepare-publication, and closeout all agree on the result
+1. run `prepare-publication --write`
+2. run `refresh-publication --approval <path> --write`
+3. author `proving-run-closeout.json`
+4. run `close-proving-run --approval <path> --closeout <path>`
 
-No hidden Rust edit. No second truth system. No surprise audit failure from a different model.
+No manual publication command choreography. No half-refreshed committed surfaces. No ambiguity
+about who owns the publication write set.
 
 ## TODO Relation
 
@@ -765,19 +639,20 @@ No hidden Rust edit. No second truth system. No surprise audit failure from a di
 
 This plan is the implementation plan for:
 
-- `Land The Generic Capability Publication Foundation`
+- `Enclose The Publication Lane End To End`
 
 The remaining pending TODOs stay deferred as written.
 
-## Completion Summary
+## Review Summary
 
 - Step 0: Scope Challenge — scope accepted as-is; this is the minimum complete slice
-- Architecture Review: one shared source module, five publication consumers rewired
-- Code Quality Review: duplicate truth derivation removed from generator, audit, closeout, and drift
-- Test Review: coverage diagram produced, 12 concrete gaps enumerated
-- Performance Review: bounded metadata reads, zero runtime backend construction
+- Architecture Review: 1 new command, 1 shared planner extraction, no lifecycle-stage redesign
+- Code Quality Review: duplicate publication render planning removed across create-mode and
+  maintenance-mode
+- Test Review: coverage diagram produced, 10 concrete gaps enumerated
+- Performance Review: bounded file generation, preflight remains the dominant and intentional cost
 - NOT in scope: written
 - What already exists: written
-- Failure modes: 8 failure modes listed, 7 critical gaps flagged on the current branch
-- Parallelization: 5 lanes total, 3 launchable after Lane A, 2 strictly sequential gates
-- Lake Score: complete option chosen for every major decision in this slice
+- Failure modes: 8 failure modes listed, 6 critical gaps flagged on the current branch
+- Parallelization: 5 steps, 2 useful parallel lanes after command naming is frozen
+- Lake Score: the complete option won every major decision in this slice
