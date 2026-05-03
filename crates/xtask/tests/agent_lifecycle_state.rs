@@ -7,7 +7,8 @@ use sha2::Digest;
 use xtask::{
     agent_lifecycle::{
         approval_artifact_path_for_entry, file_sha256, is_resting_stage_v1,
-        lifecycle_state_path_for_entry, load_lifecycle_state,
+        lifecycle_state_path_for_entry, load_lifecycle_state, publication_ready_closeout_command,
+        publication_ready_expected_next_commands, publication_ready_refresh_command,
         reconstruct_publication_ready_state_from_closed_baseline, required_evidence_for_stage,
         validate_stage_support_tier, EvidenceId, LifecycleStage, LifecycleState,
         PublicationReadyPacket, SupportTier, REQUIRED_PUBLICATION_COMMANDS,
@@ -87,6 +88,20 @@ fn required_publication_command_set_is_frozen() {
             "cargo run -p xtask -- capability-matrix --check",
             "cargo run -p xtask -- capability-matrix-audit",
             "make preflight",
+        ]
+    );
+}
+
+#[test]
+fn publication_ready_next_command_templates_match_refresh_then_closeout_contract() {
+    let approval_path =
+        "docs/agents/lifecycle/gemini-cli-onboarding/governance/approved-agent.toml";
+    let expected = publication_ready_expected_next_commands(approval_path, "gemini-cli-onboarding");
+    assert_eq!(
+        expected,
+        [
+            publication_ready_refresh_command(approval_path),
+            publication_ready_closeout_command(approval_path, "gemini-cli-onboarding"),
         ]
     );
 }
@@ -215,8 +230,10 @@ fn backfilled_lifecycle_states_validate_for_registry_targets() {
 
         let approval = load_approval_artifact(&workspace_root, &state.approval_artifact_path)
             .expect("approval");
+        let runtime_validation_root = runtime_evidence_validation_root(&workspace_root, &packet)
+            .unwrap_or_else(|| workspace_root.clone());
         let runtime_evidence = validate_packet_pinned_runtime_evidence_for_approval(
-            &workspace_root,
+            &runtime_validation_root,
             &approval,
             &packet,
         )
@@ -240,6 +257,24 @@ fn backfilled_lifecycle_states_validate_for_registry_targets() {
             pretty_json_sha(&historical_publication_state)
         );
     }
+}
+
+fn runtime_evidence_validation_root(
+    workspace_root: &Path,
+    packet: &PublicationReadyPacket,
+) -> Option<PathBuf> {
+    let run_status_path = packet
+        .runtime_evidence_paths
+        .iter()
+        .find(|path| path.ends_with("/run-status.json"))?;
+    let run_status: serde_json::Value =
+        serde_json::from_slice(&fs::read(workspace_root.join(run_status_path)).ok()?).ok()?;
+    let recorded_run_dir = PathBuf::from(run_status.get("run_dir")?.as_str()?);
+    let run_root_relative = Path::new(run_status_path).parent()?;
+    recorded_run_dir
+        .ancestors()
+        .nth(run_root_relative.components().count())
+        .map(Path::to_path_buf)
 }
 
 #[test]

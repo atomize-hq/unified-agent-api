@@ -9,8 +9,7 @@ use clap::{ArgGroup, Parser};
 use thiserror::Error;
 
 use crate::{
-    capability_matrix, release_doc,
-    support_matrix::{self, MARKDOWN_OUTPUT_PATH as SUPPORT_MATRIX_MARKDOWN_OUTPUT_PATH},
+    publication_refresh, release_doc,
     workspace_mutation::{
         apply_mutations, plan_create_or_replace, ApplySummary, WorkspaceMutationError,
         WorkspacePathJail,
@@ -21,9 +20,6 @@ use super::{
     docs::build_packet_docs,
     request::{load_request, MaintenanceAction, MaintenanceRequest, MaintenanceRequestError},
 };
-
-const CAPABILITY_MATRIX_OUTPUT_PATH: &str = capability_matrix::DEFAULT_OUT_PATH;
-const SUPPORT_MATRIX_JSON_OUTPUT_PATH: &str = support_matrix::JSON_OUTPUT_PATH;
 
 #[derive(Debug, Parser, Clone)]
 #[command(group(
@@ -157,34 +153,25 @@ pub fn build_refresh_plan(
                 }
             }
             MaintenanceAction::SupportMatrixRefresh => {
-                let bundle = support_matrix::generate_publication_artifacts(workspace_root)
-                    .map_err(Error::Validation)?;
-                push_file(
+                push_publication_action_files(
+                    workspace_root,
                     &request,
                     &mut seen_paths,
                     &mut files,
                     action,
-                    SUPPORT_MATRIX_JSON_OUTPUT_PATH.to_string(),
-                    bundle.json.into_bytes(),
-                )?;
-                push_file(
-                    &request,
-                    &mut seen_paths,
-                    &mut files,
-                    action,
-                    SUPPORT_MATRIX_MARKDOWN_OUTPUT_PATH.to_string(),
-                    bundle.markdown.into_bytes(),
+                    true,
+                    false,
                 )?;
             }
             MaintenanceAction::CapabilityMatrixRefresh => {
-                let markdown = capability_matrix::generate_markdown().map_err(Error::Validation)?;
-                push_file(
+                push_publication_action_files(
+                    workspace_root,
                     &request,
                     &mut seen_paths,
                     &mut files,
                     action,
-                    CAPABILITY_MATRIX_OUTPUT_PATH.to_string(),
-                    markdown.into_bytes(),
+                    false,
+                    true,
                 )?;
             }
             MaintenanceAction::ReleaseDocRefresh => {
@@ -284,6 +271,34 @@ fn write_plan_preview<W: Write>(
     Ok(())
 }
 
+fn push_publication_action_files(
+    workspace_root: &Path,
+    request: &MaintenanceRequest,
+    seen_paths: &mut BTreeSet<String>,
+    files: &mut Vec<PlannedFile>,
+    action: MaintenanceAction,
+    support_enabled: bool,
+    capability_enabled: bool,
+) -> Result<(), Error> {
+    for file in publication_refresh::build_publication_artifact_plan(
+        workspace_root,
+        support_enabled,
+        capability_enabled,
+    )
+    .map_err(Error::Validation)?
+    {
+        push_file(
+            request,
+            seen_paths,
+            files,
+            action,
+            file.relative_path,
+            file.contents,
+        )?;
+    }
+    Ok(())
+}
+
 fn push_file(
     request: &MaintenanceRequest,
     seen_paths: &mut BTreeSet<String>,
@@ -321,9 +336,9 @@ fn ensure_allowed_write_path(
     ];
     let is_generated_surface = matches!(
         relative_path,
-        SUPPORT_MATRIX_JSON_OUTPUT_PATH
-            | SUPPORT_MATRIX_MARKDOWN_OUTPUT_PATH
-            | CAPABILITY_MATRIX_OUTPUT_PATH
+        publication_refresh::SUPPORT_MATRIX_JSON_OUTPUT_PATH
+            | publication_refresh::SUPPORT_MATRIX_MARKDOWN_OUTPUT_PATH
+            | publication_refresh::CAPABILITY_MATRIX_OUTPUT_PATH
     ) || relative_path == release_doc::RELEASE_DOC_PATH;
 
     if allowed_packet_paths

@@ -4,30 +4,32 @@
   "onboarding_pack_prefix": "aider-onboarding",
   "approval_artifact_path": "docs/agents/lifecycle/aider-onboarding/governance/approved-agent.toml",
   "approval_artifact_sha256": "bc02f5f9b7fe7880446c4cb04b33a9f7c419008755b2229a8243ba878441a854",
-  "lifecycle_stage": "runtime_integrated",
+  "lifecycle_stage": "publication_ready",
   "support_tier": "baseline_runtime",
   "side_states": [],
-  "current_owner_command": "repair-runtime-evidence --write",
-  "expected_next_command": "prepare-publication --approval docs/agents/lifecycle/aider-onboarding/governance/approved-agent.toml --write",
-  "last_transition_at": "2026-05-02T16:21:01.028888Z",
-  "last_transition_by": "xtask repair-runtime-evidence --write",
+  "current_owner_command": "prepare-publication --write",
+  "expected_next_command": "refresh-publication --approval docs/agents/lifecycle/aider-onboarding/governance/approved-agent.toml --write",
+  "last_transition_at": "2026-05-03T03:01:26.244934Z",
+  "last_transition_by": "xtask prepare-publication --write",
   "required_evidence": [
     "registry_entry",
     "docs_pack",
     "manifest_root_skeleton",
     "runtime_write_complete",
-    "implementation_summary_present"
+    "implementation_summary_present",
+    "publication_packet_written"
   ],
   "satisfied_evidence": [
     "registry_entry",
     "docs_pack",
     "manifest_root_skeleton",
     "runtime_write_complete",
-    "implementation_summary_present"
+    "implementation_summary_present",
+    "publication_packet_written"
   ],
   "blocking_issues": [],
   "retryable_failures": [],
-  "active_runtime_evidence_run_id": "repair-aider-runtime-follow-on",
+  "active_runtime_evidence_run_id": null,
   "implementation_summary": {
     "requested_runtime_profile": "default",
     "achieved_runtime_profile": "default",

@@ -243,6 +243,8 @@ fn repair_runtime_evidence_write_emits_bundle_without_advancing_lifecycle() {
     let lifecycle_path =
         fixture.join("docs/agents/lifecycle/gemini-cli-onboarding/governance/lifecycle-state.json");
     let before_lifecycle = read_json(&lifecycle_path);
+    let expected_prepare_publication_handoff =
+        "prepare-publication --approval docs/agents/lifecycle/gemini-cli-onboarding/governance/approved-agent.toml --write";
 
     let output = run_cli(repair_args("--write", &approval_path), &fixture);
     assert_eq!(output.exit_code, 0, "stderr:\n{}", output.stderr);
@@ -309,9 +311,7 @@ fn repair_runtime_evidence_write_emits_bundle_without_advancing_lifecycle() {
         after_lifecycle
             .get("expected_next_command")
             .and_then(Value::as_str),
-        before_lifecycle
-            .get("expected_next_command")
-            .and_then(Value::as_str),
+        Some(expected_prepare_publication_handoff),
     );
     assert_eq!(
         after_lifecycle

@@ -168,10 +168,19 @@ Canonical lifecycle record:
    - exec-policy default behavior (non-interactive) and override levers if applicable
 6) Run `prepare-publication --approval docs/agents/lifecycle/<onboarding_pack_prefix>/governance/approved-agent.toml --write` after committed runtime evidence exists:
    - validate approval SHA continuity, implementation-summary completeness, capability publication continuity, and the exact runtime-evidence bundle selected by `active_runtime_evidence_run_id`
-   - write `docs/agents/lifecycle/<onboarding_pack_prefix>/governance/publication-ready.json`
+   - write only `docs/agents/lifecycle/<onboarding_pack_prefix>/governance/publication-ready.json`
    - advance the committed lifecycle record to `publication_ready`
    - clear `active_runtime_evidence_run_id` as part of that stage transition
-7) Regenerate publication outputs from committed runtime evidence.
+   - the next command template remains `refresh-publication --approval <path> --write`
+7) `refresh-publication --approval <path> --check|--write` is the only publication consumer command; run `refresh-publication --approval docs/agents/lifecycle/<onboarding_pack_prefix>/governance/approved-agent.toml --write` to consume the committed handoff packet:
+   - refresh publication outputs from the committed handoff packet
+   - own publication output writes, the required green gate, and rollback if a publication write or gate step fails
+   - keep the required publication command inventory fixed to:
+     - `cargo run -p xtask -- support-matrix --check`
+     - `cargo run -p xtask -- capability-matrix --check`
+     - `cargo run -p xtask -- capability-matrix-audit`
+     - `make preflight`
+   - the next command template after refresh remains `close-proving-run --approval <path> --closeout docs/agents/lifecycle/<prefix>/governance/proving-run-closeout.json`
 8) Ensure required CI workflows pass (see below).
 
 Publication handoff rule:

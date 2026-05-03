@@ -416,6 +416,8 @@ fn runtime_follow_on_write_spawns_configured_codex_binary_and_requires_real_writ
         "success path must record runtime-owned writes"
     );
     let lifecycle_state = read_json(&lifecycle_state_path(&fixture));
+    let expected_prepare_publication_handoff =
+        "prepare-publication --approval docs/agents/lifecycle/cursor-cli-onboarding/governance/approved-agent.toml --write";
     assert_eq!(
         lifecycle_state
             .get("lifecycle_stage")
@@ -430,9 +432,7 @@ fn runtime_follow_on_write_spawns_configured_codex_binary_and_requires_real_writ
         lifecycle_state
             .get("expected_next_command")
             .and_then(Value::as_str),
-        Some(
-            "prepare-publication --approval docs/agents/lifecycle/cursor-cli-onboarding/governance/approved-agent.toml --write"
-        )
+        Some(expected_prepare_publication_handoff)
     );
     assert!(lifecycle_state
         .get("satisfied_evidence")

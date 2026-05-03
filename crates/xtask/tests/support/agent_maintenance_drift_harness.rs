@@ -4,9 +4,10 @@ use std::{
     process::Command,
 };
 
-use crate::{
-    harness::{seed_gemini_approval_artifact, seed_release_touchpoints, sha256_hex, write_text},
-    release_doc, support_matrix,
+use xtask::{release_doc, support_matrix};
+
+use crate::harness::{
+    seed_gemini_approval_artifact, seed_release_touchpoints, sha256_hex, write_text,
 };
 
 pub fn seed_publication_inputs(root: &Path) {

@@ -11,6 +11,9 @@ mod agent_registry {
 mod capability_publication {
     pub use xtask::capability_publication::*;
 }
+mod publication_refresh {
+    pub use xtask::publication_refresh::*;
+}
 #[path = "../src/capability_matrix.rs"]
 mod capability_matrix;
 #[path = "../src/capability_projection.rs"]
@@ -294,6 +297,114 @@ fn identical_replay_is_noop() {
         replay_plan.files.len(),
         "identical replay should classify every planned file as identical"
     );
+}
+
+#[test]
+fn publication_refresh_actions_match_shared_publication_planner_bytes() {
+    let fixture = fixture_root("agent-maintenance-publication-planner-parity");
+    seed_publication_inputs(&fixture);
+    normalize_support_matrix_fixture(&fixture);
+
+    for (actions, support_enabled, capability_enabled) in [
+        (&["support_matrix_refresh"][..], true, false),
+        (&["capability_matrix_refresh"][..], false, true),
+        (
+            &["support_matrix_refresh", "capability_matrix_refresh"][..],
+            true,
+            true,
+        ),
+    ] {
+        let request_path =
+            "docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml";
+        write_text(
+            &fixture.join(request_path),
+            &request_toml("opencode", actions, false, &[]),
+        );
+
+        let plan =
+            build_refresh_plan(&fixture, Path::new(request_path)).expect("build refresh plan");
+        let maintenance_publication_files = plan
+            .files
+            .iter()
+            .filter(|file| {
+                matches!(
+                    file.relative_path.as_str(),
+                    publication_refresh::SUPPORT_MATRIX_JSON_OUTPUT_PATH
+                        | publication_refresh::SUPPORT_MATRIX_MARKDOWN_OUTPUT_PATH
+                        | publication_refresh::CAPABILITY_MATRIX_OUTPUT_PATH
+                )
+            })
+            .map(|file| (file.relative_path.clone(), file.contents.clone()))
+            .collect::<Vec<_>>();
+
+        let shared_publication_files = publication_refresh::build_publication_artifact_plan(
+            &fixture,
+            support_enabled,
+            capability_enabled,
+        )
+        .expect("build shared publication plan")
+        .into_iter()
+        .map(|file| (file.relative_path, file.contents))
+        .collect::<Vec<_>>();
+
+        assert_eq!(
+            maintenance_publication_files, shared_publication_files,
+            "maintenance refresh should reuse shared publication bytes for {:?}",
+            actions
+        );
+    }
+}
+
+fn normalize_support_matrix_fixture(root: &Path) {
+    for manifest_root in [
+        "cli_manifests/codex",
+        "cli_manifests/claude_code",
+        "cli_manifests/opencode",
+        "cli_manifests/gemini_cli",
+        "cli_manifests/aider",
+    ] {
+        let current_path = root.join(manifest_root).join("current.json");
+        let mut current: serde_json::Value =
+            serde_json::from_str(&fs::read_to_string(&current_path).expect("read current.json"))
+                .expect("parse current.json");
+        let expected_targets = current["expected_targets"]
+            .as_array()
+            .expect("expected_targets array")
+            .iter()
+            .map(|value| value.as_str().expect("target string").to_string())
+            .collect::<Vec<_>>();
+        current["inputs"] = serde_json::Value::Array(
+            expected_targets
+                .iter()
+                .map(|target| {
+                    serde_json::json!({
+                        "target_triple": target,
+                        "binary": { "semantic_version": "1.0.0" }
+                    })
+                })
+                .collect(),
+        );
+        write_text(
+            &current_path,
+            &format!(
+                "{}\n",
+                serde_json::to_string_pretty(&current).expect("serialize current.json")
+            ),
+        );
+
+        let version_path = root.join(manifest_root).join("versions/1.0.0.json");
+        let mut version: serde_json::Value =
+            serde_json::from_str(&fs::read_to_string(&version_path).expect("read version.json"))
+                .expect("parse version.json");
+        version["status"] = serde_json::Value::String("validated".to_string());
+        write_text(
+            &version_path,
+            &format!(
+                "{}\n",
+                serde_json::to_string_pretty(&version).expect("serialize version.json")
+            ),
+        );
+    }
 }
 
 fn seed_publication_inputs(root: &Path) {

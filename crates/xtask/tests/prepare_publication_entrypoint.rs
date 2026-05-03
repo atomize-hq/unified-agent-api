@@ -6,7 +6,7 @@ use std::{
 
 use clap::{CommandFactory, Parser, Subcommand};
 use serde_json::Value;
-use xtask::{agent_registry::AgentRegistry, prepare_publication};
+use xtask::{agent_lifecycle, agent_registry::AgentRegistry, prepare_publication};
 
 #[path = "support/onboard_agent_harness.rs"]
 mod harness;
@@ -252,6 +252,25 @@ fn snapshot_without_runtime_runs(root: &Path) -> BTreeMap<String, Vec<u8>> {
         .collect()
 }
 
+fn promote_to_post_refresh_publication_ready(fixture: &Path, approval_path: &str) {
+    let lifecycle_path = lifecycle_state_path(fixture);
+    let mut lifecycle_state = read_json(&lifecycle_path);
+    lifecycle_state["current_owner_command"] =
+        Value::String("refresh-publication --write".to_string());
+    lifecycle_state["expected_next_command"] = Value::String(
+        agent_lifecycle::publication_ready_closeout_command(approval_path, "gemini-cli-onboarding"),
+    );
+    lifecycle_state["last_transition_by"] =
+        Value::String("xtask refresh-publication --write".to_string());
+    write_json(&lifecycle_path, &lifecycle_state);
+
+    let lifecycle_sha = sha256_hex(&lifecycle_path);
+    let packet_path = publication_packet_path(fixture);
+    let mut packet = read_json(&packet_path);
+    packet["lifecycle_state_sha256"] = Value::String(lifecycle_sha);
+    write_json(&packet_path, &packet);
+}
+
 #[test]
 fn prepare_publication_help_text_includes_required_surface() {
     let top_help = Cli::command().render_help().to_string();
@@ -372,6 +391,28 @@ fn prepare_publication_check_revalidates_existing_packet_without_rewriting() {
     assert_eq!(
         before, after,
         "check mode must not rewrite committed surfaces"
+    );
+}
+
+#[test]
+fn prepare_publication_check_accepts_post_refresh_next_command_without_rewriting() {
+    let (fixture, approval_path) = prepare_fixture("prepare-publication-check-post-refresh");
+    let write_output = run_cli(publication_args("--write", &approval_path), &fixture);
+    assert_eq!(
+        write_output.exit_code, 0,
+        "stderr:\n{}",
+        write_output.stderr
+    );
+    promote_to_post_refresh_publication_ready(&fixture, &approval_path);
+    let before = snapshot_without_runtime_runs(&fixture);
+
+    let output = run_cli(publication_args("--check", &approval_path), &fixture);
+
+    let after = snapshot_without_runtime_runs(&fixture);
+    assert_eq!(output.exit_code, 0, "stderr:\n{}", output.stderr);
+    assert_eq!(
+        before, after,
+        "check mode must accept post-refresh publication_ready state without rewriting"
     );
 }
 

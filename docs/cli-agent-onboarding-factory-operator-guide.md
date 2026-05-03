@@ -439,7 +439,7 @@ cargo test -p unified-agent-api --all-features
 
 ### 7. Prepare the committed publication handoff
 
-Once runtime-integrated state and `.uaa-temp` runtime evidence both exist, emit the only committed publication handoff packet:
+Once runtime-integrated state and `.uaa-temp` runtime evidence both exist, emit only the committed publication handoff packet:
 
 ```sh
 "$XTASK_BIN" prepare-publication \
@@ -467,35 +467,42 @@ On success it:
 
 ### 8. Refresh publication surfaces
 
-After committed runtime evidence exists, refresh the published control-plane outputs:
+`refresh-publication --approval <path> --check|--write` is the only publication consumer command.
+
+After `prepare-publication --write` succeeds, use that single command to refresh publication outputs, run the required green gate, and own rollback if any publication write or gate step fails:
 
 ```sh
-"$XTASK_BIN" support-matrix
-"$XTASK_BIN" capability-matrix
+"$XTASK_BIN" refresh-publication \
+  --approval docs/agents/lifecycle/<onboarding_pack_prefix>/governance/approved-agent.toml \
+  --write
 ```
 
-This refreshes the published support/capability surfaces from repo truth. The relevant published files are:
+`refresh-publication --write` owns publication output writes for the published support/capability surfaces from repo truth. The relevant published files are:
 
 - `cli_manifests/support_matrix/current.json`
 - `docs/specs/unified-agent-api/support-matrix.md`
 - `docs/specs/unified-agent-api/capability-matrix.md`
 
-For capability publication, `capability-matrix` reads lifecycle-backed publication truth. Agents
+For capability publication, `refresh-publication` uses lifecycle-backed publication truth when it refreshes `capability-matrix`. Agents
 without an explicit publication target appear under their default lifecycle-backed target profile in
 the generated header.
 
 `prepare-publication` never writes these support/capability outputs directly. It only records the committed publication handoff packet and the lifecycle transition that points to `refresh-publication`.
 
-### 9. Run the green gate
+The required publication command inventory inside `refresh-publication` remains:
 
-The create lane is only green when all of the following pass:
+- `cargo run -p xtask -- support-matrix --check`
+- `cargo run -p xtask -- capability-matrix --check`
+- `cargo run -p xtask -- capability-matrix-audit`
+- `make preflight`
 
-```sh
-"$XTASK_BIN" support-matrix --check
-"$XTASK_BIN" capability-matrix --check
-"$XTASK_BIN" capability-matrix-audit
-make preflight
-```
+`refresh-publication --check` validates the same publication seam without rewriting outputs.
+
+`refresh-publication --write` is successful only when the publication outputs are refreshed and the full required green gate passes. If any publication write or gate step fails, it rolls publication outputs back to their pre-refresh bytes.
+
+On success, `refresh-publication --write` sets:
+
+- `expected_next_command = "close-proving-run --approval <path> --closeout docs/agents/lifecycle/<prefix>/governance/proving-run-closeout.json"`
 
 ### 9. Record proving-run closeout
 
