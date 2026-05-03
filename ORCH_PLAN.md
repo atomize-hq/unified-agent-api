@@ -1,156 +1,147 @@
-# Generic Capability Publication Foundation Orchestration Plan
+# Enclose The Publication Lane End To End Orchestration Plan
 
 ## Summary
 
-- Execute only against the current milestone in repo-root `PLAN.md`: `PLAN - Generic Capability Publication Foundation`.
-- Integration branch is the live implementation branch `codex/recommend-next-agent`. `main` is review base only, never the worker fork point.
-- Parent agent is the only integrator, merger, rebase authority, API-freeze owner, and final verifier.
+- Execute only against the current repo-root milestone in `PLAN.md`: `Enclose The Publication Lane End To End`.
+- Integration branch is the live implementation branch `codex/recommend-next-agent`.
+- Execution baseline for this orchestration is current HEAD `000aa69` on `2026-05-02`.
+- `PLAN.md` still records `Plan commit baseline: bfd6fd4`; treat that as milestone-history metadata only, never as the worker fork point.
+- Parent agent is the only integrator, merger, rebase authority, canonical stale-sweep owner, committed artifact normalizer, and final verifier.
 - Worker model for delegated lanes:
   - model: GPT-5.4
-  - reasoning: high
-- Keep the critical path local to the parent for:
-  - baseline capture against current repo state
-  - shared seam freeze in `crates/xtask/src/capability_publication.rs`
-  - `crates/xtask/src/lib.rs` export wiring
-  - generator migration in `crates/xtask/src/capability_matrix.rs`
-  - final convergence
-  - test lane
-  - final generated `docs/specs/unified-agent-api/capability-matrix.md`
-- Maximum worker concurrency is `3`, and only after the parent freezes Lane A. This matches the justified post-freeze lanes in `PLAN.md`:
-  - Lane B: audit + closeout reuse
-  - Lane C: drift + prepare-publication alignment
-  - Lane D: docs/spec updates
-- No human approval gates are planned for this run. Stop only for hard guards, stale-lane reopen, or verification failure.
-- This document replaces the old runtime-evidence orchestration plan entirely. That older plan is not authoritative for this milestone.
+  - reasoning_effort: high
+- Maximum worker concurrency is `3`, and only after the parent freezes the command contract and completes the stale-string/hash normalization sweep.
+- No human approval pause is planned. Stop only for hard guards, stale-lane invalidation, or verification failure.
+- This document supersedes the prior branch-local orchestration draft for this milestone.
 
 ## Hard Guards
 
-- Scope is locked to the current `PLAN.md` milestone only.
+- Scope is locked to the `PLAN.md` slice only.
 - Do not widen into:
-  - support-matrix refactors
-  - lifecycle-stage redesign
-  - new binary/package/container artifact families
-  - plugin discovery
-  - dynamic runtime reflection
-  - backend constructor discovery
-  - orthogonality-rule redesign
+  - `LifecycleStage::Published` redesign
+  - new lifecycle stages
+  - support-matrix semantics changes
+  - capability-matrix semantics changes
+  - maintenance request schema changes
+  - runtime-follow-on redesign
+  - repair-runtime-evidence redesign
+  - new artifact families beyond the required command and its lifecycle/docs/test fallout
+  - generic JSON-driven command execution
 - Locked implementation decisions from `PLAN.md` must remain intact:
-  - lifecycle-driven publication eligibility
-  - approval-registry continuity validation
-  - shared projection ownership stays in `crates/xtask/src/capability_projection.rs`
-  - one shared audit implementation
-  - pre-runtime agents omitted from generated publication
-  - no plugin/reflection architecture
-- No consumer in scope may derive publication capability truth independently after this run.
-- Parent and workers must adjust to the repo’s actual state at launch time. Never assume a clean worktree.
-- Never revert someone else’s edits.
-- Stop the run immediately if any of the following become true:
-  - `PLAN.md` conflicts with a normative contract in `docs/specs/**`
-  - the shared publication seam requires a lifecycle-model redesign
-  - the shared publication seam requires introducing plugin/reflection discovery
-  - a worker needs to edit a parent-owned file to finish its lane
-  - a worker lane can no longer stay disjoint after the freeze point
+  - add `refresh-publication --approval <path> --check|--write`
+  - keep `prepare-publication` as handoff writer only
+  - consume `publication-ready.json` as the only create-mode publication packet
+  - keep `PublicationReadyPacket.required_publication_outputs` as the authoritative write set
+  - share support/capability publication planning between create-mode and maintenance-mode
+  - make `refresh-publication --write` transactional for publication-owned committed surfaces
+  - keep `make preflight` inside the green gate
+  - do not solve `LifecycleStage::Published` in this slice
+- Any fixture or committed lifecycle artifact whose `expected_next_command` or reconstructed packet content depends on `PUBLICATION_READY_NEXT_COMMAND` must be swept and normalized before the downstream test worker launches.
+- Workers do not touch parent-owned files.
+- Workers do not merge, rebase, regenerate final publication outputs, or run the live aider verification flow.
+- Never revert someone else’s edits. Baseline task must capture actual dirty state before worker launch.
 
 ## Orchestration State
 
-Parent-owned local orchestration state lives under:
+Parent-owned orchestration state lives under:
 
-- `RUN_ROOT=/Users/spensermcconnell/__Active_Code/atomize-hq/unified-agent-api/.runs/generic-capability-publication`
+- `RUN_ROOT=/Users/spensermcconnell/__Active_Code/atomize-hq/unified-agent-api/.runs/enclose-publication-lane-e2e`
 
 Canonical parent-owned state files:
 
 - `baseline.json`
-  - current branch
-  - current HEAD SHA
-  - review base branch
-  - dirty-file summary at launch
-  - lane ownership snapshot against actual dirty state
+  - branch, HEAD SHA, dirty-state summary, launch timestamp
+  - note that execution baseline is `000aa69`
+  - note that `PLAN.md` historical baseline is `bfd6fd4`
   - note of any lane delayed because of pre-existing dirt
 - `tasks.json`
-  - ordered task list
-  - task owner
-  - task status
+  - ordered tasks
+  - owner
+  - status
   - dependencies
-  - restart count if a lane is reopened
+  - restart count
 - `session-log.md`
-  - chronological parent decisions
-  - worker launch notes
+  - launch notes
+  - freeze decisions
+  - stale-sweep findings
+  - worker prompts issued
   - relaunch reasons
-  - deviations resolved without widening scope
+  - merge and verification notes
 - `freeze.json`
   - freeze commit SHA
-  - frozen public functions and public types in `crates/xtask/src/capability_publication.rs`
-  - expected `crates/xtask/src/capability_matrix.rs` header semantics
-  - any signature changes in `crates/xtask/src/capability_projection.rs`
+  - frozen CLI contract for `refresh-publication`
+  - frozen lifecycle next-command templates
+  - frozen shared publication planning seam
+  - stale-sweep invariants
   - lane ownership map
-  - forbidden touch surfaces by lane
+  - forbidden touch surfaces
 - `merge-log.md`
   - merge order
-  - merge commit / fast-forward result
-  - post-merge smoke command results
-  - relaunch reason if a lane is rejected
+  - smoke-command results after each merge
+  - rejection/relaunch reasons
 - `acceptance.md`
-  - final command sequence
+  - final ordered command sequence
   - exit codes
-  - pass/fail status against each acceptance criterion
-  - unresolved unrelated repo-state blockers, if any
+  - pass/fail per acceptance criterion
+  - stale-string sweep results
+  - unrelated blockers, if any
 
 Per-task sentinels live under:
 
-- `REPO_ROOT/.runs/<task-id>/started.json`
-- `REPO_ROOT/.runs/<task-id>/status.json`
-- `REPO_ROOT/.runs/<task-id>/done.json`
-- `REPO_ROOT/.runs/<task-id>/blocked.json`
+- `.runs/task-epl-00-baseline/**`
+- `.runs/task-epl-01-freeze-core/**`
+- `.runs/task-epl-02-parent-stale-sweep/**`
+- `.runs/task-epl-03-maintenance-alignment/**`
+- `.runs/task-epl-04-authored-docs/**`
+- `.runs/task-epl-05-tests-fixtures/**`
+- `.runs/task-epl-06-converge/**`
+- `.runs/task-epl-07-final-verify/**`
 
 Sentinel rules:
 
-- one directory per task ID
 - parent creates `started.json` before work begins
-- parent updates `status.json` during long-running work or after worker returns
+- parent updates `status.json` during long tasks or after worker return
 - parent writes exactly one terminal sentinel: `done.json` or `blocked.json`
-- workers do not edit orchestration state directly
+- workers do not write orchestration state
 
 ## Worker Model
 
-- Parent owns all integration, orchestration state, freeze decisions, merge sequencing, and acceptance decisions.
-- Workers edit only their assigned lane surfaces.
+- Parent owns all orchestration, integration, freeze decisions, stale-string normalization, hash fallout normalization, merge sequencing, live verification, and acceptance decisions.
+- Workers edit only their assigned lane files.
 - Workers do not merge branches.
 - Workers do not rebase.
-- Workers do not modify `PLAN.md`.
-- Workers do not modify orchestration state under `.runs/**`.
-- Workers do not touch any parent-owned surface.
-
-Worker return contract is fixed. Each worker returns only:
-
-- changed files
-- commands run
-- exit codes
-- blockers or assumptions
-
-If a worker needs a parent-owned file changed, or needs the freeze contract changed, it stops and returns a blocker instead of guessing.
+- Workers do not edit `PLAN.md` or `.runs/**`.
+- Workers do not regenerate final publication outputs or committed lifecycle docs.
+- Workers return only:
+  - changed files
+  - commands run
+  - exit codes
+  - blockers or assumptions
+- If a worker needs a parent-owned file changed, it stops and returns a blocker.
 
 ## Context-Control Rules
 
-Parent active context stays narrow. The parent keeps only:
+Parent active context stays narrow:
 
 - `PLAN.md`
-- `ORCH_PLAN.md`
-- `RUN_ROOT/baseline.json`
-- `RUN_ROOT/tasks.json`
-- `RUN_ROOT/freeze.json` after freeze
-- `RUN_ROOT/session-log.md`
-- the latest integration diff summary
+- this orchestration plan
+- `freeze.json`
+- `tasks.json`
+- `session-log.md`
+- latest integration diff summary
+- only the files for the current task
 
 Worker prompts contain only:
 
-- the owned files
+- owned files
 - forbidden touch surfaces
-- the relevant `PLAN.md` excerpt
-- the current `freeze.json` contract
-- the required commands
-- the acceptance target for that lane
+- relevant `PLAN.md` excerpt
+- frozen command/lifecycle templates from `freeze.json`
+- the stale-sweep findings relevant to that lane
+- required commands
+- lane-local acceptance target
 
-Workers are closed immediately after merge or rejection. Do not keep idle worker lanes open after their result is consumed.
+Workers are closed immediately after merge or rejection. No idle worker remains open after its result is consumed.
 
 ## Parent vs Worker Ownership Model
 
@@ -158,55 +149,77 @@ Workers are closed immediately after merge or rejection. Do not keep idle worker
 
 The parent keeps these surfaces local from kickoff through final verification:
 
-- `ORCH_PLAN.md`
-- `crates/xtask/src/capability_publication.rs`
-- `crates/xtask/src/capability_matrix.rs`
+- `crates/xtask/src/publication_refresh.rs`
+- `crates/xtask/src/main.rs`
 - `crates/xtask/src/lib.rs`
-- `crates/xtask/src/capability_projection.rs` only if a signature change is required to support the shared publication seam
+- `crates/xtask/src/agent_lifecycle.rs`
+- `crates/xtask/src/prepare_publication.rs`
+- `crates/xtask/src/workspace_mutation.rs` only if rollback support needs a shared helper
 - all merge/rebase/conflict resolution
-- all test-lane edits under `crates/xtask/tests/**`
-- final generated `docs/specs/unified-agent-api/capability-matrix.md`
-- `.runs/generic-capability-publication/**`
+- all stale-string sweep edits across authored docs, lifecycle artifacts, and impacted tests
+- all fixture/hash normalization caused by `PUBLICATION_READY_NEXT_COMMAND` changes
+- final generated publication outputs:
+  - `cli_manifests/support_matrix/current.json`
+  - `docs/specs/unified-agent-api/support-matrix.md`
+  - `docs/specs/unified-agent-api/capability-matrix.md`
+- committed lifecycle and packet artifacts affected by next-command or reconstructed-hash fallout:
+  - `docs/agents/lifecycle/codex-cli-onboarding/governance/lifecycle-state.json`
+  - `docs/agents/lifecycle/codex-cli-onboarding/governance/publication-ready.json`
+  - `docs/agents/lifecycle/claude-code-cli-onboarding/governance/lifecycle-state.json`
+  - `docs/agents/lifecycle/claude-code-cli-onboarding/governance/publication-ready.json`
+  - `docs/agents/lifecycle/gemini-cli-onboarding/governance/lifecycle-state.json`
+  - `docs/agents/lifecycle/gemini-cli-onboarding/governance/publication-ready.json`
+  - `docs/agents/lifecycle/opencode-cli-onboarding/governance/lifecycle-state.json`
+  - `docs/agents/lifecycle/opencode-cli-onboarding/governance/publication-ready.json`
+  - `docs/agents/lifecycle/aider-onboarding/governance/lifecycle-state.json`
+- live create-mode verification artifacts for aider:
+  - `docs/agents/lifecycle/aider-onboarding/governance/publication-ready.json`
+- `.runs/enclose-publication-lane-e2e/**`
 
 Parent responsibilities:
 
-- capture baseline branch / SHA / dirty state
-- snapshot lane ownership against actual dirty files before worker launch
-- freeze the shared source contract before any worker starts
-- launch workers from the freeze commit only
+- capture baseline and actual dirty state
+- freeze the command contract and shared planning seam
+- run the authored-doc/test/lifecycle stale-string sweep immediately after freeze
+- normalize any historical or fixture hash fallout before test worker launch
+- launch workers only from the post-sweep parent commit
 - reject stale worker output
 - merge in order
-- run all final commands and decide acceptance
+- run targeted tests, search sweeps, live verification, and final acceptance
 
 ### Worker lane ownership
 
-Workers own only their disjoint lane files.
+Lane B: maintenance alignment
 
-Lane B: audit + closeout reuse
+- `crates/xtask/src/agent_maintenance/refresh.rs`
+- `crates/xtask/tests/agent_maintenance_refresh.rs`
 
-- `crates/xtask/src/capability_matrix_audit.rs`
-- `crates/xtask/src/close_proving_run.rs`
+Lane C: authored docs
 
-Lane C: drift + prepare-publication alignment
-
-- `crates/xtask/src/prepare_publication.rs`
-- `crates/xtask/src/agent_maintenance/drift/shared.rs`
-- `crates/xtask/src/agent_maintenance/drift/publication.rs`
-
-Lane D: docs/spec prose alignment
-
-- `docs/specs/unified-agent-api/capabilities-schema-spec.md`
-- `docs/specs/unified-agent-api/README.md`
-- `docs/specs/cli-agent-onboarding-charter.md`
 - `docs/cli-agent-onboarding-factory-operator-guide.md`
+- `docs/specs/cli-agent-onboarding-charter.md`
+
+Lane D: tests and fixture-facing regression coverage
+
+- `crates/xtask/tests/refresh_publication_entrypoint.rs`
+- `crates/xtask/tests/prepare_publication_entrypoint.rs`
+- `crates/xtask/tests/agent_lifecycle_state.rs`
+- `crates/xtask/tests/runtime_follow_on_entrypoint.rs`
+- `crates/xtask/tests/repair_runtime_evidence_entrypoint.rs`
+- `crates/xtask/tests/onboard_agent_closeout_preview/close_proving_run_write.rs`
+- `crates/xtask/tests/onboard_agent_closeout_preview/close_proving_run_paths.rs`
+- `crates/xtask/tests/support/agent_maintenance_drift_harness.rs`
+- `crates/xtask/tests/support/onboard_agent_harness.rs` only if required by the new entrypoint tests
 
 Workers do not own:
 
-- `crates/xtask/src/capability_publication.rs`
-- `crates/xtask/src/capability_matrix.rs`
+- `crates/xtask/src/publication_refresh.rs`
+- `crates/xtask/src/main.rs`
 - `crates/xtask/src/lib.rs`
-- `crates/xtask/tests/**`
-- generated `docs/specs/unified-agent-api/capability-matrix.md`
+- `crates/xtask/src/agent_lifecycle.rs`
+- `crates/xtask/src/prepare_publication.rs`
+- committed lifecycle docs under `docs/agents/lifecycle/**`
+- generated publication outputs
 - `.runs/**`
 
 ## Worktree/Branch Plan With Concrete Names
@@ -214,7 +227,7 @@ Workers do not own:
 Canonical paths:
 
 - `REPO_ROOT=/Users/spensermcconnell/__Active_Code/atomize-hq/unified-agent-api`
-- `WORKTREE_ROOT=/Users/spensermcconnell/__Active_Code/atomize-hq/.worktrees/unified-agent-api-generic-capability-publication`
+- `WORKTREE_ROOT=/Users/spensermcconnell/__Active_Code/atomize-hq/.worktrees/unified-agent-api-enclose-publication-lane`
 
 Integration surface:
 
@@ -222,170 +235,164 @@ Integration surface:
 - worktree: `REPO_ROOT`
 - owner: parent only
 
-Worker branches and worktrees, created only after the parent records the freeze commit:
+Worker branches and worktrees, created only after the parent records the post-sweep freeze commit:
 
 - Lane B:
-  - branch: `codex/recommend-next-agent-publication-audit-closeout`
-  - worktree: `$WORKTREE_ROOT/publication-audit-closeout`
+  - branch: `codex/recommend-next-agent-maintenance-publication-align`
+  - worktree: `$WORKTREE_ROOT/maintenance-publication-align`
 - Lane C:
-  - branch: `codex/recommend-next-agent-publication-drift-prepare`
-  - worktree: `$WORKTREE_ROOT/publication-drift-prepare`
+  - branch: `codex/recommend-next-agent-publication-docs`
+  - worktree: `$WORKTREE_ROOT/publication-docs`
 - Lane D:
-  - branch: `codex/recommend-next-agent-publication-docs-specs`
-  - worktree: `$WORKTREE_ROOT/publication-docs-specs`
+  - branch: `codex/recommend-next-agent-publication-tests`
+  - worktree: `$WORKTREE_ROOT/publication-tests`
 
-Creation commands from `REPO_ROOT` after freeze:
+Creation commands after `task/epl-02-parent-stale-sweep`:
 
 ```bash
 mkdir -p "$WORKTREE_ROOT" "$RUN_ROOT"
-FREEZE_SHA=$(jq -r '.freeze_commit_sha' "$RUN_ROOT/freeze.json")
+POST_SWEEP_SHA=$(jq -r '.post_sweep_commit_sha' "$RUN_ROOT/freeze.json")
 
-git worktree add -b codex/recommend-next-agent-publication-audit-closeout \
-  "$WORKTREE_ROOT/publication-audit-closeout" \
-  "$FREEZE_SHA"
+git worktree add -b codex/recommend-next-agent-maintenance-publication-align \
+  "$WORKTREE_ROOT/maintenance-publication-align" \
+  "$POST_SWEEP_SHA"
 
-git worktree add -b codex/recommend-next-agent-publication-drift-prepare \
-  "$WORKTREE_ROOT/publication-drift-prepare" \
-  "$FREEZE_SHA"
+git worktree add -b codex/recommend-next-agent-publication-docs \
+  "$WORKTREE_ROOT/publication-docs" \
+  "$POST_SWEEP_SHA"
 
-git worktree add -b codex/recommend-next-agent-publication-docs-specs \
-  "$WORKTREE_ROOT/publication-docs-specs" \
-  "$FREEZE_SHA"
+git worktree add -b codex/recommend-next-agent-publication-tests \
+  "$WORKTREE_ROOT/publication-tests" \
+  "$POST_SWEEP_SHA"
 ```
 
 Worktree rules:
 
 - never fork workers from `main`
-- never fork workers before freeze completes
-- never reuse a dirty worker worktree
-- never let workers merge back into the integration branch themselves
+- never fork workers before the parent stale sweep and hash normalization complete
+- never reuse a stale worker worktree
+- workers never merge back themselves
 
 ## Freeze Artifact And Restart Rule
 
-The freeze point is the first parent commit where these are simultaneously true:
+The initial freeze point is the first parent commit where these are simultaneously true:
 
-- `crates/xtask/src/capability_publication.rs` exists and exposes the parent-approved contract
-- `crates/xtask/src/capability_matrix.rs` reads publication truth from that shared module
-- `crates/xtask/src/lib.rs` exports the shared module
-- `RUN_ROOT/freeze.json` exists and is complete
+- `refresh-publication` exists and parses `--approval <path> --check|--write`
+- `main.rs` wires the new subcommand
+- `lib.rs` exports the new module if needed by tests
+- `prepare_publication.rs` points `publication_ready` next-step semantics at `refresh-publication`
+- `agent_lifecycle.rs` contains the frozen pre-refresh and post-refresh next-command templates
+- the shared publication planning seam used by create-mode is callable and parent-approved
+- `freeze.json` exists and is complete
 
-`freeze.json` is the authoritative worker contract. The parent must record:
+`freeze.json` must record:
 
 - `freeze_commit_sha`
-- frozen public functions in `crates/xtask/src/capability_publication.rs`
-- frozen public types in `crates/xtask/src/capability_publication.rs`
-- expected `capability_matrix.rs` header semantics
-- any signature changes in `capability_projection.rs`
+- `post_sweep_commit_sha`
+- `refresh_publication_cli`:
+  - `approval` required
+  - mutually exclusive `check` / `write`
+- `prepare_publication_next_command_template`:
+  - `refresh-publication --approval <path> --write`
+- `post_refresh_next_command_template`:
+  - `close-proving-run --approval <path> --closeout docs/agents/lifecycle/<prefix>/governance/proving-run-closeout.json`
+- `required_publication_commands`:
+  - still the four green-gate commands ending in `make preflight`
+- frozen shared planning seam:
+  - exact function names/signatures exposed for maintenance reuse
+  - exact file owning the seam
+- stale-sweep invariants:
+  - exact raw shell-chain string that must no longer remain canonical in authored workflow docs, committed lifecycle artifacts, or impacted `crates/xtask/tests/**` fixtures
+  - valid contexts where `prepare-publication --approval .* --write` still remains canonical
+  - contexts where `refresh-publication` must now appear
 - lane ownership map
-- forbidden touch surfaces per lane
+- forbidden surfaces per lane
 
-Shared-seam change definition after worker launch:
+A worker becomes stale if any of these change after launch:
 
-- any public signature, type, or error-contract change in `crates/xtask/src/capability_publication.rs`
-- any export change in `crates/xtask/src/lib.rs` that affects worker imports
-- any parent change in `crates/xtask/src/capability_projection.rs` required by the shared publication contract
-- any semantic change in how `crates/xtask/src/capability_matrix.rs` expects the shared publication inventory to behave
-- any lane ownership or forbidden-surface change in `freeze.json`
+- CLI flags or their meaning
+- lifecycle next-command template strings
+- shared publication planning function signatures or semantics
+- rollback contract over publication-owned files
+- stale-sweep invariants
+- lane ownership map
 
-Mandatory stale-worker rule:
+Stale-worker rule:
 
-1. If the shared seam changes after any worker starts, all open worker lanes are stale.
-2. Stale worker output must not be merged, cherry-picked, or manually reconciled.
-3. Parent must:
-   - update `freeze.json`
-   - record the new freeze SHA
-   - mark affected task sentinels stale / blocked
-   - delete stale worker worktrees and branches
-   - relaunch fresh worktrees from the new freeze commit
-4. Restart from the first downstream task affected by the change.
-
-Lane-local reopen rule:
-
-- If only a worker-owned file changes after launch, only that lane is stale.
-- Parent should avoid touching worker-owned files after launch except to reject and relaunch the lane.
+1. stale output is not merged or hand-reconciled
+2. parent updates `freeze.json`
+3. parent deletes stale worker worktree and branch
+4. parent relaunches from the new post-sweep freeze commit
+5. restart from the first downstream affected task
 
 ## Merge Policy
 
 - Parent is the only merger.
 - Parent merges only into `codex/recommend-next-agent` in `REPO_ROOT`.
 - Parent does not ask workers to rebase.
-- Parent may do local mechanical conflict resolution during merge.
-- Any conflict that changes the frozen shared seam is a stop-and-reopen event.
+- Parent may perform local mechanical conflict resolution only if it does not alter the frozen seam.
+- Any conflict that changes the frozen seam or stale-sweep invariants is a stop-and-relaunch event.
 
 Merge order:
 
-1. Parent completes the freeze task locally and records `freeze.json`.
-2. Launch Lanes B, C, and D from `freeze_commit_sha`.
-3. Merge Lane B first.
-4. Rerun Lane B smoke commands locally before merging anything else.
-5. Merge Lane C second.
-6. Rerun Lane C smoke commands locally before merging anything else.
-7. Merge Lane D third.
-8. If B or C changed semantics after the first docs draft, reject or relaunch Lane D from the current freeze before continuing.
-9. Parent runs the test lane locally.
-10. Parent runs regeneration and final verification locally.
-
-Reject a worker lane immediately if it:
-
-- edits a file outside its ownership set
-- depends on changing the shared seam after launch
-- assumes a clean tree and drops unrelated local state
-- returns results without the required command / exit-code accounting
+1. parent completes `task/epl-01-freeze-core`
+2. parent completes `task/epl-02-parent-stale-sweep`
+3. launch and merge Lane B first
+4. rerun Lane B smoke commands locally
+5. merge Lane C second
+6. rerun docs/search smoke locally
+7. merge Lane D third
+8. parent runs convergence and final verification locally
 
 ## Task Graph
 
 ```text
-task/gcp-00-baseline
+task/epl-00-baseline
   ->
-task/gcp-01-freeze
+task/epl-01-freeze-core
+  ->
+task/epl-02-parent-stale-sweep
   ->
 parallel:
-  task/gcp-02-audit-closeout
-  task/gcp-03-drift-prepare
-  task/gcp-04-docs-specs
+  task/epl-03-maintenance-alignment
+  task/epl-04-authored-docs
+  task/epl-05-tests-fixtures
   ->
-task/gcp-05-converge-tests
+task/epl-06-converge
   ->
-task/gcp-06-final-verify
+task/epl-07-final-verify
 ```
 
 ## Workstream Plan
 
-### task/gcp-00-baseline
+### task/epl-00-baseline
 
 Owner:
 
 - parent
 
-Owned surfaces:
-
-- `RUN_ROOT/baseline.json`
-- `RUN_ROOT/tasks.json`
-- `RUN_ROOT/session-log.md`
-- `REPO_ROOT/.runs/task-gcp-00-baseline/**`
-
 Required work:
 
 - capture current branch, HEAD SHA, and dirty-state summary
-- confirm `PLAN.md` is the current milestone source of truth
-- snapshot lane ownership against actual dirty state
-- detect whether any worker-owned surface is already dirty and must be absorbed or delayed
+- record that live execution baseline is `000aa69`
+- note that `PLAN.md` still cites `bfd6fd4`
+- snapshot lane ownership against actual dirty files
+- block worker launch if any worker-owned surface is already dirty
 
 Required commands:
 
 ```bash
 git branch --show-current
-git rev-parse HEAD
+git rev-parse --short HEAD
 git status --short
 ```
 
 Acceptance:
 
-- baseline reflects actual repo state at launch time
-- lane ownership snapshot exists in `baseline.json`
-- parent has identified whether any lane must be delayed because of pre-existing dirt
+- `baseline.json` reflects actual launch state
+- any overlap between existing dirt and lane ownership is resolved before freeze
 
-### task/gcp-01-freeze
+### task/epl-01-freeze-core
 
 Owner:
 
@@ -393,42 +400,109 @@ Owner:
 
 Owned surfaces:
 
-- `crates/xtask/src/capability_publication.rs`
-- `crates/xtask/src/capability_matrix.rs`
+- `crates/xtask/src/publication_refresh.rs`
+- `crates/xtask/src/main.rs`
 - `crates/xtask/src/lib.rs`
-- `crates/xtask/src/capability_projection.rs` only if required
-- `RUN_ROOT/freeze.json`
-- `REPO_ROOT/.runs/task-gcp-01-freeze/**`
-
-Forbidden surfaces:
-
-- worker-owned lane files
-- `crates/xtask/tests/**`
-- authored docs/specs except generated semantics review notes in `session-log.md`
+- `crates/xtask/src/agent_lifecycle.rs`
+- `crates/xtask/src/prepare_publication.rs`
+- `crates/xtask/src/workspace_mutation.rs` only if required
 
 Required work:
 
-- add `crates/xtask/src/capability_publication.rs`
-- export it from `crates/xtask/src/lib.rs`
-- move publication eligibility, continuity validation, inventory construction, and shared audit entrypoints into the new module
-- migrate `crates/xtask/src/capability_matrix.rs` to consume the shared publication source
-- remove generator dependence on hardcoded runtime backend construction
-- record the frozen contract in `freeze.json`
+- add the new `refresh-publication` command
+- wire CLI registration and public exports
+- freeze lifecycle next-command semantics
+- keep `prepare-publication` as handoff writer only
+- implement the parent-owned shared publication planning seam that maintenance will reuse
+- implement transactional write + gate + rollback behavior for create-mode publication refresh
+- freeze command output expectations enough for docs/tests/search normalization to proceed
 
 Required commands:
 
 ```bash
-cargo test -p xtask --test c8_capability_matrix_unit
-cargo run -p xtask -- capability-matrix --check
+cargo run -p xtask -- refresh-publication --help
+cargo test -p xtask --test prepare_publication_entrypoint
+cargo test -p xtask --test agent_lifecycle_state
 ```
 
 Acceptance:
 
-- `capability_matrix.rs` no longer owns publication truth derivation
-- the parent can state the frozen shared interface concretely in `freeze.json`
-- freeze is stable enough that downstream lanes can proceed independently
+- new command is wired and runnable
+- frozen lifecycle strings are recorded in `freeze.json`
+- shared publication planning seam is stable enough for maintenance reuse without further parent edits
 
-### task/gcp-02-audit-closeout
+### task/epl-02-parent-stale-sweep
+
+Owner:
+
+- parent
+
+Owned surfaces:
+
+- all parent-owned committed lifecycle artifacts
+- any test/doc/fixture file requiring purely mechanical stale-string or hash normalization before worker launch
+
+Required work:
+
+- run a targeted sweep for command-string fallout across:
+  - `docs/cli-agent-onboarding-factory-operator-guide.md`
+  - `docs/specs/cli-agent-onboarding-charter.md`
+  - `docs/agents/lifecycle/**/*.json`
+  - impacted `crates/xtask/tests/**` fixtures
+- replace stale `publication_ready` next-step shell-chain references with the new `refresh-publication` canonical form where required
+- preserve valid `prepare-publication --approval .* --write` references in runtime-integrated contexts only
+- normalize any committed lifecycle artifact, packet, or test fixture whose expected hash or reconstructed publication-ready content changed because `PUBLICATION_READY_NEXT_COMMAND` changed
+- ensure this normalization is complete before any worker launches
+
+Required search commands:
+
+```bash
+rg -n 'support-matrix --check && capability-matrix --check && capability-matrix-audit && make preflight && close-proving-run --write' \
+  docs/cli-agent-onboarding-factory-operator-guide.md \
+  docs/specs/cli-agent-onboarding-charter.md \
+  docs/agents/lifecycle \
+  crates/xtask/tests
+rg -n 'prepare-publication --approval .* --write' \
+  docs/cli-agent-onboarding-factory-operator-guide.md \
+  docs/specs/cli-agent-onboarding-charter.md \
+  docs/agents/lifecycle \
+  crates/xtask/tests
+rg -n 'refresh-publication' \
+  docs/cli-agent-onboarding-factory-operator-guide.md \
+  docs/specs/cli-agent-onboarding-charter.md \
+  docs/agents/lifecycle \
+  crates/xtask/tests \
+  crates/xtask/src
+rg -n 'PUBLICATION_READY_NEXT_COMMAND|expected_next_command|publication-ready.json' \
+  crates/xtask/tests \
+  docs/agents/lifecycle \
+  crates/xtask/src/agent_lifecycle.rs
+```
+
+Normalization rules:
+
+- raw shell-chain matches are invalid in the authored docs, committed lifecycle artifacts, and impacted tests whenever they are serving as the canonical `publication_ready` next step
+- raw shell-chain matches remain valid only as the green-gate command inventory in code or packet `required_commands`, not as the lifecycle’s single next command
+- `prepare-publication --approval .* --write` remains valid in runtime-integrated contexts, runtime-follow-on expectations, repair-runtime-evidence expectations, and docs describing the pre-refresh step
+- `prepare-publication --approval .* --write` is invalid as the canonical next command once lifecycle stage is `publication_ready`
+- `refresh-publication` must appear in the new CLI, in publication-ready lifecycle expectations, in authored docs for the create lane, and in the affected regression tests
+
+Required commands:
+
+```bash
+cargo test -p xtask --test agent_lifecycle_state
+cargo test -p xtask --test runtime_follow_on_entrypoint
+cargo test -p xtask --test repair_runtime_evidence_entrypoint
+```
+
+Acceptance:
+
+- no stale canonical raw shell-chain references remain in the swept scopes
+- all historical/fixture hash fallout tied to `PUBLICATION_READY_NEXT_COMMAND` is normalized
+- `freeze.json` records `post_sweep_commit_sha`
+- downstream workers can launch from the normalized parent state without inheriting mechanical fallout
+
+### task/epl-03-maintenance-alignment
 
 Owner:
 
@@ -436,38 +510,35 @@ Owner:
 
 Owned surfaces:
 
-- `crates/xtask/src/capability_matrix_audit.rs`
-- `crates/xtask/src/close_proving_run.rs`
-
-Forbidden surfaces:
-
-- `crates/xtask/src/capability_publication.rs`
-- `crates/xtask/src/capability_matrix.rs`
-- `crates/xtask/src/lib.rs`
-- `crates/xtask/tests/**`
-- docs/specs
-- `.runs/**`
+- `crates/xtask/src/agent_maintenance/refresh.rs`
+- `crates/xtask/tests/agent_maintenance_refresh.rs`
 
 Required work:
 
-- move the audit CLI entrypoint in `crates/xtask/src/capability_matrix_audit.rs` onto the shared publication audit
-- remove duplicated audit logic and allowlist ownership from `crates/xtask/src/close_proving_run.rs`
-- keep closeout write flow unchanged except for shared-audit reuse
+- replace maintenance-local support/capability publication planning with the frozen shared seam
+- keep `refresh-agent` behavior unchanged except for shared planner reuse
+- add parity/regression coverage proving maintenance refresh and create-mode publication derive the same publication bytes for the same surfaces
+
+Forbidden surfaces:
+
+- all parent-owned files
+- docs
+- committed lifecycle docs
+- `.runs/**`
 
 Required commands:
 
 ```bash
-cargo test -p xtask --test onboard_agent_closeout_preview
-cargo run -p xtask -- capability-matrix-audit
+cargo test -p xtask --test agent_maintenance_refresh
+cargo run -p xtask -- refresh-agent --request docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml --dry-run
 ```
 
 Acceptance:
 
-- `capability-matrix-audit` and `close-proving-run` use one audit implementation
-- no local allowlist clone remains in `close_proving_run.rs`
-- no publication truth derivation is reintroduced in the lane
+- `refresh-agent` no longer owns a duplicate support/capability publication plan
+- maintenance refresh tests prove parity against the frozen shared seam
 
-### task/gcp-03-drift-prepare
+### task/epl-04-authored-docs
 
 Owner:
 
@@ -475,39 +546,38 @@ Owner:
 
 Owned surfaces:
 
-- `crates/xtask/src/prepare_publication.rs`
-- `crates/xtask/src/agent_maintenance/drift/shared.rs`
-- `crates/xtask/src/agent_maintenance/drift/publication.rs`
-
-Forbidden surfaces:
-
-- `crates/xtask/src/capability_publication.rs`
-- `crates/xtask/src/capability_matrix.rs`
-- `crates/xtask/src/lib.rs`
-- `crates/xtask/tests/**`
-- docs/specs
-- `.runs/**`
+- `docs/cli-agent-onboarding-factory-operator-guide.md`
+- `docs/specs/cli-agent-onboarding-charter.md`
 
 Required work:
 
-- replace `prepare_publication.rs` continuity dependency on `capability_matrix` with the shared publication source
-- route drift capability truth through the shared publication source
-- keep support-matrix logic unchanged
+- replace the manual publication command choreography with the one-command refresh story
+- document that `prepare-publication` writes only the handoff packet
+- document that `refresh-publication` owns publication output writes, green gate, and rollback
+- keep charter/operator wording aligned to the frozen command strings exactly
+
+Forbidden surfaces:
+
+- code
+- tests
+- committed lifecycle docs under `docs/agents/lifecycle/**`
+- generated publication outputs
+- `.runs/**`
 
 Required commands:
 
 ```bash
-cargo test -p xtask --test prepare_publication_entrypoint
-cargo test -p xtask --test agent_maintenance_drift
-cargo run -p xtask -- prepare-publication --approval docs/agents/lifecycle/aider-onboarding/governance/approved-agent.toml --check
+rg -n 'prepare-publication|refresh-publication|support-matrix --check && capability-matrix --check && capability-matrix-audit && make preflight && close-proving-run --write' \
+  docs/cli-agent-onboarding-factory-operator-guide.md \
+  docs/specs/cli-agent-onboarding-charter.md
 ```
 
 Acceptance:
 
-- `prepare-publication`, drift, and generator all reason from the same publication truth
-- no local capability-truth derivation remains in drift or `prepare_publication.rs`
+- authored docs describe one publication consumer command, not a manual checklist
+- wording matches the frozen CLI and lifecycle templates exactly
 
-### task/gcp-04-docs-specs
+### task/epl-05-tests-fixtures
 
 Owner:
 
@@ -515,84 +585,104 @@ Owner:
 
 Owned surfaces:
 
-- `docs/specs/unified-agent-api/capabilities-schema-spec.md`
-- `docs/specs/unified-agent-api/README.md`
-- `docs/specs/cli-agent-onboarding-charter.md`
-- `docs/cli-agent-onboarding-factory-operator-guide.md`
+- `crates/xtask/tests/refresh_publication_entrypoint.rs`
+- `crates/xtask/tests/prepare_publication_entrypoint.rs`
+- `crates/xtask/tests/agent_lifecycle_state.rs`
+- `crates/xtask/tests/runtime_follow_on_entrypoint.rs`
+- `crates/xtask/tests/repair_runtime_evidence_entrypoint.rs`
+- `crates/xtask/tests/onboard_agent_closeout_preview/close_proving_run_write.rs`
+- `crates/xtask/tests/onboard_agent_closeout_preview/close_proving_run_paths.rs`
+- `crates/xtask/tests/support/agent_maintenance_drift_harness.rs`
+- `crates/xtask/tests/support/onboard_agent_harness.rs` only if necessary
+
+Required work:
+
+- add new entrypoint coverage for `refresh-publication`
+- cover happy path, stale check behavior, support-only, capability-only, support+capability, rollback-on-gate-failure, lifecycle-update rollback, and idempotent rerun
+- update `prepare-publication --check` coverage for both allowed `publication_ready` next-command states
+- update runtime-follow-on and repair-runtime-evidence coverage where they assert the prepare-publication handoff string
+- keep `close-proving-run` coverage proving unchanged behavior against post-refresh `publication_ready`
+- update harness expectations if they validate `required_commands`, `expected_next_command`, or committed lifecycle packet linkage
+- assume the parent already normalized any mechanical next-command/hash fallout before this lane starts; this lane owns only behavior-focused regressions after that point
 
 Forbidden surfaces:
 
-- generated `docs/specs/unified-agent-api/capability-matrix.md`
-- all `crates/xtask/src/**`
-- all `crates/xtask/tests/**`
+- all code under `crates/xtask/src/**`
+- docs
+- committed lifecycle docs
+- generated publication outputs
 - `.runs/**`
 
-Required work:
-
-- update the authored docs/specs to describe lifecycle-backed publication truth
-- remove built-in-backend-inventory wording from the in-scope docs
-- align prose with the frozen Lane A semantics only
-
 Required commands:
 
 ```bash
-rg -n "built-in backend|built-in backend config|default built-in backend config" docs/specs/unified-agent-api docs/cli-agent-onboarding-factory-operator-guide.md
+cargo test -p xtask --test refresh_publication_entrypoint
+cargo test -p xtask --test prepare_publication_entrypoint
+cargo test -p xtask --test agent_lifecycle_state
+cargo test -p xtask --test runtime_follow_on_entrypoint
+cargo test -p xtask --test repair_runtime_evidence_entrypoint
+cargo test -p xtask --test onboard_agent_closeout_preview
+cargo test -p xtask --test agent_maintenance_drift
 ```
 
 Acceptance:
 
-- no in-scope authored doc claims hardcoded backend constructor inventory is the publication truth source
-- prose matches the frozen code semantics
-- lane is eligible for relaunch if B/C semantics changed after docs draft started
+- the new command boundary and rollback path are covered
+- `prepare-publication` check-mode compatibility is covered
+- runtime-follow-on and repair-runtime-evidence remain aligned with the frozen handoff contract
+- `close-proving-run` remains valid against the post-refresh baseline
 
-### task/gcp-05-converge-tests
+### task/epl-06-converge
 
 Owner:
 
 - parent
 
-Owned surfaces:
-
-- merged integration branch state
-- `crates/xtask/tests/**`
-- `RUN_ROOT/merge-log.md`
-- `RUN_ROOT/session-log.md`
-- `REPO_ROOT/.runs/task-gcp-05-converge-tests/**`
-
 Required work:
 
-- merge B, then rerun Lane B smoke locally
-- merge C, then rerun Lane C smoke locally
-- merge D only after B/C semantics are confirmed stable, otherwise relaunch D
-- add or finish shared regression coverage in `crates/xtask/tests/**`
-- prove the generic behavior with a synthetic publication-eligible fixture
-- prove pre-runtime omission
-- prove continuity drift failures
-- prove shared audit reuse and drift/generator parity
+- merge Lane B, rerun its smoke commands locally
+- merge Lane C, rerun docs/search smoke locally
+- merge Lane D, rerun the widened regression stack locally
+- rerun the stale-string sweep and prove no newly merged stale references reappeared
+- run the full targeted verification stack before the live aider flow
 
 Required commands:
 
 ```bash
-cargo test -p xtask --test onboard_agent_closeout_preview
-cargo run -p xtask -- capability-matrix-audit
+cargo test -p xtask --test agent_maintenance_refresh
+cargo test -p xtask --test refresh_publication_entrypoint
 cargo test -p xtask --test prepare_publication_entrypoint
-cargo test -p xtask --test agent_maintenance_drift
-cargo run -p xtask -- prepare-publication --approval docs/agents/lifecycle/aider-onboarding/governance/approved-agent.toml --check
-cargo test -p xtask --test c8_capability_matrix_unit
-cargo test -p xtask --test c8_spec_capability_matrix_paths
-cargo test -p xtask --test prepare_publication_entrypoint
-cargo test -p xtask --test agent_maintenance_drift
+cargo test -p xtask --test agent_lifecycle_state
+cargo test -p xtask --test runtime_follow_on_entrypoint
+cargo test -p xtask --test repair_runtime_evidence_entrypoint
 cargo test -p xtask --test onboard_agent_closeout_preview
+cargo test -p xtask --test agent_maintenance_drift
 make check
+rg -n 'support-matrix --check && capability-matrix --check && capability-matrix-audit && make preflight && close-proving-run --write' \
+  docs/cli-agent-onboarding-factory-operator-guide.md \
+  docs/specs/cli-agent-onboarding-charter.md \
+  docs/agents/lifecycle \
+  crates/xtask/tests
+rg -n 'prepare-publication --approval .* --write' \
+  docs/cli-agent-onboarding-factory-operator-guide.md \
+  docs/specs/cli-agent-onboarding-charter.md \
+  docs/agents/lifecycle \
+  crates/xtask/tests
+rg -n 'refresh-publication' \
+  docs/cli-agent-onboarding-factory-operator-guide.md \
+  docs/specs/cli-agent-onboarding-charter.md \
+  docs/agents/lifecycle \
+  crates/xtask/tests \
+  crates/xtask/src
 ```
 
 Acceptance:
 
-- required test files in `PLAN.md` cover the locked regressions
-- no consumer in scope still restates publication-capability derivation independently
-- merge checkpoints are recorded in `merge-log.md`
+- merged branch is internally green before live repo-state verification
+- no worker-owned duplicate logic survives in maintenance refresh
+- no stale canonical raw shell-chain references reappear in the swept scopes
 
-### task/gcp-06-final-verify
+### task/epl-07-final-verify
 
 Owner:
 
@@ -600,70 +690,133 @@ Owner:
 
 Owned surfaces:
 
-- merged integration branch state
-- generated `docs/specs/unified-agent-api/capability-matrix.md`
-- `RUN_ROOT/acceptance.md`
-- `REPO_ROOT/.runs/task-gcp-06-final-verify/**`
+- merged integration branch
+- live aider lifecycle docs
+- final generated publication outputs
+- `acceptance.md`
 
 Required work:
 
-- regenerate `docs/specs/unified-agent-api/capability-matrix.md` from merged code
-- rerun the full ordered final verification sequence
-- record command results and acceptance in `acceptance.md`
+- run the real create-mode publication flow against aider
+- allow `refresh-publication --check` to act as the pre-write stale detector, then prove `--write` makes the lane green
+- keep `close-proving-run` verification at the test level only; do not widen into live closeout authoring for aider
+- run the final targeted search sweeps and classify remaining matches as valid or invalid
 
 Required final ordered sequence:
 
-1. Regenerate the matrix:
+1. Verify pre-refresh search state:
    ```bash
-   cargo run -p xtask -- capability-matrix
+   rg -n 'support-matrix --check && capability-matrix --check && capability-matrix-audit && make preflight && close-proving-run --write' \
+     docs/cli-agent-onboarding-factory-operator-guide.md \
+     docs/specs/cli-agent-onboarding-charter.md \
+     docs/agents/lifecycle \
+     crates/xtask/tests
+   rg -n 'prepare-publication --approval .* --write' \
+     docs/cli-agent-onboarding-factory-operator-guide.md \
+     docs/specs/cli-agent-onboarding-charter.md \
+     docs/agents/lifecycle \
+     crates/xtask/tests
+   rg -n 'refresh-publication' \
+     docs/cli-agent-onboarding-factory-operator-guide.md \
+     docs/specs/cli-agent-onboarding-charter.md \
+     docs/agents/lifecycle \
+     crates/xtask/tests \
+     crates/xtask/src
    ```
-2. Verify the regenerated matrix is clean:
+2. Write the committed handoff:
    ```bash
-   cargo run -p xtask -- capability-matrix --check
+   cargo run -p xtask -- prepare-publication --approval docs/agents/lifecycle/aider-onboarding/governance/approved-agent.toml --write
    ```
-3. Verify the shared audit:
+3. Run the stale/green detector:
+   ```bash
+   cargo run -p xtask -- refresh-publication --approval docs/agents/lifecycle/aider-onboarding/governance/approved-agent.toml --check
+   ```
+4. If step 3 reports stale publication outputs, repair them:
+   ```bash
+   cargo run -p xtask -- refresh-publication --approval docs/agents/lifecycle/aider-onboarding/governance/approved-agent.toml --write
+   ```
+5. Prove the post-write state is green:
+   ```bash
+   cargo run -p xtask -- refresh-publication --approval docs/agents/lifecycle/aider-onboarding/governance/approved-agent.toml --check
+   ```
+6. Verify semantic publication truth:
    ```bash
    cargo run -p xtask -- capability-matrix-audit
    ```
-4. Verify drift against the merged truth:
+7. Run the full repo gate:
    ```bash
-   cargo run -p xtask -- check-agent-drift --agent codex
+   make preflight
    ```
-5. Verify publication continuity through the shared source path:
+8. Re-run the targeted search sweeps and classify matches:
    ```bash
-   cargo run -p xtask -- prepare-publication --approval docs/agents/lifecycle/aider-onboarding/governance/approved-agent.toml --check
+   rg -n 'support-matrix --check && capability-matrix --check && capability-matrix-audit && make preflight && close-proving-run --write' \
+     docs/cli-agent-onboarding-factory-operator-guide.md \
+     docs/specs/cli-agent-onboarding-charter.md \
+     docs/agents/lifecycle \
+     crates/xtask/tests
+   rg -n 'prepare-publication --approval .* --write' \
+     docs/cli-agent-onboarding-factory-operator-guide.md \
+     docs/specs/cli-agent-onboarding-charter.md \
+     docs/agents/lifecycle \
+     crates/xtask/tests
+   rg -n 'refresh-publication' \
+     docs/cli-agent-onboarding-factory-operator-guide.md \
+     docs/specs/cli-agent-onboarding-charter.md \
+     docs/agents/lifecycle \
+     crates/xtask/tests \
+     crates/xtask/src
    ```
+
+Final search classification rules:
+
+- raw shell-chain matches:
+  - invalid anywhere in the authored docs, committed lifecycle artifacts, or impacted tests when used as the lifecycle’s canonical next command
+  - valid only in code or packet contexts that are intentionally describing the green-gate command inventory itself
+- `prepare-publication --approval .* --write` matches:
+  - valid in runtime-integrated contexts, runtime-follow-on expectations, repair-runtime-evidence expectations, and docs describing the pre-refresh step
+  - invalid as the canonical next step after `publication_ready`
+- `refresh-publication` matches:
+  - must exist in `crates/xtask/src/**`, in publication-ready workflow docs, and in the updated regression tests
+  - absence from those canonical contexts is a blocker
 
 Failure handling:
 
-- If a failure is caused by files in touched scope for this milestone, patch within the milestone touch set and rerun from the first failed step.
-- If a failure is caused by unrelated pre-existing repo state outside the touch set, record it in `acceptance.md`, leave scope unchanged, and stop instead of widening the run.
+- if step 3 or step 5 fails because surfaces are stale or miscomputed, fix within touched scope and rerun from step 3
+- if step 4 fails, the new command must restore publication-owned committed surfaces; rollback failure is a hard blocker
+- if `make preflight` fails for a touched-scope regression, fix within scope and rerun from the first failed step
+- if `make preflight` fails for an unrelated pre-existing blocker, record it in `acceptance.md` and stop without widening
 
 Acceptance:
 
-- generated capability publication matches the merged shared source
-- all final gates pass, or any unrelated blocker is explicitly recorded as out of scope
-- the branch is ready for review without hidden follow-up edits
+- aider transitions from `runtime_integrated` to `publication_ready` through the new command path
+- `refresh-publication --write` leaves committed publication outputs green and checkable
+- final search sweeps show no stale canonical shell-chain references in the swept scopes
+- final publication surfaces and lifecycle docs are review-ready on `codex/recommend-next-agent`
 
 ## Tests And Acceptance
 
 The run is accepted only if all of the following are true:
 
-1. `cargo run -p xtask -- capability-matrix --check` passes without any hardcoded runtime backend inventory path in `capability_matrix.rs`.
-2. `capability-matrix-audit` and `close-proving-run` use the same shared audit implementation.
-3. A synthetic publication-eligible agent fixture can enter publication truth without a new `xtask` hardcoded backend arm.
-4. A synthetic pre-runtime fixture is omitted from generated publication output.
-5. `check-agent-drift` compares against the same shared publication truth used by the generator.
-6. `prepare-publication` uses the shared continuity path, not the generator module.
-7. In-scope authored docs and the generated matrix header no longer describe publication as built-in backend inventory.
-8. No consumer in scope restates publication-capability derivation independently.
+1. `prepare-publication --write` points to `refresh-publication --approval ... --write`.
+2. `prepare-publication --check` accepts both valid `publication_ready` next-command states:
+  - pre-refresh `refresh-publication --approval ... --write`
+  - post-refresh `close-proving-run --approval ... --closeout ...`
+3. `refresh-publication --write` consumes `publication-ready.json` and writes only the packet’s required publication outputs.
+4. `refresh-publication --write` rolls back publication-owned committed surfaces on gate failure.
+5. maintenance refresh and create-mode publication use the same support/capability planning seam.
+6. runtime-follow-on and repair-runtime-evidence remain aligned with the frozen pre-publication handoff contract.
+7. `close-proving-run` works unchanged against a post-refresh `publication_ready` baseline.
+8. authored docs describe one publication consumer command, not a manual checklist.
+9. all historical or fixture hash fallout tied to `PUBLICATION_READY_NEXT_COMMAND` is normalized before the test worker launches.
+10. final ordered verification through aider plus `make preflight` passes.
+11. targeted `rg` sweeps prove no stale canonical raw shell-chain references remain in the authored docs, committed lifecycle artifacts, or impacted `crates/xtask/tests/**` scopes.
 
 ## Assumptions
 
-- `PLAN.md` remains the current milestone source of truth for the full run.
-- No human approval gate is required before merge; ordinary review happens after branch completion.
-- Parent can create local worker worktrees under `/Users/spensermcconnell/__Active_Code/atomize-hq/.worktrees/`.
-- The shared seam can be frozen with one parent-owned source module and surgical rewires, not a broader architecture rewrite.
-- The generated `docs/specs/unified-agent-api/capability-matrix.md` should be refreshed only after the merged code is stable.
-- Current repo dirt may overlap with lane-owned files; the parent must snapshot and honor that actual dirty state before launching workers, even if it forces a lane delay or ownership rebalance.
-- If repo state changes under active work, the parent will re-evaluate ownership and relaunch stale lanes rather than forcing merges across moving semantics.
+- current live execution baseline remains `000aa69` until the run starts
+- worker launch happens only after the parent has frozen CLI strings and completed the stale-string/hash normalization sweep
+- `REQUIRED_PUBLICATION_COMMANDS` remains the four-command green gate and does not become `refresh-publication`
+- historical closed-baseline packet hashes may need committed doc refresh because `reconstruct_publication_ready_state_from_closed_baseline()` uses `PUBLICATION_READY_NEXT_COMMAND`
+- test and fixture fallout is broader than the first narrow lane draft, so the widened test lane plus parent stale sweep are both required
+- live final verification is allowed to leave aider at `publication_ready` on the branch
+- no unrelated repo dirt overlaps with worker-owned files at launch; if it does, the parent rebalance happens before worker creation
