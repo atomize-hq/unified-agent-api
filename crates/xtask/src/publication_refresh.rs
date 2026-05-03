@@ -6,7 +6,6 @@ use std::{
 };
 
 use clap::{ArgGroup, Parser};
-use sha2::Digest;
 
 #[cfg(test)]
 use std::cell::RefCell;
@@ -69,6 +68,7 @@ struct RefreshContext {
     lifecycle_state_path: String,
     lifecycle_state: LifecycleState,
     publication_packet_path: String,
+    publication_packet_sha256: String,
     publication_packet: PublicationReadyPacket,
 }
 
@@ -201,41 +201,18 @@ pub fn run_in_workspace<W: Write>(
         return Ok(());
     }
 
-    let packet_runtime_evidence = validate_packet_pinned_runtime_evidence_for_approval(
+    validate_packet_pinned_runtime_evidence_for_approval(
         workspace_root,
         &context.approval,
         &context.publication_packet,
     )
     .map_err(map_prepare_publication_error)?;
     let next_state = build_next_lifecycle_state(&context)?;
-    let lifecycle_sha = sha256_json(&next_state)?;
-    let next_packet = build_publication_ready_packet(
-        &context.approval,
-        &context.entry,
-        &context.lifecycle_state_path,
-        &lifecycle_sha,
-        context.publication_packet_path.clone(),
-        next_state.implementation_summary.clone().ok_or_else(|| {
-            Error::Validation(format!(
-                "`{}` must include an implementation_summary before publication refresh",
-                context.lifecycle_state_path
-            ))
-        })?,
-        packet_runtime_evidence.runtime_evidence_paths,
-        next_state.blocking_issues.clone(),
-    )
-    .map_err(map_prepare_publication_error)?;
-    next_packet
-        .validate()
-        .map_err(|err| Error::Validation(err.to_string()))?;
-
     let mut mutations = planned_output_mutations(workspace_root, &planned_outputs)?;
     mutations.extend(governance_mutations(
         workspace_root,
         &context.lifecycle_state_path,
         &next_state,
-        &context.publication_packet_path,
-        &next_packet,
     )?);
     let snapshots = capture_snapshots(workspace_root, &mutations)?;
     apply_mutations(workspace_root, &mutations)?;
@@ -305,6 +282,8 @@ fn build_context(workspace_root: &Path, args: &Args) -> Result<RefreshContext, E
     validate_expected_next_command(&approval, &entry, &lifecycle_state_path, &lifecycle_state)?;
 
     let publication_packet_path = agent_lifecycle::publication_ready_path_for_entry(&entry);
+    let publication_packet_sha256 = file_sha256(workspace_root, &publication_packet_path)
+        .map_err(|err| Error::Validation(err.to_string()))?;
     let publication_packet =
         load_publication_ready_packet(workspace_root, &publication_packet_path)
             .map_err(|err| Error::Validation(err.to_string()))?;
@@ -322,6 +301,7 @@ fn build_context(workspace_root: &Path, args: &Args) -> Result<RefreshContext, E
         lifecycle_state_path,
         lifecycle_state,
         publication_packet_path,
+        publication_packet_sha256,
         publication_packet,
     })
 }
@@ -417,6 +397,15 @@ fn validate_packet_freshness(workspace_root: &Path, context: &RefreshContext) ->
 
 fn build_next_lifecycle_state(context: &RefreshContext) -> Result<LifecycleState, Error> {
     let mut next_state = context.lifecycle_state.clone();
+    next_state.lifecycle_stage = LifecycleStage::Published;
+    next_state.support_tier = if matches!(
+        next_state.support_tier,
+        agent_lifecycle::SupportTier::FirstClass
+    ) {
+        agent_lifecycle::SupportTier::FirstClass
+    } else {
+        agent_lifecycle::SupportTier::PublicationBacked
+    };
     next_state.current_owner_command = "refresh-publication --write".to_string();
     next_state.expected_next_command = agent_lifecycle::publication_ready_closeout_command(
         &context.approval.relative_path,
@@ -425,6 +414,20 @@ fn build_next_lifecycle_state(context: &RefreshContext) -> Result<LifecycleState
     next_state.last_transition_at =
         now_rfc3339().map_err(|err| Error::Internal(err.to_string()))?;
     next_state.last_transition_by = "xtask refresh-publication --write".to_string();
+    next_state.required_evidence = required_evidence_for_stage(LifecycleStage::Published).to_vec();
+    next_state.satisfied_evidence = required_evidence_for_stage(LifecycleStage::Published).to_vec();
+    next_state.side_states.retain(|state| {
+        !matches!(
+            state,
+            agent_lifecycle::SideState::Blocked | agent_lifecycle::SideState::FailedRetryable
+        )
+    });
+    next_state.blocking_issues.clear();
+    next_state.retryable_failures.clear();
+    next_state.active_runtime_evidence_run_id = None;
+    next_state.publication_packet_path = Some(context.publication_packet_path.clone());
+    next_state.publication_packet_sha256 = Some(context.publication_packet_sha256.clone());
+    next_state.closeout_baseline_path = None;
     next_state
         .validate()
         .map_err(|err| Error::Validation(err.to_string()))?;
@@ -453,16 +456,14 @@ fn governance_mutations(
     workspace_root: &Path,
     lifecycle_state_path: &str,
     next_state: &LifecycleState,
-    publication_packet_path: &str,
-    next_packet: &PublicationReadyPacket,
 ) -> Result<Vec<PlannedMutation>, Error> {
     let jail = WorkspacePathJail::new(workspace_root)?;
     let lifecycle_bytes = serialize_json_pretty(next_state)?;
-    let packet_bytes = serialize_json_pretty(next_packet)?;
-    Ok(vec![
-        plan_create_or_replace(&jail, PathBuf::from(lifecycle_state_path), lifecycle_bytes)?,
-        plan_create_or_replace(&jail, PathBuf::from(publication_packet_path), packet_bytes)?,
-    ])
+    Ok(vec![plan_create_or_replace(
+        &jail,
+        PathBuf::from(lifecycle_state_path),
+        lifecycle_bytes,
+    )?])
 }
 
 fn capture_snapshots(
@@ -596,22 +597,24 @@ fn validate_expected_next_command(
     lifecycle_state_path: &str,
     lifecycle_state: &LifecycleState,
 ) -> Result<(), Error> {
-    let expected_commands = agent_lifecycle::publication_ready_expected_next_commands(
+    let refresh_command =
+        agent_lifecycle::publication_ready_refresh_command(&approval.relative_path);
+    let closeout_command = agent_lifecycle::publication_ready_closeout_command(
         &approval.relative_path,
         &entry.scaffold.onboarding_pack_prefix,
     );
-    if expected_commands
-        .iter()
-        .any(|expected| expected == &lifecycle_state.expected_next_command)
+    if lifecycle_state.expected_next_command == refresh_command
+        || (lifecycle_state.expected_next_command == closeout_command
+            && agent_lifecycle::is_legacy_post_refresh_publication_ready_state(lifecycle_state))
     {
         Ok(())
     } else {
         Err(Error::Validation(format!(
-            "`{}` has stale expected_next_command `{}`; expected one of `{}` or `{}`",
+            "`{}` has stale expected_next_command `{}`; expected `{}` or the explicit legacy post-refresh closeout compatibility shape `{}`",
             lifecycle_state_path,
             lifecycle_state.expected_next_command,
-            expected_commands[0],
-            expected_commands[1]
+            refresh_command,
+            closeout_command
         )))
     }
 }
@@ -712,10 +715,4 @@ fn serialize_json_pretty<T: serde::Serialize>(value: &T) -> Result<Vec<u8>, Erro
         .map_err(|err| Error::Internal(format!("serialize json: {err}")))?;
     bytes.push(b'\n');
     Ok(bytes)
-}
-
-fn sha256_json<T: serde::Serialize>(value: &T) -> Result<String, Error> {
-    let bytes = serialize_json_pretty(value)?;
-    let digest = sha2::Sha256::digest(bytes);
-    Ok(format!("{digest:x}"))
 }

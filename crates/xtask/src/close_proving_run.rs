@@ -258,10 +258,19 @@ fn validate_closeout_prerequisites(
         )));
     }
     match lifecycle_state.lifecycle_stage {
-        LifecycleStage::PublicationReady | LifecycleStage::Published => {}
+        LifecycleStage::Published => {}
+        LifecycleStage::PublicationReady
+            if agent_lifecycle::is_legacy_post_refresh_publication_ready_state(&lifecycle_state) => {}
+        LifecycleStage::PublicationReady => {
+            return Err(Error::Validation(format!(
+                "close-proving-run rejects ordinary prepare-time `publication_ready` at `{}`; run `refresh-publication --approval {} --write` first",
+                lifecycle_state_path,
+                approval.relative_path
+            )))
+        }
         other => {
             return Err(Error::Validation(format!(
-                "close-proving-run requires lifecycle stage `publication_ready` or legacy `published` at `{}` (found `{}`)",
+                "close-proving-run requires lifecycle stage `published`, or the explicit legacy post-refresh `publication_ready` compatibility shape, at `{}` (found `{}`)",
                 lifecycle_state_path,
                 other.as_str()
             )))
@@ -398,6 +407,22 @@ fn update_lifecycle_baseline(
             lifecycle_state_path, approval.relative_path
         )));
     }
+    let packet_sha = file_sha256(workspace_root, &packet_path)
+        .map_err(|err| Error::Validation(err.to_string()))?;
+    if matches!(lifecycle_state.lifecycle_stage, LifecycleStage::Published) {
+        if lifecycle_state.publication_packet_path.as_deref() != Some(packet_path.as_str()) {
+            return Err(Error::Validation(format!(
+                "`{}` published continuity must record publication_packet_path `{}` before closeout",
+                lifecycle_state_path, packet_path
+            )));
+        }
+        if lifecycle_state.publication_packet_sha256.as_deref() != Some(packet_sha.as_str()) {
+            return Err(Error::Validation(format!(
+                "`{}` published continuity must record publication_packet_sha256 for `{}` before closeout",
+                lifecycle_state_path, packet_path
+            )));
+        }
+    }
 
     lifecycle_state.lifecycle_stage = LifecycleStage::ClosedBaseline;
     lifecycle_state.support_tier =
@@ -425,10 +450,7 @@ fn update_lifecycle_baseline(
     lifecycle_state.blocking_issues.clear();
     lifecycle_state.retryable_failures.clear();
     lifecycle_state.publication_packet_path = Some(packet_path.clone());
-    lifecycle_state.publication_packet_sha256 = Some(
-        file_sha256(workspace_root, &packet_path)
-            .map_err(|err| Error::Validation(err.to_string()))?,
-    );
+    lifecycle_state.publication_packet_sha256 = Some(packet_sha);
     lifecycle_state.closeout_baseline_path = Some(closeout_path.display().to_string());
 
     write_lifecycle_state(workspace_root, &lifecycle_state_path, &lifecycle_state)

@@ -56,6 +56,24 @@ pub fn publication_ready_expected_next_commands(
     ]
 }
 
+pub fn is_legacy_post_refresh_publication_ready_state(state: &LifecycleState) -> bool {
+    state.lifecycle_stage == LifecycleStage::PublicationReady
+        && state.support_tier == SupportTier::BaselineRuntime
+        && state.current_owner_command == "refresh-publication --write"
+        && state.last_transition_by == "xtask refresh-publication --write"
+        && state.expected_next_command
+            == publication_ready_closeout_command(
+                &state.approval_artifact_path,
+                &state.onboarding_pack_prefix,
+            )
+        && state.required_evidence == required_evidence_for_stage(LifecycleStage::PublicationReady)
+        && state.satisfied_evidence == required_evidence_for_stage(LifecycleStage::PublicationReady)
+        && state.active_runtime_evidence_run_id.is_none()
+        && state.publication_packet_path.is_none()
+        && state.publication_packet_sha256.is_none()
+        && state.closeout_baseline_path.is_none()
+}
+
 #[derive(Debug, Error)]
 pub enum LifecycleError {
     #[error("{0}")]
@@ -640,6 +658,7 @@ pub fn is_resting_stage_v1(stage: LifecycleStage) -> bool {
         LifecycleStage::Enrolled
             | LifecycleStage::RuntimeIntegrated
             | LifecycleStage::PublicationReady
+            | LifecycleStage::Published
             | LifecycleStage::ClosedBaseline
     )
 }

@@ -312,20 +312,24 @@ fn validate_check_mode(workspace_root: &Path, context: &PublicationContext) -> R
                 LifecycleStage::PublicationReady,
                 &context.lifecycle_state_path,
             )?;
-            let expected_commands = agent_lifecycle::publication_ready_expected_next_commands(
+            let refresh_command =
+                agent_lifecycle::publication_ready_refresh_command(&context.approval.relative_path);
+            let closeout_command = agent_lifecycle::publication_ready_closeout_command(
                 &context.approval.relative_path,
                 &context.entry.scaffold.onboarding_pack_prefix,
             );
-            if !expected_commands
-                .iter()
-                .any(|expected| expected == &context.lifecycle_state.expected_next_command)
+            if context.lifecycle_state.expected_next_command != refresh_command
+                && !(context.lifecycle_state.expected_next_command == closeout_command
+                    && agent_lifecycle::is_legacy_post_refresh_publication_ready_state(
+                        &context.lifecycle_state,
+                    ))
             {
                 return Err(Error::Validation(format!(
-                    "`{}` has stale expected_next_command `{}`; expected one of `{}` or `{}`",
+                    "`{}` has stale expected_next_command `{}`; expected `{}` or the explicit legacy post-refresh closeout compatibility shape `{}`",
                     context.lifecycle_state_path,
                     context.lifecycle_state.expected_next_command,
-                    expected_commands[0],
-                    expected_commands[1]
+                    refresh_command,
+                    closeout_command
                 )));
             }
             let packet =
