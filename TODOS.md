@@ -2,18 +2,6 @@
 
 ## Pending
 
-### Enclose The Publication Lane End To End
-
-**What:** Add one repo-owned publication command that consumes `publication-ready.json`, writes the required publication-owned support/capability outputs, runs the green publication checks, and fails transactionally if any required surface cannot be made green.
-
-**Why:** `prepare-publication` currently records the handoff into `publication_ready`, but it does not actually write the published support/capability surfaces. That leaves the operator packet with a check-only next step while the real write commands still live outside the committed handoff contract.
-
-**Context:** Today the repo can verify green publication surfaces, but the act of materializing them is still a loose seam split across the operator guide and separate commands. This milestone should make publication refresh a first-class lifecycle consumer, define the exact write set for publication-owned surfaces, and ensure the create lane cannot drift into “handoff prepared but publication still implicit.”
-
-**Effort:** M
-**Priority:** P1
-**Depends on:** The capability publication foundation above so publication refresh can reason about any enrolled agent without hidden backend-specific code edits
-
 ### Make The Published State Honest In The Lifecycle Model
 
 **What:** Resolve the mismatch between the lifecycle schema and the live lane by either making `published` a real committed transition or removing/replacing it so the state machine matches the actual path from runtime integration to closeout.
@@ -75,6 +63,19 @@
 **Depends on:** `uaa-0022` landing with a structured runtime summary and explicit handoff into publication refresh
 
 ## Completed
+
+### Enclose The Publication Lane End To End
+
+**What:** Add one repo-owned publication command that consumes `publication-ready.json`, writes the required publication-owned support/capability outputs, runs the green publication checks, and fails transactionally if any required surface cannot be made green.
+
+**Why:** `prepare-publication` currently records the handoff into `publication_ready`, but it does not actually write the published support/capability surfaces. That leaves the operator packet with a check-only next step while the real write commands still live outside the committed handoff contract.
+
+**Context:** This landed on 2026-05-02 with `refresh-publication --approval <path> --check|--write` as the sole publication consumer, shared publication planning between create-mode and maintenance-mode, transactional publication-owned output writes with rollback on gate failure, updated lifecycle/operator-guide next-command semantics, and regression coverage for stale detection, rollback, surface selection, and idempotent rerun.
+
+**Effort:** M
+**Priority:** P1
+**Depends on:** The capability publication foundation above so publication refresh can reason about any enrolled agent without hidden backend-specific code edits
+**Completed:** landed on 2026-05-02
 
 ### Land The Generic Capability Publication Foundation
 
