@@ -2,18 +2,6 @@
 
 ## Pending
 
-### Land The Generic Capability Publication Foundation
-
-**What:** Replace the hardcoded built-in backend inventory in capability publication with one registry- and lifecycle-driven model that all publication consumers share: `capability-matrix`, `capability-matrix-audit`, `check-agent-drift`, and `close-proving-run`.
-
-**Why:** A newly enrolled agent still cannot flow generically through capability publication today. The current generator knows only the backends compiled into `crates/xtask/src/capability_matrix.rs`, so adding an agent to `agent_registry.toml` is not enough. Hidden Rust edits are still required before publication can become truthful.
-
-**Context:** The remaining create-lane hole is larger than one hardcoded `match`. The built-in-backend assumption also appears in the capability-matrix spec, audit logic, and closeout gating. This milestone should define one authoritative publication-capability source, decide how runtime capability truth is derived for newly enrolled agents, and remove the need to manually “teach” the generator about each backend in separate code paths.
-
-**Effort:** M
-**Priority:** P1
-**Depends on:** The current lifecycle record, approval artifact capability declarations, and manifest-root capability projection contract staying authoritative inputs during the transition
-
 ### Enclose The Publication Lane End To End
 
 **What:** Add one repo-owned publication command that consumes `publication-ready.json`, writes the required publication-owned support/capability outputs, runs the green publication checks, and fails transactionally if any required surface cannot be made green.
@@ -87,6 +75,19 @@
 **Depends on:** `uaa-0022` landing with a structured runtime summary and explicit handoff into publication refresh
 
 ## Completed
+
+### Land The Generic Capability Publication Foundation
+
+**What:** Replace the hardcoded built-in backend inventory in capability publication with one registry- and lifecycle-driven model that all publication consumers share: `capability-matrix`, `capability-matrix-audit`, `check-agent-drift`, and `close-proving-run`.
+
+**Why:** A newly enrolled agent still cannot flow generically through capability publication today. The current generator knows only the backends compiled into `crates/xtask/src/capability_matrix.rs`, so adding an agent to `agent_registry.toml` is not enough. Hidden Rust edits are still required before publication can become truthful.
+
+**Context:** This landed on 2026-05-02 with a shared `crates/xtask/src/capability_publication.rs` source, generator/audit/closeout/drift/prepare-publication convergence, lifecycle-backed publication wording in the capability matrix spec, and a replayed final verification chain that uses a stage-appropriate `prepare-publication --check` target.
+
+**Effort:** M
+**Priority:** P1
+**Depends on:** The current lifecycle record, approval artifact capability declarations, and manifest-root capability projection contract staying authoritative inputs during the transition
+**Completed:** landed on 2026-05-02
 
 ### Enclose The Runtime Follow-On In A Codex Exec Runner
 

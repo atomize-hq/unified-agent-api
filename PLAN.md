@@ -644,7 +644,7 @@ make check
 cargo run -p xtask -- capability-matrix --check
 cargo run -p xtask -- capability-matrix-audit
 cargo run -p xtask -- check-agent-drift --agent codex
-cargo run -p xtask -- prepare-publication --approval docs/agents/lifecycle/codex-cli-onboarding/governance/approved-agent.toml --check
+cargo run -p xtask -- prepare-publication --approval docs/agents/lifecycle/aider-onboarding/governance/approved-agent.toml --check
 ```
 
 ## Failure Modes Registry

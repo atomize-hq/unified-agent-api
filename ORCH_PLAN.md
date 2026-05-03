@@ -499,7 +499,7 @@ Required commands:
 ```bash
 cargo test -p xtask --test prepare_publication_entrypoint
 cargo test -p xtask --test agent_maintenance_drift
-cargo run -p xtask -- prepare-publication --approval docs/agents/lifecycle/codex-cli-onboarding/governance/approved-agent.toml --check
+cargo run -p xtask -- prepare-publication --approval docs/agents/lifecycle/aider-onboarding/governance/approved-agent.toml --check
 ```
 
 Acceptance:
@@ -577,7 +577,7 @@ cargo test -p xtask --test onboard_agent_closeout_preview
 cargo run -p xtask -- capability-matrix-audit
 cargo test -p xtask --test prepare_publication_entrypoint
 cargo test -p xtask --test agent_maintenance_drift
-cargo run -p xtask -- prepare-publication --approval docs/agents/lifecycle/codex-cli-onboarding/governance/approved-agent.toml --check
+cargo run -p xtask -- prepare-publication --approval docs/agents/lifecycle/aider-onboarding/governance/approved-agent.toml --check
 cargo test -p xtask --test c8_capability_matrix_unit
 cargo test -p xtask --test c8_spec_capability_matrix_paths
 cargo test -p xtask --test prepare_publication_entrypoint
@@ -631,7 +631,7 @@ Required final ordered sequence:
    ```
 5. Verify publication continuity through the shared source path:
    ```bash
-   cargo run -p xtask -- prepare-publication --approval docs/agents/lifecycle/codex-cli-onboarding/governance/approved-agent.toml --check
+   cargo run -p xtask -- prepare-publication --approval docs/agents/lifecycle/aider-onboarding/governance/approved-agent.toml --check
    ```
 
 Failure handling:
