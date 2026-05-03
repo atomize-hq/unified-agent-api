@@ -92,7 +92,9 @@ fn seed_lifecycle_eligible_audit_peers(root: &std::path::Path) {
     );
     write_text(
         &root.join("docs/agents/lifecycle/codex-cli-onboarding/governance/approved-agent.toml"),
-        include_str!("../../../../docs/agents/lifecycle/codex-cli-onboarding/governance/approved-agent.toml"),
+        include_str!(
+            "../../../../docs/agents/lifecycle/codex-cli-onboarding/governance/approved-agent.toml"
+        ),
     );
     write_text(
         &root.join("docs/agents/lifecycle/codex-cli-onboarding/governance/lifecycle-state.json"),
@@ -172,10 +174,10 @@ fn seed_publication_ready_baseline(root: &std::path::Path, approval_path: &str) 
             "lifecycle_stage": "publication_ready",
             "support_tier": "baseline_runtime",
             "side_states": [],
-            "current_owner_command": "prepare-publication --write",
-            "expected_next_command": "support-matrix --check && capability-matrix --check && capability-matrix-audit && make preflight && close-proving-run --write",
+            "current_owner_command": "refresh-publication --write",
+            "expected_next_command": "close-proving-run --approval docs/agents/lifecycle/gemini-cli-onboarding/governance/approved-agent.toml --closeout docs/agents/lifecycle/gemini-cli-onboarding/governance/proving-run-closeout.json",
             "last_transition_at": "2026-05-01T00:00:00Z",
-            "last_transition_by": "close-proving-run-entrypoint-test",
+            "last_transition_by": "xtask refresh-publication --write",
             "required_evidence": [
                 "registry_entry",
                 "docs_pack",

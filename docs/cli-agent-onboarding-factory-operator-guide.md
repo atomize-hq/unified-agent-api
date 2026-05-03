@@ -461,7 +461,7 @@ On success it:
 - advances the committed lifecycle record to `lifecycle_stage = publication_ready`
 - clears `active_runtime_evidence_run_id`
 - satisfies `publication_packet_written`
-- sets `expected_next_command = "support-matrix --check && capability-matrix --check && capability-matrix-audit && make preflight && close-proving-run --write"`
+- sets `expected_next_command = "refresh-publication --approval <path> --write"`
 
 `prepare-publication --check` revalidates the same seam without rewriting either governance file. At `publication_ready`, it validates only the packet-pinned `runtime_evidence_paths`; newer sibling `.uaa-temp` runs do not change authority.
 
@@ -484,7 +484,7 @@ For capability publication, `capability-matrix` reads lifecycle-backed publicati
 without an explicit publication target appear under their default lifecycle-backed target profile in
 the generated header.
 
-`prepare-publication` never writes these support/capability outputs directly. It only records the committed publication handoff packet and the lifecycle transition that points to the green gate.
+`prepare-publication` never writes these support/capability outputs directly. It only records the committed publication handoff packet and the lifecycle transition that points to `refresh-publication`.
 
 ### 9. Run the green gate
 

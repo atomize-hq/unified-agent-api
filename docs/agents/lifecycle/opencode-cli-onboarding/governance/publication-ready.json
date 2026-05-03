@@ -4,7 +4,7 @@
   "approval_artifact_path": "docs/agents/lifecycle/opencode-cli-onboarding/governance/approved-agent.toml",
   "approval_artifact_sha256": "83d7a804eb96578458c946419bfc1219b69029d824797b3342c65d9bddec3cdf",
   "lifecycle_state_path": "docs/agents/lifecycle/opencode-cli-onboarding/governance/lifecycle-state.json",
-  "lifecycle_state_sha256": "e06c8062afe63310ddeba7933625b5d7e0bd49e26e97c4dff5404616b818553c",
+  "lifecycle_state_sha256": "205b3d23fc4bfd741256171a0e5aff4218b3a95606085fd834c9d373050f69ac",
   "lifecycle_stage": "publication_ready",
   "support_tier_at_emit": "baseline_runtime",
   "manifest_root": "cli_manifests/opencode",

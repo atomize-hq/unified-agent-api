@@ -64,6 +64,6 @@
     "minimal_profile_justification": null
   },
   "publication_packet_path": "docs/agents/lifecycle/claude-code-cli-onboarding/governance/publication-ready.json",
-  "publication_packet_sha256": "08ea7d615ca1f45f8cf2f386f9a9155f9c263d287083c48a92c7509d45394703",
+  "publication_packet_sha256": "d35eeb695961a7275e131e93f1557dd01fc652e8f8e9af6afcfbd7eec5385fb6",
   "closeout_baseline_path": "docs/agents/lifecycle/claude-code-cli-onboarding/governance/proving-run-closeout.json"
 }

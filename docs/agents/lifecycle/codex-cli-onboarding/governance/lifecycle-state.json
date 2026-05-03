@@ -64,6 +64,6 @@
     "minimal_profile_justification": null
   },
   "publication_packet_path": "docs/agents/lifecycle/codex-cli-onboarding/governance/publication-ready.json",
-  "publication_packet_sha256": "8dedd01022269268a9bbb0092925da5f0d0d74859535d95ddd4da352167e6195",
+  "publication_packet_sha256": "7416176c0ef1cf08cce9eccb7b475ebab8a7a7dd86ed52a7af137a98a34c288f",
   "closeout_baseline_path": "docs/agents/lifecycle/codex-cli-onboarding/governance/proving-run-closeout.json"
 }

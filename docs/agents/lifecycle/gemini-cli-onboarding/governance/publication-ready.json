@@ -4,7 +4,7 @@
   "approval_artifact_path": "docs/agents/lifecycle/gemini-cli-onboarding/governance/approved-agent.toml",
   "approval_artifact_sha256": "aa3f57681d108fe28b64976a18799071f921086e57ab4fa9ce518186b710bb7a",
   "lifecycle_state_path": "docs/agents/lifecycle/gemini-cli-onboarding/governance/lifecycle-state.json",
-  "lifecycle_state_sha256": "245a1731a60799f9ac66a3ee48c23adcfdbe059aa36a511ef119600f32191d66",
+  "lifecycle_state_sha256": "5df8caedc5770c212aabbbe15c324a743014c988d01dbbf0a462091586d82911",
   "lifecycle_stage": "publication_ready",
   "support_tier_at_emit": "baseline_runtime",
   "manifest_root": "cli_manifests/gemini_cli",

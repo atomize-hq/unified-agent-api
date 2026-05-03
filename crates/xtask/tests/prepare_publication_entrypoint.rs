@@ -288,7 +288,7 @@ fn prepare_publication_write_emits_packet_and_advances_lifecycle() {
         lifecycle_state
             .get("expected_next_command")
             .and_then(Value::as_str),
-        Some("support-matrix --check && capability-matrix --check && capability-matrix-audit && make preflight && close-proving-run --write")
+        Some("refresh-publication --approval docs/agents/lifecycle/gemini-cli-onboarding/governance/approved-agent.toml --write")
     );
     assert!(lifecycle_state
         .get("satisfied_evidence")
