@@ -2,18 +2,6 @@
 
 ## Pending
 
-### Enclose Create-Mode Closeout Without Ad Hoc Authoring
-
-**What:** Add a repo-owned closeout preparation flow that materializes or scaffolds `proving-run-closeout.json` from machine-known lifecycle facts plus the minimal remaining human inputs, so the create lane can advance from green publication to `closed_baseline` without freehand artifact authoring.
-
-**Why:** `close-proving-run` is already a strong validator and packet refresher, but it still depends on a separately authored closeout JSON artifact. That means the lifecycle machine is still not fully enclosed even after publication is green.
-
-**Context:** The goal is not to remove the human signal from closeout metrics like residual friction or manual edits. The goal is to stop requiring humans to hand-build the whole artifact shape. This milestone should define which fields are machine-owned, which are human-owned, how the closeout draft is created transactionally from lifecycle/publication truth, and how the final closeout handoff becomes boring enough to run every time.
-
-**Effort:** S
-**Priority:** P1
-**Depends on:** A truthful enclosed publication lane and an explicit decision on the canonical post-publication lifecycle state
-
 ### Land The LLM-Guided Research Layer For The Recommendation Lane
 
 **What:** Replace the thin repo-local `recommend-next-agent` skill with a real AI research workflow that gathers explicit proof for candidate charter fit, then feed that structured research into the existing deterministic runner for validation, rendering, promotion, and approval-artifact drafting.
@@ -38,19 +26,35 @@
 **Priority:** P2
 **Depends on:** M5 landing with one canonical capability projection contract and one shared local/CI check-only gate
 
+## Retired / Superseded
+
 ### Enclose The Publication Refresh Follow-On After The Runtime Runner
 
 **What:** Add the next bounded automation seam after `uaa-0022`: deterministic refresh of runtime-derived manifest evidence into publication-owned support and capability surfaces, validation gates, and proving-run-closeout readiness.
 
 **Why:** The runtime runner milestone deliberately stops before publication refresh so the runtime seam stays boilable. But the real create-lane done-state still requires support/capability refresh, green validation, and closeout. If this follow-on is not captured explicitly, the runtime runner risks becoming a well-documented island instead of a step toward a full green lane.
 
-**Context:** The 2026-04-29 `/autoplan` review for `uaa-0022` accepted a green-lane handoff contract into scope but kept publication automation deferred. This follow-on should define the machine-readable handoff artifact, the exact runtime-owned versus publication-owned `cli_manifests/<agent_id>/` split, and the validation contract for `support-matrix --check`, `capability-matrix --check`, `capability-matrix-audit`, and `make preflight`.
+**Context:** This item is no longer a live pending milestone. Its scope was absorbed by the landed 2026-05-02 through 2026-05-04 sequence: `refresh-publication --write` now owns publication refresh, `published` is the honest committed post-refresh lifecycle state, and `prepare-proving-run-closeout` plus `close-proving-run` now finish the green publication to `closed_baseline` handoff without ad hoc artifact authoring.
 
 **Effort:** M
 **Priority:** P2
 **Depends on:** `uaa-0022` landing with a structured runtime summary and explicit handoff into publication refresh
+**Retired:** superseded by landed publication + closeout work on 2026-05-04
 
 ## Completed
+
+### Enclose Create-Mode Closeout Without Ad Hoc Authoring
+
+**What:** Add a repo-owned closeout preparation flow that materializes or scaffolds `proving-run-closeout.json` from machine-known lifecycle facts plus the minimal remaining human inputs, so the create lane can advance from green publication to `closed_baseline` without freehand artifact authoring.
+
+**Why:** `close-proving-run` is already a strong validator and packet refresher, but it still depended on a separately authored closeout JSON artifact. That meant the lifecycle machine was still not fully enclosed even after publication was green.
+
+**Context:** This landed on 2026-05-04. `refresh-publication --write` now hands off to `prepare-proving-run-closeout --approval <path> --write`, the canonical `proving-run-closeout.json` supports truthful `prepared` and `closed` states, prepared packet docs render as `closeout_prepared`, `close-proving-run` rewrites machine-owned fields from current lifecycle/publication truth and rejects unresolved placeholders, and historical backfill now uses the shared create-mode closeout builder/serializer instead of bespoke inline JSON.
+
+**Effort:** S
+**Priority:** P1
+**Depends on:** A truthful enclosed publication lane and an explicit decision on the canonical post-publication lifecycle state
+**Completed:** landed on 2026-05-04
 
 ### Make The Published State Honest In The Lifecycle Model
 
@@ -97,7 +101,7 @@
 
 **Why:** The recommendation lane now closes the pre-create gap, and the control-plane commands already own enrollment, scaffolding, packet closeout, and now the runtime execution seam itself. The next remaining create-lane gap is not runtime implementation anymore; it is deterministic publication refresh and maintenance wiring after runtime-owned evidence exists.
 
-**Context:** The runtime runner landed on 2026-04-29 and now owns `runtime-follow-on --approval <path> --dry-run/--write`, bounded runtime evidence, and handoff validation ahead of publication refresh. `opencode` remains the default baseline template. Publication refresh automation stays deferred to the pending follow-on above.
+**Context:** The runtime runner landed on 2026-04-29 and now owns `runtime-follow-on --approval <path> --dry-run/--write`, bounded runtime evidence, and handoff validation ahead of publication refresh. `opencode` remains the default baseline template. The deferred publication/closeout follow-on later landed across the 2026-05-02 through 2026-05-04 publication, lifecycle, and closeout milestones above.
 
 **Effort:** M
 **Priority:** P1
