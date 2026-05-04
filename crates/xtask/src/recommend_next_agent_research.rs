@@ -636,8 +636,11 @@ fn execute_write_mode<W: Write>(
             "Research root contains frozen seed and copied discovery inputs".to_string(),
         );
 
-        let research_prompt =
-            read_string(&context.packet_dir.join(RESEARCH_PROMPT_FILE_NAME))?;
+        let research_prompt = render_research_prompt(context);
+        write_string(
+            &context.packet_dir.join(RESEARCH_PROMPT_FILE_NAME),
+            &research_prompt,
+        )?;
         let before_research =
             snapshot_workspace(workspace_root, &[context.packet_dir.as_path()])?;
         let executed_research = execute_codex_phase(

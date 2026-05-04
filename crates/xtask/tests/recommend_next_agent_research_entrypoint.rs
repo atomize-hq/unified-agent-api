@@ -178,6 +178,11 @@ fn recommend_next_agent_research_write_invokes_freeze_discovery_with_expected_ar
             "docs/agents/.uaa-temp/recommend-next-agent/research/rna-pass1",
         ])
     );
+    let research_prompt =
+        fs::read_to_string(packet_dir(&fixture, PASS1_RUN_ID).join("research-prompt.md"))
+            .expect("read refreshed research prompt");
+    assert!(research_prompt.contains("dossiers/alpha.json"));
+    assert!(!research_prompt.contains("Seed snapshot sha256: ``"));
 }
 
 #[test]
