@@ -36,6 +36,10 @@ pub fn publication_ready_refresh_command(approval_artifact_path: &str) -> String
     format!("refresh-publication --approval {approval_artifact_path} --write")
 }
 
+pub fn published_prepare_closeout_command(approval_artifact_path: &str) -> String {
+    format!("prepare-proving-run-closeout --approval {approval_artifact_path} --write")
+}
+
 pub fn publication_ready_closeout_command(
     approval_artifact_path: &str,
     onboarding_pack_prefix: &str,
@@ -48,11 +52,11 @@ pub fn publication_ready_closeout_command(
 
 pub fn publication_ready_expected_next_commands(
     approval_artifact_path: &str,
-    onboarding_pack_prefix: &str,
+    _onboarding_pack_prefix: &str,
 ) -> [String; 2] {
     [
         publication_ready_refresh_command(approval_artifact_path),
-        publication_ready_closeout_command(approval_artifact_path, onboarding_pack_prefix),
+        published_prepare_closeout_command(approval_artifact_path),
     ]
 }
 

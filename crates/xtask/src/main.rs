@@ -24,6 +24,7 @@ use xtask::agent_maintenance::{
 use xtask::capability_matrix;
 pub use xtask::onboard_agent;
 pub use xtask::prepare_publication;
+pub use xtask::prepare_proving_run_closeout;
 pub use xtask::publication_refresh;
 pub use xtask::repair_runtime_evidence;
 pub use xtask::runtime_follow_on;
@@ -77,6 +78,8 @@ enum Command {
     PreparePublication(prepare_publication::Args),
     /// Refresh publication-owned outputs from a committed publication-ready packet.
     RefreshPublication(publication_refresh::Args),
+    /// Prepare the canonical proving-run closeout draft from published lifecycle truth.
+    PrepareProvingRunCloseout(prepare_proving_run_closeout::Args),
     /// Repair a stale runtime evidence bundle without advancing lifecycle stage.
     RepairRuntimeEvidence(repair_runtime_evidence::Args),
     /// Generate or verify the universal agent capability matrix markdown.
@@ -210,6 +213,13 @@ fn main() {
             }
         },
         Command::RefreshPublication(args) => match publication_refresh::run(args) {
+            Ok(()) => 0,
+            Err(err) => {
+                eprintln!("{err}");
+                err.exit_code()
+            }
+        },
+        Command::PrepareProvingRunCloseout(args) => match prepare_proving_run_closeout::run(args) {
             Ok(()) => 0,
             Err(err) => {
                 eprintln!("{err}");

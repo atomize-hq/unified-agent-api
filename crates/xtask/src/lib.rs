@@ -9,6 +9,7 @@ pub mod capability_projection;
 pub mod capability_publication;
 pub mod onboard_agent;
 pub mod prepare_publication;
+pub mod prepare_proving_run_closeout;
 pub mod proving_run_closeout;
 pub mod publication_refresh;
 pub mod release_doc;
