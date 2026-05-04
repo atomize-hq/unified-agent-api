@@ -136,7 +136,7 @@ fn prepared_closeout_draft_does_not_preview_as_closed_packet() {
         proving_run_closeout::ProvingRunCloseoutMachineFields {
             approval_ref: approval_path.clone(),
             approval_sha256: sha256_hex(&fixture.join(&approval_path)),
-            approval_source: "prepare-proving-run-closeout".to_string(),
+            approval_source: "governance-review".to_string(),
             preflight_passed: true,
             recorded_at: "2026-04-21T11:23:09Z".to_string(),
             commit: "6b7d5f6e9cf2bf54933659f5700bb59d1f8a95e8".to_string(),

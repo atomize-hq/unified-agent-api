@@ -2,7 +2,7 @@ mod approval;
 mod descriptor;
 mod lifecycle;
 mod mutation;
-mod preview;
+pub(crate) mod preview;
 mod validation;
 
 use std::{

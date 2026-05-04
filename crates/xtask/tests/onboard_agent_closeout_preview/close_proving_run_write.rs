@@ -471,7 +471,7 @@ fn close_proving_run_finalizes_truthful_prepared_draft() {
         proving_run_closeout::ProvingRunCloseoutMachineFields {
             approval_ref: approval_path.clone(),
             approval_sha256: sha256_hex(&fixture.join(&approval_path)),
-            approval_source: "prepare-proving-run-closeout".to_string(),
+            approval_source: "governance-review".to_string(),
             preflight_passed: true,
             recorded_at: "2026-04-21T11:23:09Z".to_string(),
             commit: "6b7d5f6e9cf2bf54933659f5700bb59d1f8a95e8".to_string(),
@@ -534,7 +534,7 @@ fn close_proving_run_rejects_unresolved_placeholders_in_prepared_draft() {
         proving_run_closeout::ProvingRunCloseoutMachineFields {
             approval_ref: approval_path.clone(),
             approval_sha256: sha256_hex(&fixture.join(&approval_path)),
-            approval_source: "prepare-proving-run-closeout".to_string(),
+            approval_source: "governance-review".to_string(),
             preflight_passed: true,
             recorded_at: "2026-04-21T11:23:09Z".to_string(),
             commit: "6b7d5f6e9cf2bf54933659f5700bb59d1f8a95e8".to_string(),

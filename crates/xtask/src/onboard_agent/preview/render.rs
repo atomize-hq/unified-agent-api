@@ -1,5 +1,6 @@
 use std::path::{Path, PathBuf};
 
+use crate::agent_registry::AgentRegistryEntry;
 use crate::agent_registry::REGISTRY_RELATIVE_PATH;
 use crate::proving_run_closeout::{
     DurationTruth, ProvingRunCloseout, ProvingRunCloseoutState, ResidualFrictionTruth,
@@ -11,26 +12,141 @@ use super::super::{
 };
 use super::ApprovalRenderInput;
 use super::DraftEntry;
+
 const DOCS_NEXT_ROOT: &str = "docs/agents/lifecycle";
 const PROVING_RUN_CLOSEOUT_RELATIVE_PATH: &str = "governance/proving-run-closeout.json";
 
-#[derive(Debug, Clone, Copy)]
-pub(in crate::onboard_agent) enum PacketPhase<'a> {
-    Execution,
-    Closeout(&'a ProvingRunCloseout),
+#[derive(Debug, Clone)]
+pub(crate) struct CloseoutPacketRenderInput {
+    agent_id: String,
+    display_name: String,
+    crate_path: String,
+    backend_module: String,
+    manifest_root: String,
+    package_name: String,
+    docs_release_track: String,
+    onboarding_pack_prefix: String,
+}
+
+impl CloseoutPacketRenderInput {
+    pub(super) fn from_draft(draft: &DraftEntry) -> Self {
+        Self {
+            agent_id: draft.agent_id.clone(),
+            display_name: draft.display_name.clone(),
+            crate_path: draft.crate_path.clone(),
+            backend_module: draft.backend_module.clone(),
+            manifest_root: draft.manifest_root.clone(),
+            package_name: draft.package_name.clone(),
+            docs_release_track: draft.docs_release_track.clone(),
+            onboarding_pack_prefix: draft.onboarding_pack_prefix.clone(),
+        }
+    }
+
+    pub(crate) fn from_registry_entry(entry: &AgentRegistryEntry) -> Self {
+        Self {
+            agent_id: entry.agent_id.clone(),
+            display_name: entry.display_name.clone(),
+            crate_path: entry.crate_path.clone(),
+            backend_module: entry.backend_module.clone(),
+            manifest_root: entry.manifest_root.clone(),
+            package_name: entry.package_name.clone(),
+            docs_release_track: entry.release.docs_release_track.clone(),
+            onboarding_pack_prefix: entry.scaffold.onboarding_pack_prefix.clone(),
+        }
+    }
+
+    fn docs_pack_root(&self) -> PathBuf {
+        Path::new(DOCS_NEXT_ROOT).join(&self.onboarding_pack_prefix)
+    }
 }
 
 pub(in crate::onboard_agent) fn closeout_relative_path(draft: &DraftEntry) -> String {
-    docs_pack_root(&draft.onboarding_pack_prefix)
+    closeout_relative_path_for_prefix(&draft.onboarding_pack_prefix)
+}
+
+fn closeout_relative_path_for_prefix(prefix: &str) -> String {
+    docs_pack_root(prefix)
         .join(PROVING_RUN_CLOSEOUT_RELATIVE_PATH)
         .display()
         .to_string()
 }
 
+pub(crate) fn build_closeout_docs_preview(
+    input: &CloseoutPacketRenderInput,
+    closeout: &ProvingRunCloseout,
+) -> Vec<(String, Option<String>)> {
+    let docs_root = input.docs_pack_root();
+    let docs_root_display = docs_root.display().to_string();
+    let closeout_path = closeout_relative_path_for_prefix(&input.onboarding_pack_prefix);
+    let release_touchpoints = closeout_release_touchpoint_lines(input)
+        .iter()
+        .map(|line| format!("- {line}"))
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    vec![
+        (
+            docs_root.join("README.md").display().to_string(),
+            Some(render_markdown_file(render_closeout_readme_body(
+                input,
+                closeout,
+                &closeout_path,
+            ))),
+        ),
+        (
+            docs_root.join("scope_brief.md").display().to_string(),
+            Some(render_markdown_file(render_closeout_scope_brief_body(
+                input,
+                &docs_root_display,
+                closeout,
+                &closeout_path,
+            ))),
+        ),
+        (
+            docs_root.join("seam_map.md").display().to_string(),
+            Some(render_markdown_file(render_closeout_seam_map_body(
+                input,
+                &docs_root_display,
+            ))),
+        ),
+        (
+            docs_root.join("threading.md").display().to_string(),
+            Some(render_markdown_file(render_closeout_threading_body(
+                input, closeout,
+            ))),
+        ),
+        (
+            docs_root.join("review_surfaces.md").display().to_string(),
+            Some(render_markdown_file(render_closeout_review_surfaces_body(
+                input,
+                closeout,
+                &docs_root_display,
+            ))),
+        ),
+        (
+            docs_root
+                .join("governance/remediation-log.md")
+                .display()
+                .to_string(),
+            Some(render_markdown_file(render_closeout_remediation_log_body(
+                closeout,
+            ))),
+        ),
+        (
+            docs_root.join("HANDOFF.md").display().to_string(),
+            Some(render_markdown_file(render_closeout_handoff_body(
+                input,
+                closeout,
+                &closeout_path,
+                &release_touchpoints,
+            ))),
+        ),
+    ]
+}
+
 pub(in crate::onboard_agent) fn build_docs_preview(
     draft: &DraftEntry,
     release_touchpoints: &[String],
-    phase: PacketPhase<'_>,
     approval: Option<ApprovalRenderInput<'_>>,
 ) -> Vec<(String, Option<String>)> {
     let docs_root = draft.docs_pack_root();
@@ -47,7 +163,6 @@ pub(in crate::onboard_agent) fn build_docs_preview(
             docs_root.join("README.md").display().to_string(),
             Some(render_markdown_file(render_readme_body(
                 draft,
-                phase,
                 &closeout_path,
                 approval,
             ))),
@@ -56,9 +171,7 @@ pub(in crate::onboard_agent) fn build_docs_preview(
             docs_root.join("scope_brief.md").display().to_string(),
             Some(render_markdown_file(render_scope_brief_body(
                 draft,
-                phase,
                 &docs_root_display,
-                &closeout_path,
                 approval,
             ))),
         ),
@@ -71,13 +184,12 @@ pub(in crate::onboard_agent) fn build_docs_preview(
         ),
         (
             docs_root.join("threading.md").display().to_string(),
-            Some(render_markdown_file(render_threading_body(draft, phase))),
+            Some(render_markdown_file(render_threading_body(draft))),
         ),
         (
             docs_root.join("review_surfaces.md").display().to_string(),
             Some(render_markdown_file(render_review_surfaces_body(
                 draft,
-                phase,
                 &docs_root_display,
             ))),
         ),
@@ -86,13 +198,12 @@ pub(in crate::onboard_agent) fn build_docs_preview(
                 .join("governance/remediation-log.md")
                 .display()
                 .to_string(),
-            Some(render_markdown_file(render_remediation_log_body(phase))),
+            Some(render_markdown_file(render_remediation_log_body())),
         ),
         (
             docs_root.join("HANDOFF.md").display().to_string(),
             Some(render_markdown_file(render_handoff_body(
                 draft,
-                phase,
                 &closeout_path,
                 &release_touchpoints,
                 approval,
@@ -117,55 +228,220 @@ pub(in crate::onboard_agent) fn release_touchpoint_lines(draft: &DraftEntry) -> 
     ]
 }
 
+fn closeout_release_touchpoint_lines(input: &CloseoutPacketRenderInput) -> Vec<String> {
+    vec![
+        format!(
+            "Path: Cargo.toml will ensure workspace member `{}` is enrolled.",
+            input.crate_path
+        ),
+        format!(
+            "Path: {RELEASE_DOC_PATH} will ensure the generated release block includes `{}` on release track `{}`.",
+            input.package_name, input.docs_release_track
+        ),
+        format!(
+            "Workflow and script files remain unchanged: {PUBLISH_WORKFLOW_PATH}, {PUBLISH_SCRIPT_PATH}, {VALIDATE_PUBLISH_SCRIPT_PATH}, {CHECK_PUBLISH_READINESS_SCRIPT_PATH}."
+        ),
+    ]
+}
+
 fn render_markdown_file(body: String) -> String {
     format!("{OWNERSHIP_MARKER}\n\n{body}")
 }
 
+fn render_closeout_readme_body(
+    input: &CloseoutPacketRenderInput,
+    closeout: &ProvingRunCloseout,
+    closeout_path: &str,
+) -> String {
+    let (summary, packet_state, closeout_line) = match closeout.state {
+        ProvingRunCloseoutState::Prepared => (
+            format!(
+                "This packet records the prepared proving-run closeout draft for `{}`.",
+                input.display_name
+            ),
+            "closeout_prepared",
+            format!(
+                "Prepared closeout metadata is recorded in `{closeout_path}`; the proving run is not yet closed."
+            ),
+        ),
+        ProvingRunCloseoutState::Closed => (
+            format!(
+                "This packet records the closed proving run for `{}`.",
+                input.display_name
+            ),
+            "closed_proving_run",
+            format!("Closeout metadata is recorded in `{closeout_path}`."),
+        ),
+    };
+
+    format!(
+        "# {} onboarding pack\n\n{}\n\n- Packet state: `{}`\n- Agent id: `{}`\n- Wrapper crate: `{}`\n- Backend module: `{}`\n- Manifest root: `{}`\n- {}\n- Approval linkage: `{}` via `{}` (`sha256: {}`)\n",
+        input.display_name,
+        summary,
+        packet_state,
+        input.agent_id,
+        input.crate_path,
+        input.backend_module,
+        input.manifest_root,
+        closeout_line,
+        closeout.approval_source,
+        closeout.approval_ref,
+        closeout.approval_sha256
+    )
+}
+
+fn render_closeout_scope_brief_body(
+    input: &CloseoutPacketRenderInput,
+    docs_root_display: &str,
+    closeout: &ProvingRunCloseout,
+    closeout_path: &str,
+) -> String {
+    match closeout.state {
+        ProvingRunCloseoutState::Prepared => format!(
+            "# Scope brief\n\nThis packet records the prepared proving-run closeout draft for `{}`.\n\n- Registry enrollment in `{REGISTRY_RELATIVE_PATH}`\n- Docs pack in `{docs_root_display}`\n- Manifest root in `{}`\n- Closeout draft in `{closeout_path}`\n- Approval linkage via `{}` (`{}`, sha256 `{}`)\n\nCloseout status: publication outputs are refreshed, the draft is prepared, and the proving run is not yet closed.\n",
+            input.agent_id,
+            input.manifest_root,
+            closeout.approval_ref,
+            closeout.approval_source,
+            closeout.approval_sha256,
+        ),
+        ProvingRunCloseoutState::Closed => format!(
+            "# Scope brief\n\nThis packet records the closed proving run for `{}`.\n\n- Registry enrollment in `{REGISTRY_RELATIVE_PATH}`\n- Docs pack in `{docs_root_display}`\n- Manifest root in `{}`\n- Closeout metadata in `{closeout_path}`\n- Approval linkage via `{}` (`{}`, sha256 `{}`)\n\nCloseout status: `make preflight` {} for this proving run.\n",
+            input.agent_id,
+            input.manifest_root,
+            closeout.approval_ref,
+            closeout.approval_source,
+            closeout.approval_sha256,
+            if closeout.preflight_passed { "passed" } else { "did not pass" }
+        ),
+    }
+}
+
+fn render_closeout_seam_map_body(
+    input: &CloseoutPacketRenderInput,
+    docs_root_display: &str,
+) -> String {
+    format!(
+        "# Seam map\n\n- Declaration seam: registry entry for `{}`\n- Docs seam: onboarding pack `{docs_root_display}`\n- Manifest seam: `{}`\n- Runtime seam: wrapper crate shell `{}` via `scaffold-wrapper-crate` and backend module `{}`\n",
+        input.agent_id,
+        input.manifest_root,
+        input.crate_path,
+        input.backend_module
+    )
+}
+
+fn render_closeout_threading_body(
+    input: &CloseoutPacketRenderInput,
+    closeout: &ProvingRunCloseout,
+) -> String {
+    match closeout.state {
+        ProvingRunCloseoutState::Prepared => format!(
+            "# Threading\n\n1. Control-plane onboarding writes for `{}` landed without follow-up packet drift.\n2. Runtime-owned wrapper and backend work landed at `{}` and `{}`.\n3. Manifest evidence and publication artifacts were regenerated from committed runtime outputs.\n4. `prepare-proving-run-closeout --write` prepared the proving-run closeout draft; bounded human edits remain before `close-proving-run`.\n",
+            input.agent_id,
+            input.crate_path,
+            input.backend_module
+        ),
+        ProvingRunCloseoutState::Closed => format!(
+            "# Threading\n\n1. Control-plane onboarding writes for `{}` landed without follow-up packet drift.\n2. Runtime-owned wrapper and backend work landed at `{}` and `{}`.\n3. Manifest evidence and publication artifacts were regenerated from committed runtime outputs.\n4. The proving run closed with `make preflight`.\n",
+            input.agent_id,
+            input.crate_path,
+            input.backend_module
+        ),
+    }
+}
+
+fn render_closeout_review_surfaces_body(
+    input: &CloseoutPacketRenderInput,
+    closeout: &ProvingRunCloseout,
+    docs_root_display: &str,
+) -> String {
+    let release_rails = match closeout.state {
+        ProvingRunCloseoutState::Prepared => {
+            "Supporting release rails remained unchanged through publication refresh and closeout preparation"
+        }
+        ProvingRunCloseoutState::Closed => {
+            "Supporting release rails remained unchanged across the proving run"
+        }
+    };
+    format!(
+        "# Review surfaces\n\n- `{REGISTRY_RELATIVE_PATH}`\n- `{docs_root_display}`\n- `{}`\n- `{RELEASE_DOC_PATH}`\n- {}: `{PUBLISH_WORKFLOW_PATH}`, `{PUBLISH_SCRIPT_PATH}`, `{VALIDATE_PUBLISH_SCRIPT_PATH}`, `{CHECK_PUBLISH_READINESS_SCRIPT_PATH}`\n",
+        input.manifest_root, release_rails
+    )
+}
+
+fn render_closeout_remediation_log_body(closeout: &ProvingRunCloseout) -> String {
+    match closeout.state {
+        ProvingRunCloseoutState::Prepared => format!(
+            "# Remediation log\n\nThis draft is not yet closed. Replace placeholders and record any residual friction before `close-proving-run`.\n\n{}\n",
+            render_residual_friction_lines(closeout)
+        ),
+        ProvingRunCloseoutState::Closed => format!(
+            "# Remediation log\n\n{}\n",
+            render_residual_friction_lines(closeout)
+        ),
+    }
+}
+
+fn render_closeout_handoff_body(
+    input: &CloseoutPacketRenderInput,
+    closeout: &ProvingRunCloseout,
+    closeout_path: &str,
+    release_touchpoints: &str,
+) -> String {
+    match closeout.state {
+        ProvingRunCloseoutState::Prepared => format!(
+            "# Handoff\n\nThis packet records the prepared proving-run closeout draft for `{}`.\n\n## Release touchpoints\n\n{}\n\n## Proving-run closeout draft\n\n- state: `prepared`\n- approval ref: `{}`\n- approval source: `{}`\n- approval artifact sha256: `{}`\n- manual control-plane file edits by maintainers: `{}`\n- partial-write incidents: `{}`\n- ambiguous ownership incidents: `{}`\n- approved-agent to repo-ready control-plane mutation time: `{}`\n- proving-run closeout passes `make preflight`: `{}`\n- recorded at: `{}`\n- commit: `{}`\n- closeout draft: `{}`\n\n## Residual friction\n\n{}\n\n## Status\n\nThe proving run is not yet closed. Complete bounded human edits to `{}` and then run `close-proving-run --approval {} --closeout {}`.\n",
+            input.agent_id,
+            release_touchpoints,
+            closeout.approval_ref,
+            closeout.approval_source,
+            closeout.approval_sha256,
+            closeout.manual_control_plane_edits,
+            closeout.partial_write_incidents,
+            closeout.ambiguous_ownership_incidents,
+            render_closeout_duration(closeout),
+            closeout.preflight_passed,
+            closeout.recorded_at,
+            closeout.commit,
+            closeout_path,
+            render_residual_friction_lines(closeout),
+            closeout_path,
+            closeout.approval_ref,
+            closeout_path
+        ),
+        ProvingRunCloseoutState::Closed => format!(
+            "# Handoff\n\nThis packet records the closed proving run for `{}`.\n\n## Release touchpoints\n\n{}\n\n## Proving-run closeout\n\n- state: `closed`\n- approval ref: `{}`\n- approval source: `{}`\n- approval artifact sha256: `{}`\n- manual control-plane file edits by maintainers: `{}`\n- partial-write incidents: `{}`\n- ambiguous ownership incidents: `{}`\n- approved-agent to repo-ready control-plane mutation time: `{}`\n- proving-run closeout passes `make preflight`: `{}`\n- recorded at: `{}`\n- commit: `{}`\n- closeout metadata: `{}`\n\n## Residual friction\n\n{}\n\n## Status\n\nNo open runtime next step remains in this packet.\n",
+            input.agent_id,
+            release_touchpoints,
+            closeout.approval_ref,
+            closeout.approval_source,
+            closeout.approval_sha256,
+            closeout.manual_control_plane_edits,
+            closeout.partial_write_incidents,
+            closeout.ambiguous_ownership_incidents,
+            render_closeout_duration(closeout),
+            closeout.preflight_passed,
+            closeout.recorded_at,
+            closeout.commit,
+            closeout_path,
+            render_residual_friction_lines(closeout)
+        ),
+    }
+}
+
 fn render_readme_body(
     draft: &DraftEntry,
-    phase: PacketPhase<'_>,
     closeout_path: &str,
     approval: Option<ApprovalRenderInput<'_>>,
 ) -> String {
-    let packet_state = packet_phase_name(phase);
-    let summary = match phase {
-        PacketPhase::Execution => format!(
-            "This packet records the current onboarding handoff for `{}`.",
-            draft.display_name
-        ),
-        PacketPhase::Closeout(closeout) => match closeout.state {
-            ProvingRunCloseoutState::Prepared => format!(
-                "This packet records the prepared proving-run closeout draft for `{}`.",
-                draft.display_name
-            ),
-            ProvingRunCloseoutState::Closed => format!(
-                "This packet records the closed proving run for `{}`.",
-                draft.display_name
-            ),
-        },
-    };
-    let closeout_line = match phase {
-        PacketPhase::Execution => {
-            format!(
-                "Closeout metadata becomes authoritative at `{closeout_path}` once the proving run closes."
-            ) + &render_execution_approval_linkage(approval)
-        }
-        PacketPhase::Closeout(closeout) => match closeout.state {
-            ProvingRunCloseoutState::Prepared => format!(
-                "Prepared closeout metadata is recorded in `{closeout_path}`; the proving run is not yet closed."
-            ) + &format!(
-                "\n- Approval linkage: `{}` via `{}` (`sha256: {}`)",
-                closeout.approval_source, closeout.approval_ref, closeout.approval_sha256
-            ),
-            ProvingRunCloseoutState::Closed => {
-                format!("Closeout metadata is recorded in `{closeout_path}`.")
-                    + &format!(
-                        "\n- Approval linkage: `{}` via `{}` (`sha256: {}`)",
-                        closeout.approval_source, closeout.approval_ref, closeout.approval_sha256
-                    )
-            }
-        },
-    };
+    let packet_state = "execution";
+    let summary = format!(
+        "This packet records the current onboarding handoff for `{}`.",
+        draft.display_name
+    );
+    let closeout_line = format!(
+        "Closeout metadata becomes authoritative at `{closeout_path}` once the proving run closes."
+    ) + &render_execution_approval_linkage(approval);
 
     format!(
         "# {} onboarding pack\n\n{}\n\n- Packet state: `{}`\n- Agent id: `{}`\n- Wrapper crate: `{}`\n- Backend module: `{}`\n- Manifest root: `{}`\n- {}\n",
@@ -182,38 +458,15 @@ fn render_readme_body(
 
 fn render_scope_brief_body(
     draft: &DraftEntry,
-    phase: PacketPhase<'_>,
     docs_root_display: &str,
-    closeout_path: &str,
     approval: Option<ApprovalRenderInput<'_>>,
 ) -> String {
-    match phase {
-        PacketPhase::Execution => format!(
-            "# Scope brief\n\nThis packet covers the control-plane-owned onboarding surfaces for `{}`.\n\n- Registry enrollment in `{REGISTRY_RELATIVE_PATH}`\n- Docs pack in `{docs_root_display}`\n- Manifest root in `{}`\n- Release/workspace touchpoints in `Cargo.toml` and `{RELEASE_DOC_PATH}`{}\n\nCurrent proving-run target: complete the runtime-owned wrapper/backend lane, commit manifest evidence, regenerate publication artifacts, and close with `make preflight`.\n",
-            draft.agent_id,
-            draft.manifest_root,
-            render_execution_scope_approval(approval),
-        ),
-        PacketPhase::Closeout(closeout) => match closeout.state {
-            ProvingRunCloseoutState::Prepared => format!(
-                "# Scope brief\n\nThis packet records the prepared proving-run closeout draft for `{}`.\n\n- Registry enrollment in `{REGISTRY_RELATIVE_PATH}`\n- Docs pack in `{docs_root_display}`\n- Manifest root in `{}`\n- Closeout draft in `{closeout_path}`\n- Approval linkage via `{}` (`{}`, sha256 `{}`)\n\nCloseout status: publication outputs are refreshed, the draft is prepared, and the proving run is not yet closed.\n",
-                draft.agent_id,
-                draft.manifest_root,
-                closeout.approval_ref,
-                closeout.approval_source,
-                closeout.approval_sha256,
-            ),
-            ProvingRunCloseoutState::Closed => format!(
-                "# Scope brief\n\nThis packet records the closed proving run for `{}`.\n\n- Registry enrollment in `{REGISTRY_RELATIVE_PATH}`\n- Docs pack in `{docs_root_display}`\n- Manifest root in `{}`\n- Closeout metadata in `{closeout_path}`\n- Approval linkage via `{}` (`{}`, sha256 `{}`)\n\nCloseout status: `make preflight` {} for this proving run.\n",
-                draft.agent_id,
-                draft.manifest_root,
-                closeout.approval_ref,
-                closeout.approval_source,
-                closeout.approval_sha256,
-                if closeout.preflight_passed { "passed" } else { "did not pass" }
-            ),
-        },
-    }
+    format!(
+        "# Scope brief\n\nThis packet covers the control-plane-owned onboarding surfaces for `{}`.\n\n- Registry enrollment in `{REGISTRY_RELATIVE_PATH}`\n- Docs pack in `{docs_root_display}`\n- Manifest root in `{}`\n- Release/workspace touchpoints in `Cargo.toml` and `{RELEASE_DOC_PATH}`{}\n\nCurrent proving-run target: complete the runtime-owned wrapper/backend lane, commit manifest evidence, regenerate publication artifacts, and close with `make preflight`.\n",
+        draft.agent_id,
+        draft.manifest_root,
+        render_execution_scope_approval(approval),
+    )
 }
 
 fn render_seam_map_body(draft: &DraftEntry, docs_root_display: &str) -> String {
@@ -226,146 +479,50 @@ fn render_seam_map_body(draft: &DraftEntry, docs_root_display: &str) -> String {
     )
 }
 
-fn render_threading_body(draft: &DraftEntry, phase: PacketPhase<'_>) -> String {
-    match phase {
-        PacketPhase::Execution => format!(
-            "# Threading\n\n1. Apply the control-plane onboarding packet with `onboard-agent --write`.\n2. Run `cargo run -p xtask -- scaffold-wrapper-crate --agent {} --write` to create the runtime-owned wrapper crate shell at `{}`; `onboard-agent` does not create the wrapper crate.\n3. Materialize the bounded runtime packet with `runtime-follow-on --dry-run`, then implement backend/runtime details in `{}` and `{}`.\n4. Keep runtime evidence inside `{}/snapshots/**` and `{}/supplement/**`, complete `runtime-follow-on --write`, then hand publication refresh and proving-run closeout to the next lane.\n",
-            draft.agent_id,
-            draft.crate_path,
-            draft.crate_path,
-            draft.backend_module,
-            draft.manifest_root,
-            draft.manifest_root
-        ),
-        PacketPhase::Closeout(closeout) => match closeout.state {
-            ProvingRunCloseoutState::Prepared => format!(
-                "# Threading\n\n1. Control-plane onboarding writes for `{}` landed without follow-up packet drift.\n2. Runtime-owned wrapper and backend work landed at `{}` and `{}`.\n3. Manifest evidence and publication artifacts were regenerated from committed runtime outputs.\n4. `prepare-proving-run-closeout --write` prepared the proving-run closeout draft; bounded human edits remain before `close-proving-run`.\n",
-                draft.agent_id,
-                draft.crate_path,
-                draft.backend_module
-            ),
-            ProvingRunCloseoutState::Closed => format!(
-                "# Threading\n\n1. Control-plane onboarding writes for `{}` landed without follow-up packet drift.\n2. Runtime-owned wrapper and backend work landed at `{}` and `{}`.\n3. Manifest evidence and publication artifacts were regenerated from committed runtime outputs.\n4. The proving run closed with `make preflight`.\n",
-                draft.agent_id,
-                draft.crate_path,
-                draft.backend_module
-            ),
-        },
-    }
+fn render_threading_body(draft: &DraftEntry) -> String {
+    format!(
+        "# Threading\n\n1. Apply the control-plane onboarding packet with `onboard-agent --write`.\n2. Run `cargo run -p xtask -- scaffold-wrapper-crate --agent {} --write` to create the runtime-owned wrapper crate shell at `{}`; `onboard-agent` does not create the wrapper crate.\n3. Materialize the bounded runtime packet with `runtime-follow-on --dry-run`, then implement backend/runtime details in `{}` and `{}`.\n4. Keep runtime evidence inside `{}/snapshots/**` and `{}/supplement/**`, complete `runtime-follow-on --write`, then hand publication refresh and proving-run closeout to the next lane.\n",
+        draft.agent_id,
+        draft.crate_path,
+        draft.crate_path,
+        draft.backend_module,
+        draft.manifest_root,
+        draft.manifest_root
+    )
 }
 
-fn render_review_surfaces_body(
-    draft: &DraftEntry,
-    phase: PacketPhase<'_>,
-    docs_root_display: &str,
-) -> String {
-    let release_rails = match phase {
-        PacketPhase::Execution => "Supporting release rails reviewed for this onboarding run",
-        PacketPhase::Closeout(closeout) => match closeout.state {
-            ProvingRunCloseoutState::Prepared => {
-                "Supporting release rails remained unchanged through publication refresh and closeout preparation"
-            }
-            ProvingRunCloseoutState::Closed => {
-                "Supporting release rails remained unchanged across the proving run"
-            }
-        },
-    };
+fn render_review_surfaces_body(draft: &DraftEntry, docs_root_display: &str) -> String {
+    let release_rails = "Supporting release rails reviewed for this onboarding run";
     format!(
         "# Review surfaces\n\n- `{REGISTRY_RELATIVE_PATH}`\n- `{docs_root_display}`\n- `{}`\n- `{RELEASE_DOC_PATH}`\n- {}: `{PUBLISH_WORKFLOW_PATH}`, `{PUBLISH_SCRIPT_PATH}`, `{VALIDATE_PUBLISH_SCRIPT_PATH}`, `{CHECK_PUBLISH_READINESS_SCRIPT_PATH}`\n",
         draft.manifest_root, release_rails
     )
 }
 
-fn render_remediation_log_body(phase: PacketPhase<'_>) -> String {
-    match phase {
-        PacketPhase::Execution => {
-            "# Remediation log\n\nNo remediations are recorded yet. Capture residual friction or follow-up decisions here if the proving run surfaces them.\n".to_string()
-        }
-        PacketPhase::Closeout(closeout) => match closeout.state {
-            ProvingRunCloseoutState::Prepared => format!(
-                "# Remediation log\n\nThis draft is not yet closed. Replace placeholders and record any residual friction before `close-proving-run`.\n\n{}\n",
-                render_residual_friction_lines(closeout)
-            ),
-            ProvingRunCloseoutState::Closed => format!(
-                "# Remediation log\n\n{}\n",
-                render_residual_friction_lines(closeout)
-            ),
-        },
-    }
+fn render_remediation_log_body() -> String {
+    "# Remediation log\n\nNo remediations are recorded yet. Capture residual friction or follow-up decisions here if the proving run surfaces them.\n".to_string()
 }
 
 fn render_handoff_body(
     draft: &DraftEntry,
-    phase: PacketPhase<'_>,
     closeout_path: &str,
     release_touchpoints: &str,
     approval: Option<ApprovalRenderInput<'_>>,
 ) -> String {
-    match phase {
-        PacketPhase::Execution => format!(
-            "# Handoff\n\nThis packet captures the next executable onboarding step for `{}`.\n\n## Release touchpoints\n\n{}\n\n{}\n## Next executable runtime step\n\nRun `cargo run -p xtask -- scaffold-wrapper-crate --agent {} --write` to create the runtime-owned wrapper crate shell at `{}`. `onboard-agent` does not create the wrapper crate.\n\n## Remaining runtime checklist\n\n- After scaffolding, materialize the bounded runtime packet with `runtime-follow-on --dry-run` for this approval artifact.\n- Implement backend/runtime details in `{}` and `{}`.\n- Author wrapper coverage input at `{}` for binding kind `{}`.\n- Populate committed runtime evidence only under `{}/snapshots/**` and `{}/supplement/**`.\n- Complete `runtime-follow-on --write`; publication refresh and proving-run closeout stay in the next lane.\n",
-            draft.agent_id,
-            release_touchpoints,
-            render_execution_handoff_approval(closeout_path, approval),
-            draft.agent_id,
-            draft.crate_path,
-            draft.crate_path,
-            draft.backend_module,
-            draft.wrapper_coverage_source_path,
-            draft.wrapper_coverage_binding_kind,
-            draft.manifest_root,
-            draft.manifest_root
-        ),
-        PacketPhase::Closeout(closeout) => match closeout.state {
-            ProvingRunCloseoutState::Prepared => format!(
-                "# Handoff\n\nThis packet records the prepared proving-run closeout draft for `{}`.\n\n## Release touchpoints\n\n{}\n\n## Proving-run closeout draft\n\n- state: `prepared`\n- approval ref: `{}`\n- approval source: `{}`\n- approval artifact sha256: `{}`\n- manual control-plane file edits by maintainers: `{}`\n- partial-write incidents: `{}`\n- ambiguous ownership incidents: `{}`\n- approved-agent to repo-ready control-plane mutation time: `{}`\n- proving-run closeout passes `make preflight`: `{}`\n- recorded at: `{}`\n- commit: `{}`\n- closeout draft: `{}`\n\n## Residual friction\n\n{}\n\n## Status\n\nThe proving run is not yet closed. Complete bounded human edits to `{}` and then run `close-proving-run --approval {} --closeout {}`.\n",
-                draft.agent_id,
-                release_touchpoints,
-                closeout.approval_ref,
-                closeout.approval_source,
-                closeout.approval_sha256,
-                closeout.manual_control_plane_edits,
-                closeout.partial_write_incidents,
-                closeout.ambiguous_ownership_incidents,
-                render_closeout_duration(closeout),
-                closeout.preflight_passed,
-                closeout.recorded_at,
-                closeout.commit,
-                closeout_path,
-                render_residual_friction_lines(closeout),
-                closeout_path,
-                closeout.approval_ref,
-                closeout_path
-            ),
-            ProvingRunCloseoutState::Closed => format!(
-                "# Handoff\n\nThis packet records the closed proving run for `{}`.\n\n## Release touchpoints\n\n{}\n\n## Proving-run closeout\n\n- state: `closed`\n- approval ref: `{}`\n- approval source: `{}`\n- approval artifact sha256: `{}`\n- manual control-plane file edits by maintainers: `{}`\n- partial-write incidents: `{}`\n- ambiguous ownership incidents: `{}`\n- approved-agent to repo-ready control-plane mutation time: `{}`\n- proving-run closeout passes `make preflight`: `{}`\n- recorded at: `{}`\n- commit: `{}`\n- closeout metadata: `{}`\n\n## Residual friction\n\n{}\n\n## Status\n\nNo open runtime next step remains in this packet.\n",
-                draft.agent_id,
-                release_touchpoints,
-                closeout.approval_ref,
-                closeout.approval_source,
-                closeout.approval_sha256,
-                closeout.manual_control_plane_edits,
-                closeout.partial_write_incidents,
-                closeout.ambiguous_ownership_incidents,
-                render_closeout_duration(closeout),
-                closeout.preflight_passed,
-                closeout.recorded_at,
-                closeout.commit,
-                closeout_path,
-                render_residual_friction_lines(closeout)
-            ),
-        },
-    }
-}
-
-fn packet_phase_name(phase: PacketPhase<'_>) -> &'static str {
-    match phase {
-        PacketPhase::Execution => "execution",
-        PacketPhase::Closeout(closeout) => match closeout.state {
-            ProvingRunCloseoutState::Prepared => "closeout_prepared",
-            ProvingRunCloseoutState::Closed => "closed_proving_run",
-        },
-    }
+    format!(
+        "# Handoff\n\nThis packet captures the next executable onboarding step for `{}`.\n\n## Release touchpoints\n\n{}\n\n{}\n## Next executable runtime step\n\nRun `cargo run -p xtask -- scaffold-wrapper-crate --agent {} --write` to create the runtime-owned wrapper crate shell at `{}`. `onboard-agent` does not create the wrapper crate.\n\n## Remaining runtime checklist\n\n- After scaffolding, materialize the bounded runtime packet with `runtime-follow-on --dry-run` for this approval artifact.\n- Implement backend/runtime details in `{}` and `{}`.\n- Author wrapper coverage input at `{}` for binding kind `{}`.\n- Populate committed runtime evidence only under `{}/snapshots/**` and `{}/supplement/**`.\n- Complete `runtime-follow-on --write`; publication refresh and proving-run closeout stay in the next lane.\n",
+        draft.agent_id,
+        release_touchpoints,
+        render_execution_handoff_approval(closeout_path, approval),
+        draft.agent_id,
+        draft.crate_path,
+        draft.crate_path,
+        draft.backend_module,
+        draft.wrapper_coverage_source_path,
+        draft.wrapper_coverage_binding_kind,
+        draft.manifest_root,
+        draft.manifest_root
+    )
 }
 
 fn render_closeout_duration(closeout: &ProvingRunCloseout) -> String {

@@ -2,7 +2,7 @@ mod render;
 
 use std::{fmt::Write as _, fs, io::Write, path::Path};
 
-use crate::agent_registry::REGISTRY_RELATIVE_PATH;
+use crate::agent_registry::{AgentRegistryEntry, REGISTRY_RELATIVE_PATH};
 use crate::proving_run_closeout::{
     load_validated_closeout_if_present_with_states, ProvingRunCloseout, ProvingRunCloseoutError,
     ProvingRunCloseoutExpected, ProvingRunCloseoutState,
@@ -11,8 +11,9 @@ use crate::workspace_mutation::WorkspacePathJail;
 use toml_edit::DocumentMut;
 
 use self::render::{
+    build_closeout_docs_preview as render_closeout_docs_preview,
     build_docs_preview as render_docs_preview, closeout_relative_path, release_touchpoint_lines,
-    PacketPhase,
+    CloseoutPacketRenderInput,
 };
 use super::{ConfigGate, DraftEntry, Error, LifecycleStatePreview, TargetGate, RELEASE_DOC_PATH};
 
@@ -393,12 +394,24 @@ pub(super) fn build_docs_preview(
     release_preview: &ReleasePreview,
     closeout: Option<&ProvingRunCloseout>,
 ) -> Vec<(String, Option<String>)> {
-    let approval = approval_render_input(draft);
-    let phase = match closeout {
-        Some(closeout) => PacketPhase::Closeout(closeout),
-        None => PacketPhase::Execution,
-    };
-    render_docs_preview(draft, &release_preview.lines, phase, approval)
+    match closeout {
+        Some(closeout) => {
+            let input = CloseoutPacketRenderInput::from_draft(draft);
+            render_closeout_docs_preview(&input, closeout)
+        }
+        None => {
+            let approval = approval_render_input(draft);
+            render_docs_preview(draft, &release_preview.lines, approval)
+        }
+    }
+}
+
+pub(crate) fn build_closeout_docs_preview_for_entry(
+    entry: &AgentRegistryEntry,
+    closeout: &ProvingRunCloseout,
+) -> Vec<(String, Option<String>)> {
+    let input = CloseoutPacketRenderInput::from_registry_entry(entry);
+    render_closeout_docs_preview(&input, closeout)
 }
 
 fn approval_render_input(draft: &DraftEntry) -> Option<ApprovalRenderInput<'_>> {

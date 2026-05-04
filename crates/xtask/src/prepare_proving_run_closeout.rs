@@ -1,4 +1,5 @@
 use std::{
+    fs,
     io::{self, Write},
     path::{Path, PathBuf},
     process::Command,
@@ -8,11 +9,12 @@ use clap::{ArgGroup, Parser};
 
 use crate::{
     agent_lifecycle::{
-        self, file_sha256, load_lifecycle_state, load_publication_ready_packet, now_rfc3339,
-        required_evidence_for_stage, LifecycleStage, LifecycleState, PublicationReadyPacket,
+        self, file_sha256, load_lifecycle_state, now_rfc3339, required_evidence_for_stage,
+        LifecycleStage, LifecycleState, PublicationReadyPacket,
     },
     agent_registry::{AgentRegistry, AgentRegistryEntry},
     approval_artifact::{load_approval_artifact, ApprovalArtifact, ApprovalArtifactError},
+    onboard_agent::preview::build_closeout_docs_preview_for_entry,
     proving_run_closeout::{
         build_closeout, build_prepared_closeout, load_validated_closeout_if_present_with_states,
         render_closeout_json, DurationTruth, ProvingRunCloseout, ProvingRunCloseoutError,
@@ -20,7 +22,8 @@ use crate::{
         ProvingRunCloseoutState, ResidualFrictionTruth,
     },
     workspace_mutation::{
-        apply_mutations, plan_create_or_replace, WorkspaceMutationError, WorkspacePathJail,
+        apply_mutations, plan_create_or_replace, PlannedMutation, WorkspaceMutationError,
+        WorkspacePathJail,
     },
 };
 
@@ -124,7 +127,8 @@ pub fn run_in_workspace<W: Write>(
     )?;
     let lifecycle_state = build_next_lifecycle_state(&context, recorded_at)?;
     let jail = WorkspacePathJail::new(workspace_root)?;
-    let mutations = vec![
+    let docs_preview = build_closeout_docs_preview_for_entry(&context.entry, &closeout);
+    let mut mutations = vec![
         plan_create_or_replace(
             &jail,
             PathBuf::from(&context.closeout_path),
@@ -138,6 +142,7 @@ pub fn run_in_workspace<W: Write>(
             serialize_json_pretty(&lifecycle_state)?,
         )?,
     ];
+    mutations.extend(plan_docs_mutations(&jail, &docs_preview)?);
     apply_mutations(workspace_root, &mutations)?;
 
     writeln!(writer, "OK: prepare-proving-run-closeout write complete.")
@@ -385,7 +390,7 @@ fn validate_published_continuity(
         )));
     }
 
-    let packet = load_publication_ready_packet(workspace_root, &publication_packet_path)
+    let packet = load_published_publication_packet(workspace_root, &publication_packet_path)
         .map_err(|err| Error::Validation(err.to_string()))?;
     validate_packet_identity(
         &publication_packet_path,
@@ -394,6 +399,22 @@ fn validate_published_continuity(
         entry,
         lifecycle_state_path,
     )
+}
+
+fn load_published_publication_packet(
+    workspace_root: &Path,
+    packet_path: &str,
+) -> Result<PublicationReadyPacket, crate::agent_lifecycle::LifecycleError> {
+    let packet_bytes = fs::read(workspace_root.join(packet_path)).map_err(|err| {
+        crate::agent_lifecycle::LifecycleError::Validation(format!("read {packet_path}: {err}"))
+    })?;
+    let packet: PublicationReadyPacket = serde_json::from_slice(&packet_bytes).map_err(|err| {
+        crate::agent_lifecycle::LifecycleError::Validation(format!("parse {packet_path}: {err}"))
+    })?;
+    packet
+        .validate()
+        .map_err(|err| crate::agent_lifecycle::LifecycleError::Validation(err.to_string()))?;
+    Ok(packet)
 }
 
 fn validate_packet_identity(
@@ -441,6 +462,23 @@ fn serialize_json_pretty<T: serde::Serialize>(value: &T) -> Result<Vec<u8>, Erro
         .map_err(|err| Error::Internal(format!("serialize json: {err}")))?;
     bytes.push(b'\n');
     Ok(bytes)
+}
+
+fn plan_docs_mutations(
+    jail: &WorkspacePathJail,
+    docs_preview: &[(String, Option<String>)],
+) -> Result<Vec<PlannedMutation>, Error> {
+    docs_preview
+        .iter()
+        .map(|(relative_path, contents)| {
+            plan_create_or_replace(
+                jail,
+                PathBuf::from(relative_path),
+                contents.clone().unwrap_or_default().into_bytes(),
+            )
+            .map_err(Error::from)
+        })
+        .collect()
 }
 
 fn resolve_workspace_root() -> Result<PathBuf, Error> {
