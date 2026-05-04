@@ -1,55 +1,73 @@
-# Make The Published State Honest In The Lifecycle Model Orchestration Plan
+# Enclose Create-Mode Closeout Without Ad Hoc Authoring Orchestration Plan
 
 ## Summary
 
-- This orchestration plan executes only the current `PLAN.md` milestone: `Make The Published State Honest In The Lifecycle Model`.
-- Integration branch: `codex/recommend-next-agent`.
-- Execution baseline: HEAD `07a0ce9259b8` on `2026-05-03`.
-- The parent agent keeps the semantic authority lane local:
-  - `refresh-publication --write` becomes the only committed writer of `LifecycleStage::Published`
-  - the normal path becomes `publication_ready -> published -> closed_baseline`
-  - `close-proving-run` consumes `published` on the normal path
-  - the legacy `publication_ready` compatibility branch stays narrow and transitional
-- After the parent freezes the semantics, three worker lanes may run in parallel:
-  - tests
-  - narrative docs
-  - seeded lifecycle fixtures
-- Final integration, merge decisions, and full verification return to the parent.
+- Execute from the current checked-out branch `codex/recommend-next-agent`.
+- Treat HEAD `f6023e1` on `2026-05-03` as the live execution baseline.
+- Keep the critical semantic path local to the parent agent:
+  - freeze the prepared-vs-closed contract first
+  - keep `close-proving-run` finalization and historical backfill reuse on the parent lane
+  - keep the parent as the only integrator and final verifier
+- Use dedicated worktrees under:
+  - `/Users/spensermcconnell/__Active_Code/atomize-hq/.worktrees/unified-agent-api-closeout-prep/{handoff,packet-docs,tests-fixtures}`
+- Use workstream branches:
+  - `codex/recommend-next-agent-closeout-handoff`
+  - `codex/recommend-next-agent-closeout-packet-docs`
+  - `codex/recommend-next-agent-closeout-tests-fixtures`
+- Use GPT-5.4 with `reasoning_effort=high` for all worker lanes. Cap concurrency at `3`.
+- Keep orchestration state in one local source of truth:
+  - queue: `.runs/closeout-prep/tasks.json`
+  - freeze: `.runs/closeout-prep/freeze.json`
+  - session log: `.runs/closeout-prep/session-log.md`
+  - acceptance log: `.runs/closeout-prep/acceptance.md`
+- Treat `.runs/closeout-prep/**` as run artifacts and execution state, not authored product surfaces.
 
 ## Hard Guards
 
-- Scope is locked to the current milestone only.
-- Do not preserve or reintroduce any publication-lane orchestration from the prior milestone.
-- Do not add or redesign commands in this slice.
-- Do not invent a new lifecycle stage, packet type, or post-refresh artifact model.
-- `refresh-publication --write` is the only allowed writer for `LifecycleStage::Published`.
-- `prepare-publication --write` remains the writer for `publication_ready` only.
-- `publication_ready` must mean only: the handoff packet exists and refresh is next.
-- `close-proving-run` must treat `published` as the normal closeout input.
-- Compatibility for `publication_ready` exists only for legacy post-refresh states that were never lifecycle-promoted.
-- Docs, fixtures, and tests do not start until the parent freeze is recorded.
-- The parent is the only merge authority and the only lane allowed to change semantic code after freeze.
-- No worker may touch files outside its assigned ownership set.
-- No lane may widen into closeout redesign, maintenance workflow redesign, or support/capability publication redesign beyond what `PLAN.md` already requires for lifecycle honesty.
+- Scope is locked to the current `PLAN.md` milestone only:
+  - `Enclose Create-Mode Closeout Without Ad Hoc Authoring`
+- Do not reopen the previous milestone:
+  - `Make The Published State Honest In The Lifecycle Model`
+- Do not invent a new lifecycle stage.
+- Do not invent a second closeout artifact path.
+- The canonical create-mode closeout file remains:
+  - `docs/agents/lifecycle/<prefix>/governance/proving-run-closeout.json`
+- The new command name is locked exactly as:
+  - `prepare-proving-run-closeout --approval <path> --check|--write`
+- `prepare-proving-run-closeout` must not accept `--closeout`.
+- `refresh-publication --write` must hand off to:
+  - `prepare-proving-run-closeout --approval <path> --write`
+- `prepare-proving-run-closeout --write` must keep `lifecycle_stage = published`.
+- `close-proving-run --write` remains the only writer of `closed_baseline`.
+- The prepared-vs-closed contract is the central freeze gate. No downstream lane launches before it is frozen.
+- `onboard-agent` preview must never render a prepared draft as a closed proving run.
+- Historical backfill must migrate to the shared create-mode closeout builder/serializer. No new bespoke inline closeout JSON.
+- Maintenance closeout behavior and schema stay out of scope.
+- Parent agent is the only merge authority.
+- No worker may edit files outside its assigned ownership set.
+- If the parent changes any frozen prepared/closed semantics after worker launch, all launched workers are stale by default.
 
 ## Orchestration State
 
-Parent-owned orchestration state lives under:
+Parent-owned execution state lives under:
 
-- `RUN_ROOT=/Users/spensermcconnell/__Active_Code/atomize-hq/unified-agent-api/.runs/published-state-honesty`
+- `RUN_ROOT=/Users/spensermcconnell/__Active_Code/atomize-hq/unified-agent-api/.runs/closeout-prep`
 
 State files:
 
 - `baseline.json`
   - branch
   - head sha
-  - dirty-state summary
   - launch timestamp
+  - dirty-state summary
+  - plan title
 - `freeze.json`
   - freeze sha
-  - frozen stage sequence
-  - frozen refresh writer contract
-  - frozen closeout compatibility rule
+  - frozen command names
+  - frozen closeout state enum
+  - frozen machine-owned vs human-owned field map
+  - frozen placeholder vocabulary
+  - frozen preview phase names
   - worker ownership map
   - stale-lane triggers
 - `tasks.json`
@@ -57,132 +75,184 @@ State files:
   - owner
   - status
   - dependencies
+  - worktree path
+  - launch sha
   - restart count
-- `merge-log.md`
-  - merge order
-  - lane validation result
-  - post-merge smoke result
+- `session-log.md`
+  - parent decisions
+  - worker launch/return summaries
+  - stale-lane invalidations
+  - merge sequence
 - `acceptance.md`
-  - final command matrix
+  - command matrix
   - exit codes
-  - acceptance checklist
+  - final acceptance checklist
 
-Task sentinels:
+Per-task sentinels:
 
-- `.runs/task-honest-00-baseline/`
-- `.runs/task-honest-10-parent-semantics/`
-- `.runs/task-honest-20-freeze/`
-- `.runs/task-honest-30-tests/`
-- `.runs/task-honest-40-docs/`
-- `.runs/task-honest-50-fixtures/`
-- `.runs/task-honest-60-merge/`
-- `.runs/task-honest-70-verify/`
+- `.runs/closeout-prep/task-closeout-00-baseline/`
+- `.runs/closeout-prep/task-closeout-10-root-contract/`
+- `.runs/closeout-prep/task-closeout-20-freeze/`
+- `.runs/closeout-prep/task-closeout-30-handoff/`
+- `.runs/closeout-prep/task-closeout-40-packet-docs/`
+- `.runs/closeout-prep/task-closeout-50-tests-fixtures/`
+- `.runs/closeout-prep/task-closeout-60-parent-final/`
+- `.runs/closeout-prep/task-closeout-70-final-verify/`
 
 Sentinel rules:
 
-- The parent writes `started.json` before each task begins.
-- The parent writes exactly one terminal file per task: `done.json` or `blocked.json`.
+- Parent writes `started.json` before each task begins.
+- Parent writes exactly one terminal marker per task:
+  - `done.json`
+  - `blocked.json`
 - Workers do not write orchestration state.
+- Worker results are summarized by the parent into `session-log.md`, not copied wholesale.
 
 ## Worker Model
 
 - Parent lane:
-  - owns all semantic code
-  - defines freeze
-  - launches workers
-  - invalidates stale lanes
-  - merges completed lanes
-  - runs final verification
+  - owns the root contract freeze
+  - owns final closeout finalization
+  - owns historical backfill reuse
+  - owns merge decisions
+  - owns final verification
 - Worker lanes:
   - launch only from the recorded freeze sha
   - edit only assigned files
   - do not merge, rebase, or resolve cross-lane conflicts
-  - return changed files, commands run, exit codes, and blockers only
+  - return only:
+    - changed files
+    - commands run
+    - exit codes
+    - blockers or unresolved assumptions
 - Maximum worker concurrency: `3`
-- Worker lane set is fixed for this milestone:
-  - Lane T: tests
-  - Lane D: docs
-  - Lane F: seeded fixtures
+- Fixed worker lane set for this milestone:
+  - Lane H: published-to-prepared handoff
+  - Lane P: preview and docs
+  - Lane T: tests and fixtures
 
 ## Context-Control Rules
 
-- Parent context stays limited to:
+- Parent working context stays limited to:
   - `PLAN.md`
   - `ORCH_PLAN.md`
-  - current integration diff
-  - parent-owned semantic files
   - `freeze.json`
+  - `tasks.json`
+  - parent-owned source files
+  - latest integration diff summary
 - Worker prompts contain only:
-  - owned files
-  - the relevant `PLAN.md` excerpt
-  - the frozen lifecycle sequence
-  - the frozen compatibility rule
-  - lane-local acceptance checks
+  - owned file set
+  - exact relevant `PLAN.md` excerpt
+  - frozen prepared/closed contract summary
+  - required commands
   - forbidden touch surfaces
+  - acceptance checks for that lane
+- Parent reviews worker summaries and narrow diffs only. Do not pull whole worker transcripts into the main context.
 - Workers are disposable:
-  - if a lane goes stale, discard it and relaunch from the newest freeze sha
-  - do not manually salvage stale output into the integration branch
+  - if a lane goes stale, discard it
+  - relaunch from the newest freeze sha
+  - do not manually salvage partial stale work into integration
+- Close a worker immediately after merge or rejection.
 
 ## Parent vs Worker Ownership Model
 
-### Parent-only ownership
+### Parent-only ownership before freeze
 
-The parent owns the root semantic lane and any lifecycle-contract fallout in:
+The parent owns the root contract lane in:
 
-- `crates/xtask/src/publication_refresh.rs`
+- `crates/xtask/src/proving_run_closeout.rs`
 - `crates/xtask/src/agent_lifecycle.rs`
-- `crates/xtask/src/agent_lifecycle/validation.rs`
-- `crates/xtask/src/close_proving_run.rs`
-- `crates/xtask/src/capability_publication.rs`
-- `crates/xtask/src/agent_maintenance/drift/governance.rs`
-- `crates/xtask/src/prepare_publication.rs` only if needed to keep `publication_ready` explicitly pre-refresh
+- `crates/xtask/src/main.rs`
+- `crates/xtask/src/lib.rs`
+- `crates/xtask/src/prepare_proving_run_closeout.rs` only for skeleton/scaffold creation if required to keep the CLI contract compile-clean before freeze
 
-Parent responsibilities:
+Parent root-lane responsibilities:
 
-- make refresh commit `published`
-- write published-stage evidence and continuity fields during refresh
-- promote support tier during refresh to `publication_backed` unless already `first_class`
-- keep `publication_ready` pre-refresh only
-- implement the narrow compatibility branch for legacy post-refresh `publication_ready`
-- make closeout consume `published` on the normal path
-- align maintenance and capability publication semantics with the honest post-refresh stage
-- freeze the contract before any worker launches
-- integrate all follow-on lanes and run final verification
+- lock the create-mode closeout state model:
+  - `prepared`
+  - `closed`
+- centralize create-mode closeout builder and serializer behavior
+- centralize placeholder detection and machine-owned field rules
+- lock the exact command spelling and lifecycle helper names
+- scaffold any minimal CLI/module wiring needed so post-freeze worker lanes can stay disjoint
+- record the prepared-vs-closed contract in `freeze.json`
 
-### Worker ownership
+### Worker ownership after freeze
 
-Lane T: tests
+Lane H: published-to-prepared handoff
 
-- `crates/xtask/tests/agent_lifecycle_state.rs`
-- `crates/xtask/tests/refresh_publication_entrypoint.rs`
-- `crates/xtask/tests/prepare_publication_entrypoint.rs`
-- `crates/xtask/tests/onboard_agent_closeout_preview/close_proving_run_write.rs`
-- `crates/xtask/tests/onboard_agent_closeout_preview/close_proving_run_paths.rs`
-- `crates/xtask/tests/support/agent_maintenance_drift_harness.rs`
+- `crates/xtask/src/prepare_proving_run_closeout.rs`
+- `crates/xtask/src/publication_refresh.rs`
 
-Lane D: narrative docs
+Lane H responsibilities:
 
+- implement `prepare-proving-run-closeout --check|--write`
+- validate published continuity before draft generation
+- derive the canonical closeout path from approval truth
+- write the prepared draft and update next-command provenance
+- make `refresh-publication --write` point to prepare-closeout instead of directly to closeout
+
+Lane P: preview and docs
+
+- `crates/xtask/src/onboard_agent/preview/render.rs`
 - `docs/specs/cli-agent-onboarding-charter.md`
 - `docs/specs/unified-agent-api/capabilities-schema-spec.md`
 - `docs/cli-agent-onboarding-factory-operator-guide.md`
 
-Lane F: seeded lifecycle fixtures
+Lane P responsibilities:
 
-- `docs/agents/lifecycle/**`
+- add `closeout_prepared` preview semantics
+- ensure prepared packet surfaces never present as closed
+- update operator and normative docs to reflect the new post-publication handoff
+
+Lane T: tests and fixtures
+
+- `crates/xtask/tests/refresh_publication_entrypoint.rs`
+- `crates/xtask/tests/prepare_proving_run_closeout_entrypoint.rs`
+- `crates/xtask/tests/onboard_agent_closeout_preview.rs`
+- `crates/xtask/tests/onboard_agent_closeout_preview/preview_states.rs`
+- `crates/xtask/tests/onboard_agent_closeout_preview/closeout_schema_validation.rs`
+- `crates/xtask/tests/onboard_agent_closeout_preview/close_proving_run_paths.rs`
+- `crates/xtask/tests/onboard_agent_closeout_preview/close_proving_run_write.rs`
+- `crates/xtask/tests/historical_lifecycle_backfill_entrypoint.rs`
+- committed lifecycle/closeout fixture surfaces only if required to keep shared serializer parity:
+  - `docs/agents/lifecycle/**/governance/proving-run-closeout.json`
+
+Lane T responsibilities:
+
+- add the new entrypoint test target
+- update preview-state, schema, path, and write-mode regression coverage
+- add historical backfill coverage against the shared serializer
+- adjust committed closeout fixtures only if the shared serializer makes that necessary
+
+### Parent-only ownership after freeze
+
+The parent keeps exclusive ownership of the final semantic lane in:
+
+- `crates/xtask/src/close_proving_run.rs`
+- `crates/xtask/src/historical_lifecycle_backfill.rs`
+
+Parent final-lane responsibilities:
+
+- make `close-proving-run` consume prepared drafts on the normal path
+- reject unresolved placeholders
+- rewrite machine-owned fields from current truth before final write
+- keep `close-proving-run` the only writer of `closed_baseline`
+- migrate historical backfill to the shared builder/serializer
 
 Workers never own:
 
-- any `crates/xtask/src/**` file
 - `PLAN.md`
 - `ORCH_PLAN.md`
 - `.runs/**`
+- parent-owned semantic files listed above
 
 ## Worktree/Branch Plan With Concrete Names
 
 Canonical paths:
 
 - `REPO_ROOT=/Users/spensermcconnell/__Active_Code/atomize-hq/unified-agent-api`
-- `WORKTREE_ROOT=/Users/spensermcconnell/__Active_Code/atomize-hq/.worktrees/unified-agent-api-published-state-honesty`
+- `WORKTREE_ROOT=/Users/spensermcconnell/__Active_Code/atomize-hq/.worktrees/unified-agent-api-closeout-prep`
 
 Integration lane:
 
@@ -192,15 +262,15 @@ Integration lane:
 
 Worker lanes, created only from the recorded freeze sha:
 
+- Lane H
+  - branch: `codex/recommend-next-agent-closeout-handoff`
+  - worktree: `$WORKTREE_ROOT/handoff`
+- Lane P
+  - branch: `codex/recommend-next-agent-closeout-packet-docs`
+  - worktree: `$WORKTREE_ROOT/packet-docs`
 - Lane T
-  - branch: `codex/recommend-next-agent-honest-published-tests`
-  - worktree: `$WORKTREE_ROOT/tests`
-- Lane D
-  - branch: `codex/recommend-next-agent-honest-published-docs`
-  - worktree: `$WORKTREE_ROOT/docs`
-- Lane F
-  - branch: `codex/recommend-next-agent-honest-published-fixtures`
-  - worktree: `$WORKTREE_ROOT/fixtures`
+  - branch: `codex/recommend-next-agent-closeout-tests-fixtures`
+  - worktree: `$WORKTREE_ROOT/tests-fixtures`
 
 Creation pattern after freeze:
 
@@ -208,16 +278,16 @@ Creation pattern after freeze:
 mkdir -p "$WORKTREE_ROOT" "$RUN_ROOT"
 FREEZE_SHA=$(jq -r '.freeze_sha' "$RUN_ROOT/freeze.json")
 
-git worktree add -b codex/recommend-next-agent-honest-published-tests \
-  "$WORKTREE_ROOT/tests" \
+git worktree add -b codex/recommend-next-agent-closeout-handoff \
+  "$WORKTREE_ROOT/handoff" \
   "$FREEZE_SHA"
 
-git worktree add -b codex/recommend-next-agent-honest-published-docs \
-  "$WORKTREE_ROOT/docs" \
+git worktree add -b codex/recommend-next-agent-closeout-packet-docs \
+  "$WORKTREE_ROOT/packet-docs" \
   "$FREEZE_SHA"
 
-git worktree add -b codex/recommend-next-agent-honest-published-fixtures \
-  "$WORKTREE_ROOT/fixtures" \
+git worktree add -b codex/recommend-next-agent-closeout-tests-fixtures \
+  "$WORKTREE_ROOT/tests-fixtures" \
   "$FREEZE_SHA"
 ```
 
@@ -225,32 +295,37 @@ git worktree add -b codex/recommend-next-agent-honest-published-fixtures \
 
 Freeze point:
 
-- Workers launch only after the parent completes the root semantic lane and records `freeze_sha`.
+- Workers launch only after the parent completes the root contract lane and records `freeze_sha`.
 - Freeze means these statements are locked for downstream lanes:
-  - refresh is the only writer of `published`
-  - the normal path is `publication_ready -> published -> closed_baseline`
-  - closeout consumes `published` on the normal path
-  - the legacy `publication_ready` compatibility branch definition is stable enough for docs, fixtures, and tests
+  - the new command name is exactly `prepare-proving-run-closeout`
+  - the closeout state enum is exactly `prepared` / `closed`
+  - the canonical artifact path stays `proving-run-closeout.json`
+  - machine-owned vs human-owned field boundaries are frozen
+  - placeholder vocabulary and rejection rules are frozen
+  - preview phase naming is frozen
+  - `close-proving-run` remains the sole `closed_baseline` writer
 
 Stale-lane invalidation triggers:
 
-- The parent edits any of these files after worker launch:
-  - `crates/xtask/src/publication_refresh.rs`
+- The parent edits any frozen root-contract file after worker launch:
+  - `crates/xtask/src/proving_run_closeout.rs`
   - `crates/xtask/src/agent_lifecycle.rs`
-  - `crates/xtask/src/agent_lifecycle/validation.rs`
-  - `crates/xtask/src/close_proving_run.rs`
-  - `crates/xtask/src/capability_publication.rs`
-  - `crates/xtask/src/agent_maintenance/drift/governance.rs`
-  - `crates/xtask/src/prepare_publication.rs` if it was part of the freeze
-- The parent changes frozen wording that docs or fixtures were told to mirror.
+  - `crates/xtask/src/main.rs`
+  - `crates/xtask/src/lib.rs`
+- The parent changes the frozen command spelling, field ownership map, placeholder vocabulary, or preview phase name.
 - A worker edits outside its ownership set.
-- A worker returns assumptions that conflict with `freeze.json`.
+- A worker introduces:
+  - a second closeout artifact path
+  - a new lifecycle stage
+  - `--closeout` on `prepare-proving-run-closeout`
+- Parent final-lane integration discovers that the frozen contract itself must change.
 
 Restart rules:
 
 - If one worker lane is stale, discard and relaunch only that lane from the newest freeze sha.
-- If the parent semantic lane changes after freeze, all worker lanes are stale by default.
-- Do not rebase stale lanes for this milestone; relaunch them cleanly.
+- If the root contract changes after freeze, all worker lanes are stale by default.
+- If parent final-lane work requires edits back in frozen root-contract files, stop, write a new freeze, and relaunch every affected worker lane.
+- Do not rebase stale worker lanes. Relaunch cleanly.
 
 ## Merge Policy
 
@@ -260,103 +335,104 @@ Restart rules:
   - lane-local validation passed
   - no stale trigger fired since lane launch
 - Merge order is fixed:
-  1. Lane F: seeded fixtures
-  2. Lane D: docs
-  3. Lane T: tests
+  1. Lane H: handoff
+  2. Lane P: packet/docs
+  3. Parent final lane: closeout finalization + historical backfill reuse
+  4. Lane T: tests/fixtures
 - Reason for this order:
-  - fixtures must reflect the frozen lifecycle truth before final test integration
-  - docs should match the same frozen lifecycle story before the final verification sweep
-  - tests land last so they validate the near-final tree
+  - handoff wiring must exist before prepared packet behavior is meaningful
+  - preview/docs should land against the same prepared-draft semantics
+  - parent final lane must make `close-proving-run` and historical backfill honor the frozen contract before test assertions are treated as final
+  - tests/fixtures merge last so they validate the near-final tree
 - If a worker diff conflicts with parent-owned semantic files, reject and relaunch the lane.
-- If integration reveals new semantic work, return to the parent lane, write a new freeze sha, and relaunch affected workers.
+- If integration reveals a gap inside worker-owned files but the frozen contract is still correct, bounce the fix back to that worker lane instead of hand-editing it on the parent branch.
 
 ## Task Graph
 
 ```text
-HONEST-00 Baseline
-  -> HONEST-10 Parent Semantic Authority Lane
-  -> HONEST-20 Freeze
-       -> HONEST-30 Tests Lane
-       -> HONEST-40 Docs Lane
-       -> HONEST-50 Fixtures Lane
-  -> HONEST-60 Parent Integration
-  -> HONEST-70 Final Verification
+CLOSEOUT-00 Baseline
+  -> CLOSEOUT-10 Parent Root Contract
+  -> CLOSEOUT-20 Freeze
+       -> CLOSEOUT-30 Handoff Lane
+       -> CLOSEOUT-40 Packet/Docs Lane
+       -> CLOSEOUT-50 Tests/Fixtures Lane
+  -> CLOSEOUT-60 Parent Final Lane
+  -> CLOSEOUT-70 Final Verification
 ```
 
 Critical path:
 
-- `HONEST-10 -> HONEST-20 -> HONEST-60 -> HONEST-70`
+- `CLOSEOUT-10 -> CLOSEOUT-20 -> CLOSEOUT-30 -> CLOSEOUT-60 -> CLOSEOUT-70`
 
 Parallel window:
 
-- `HONEST-30`, `HONEST-40`, and `HONEST-50` only, after `HONEST-20`
+- `CLOSEOUT-30`, `CLOSEOUT-40`, and `CLOSEOUT-50` may run concurrently only after `CLOSEOUT-20`
 
 ## Workstream Plan
 
-### HONEST-00 Baseline
+### CLOSEOUT-00 Baseline
 
 Owner: parent
 Depends on: none
 
 Actions:
 
-- record branch, head sha, dirty state, and launch timestamp
-- confirm the milestone title in `PLAN.md`
-- confirm no unrelated in-flight edits make the parent semantic lane ambiguous
+- record branch, head sha, launch timestamp, and dirty state
+- confirm `PLAN.md` title and baseline
+- confirm the stale `ORCH_PLAN.md` has been superseded
+- initialize `tasks.json`, `session-log.md`, and `acceptance.md`
 
 Exit:
 
 - baseline recorded
-- task registry initialized
+- orchestration state initialized
 
-### HONEST-10 Parent Semantic Authority Lane
+### CLOSEOUT-10 Parent Root Contract
 
 Owner: parent
-Depends on: `HONEST-00`
+Depends on: `CLOSEOUT-00`
 
 Files:
 
-- `crates/xtask/src/publication_refresh.rs`
+- `crates/xtask/src/proving_run_closeout.rs`
 - `crates/xtask/src/agent_lifecycle.rs`
-- `crates/xtask/src/agent_lifecycle/validation.rs`
-- `crates/xtask/src/close_proving_run.rs`
-- `crates/xtask/src/capability_publication.rs`
-- `crates/xtask/src/agent_maintenance/drift/governance.rs`
-- `crates/xtask/src/prepare_publication.rs` if required
+- `crates/xtask/src/main.rs`
+- `crates/xtask/src/lib.rs`
+- `crates/xtask/src/prepare_proving_run_closeout.rs` only for skeleton/scaffold if needed
 
 Required outcomes:
 
-- successful refresh commits `lifecycle_stage = published`
-- refresh becomes the only committed writer of `published`
-- refresh writes published-stage evidence and continuity fields
-- refresh promotes support tier correctly
-- closeout consumes `published` on the normal path
-- legacy post-refresh `publication_ready` compatibility is explicit and narrow
-- plain prepare-time `publication_ready` is not closable
+- create-mode closeout state model is locked to `prepared` and `closed`
+- create-mode closeout serializer/builder path is centralized
+- machine-owned and human-owned fields are explicit in code
+- placeholder detection is explicit in code
+- CLI/module contract for `prepare-proving-run-closeout` is frozen enough that downstream lanes can build against it
 
-Freeze gate:
+Verification:
 
-- the parent must finish the semantic code and any immediate lifecycle validation adjustments before worker launch
-- the parent must capture the final compatibility rule in `freeze.json`
-- workers do not start while the semantic contract is still moving
+- `cargo test -p xtask --no-run`
 
-Exit:
+Acceptance for `CLOSEOUT-10`:
 
-- semantic contract is frozen enough for downstream lanes
+- no second artifact path exists
+- no new lifecycle stage exists
+- the parent can describe the exact frozen contract in one page of `freeze.json`
 
-### HONEST-20 Freeze
+### CLOSEOUT-20 Freeze
 
 Owner: parent
-Depends on: `HONEST-10`
+Depends on: `CLOSEOUT-10`
 
 Actions:
 
 - write `freeze.json`
 - record:
   - freeze sha
-  - frozen stage sequence
-  - frozen refresh writer contract
-  - frozen closeout compatibility rule
+  - command names
+  - state enum
+  - field ownership
+  - placeholder vocabulary
+  - preview phase names
   - worker ownership boundaries
   - stale triggers
 
@@ -364,78 +440,72 @@ Exit:
 
 - workers may fork from the freeze sha
 
-### HONEST-30 Tests Lane
+### CLOSEOUT-30 Handoff Lane
 
 Owner: worker
-Depends on: `HONEST-20`
+Depends on: `CLOSEOUT-20`
 
 Files:
 
-- `crates/xtask/tests/agent_lifecycle_state.rs`
-- `crates/xtask/tests/refresh_publication_entrypoint.rs`
-- `crates/xtask/tests/prepare_publication_entrypoint.rs`
-- `crates/xtask/tests/onboard_agent_closeout_preview/close_proving_run_write.rs`
-- `crates/xtask/tests/onboard_agent_closeout_preview/close_proving_run_paths.rs`
-- `crates/xtask/tests/support/agent_maintenance_drift_harness.rs`
+- `crates/xtask/src/prepare_proving_run_closeout.rs`
+- `crates/xtask/src/publication_refresh.rs`
 
-Required assertions:
+Required outcomes:
 
-- `refresh-publication --write` leaves `lifecycle_stage = "published"`
-- refresh writes published-stage evidence and continuity fields
-- refresh promotes support tier to `publication_backed` unless already `first_class`
-- refresh failure does not leave fake committed `published`
-- `prepare-publication --write` still leaves `publication_ready`, never `published`
-- closeout succeeds from canonical `published`
-- ordinary prepare-time `publication_ready` is rejected
-- only the explicit legacy compatibility shape may close from `publication_ready`
-- maintenance accepts `published` and rejects pre-refresh `publication_ready` as a post-publication baseline
+- implement `prepare-proving-run-closeout --check|--write`
+- derive the closeout path from approval truth
+- validate published continuity before draft generation
+- write a prepared draft without changing `lifecycle_stage = published`
+- update lifecycle next-command provenance to point at `close-proving-run`
+- update `refresh-publication --write` to point to `prepare-proving-run-closeout`
 
 Lane-local validation:
 
-- `cargo test -p xtask --test refresh_publication_entrypoint`
-- `cargo test -p xtask --test agent_lifecycle_state`
-- `cargo test -p xtask --test prepare_publication_entrypoint`
-- `cargo test -p xtask --test onboard_agent_closeout_preview -- --nocapture`
-- `cargo test -p xtask --test agent_maintenance_drift`
+- `cargo test -p xtask --test refresh_publication_entrypoint --no-run`
+- `cargo test -p xtask --no-run`
 
 Exit:
 
-- every changed branch in the lifecycle seam has direct regression coverage
+- published-to-prepared handoff wiring is implemented without touching final-closeout semantics
 
-### HONEST-40 Docs Lane
+### CLOSEOUT-40 Packet/Docs Lane
 
 Owner: worker
-Depends on: `HONEST-20`
+Depends on: `CLOSEOUT-20`
 
 Files:
 
+- `crates/xtask/src/onboard_agent/preview/render.rs`
 - `docs/specs/cli-agent-onboarding-charter.md`
 - `docs/specs/unified-agent-api/capabilities-schema-spec.md`
 - `docs/cli-agent-onboarding-factory-operator-guide.md`
 
-Required changes:
+Required outcomes:
 
-- restate the canonical path as `publication_ready -> published -> closed_baseline`
-- describe `publication_ready` as pre-refresh only
-- describe refresh success as committing `published`
-- describe closeout as consuming `published` on the normal path
-- describe the compatibility branch as transitional, not a second steady-state meaning
+- add `closeout_prepared` preview behavior
+- ensure prepared draft copy says the run is not yet closed
+- update docs so post-publication flow is:
+  - `refresh-publication`
+  - `prepare-proving-run-closeout`
+  - human bounded edits
+  - `close-proving-run`
 
 Lane-local validation:
 
-- absence check:
+- presence checks:
 
 ```bash
-! rg -n 'refresh-publication.*publication_ready|close-proving-run.*publication_ready' \
+rg -n 'prepare-proving-run-closeout|closeout_prepared|prepared|closed_proving_run' \
+  crates/xtask/src/onboard_agent/preview/render.rs \
   docs/specs/cli-agent-onboarding-charter.md \
   docs/specs/unified-agent-api/capabilities-schema-spec.md \
   docs/cli-agent-onboarding-factory-operator-guide.md
 ```
 
-- presence check:
+- absence checks:
 
 ```bash
-rg -n 'publication_ready -> published -> closed_baseline|refresh-publication.*published|close-proving-run.*published' \
+! rg -n 'proving-run-closeout\\.draft|published -> close-proving-run' \
   docs/specs/cli-agent-onboarding-charter.md \
   docs/specs/unified-agent-api/capabilities-schema-spec.md \
   docs/cli-agent-onboarding-factory-operator-guide.md
@@ -443,157 +513,158 @@ rg -n 'publication_ready -> published -> closed_baseline|refresh-publication.*pu
 
 Exit:
 
-- normative and operator docs tell one lifecycle story
+- packet preview and operator docs tell one prepared-vs-closed story
 
-### HONEST-50 Fixtures Lane
+### CLOSEOUT-50 Tests/Fixtures Lane
 
 Owner: worker
-Depends on: `HONEST-20`
+Depends on: `CLOSEOUT-20`
 
 Files:
 
-- `docs/agents/lifecycle/**`
+- `crates/xtask/tests/refresh_publication_entrypoint.rs`
+- `crates/xtask/tests/prepare_proving_run_closeout_entrypoint.rs`
+- `crates/xtask/tests/onboard_agent_closeout_preview.rs`
+- `crates/xtask/tests/onboard_agent_closeout_preview/preview_states.rs`
+- `crates/xtask/tests/onboard_agent_closeout_preview/closeout_schema_validation.rs`
+- `crates/xtask/tests/onboard_agent_closeout_preview/close_proving_run_paths.rs`
+- `crates/xtask/tests/onboard_agent_closeout_preview/close_proving_run_write.rs`
+- `crates/xtask/tests/historical_lifecycle_backfill_entrypoint.rs`
+- committed fixture surfaces only if required:
+  - `docs/agents/lifecycle/**/governance/proving-run-closeout.json`
 
-Required changes:
+Required outcomes:
 
-- update only those seeded examples that represent post-refresh truth
-- keep pre-refresh examples at `publication_ready` when they are intentionally pre-refresh
-- ensure seeded lifecycle examples reflect `published` after successful refresh
+- add the new entrypoint test target
+- assert refresh now points at prepare-closeout
+- assert prepared drafts parse and serialize correctly
+- assert prepared drafts do not preview as closed
+- assert close-proving-run finalizes prepared drafts and rejects unresolved placeholders
+- assert historical backfill uses the shared serializer path
 
 Lane-local validation:
 
-- absence check for closable or post-refresh `publication_ready` lifecycle fixtures:
-
-```bash
-! rg -n --multiline -P '"lifecycle_stage": "publication_ready"[\\s\\S]*"expected_next_command": "close-proving-run' \
-  docs/agents/lifecycle/**/governance/lifecycle-state.json
-```
-
-- presence check for legitimate pre-refresh examples:
-
-```bash
-rg -n --multiline -P '"lifecycle_stage": "publication_ready"[\\s\\S]*"expected_next_command": "refresh-publication' \
-  docs/agents/lifecycle/**/governance/lifecycle-state.json
-```
-
-- presence check for post-refresh truth:
-
-```bash
-rg -n --multiline -P '"lifecycle_stage": "published"[\\s\\S]*"expected_next_command": "close-proving-run' \
-  docs/agents/lifecycle/**/governance/lifecycle-state.json
-```
+- `cargo test -p xtask --test onboard_agent_closeout_preview --no-run`
+- `cargo test -p xtask --test historical_lifecycle_backfill_entrypoint --no-run`
+- `cargo test -p xtask --test prepare_proving_run_closeout_entrypoint --no-run`
 
 Exit:
 
-- seeded lifecycle fixtures match the frozen lifecycle model
+- regression surfaces exist for every new seam even if full green proof waits for parent final integration
 
-### HONEST-60 Parent Integration
+### CLOSEOUT-60 Parent Final Lane
 
 Owner: parent
-Depends on: `HONEST-30`, `HONEST-40`, `HONEST-50`
+Depends on: `CLOSEOUT-30`, `CLOSEOUT-40`, `CLOSEOUT-50`
+
+Files:
+
+- `crates/xtask/src/close_proving_run.rs`
+- `crates/xtask/src/historical_lifecycle_backfill.rs`
 
 Actions:
 
-- verify worker ownership boundaries
-- merge Lane F, then Lane D, then Lane T
-- run post-merge smoke checks after each merge
-- reject and relaunch any stale or cross-boundary lane instead of hand-correcting it
+- merge Lane H
+- merge Lane P
+- implement close-proving-run finalization on the parent lane
+- migrate historical backfill to the shared serializer/builder path
+- merge Lane T only after the final-closeout path matches the frozen contract
+
+Parent-only semantic outcomes:
+
+- prepared drafts are the normal create-mode closeout input
+- unresolved placeholders block closeout
+- machine-owned fields are rewritten from current truth before final write
+- `close-proving-run` alone writes `closed_baseline`
+- historical backfill no longer emits bespoke inline closeout JSON
 
 Post-merge smoke:
 
-- after Lane F: lifecycle fixture consistency sweep
-- after Lane D: doc wording sweep
+- after Lane H:
+  - `cargo test -p xtask --test refresh_publication_entrypoint --no-run`
+- after Lane P:
+  - `cargo test -p xtask --test onboard_agent_closeout_preview --no-run`
+- after parent final-lane edits:
+  - `cargo test -p xtask --test historical_lifecycle_backfill_entrypoint --no-run`
 - after Lane T:
-  - `cargo test -p xtask --test refresh_publication_entrypoint`
-  - `cargo test -p xtask --test agent_lifecycle_state`
-  - `cargo test -p xtask --test agent_maintenance_drift`
+  - `cargo test -p xtask --no-run`
 
 Exit:
 
-- follow-on work is integrated on the parent branch
+- the full milestone implementation is integrated on the parent branch
 
-### HONEST-70 Final Verification
+### CLOSEOUT-70 Final Verification
 
 Owner: parent
-Depends on: `HONEST-60`
+Depends on: `CLOSEOUT-60`
 
 Required command matrix:
 
 ```bash
 cargo test -p xtask --test refresh_publication_entrypoint
-cargo test -p xtask --test agent_lifecycle_state
-cargo test -p xtask --test prepare_publication_entrypoint
-cargo test -p xtask --test onboard_agent_closeout_preview -- --nocapture
-cargo test -p xtask --test agent_maintenance_drift
+cargo test -p xtask --test prepare_proving_run_closeout_entrypoint
+cargo test -p xtask --test onboard_agent_closeout_preview
+cargo test -p xtask --test historical_lifecycle_backfill_entrypoint
 make test
 make preflight
 ```
 
-Targeted proof mapping for the four milestone verification outcomes:
+If any command fails:
 
-- refresh success writes `published`:
-  - `cargo test -p xtask --test refresh_publication_entrypoint`
-- refresh failure rolls back to the pre-refresh state:
-  - `cargo test -p xtask --test refresh_publication_entrypoint`
-- closeout consumes `published` on the normal path:
-  - `cargo test -p xtask --test onboard_agent_closeout_preview -- --nocapture`
-- compatibility `publication_ready` is explicit and narrow:
-  - `cargo test -p xtask --test onboard_agent_closeout_preview -- --nocapture`
-- maintenance-drift post-publication truth remains aligned with the honest lifecycle stage:
-  - `cargo test -p xtask --test agent_maintenance_drift`
+- write `.runs/closeout-prep/task-closeout-70-final-verify/blocked.json`
+- stop
+- do not silently weaken acceptance
 
-Required acceptance checks:
+## Tests and Acceptance
 
-- a successful refresh leaves:
+### Root Contract
 
-```json
-{ "lifecycle_stage": "published" }
-```
+- `proving_run_closeout.rs` owns the shared create-mode closeout state and serializer path.
+- `prepared` and `closed` are the only accepted create-mode closeout states.
+- The canonical artifact path remains `proving-run-closeout.json`.
 
-- `refresh-publication --write` is the only committed writer of `published`
-- closeout consumes `published` on the normal path
-- legacy `publication_ready` compatibility remains narrow and transitional
-- the named targeted tests above are the direct proof that:
-  - refresh success writes `published`
-  - refresh failure rolls back to the pre-refresh state
-  - closeout consumes `published` on the normal path
-  - compatibility `publication_ready` remains explicit and narrow
-- published-stage evidence and continuity fields are present when `published` is committed
-- docs, fixtures, and tests all tell the same lifecycle story
+### Handoff
 
-Exit:
+- `refresh-publication --write` records `prepare-proving-run-closeout --approval <path> --write` as the next command.
+- `prepare-proving-run-closeout --write` derives the closeout path from approval truth.
+- `prepare-proving-run-closeout --write` writes a prepared draft without advancing lifecycle stage beyond `published`.
 
-- acceptance log is complete
-- the milestone is ready for branch closeout
+### Preview and Docs
 
-## Tests And Acceptance
+- prepared packet surfaces render as prepared, not closed
+- operator and normative docs describe the new post-publication handoff sequence consistently
 
-Minimum verification commands:
+### Final Closeout and Historical Backfill
 
-```bash
-cargo test -p xtask --test refresh_publication_entrypoint
-cargo test -p xtask --test agent_lifecycle_state
-cargo test -p xtask --test prepare_publication_entrypoint
-cargo test -p xtask --test onboard_agent_closeout_preview -- --nocapture
-cargo test -p xtask --test agent_maintenance_drift
-make test
-make preflight
-```
+- `close-proving-run` consumes prepared drafts on the normal path
+- unresolved placeholders are rejected
+- machine-owned fields are rewritten at finalization time
+- `close-proving-run` remains the sole `closed_baseline` writer
+- `historical_lifecycle_backfill` uses the shared create-mode closeout builder/serializer
 
-Acceptance fails if any of these remain false:
+### Verification Matrix
 
-- `published` is not a reachable committed stage
-- refresh can still finish normally while leaving steady-state `publication_ready`
-- closeout still accepts ordinary prepare-time `publication_ready` as normal input
-- the compatibility branch is broader than the frozen rule
-- docs or seeded fixtures contradict the new stage sequence
-- test coverage misses a changed lifecycle branch
+- `cargo test -p xtask --test refresh_publication_entrypoint`
+  - proves refresh points at prepare-closeout and preserves published semantics
+- `cargo test -p xtask --test prepare_proving_run_closeout_entrypoint`
+  - proves the new command exists and materializes prepared drafts correctly
+- `cargo test -p xtask --test onboard_agent_closeout_preview`
+  - proves prepared drafts render as prepared and close-proving-run finalizes them correctly
+- `cargo test -p xtask --test historical_lifecycle_backfill_entrypoint`
+  - proves historical backfill stays truthful through the shared serializer path
+- `make test`
+  - repo-wide regression gate
+- `make preflight`
+  - final integration gate
 
 ## Assumptions
 
-- `PLAN.md` remains the canonical milestone design for this slice.
-- The current integration branch remains `codex/recommend-next-agent`.
-- The current execution baseline remains HEAD `07a0ce9259b8` until work begins.
-- The parent semantic lane can be contained to the named `crates/xtask/src/**` files.
-- Narrative docs, seeded fixtures, and regression tests can safely wait until after freeze.
-- Three follow-on worker lanes are the maximum useful concurrency for this milestone; more would add merge risk without reducing the true critical path.
+- The current branch `codex/recommend-next-agent` remains the integration lane for this session.
+- Worker lanes are allowed to use dedicated git worktrees under the absolute path named above.
+- GPT-5.4 with `reasoning_effort=high` is available for all worker lanes.
+- The parent can create a compile-clean skeleton for `prepare_proving_run_closeout.rs` before freeze if needed, then stop touching that file after freeze.
+- Committed `docs/agents/lifecycle/**/governance/proving-run-closeout.json` files may not need changes if the shared serializer is byte-compatible with current historical examples. The tests/fixtures lane owns those files only if updates become necessary.
+- There is no intentional human approval gate inside this milestone. The only pauses are:
+  - freeze creation
+  - stale-lane invalidation
+  - blocked final verification

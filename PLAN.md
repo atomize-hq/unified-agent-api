@@ -1,48 +1,55 @@
-<!-- /autoplan restore point: /Users/spensermcconnell/.gstack/projects/atomize-hq-unified-agent-api/restores/codex-recommend-next-agent-autoplan-restore-20260503-104405.md -->
-# PLAN - Make The Published State Honest In The Lifecycle Model
+# PLAN - Enclose Create-Mode Closeout Without Ad Hoc Authoring
 
-Status: planned  
-Date: 2026-05-03  
-Branch: `codex/recommend-next-agent`  
-Base branch: `main`  
-Repo: `atomize-hq/unified-agent-api`  
-Work item: `Make The Published State Honest In The Lifecycle Model`  
-Plan commit baseline: `07a0ce9`
+Status: planned
+Date: 2026-05-03
+Branch: `codex/recommend-next-agent`
+Base branch: `main`
+Repo: `atomize-hq/unified-agent-api`
+Work item: `Enclose Create-Mode Closeout Without Ad Hoc Authoring`
+Plan commit baseline: `f6023e1`
 
-Separate design doc: not required for this slice. This is a backend-only lifecycle and
-control-plane correction. `PLAN.md` is the canonical design and execution record.
+Separate design doc: not required. This is a backend and operator-workflow slice inside the
+existing create-mode lifecycle. `PLAN.md` is the canonical design and execution record.
 
 ## Objective
 
-Make `published` a real committed lifecycle stage with one writer, one meaning, and one
-normal downstream consumer.
+Add one repo-owned closeout preparation seam so maintainers stop hand-authoring the full
+`proving-run-closeout.json` shape after publication is green.
 
 After this plan lands:
 
-1. the canonical create-mode path becomes
-   `approved -> enrolled -> runtime_integrated -> publication_ready -> published -> closed_baseline`
-2. `refresh-publication --write` becomes the only command that can commit
-   `LifecycleStage::Published`
-3. `publication_ready` goes back to meaning exactly one thing: the frozen handoff packet
-   exists and refresh is next
-4. `close-proving-run` consumes `published` on the normal path and treats
-   `publication_ready` as compatibility-only
-5. specs, operator docs, lifecycle validation, seeded fixtures, and maintenance logic all
-   tell the same story
+1. `refresh-publication --write` no longer hands the maintainer a blank JSON problem
+2. `prepare-proving-run-closeout --approval <path> --check|--write` becomes the only way to
+   materialize the create-mode closeout draft
+3. `proving-run-closeout.json` can exist safely in a draft form without pretending the proving
+   run is already closed
+4. `close-proving-run` stops trusting human-authored machine fields and finalizes them from
+   committed lifecycle and publication truth
+5. the create-mode path becomes:
+
+```text
+runtime_follow_on
+  -> prepare-publication
+  -> refresh-publication
+  -> prepare-proving-run-closeout
+  -> close-proving-run
+```
 
 The non-negotiable outcome is simple:
 
-```json
-{ "lifecycle_stage": "published" }
+```text
+green publication
+  -> repo-owned closeout draft
+  -> bounded human inputs
+  -> closed_baseline
 ```
 
-That must be true immediately after a successful `refresh-publication --write`.
+No freehand artifact shape authoring in the middle.
 
 ## Source Inputs
 
 - Backlog source:
   - `TODOS.md`
-  - `docs/backlog/cli-agent-onboarding-lifecycle-unification-gap-memo.md`
 - Normative contracts:
   - `docs/specs/cli-agent-onboarding-charter.md`
   - `docs/specs/unified-agent-api/capabilities-schema-spec.md`
@@ -50,222 +57,273 @@ That must be true immediately after a successful `refresh-publication --write`.
 - Procedure source:
   - `docs/cli-agent-onboarding-factory-operator-guide.md`
 - Implementation surfaces:
+  - `crates/xtask/src/main.rs`
+  - `crates/xtask/src/lib.rs`
   - `crates/xtask/src/agent_lifecycle.rs`
-  - `crates/xtask/src/agent_lifecycle/validation.rs`
-  - `crates/xtask/src/prepare_publication.rs`
+  - `crates/xtask/src/proving_run_closeout.rs`
   - `crates/xtask/src/publication_refresh.rs`
   - `crates/xtask/src/close_proving_run.rs`
-  - `crates/xtask/src/capability_publication.rs`
-  - `crates/xtask/src/agent_maintenance/drift/governance.rs`
+  - `crates/xtask/src/historical_lifecycle_backfill.rs`
+  - `crates/xtask/src/onboard_agent/preview/render.rs`
+  - `crates/xtask/src/agent_maintenance/closeout/render.rs`
 - Current tests and fixtures:
-  - `crates/xtask/tests/agent_lifecycle_state.rs`
   - `crates/xtask/tests/refresh_publication_entrypoint.rs`
-  - `crates/xtask/tests/prepare_publication_entrypoint.rs`
-  - `crates/xtask/tests/onboard_agent_closeout_preview/close_proving_run_write.rs`
+  - `crates/xtask/tests/onboard_agent_closeout_preview/preview_states.rs`
+  - `crates/xtask/tests/onboard_agent_closeout_preview/closeout_schema_validation.rs`
   - `crates/xtask/tests/onboard_agent_closeout_preview/close_proving_run_paths.rs`
-  - `crates/xtask/tests/support/agent_maintenance_drift_harness.rs`
-  - `docs/agents/lifecycle/**`
+  - `crates/xtask/tests/onboard_agent_closeout_preview/close_proving_run_write.rs`
+  - `docs/agents/lifecycle/*/governance/proving-run-closeout.json`
 
 ## Verified Current State
 
-These facts were re-verified from the current branch before this rewrite.
+These facts were re-verified on the current branch before this rewrite.
 
-1. `LifecycleStage::Published` already exists in `crates/xtask/src/agent_lifecycle.rs`.
-2. `required_evidence_for_stage(Published)` already maps to `PUBLISHED_MINIMUM_EVIDENCE`.
-3. `validate_stage_support_tier(...)` already requires `publication_backed` or
-   `first_class` for `published` and `closed_baseline`.
-4. `publication_refresh::build_next_lifecycle_state(...)` currently updates transition
-   metadata but does not set `lifecycle_stage = published`, does not promote
-   `support_tier`, and does not record published continuity fields.
-5. `prepare-publication --write` currently owns the transition into
-   `publication_ready` and points the next command at `refresh-publication --write`.
-6. `close-proving-run` currently accepts `publication_ready` or legacy/manual
-   `published`, which leaves two possible interpretations of "post-publication."
-7. `capability_publication` and maintenance governance already treat `published` as a
-   valid post-publication state.
-8. `publication-ready.json` is intentionally pinned to `lifecycle_stage = publication_ready`
-   and `support_tier_at_emit = baseline_runtime`. It is a pre-refresh handoff packet, not a
-   durable post-refresh state snapshot.
-9. The live `aider-onboarding` fixture is still at `publication_ready` with
-   `expected_next_command = refresh-publication --write`, so the repo still contains the
-   honest pre-refresh seam.
-10. The operator guide and charter already describe refresh as the sole publication
-    consumer, but closeout wording still leaves `publication_ready` in the normal input path.
+1. `refresh-publication --write` now commits `lifecycle_stage = published` and records
+   `publication_packet_path` plus `publication_packet_sha256` in
+   `lifecycle-state.json`.
+2. `refresh-publication --write` still points the next command directly at
+   `close-proving-run --approval <path> --closeout <path>`.
+3. `close-proving-run` validates an already-authored `proving-run-closeout.json`, but it
+   does not prepare or serialize that artifact itself.
+4. `proving_run_closeout::RawProvingRunCloseout` currently accepts only `state = "closed"`.
+   There is no safe draft state.
+5. `onboard-agent` preview treats any valid closeout JSON as authoritative closed-packet
+   truth and renders the packet as `closed_proving_run`.
+6. `historical_lifecycle_backfill::ensure_closeout(...)` already proves the repo can
+   synthesize a valid create-mode closeout JSON from machine-known truth when a file is
+   missing.
+7. Maintenance closeout already has a dedicated serializer and writer path under
+   `crates/xtask/src/agent_maintenance/closeout/`. Create-mode closeout does not.
+8. The current create-mode closeout examples mostly repeat machine-owned facts:
+   approval path, approval sha, source label, preflight status, timestamp, commit.
+9. The fields that still genuinely need human judgment are narrow:
+   manual edit count, partial-write count, ambiguous-ownership count, duration, and
+   residual friction.
+10. The operator guide still instructs maintainers to author the entire
+    `proving-run-closeout.json` by hand after publication is green.
+11. Historical backfill uses `approval_source = "historical-lifecycle-backfill"`, while live
+    closeout tests use `approval_source = "governance-review"`. That distinction exists in
+    practice but is not centralized.
+12. The repo already has the honest post-publication lifecycle state. This slice should build
+    on `published`, not reopen stage semantics.
 
 ## Problem Statement
 
-The schema says `published` exists. The live write path does not make it real.
+The lifecycle machine is enclosed through publication, but the last operator handoff is still
+manual artifact shape assembly.
 
 Current shape:
 
 ```text
-runtime-follow-on --write
-  -> prepare-publication --write
-       writes publication-ready.json
-       writes lifecycle_stage = publication_ready
-  -> refresh-publication --write
-       writes publication outputs
-       runs green publication gate
-       keeps lifecycle_stage = publication_ready
-  -> close-proving-run --write
-       writes lifecycle_stage = closed_baseline
+refresh-publication --write
+  -> writes published lifecycle truth
+  -> points next command at close-proving-run
+
+operator
+  -> hand-builds proving-run-closeout.json
+
+close-proving-run --write
+  -> validates authored JSON
+  -> advances to closed_baseline
 ```
 
-That creates four real problems:
+That leaves five problems:
 
-1. the lifecycle machine and the actual write path disagree
-2. `publication_ready` is overloaded and means different things depending on hidden context
-3. `published` appears in validators and evidence contracts but has no committed producer
-4. future automation cannot answer "has publication completed?" from lifecycle truth alone
+1. machine-known closeout facts are still recopied by humans
+2. there is no repo-owned draft step between `published` and `closed_baseline`
+3. the current schema cannot represent "prepared but not closed"
+4. any naive auto-writer would accidentally create a file that previews as fully closed
+5. machine-owned closeout serialization logic is split across historical backfill, tests, and
+   operator instructions
 
 Target shape:
 
 ```text
-runtime-follow-on --write
-  -> prepare-publication --write
-       writes publication-ready.json
-       writes lifecycle_stage = publication_ready
-       expected_next_command = refresh-publication --write
-  -> refresh-publication --write
-       writes publication outputs
-       runs green publication gate
-       writes lifecycle_stage = published
-       writes support_tier = publication_backed | first_class
-       writes publication_packet_path / publication_packet_sha256
-       writes published-stage evidence
-       expected_next_command = close-proving-run --write
-  -> close-proving-run --write
-       consumes published on the normal path
-       writes lifecycle_stage = closed_baseline
+refresh-publication --write
+  -> lifecycle_stage = published
+  -> expected_next_command = prepare-proving-run-closeout --approval <path> --write
+
+prepare-proving-run-closeout --write
+  -> validates published continuity
+  -> writes proving-run-closeout.json with state = prepared
+  -> fills machine-owned fields
+  -> seeds bounded placeholders for remaining human inputs
+  -> refreshes packet docs to "closeout prepared"
+  -> expected_next_command = close-proving-run --approval <path> --closeout <path>
+
+human
+  -> edits only bounded human-owned fields
+
+close-proving-run --write
+  -> revalidates publication continuity
+  -> rejects unresolved placeholders
+  -> rewrites machine-owned fields from current truth
+  -> flips state = closed
+  -> writes closed packet docs
+  -> lifecycle_stage = closed_baseline
 ```
 
-That machine is honest:
-
-- `publication_ready` means refresh has not been committed yet
-- `published` means publication-owned outputs are written and green
-- `closed_baseline` means create-mode closeout truth is committed
+That is the boring lane we want.
 
 ## Step 0 Scope Challenge
 
 ### Premise Check
 
-The repo does not need a new lifecycle concept. It already has the right one. It just
-fails to commit it.
+The repo does not need:
 
-The real decision is:
+- a new create-mode lifecycle stage
+- a second closeout artifact type
+- a generic workflow engine
 
-1. make `published` real by giving it one writer, or
-2. delete it and push more hidden meaning into `publication_ready`
+The repo does need:
 
-Recommendation: choose option 1. It is the smaller semantic diff, the more explicit
-state machine, and it reuses contracts that already exist in code.
+- one explicit preparation command
+- one safe draft state inside the canonical artifact
+- one shared source of truth for create-mode closeout serialization
+
+The whole game is making draft closeout possible without falsely claiming the run is already
+closed.
 
 ### What Already Exists
 
 | Sub-problem | Existing surface | Reuse decision |
 | --- | --- | --- |
-| lifecycle stage enum | `agent_lifecycle::LifecycleStage` | Reuse directly. `Published` already exists. |
-| published evidence contract | `PUBLISHED_MINIMUM_EVIDENCE` | Reuse directly. Do not invent a second "publication complete" marker. |
-| publication writer and gate | `publication_refresh.rs` | Reuse directly as the sole `published` writer. |
-| pre-refresh handoff packet | `publication-ready.json` + `PublicationReadyPacket` | Reuse directly. Keep it as the handoff artifact. |
-| closeout consumer | `close_proving_run.rs` | Reuse directly. Tighten it around `published` as the normal input. |
-| stage/tier semantics | `validate_stage_support_tier(...)` | Reuse directly. The contract already expects `published`. |
-| publication eligibility | `capability_publication.rs` | Reuse directly, then align wording and tests. |
-| maintenance baseline semantics | `agent_maintenance/drift/governance.rs` | Reuse directly, but make the post-publication truth path explicit. |
+| deterministic closeout path | `agent_lifecycle::proving_run_closeout_path(...)` and `onboard_agent::preview::closeout_relative_path(...)` | Reuse one canonical path rule. Do not add a second draft path. |
+| published continuity truth | `publication_refresh.rs` + `lifecycle-state.json` packet continuity fields | Reuse directly as the machine input for draft generation. |
+| closeout validation | `proving_run_closeout.rs` | Extend it to understand `prepared` and `closed`. Do not fork a second validator. |
+| closeout draft precedent | `historical_lifecycle_backfill::ensure_closeout(...)` | Extract and generalize. This is already the seed of the right behavior. |
+| JSON serializer pattern | `agent_maintenance/closeout/render.rs::serialize_closeout_json(...)` | Mirror the pattern for proving-run closeout. Keep serializers explicit. |
+| closed-packet rendering | `onboard_agent/preview/render.rs` | Extend the packet phase model. Do not create a parallel packet renderer. |
+| final closeout command | `close_proving_run.rs` | Keep it as the only lifecycle-closing writer. Teach it to finalize prepared drafts. |
 
 ### Alternatives Considered
 
 | Option | Summary | Pros | Cons | Decision |
 | --- | --- | --- | --- | --- |
-| A | Make `refresh-publication --write` commit `published` | Reuses the existing schema, evidence model, support-tier rules, and command boundaries. | Requires lifecycle, test, and docs updates across the refresh and closeout seam. | **Chosen.** |
-| B | Delete `published` and keep green publication hidden inside `publication_ready` | Avoids a new committed transition in the write path. | Makes the machine less explicit, increases validator churn, and preserves ambiguity. | Rejected. |
-| C | Rename `published` to something else | Could tune wording. | Pure naming churn, zero control-plane gain, wider migration surface. | Rejected. |
+| A | Add `prepare-proving-run-closeout`, keep one canonical JSON path, add `prepared` state | Explicit ownership, safe draft semantics, clean operator next step, no second artifact type | Touches schema, preview docs, and command wiring | **Chosen.** |
+| B | Add `--prepare` mode to `close-proving-run` | Fewer CLI entrypoints | Blurs prepare vs close ownership, worse operator story, harder lifecycle next-command wording | Rejected. |
+| C | Auto-write a schema-valid `closed` skeleton and ask humans to edit it | Smallest code diff | Preview/docs would lie that the proving run is closed | Rejected. |
+| D | Introduce `proving-run-closeout.draft.json` | Keeps final schema untouched | New artifact type, duplicate paths, worse ergonomics, more drift surface | Rejected. |
 
 ### Minimum Complete Change Set
 
-Anything smaller than this is a shortcut that leaves the lifecycle dishonest:
+Anything smaller than this is a shortcut that keeps the lane half-manual:
 
-1. make `refresh-publication --write` write `LifecycleStage::Published`
-2. promote `support_tier` during refresh to `publication_backed` unless already
-   `first_class`
-3. write published-stage required and satisfied evidence during refresh
-4. record `publication_packet_path` and `publication_packet_sha256` at refresh time
-5. make `close-proving-run` consume `published` as the canonical input stage
-6. keep one bounded compatibility branch for pre-migration `publication_ready` states
-7. update lifecycle/spec/operator docs and seeded fixtures so the state machine is
-   described exactly once
-8. add direct regression coverage proving that refresh now commits `published`
+1. add `prepare-proving-run-closeout --approval <path> --check|--write`
+2. extend create-mode closeout schema to represent both `prepared` and `closed`
+3. centralize create-mode closeout build and serialize logic in `proving_run_closeout.rs`
+4. change `refresh-publication --write` to point at the preparation command, not directly at
+   `close-proving-run`
+5. update `onboard-agent` preview and generated packet docs to distinguish `execution`,
+   `closeout_prepared`, and `closed_proving_run`
+6. update `close-proving-run` to finalize machine-owned fields and reject unresolved draft
+   placeholders
+7. move historical backfill onto the same shared create-mode closeout builder
+8. add direct regression coverage for the full `published -> prepared -> closed_baseline` path
+9. update operator and charter docs so there is one documented post-publication lane
 
 ### Complexity Check
 
-This slice touches more than 8 files, but that is still the minimum complete version.
-The truth boundary spans:
+This will touch more than 8 files. That is not overbuilt. It is the minimum complete version.
 
-- lifecycle schema and validation
-- refresh writer logic
-- closeout input-stage validation
-- maintenance baseline semantics
-- operator/spec docs
-- refresh and closeout tests
+The seam spans:
+
+- xtask CLI dispatch
+- lifecycle next-command semantics
+- create-mode closeout schema
+- packet preview rendering
+- historical backfill reuse
+- final closeout validation
+- operator docs and regression tests
 
 Complexity controls:
 
-- no new command
-- no new artifact type
-- no packet rename
-- no support/capability publication redesign
-- no closeout schema redesign
-- no maintenance workflow redesign
+- no new lifecycle stage
+- no second closeout artifact type
+- no maintenance-mode behavior change
+- no new repo-wide publication contract
+- no generic JSON templating framework
 
 ### Search / Build Decision
 
-This is mostly a Layer 1 reuse correction with one Layer 3 truth decision.
+This is mostly a reuse correction with one first-principles architectural call.
 
-- **[Layer 1]** Reuse `LifecycleStage::Published`
-- **[Layer 1]** Reuse `PUBLISHED_MINIMUM_EVIDENCE`
-- **[Layer 1]** Reuse `refresh-publication --write` as the stage owner
-- **[Layer 1]** Reuse `publication-ready.json` as the pre-refresh packet
-- **[Layer 1]** Reuse `close-proving-run` as the post-publication consumer
-- **[Layer 3]** Stop encoding "green publication" as hidden prose and make it a committed stage
+- **[Layer 1]** Reuse `published` lifecycle continuity as the machine truth source.
+- **[Layer 1]** Reuse the closeout path derivation that already exists in lifecycle helpers.
+- **[Layer 1]** Reuse the historical backfill materialization precedent.
+- **[Layer 1]** Reuse the maintenance closeout serializer pattern.
+- **[Layer 3]** A safe draft must not look like a finished closeout. That is why the
+  canonical artifact needs a `prepared` state instead of a fake `closed` skeleton.
+
+No web search is needed here. The repo already contains the authoritative constraints.
 
 ### TODOS Cross-Reference
 
 This plan closes:
 
+- `Enclose Create-Mode Closeout Without Ad Hoc Authoring`
+
+This plan depends on already-landed work:
+
+- `Enclose The Publication Lane End To End`
 - `Make The Published State Honest In The Lifecycle Model`
 
-This plan unblocks, but does not implement:
+This plan does not implement:
 
-- `Enclose Create-Mode Closeout Without Ad Hoc Authoring`
+- `Land The LLM-Guided Research Layer For The Recommendation Lane`
+- `Decide Whether Capability Matrix Markdown Stays Canonical After M5`
+
+### Completeness Check
+
+The shortcut version would be "just generate a JSON skeleton." Not good enough.
+
+The complete version is:
+
+- machine-owned fields written by the repo
+- draft semantics that do not falsely imply closure
+- finalization that rewrites machine-owned truth
+- preview/docs/operator flow that match the new contract
+- regression coverage for the whole seam
+
+That is still a boilable lake.
 
 ### Distribution Check
 
-No new binary, package, container, or published artifact type is introduced.
+No new externally published artifact type is introduced. This is an internal xtask and
+governance-flow change only.
 
 ## Locked Decisions
 
-1. The canonical create-mode stage sequence is
-   `approved -> enrolled -> runtime_integrated -> publication_ready -> published -> closed_baseline`.
-2. `refresh-publication --write` is the only command allowed to write
-   `LifecycleStage::Published`.
-3. `publication-ready.json` remains the pre-refresh handoff packet. It is not renamed in
-   this milestone.
-4. `published` is a committed stage, not just a validated condition.
-5. `publication_ready` means "packet emitted, refresh not yet committed." It no longer
-   doubles as a post-refresh steady state.
-6. Successful refresh promotes `support_tier` to `publication_backed` unless the agent is
-   already `first_class`.
-7. Successful refresh records `publication_packet_path` and `publication_packet_sha256`
-   into `lifecycle-state.json`.
-8. `close-proving-run` treats `published` as the normal input stage.
-9. Compatibility for `publication_ready` is transitional and explicitly gated. It exists
-   only to support pre-migration fixtures and in-flight repositories that already ran
-   refresh before this lifecycle correction.
-10. Maintenance drift may continue to treat `published` and `closed_baseline` as valid
-    post-publication baselines. This plan does not narrow that maintenance capability.
-11. `closed_baseline` remains the create-mode done state. `published` is truthful
-    publication completion, not closeout completion.
-12. This milestone does not redesign closeout artifact authoring.
+1. The new command is `prepare-proving-run-closeout --approval <path> --check|--write`.
+2. `prepare-proving-run-closeout` derives the closeout path from the approval artifact. It does
+   not take a separate `--closeout` argument.
+3. `proving-run-closeout.json` remains the canonical artifact path. There is no
+   `.draft.json`, `.template.json`, or sidecar prompt file.
+4. Create-mode closeout `state` becomes a real enum with exactly two accepted values:
+   `prepared` and `closed`.
+5. `refresh-publication --write` sets
+   `expected_next_command = prepare-proving-run-closeout --approval <path> --write`.
+6. `prepare-proving-run-closeout --write` keeps `lifecycle_stage = published`. It updates only
+   provenance and next-command fields, not the stage itself.
+7. `prepare-proving-run-closeout --write` sets
+   `expected_next_command = close-proving-run --approval <path> --closeout <path>`.
+8. Machine-owned fields for live create-mode closeout are:
+   `state`, `approval_ref`, `approval_sha256`, `approval_source`, `preflight_passed`,
+   `recorded_at`, and `commit`.
+9. Human-owned fields are:
+   `manual_control_plane_edits`, `partial_write_incidents`,
+   `ambiguous_ownership_incidents`, exactly one of
+   `duration_seconds` or `duration_missing_reason`, and exactly one of
+   `residual_friction` or `explicit_none_reason`.
+10. Live create-mode prepared and closed artifacts use
+    `approval_source = "governance-review"`. Historical backfill keeps its explicit historical
+    source label.
+11. Draft placeholders are allowed only in the prepared state. `close-proving-run` must reject
+    unresolved placeholder text or unresolved human input branches.
+12. `close-proving-run` rewrites machine-owned fields from current repo truth before persisting
+    the final closed artifact.
+13. `onboard-agent` preview must never render a prepared draft as a closed packet.
+14. This milestone does not change maintenance closeout behavior or schema.
 
 ## Architecture Review
 
@@ -276,170 +334,195 @@ approved
   -> enrolled
   -> runtime_integrated
   -> publication_ready
-       owner: prepare-publication --write
-       meaning: frozen handoff packet exists, refresh is next
   -> published
        owner: refresh-publication --write
-       meaning: publication-owned outputs are written and green
+       next:  prepare-proving-run-closeout --approval <path> --write
+  -> published
+       owner: prepare-proving-run-closeout --write
+       next:  close-proving-run --approval <path> --closeout <path>
   -> closed_baseline
        owner: close-proving-run --write
-       meaning: closeout truth is committed
 ```
 
-### Stage Contract
+No new stage. One better handoff.
 
-| Stage | Written by | Required truth at commit time | Expected next command |
+### Draft And Final Artifact Semantics
+
+Prepared draft:
+
+```json
+{
+  "state": "prepared",
+  "approval_ref": "docs/agents/lifecycle/<prefix>/governance/approved-agent.toml",
+  "approval_sha256": "<approval sha256>",
+  "approval_source": "governance-review",
+  "manual_control_plane_edits": 0,
+  "partial_write_incidents": 0,
+  "ambiguous_ownership_incidents": 0,
+  "duration_missing_reason": "TODO: replace with duration_seconds or explain why exact duration is unavailable.",
+  "explicit_none_reason": "TODO: replace with residual_friction items or explain why no residual friction remained.",
+  "preflight_passed": true,
+  "recorded_at": "<draft timestamp>",
+  "commit": "<draft commit>"
+}
+```
+
+Final closed artifact:
+
+- same path
+- same machine-owned continuity fields, refreshed from current truth
+- `state = "closed"`
+- placeholder strings forbidden
+- closed packet docs become authoritative
+
+### Field Ownership Matrix
+
+| Field | Owner | Prepare-time source | Close-time source |
 | --- | --- | --- | --- |
-| `publication_ready` | `prepare-publication --write` | runtime evidence is pinned, `publication-ready.json` is written, support tier remains `baseline_runtime` | `refresh-publication --approval <path> --write` |
-| `published` | `refresh-publication --write` | publication outputs are refreshed, publication gate is green, support tier is `publication_backed` or `first_class`, packet continuity fields are recorded | `close-proving-run --approval <path> --closeout <path>` |
-| `closed_baseline` | `close-proving-run --write` | closeout inputs are valid, publication continuity still holds, baseline paths are written | maintenance or no-op follow-on |
+| `state` | machine | hard-coded `prepared` | hard-coded `closed` |
+| `approval_ref` | machine | approval artifact path | approval artifact path |
+| `approval_sha256` | machine | approval artifact sha256 | approval artifact sha256 |
+| `approval_source` | machine | command identity | command identity |
+| `manual_control_plane_edits` | human | seeded to `0` | validated from edited draft |
+| `partial_write_incidents` | human | seeded to `0` | validated from edited draft |
+| `ambiguous_ownership_incidents` | human | seeded to `0` | validated from edited draft |
+| `duration_*` branch | human | seeded placeholder reason | validated from edited draft |
+| `residual_friction` / `explicit_none_reason` | human | seeded placeholder explicit-none reason | validated from edited draft |
+| `preflight_passed` | machine | derived from published lifecycle truth | derived from current published lifecycle truth |
+| `recorded_at` | machine | draft generation timestamp | close command timestamp |
+| `commit` | machine | current HEAD at draft time | current HEAD at close time |
 
 ### Command Ownership
 
 ```text
-prepare-publication --write
-  writes:
-    lifecycle_stage = publication_ready
-    publication-ready.json
-  does not write:
-    support/capability publication outputs
-
 refresh-publication --write
   writes:
-    publication-owned support/capability outputs
     lifecycle_stage = published
-    support_tier = publication_backed | first_class
-    publication_packet_path
-    publication_packet_sha256
-    required_evidence = required_evidence_for_stage(Published)
-    satisfied_evidence = required_evidence_for_stage(Published)
-  verifies:
-    support-matrix --check
-    capability-matrix --check
-    capability-matrix-audit
-    make preflight
+    publication continuity fields
+    expected_next_command = prepare-proving-run-closeout --approval <path> --write
+  does not write:
+    proving-run-closeout.json
+
+prepare-proving-run-closeout --write
+  writes:
+    proving-run-closeout.json with state = prepared
+    packet docs in "closeout prepared" mode
+    lifecycle provenance fields
+    expected_next_command = close-proving-run --approval <path> --closeout <path>
+  does not write:
+    lifecycle_stage = closed_baseline
 
 close-proving-run --write
-  reads:
-    lifecycle_stage = published on the normal path
-    publication-ready.json continuity
-    green publication truth
   writes:
+    proving-run-closeout.json with state = closed
+    packet docs in closed mode
     lifecycle_stage = closed_baseline
     closeout_baseline_path
 ```
-
-### Compatibility Rule
-
-This is the ambiguity killer for the slice.
-
-Normal path:
-
-- `prepare-publication --write` ends at `publication_ready`
-- `refresh-publication --write` ends at `published`
-- `close-proving-run --write` consumes `published`
-
-Compatibility-only path:
-
-- `close-proving-run` may still accept `publication_ready` only when the state clearly
-  represents a pre-migration "refresh already happened, lifecycle was never promoted"
-  shape
-- that means all of the following must be true:
-  - `lifecycle_stage == publication_ready`
-  - `expected_next_command` already points at `close-proving-run`, not refresh
-  - `last_transition_by` reflects refresh ownership, not prepare ownership
-  - publication outputs and publication audits are already green
-- a plain prepare-time `publication_ready` state with
-  `expected_next_command = refresh-publication --write` is never closable
-
-This keeps old fixtures working without leaving two steady-state meanings for
-`publication_ready`.
 
 ### Module / Responsibility Map
 
 | Module | Responsibility in this slice |
 | --- | --- |
-| `crates/xtask/src/publication_refresh.rs` | Commit `published`, promote support tier, write continuity fields, keep rollback honest |
-| `crates/xtask/src/agent_lifecycle.rs` | Stage contract, evidence minima, helper commands, packet continuity fields |
-| `crates/xtask/src/agent_lifecycle/validation.rs` | Stage-specific validation and lifecycle invariants |
-| `crates/xtask/src/close_proving_run.rs` | Canonical `published` input path and bounded `publication_ready` compatibility |
-| `crates/xtask/src/agent_maintenance/drift/governance.rs` | Preserve explicit post-publication maintenance semantics |
-| `crates/xtask/src/capability_publication.rs` | Align comments, selectors, and expectations to the real post-refresh stage |
-| `crates/xtask/tests/**` | Lock the stage machine with direct regression coverage |
-| `docs/specs/**` and `docs/cli-agent-onboarding-factory-operator-guide.md` | Restate one canonical lifecycle story |
+| `crates/xtask/src/main.rs` | register the new command |
+| `crates/xtask/src/lib.rs` | export the new module |
+| `crates/xtask/src/agent_lifecycle.rs` | add helper for the prepare-closeout next command |
+| `crates/xtask/src/proving_run_closeout.rs` | shared create-mode closeout state enum, builder, serializer, placeholder detection, validation helpers |
+| `crates/xtask/src/prepare_proving_run_closeout.rs` | new check/write entrypoint for draft materialization |
+| `crates/xtask/src/publication_refresh.rs` | point published state at the new prepare command |
+| `crates/xtask/src/close_proving_run.rs` | finalize prepared drafts, rewrite machine-owned fields, preserve existing closeout gate |
+| `crates/xtask/src/historical_lifecycle_backfill.rs` | switch inline JSON creation to shared create-mode builder |
+| `crates/xtask/src/onboard_agent/preview/render.rs` | add `closeout_prepared` packet phase and copy |
+| `docs/cli-agent-onboarding-factory-operator-guide.md` | document the new post-publication handoff |
+| `docs/specs/cli-agent-onboarding-charter.md` | pin the new canonical next step |
 
-### Failure-Aware Mutation Ordering
-
-Refresh must not commit `published` until the whole publication seam is green.
-
-Required ordering:
-
-1. validate `publication_ready` seam and packet continuity
-2. plan output mutations
-3. write publication-owned outputs
-4. run the publication gate
-5. build and persist the next lifecycle state as `published`
-6. persist any packet continuity updates tied to the new lifecycle snapshot
-7. report success
-
-Rollback rule:
-
-- if any step before lifecycle persistence fails, nothing may leave a fake `published`
-  state behind
-- if lifecycle or packet persistence fails after output writes, rollback must restore the
-  pre-refresh bytes for publication-owned outputs and lifecycle-owned files
-
-### Dependency Graph
+### Data Flow
 
 ```text
-prepare_publication.rs
-  -> agent_lifecycle.rs
-  -> publication-ready.json
+published lifecycle-state.json
+  + approval artifact
+  + publication-ready.json continuity
+  -> prepare_proving_run_closeout::build_draft(...)
+      -> proving-run-closeout.json (prepared)
+      -> packet docs (closeout prepared)
+      -> lifecycle provenance update
 
-publication_refresh.rs
-  -> agent_lifecycle.rs
-  -> publication-ready.json
-  -> support_matrix.rs
-  -> capability_matrix.rs
-  -> capability_publication.rs
-  -> workspace_mutation.rs
-
-close_proving_run.rs
-  -> agent_lifecycle.rs
-  -> publication-ready.json
-  -> agent_maintenance::drift
-  -> capability_publication.rs
+prepared proving-run-closeout.json
+  + human-owned metrics/final notes
+  + current published continuity
+  -> close_proving_run::finalize(...)
+      -> proving-run-closeout.json (closed)
+      -> packet docs (closed)
+      -> lifecycle_state.json (closed_baseline)
 ```
+
+### Transaction Ordering
+
+Prepare write must be transactional across the draft artifact and the published state's next-step
+metadata.
+
+Required prepare ordering:
+
+1. validate `published` lifecycle continuity and approval continuity
+2. derive the deterministic closeout path
+3. build the prepared draft from machine-owned truth
+4. plan closeout JSON, packet-doc, and lifecycle-provenance mutations
+5. apply the mutations as one bounded workspace change
+
+Required close ordering:
+
+1. validate `published` lifecycle continuity and publication continuity
+2. load the prepared draft
+3. reject unresolved placeholders or invalid human-owned branches
+4. rebuild machine-owned fields from current truth
+5. write the final closeout JSON
+6. refresh closed packet docs
+7. advance lifecycle state to `closed_baseline`
+
+If any step before lifecycle advancement fails, the repo must not claim `closed_baseline`.
+
+### Failure Modes Registry
+
+| Codepath | Realistic failure | Test coverage requirement | Handling | User-visible outcome |
+| --- | --- | --- | --- | --- |
+| refresh -> prepare handoff | published state still points directly at `close-proving-run` | direct CLI regression | fail test, fix next-command wiring | clear xtask regression before ship |
+| prepare draft | command runs before `published` exists | entrypoint test | hard reject with explicit stage error | clear error, no writes |
+| prepared draft preview | draft renders as closed packet | preview-state test | new `closeout_prepared` phase | maintainers see the right next step |
+| close finalization | maintainer leaves placeholder text in duration or friction fields | close-proving-run write test | hard reject with actionable message | no baseline advancement |
+| machine continuity drift | human edits `approval_sha256` or approval path | validation test | hard reject and preserve files | explicit continuity error |
+| historical backfill | shared serializer changes historical output shape unexpectedly | backfill regression test | reuse shared builder with historical source label | historical repair stays truthful |
+
+No critical gaps remain if the plan above lands as written.
 
 ## Code Quality Review
 
-The repo already has the right abstractions. This is an ownership correction, not a
-"build a new model" job.
+This slice wants explicit code, not clever abstractions.
 
 Implementation rules:
 
-1. do not add a second "publication complete" helper type
-2. do not add a second post-refresh packet format
-3. keep stage transition logic localized to:
-   - `prepare_publication.rs`
-   - `publication_refresh.rs`
-   - `close_proving_run.rs`
-4. keep stage-specific invariants centralized in:
-   - `agent_lifecycle.rs`
-   - `agent_lifecycle/validation.rs`
-5. do not infer publication completion from `expected_next_command`
-6. do not spread compatibility logic across multiple modules
+1. Extend `ProvingRunCloseout` instead of inventing a second parallel create-mode closeout model.
+2. Put placeholder constants and state parsing in `proving_run_closeout.rs`, not scattered through
+   entrypoints and tests.
+3. Keep `prepare_proving_run_closeout.rs` thin. It should orchestrate validation and writes, not
+   redefine the schema.
+4. Keep `close_proving_run.rs` the only writer of `closed_baseline`.
+5. Reuse the maintenance closeout serializer shape as a pattern, but do not try to genericize
+   maintenance and create-mode closeout into one abstraction. Different domains, different truth.
+6. Reuse existing path helpers. No stringly-typed duplicate path builders.
+7. Migrate the historical backfill inline JSON builder to the shared serializer so the repo has
+   exactly one create-mode closeout shape.
 
 ASCII diagram maintenance:
 
-- if nearby lifecycle comments exist in `agent_lifecycle.rs`, `publication_refresh.rs`, or
-  `close_proving_run.rs`, update them in the same change
-- `PLAN.md` remains the canonical cross-file state-machine diagram for this slice
+- `PLAN.md` carries the canonical cross-file flow for this slice.
+- If nearby comments in `publication_refresh.rs`, `close_proving_run.rs`, or
+  `onboard_agent/preview/render.rs` describe the post-publication flow, update them in the same
+  commit so they do not lie.
 
 ## Test Review
 
-This slice is not done until the changed lifecycle seam is directly provable in tests.
-The regression is the whole point.
+This slice is not done until the repo proves the full `published -> prepared -> closed_baseline`
+seam directly.
 
 ### Code Path Coverage
 
@@ -448,36 +531,44 @@ CODE PATH COVERAGE
 ===========================
 [+] crates/xtask/src/publication_refresh.rs
     │
+    └── run_in_workspace(--write)
+        ├── [★★ TESTED] commits lifecycle_stage = published
+        ├── [GAP]      points next command at prepare-proving-run-closeout
+        └── [GAP]      no longer points directly at close-proving-run
+
+[+] crates/xtask/src/prepare_proving_run_closeout.rs
+    │
     ├── run_in_workspace(--check)
-    │   ├── validates publication_ready seam
-    │   └── preserves pre-refresh semantics
+    │   ├── [GAP] validates published continuity
+    │   └── [GAP] validates existing draft freshness
     │
     └── run_in_workspace(--write)
-        ├── validates publication_ready seam
-        ├── writes publication outputs
-        ├── runs green gate
-        ├── [GAP] writes lifecycle_stage = published
-        ├── [GAP] promotes support_tier
-        ├── [GAP] writes publication_packet_path / publication_packet_sha256
-        ├── [GAP] writes published-stage evidence
-        └── [GAP] rolls back cleanly if failure occurs before commit completion
+        ├── [GAP] derives canonical closeout path from approval
+        ├── [GAP] writes state = prepared
+        ├── [GAP] seeds machine-owned fields
+        ├── [GAP] seeds bounded human placeholders
+        ├── [GAP] refreshes packet docs into prepared mode
+        └── [GAP] updates expected_next_command to close-proving-run
+
+[+] crates/xtask/src/proving_run_closeout.rs
+    │
+    ├── parse prepared draft
+    ├── parse closed artifact
+    ├── serialize prepared draft
+    ├── serialize closed artifact
+    └── [GAP] detect unresolved placeholder truth at close time
 
 [+] crates/xtask/src/close_proving_run.rs
     │
-    ├── validate_closeout_inputs(...)
-    │   ├── [GAP] treats published as canonical normal path
-    │   ├── [GAP] accepts compatibility publication_ready only when explicitly eligible
-    │   └── [GAP] rejects ordinary prepare-time publication_ready
-    │
-    └── write_closed_baseline(...)
-        ├── consumes publication continuity fields
-        └── preserves first_class when already set
+    ├── [★★ TESTED] validates published continuity
+    ├── [GAP] accepts prepared drafts as the normal input artifact
+    ├── [GAP] rewrites machine-owned fields before final write
+    ├── [GAP] rejects unresolved placeholders
+    └── [★★ TESTED] advances lifecycle_state to closed_baseline
 
-[+] crates/xtask/src/agent_lifecycle.rs
+[+] crates/xtask/src/historical_lifecycle_backfill.rs
     │
-    ├── required_evidence_for_stage(Published)
-    ├── validate_stage_support_tier(Published)
-    └── [GAP] direct fixture coverage that published is now a reachable committed state
+    └── [GAP] emits closed artifacts through the shared serializer
 ```
 
 ### Operator Flow Coverage
@@ -485,29 +576,30 @@ CODE PATH COVERAGE
 ```text
 USER / OPERATOR FLOW COVERAGE
 =============================
-[+] Create-mode publication flow
+[+] Post-publication handoff
     │
-    ├── [★★ TESTED] prepare-publication -> publication_ready
-    ├── [GAP] refresh-publication -> published
-    ├── [GAP] published -> close-proving-run -> closed_baseline
-    └── [GAP] refresh failure rolls back without leaving fake published state
+    ├── [GAP] refresh-publication prints / records prepare-proving-run-closeout as next
+    ├── [GAP] prepare-proving-run-closeout writes a prepared draft
+    ├── [GAP] onboard-agent preview shows "closeout prepared", not "closed"
+    └── [GAP] close-proving-run succeeds once only human-owned fields are resolved
 
-[+] Compatibility flow
+[+] Draft safety
     │
-    ├── [GAP] legacy post-refresh publication_ready fixture closes only through the explicit compatibility branch
-    └── [GAP] ordinary prepare-time publication_ready remains non-closable
+    ├── [GAP] prepared draft does not mark packet closed
+    ├── [GAP] unresolved TODO placeholders block close
+    └── [GAP] manual edits to machine-owned continuity fields block close
 
-[+] Maintenance and publication truth
+[+] Historical compatibility
     │
-    ├── [GAP] published is accepted as a post-publication maintenance baseline
-    └── [GAP] pre-refresh publication_ready is not treated as a maintenance baseline
+    ├── [★★ TESTED] existing historical closed JSON still parses
+    └── [GAP] historical backfill still emits valid closed JSON through shared code
 
 ─────────────────────────────────
 COVERAGE TARGET: all changed paths
-  Critical path tests to add/update: 8
-  CLI seam tests: 5
-  Validation/unit tests: 3
-QUALITY TARGET: no stage-transition branch without a direct test
+  New entrypoint suites: 1
+  Existing suite updates: 5
+  Critical workflow regressions: 9
+QUALITY TARGET: no draft/final branch without a direct test
 ─────────────────────────────────
 ```
 
@@ -515,232 +607,242 @@ QUALITY TARGET: no stage-transition branch without a direct test
 
 | File | Required assertions |
 | --- | --- |
-| `crates/xtask/tests/refresh_publication_entrypoint.rs` | assert `refresh-publication --write` sets `lifecycle_stage = "published"` |
-| `crates/xtask/tests/refresh_publication_entrypoint.rs` | assert support tier becomes `publication_backed` unless already `first_class` |
-| `crates/xtask/tests/refresh_publication_entrypoint.rs` | assert `publication_packet_path` and `publication_packet_sha256` are present and coherent |
-| `crates/xtask/tests/refresh_publication_entrypoint.rs` | assert `required_evidence` and `satisfied_evidence` equal the published-stage set |
-| `crates/xtask/tests/refresh_publication_entrypoint.rs` | add rollback coverage proving a failed write path does not persist `published` |
-| `crates/xtask/tests/onboard_agent_closeout_preview/close_proving_run_write.rs` | seed canonical `published` and assert closeout succeeds |
-| `crates/xtask/tests/onboard_agent_closeout_preview/close_proving_run_paths.rs` | prove canonical next-command flow is `published -> closed_baseline` and that plain prepare-time `publication_ready` is rejected |
-| `crates/xtask/tests/agent_lifecycle_state.rs` | add direct published-stage validation for support tier and continuity fields |
-| `crates/xtask/tests/support/agent_maintenance_drift_harness.rs` | ensure maintenance accepts `published` and rejects pre-refresh `publication_ready` |
-| `crates/xtask/tests/prepare_publication_entrypoint.rs` | keep prepare explicit: it writes `publication_ready`, never `published` |
-| `docs/agents/lifecycle/**` fixtures | update seeded post-refresh examples so fixtures match the new machine |
+| `crates/xtask/tests/refresh_publication_entrypoint.rs` | assert `refresh-publication --write` now records `prepare-proving-run-closeout --approval <path> --write` as the next command |
+| `crates/xtask/tests/prepare_proving_run_closeout_entrypoint.rs` | new suite for check/write behavior on published fixtures |
+| `crates/xtask/tests/prepare_proving_run_closeout_entrypoint.rs` | assert write mode derives the closeout path, writes `state = "prepared"`, and updates lifecycle next-command provenance |
+| `crates/xtask/tests/prepare_proving_run_closeout_entrypoint.rs` | assert prepare rejects non-`published` lifecycle state |
+| `crates/xtask/tests/onboard_agent_closeout_preview/preview_states.rs` | assert prepared draft renders packet state `closeout_prepared`, not `closed_proving_run` |
+| `crates/xtask/tests/onboard_agent_closeout_preview/closeout_schema_validation.rs` | cover prepared-state parse/serialize rules and placeholder rejection rules |
+| `crates/xtask/tests/onboard_agent_closeout_preview/close_proving_run_write.rs` | assert close-proving-run finalizes a prepared draft, flips state to `closed`, and rewrites machine-owned fields |
+| `crates/xtask/tests/onboard_agent_closeout_preview/close_proving_run_paths.rs` | assert prepare infers the closeout path while close still consumes the explicit canonical path |
+| `crates/xtask/tests/historical_lifecycle_backfill.rs` or equivalent | assert shared serializer preserves historical closeout validity |
 
-### Regression Rule
-
-This plan fixes a lifecycle regression. The regression test is mandatory:
-
-- `refresh-publication --write` must leave a committed `published` lifecycle state
-
-No deferral. No TODO. That test is the proof that the control-plane lie is gone.
-
-## Performance Review
-
-This is a control-plane write path, not a runtime hot path. The performance risk is wasted
-gate work or a sloppy rollback boundary.
-
-Constraints:
-
-1. do not add extra publication-gate passes beyond the existing refresh checks
-2. do not rebuild the packet multiple times in one write path without a reason
-3. keep rollback snapshots scoped to the publication-owned outputs and lifecycle-owned
-   files that refresh mutates
-4. do not add concurrency to this seam; determinism matters more than speed here
-
-No caching work, batching, or infra changes are required.
-
-## Implementation Plan
-
-### Slice 1. Commit `published` in the refresh writer
-
-Primary files:
-
-- `crates/xtask/src/publication_refresh.rs`
-- `crates/xtask/src/agent_lifecycle.rs`
-
-Exact changes:
-
-1. update `build_next_lifecycle_state(...)` so successful refresh writes
-   `lifecycle_stage = published`
-2. promote `support_tier` to `publication_backed` unless already `first_class`
-3. write `required_evidence` and `satisfied_evidence` for `Published`
-4. record `publication_packet_path` and `publication_packet_sha256`
-5. preserve refresh ownership metadata and `expected_next_command = close-proving-run ...`
-6. keep lifecycle persistence inside the same honest rollback boundary as publication output writes
-
-Exit criteria:
-
-- refresh success leaves a committed `published` lifecycle state
-- refresh failure leaves no fake `published` state behind
-
-### Slice 2. Tighten lifecycle, closeout, and maintenance validation
-
-Primary files:
-
-- `crates/xtask/src/agent_lifecycle.rs`
-- `crates/xtask/src/agent_lifecycle/validation.rs`
-- `crates/xtask/src/close_proving_run.rs`
-- `crates/xtask/src/agent_maintenance/drift/governance.rs`
-- `crates/xtask/src/capability_publication.rs`
-
-Exact changes:
-
-1. codify `published` as the canonical post-refresh stage everywhere lifecycle truth is validated
-2. narrow `publication_ready` back to pre-refresh meaning
-3. implement one explicit compatibility branch for legacy post-refresh `publication_ready`
-4. require closeout to reject ordinary prepare-time `publication_ready`
-5. preserve the rule that post-publication maintenance truth begins at `published` and later
-
-Exit criteria:
-
-- canonical post-refresh stage is `published` everywhere
-- compatibility path is explicit, narrow, and testable
-
-### Slice 3. Update docs and seeded fixtures
-
-Primary files:
-
-- `docs/specs/cli-agent-onboarding-charter.md`
-- `docs/specs/unified-agent-api/capabilities-schema-spec.md`
-- `docs/cli-agent-onboarding-factory-operator-guide.md`
-- `docs/agents/lifecycle/**`
-
-Exact changes:
-
-1. restate the lifecycle sequence once, consistently
-2. update refresh success semantics to say it commits `published`
-3. update closeout semantics so `published` is the normal input stage
-4. keep `publication-ready.json` described as the pre-refresh handoff packet
-5. update only those fixtures that represent post-refresh truth
-
-Exit criteria:
-
-- specs, operator docs, and fixtures match the same machine with no contradictory prose
-
-## NOT In Scope
-
-- renaming `publication-ready.json`
-  - rationale: naming churn without fixing the lifecycle lie
-- removing `published` from the schema
-  - rationale: rejected because it makes the machine less explicit
-- redesigning `close-proving-run` artifact authoring
-  - rationale: separate pending milestone
-- redesigning the publication gate or shrinking `make preflight`
-  - rationale: gate semantics are already pinned
-- changing support/capability publication ownership
-  - rationale: that lane already landed; this slice only makes lifecycle truth match it
-
-## Failure Modes Registry
-
-| Failure mode | Test covers it? | Error handling exists? | User-visible outcome | Critical? |
-| --- | --- | --- | --- | --- |
-| refresh gate fails after output writes but before lifecycle commit | Planned | Must exist | command failure, no persisted fake published state | Yes |
-| refresh succeeds but support tier stays `baseline_runtime` | Planned | lifecycle validation should fail | silent semantic corruption without test | Yes |
-| published state lacks packet path or packet sha | Planned | lifecycle validation should fail | closeout or maintenance breaks later | Yes |
-| closeout still accepts ordinary `publication_ready` as a steady state | Planned | compatibility branch must be narrow | hidden ambiguity persists | Yes |
-| docs still describe refresh as staying in `publication_ready` | Planned | doc review only | operator confusion | No |
-
-Critical gap rule:
-
-Any path that can leave `published` committed without published-stage evidence, correct
-support-tier promotion, or packet continuity is a release blocker for this slice.
-
-## Worktree Parallelization Strategy
-
-This plan has real parallelization value because the implementation splits cleanly across
-runtime code, test surfaces, and documentation once the core semantics are locked.
-
-### Dependency Table
-
-| Step | Modules touched | Depends on |
-| --- | --- | --- |
-| Refresh stage writer | `crates/xtask/src/` lifecycle + refresh modules | — |
-| Closeout and validation alignment | `crates/xtask/src/` closeout + lifecycle validation modules | Refresh stage writer |
-| Lifecycle and seam tests | `crates/xtask/tests/` | Refresh stage writer |
-| Specs and operator docs | `docs/specs/`, `docs/` | Refresh stage writer |
-| Seeded lifecycle fixture updates | `docs/agents/lifecycle/` | Refresh stage writer |
-
-### Parallel Lanes
-
-Lane A: Refresh stage writer -> Closeout and validation alignment
-Sequential. Shared `crates/xtask/src/` ownership, one semantic authority lane.
-
-Lane B: Lifecycle and seam tests  
-Starts after Lane A has locked the public semantics. Independent from docs, but should not
-start before the stage contract is stable.
-
-Lane C: Specs, operator docs, and seeded fixture updates
-Starts after Lane A locks the exact lifecycle wording. Sequential inside docs because the
-same terms repeat across multiple surfaces.
-
-### Execution Order
-
-1. Launch Lane A first.
-2. Once Lane A compiles and the lifecycle contract is stable, launch Lane B and Lane C in
-   parallel worktrees.
-3. Merge Lane B and Lane C.
-4. Run the targeted xtask suites and then the full repo gate.
-
-### Conflict Flags
-
-- Lane A and Lane B share semantics but not directories if ownership stays clean
-- Lane A and Lane C share terminology, so Lane C must wait until Lane A locks the final wording
-- sequential implementation is required inside `crates/xtask/src/`; trying to split refresh
-  and closeout semantics into parallel code lanes is just merge-conflict farming
-
-## Verification Matrix
+### Required Verification Commands
 
 Run at minimum:
 
 ```sh
 cargo test -p xtask --test refresh_publication_entrypoint
-cargo test -p xtask --test agent_lifecycle_state
-cargo test -p xtask --test prepare_publication_entrypoint
-cargo test -p xtask --test onboard_agent_closeout_preview -- --nocapture
+cargo test -p xtask --test prepare_proving_run_closeout_entrypoint
+cargo test -p xtask --test onboard_agent_closeout_preview
+cargo test -p xtask --test historical_lifecycle_backfill_entrypoint
 make test
+```
+
+Then the normal repo gate:
+
+```sh
 make preflight
 ```
 
-Targeted assertions:
+## Performance Review
 
-1. refresh success writes `published`
-2. refresh failure rolls back to the pre-refresh state
-3. closeout consumes `published` on the normal path
-4. compatibility `publication_ready` is explicit and narrow
-5. docs and fixtures match the new stage sequence exactly
+This is a control-plane feature. Runtime performance is not the story. Still, there are a few
+ways to make it sloppy.
+
+1. `prepare-proving-run-closeout` must not rerun the full publication gate. It should validate
+   current published continuity, not redo `make preflight`.
+2. Path, hash, and lifecycle reads should happen once per invocation and then flow through a
+   small context struct, same style as `publication_refresh.rs`.
+3. The new command should write only the draft JSON, the prepared packet docs, and the lifecycle
+   provenance update. No repo-wide regeneration.
+4. Historical backfill should keep its current bounded behavior. No extra git probes on the live
+   prepare/close path.
+
+The performance smell to avoid is using a lightweight draft step as a second publication gate.
+That would make the operator lane slower without adding truth.
+
+## Implementation Plan
+
+### Phase 1. Shared closeout domain
+
+Files:
+
+- `crates/xtask/src/proving_run_closeout.rs`
+- `crates/xtask/src/agent_lifecycle.rs`
+- `crates/xtask/src/lib.rs`
+- `crates/xtask/src/main.rs`
+
+Work:
+
+1. Add a create-mode closeout state enum with `Prepared` and `Closed`.
+2. Add shared builder helpers for:
+   - prepared draft construction from approval + published lifecycle truth
+   - closed artifact construction from current truth + validated human inputs
+3. Add one explicit serializer for create-mode closeout JSON.
+4. Add placeholder detection for the prepared-state human-owned fields.
+5. Add lifecycle helper for the prepare-closeout next command.
+
+Acceptance:
+
+- the shared module can build both prepared and closed forms without inline `json!` in callers
+- CLI wiring compiles with the new command registered
+
+### Phase 2. Published to prepared handoff
+
+Files:
+
+- `crates/xtask/src/publication_refresh.rs`
+- `crates/xtask/src/prepare_proving_run_closeout.rs`
+
+Work:
+
+1. Add the new entrypoint with `--check|--write`.
+2. Validate that `published` lifecycle continuity exists before writing anything.
+3. Derive the closeout path from approval truth.
+4. Write the prepared draft and update lifecycle provenance plus next-command fields.
+5. Update `refresh-publication --write` to point at the new prepare step.
+
+Acceptance:
+
+- published lifecycle records the prepare-closeout next step
+- prepare-closeout write produces a deterministic draft without manual path input
+
+### Phase 3. Packet preview and docs
+
+Files:
+
+- `crates/xtask/src/onboard_agent/preview/render.rs`
+- `docs/cli-agent-onboarding-factory-operator-guide.md`
+- `docs/specs/cli-agent-onboarding-charter.md`
+
+Work:
+
+1. Add a `closeout_prepared` packet phase.
+2. Render prepared docs with explicit "fill the human-owned fields, then run close-proving-run"
+   language.
+3. Update operator and charter docs to reflect the new post-publication step.
+
+Acceptance:
+
+- a prepared draft never renders as a closed proving run
+- the operator guide tells one exact story after publication
+
+### Phase 4. Final closeout and historical reuse
+
+Files:
+
+- `crates/xtask/src/close_proving_run.rs`
+- `crates/xtask/src/historical_lifecycle_backfill.rs`
+
+Work:
+
+1. Make `close-proving-run` load prepared drafts as the normal create-mode input.
+2. Reject unresolved placeholder values or unresolved human-owned branches.
+3. Rebuild machine-owned fields from current truth before the final write.
+4. Persist the final `closed` artifact and then advance lifecycle state to
+   `closed_baseline`.
+5. Replace historical backfill inline closeout JSON generation with the shared builder and
+   serializer.
+
+Acceptance:
+
+- close-proving-run finalizes prepared drafts
+- historical backfill still emits truthful closed artifacts
+
+### Phase 5. Tests and fixtures
+
+Files:
+
+- `crates/xtask/tests/refresh_publication_entrypoint.rs`
+- `crates/xtask/tests/prepare_proving_run_closeout_entrypoint.rs`
+- `crates/xtask/tests/onboard_agent_closeout_preview/**`
+- any historical backfill test surface that covers emitted closeouts
+
+Work:
+
+1. Add the new entrypoint suite.
+2. Update preview-state tests for prepared vs closed semantics.
+3. Add close rejection tests for unresolved placeholders and continuity drift.
+4. Prove the full `published -> prepared -> closed_baseline` path.
+
+Acceptance:
+
+- all changed branches have direct regression coverage
+- `make preflight` is green
+
+## NOT In Scope
+
+These ideas were considered and explicitly deferred.
+
+- Auto-capturing duration from lifecycle timestamps alone.
+  Reason: duration is still partly a human truth question for proving-run interpretation.
+- Re-running `make preflight` inside `prepare-proving-run-closeout`.
+  Reason: published truth already proves the gate; duplicating it here would slow the lane without
+  adding authority.
+- Extending the same prep workflow to `maintenance-closeout.json`.
+  Reason: maintenance already has its own request/closeout contract and is not the blocker here.
+- Replacing `proving-run-closeout.json` with TOML or Markdown.
+  Reason: pure format churn, zero lifecycle gain.
+- Batch closeout preparation for multiple onboarding packs.
+  Reason: unnecessary complexity for the current single-pack operator flow.
+
+## TODOS.md Updates
+
+No new TODOs are required to land this slice.
+
+If a follow-on is ever needed, it should be a separate milestone:
+
+- capture duration automatically only if real proving runs show that humans never provide better
+  signal than machine timestamps
+
+That is not part of this plan.
+
+## Worktree Parallelization Strategy
+
+This plan has one real parallel window, but not a huge one. The closeout contract has to lock
+first.
+
+### Dependency Table
+
+| Step | Modules touched | Depends on |
+| --- | --- | --- |
+| Shared closeout domain and CLI contract | `crates/xtask/src`, `crates/xtask/src/proving_run_closeout.rs`, `crates/xtask/src/agent_lifecycle.rs` | — |
+| Prepare command and published-hand-off wiring | `crates/xtask/src`, `crates/xtask/src/publication_refresh.rs` | shared closeout domain and CLI contract |
+| Packet preview and operator docs | `crates/xtask/src/onboard_agent/preview`, `docs/` | shared closeout domain and command names locked |
+| Final closeout + historical backfill reuse | `crates/xtask/src`, `crates/xtask/src/close_proving_run.rs`, `crates/xtask/src/historical_lifecycle_backfill.rs` | shared closeout domain |
+| Regression tests | `crates/xtask/tests/**` | prepare command, preview/docs, and final closeout behavior locked |
+
+### Parallel Lanes
+
+Lane A: shared closeout domain and CLI contract -> final closeout and historical reuse
+Sequential, shared create-mode closeout core.
+
+Lane B: packet preview and operator docs
+Can run after Lane A freezes the `prepared` vs `closed` contract and command names.
+
+Lane C: prepare command and publication hand-off wiring
+Can run after Lane A freezes the shared builder and lifecycle helper names.
+
+Lane D: regression tests
+Runs after Lanes A, B, and C settle.
+
+### Execution Order
+
+1. Launch Lane A first. This locks the schema, builder, serializer, and command names.
+2. Once Lane A is stable, launch Lane B and Lane C in parallel worktrees.
+3. Merge B and C.
+4. Run Lane D last because the tests depend on the final preview and command semantics.
+
+### Conflict Flags
+
+- Lane A and Lane C both touch `crates/xtask/src`. Keep their boundary explicit:
+  Lane A owns shared closeout types and lifecycle helpers, Lane C owns the new entrypoint plus
+  refresh wiring.
+- Lane B and Lane D both depend on preview copy under
+  `crates/xtask/src/onboard_agent/preview/`. Do not start D until B lands.
 
 ## Completion Summary
 
-- Step 0: Scope Challenge
-  - make `published` real, do not hide publication truth inside `publication_ready`
-- Architecture Review
-  - one explicit writer, one explicit meaning, one explicit downstream consumer
-- Code Quality Review
-  - no new abstraction layer, only ownership repair and narrower compatibility
-- Test Review
-  - direct regression coverage for refresh, closeout, validation, and maintenance seams
-- Performance Review
-  - keep the gate count stable and the rollback boundary tight
-- NOT in scope
-  - written
-- What already exists
-  - written
-- Failure modes
-  - 4 critical gaps identified and all tied to mandatory tests
-- Parallelization
-  - 3 lanes, 2 parallel follow-on lanes after 1 root semantic lane
-
-## Ready-To-Implement Outcome
-
-When this plan is done, the repo has one truthful answer to "has publication completed?"
-
-Look at `lifecycle-state.json` after `refresh-publication --write`.
-
-If the answer is not:
-
-```json
-{ "lifecycle_stage": "published" }
-```
-
-the slice is not done.
+- Step 0: Scope Challenge, scope accepted with one new command and no new artifact type
+- Architecture Review: 4 architectural issues resolved by locked decisions
+- Code Quality Review: 5 rules locked to keep the diff explicit and small
+- Test Review: coverage diagrams produced, 9 direct regression cases required
+- Performance Review: 1 substantive guardrail, do not turn prepare-closeout into a second publication gate
+- NOT in scope: written
+- What already exists: written
+- TODOS.md updates: 0 new items proposed
+- Failure modes: 0 critical gaps if implemented as planned
+- Outside voice: not run for this rewrite
+- Parallelization: 4 lanes total, 2 can overlap after the core contract lands
+- Lake Score: 6/6 recommendations chose the complete option over the shortcut
