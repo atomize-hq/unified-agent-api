@@ -111,6 +111,8 @@ This step writes only to:
 
 It does not mutate repo-tracked files, and it is post-research only.
 
+The repo-owned `recommend-next-agent-research --write` flow fails closed before `freeze-discovery` if the generated discovery seed contains fewer than 3 candidates. It also canonicalizes valid `sources.lock.json` entry hashes to the frozen rule before the freeze handoff, and it validates research dossiers against the same repo-owned Python contract that `generate` consumes. Do not patch discovery or research artifacts by hand; fix the host flow or rerun from a corrected contract.
+
 Required success-path evaluation artifacts:
 - `run-status.json`
 - `seed.snapshot.toml`
@@ -147,6 +149,7 @@ The widening rule is fixed:
   - `CLI coding assistant blog`
 - if `pass1` has zero surviving candidates after hard rejection, omit the candidate-relative widening query and use only the two generic widening queries
 - `pass2` adds at most 3 new candidates
+- any discovery packet that advances to `freeze-discovery` must still nominate at least 3 candidates
 
 Prepare and execute the `pass2` packet with a fresh `run_id`:
 

@@ -1,0 +1,24 @@
+artifact_version = "1"
+comparison_ref = "docs/agents/selection/cli-agent-selection-packet.md"
+selection_mode = "factory_validation"
+recommended_agent_id = "goose"
+approved_agent_id = "goose"
+approval_commit = "3e591d8a3b29c5fdb7ce21bec3f16b8628a51bfc"
+approval_recorded_at = "2026-05-04T21:44:25Z"
+
+[descriptor]
+agent_id = "goose"
+display_name = "Goose"
+crate_path = "crates/goose"
+backend_module = "crates/agent_api/src/backends/goose"
+manifest_root = "cli_manifests/goose"
+package_name = "unified-agent-api-goose"
+canonical_targets = ["darwin-arm64"]
+wrapper_coverage_binding_kind = "generated_from_wrapper_crate"
+wrapper_coverage_source_path = "crates/goose"
+always_on_capabilities = ["agent_api.config.model.v1", "agent_api.events", "agent_api.events.live", "agent_api.run"]
+backend_extensions = []
+support_matrix_enabled = true
+capability_matrix_enabled = true
+docs_release_track = "crates-io"
+onboarding_pack_prefix = "goose"

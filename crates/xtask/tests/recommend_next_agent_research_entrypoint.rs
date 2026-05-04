@@ -9,9 +9,9 @@ mod harness;
 mod recommendation_harness;
 
 use recommendation_harness::{
-    fake_codex_binary, packet_dir, pass2_args, prepare_recommendation_fixture, read_json,
-    recommend_args, seed_prior_insufficiency_run, snapshot_without_packet_runs,
-    write_fake_codex_scenario, Cli, PASS1_RUN_ID, PASS2_RUN_ID,
+    fake_codex_binary, force_freeze_discovery_failure, packet_dir, pass2_args,
+    prepare_recommendation_fixture, read_json, recommend_args, seed_prior_insufficiency_run,
+    snapshot_without_packet_runs, write_fake_codex_scenario, Cli, PASS1_RUN_ID, PASS2_RUN_ID,
 };
 
 #[test]
@@ -53,9 +53,15 @@ fn recommend_next_agent_research_pass2_requires_prior_run_dir() {
 
 #[test]
 fn recommend_next_agent_research_write_requires_matching_dry_run_packet() {
-    let fixture = prepare_recommendation_fixture("recommend-next-agent-research-write-precondition");
+    let fixture =
+        prepare_recommendation_fixture("recommend-next-agent-research-write-precondition");
     let output = recommendation_harness::run_cli(
-        recommend_args("--write", "pass1", PASS1_RUN_ID, &fake_codex_binary(&fixture)),
+        recommend_args(
+            "--write",
+            "pass1",
+            PASS1_RUN_ID,
+            &fake_codex_binary(&fixture),
+        ),
         &fixture,
     );
 
@@ -101,6 +107,8 @@ fn recommend_next_agent_research_dry_run_writes_complete_packet_for_pass1() {
     assert!(prompt.contains("best AI coding CLI"));
     assert!(prompt.contains("AI agent CLI tools"));
     assert!(prompt.contains("developer agent command line"));
+    assert!(prompt.contains("Nominate at least 3 candidate ids"));
+    assert!(prompt.contains("exact `display_name` string"));
     assert!(prompt.contains("docs/agents/.uaa-temp/recommend-next-agent/discovery/rna-pass1"));
 }
 
@@ -120,9 +128,7 @@ fn recommend_next_agent_research_dry_run_writes_complete_packet_for_pass2() {
     assert!(prompt.contains("Excluded candidate ids: `alpha, beta, gamma`"));
     let contract = read_json(&packet_dir(&fixture, PASS2_RUN_ID).join("input-contract.json"));
     assert_eq!(
-        contract
-            .get("prior_run_dir")
-            .and_then(Value::as_str),
+        contract.get("prior_run_dir").and_then(Value::as_str),
         Some(prior_run_dir.as_str())
     );
 }
@@ -138,8 +144,10 @@ fn recommend_next_agent_research_write_rejects_out_of_bounds_paths() {
     assert_eq!(dry_run.exit_code, 0, "stderr:\n{}", dry_run.stderr);
     write_fake_codex_scenario(&fixture, "out_of_bounds");
 
-    let output =
-        recommendation_harness::run_cli(recommend_args("--write", "pass1", PASS1_RUN_ID, &codex_binary), &fixture);
+    let output = recommendation_harness::run_cli(
+        recommend_args("--write", "pass1", PASS1_RUN_ID, &codex_binary),
+        &fixture,
+    );
 
     assert_eq!(output.exit_code, 2);
     assert!(output.stderr.contains("write boundary violation"));
@@ -157,8 +165,10 @@ fn recommend_next_agent_research_write_invokes_freeze_discovery_with_expected_ar
     assert_eq!(dry_run.exit_code, 0, "stderr:\n{}", dry_run.stderr);
     write_fake_codex_scenario(&fixture, "success");
 
-    let output =
-        recommendation_harness::run_cli(recommend_args("--write", "pass1", PASS1_RUN_ID, &codex_binary), &fixture);
+    let output = recommendation_harness::run_cli(
+        recommend_args("--write", "pass1", PASS1_RUN_ID, &codex_binary),
+        &fixture,
+    );
 
     assert_eq!(output.exit_code, 0, "stderr:\n{}", output.stderr);
     let report = read_json(&packet_dir(&fixture, PASS1_RUN_ID).join("validation-report.json"));
@@ -194,13 +204,169 @@ fn recommend_next_agent_research_write_fails_closed_on_freeze_discovery_error() 
         &fixture,
     );
     assert_eq!(dry_run.exit_code, 0, "stderr:\n{}", dry_run.stderr);
-    write_fake_codex_scenario(&fixture, "freeze_fail");
+    write_fake_codex_scenario(&fixture, "success");
+    force_freeze_discovery_failure(&fixture);
 
-    let output =
-        recommendation_harness::run_cli(recommend_args("--write", "pass1", PASS1_RUN_ID, &codex_binary), &fixture);
+    let output = recommendation_harness::run_cli(
+        recommend_args("--write", "pass1", PASS1_RUN_ID, &codex_binary),
+        &fixture,
+    );
 
     assert_eq!(output.exit_code, 2);
     assert!(output.stderr.contains("freeze-discovery failed"));
+}
+
+#[test]
+fn recommend_next_agent_research_write_rejects_discovery_sources_lock_contract() {
+    let fixture = prepare_recommendation_fixture("recommend-next-agent-research-sources-lock");
+    let codex_binary = fake_codex_binary(&fixture);
+    let dry_run = recommendation_harness::run_cli(
+        recommend_args("--dry-run", "pass1", PASS1_RUN_ID, &codex_binary),
+        &fixture,
+    );
+    assert_eq!(dry_run.exit_code, 0, "stderr:\n{}", dry_run.stderr);
+    write_fake_codex_scenario(&fixture, "invalid_sources_lock_keys");
+
+    let output = recommendation_harness::run_cli(
+        recommend_args("--write", "pass1", PASS1_RUN_ID, &codex_binary),
+        &fixture,
+    );
+
+    assert_eq!(output.exit_code, 2);
+    assert!(output.stderr.contains("sources lock"));
+    let report = read_json(&packet_dir(&fixture, PASS1_RUN_ID).join("validation-report.json"));
+    let checks = report
+        .get("checks")
+        .and_then(Value::as_array)
+        .expect("validation checks");
+    assert!(checks.iter().any(|check| {
+        check.get("name").and_then(Value::as_str) == Some("discovery_sources_lock_contract")
+            && check.get("ok").and_then(Value::as_bool) == Some(false)
+    }));
+}
+
+#[test]
+fn recommend_next_agent_research_write_normalizes_discovery_sources_lock_sha256() {
+    let fixture = prepare_recommendation_fixture("recommend-next-agent-research-sources-sha");
+    let codex_binary = fake_codex_binary(&fixture);
+    let dry_run = recommendation_harness::run_cli(
+        recommend_args("--dry-run", "pass1", PASS1_RUN_ID, &codex_binary),
+        &fixture,
+    );
+    assert_eq!(dry_run.exit_code, 0, "stderr:\n{}", dry_run.stderr);
+    write_fake_codex_scenario(&fixture, "freeze_fail");
+
+    let output = recommendation_harness::run_cli(
+        recommend_args("--write", "pass1", PASS1_RUN_ID, &codex_binary),
+        &fixture,
+    );
+
+    assert_eq!(output.exit_code, 0, "stderr:\n{}", output.stderr);
+    let sources = read_json(
+        &fixture
+            .join("docs/agents/.uaa-temp/recommend-next-agent/discovery")
+            .join(PASS1_RUN_ID)
+            .join("sources.lock.json"),
+    );
+    let first_sha = sources
+        .get("sources")
+        .and_then(Value::as_array)
+        .and_then(|sources| sources.first())
+        .and_then(|entry| entry.get("sha256"))
+        .and_then(Value::as_str)
+        .expect("first source sha256");
+    assert_ne!(
+        first_sha,
+        "0000000000000000000000000000000000000000000000000000000000000000"
+    );
+}
+
+#[test]
+fn recommend_next_agent_research_write_rejects_discovery_seed_with_too_few_candidates() {
+    let fixture =
+        prepare_recommendation_fixture("recommend-next-agent-research-too-few-candidates");
+    let codex_binary = fake_codex_binary(&fixture);
+    let dry_run = recommendation_harness::run_cli(
+        recommend_args("--dry-run", "pass1", PASS1_RUN_ID, &codex_binary),
+        &fixture,
+    );
+    assert_eq!(dry_run.exit_code, 0, "stderr:\n{}", dry_run.stderr);
+    write_fake_codex_scenario(&fixture, "too_few_candidates");
+
+    let output = recommendation_harness::run_cli(
+        recommend_args("--write", "pass1", PASS1_RUN_ID, &codex_binary),
+        &fixture,
+    );
+
+    assert_eq!(output.exit_code, 2);
+    assert!(output.stderr.contains("at least 3 candidates"));
+    let report = read_json(&packet_dir(&fixture, PASS1_RUN_ID).join("validation-report.json"));
+    let checks = report
+        .get("checks")
+        .and_then(Value::as_array)
+        .expect("validation checks");
+    assert!(checks.iter().any(|check| {
+        check.get("name").and_then(Value::as_str) == Some("discovery_candidate_minimum")
+            && check.get("ok").and_then(Value::as_bool) == Some(false)
+    }));
+}
+
+#[test]
+fn recommend_next_agent_research_write_rejects_discovery_summary_missing_display_name() {
+    let fixture = prepare_recommendation_fixture("recommend-next-agent-research-summary-contract");
+    let codex_binary = fake_codex_binary(&fixture);
+    let dry_run = recommendation_harness::run_cli(
+        recommend_args("--dry-run", "pass1", PASS1_RUN_ID, &codex_binary),
+        &fixture,
+    );
+    assert_eq!(dry_run.exit_code, 0, "stderr:\n{}", dry_run.stderr);
+    write_fake_codex_scenario(&fixture, "summary_missing_display_name");
+
+    let output = recommendation_harness::run_cli(
+        recommend_args("--write", "pass1", PASS1_RUN_ID, &codex_binary),
+        &fixture,
+    );
+
+    assert_eq!(output.exit_code, 2);
+    assert!(output.stderr.contains("display name"));
+    let report = read_json(&packet_dir(&fixture, PASS1_RUN_ID).join("validation-report.json"));
+    let checks = report
+        .get("checks")
+        .and_then(Value::as_array)
+        .expect("validation checks");
+    assert!(checks.iter().any(|check| {
+        check.get("name").and_then(Value::as_str) == Some("discovery_summary_contract")
+            && check.get("ok").and_then(Value::as_bool) == Some(false)
+    }));
+}
+
+#[test]
+fn recommend_next_agent_research_write_rejects_invalid_research_schema() {
+    let fixture = prepare_recommendation_fixture("recommend-next-agent-research-schema-contract");
+    let codex_binary = fake_codex_binary(&fixture);
+    let dry_run = recommendation_harness::run_cli(
+        recommend_args("--dry-run", "pass1", PASS1_RUN_ID, &codex_binary),
+        &fixture,
+    );
+    assert_eq!(dry_run.exit_code, 0, "stderr:\n{}", dry_run.stderr);
+    write_fake_codex_scenario(&fixture, "invalid_research_schema");
+
+    let output = recommendation_harness::run_cli(
+        recommend_args("--write", "pass1", PASS1_RUN_ID, &codex_binary),
+        &fixture,
+    );
+
+    assert_eq!(output.exit_code, 2);
+    assert!(output.stderr.contains("research schema validation failed"));
+    let report = read_json(&packet_dir(&fixture, PASS1_RUN_ID).join("validation-report.json"));
+    let checks = report
+        .get("checks")
+        .and_then(Value::as_array)
+        .expect("validation checks");
+    assert!(checks.iter().any(|check| {
+        check.get("name").and_then(Value::as_str) == Some("research_schema_contract")
+            && check.get("ok").and_then(Value::as_bool) == Some(false)
+    }));
 }
 
 #[test]
@@ -214,9 +380,13 @@ fn recommend_next_agent_research_write_enforces_research_identity() {
     assert_eq!(dry_run.exit_code, 0, "stderr:\n{}", dry_run.stderr);
     write_fake_codex_scenario(&fixture, "identity_mismatch");
 
-    let output =
-        recommendation_harness::run_cli(recommend_args("--write", "pass1", PASS1_RUN_ID, &codex_binary), &fixture);
+    let output = recommendation_harness::run_cli(
+        recommend_args("--write", "pass1", PASS1_RUN_ID, &codex_binary),
+        &fixture,
+    );
 
     assert_eq!(output.exit_code, 2);
-    assert!(output.stderr.contains("seed_snapshot_sha256 does not match the frozen seed"));
+    assert!(output
+        .stderr
+        .contains("seed_snapshot_sha256 does not match the frozen seed"));
 }

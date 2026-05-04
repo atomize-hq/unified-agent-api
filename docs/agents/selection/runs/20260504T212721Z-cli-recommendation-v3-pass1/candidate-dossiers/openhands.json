@@ -1,0 +1,154 @@
+{
+  "schema_version": "cli-agent-recommendation-dossier.v1",
+  "agent_id": "openhands",
+  "display_name": "OpenHands",
+  "generated_at": "2026-05-04T21:37:24Z",
+  "seed_snapshot_sha256": "8702b1b91e0fe730a62f9fd5e3c0c10b5cce86c36433dcf65bb3ccf08ec5f1da",
+  "official_links": [
+    "https://openhands.dev/product/cli",
+    "https://docs.openhands.dev/openhands/usage/cli/installation",
+    "https://docs.openhands.dev/openhands/usage/cli/headless",
+    "https://docs.openhands.dev/openhands/usage/cli/command-reference",
+    "https://github.com/OpenHands/OpenHands-CLI",
+    "https://pypi.org/project/openhands/"
+  ],
+  "install_channels": [
+    "uv tool install openhands --python 3.12",
+    "curl -fsSL https://install.openhands.dev/install.sh | sh"
+  ],
+  "auth_prerequisites": [
+    "Configure LLM settings on first run or pre-seed the `~/.openhands` config directory before starting the CLI.",
+    "If using environment variables, export `LLM_API_KEY` and optionally `LLM_MODEL` or `LLM_BASE_URL`, then pass `--override-with-envs`.",
+    "Windows users must run the CLI inside WSL (Ubuntu)."
+  ],
+  "claims": {
+    "non_interactive_execution": {
+      "state": "verified",
+      "summary": "Official docs describe a headless mode for scripting, CI/CD, and automation that requires a task or file input and can emit structured JSONL events.",
+      "evidence_ids": [
+        "openhands-headless",
+        "openhands-pypi"
+      ]
+    },
+    "offline_strategy": {
+      "state": "inferred",
+      "summary": "OpenHands documents self-hosted and isolated deployment options plus custom LLM base URLs, but the retrieved sources do not prove a bundled fully offline local-model path.",
+      "evidence_ids": [
+        "openhands-product",
+        "openhands-command",
+        "openhands-pypi"
+      ],
+      "notes": "This is an inference from self-hosted deployment and `LLM_BASE_URL` support, not a verified offline-runtime claim."
+    },
+    "observable_cli_surface": {
+      "state": "verified",
+      "summary": "The CLI exposes explicit headless mode, JSONL output, documented exit codes, and a broad command reference that is suitable for wrapper observation and event capture.",
+      "evidence_ids": [
+        "openhands-headless",
+        "openhands-command"
+      ]
+    },
+    "redaction_fit": {
+      "state": "inferred",
+      "summary": "OpenHands keeps persistent settings under `~/.openhands`, ignores env overrides unless explicitly enabled, and publishes its CLI code openly, which is a workable surface for wrapper-side redaction rules.",
+      "evidence_ids": [
+        "openhands-command",
+        "openhands-github",
+        "openhands-pypi"
+      ],
+      "notes": "The exact persisted config filename should be probed before hard-coding file-path redaction rules."
+    },
+    "crate_first_fit": {
+      "state": "inferred",
+      "summary": "OpenHands has a public CLI binary, a Python package, and a stable documented command surface, so a crate-first wrapper looks viable with platform/version gating.",
+      "evidence_ids": [
+        "openhands-install",
+        "openhands-github",
+        "openhands-pypi"
+      ]
+    },
+    "reproducibility": {
+      "state": "verified",
+      "summary": "Official install docs pin the supported Python line (`3.12`) for the uv install path, and current GitHub and PyPI releases both surface version `1.15.1` on 2026-05-04.",
+      "evidence_ids": [
+        "openhands-install",
+        "openhands-pypi"
+      ]
+    },
+    "future_leverage": {
+      "state": "inferred",
+      "summary": "OpenHands exposes more than a single chat loop: the docs and product page cover CLI, headless pipelines, cloud, web, ACP, MCP, and self-hosted deployment paths.",
+      "evidence_ids": [
+        "openhands-product",
+        "openhands-command",
+        "openhands-github"
+      ]
+    }
+  },
+  "probe_requests": [],
+  "blocked_steps": [
+    "Confirm the live persisted config filename under `~/.openhands` before encoding wrapper-side file assumptions, because the install page and command reference differ."
+  ],
+  "normalized_caveats": [
+    "Headless mode always runs in `always-approve` mode, which is operationally useful but raises the default risk profile.",
+    "Native Windows is not supported; the official docs require WSL.",
+    "The retrieved official docs disagree on the exact persisted config filename inside `~/.openhands`.",
+    "The recommended package install path requires Python `3.12`."
+  ],
+  "evidence": [
+    {
+      "evidence_id": "openhands-product",
+      "kind": "ancillary",
+      "url": "https://openhands.dev/product/cli",
+      "title": "OpenHands CLI | Secure, Scalable Agentic Software Development",
+      "captured_at": "2026-05-04T21:37:24Z",
+      "sha256": "0d035d579ee1452b5c4208356a37997be58e45132a589b5adf13b49cb799b7af",
+      "excerpt": "The product page says the CLI runs from the terminal or headlessly in pipelines, with visibility, control, and support for self-hosted secure setups."
+    },
+    {
+      "evidence_id": "openhands-install",
+      "kind": "official_doc",
+      "url": "https://docs.openhands.dev/openhands/usage/cli/installation",
+      "title": "Installation - OpenHands Docs",
+      "captured_at": "2026-05-04T21:37:24Z",
+      "sha256": "cbc3755e7b3ac262baab6149f0f8ed1577a98d417f96a085dc069999371c1346",
+      "excerpt": "Install docs recommend `uv tool install openhands --python 3.12` or the standalone installer, require WSL on Windows, and save first-run state under `~/.openhands`."
+    },
+    {
+      "evidence_id": "openhands-headless",
+      "kind": "official_doc",
+      "url": "https://docs.openhands.dev/openhands/usage/cli/headless",
+      "title": "Headless Mode - OpenHands Docs",
+      "captured_at": "2026-05-04T21:37:24Z",
+      "sha256": "e18e1dfc839bae65ea7a95f9bc05c13f34224e4bb7f47640c10c05ac6c6ea0b9",
+      "excerpt": "Headless mode is documented for scripting and CI/CD, requires `--task` or `--file`, supports `--json`, and always uses `always-approve`."
+    },
+    {
+      "evidence_id": "openhands-command",
+      "kind": "official_doc",
+      "url": "https://docs.openhands.dev/openhands/usage/cli/command-reference",
+      "title": "Command Reference - OpenHands Docs",
+      "captured_at": "2026-05-04T21:37:24Z",
+      "sha256": "6b861dbfd48fe23902d2a7f1defa04fb67ed22be548d93981e04677107e26a39",
+      "excerpt": "The command reference documents `--headless`, `--json`, `--override-with-envs`, `LLM_API_KEY`/`LLM_MODEL`/`LLM_BASE_URL`, exit codes, and config files under `~/.openhands`."
+    },
+    {
+      "evidence_id": "openhands-github",
+      "kind": "github",
+      "url": "https://github.com/OpenHands/OpenHands-CLI",
+      "title": "GitHub - OpenHands/OpenHands-CLI",
+      "captured_at": "2026-05-04T21:37:24Z",
+      "sha256": "ba39a54dd32b832a3bf580fdf668e45919374dec01fe972e2ae8b87b3691f929",
+      "excerpt": "GitHub describes a lightweight OpenHands CLI binary, lists the MIT license, and shows latest release `1.15.1` on 2026-05-04."
+    },
+    {
+      "evidence_id": "openhands-pypi",
+      "kind": "package_registry",
+      "url": "https://pypi.org/project/openhands/",
+      "title": "openhands · PyPI",
+      "captured_at": "2026-05-04T21:37:24Z",
+      "sha256": "32ed63159c77e21ee19ca1b9aa3213ccf0218eb59539560b132a8e68ef0e18ea",
+      "excerpt": "PyPI shows `openhands 1.15.1`, Python `==3.12.*`, install methods, config under `~/.openhands`, and env overrides that are not persisted."
+    }
+  ]
+}

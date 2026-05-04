@@ -1,0 +1,61 @@
+[defaults.descriptor]
+canonical_targets = ["darwin-arm64"]
+wrapper_coverage_binding_kind = "generated_from_wrapper_crate"
+always_on_capabilities = [
+  "agent_api.config.model.v1",
+  "agent_api.events",
+  "agent_api.events.live",
+  "agent_api.run",
+]
+target_gated_capabilities = []
+config_gated_capabilities = []
+backend_extensions = []
+support_matrix_enabled = true
+capability_matrix_enabled = true
+capability_matrix_target = ""
+docs_release_track = "crates-io"
+
+[candidate.goose]
+display_name = "Goose"
+research_urls = [
+  "https://goose-docs.ai/",
+  "https://goose-docs.ai/docs/getting-started/installation/",
+  "https://goose-docs.ai/docs/guides/goose-cli-commands/",
+  "https://github.com/aaif-goose/goose",
+  "https://pypi.org/project/goose-ai/",
+]
+install_channels = [
+  "curl -fsSL https://github.com/aaif-goose/goose/releases/download/stable/download_cli.sh | bash",
+  "brew install block-goose-cli",
+  "pipx install goose-ai",
+]
+auth_notes = "First run requires selecting or configuring an LLM provider. Current docs also document subscription-backed ACP setup paths and local-model workflows."
+
+[candidate.openhands]
+display_name = "OpenHands"
+research_urls = [
+  "https://openhands.dev/product/cli",
+  "https://docs.openhands.dev/openhands/usage/cli/installation",
+  "https://docs.openhands.dev/openhands/usage/cli/quick-start",
+  "https://github.com/OpenHands/OpenHands-CLI",
+  "https://pypi.org/project/openhands/",
+]
+install_channels = [
+  "uv tool install openhands --python 3.12",
+  "curl -fsSL https://install.openhands.dev/install.sh | sh",
+]
+auth_notes = "First run prompts for LLM settings and stores them under ~/.openhands. Native Windows is not supported for the CLI; current docs require running inside WSL."
+
+[candidate.gptme]
+display_name = "gptme"
+research_urls = [
+  "https://gptme.org/",
+  "https://gptme.org/docs/getting-started.html",
+  "https://github.com/gptme/gptme",
+  "https://pypi.org/project/gptme/",
+]
+install_channels = [
+  "pipx install gptme",
+  "uv tool install gptme",
+]
+auth_notes = "Requires a configured LLM provider API key unless using a supported local-model backend. Optional extras add browser, server, and other capability surfaces."

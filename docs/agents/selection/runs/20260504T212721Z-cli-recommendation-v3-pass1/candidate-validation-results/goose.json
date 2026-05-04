@@ -1,0 +1,79 @@
+{
+  "agent_id": "goose",
+  "error_reasons": [],
+  "evidence_ids_used": [
+    "goose-install",
+    "goose-running-tasks",
+    "goose-providers",
+    "goose-github",
+    "goose-pypi"
+  ],
+  "hard_gate_results": {
+    "crate_first_fit": {
+      "evidence_ids": [
+        "goose-install",
+        "goose-github",
+        "goose-pypi"
+      ],
+      "notes": "The wrapper should prefer the shell installer or Homebrew over the archived PyPI package.",
+      "rejection_reason": "",
+      "rule_id": "hard_gate.crate_first_fit.doc_or_repo_or_package_backed",
+      "status": "pass"
+    },
+    "non_interactive_execution": {
+      "evidence_ids": [
+        "goose-running-tasks",
+        "goose-pypi"
+      ],
+      "notes": "",
+      "rejection_reason": "",
+      "rule_id": "hard_gate.non_interactive_execution.verified_doc_and_package_or_probe",
+      "status": "pass"
+    },
+    "observable_cli_surface": {
+      "evidence_ids": [
+        "goose-running-tasks"
+      ],
+      "notes": "",
+      "rejection_reason": "",
+      "rule_id": "hard_gate.observable_cli_surface.verified_doc_or_repo_or_probe",
+      "status": "pass"
+    },
+    "offline_strategy": {
+      "evidence_ids": [
+        "goose-providers"
+      ],
+      "notes": "",
+      "rejection_reason": "",
+      "rule_id": "hard_gate.offline_strategy.doc_or_repo_backed",
+      "status": "pass"
+    },
+    "redaction_fit": {
+      "evidence_ids": [
+        "goose-providers",
+        "goose-github"
+      ],
+      "notes": "This is an inference from the documented config/auth surfaces rather than a repo-owned probe of emitted stderr/stdout.",
+      "rejection_reason": "",
+      "rule_id": "hard_gate.redaction_fit.repo_or_probe_backed",
+      "status": "pass"
+    },
+    "reproducibility": {
+      "evidence_ids": [
+        "goose-install",
+        "goose-pypi"
+      ],
+      "notes": "The PyPI evidence is weaker than the active docs/GitHub release train because the package is archived.",
+      "rejection_reason": "",
+      "rule_id": "hard_gate.reproducibility.doc_and_package",
+      "status": "pass"
+    }
+  },
+  "notes": [
+    "schema validation passed"
+  ],
+  "probe_results": [],
+  "rejection_reasons": [],
+  "schema_valid": true,
+  "status": "eligible"
+}

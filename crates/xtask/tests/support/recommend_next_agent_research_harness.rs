@@ -172,7 +172,22 @@ pub fn fake_codex_binary(root: &Path) -> PathBuf {
 }
 
 pub fn write_fake_codex_scenario(root: &Path, scenario: &str) {
-    write_text(&root.join(FAKE_CODEX_SCENARIO_FILE), &format!("{scenario}\n"));
+    write_text(
+        &root.join(FAKE_CODEX_SCENARIO_FILE),
+        &format!("{scenario}\n"),
+    );
+}
+
+pub fn force_freeze_discovery_failure(root: &Path) {
+    write_text(
+        &root.join("scripts/recommend_next_agent.py"),
+        concat!(
+            "#!/usr/bin/env python3\n",
+            "import sys\n",
+            "print('ERROR: forced freeze-discovery failure')\n",
+            "raise SystemExit(1)\n",
+        ),
+    );
 }
 
 pub fn packet_dir(root: &Path, run_id: &str) -> PathBuf {
@@ -328,6 +343,8 @@ candidates = [
     ("gamma", "Gamma CLI"),
     ("delta", "Delta CLI"),
 ]
+if scenario == "too_few_candidates":
+    candidates = candidates[:2]
 
 seed_lines = [
     "[defaults.descriptor]",
@@ -354,7 +371,26 @@ for agent_id, display_name in candidates:
 (allowed_root / "candidate-seed.generated.toml").write_text("\n".join(seed_lines) + "\n", encoding="utf-8")
 
 if scenario == "freeze_fail":
-    summary_text = "bad summary\n"
+    summary_text = "\n".join([
+        f"# Discovery Summary {run_id}",
+        "",
+        f"Discovery run id: {run_id}",
+        "Discovery pass number: 1",
+        "Queries used: best AI coding CLI; AI agent CLI tools; developer agent command line",
+        "",
+        "## alpha - Alpha CLI",
+        "Alpha CLI entered the pool for run {run_id}.",
+        "",
+        "## beta - Beta CLI",
+        "Beta CLI entered the pool for run {run_id}.",
+        "",
+        "## gamma - Gamma CLI",
+        "Gamma CLI entered the pool for run {run_id}.",
+        "",
+        "## delta - Delta CLI",
+        "Delta CLI entered the pool for run {run_id}.",
+        "",
+    ]).replace("{run_id}", run_id)
 else:
     lines = [
         f"# Discovery Summary {run_id}",
@@ -365,9 +401,15 @@ else:
         "",
     ]
     for agent_id, display_name in candidates:
+        heading = f"## {agent_id} - {display_name}"
+        if scenario == "summary_missing_display_name":
+            heading = f"## {agent_id}"
+        body = f"{display_name} entered the pool for run {run_id}."
+        if scenario == "summary_missing_display_name":
+            body = f"Candidate {agent_id} entered the pool for run {run_id}."
         lines.extend([
-            f"## {agent_id} - {display_name}",
-            f"{display_name} entered the pool for run {run_id}.",
+            heading,
+            body,
             "",
         ])
     summary_text = "\n".join(lines)
@@ -402,9 +444,24 @@ for rank, (agent_id, display_name) in enumerate(candidates, start=1):
     entry["sha256"] = hashlib.sha256(
         json.dumps(canonical_entry(entry), sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
     ).hexdigest()
+    if scenario == "freeze_fail" and rank == 1:
+        entry["sha256"] = "0" * 64
     sources.append(entry)
+payload = {"run_id": run_id, "sources": sources}
+if scenario == "invalid_sources_lock_keys":
+    payload = {
+        "workflow_version": "recommend_next_agent_research_v1",
+        "run_id": run_id,
+        "sources": [
+            {
+                **{k: v for k, v in entry.items() if k != "source_kind"},
+                "kind": entry["source_kind"],
+            }
+            for entry in sources
+        ],
+    }
 (allowed_root / "sources.lock.json").write_text(
-    json.dumps({"run_id": run_id, "sources": sources}, indent=2, sort_keys=True) + "\n",
+    json.dumps(payload, indent=2, sort_keys=True) + "\n",
     encoding="utf-8",
 )
 
@@ -440,12 +497,82 @@ seed_text = seed_snapshot.read_text(encoding="utf-8")
 seed_sha = hashlib.sha256(seed_snapshot.read_bytes()).hexdigest()
 candidate_ids = re.findall(r"^\[candidate\.([A-Za-z0-9_-]+)\]\s*$", seed_text, flags=re.MULTILINE)
 for index, agent_id in enumerate(candidate_ids):
+    display_name = agent_id.replace("_", " ").title()
+    evidence = [
+        {
+            "evidence_id": f"{agent_id}-doc",
+            "kind": "official_doc",
+            "url": f"https://research.local/{agent_id}/docs",
+            "title": f"{display_name} docs",
+            "captured_at": "2026-05-04T00:00:00Z",
+            "sha256": hashlib.sha256(f"{agent_id}:doc".encode("utf-8")).hexdigest(),
+            "excerpt": f"{display_name} official docs",
+        },
+        {
+            "evidence_id": f"{agent_id}-pkg",
+            "kind": "package_registry",
+            "url": f"https://research.local/{agent_id}/pkg",
+            "title": f"{display_name} package registry",
+            "captured_at": "2026-05-04T00:00:00Z",
+            "sha256": hashlib.sha256(f"{agent_id}:pkg".encode("utf-8")).hexdigest(),
+            "excerpt": f"{display_name} package registry",
+        },
+        {
+            "evidence_id": f"{agent_id}-gh",
+            "kind": "github",
+            "url": f"https://research.local/{agent_id}/repo",
+            "title": f"{display_name} repository",
+            "captured_at": "2026-05-04T00:00:00Z",
+            "sha256": hashlib.sha256(f"{agent_id}:gh".encode("utf-8")).hexdigest(),
+            "excerpt": f"{display_name} repository",
+        },
+    ]
+    claims = {}
+    for claim_key in [
+        "non_interactive_execution",
+        "offline_strategy",
+        "observable_cli_surface",
+        "redaction_fit",
+        "crate_first_fit",
+        "reproducibility",
+        "future_leverage",
+    ]:
+        claims[claim_key] = {
+            "state": "verified" if claim_key in {"non_interactive_execution", "observable_cli_surface"} else "inferred",
+            "summary": f"{display_name} {claim_key} summary",
+            "evidence_ids": [f"{agent_id}-doc", f"{agent_id}-pkg", f"{agent_id}-gh"],
+        }
     payload = {
+        "schema_version": "1.0.0",
         "agent_id": agent_id,
+        "display_name": display_name,
+        "generated_at": "2026-05-04T00:00:00Z",
         "seed_snapshot_sha256": seed_sha,
+        "official_links": [
+            f"https://research.local/{agent_id}/docs",
+            f"https://research.local/{agent_id}/repo",
+        ],
+        "install_channels": [
+            f"brew install {agent_id}",
+            f"npm install -g {agent_id}",
+        ],
+        "auth_prerequisites": [f"{display_name} auth notes"],
+        "claims": claims,
+        "probe_requests": [
+            {
+                "probe_kind": "help",
+                "binary": agent_id.replace("_", "-"),
+                "required_for_gate": False,
+            }
+        ],
+        "blocked_steps": [],
+        "normalized_caveats": [],
+        "evidence": evidence,
     }
     if scenario == "identity_mismatch" and index == 0:
         payload["seed_snapshot_sha256"] = "0" * 64
+    if scenario == "invalid_research_schema" and index == 0:
+        payload["official_links"] = [{"label": "Docs", "url": f"https://research.local/{agent_id}/docs"}]
     (allowed_root / "dossiers" / f"{agent_id}.json").write_text(
         json.dumps(payload, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",

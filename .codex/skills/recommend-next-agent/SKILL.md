@@ -82,6 +82,9 @@ cargo run -p xtask -- onboard-agent --approval docs/agents/lifecycle/<onboarding
 - Pass support is exactly `pass1` and `pass2`.
 - `pass2` requires prior insufficiency input and a fresh `run_id`.
 - `--write` is invalid without a preexisting dry-run packet for the same `run_id`.
+- The host flow rejects discovery seeds with fewer than 3 candidates before `freeze-discovery`.
+- The host flow may canonicalize valid `sources.lock.json` entry hashes before `freeze-discovery`.
+- The host flow validates research dossiers against the same repo-owned Python contract that `generate` uses.
 - Codex write roots are limited to `docs/agents/.uaa-temp/recommend-next-agent/discovery/<run_id>/` and `docs/agents/.uaa-temp/recommend-next-agent/research/<run_id>/`.
 - The execution packet root is `docs/agents/.uaa-temp/recommend-next-agent/research-runs/<run_id>/`.
 - The evaluation run root is `docs/agents/.uaa-temp/recommend-next-agent/runs/<run_id>/`.

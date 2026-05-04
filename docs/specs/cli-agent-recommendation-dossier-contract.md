@@ -179,6 +179,8 @@ Required per-candidate fields are unchanged:
 - `install_channels`
 - `auth_notes`
 
+The generated seed MUST define at least 3 candidate ids before `freeze-discovery` may run.
+
 Discovery rationale belongs in `discovery-summary.md`, not in the generated seed.
 
 ### `discovery-summary.md`
@@ -232,10 +234,11 @@ Entries with `source_kind = web_search_result` MUST also contain:
   - `title`
   - `captured_at`
   - `role`
-  - `query` and `rank` when `source_kind = web_search_result`
+- `query` and `rank` when `source_kind = web_search_result`
 - DO NOT hash live page bodies, screenshots, or fetched HTML
 
 Two logically identical entries MUST therefore produce the same `sha256` across reruns.
+The repo-owned host surface MAY canonicalize each entry’s `sha256` field to this exact value before `freeze-discovery` runs.
 
 ## Discovery Query Families And Nomination Rules
 
@@ -347,12 +350,14 @@ Repo-owned `--write` responsibilities:
 - validate `candidate-seed.generated.toml`
 - validate `discovery-summary.md`
 - validate discovery `sources.lock.json`
+- canonicalize discovery `sources.lock.json` entry `sha256` values to the frozen rule before `freeze-discovery`
+- fail closed if the generated seed defines fewer than 3 candidates
 - reject duplicate candidate ids
 - reject candidates already onboarded in the registry
 - perform `freeze-discovery`
 - copy the reviewed generated seed to `research/<run_id>/seed.snapshot.toml`
 - copy all three discovery artifacts to `research/<run_id>/discovery-input/`
-- validate the research artifacts and exact dossier count
+- validate the research metadata envelope, dossier schema, and exact dossier count against the repo-owned Python contract
 - record execution evidence and path-level write audits under `research-runs/<run_id>/`
 
 The post-research CLI surfaces stay unchanged:
