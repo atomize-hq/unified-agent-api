@@ -26,6 +26,7 @@ pub use xtask::onboard_agent;
 pub use xtask::prepare_proving_run_closeout;
 pub use xtask::prepare_publication;
 pub use xtask::publication_refresh;
+pub use xtask::recommend_next_agent_research;
 pub use xtask::repair_runtime_evidence;
 pub use xtask::runtime_follow_on;
 pub use xtask::support_matrix;
@@ -78,6 +79,8 @@ enum Command {
     PreparePublication(prepare_publication::Args),
     /// Refresh publication-owned outputs from a committed publication-ready packet.
     RefreshPublication(publication_refresh::Args),
+    /// Prepare or validate the bounded recommendation research lane.
+    RecommendNextAgentResearch(recommend_next_agent_research::Args),
     /// Prepare the canonical proving-run closeout draft from published lifecycle truth.
     PrepareProvingRunCloseout(prepare_proving_run_closeout::Args),
     /// Repair a stale runtime evidence bundle without advancing lifecycle stage.
@@ -219,6 +222,15 @@ fn main() {
                 err.exit_code()
             }
         },
+        Command::RecommendNextAgentResearch(args) => {
+            match recommend_next_agent_research::run(args) {
+                Ok(()) => 0,
+                Err(err) => {
+                    eprintln!("{err}");
+                    err.exit_code()
+                }
+            }
+        }
         Command::PrepareProvingRunCloseout(args) => match prepare_proving_run_closeout::run(args) {
             Ok(()) => 0,
             Err(err) => {
