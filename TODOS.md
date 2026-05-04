@@ -2,18 +2,6 @@
 
 ## Pending
 
-### Make The Published State Honest In The Lifecycle Model
-
-**What:** Resolve the mismatch between the lifecycle schema and the live lane by either making `published` a real committed transition or removing/replacing it so the state machine matches the actual path from runtime integration to closeout.
-
-**Why:** The repo currently talks about green published state, but the live create lane does not appear to write `LifecycleStage::Published`. It transitions from `runtime_integrated` to `publication_ready` and then to `closed_baseline`, which means “published” is more of a validated condition than a committed lifecycle state.
-
-**Context:** This is a control-plane truth problem, not just naming polish. As long as the schema advertises a state with no real writer, operators and future automation have to reason about historical compatibility instead of one honest machine. This milestone should define the canonical post-publication stage semantics, update the operator guide and charter, and align closeout/maintenance logic to the chosen model.
-
-**Effort:** S
-**Priority:** P1
-**Depends on:** The publication lane being enclosed enough to define exactly when publication is complete and what lifecycle evidence that completion owns
-
 ### Enclose Create-Mode Closeout Without Ad Hoc Authoring
 
 **What:** Add a repo-owned closeout preparation flow that materializes or scaffolds `proving-run-closeout.json` from machine-known lifecycle facts plus the minimal remaining human inputs, so the create lane can advance from green publication to `closed_baseline` without freehand artifact authoring.
@@ -63,6 +51,19 @@
 **Depends on:** `uaa-0022` landing with a structured runtime summary and explicit handoff into publication refresh
 
 ## Completed
+
+### Make The Published State Honest In The Lifecycle Model
+
+**What:** Resolve the mismatch between the lifecycle schema and the live lane by either making `published` a real committed transition or removing/replacing it so the state machine matches the actual path from runtime integration to closeout.
+
+**Why:** The repo currently talks about green published state, but the live create lane does not appear to write `LifecycleStage::Published`. It transitions from `runtime_integrated` to `publication_ready` and then to `closed_baseline`, which means “published” is more of a validated condition than a committed lifecycle state.
+
+**Context:** This landed on 2026-05-03 with `refresh-publication --write` as the sole committed writer of `LifecycleStage::Published`, the canonical create-mode path corrected to `publication_ready -> published -> closed_baseline`, maintenance and closeout semantics aligned to treat `published` as the normal post-refresh state, and docs plus regression coverage updated to reflect one honest lifecycle story.
+
+**Effort:** S
+**Priority:** P1
+**Depends on:** The publication lane being enclosed enough to define exactly when publication is complete and what lifecycle evidence that completion owns
+**Completed:** landed on 2026-05-03
 
 ### Enclose The Publication Lane End To End
 
