@@ -1,9 +1,18 @@
+#[path = "close_proving_run/render.rs"]
+mod render;
+
 use std::{
     fs,
     io::{self, Write},
     path::{Component, Path, PathBuf},
+    process::Command,
 };
 
+use self::render::{
+    release_touchpoint_lines, render_handoff_body, render_markdown_file, render_readme_body,
+    render_remediation_log_body, render_review_surfaces_body, render_scope_brief_body,
+    render_seam_map_body, render_threading_body,
+};
 use clap::Parser;
 use thiserror::Error;
 use xtask::workspace_mutation::{
@@ -19,20 +28,16 @@ use xtask::{
     agent_registry::{AgentRegistry, AgentRegistryEntry, REGISTRY_RELATIVE_PATH},
     approval_artifact::{load_approval_artifact, ApprovalArtifact, ApprovalArtifactError},
     proving_run_closeout::{
-        self, DurationTruth, ProvingRunCloseout, ProvingRunCloseoutError,
-        ProvingRunCloseoutExpected, ResidualFrictionTruth,
+        self, build_closeout, has_unresolved_placeholders, render_closeout_json,
+        unresolved_placeholder_fields, DurationTruth, ProvingRunCloseout, ProvingRunCloseoutError,
+        ProvingRunCloseoutExpected, ProvingRunCloseoutHumanFields, ProvingRunCloseoutMachineFields,
+        ProvingRunCloseoutState, ResidualFrictionTruth,
     },
 };
 
-const OWNERSHIP_MARKER: &str = "<!-- generated-by: xtask onboard-agent; owner: control-plane -->";
 const DOCS_NEXT_ROOT: &str = "docs/agents/lifecycle";
-const REGISTRY_ENTRY_PATH: &str = "crates/xtask/data/agent_registry.toml";
-const RELEASE_DOC_PATH: &str = "docs/crates-io-release.md";
-const PUBLISH_WORKFLOW_PATH: &str = ".github/workflows/publish-crates.yml";
-const PUBLISH_SCRIPT_PATH: &str = "scripts/publish_crates.py";
-const VALIDATE_PUBLISH_SCRIPT_PATH: &str = "scripts/validate_publish_versions.py";
-const CHECK_PUBLISH_READINESS_SCRIPT_PATH: &str = "scripts/check_publish_readiness.py";
 const NEXT_MAINTENANCE_COMMAND_TEMPLATE: &str = "check-agent-drift --agent {agent_id}";
+const APPROVAL_SOURCE: &str = "governance-review";
 
 #[derive(Debug, Parser, Clone)]
 pub struct Args {
@@ -108,8 +113,11 @@ pub fn run_in_workspace<W: Write>(
             ))
         })?;
     validate_closeout_prerequisites(workspace_root, entry, &approval, &closeout_path, &closeout)?;
+    let finalized_closeout =
+        finalize_closeout(workspace_root, &approval, &closeout, &closeout_path)?;
+    write_closeout_artifact(workspace_root, &closeout_path, &finalized_closeout)?;
 
-    let docs_preview = build_docs_preview(entry, &closeout, &closeout_path);
+    let docs_preview = build_docs_preview(entry, &finalized_closeout, &closeout_path);
     write_docs(workspace_root, &docs_preview)?;
     update_lifecycle_baseline(workspace_root, entry, &approval, &closeout_path)?;
 
@@ -286,6 +294,13 @@ fn validate_closeout_prerequisites(
         approval,
         &entry.manifest_root,
     )?;
+    if has_unresolved_placeholders(closeout) {
+        return Err(Error::Validation(format!(
+            "{} contains unresolved prepared-closeout placeholders in: {}",
+            closeout_path.display(),
+            unresolved_placeholder_fields(closeout).join(", ")
+        )));
+    }
     if !closeout.preflight_passed {
         return Err(Error::Validation(format!(
             "{} records `preflight_passed = false`; close-proving-run requires a green preflight gate",
@@ -462,6 +477,67 @@ fn validate_capability_matrix_audit_green(workspace_root: &Path) -> Result<(), E
         .map_err(Error::Validation)
 }
 
+fn finalize_closeout(
+    workspace_root: &Path,
+    approval: &ApprovalArtifact,
+    closeout: &ProvingRunCloseout,
+    closeout_path: &Path,
+) -> Result<ProvingRunCloseout, Error> {
+    build_closeout(
+        ProvingRunCloseoutState::Closed,
+        ProvingRunCloseoutMachineFields {
+            approval_ref: approval.relative_path.clone(),
+            approval_sha256: approval.sha256.clone(),
+            approval_source: APPROVAL_SOURCE.to_string(),
+            preflight_passed: true,
+            recorded_at: agent_lifecycle::now_rfc3339()
+                .map_err(|err| Error::Internal(err.to_string()))?,
+            commit: current_head_commit(workspace_root, &closeout.commit),
+        },
+        ProvingRunCloseoutHumanFields {
+            manual_control_plane_edits: closeout.manual_control_plane_edits,
+            partial_write_incidents: closeout.partial_write_incidents,
+            ambiguous_ownership_incidents: closeout.ambiguous_ownership_incidents,
+            duration: match &closeout.duration {
+                DurationTruth::Seconds(seconds) => DurationTruth::Seconds(*seconds),
+                DurationTruth::MissingReason(reason) => {
+                    DurationTruth::MissingReason(reason.clone())
+                }
+            },
+            residual_friction: match &closeout.residual_friction {
+                ResidualFrictionTruth::Items(items) => ResidualFrictionTruth::Items(items.clone()),
+                ResidualFrictionTruth::ExplicitNone(reason) => {
+                    ResidualFrictionTruth::ExplicitNone(reason.clone())
+                }
+            },
+        },
+    )
+    .map_err(map_closeout_error)
+    .map_err(|err| match err {
+        Error::Validation(message) => {
+            Error::Validation(format!("{}: {message}", closeout_path.display()))
+        }
+        other => other,
+    })
+}
+
+fn write_closeout_artifact(
+    workspace_root: &Path,
+    closeout_path: &Path,
+    closeout: &ProvingRunCloseout,
+) -> Result<(), Error> {
+    let jail = WorkspacePathJail::new(workspace_root)?;
+    let mutation = plan_create_or_replace(
+        &jail,
+        closeout_path.to_path_buf(),
+        render_closeout_json(closeout)
+            .map_err(map_closeout_error)?
+            .into_bytes(),
+    )?;
+    apply_mutations(workspace_root, &[mutation])?;
+    Ok(())
+}
+
 fn load_validated_closeout(
     workspace_root: &Path,
     closeout_path: &Path,
@@ -473,11 +549,15 @@ fn load_validated_closeout(
         approval_path: Some(approval_path),
         onboarding_pack_prefix,
     };
-    proving_run_closeout::load_validated_closeout(
+    proving_run_closeout::load_validated_closeout_with_states(
         workspace_root,
         closeout_path,
         resolved_closeout_path,
         expected,
+        &[
+            ProvingRunCloseoutState::Prepared,
+            ProvingRunCloseoutState::Closed,
+        ],
     )
     .map_err(map_closeout_error)
 }
@@ -566,145 +646,19 @@ fn display_repo_relative_path(path: &Path) -> String {
     path.display().to_string()
 }
 
-fn release_touchpoint_lines(entry: &AgentRegistryEntry) -> Vec<String> {
-    vec![
-        format!(
-            "Path: Cargo.toml will ensure workspace member `{}` is enrolled.",
-            entry.crate_path
-        ),
-        format!(
-            "Path: {RELEASE_DOC_PATH} will ensure the generated release block includes `{}` on release track `{}`.",
-            entry.package_name, entry.release.docs_release_track
-        ),
-        format!(
-            "Workflow and script files remain unchanged: {PUBLISH_WORKFLOW_PATH}, {PUBLISH_SCRIPT_PATH}, {VALIDATE_PUBLISH_SCRIPT_PATH}, {CHECK_PUBLISH_READINESS_SCRIPT_PATH}."
-        ),
-    ]
-}
-
-fn render_markdown_file(body: String) -> String {
-    format!("{OWNERSHIP_MARKER}\n\n{body}")
-}
-
-fn render_readme_body(
-    entry: &AgentRegistryEntry,
-    closeout: &ProvingRunCloseout,
-    closeout_path: &str,
-) -> String {
-    format!(
-        "# {} onboarding pack\n\nThis packet records the closed proving run for `{}`.\n\n- Packet state: `closed_proving_run`\n- Agent id: `{}`\n- Wrapper crate: `{}`\n- Backend module: `{}`\n- Manifest root: `{}`\n- Closeout metadata is recorded in `{}`.\n- Approval linkage: `{}` via `{}` (`sha256: {}`)\n",
-        entry.display_name,
-        entry.display_name,
-        entry.agent_id,
-        entry.crate_path,
-        entry.backend_module,
-        entry.manifest_root,
-        closeout_path,
-        closeout.approval_source,
-        closeout.approval_ref,
-        closeout.approval_sha256
-    )
-}
-
-fn render_scope_brief_body(
-    entry: &AgentRegistryEntry,
-    docs_root_display: &str,
-    closeout: &ProvingRunCloseout,
-    closeout_path: &str,
-) -> String {
-    format!(
-        "# Scope brief\n\nThis packet records the closed proving run for `{}`.\n\n- Registry enrollment in `{REGISTRY_ENTRY_PATH}`\n- Docs pack in `{docs_root_display}`\n- Manifest root in `{}`\n- Closeout metadata in `{}`\n- Approval linkage via `{}` (`{}`, sha256 `{}`)\n\nCloseout status: `make preflight` {} for this proving run.\n",
-        entry.agent_id,
-        entry.manifest_root,
-        closeout_path,
-        closeout.approval_ref,
-        closeout.approval_source,
-        closeout.approval_sha256,
-        if closeout.preflight_passed {
-            "passed"
-        } else {
-            "did not pass"
-        }
-    )
-}
-
-fn render_seam_map_body(entry: &AgentRegistryEntry, docs_root_display: &str) -> String {
-    format!(
-        "# Seam map\n\n- Declaration seam: registry entry for `{}`\n- Docs seam: onboarding pack `{docs_root_display}`\n- Manifest seam: `{}`\n- Runtime seam: wrapper crate `{}` and backend module `{}`\n",
-        entry.agent_id,
-        entry.manifest_root,
-        entry.crate_path,
-        entry.backend_module
-    )
-}
-
-fn render_threading_body(entry: &AgentRegistryEntry) -> String {
-    format!(
-        "# Threading\n\n1. Control-plane onboarding writes for `{}` landed without follow-up packet drift.\n2. Runtime-owned wrapper and backend work landed at `{}` and `{}`.\n3. Manifest evidence and publication artifacts were regenerated from committed runtime outputs.\n4. The proving run closed with `make preflight`.\n",
-        entry.agent_id,
-        entry.crate_path,
-        entry.backend_module
-    )
-}
-
-fn render_review_surfaces_body(entry: &AgentRegistryEntry, docs_root_display: &str) -> String {
-    format!(
-        "# Review surfaces\n\n- `{REGISTRY_ENTRY_PATH}`\n- `{docs_root_display}`\n- `{}`\n- `{RELEASE_DOC_PATH}`\n- Supporting release rails remained unchanged across the proving run: `{PUBLISH_WORKFLOW_PATH}`, `{PUBLISH_SCRIPT_PATH}`, `{VALIDATE_PUBLISH_SCRIPT_PATH}`, `{CHECK_PUBLISH_READINESS_SCRIPT_PATH}`\n",
-        entry.manifest_root
-    )
-}
-
-fn render_remediation_log_body(closeout: &ProvingRunCloseout) -> String {
-    format!(
-        "# Remediation log\n\n{}\n",
-        render_residual_friction_lines(closeout)
-    )
-}
-
-fn render_handoff_body(
-    entry: &AgentRegistryEntry,
-    closeout: &ProvingRunCloseout,
-    closeout_path: &str,
-    release_touchpoints: &str,
-) -> String {
-    format!(
-        "# Handoff\n\nThis packet records the closed proving run for `{}`.\n\n## Release touchpoints\n\n{}\n\n## Proving-run closeout\n\n- approval ref: `{}`\n- approval source: `{}`\n- approval artifact sha256: `{}`\n- manual control-plane file edits by maintainers: `{}`\n- partial-write incidents: `{}`\n- ambiguous ownership incidents: `{}`\n- approved-agent to repo-ready control-plane mutation time: `{}`\n- proving-run closeout passes `make preflight`: `{}`\n- recorded at: `{}`\n- commit: `{}`\n- closeout metadata: `{}`\n\n## Residual friction\n\n{}\n\n## Status\n\nNo open runtime next step remains in this packet.\n",
-        entry.agent_id,
-        release_touchpoints,
-        closeout.approval_ref,
-        closeout.approval_source,
-        closeout.approval_sha256,
-        closeout.manual_control_plane_edits,
-        closeout.partial_write_incidents,
-        closeout.ambiguous_ownership_incidents,
-        render_closeout_duration(closeout),
-        closeout.preflight_passed,
-        closeout.recorded_at,
-        closeout.commit,
-        closeout_path,
-        render_residual_friction_lines(closeout)
-    )
-}
-
-fn render_closeout_duration(closeout: &ProvingRunCloseout) -> String {
-    match &closeout.duration {
-        DurationTruth::Seconds(seconds) => format!("{seconds}s"),
-        DurationTruth::MissingReason(reason) => format!("missing ({reason})"),
-    }
-}
-
-fn render_residual_friction_lines(closeout: &ProvingRunCloseout) -> String {
-    let mut lines = match &closeout.residual_friction {
-        ResidualFrictionTruth::Items(items) => items
-            .iter()
-            .map(|item| format!("- {item}"))
-            .collect::<Vec<_>>(),
-        ResidualFrictionTruth::ExplicitNone(reason) => {
-            vec![format!("- No residual friction recorded: {reason}")]
-        }
+fn current_head_commit(workspace_root: &Path, fallback: &str) -> String {
+    let output = Command::new("git")
+        .arg("rev-parse")
+        .arg("HEAD")
+        .current_dir(workspace_root)
+        .output();
+    let Ok(output) = output else {
+        return fallback.to_string();
     };
-    if let DurationTruth::MissingReason(reason) = &closeout.duration {
-        lines.push(format!("- Duration missing reason: {reason}"));
+    if !output.status.success() {
+        return fallback.to_string();
     }
-    lines.join("\n")
+    String::from_utf8(output.stdout)
+        .map(|commit| commit.trim().to_string())
+        .unwrap_or_else(|_| fallback.to_string())
 }

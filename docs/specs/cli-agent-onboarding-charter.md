@@ -181,14 +181,26 @@ Canonical lifecycle record:
      - `cargo run -p xtask -- capability-matrix-audit`
      - `make preflight`
    - on success, commit lifecycle stage `published` in `lifecycle-state.json` and record packet continuity there while leaving `publication-ready.json` as the pre-refresh handoff packet
-   - the next command template after refresh remains `close-proving-run --approval <path> --closeout docs/agents/lifecycle/<prefix>/governance/proving-run-closeout.json`
-8) Ensure required CI workflows pass (see below).
+   - the next command template after refresh remains `prepare-proving-run-closeout --approval <path> --write`
+8) Run `prepare-proving-run-closeout --approval docs/agents/lifecycle/<onboarding_pack_prefix>/governance/approved-agent.toml --write` after publication refresh succeeds:
+   - write the canonical closeout artifact only at `docs/agents/lifecycle/<prefix>/governance/proving-run-closeout.json`
+   - materialize that closeout artifact with `state = prepared`
+   - keep lifecycle stage `published` until final closeout succeeds
+   - prepare the generated onboarding packet in preview phase `closeout_prepared`
+   - hand bounded human edits on the prepared closeout artifact to the maintainer before final closeout
+9) Complete bounded human edits in `docs/agents/lifecycle/<prefix>/governance/proving-run-closeout.json`, then run `close-proving-run --approval <path> --closeout docs/agents/lifecycle/<prefix>/governance/proving-run-closeout.json`:
+   - the committed closeout artifact must remain on the canonical path above
+   - closeout states are exactly `prepared` and `closed`
+   - prepared packet surfaces must not present the proving run as closed
+10) Ensure required CI workflows pass (see below).
 
 Publication handoff rule:
 - `docs/agents/lifecycle/<onboarding_pack_prefix>/governance/publication-ready.json` is the only committed publication handoff packet
 - once `publication-ready.json` exists, its `runtime_evidence_paths` become the only frozen committed authority for runtime evidence; sibling `.uaa-temp` runs are never authoritative by sort order
 - `publication_ready` means that committed handoff packet exists and refresh is the next required command; it is not a second steady-state publication meaning
-- `close-proving-run` consumes committed `published` state on the normal path
+- after publication refresh, the required post-publication flow is `refresh-publication -> prepare-proving-run-closeout -> bounded human edits -> close-proving-run`
+- `prepare-proving-run-closeout` consumes committed `published` state on the normal path and writes the canonical closeout artifact in `state = prepared`
+- `close-proving-run` is the final transition that consumes the prepared closeout artifact and records `state = closed`
 - any remaining `publication_ready` acceptance is limited to narrow transitional compatibility for legacy/manual records
 - scratch runtime `handoff.json` files remain run evidence only
 

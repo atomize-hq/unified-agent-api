@@ -9,6 +9,7 @@ use xtask::{
     agent_lifecycle::{load_lifecycle_state, LifecycleStage, PublicationReadyPacket},
     approval_artifact::load_approval_artifact,
     prepare_publication::validate_runtime_evidence_run_for_approval,
+    proving_run_closeout,
 };
 
 #[allow(dead_code)]
@@ -267,9 +268,26 @@ fn historical_lifecycle_backfill_rebuilds_multi_file_runtime_evidence_and_downst
         lifecycle.publication_packet_path.as_deref(),
         Some("docs/agents/lifecycle/gemini-cli-onboarding/governance/publication-ready.json")
     );
-    assert!(fixture
-        .join("docs/agents/lifecycle/gemini-cli-onboarding/governance/proving-run-closeout.json")
-        .is_file());
+    let closeout_rel =
+        "docs/agents/lifecycle/gemini-cli-onboarding/governance/proving-run-closeout.json";
+    let closeout_path = fixture.join(closeout_rel);
+    let closeout = proving_run_closeout::load_validated_closeout_with_states(
+        &fixture,
+        Path::new(closeout_rel),
+        &closeout_path,
+        proving_run_closeout::ProvingRunCloseoutExpected {
+            approval_path: Some(Path::new(&approval_path)),
+            onboarding_pack_prefix: "gemini-cli-onboarding",
+        },
+        proving_run_closeout::ProvingRunCloseoutState::all(),
+    )
+    .expect("load closeout through shared parser");
+    assert_eq!(closeout.state.as_str(), "closed");
+    assert_eq!(
+        fs::read_to_string(&closeout_path).expect("read closeout"),
+        proving_run_closeout::render_closeout_json(&closeout)
+            .expect("render closeout through shared serializer")
+    );
 }
 
 fn write_json(path: &Path, value: &Value) {

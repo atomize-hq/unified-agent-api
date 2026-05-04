@@ -345,13 +345,7 @@ fn refresh_publication_write_advances_to_closeout_and_refreshes_outputs() {
         lifecycle_state
             .get("expected_next_command")
             .and_then(Value::as_str),
-        Some(
-            agent_lifecycle::publication_ready_closeout_command(
-                APPROVAL_PATH,
-                "gemini-cli-onboarding",
-            )
-            .as_str(),
-        )
+        Some(agent_lifecycle::published_prepare_closeout_command(APPROVAL_PATH).as_str(),)
     );
     assert_eq!(
         lifecycle_state
@@ -597,13 +591,7 @@ fn refresh_publication_rejects_rerun_after_published_handoff_is_set() {
         lifecycle_state
             .get("expected_next_command")
             .and_then(Value::as_str),
-        Some(
-            agent_lifecycle::publication_ready_closeout_command(
-                APPROVAL_PATH,
-                "gemini-cli-onboarding",
-            )
-            .as_str(),
-        )
+        Some(agent_lifecycle::published_prepare_closeout_command(APPROVAL_PATH).as_str(),)
     );
     for (path, first_contents) in outputs_after_first {
         let second_contents = fs::read(fixture.join(&path)).expect("read second-pass output");

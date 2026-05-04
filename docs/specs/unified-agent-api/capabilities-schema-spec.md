@@ -87,6 +87,8 @@ Semantics (pinned):
   `runtime_integrated`, `publication_ready`, `published`, or `closed_baseline`.
 - The canonical committed create-mode publication path is `publication_ready -> published -> closed_baseline`.
 - In that path, `publication_ready` is the pre-refresh handoff stage only, `published` is committed only after `refresh-publication --write` succeeds, and `closed_baseline` is the post-closeout steady state.
+- While lifecycle stage remains `published`, the required post-publication handoff is `refresh-publication -> prepare-proving-run-closeout -> bounded human edits -> close-proving-run`.
+- During that `published` interval, the canonical closeout artifact remains `docs/agents/lifecycle/<prefix>/governance/proving-run-closeout.json`, its states are exactly `prepared` and `closed`, and prepared preview surfaces must not present the run as closed.
 - Any remaining use of `publication_ready` as a publication-eligible compatibility branch is narrow and transitional, not a second steady-state meaning of published truth.
 - Before an agent's advertised capability set is accepted into publication truth, generation validates approval/registry
   continuity, lifecycle/approval continuity, and manifest target continuity for that agent.

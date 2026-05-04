@@ -7,8 +7,9 @@ use sha2::Digest;
 use xtask::{
     agent_lifecycle::{
         approval_artifact_path_for_entry, file_sha256, is_resting_stage_v1,
-        lifecycle_state_path_for_entry, load_lifecycle_state, publication_ready_closeout_command,
+        lifecycle_state_path_for_entry, load_lifecycle_state,
         publication_ready_expected_next_commands, publication_ready_refresh_command,
+        published_prepare_closeout_command,
         reconstruct_publication_ready_state_from_closed_baseline, required_evidence_for_stage,
         validate_stage_support_tier, EvidenceId, LifecycleStage, LifecycleState,
         PublicationReadyPacket, SupportTier, REQUIRED_PUBLICATION_COMMANDS,
@@ -93,7 +94,7 @@ fn required_publication_command_set_is_frozen() {
 }
 
 #[test]
-fn publication_ready_next_command_templates_match_refresh_then_closeout_contract() {
+fn publication_ready_next_command_templates_match_refresh_then_prepare_closeout_contract() {
     let approval_path =
         "docs/agents/lifecycle/gemini-cli-onboarding/governance/approved-agent.toml";
     let expected = publication_ready_expected_next_commands(approval_path, "gemini-cli-onboarding");
@@ -101,7 +102,7 @@ fn publication_ready_next_command_templates_match_refresh_then_closeout_contract
         expected,
         [
             publication_ready_refresh_command(approval_path),
-            publication_ready_closeout_command(approval_path, "gemini-cli-onboarding"),
+            published_prepare_closeout_command(approval_path),
         ]
     );
 }

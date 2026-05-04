@@ -407,10 +407,8 @@ fn build_next_lifecycle_state(context: &RefreshContext) -> Result<LifecycleState
         agent_lifecycle::SupportTier::PublicationBacked
     };
     next_state.current_owner_command = "refresh-publication --write".to_string();
-    next_state.expected_next_command = agent_lifecycle::publication_ready_closeout_command(
-        &context.approval.relative_path,
-        &context.entry.scaffold.onboarding_pack_prefix,
-    );
+    next_state.expected_next_command =
+        agent_lifecycle::published_prepare_closeout_command(&context.approval.relative_path);
     next_state.last_transition_at =
         now_rfc3339().map_err(|err| Error::Internal(err.to_string()))?;
     next_state.last_transition_by = "xtask refresh-publication --write".to_string();

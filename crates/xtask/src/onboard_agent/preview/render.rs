@@ -1,7 +1,9 @@
 use std::path::{Path, PathBuf};
 
 use crate::agent_registry::REGISTRY_RELATIVE_PATH;
-use crate::proving_run_closeout::{DurationTruth, ProvingRunCloseout, ResidualFrictionTruth};
+use crate::proving_run_closeout::{
+    DurationTruth, ProvingRunCloseout, ProvingRunCloseoutState, ResidualFrictionTruth,
+};
 
 use super::super::{
     CHECK_PUBLISH_READINESS_SCRIPT_PATH, OWNERSHIP_MARKER, PUBLISH_SCRIPT_PATH,
@@ -125,19 +127,22 @@ fn render_readme_body(
     closeout_path: &str,
     approval: Option<ApprovalRenderInput<'_>>,
 ) -> String {
-    let packet_state = match phase {
-        PacketPhase::Execution => "execution",
-        PacketPhase::Closeout(_) => "closed_proving_run",
-    };
+    let packet_state = packet_phase_name(phase);
     let summary = match phase {
         PacketPhase::Execution => format!(
             "This packet records the current onboarding handoff for `{}`.",
             draft.display_name
         ),
-        PacketPhase::Closeout(_) => format!(
-            "This packet records the closed proving run for `{}`.",
-            draft.display_name
-        ),
+        PacketPhase::Closeout(closeout) => match closeout.state {
+            ProvingRunCloseoutState::Prepared => format!(
+                "This packet records the prepared proving-run closeout draft for `{}`.",
+                draft.display_name
+            ),
+            ProvingRunCloseoutState::Closed => format!(
+                "This packet records the closed proving run for `{}`.",
+                draft.display_name
+            ),
+        },
     };
     let closeout_line = match phase {
         PacketPhase::Execution => {
@@ -145,13 +150,21 @@ fn render_readme_body(
                 "Closeout metadata becomes authoritative at `{closeout_path}` once the proving run closes."
             ) + &render_execution_approval_linkage(approval)
         }
-        PacketPhase::Closeout(closeout) => {
-            format!("Closeout metadata is recorded in `{closeout_path}`.")
-                + &format!(
-                    "\n- Approval linkage: `{}` via `{}` (`sha256: {}`)",
-                    closeout.approval_source, closeout.approval_ref, closeout.approval_sha256
-                )
-        }
+        PacketPhase::Closeout(closeout) => match closeout.state {
+            ProvingRunCloseoutState::Prepared => format!(
+                "Prepared closeout metadata is recorded in `{closeout_path}`; the proving run is not yet closed."
+            ) + &format!(
+                "\n- Approval linkage: `{}` via `{}` (`sha256: {}`)",
+                closeout.approval_source, closeout.approval_ref, closeout.approval_sha256
+            ),
+            ProvingRunCloseoutState::Closed => {
+                format!("Closeout metadata is recorded in `{closeout_path}`.")
+                    + &format!(
+                        "\n- Approval linkage: `{}` via `{}` (`sha256: {}`)",
+                        closeout.approval_source, closeout.approval_ref, closeout.approval_sha256
+                    )
+            }
+        },
     };
 
     format!(
@@ -181,15 +194,25 @@ fn render_scope_brief_body(
             draft.manifest_root,
             render_execution_scope_approval(approval),
         ),
-        PacketPhase::Closeout(closeout) => format!(
-            "# Scope brief\n\nThis packet records the closed proving run for `{}`.\n\n- Registry enrollment in `{REGISTRY_RELATIVE_PATH}`\n- Docs pack in `{docs_root_display}`\n- Manifest root in `{}`\n- Closeout metadata in `{closeout_path}`\n- Approval linkage via `{}` (`{}`, sha256 `{}`)\n\nCloseout status: `make preflight` {} for this proving run.\n",
-            draft.agent_id,
-            draft.manifest_root,
-            closeout.approval_ref,
-            closeout.approval_source,
-            closeout.approval_sha256,
-            if closeout.preflight_passed { "passed" } else { "did not pass" }
-        ),
+        PacketPhase::Closeout(closeout) => match closeout.state {
+            ProvingRunCloseoutState::Prepared => format!(
+                "# Scope brief\n\nThis packet records the prepared proving-run closeout draft for `{}`.\n\n- Registry enrollment in `{REGISTRY_RELATIVE_PATH}`\n- Docs pack in `{docs_root_display}`\n- Manifest root in `{}`\n- Closeout draft in `{closeout_path}`\n- Approval linkage via `{}` (`{}`, sha256 `{}`)\n\nCloseout status: publication outputs are refreshed, the draft is prepared, and the proving run is not yet closed.\n",
+                draft.agent_id,
+                draft.manifest_root,
+                closeout.approval_ref,
+                closeout.approval_source,
+                closeout.approval_sha256,
+            ),
+            ProvingRunCloseoutState::Closed => format!(
+                "# Scope brief\n\nThis packet records the closed proving run for `{}`.\n\n- Registry enrollment in `{REGISTRY_RELATIVE_PATH}`\n- Docs pack in `{docs_root_display}`\n- Manifest root in `{}`\n- Closeout metadata in `{closeout_path}`\n- Approval linkage via `{}` (`{}`, sha256 `{}`)\n\nCloseout status: `make preflight` {} for this proving run.\n",
+                draft.agent_id,
+                draft.manifest_root,
+                closeout.approval_ref,
+                closeout.approval_source,
+                closeout.approval_sha256,
+                if closeout.preflight_passed { "passed" } else { "did not pass" }
+            ),
+        },
     }
 }
 
@@ -214,12 +237,20 @@ fn render_threading_body(draft: &DraftEntry, phase: PacketPhase<'_>) -> String {
             draft.manifest_root,
             draft.manifest_root
         ),
-        PacketPhase::Closeout(_) => format!(
-            "# Threading\n\n1. Control-plane onboarding writes for `{}` landed without follow-up packet drift.\n2. Runtime-owned wrapper and backend work landed at `{}` and `{}`.\n3. Manifest evidence and publication artifacts were regenerated from committed runtime outputs.\n4. The proving run closed with `make preflight`.\n",
-            draft.agent_id,
-            draft.crate_path,
-            draft.backend_module
-        ),
+        PacketPhase::Closeout(closeout) => match closeout.state {
+            ProvingRunCloseoutState::Prepared => format!(
+                "# Threading\n\n1. Control-plane onboarding writes for `{}` landed without follow-up packet drift.\n2. Runtime-owned wrapper and backend work landed at `{}` and `{}`.\n3. Manifest evidence and publication artifacts were regenerated from committed runtime outputs.\n4. `prepare-proving-run-closeout --write` prepared the proving-run closeout draft; bounded human edits remain before `close-proving-run`.\n",
+                draft.agent_id,
+                draft.crate_path,
+                draft.backend_module
+            ),
+            ProvingRunCloseoutState::Closed => format!(
+                "# Threading\n\n1. Control-plane onboarding writes for `{}` landed without follow-up packet drift.\n2. Runtime-owned wrapper and backend work landed at `{}` and `{}`.\n3. Manifest evidence and publication artifacts were regenerated from committed runtime outputs.\n4. The proving run closed with `make preflight`.\n",
+                draft.agent_id,
+                draft.crate_path,
+                draft.backend_module
+            ),
+        },
     }
 }
 
@@ -230,9 +261,14 @@ fn render_review_surfaces_body(
 ) -> String {
     let release_rails = match phase {
         PacketPhase::Execution => "Supporting release rails reviewed for this onboarding run",
-        PacketPhase::Closeout(_) => {
-            "Supporting release rails remained unchanged across the proving run"
-        }
+        PacketPhase::Closeout(closeout) => match closeout.state {
+            ProvingRunCloseoutState::Prepared => {
+                "Supporting release rails remained unchanged through publication refresh and closeout preparation"
+            }
+            ProvingRunCloseoutState::Closed => {
+                "Supporting release rails remained unchanged across the proving run"
+            }
+        },
     };
     format!(
         "# Review surfaces\n\n- `{REGISTRY_RELATIVE_PATH}`\n- `{docs_root_display}`\n- `{}`\n- `{RELEASE_DOC_PATH}`\n- {}: `{PUBLISH_WORKFLOW_PATH}`, `{PUBLISH_SCRIPT_PATH}`, `{VALIDATE_PUBLISH_SCRIPT_PATH}`, `{CHECK_PUBLISH_READINESS_SCRIPT_PATH}`\n",
@@ -245,10 +281,16 @@ fn render_remediation_log_body(phase: PacketPhase<'_>) -> String {
         PacketPhase::Execution => {
             "# Remediation log\n\nNo remediations are recorded yet. Capture residual friction or follow-up decisions here if the proving run surfaces them.\n".to_string()
         }
-        PacketPhase::Closeout(closeout) => format!(
-            "# Remediation log\n\n{}\n",
-            render_residual_friction_lines(closeout)
-        ),
+        PacketPhase::Closeout(closeout) => match closeout.state {
+            ProvingRunCloseoutState::Prepared => format!(
+                "# Remediation log\n\nThis draft is not yet closed. Replace placeholders and record any residual friction before `close-proving-run`.\n\n{}\n",
+                render_residual_friction_lines(closeout)
+            ),
+            ProvingRunCloseoutState::Closed => format!(
+                "# Remediation log\n\n{}\n",
+                render_residual_friction_lines(closeout)
+            ),
+        },
     }
 }
 
@@ -274,23 +316,55 @@ fn render_handoff_body(
             draft.manifest_root,
             draft.manifest_root
         ),
-        PacketPhase::Closeout(closeout) => format!(
-            "# Handoff\n\nThis packet records the closed proving run for `{}`.\n\n## Release touchpoints\n\n{}\n\n## Proving-run closeout\n\n- approval ref: `{}`\n- approval source: `{}`\n- approval artifact sha256: `{}`\n- manual control-plane file edits by maintainers: `{}`\n- partial-write incidents: `{}`\n- ambiguous ownership incidents: `{}`\n- approved-agent to repo-ready control-plane mutation time: `{}`\n- proving-run closeout passes `make preflight`: `{}`\n- recorded at: `{}`\n- commit: `{}`\n- closeout metadata: `{}`\n\n## Residual friction\n\n{}\n\n## Status\n\nNo open runtime next step remains in this packet.\n",
-            draft.agent_id,
-            release_touchpoints,
-            closeout.approval_ref,
-            closeout.approval_source,
-            closeout.approval_sha256,
-            closeout.manual_control_plane_edits,
-            closeout.partial_write_incidents,
-            closeout.ambiguous_ownership_incidents,
-            render_closeout_duration(closeout),
-            closeout.preflight_passed,
-            closeout.recorded_at,
-            closeout.commit,
-            closeout_path,
-            render_residual_friction_lines(closeout)
-        ),
+        PacketPhase::Closeout(closeout) => match closeout.state {
+            ProvingRunCloseoutState::Prepared => format!(
+                "# Handoff\n\nThis packet records the prepared proving-run closeout draft for `{}`.\n\n## Release touchpoints\n\n{}\n\n## Proving-run closeout draft\n\n- state: `prepared`\n- approval ref: `{}`\n- approval source: `{}`\n- approval artifact sha256: `{}`\n- manual control-plane file edits by maintainers: `{}`\n- partial-write incidents: `{}`\n- ambiguous ownership incidents: `{}`\n- approved-agent to repo-ready control-plane mutation time: `{}`\n- proving-run closeout passes `make preflight`: `{}`\n- recorded at: `{}`\n- commit: `{}`\n- closeout draft: `{}`\n\n## Residual friction\n\n{}\n\n## Status\n\nThe proving run is not yet closed. Complete bounded human edits to `{}` and then run `close-proving-run --approval {} --closeout {}`.\n",
+                draft.agent_id,
+                release_touchpoints,
+                closeout.approval_ref,
+                closeout.approval_source,
+                closeout.approval_sha256,
+                closeout.manual_control_plane_edits,
+                closeout.partial_write_incidents,
+                closeout.ambiguous_ownership_incidents,
+                render_closeout_duration(closeout),
+                closeout.preflight_passed,
+                closeout.recorded_at,
+                closeout.commit,
+                closeout_path,
+                render_residual_friction_lines(closeout),
+                closeout_path,
+                closeout.approval_ref,
+                closeout_path
+            ),
+            ProvingRunCloseoutState::Closed => format!(
+                "# Handoff\n\nThis packet records the closed proving run for `{}`.\n\n## Release touchpoints\n\n{}\n\n## Proving-run closeout\n\n- state: `closed`\n- approval ref: `{}`\n- approval source: `{}`\n- approval artifact sha256: `{}`\n- manual control-plane file edits by maintainers: `{}`\n- partial-write incidents: `{}`\n- ambiguous ownership incidents: `{}`\n- approved-agent to repo-ready control-plane mutation time: `{}`\n- proving-run closeout passes `make preflight`: `{}`\n- recorded at: `{}`\n- commit: `{}`\n- closeout metadata: `{}`\n\n## Residual friction\n\n{}\n\n## Status\n\nNo open runtime next step remains in this packet.\n",
+                draft.agent_id,
+                release_touchpoints,
+                closeout.approval_ref,
+                closeout.approval_source,
+                closeout.approval_sha256,
+                closeout.manual_control_plane_edits,
+                closeout.partial_write_incidents,
+                closeout.ambiguous_ownership_incidents,
+                render_closeout_duration(closeout),
+                closeout.preflight_passed,
+                closeout.recorded_at,
+                closeout.commit,
+                closeout_path,
+                render_residual_friction_lines(closeout)
+            ),
+        },
+    }
+}
+
+fn packet_phase_name(phase: PacketPhase<'_>) -> &'static str {
+    match phase {
+        PacketPhase::Execution => "execution",
+        PacketPhase::Closeout(closeout) => match closeout.state {
+            ProvingRunCloseoutState::Prepared => "closeout_prepared",
+            ProvingRunCloseoutState::Closed => "closed_proving_run",
+        },
     }
 }
 

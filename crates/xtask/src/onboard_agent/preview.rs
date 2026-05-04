@@ -4,8 +4,8 @@ use std::{fmt::Write as _, fs, io::Write, path::Path};
 
 use crate::agent_registry::REGISTRY_RELATIVE_PATH;
 use crate::proving_run_closeout::{
-    load_validated_closeout_if_present, ProvingRunCloseout, ProvingRunCloseoutError,
-    ProvingRunCloseoutExpected,
+    load_validated_closeout_if_present_with_states, ProvingRunCloseout, ProvingRunCloseoutError,
+    ProvingRunCloseoutExpected, ProvingRunCloseoutState,
 };
 use crate::workspace_mutation::WorkspacePathJail;
 use toml_edit::DocumentMut;
@@ -86,11 +86,15 @@ pub(super) fn load_proving_run_metrics(
         approval_path: draft.approval_identity().map(|(path, _)| Path::new(path)),
         onboarding_pack_prefix: &draft.onboarding_pack_prefix,
     };
-    load_validated_closeout_if_present(
+    load_validated_closeout_if_present_with_states(
         workspace_root,
         Path::new(&closeout_relative_path(draft)),
         &resolved_closeout_path,
         expected,
+        &[
+            ProvingRunCloseoutState::Prepared,
+            ProvingRunCloseoutState::Closed,
+        ],
     )
     .map_err(map_closeout_error)
 }

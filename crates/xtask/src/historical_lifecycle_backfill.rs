@@ -6,7 +6,6 @@ use std::{
 };
 
 use clap::Parser;
-use serde_json::json;
 use sha2::Digest;
 use xtask::{
     agent_lifecycle::{
@@ -19,6 +18,10 @@ use xtask::{
     prepare_publication::{
         build_publication_ready_packet, validate_runtime_evidence_run_for_approval,
         RuntimeEvidenceBundle,
+    },
+    proving_run_closeout::{
+        build_closeout, render_closeout_json, DurationTruth, ProvingRunCloseoutHumanFields,
+        ProvingRunCloseoutMachineFields, ProvingRunCloseoutState, ResidualFrictionTruth,
     },
     runtime_evidence_bundle::{
         self, historical_run_id, write_runtime_evidence_bundle, RuntimeEvidenceBundleSpec,
@@ -255,23 +258,34 @@ fn ensure_closeout(
     let recorded_commit = git_first_add_metadata(workspace_root, lifecycle_path)
         .map(|(commit, _)| commit)
         .unwrap_or_else(|| approval.sha256[..40.min(approval.sha256.len())].to_string());
-    write_json(
-        &absolute,
-        &json!({
-            "state": "closed",
-            "approval_ref": approval.relative_path,
-            "approval_sha256": approval.sha256,
-            "approval_source": APPROVAL_SOURCE,
-            "manual_control_plane_edits": 0,
-            "partial_write_incidents": 0,
-            "ambiguous_ownership_incidents": 0,
-            "duration_missing_reason": DURATION_MISSING_REASON,
-            "explicit_none_reason": EXPLICIT_NONE_REASON,
-            "preflight_passed": true,
-            "recorded_at": lifecycle_state.last_transition_at,
-            "commit": recorded_commit,
-        }),
+    let closeout = build_closeout(
+        ProvingRunCloseoutState::Closed,
+        ProvingRunCloseoutMachineFields {
+            approval_ref: approval.relative_path.clone(),
+            approval_sha256: approval.sha256.clone(),
+            approval_source: APPROVAL_SOURCE.to_string(),
+            preflight_passed: true,
+            recorded_at: lifecycle_state.last_transition_at.clone(),
+            commit: recorded_commit,
+        },
+        ProvingRunCloseoutHumanFields {
+            manual_control_plane_edits: 0,
+            partial_write_incidents: 0,
+            ambiguous_ownership_incidents: 0,
+            duration: DurationTruth::MissingReason(DURATION_MISSING_REASON.to_string()),
+            residual_friction: ResidualFrictionTruth::ExplicitNone(
+                EXPLICIT_NONE_REASON.to_string(),
+            ),
+        },
     )
+    .map_err(map_closeout_error)?;
+    fs::write(
+        &absolute,
+        render_closeout_json(&closeout)
+            .map_err(map_closeout_error)?
+            .into_bytes(),
+    )
+    .map_err(|err| Error::Internal(format!("write {}: {err}", absolute.display())))
 }
 
 fn git_first_add_metadata(workspace_root: &Path, relative_path: &str) -> Option<(String, String)> {
@@ -303,18 +317,6 @@ fn read_raw_lifecycle_state(
         .map_err(|err| Error::Validation(format!("read {}: {err}", absolute.display())))?;
     serde_json::from_slice(&bytes)
         .map_err(|err| Error::Validation(format!("parse {}: {err}", absolute.display())))
-}
-
-fn write_json(path: &Path, value: &serde_json::Value) -> Result<(), Error> {
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent)
-            .map_err(|err| Error::Internal(format!("create {}: {err}", parent.display())))?;
-    }
-    let mut bytes = serde_json::to_vec_pretty(value)
-        .map_err(|err| Error::Internal(format!("serialize {}: {err}", path.display())))?;
-    bytes.push(b'\n');
-    fs::write(path, bytes)
-        .map_err(|err| Error::Internal(format!("write {}: {err}", path.display())))
 }
 
 fn sha256_pretty_json<T: serde::Serialize>(value: &T) -> Result<String, String> {
@@ -357,5 +359,16 @@ fn map_runtime_evidence_bundle_error(err: runtime_evidence_bundle::Error) -> Err
     match err {
         runtime_evidence_bundle::Error::Validation(message) => Error::Validation(message),
         runtime_evidence_bundle::Error::Internal(message) => Error::Internal(message),
+    }
+}
+
+fn map_closeout_error(err: xtask::proving_run_closeout::ProvingRunCloseoutError) -> Error {
+    match err {
+        xtask::proving_run_closeout::ProvingRunCloseoutError::Validation(message) => {
+            Error::Validation(message)
+        }
+        xtask::proving_run_closeout::ProvingRunCloseoutError::Internal(message) => {
+            Error::Internal(message)
+        }
     }
 }

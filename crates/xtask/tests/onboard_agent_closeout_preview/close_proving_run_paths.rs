@@ -167,9 +167,6 @@ fn seed_published_baseline(root: &std::path::Path, approval_path: &str) {
         "docs/agents/lifecycle/gemini-cli-onboarding/governance/publication-ready.json";
     let lifecycle_rel =
         "docs/agents/lifecycle/gemini-cli-onboarding/governance/lifecycle-state.json";
-    let closeout_rel =
-        "docs/agents/lifecycle/gemini-cli-onboarding/governance/proving-run-closeout.json";
-
     let packet_json = |lifecycle_sha256: &str| {
         json!({
             "schema_version": "1",
@@ -235,8 +232,8 @@ fn seed_published_baseline(root: &std::path::Path, approval_path: &str) {
             "support_tier": "publication_backed",
             "side_states": [],
             "current_owner_command": "refresh-publication --write",
-            "expected_next_command": format!(
-                "close-proving-run --approval {approval_path} --closeout {closeout_rel}"
+            "expected_next_command": xtask::agent_lifecycle::published_prepare_closeout_command(
+                approval_path
             ),
             "last_transition_at": "2026-05-01T00:00:00Z",
             "last_transition_by": "xtask refresh-publication --write",

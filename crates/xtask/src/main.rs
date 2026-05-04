@@ -23,8 +23,8 @@ use xtask::agent_maintenance::{
 };
 use xtask::capability_matrix;
 pub use xtask::onboard_agent;
-pub use xtask::prepare_publication;
 pub use xtask::prepare_proving_run_closeout;
+pub use xtask::prepare_publication;
 pub use xtask::publication_refresh;
 pub use xtask::repair_runtime_evidence;
 pub use xtask::runtime_follow_on;
