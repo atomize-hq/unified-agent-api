@@ -1,7 +1,7 @@
 # CLI Agent Recommendation Dossier Contract
 
 Status: Draft  
-Date (UTC): 2026-04-28  
+Date (UTC): 2026-05-04  
 Canonical location: `docs/specs/cli-agent-recommendation-dossier-contract.md`
 
 Normative language: this contract uses RFC 2119 requirement keywords (`MUST`, `MUST NOT`, `SHOULD`).
@@ -12,10 +12,10 @@ This contract freezes the discovery-enabled v2 recommendation lane for selecting
 
 It defines:
 
-- the discovery, freeze, research, generate, and promote boundaries
-- the fixed discovery query families and nomination rules
-- the reviewed-seed authority
-- the exact scratch and committed artifact roots
+- the repo-owned host surface for `cargo run -p xtask -- recommend-next-agent-research --dry-run|--write`
+- the fixed `pass1` and `pass2` discovery query families and widening rules
+- the reviewed-seed authority and repo-owned `freeze-discovery` boundary
+- the exact execution-packet, scratch, and committed artifact roots
 - the insufficiency and widening semantics
 - the packet constraints and promote-time Model B rules
 
@@ -29,23 +29,26 @@ If skill text, operator procedure, or planning prose diverge from this document,
 
 ## Workflow Boundary
 
-The recommendation lane is a frozen five-stage workflow:
+The recommendation lane is a frozen repo-owned host flow:
 
-1. Discovery may search public sources and nominate candidates.
-2. `freeze-discovery` validates discovery artifacts and freezes the reviewed seed.
-3. Research writes dossiers only against the frozen reviewed seed.
-4. `generate` consumes only frozen research artifacts and produces the evaluation run.
+1. `recommend-next-agent-research --dry-run` renders the execution packet for `pass1` or `pass2`.
+2. `recommend-next-agent-research --write` validates the matching dry-run packet, renders prompts, runs bounded Codex discovery and research, performs `freeze-discovery`, validates outputs, and records execution evidence.
+3. `generate` consumes only frozen research artifacts and produces the deterministic evaluation run.
+4. If `pass1` is insufficient, one optional `pass2` dry-run/write/generate cycle MAY run with a fresh `run_id` and prior insufficiency input.
 5. `promote` commits review evidence, updates the canonical packet, and renders the final approval artifact.
 
 The deterministic boundary is unchanged:
 
-- discovery MAY search
-- freeze MUST validate and snapshot
+- the repo, not Codex, owns prompt rendering, dry-run packet creation, bounded Codex execution, `freeze-discovery`, validation, and execution evidence
+- Codex write roots are limited to `docs/agents/.uaa-temp/recommend-next-agent/discovery/<run_id>/` and `docs/agents/.uaa-temp/recommend-next-agent/research/<run_id>/`
+- discovery MAY search only within the bounded host execution
+- `freeze-discovery` MUST validate and snapshot before evaluation
 - research MUST work from the frozen snapshot
 - `generate` MUST be post-research only
 - `promote` MUST stay approval-artifact preserving
+- proving is last and MUST NOT define this contract
 
-The runner is post-research only:
+The evaluation step is post-research only:
 
 - it MUST NOT fetch open-ended web, docs, package-registry, or GitHub evidence
 - it MUST NOT mutate the research artifacts
@@ -59,6 +62,7 @@ The repo-local scratch root for this lane is:
 
 Owned subroots are:
 
+- execution packets: `docs/agents/.uaa-temp/recommend-next-agent/research-runs/<run_id>/`
 - discovery: `docs/agents/.uaa-temp/recommend-next-agent/discovery/<run_id>/`
 - research: `docs/agents/.uaa-temp/recommend-next-agent/research/<run_id>/`
 - evaluation runs: `docs/agents/.uaa-temp/recommend-next-agent/runs/<run_id>/`
@@ -74,6 +78,8 @@ The canonical comparison packet is:
 The create-lane approval artifact is:
 
 `docs/agents/lifecycle/<onboarding_pack_prefix>/governance/approved-agent.toml`
+
+The execution packet root is repo-owned host state. Codex MUST NOT write directly to `research-runs/<run_id>/`.
 
 `.staging/` directories remain reserved for internal promote-time staging and MUST NOT be used as operator scratch space.
 
@@ -146,7 +152,7 @@ Discovery MUST reject a candidate before research when any of these are true:
 
 ## Discovery Scratch Contract
 
-The discovery directory is:
+The repo-owned `recommend-next-agent-research --write` flow may write discovery artifacts only to:
 
 `docs/agents/.uaa-temp/recommend-next-agent/discovery/<run_id>/`
 
@@ -157,6 +163,7 @@ It MUST contain exactly:
 - `sources.lock.json`
 
 No screenshots, HTML caches, or additional artifact types are part of v2.
+No freehand discovery artifact path outside the repo-owned host flow is part of the normative workflow.
 
 ### `candidate-seed.generated.toml`
 
@@ -232,19 +239,19 @@ Two logically identical entries MUST therefore produce the same `sha256` across 
 
 ## Discovery Query Families And Nomination Rules
 
-### Pass 1 Fixed Query Family
+### Pass1 Fixed Query Family
 
-Pass 1 MUST use exactly these queries:
+`pass1` MUST use exactly these queries:
 
 - `best AI coding CLI`
 - `AI agent CLI tools`
 - `developer agent command line`
 
-### Pass 1 Nomination Algorithm
+### Pass1 Nomination Algorithm
 
-Pass 1 nomination is frozen to:
+`pass1` nomination is frozen to:
 
-1. collect candidates from first-page results for the three fixed pass 1 queries
+1. collect candidates from first-page results for the three fixed `pass1` queries
 2. normalize each candidate to the upstream project / CLI identity used in this repo
 3. deduplicate by normalized `candidate_id`
 4. drop candidates rejected by any hard discovery rejection rule
@@ -256,11 +263,11 @@ Pass 1 nomination is frozen to:
    - then alphabetical `candidate_id`
 8. emit exactly 5 candidates unless fewer than 5 survive hard rejection
 
-The pass 1 emission cap of 5 is a hard cap.
+The `pass1` emission cap of 5 is a hard cap.
 
-### Pass 2 Fixed Widening Query Family
+### Pass2 Fixed Widening Query Family
 
-Pass 2 widening is frozen to this family:
+`pass2` widening is frozen to this family:
 
 - candidate-relative query: `alternatives to <top surviving candidate>`
 - generic query: `top coding agent CLI open source`
@@ -268,62 +275,87 @@ Pass 2 widening is frozen to this family:
 
 Zero-survivor fallback is part of the contract:
 
-- if pass 1 has zero surviving candidates after hard rejection, pass 2 MUST omit the candidate-relative query
-- in that zero-survivor case, pass 2 MUST use only the two generic widening queries
+- if `pass1` has zero surviving candidates after hard rejection, `pass2` MUST omit the candidate-relative query
+- in that zero-survivor case, `pass2` MUST use only the two generic widening queries
 
-### Pass 2 Widening Nomination Algorithm
+### Pass2 Widening Nomination Algorithm
 
-Pass 2 nomination is frozen to:
+`pass2` nomination is frozen to:
 
-1. start from the pass 1 rejection summary
-2. run only the fixed pass 2 widening query family
-3. exclude every candidate already seen in pass 1, whether accepted or rejected
+1. start from the `pass1` rejection summary
+2. run only the fixed `pass2` widening query family
+3. exclude every candidate already seen in `pass1`, whether accepted or rejected
 4. apply the same hard discovery rejection rules
 5. apply the same hint-precedence rules
-6. allow soft-preference relaxation only for pass 2 survivor selection
+6. allow soft-preference relaxation only for `pass2` survivor selection
 7. emit at most 3 new candidates
 
-The pass 2 add cap of 3 is a hard cap.
+The `pass2` add cap of 3 is a hard cap.
 
 ## Distinct Pass Ownership And Freeze Semantics
 
 The widening loop is frozen to one retry:
 
-- maximum 2 discovery passes per skill invocation
-- pass 1 is the default entry point
-- pass 2 is the only allowed widening pass
-- if fewer than 3 eligible candidates survive after pass 2, stop with explicit insufficiency
+- maximum 2 discovery passes per recommendation attempt
+- `pass1` is the default entry point
+- `pass2` is the only allowed widening pass
+- `pass2` requires prior insufficiency input and a fresh `run_id`
+- if fewer than 3 eligible candidates survive after `pass2`, stop with explicit insufficiency
 
 Pass ownership rules are:
 
+- each pass MUST write its own execution packet root under its own `run_id`
 - each pass MUST write its own discovery directory under its own `run_id`
+- each pass MUST write its own research directory under its own `run_id`
+- each pass MUST write its own evaluation run under its own `run_id`
 - a later pass MUST NOT mutate, delete, or overwrite an earlier pass directory
 - the reviewed seed for a pass is authoritative only for the research and evaluation run derived from that same pass
 - only the final promoted evaluation run becomes committed review evidence
 
 `freeze-discovery` is the only operation that may create the reviewed seed authority.
 
-## Runner CLI Contract
+## Host Command Contract
 
-`freeze-discovery` is frozen to:
+The repo-owned host command is frozen to this public shape:
 
 ```sh
-python3 scripts/recommend_next_agent.py freeze-discovery \
-  --discovery-dir docs/agents/.uaa-temp/recommend-next-agent/discovery/<run_id> \
-  --research-dir docs/agents/.uaa-temp/recommend-next-agent/research/<run_id>
+cargo run -p xtask -- recommend-next-agent-research --dry-run --pass pass1 --run-id <run_id>
+cargo run -p xtask -- recommend-next-agent-research --write --pass pass1 --run-id <same_run_id>
+
+cargo run -p xtask -- recommend-next-agent-research --dry-run --pass pass2 \
+  --prior-run-dir docs/agents/.uaa-temp/recommend-next-agent/runs/<pass1_run_id> \
+  --run-id <fresh_run_id>
+
+cargo run -p xtask -- recommend-next-agent-research --write --pass pass2 \
+  --prior-run-dir docs/agents/.uaa-temp/recommend-next-agent/runs/<pass1_run_id> \
+  --run-id <same_fresh_run_id>
 ```
 
-Responsibilities:
+Rules:
 
+- pass support is exactly `pass1` and `pass2`
+- `--prior-run-dir` is forbidden for `pass1`
+- `--prior-run-dir` is required for `pass2`
+- `pass2` MUST consume prior insufficiency input from a previous evaluation run and MUST use a fresh `run_id`
+- `--write` is invalid without a preexisting dry-run packet for the same `run_id`
+- no freehand discovery or dossier-authoring path outside this host command is part of the contract
+
+Repo-owned `--write` responsibilities:
+
+- render prompts from repo state
+- create and validate the bounded Codex execution request
 - validate `candidate-seed.generated.toml`
 - validate `discovery-summary.md`
 - validate discovery `sources.lock.json`
 - reject duplicate candidate ids
 - reject candidates already onboarded in the registry
+- perform `freeze-discovery`
 - copy the reviewed generated seed to `research/<run_id>/seed.snapshot.toml`
 - copy all three discovery artifacts to `research/<run_id>/discovery-input/`
+- validate the research artifacts and exact dossier count
+- record execution evidence and path-level write audits under `research-runs/<run_id>/`
 
-`generate` is frozen to:
+The post-research CLI surfaces stay unchanged:
 
 ```sh
 python3 scripts/recommend_next_agent.py generate \
@@ -345,9 +377,38 @@ python3 scripts/recommend_next_agent.py promote \
   [--override-reason "<required when approved agent differs from recommended>"]
 ```
 
+## Execution Packet Contract
+
+The execution packet root is:
+
+`docs/agents/.uaa-temp/recommend-next-agent/research-runs/<run_id>/`
+
+It is repo-owned host state. `--dry-run` creates the packet. `--write` validates and completes the matching packet for the same `run_id`.
+
+Across the dry-run/write pair, the packet root MUST contain:
+
+- `input-contract.json`
+- `discovery-prompt.md`
+- `research-prompt.md`
+- `codex-execution.discovery.json`
+- `codex-execution.research.json`
+- `codex-stdout.discovery.log`
+- `codex-stderr.discovery.log`
+- `codex-stdout.research.log`
+- `codex-stderr.research.log`
+- `written-paths.discovery.json`
+- `written-paths.research.json`
+- `validation-report.json`
+- `run-status.json`
+- `run-summary.md`
+
+`written-paths.discovery.json` and `written-paths.research.json` MUST prove that Codex wrote only under the allowed discovery and research roots for that `run_id`.
+
+The execution-packet `run-status.json` and `run-summary.md` describe host execution status. They are distinct from the later evaluation-run artifacts written by `generate`.
+
 ## Research Directory Contract
 
-The research directory is:
+The repo-owned `recommend-next-agent-research --write` flow may write research artifacts only to:
 
 `docs/agents/.uaa-temp/recommend-next-agent/research/<run_id>/`
 
@@ -362,6 +423,8 @@ It MUST contain:
 - `dossiers/<agent_id>.json`
 
 `seed.snapshot.toml` is the only reviewed seed authority used by `generate`.
+
+No freehand dossier-authoring path outside the repo-owned host flow is part of the normative workflow.
 
 `docs/agents/selection/candidate-seed.toml` remains a fallback curated pool and example. It is not the v2 reviewed runtime input.
 
@@ -532,8 +595,8 @@ Scratch `run-status.json` MUST already contain all promote-time bookkeeping fiel
 When fewer than 3 eligible candidates survive:
 
 - `run-status.json.status` MUST be `insufficient_eligible_candidates`
-- `run-status.json.next_action` MUST be `expand_discovery` after pass 1
-- `run-status.json.next_action` MUST be `stop` after pass 2
+- `run-status.json.next_action` MUST be `expand_discovery` after `pass1`
+- `run-status.json.next_action` MUST be `stop` after `pass2`
 - `run-summary.md` MUST include grouped rejection reasons
 
 Grouped insufficiency reasons are frozen to:

@@ -16,6 +16,7 @@ It documents what to run, in what order, and which artifact roots each command o
 
 Generated packet docs are evidence and examples. Do not treat them as the procedural source of truth, and do not hand-edit them for tone cleanup.
 When a create-mode lifecycle record exists, treat `lifecycle-state.json` as the authoritative committed support baseline for both create mode and later maintenance checks.
+Proving outputs are downstream evidence. They happen last and do not define the recommendation contract.
 
 ## Recommendation lane
 
@@ -25,89 +26,92 @@ The normative recommendation-lane contract is:
 
 `docs/specs/cli-agent-recommendation-dossier-contract.md`
 
-### 1. Run discovery pass 1
+### 1. Prepare the `pass1` dry-run packet
 
-The v2 recommendation lane starts from discovery, not from the committed fallback seed.
+The v2 recommendation lane starts from the repo-owned host command, not from freehand discovery or the committed fallback seed.
 
 Optional discovery control input:
 
 `docs/agents/selection/discovery-hints.json`
 
-Discovery pass 1 writes only to:
+Render the `pass1` execution packet:
 
-`docs/agents/.uaa-temp/recommend-next-agent/discovery/<run_id>/`
+```sh
+cargo run -p xtask -- recommend-next-agent-research --dry-run --pass pass1 --run-id <pass1_run_id>
+```
 
-Required pass 1 artifacts:
+This step writes only to:
+
+`docs/agents/.uaa-temp/recommend-next-agent/research-runs/<pass1_run_id>/`
+
+It does not invoke Codex. The packet root is repo-owned host state and must become the matching input for `--write`.
+
+### 2. Execute the repo-owned `pass1` flow
+
+Run the matching write command with the same `run_id`:
+
+```sh
+cargo run -p xtask -- recommend-next-agent-research --write --pass pass1 --run-id <pass1_run_id>
+```
+
+`--write` is invalid unless the dry-run packet already exists for the same `run_id`.
+
+The repo, not Codex, owns prompt rendering, dry-run packet creation, bounded Codex execution, `freeze-discovery`, validation, and execution evidence.
+Codex write roots are limited to:
+
+- `docs/agents/.uaa-temp/recommend-next-agent/discovery/<pass1_run_id>/`
+- `docs/agents/.uaa-temp/recommend-next-agent/research/<pass1_run_id>/`
+
+Required discovery artifacts under `discovery/<pass1_run_id>/`:
 - `candidate-seed.generated.toml`
 - `discovery-summary.md`
 - `sources.lock.json`
 
-Pass 1 uses the fixed query family from the normative contract:
-- `best AI coding CLI`
-- `AI agent CLI tools`
-- `developer agent command line`
-
-Pass 1 emits at most 5 surviving candidates after hard rejection.
-
-Discovery-hint precedence is fixed:
-- hard discovery rejections win first
-- `exclude_candidates` beats `include_candidates`
-- `include_candidates` may bypass soft preferences only
-- soft preferences do not affect evaluation scoring
-
-The committed `docs/agents/selection/candidate-seed.toml` remains a fallback curated pool and example. It is not the reviewed v2 runtime input.
-
-### 2. Review and freeze the discovery output
-
-Review or lightly edit `candidate-seed.generated.toml`, then freeze the reviewed discovery artifacts:
-
-```sh
-python3 scripts/recommend_next_agent.py freeze-discovery \
-  --discovery-dir docs/agents/.uaa-temp/recommend-next-agent/discovery/<run_id> \
-  --research-dir docs/agents/.uaa-temp/recommend-next-agent/research/<run_id>
-```
-
-`freeze-discovery` is the only step that creates the reviewed seed authority.
-
-The research root after freeze is:
-
-`docs/agents/.uaa-temp/recommend-next-agent/research/<run_id>/`
-
-Required artifacts after freeze:
+Required research artifacts under `research/<pass1_run_id>/`:
 - `seed.snapshot.toml`
 - `discovery-input/candidate-seed.generated.toml`
 - `discovery-input/discovery-summary.md`
 - `discovery-input/sources.lock.json`
-
-### 3. Author research against the frozen seed
-
-Research must proceed only from `research/<run_id>/seed.snapshot.toml`.
-
-Required research artifacts:
 - `research-summary.md`
 - `research-metadata.json`
 - `dossiers/<agent_id>.json` for every candidate in `seed.snapshot.toml`
 
-The dossier count is exact. If the seed snapshot contains `N` candidates, the dossier directory must contain exactly `N` dossier files.
+Required execution evidence under `research-runs/<pass1_run_id>/`:
+- `input-contract.json`
+- `discovery-prompt.md`
+- `research-prompt.md`
+- `codex-execution.discovery.json`
+- `codex-execution.research.json`
+- `codex-stdout.discovery.log`
+- `codex-stderr.discovery.log`
+- `codex-stdout.research.log`
+- `codex-stderr.research.log`
+- `written-paths.discovery.json`
+- `written-paths.research.json`
+- `validation-report.json`
+- `run-status.json`
+- `run-summary.md`
 
-### 4. Generate the deterministic evaluation run
+The committed `docs/agents/selection/candidate-seed.toml` remains a fallback curated pool and example. It is not the reviewed runtime input.
 
-After the research artifacts exist, run the deterministic recommendation generator:
+### 3. Generate the deterministic evaluation run
+
+After the frozen research artifacts exist, run the deterministic recommendation generator:
 
 ```sh
 python3 scripts/recommend_next_agent.py generate \
-  --research-dir docs/agents/.uaa-temp/recommend-next-agent/research/<run_id> \
-  --run-id <run_id> \
+  --research-dir docs/agents/.uaa-temp/recommend-next-agent/research/<pass1_run_id> \
+  --run-id <pass1_run_id> \
   --scratch-root docs/agents/.uaa-temp/recommend-next-agent/runs
 ```
 
 This step writes only to:
 
-`docs/agents/.uaa-temp/recommend-next-agent/runs/<run_id>/`
+`docs/agents/.uaa-temp/recommend-next-agent/runs/<pass1_run_id>/`
 
 It does not mutate repo-tracked files, and it is post-research only.
 
-Required success-path scratch artifacts:
+Required success-path evaluation artifacts:
 - `run-status.json`
 - `seed.snapshot.toml`
 - `candidate-pool.json`
@@ -125,41 +129,57 @@ Required success-path scratch artifacts:
 
 Generation still applies a hard ineligibility gate against `crates/xtask/data/agent_registry.toml` before scoring.
 
-### 5. Handle insufficiency exactly once
+### 4. Handle insufficiency exactly once with `pass2`
 
 If fewer than 3 eligible candidates survive generation:
 - `run-status.json.status` is `insufficient_eligible_candidates`
-- pass 1 returns `next_action = expand_discovery`
-- pass 2 returns `next_action = stop`
+- `pass1` returns `next_action = expand_discovery`
+- `pass2` returns `next_action = stop`
 
 The widening rule is fixed:
-- at most one widening retry per invocation
-- pass 2 uses the fixed widening query family:
+- at most one widening retry per recommendation attempt
+- `pass2` support is exactly `--pass pass2`
+- `pass2` requires prior insufficiency input from `docs/agents/.uaa-temp/recommend-next-agent/runs/<pass1_run_id>/`
+- `pass2` must use a fresh `run_id` and must not overwrite `pass1` artifacts
+- `pass2` uses the fixed widening query family:
   - `alternatives to <top surviving candidate>`
   - `top coding agent CLI open source`
   - `CLI coding assistant blog`
-- if pass 1 has zero surviving candidates after hard rejection, omit the candidate-relative widening query and use only the two generic widening queries
-- pass 2 adds at most 3 new candidates
-- pass 2 must use a new `run_id` and must not overwrite pass 1 artifacts
+- if `pass1` has zero surviving candidates after hard rejection, omit the candidate-relative widening query and use only the two generic widening queries
+- `pass2` adds at most 3 new candidates
 
-Do not patch the frozen seed in place. Start pass 2 discovery, freeze the new reviewed seed, rerun research, and rerun `generate` once.
+Prepare and execute the `pass2` packet with a fresh `run_id`:
 
-### 6. Review the scratch run
+```sh
+cargo run -p xtask -- recommend-next-agent-research --dry-run --pass pass2 \
+  --prior-run-dir docs/agents/.uaa-temp/recommend-next-agent/runs/<pass1_run_id> \
+  --run-id <pass2_run_id>
 
-Review the scratch run before promotion:
-- reviewed seed snapshot
-- discovery provenance under `discovery/**`
-- research metadata and one dossier per seeded candidate
-- shortlisted candidates
-- rejection reasons for non-eligible candidates
-- scratch comparison packet preview
-- provisional approval draft preview for the recommended candidate
+cargo run -p xtask -- recommend-next-agent-research --write --pass pass2 \
+  --prior-run-dir docs/agents/.uaa-temp/recommend-next-agent/runs/<pass1_run_id> \
+  --run-id <pass2_run_id>
+
+python3 scripts/recommend_next_agent.py generate \
+  --research-dir docs/agents/.uaa-temp/recommend-next-agent/research/<pass2_run_id> \
+  --run-id <pass2_run_id> \
+  --scratch-root docs/agents/.uaa-temp/recommend-next-agent/runs
+```
+
+Do not patch the frozen seed in place. If `pass2` still returns `insufficient_eligible_candidates`, stop and report structured insufficiency.
+
+### 5. Review execution evidence and the evaluation run
+
+Review both roots before promotion:
+- `docs/agents/.uaa-temp/recommend-next-agent/research-runs/<run_id>/` for the repo-owned execution packet, validation report, and written-path audits
+- `docs/agents/.uaa-temp/recommend-next-agent/runs/<run_id>/` for the post-research evaluation run
+
+Review the frozen seed snapshot, discovery provenance under `discovery/**`, research metadata and one dossier per seeded candidate, shortlisted candidates, rejection reasons for non-eligible candidates, the scratch comparison packet preview, and the provisional approval draft preview.
 
 Scratch runs are never committed.
 `docs/agents/.uaa-temp/**` is ignored operator scratch space.
 `docs/agents/*/.staging/**` remains internal promote-time staging owned by the scripts and must not be used as operator scratch space.
 
-### 7. Promote one reviewed run
+### 6. Promote one reviewed run
 
 Promote one scratch run into the canonical packet, a committed review run, and a final approval artifact:
 
@@ -216,7 +236,7 @@ Template audit result:
 - no update to `docs/templates/agent-selection/cli-agent-selection-packet-template.md` is required for v2
 - discovery changes provenance and reviewed-input flow, not the stable packet structure or decision lines
 
-### 8. Stop for maintainer approve-or-override
+### 7. Stop for maintainer approve-or-override
 
 The recommendation lane ends at:
 
@@ -226,7 +246,7 @@ Maintainers now either:
 - accept the recommended agent
 - override to another shortlisted candidate and provide `--override-reason`
 
-### 9. Continue with create mode unchanged
+### 8. Continue with create mode unchanged
 
 After the approval artifact exists, continue with the existing create lane exactly as documented below.
 
