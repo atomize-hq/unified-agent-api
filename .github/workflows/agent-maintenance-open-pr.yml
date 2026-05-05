@@ -66,6 +66,10 @@ on:
         required: true
         type: string
 
+concurrency:
+  group: agent-maintenance-${{ inputs.branch_name }}
+  cancel-in-progress: false
+
 permissions:
   contents: write
   pull-requests: write
@@ -100,6 +104,8 @@ jobs:
             --request-commit "${{ github.sha }}" \
             --write
       - name: Create PR
+        id: create_pr
+        continue-on-error: true
         uses: peter-evans/create-pull-request@v8
         with:
           token: ${{ secrets.AUTOMATION_TOKEN || github.token }}
@@ -110,3 +116,18 @@ jobs:
           body-path: docs/agents/lifecycle/${{ inputs.agent_id }}-maintenance/governance/pr-summary.md
           add-paths: ${{ inputs.add_paths }}
           delete-branch: true
+      - name: Print recovery guidance
+        if: ${{ steps.create_pr.outcome == 'failure' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          REQUEST_PATH="docs/agents/lifecycle/${{ inputs.agent_id }}-maintenance/governance/maintenance-request.toml"
+          PR_SUMMARY_PATH="docs/agents/lifecycle/${{ inputs.agent_id }}-maintenance/governance/pr-summary.md"
+          PR_TITLE="chore: open maintenance packet for ${{ inputs.agent_id }} ${{ inputs.target_version }}"
+          echo "::error title=Maintenance PR creation failed::Packet generation completed, but opening the PR failed." >&2
+          cat <<EOF >&2
+          Recovery path:
+          cargo run -p xtask -- prepare-agent-maintenance --request "${REQUEST_PATH}" --write
+          gh pr create --base staging --head "${{ inputs.branch_name }}" --title "${PR_TITLE}" --body-file "${PR_SUMMARY_PATH}"
+          EOF
+          exit 1

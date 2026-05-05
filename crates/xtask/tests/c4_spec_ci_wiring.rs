@@ -37,6 +37,16 @@ fn c4_spec_agent_maintenance_workflows_share_the_release_watch_and_packet_only_p
         !shared_watch.contains("listReleases"),
         "workflow yaml must not reimplement stale detection"
     );
+    for required in [
+        "concurrency:",
+        "group: agent-maintenance-release-watch",
+        "cancel-in-progress: false",
+    ] {
+        assert!(
+            shared_watch.contains(required),
+            "shared watcher must retain workflow concurrency guard {required}"
+        );
+    }
     for legacy in [
         ".github/workflows/codex-cli-release-watch.yml",
         ".github/workflows/claude-code-release-watch.yml",
@@ -59,6 +69,13 @@ fn c4_spec_agent_maintenance_workflows_share_the_release_watch_and_packet_only_p
         "base: staging",
         "add-paths: ${{ inputs.add_paths }}",
         "body-path: docs/agents/lifecycle/${{ inputs.agent_id }}-maintenance/governance/pr-summary.md",
+        "concurrency:",
+        "group: agent-maintenance-${{ inputs.branch_name }}",
+        "cancel-in-progress: false",
+        "continue-on-error: true",
+        "steps.create_pr.outcome == 'failure'",
+        "cargo run -p xtask -- prepare-agent-maintenance --request \"${REQUEST_PATH}\" --write",
+        "gh pr create --base staging --head \"${{ inputs.branch_name }}\"",
     ] {
         assert!(
             packet_only_pr.contains(required),
@@ -238,6 +255,20 @@ fn c4_spec_worker_update_snapshot_workflows_consume_shared_maintenance_inputs() 
             !yml.contains("\n          body:"),
             "{workflow} must not keep an inline body block"
         );
+        for required in [
+            "concurrency:",
+            "group: agent-maintenance-${{ inputs.branch_name }}",
+            "cancel-in-progress: false",
+            "continue-on-error: true",
+            "steps.create_pr.outcome == 'failure'",
+            "cargo run -p xtask -- prepare-agent-maintenance --request \"${REQUEST_PATH}\" --write",
+            "gh pr create --base staging --head \"${{ inputs.branch_name }}\"",
+        ] {
+            assert!(
+                yml.contains(required),
+                "{workflow} must retain PR recovery contract surface {required}"
+            );
+        }
         assert_prepare_step_precedes(&yml, "prepare-agent-maintenance", body_path, workflow);
     }
 

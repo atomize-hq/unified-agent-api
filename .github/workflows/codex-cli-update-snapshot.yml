@@ -41,6 +41,10 @@ on:
         default: false
         type: boolean
 
+concurrency:
+  group: agent-maintenance-${{ inputs.branch_name }}
+  cancel-in-progress: false
+
 permissions:
   contents: write
   pull-requests: write
@@ -448,6 +452,7 @@ jobs:
             --write
 
       - name: Create PR (best effort)
+        id: create_pr
         continue-on-error: true
         uses: peter-evans/create-pull-request@v8
         with:
@@ -458,3 +463,18 @@ jobs:
           body-path: docs/agents/lifecycle/codex-maintenance/governance/pr-summary.md
           branch: "${{ inputs.branch_name }}"
           delete-branch: true
+      - name: Print recovery guidance
+        if: ${{ steps.create_pr.outcome == 'failure' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          REQUEST_PATH="docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml"
+          PR_SUMMARY_PATH="docs/agents/lifecycle/codex-maintenance/governance/pr-summary.md"
+          PR_TITLE="chore: codex cli artifacts for ${{ inputs.target_version }}"
+          echo "::error title=Maintenance PR creation failed::Packet generation completed, but opening the PR failed." >&2
+          cat <<EOF >&2
+          Recovery path:
+          cargo run -p xtask -- prepare-agent-maintenance --request "${REQUEST_PATH}" --write
+          gh pr create --base staging --head "${{ inputs.branch_name }}" --title "${PR_TITLE}" --body-file "${PR_SUMMARY_PATH}"
+          EOF
+          exit 1
