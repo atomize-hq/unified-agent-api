@@ -17,6 +17,65 @@ fn read_repo_file(relative_path: &str) -> String {
 }
 
 #[test]
+fn c4_spec_agent_maintenance_workflows_share_the_release_watch_and_packet_only_pr_contract() {
+    let shared_watch = read_repo_file(".github/workflows/agent-maintenance-release-watch.yml");
+    let packet_only_pr = read_repo_file(".github/workflows/agent-maintenance-open-pr.yml");
+
+    assert!(
+        shared_watch.contains("cargo run -p xtask -- maintenance-watch --emit-json _ci_tmp/maintenance-watch.json"),
+        "shared watcher must delegate stale detection to xtask"
+    );
+    assert!(
+        shared_watch.contains(".stale_agents[]"),
+        "shared watcher must fan out from stale_agents queue data"
+    );
+    assert!(
+        !shared_watch.contains("listReleases"),
+        "workflow yaml must not reimplement stale detection"
+    );
+    for legacy in [
+        ".github/workflows/codex-cli-release-watch.yml",
+        ".github/workflows/claude-code-release-watch.yml",
+    ] {
+        assert!(
+            !repo_root().join(legacy).exists(),
+            "legacy watcher must be deleted: {legacy}"
+        );
+    }
+
+    for required in [
+        "prepare-agent-maintenance",
+        "--current-version",
+        "--latest-stable",
+        "--target-version",
+        "--opened-from",
+        "--detected-by",
+        "--dispatch-kind",
+        "--branch-name",
+        "base: staging",
+        "add-paths: ${{ inputs.add_paths }}",
+    ] {
+        assert!(
+            packet_only_pr.contains(required),
+            "packet-only PR workflow must retain {required}"
+        );
+    }
+    for forbidden in [
+        "actions/download-artifact@v7",
+        "codex-snapshot",
+        "claude-snapshot",
+        "prepare-publication",
+        "refresh-publication",
+        "artifacts.lock.json",
+    ] {
+        assert!(
+            !packet_only_pr.contains(forbidden),
+            "packet-only PR workflow must not perform acquisition/generation work: {forbidden}"
+        );
+    }
+}
+
+#[test]
 fn c4_spec_update_snapshot_workflow_runs_full_pipeline_and_uploads_artifacts() {
     let yml = read_repo_file(".github/workflows/codex-cli-update-snapshot.yml");
 

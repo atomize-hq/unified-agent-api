@@ -1,0 +1,100 @@
+name: Agent maintenance release watch
+
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  queue:
+    name: Build watcher queue
+    runs-on: ubuntu-latest
+    outputs:
+      queue: ${{ steps.queue.outputs.queue }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: staging
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Emit stale-agent queue
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p _ci_tmp
+          cargo run -p xtask -- maintenance-watch --emit-json _ci_tmp/maintenance-watch.json
+      - name: Convert stale_agents to matrix include list
+        id: queue
+        shell: bash
+        run: |
+          set -euo pipefail
+          jq -c '{include: [.stale_agents[] | . + {
+            current_version: .current_validated,
+            dispatch_ref: "staging"
+          }]}' _ci_tmp/maintenance-watch.json > _ci_tmp/maintenance-watch-matrix.json
+          {
+            echo 'queue<<EOF'
+            cat _ci_tmp/maintenance-watch-matrix.json
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
+
+  dispatch:
+    name: Fan out ${{ matrix.agent_id }}
+    needs: queue
+    if: ${{ fromJSON(needs.queue.outputs.queue).include[0] != null }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.queue.outputs.queue) }}
+    steps:
+      - uses: actions/github-script@v8
+        env:
+          AGENT_ID: ${{ matrix.agent_id }}
+          DISPATCH_KIND: ${{ matrix.dispatch_kind }}
+          DISPATCH_WORKFLOW: ${{ matrix.dispatch_workflow }}
+          DISPATCH_REF: ${{ matrix.dispatch_ref }}
+          CURRENT_VERSION: ${{ matrix.current_version }}
+          LATEST_STABLE: ${{ matrix.latest_stable }}
+          TARGET_VERSION: ${{ matrix.target_version }}
+          BRANCH_NAME: ${{ matrix.branch_name }}
+          DETECTED_BY: ${{ matrix.detected_by }}
+          OPENED_FROM: ${{ matrix.opened_from }}
+          MAINTENANCE_ROOT: ${{ matrix.maintenance_root }}
+        with:
+          script: |
+            const inputs = process.env.DISPATCH_KIND === "packet_pr"
+              ? {
+                  agent_id: process.env.AGENT_ID,
+                  current_version: process.env.CURRENT_VERSION,
+                  latest_stable: process.env.LATEST_STABLE,
+                  target_version: process.env.TARGET_VERSION,
+                  opened_from: process.env.OPENED_FROM,
+                  detected_by: process.env.DETECTED_BY,
+                  dispatch_kind: process.env.DISPATCH_KIND,
+                  dispatch_workflow: process.env.DISPATCH_WORKFLOW,
+                  branch_name: process.env.BRANCH_NAME,
+                  add_paths: `${process.env.MAINTENANCE_ROOT}\n`,
+                }
+              : {
+                  agent_id: process.env.AGENT_ID,
+                  current_version: process.env.CURRENT_VERSION,
+                  latest_stable: process.env.LATEST_STABLE,
+                  target_version: process.env.TARGET_VERSION,
+                  opened_from: process.env.OPENED_FROM,
+                  detected_by: process.env.DETECTED_BY,
+                  dispatch_kind: process.env.DISPATCH_KIND,
+                  branch_name: process.env.BRANCH_NAME,
+                };
+
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: process.env.DISPATCH_KIND === "packet_pr"
+                ? "agent-maintenance-open-pr.yml"
+                : process.env.DISPATCH_WORKFLOW,
+              ref: process.env.DISPATCH_REF,
+              inputs,
+            });

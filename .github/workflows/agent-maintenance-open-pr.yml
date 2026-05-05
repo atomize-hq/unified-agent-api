@@ -1,0 +1,112 @@
+name: Agent maintenance open PR
+
+on:
+  workflow_call:
+    inputs:
+      agent_id:
+        required: true
+        type: string
+      current_version:
+        required: true
+        type: string
+      latest_stable:
+        required: true
+        type: string
+      target_version:
+        required: true
+        type: string
+      opened_from:
+        required: true
+        type: string
+      detected_by:
+        required: true
+        type: string
+      dispatch_kind:
+        required: true
+        type: string
+      dispatch_workflow:
+        required: false
+        type: string
+      branch_name:
+        required: true
+        type: string
+      add_paths:
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      agent_id:
+        required: true
+        type: string
+      current_version:
+        required: true
+        type: string
+      latest_stable:
+        required: true
+        type: string
+      target_version:
+        required: true
+        type: string
+      opened_from:
+        required: true
+        type: string
+      detected_by:
+        required: true
+        type: string
+      dispatch_kind:
+        required: true
+        type: string
+      dispatch_workflow:
+        required: false
+        type: string
+      branch_name:
+        required: true
+        type: string
+      add_paths:
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  open-pr:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: staging
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Prepare maintenance packet
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run -p xtask -- prepare-agent-maintenance \
+            --agent "${{ inputs.agent_id }}" \
+            --current-version "${{ inputs.current_version }}" \
+            --latest-stable "${{ inputs.latest_stable }}" \
+            --target-version "${{ inputs.target_version }}" \
+            --opened-from "${{ inputs.opened_from }}" \
+            --detected-by "${{ inputs.detected_by }}" \
+            --dispatch-kind "${{ inputs.dispatch_kind }}" \
+            ${{
+              inputs.dispatch_workflow != '' &&
+              format('--dispatch-workflow "{0}"', inputs.dispatch_workflow) ||
+              ''
+            }} \
+            --branch-name "${{ inputs.branch_name }}" \
+            --request-recorded-at "$(date -u +"%Y-%m-%dT%H:%M:%SZ")" \
+            --request-commit "${{ github.sha }}" \
+            --write
+      - name: Create PR
+        uses: peter-evans/create-pull-request@v8
+        with:
+          token: ${{ secrets.AUTOMATION_TOKEN || github.token }}
+          base: staging
+          branch: ${{ inputs.branch_name }}
+          commit-message: "chore: open maintenance packet for ${{ inputs.agent_id }} ${{ inputs.target_version }}"
+          title: "chore: open maintenance packet for ${{ inputs.agent_id }} ${{ inputs.target_version }}"
+          body: "Automated maintenance packet for `${{ inputs.agent_id }}` target `${{ inputs.target_version }}`."
+          add-paths: ${{ inputs.add_paths }}
+          delete-branch: true
