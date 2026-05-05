@@ -66,6 +66,19 @@ docs_release_track = "crates-io"
 [agents.scaffold]
 onboarding_pack_prefix = "codex-cli-onboarding"
 
+[agents.maintenance]
+[agents.maintenance.release_watch]
+enabled = true
+version_policy = "latest_stable_minus_one"
+dispatch_kind = "workflow_dispatch"
+dispatch_workflow = "codex-cli-update-snapshot.yml"
+
+[agents.maintenance.release_watch.upstream]
+source_kind = "github_releases"
+owner = "openai"
+repo = "codex"
+tag_prefix = "rust-v"
+
 [[agents]]
 agent_id = "claude_code"
 display_name = "Claude Code"
@@ -131,6 +144,19 @@ docs_release_track = "crates-io"
 
 [agents.scaffold]
 onboarding_pack_prefix = "claude-code-cli-onboarding"
+
+[agents.maintenance]
+[agents.maintenance.release_watch]
+enabled = true
+version_policy = "latest_stable_minus_one"
+dispatch_kind = "workflow_dispatch"
+dispatch_workflow = "claude-code-update-snapshot.yml"
+
+[agents.maintenance.release_watch.upstream]
+source_kind = "gcs_object_listing"
+bucket = "claude-code-dist-86c565f3-f756-42ad-8dfa-d59b1c096819"
+prefix = "claude-code-releases"
+version_marker = "manifest.json"
 
 [[agents]]
 agent_id = "opencode"
