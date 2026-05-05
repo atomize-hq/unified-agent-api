@@ -39,6 +39,12 @@ pub struct MaintenanceRequest {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MaintenanceRequestEnvelope {
+    pub request: MaintenanceRequest,
+    pub execution_contract: Option<ExecutionContract>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RuntimeFollowupRequired {
     pub required: bool,
     pub items: Vec<String>,
@@ -56,6 +62,29 @@ pub struct DetectedRelease {
     pub dispatch_kind: String,
     pub dispatch_workflow: String,
     pub branch_name: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ExecutionContract {
+    pub executor: String,
+    pub prompt_template_path: String,
+    pub prompt_sha256: String,
+    pub pr_summary_path: String,
+    pub closeout_path: String,
+    pub requires_manual_closeout: bool,
+    pub writable_surfaces: Vec<String>,
+    pub read_only_inputs: Vec<String>,
+    pub ordered_commands: Vec<String>,
+    pub green_gates: Vec<String>,
+    pub recovery: ExecutionContractRecovery,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ExecutionContractRecovery {
+    pub recreate_packet_command: String,
+    pub reopen_pr_body_path: String,
+    pub reopen_pr_branch: String,
+    pub notes: Vec<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -93,6 +122,8 @@ struct RawMaintenanceRequest {
     runtime_followup_required: RawRuntimeFollowupRequired,
     #[serde(default)]
     detected_release: Option<RawDetectedRelease>,
+    #[serde(default)]
+    execution_contract: Option<RawExecutionContract>,
     request_recorded_at: String,
     request_commit: String,
 }
@@ -117,6 +148,31 @@ struct RawDetectedRelease {
     dispatch_kind: String,
     dispatch_workflow: String,
     branch_name: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawExecutionContract {
+    executor: String,
+    prompt_template_path: String,
+    prompt_sha256: String,
+    pr_summary_path: String,
+    closeout_path: String,
+    requires_manual_closeout: bool,
+    writable_surfaces: Vec<String>,
+    read_only_inputs: Vec<String>,
+    ordered_commands: Vec<String>,
+    green_gates: Vec<String>,
+    recovery: RawExecutionContractRecovery,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawExecutionContractRecovery {
+    recreate_packet_command: String,
+    reopen_pr_body_path: String,
+    reopen_pr_branch: String,
+    notes: Vec<String>,
 }
 
 impl fmt::Display for MaintenanceRequestError {
@@ -157,6 +213,19 @@ impl MaintenanceRequest {
     }
 }
 
+impl MaintenanceRequestEnvelope {
+    pub fn require_execution_contract_for_relay(
+        &self,
+    ) -> Result<&ExecutionContract, MaintenanceRequestError> {
+        self.execution_contract.as_ref().ok_or_else(|| {
+            MaintenanceRequestError::Validation(format!(
+                "maintenance request `{}` trigger_kind `upstream_release_detected` requires an `[execution_contract]` table for relay execution",
+                self.request.relative_path
+            ))
+        })
+    }
+}
+
 impl MaintenanceAction {
     fn parse(value: &str, request_path: &Path) -> Result<Self, MaintenanceRequestError> {
         match value {
@@ -185,6 +254,13 @@ pub fn load_request(
     workspace_root: &Path,
     request_path: &Path,
 ) -> Result<MaintenanceRequest, MaintenanceRequestError> {
+    Ok(load_request_envelope(workspace_root, request_path)?.request)
+}
+
+pub fn load_request_envelope(
+    workspace_root: &Path,
+    request_path: &Path,
+) -> Result<MaintenanceRequestEnvelope, MaintenanceRequestError> {
     let workspace_root = fs::canonicalize(workspace_root).map_err(|err| {
         MaintenanceRequestError::Internal(format!(
             "canonicalize {}: {err}",
@@ -250,13 +326,13 @@ pub fn load_request(
     let registry = AgentRegistry::load(&workspace_root).map_err(|err| {
         MaintenanceRequestError::Internal(format!("load {REGISTRY_RELATIVE_PATH}: {err}"))
     })?;
-    if registry.find(&raw.agent_id).is_none() {
-        return Err(MaintenanceRequestError::Validation(format!(
+    let registry_entry = registry.find(&raw.agent_id).ok_or_else(|| {
+        MaintenanceRequestError::Validation(format!(
             "maintenance request `{}` references unknown agent_id `{}`; onboarded agents must already exist in {REGISTRY_RELATIVE_PATH}",
             relative_path.display(),
             raw.agent_id
-        )));
-    }
+        ))
+    })?;
 
     let trigger_kind = TriggerKind::parse(&raw.trigger_kind, &relative_path)?;
     let jail = WorkspacePathJail::new(&workspace_root).map_err(map_jail_error)?;
@@ -268,6 +344,16 @@ pub fn load_request(
         validate_runtime_followup_required(&relative_path, raw.runtime_followup_required)?;
     let detected_release =
         validate_detected_release(&relative_path, trigger_kind, raw.detected_release)?;
+    let execution_contract = validate_execution_contract(
+        &workspace_root,
+        &jail,
+        &relative_path,
+        &maintenance_root,
+        registry_entry,
+        trigger_kind,
+        detected_release.as_ref(),
+        raw.execution_contract,
+    )?;
     validate_automated_watch_request(
         &relative_path,
         &raw.artifact_version,
@@ -281,22 +367,331 @@ pub fn load_request(
     )?;
     validate_commit_value(&relative_path, "request_commit", &raw.request_commit)?;
 
-    Ok(MaintenanceRequest {
-        relative_path: relative_path.display().to_string(),
-        canonical_path,
-        sha256: hex::encode(Sha256::digest(&bytes)),
-        maintenance_pack_prefix,
-        maintenance_root: maintenance_root.display().to_string(),
-        agent_id: raw.agent_id,
-        trigger_kind,
-        basis_ref: raw.basis_ref,
-        opened_from: raw.opened_from,
-        requested_control_plane_actions,
-        runtime_followup_required,
-        detected_release,
-        request_recorded_at: raw.request_recorded_at,
-        request_commit: raw.request_commit,
+    Ok(MaintenanceRequestEnvelope {
+        request: MaintenanceRequest {
+            relative_path: relative_path.display().to_string(),
+            canonical_path,
+            sha256: hex::encode(Sha256::digest(&bytes)),
+            maintenance_pack_prefix,
+            maintenance_root: maintenance_root.display().to_string(),
+            agent_id: raw.agent_id,
+            trigger_kind,
+            basis_ref: raw.basis_ref,
+            opened_from: raw.opened_from,
+            requested_control_plane_actions,
+            runtime_followup_required,
+            detected_release,
+            request_recorded_at: raw.request_recorded_at,
+            request_commit: raw.request_commit,
+        },
+        execution_contract,
     })
+}
+
+fn validate_execution_contract(
+    workspace_root: &Path,
+    jail: &WorkspacePathJail,
+    request_path: &Path,
+    maintenance_root: &Path,
+    registry_entry: &crate::agent_registry::AgentRegistryEntry,
+    trigger_kind: TriggerKind,
+    detected_release: Option<&DetectedRelease>,
+    raw: Option<RawExecutionContract>,
+) -> Result<Option<ExecutionContract>, MaintenanceRequestError> {
+    match (trigger_kind, raw) {
+        (TriggerKind::UpstreamReleaseDetected, None) => Ok(None),
+        (
+            TriggerKind::UpstreamReleaseDetected,
+            Some(raw_execution_contract),
+        ) => {
+            let detected_release = detected_release.ok_or_else(|| {
+                MaintenanceRequestError::Internal(format!(
+                    "maintenance request `{}` is missing detected_release while validating execution_contract",
+                    request_path.display()
+                ))
+            })?;
+
+            validate_non_empty_scalar(
+                request_path,
+                "execution_contract.executor",
+                &raw_execution_contract.executor,
+            )?;
+            if raw_execution_contract.executor != "codex" {
+                return Err(MaintenanceRequestError::Validation(format!(
+                    "maintenance request `{}` field `execution_contract.executor` must be `codex` in milestone 1",
+                    request_path.display()
+                )));
+            }
+
+            let expected_prompt_template_path =
+                format!("{}/PR_BODY_TEMPLATE.md", registry_entry.manifest_root);
+            validate_repo_relative_reference(
+                jail,
+                request_path,
+                "execution_contract.prompt_template_path",
+                &raw_execution_contract.prompt_template_path,
+            )?;
+            if raw_execution_contract.prompt_template_path != expected_prompt_template_path {
+                return Err(MaintenanceRequestError::Validation(format!(
+                    "maintenance request `{}` field `execution_contract.prompt_template_path` must be `{expected_prompt_template_path}` for agent `{}`",
+                    request_path.display(),
+                    registry_entry.agent_id
+                )));
+            }
+            validate_sha256_value(
+                request_path,
+                "execution_contract.prompt_sha256",
+                &raw_execution_contract.prompt_sha256,
+            )?;
+            let rendered_prompt = render_execution_prompt(
+                workspace_root,
+                &raw_execution_contract.prompt_template_path,
+                &detected_release.target_version,
+            )?;
+            let rendered_prompt_sha256 = hex::encode(Sha256::digest(rendered_prompt.as_bytes()));
+            if raw_execution_contract.prompt_sha256 != rendered_prompt_sha256 {
+                return Err(MaintenanceRequestError::Validation(format!(
+                    "maintenance request `{}` field `execution_contract.prompt_sha256` must match the rendered prompt template digest `{rendered_prompt_sha256}`",
+                    request_path.display()
+                )));
+            }
+
+            let expected_pr_summary_path =
+                format!("{}/governance/pr-summary.md", maintenance_root.display());
+            validate_repo_relative_glob_path(
+                request_path,
+                "execution_contract.pr_summary_path",
+                &raw_execution_contract.pr_summary_path,
+            )?;
+            if raw_execution_contract.pr_summary_path != expected_pr_summary_path {
+                return Err(MaintenanceRequestError::Validation(format!(
+                    "maintenance request `{}` field `execution_contract.pr_summary_path` must be `{expected_pr_summary_path}` under the same maintenance root",
+                    request_path.display()
+                )));
+            }
+
+            let expected_closeout_path = format!(
+                "{}/governance/maintenance-closeout.json",
+                maintenance_root.display()
+            );
+            validate_repo_relative_glob_path(
+                request_path,
+                "execution_contract.closeout_path",
+                &raw_execution_contract.closeout_path,
+            )?;
+            if raw_execution_contract.closeout_path != expected_closeout_path {
+                return Err(MaintenanceRequestError::Validation(format!(
+                    "maintenance request `{}` field `execution_contract.closeout_path` must be `{expected_closeout_path}` under the same maintenance root",
+                    request_path.display()
+                )));
+            }
+
+            if !raw_execution_contract.requires_manual_closeout {
+                return Err(MaintenanceRequestError::Validation(format!(
+                    "maintenance request `{}` field `execution_contract.requires_manual_closeout` must be `true` in milestone 1",
+                    request_path.display()
+                )));
+            }
+
+            let writable_surfaces = validate_repo_relative_string_array(
+                request_path,
+                "execution_contract.writable_surfaces",
+                &raw_execution_contract.writable_surfaces,
+                true,
+            )?;
+            let read_only_inputs = validate_existing_repo_relative_string_array(
+                jail,
+                request_path,
+                "execution_contract.read_only_inputs",
+                &raw_execution_contract.read_only_inputs,
+            )?;
+            let ordered_commands = validate_non_empty_string_array(
+                request_path,
+                "execution_contract.ordered_commands",
+                &raw_execution_contract.ordered_commands,
+                true,
+            )?;
+            let green_gates = validate_non_empty_string_array(
+                request_path,
+                "execution_contract.green_gates",
+                &raw_execution_contract.green_gates,
+                true,
+            )?;
+
+            validate_non_empty_scalar(
+                request_path,
+                "execution_contract.recovery.recreate_packet_command",
+                &raw_execution_contract.recovery.recreate_packet_command,
+            )?;
+            validate_repo_relative_glob_path(
+                request_path,
+                "execution_contract.recovery.reopen_pr_body_path",
+                &raw_execution_contract.recovery.reopen_pr_body_path,
+            )?;
+            if raw_execution_contract.recovery.reopen_pr_body_path != expected_pr_summary_path {
+                return Err(MaintenanceRequestError::Validation(format!(
+                    "maintenance request `{}` field `execution_contract.recovery.reopen_pr_body_path` must match `execution_contract.pr_summary_path` `{expected_pr_summary_path}`",
+                    request_path.display()
+                )));
+            }
+            validate_non_empty_scalar(
+                request_path,
+                "execution_contract.recovery.reopen_pr_branch",
+                &raw_execution_contract.recovery.reopen_pr_branch,
+            )?;
+            if raw_execution_contract.recovery.reopen_pr_branch != detected_release.branch_name {
+                return Err(MaintenanceRequestError::Validation(format!(
+                    "maintenance request `{}` field `execution_contract.recovery.reopen_pr_branch` must match `detected_release.branch_name` `{}`",
+                    request_path.display(),
+                    detected_release.branch_name
+                )));
+            }
+            let recovery_notes = validate_non_empty_string_array(
+                request_path,
+                "execution_contract.recovery.notes",
+                &raw_execution_contract.recovery.notes,
+                true,
+            )?;
+
+            Ok(Some(ExecutionContract {
+                executor: raw_execution_contract.executor,
+                prompt_template_path: raw_execution_contract.prompt_template_path,
+                prompt_sha256: raw_execution_contract.prompt_sha256,
+                pr_summary_path: raw_execution_contract.pr_summary_path,
+                closeout_path: raw_execution_contract.closeout_path,
+                requires_manual_closeout: raw_execution_contract.requires_manual_closeout,
+                writable_surfaces,
+                read_only_inputs,
+                ordered_commands,
+                green_gates,
+                recovery: ExecutionContractRecovery {
+                    recreate_packet_command: raw_execution_contract
+                        .recovery
+                        .recreate_packet_command,
+                    reopen_pr_body_path: raw_execution_contract.recovery.reopen_pr_body_path,
+                    reopen_pr_branch: raw_execution_contract.recovery.reopen_pr_branch,
+                    notes: recovery_notes,
+                },
+            }))
+        }
+        (_, Some(_)) => Err(MaintenanceRequestError::Validation(format!(
+            "maintenance request `{}` may only include `[execution_contract]` when `trigger_kind = \"upstream_release_detected\"`",
+            request_path.display()
+        ))),
+        (_, None) => Ok(None),
+    }
+}
+
+fn render_execution_prompt(
+    workspace_root: &Path,
+    prompt_template_path: &str,
+    target_version: &str,
+) -> Result<String, MaintenanceRequestError> {
+    let prompt_template =
+        fs::read_to_string(workspace_root.join(prompt_template_path)).map_err(|err| {
+            MaintenanceRequestError::Validation(format!(
+                "read execution contract prompt template `{prompt_template_path}`: {err}"
+            ))
+        })?;
+    Ok(prompt_template.replace("{{VERSION}}", target_version))
+}
+
+fn validate_sha256_value(
+    request_path: &Path,
+    field_name: &str,
+    value: &str,
+) -> Result<(), MaintenanceRequestError> {
+    let is_valid = value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || matches!(byte, b'a'..=b'f'));
+    if !is_valid {
+        return Err(MaintenanceRequestError::Validation(format!(
+            "maintenance request `{}` field `{field_name}` must be 64 lowercase hex characters",
+            request_path.display()
+        )));
+    }
+    Ok(())
+}
+
+fn validate_repo_relative_glob_path(
+    request_path: &Path,
+    field_name: &str,
+    value: &str,
+) -> Result<(), MaintenanceRequestError> {
+    validate_non_empty_scalar(request_path, field_name, value)?;
+    let path = Path::new(value);
+    if path.is_absolute()
+        || path.components().next().is_none()
+        || path
+            .components()
+            .any(|component| !matches!(component, Component::Normal(_)))
+    {
+        return Err(MaintenanceRequestError::Validation(format!(
+            "maintenance request `{}` field `{field_name}` must be a repo-relative path with only normal components",
+            request_path.display()
+        )));
+    }
+    Ok(())
+}
+
+fn validate_repo_relative_string_array(
+    request_path: &Path,
+    field_name: &str,
+    values: &[String],
+    require_non_empty: bool,
+) -> Result<Vec<String>, MaintenanceRequestError> {
+    if require_non_empty && values.is_empty() {
+        return Err(MaintenanceRequestError::Validation(format!(
+            "maintenance request `{}` field `{field_name}` must be a non-empty array",
+            request_path.display()
+        )));
+    }
+    let mut parsed = Vec::with_capacity(values.len());
+    for value in values {
+        validate_repo_relative_glob_path(request_path, field_name, value)?;
+        parsed.push(value.clone());
+    }
+    Ok(parsed)
+}
+
+fn validate_existing_repo_relative_string_array(
+    jail: &WorkspacePathJail,
+    request_path: &Path,
+    field_name: &str,
+    values: &[String],
+) -> Result<Vec<String>, MaintenanceRequestError> {
+    let mut parsed = Vec::with_capacity(values.len());
+    for value in values {
+        validate_repo_relative_reference(jail, request_path, field_name, value)?;
+        parsed.push(value.clone());
+    }
+    Ok(parsed)
+}
+
+fn validate_non_empty_string_array(
+    request_path: &Path,
+    field_name: &str,
+    values: &[String],
+    require_non_empty: bool,
+) -> Result<Vec<String>, MaintenanceRequestError> {
+    if require_non_empty && values.is_empty() {
+        return Err(MaintenanceRequestError::Validation(format!(
+            "maintenance request `{}` field `{field_name}` must be a non-empty array",
+            request_path.display()
+        )));
+    }
+    let mut parsed = Vec::with_capacity(values.len());
+    for value in values {
+        if value.trim().is_empty() {
+            return Err(MaintenanceRequestError::Validation(format!(
+                "maintenance request `{}` field `{field_name}` must not contain blank entries",
+                request_path.display()
+            )));
+        }
+        parsed.push(value.clone());
+    }
+    Ok(parsed)
 }
 
 fn normalize_repo_relative_path(

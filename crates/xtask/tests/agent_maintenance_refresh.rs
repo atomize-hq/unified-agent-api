@@ -2,6 +2,8 @@
 
 use std::{collections::BTreeSet, fs, path::Path};
 
+use sha2::{Digest, Sha256};
+
 #[path = "support/onboard_agent_harness.rs"]
 mod harness;
 
@@ -34,7 +36,7 @@ mod support_matrix;
 mod workspace_mutation;
 use harness::{fixture_root, seed_release_touchpoints, snapshot_files, write_text};
 use refresh::{apply_refresh_plan, build_refresh_plan};
-use request::load_request;
+use request::{load_request, load_request_envelope};
 
 #[test]
 fn request_outside_maintenance_root_rejected() {
@@ -386,6 +388,199 @@ fn automated_request_v2_with_detected_release_parses() {
 }
 
 #[test]
+fn automated_request_with_execution_contract_parses_and_validates() {
+    let fixture = fixture_root("agent-maintenance-automated-request-with-contract");
+    seed_publication_inputs(&fixture);
+    write_text(
+        &fixture.join(".github/workflows/codex-cli-update-snapshot.yml"),
+        "name: Codex worker\n",
+    );
+
+    let request_path =
+        "docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml";
+    write_text(
+        &fixture.join(request_path),
+        &automated_request_with_execution_contract_toml(
+            "opencode",
+            "docs/integrations/opencode/governance/seam-2-closeout.md",
+        ),
+    );
+
+    let envelope =
+        load_request_envelope(&fixture, Path::new(request_path)).expect("load request envelope");
+    let contract = envelope
+        .require_execution_contract_for_relay()
+        .expect("execution contract");
+
+    assert_eq!(contract.executor, "codex");
+    assert_eq!(
+        contract.prompt_template_path,
+        "cli_manifests/opencode/PR_BODY_TEMPLATE.md"
+    );
+    assert_eq!(
+        contract.pr_summary_path,
+        "docs/agents/lifecycle/opencode-maintenance/governance/pr-summary.md"
+    );
+    assert_eq!(
+        contract.recovery.reopen_pr_branch,
+        "automation/opencode-maintenance-0.98.0"
+    );
+    assert!(contract.requires_manual_closeout);
+    assert!(contract
+        .writable_surfaces
+        .contains(&"docs/agents/lifecycle/opencode-maintenance/**".to_string()));
+}
+
+#[test]
+fn historical_automated_request_without_execution_contract_still_loads_for_read_only() {
+    let fixture = fixture_root("agent-maintenance-automated-request-historical-read-only");
+    seed_publication_inputs(&fixture);
+    write_text(
+        &fixture.join(".github/workflows/codex-cli-update-snapshot.yml"),
+        "name: Codex worker\n",
+    );
+
+    let request_path =
+        "docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml";
+    write_text(
+        &fixture.join(request_path),
+        &automated_request_toml(
+            "opencode",
+            "docs/integrations/opencode/governance/seam-2-closeout.md",
+        ),
+    );
+
+    let envelope =
+        load_request_envelope(&fixture, Path::new(request_path)).expect("load request envelope");
+    assert!(envelope.request.is_automated_watch_request());
+    assert!(envelope.execution_contract.is_none());
+
+    let err = envelope
+        .require_execution_contract_for_relay()
+        .expect_err("historical request should fail relay-only requirement");
+    assert!(err.to_string().contains("[execution_contract]"));
+}
+
+#[test]
+fn automated_request_execution_contract_rejects_non_repo_relative_writable_surface() {
+    let fixture = fixture_root("agent-maintenance-automated-request-invalid-writable-surface");
+    seed_publication_inputs(&fixture);
+    write_text(
+        &fixture.join(".github/workflows/codex-cli-update-snapshot.yml"),
+        "name: Codex worker\n",
+    );
+
+    let request_path =
+        "docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml";
+    write_text(
+        &fixture.join(request_path),
+        &automated_request_with_execution_contract_toml(
+            "opencode",
+            "docs/integrations/opencode/governance/seam-2-closeout.md",
+        )
+        .replace(
+            "\"docs/agents/lifecycle/opencode-maintenance/**\"",
+            "\"../escape/**\"",
+        ),
+    );
+
+    let err = load_request_envelope(&fixture, Path::new(request_path))
+        .expect_err("invalid writable surface should fail");
+    assert!(err
+        .to_string()
+        .contains("execution_contract.writable_surfaces"));
+    assert!(err.to_string().contains("repo-relative path"));
+}
+
+#[test]
+fn automated_request_execution_contract_rejects_recovery_branch_mismatch() {
+    let fixture = fixture_root("agent-maintenance-automated-request-invalid-recovery-branch");
+    seed_publication_inputs(&fixture);
+    write_text(
+        &fixture.join(".github/workflows/codex-cli-update-snapshot.yml"),
+        "name: Codex worker\n",
+    );
+
+    let request_path =
+        "docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml";
+    write_text(
+        &fixture.join(request_path),
+        &automated_request_with_execution_contract_toml(
+            "opencode",
+            "docs/integrations/opencode/governance/seam-2-closeout.md",
+        )
+        .replace(
+            "reopen_pr_branch = \"automation/opencode-maintenance-0.98.0\"",
+            "reopen_pr_branch = \"automation/opencode-maintenance-0.99.0\"",
+        ),
+    );
+
+    let err = load_request_envelope(&fixture, Path::new(request_path))
+        .expect_err("recovery branch mismatch should fail");
+    assert!(err
+        .to_string()
+        .contains("execution_contract.recovery.reopen_pr_branch"));
+    assert!(err.to_string().contains("detected_release.branch_name"));
+}
+
+#[test]
+fn automated_request_execution_contract_rejects_non_codex_executor() {
+    let fixture = fixture_root("agent-maintenance-automated-request-invalid-executor");
+    seed_publication_inputs(&fixture);
+    write_text(
+        &fixture.join(".github/workflows/codex-cli-update-snapshot.yml"),
+        "name: Codex worker\n",
+    );
+
+    let request_path =
+        "docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml";
+    write_text(
+        &fixture.join(request_path),
+        &automated_request_with_execution_contract_toml(
+            "opencode",
+            "docs/integrations/opencode/governance/seam-2-closeout.md",
+        )
+        .replace("executor = \"codex\"", "executor = \"claude_code\""),
+    );
+
+    let err = load_request_envelope(&fixture, Path::new(request_path))
+        .expect_err("non-codex executor should fail");
+    assert!(err.to_string().contains("execution_contract.executor"));
+    assert!(err.to_string().contains("must be `codex`"));
+}
+
+#[test]
+fn automated_request_execution_contract_rejects_manual_closeout_false() {
+    let fixture = fixture_root("agent-maintenance-automated-request-invalid-closeout-flag");
+    seed_publication_inputs(&fixture);
+    write_text(
+        &fixture.join(".github/workflows/codex-cli-update-snapshot.yml"),
+        "name: Codex worker\n",
+    );
+
+    let request_path =
+        "docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml";
+    write_text(
+        &fixture.join(request_path),
+        &automated_request_with_execution_contract_toml(
+            "opencode",
+            "docs/integrations/opencode/governance/seam-2-closeout.md",
+        )
+        .replace(
+            "requires_manual_closeout = true",
+            "requires_manual_closeout = false",
+        ),
+    );
+
+    let err = load_request_envelope(&fixture, Path::new(request_path))
+        .expect_err("manual closeout false should fail");
+    assert!(err
+        .to_string()
+        .contains("execution_contract.requires_manual_closeout"));
+    assert!(err.to_string().contains("must be `true`"));
+}
+
+#[test]
 fn automated_packet_refresh_renders_canonical_handoff_and_pr_summary() {
     let fixture = fixture_root("agent-maintenance-automated-packet-docs");
     seed_publication_inputs(&fixture);
@@ -724,6 +919,66 @@ fn automated_request_toml(agent_id: &str, basis_ref: &str) -> String {
         ),
         agent_id = agent_id,
         basis_ref = basis_ref
+    )
+}
+
+fn automated_request_with_execution_contract_toml(agent_id: &str, basis_ref: &str) -> String {
+    let prompt = "# Goal\n\nFollow the maintained PR template for 0.98.0.\n";
+    let prompt_sha256 = hex::encode(Sha256::digest(prompt.as_bytes()));
+
+    format!(
+        concat!(
+            "{}\n",
+            "[execution_contract]\n",
+            "executor = \"codex\"\n",
+            "prompt_template_path = \"cli_manifests/{agent_id}/PR_BODY_TEMPLATE.md\"\n",
+            "prompt_sha256 = \"{prompt_sha256}\"\n",
+            "pr_summary_path = \"docs/agents/lifecycle/{agent_id}-maintenance/governance/pr-summary.md\"\n",
+            "closeout_path = \"docs/agents/lifecycle/{agent_id}-maintenance/governance/maintenance-closeout.json\"\n",
+            "requires_manual_closeout = true\n",
+            "writable_surfaces = [\n",
+            "  \"docs/agents/lifecycle/{agent_id}-maintenance/**\",\n",
+            "  \"crates/{agent_id}/**\",\n",
+            "  \"crates/agent_api/**\",\n",
+            "  \"cli_manifests/{agent_id}/artifacts.lock.json\",\n",
+            "  \"cli_manifests/{agent_id}/snapshots/0.98.0/**\",\n",
+            "  \"cli_manifests/{agent_id}/reports/0.98.0/**\",\n",
+            "  \"cli_manifests/{agent_id}/versions/0.98.0.json\",\n",
+            "  \"cli_manifests/{agent_id}/wrapper_coverage.json\",\n",
+            "]\n",
+            "read_only_inputs = [\n",
+            "  \"cli_manifests/{agent_id}/OPS_PLAYBOOK.md\",\n",
+            "  \"cli_manifests/{agent_id}/CI_WORKFLOWS_PLAN.md\",\n",
+            "  \"cli_manifests/{agent_id}/PR_BODY_TEMPLATE.md\",\n",
+            "  \".github/workflows/codex-cli-update-snapshot.yml\",\n",
+            "]\n",
+            "ordered_commands = [\n",
+            "  \"cargo run -p xtask -- codex-validate --root cli_manifests/{agent_id}\",\n",
+            "  \"cargo run -p xtask -- support-matrix --check\",\n",
+            "  \"cargo run -p xtask -- capability-matrix --check\",\n",
+            "  \"cargo run -p xtask -- capability-matrix-audit\",\n",
+            "  \"make preflight\",\n",
+            "]\n",
+            "green_gates = [\n",
+            "  \"cargo run -p xtask -- codex-validate --root cli_manifests/{agent_id}\",\n",
+            "  \"cargo run -p xtask -- support-matrix --check\",\n",
+            "  \"cargo run -p xtask -- capability-matrix --check\",\n",
+            "  \"cargo run -p xtask -- capability-matrix-audit\",\n",
+            "  \"make preflight\",\n",
+            "]\n",
+            "\n",
+            "[execution_contract.recovery]\n",
+            "recreate_packet_command = \"cargo run -p xtask -- prepare-agent-maintenance --request docs/agents/lifecycle/{agent_id}-maintenance/governance/maintenance-request.toml --write\"\n",
+            "reopen_pr_body_path = \"docs/agents/lifecycle/{agent_id}-maintenance/governance/pr-summary.md\"\n",
+            "reopen_pr_branch = \"automation/{agent_id}-maintenance-0.98.0\"\n",
+            "notes = [\n",
+            "  \"If PR creation fails after packet generation, rerun packet creation and reopen the PR from the generated pr-summary path.\",\n",
+            "  \"If local Codex preflight fails, fix binary/auth and rerun execute-agent-maintenance --dry-run before write mode.\",\n",
+            "]\n"
+        ),
+        automated_request_toml(agent_id, basis_ref),
+        agent_id = agent_id,
+        prompt_sha256 = prompt_sha256
     )
 }
 
