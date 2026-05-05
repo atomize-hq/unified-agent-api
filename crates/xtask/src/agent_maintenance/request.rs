@@ -67,6 +67,7 @@ pub enum TriggerKind {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[allow(clippy::enum_variant_names)]
 pub enum MaintenanceAction {
     PacketDocRefresh,
     SupportMatrixRefresh,

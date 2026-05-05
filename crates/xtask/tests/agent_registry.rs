@@ -9,8 +9,8 @@ mod capability_projection {
 use std::path::PathBuf;
 
 use agent_registry::{
-    AgentRegistry, REGISTRY_RELATIVE_PATH, ReleaseWatchDispatchKind, ReleaseWatchSourceKind,
-    ReleaseWatchVersionPolicy,
+    AgentRegistry, ReleaseWatchDispatchKind, ReleaseWatchSourceKind, ReleaseWatchVersionPolicy,
+    REGISTRY_RELATIVE_PATH,
 };
 
 const SEEDED_REGISTRY: &str = include_str!("../data/agent_registry.toml");
@@ -96,7 +96,10 @@ fn seeded_registry_parses_successfully() {
         .release_watch
         .as_ref()
         .expect("claude_code seeded release_watch enrollment");
-    assert!(claude_watch.enabled, "claude_code release watch stays enabled");
+    assert!(
+        claude_watch.enabled,
+        "claude_code release watch stays enabled"
+    );
     assert_eq!(
         claude_watch.version_policy,
         ReleaseWatchVersionPolicy::LatestStableMinusOne
@@ -130,9 +133,11 @@ fn seeded_registry_parses_successfully() {
         .agents
         .iter()
         .filter_map(|agent| {
-            agent.maintenance.release_watch.as_ref().and_then(|release_watch| {
-                release_watch.enabled.then_some(agent.agent_id.as_str())
-            })
+            agent
+                .maintenance
+                .release_watch
+                .as_ref()
+                .and_then(|release_watch| release_watch.enabled.then_some(agent.agent_id.as_str()))
         })
         .collect();
     assert_eq!(
@@ -582,7 +587,10 @@ fn generic_packet_pr_release_watch_schema_remains_valid() {
         .expect("packet_pr release_watch should be present");
 
     assert!(release_watch.enabled);
-    assert_eq!(release_watch.dispatch_kind, ReleaseWatchDispatchKind::PacketPr);
+    assert_eq!(
+        release_watch.dispatch_kind,
+        ReleaseWatchDispatchKind::PacketPr
+    );
     assert_eq!(release_watch.dispatch_workflow, None);
     assert_eq!(
         release_watch.upstream.source_kind,

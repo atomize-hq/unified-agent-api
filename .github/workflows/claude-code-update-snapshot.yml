@@ -384,10 +384,6 @@ jobs:
           base: staging
           commit-message: "chore: snapshot claude code ${{ inputs.target_version }}"
           title: "chore: snapshot claude code ${{ inputs.target_version }}"
-          body: |
-            ## Claude Code snapshot update
-
-            - version: `${{ inputs.target_version }}`
-            - parity root: `cli_manifests/claude_code`
+          body-path: docs/agents/lifecycle/claude_code-maintenance/governance/pr-summary.md
           branch: "${{ inputs.branch_name }}"
           delete-branch: true

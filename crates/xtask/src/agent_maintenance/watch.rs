@@ -189,7 +189,8 @@ where
             .last()
             .cloned()
             .ok_or_else(|| Error::Internal("latest stable missing after sort".to_string()))?;
-        let Some(target_version) = select_target_version(&versions, release_watch.version_policy) else {
+        let Some(target_version) = select_target_version(&versions, release_watch.version_policy)
+        else {
             continue;
         };
         if target_version <= current_validated {
@@ -211,7 +212,10 @@ where
             request_path: maintenance_request_path(&entry.agent_id),
             opened_from: format!(".github/workflows/{dispatch_workflow}"),
             detected_by: GENERATED_BY_WORKFLOW.to_string(),
-            branch_name: format!("automation/{}-maintenance-{}", entry.agent_id, target_version),
+            branch_name: format!(
+                "automation/{}-maintenance-{}",
+                entry.agent_id, target_version
+            ),
         });
     }
 
@@ -301,12 +305,16 @@ fn fetch_github_releases(
             entry.agent_id
         ))
     })?;
-    let tag_prefix = release_watch.upstream.tag_prefix.as_deref().ok_or_else(|| {
-        Error::Validation(format!(
-            "release_watch tag_prefix missing for github_releases agent `{}`",
-            entry.agent_id
-        ))
-    })?;
+    let tag_prefix = release_watch
+        .upstream
+        .tag_prefix
+        .as_deref()
+        .ok_or_else(|| {
+            Error::Validation(format!(
+                "release_watch tag_prefix missing for github_releases agent `{}`",
+                entry.agent_id
+            ))
+        })?;
     let url = format!("https://api.github.com/repos/{owner}/{repo}/releases?per_page=100");
     let body = fetch_text(&url)?;
     let releases: Vec<GithubRelease> = serde_json::from_str(&body).map_err(|err| {
@@ -350,12 +358,16 @@ fn fetch_gcs_versions(
             entry.agent_id
         ))
     })?;
-    let version_marker = release_watch.upstream.version_marker.as_deref().ok_or_else(|| {
-        Error::Validation(format!(
-            "release_watch version_marker missing for gcs_object_listing agent `{}`",
-            entry.agent_id
-        ))
-    })?;
+    let version_marker = release_watch
+        .upstream
+        .version_marker
+        .as_deref()
+        .ok_or_else(|| {
+            Error::Validation(format!(
+                "release_watch version_marker missing for gcs_object_listing agent `{}`",
+                entry.agent_id
+            ))
+        })?;
 
     let normalized_prefix = if prefix.ends_with('/') {
         prefix.to_string()

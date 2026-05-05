@@ -602,9 +602,22 @@ cargo run -p xtask -- check-agent-drift --agent <agent_id>
 
 If drift is reported, open the maintenance lane for that already-onboarded agent.
 
-### 2. Author the request artifact
+For upstream-release maintenance, the live scheduled entrypoint is the shared watcher workflow:
 
-The maintenance lane starts from the maintainer-authored request:
+`.github/workflows/agent-maintenance-release-watch.yml`
+
+It checks out `staging`, runs `cargo run -p xtask -- maintenance-watch --emit-json _ci_tmp/maintenance-watch.json`, and fans out from the emitted `stale_agents[]` queue. The legacy per-agent watcher workflows are no longer live entrypoints.
+
+For local inspection, use the same detector surfaces directly:
+
+```sh
+cargo run -p xtask -- maintenance-watch --check
+cargo run -p xtask -- maintenance-watch --emit-json _ci_tmp/maintenance-watch.json
+```
+
+### 2. Author or prepare the request artifact
+
+Manual drift lanes still start from the maintainer-authored request:
 
 `docs/agents/lifecycle/<agent_id>-maintenance/governance/maintenance-request.toml`
 
@@ -616,6 +629,32 @@ This request is the control-plane input for `refresh-agent`. It can request only
 - `release_doc_refresh`
 
 Historical onboarding and implementation packet docs remain read-only detector inputs.
+
+Automated upstream-release lanes use the prepared v2 request contract with `artifact_version = "2"` and `trigger_kind = "upstream_release_detected"`. The shared worker workflows generate that request and packet root before they open the maintenance PR:
+
+```sh
+cargo run -p xtask -- prepare-agent-maintenance \
+  --agent <agent_id> \
+  --current-version <current_validated> \
+  --latest-stable <latest_stable> \
+  --target-version <target_version> \
+  --opened-from .github/workflows/<worker-workflow>.yml \
+  --detected-by .github/workflows/agent-maintenance-release-watch.yml \
+  --dispatch-kind workflow_dispatch \
+  --branch-name automation/<agent_id>-maintenance-<target_version> \
+  --request-recorded-at <rfc3339_utc> \
+  --request-commit <git_sha> \
+  --dry-run
+```
+
+Use `--write` to materialize the request and packet docs. Automated requests are packet-first and should not be hand-edited to remove the `[detected_release]` linkage.
+
+For automated upstream-release lanes:
+- `docs/agents/lifecycle/<agent_id>-maintenance/HANDOFF.md` is the canonical contributor execution contract.
+- `docs/agents/lifecycle/<agent_id>-maintenance/governance/pr-summary.md` is a derivative PR presentation surface rendered from the same packet context.
+- the exact coding-agent prompt and PR-body tail both come from `cli_manifests/<agent_id>/PR_BODY_TEMPLATE.md`
+- promotion-only files such as `cli_manifests/<agent_id>/latest_validated.txt` and `cli_manifests/<agent_id>/min_supported.txt` remain out of scope for this packet-first follow-on
+- support/capability/release-doc publication surfaces such as `cli_manifests/support_matrix/current.json`, `docs/specs/unified-agent-api/support-matrix.md`, `docs/specs/unified-agent-api/capability-matrix.md`, and `docs/crates-io-release.md` still exist in the broader maintenance framework, but this automated upstream-release lane is packet-only and does not request or rewrite them
 
 ### 3. Preview and apply the maintenance refresh
 

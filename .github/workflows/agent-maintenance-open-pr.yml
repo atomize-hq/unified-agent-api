@@ -107,6 +107,6 @@ jobs:
           branch: ${{ inputs.branch_name }}
           commit-message: "chore: open maintenance packet for ${{ inputs.agent_id }} ${{ inputs.target_version }}"
           title: "chore: open maintenance packet for ${{ inputs.agent_id }} ${{ inputs.target_version }}"
-          body: "Automated maintenance packet for `${{ inputs.agent_id }}` target `${{ inputs.target_version }}`."
+          body-path: docs/agents/lifecycle/${{ inputs.agent_id }}-maintenance/governance/pr-summary.md
           add-paths: ${{ inputs.add_paths }}
           delete-branch: true

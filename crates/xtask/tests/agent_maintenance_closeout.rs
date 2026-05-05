@@ -507,7 +507,10 @@ fn automated_request_closeout_preserves_trigger_truth_in_handoff() {
     let request_absolute = fixture.join(request_path);
     write_text(
         &request_absolute,
-        &automated_maintenance_request_toml("opencode", "docs/integrations/opencode/governance/seam-2-closeout.md"),
+        &automated_maintenance_request_toml(
+            "opencode",
+            "docs/integrations/opencode/governance/seam-2-closeout.md",
+        ),
     );
     let closeout_path = Path::new(
         "docs/agents/lifecycle/opencode-maintenance/governance/maintenance-closeout.json",
@@ -518,10 +521,9 @@ fn automated_request_closeout_preserves_trigger_truth_in_handoff() {
     );
 
     write_closeout_outputs(&fixture, request_path, closeout_path).expect("closeout write");
-    let handoff = fs::read_to_string(
-        fixture.join("docs/agents/lifecycle/opencode-maintenance/HANDOFF.md"),
-    )
-    .expect("read handoff");
+    let handoff =
+        fs::read_to_string(fixture.join("docs/agents/lifecycle/opencode-maintenance/HANDOFF.md"))
+            .expect("read handoff");
     assert!(handoff.contains("upstream_release_detected"));
     assert!(handoff.contains("automation/opencode-maintenance-0.98.0"));
 }

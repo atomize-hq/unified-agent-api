@@ -155,7 +155,10 @@ fn packet_pr_enrollment_uses_generic_open_pr_workflow() {
         .expect("codex stale agent");
     assert_eq!(codex.dispatch_kind, "packet_pr");
     assert_eq!(codex.dispatch_workflow, "agent-maintenance-open-pr.yml");
-    assert_eq!(codex.opened_from, ".github/workflows/agent-maintenance-open-pr.yml");
+    assert_eq!(
+        codex.opened_from,
+        ".github/workflows/agent-maintenance-open-pr.yml"
+    );
 }
 
 fn resolver_for_queue(

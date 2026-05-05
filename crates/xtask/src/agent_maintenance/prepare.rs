@@ -1,5 +1,4 @@
 use std::{
-    fs,
     io::{self, Write},
     path::{Path, PathBuf},
 };
@@ -10,7 +9,9 @@ use thiserror::Error;
 
 use crate::{
     agent_lifecycle::maintenance_request_path,
-    agent_registry::{AgentRegistry, AgentRegistryEntry, ReleaseWatchMetadata, ReleaseWatchSourceKind},
+    agent_registry::{
+        AgentRegistry, AgentRegistryEntry, ReleaseWatchMetadata, ReleaseWatchSourceKind,
+    },
     workspace_mutation::{
         apply_mutations, plan_create_or_replace, ApplySummary, WorkspaceMutationError,
         WorkspacePathJail,
@@ -115,7 +116,10 @@ impl Error {
 
 impl PreparePlan {
     pub fn planned_paths(&self) -> Vec<&str> {
-        self.files.iter().map(|file| file.relative_path.as_str()).collect()
+        self.files
+            .iter()
+            .map(|file| file.relative_path.as_str())
+            .collect()
     }
 }
 
@@ -198,7 +202,9 @@ pub fn build_prepare_plan(workspace_root: &Path, args: &Args) -> Result<PrepareP
         relative_path: request.relative_path.clone(),
         contents: request_bytes,
     }];
-    for doc in build_packet_docs(&request) {
+    for doc in build_packet_docs(workspace_root, &request)
+        .map_err(|err| Error::Internal(format!("render maintenance packet docs: {err}")))?
+    {
         files.push(PreparedFile {
             relative_path: doc.relative_path,
             contents: doc.contents.into_bytes(),
@@ -372,11 +378,7 @@ fn source_kind_str(kind: ReleaseWatchSourceKind) -> &'static str {
     }
 }
 
-fn write_preview<W: Write>(
-    writer: &mut W,
-    plan: &PreparePlan,
-    writing: bool,
-) -> Result<(), Error> {
+fn write_preview<W: Write>(writer: &mut W, plan: &PreparePlan, writing: bool) -> Result<(), Error> {
     writeln!(writer, "request: {}", plan.request.relative_path)
         .map_err(|err| Error::Internal(format!("write stdout: {err}")))?;
     for path in plan.planned_paths() {

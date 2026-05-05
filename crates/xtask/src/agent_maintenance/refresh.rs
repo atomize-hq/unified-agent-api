@@ -141,7 +141,9 @@ pub fn build_refresh_plan(
     for action in request.requested_control_plane_actions.iter().copied() {
         match action {
             MaintenanceAction::PacketDocRefresh => {
-                for doc in build_packet_docs(&request) {
+                for doc in build_packet_docs(workspace_root, &request).map_err(|err| {
+                    Error::Internal(format!("render maintenance packet docs: {err}"))
+                })? {
                     push_file(
                         &request,
                         &mut seen_paths,
@@ -332,6 +334,7 @@ fn ensure_allowed_write_path(
         format!("{}/threading.md", request.maintenance_root),
         format!("{}/review_surfaces.md", request.maintenance_root),
         format!("{}/HANDOFF.md", request.maintenance_root),
+        format!("{}/governance/pr-summary.md", request.maintenance_root),
         format!("{}/governance/remediation-log.md", request.maintenance_root),
     ];
     let is_generated_surface = matches!(

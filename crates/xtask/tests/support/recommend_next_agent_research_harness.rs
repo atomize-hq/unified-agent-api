@@ -312,7 +312,7 @@ if [[ -f "$workspace_root/fake-rna-codex-scenario.txt" ]]; then
 fi
 
 phase="discovery"
-if printf '%s\n' "$prompt" | grep -q "Recommendation Research Dossier Prompt"; then
+if [[ "$prompt" == *"Recommendation Research Dossier Prompt"* ]]; then
   phase="research"
 fi
 

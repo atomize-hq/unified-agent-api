@@ -2,17 +2,17 @@
 
 ## Pending
 
-### Land The LLM-Guided Research Layer For The Recommendation Lane
+### Make Goose The Explicit P1 End-To-End Lifecycle Validation
 
-**What:** Replace the thin repo-local `recommend-next-agent` skill with a real AI research workflow that gathers explicit proof for candidate charter fit, then feed that structured research into the existing deterministic runner for validation, rendering, promotion, and approval-artifact drafting.
+**What:** Take `docs/agents/lifecycle/goose/governance/approved-agent.toml` through the full repo-owned create lane: `scaffold-wrapper-crate`, `runtime-follow-on`, `prepare-publication`, `refresh-publication`, `prepare-proving-run-closeout`, and `close-proving-run`.
 
-**Why:** The shipped recommendation lane now works mechanically, but it still ranks candidates from heuristic signals in `scripts/recommend_next_agent.py` instead of using the skill as the actual research layer. That misses the intended product. Maintainers need a recommendation packet they can trust because an AI agent did the research and the runner enforced the contract.
+**Why:** The remaining open design gap is agent maintenance CI enrollment and release-watch orchestration for onboarded CLI agents. Once that lands, `goose` should be the first explicit end-to-end proving target so the repo validates the whole lifecycle on a real approved agent instead of treating the approval artifact as the finish line.
 
-**Context:** The 2026-04-28 validation on `codex/recommend-next-agent` found that the landed lane is valid for promotion mechanics but not for full intent. The missing next step is narrower than "more runner logic": the skill must perform web/docs/package/GitHub research plus safe local non-mutating probes when available, write structured proof fields, and let the runner reject incomplete candidates before scoring. The existing `approved-agent.toml` handoff and promote-time dry-run validation should stay unchanged.
+**Context:** Recommendation research already promoted `goose` and recorded the final approval handoff at `docs/agents/lifecycle/goose/governance/approved-agent.toml`. The publication and closeout machinery is now landed. The follow-up after landing agent-maintenance CI work is to run one honest full-lifecycle proving pass for `goose`.
 
 **Effort:** M
 **Priority:** P1
-**Depends on:** The current deterministic runner, packet template, approval-artifact contract, and operator guide remaining the control-plane truth
+**Depends on:** Deciding and landing the agent-maintenance CI architecture, either per-agent maintenance automation enrollment or one shared watcher/orchestrator driven from registry truth
 
 ### Decide Whether Capability Matrix Markdown Stays Canonical After M5
 
@@ -42,6 +42,19 @@
 **Retired:** superseded by landed publication + closeout work on 2026-05-04
 
 ## Completed
+
+### Land The LLM-Guided Research Layer For The Recommendation Lane
+
+**What:** Replace the thin repo-local `recommend-next-agent` skill with a real AI research workflow that gathers explicit proof for candidate charter fit, then feed that structured research into the existing deterministic runner for validation, rendering, promotion, and approval-artifact drafting.
+
+**Why:** The shipped recommendation lane now works mechanically, but it still ranks candidates from heuristic signals in `scripts/recommend_next_agent.py` instead of using the skill as the actual research layer. That misses the intended product. Maintainers need a recommendation packet they can trust because an AI agent did the research and the runner enforced the contract.
+
+**Context:** This landed on 2026-05-04. `cargo run -p xtask -- recommend-next-agent-research --dry-run|--write` now owns bounded discovery prompt rendering, Codex execution, `freeze-discovery`, research validation, and execution evidence; the skill and operator guide are thin wrappers over that repo-owned flow; proving completed successfully for `20260504T212721Z-cli-recommendation-v3-pass1`; promotion produced `docs/agents/selection/runs/20260504T212721Z-cli-recommendation-v3-pass1`; and the final approval handoff was recorded at `docs/agents/lifecycle/goose/governance/approved-agent.toml`.
+
+**Effort:** M
+**Priority:** P1
+**Depends on:** The current deterministic runner, packet template, approval-artifact contract, and operator guide remaining the control-plane truth
+**Completed:** landed on 2026-05-04
 
 ### Enclose Create-Mode Closeout Without Ad Hoc Authoring
 

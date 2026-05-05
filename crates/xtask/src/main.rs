@@ -19,7 +19,8 @@ mod wrapper_coverage_shared;
 
 use xtask::agent_maintenance::{
     closeout as agent_maintenance_closeout, drift as agent_maintenance_drift,
-    refresh as agent_maintenance_refresh,
+    prepare as agent_maintenance_prepare, refresh as agent_maintenance_refresh,
+    watch as agent_maintenance_watch,
 };
 use xtask::capability_matrix;
 pub use xtask::onboard_agent;
@@ -91,6 +92,10 @@ enum Command {
     CapabilityMatrixAudit(capability_matrix_audit::Args),
     /// Detect maintenance-relevant drift for an already-onboarded agent.
     CheckAgentDrift(agent_maintenance_drift::Args),
+    /// Detect stale enrolled agents from registry truth and emit the maintenance queue.
+    MaintenanceWatch(agent_maintenance_watch::Args),
+    /// Prepare an automated maintenance request and packet docs from release-watch inputs.
+    PrepareAgentMaintenance(agent_maintenance_prepare::Args),
     /// Refresh maintenance packet docs and generated publication surfaces from a maintenance request.
     RefreshAgent(agent_maintenance_refresh::Args),
     /// Validate and close an agent maintenance run.
@@ -262,6 +267,20 @@ fn main() {
         Command::CheckAgentDrift(args) => match agent_maintenance_drift::run(args) {
             Ok(agent_maintenance_drift::DriftCheckOutcome::Clean(_)) => 0,
             Ok(agent_maintenance_drift::DriftCheckOutcome::DriftDetected(_)) => 2,
+            Err(err) => {
+                eprintln!("{err}");
+                err.exit_code()
+            }
+        },
+        Command::MaintenanceWatch(args) => match agent_maintenance_watch::run(args) {
+            Ok(()) => 0,
+            Err(err) => {
+                eprintln!("{err}");
+                err.exit_code()
+            }
+        },
+        Command::PrepareAgentMaintenance(args) => match agent_maintenance_prepare::run(args) {
+            Ok(()) => 0,
             Err(err) => {
                 eprintln!("{err}");
                 err.exit_code()

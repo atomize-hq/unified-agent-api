@@ -3,6 +3,8 @@ use std::path::PathBuf;
 
 use regex::Regex;
 
+const GENERATED_PR_SUMMARY_SUFFIX: &str = "governance/pr-summary.md";
+
 fn repo_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .parent()
@@ -22,7 +24,9 @@ fn c4_spec_agent_maintenance_workflows_share_the_release_watch_and_packet_only_p
     let packet_only_pr = read_repo_file(".github/workflows/agent-maintenance-open-pr.yml");
 
     assert!(
-        shared_watch.contains("cargo run -p xtask -- maintenance-watch --emit-json _ci_tmp/maintenance-watch.json"),
+        shared_watch.contains(
+            "cargo run -p xtask -- maintenance-watch --emit-json _ci_tmp/maintenance-watch.json"
+        ),
         "shared watcher must delegate stale detection to xtask"
     );
     assert!(
@@ -54,12 +58,23 @@ fn c4_spec_agent_maintenance_workflows_share_the_release_watch_and_packet_only_p
         "--branch-name",
         "base: staging",
         "add-paths: ${{ inputs.add_paths }}",
+        "body-path: docs/agents/lifecycle/${{ inputs.agent_id }}-maintenance/governance/pr-summary.md",
     ] {
         assert!(
             packet_only_pr.contains(required),
             "packet-only PR workflow must retain {required}"
         );
     }
+    assert!(
+        !packet_only_pr.contains("\n          body:"),
+        "packet-only PR workflow must not keep an inline body block"
+    );
+    assert_prepare_step_precedes(
+        &packet_only_pr,
+        "prepare-agent-maintenance",
+        "body-path: docs/agents/lifecycle/${{ inputs.agent_id }}-maintenance/governance/pr-summary.md",
+        ".github/workflows/agent-maintenance-open-pr.yml",
+    );
     for forbidden in [
         "actions/download-artifact@v7",
         "codex-snapshot",
@@ -67,6 +82,7 @@ fn c4_spec_agent_maintenance_workflows_share_the_release_watch_and_packet_only_p
         "prepare-publication",
         "refresh-publication",
         "artifacts.lock.json",
+        "_ci_tmp/codex_cli_pr_body.md",
     ] {
         assert!(
             !packet_only_pr.contains(forbidden),
@@ -152,6 +168,95 @@ fn c4_spec_update_snapshot_workflow_runs_full_pipeline_and_uploads_artifacts() {
 }
 
 #[test]
+fn c4_spec_worker_update_snapshot_workflows_consume_shared_maintenance_inputs() {
+    for (workflow, expected_dispatch_workflow, stale_branch_family, body_path) in [
+        (
+            ".github/workflows/codex-cli-update-snapshot.yml",
+            "codex-cli-update-snapshot.yml",
+            "automation/codex-cli-",
+            "body-path: docs/agents/lifecycle/codex-maintenance/governance/pr-summary.md",
+        ),
+        (
+            ".github/workflows/claude-code-update-snapshot.yml",
+            "claude-code-update-snapshot.yml",
+            "automation/claude-code-",
+            "body-path: docs/agents/lifecycle/claude_code-maintenance/governance/pr-summary.md",
+        ),
+    ] {
+        let yml = read_repo_file(workflow);
+
+        for required in [
+            "agent_id:",
+            "current_version:",
+            "latest_stable:",
+            "target_version:",
+            "opened_from:",
+            "detected_by:",
+            "dispatch_kind:",
+            "branch_name:",
+            "prepare-agent-maintenance",
+            "--current-version",
+            "--latest-stable",
+            "--target-version",
+            "--opened-from",
+            "--detected-by",
+            "--dispatch-kind",
+            "--branch-name",
+            "branch: \"${{ inputs.branch_name }}\"",
+            "base: staging",
+            "inputs.target_version",
+        ] {
+            assert!(
+                yml.contains(required),
+                "{workflow} must retain shared maintenance worker contract surface {required}"
+            );
+        }
+
+        assert!(
+            yml.contains("--agent \"${{ inputs.agent_id }}\""),
+            "{workflow} must thread shared agent_id into prepare-agent-maintenance"
+        );
+        assert!(
+            yml.contains(&format!(
+                "--dispatch-workflow \"{expected_dispatch_workflow}\""
+            )),
+            "{workflow} must freeze its own worker workflow filename for automated packet preparation"
+        );
+        assert!(
+            !yml.contains("inputs.version"),
+            "{workflow} must use target_version instead of the stale version input"
+        );
+        assert!(
+            !yml.contains(stale_branch_family),
+            "{workflow} must not keep the stale per-workflow branch family {stale_branch_family}"
+        );
+        assert!(
+            yml.contains(body_path),
+            "{workflow} must use the generated maintenance packet summary path"
+        );
+        assert!(
+            !yml.contains("\n          body:"),
+            "{workflow} must not keep an inline body block"
+        );
+        assert_prepare_step_precedes(&yml, "prepare-agent-maintenance", body_path, workflow);
+    }
+
+    let codex = read_repo_file(".github/workflows/codex-cli-update-snapshot.yml");
+    for forbidden in [
+        "Generate work queue summary",
+        "_ci_tmp/codex_cli_work_queue.md",
+        "_ci_tmp/codex_cli_pr_body.md",
+        "Render PR body from template",
+        "cli_manifests/codex/PR_BODY_TEMPLATE.md",
+    ] {
+        assert!(
+            !codex.contains(forbidden),
+            "codex worker must not keep workflow-side PR body assembly: {forbidden}"
+        );
+    }
+}
+
+#[test]
 fn c4_spec_ci_workflow_has_conditional_codex_validate_gate() {
     let yml = read_repo_file(".github/workflows/ci.yml");
 
@@ -176,6 +281,24 @@ fn c4_spec_ci_workflow_has_conditional_codex_validate_gate() {
     assert!(
         validate_invocation.is_match(&yml),
         "ci.yml must invoke: cargo run -p xtask -- codex-validate"
+    );
+}
+
+fn assert_prepare_step_precedes(
+    workflow_text: &str,
+    prepare_needle: &str,
+    body_path_needle: &str,
+    workflow: &str,
+) {
+    let prepare_index = workflow_text
+        .find(prepare_needle)
+        .unwrap_or_else(|| panic!("{workflow} must contain {prepare_needle}"));
+    let body_path_index = workflow_text
+        .find(body_path_needle)
+        .unwrap_or_else(|| panic!("{workflow} must contain {body_path_needle}"));
+    assert!(
+        prepare_index < body_path_index,
+        "{workflow} must render the maintenance packet before referencing {GENERATED_PR_SUMMARY_SUFFIX}"
     );
 }
 
