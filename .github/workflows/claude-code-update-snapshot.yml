@@ -3,8 +3,36 @@ name: Claude Code update snapshot
 on:
   workflow_dispatch:
     inputs:
-      version:
-        description: "Bare semver (example: 2.1.29)"
+      agent_id:
+        description: "Frozen shared watcher agent id"
+        required: true
+        type: string
+      current_version:
+        description: "Current validated claude_code version from registry truth"
+        required: true
+        type: string
+      latest_stable:
+        description: "Latest stable upstream release observed by maintenance-watch"
+        required: true
+        type: string
+      target_version:
+        description: "Worker target version from shared watcher queue"
+        required: true
+        type: string
+      opened_from:
+        description: "Repo-relative workflow path that opens this maintenance lane"
+        required: true
+        type: string
+      detected_by:
+        description: "Repo-relative shared watcher workflow path"
+        required: true
+        type: string
+      dispatch_kind:
+        description: "Frozen shared dispatch kind"
+        required: true
+        type: string
+      branch_name:
+        description: "Frozen automation branch name for the maintenance PR"
         required: true
         type: string
 
@@ -34,7 +62,7 @@ jobs:
         id: manifest
         shell: bash
         env:
-          VERSION: ${{ inputs.version }}
+          VERSION: ${{ inputs.target_version }}
           BUCKET: "https://storage.googleapis.com/claude-code-dist-86c565f3-f756-42ad-8dfa-d59b1c096819/claude-code-releases"
         run: |
           set -euo pipefail
@@ -76,7 +104,7 @@ jobs:
       - name: Download artifacts + update lockfile
         shell: bash
         env:
-          VERSION: ${{ inputs.version }}
+          VERSION: ${{ inputs.target_version }}
           BUCKET: "https://storage.googleapis.com/claude-code-dist-86c565f3-f756-42ad-8dfa-d59b1c096819/claude-code-releases"
         run: |
           set -euo pipefail
@@ -137,7 +165,7 @@ jobs:
       - name: Upload pins + downloads
         uses: actions/upload-artifact@v6
         with:
-          name: "claude-code-pins-${{ inputs.version }}"
+          name: "claude-code-pins-${{ inputs.target_version }}"
           if-no-files-found: error
           path: |
             cli_manifests/claude_code/artifacts.lock.json
@@ -165,13 +193,13 @@ jobs:
       - name: Download pins + downloads
         uses: actions/download-artifact@v7
         with:
-          name: "claude-code-pins-${{ inputs.version }}"
+          name: "claude-code-pins-${{ inputs.target_version }}"
           path: .
 
       - name: Acquire pinned Claude Code CLI
         shell: bash
         env:
-          VERSION: ${{ inputs.version }}
+          VERSION: ${{ inputs.target_version }}
           TARGET: ${{ matrix.target_triple }}
           ASSET: ${{ matrix.asset_name }}
           BIN: ${{ matrix.binary_path }}
@@ -200,7 +228,7 @@ jobs:
       - name: Generate per-target snapshot (+ raw help)
         shell: bash
         env:
-          VERSION: ${{ inputs.version }}
+          VERSION: ${{ inputs.target_version }}
           TARGET: ${{ matrix.target_triple }}
           BIN: ${{ matrix.binary_path }}
           SOURCE_DATE_EPOCH: ${{ needs.prepare.outputs.source_date_epoch }}
@@ -219,18 +247,18 @@ jobs:
       - name: Upload snapshot JSON
         uses: actions/upload-artifact@v6
         with:
-          name: "claude-code-snapshot-${{ inputs.version }}-${{ matrix.target_triple }}"
+          name: "claude-code-snapshot-${{ inputs.target_version }}-${{ matrix.target_triple }}"
           if-no-files-found: error
           path: |
-            cli_manifests/claude_code/snapshots/${{ inputs.version }}/
+            cli_manifests/claude_code/snapshots/${{ inputs.target_version }}/
 
       - name: Upload raw help capture (not committed)
         uses: actions/upload-artifact@v6
         with:
-          name: "claude-code-raw-help-${{ inputs.version }}-${{ matrix.target_triple }}"
+          name: "claude-code-raw-help-${{ inputs.target_version }}-${{ matrix.target_triple }}"
           if-no-files-found: error
           path: |
-            cli_manifests/claude_code/raw_help/${{ inputs.version }}/${{ matrix.target_triple }}/
+            cli_manifests/claude_code/raw_help/${{ inputs.target_version }}/${{ matrix.target_triple }}/
 
   union-report-validate:
     name: Union → Report → Validate (Linux)
@@ -247,13 +275,13 @@ jobs:
       - name: Download pins + downloads
         uses: actions/download-artifact@v7
         with:
-          name: "claude-code-pins-${{ inputs.version }}"
+          name: "claude-code-pins-${{ inputs.target_version }}"
           path: .
 
       - name: Download required Linux snapshot
         uses: actions/download-artifact@v7
         with:
-          name: "claude-code-snapshot-${{ inputs.version }}-linux-x64"
+          name: "claude-code-snapshot-${{ inputs.target_version }}-linux-x64"
           path: .
           merge-multiple: true
 
@@ -261,7 +289,7 @@ jobs:
         continue-on-error: true
         uses: actions/download-artifact@v7
         with:
-          name: "claude-code-snapshot-${{ inputs.version }}-darwin-arm64"
+          name: "claude-code-snapshot-${{ inputs.target_version }}-darwin-arm64"
           path: .
           merge-multiple: true
 
@@ -269,14 +297,14 @@ jobs:
         continue-on-error: true
         uses: actions/download-artifact@v7
         with:
-          name: "claude-code-snapshot-${{ inputs.version }}-win32-x64"
+          name: "claude-code-snapshot-${{ inputs.target_version }}-win32-x64"
           path: .
           merge-multiple: true
 
       - name: Normalize snapshot paths (download-artifact v4)
         shell: bash
         env:
-          VERSION: ${{ inputs.version }}
+          VERSION: ${{ inputs.target_version }}
         run: |
           set -euo pipefail
           for t in linux-x64 darwin-arm64 win32-x64; do
@@ -313,7 +341,7 @@ jobs:
       - name: Union
         shell: bash
         env:
-          VERSION: ${{ inputs.version }}
+          VERSION: ${{ inputs.target_version }}
           SOURCE_DATE_EPOCH: ${{ needs.prepare.outputs.source_date_epoch }}
         run: |
           set -euo pipefail
@@ -322,7 +350,7 @@ jobs:
       - name: Wrapper coverage + reports + validate
         shell: bash
         env:
-          VERSION: ${{ inputs.version }}
+          VERSION: ${{ inputs.target_version }}
           SOURCE_DATE_EPOCH: ${{ needs.prepare.outputs.source_date_epoch }}
         run: |
           set -euo pipefail
@@ -331,17 +359,35 @@ jobs:
           cargo run -p xtask -- codex-version-metadata --root cli_manifests/claude_code --version "$VERSION" --status reported
           cargo run -p xtask -- codex-validate --root cli_manifests/claude_code
 
+      - name: Prepare maintenance packet
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run -p xtask -- prepare-agent-maintenance \
+            --agent "${{ inputs.agent_id }}" \
+            --current-version "${{ inputs.current_version }}" \
+            --latest-stable "${{ inputs.latest_stable }}" \
+            --target-version "${{ inputs.target_version }}" \
+            --opened-from "${{ inputs.opened_from }}" \
+            --detected-by "${{ inputs.detected_by }}" \
+            --dispatch-kind "${{ inputs.dispatch_kind }}" \
+            --dispatch-workflow "claude-code-update-snapshot.yml" \
+            --branch-name "${{ inputs.branch_name }}" \
+            --request-recorded-at "$(date -u +"%Y-%m-%dT%H:%M:%SZ")" \
+            --request-commit "${{ github.sha }}" \
+            --write
+
       - name: Create update PR
         uses: peter-evans/create-pull-request@v8
         with:
           token: ${{ secrets.AUTOMATION_TOKEN || secrets.GITHUB_TOKEN }}
           base: staging
-          commit-message: "chore: snapshot claude code ${VERSION}"
-          title: "chore: snapshot claude code ${VERSION}"
+          commit-message: "chore: snapshot claude code ${{ inputs.target_version }}"
+          title: "chore: snapshot claude code ${{ inputs.target_version }}"
           body: |
             ## Claude Code snapshot update
 
-            - version: `${{ inputs.version }}`
+            - version: `${{ inputs.target_version }}`
             - parity root: `cli_manifests/claude_code`
-          branch: "automation/claude-code-${{ inputs.version }}"
+          branch: "${{ inputs.branch_name }}"
           delete-branch: true
