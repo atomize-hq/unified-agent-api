@@ -8,7 +8,10 @@ mod capability_projection {
 
 use std::path::PathBuf;
 
-use agent_registry::{AgentRegistry, REGISTRY_RELATIVE_PATH};
+use agent_registry::{
+    AgentRegistry, REGISTRY_RELATIVE_PATH, ReleaseWatchDispatchKind, ReleaseWatchSourceKind,
+    ReleaseWatchVersionPolicy,
+};
 
 const SEEDED_REGISTRY: &str = include_str!("../data/agent_registry.toml");
 
@@ -45,6 +48,11 @@ fn seeded_registry_parses_successfully() {
     );
 
     let codex = registry.find("codex").expect("seeded codex entry");
+    let codex_watch = codex
+        .maintenance
+        .release_watch
+        .as_ref()
+        .expect("codex seeded release_watch enrollment");
     assert_eq!(
         codex.capability_declaration.target_gated.len(),
         2,
@@ -58,6 +66,79 @@ fn seeded_registry_parses_successfully() {
     assert_eq!(
         codex.publication.capability_matrix_target.as_deref(),
         Some("x86_64-unknown-linux-musl")
+    );
+    assert!(codex_watch.enabled, "codex release watch stays enabled");
+    assert_eq!(
+        codex_watch.version_policy,
+        ReleaseWatchVersionPolicy::LatestStableMinusOne
+    );
+    assert_eq!(
+        codex_watch.dispatch_kind,
+        ReleaseWatchDispatchKind::WorkflowDispatch
+    );
+    assert_eq!(
+        codex_watch.dispatch_workflow.as_deref(),
+        Some("codex-cli-update-snapshot.yml")
+    );
+    assert_eq!(
+        codex_watch.upstream.source_kind,
+        ReleaseWatchSourceKind::GithubReleases
+    );
+    assert_eq!(codex_watch.upstream.owner.as_deref(), Some("openai"));
+    assert_eq!(codex_watch.upstream.repo.as_deref(), Some("codex"));
+    assert_eq!(codex_watch.upstream.tag_prefix.as_deref(), Some("rust-v"));
+
+    let claude = registry
+        .find("claude_code")
+        .expect("seeded claude_code entry");
+    let claude_watch = claude
+        .maintenance
+        .release_watch
+        .as_ref()
+        .expect("claude_code seeded release_watch enrollment");
+    assert!(claude_watch.enabled, "claude_code release watch stays enabled");
+    assert_eq!(
+        claude_watch.version_policy,
+        ReleaseWatchVersionPolicy::LatestStableMinusOne
+    );
+    assert_eq!(
+        claude_watch.dispatch_kind,
+        ReleaseWatchDispatchKind::WorkflowDispatch
+    );
+    assert_eq!(
+        claude_watch.dispatch_workflow.as_deref(),
+        Some("claude-code-update-snapshot.yml")
+    );
+    assert_eq!(
+        claude_watch.upstream.source_kind,
+        ReleaseWatchSourceKind::GcsObjectListing
+    );
+    assert_eq!(
+        claude_watch.upstream.bucket.as_deref(),
+        Some("claude-code-dist-86c565f3-f756-42ad-8dfa-d59b1c096819")
+    );
+    assert_eq!(
+        claude_watch.upstream.prefix.as_deref(),
+        Some("claude-code-releases")
+    );
+    assert_eq!(
+        claude_watch.upstream.version_marker.as_deref(),
+        Some("manifest.json")
+    );
+
+    let release_watch_ids: Vec<&str> = registry
+        .agents
+        .iter()
+        .filter_map(|agent| {
+            agent.maintenance.release_watch.as_ref().and_then(|release_watch| {
+                release_watch.enabled.then_some(agent.agent_id.as_str())
+            })
+        })
+        .collect();
+    assert_eq!(
+        release_watch_ids,
+        vec!["codex", "claude_code"],
+        "milestone 1 release_watch enrollment stays registry-only for codex and claude_code"
     );
 
     let opencode = registry.find("opencode").expect("seeded opencode entry");
@@ -73,6 +154,10 @@ fn seeded_registry_parses_successfully() {
         opencode.maintenance.governance_checks.len(),
         2,
         "opencode seeds explicit governance checks"
+    );
+    assert!(
+        opencode.maintenance.release_watch.is_none(),
+        "opencode stays unenrolled in milestone 1"
     );
 
     let gemini = registry
@@ -92,6 +177,16 @@ fn seeded_registry_parses_successfully() {
         "gemini_cli seeds approval-artifact governance checks"
     );
     assert_eq!(gemini.publication.capability_matrix_target, None);
+    assert!(
+        gemini.maintenance.release_watch.is_none(),
+        "gemini_cli stays unenrolled in milestone 1"
+    );
+
+    let aider = registry.find("aider").expect("seeded aider entry");
+    assert!(
+        aider.maintenance.release_watch.is_none(),
+        "aider stays unenrolled in milestone 1"
+    );
 }
 
 #[test]
@@ -393,6 +488,106 @@ fn malformed_governance_checks_fail_closed() {
         let text = err.to_string();
         assert!(text.contains(expected), "{label}: {text}");
     }
+}
+
+#[test]
+fn malformed_release_watch_metadata_fails_closed() {
+    let cases = [
+        (
+            "missing workflow for workflow dispatch",
+            SEEDED_REGISTRY.replacen(
+                "dispatch_workflow = \"codex-cli-update-snapshot.yml\"\n",
+                "",
+                1,
+            ),
+            "dispatch_workflow is required when dispatch_kind = `workflow_dispatch`",
+        ),
+        (
+            "packet pr must not keep workflow field",
+            SEEDED_REGISTRY
+                .replacen(
+                    "dispatch_kind = \"workflow_dispatch\"",
+                    "dispatch_kind = \"packet_pr\"",
+                    1,
+                ),
+            "dispatch_workflow must be omitted when dispatch_kind = `packet_pr`",
+        ),
+        (
+            "github release watch missing repo",
+            SEEDED_REGISTRY.replacen("repo = \"codex\"\n", "", 1),
+            "upstream.repo is required for this upstream source",
+        ),
+        (
+            "gcs object listing missing version marker",
+            SEEDED_REGISTRY.replacen("version_marker = \"manifest.json\"\n", "", 1),
+            "upstream.version_marker is required for this upstream source",
+        ),
+        (
+            "github release watch must not declare gcs-only field",
+            SEEDED_REGISTRY.replacen(
+                "tag_prefix = \"rust-v\"",
+                "tag_prefix = \"rust-v\"\nbucket = \"unexpected\"",
+                1,
+            ),
+            "must not be set when maintenance.release_watch.upstream.source_kind = `github_releases`",
+        ),
+        (
+            "release watch block may not be present disabled",
+            SEEDED_REGISTRY.replacen(
+                "enabled = true\nversion_policy = \"latest_stable_minus_one\"",
+                "enabled = false\nversion_policy = \"latest_stable_minus_one\"",
+                1,
+            ),
+            "enabled=false is not allowed",
+        ),
+        (
+            "workflow dispatch path still requires source-specific fields",
+            SEEDED_REGISTRY
+                .replacen(
+                    "dispatch_kind = \"workflow_dispatch\"",
+                    "dispatch_kind = \"packet_pr\"",
+                    1,
+                )
+                .replacen(
+                    "dispatch_workflow = \"codex-cli-update-snapshot.yml\"\n",
+                    "",
+                    1,
+                )
+                .replacen("repo = \"codex\"\n", "", 1),
+            "upstream.repo is required for this upstream source",
+        ),
+    ];
+
+    for (label, raw, expected) in cases {
+        let err = AgentRegistry::parse(&raw).unwrap_err();
+        let text = err.to_string();
+        assert!(text.contains(expected), "{label}: {text}");
+    }
+}
+
+#[test]
+fn generic_packet_pr_release_watch_schema_remains_valid() {
+    let raw = SEEDED_REGISTRY.replacen(
+        "[agents.maintenance]\n\n[[agents.maintenance.governance_checks]]",
+        "[agents.maintenance]\n[agents.maintenance.release_watch]\nenabled = true\nversion_policy = \"latest_stable_minus_one\"\ndispatch_kind = \"packet_pr\"\n\n[agents.maintenance.release_watch.upstream]\nsource_kind = \"github_releases\"\nowner = \"example\"\nrepo = \"future-agent\"\ntag_prefix = \"v\"\n\n[[agents.maintenance.governance_checks]]",
+        1,
+    );
+
+    let registry = AgentRegistry::parse(&raw).expect("packet_pr release_watch should parse");
+    let opencode = registry.find("opencode").expect("seeded opencode entry");
+    let release_watch = opencode
+        .maintenance
+        .release_watch
+        .as_ref()
+        .expect("packet_pr release_watch should be present");
+
+    assert!(release_watch.enabled);
+    assert_eq!(release_watch.dispatch_kind, ReleaseWatchDispatchKind::PacketPr);
+    assert_eq!(release_watch.dispatch_workflow, None);
+    assert_eq!(
+        release_watch.upstream.source_kind,
+        ReleaseWatchSourceKind::GithubReleases
+    );
 }
 
 #[test]

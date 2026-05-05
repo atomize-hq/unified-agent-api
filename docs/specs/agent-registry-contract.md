@@ -21,6 +21,7 @@ maintenance governance metadata consumed by `check-agent-drift`.
 - publication flags and release track enrollment
 - onboarding packet ownership
 - maintenance governance checks for already-onboarded agents
+- maintenance release-watch enrollment and upstream-watch metadata
 
 Generated docs and maintenance packets MAY reference this registry, but they MUST NOT redefine its
 schema.
@@ -62,6 +63,61 @@ If maintenance governance auditing is configured for an agent, it MUST live unde
 [agents.maintenance]
 [[agents.maintenance.governance_checks]]
 ```
+
+If maintenance release-watch enrollment is configured for an agent, it MUST live under:
+
+```toml
+[agents.maintenance.release_watch]
+[agents.maintenance.release_watch.upstream]
+```
+
+Absence of `maintenance.release_watch` is the only “not enrolled” state. Callers MUST NOT create a
+second enrollment inventory outside the registry or represent unenrolled agents with
+`enabled = false` placeholders.
+
+## Maintenance release watch
+
+`maintenance.release_watch` declares the machine-owned watch metadata for upstream release
+detection. The schema is:
+
+```toml
+[agents.maintenance.release_watch]
+enabled = true
+version_policy = "latest_stable_minus_one"
+dispatch_kind = "workflow_dispatch" # or "packet_pr"
+dispatch_workflow = "example.yml"    # required only for workflow_dispatch
+
+[agents.maintenance.release_watch.upstream]
+source_kind = "github_releases"      # or "gcs_object_listing"
+```
+
+Required top-level fields:
+
+- `enabled`: boolean. When the block is present, it MUST be `true`.
+- `version_policy`: currently `latest_stable_minus_one`
+- `dispatch_kind`: one of `workflow_dispatch` or `packet_pr`
+
+Dispatch rules:
+
+- `dispatch_workflow` MUST be present only when `dispatch_kind = "workflow_dispatch"`.
+- `dispatch_workflow` MUST be omitted when `dispatch_kind = "packet_pr"`.
+- `dispatch_workflow`, when present, MUST be a non-empty workflow filename.
+
+Upstream rules:
+
+- `source_kind = "github_releases"` requires:
+  - `owner`
+  - `repo`
+  - `tag_prefix`
+- `source_kind = "gcs_object_listing"` requires:
+  - `bucket`
+  - `prefix`
+  - `version_marker`
+- Source-specific fields from the non-selected source kind MUST NOT be present.
+
+Current milestone-1 seeded registry truth enables release-watch metadata only for `codex` and
+`claude_code`. That rollout limit lives in the committed registry content, not as a permanent
+schema-level allowlist for future agents.
 
 ## Maintenance governance checks
 
