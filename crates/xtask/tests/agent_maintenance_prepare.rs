@@ -2,6 +2,8 @@
 
 use std::{fs, path::Path};
 
+use sha2::{Digest, Sha256};
+
 #[path = "support/onboard_agent_harness.rs"]
 mod harness;
 
@@ -22,6 +24,7 @@ mod workspace_mutation;
 
 use harness::{fixture_root, write_text};
 use prepare::{apply_prepare_plan, build_prepare_plan, Args};
+use request::load_request_envelope;
 
 const SEEDED_REGISTRY: &str = include_str!("../data/agent_registry.toml");
 
@@ -101,6 +104,107 @@ fn prepare_agent_maintenance_packet_pr_defaults_to_generic_open_pr_workflow() {
     assert!(request_text.contains("dispatch_workflow = \"agent-maintenance-open-pr.yml\""));
 }
 
+#[test]
+fn shared_renderer_keeps_handoff_pr_summary_and_prompt_in_lockstep() {
+    let fixture = fixture_root("prepare-agent-maintenance-shared-renderer");
+    seed_registry(&fixture);
+    seed_support_files(&fixture);
+
+    let request_path =
+        "docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml";
+    write_text(
+        &fixture.join(request_path),
+        &automated_request_with_execution_contract_toml(),
+    );
+
+    let envelope =
+        load_request_envelope(&fixture, Path::new(request_path)).expect("load request envelope");
+    let contract = envelope
+        .require_execution_contract_for_relay()
+        .expect("execution contract")
+        .clone();
+    let rendered_packet = docs::render_execution_packet(&fixture, &envelope.request, &contract)
+        .expect("render execution packet");
+    let planned_docs =
+        docs::build_packet_docs_from_envelope(&fixture, &envelope).expect("build packet docs");
+
+    assert_eq!(
+        rendered_packet.pr_summary_relative_path,
+        contract.pr_summary_path
+    );
+    assert_eq!(
+        rendered_packet.prompt_sha256, contract.prompt_sha256,
+        "renderer must preserve the exact request-truth prompt digest"
+    );
+
+    let prompt_hash = hex::encode(Sha256::digest(rendered_packet.prompt_contents.as_bytes()));
+    assert_eq!(prompt_hash, contract.prompt_sha256);
+    assert!(rendered_packet.handoff_contents.contains("## Recovery"));
+    assert!(rendered_packet
+        .handoff_contents
+        .contains("docs/agents/lifecycle/codex-maintenance/**"));
+    assert!(rendered_packet
+        .handoff_contents
+        .contains("cargo run -p xtask -- codex-validate --root cli_manifests/codex"));
+    assert!(rendered_packet
+        .handoff_contents
+        .contains("automation/codex-maintenance-0.98.0"));
+    assert!(rendered_packet
+        .handoff_contents
+        .contains(&rendered_packet.prompt_contents));
+    assert!(rendered_packet
+        .pr_summary_contents
+        .contains(&rendered_packet.handoff_relative_path));
+    assert!(rendered_packet
+        .pr_summary_contents
+        .contains(&rendered_packet.prompt_contents));
+
+    let handoff_doc = planned_docs
+        .iter()
+        .find(|doc| doc.relative_path == rendered_packet.handoff_relative_path)
+        .expect("handoff doc");
+    let pr_summary_doc = planned_docs
+        .iter()
+        .find(|doc| doc.relative_path == rendered_packet.pr_summary_relative_path)
+        .expect("pr summary doc");
+    assert_eq!(handoff_doc.contents, rendered_packet.handoff_contents);
+    assert_eq!(pr_summary_doc.contents, rendered_packet.pr_summary_contents);
+}
+
+#[test]
+fn shared_renderer_fails_closed_on_digest_and_root_mismatch() {
+    let fixture = fixture_root("prepare-agent-maintenance-renderer-fail-closed");
+    seed_registry(&fixture);
+    seed_support_files(&fixture);
+
+    let request_path =
+        "docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml";
+    write_text(
+        &fixture.join(request_path),
+        &automated_request_with_execution_contract_toml(),
+    );
+
+    let envelope =
+        load_request_envelope(&fixture, Path::new(request_path)).expect("load request envelope");
+    let contract = envelope
+        .require_execution_contract_for_relay()
+        .expect("execution contract")
+        .clone();
+
+    let mut bad_digest = contract.clone();
+    bad_digest.prompt_sha256 = "0".repeat(64);
+    let digest_err = docs::render_execution_packet(&fixture, &envelope.request, &bad_digest)
+        .expect_err("prompt digest mismatch should fail closed");
+    assert!(digest_err.contains("prompt digest mismatch"));
+
+    let mut wrong_root = contract;
+    wrong_root.pr_summary_path =
+        "docs/agents/lifecycle/other-maintenance/governance/pr-summary.md".to_string();
+    let root_err = docs::render_execution_packet(&fixture, &envelope.request, &wrong_root)
+        .expect_err("maintenance root mismatch should fail closed");
+    assert!(root_err.contains("pr-summary path mismatch"));
+}
+
 fn args() -> Args {
     Args {
         agent: "codex".to_string(),
@@ -147,4 +251,88 @@ fn seed_support_files(root: &Path) {
         &root.join("cli_manifests/codex/latest_validated.txt"),
         "0.97.0\n",
     );
+}
+
+fn automated_request_with_execution_contract_toml() -> String {
+    let prompt = "@codex\n\n## Goal\n\nFollow the maintained PR template for 0.98.0.\n";
+    let prompt_sha256 = hex::encode(Sha256::digest(prompt.as_bytes()));
+
+    format!(
+        concat!(
+            "artifact_version = \"2\"\n",
+            "agent_id = \"codex\"\n",
+            "trigger_kind = \"upstream_release_detected\"\n",
+            "basis_ref = \"cli_manifests/codex/latest_validated.txt\"\n",
+            "opened_from = \".github/workflows/codex-cli-update-snapshot.yml\"\n",
+            "requested_control_plane_actions = [\n",
+            "  \"packet_doc_refresh\",\n",
+            "]\n",
+            "request_recorded_at = \"2026-05-05T15:00:00Z\"\n",
+            "request_commit = \"abcdef1\"\n",
+            "\n",
+            "[runtime_followup_required]\n",
+            "required = false\n",
+            "items = []\n",
+            "\n",
+            "[detected_release]\n",
+            "detected_by = \".github/workflows/agent-maintenance-release-watch.yml\"\n",
+            "current_validated = \"0.97.0\"\n",
+            "target_version = \"0.98.0\"\n",
+            "latest_stable = \"0.99.0\"\n",
+            "version_policy = \"latest_stable_minus_one\"\n",
+            "source_kind = \"github_releases\"\n",
+            "source_ref = \"openai/codex\"\n",
+            "dispatch_kind = \"workflow_dispatch\"\n",
+            "dispatch_workflow = \"codex-cli-update-snapshot.yml\"\n",
+            "branch_name = \"automation/codex-maintenance-0.98.0\"\n",
+            "\n",
+            "[execution_contract]\n",
+            "executor = \"codex\"\n",
+            "prompt_template_path = \"cli_manifests/codex/PR_BODY_TEMPLATE.md\"\n",
+            "prompt_sha256 = \"{prompt_sha256}\"\n",
+            "pr_summary_path = \"docs/agents/lifecycle/codex-maintenance/governance/pr-summary.md\"\n",
+            "closeout_path = \"docs/agents/lifecycle/codex-maintenance/governance/maintenance-closeout.json\"\n",
+            "requires_manual_closeout = true\n",
+            "writable_surfaces = [\n",
+            "  \"docs/agents/lifecycle/codex-maintenance/**\",\n",
+            "  \"crates/codex/**\",\n",
+            "  \"crates/agent_api/**\",\n",
+            "  \"cli_manifests/codex/artifacts.lock.json\",\n",
+            "  \"cli_manifests/codex/snapshots/0.98.0/**\",\n",
+            "  \"cli_manifests/codex/reports/0.98.0/**\",\n",
+            "  \"cli_manifests/codex/versions/0.98.0.json\",\n",
+            "  \"cli_manifests/codex/wrapper_coverage.json\",\n",
+            "]\n",
+            "read_only_inputs = [\n",
+            "  \"cli_manifests/codex/OPS_PLAYBOOK.md\",\n",
+            "  \"cli_manifests/codex/CI_WORKFLOWS_PLAN.md\",\n",
+            "  \"cli_manifests/codex/PR_BODY_TEMPLATE.md\",\n",
+            "  \".github/workflows/codex-cli-update-snapshot.yml\",\n",
+            "]\n",
+            "ordered_commands = [\n",
+            "  \"cargo run -p xtask -- codex-validate --root cli_manifests/codex\",\n",
+            "  \"cargo run -p xtask -- support-matrix --check\",\n",
+            "  \"cargo run -p xtask -- capability-matrix --check\",\n",
+            "  \"cargo run -p xtask -- capability-matrix-audit\",\n",
+            "  \"make preflight\",\n",
+            "]\n",
+            "green_gates = [\n",
+            "  \"cargo run -p xtask -- codex-validate --root cli_manifests/codex\",\n",
+            "  \"cargo run -p xtask -- support-matrix --check\",\n",
+            "  \"cargo run -p xtask -- capability-matrix --check\",\n",
+            "  \"cargo run -p xtask -- capability-matrix-audit\",\n",
+            "  \"make preflight\",\n",
+            "]\n",
+            "\n",
+            "[execution_contract.recovery]\n",
+            "recreate_packet_command = \"cargo run -p xtask -- prepare-agent-maintenance --request docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml --write\"\n",
+            "reopen_pr_body_path = \"docs/agents/lifecycle/codex-maintenance/governance/pr-summary.md\"\n",
+            "reopen_pr_branch = \"automation/codex-maintenance-0.98.0\"\n",
+            "notes = [\n",
+            "  \"If PR creation fails after packet generation, rerun packet creation and reopen the PR from the generated pr-summary path.\",\n",
+            "  \"If local Codex preflight fails, fix binary/auth and rerun execute-agent-maintenance --dry-run before write mode.\",\n",
+            "]\n"
+        ),
+        prompt_sha256 = prompt_sha256
+    )
 }
