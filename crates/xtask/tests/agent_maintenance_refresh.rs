@@ -355,6 +355,30 @@ fn publication_refresh_actions_match_shared_publication_planner_bytes() {
     }
 }
 
+#[test]
+fn automated_request_v2_with_detected_release_parses() {
+    let fixture = fixture_root("agent-maintenance-automated-request-v2");
+    seed_publication_inputs(&fixture);
+    write_text(
+        &fixture.join(".github/workflows/codex-cli-update-snapshot.yml"),
+        "name: Codex worker\n",
+    );
+
+    let request_path =
+        "docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml";
+    write_text(
+        &fixture.join(request_path),
+        &automated_request_toml("opencode", "docs/integrations/opencode/governance/seam-2-closeout.md"),
+    );
+
+    let request = load_request(&fixture, Path::new(request_path)).expect("load request");
+    assert!(request.is_automated_watch_request());
+    let detected = request.detected_release.expect("detected release");
+    assert_eq!(detected.target_version, "0.98.0");
+    assert_eq!(detected.dispatch_workflow, "codex-cli-update-snapshot.yml");
+    assert_eq!(detected.branch_name, "automation/opencode-maintenance-0.98.0");
+}
+
 fn normalize_support_matrix_fixture(root: &Path) {
     for manifest_root in [
         "cli_manifests/codex",
@@ -601,6 +625,41 @@ fn request_toml_with_refs(
         actions_block = actions_block,
         runtime_required = if runtime_required { "true" } else { "false" },
         runtime_items_block = runtime_items_block
+    )
+}
+
+fn automated_request_toml(agent_id: &str, basis_ref: &str) -> String {
+    format!(
+        concat!(
+            "artifact_version = \"2\"\n",
+            "agent_id = \"{agent_id}\"\n",
+            "trigger_kind = \"upstream_release_detected\"\n",
+            "basis_ref = \"{basis_ref}\"\n",
+            "opened_from = \".github/workflows/codex-cli-update-snapshot.yml\"\n",
+            "requested_control_plane_actions = [\n",
+            "  \"packet_doc_refresh\",\n",
+            "]\n",
+            "request_recorded_at = \"2026-05-05T15:00:00Z\"\n",
+            "request_commit = \"abcdef1\"\n",
+            "\n",
+            "[runtime_followup_required]\n",
+            "required = false\n",
+            "items = []\n",
+            "\n",
+            "[detected_release]\n",
+            "detected_by = \".github/workflows/agent-maintenance-release-watch.yml\"\n",
+            "current_validated = \"0.97.0\"\n",
+            "target_version = \"0.98.0\"\n",
+            "latest_stable = \"0.99.0\"\n",
+            "version_policy = \"latest_stable_minus_one\"\n",
+            "source_kind = \"github_releases\"\n",
+            "source_ref = \"openai/codex\"\n",
+            "dispatch_kind = \"workflow_dispatch\"\n",
+            "dispatch_workflow = \"codex-cli-update-snapshot.yml\"\n",
+            "branch_name = \"automation/{agent_id}-maintenance-0.98.0\"\n"
+        ),
+        agent_id = agent_id,
+        basis_ref = basis_ref
     )
 }
 

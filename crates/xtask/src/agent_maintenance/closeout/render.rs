@@ -80,6 +80,7 @@ pub(crate) fn render_handoff_body(linked: &LinkedMaintenanceCloseout) -> String 
             format!("- No deferred findings remain: {reason}")
         }
     };
+    let trigger_context = render_detected_release_context(linked);
     let runtime_followup = if linked.request.runtime_followup_required.required {
         linked
             .request
@@ -94,7 +95,7 @@ pub(crate) fn render_handoff_body(linked: &LinkedMaintenanceCloseout) -> String 
     };
 
     format!(
-        "# Handoff\n\nThis packet records the closed maintenance run for `{}`.\n\n## Request linkage\n\n- request ref: `{}`\n- request sha256: `{}`\n- trigger kind: `{}`\n- basis ref: `{}`\n- opened from: `{}`\n- requested control-plane actions:\n{}\n\n## Closeout\n\n- closeout metadata: `{}`\n- preflight passed: `{}`\n- recorded at: `{}`\n- commit: `{}`\n\n## Resolved findings\n\n{}\n\n## Deferred findings\n\n{}\n\n## Runtime follow-up\n\n{}\n",
+        "# Handoff\n\nThis packet records the closed maintenance run for `{}`.\n\n## Request linkage\n\n- request ref: `{}`\n- request sha256: `{}`\n- trigger kind: `{}`\n- basis ref: `{}`\n- opened from: `{}`\n- requested control-plane actions:\n{}\n\n## Trigger context\n\n{}\n\n## Closeout\n\n- closeout metadata: `{}`\n- preflight passed: `{}`\n- recorded at: `{}`\n- commit: `{}`\n\n## Resolved findings\n\n{}\n\n## Deferred findings\n\n{}\n\n## Runtime follow-up\n\n{}\n",
         linked.request.agent_id,
         linked.closeout.request_ref,
         linked.request_sha256,
@@ -102,6 +103,7 @@ pub(crate) fn render_handoff_body(linked: &LinkedMaintenanceCloseout) -> String 
         linked.request.basis_ref,
         linked.request.opened_from,
         actions,
+        trigger_context,
         linked.closeout_path.display(),
         linked.closeout.preflight_passed,
         linked.closeout.recorded_at,
@@ -120,13 +122,15 @@ pub(crate) fn render_remediation_log_body(linked: &LinkedMaintenanceCloseout) ->
             format!("- No deferred findings remain: {reason}")
         }
     };
+    let trigger_context = render_detected_release_context(linked);
 
     format!(
-        "# Remediation log\n\n## Request\n\n- request ref: `{}`\n- request sha256: `{}`\n- request recorded at: `{}`\n- request commit: `{}`\n\n## Resolved findings\n\n{}\n\n## Deferred findings\n\n{}\n",
+        "# Remediation log\n\n## Request\n\n- request ref: `{}`\n- request sha256: `{}`\n- request recorded at: `{}`\n- request commit: `{}`\n\n## Trigger context\n\n{}\n\n## Resolved findings\n\n{}\n\n## Deferred findings\n\n{}\n",
         linked.closeout.request_ref,
         linked.request_sha256,
         linked.request.request_recorded_at,
         linked.request.request_commit,
+        trigger_context,
         resolved_findings,
         deferred_findings
     )
@@ -151,6 +155,26 @@ fn render_findings(findings: &[MaintenanceFinding]) -> String {
         })
         .collect::<Vec<_>>()
         .join("\n")
+}
+
+fn render_detected_release_context(linked: &LinkedMaintenanceCloseout) -> String {
+    if let Some(detected_release) = &linked.request.detected_release {
+        format!(
+            "- detected_by: `{}`\n- current_validated: `{}`\n- target_version: `{}`\n- latest_stable: `{}`\n- version_policy: `{}`\n- source_kind: `{}`\n- source_ref: `{}`\n- dispatch_kind: `{}`\n- dispatch_workflow: `{}`\n- branch_name: `{}`",
+            detected_release.detected_by,
+            detected_release.current_validated,
+            detected_release.target_version,
+            detected_release.latest_stable,
+            detected_release.version_policy,
+            detected_release.source_kind,
+            detected_release.source_ref,
+            detected_release.dispatch_kind,
+            detected_release.dispatch_workflow,
+            detected_release.branch_name
+        )
+    } else {
+        "- no automated release detection metadata recorded".to_string()
+    }
 }
 
 impl<'a> From<&'a MaintenanceFinding> for SerializableMaintenanceFinding<'a> {
