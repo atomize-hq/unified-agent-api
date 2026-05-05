@@ -1,194 +1,195 @@
-# ORCH_PLAN - Maintenance CI Registry-Driven Revamp
+# ORCH_PLAN - Enclose The Agent-Maintenance Execution Relay
 
 ## Summary
 
-This orchestration plan executes the live maintenance-CI milestone defined by `PLAN.md` on branch
-`codex/recommend-next-agent` in
-`/Users/spensermcconnell/__Active_Code/atomize-hq/unified-agent-api`.
+This orchestration plan owns the current milestone in
+`/Users/spensermcconnell/__Active_Code/atomize-hq/unified-agent-api` on branch
+`codex/recommend-next-agent`.
 
-This orchestration ends at maintenance-CI completion. It does not continue into goose execution,
-goose proving, or any post-maintenance follow-on from `TODOS.md`. Goose remains a later milestone
-gated on this one landing cleanly.
+Authoritative milestone source: `PLAN.md`
+Milestone: `Enclose The Agent-Maintenance Execution Relay`
 
-Frozen parent critical path:
+This is a follow-on to already-landed shared watcher plus packet-first PR work. The job here is
+to enclose the local maintainer execution seam with:
+
+- structured `[execution_contract]` request truth
+- one shared execution-packet renderer
+- `execute-agent-maintenance --dry-run|--write`
+- one prepared `run_id` baseline
+- temp relay evidence under `docs/agents/.uaa-temp/agent-maintenance/runs/<run_id>/`
+- bounded write enforcement plus diff validation
+- workflow recovery hardening
+- docs and playbook alignment
+- final proving
+
+This milestone does not redesign the watcher, does not widen to packet-only relay execution, does
+not widen beyond local Codex execution, and does not automate closeout.
+
+Completion definition:
+
+- lanes A through G below are merged back onto `codex/recommend-next-agent`
+- the serial spine from schema -> shared renderer is preserved before downstream lane launch
+- `execute-agent-maintenance --dry-run` and `--write` behave exactly as specified in `PLAN.md`
+- manual closeout remains outside relay write mode
+- all commands in `PLAN.md` section `Commands That Must Pass Before Landing` pass on the parent branch
+
+## Parent Critical Path
+
+Frozen parent spine:
 
 ```text
-MCI-00 Baseline Capture
--> MCI-05 Scope Freeze From PLAN.md
--> MCI-10 Interface And Ownership Freeze
--> MCI-15 Worktree / Worker Launch Freeze
--> parallel worker phase
--> MCI-60 Parent Spine Integration
--> MCI-70 Parent Workflow/Worker Integration
--> MCI-80 Parent Docs And CI Contract Closeout
--> MCI-90 Final Proving And Acceptance
+P0 baseline capture + stale-scope rejection
+-> P1 schema lane launch and merge (Lane A)
+-> P2 shared renderer lane plus closeout compatibility launch (Lanes B, E)
+-> P3 packet generation and relay launch after renderer merge (Lanes C, D)
+-> P4 workflow recovery hardening after packet generation is merged (Lane F)
+-> P5 docs and playbook closeout after relay + workflow semantics are stable (Lane G)
+-> P6 parent-only proving and acceptance
 ```
 
-Milestone done state:
+Parent-only completion gate:
 
-- `crates/xtask/data/agent_registry.toml` owns maintenance watch enrollment
-- `maintenance-watch` exists and emits the stale-agent queue from repo truth
-- `prepare-agent-maintenance` exists and writes automated maintenance request v2 plus packet docs
-- one shared watcher workflow replaces the two legacy scheduled watcher workflows
-- `codex` and `claude_code` worker workflows become shared-input worker-only entrypoints
-- generic `packet_pr` support lands but no additional agents are enabled in milestone 1
-- all explicit tests and gates from `PLAN.md` pass locally
-
-## Worker Model
-
-All workers use `GPT-5.4` with `reasoning_effort=high`.
-
-Concurrency cap:
-
-- Maximum concurrent workers: `4`
-- Recommended live cap for this milestone: `4`
-- Parent remains local and does not count toward the worker cap
-
-Authority model:
-
-- Parent agent is the only integrator
-- Parent agent is the only merge authority
-- Parent agent is the only rebase/relaunch authority
-- Parent agent is the only final prover
-- Parent agent is the only owner of orchestration state
-
-Worker rules:
-
-- Workers operate only on their frozen owned surfaces
-- Workers do not merge
-- Workers do not update orchestration state
-- Workers do not widen scope
-- Workers return diffs, commands run, exit codes, blockers, and unresolved assumptions only
+1. Lane A is merged before Lane B starts.
+2. Lane A is merged before Lane E starts.
+3. Lane B is merged before Lanes C and D start.
+4. Lane C is merged before Lane F starts.
+5. Lane G waits until C, D, and F are stable enough that docs will not churn.
+6. Final proving runs only on the parent branch after all lane merges are complete.
 
 ## Hard Guards
 
-- `PLAN.md` is the only authoritative plan for this milestone. The existing `ORCH_PLAN.md` is
-  stale and is input only for stale-assumption rejection.
-- This orchestration ends at maintenance-CI completion. Do not continue into goose execution,
-  `scaffold-wrapper-crate`, `runtime-follow-on`, `prepare-publication`, `refresh-publication`,
-  `prepare-proving-run-closeout`, or `close-proving-run`.
-- Do not reintroduce stale goals from the current `ORCH_PLAN.md`, especially:
-  - no `PLAN.md` replacement step
-  - no promote-workflow edits
-  - no goose lane
-- Parent-only merge authority stays on `codex/recommend-next-agent`.
-- Worker branches fork from `codex/recommend-next-agent`.
-- Workflow product behavior remains frozen to `staging`:
-  - shared watcher runs against `staging`
-  - downstream workflow dispatches use `ref: staging`
-  - generated maintenance PRs target base `staging`
-- Milestone-1 watch enrollment is frozen:
-  - `codex` enabled
-  - `claude_code` enabled
-  - all other agents not enabled
-- Upstream source kinds are frozen:
-  - `github_releases`
-  - `gcs_object_listing`
-- Request-contract freeze:
-  - `artifact_version = "2"`
-  - `trigger_kind = "upstream_release_detected"`
-  - `[detected_release]` required for automated watch requests
-- Workflow-topology freeze:
-  - add `.github/workflows/agent-maintenance-release-watch.yml`
-  - add `.github/workflows/agent-maintenance-open-pr.yml`
-  - delete `.github/workflows/codex-cli-release-watch.yml`
-  - delete `.github/workflows/claude-code-release-watch.yml`
-  - retain and migrate `.github/workflows/codex-cli-update-snapshot.yml`
-  - retain and migrate `.github/workflows/claude-code-update-snapshot.yml`
-- Do not edit:
-  - `.github/workflows/codex-cli-promote.yml`
-  - `.github/workflows/claude-code-promote.yml`
-  - `TODOS.md`
-- Any change to frozen queue fields, request-v2 fields, workflow inputs, or branch rules
-  invalidates affected worker lanes and requires relaunch from the new freeze SHA.
+- `PLAN.md` is the only milestone authority. The previous `ORCH_PLAN.md` is stale and is valid
+  only as a rejection source for outdated goals.
+- Shared watcher topology and packet-first PR flow are already landed. Do not reopen watcher
+  architecture, queue math, registry enrollment, or worker migration as new milestone goals.
+- No watcher redesign.
+- No earlier registry/watcher revamp scope.
+- No packet-only relay executor in milestone 1. Packet-only agents remain on the existing packet PR path.
+- No executor widening beyond local Codex.
+- No GitHub-hosted or cloud-hosted autonomous relay execution.
+- No automatic closeout. `close-agent-maintenance` remains manual and outside relay write mode.
+- No promotion-pointer or publication-surface writes inside relay write mode.
+- Temp relay evidence is host-owned and stays under
+  `docs/agents/.uaa-temp/agent-maintenance/runs/<run_id>/`.
+- Relay write-boundary enforcement must reuse the repo's existing path-jail machinery. Do not
+  invent a second boundary system.
+- `HANDOFF.md` remains the human entrypoint, but machine truth comes from structured request truth
+  and the frozen dry-run packet, never from parsing rendered markdown.
+- Any proposal that reintroduces stale ORCH scope such as watcher replacement,
+  worker-entrypoint migration, or goose follow-on work halts the lane immediately.
+
+## Authority Model
+
+Parent-only authority:
+
+- owns `PLAN.md` interpretation for this milestone
+- owns this orchestration document
+- owns launch order, relaunch decisions, and dependency freezes
+- owns merge decisions onto `codex/recommend-next-agent`
+- owns integration conflict resolution
+- owns final proving, acceptance, and landing recommendation
+- owns orchestration state under the `.runs/...` root below
+
+Worker authority:
+
+- may edit only the files assigned to the worker lane
+- may run only the lane-scoped tests and validation called out for that lane
+- may not merge, rebase other lanes, or update orchestration state
+- may not widen milestone scope or alter frozen boundaries
+- must report exact commands run, exact files changed, blockers, and unresolved assumptions
+
+Merge policy:
+
+- all worker branches fork from `codex/recommend-next-agent`
+- workers should keep output to one reviewable commit when practical
+- parent integrates worker output onto `codex/recommend-next-agent`
+- preferred integration is `git cherry-pick -x <worker-commit>`; if drift makes that unsafe,
+  parent manually reapplies the worker diff on the parent branch
+- workers do not merge each other
+- if a dependency freeze changes after a lane launches, parent stops the affected lane and relaunches it from the new freeze SHA
+
+Concurrency cap:
+
+- maximum concurrent workers: `3`
+- recommended live cap for this milestone: `3`
+- safe overlap is:
+  - Lane A alone
+  - Lanes B and E together
+  - Lanes C, D, and E together after Lane B merges, if E is still open
+  - Lane F alone or alongside only parent integration work
+  - Lane G alone
+- parent does not exceed the cap even if more lanes are technically unblocked; preserving the schema -> renderer -> packet/relay spine is more important than maximizing parallelism
 
 ## Orchestration State
 
 Parent-owned orchestration root:
 
 ```text
-/Users/spensermcconnell/__Active_Code/atomize-hq/unified-agent-api/.runs/maintenance-ci-revamp
+/Users/spensermcconnell/__Active_Code/atomize-hq/unified-agent-api/.runs/enclose-agent-maintenance-execution-relay
 ```
 
-Parent-owned state files:
+Concrete state files:
 
 - `baseline.json`
 - `freeze.json`
-- `queue.json`
+- `lane-status.json`
+- `worker-launches.json`
+- `merge-log.md`
 - `session-log.md`
 - `acceptance.md`
-- `tasks.json`
+- `final-proving.md`
+
+Per-lane state records:
+
+- `lane-a-schema.json`
+- `lane-b-renderer.json`
+- `lane-c-prepare.json`
+- `lane-d-execute.json`
+- `lane-e-closeout.json`
+- `lane-f-workflows.json`
+- `lane-g-docs.json`
 
 Required contents:
 
 - `baseline.json`
-  - branch
-  - head sha
-  - dirty-state summary
-  - timestamp
-  - workflow inventory
+  - parent branch
+  - parent HEAD SHA
+  - dirty-worktree summary
   - `PLAN.md` hash
   - stale-ORCH rejection notes
 - `freeze.json`
-  - frozen scope summary
-  - exact command spellings
-  - frozen queue schema
-  - frozen request-v2 schema additions
-  - frozen workflow filenames
-  - frozen branch and PR rules
-  - ownership split
-  - stale-lane invalidation rules
-- `queue.json`
-  - ordered task queue
-  - launch readiness per task
-  - dependency satisfaction
-  - active worker count
+  - locked milestone boundaries
+  - dependency order
+  - lane ownership table
+  - exact final proving commands
+  - relaunch triggers
+- `lane-status.json`
+  - each lane status: `pending|running|blocked|merged|relaunch-required`
+  - launch SHA
+  - dependency SHA
+  - blocking issue, if any
+- `worker-launches.json`
+  - lane id
+  - branch
+  - worktree path
+  - launch timestamp
+  - worker handoff packet version
+- `merge-log.md`
+  - merge order
+  - conflicts encountered
+  - post-merge smoke results
 - `session-log.md`
   - parent decisions
-  - worker launches
-  - stale-lane invalidations
-  - merge outcomes
-  - proving notes
+  - halt events
+  - relaunch reasons
 - `acceptance.md`
-  - final checklist by area
-  - command results
-  - manual topology verification
-- `tasks.json`
-  - task id
-  - title
-  - owner
-  - branch
-  - worktree
-  - launch sha
-  - status
-  - restart count
-  - dependency ids
+  - milestone acceptance checklist mapped to `PLAN.md`
+- `final-proving.md`
+  - exact command results
+  - final manual inspections
+  - residual risk notes
 
-Per-task sentinel directories:
-
-```text
-.runs/maintenance-ci-revamp/task-mci-00-baseline/
-.runs/maintenance-ci-revamp/task-mci-05-scope-freeze/
-.runs/maintenance-ci-revamp/task-mci-10-interface-freeze/
-.runs/maintenance-ci-revamp/task-mci-15-launch-freeze/
-.runs/maintenance-ci-revamp/task-mci-20-registry-contract/
-.runs/maintenance-ci-revamp/task-mci-30-watch-surface/
-.runs/maintenance-ci-revamp/task-mci-40-packet-surface/
-.runs/maintenance-ci-revamp/task-mci-50-shared-workflows/
-.runs/maintenance-ci-revamp/task-mci-60-parent-spine-integration/
-.runs/maintenance-ci-revamp/task-mci-70-worker-migrations/
-.runs/maintenance-ci-revamp/task-mci-80-docs-ci-closeout/
-.runs/maintenance-ci-revamp/task-mci-90-final-proving/
-```
-
-Each task directory uses parent-written markers only:
-
-- `started.json`
-- `done.json`
-- `blocked.json`
-- optional `skipped.json`
-
-Workers never write orchestration state, markers, queue files, or logs.
+Workers never write any file under the orchestration root.
 
 ## Branch And Worktree Layout
 
@@ -210,592 +211,359 @@ Worker worktree root:
 /Users/spensermcconnell/__Active_Code/atomize-hq/wt
 ```
 
-Frozen worker branches and worktrees:
+Frozen lane branches and worktrees:
 
-| Task | Branch | Worktree |
-| --- | --- | --- |
-| `MCI-20` | `codex/recommend-next-agent-mci-20-registry` | `/Users/spensermcconnell/__Active_Code/atomize-hq/wt/unified-agent-api-mci-20-registry` |
-| `MCI-30` | `codex/recommend-next-agent-mci-30-watch` | `/Users/spensermcconnell/__Active_Code/atomize-hq/wt/unified-agent-api-mci-30-watch` |
-| `MCI-40` | `codex/recommend-next-agent-mci-40-packet` | `/Users/spensermcconnell/__Active_Code/atomize-hq/wt/unified-agent-api-mci-40-packet` |
-| `MCI-50` | `codex/recommend-next-agent-mci-50-shared-workflows` | `/Users/spensermcconnell/__Active_Code/atomize-hq/wt/unified-agent-api-mci-50-shared-workflows` |
-| `MCI-71` | `codex/recommend-next-agent-mci-71-codex-worker` | `/Users/spensermcconnell/__Active_Code/atomize-hq/wt/unified-agent-api-mci-71-codex-worker` |
-| `MCI-72` | `codex/recommend-next-agent-mci-72-claude-worker` | `/Users/spensermcconnell/__Active_Code/atomize-hq/wt/unified-agent-api-mci-72-claude-worker` |
+| Lane | Purpose | Branch | Worktree |
+| --- | --- | --- | --- |
+| A | execution-contract schema | `codex/recommend-next-agent-relay-a-schema` | `/Users/spensermcconnell/__Active_Code/atomize-hq/wt/unified-agent-api-relay-a-schema` |
+| B | shared execution-packet renderer | `codex/recommend-next-agent-relay-b-renderer` | `/Users/spensermcconnell/__Active_Code/atomize-hq/wt/unified-agent-api-relay-b-renderer` |
+| C | packet generation | `codex/recommend-next-agent-relay-c-prepare` | `/Users/spensermcconnell/__Active_Code/atomize-hq/wt/unified-agent-api-relay-c-prepare` |
+| D | relay command | `codex/recommend-next-agent-relay-d-execute` | `/Users/spensermcconnell/__Active_Code/atomize-hq/wt/unified-agent-api-relay-d-execute` |
+| E | closeout compatibility | `codex/recommend-next-agent-relay-e-closeout` | `/Users/spensermcconnell/__Active_Code/atomize-hq/wt/unified-agent-api-relay-e-closeout` |
+| F | workflow recovery hardening | `codex/recommend-next-agent-relay-f-workflows` | `/Users/spensermcconnell/__Active_Code/atomize-hq/wt/unified-agent-api-relay-f-workflows` |
+| G | docs and playbooks | `codex/recommend-next-agent-relay-g-docs` | `/Users/spensermcconnell/__Active_Code/atomize-hq/wt/unified-agent-api-relay-g-docs` |
 
-Creation pattern:
+Recommended creation pattern:
 
 ```sh
-git worktree add /Users/spensermcconnell/__Active_Code/atomize-hq/wt/unified-agent-api-mci-20-registry -b codex/recommend-next-agent-mci-20-registry codex/recommend-next-agent
+git worktree add /Users/spensermcconnell/__Active_Code/atomize-hq/wt/unified-agent-api-relay-a-schema -b codex/recommend-next-agent-relay-a-schema codex/recommend-next-agent
 ```
 
-Use the same pattern for the remaining worker branches.
+Repeat with the lane-specific path and branch for each worker.
 
-## Parent Vs Worker Ownership
+## Ownership Split
 
-### Parent-only surfaces
+Parent-only surfaces:
 
 - `PLAN.md`
 - `ORCH_PLAN.md`
-- `TODOS.md`
-- `.runs/maintenance-ci-revamp/**`
-- `crates/xtask/src/agent_maintenance/mod.rs`
-- `crates/xtask/src/main.rs`
-- final integration edits in `crates/xtask/tests/c4_spec_ci_wiring.rs`
-- final docs truth pass in `docs/cli-agent-onboarding-factory-operator-guide.md`
+- `.runs/enclose-agent-maintenance-execution-relay/**`
+- final parent integration on `codex/recommend-next-agent`
 
-### Worker-owned surfaces
+Lane A: Execution-contract schema
 
-#### `MCI-20` Registry Contract
-
-Owns:
-
-- `crates/xtask/data/agent_registry.toml`
-- `crates/xtask/src/agent_registry.rs`
-- `docs/specs/agent-registry-contract.md`
-- `crates/xtask/tests/agent_registry.rs`
-
-Forbidden:
-
-- `crates/xtask/src/agent_maintenance/**`
-- `.github/workflows/**`
-- `docs/cli-agent-onboarding-factory-operator-guide.md`
-
-#### `MCI-30` Watch Surface
-
-Owns:
-
-- `crates/xtask/src/agent_maintenance/watch.rs`
-- `crates/xtask/tests/agent_maintenance_watch.rs`
-- watch-only fixtures or harness support required by that test
-
-Forbidden:
-
-- `request.rs`
-- `docs.rs`
-- `prepare.rs`
-- `closeout/**`
-- `.github/workflows/**`
-
-#### `MCI-40` Packet Surface
-
-Owns:
-
-- `crates/xtask/src/agent_maintenance/request.rs`
-- `crates/xtask/src/agent_maintenance/docs.rs`
-- `crates/xtask/src/agent_maintenance/prepare.rs`
-- `crates/xtask/src/agent_maintenance/closeout/types.rs`
-- `crates/xtask/src/agent_maintenance/closeout/write.rs`
-- `docs/specs/cli-agent-onboarding-charter.md`
-- `crates/xtask/tests/agent_maintenance_prepare.rs`
-- required request/closeout test updates in:
+- Owns:
+  - `crates/xtask/src/agent_maintenance/request.rs`
   - `crates/xtask/tests/agent_maintenance_refresh.rs`
+- Goal:
+  - add `[execution_contract]` parsing and validation
+  - preserve compatibility for manual requests without `[execution_contract]`
+- Forbidden:
+  - `docs.rs`
+  - `prepare.rs`
+  - `execute.rs`
+  - workflows
+  - docs and playbooks
+
+Lane B: Shared execution-packet renderer
+
+- Owns:
+  - `crates/xtask/src/agent_maintenance/docs.rs`
+  - renderer-specific assertions in `crates/xtask/tests/agent_maintenance_prepare.rs`
+- Goal:
+  - one shared renderer for `HANDOFF.md`, `governance/pr-summary.md`, and frozen relay prompt artifacts
+  - prompt digest and linkage fail closed
+- Forbidden:
+  - `request.rs`
+  - `prepare.rs`
+  - `execute.rs`
+  - workflows
+
+Lane C: Packet generation
+
+- Owns:
+  - `crates/xtask/src/agent_maintenance/prepare.rs`
+  - packet-generation assertions in `crates/xtask/tests/agent_maintenance_prepare.rs`
+- Goal:
+  - `prepare-agent-maintenance --write` becomes the sole writer of request truth plus packet docs
+  - automated requests emit deterministic `execution_contract` and recovery data
+- Forbidden:
+  - `request.rs`
+  - `docs.rs`
+  - `execute.rs`
+  - workflows
+
+Lane D: Relay command
+
+- Owns:
+  - `crates/xtask/src/agent_maintenance/execute.rs`
+  - `crates/xtask/src/agent_maintenance/mod.rs`
+  - `crates/xtask/src/main.rs`
+  - `crates/xtask/tests/agent_maintenance_execute.rs`
+  - `crates/xtask/tests/support/agent_maintenance_harness.rs`
+- Goal:
+  - add `execute-agent-maintenance --dry-run|--write`
+  - persist prepared run artifacts
+  - enforce path jail plus diff validation
+  - keep closeout manual
+- Forbidden:
+  - workflows
+  - playbooks
+  - closeout ownership outside compatibility hooks already merged from E
+
+Lane E: Closeout compatibility
+
+- Owns:
+  - `crates/xtask/src/agent_maintenance/closeout/**`
   - `crates/xtask/tests/agent_maintenance_closeout.rs`
+- Goal:
+  - preserve manual closeout semantics while remaining compatible with new request metadata
+- Forbidden:
+  - relay command
+  - workflows
+  - docs/playbooks
 
-Forbidden:
+Lane F: Workflow recovery hardening
 
-- `agent_registry.toml`
-- `.github/workflows/**`
+- Owns:
+  - `.github/workflows/agent-maintenance-release-watch.yml`
+  - `.github/workflows/agent-maintenance-open-pr.yml`
+  - `.github/workflows/codex-cli-update-snapshot.yml`
+  - `.github/workflows/claude-code-update-snapshot.yml`
+  - `crates/xtask/tests/c4_spec_ci_wiring.rs`
+  - `crates/xtask/tests/agent_maintenance_watch.rs` if workflow-facing assertions need updates
+- Goal:
+  - preserve existing topology
+  - ensure packet generation precedes PR creation
+  - ensure `governance/pr-summary.md` remains the PR body source
+  - make PR-creation recovery explicit
+  - preserve one stale agent/version -> one branch/PR concurrency
+- Forbidden:
+  - watcher redesign
+  - registry enrollment changes
+  - relay execution logic
 
-#### `MCI-50` Shared Workflow Topology
+Lane G: Docs and playbooks
 
-Owns:
-
-- `.github/workflows/agent-maintenance-release-watch.yml`
-- `.github/workflows/agent-maintenance-open-pr.yml`
-- delete `.github/workflows/codex-cli-release-watch.yml`
-- delete `.github/workflows/claude-code-release-watch.yml`
-- first-pass updates to `crates/xtask/tests/c4_spec_ci_wiring.rs`
-- minimal `ci.yml` edits only if needed for workflow contract coverage
-
-Forbidden:
-
-- `.github/workflows/codex-cli-update-snapshot.yml`
-- `.github/workflows/claude-code-update-snapshot.yml`
-- promote workflows
-
-#### `MCI-71` Codex Worker Migration
-
-Owns:
-
-- `.github/workflows/codex-cli-update-snapshot.yml`
-
-Forbidden:
-
-- shared workflow files
-- `c4_spec_ci_wiring.rs`
-- promote workflows
-
-#### `MCI-72` Claude Worker Migration
-
-Owns:
-
-- `.github/workflows/claude-code-update-snapshot.yml`
-
-Forbidden:
-
-- shared workflow files
-- `c4_spec_ci_wiring.rs`
-- promote workflows
+- Owns:
+  - `docs/cli-agent-onboarding-factory-operator-guide.md`
+  - `cli_manifests/codex/OPS_PLAYBOOK.md`
+  - `cli_manifests/claude_code/OPS_PLAYBOOK.md`
+- Goal:
+  - document the relay dry-run/write flow
+  - freeze packet-only agents as deferred
+  - make the manual-closeout boundary explicit
+- Forbidden:
+  - code changes
+  - workflow edits
 
 ## Workstream Plan
 
-### Phase 1: Parent-only Freeze And Launch Control
+### Parent-only serialized phases
 
-#### `MCI-00` Baseline Capture
+P0. Baseline and freeze
 
-Scope:
+- capture current parent SHA and dirty-state summary
+- hash `PLAN.md`
+- record stale assumptions rejected from the old `ORCH_PLAN.md`
+- freeze the lane ownership table and proving commands
 
-- Capture the starting state from the real repo and live milestone inputs.
+P1. Schema lane
 
-Owned files:
+- launch Lane A alone
+- worker runs before handoff:
+  - `cargo test -p xtask --test agent_maintenance_refresh`
+- merge only after request parsing coverage is green
+- record the schema freeze SHA in orchestration state
 
-- `.runs/maintenance-ci-revamp/baseline.json`
-- `.runs/maintenance-ci-revamp/session-log.md`
-- `.runs/maintenance-ci-revamp/tasks.json`
+P2. Renderer lane
 
-Required commands:
+- launch Lanes B and E from the schema freeze SHA
+- Lane B worker runs before handoff:
+  - `cargo test -p xtask --test agent_maintenance_prepare`
+- Lane E worker runs before handoff:
+  - `cargo test -p xtask --test agent_maintenance_closeout`
+- merge only after renderer exactness and digest checks are green
+- record the renderer freeze SHA
+- merge E whenever its compatibility tests are green; it does not wait on the renderer
 
-```sh
-git branch --show-current
-git rev-parse HEAD
-rg --files -g 'PLAN.md' -g 'ORCH_PLAN.md' -g '.github/workflows/*' -g 'crates/xtask/src/**'
-```
+P3. Parallel core execution lanes
 
-Acceptance:
+- launch Lanes C and D from the renderer freeze SHA
+- Lane C worker runs before handoff:
+  - `cargo test -p xtask --test agent_maintenance_prepare`
+- Lane D worker runs before handoff:
+  - `cargo test -p xtask --test agent_maintenance_execute`
+- merge C only after packet-generation behavior is stable
+- merge D only after relay dry-run/write behavior is stable
 
-- branch confirmed as `codex/recommend-next-agent`
-- workflow inventory captured
-- stale `ORCH_PLAN.md` assumptions recorded
-- `started.json` and `done.json` written for `task-mci-00-baseline`
+P4. Workflow lane
 
-#### `MCI-05` Scope Freeze From `PLAN.md`
+- launch Lane F only after Lane C is merged
+- worker runs before handoff:
+  - `cargo test -p xtask --test agent_maintenance_watch`
+  - `cargo test -p xtask --test c4_spec_ci_wiring`
+- merge only after workflow contract tests confirm packet-first PR behavior and recovery semantics
 
-Scope:
+P5. Docs lane
 
-- Freeze the milestone strictly from `PLAN.md` and reject stale goals.
+- launch Lane G only after D and F are stable enough that docs will not immediately drift
+- worker runs before handoff:
+  - no additional lane-only command is required beyond keeping docs aligned to the merged command surface from Lanes C, D, and F
+- merge only after docs reflect the final command surface and boundaries
 
-Owned files:
+P6. Parent integration and final proving
 
-- `.runs/maintenance-ci-revamp/freeze.json`
-- `.runs/maintenance-ci-revamp/session-log.md`
+- run the full required command set on the parent branch
+- manually verify milestone boundary rules that are not fully encoded by tests
+- record acceptance and residual risk
 
-Required commands:
+### Parallel worker phases
 
-```sh
-sed -n '1,260p' PLAN.md
-sed -n '261,980p' PLAN.md
-```
+Phase 1:
 
-Acceptance:
+- Lane A only
 
-- scope frozen to maintenance-CI only
-- goose explicitly marked out of scope for this orchestration
-- exact additions, deletions, and preserved worker workflows extracted from `PLAN.md`
+Phase 2:
 
-#### `MCI-10` Interface And Ownership Freeze
+- Lanes B and E may overlap only if E starts from the Lane A merge SHA
+- B remains the serial spine and must merge before C or D launch
 
-Scope:
+Phase 3:
 
-- Freeze interfaces before workers launch.
+- Lanes C and D can run in parallel from the Lane B merge SHA
+- Lane E may still be running in parallel if it launched from the Lane A merge SHA
+- C and D must treat the renderer contract from B as frozen
 
-Owned files:
+Phase 4:
 
-- `.runs/maintenance-ci-revamp/freeze.json`
-- `.runs/maintenance-ci-revamp/queue.json`
+- Lane F runs after C merges
+- Lane G runs last after D and F stabilize
 
-Required commands:
+## Stop And Halt Conditions
 
-```sh
-sed -n '1,260p' crates/xtask/src/main.rs
-sed -n '1,260p' crates/xtask/src/agent_registry.rs
-sed -n '1,260p' crates/xtask/src/agent_maintenance/request.rs
-sed -n '1,260p' crates/xtask/tests/c4_spec_ci_wiring.rs
-```
+- Halt any lane that proposes watcher redesign, worker-topology redesign, or registry-enrollment changes.
+- Halt any lane that widens executor scope beyond local Codex.
+- Halt any lane that tries to pull packet-only agents into relay write mode.
+- Halt any lane that moves closeout into relay write mode.
+- Halt any lane that writes outside its owned file set.
+- Halt C, D, F, and G if Lane A or B contract changes after those lanes launch; relaunch them from the new freeze SHA.
+- Halt F if packet generation truth is still moving.
+- Halt G if relay or workflow semantics are not yet stable.
+- Halt final landing if any required proving command fails.
+- Halt final landing if dry-run or write mode writes outside the declared envelope or if the run artifact root is not the temp path required by `PLAN.md`.
 
-Freeze items:
+## Parent-Only Proving And Integration Gates
 
-- xtask command spellings
-- queue schema
-- request-v2 fields
-- workflow filenames
-- branch naming
-- PR base behavior
-- exact owned/forbidden surfaces per task
+Parent-only merge checklist for each lane:
 
-Acceptance:
+1. worker diff touches only owned files
+2. lane-scoped tests passed in the worker report
+3. no milestone-boundary violation is visible in the diff
+4. parent smoke-check after merge still passes for the merged surface
 
-- workers can be launched from one stable contract
-- stale-lane invalidation rules are explicit
-
-#### `MCI-15` Worktree / Worker Launch Freeze
-
-Scope:
-
-- Create worktrees and launch the first worker wave from the frozen parent SHA.
-
-Owned files:
-
-- `.runs/maintenance-ci-revamp/queue.json`
-- `.runs/maintenance-ci-revamp/tasks.json`
-- task sentinel markers
-
-Required commands:
-
-```sh
-git worktree add /Users/spensermcconnell/__Active_Code/atomize-hq/wt/unified-agent-api-mci-20-registry -b codex/recommend-next-agent-mci-20-registry codex/recommend-next-agent
-git worktree add /Users/spensermcconnell/__Active_Code/atomize-hq/wt/unified-agent-api-mci-30-watch -b codex/recommend-next-agent-mci-30-watch codex/recommend-next-agent
-git worktree add /Users/spensermcconnell/__Active_Code/atomize-hq/wt/unified-agent-api-mci-40-packet -b codex/recommend-next-agent-mci-40-packet codex/recommend-next-agent
-git worktree add /Users/spensermcconnell/__Active_Code/atomize-hq/wt/unified-agent-api-mci-50-shared-workflows -b codex/recommend-next-agent-mci-50-shared-workflows codex/recommend-next-agent
-```
-
-Acceptance:
-
-- worker launch SHA recorded
-- no worker launched before `MCI-10` done
-- active worker count does not exceed `4`
-
-### Phase 2: Parallel Worker Phase
-
-#### `MCI-20` Registry Contract
-
-Scope:
-
-- Add and validate `release_watch` metadata in registry truth.
-
-Required commands:
-
-```sh
-cargo test -p xtask --test agent_registry
-```
-
-Acceptance:
-
-- `release_watch` metadata parses and validates
-- invalid dispatch/source combinations fail
-- only `codex` and `claude_code` are enabled in milestone 1
-- no second enrollment inventory exists
-
-#### `MCI-30` Watch Surface
-
-Scope:
-
-- Add `maintenance-watch` detector and queue emitter.
-
-Required commands:
-
-```sh
-cargo test -p xtask --test agent_maintenance_watch
-```
-
-Acceptance:
-
-- `maintenance-watch --check` path exists
-- `maintenance-watch --emit-json _ci_tmp/maintenance-watch.json` path exists
-- queue entries include frozen fields from `PLAN.md`
-- `github_releases` and `gcs_object_listing` both support `latest_stable_minus_one`
-- no stale-detection logic remains in workflow JavaScript
-
-#### `MCI-40` Packet Surface
-
-Scope:
-
-- Add request-v2 automated trigger support plus packet creation.
-
-Required commands:
+Parent-only final proving commands, copied exactly from `PLAN.md`:
 
 ```sh
 cargo test -p xtask --test agent_maintenance_prepare
 cargo test -p xtask --test agent_maintenance_refresh
+cargo test -p xtask --test agent_maintenance_execute
 cargo test -p xtask --test agent_maintenance_closeout
-```
-
-Acceptance:
-
-- request v2 parses
-- `upstream_release_detected` validates
-- `prepare-agent-maintenance --dry-run|--write` exists
-- packet roots are created under `docs/agents/lifecycle/<agent_id>-maintenance/`
-- generated packet content is contributor-ready and packet-first
-- closeout remains truthful for automated triggers
-
-#### `MCI-50` Shared Workflow Topology
-
-Scope:
-
-- Add shared watcher and generic packet-only PR workflow, and delete legacy scheduled watcher
-  workflows.
-
-Required commands:
-
-```sh
-cargo test -p xtask --test c4_spec_ci_wiring
-```
-
-Acceptance:
-
-- one shared watcher workflow exists
-- one generic packet-only workflow exists
-- legacy scheduled watcher workflows are deleted
-- shared workflow fans out from queue data
-- generic packet-only workflow never performs artifact acquisition or snapshot generation
-
-### Phase 3: Parent Spine Integration
-
-#### `MCI-60` Parent Spine Integration
-
-Scope:
-
-- Integrate shared xtask entrypoints and module exports after worker phase 1 stabilizes.
-
-Owned files:
-
-- `crates/xtask/src/agent_maintenance/mod.rs`
-- `crates/xtask/src/main.rs`
-
-Required commands:
-
-```sh
-git merge --no-ff codex/recommend-next-agent-mci-20-registry
-git merge --no-ff codex/recommend-next-agent-mci-30-watch
-git merge --no-ff codex/recommend-next-agent-mci-40-packet
-```
-
-Acceptance:
-
-- parent owns all integration edits in `mod.rs` and `main.rs`
-- worker outputs land without write-surface collisions
-- if frozen interfaces changed, stale lanes are invalidated before proceeding
-
-### Phase 4: Worker Migration Phase
-
-#### `MCI-71` Codex Worker Migration
-
-Scope:
-
-- Convert codex update workflow into a worker-only consumer of shared inputs.
-
-Required commands:
-
-```sh
-cargo test -p xtask --test c4_spec_ci_wiring
-```
-
-Acceptance:
-
-- accepts shared payload fields
-- uses `target_version`
-- runs `prepare-agent-maintenance --write` before PR creation
-- preserves existing codex artifact/snapshot/union/report/validate path
-- uses `automation/codex-maintenance-<target_version>` against `staging`
-
-#### `MCI-72` Claude Worker Migration
-
-Scope:
-
-- Convert claude update workflow into a worker-only consumer of shared inputs.
-
-Required commands:
-
-```sh
-cargo test -p xtask --test c4_spec_ci_wiring
-```
-
-Acceptance:
-
-- accepts shared payload fields
-- uses `target_version`
-- runs `prepare-agent-maintenance --write` before PR creation
-- preserves existing claude artifact/snapshot/union/report/validate path
-- uses `automation/claude_code-maintenance-<target_version>` against `staging`
-
-### Phase 5: Parent-only Integration / Proving / Closeout
-
-#### `MCI-70` Parent Workflow/Worker Integration
-
-Scope:
-
-- Merge shared workflows first, then worker migrations.
-
-Owned files:
-
-- final conflict resolution in `crates/xtask/tests/c4_spec_ci_wiring.rs`
-
-Required commands:
-
-```sh
-git merge --no-ff codex/recommend-next-agent-mci-50-shared-workflows
-git merge --no-ff codex/recommend-next-agent-mci-71-codex-worker
-git merge --no-ff codex/recommend-next-agent-mci-72-claude-worker
-cargo test -p xtask --test c4_spec_ci_wiring
-```
-
-Acceptance:
-
-- merge order preserved: shared workflows first, then worker migrations
-- no promote workflows changed
-- final CI wiring contract is truthful
-
-#### `MCI-80` Docs And CI Contract Closeout
-
-Scope:
-
-- Final docs truth pass and any last CI contract cleanup.
-
-Owned files:
-
-- `docs/cli-agent-onboarding-factory-operator-guide.md`
-- final touch-ups in docs/specs if parent integration exposed drift
-- final cleanup in `crates/xtask/tests/c4_spec_ci_wiring.rs` if still needed
-
-Required commands:
-
-```sh
-rg -n "maintenance-watch|prepare-agent-maintenance|release-watch|packet_pr|upstream_release_detected" docs/specs docs/cli-agent-onboarding-factory-operator-guide.md
-```
-
-Acceptance:
-
-- operator guide matches live workflows and new command surfaces
-- docs do not imply goose is in this milestone
-- docs do not mention legacy watcher workflows as live entrypoints
-
-#### `MCI-90` Final Proving And Acceptance
-
-Scope:
-
-- Run the full proving gate and complete final acceptance.
-
-Required commands:
-
-```sh
-cargo test -p xtask --test agent_registry
-cargo test -p xtask --test agent_maintenance_drift
-cargo test -p xtask --test agent_maintenance_refresh
-cargo test -p xtask --test agent_maintenance_prepare
 cargo test -p xtask --test agent_maintenance_watch
-cargo test -p xtask --test agent_maintenance_closeout
 cargo test -p xtask --test c4_spec_ci_wiring
 make preflight
 ```
 
-Acceptance:
+Parent merge and prove flow:
 
-- all explicit commands pass
-- final topology matches `PLAN.md`
-- orchestration ends here with maintenance-CI complete
-- no goose lane is launched
+1. Merge Lane A, then run `cargo test -p xtask --test agent_maintenance_refresh`.
+2. Launch or continue Lanes B and E from the Lane A merge SHA.
+3. Merge Lane B, then run `cargo test -p xtask --test agent_maintenance_prepare`.
+4. Merge Lane E whenever ready, then run `cargo test -p xtask --test agent_maintenance_closeout`.
+5. Merge Lane C, then run `cargo test -p xtask --test agent_maintenance_prepare`.
+6. Merge Lane D, then run `cargo test -p xtask --test agent_maintenance_execute`.
+7. Merge Lane F, then run:
+   `cargo test -p xtask --test agent_maintenance_watch`
+   `cargo test -p xtask --test c4_spec_ci_wiring`
+8. Merge Lane G after C, D, and F are stable.
+9. Run the full final proving command set on `codex/recommend-next-agent`.
+10. Accept the milestone only if the final command set passes and the relay boundary checks below still hold.
 
-## Merge Order
+Parent-only acceptance checks after commands pass:
 
-Frozen merge order:
-
-1. `MCI-20`
-2. `MCI-30`
-3. `MCI-40`
-4. parent `MCI-60` spine integration
-5. `MCI-50`
-6. `MCI-71`
-7. `MCI-72`
-8. parent `MCI-80`
-9. parent `MCI-90`
-
-Relaunch rule:
-
-- If `MCI-20`, `MCI-30`, or `MCI-40` changes frozen interfaces after another lane launched,
-  affected lanes are stale and must be relaunched from the new parent HEAD.
-- Rebase-in-place is allowed only for non-interface drift outside the worker’s frozen owned
-  surfaces.
+- automated upstream-release requests require `[execution_contract]`
+- `HANDOFF.md`, `governance/pr-summary.md`, and frozen prompt artifacts come from one shared renderer contract
+- `execute-agent-maintenance --dry-run` persists only temp evidence under
+  `docs/agents/.uaa-temp/agent-maintenance/runs/<run_id>/`
+- `execute-agent-maintenance --write` requires a prepared `run_id`
+- relay write mode reuses the frozen dry-run baseline instead of reconstructing state from markdown
+- diff validation and path jail enforce `execution_contract.writable_surfaces`
+- write mode stops before closeout and prints the manual closeout step
+- workflow recovery path is explicit when PR creation fails after packet generation
+- docs and playbooks tell the same local relay story as the shipped command surface
 
 ## Context-Control Rules
 
-- Parent retains the full milestone context.
-- Worker prompts include only:
-  - frozen scope excerpt
-  - owned files
-  - forbidden files
-  - exact acceptance
-  - exact required commands
-- Workers do not receive broad repo-edit authority.
-- `MCI-30` and `MCI-40` may both touch `crates/xtask/src/agent_maintenance/`, but ownership is
-  frozen by file, not by directory.
-- `MCI-50`, `MCI-71`, and `MCI-72` may all affect workflow behavior, but only `MCI-50` may edit
-  shared workflow files.
-- Parent owns all final conflict resolution in `c4_spec_ci_wiring.rs`.
+- Parent context stays anchored to:
+  - the milestone sections of `PLAN.md`
+  - this orchestration file
+  - the active lane ownership table
+  - merge status and proving results
+- Workers receive only:
+  - milestone summary
+  - locked decisions relevant to the lane
+  - exact owned files
+  - exact dependency SHA
+  - required tests
+  - explicit forbidden surfaces
+- Do not hand workers the stale `ORCH_PLAN.md` content except as a warning about rejected goals.
+- After a lane merges, parent drops that worker's detailed context and keeps only the merged outcome and any remaining risks.
+- If a lane is relaunched, parent issues a new freeze SHA and treats prior worker context as stale.
+- Parent never lets downstream lanes infer machine truth from rendered markdown. Frozen input contract plus renderer output remain the only execution basis.
 
-## Stale-Lane Invalidation Rules
+## Tests And Acceptance By Lane
 
-Invalidate and relaunch a worker lane if any of the following changes after launch:
+Lane A acceptance:
 
-- `PLAN.md` hash
-- frozen queue fields
-- request-v2 field names
-- workflow input names
-- `dispatch_kind` semantics
-- branch naming rule
-- milestone-1 enrollment scope
-- any write-surface boundary in this plan
+- `crates/xtask/tests/agent_maintenance_refresh.rs` covers valid and invalid `[execution_contract]`
+- manual requests remain loadable without `[execution_contract]`
 
-Do not patch stale lanes informally. Relaunch them from the new frozen parent SHA.
+Lane B acceptance:
 
-## Tests And Acceptance
+- shared renderer drives `HANDOFF.md`, `governance/pr-summary.md`, and frozen prompt output
+- prompt digest and maintenance-root linkage fail closed
 
-### Registry
+Lane C acceptance:
 
-- `release_watch` metadata exists in registry truth
-- only `codex` and `claude_code` are enabled
-- invalid source/dispatch combinations fail
-- `cargo test -p xtask --test agent_registry` passes
+- `prepare-agent-maintenance --write` emits structured execution contract for automated requests
+- writable surfaces, green gates, and recovery data are deterministic
 
-### Watch
+Lane D acceptance:
 
-- `maintenance-watch --check` exists
-- `maintenance-watch --emit-json _ci_tmp/maintenance-watch.json` exists
-- queue schema matches `PLAN.md`
-- both upstream source kinds are covered
-- `cargo test -p xtask --test agent_maintenance_watch` passes
+- dry-run emits one `run_id` and one frozen packet under the temp run root
+- write mode requires `--run-id`
+- relay reuses the prepared baseline
+- path-jail plus diff validation reject out-of-bounds writes
+- no-op write and prompt mismatch fail closed
+- closeout is not run automatically
 
-### Packet Creator
+Lane E acceptance:
 
-- automated request version is `2`
-- trigger kind is `upstream_release_detected`
-- `[detected_release]` is persisted
-- maintenance packet roots are created on first write
-- `cargo test -p xtask --test agent_maintenance_prepare` passes
+- closeout remains explicit and manual
+- new request metadata does not break closeout compatibility
 
-### Request / Refresh / Closeout Compatibility
+Lane F acceptance:
 
-- `agent_maintenance_refresh` accepts request v2
-- closeout preserves automated-trigger truth
-- final `HANDOFF.md` remains truthful
-- `cargo test -p xtask --test agent_maintenance_refresh` passes
-- `cargo test -p xtask --test agent_maintenance_closeout` passes
-
-### Shared Workflows
-
-- `.github/workflows/agent-maintenance-release-watch.yml` exists
-- `.github/workflows/agent-maintenance-open-pr.yml` exists
-- `.github/workflows/codex-cli-release-watch.yml` is deleted
-- `.github/workflows/claude-code-release-watch.yml` is deleted
-- no promote workflow changes exist
-- `cargo test -p xtask --test c4_spec_ci_wiring` passes
-
-### Codex Worker
-
-- `.github/workflows/codex-cli-update-snapshot.yml` accepts shared payload
 - packet generation happens before PR creation
-- codex artifact and validation pipeline remains intact
-- branch naming and `staging` base rules hold
+- `governance/pr-summary.md` remains the PR body source
+- one stale agent/version still maps to one branch/PR
+- recovery guidance is explicit when PR opening fails
 
-### Claude Worker
+Lane G acceptance:
 
-- `.github/workflows/claude-code-update-snapshot.yml` accepts shared payload
-- packet generation happens before PR creation
-- claude artifact and validation pipeline remains intact
-- branch naming and `staging` base rules hold
+- operator guide and playbooks match the final relay flow
+- packet-only agents are still explicitly deferred
+- manual closeout boundary is visible in maintainer-facing docs
 
-### Final Proving
+Milestone acceptance:
 
-- all targeted xtask tests pass
-- `make preflight` passes
-- docs reflect the new live workflow
-- maintenance-CI milestone is complete
-- orchestration stops without entering goose execution
+- all lane acceptances above are satisfied
+- all final proving commands pass on `codex/recommend-next-agent`
+- no stale watcher-revamp work leaked back into scope
+
+## Assumptions
+
+- worker worktrees will be created under `/Users/spensermcconnell/__Active_Code/atomize-hq/wt`
+- each lane can be reviewed and merged independently once its declared dependencies are merged
+- the repo keeps the current test file layout from `PLAN.md`; if a lane must introduce a new focused test file to avoid unsafe overlap, parent records that deviation in `freeze.json` before launch
+- no hidden milestone requirement exists beyond `PLAN.md` for human approvals or extra landing gates

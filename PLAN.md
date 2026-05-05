@@ -1,88 +1,89 @@
-# PLAN - Make Agent-Maintenance CI Registry-Driven And Contributor-Ready
+# PLAN - Enclose The Agent-Maintenance Execution Relay
 
 Status: proposed
 Date: 2026-05-05
 Branch: `codex/recommend-next-agent`
 Base branch: `main`
 Repo: `atomize-hq/unified-agent-api`
-Work item: `Land The Agent-Maintenance CI Architecture Revamp`
-Plan commit baseline: `65ed435`
+Work item: `Land The Agent-Maintenance Execution Relay Follow-On`
+Plan commit baseline: `ad6749a`
 Design input: `~/.gstack/projects/atomize-hq-unified-agent-api/spensermcconnell-codex-recommend-next-agent-design-20260505-103414.md`
-Supersedes: the completed recommendation-research `PLAN.md` that no longer reflects the active milestone
+Review addendum: `~/.gstack/projects/atomize-hq-unified-agent-api/spensermcconnell-codex-recommend-next-agent-eng-review-test-plan-20260505-172540.md`
+Supersedes: the earlier maintenance-CI registry/watcher `PLAN.md`, whose core watcher, packet, and worker-migration slices are already landed on this branch
 
 ## Objective
 
-Replace the repo's per-agent release-watch sprawl with one registry-driven maintenance intake
-surface that:
+Keep the shared maintenance watcher and packet-first PR flow exactly as landed, then close the
+next honest seam:
 
-1. reads watch-enabled agents from repo truth
-2. computes the target upgrade version from repo-owned upstream metadata, starting with
-   `latest stable - 1`
-3. opens exactly one PR per stale agent
-4. materializes a contributor-ready maintenance packet with the exact prompt, commands, touched
-   surfaces, and green gates needed to complete the upgrade work
-5. reuses the existing maintenance lane and existing specialized update workflows where they
-   already exist
-6. defers autonomous "run the AI agent and push the branch for me" execution to the next
-   milestone
+1. make the maintenance execution contract repo-owned instead of living only inside rendered prose
+2. add one local maintainer/contributor relay command,
+   `cargo run -p xtask -- execute-agent-maintenance --request ... --dry-run|--write`
+3. guarantee that `HANDOFF.md` and `governance/pr-summary.md` are faithful projections of
+   structured request truth
+4. guarantee that relay write mode cannot escape the declared write envelope
+5. stop before closeout and promotion so human review remains explicit
 
 The non-negotiable outcome is:
 
 ```text
-agent_registry maintenance.release_watch metadata
-  -> maintenance-watch xtask command
-  -> stale-agent queue JSON
-  -> one stale agent fanout at a time
-  -> prepare-agent-maintenance packet creation
-  -> worker PR or packet-only PR
-  -> maintainer or contributor follows the exact packet
-  -> existing validation and maintenance closeout surfaces
+maintenance-watch queue
+  -> worker or packet-only PR opens from generated packet docs
+  -> maintainer reads one canonical HANDOFF.md
+  -> execute-agent-maintenance --dry-run proves trust boundary
+  -> execute-agent-maintenance --write runs the bounded Codex relay + green gates
+  -> maintainer reviews diff
+  -> explicit close-agent-maintenance remains manual
 ```
 
-Initial milestone boundary:
+This is the missing product layer. The current packet-first PRs are useful, but they still ask the
+maintainer to trust human-readable instructions more than repo-owned execution truth.
 
-- `codex` and `claude_code` are the first watch-enabled agents
-- generic `packet_pr` support lands in the same milestone
-- no existing packet-only agent is enrolled until its packet basis docs are complete
-
-That is the smallest honest landing. The architecture becomes dynamic now. Broader agent rollout
-comes after the surface is real.
+This document is the Milestone 2 follow-on from the approved design input: execution automation
+stays local, bounded, reproducible, and explicitly stops before closeout.
 
 ## Why This, Why Now
 
-The repo already owns lifecycle enrollment, runtime follow-on, publication refresh, proving-run
-closeout, maintenance drift detection, maintenance refresh, and maintenance closeout.
+This branch already landed the maintenance intake revamp:
 
-What it still does not own cleanly is the top of the maintenance funnel. Codex and Claude Code
-each have bespoke release-watch logic and bespoke automation topology. New agents would either add
-more permanent YAML or wait indefinitely for maintenance automation.
+- registry-owned `maintenance.release_watch` enrollment
+- `maintenance-watch` queue emission
+- `prepare-agent-maintenance --write`
+- packet-first PR summaries
+- shared watcher workflow
+- migrated Codex and Claude worker entrypoints
 
-That is the last boring but critical control-plane gap before `goose` can become the first honest
-end-to-end lifecycle proving target in follow-on work already captured in `TODOS.md`.
+That part is real. The remaining gap is narrower and sharper:
+
+- the exact execution contract is still rendered markdown, not structured request truth
+- there is no repo-owned dry-run proving what can be written, what commands will run, and what
+  recovery path exists
+- there is no repo-owned write path that runs the bounded coding-agent relay and the required
+  gates before handing control back to the maintainer
+
+If the repo skips this seam, every future maintenance PR still depends on tribal knowledge:
+"read the packet carefully and do the right thing." That is not boring enough.
 
 ## Source Inputs
 
-- Priority source:
-  - `TODOS.md`
+- Priority inputs:
   - `~/.gstack/projects/atomize-hq-unified-agent-api/spensermcconnell-codex-recommend-next-agent-design-20260505-103414.md`
-- Normative contracts:
-  - `docs/specs/agent-registry-contract.md`
-  - `docs/specs/cli-agent-onboarding-charter.md`
-  - `docs/specs/unified-agent-api/support-matrix.md`
-- Live operator procedure:
-  - `docs/cli-agent-onboarding-factory-operator-guide.md`
-- Existing maintenance surfaces:
+  - `~/.gstack/projects/atomize-hq-unified-agent-api/spensermcconnell-codex-recommend-next-agent-eng-review-test-plan-20260505-172540.md`
+  - `TODOS.md`
+- Existing landed maintenance surfaces:
   - `crates/xtask/src/agent_maintenance/request.rs`
-  - `crates/xtask/src/agent_maintenance/refresh.rs`
   - `crates/xtask/src/agent_maintenance/docs.rs`
+  - `crates/xtask/src/agent_maintenance/prepare.rs`
+  - `crates/xtask/src/agent_maintenance/watch.rs`
   - `crates/xtask/src/agent_maintenance/closeout/**`
-  - `crates/xtask/src/agent_maintenance/drift/**`
-- Existing seed automations:
-  - `.github/workflows/codex-cli-release-watch.yml`
+  - `crates/xtask/src/main.rs`
+- Existing live workflows:
+  - `.github/workflows/agent-maintenance-release-watch.yml`
+  - `.github/workflows/agent-maintenance-open-pr.yml`
   - `.github/workflows/codex-cli-update-snapshot.yml`
-  - `.github/workflows/claude-code-release-watch.yml`
   - `.github/workflows/claude-code-update-snapshot.yml`
-- Existing agent-local operator guidance:
+- Existing operator and packet surfaces:
+  - `docs/cli-agent-onboarding-factory-operator-guide.md`
   - `cli_manifests/codex/OPS_PLAYBOOK.md`
   - `cli_manifests/codex/CI_WORKFLOWS_PLAN.md`
   - `cli_manifests/codex/PR_BODY_TEMPLATE.md`
@@ -90,63 +91,60 @@ end-to-end lifecycle proving target in follow-on work already captured in `TODOS
   - `cli_manifests/claude_code/CI_WORKFLOWS_PLAN.md`
   - `cli_manifests/claude_code/PR_BODY_TEMPLATE.md`
 - Existing verification surfaces:
-  - `crates/xtask/tests/agent_registry.rs`
-  - `crates/xtask/tests/agent_maintenance_drift.rs`
+  - `crates/xtask/tests/agent_maintenance_prepare.rs`
   - `crates/xtask/tests/agent_maintenance_refresh.rs`
+  - `crates/xtask/tests/agent_maintenance_watch.rs`
   - `crates/xtask/tests/agent_maintenance_closeout.rs`
   - `crates/xtask/tests/c4_spec_ci_wiring.rs`
+  - `crates/xtask/tests/support/agent_maintenance_harness.rs`
 
 ## Problem Statement
 
-Current shape:
+Current landed shape:
 
 ```text
-codex release watch workflow
-  -> hardcoded GitHub release query
-  -> dispatch codex update workflow
-  -> open codex-only automation PR
-
-claude release watch workflow
-  -> hardcoded GCS stable pointer query
-  -> dispatch claude update workflow
-  -> open claude-only automation PR
-
-other onboarded agents
-  -> no shared release-watch enrollment
-  -> only enter maintenance after humans notice drift
+shared watcher
+  -> stale-agent queue
+  -> worker or packet-only PR
+  -> generated maintenance-request.toml + HANDOFF.md + pr-summary.md
+  -> maintainer manually interprets HANDOFF.md
+  -> maintainer manually drives Codex, gates, and recovery
+  -> manual closeout
 ```
 
-That leaves six concrete problems:
+That leaves seven concrete problems:
 
-1. release-watch enrollment is not driven by `agent_registry.toml`
-2. upstream version-query policy is not canonical repo truth
-3. the repo has no shared stale-agent queue artifact
-4. maintenance packets are not opened automatically from upstream-version drift
-5. contributor instructions are inconsistent across agent update PRs
-6. every new agent risks adding more permanent YAML instead of inheriting the shared topology
+1. the execution contract is rendered text, not structured request truth
+2. there is no repo-owned dry-run that proves the exact write envelope before any mutation
+3. there is no repo-owned preflight for local Codex availability and auth
+4. worker PR creation recovery is implied, not explicit and machine-derived
+5. `HANDOFF.md` and `pr-summary.md` are generated from shared context, but there is no explicit
+   validation surface for prompt-digest and contract consistency
+6. packet-only agents are deferred in principle, but the relay path is not frozen clearly enough
+   to prevent accidental widening
+7. closeout remains manual, which is correct, but the current packet does not make the
+   stop-before-closeout boundary operationally obvious enough
 
 Target shape:
 
 ```text
-shared maintenance watch workflow on staging
-  -> cargo run -p xtask -- maintenance-watch --emit-json <queue>
-  -> reads watch-enabled agents from registry
-  -> computes stale agents from repo-owned version policy
-  -> fans out one agent at a time
-
-per-agent fanout
-  -> dispatch specialized worker workflow
-     OR run generic packet-only PR workflow
-
-packet creation
-  -> cargo run -p xtask -- prepare-agent-maintenance --write ...
-  -> writes maintenance-request.toml
-  -> writes generated maintenance packet docs
-
-worker or contributor
-  -> follows exact prompt + commands from the packet
-  -> runs existing green gates
-  -> closes maintenance with existing xtask surfaces
+shared watcher
+  -> stale-agent queue
+  -> worker or packet-only PR
+  -> structured maintenance request with execution_contract
+  -> generated HANDOFF.md + derivative pr-summary.md
+  -> execute-agent-maintenance --dry-run
+       prints exact writable surfaces
+       prints exact ordered commands
+       prints exact green gates
+       prints exact recovery path
+       verifies local Codex preflight
+  -> execute-agent-maintenance --write
+       runs bounded Codex relay
+       enforces path jail
+       runs green gates
+       stops before closeout
+  -> maintainer reviews diff and runs explicit closeout
 ```
 
 ## Step 0 Scope Challenge
@@ -155,239 +153,154 @@ worker or contributor
 
 The repo does not need:
 
-- a multi-agent bundle PR model
-- a cloud execution runner in this milestone
-- a generic replacement for every specialized update workflow before the watcher lands
-- a lifecycle model rewrite
-- a plugin-style upstream source framework
-- promotion-policy changes beyond codifying the target version rule
+- a new watcher architecture
+- GitHub-hosted autonomous Codex execution
+- automatic closeout
+- promotion pointer writes inside the upstream-release relay
+- relay support for every packet-only agent in milestone 1
+- a general multi-provider execution framework
 
 The repo does need:
 
-- one registry-owned maintenance enrollment and upstream query contract
-- one shared stale-agent detector and queue emitter
-- one repo-owned way to create a maintenance packet from version drift
-- one shared watcher/orchestrator workflow
-- migration of Codex and Claude Code off bespoke release-watch scheduling onto the shared watcher
-- one honest rule for which agents are watch-enabled now vs merely onboarded
+- one structured execution contract in maintenance request truth
+- one local dry-run/write relay surface
+- one explicit recovery contract for PR-creation and preflight failure cases
+- one strict path jail for relay write mode
+- one clean rule that packet-only agents stay deferred
 
 ### What Already Exists
 
 | Sub-problem | Existing surface | Reuse decision |
 | --- | --- | --- |
-| current maintenance truth | `crates/xtask/data/agent_registry.toml` + `docs/specs/agent-registry-contract.md` | Reuse and extend. Do not invent a second metadata file. |
-| maintenance drift detection | `cargo run -p xtask -- check-agent-drift --agent <id>` + `crates/xtask/src/agent_maintenance/drift/**` | Reuse directly as the maintenance baseline checker. |
-| maintenance request validation | `crates/xtask/src/agent_maintenance/request.rs` | Reuse and extend. New automated requests must still flow through the same validator. |
-| maintenance packet rendering | `crates/xtask/src/agent_maintenance/docs.rs` + `refresh.rs` | Reuse the renderer. Do not fork a second packet-doc system for release watch. |
-| maintenance closeout | `crates/xtask/src/agent_maintenance/closeout/**` | Reuse and extend so new trigger kinds stay truthful through closeout. |
-| per-agent update execution seeds | `.github/workflows/codex-cli-update-snapshot.yml`, `.github/workflows/claude-code-update-snapshot.yml` | Reuse in milestone 1. Remove watch responsibility, keep agent-specific execution where it already works. |
-| agent-local work-queue guidance | `cli_manifests/*/OPS_PLAYBOOK.md`, `CI_WORKFLOWS_PLAN.md`, `PR_BODY_TEMPLATE.md` | Reuse when present. These remain packet inputs, not new truth surfaces. |
-| version truth inside repo | `cli_manifests/<agent>/latest_validated.txt`, `artifacts.lock.json`, snapshots, reports, versions | Reuse directly. This remains the baseline comparator. |
-| green gates | `support-matrix --check`, `capability-matrix --check`, `capability-matrix-audit`, `make preflight` | Reuse unchanged. |
-| CI workflow contract tests | `crates/xtask/tests/c4_spec_ci_wiring.rs` | Extend instead of adding ad hoc shell validation. |
+| stale-agent detection | `crates/xtask/src/agent_maintenance/watch.rs` | Reuse unchanged as the only detector. This milestone does not revisit queue math. |
+| automated request creation | `crates/xtask/src/agent_maintenance/prepare.rs` | Reuse and extend. It should become the sole writer of the structured execution contract. |
+| packet rendering | `crates/xtask/src/agent_maintenance/docs.rs` | Reuse and extend. `HANDOFF.md` stays canonical and `pr-summary.md` stays derivative. |
+| request parsing + validation | `crates/xtask/src/agent_maintenance/request.rs` | Reuse and extend. New execution-contract fields belong here. |
+| closeout semantics | `crates/xtask/src/agent_maintenance/closeout/**` | Reuse. Preserve manual closeout and new request metadata without widening scope. |
+| workflow topology | `.github/workflows/agent-maintenance-release-watch.yml`, `.github/workflows/agent-maintenance-open-pr.yml`, worker workflows | Reuse. Only harden packet timing, recovery, and concurrency semantics. |
+| path-jail mutation primitives | `workspace_mutation::*` used by `prepare-agent-maintenance` | Reuse directly for relay write enforcement. Do not invent a second write-boundary mechanism. |
+| repo-owned dry-run/write pattern | `runtime-follow-on --dry-run|--write`, `recommend-next-agent-research --dry-run|--write` | Reuse the same host-owned contract shape. Dry-run proves the packet. Write executes the bounded seam. |
+| green gates | `codex-validate`, `support-matrix --check`, `capability-matrix --check`, `capability-matrix-audit`, `make preflight` | Reuse exactly. Relay adds orchestration, not new validation philosophy. |
 
 ### Minimum Complete Change
 
 The minimum complete change set is:
 
-1. extend `agent_registry.toml` with watch-enrollment and upstream-source metadata
-2. add a repo-owned `xtask` detector that emits a stale-agent queue JSON artifact
-3. add a repo-owned `xtask` packet creator that writes `maintenance-request.toml` and the
-   generated maintenance packet docs for version-drift work
-4. add one shared scheduled GitHub Actions watcher/orchestrator
-5. add one generic packet-only PR workflow for future agents without a specialized worker
-6. migrate Codex and Claude Code so the shared watcher becomes their only release-watch entrypoint
-7. update the contracts and operator guide so the packet format, branch rules, and workflow
-   ownership are explicit
-8. add fixture-backed tests for registry parsing, queue generation, packet creation, closeout
-   compatibility, and CI wiring
+1. extend automated maintenance requests with a structured `[execution_contract]` block
+2. render `HANDOFF.md` and `governance/pr-summary.md` from that exact contract
+3. add `execute-agent-maintenance --dry-run|--write`
+4. enforce local Codex binary/auth preflight before write mode
+5. enforce the declared write envelope during write mode
+6. encode one explicit manual recovery path for PR creation or post-packet failure
+7. update workflows, playbooks, and operator docs so the relay contract is the only story
+8. add coverage for request parsing, rendering consistency, relay preview, path jail, and
+   workflow recovery
 
-Anything smaller leaves the automation surface half-owned.
+Anything smaller still leaves the critical execution seam half-owned.
 
 ### Complexity Check
 
-This work touches more than 8 files. That is acceptable because the seam crosses one coherent
+This work touches more than 8 files. That is acceptable because the seam is still one coherent
 control-plane slice:
 
-- registry truth
-- xtask command surface
-- maintenance request contract
-- maintenance packet rendering
-- GitHub Actions watcher topology
-- worker input normalization
+- maintenance request truth
+- packet rendering
+- local relay execution
+- worker/open-pr recovery behavior
+- operator packet documentation
 - workflow contract tests
 
 Complexity controls:
 
-- support exactly two upstream source kinds in v1: `github_releases` and `gcs_object_listing`
-- do not replace the existing Codex and Claude Code update workers in this milestone
-- do not widen the maintenance closeout model beyond the new trigger data it must preserve
-- do not add autonomous execution
-- do not create a second packet root outside `docs/agents/lifecycle/<agent_id>-maintenance/`
-- do not enroll existing packet-only agents until their packet-basis docs are explicit
+- initial relay executor is Codex only
+- local relay only, no cloud runner
+- keep manual closeout outside the relay
+- keep packet-only agents on the existing packet-only path
+- keep support/capability/release-doc publication surfaces out of scope
 
 ### Search / Build Decision
 
-- **[Layer 1]** Reuse the existing maintenance lane, request validator, packet renderer, and
-  closeout flow.
-- **[Layer 1]** Reuse the existing Codex and Claude Code update workers as the initial execution
-  targets.
-- **[Layer 1]** Reuse `c4_spec_ci_wiring.rs` as the CI workflow contract guardrail.
-- **[Layer 1]** Reuse the Google Cloud Storage JSON object-listing API for Claude Code version
-  history instead of pretending the `stable` pointer alone can support `latest_stable_minus_one`.
-- **[Layer 3]** The missing product is not more workflow YAML. It is repo-owned maintenance
-  detection and packet creation driven from one registry contract.
+- **[Layer 1]** Reuse `workspace_mutation` path-jail enforcement instead of inventing a new file-boundary checker.
+- **[Layer 1]** Reuse the existing `prepare-agent-maintenance` packet writer and make it the sole source of execution-contract truth.
+- **[Layer 1]** Reuse the repo's existing dry-run/write command pattern from `runtime-follow-on` and `recommend-next-agent-research`.
+- **[Layer 1]** Reuse worker PR-body generation from `governance/pr-summary.md`; do not bring back inline YAML PR bodies.
+- **[Layer 3]** The missing product is not "better markdown." It is a machine-readable execution contract that markdown can project from.
 
 ### Distribution Check
 
-This is a repo-internal GitHub Actions plus `xtask` surface. There is no new external package to
-publish, but the PR packet itself is a real distribution surface for maintainers and fork
-contributors and must be treated as part of the product.
+This is still a repo-internal feature delivered through `xtask`, generated packet docs, and
+GitHub PRs.
+
+The real distribution surfaces are:
+
+- maintainers running `execute-agent-maintenance --dry-run|--write`
+- contributors consuming `HANDOFF.md` and `pr-summary.md`
+- future repos inheriting the same bounded execution relay pattern
 
 ## Locked Decisions
 
-1. Watch enrollment is opt-in per agent through a new `[agents.maintenance.release_watch]` block
-   in `crates/xtask/data/agent_registry.toml`. Being onboarded is not the same as being
-   watch-enabled.
-2. The only target version policy shipped in this milestone is the named enum
-   `latest_stable_minus_one`.
-3. Pointer-only upstream sources are not supported in this milestone. `latest_stable_minus_one`
-   requires upstream history. The initial supported source kinds are:
-   - `github_releases`
-   - `gcs_object_listing`
-4. The shared watcher and the worker dispatches operate against `staging`, because the existing
-   snapshot workers already check out `staging` and open PRs back to `staging`.
-5. One stale agent equals one branch and one PR. Bundled multi-agent maintenance PRs are
-   forbidden.
-6. Queue emission is the only place stale detection happens. Workflow YAML and `github-script`
-   must not duplicate version-comparison logic.
-7. The maintenance packet root stays
-   `docs/agents/lifecycle/<agent_id>-maintenance/`, preserving the exact `agent_id` spelling.
-   Example: `claude_code` maps to `docs/agents/lifecycle/claude_code-maintenance/`.
-8. `prepare-agent-maintenance --write` owns first creation of a maintenance packet root when it
-   does not exist. It writes the request and initial packet docs directly. It does not shell out to
-   `refresh-agent`.
-9. `maintenance-request.toml` is bumped to `artifact_version = "2"` for automated release-watch
-   requests. Parser, refresh, and closeout paths are updated in the same change.
-10. Automated release-watch requests use a new `trigger_kind = "upstream_release_detected"` and a
-    new `[detected_release]` block. This is not folded into `drift_detected`.
-11. `opened_from` records the workflow that actually created the request or PR. The watcher origin
-    is stored inside `[detected_release]` as `detected_by`.
-12. Existing `codex-cli-release-watch.yml` and `claude-code-release-watch.yml` are deleted in this
-    milestone. No compatibility shims. The shared watcher is the only release-watch entrypoint.
-13. Codex and Claude Code keep specialized execution workers in milestone 1, but those workers
-    stop owning schedule and upstream querying.
-14. Generic `packet_pr` support lands now but is not enabled for current non-worker agents until
-    their packet basis docs are complete enough to produce an exact contributor packet.
-15. Automated release-watch requests set `requested_control_plane_actions = ["packet_doc_refresh"]`
-    in milestone 1. Publication refresh and runtime-owned work stay in the worker or human lane.
+1. The shared watcher and packet-first PR topology stay in place. This plan is a follow-on, not a redesign.
+2. `HANDOFF.md` remains the canonical human entrypoint, but its contents are derived from structured request truth.
+3. `governance/pr-summary.md` remains derivative. It must never become an independent source of truth.
+4. `execute-agent-maintenance --dry-run` is the required trust step before `--write`.
+5. `execute-agent-maintenance --write` may write only paths enumerated in the execution contract.
+6. Relay write mode stops before `close-agent-maintenance`. Closeout remains explicit and manual.
+7. Automated upstream-release relay stays packet-only with respect to promotion pointers and publication surfaces.
+8. Packet-only agents remain deferred. They keep the open-PR path and must not accidentally inherit the relay.
+9. PR-creation failure recovery is one explicit machine-derived path, not tribal knowledge.
+10. The worker workflows remain responsible for generating artifacts and packet docs before PR creation. The local relay owns only the maintainer/contributor execution seam after the PR exists.
+11. `execute-agent-maintenance --dry-run` may persist evidence only under a temp run root such as `docs/agents/.uaa-temp/agent-maintenance/runs/<run_id>/`; it must not mutate wrapper, manifest, or maintenance packet truth.
+12. `execute-agent-maintenance --write` validates against one prepared dry-run baseline for the same `run_id`, so boundary enforcement is deterministic instead of reconstructing state from live markdown.
 
 ## Target Architecture
 
 ### Architecture Overview
 
 ```text
-crates/xtask/data/agent_registry.toml
-  └── agents[*].maintenance.release_watch
-        ├── enabled
-        ├── version_policy = latest_stable_minus_one
-        ├── dispatch_kind = workflow_dispatch | packet_pr
-        └── upstream source metadata
-
 maintenance-watch
-  ├── read registry
-  ├── query upstream release history
-  ├── read cli_manifests/<agent>/latest_validated.txt
-  ├── compute target_version
-  ├── drop clean agents
-  └── emit stale-agent queue JSON
+  -> stale_agents[]
+  -> worker workflow or packet-only opener
+  -> prepare-agent-maintenance --write
+       writes maintenance-request.toml
+       writes execution_contract
+       writes HANDOFF.md
+       writes governance/pr-summary.md
+  -> PR opens from pr-summary.md
 
-agent-maintenance-release-watch.yml
-  ├── checkout staging
-  ├── run maintenance-watch --emit-json
-  └── fan out one queue item at a time
-       ├── workflow_dispatch -> existing specialized worker
-       └── packet_pr        -> generic packet-only PR opener
-
-prepare-agent-maintenance --write
-  ├── write docs/agents/lifecycle/<agent_id>-maintenance/governance/maintenance-request.toml
-  ├── write README.md / scope_brief.md / seam_map.md / threading.md / review_surfaces.md / HANDOFF.md
-  └── write governance/remediation-log.md
-
-worker PR or packet-only PR
-  ├── include the generated maintenance packet
-  ├── include exact next commands
-  ├── include green gates
-  └── target base branch staging
+local maintainer/contributor
+  -> execute-agent-maintenance --dry-run
+       validates request + execution_contract
+       validates local Codex preflight
+       writes frozen run packet + run_id
+       prints write envelope / gates / recovery
+  -> execute-agent-maintenance --write
+       reuses prepared run_id baseline
+       runs bounded Codex relay
+       enforces path jail + diff validation
+       runs green gates
+       prints explicit closeout command
 ```
 
 ### Branch And State Flow
 
 ```text
-nightly schedule on staging
-  -> shared watcher runs on staging
-  -> queue entry for stale agent
-  -> worker/open-pr workflow dispatched with ref=staging
-  -> workflow checks out staging
+nightly watcher on staging
+  -> one queue item per stale agent/version
   -> branch automation/<agent_id>-maintenance-<target_version>
-  -> PR base staging
-  -> rerun for same agent/version updates same branch + same PR
+  -> packet docs generated before PR creation
+  -> PR body sourced from governance/pr-summary.md
+  -> maintainer runs dry-run locally to prepare one frozen relay packet
+  -> maintainer runs write mode against that prepared run_id
+  -> relay stops before closeout
+  -> maintainer reviews and closes lane explicitly
 ```
 
-### Registry Contract Additions
+### Request Contract Additions
 
-Extend `crates/xtask/data/agent_registry.toml` and `docs/specs/agent-registry-contract.md` with
-one new nested block under `[agents.maintenance]`:
+Extend `crates/xtask/src/agent_maintenance/request.rs` so automated upstream-release requests
+carry structured relay truth.
 
-```toml
-[agents.maintenance.release_watch]
-enabled = true
-version_policy = "latest_stable_minus_one"
-dispatch_kind = "workflow_dispatch" # or "packet_pr"
-dispatch_workflow = "codex-cli-update-snapshot.yml" # required when dispatch_kind = "workflow_dispatch"
-
-[agents.maintenance.release_watch.upstream]
-source_kind = "github_releases" # or "gcs_object_listing"
-
-# github_releases fields
-owner = "openai"
-repo = "codex"
-tag_prefix = "rust-v"
-
-# gcs_object_listing fields
-bucket = "claude-code-dist-86c565f3-f756-42ad-8dfa-d59b1c096819"
-prefix = "claude-code-releases/"
-version_marker = "manifest.json"
-```
-
-Validation rules:
-
-- `enabled = true` requires a valid `upstream` block
-- `dispatch_workflow` is required for `workflow_dispatch`, forbidden for `packet_pr`
-- `version_policy` must be a known enum, not free text
-- `source_kind = github_releases` requires `owner`, `repo`, and `tag_prefix`
-- `source_kind = gcs_object_listing` requires `bucket`, `prefix`, and `version_marker`
-- pointer-only sources are rejected for `latest_stable_minus_one`
-- release-watch-enabled agents must still have a valid `manifest_root`
-- release-watch-enabled agents in milestone 1 must also have `latest_validated.txt`
-- initial rollout sets `enabled = true` for `codex` and `claude_code` only
-
-Concrete upstream behavior:
-
-- `github_releases`: fetch stable releases, filter tags by `tag_prefix`, parse strict semver,
-  sort descending, choose latest stable and stable-minus-one
-- `gcs_object_listing`: query the GCS JSON API for object names under `prefix`, extract the first
-  path component whose object set contains `version_marker`, parse strict semver, deduplicate,
-  sort descending, choose latest stable and stable-minus-one
-
-This resolves the main design gap in the draft: Claude Code cannot compute stable-minus-one from
-the `stable` pointer alone. It needs release history, and the bucket listing already provides it.
-
-### Maintenance Request Contract Additions
-
-Extend `crates/xtask/src/agent_maintenance/request.rs`,
-`docs/specs/cli-agent-onboarding-charter.md`, and the maintenance packet docs so automated
-version-drift requests are first-class:
+The request shape becomes:
 
 ```toml
 artifact_version = "2"
@@ -396,16 +309,8 @@ trigger_kind = "upstream_release_detected"
 basis_ref = "cli_manifests/codex/latest_validated.txt"
 opened_from = ".github/workflows/codex-cli-update-snapshot.yml"
 requested_control_plane_actions = ["packet_doc_refresh"]
-request_recorded_at = "2026-05-05T15:00:00Z"
-request_commit = "abcdef1"
-
-[runtime_followup_required]
-required = true
-items = [
-  "Refresh codex manifest artifacts for the target version",
-  "Run the codex validation gates",
-  "Review and merge the generated maintenance packet",
-]
+request_recorded_at = "2026-05-05T18:00:00Z"
+request_commit = "ad6749a"
 
 [detected_release]
 detected_by = ".github/workflows/agent-maintenance-release-watch.yml"
@@ -418,327 +323,317 @@ source_ref = "openai/codex"
 dispatch_kind = "workflow_dispatch"
 dispatch_workflow = "codex-cli-update-snapshot.yml"
 branch_name = "automation/codex-maintenance-0.98.0"
+
+[execution_contract]
+executor = "codex"
+prompt_template_path = "cli_manifests/codex/PR_BODY_TEMPLATE.md"
+prompt_sha256 = "<sha256 of rendered coding-agent prompt>"
+pr_summary_path = "docs/agents/lifecycle/codex-maintenance/governance/pr-summary.md"
+closeout_path = "docs/agents/lifecycle/codex-maintenance/governance/maintenance-closeout.json"
+requires_manual_closeout = true
+writable_surfaces = [
+  "docs/agents/lifecycle/codex-maintenance/**",
+  "crates/codex/**",
+  "crates/agent_api/**",
+  "cli_manifests/codex/artifacts.lock.json",
+  "cli_manifests/codex/snapshots/0.98.0/**",
+  "cli_manifests/codex/reports/0.98.0/**",
+  "cli_manifests/codex/versions/0.98.0.json",
+  "cli_manifests/codex/wrapper_coverage.json",
+]
+read_only_inputs = [
+  "cli_manifests/codex/OPS_PLAYBOOK.md",
+  "cli_manifests/codex/CI_WORKFLOWS_PLAN.md",
+  "cli_manifests/codex/PR_BODY_TEMPLATE.md",
+  ".github/workflows/codex-cli-update-snapshot.yml",
+]
+ordered_commands = [
+  "cargo run -p xtask -- codex-validate --root cli_manifests/codex",
+  "cargo run -p xtask -- support-matrix --check",
+  "cargo run -p xtask -- capability-matrix --check",
+  "cargo run -p xtask -- capability-matrix-audit",
+  "make preflight",
+]
+green_gates = [
+  "cargo run -p xtask -- codex-validate --root cli_manifests/codex",
+  "cargo run -p xtask -- support-matrix --check",
+  "cargo run -p xtask -- capability-matrix --check",
+  "cargo run -p xtask -- capability-matrix-audit",
+  "make preflight",
+]
+
+[execution_contract.recovery]
+recreate_packet_command = "cargo run -p xtask -- prepare-agent-maintenance ... --write"
+reopen_pr_body_path = "docs/agents/lifecycle/codex-maintenance/governance/pr-summary.md"
+reopen_pr_branch = "automation/codex-maintenance-0.98.0"
+notes = [
+  "If PR creation fails after packet generation, rerun packet creation and reopen the PR from the generated pr-summary path.",
+  "If local Codex preflight fails, fix binary/auth and rerun execute-agent-maintenance --dry-run before write mode.",
+]
 ```
 
-Contract rules:
+Validation rules:
 
-- `artifact_version = "2"` is required for automated release-watch requests
-- `trigger_kind = "upstream_release_detected"` is valid only when `[detected_release]` is present
-- `basis_ref` remains a repo-relative path
-- `opened_from` is the workflow that wrote the request
-- `detected_release.detected_by` is the watcher workflow that found the stale version
-- `branch_name` is authoritative for PR deduping
-- `requested_control_plane_actions` is `["packet_doc_refresh"]` in milestone 1
+- `[execution_contract]` is required for `trigger_kind = "upstream_release_detected"`
+- `executor` must be `codex` in milestone 1
+- `prompt_sha256` must match the rendered prompt block used in `HANDOFF.md`
+- `pr_summary_path` must live under the same maintenance root as the request
+- `requires_manual_closeout` must be `true` in milestone 1
+- `writable_surfaces` must be non-empty and repo-relative
+- recovery branch/path values must match `[detected_release].branch_name` and the generated
+  `pr-summary.md`
 
-Closeout implication:
+Backward-compatibility rule:
 
-- `close-agent-maintenance` and its types/renderers must preserve the new trigger kind and
-  detected-release metadata so the final `HANDOFF.md` remains truthful
+- manual maintenance requests remain valid without `[execution_contract]`
+- historical automated requests may still load for read-only closeout/inspection
+- new automated writes must emit the full relay contract
 
-### New xtask Surface 1: Stale-Agent Detector
+### Packet Rendering Rules
+
+`prepare-agent-maintenance --write` becomes the sole writer of:
+
+- `governance/maintenance-request.toml`
+- `HANDOFF.md`
+- `governance/pr-summary.md`
+
+Rendering rules:
+
+1. `HANDOFF.md`, `governance/pr-summary.md`, and the relay's frozen prompt artifact must all come from one shared execution-packet renderer over `prompt_template_path`; the relay must never scrape markdown to recover execution facts.
+2. `HANDOFF.md` must render `writable_surfaces`, `read_only_inputs`, `ordered_commands`,
+   `green_gates`, and `recovery` from the structured execution contract, not recomputed prose.
+3. `governance/pr-summary.md` must point back to `HANDOFF.md` and must not contain any execution
+   facts missing from the request truth.
+4. The renderer must fail closed if prompt digest, maintenance root, or branch linkage is
+   inconsistent.
+
+### New xtask Surface: Execution Relay
 
 Add:
 
-```text
-cargo run -p xtask -- maintenance-watch --check
-cargo run -p xtask -- maintenance-watch --emit-json _ci_tmp/maintenance-watch.json
-```
-
-Behavior:
-
-- load `agent_registry.toml`
-- select `agents[*].maintenance.release_watch.enabled = true`
-- read `cli_manifests/<agent>/latest_validated.txt`
-- query upstream release history per registry metadata
-- compute `latest_stable` and `target_version`
-- compare `target_version` against `latest_validated.txt`
-- emit a human summary and, when requested, a JSON queue artifact
-
-Queue artifact shape:
-
-```json
-{
-  "schema_version": 1,
-  "generated_at": "2026-05-05T15:00:00Z",
-  "stale_agents": [
-    {
-      "agent_id": "codex",
-      "manifest_root": "cli_manifests/codex",
-      "current_validated": "0.97.0",
-      "latest_stable": "0.99.0",
-      "target_version": "0.98.0",
-      "version_policy": "latest_stable_minus_one",
-      "dispatch_kind": "workflow_dispatch",
-      "dispatch_workflow": "codex-cli-update-snapshot.yml",
-      "maintenance_root": "docs/agents/lifecycle/codex-maintenance",
-      "request_path": "docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml",
-      "opened_from": ".github/workflows/codex-cli-update-snapshot.yml",
-      "detected_by": ".github/workflows/agent-maintenance-release-watch.yml",
-      "branch_name": "automation/codex-maintenance-0.98.0"
-    }
-  ]
-}
-```
-
-Hard-fail conditions:
-
-- malformed registry metadata
-- malformed `latest_validated.txt`
-- malformed upstream response
-- unsupported `version_policy`
-- unsupported `source_kind`
-- `dispatch_kind = workflow_dispatch` with missing workflow id
-
-No-op conditions:
-
-- no enrolled agents
-- fewer than two stable versions for a `latest_stable_minus_one` source
-- computed candidate equals current validated
-- computed candidate is older than current validated
-
-Implementation rule:
-
-- keep this explicit and small, one enum plus two source-specific helpers
-- do not build a generic plugin registry for upstream sources in this milestone
-
-### New xtask Surface 2: Maintenance Packet Creator
-
-Add:
-
-```text
-cargo run -p xtask -- prepare-agent-maintenance \
-  --agent <agent_id> \
-  --current-version <version> \
-  --latest-stable <version> \
-  --target-version <version> \
-  --opened-from <workflow-path> \
-  --detected-by <workflow-path> \
-  --dispatch-kind <workflow_dispatch|packet_pr> \
-  [--dispatch-workflow <workflow-id>] \
-  --branch-name <branch> \
+```sh
+cargo run -p xtask -- execute-agent-maintenance \
+  --request docs/agents/lifecycle/<agent_id>-maintenance/governance/maintenance-request.toml \
   --dry-run
 
-cargo run -p xtask -- prepare-agent-maintenance ... --write
+cargo run -p xtask -- execute-agent-maintenance \
+  --request docs/agents/lifecycle/<agent_id>-maintenance/governance/maintenance-request.toml \
+  --write \
+  --run-id <prepared_run_id>
 ```
 
-Behavior:
+Responsibilities:
 
-- validate the agent exists in `agent_registry.toml`
-- validate the provided release data against the registry's `release_watch` metadata
-- create the maintenance root if it does not already exist
-- synthesize `maintenance-request.toml` with `artifact_version = "2"` and
-  `trigger_kind = "upstream_release_detected"`
-- render `README.md`, `scope_brief.md`, `seam_map.md`, `threading.md`, `review_surfaces.md`,
-  `HANDOFF.md`, and `governance/remediation-log.md`
-- use the same doc renderer contract as `refresh-agent`, but do the initial write directly
+1. load and validate the maintenance request
+2. require `[execution_contract]` for automated upstream-release requests
+3. build one frozen execution packet from structured request truth plus the shared prompt renderer
+4. preflight the local Codex binary and auth during dry-run and again before write mode
+5. persist the frozen prompt, input contract, and repo baseline under a temp run root
+6. preview the exact write envelope, ordered commands, green gates, and recovery path in dry-run
+7. require `--run-id` for write mode so the command validates against one prepared baseline
+8. run the frozen Codex prompt in write mode with a bounded write root
+9. reject any write outside `execution_contract.writable_surfaces`
+10. run the exact green gates from the execution contract after Codex returns and after boundary validation passes
+11. stop before `close-agent-maintenance`
+12. print the exact closeout command as the next manual step
 
-`HANDOFF.md` must include:
+Dry-run output contract:
 
-- current validated version
-- latest stable version
+- generated `run_id`
+- temp run root
+- request path
+- agent id
 - target version
-- why the agent is stale
-- exact repo commands to run next
-- exact validation gates
-- touched surface inventory
-- packet basis paths
-- closeout command
-- explicit "do not edit by hand" notes for generated surfaces
-
-This is the most important product surface in the milestone. The PR packet is the feature.
-
-### Shared Workflow Topology
-
-Add one new scheduled workflow:
-
-`/.github/workflows/agent-maintenance-release-watch.yml`
-
-Responsibilities:
-
-1. check out `staging`
-2. run `cargo run -p xtask -- maintenance-watch --emit-json _ci_tmp/maintenance-watch.json`
-3. stop early if `stale_agents` is empty
-4. fan out over `stale_agents`
-5. for `dispatch_kind = workflow_dispatch`, dispatch the named worker workflow with:
-   - `agent_id`
-   - `current_version`
-   - `latest_stable`
-   - `target_version`
-   - `branch_name`
-   - `detected_by`
-6. for `dispatch_kind = packet_pr`, invoke one new generic workflow that opens a packet-only PR
-7. dispatch all downstream workflows with `ref: staging`
-
-Add one new generic workflow:
-
-`/.github/workflows/agent-maintenance-open-pr.yml`
-
-Responsibilities:
-
-1. check out `staging`
-2. run `prepare-agent-maintenance --write`
-3. create or update branch `automation/<agent_id>-maintenance-<target_version>`
-4. open one PR whose body begins with the generated packet summary
-5. never attempt artifact acquisition, snapshot generation, or publication refresh
-
-### Migration of Existing Worker Workflows
-
-Codex and Claude Code keep their specialized execution workflows in milestone 1, but both become
-worker-only surfaces:
-
-- `.github/workflows/codex-cli-update-snapshot.yml`
-- `.github/workflows/claude-code-update-snapshot.yml`
-
-The old scheduled watcher files are deleted:
-
-- `.github/workflows/codex-cli-release-watch.yml`
-- `.github/workflows/claude-code-release-watch.yml`
-
-Required worker changes:
-
-1. accept `agent_id`, `current_version`, `latest_stable`, `target_version`, `branch_name`, and
-   `detected_by`
-2. normalize all internal use of "version" to `target_version`
-3. run `prepare-agent-maintenance --write` before PR creation so the PR always contains the
-   maintenance packet
-4. prepend or append the generated packet summary to the PR body
-5. preserve the existing artifact acquisition, snapshot, union, report, version-metadata,
-   validation, and PR-creation behavior that already works
-6. target branch `automation/<agent_id>-maintenance-<target_version>` and base `staging`
-
-Agent-specific notes:
-
-- Codex keeps its existing work-queue summary generation and `PR_BODY_TEMPLATE.md`, but the packet
-  summary becomes the first part of the PR body
-- Claude Code upgrades from a thin handwritten PR body to the same packet-first model
-
-### Maintenance Packet Content Rules
-
-The packet opened by automation is deterministic and minimal:
-
-- machine contract:
-  - `docs/agents/lifecycle/<agent_id>-maintenance/governance/maintenance-request.toml`
-- generated human entrypoints:
-  - `docs/agents/lifecycle/<agent_id>-maintenance/HANDOFF.md`
-  - `docs/agents/lifecycle/<agent_id>-maintenance/threading.md`
-  - `docs/agents/lifecycle/<agent_id>-maintenance/review_surfaces.md`
-
-The packet must call out:
-
-- exact prompt for the coding agent
-- exact repo commands to run
-- exact files and directories expected to change
+- branch name
+- executor
+- prompt digest
+- exact writable surfaces
+- exact read-only inputs
+- exact ordered commands
 - exact green gates
-- exact follow-up closeout command
+- exact recovery path
+- exact closeout command
+- explicit statement that closeout is not run automatically
+
+Write-mode contract:
+
+- require an existing dry-run packet for the same `run_id`
+- reload the frozen input contract and frozen prompt instead of regenerating them
+- rerun the same request + preflight validation as dry-run
+- invoke Codex using the exact frozen prompt
+- diff the workspace against the prepared baseline while ignoring the temp run root
+- fail if Codex writes outside the allowed surfaces
+- fail if no runtime-owned write occurred
+- run the declared green gates in order only after boundary validation succeeds
+- write execution evidence, validation report, written-path list, and run summary for operator recovery
+- stop and print recovery guidance on any failure
+- never run `close-agent-maintenance`
+
+### Relay Run Artifact Contract
+
+Mirror the existing repo-owned dry-run/write host-surface pattern used by
+`runtime-follow-on` and `recommend-next-agent-research`.
+
+`execute-agent-maintenance --dry-run` writes only temp evidence under:
+
+```text
+docs/agents/.uaa-temp/agent-maintenance/runs/<run_id>/
+  input-contract.json
+  codex-prompt.md
+  run-status.json
+  run-summary.md
+  validation-report.json
+  written-paths.json
+```
+
+`execute-agent-maintenance --write` adds:
+
+```text
+  codex-execution.json
+  codex-stdout.log
+  codex-stderr.log
+```
+
+Rules:
+
+1. The temp run root is excluded from repo diff validation.
+2. The temp run root is not part of `execution_contract.writable_surfaces`; it is host-owned evidence, not maintainer-owned output.
+3. The frozen prompt artifact must hash to `execution_contract.prompt_sha256`.
+4. The relay prints `run_id` on dry-run and requires the same `run_id` on write.
+5. `HANDOFF.md` remains the canonical human contract, but the relay consumes the frozen input contract and frozen prompt, never the rendered markdown.
+
+### Workflow Hardening
+
+Shared watcher workflow:
+
+- keep the current queue-emission topology
+- retain one queue item per stale agent/version
+- add or preserve concurrency so the same agent/version cannot race the same branch concurrently
+
+Generic packet-only PR opener:
+
+- keep `prepare-agent-maintenance --write` before PR creation
+- keep `governance/pr-summary.md` as `body-path`
+- print one explicit manual recovery path if PR creation fails after packet generation
+
+Codex worker workflow:
+
+- keep artifact acquisition and snapshot generation behavior
+- ensure packet generation happens after artifact outputs are ready and before PR creation
+- ensure `governance/pr-summary.md` stays the PR body source
+- emit the same explicit recovery path on PR-creation failure
+
+Claude worker workflow:
+
+- same hardening as Codex
+- same packet-first PR-body contract
+- same single recovery path
 
 ### File-Level Implementation Map
 
 | Surface | Planned change |
 | --- | --- |
-| `crates/xtask/data/agent_registry.toml` | add `maintenance.release_watch` metadata; enable `codex` and `claude_code` in milestone 1 |
-| `crates/xtask/src/agent_registry.rs` | parse and validate `release_watch` metadata |
-| `crates/xtask/src/agent_maintenance/mod.rs` | export new `watch` and `prepare` modules |
-| `crates/xtask/src/agent_maintenance/request.rs` | add `artifact_version = "2"`, `upstream_release_detected`, and `detected_release` fields |
-| `crates/xtask/src/agent_maintenance/docs.rs` | render packet-first contributor guidance with release metadata |
-| `crates/xtask/src/agent_maintenance/watch.rs` | new detector and queue emitter |
-| `crates/xtask/src/agent_maintenance/prepare.rs` | new packet creator for release-watch requests |
-| `crates/xtask/src/agent_maintenance/closeout/types.rs` | preserve new trigger kind and detected-release metadata through closeout |
-| `crates/xtask/src/agent_maintenance/closeout/write.rs` | keep final handoff truthful for automated release-watch runs |
-| `crates/xtask/src/main.rs` | expose `maintenance-watch` and `prepare-agent-maintenance` |
-| `.github/workflows/agent-maintenance-release-watch.yml` | new shared watcher/orchestrator |
-| `.github/workflows/agent-maintenance-open-pr.yml` | new generic packet-only PR opener |
-| `.github/workflows/codex-cli-update-snapshot.yml` | worker-only migration plus packet generation |
-| `.github/workflows/claude-code-update-snapshot.yml` | worker-only migration plus packet generation |
-| `.github/workflows/codex-cli-release-watch.yml` | delete |
-| `.github/workflows/claude-code-release-watch.yml` | delete |
-| `docs/specs/agent-registry-contract.md` | document `release_watch` enrollment and source metadata |
-| `docs/specs/cli-agent-onboarding-charter.md` | document the new request version and maintenance watch ownership |
-| `docs/cli-agent-onboarding-factory-operator-guide.md` | document the live shared watcher, packet creator, and branch rules |
+| `crates/xtask/src/agent_maintenance/request.rs` | add `execution_contract` + recovery parsing and validation |
+| `crates/xtask/src/agent_maintenance/docs.rs` | factor a shared execution-packet renderer so `HANDOFF.md`, `pr-summary.md`, and relay prompt artifacts stay byte-identical to the same request truth |
+| `crates/xtask/src/agent_maintenance/prepare.rs` | emit the structured execution contract during automated packet creation |
+| `crates/xtask/src/agent_maintenance/execute.rs` | new relay command, dry-run/write, prepared-run artifacts, preflight, prompt invocation, diff-based boundary validation, gate execution, and recovery evidence |
+| `crates/xtask/src/agent_maintenance/mod.rs` | export `execute` module |
+| `crates/xtask/src/main.rs` | expose `execute-agent-maintenance` |
+| `crates/xtask/src/agent_maintenance/closeout/**` | preserve compatibility with new request metadata and manual-closeout boundary |
+| `.github/workflows/agent-maintenance-release-watch.yml` | keep topology, harden concurrency/queue invariants if needed |
+| `.github/workflows/agent-maintenance-open-pr.yml` | preserve packet-first PR creation, add explicit recovery semantics |
+| `.github/workflows/codex-cli-update-snapshot.yml` | preserve worker behavior, add packet timing + recovery semantics |
+| `.github/workflows/claude-code-update-snapshot.yml` | preserve worker behavior, add packet timing + recovery semantics |
+| `docs/cli-agent-onboarding-factory-operator-guide.md` | document relay dry-run/write flow and manual-closeout boundary |
+| `cli_manifests/codex/OPS_PLAYBOOK.md` | align local maintainer execution to the relay contract |
+| `cli_manifests/claude_code/OPS_PLAYBOOK.md` | align local maintainer execution to the relay contract |
 
 ## Code Quality Rules For This Slice
 
-1. Registry parsing and version-policy logic live in Rust, not copied into workflow JavaScript.
-2. Workflow YAML may dispatch work, but it may not reimplement stale detection.
-3. `maintenance-request.toml` remains the only machine-readable packet contract.
-4. Existing maintenance packet roots stay authoritative. No `docs/agents/.uaa-temp/...` fork for
-   this slice.
-5. Specialized worker workflows are allowed only for execution differences. Detection and packet
-   creation are shared.
-6. Use one enum plus two source-specific parsing helpers. Do not spend an innovation token on a
-   provider plugin framework.
-7. Keep packet-root naming consistent with exact `agent_id` spelling, even when it means
-   underscores in maintenance root names.
+1. Structured request truth owns execution facts. Rendered markdown does not.
+2. Relay write-boundary enforcement must reuse the repo's existing path-jail machinery.
+3. Workflow YAML may route work, but it may not duplicate execution-contract truth.
+4. Packet-only and relay-enabled paths stay explicit. No hidden widening by convention.
+5. Recovery behavior must be one explicit path per failure class, not scattered log text.
+6. Manual closeout remains explicit. Do not smuggle closeout into relay write mode.
+7. The relay may consume shared renderer outputs, but it may not parse `HANDOFF.md` or `pr-summary.md` to reconstruct machine truth.
 
 ## Implementation Slices
 
-### Slice 1. Contract Extensions
+### Slice 1. Execution-Contract Schema
 
-Ship the metadata and request-schema extensions first.
-
-Done means:
-
-- `agent_registry.toml` can express watch enrollment and upstream source truth
-- `maintenance-request.toml` can represent upstream version drift explicitly
-- `artifact_version = "2"` is validated
-- contract docs are updated before workflow edits
-
-### Slice 2. Shared Detector And Queue Emitter
-
-Add `maintenance-watch` with fixture-backed tests.
+Ship the request and renderer schema first.
 
 Done means:
 
-- local dry-run summary exists
-- JSON queue artifact exists
-- GitHub releases and GCS listings both support `latest_stable_minus_one`
-- no stale agent opens work when candidate is not strictly newer
-- stale-agent detection is no longer hardcoded in workflow JavaScript
+- automated requests carry `[execution_contract]`
+- `HANDOFF.md` and `pr-summary.md` project from that exact truth
+- prompt digest and path linkage validate cleanly
 
-### Slice 3. Packet Creator And Packet Rendering
+### Slice 2. Local Relay Command
 
-Add `prepare-agent-maintenance --dry-run|--write`.
+Add `execute-agent-maintenance --dry-run|--write`.
 
 Done means:
 
-- automation can create a maintenance packet without hand-authoring the request
-- missing maintenance roots are created on first write
-- `HANDOFF.md` becomes the canonical contributor packet entrypoint
-- exact prompt, commands, touched surfaces, and gates are rendered from repo truth
-- closeout remains truthful for the new automated trigger
+- dry-run emits one frozen execution packet and one `run_id` without mutating repo-owned maintenance or wrapper surfaces
+- write mode requires that prepared `run_id` and reuses the frozen prompt/input contract instead of regenerating them
+- write mode invokes Codex with bounded writes
+- boundary validation combines the declared write envelope with an actual repo diff against the prepared baseline
+- path jail blocks any write outside `writable_surfaces`
+- run evidence is persisted for recovery and operator audit
+- manual closeout remains outside the command
 
-### Slice 4. Shared Workflow Topology
+Implementation sequence:
 
-Add the shared watcher and the generic packet-only PR flow.
+1. **2A. Prepare relay packet**
+   - load `maintenance-request.toml`
+   - validate `[execution_contract]`, branch linkage, prompt digest, and maintenance root linkage
+   - render the exact prompt from the shared execution-packet renderer
+   - snapshot the repo baseline, then persist `input-contract.json`, `codex-prompt.md`, and dry-run summaries under `docs/agents/.uaa-temp/agent-maintenance/runs/<run_id>/`
+2. **2B. Execute bounded write**
+   - require `--run-id`
+   - rerun Codex preflight
+   - execute the frozen prompt
+   - diff the repo against the prepared baseline while excluding the temp run root
+   - fail closed on any out-of-bounds write, missing required write, or prompt-digest mismatch
+3. **2C. Validate and hand off**
+   - run the exact green gates from the execution contract in order
+   - persist execution evidence and validation summaries
+   - print the exact closeout command plus the machine-derived recovery path
+   - stop before closeout
 
-Done means:
+### Slice 3. Workflow Recovery Hardening
 
-- nightly schedule exists in one workflow
-- fanout reads the queue artifact
-- packet-only agents have a real PR path even without a specialized worker
-- no legacy scheduled watcher workflows remain
-
-### Slice 5. Codex And Claude Code Migration
-
-Migrate the current live automations onto the shared entrypoint.
-
-Done means:
-
-- Codex and Claude Code no longer own their own release-watch schedule
-- both workers accept shared payloads
-- both workers write the maintenance packet into their PRs
-- both workers keep their existing artifact-generation behavior
-- both workers use the shared branch naming scheme
-
-### Slice 6. Proof And Documentation Closeout
-
-Prove the architecture with the migrated workers and refreshed docs.
+Harden the shared opener and specialized workers.
 
 Done means:
 
-- operator guide matches the live workflows
-- contracts are truthful
-- test suite covers registry, detector, packet creation, closeout compatibility, and CI topology
-- milestone 1 rollout is explicitly codex + claude_code only
+- packet generation always precedes PR creation
+- PR body always comes from generated `pr-summary.md`
+- recovery path is explicit when PR creation fails
+- shared queue/branch concurrency remains one stale agent/version -> one branch/PR
+
+### Slice 4. Operator Docs And Playbooks
+
+Update all maintainer-facing docs.
+
+Done means:
+
+- operator guide tells the same story as the code
+- playbooks point to relay dry-run/write, not manual translation
+- packet-only agents remain explicitly deferred
+
+### Slice 5. Verification Closeout
+
+Prove schema, relay, workflows, and docs together.
+
+Done means:
+
+- request parsing and renderer consistency are covered
+- relay preview and write-boundary enforcement are covered
+- workflow contract tests match the live topology
+- docs and playbooks match the final command surface
 
 ## Test Review
 
@@ -747,40 +642,41 @@ Done means:
 ```text
 CODE PATH COVERAGE
 ===========================
-[+] crates/xtask/src/agent_registry.rs
-    ├── parse valid release_watch metadata
-    ├── reject missing dispatch_workflow for workflow_dispatch
-    ├── reject pointer-only sources for latest_stable_minus_one
-    ├── reject malformed github_releases metadata
-    ├── reject malformed gcs_object_listing metadata
-    └── reject unknown version_policy
+[+] crates/xtask/src/agent_maintenance/request.rs
+    ├── parse valid execution_contract block
+    ├── reject missing executor for automated requests
+    ├── reject missing prompt_sha256
+    ├── reject writable_surfaces outside repo-relative paths
+    ├── reject recovery branch/path mismatch
+    └── preserve compatibility for manual requests without execution_contract
 
-[+] crates/xtask/src/agent_maintenance/watch.rs
-    ├── no enrolled agents -> empty queue
-    ├── github_releases source -> latest_stable and stable_minus_one computed
-    ├── gcs_object_listing source -> latest_stable and stable_minus_one computed
-    ├── candidate == latest_validated -> no-op
-    ├── candidate < latest_validated -> no-op
-    ├── stale agent -> queue entry emitted
-    └── malformed upstream response -> hard fail
+[+] crates/xtask/src/agent_maintenance/docs.rs
+    ├── HANDOFF renders execution_contract exactly
+    ├── pr-summary remains derivative of the same truth
+    ├── prompt digest matches rendered prompt block
+    └── malformed execution_contract fails closed
 
-[+] crates/xtask/src/agent_maintenance/prepare.rs / request.rs
-    ├── trigger_kind = upstream_release_detected parses
-    ├── detected_release block validates
-    ├── dry-run previews exact file set
-    ├── write creates missing maintenance root
-    └── write renders request + packet docs inside docs/agents/lifecycle/<agent_id>-maintenance/
+[+] crates/xtask/src/agent_maintenance/prepare.rs
+    ├── emits execution_contract for automated requests
+    ├── populates writable_surfaces deterministically
+    ├── populates recovery contract deterministically
+    └── keeps packet-only exclusions explicit
 
-[+] crates/xtask/src/agent_maintenance/closeout/**
-    ├── closeout accepts artifact_version = 2 request linkage
-    ├── closeout preserves upstream_release_detected in final handoff
-    └── final HANDOFF.md stays truthful for automated release-watch runs
+[+] crates/xtask/src/agent_maintenance/execute.rs
+    ├── dry-run writes frozen input-contract + prompt artifacts and prints exact write envelope and gates
+    ├── preflight fails when codex binary is missing
+    ├── preflight fails when auth is missing
+    ├── write mode requires a prepared run_id baseline
+    ├── write mode refuses writes outside writable_surfaces
+    ├── write mode fails if frozen prompt digest and request truth diverge
+    ├── write mode runs green gates in order
+    └── write mode stops before closeout
 
 [+] workflow migrations
-    ├── shared watcher dispatches specialized workers correctly
-    ├── generic packet-only workflow opens one PR for one agent
-    ├── codex worker accepts shared payload and retains work-queue summary
-    └── claude worker accepts shared payload and writes packet-first PR body
+    ├── packet-only opener uses generated pr-summary.md
+    ├── codex worker prepares packet before PR creation
+    ├── claude worker prepares packet before PR creation
+    └── watcher/workers preserve one stale agent/version -> one branch/PR
 ```
 
 ### User Flow Coverage
@@ -788,48 +684,55 @@ CODE PATH COVERAGE
 ```text
 USER FLOW COVERAGE
 ===========================
-[+] Shared watcher nightly run
-    ├── no stale agents -> exits clean, opens nothing
-    ├── one stale codex release -> dispatches codex worker
-    ├── one stale claude release -> dispatches claude worker
-    ├── packet_pr queue entry -> opens packet-only PR
-    └── multiple stale agents -> one branch/PR path each, never bundled
+[+] Shared watcher -> PR path
+    ├── stale codex version -> codex worker -> PR opens with generated pr-summary
+    ├── stale claude version -> claude worker -> PR opens with generated pr-summary
+    ├── packet_pr agent -> generic opener -> packet-only PR path
+    └── repeat run for same agent/version -> same branch/PR, not duplicate spray
 
-[+] Contributor-ready PR packet
-    ├── packet explains why agent is stale
-    ├── packet includes exact prompt
-    ├── packet includes exact repo commands
-    ├── packet lists touched surfaces
-    ├── packet includes closeout command + green gates
-    └── rerun for same target updates same branch instead of spraying duplicates
+[+] Maintainer relay trust path
+    ├── maintainer reads HANDOFF.md only
+    ├── dry-run prints exact writable surfaces
+    ├── dry-run prints exact ordered commands
+    ├── dry-run prints exact green gates
+    ├── dry-run prints exact recovery path
+    ├── dry-run emits a run_id and frozen prompt packet
+    └── dry-run states that closeout remains manual
 
-[+] Closeout truth
-    ├── request version 2 stays readable after work completes
-    ├── final HANDOFF.md still names the automated trigger
-    └── maintainer can trace the request back to watcher + worker workflow origins
+[+] Relay execution path
+    ├── write mode reuses the prepared run_id baseline
+    ├── write mode passes Codex preflight
+    ├── write mode applies bounded changes only
+    ├── write mode runs green gates
+    ├── write mode fails closed on out-of-bounds writes
+    └── maintainer runs explicit closeout afterward
+
+[+] Recovery path
+    ├── PR creation fails after packet generation
+    ├── maintainer reruns the generated recovery path
+    └── packet docs remain the same truth during recovery
 ```
 
 ### Test Files To Add Or Update
 
 | Surface | Test location | Required assertions |
 | --- | --- | --- |
-| registry metadata validation | `crates/xtask/tests/agent_registry.rs` | new `release_watch` fields parse; invalid source/dispatch combos fail |
-| stale-agent detector | `crates/xtask/tests/agent_maintenance_watch.rs` | queue generation, no-op paths, malformed upstream handling, GitHub and GCS stable-minus-one logic |
-| packet creator | `crates/xtask/tests/agent_maintenance_prepare.rs` | dry-run preview, initial root creation, request + packet file set, branch/request path correctness |
-| maintenance request schema | `crates/xtask/tests/agent_maintenance_refresh.rs` | `artifact_version = "2"`, `upstream_release_detected`, `detected_release` parsing |
-| closeout compatibility | `crates/xtask/tests/agent_maintenance_closeout.rs` | final handoff preserves automated trigger and request linkage |
-| workflow contract | `crates/xtask/tests/c4_spec_ci_wiring.rs` | shared watcher exists, legacy watchers deleted, workers accept shared inputs, shared branch/base rules hold |
-| end-to-end detector fixtures | `crates/xtask/tests/support/agent_maintenance_harness.rs` or sibling harness | fixture registry + manifest roots + upstream JSON produce the expected queue |
+| execution-contract parsing | `crates/xtask/tests/agent_maintenance_refresh.rs` or a request-focused sibling | valid/invalid `[execution_contract]` parsing, compatibility rules, recovery linkage validation |
+| packet generation | `crates/xtask/tests/agent_maintenance_prepare.rs` | generated request includes execution contract, prompt digest, writable surfaces, green gates, and recovery path |
+| relay command | `crates/xtask/tests/agent_maintenance_execute.rs` | dry-run packet artifacts, missing codex/auth preflight, run-id requirement, path-jail rejection, no-op write rejection, closeout omission, gate ordering |
+| renderer consistency | `crates/xtask/tests/agent_maintenance_prepare.rs` | `HANDOFF.md` and `pr-summary.md` remain byte-consistent with request truth |
+| closeout compatibility | `crates/xtask/tests/agent_maintenance_closeout.rs` | closeout preserves new request metadata and still requires explicit human step |
+| workflow contract | `crates/xtask/tests/c4_spec_ci_wiring.rs` | packet-first PR bodies, recovery semantics, shared concurrency/branch invariants, no stale watcher references |
+| harness support | `crates/xtask/tests/support/agent_maintenance_harness.rs` | fixture helpers for request v2 execution-contract generation, prepared run roots, and relay-path testing |
 
 ### Commands That Must Pass Before Landing
 
 ```sh
-cargo test -p xtask --test agent_registry
-cargo test -p xtask --test agent_maintenance_drift
-cargo test -p xtask --test agent_maintenance_refresh
 cargo test -p xtask --test agent_maintenance_prepare
-cargo test -p xtask --test agent_maintenance_watch
+cargo test -p xtask --test agent_maintenance_refresh
+cargo test -p xtask --test agent_maintenance_execute
 cargo test -p xtask --test agent_maintenance_closeout
+cargo test -p xtask --test agent_maintenance_watch
 cargo test -p xtask --test c4_spec_ci_wiring
 make preflight
 ```
@@ -838,46 +741,59 @@ make preflight
 
 | Codepath | Realistic failure | Test coverage required | Error handling required | User-visible outcome |
 | --- | --- | --- | --- | --- |
-| `maintenance-watch` GitHub release query | upstream tag format changes | yes | hard fail with agent id + repo + tag prefix | workflow fails closed before dispatch |
-| `maintenance-watch` GCS object listing | bucket listing shape changes or version extraction breaks | yes | hard fail with bucket + prefix | workflow fails closed before dispatch |
-| queue fanout | stale agent computed twice across reruns | yes | deterministic `branch_name` per agent/version | same PR is updated, not duplicated |
-| packet creator | request written outside maintenance root | yes | path-jail validation | creator fails closed |
-| request schema evolution | closeout no longer understands request version 2 | yes | versioned request parsing in closeout | maintenance lane blocks before false closeout |
-| specialized worker dispatch | workflow id missing or mistyped | yes | registry validation + dispatch step failure | no silent drop of stale agent |
-| contributor packet | PR opens without exact commands/prompt | yes | content assertions in packet-renderer tests | packet is blocked as invalid in tests |
+| request parsing | malformed or partial `[execution_contract]` block | yes | fail closed with request path + missing field | relay refuses to start |
+| packet rendering | prompt digest no longer matches rendered prompt block | yes | fail closed before packet write | no misleading `HANDOFF.md` lands |
+| relay preflight | local `codex` binary missing or auth missing | yes | dry-run/write stops with exact fix guidance | maintainer sees one explicit remediation path |
+| relay baseline | maintainer runs `--write` without a prepared `run_id` or with stale baseline state | yes | fail closed and point to the exact dry-run to rerun | maintainer does not guess which prompt/baseline is in force |
+| relay path jail | Codex writes outside `writable_surfaces` | yes | fail closed and report offending path | no out-of-bounds mutation survives |
+| worker PR creation | artifacts + packet docs generated but PR open fails | yes | print one explicit recovery path using generated `pr-summary.md` | maintainer can reopen without guessing |
+| watcher concurrency | same stale agent/version dispatched twice | yes | deterministic branch concurrency | same branch/PR reused, not duplicated |
+| closeout boundary | maintainer assumes relay already finalized closeout | yes | dry-run/write explicitly states closeout is manual | no false-positive closed lane |
 
-Any path that opens a PR without exact commands and green gates is a critical gap and must block
-landing.
+Any path that mutates outside the declared write envelope or silently finalizes closeout is a
+critical gap and blocks landing.
 
 ## Performance Review
 
-This slice is operationally light if the shared watcher stays narrow:
+This slice is operationally light in dry-run mode and intentionally heavier in write mode.
 
-- the watcher does O(enrolled agents) registry reads plus one upstream-history query per agent
-- it must not build snapshots or wrapper crates itself
-- heavy work remains isolated inside per-agent worker flows
-- queue emission is tiny JSON, not a committed artifact
-- matrix fanout should start conservative, `max-parallel: 2` is enough
+Dry-run must stay cheap:
 
-The real performance risk is not CPU. It is PR storm behavior and upstream rate limits.
+- parse request
+- validate digest/linkage
+- preflight local Codex availability
+- write the frozen temp run packet
+- print the contract
+
+Write mode is allowed to be heavier because it is the bounded execution seam:
+
+- one local Codex run
+- one repo diff against the prepared baseline
+- one ordered gate sequence
+- zero network fanout beyond what the existing workflow/product already requires
+
+The real performance risks are:
+
+- repeated local retries because preflight guidance is unclear
+- unnecessary re-runs because recovery is ambiguous
+- gate cost hiding inside repeated failed write attempts
 
 Controls:
 
-- no-op when the target version is not strictly newer
-- deterministic branch names so reruns update the same PR
-- shared watcher performs detection only, not artifact work
-- initial rollout limits watch-enabled agents to two known workers
+- fail fast on missing binary/auth in dry-run
+- fail fast on request/render mismatch before Codex runs
+- fail fast on out-of-bounds writes
+- keep closeout outside the command so reruns stay explicit
 
 ## NOT in scope
 
-- autonomous execution that runs Codex or another agent and pushes branch updates automatically
-- a generic artifact-acquisition engine for every agent
-- enrolling current non-worker agents in release watch before their packet basis docs are complete
-- multi-agent upgrade PRs
-- release promotion workflow changes
-- `goose` lifecycle proving work after maintenance CI lands
-- maintenance closeout model changes beyond preserving the new automated-trigger data
-- a pointer-only upstream source contract
+- GitHub-hosted or cloud-hosted autonomous maintenance execution
+- automatic closeout
+- promotion pointer updates such as `latest_validated.txt` or `min_supported.txt`
+- support/capability/release-doc publication refresh in the upstream-release relay
+- widening the relay path to packet-only agents that do not yet have a complete execution basis
+- a generic multi-executor framework beyond Codex
+- redesigning the shared watcher or stale-agent queue contract
 
 ## Worktree Parallelization Strategy
 
@@ -885,77 +801,66 @@ Controls:
 
 | Step | Modules touched | Depends on |
 | --- | --- | --- |
-| Contract extensions | `crates/xtask/data/`, `crates/xtask/src/agent_registry.rs`, `docs/specs/`, `docs/cli-agent-onboarding-factory-operator-guide.md` | — |
-| Detector implementation | `crates/xtask/src/agent_maintenance/`, `crates/xtask/src/main.rs`, `crates/xtask/tests/` | Contract extensions |
-| Packet creator implementation | `crates/xtask/src/agent_maintenance/`, `docs/agents/lifecycle/`, `crates/xtask/tests/` | Contract extensions |
-| Closeout compatibility updates | `crates/xtask/src/agent_maintenance/closeout/`, `crates/xtask/tests/` | Contract extensions |
-| Shared watcher workflow | `.github/workflows/`, `crates/xtask/tests/c4_spec_ci_wiring.rs` | Detector implementation |
-| Generic packet-only PR workflow | `.github/workflows/`, packet creator, CI wiring tests | Packet creator implementation |
-| Codex worker migration | `.github/workflows/`, `cli_manifests/codex/**`, CI wiring tests | Detector + packet creator |
-| Claude worker migration | `.github/workflows/`, `cli_manifests/claude_code/**`, CI wiring tests | Detector + packet creator |
-| Docs closeout | `docs/specs/`, `docs/cli-agent-onboarding-factory-operator-guide.md`, `PLAN.md` | Detector + packet creator + workflow topology |
+| Execution-contract schema | `crates/xtask/src/agent_maintenance/request.rs`, `crates/xtask/tests/` | — |
+| Shared execution-packet renderer | `crates/xtask/src/agent_maintenance/docs.rs`, `crates/xtask/tests/` | Execution-contract schema |
+| Packet generation | `crates/xtask/src/agent_maintenance/prepare.rs`, `crates/xtask/tests/` | Shared execution-packet renderer |
+| Relay command | `crates/xtask/src/agent_maintenance/execute.rs`, `crates/xtask/src/main.rs`, `crates/xtask/tests/` | Shared execution-packet renderer |
+| Workflow recovery hardening | `.github/workflows/`, `crates/xtask/tests/c4_spec_ci_wiring.rs` | Packet generation |
+| Closeout compatibility | `crates/xtask/src/agent_maintenance/closeout/`, `crates/xtask/tests/` | Execution-contract schema |
+| Docs + playbook closeout | `docs/`, `cli_manifests/*/OPS_PLAYBOOK.md`, `PLAN.md` | Packet generation + relay + workflow semantics stable |
 
 ### Parallel Lanes
 
-Lane A: Contract extensions
+Lane A: Execution-contract schema
 
-Lane B: Detector implementation and tests
-Sequential inside the lane because it all touches `crates/xtask/src/agent_maintenance/` and the
-same queue contract.
+Lane B: Shared execution-packet renderer
+Sequential inside the lane because it owns the shared renderer contract that both packet docs and the relay consume.
 
-Lane C: Packet creator implementation and tests
-Sequential inside the lane because it all touches `crates/xtask/src/agent_maintenance/` and
-generated packet docs.
+Lane C: Packet generation
+Sequential inside the lane because it owns `prepare.rs` and prepare-focused tests.
 
-Lane D: Closeout compatibility
-Sequential inside the lane because it touches the same maintenance request truth and closeout
-surfaces.
+Lane D: Relay command
+Sequential inside the lane because it owns `execute.rs`, `main.rs`, and relay-specific tests.
 
-Lane E: Shared watcher workflow + generic packet-only PR workflow
-Sequential, shared `.github/workflows/` and `c4_spec_ci_wiring.rs`.
+Lane E: Closeout compatibility
+Independent after schema freeze, because it focuses on `closeout/**` and request compatibility.
 
-Lane F: Codex worker migration
-Independent from Claude after the packet creator contract is stable.
+Lane F: Workflow recovery hardening
+Waits for packet-generation truth, then owns workflow YAML and `c4_spec_ci_wiring.rs`.
 
-Lane G: Claude worker migration
-Independent from Codex after the packet creator contract is stable.
-
-Lane H: Docs closeout
-Waits until contract, detector, packet creator, and workflow topology are stable.
+Lane G: Docs + playbook closeout
+Waits until the relay contract and workflow semantics are stable.
 
 ### Execution Order
 
 1. Launch Lane A first.
-2. After A lands locally, launch B + C + D in parallel worktrees.
-3. After B, C, and D converge, launch E + F + G in parallel worktrees.
-4. Merge E first because it owns the shared workflow topology and CI wiring baseline.
-5. Merge F and G after rebasing onto E if needed.
-6. Run H last, then full verification.
+2. After A stabilizes, launch B + E in parallel worktrees.
+3. Merge B before launching C + D, because both packet generation and relay execution depend on the shared renderer contract.
+4. After B lands, launch C + D in parallel worktrees.
+5. Merge E whenever its compatibility tests are green because it only depends on the schema.
+6. Merge C before F, because workflows depend on final packet-generation truth.
+7. Merge D once relay tests are green.
+8. Launch and merge F.
+9. Run G last, then full verification.
 
 ### Conflict Flags
 
-- Lanes B, C, and D all touch `crates/xtask/src/agent_maintenance/`. Split ownership by module:
-  - B owns `watch.rs`
-  - C owns `prepare.rs` and packet-rendering changes
-  - D owns `closeout/**`
-- Lanes E, F, and G all touch `.github/workflows/` and `crates/xtask/tests/c4_spec_ci_wiring.rs`.
-  Keep one owner for the CI wiring test file or merge sequentially at the end.
-- Docs closeout must happen last or it will drift immediately.
+- Lanes B, C, D, and E all touch `crates/xtask/tests/`. Keep test-file ownership explicit.
+- Lanes C and D both depend on the shared renderer contract from `docs.rs`; do not let either fork its own prompt-building helper.
+- Lanes F and G both touch maintainer-facing workflow semantics. Do docs last.
 
 ## Completion Summary
 
-- Step 0: Scope Challenge, scope accepted as shared watcher + packet creator + worker migration
-- Architecture Review: locked on registry-owned watch metadata, history-capable upstream sources,
-  request version 2, shared detector, shared packet creator, and one PR per stale agent
-- Code Quality Review: DRY boundary is `xtask`, not workflow JavaScript
-- Test Review: detector, request contract, packet creation, closeout truth, and CI topology all
-  have explicit test homes
-- Performance Review: watcher stays light, worker flows stay isolated
+- Step 0: Scope Challenge, scope reduced to the execution relay follow-on instead of reopening watcher architecture
+- Architecture Review: locked on structured execution truth, local Codex relay, bounded writes, explicit recovery, and manual closeout
+- Code Quality Review: request truth owns execution semantics, markdown stays projection-only
+- Test Review: request parsing, renderer consistency, relay dry-run/write, workflow recovery, and closeout boundary all have explicit homes
+- Performance Review: dry-run stays cheap, write mode is bounded and explicit
 - NOT in scope: written
 - What already exists: written
 - Failure modes: critical gaps identified and blocked
-- Parallelization: 9 steps, with B/C/D then E/F/G as the main parallel lanes
+- Parallelization: 7 steps, with schema -> shared renderer as the serial spine, then packet generation + relay + closeout compatibility split into safe worktree lanes
 
-That is the whole job. Land the shared watcher and packet creator, migrate Codex and Claude Code
-onto it, keep packet-only support ready but disabled for incomplete agents, and leave autonomous
-execution for the next milestone.
+That is the whole job. Do not redesign the watcher. Do not widen to cloud execution. Make the
+existing maintenance PR packet honest enough that a maintainer can trust one dry-run, one write
+run, and one explicit closeout step.
