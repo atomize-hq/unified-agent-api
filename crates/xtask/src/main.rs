@@ -19,8 +19,8 @@ mod wrapper_coverage_shared;
 
 use xtask::agent_maintenance::{
     closeout as agent_maintenance_closeout, drift as agent_maintenance_drift,
-    prepare as agent_maintenance_prepare, refresh as agent_maintenance_refresh,
-    watch as agent_maintenance_watch,
+    execute as agent_maintenance_execute, prepare as agent_maintenance_prepare,
+    refresh as agent_maintenance_refresh, watch as agent_maintenance_watch,
 };
 use xtask::capability_matrix;
 pub use xtask::onboard_agent;
@@ -96,6 +96,8 @@ enum Command {
     MaintenanceWatch(agent_maintenance_watch::Args),
     /// Prepare an automated maintenance request and packet docs from release-watch inputs.
     PrepareAgentMaintenance(agent_maintenance_prepare::Args),
+    /// Execute the bounded contributor relay for an automated maintenance request.
+    ExecuteAgentMaintenance(agent_maintenance_execute::Args),
     /// Refresh maintenance packet docs and generated publication surfaces from a maintenance request.
     RefreshAgent(agent_maintenance_refresh::Args),
     /// Validate and close an agent maintenance run.
@@ -280,6 +282,13 @@ fn main() {
             }
         },
         Command::PrepareAgentMaintenance(args) => match agent_maintenance_prepare::run(args) {
+            Ok(()) => 0,
+            Err(err) => {
+                eprintln!("{err}");
+                err.exit_code()
+            }
+        },
+        Command::ExecuteAgentMaintenance(args) => match agent_maintenance_execute::run(args) {
             Ok(()) => 0,
             Err(err) => {
                 eprintln!("{err}");
