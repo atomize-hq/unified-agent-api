@@ -528,6 +528,56 @@ fn automated_request_closeout_preserves_trigger_truth_in_handoff() {
     assert!(handoff.contains("automation/opencode-maintenance-0.98.0"));
 }
 
+#[test]
+fn automated_request_execution_contract_still_supports_manual_closeout() {
+    let fixture = fixture_root("automated-request-closeout-execution-contract");
+    maintenance_harness::seed_opencode_basis(&fixture);
+    write_text(
+        &fixture.join("cli_manifests/opencode/PR_BODY_TEMPLATE.md"),
+        "# Goal\n\nFollow the maintained PR template for {{VERSION}}.\n",
+    );
+    write_text(
+        &fixture.join("cli_manifests/opencode/OPS_PLAYBOOK.md"),
+        "# Ops playbook\n",
+    );
+    write_text(
+        &fixture.join("cli_manifests/opencode/CI_WORKFLOWS_PLAN.md"),
+        "# CI workflows\n",
+    );
+    write_text(
+        &fixture.join(".github/workflows/codex-cli-update-snapshot.yml"),
+        "name: Codex worker\n",
+    );
+
+    let request_path =
+        Path::new("docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml");
+    let request_absolute = fixture.join(request_path);
+    write_text(
+        &request_absolute,
+        &automated_maintenance_request_with_execution_contract_toml(
+            "opencode",
+            "docs/integrations/opencode/governance/seam-2-closeout.md",
+        ),
+    );
+    let closeout_path = Path::new(
+        "docs/agents/lifecycle/opencode-maintenance/governance/maintenance-closeout.json",
+    );
+    write_text(
+        &fixture.join(closeout_path),
+        &valid_closeout_json(&request_absolute, request_path),
+    );
+
+    write_closeout_outputs(&fixture, request_path, closeout_path).expect("closeout write");
+    let handoff =
+        fs::read_to_string(fixture.join("docs/agents/lifecycle/opencode-maintenance/HANDOFF.md"))
+            .expect("read handoff");
+    assert!(handoff.contains("upstream_release_detected"));
+    assert!(handoff.contains("automation/opencode-maintenance-0.98.0"));
+    assert!(handoff.contains(
+        "Manual closeout remained an explicit maintainer action recorded with `close-agent-maintenance`"
+    ));
+}
+
 fn maintenance_request_toml(agent_id: &str, basis_ref: &str) -> String {
     maintenance_request_toml_with_refs(agent_id, basis_ref, basis_ref)
 }
@@ -593,6 +643,69 @@ fn automated_maintenance_request_toml(agent_id: &str, basis_ref: &str) -> String
         ),
         agent_id = agent_id,
         basis_ref = basis_ref
+    )
+}
+
+fn automated_maintenance_request_with_execution_contract_toml(
+    agent_id: &str,
+    basis_ref: &str,
+) -> String {
+    let prompt = "# Goal\n\nFollow the maintained PR template for 0.98.0.\n";
+    let prompt_sha256 = hex::encode(sha2::Sha256::digest(prompt.as_bytes()));
+
+    format!(
+        concat!(
+            "{}\n",
+            "[execution_contract]\n",
+            "executor = \"codex\"\n",
+            "prompt_template_path = \"cli_manifests/{agent_id}/PR_BODY_TEMPLATE.md\"\n",
+            "prompt_sha256 = \"{prompt_sha256}\"\n",
+            "pr_summary_path = \"docs/agents/lifecycle/{agent_id}-maintenance/governance/pr-summary.md\"\n",
+            "closeout_path = \"docs/agents/lifecycle/{agent_id}-maintenance/governance/maintenance-closeout.json\"\n",
+            "requires_manual_closeout = true\n",
+            "writable_surfaces = [\n",
+            "  \"docs/agents/lifecycle/{agent_id}-maintenance/**\",\n",
+            "  \"crates/{agent_id}/**\",\n",
+            "  \"crates/agent_api/**\",\n",
+            "  \"cli_manifests/{agent_id}/artifacts.lock.json\",\n",
+            "  \"cli_manifests/{agent_id}/snapshots/0.98.0/**\",\n",
+            "  \"cli_manifests/{agent_id}/reports/0.98.0/**\",\n",
+            "  \"cli_manifests/{agent_id}/versions/0.98.0.json\",\n",
+            "  \"cli_manifests/{agent_id}/wrapper_coverage.json\",\n",
+            "]\n",
+            "read_only_inputs = [\n",
+            "  \"cli_manifests/{agent_id}/OPS_PLAYBOOK.md\",\n",
+            "  \"cli_manifests/{agent_id}/CI_WORKFLOWS_PLAN.md\",\n",
+            "  \"cli_manifests/{agent_id}/PR_BODY_TEMPLATE.md\",\n",
+            "  \".github/workflows/codex-cli-update-snapshot.yml\",\n",
+            "]\n",
+            "ordered_commands = [\n",
+            "  \"cargo run -p xtask -- codex-validate --root cli_manifests/{agent_id}\",\n",
+            "  \"cargo run -p xtask -- support-matrix --check\",\n",
+            "  \"cargo run -p xtask -- capability-matrix --check\",\n",
+            "  \"cargo run -p xtask -- capability-matrix-audit\",\n",
+            "  \"make preflight\",\n",
+            "]\n",
+            "green_gates = [\n",
+            "  \"cargo run -p xtask -- codex-validate --root cli_manifests/{agent_id}\",\n",
+            "  \"cargo run -p xtask -- support-matrix --check\",\n",
+            "  \"cargo run -p xtask -- capability-matrix --check\",\n",
+            "  \"cargo run -p xtask -- capability-matrix-audit\",\n",
+            "  \"make preflight\",\n",
+            "]\n",
+            "\n",
+            "[execution_contract.recovery]\n",
+            "recreate_packet_command = \"cargo run -p xtask -- prepare-agent-maintenance --request docs/agents/lifecycle/{agent_id}-maintenance/governance/maintenance-request.toml --write\"\n",
+            "reopen_pr_body_path = \"docs/agents/lifecycle/{agent_id}-maintenance/governance/pr-summary.md\"\n",
+            "reopen_pr_branch = \"automation/{agent_id}-maintenance-0.98.0\"\n",
+            "notes = [\n",
+            "  \"If PR creation fails after packet generation, rerun packet creation and reopen the PR from the generated pr-summary path.\",\n",
+            "  \"If local Codex preflight fails, fix binary/auth and rerun execute-agent-maintenance --dry-run before write mode.\",\n",
+            "]\n"
+        ),
+        automated_maintenance_request_toml(agent_id, basis_ref),
+        agent_id = agent_id,
+        prompt_sha256 = prompt_sha256
     )
 }
 

@@ -95,7 +95,7 @@ pub(crate) fn render_handoff_body(linked: &LinkedMaintenanceCloseout) -> String 
     };
 
     format!(
-        "# Handoff\n\nThis packet records the closed maintenance run for `{}`.\n\n## Request linkage\n\n- request ref: `{}`\n- request sha256: `{}`\n- trigger kind: `{}`\n- basis ref: `{}`\n- opened from: `{}`\n- requested control-plane actions:\n{}\n\n## Trigger context\n\n{}\n\n## Closeout\n\n- closeout metadata: `{}`\n- preflight passed: `{}`\n- recorded at: `{}`\n- commit: `{}`\n\n## Resolved findings\n\n{}\n\n## Deferred findings\n\n{}\n\n## Runtime follow-up\n\n{}\n",
+        "# Handoff\n\nThis packet records the closed maintenance run for `{}`.\n\nManual closeout remained an explicit maintainer action recorded with `close-agent-maintenance`; relay execution does not finalize it automatically.\n\n## Request linkage\n\n- request ref: `{}`\n- request sha256: `{}`\n- trigger kind: `{}`\n- basis ref: `{}`\n- opened from: `{}`\n- requested control-plane actions:\n{}\n\n## Trigger context\n\n{}\n\n## Closeout\n\n- closeout metadata: `{}`\n- preflight passed: `{}`\n- recorded at: `{}`\n- commit: `{}`\n\n## Resolved findings\n\n{}\n\n## Deferred findings\n\n{}\n\n## Runtime follow-up\n\n{}\n",
         linked.request.agent_id,
         linked.closeout.request_ref,
         linked.request_sha256,
