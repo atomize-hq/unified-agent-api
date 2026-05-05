@@ -15,6 +15,11 @@ Procedure note:
 - the shipped operator workflow lives in `docs/cli-agent-onboarding-factory-operator-guide.md`
 - if the charter and an operator step summary ever diverge, the charter and `docs/specs/**` own the contract truth
 
+Maintenance request note:
+- maintainer-authored maintenance requests remain valid under the legacy request format
+- automated release-watch maintenance requests use `artifact_version = "2"` and `trigger_kind = "upstream_release_detected"`
+- automated release-watch requests MUST carry a `[detected_release]` table and MUST freeze `requested_control_plane_actions = ["packet_doc_refresh"]`
+
 ## Goals
 
 - Make adding “CLI Agent X” a deterministic process:
