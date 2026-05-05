@@ -3,8 +3,36 @@ name: Codex CLI update snapshot
 on:
   workflow_dispatch:
     inputs:
-      version:
-        description: "Bare semver (example: 0.77.0)"
+      agent_id:
+        description: "Frozen shared watcher agent id"
+        required: true
+        type: string
+      current_version:
+        description: "Current validated codex version from registry truth"
+        required: true
+        type: string
+      latest_stable:
+        description: "Latest stable upstream release observed by maintenance-watch"
+        required: true
+        type: string
+      target_version:
+        description: "Worker target version from shared watcher queue"
+        required: true
+        type: string
+      opened_from:
+        description: "Repo-relative workflow path that opens this maintenance lane"
+        required: true
+        type: string
+      detected_by:
+        description: "Repo-relative shared watcher workflow path"
+        required: true
+        type: string
+      dispatch_kind:
+        description: "Frozen shared dispatch kind"
+        required: true
+        type: string
+      branch_name:
+        description: "Frozen automation branch name for the maintenance PR"
         required: true
         type: string
       update_min_supported:
@@ -14,7 +42,8 @@ on:
         type: boolean
 
 permissions:
-  contents: read
+  contents: write
+  pull-requests: write
 
 jobs:
   # IMPORTANT: This workflow always checks out and builds from the `staging` branch so that
@@ -48,7 +77,7 @@ jobs:
         id: upstream
         shell: bash
         env:
-          VERSION: ${{ inputs.version }}
+          VERSION: ${{ inputs.target_version }}
         run: |
           set -euo pipefail
           TAG="rust-v${VERSION}"
@@ -96,7 +125,7 @@ jobs:
       - name: Download artifacts + update lockfile
         shell: bash
         env:
-          VERSION: ${{ inputs.version }}
+          VERSION: ${{ inputs.target_version }}
           TAG: ${{ steps.upstream.outputs.tag }}
         run: |
           set -euo pipefail
@@ -147,7 +176,7 @@ jobs:
       - name: Upload pins + downloads
         uses: actions/upload-artifact@v6
         with:
-          name: "codex-cli-pins-${{ inputs.version }}"
+          name: "codex-cli-pins-${{ inputs.target_version }}"
           if-no-files-found: error
           path: |
             cli_manifests/codex/artifacts.lock.json
@@ -173,13 +202,13 @@ jobs:
       - name: Download pins + downloads
         uses: actions/download-artifact@v7
         with:
-          name: "codex-cli-pins-${{ inputs.version }}"
+          name: "codex-cli-pins-${{ inputs.target_version }}"
           path: .
 
       - name: Acquire pinned Codex CLI
         shell: bash
         env:
-          VERSION: ${{ inputs.version }}
+          VERSION: ${{ inputs.target_version }}
           TARGET: ${{ matrix.target_triple }}
           ASSET: ${{ matrix.asset_name }}
           BIN: ${{ matrix.binary_path }}
@@ -215,7 +244,7 @@ jobs:
       - name: Generate per-target snapshot (+ raw help)
         shell: bash
         env:
-          VERSION: ${{ inputs.version }}
+          VERSION: ${{ inputs.target_version }}
           TARGET: ${{ matrix.target_triple }}
           BIN: ${{ matrix.binary_path }}
           SOURCE_DATE_EPOCH: ${{ needs.prepare.outputs.source_date_epoch }}
@@ -233,18 +262,18 @@ jobs:
       - name: Upload snapshot JSON
         uses: actions/upload-artifact@v6
         with:
-          name: "codex-cli-snapshot-${{ inputs.version }}-${{ matrix.target_triple }}"
+          name: "codex-cli-snapshot-${{ inputs.target_version }}-${{ matrix.target_triple }}"
           if-no-files-found: error
           path: |
-            cli_manifests/codex/snapshots/${{ inputs.version }}/${{ matrix.target_triple }}.json
+            cli_manifests/codex/snapshots/${{ inputs.target_version }}/${{ matrix.target_triple }}.json
 
       - name: Upload raw help capture (not committed)
         uses: actions/upload-artifact@v6
         with:
-          name: "codex-cli-raw-help-${{ inputs.version }}-${{ matrix.target_triple }}"
+          name: "codex-cli-raw-help-${{ inputs.target_version }}-${{ matrix.target_triple }}"
           if-no-files-found: error
           path: |
-            cli_manifests/codex/raw_help/${{ inputs.version }}/${{ matrix.target_triple }}/
+            cli_manifests/codex/raw_help/${{ inputs.target_version }}/${{ matrix.target_triple }}/
 
   union-report-validate:
     name: Union → Report → Validate (Linux)
@@ -259,34 +288,34 @@ jobs:
       - name: Download pins + downloads
         uses: actions/download-artifact@v7
         with:
-          name: "codex-cli-pins-${{ inputs.version }}"
+          name: "codex-cli-pins-${{ inputs.target_version }}"
           path: .
 
       - name: Download required Linux snapshot
         uses: actions/download-artifact@v7
         with:
-          name: "codex-cli-snapshot-${{ inputs.version }}-x86_64-unknown-linux-musl"
+          name: "codex-cli-snapshot-${{ inputs.target_version }}-x86_64-unknown-linux-musl"
           path: .
 
       - name: Download macOS snapshot (best effort)
         continue-on-error: true
         uses: actions/download-artifact@v7
         with:
-          name: "codex-cli-snapshot-${{ inputs.version }}-aarch64-apple-darwin"
+          name: "codex-cli-snapshot-${{ inputs.target_version }}-aarch64-apple-darwin"
           path: .
 
       - name: Download Windows snapshot (best effort)
         continue-on-error: true
         uses: actions/download-artifact@v7
         with:
-          name: "codex-cli-snapshot-${{ inputs.version }}-x86_64-pc-windows-msvc"
+          name: "codex-cli-snapshot-${{ inputs.target_version }}-x86_64-pc-windows-msvc"
           path: .
 
       - name: Ensure required snapshot exists
         id: ensure-linux-snapshot
         shell: bash
         env:
-          VERSION: ${{ inputs.version }}
+          VERSION: ${{ inputs.target_version }}
           SOURCE_DATE_EPOCH: ${{ needs.prepare.outputs.source_date_epoch }}
         run: |
           set -euo pipefail
@@ -336,7 +365,7 @@ jobs:
       - name: Merge union snapshot
         shell: bash
         env:
-          VERSION: ${{ inputs.version }}
+          VERSION: ${{ inputs.target_version }}
           SOURCE_DATE_EPOCH: ${{ needs.prepare.outputs.source_date_epoch }}
         run: |
           set -euo pipefail
@@ -355,7 +384,7 @@ jobs:
       - name: Generate coverage reports
         shell: bash
         env:
-          VERSION: ${{ inputs.version }}
+          VERSION: ${{ inputs.target_version }}
           SOURCE_DATE_EPOCH: ${{ needs.prepare.outputs.source_date_epoch }}
         run: |
           set -euo pipefail
@@ -364,7 +393,7 @@ jobs:
       - name: Generate version metadata (status=reported)
         shell: bash
         env:
-          VERSION: ${{ inputs.version }}
+          VERSION: ${{ inputs.target_version }}
           SOURCE_DATE_EPOCH: ${{ needs.prepare.outputs.source_date_epoch }}
         run: |
           set -euo pipefail
@@ -385,7 +414,7 @@ jobs:
       - name: Generate work queue summary (append to PR body)
         shell: bash
         env:
-          VERSION: ${{ inputs.version }}
+          VERSION: ${{ inputs.target_version }}
         run: |
           set -euo pipefail
           mkdir -p _ci_tmp
@@ -501,7 +530,7 @@ jobs:
       - name: Render PR body from template
         shell: bash
         env:
-          VERSION: ${{ inputs.version }}
+          VERSION: ${{ inputs.target_version }}
         run: |
           set -euo pipefail
           mkdir -p _ci_tmp
@@ -516,7 +545,7 @@ jobs:
       - name: Upload CI PR-body (debug)
         uses: actions/upload-artifact@v6
         with:
-          name: "codex-cli-pr-body-${{ inputs.version }}"
+          name: "codex-cli-pr-body-${{ inputs.target_version }}"
           if-no-files-found: error
           path: |
             _ci_tmp/codex_cli_pr_body.md
@@ -525,12 +554,12 @@ jobs:
       - name: Upload committed artifact bundle (PR fallback)
         uses: actions/upload-artifact@v6
         with:
-          name: "codex-cli-artifacts-${{ inputs.version }}"
+          name: "codex-cli-artifacts-${{ inputs.target_version }}"
           if-no-files-found: error
           path: |
-            cli_manifests/codex/snapshots/${{ inputs.version }}/
-            cli_manifests/codex/reports/${{ inputs.version }}/
-            cli_manifests/codex/versions/${{ inputs.version }}.json
+            cli_manifests/codex/snapshots/${{ inputs.target_version }}/
+            cli_manifests/codex/reports/${{ inputs.target_version }}/
+            cli_manifests/codex/versions/${{ inputs.target_version }}.json
             cli_manifests/codex/wrapper_coverage.json
             cli_manifests/codex/artifacts.lock.json
 
@@ -540,14 +569,32 @@ jobs:
           set -euo pipefail
           rm -rf _download _extract
 
+      - name: Prepare maintenance packet
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run -p xtask -- prepare-agent-maintenance \
+            --agent "${{ inputs.agent_id }}" \
+            --current-version "${{ inputs.current_version }}" \
+            --latest-stable "${{ inputs.latest_stable }}" \
+            --target-version "${{ inputs.target_version }}" \
+            --opened-from "${{ inputs.opened_from }}" \
+            --detected-by "${{ inputs.detected_by }}" \
+            --dispatch-kind "${{ inputs.dispatch_kind }}" \
+            --dispatch-workflow "codex-cli-update-snapshot.yml" \
+            --branch-name "${{ inputs.branch_name }}" \
+            --request-recorded-at "$(date -u +"%Y-%m-%dT%H:%M:%SZ")" \
+            --request-commit "${{ github.sha }}" \
+            --write
+
       - name: Create PR (best effort)
         continue-on-error: true
         uses: peter-evans/create-pull-request@v8
         with:
           token: ${{ secrets.AUTOMATION_TOKEN || github.token }}
           base: staging
-          commit-message: "chore: codex cli artifacts for ${{ inputs.version }}"
-          title: "chore: codex cli artifacts for ${{ inputs.version }}"
+          commit-message: "chore: codex cli artifacts for ${{ inputs.target_version }}"
+          title: "chore: codex cli artifacts for ${{ inputs.target_version }}"
           body-path: _ci_tmp/codex_cli_pr_body.md
-          branch: "automation/codex-cli-${{ inputs.version }}"
+          branch: "${{ inputs.branch_name }}"
           delete-branch: true
