@@ -1,4 +1,5 @@
 use std::{
+    fs,
     io::{self, Write},
     path::{Path, PathBuf},
 };
@@ -19,11 +20,12 @@ use crate::{
 };
 
 use super::{
-    docs::build_packet_docs,
+    docs::build_packet_docs_from_envelope,
     request::{
         self, validate_commit_value, validate_non_empty_scalar, validate_repo_relative_reference,
-        DetectedRelease, MaintenanceAction, MaintenanceRequest, RuntimeFollowupRequired,
-        TriggerKind, AUTOMATED_ARTIFACT_VERSION,
+        DetectedRelease, ExecutionContract, ExecutionContractRecovery, MaintenanceAction,
+        MaintenanceRequest, MaintenanceRequestEnvelope, RuntimeFollowupRequired, TriggerKind,
+        AUTOMATED_ARTIFACT_VERSION,
     },
 };
 
@@ -166,43 +168,58 @@ pub fn build_prepare_plan(workspace_root: &Path, args: &Args) -> Result<PrepareP
     validate_prepare_args(workspace_root, entry, args)?;
 
     let request_path = maintenance_request_path(&args.agent);
-    let request_bytes = render_request_toml(entry, release_watch, args).into_bytes();
+    let maintenance_root = format!("docs/agents/lifecycle/{}-maintenance", args.agent);
+    let basis_ref = format!("{}/latest_validated.txt", entry.manifest_root);
+    let detected_release = DetectedRelease {
+        detected_by: args.detected_by.clone(),
+        current_validated: args.current_version.clone(),
+        target_version: args.target_version.clone(),
+        latest_stable: args.latest_stable.clone(),
+        version_policy: "latest_stable_minus_one".to_string(),
+        source_kind: source_kind_str(release_watch.upstream.source_kind).to_string(),
+        source_ref: source_ref(release_watch),
+        dispatch_kind: args.dispatch_kind.clone(),
+        dispatch_workflow: dispatch_workflow_value(args),
+        branch_name: args.branch_name.clone(),
+    };
+    let execution_contract = build_execution_contract(
+        workspace_root,
+        entry,
+        args,
+        &request_path,
+        &maintenance_root,
+    )?;
+    let request_bytes =
+        render_request_toml(args, &basis_ref, &detected_release, &execution_contract).into_bytes();
     let request = MaintenanceRequest {
         relative_path: request_path.clone(),
         canonical_path: workspace_root.join(&request_path),
         sha256: hex::encode(Sha256::digest(&request_bytes)),
         maintenance_pack_prefix: format!("{}-maintenance", args.agent),
-        maintenance_root: format!("docs/agents/lifecycle/{}-maintenance", args.agent),
+        maintenance_root,
         agent_id: args.agent.clone(),
         trigger_kind: TriggerKind::UpstreamReleaseDetected,
-        basis_ref: format!("{}/latest_validated.txt", entry.manifest_root),
+        basis_ref,
         opened_from: args.opened_from.display().to_string(),
         requested_control_plane_actions: vec![MaintenanceAction::PacketDocRefresh],
         runtime_followup_required: RuntimeFollowupRequired {
             required: false,
             items: Vec::new(),
         },
-        detected_release: Some(DetectedRelease {
-            detected_by: args.detected_by.clone(),
-            current_validated: args.current_version.clone(),
-            target_version: args.target_version.clone(),
-            latest_stable: args.latest_stable.clone(),
-            version_policy: "latest_stable_minus_one".to_string(),
-            source_kind: source_kind_str(release_watch.upstream.source_kind).to_string(),
-            source_ref: source_ref(release_watch),
-            dispatch_kind: args.dispatch_kind.clone(),
-            dispatch_workflow: dispatch_workflow_value(args),
-            branch_name: args.branch_name.clone(),
-        }),
+        detected_release: Some(detected_release),
         request_recorded_at: args.request_recorded_at.clone(),
         request_commit: args.request_commit.clone(),
+    };
+    let envelope = MaintenanceRequestEnvelope {
+        request: request.clone(),
+        execution_contract: Some(execution_contract),
     };
 
     let mut files = vec![PreparedFile {
         relative_path: request.relative_path.clone(),
         contents: request_bytes,
     }];
-    for doc in build_packet_docs(workspace_root, &request)
+    for doc in build_packet_docs_from_envelope(workspace_root, &envelope)
         .map_err(|err| Error::Internal(format!("render maintenance packet docs: {err}")))?
     {
         files.push(PreparedFile {
@@ -299,55 +316,210 @@ fn validate_prepare_args(
 }
 
 fn render_request_toml(
-    entry: &AgentRegistryEntry,
-    release_watch: &ReleaseWatchMetadata,
     args: &Args,
+    basis_ref: &str,
+    detected_release: &DetectedRelease,
+    execution_contract: &ExecutionContract,
 ) -> String {
-    format!(
-        concat!(
-            "artifact_version = \"{artifact_version}\"\n",
-            "agent_id = \"{agent_id}\"\n",
-            "trigger_kind = \"upstream_release_detected\"\n",
-            "basis_ref = \"{basis_ref}\"\n",
-            "opened_from = \"{opened_from}\"\n",
-            "requested_control_plane_actions = [\n",
-            "  \"packet_doc_refresh\",\n",
-            "]\n",
-            "request_recorded_at = \"{request_recorded_at}\"\n",
-            "request_commit = \"{request_commit}\"\n",
-            "\n",
-            "[runtime_followup_required]\n",
-            "required = false\n",
-            "items = []\n",
-            "\n",
-            "[detected_release]\n",
-            "detected_by = \"{detected_by}\"\n",
-            "current_validated = \"{current_version}\"\n",
-            "target_version = \"{target_version}\"\n",
-            "latest_stable = \"{latest_stable}\"\n",
-            "version_policy = \"latest_stable_minus_one\"\n",
-            "source_kind = \"{source_kind}\"\n",
-            "source_ref = \"{source_ref}\"\n",
-            "dispatch_kind = \"{dispatch_kind}\"\n",
-            "dispatch_workflow = \"{dispatch_workflow}\"\n",
-            "branch_name = \"{branch_name}\"\n"
+    let mut out = String::new();
+    push_toml_line(&mut out, "artifact_version", AUTOMATED_ARTIFACT_VERSION);
+    push_toml_line(&mut out, "agent_id", &args.agent);
+    push_toml_line(&mut out, "trigger_kind", "upstream_release_detected");
+    push_toml_line(&mut out, "basis_ref", basis_ref);
+    push_toml_line(
+        &mut out,
+        "opened_from",
+        &args.opened_from.display().to_string(),
+    );
+    push_toml_array(
+        &mut out,
+        "requested_control_plane_actions",
+        &["packet_doc_refresh".to_string()],
+    );
+    push_toml_line(&mut out, "request_recorded_at", &args.request_recorded_at);
+    push_toml_line(&mut out, "request_commit", &args.request_commit);
+    out.push('\n');
+
+    out.push_str("[runtime_followup_required]\n");
+    out.push_str("required = false\n");
+    out.push_str("items = []\n\n");
+
+    out.push_str("[detected_release]\n");
+    push_toml_line(&mut out, "detected_by", &detected_release.detected_by);
+    push_toml_line(
+        &mut out,
+        "current_validated",
+        &detected_release.current_validated,
+    );
+    push_toml_line(&mut out, "target_version", &detected_release.target_version);
+    push_toml_line(&mut out, "latest_stable", &detected_release.latest_stable);
+    push_toml_line(&mut out, "version_policy", &detected_release.version_policy);
+    push_toml_line(&mut out, "source_kind", &detected_release.source_kind);
+    push_toml_line(&mut out, "source_ref", &detected_release.source_ref);
+    push_toml_line(&mut out, "dispatch_kind", &detected_release.dispatch_kind);
+    push_toml_line(
+        &mut out,
+        "dispatch_workflow",
+        &detected_release.dispatch_workflow,
+    );
+    push_toml_line(&mut out, "branch_name", &detected_release.branch_name);
+    out.push('\n');
+
+    out.push_str("[execution_contract]\n");
+    push_toml_line(&mut out, "executor", &execution_contract.executor);
+    push_toml_line(
+        &mut out,
+        "prompt_template_path",
+        &execution_contract.prompt_template_path,
+    );
+    push_toml_line(&mut out, "prompt_sha256", &execution_contract.prompt_sha256);
+    push_toml_line(
+        &mut out,
+        "pr_summary_path",
+        &execution_contract.pr_summary_path,
+    );
+    push_toml_line(&mut out, "closeout_path", &execution_contract.closeout_path);
+    out.push_str("requires_manual_closeout = true\n");
+    push_toml_array(
+        &mut out,
+        "writable_surfaces",
+        &execution_contract.writable_surfaces,
+    );
+    push_toml_array(
+        &mut out,
+        "read_only_inputs",
+        &execution_contract.read_only_inputs,
+    );
+    push_toml_array(
+        &mut out,
+        "ordered_commands",
+        &execution_contract.ordered_commands,
+    );
+    push_toml_array(&mut out, "green_gates", &execution_contract.green_gates);
+    out.push('\n');
+
+    out.push_str("[execution_contract.recovery]\n");
+    push_toml_line(
+        &mut out,
+        "recreate_packet_command",
+        &execution_contract.recovery.recreate_packet_command,
+    );
+    push_toml_line(
+        &mut out,
+        "reopen_pr_body_path",
+        &execution_contract.recovery.reopen_pr_body_path,
+    );
+    push_toml_line(
+        &mut out,
+        "reopen_pr_branch",
+        &execution_contract.recovery.reopen_pr_branch,
+    );
+    push_toml_array(&mut out, "notes", &execution_contract.recovery.notes);
+    out
+}
+
+fn build_execution_contract(
+    workspace_root: &Path,
+    entry: &AgentRegistryEntry,
+    args: &Args,
+    request_path: &str,
+    maintenance_root: &str,
+) -> Result<ExecutionContract, Error> {
+    let prompt_template_path = format!("{}/PR_BODY_TEMPLATE.md", entry.manifest_root);
+    let prompt_contents =
+        render_execution_prompt(workspace_root, &prompt_template_path, &args.target_version)?;
+    let pr_summary_path = format!("{maintenance_root}/governance/pr-summary.md");
+    let closeout_path = format!("{maintenance_root}/governance/maintenance-closeout.json");
+    let green_gates = execution_green_gates(entry);
+
+    Ok(ExecutionContract {
+        executor: "codex".to_string(),
+        prompt_template_path,
+        prompt_sha256: hex::encode(Sha256::digest(prompt_contents.as_bytes())),
+        pr_summary_path: pr_summary_path.clone(),
+        closeout_path,
+        requires_manual_closeout: true,
+        writable_surfaces: vec![
+            format!("{maintenance_root}/**"),
+            format!("{}/**", entry.crate_path),
+            "crates/agent_api/**".to_string(),
+            format!("{}/artifacts.lock.json", entry.manifest_root),
+            format!(
+                "{}/snapshots/{}/**",
+                entry.manifest_root, args.target_version
+            ),
+            format!("{}/reports/{}/**", entry.manifest_root, args.target_version),
+            format!(
+                "{}/versions/{}.json",
+                entry.manifest_root, args.target_version
+            ),
+            format!("{}/wrapper_coverage.json", entry.manifest_root),
+        ],
+        read_only_inputs: vec![
+            format!("{}/OPS_PLAYBOOK.md", entry.manifest_root),
+            format!("{}/CI_WORKFLOWS_PLAN.md", entry.manifest_root),
+            format!("{}/PR_BODY_TEMPLATE.md", entry.manifest_root),
+            args.opened_from.display().to_string(),
+        ],
+        ordered_commands: green_gates.clone(),
+        green_gates,
+        recovery: ExecutionContractRecovery {
+            recreate_packet_command: format!(
+                "cargo run -p xtask -- prepare-agent-maintenance --request {request_path} --write"
+            ),
+            reopen_pr_body_path: pr_summary_path,
+            reopen_pr_branch: args.branch_name.clone(),
+            notes: vec![
+                "If PR creation fails after packet generation, rerun packet creation and reopen the PR from the generated pr-summary path.".to_string(),
+                "If local Codex preflight fails, fix binary/auth and rerun execute-agent-maintenance --dry-run before write mode.".to_string(),
+            ],
+        },
+    })
+}
+
+fn render_execution_prompt(
+    workspace_root: &Path,
+    prompt_template_path: &str,
+    target_version: &str,
+) -> Result<String, Error> {
+    let template =
+        fs::read_to_string(workspace_root.join(prompt_template_path)).map_err(|err| {
+            Error::Internal(format!(
+                "read execution contract prompt template `{prompt_template_path}`: {err}"
+            ))
+        })?;
+    Ok(template.replace("{{VERSION}}", target_version))
+}
+
+fn execution_green_gates(entry: &AgentRegistryEntry) -> Vec<String> {
+    vec![
+        format!(
+            "cargo run -p xtask -- codex-validate --root {}",
+            entry.manifest_root
         ),
-        artifact_version = AUTOMATED_ARTIFACT_VERSION,
-        agent_id = args.agent,
-        basis_ref = format!("{}/latest_validated.txt", entry.manifest_root),
-        opened_from = args.opened_from.display(),
-        request_recorded_at = args.request_recorded_at,
-        request_commit = args.request_commit,
-        detected_by = args.detected_by,
-        current_version = args.current_version,
-        target_version = args.target_version,
-        latest_stable = args.latest_stable,
-        source_kind = source_kind_str(release_watch.upstream.source_kind),
-        source_ref = source_ref(release_watch),
-        dispatch_kind = args.dispatch_kind,
-        dispatch_workflow = dispatch_workflow_value(args),
-        branch_name = args.branch_name,
-    )
+        "cargo run -p xtask -- support-matrix --check".to_string(),
+        "cargo run -p xtask -- capability-matrix --check".to_string(),
+        "cargo run -p xtask -- capability-matrix-audit".to_string(),
+        "make preflight".to_string(),
+    ]
+}
+
+fn push_toml_line(out: &mut String, key: &str, value: &str) {
+    out.push_str(key);
+    out.push_str(" = \"");
+    out.push_str(value);
+    out.push_str("\"\n");
+}
+
+fn push_toml_array(out: &mut String, key: &str, values: &[String]) {
+    out.push_str(key);
+    out.push_str(" = [\n");
+    for value in values {
+        out.push_str("  \"");
+        out.push_str(value);
+        out.push_str("\",\n");
+    }
+    out.push_str("]\n");
 }
 
 fn dispatch_workflow_value(args: &Args) -> String {
