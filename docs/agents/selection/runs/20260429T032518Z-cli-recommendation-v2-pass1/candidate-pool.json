@@ -1,0 +1,29 @@
+{
+  "candidates": [
+    {
+      "agent_id": "openhands",
+      "error_reasons": [],
+      "recommended": true,
+      "rejection_reasons": [],
+      "shortlisted": true,
+      "status": "eligible"
+    },
+    {
+      "agent_id": "aider",
+      "error_reasons": [],
+      "recommended": false,
+      "rejection_reasons": [],
+      "shortlisted": true,
+      "status": "eligible"
+    },
+    {
+      "agent_id": "goose",
+      "error_reasons": [],
+      "recommended": false,
+      "rejection_reasons": [],
+      "shortlisted": true,
+      "status": "eligible"
+    }
+  ],
+  "run_id": "20260429T032518Z-cli-recommendation-v2-pass1"
+}

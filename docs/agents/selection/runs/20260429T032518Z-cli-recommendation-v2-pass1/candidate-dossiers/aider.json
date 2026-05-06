@@ -1,0 +1,118 @@
+{
+  "schema_version": "v1",
+  "agent_id": "aider",
+  "display_name": "aider",
+  "generated_at": "2026-04-28T15:31:24Z",
+  "seed_snapshot_sha256": "d8d4c3d27236efa00b378c569bd0fbbeaec1f73eb76524df9a6438f24ee098ec",
+  "official_links": [
+    "https://aider.chat/",
+    "https://pypi.org/project/aider-chat/"
+  ],
+  "install_channels": [
+    "python -m pip install aider-install",
+    "python -m pip install aider-chat"
+  ],
+  "auth_prerequisites": [
+    "Model or provider credentials are required for realistic end-to-end coding sessions."
+  ],
+  "claims": {
+    "non_interactive_execution": {
+      "state": "verified",
+      "summary": "Public docs and the published PyPI package show a documented CLI install and execution surface.",
+      "evidence_ids": [
+        "aider-doc",
+        "aider-pkg"
+      ],
+      "notes": "The terminal entrypoint is publicly documented and packaged."
+    },
+    "offline_strategy": {
+      "state": "inferred",
+      "summary": "Wrapper-level tests can rely on fixture capture or a fake aider binary before any live provider session.",
+      "evidence_ids": [
+        "aider-doc",
+        "aider-repo"
+      ],
+      "notes": "The recommendation lane only needs deterministic parser and wrapper proof."
+    },
+    "observable_cli_surface": {
+      "state": "verified",
+      "summary": "The docs and repo describe a terminal-facing tool with observable CLI behavior.",
+      "evidence_ids": [
+        "aider-doc",
+        "aider-repo"
+      ],
+      "notes": "Observable CLI surface is documented publicly."
+    },
+    "redaction_fit": {
+      "state": "inferred",
+      "summary": "CLI stdout and stderr are text streams that can be sanitized before persistence.",
+      "evidence_ids": [
+        "aider-repo"
+      ],
+      "notes": "Redaction fit is a repo-local inference from terminal-oriented IO."
+    },
+    "crate_first_fit": {
+      "state": "inferred",
+      "summary": "Aider ships as an external installable CLI, which aligns with wrapper-crate-first onboarding.",
+      "evidence_ids": [
+        "aider-doc",
+        "aider-pkg"
+      ],
+      "notes": "The wrapper can own process invocation before any deeper adapter work."
+    },
+    "reproducibility": {
+      "state": "inferred",
+      "summary": "Public install docs and PyPI distribution make local setup repeatable before provider auth is added.",
+      "evidence_ids": [
+        "aider-doc",
+        "aider-pkg"
+      ],
+      "notes": "Repeatable local setup is public, while provider sessions remain gated later."
+    },
+    "future_leverage": {
+      "state": "inferred",
+      "summary": "Aider\u2019s adoption and active packaging make it a strong candidate for future repo leverage.",
+      "evidence_ids": [
+        "aider-repo",
+        "aider-pkg"
+      ],
+      "notes": "Upstream adoption is strong enough to treat aider as a serious finalist."
+    }
+  },
+  "probe_requests": [],
+  "blocked_steps": [
+    "Provider-backed coding sessions still need maintainer credentials after local CLI install."
+  ],
+  "normalized_caveats": [
+    "Public docs cover local install now; provider-backed coding behavior should be proven in onboarding."
+  ],
+  "evidence": [
+    {
+      "evidence_id": "aider-doc",
+      "kind": "official_doc",
+      "url": "https://aider.chat/",
+      "title": "Aider - AI Pair Programming in Your Terminal",
+      "captured_at": "2026-04-28T15:31:24Z",
+      "excerpt": "Aider docs say \"AI pair programming in your terminal\" and present public getting-started, documentation, and install-oriented surfaces.",
+      "sha256": "74c0259ff0502933194d175a9abe9ac02defffd2b0a4b9b4793e62052b8dc8f1"
+    },
+    {
+      "evidence_id": "aider-repo",
+      "kind": "github",
+      "url": "https://github.com/Aider-AI/aider",
+      "title": "Aider-AI/aider",
+      "captured_at": "2026-04-28T15:31:24Z",
+      "excerpt": "GitHub describes aider as \"aider is AI pair programming in your terminal.\" Repo has 44063 stars and was pushed 2026-04-25T16:44:33Z.",
+      "sha256": "d3c1f2315db25c1c50a36bd3242922efc1b14a5a29a9f7467196faf69a4b1f7a"
+    },
+    {
+      "evidence_id": "aider-pkg",
+      "kind": "package_registry",
+      "url": "https://pypi.org/project/aider-chat/",
+      "title": "aider-chat PyPI package",
+      "captured_at": "2026-04-28T15:31:24Z",
+      "excerpt": "PyPI lists aider-chat 0.86.2 uploaded 2026-02-12T00:42:52.678771Z with summary \"Aider is AI pair programming in your terminal.\"",
+      "sha256": "f7f19af487666c70645d7fb39711319311cc4bfbbe7edb7119a970d74d7124f0"
+    }
+  ]
+}

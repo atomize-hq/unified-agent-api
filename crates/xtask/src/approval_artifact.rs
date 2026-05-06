@@ -7,9 +7,11 @@ use sha2::{Digest, Sha256};
 use time::{format_description::well_known::Rfc3339, OffsetDateTime};
 use toml_edit::{DocumentMut, TableLike};
 
-const DOCS_NEXT_ROOT: &str = "docs/project_management/next";
+const DOCS_NEXT_ROOT: &str = "docs/agents/lifecycle";
+const STAGING_DIR_NAME: &str = ".staging";
 const APPROVAL_FILE_NAME: &str = "approved-agent.toml";
 const GOVERNANCE_DIR_NAME: &str = "governance";
+const COMPARISON_REF_PATH: &str = "docs/agents/selection/cli-agent-selection-packet.md";
 const FACTORY_VALIDATION_MODE: &str = "factory_validation";
 const FRONTIER_EXPANSION_MODE: &str = "frontier_expansion";
 const APPROVAL_ARTIFACT_VERSION: &str = "1";
@@ -39,6 +41,7 @@ pub struct ApprovalDescriptor {
     pub backend_extensions: Vec<String>,
     pub support_matrix_enabled: bool,
     pub capability_matrix_enabled: bool,
+    pub capability_matrix_target: Option<String>,
     pub docs_release_track: String,
     pub onboarding_pack_prefix: String,
 }
@@ -61,8 +64,31 @@ pub fn load_approval_artifact(
     workspace_root: &Path,
     approval_path: &str,
 ) -> Result<ApprovalArtifact, ApprovalArtifactError> {
+    load_approval_artifact_with_options(workspace_root, approval_path, false)
+}
+
+pub fn load_approval_artifact_for_validation(
+    workspace_root: &Path,
+    approval_path: &str,
+) -> Result<ApprovalArtifact, ApprovalArtifactError> {
+    load_approval_artifact_with_options(workspace_root, approval_path, true)
+}
+
+pub fn is_staged_approval_path(approval_path: &str) -> bool {
+    let relative_path = Path::new(approval_path);
+    matches!(
+        parse_approval_path(relative_path, true),
+        Ok(ApprovalPath { staged: true, .. })
+    )
+}
+
+fn load_approval_artifact_with_options(
+    workspace_root: &Path,
+    approval_path: &str,
+    allow_staged_paths: bool,
+) -> Result<ApprovalArtifact, ApprovalArtifactError> {
     let relative_path = PathBuf::from(approval_path);
-    let path_pack_prefix = validate_approval_path(&relative_path)?;
+    let path_pack_prefix = validate_approval_path(&relative_path, allow_staged_paths)?;
 
     let workspace_root = fs::canonicalize(workspace_root).map_err(|err| {
         ApprovalArtifactError::Internal(format!("canonicalize {}: {err}", workspace_root.display()))
@@ -110,6 +136,12 @@ pub fn load_approval_artifact(
     )
 }
 
+#[derive(Debug, Clone)]
+struct ApprovalPath {
+    pack_prefix: String,
+    staged: bool,
+}
+
 fn parse_approval_document(
     document: DocumentMut,
     workspace_root: &Path,
@@ -128,6 +160,12 @@ fn parse_approval_document(
     let artifact_version = required_string(root, "artifact_version", relative_path)?;
     validate_artifact_version(relative_path, &artifact_version)?;
     let comparison_ref = required_string(root, "comparison_ref", relative_path)?;
+    if comparison_ref != COMPARISON_REF_PATH {
+        return Err(ApprovalArtifactError::Validation(format!(
+            "approval artifact `{}` field `comparison_ref` must equal `{COMPARISON_REF_PATH}`",
+            relative_path.display()
+        )));
+    }
     validate_repo_relative_existing_file(
         workspace_root,
         relative_path,
@@ -237,48 +275,97 @@ fn parse_approval_document(
                 "capability_matrix_enabled",
                 relative_path,
             )?,
+            capability_matrix_target: optional_string(
+                descriptor,
+                "capability_matrix_target",
+                relative_path,
+            )?,
             docs_release_track: required_string(descriptor, "docs_release_track", relative_path)?,
             onboarding_pack_prefix,
         },
     })
 }
 
-fn validate_approval_path(relative_path: &Path) -> Result<String, ApprovalArtifactError> {
+fn validate_approval_path(
+    relative_path: &Path,
+    allow_staged_paths: bool,
+) -> Result<String, ApprovalArtifactError> {
+    parse_approval_path(relative_path, allow_staged_paths).map(|path| path.pack_prefix)
+}
+
+fn parse_approval_path(
+    relative_path: &Path,
+    allow_staged_paths: bool,
+) -> Result<ApprovalPath, ApprovalArtifactError> {
     let components = relative_path.components().collect::<Vec<_>>();
     if components.is_empty()
         || components
             .iter()
             .any(|component| !matches!(component, Component::Normal(_)))
     {
-        return Err(invalid_approval_path(relative_path));
+        return Err(invalid_approval_path(relative_path, allow_staged_paths));
     }
 
     let rooted = relative_path
         .strip_prefix(DOCS_NEXT_ROOT)
-        .map_err(|_| invalid_approval_path(relative_path))?;
+        .map_err(|_| invalid_approval_path(relative_path, allow_staged_paths))?;
     let rooted_components = rooted.components().collect::<Vec<_>>();
-    if rooted_components.len() != 3
-        || !matches!(
+    if rooted_components.len() == 3
+        && matches!(
             rooted_components[1],
             Component::Normal(part) if part == GOVERNANCE_DIR_NAME
         )
-        || !matches!(
+        && matches!(
             rooted_components[2],
             Component::Normal(part) if part == APPROVAL_FILE_NAME
         )
     {
-        return Err(invalid_approval_path(relative_path));
+        let Component::Normal(prefix) = rooted_components[0] else {
+            return Err(invalid_approval_path(relative_path, allow_staged_paths));
+        };
+        return Ok(ApprovalPath {
+            pack_prefix: prefix.to_string_lossy().into_owned(),
+            staged: false,
+        });
     }
 
-    let Component::Normal(prefix) = rooted_components[0] else {
-        return Err(invalid_approval_path(relative_path));
-    };
-    Ok(prefix.to_string_lossy().into_owned())
+    if allow_staged_paths
+        && rooted_components.len() == 5
+        && matches!(
+            rooted_components[0],
+            Component::Normal(part) if part == STAGING_DIR_NAME
+        )
+        && matches!(
+            rooted_components[3],
+            Component::Normal(part) if part == GOVERNANCE_DIR_NAME
+        )
+        && matches!(
+            rooted_components[4],
+            Component::Normal(part) if part == APPROVAL_FILE_NAME
+        )
+    {
+        let Component::Normal(prefix) = rooted_components[2] else {
+            return Err(invalid_approval_path(relative_path, allow_staged_paths));
+        };
+        return Ok(ApprovalPath {
+            pack_prefix: prefix.to_string_lossy().into_owned(),
+            staged: true,
+        });
+    }
+
+    Err(invalid_approval_path(relative_path, allow_staged_paths))
 }
 
-fn invalid_approval_path(relative_path: &Path) -> ApprovalArtifactError {
+fn invalid_approval_path(relative_path: &Path, allow_staged_paths: bool) -> ApprovalArtifactError {
+    let expected = if allow_staged_paths {
+        format!(
+            "`{DOCS_NEXT_ROOT}/<prefix>/{GOVERNANCE_DIR_NAME}/{APPROVAL_FILE_NAME}` or `{DOCS_NEXT_ROOT}/{STAGING_DIR_NAME}/<run_id>/<prefix>/{GOVERNANCE_DIR_NAME}/{APPROVAL_FILE_NAME}`"
+        )
+    } else {
+        format!("`{DOCS_NEXT_ROOT}/<prefix>/{GOVERNANCE_DIR_NAME}/{APPROVAL_FILE_NAME}`")
+    };
     ApprovalArtifactError::Validation(format!(
-        "approval path `{}` must be repo-relative and match `{DOCS_NEXT_ROOT}/<prefix>/{GOVERNANCE_DIR_NAME}/{APPROVAL_FILE_NAME}`",
+        "approval path `{}` must be repo-relative and match {expected}",
         relative_path.display()
     ))
 }

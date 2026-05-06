@@ -21,6 +21,7 @@ maintenance governance metadata consumed by `check-agent-drift`.
 - publication flags and release track enrollment
 - onboarding packet ownership
 - maintenance governance checks for already-onboarded agents
+- maintenance release-watch enrollment and upstream-watch metadata
 
 Generated docs and maintenance packets MAY reference this registry, but they MUST NOT redefine its
 schema.
@@ -30,12 +31,93 @@ schema.
 Each `[[agents]]` entry MUST continue to declare the existing identity, capability, publication,
 release, and scaffold fields enforced by `xtask`.
 
+Downstream `xtask` commands that materialize wrapper-crate files MUST use the entry's `crate_path`
+directly. They MUST NOT derive a second crate-location contract from `agent_id`.
+
+When wrapper scaffolding derives the crate-local Rust `[lib].name`, it MUST use the final
+`crate_path` path component as the source basename, normalize `-` to `_`, and then require the
+normalized result to match ASCII `[A-Za-z0-9_]+`. Hyphenated crate directories are therefore
+valid location contracts, but basenames containing other punctuation, whitespace, or non-ASCII
+characters are invalid for scaffoldable registry entries.
+
+If capability publication is enabled for an agent, the registry publication block is also the
+canonical source of the target-scoped publication contract. In particular:
+
+- `publication.capability_matrix_target` MAY be omitted when the agent does not require a
+  target-scoped capability publication declaration.
+- `publication.capability_matrix_target` MUST be present when
+  `publication.capability_matrix_enabled = true` and publication truth depends on a specific
+  declared target.
+- when present, `publication.capability_matrix_target` MUST equal one entry from
+  `canonical_targets`
+- target ordering in `canonical_targets` MUST NOT be treated as an implicit publication-selection
+  contract
+
+Registry-controlled publication truth for capability advertising MUST be derived from the shared
+projection contract reused by publication generation and maintenance drift/closeout checks; callers
+MUST NOT restate config-gated capability semantics independently.
+
 If maintenance governance auditing is configured for an agent, it MUST live under:
 
 ```toml
 [agents.maintenance]
 [[agents.maintenance.governance_checks]]
 ```
+
+If maintenance release-watch enrollment is configured for an agent, it MUST live under:
+
+```toml
+[agents.maintenance.release_watch]
+[agents.maintenance.release_watch.upstream]
+```
+
+Absence of `maintenance.release_watch` is the only “not enrolled” state. Callers MUST NOT create a
+second enrollment inventory outside the registry or represent unenrolled agents with
+`enabled = false` placeholders.
+
+## Maintenance release watch
+
+`maintenance.release_watch` declares the machine-owned watch metadata for upstream release
+detection. The schema is:
+
+```toml
+[agents.maintenance.release_watch]
+enabled = true
+version_policy = "latest_stable_minus_one"
+dispatch_kind = "workflow_dispatch" # or "packet_pr"
+dispatch_workflow = "example.yml"    # required only for workflow_dispatch
+
+[agents.maintenance.release_watch.upstream]
+source_kind = "github_releases"      # or "gcs_object_listing"
+```
+
+Required top-level fields:
+
+- `enabled`: boolean. When the block is present, it MUST be `true`.
+- `version_policy`: currently `latest_stable_minus_one`
+- `dispatch_kind`: one of `workflow_dispatch` or `packet_pr`
+
+Dispatch rules:
+
+- `dispatch_workflow` MUST be present only when `dispatch_kind = "workflow_dispatch"`.
+- `dispatch_workflow` MUST be omitted when `dispatch_kind = "packet_pr"`.
+- `dispatch_workflow`, when present, MUST be a non-empty workflow filename.
+
+Upstream rules:
+
+- `source_kind = "github_releases"` requires:
+  - `owner`
+  - `repo`
+  - `tag_prefix`
+- `source_kind = "gcs_object_listing"` requires:
+  - `bucket`
+  - `prefix`
+  - `version_marker`
+- Source-specific fields from the non-selected source kind MUST NOT be present.
+
+Current milestone-1 seeded registry truth enables release-watch metadata only for `codex` and
+`claude_code`. That rollout limit lives in the committed registry content, not as a permanent
+schema-level allowlist for future agents.
 
 ## Maintenance governance checks
 
@@ -57,14 +139,19 @@ Additional rules:
 
 ### `approved_agent_descriptor`
 
-Use this comparison kind only for historical approval artifacts under:
+Use this comparison kind only for approval artifacts under:
 
-`docs/project_management/next/<onboarding_pack_prefix>/governance/approved-agent.toml`
+`docs/agents/lifecycle/<onboarding_pack_prefix>/governance/approved-agent.toml`
 
 Rules:
 
 - `path` MUST match the agent entry’s `scaffold.onboarding_pack_prefix`
 - no markdown parser config may be present
+- approval and governance comparison MAY omit `capability_matrix_target`; when absent, governance
+  comparison MUST treat the field as not asserted rather than as a mismatch
+- onboarding approval-mode MUST remain backward-compatible with legacy single-target descriptors,
+  while newly generated descriptors MUST include `capability_matrix_target` whenever the registry
+  contract requires it
 
 ### `markdown_capability_claim`
 

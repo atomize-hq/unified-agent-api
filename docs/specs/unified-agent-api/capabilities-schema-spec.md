@@ -77,20 +77,32 @@ The repository capability matrix is a generated artifact:
 
 - Location: `docs/specs/unified-agent-api/capability-matrix.md`
 - Generator: `cargo run -p xtask -- capability-matrix`
+- Freshness check contract: `cargo run -p xtask -- capability-matrix --check`
+- Semantic companion gate: `cargo run -p xtask -- capability-matrix-audit`
 
 Semantics (pinned):
 
-- The matrix lists only capability ids advertised by at least one built-in backend at generation time (it is a union of
-  `AgentWrapperBackend::capabilities().ids` across built-in backends).
-- Generation is evaluated against the repository's canonical built-in target profile, not the host OS running the
+- The matrix is derived from lifecycle-backed publication truth, not from a built-in backend constructor inventory.
+- Only lifecycle-eligible agents participate in publication truth. In v1, eligibility requires lifecycle stage
+  `runtime_integrated`, `publication_ready`, `published`, or `closed_baseline`.
+- The canonical committed create-mode publication path is `publication_ready -> published -> closed_baseline`.
+- In that path, `publication_ready` is the pre-refresh handoff stage only, `published` is committed only after `refresh-publication --write` succeeds, and `closed_baseline` is the post-closeout steady state.
+- While lifecycle stage remains `published`, the required post-publication handoff is `refresh-publication -> prepare-proving-run-closeout -> bounded human edits -> close-proving-run`.
+- During that `published` interval, the canonical closeout artifact remains `docs/agents/lifecycle/<prefix>/governance/proving-run-closeout.json`, its states are exactly `prepared` and `closed`, and prepared preview surfaces must not present the run as closed.
+- Any remaining use of `publication_ready` as a publication-eligible compatibility branch is narrow and transitional, not a second steady-state meaning of published truth.
+- Before an agent's advertised capability set is accepted into publication truth, generation validates approval/registry
+  continuity, lifecycle/approval continuity, and manifest target continuity for that agent.
+- The matrix lists only capability ids published by at least one lifecycle-eligible agent at generation time.
+- Generation is evaluated against the repository's canonical publication target profile, not the host OS running the
   generator. In v1 that profile is:
   - `codex` -> `x86_64-unknown-linux-musl`
   - `claude_code` -> `linux-x64`
-  - `gemini_cli` -> default built-in backend config
-  - `opencode` -> default built-in backend config
+  - agents without an explicit publication target use their default lifecycle-backed target profile
+- The generated header MUST describe that same canonical publication target profile, including that agents without an
+  explicit target use their default lifecycle-backed target profile.
 - The matrix is **not** an exhaustive registry of standard `agent_api.*` capability ids.
-- If a standard capability id defined in this spec is absent from the matrix, that means no built-in backend currently
-  advertises it under the generator's default built-in configs for that canonical target profile (not that the id is invalid or removed).
+- If a standard capability id defined in this spec is absent from the matrix, that means no lifecycle-eligible agent
+  currently publishes it for its publication target profile (not that the id is invalid or removed).
 - Config-conditional standard capabilities may therefore be absent from the matrix when safe defaults leave them off; for
   example, `agent_api.tools.mcp.add.v1` / `agent_api.tools.mcp.remove.v1` may be absent because built-in backends default
   `allow_mcp_write` to `false`.
@@ -104,8 +116,13 @@ capability id is introduced or promoted:
 
 - This spec MUST be updated in the same change that introduces the capability.
 - The capability matrix MUST be regenerated, and reviewers SHOULD verify the id appears in both
-  this spec and the generated matrix (noting that config-conditional capabilities may be absent
-  from the matrix under default generator settings).
+  this spec and the generated matrix when at least one lifecycle-eligible agent publishes it for
+  its publication target profile (noting that config-conditional capabilities may be absent from
+  the matrix under default generator settings).
+- `cargo run -p xtask -- capability-matrix --check` is the authoritative freshness contract and
+  MUST fail without mutating the worktree when the generated artifact is stale.
+- `cargo run -p xtask -- capability-matrix-audit` is the required semantic companion gate and MUST
+  remain paired with the freshness check in local preflight and CI.
 
 ## Required minimum capabilities (v1, normative)
 

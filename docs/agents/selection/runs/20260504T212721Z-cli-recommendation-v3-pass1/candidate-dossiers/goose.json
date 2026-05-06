@@ -1,0 +1,138 @@
+{
+  "schema_version": "cli-agent-recommendation-dossier.v1",
+  "agent_id": "goose",
+  "display_name": "Goose",
+  "generated_at": "2026-05-04T21:37:24Z",
+  "seed_snapshot_sha256": "8702b1b91e0fe730a62f9fd5e3c0c10b5cce86c36433dcf65bb3ccf08ec5f1da",
+  "official_links": [
+    "https://goose-docs.ai/docs/getting-started/installation/",
+    "https://goose-docs.ai/docs/guides/running-tasks/",
+    "https://goose-docs.ai/docs/getting-started/providers/",
+    "https://github.com/aaif-goose/goose",
+    "https://pypi.org/project/goose-ai/"
+  ],
+  "install_channels": [
+    "curl -fsSL https://github.com/aaif-goose/goose/releases/download/stable/download_cli.sh | bash",
+    "brew install block-goose-cli",
+    "pipx install goose-ai"
+  ],
+  "auth_prerequisites": [
+    "Configure an LLM provider on first use with `goose configure` or the first-run wizard.",
+    "If keyring access is unavailable, provider credentials can be supplied through environment variables or config-backed secrets storage.",
+    "For local/offline operation, start a supported local provider such as Ollama or LM Studio before selecting it in `goose configure`."
+  ],
+  "claims": {
+    "non_interactive_execution": {
+      "state": "verified",
+      "summary": "Official docs describe `goose run` as a one-shot task runner that accepts inline text, instruction files, or stdin, exits automatically when complete, and can emit JSON for CI/CD automation.",
+      "evidence_ids": [
+        "goose-running-tasks",
+        "goose-pypi"
+      ]
+    },
+    "offline_strategy": {
+      "state": "verified",
+      "summary": "Official provider docs say Goose supports local providers, keeps data private with local LLMs, and can work entirely offline when paired with supported local model backends.",
+      "evidence_ids": [
+        "goose-providers"
+      ]
+    },
+    "observable_cli_surface": {
+      "state": "verified",
+      "summary": "Official docs expose debug output, JSON and stream-JSON modes, and no-session execution paths that make Goose observable enough for wrapper capture and automated evaluation.",
+      "evidence_ids": [
+        "goose-running-tasks"
+      ]
+    },
+    "redaction_fit": {
+      "state": "inferred",
+      "summary": "Goose separates provider credentials from prompt text through provider configuration, environment variables, and secret storage, and the open-source repo makes the CLI surface inspectable for wrapper-side redaction policies.",
+      "evidence_ids": [
+        "goose-providers",
+        "goose-github"
+      ],
+      "notes": "This is an inference from the documented config/auth surfaces rather than a repo-owned probe of emitted stderr/stdout."
+    },
+    "crate_first_fit": {
+      "state": "inferred",
+      "summary": "Goose has a standalone public CLI install surface, active GitHub releases, and stable task-oriented commands that look suitable for a crate-first wrapper lane.",
+      "evidence_ids": [
+        "goose-install",
+        "goose-github",
+        "goose-pypi"
+      ],
+      "notes": "The wrapper should prefer the shell installer or Homebrew over the archived PyPI package."
+    },
+    "reproducibility": {
+      "state": "verified",
+      "summary": "Official docs document non-interactive install (`CONFIGURE=false`) and a pinned-version CI/CD flow, which is enough to reproduce CLI installation independently of interactive first-run setup.",
+      "evidence_ids": [
+        "goose-install",
+        "goose-pypi"
+      ],
+      "notes": "The PyPI evidence is weaker than the active docs/GitHub release train because the package is archived."
+    },
+    "future_leverage": {
+      "state": "inferred",
+      "summary": "Goose appears to have leverage beyond a narrow chat wrapper because the project is open source, extensible, and explicitly documents local providers plus MCP/ACP-oriented surfaces.",
+      "evidence_ids": [
+        "goose-providers",
+        "goose-github"
+      ]
+    }
+  },
+  "probe_requests": [],
+  "blocked_steps": [],
+  "normalized_caveats": [
+    "The `goose-ai` PyPI package is archived at version `0.9.11` while the active CLI release train on GitHub/docs is much newer; prefer the documented shell installer or Homebrew for onboarding.",
+    "Provider configuration is still required before useful execution unless install/config is pre-seeded.",
+    "Local-model operation exists, but some models lack tool-calling and require reduced extension usage."
+  ],
+  "evidence": [
+    {
+      "evidence_id": "goose-install",
+      "kind": "official_doc",
+      "url": "https://goose-docs.ai/docs/getting-started/installation/",
+      "title": "Install goose | goose",
+      "captured_at": "2026-05-04T21:37:24Z",
+      "sha256": "e84733da403fcae1e17ed01b4bda9f3a336931cf30b9a2ef0d1f36aec2c52d52",
+      "excerpt": "Install docs show the shell installer, support `CONFIGURE=false` for non-interactive setup, and note that first use prompts for provider configuration."
+    },
+    {
+      "evidence_id": "goose-running-tasks",
+      "kind": "official_doc",
+      "url": "https://goose-docs.ai/docs/guides/running-tasks/",
+      "title": "Running Tasks | goose",
+      "captured_at": "2026-05-04T21:37:24Z",
+      "sha256": "d002ed8274bbf0f8f1150461a6d9478c9f9fb117eb210c59fafe408909439781",
+      "excerpt": "The `goose run` guide documents inline text, instruction files, stdin, `--no-session`, debug output, and `json` or `stream-json` output for automation."
+    },
+    {
+      "evidence_id": "goose-providers",
+      "kind": "official_doc",
+      "url": "https://goose-docs.ai/docs/getting-started/providers/",
+      "title": "Configure LLM Provider | goose",
+      "captured_at": "2026-05-04T21:37:24Z",
+      "sha256": "f7d01783c49ca399ff72f9ef2fca427a1c4dde0d58b7e6c4ef924bbb539db13e",
+      "excerpt": "Provider docs say local LLMs keep data private, can work entirely offline, and may use env vars, keychain, or `secrets.yaml` for credentials."
+    },
+    {
+      "evidence_id": "goose-github",
+      "kind": "github",
+      "url": "https://github.com/aaif-goose/goose",
+      "title": "GitHub - aaif-goose/goose",
+      "captured_at": "2026-05-04T21:37:24Z",
+      "sha256": "38447a5dc47dfa041850553e6c2ce38f1bb4b3373eef53d65a08baca8a379dd5",
+      "excerpt": "GitHub describes Goose as an open-source, extensible AI agent, lists Apache-2.0, and shows latest release `v1.33.1` on 2026-04-29."
+    },
+    {
+      "evidence_id": "goose-pypi",
+      "kind": "package_registry",
+      "url": "https://pypi.org/project/goose-ai/",
+      "title": "goose-ai · PyPI",
+      "captured_at": "2026-05-04T21:37:24Z",
+      "sha256": "32ed63159c77e21ee19ca1b9aa3213ccf0218eb59539560b132a8e68ef0e18ea",
+      "excerpt": "PyPI shows `goose-ai 0.9.11`, Python `>=3.10`, and explicitly marks the package archived with no new releases expected."
+    }
+  ]
+}

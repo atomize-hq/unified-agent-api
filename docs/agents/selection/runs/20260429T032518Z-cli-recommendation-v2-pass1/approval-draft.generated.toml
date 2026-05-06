@@ -1,0 +1,24 @@
+artifact_version = "1"
+comparison_ref = "docs/agents/selection/cli-agent-selection-packet.md"
+selection_mode = "factory_validation"
+recommended_agent_id = "openhands"
+approved_agent_id = "openhands"
+approval_commit = "0000000"
+approval_recorded_at = "2026-04-29T03:26:22Z"
+
+[descriptor]
+agent_id = "openhands"
+display_name = "OpenHands"
+crate_path = "crates/openhands"
+backend_module = "crates/agent_api/src/backends/openhands"
+manifest_root = "cli_manifests/openhands"
+package_name = "unified-agent-api-openhands"
+canonical_targets = ["darwin-arm64"]
+wrapper_coverage_binding_kind = "generated_from_wrapper_crate"
+wrapper_coverage_source_path = "crates/openhands"
+always_on_capabilities = ["agent_api.config.model.v1", "agent_api.events", "agent_api.events.live", "agent_api.run"]
+backend_extensions = []
+support_matrix_enabled = true
+capability_matrix_enabled = true
+docs_release_track = "crates-io"
+onboarding_pack_prefix = "openhands-onboarding"

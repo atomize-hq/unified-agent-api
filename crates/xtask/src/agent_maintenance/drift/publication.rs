@@ -100,13 +100,13 @@ pub(super) fn inspect_capability_publication(
             issues.push(err.clone());
             return Some(build_finding(
                 DriftCategory::CapabilityPublication,
-                "published capability inventory no longer matches modeled backend truth.",
+                "published capability inventory no longer matches shared publication truth.",
                 issues,
                 shared::build_surfaces(
                     workspace_root,
                     [
                         PathBuf::from(CAPABILITY_MATRIX_PATH),
-                        PathBuf::from(&entry.backend_module),
+                        PathBuf::from(&entry.manifest_root).join("current.json"),
                     ],
                 ),
             ));
@@ -123,13 +123,13 @@ pub(super) fn inspect_capability_publication(
             issues.push(err);
             return Some(build_finding(
                 DriftCategory::CapabilityPublication,
-                "published capability inventory no longer matches modeled backend truth.",
+                "published capability inventory no longer matches shared publication truth.",
                 issues,
                 shared::build_surfaces(
                     workspace_root,
                     [
                         PathBuf::from(CAPABILITY_MATRIX_PATH),
-                        PathBuf::from(&entry.backend_module),
+                        PathBuf::from(&entry.manifest_root).join("current.json"),
                     ],
                 ),
             ));
@@ -159,13 +159,13 @@ pub(super) fn inspect_capability_publication(
     } else {
         Some(build_finding(
             DriftCategory::CapabilityPublication,
-            "published capability inventory no longer matches modeled backend truth.",
+            "published capability inventory no longer matches shared publication truth.",
             issues,
             shared::build_surfaces(
                 workspace_root,
                 [
                     PathBuf::from(CAPABILITY_MATRIX_PATH),
-                    PathBuf::from(&entry.backend_module),
+                    PathBuf::from(&entry.manifest_root).join("current.json"),
                 ],
             ),
         ))

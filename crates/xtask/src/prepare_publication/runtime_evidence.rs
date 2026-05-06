@@ -1,0 +1,283 @@
+use std::{fs, path::Path};
+
+use serde::Deserialize;
+
+use crate::{
+    agent_lifecycle::{LifecycleState, PublicationReadyPacket},
+    approval_artifact::ApprovalArtifact,
+    runtime_evidence_run,
+};
+
+use super::{read_json, validate_required_commands, Error};
+
+#[derive(Debug, Deserialize)]
+struct RuntimeInputContract {
+    approval_artifact_path: String,
+    approval_artifact_sha256: String,
+    agent_id: String,
+    manifest_root: String,
+    required_handoff_commands: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct RuntimeRunStatus {
+    approval_artifact_path: String,
+    agent_id: String,
+    status: String,
+    validation_passed: bool,
+    handoff_ready: bool,
+    run_dir: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct RuntimeValidationReport {
+    status: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct RuntimeHandoff {
+    agent_id: String,
+    manifest_root: String,
+    runtime_lane_complete: bool,
+    publication_refresh_required: bool,
+    required_commands: Vec<String>,
+    blockers: Vec<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct RuntimeEvidenceBundle {
+    pub run_id: String,
+    pub runtime_evidence_paths: Vec<String>,
+}
+
+pub(super) fn resolve_runtime_integrated_runtime_evidence(
+    workspace_root: &Path,
+    approval: &ApprovalArtifact,
+    lifecycle_state: &LifecycleState,
+) -> Result<RuntimeEvidenceBundle, Error> {
+    let run_id = lifecycle_state
+        .active_runtime_evidence_run_id
+        .as_deref()
+        .ok_or_else(|| {
+            Error::Validation(
+                "runtime_integrated lifecycle state is missing active_runtime_evidence_run_id"
+                    .to_string(),
+            )
+        })?;
+    validate_runtime_evidence_run(workspace_root, approval, run_id)
+}
+
+pub(super) fn validate_packet_pinned_runtime_evidence(
+    workspace_root: &Path,
+    approval: &ApprovalArtifact,
+    packet: &PublicationReadyPacket,
+) -> Result<RuntimeEvidenceBundle, Error> {
+    let run_id =
+        runtime_evidence_run::validate_runtime_evidence_paths_shape(&packet.runtime_evidence_paths)
+            .map_err(|err| {
+                Error::Validation(format!(
+                    "publication-ready packet `{}` carries invalid runtime_evidence_paths: {err}",
+                    packet.lifecycle_state_path.replace(
+                        crate::agent_lifecycle::LIFECYCLE_STATE_FILE_NAME,
+                        crate::agent_lifecycle::PUBLICATION_READY_FILE_NAME,
+                    )
+                ))
+            })?;
+    let bundle = validate_runtime_evidence_run(workspace_root, approval, &run_id)?;
+    if bundle.runtime_evidence_paths != packet.runtime_evidence_paths {
+        return Err(Error::Validation(
+            "publication-ready packet runtime_evidence_paths no longer match the canonical runtime evidence bundle"
+                .to_string(),
+        ));
+    }
+    Ok(bundle)
+}
+
+pub(super) fn validate_runtime_evidence_run(
+    workspace_root: &Path,
+    approval: &ApprovalArtifact,
+    run_id: &str,
+) -> Result<RuntimeEvidenceBundle, Error> {
+    runtime_evidence_run::validate_run_id(run_id).map_err(Error::Validation)?;
+    let relative_run_root =
+        runtime_evidence_run::run_relative_root(run_id).map_err(Error::Validation)?;
+    let absolute_run_root = workspace_root.join(&relative_run_root);
+    inspect_runtime_run_at(approval, run_id, &relative_run_root, &absolute_run_root)?.ok_or_else(
+        || {
+            Error::Validation(format!(
+                "runtime evidence run `{run_id}` is missing required runtime evidence files under `{}`",
+                runtime_evidence_run::RUNTIME_RUNS_ROOT
+            ))
+        },
+    )
+}
+
+pub(super) fn validate_runtime_evidence_directory(
+    workspace_root: &Path,
+    approval: &ApprovalArtifact,
+    run_id: &str,
+    run_root: &Path,
+) -> Result<RuntimeEvidenceBundle, Error> {
+    runtime_evidence_run::validate_run_id(run_id).map_err(Error::Validation)?;
+    let relative_run_root = run_root
+        .strip_prefix(workspace_root)
+        .map_err(|_| {
+            Error::Internal(format!(
+                "runtime evidence run root `{}` must stay inside workspace `{}`",
+                run_root.display(),
+                workspace_root.display()
+            ))
+        })?
+        .to_string_lossy()
+        .replace('\\', "/");
+    inspect_runtime_run_at(approval, run_id, &relative_run_root, run_root)?.ok_or_else(|| {
+        Error::Validation(format!(
+            "runtime evidence run `{run_id}` is missing required runtime evidence files under `{relative_run_root}`"
+        ))
+    })
+}
+
+fn inspect_runtime_run_at(
+    approval: &ApprovalArtifact,
+    run_id: &str,
+    relative_run_root: &str,
+    absolute_run_root: &Path,
+) -> Result<Option<RuntimeEvidenceBundle>, Error> {
+    let status_path = absolute_run_root.join("run-status.json");
+    if !status_path.is_file() {
+        return Ok(None);
+    }
+
+    let status: RuntimeRunStatus = read_json(&status_path)?;
+    if status.approval_artifact_path != approval.relative_path
+        || status.agent_id != approval.descriptor.agent_id
+    {
+        return Ok(None);
+    }
+    if status.status != "write_validated" || !status.validation_passed || !status.handoff_ready {
+        return Err(stale_runtime_evidence_error(
+            approval,
+            run_id,
+            "is not a validated runtime handoff",
+        ));
+    }
+    let expected_absolute_run_dir = absolute_run_root.to_string_lossy();
+    if status.run_dir != expected_absolute_run_dir && status.run_dir != relative_run_root {
+        return Err(stale_runtime_evidence_error(
+            approval,
+            run_id,
+            &format!(
+                "recorded run_dir `{}` but expected `{}` or `{}`",
+                status.run_dir,
+                absolute_run_root.display(),
+                relative_run_root
+            ),
+        ));
+    }
+
+    let input_contract: RuntimeInputContract =
+        read_json(&absolute_run_root.join("input-contract.json"))?;
+    if input_contract.approval_artifact_path != approval.relative_path
+        || input_contract.approval_artifact_sha256 != approval.sha256
+        || input_contract.agent_id != approval.descriptor.agent_id
+        || input_contract.manifest_root != approval.descriptor.manifest_root
+    {
+        return Err(stale_runtime_evidence_error(
+            approval,
+            run_id,
+            "no longer matches the approval artifact continuity",
+        ));
+    }
+    validate_required_commands(
+        "runtime input-contract required_handoff_commands",
+        &input_contract.required_handoff_commands,
+    )
+    .map_err(|err| stale_runtime_evidence_error(approval, run_id, &err.to_string()))?;
+
+    let report: RuntimeValidationReport =
+        read_json(&absolute_run_root.join("validation-report.json"))?;
+    if report.status != "pass" {
+        return Err(stale_runtime_evidence_error(
+            approval,
+            run_id,
+            "validation-report.json is not green",
+        ));
+    }
+
+    let handoff: RuntimeHandoff = read_json(&absolute_run_root.join("handoff.json"))?;
+    if handoff.agent_id != approval.descriptor.agent_id
+        || handoff.manifest_root != approval.descriptor.manifest_root
+    {
+        return Err(stale_runtime_evidence_error(
+            approval,
+            run_id,
+            "handoff.json no longer matches the approval artifact continuity",
+        ));
+    }
+    if !handoff.runtime_lane_complete || !handoff.publication_refresh_required {
+        return Err(stale_runtime_evidence_error(
+            approval,
+            run_id,
+            "handoff.json is not publication-ready",
+        ));
+    }
+    if handoff
+        .blockers
+        .iter()
+        .any(|blocker| !blocker.trim().is_empty())
+    {
+        return Err(stale_runtime_evidence_error(
+            approval,
+            run_id,
+            "handoff.json still carries blocker text",
+        ));
+    }
+    validate_required_commands(
+        "runtime handoff required_commands",
+        &handoff.required_commands,
+    )
+    .map_err(|err| stale_runtime_evidence_error(approval, run_id, &err.to_string()))?;
+
+    let written_paths: Vec<String> = read_json(&absolute_run_root.join("written-paths.json"))?;
+    if written_paths.is_empty() {
+        return Err(stale_runtime_evidence_error(
+            approval,
+            run_id,
+            "did not record any written paths",
+        ));
+    }
+
+    let summary_path = absolute_run_root.join("run-summary.md");
+    let summary = fs::read_to_string(&summary_path)
+        .map_err(|err| Error::Validation(format!("read {}: {err}", summary_path.display())))?;
+    if summary.trim().is_empty() {
+        return Err(stale_runtime_evidence_error(
+            approval,
+            run_id,
+            "run-summary.md is empty",
+        ));
+    }
+
+    for name in runtime_evidence_run::REQUIRED_RUNTIME_EVIDENCE_FILES {
+        if !absolute_run_root.join(name).is_file() {
+            return Err(stale_runtime_evidence_error(
+                approval,
+                run_id,
+                &format!("is missing required file `{name}`"),
+            ));
+        }
+    }
+
+    Ok(Some(RuntimeEvidenceBundle {
+        run_id: run_id.to_string(),
+        runtime_evidence_paths: runtime_evidence_run::runtime_evidence_paths_for_run(run_id)
+            .map_err(Error::Validation)?,
+    }))
+}
+
+fn stale_runtime_evidence_error(approval: &ApprovalArtifact, run_id: &str, detail: &str) -> Error {
+    Error::Validation(format!(
+        "runtime evidence run `{run_id}` {detail}; rerun `cargo run -p xtask -- repair-runtime-evidence --approval {} --check` to inspect or `cargo run -p xtask -- repair-runtime-evidence --approval {} --write` to repair the runtime evidence bundle",
+        approval.relative_path, approval.relative_path
+    ))
+}

@@ -1,83 +1,41 @@
 # Unified Agent API (Rust)
 
-This repository provides a unified Rust API over coding-agent CLIs, starting with:
-- OpenAI Codex CLI (`codex`)
-- Anthropic Claude Code (`claude`)
-- Google Gemini CLI (`gemini`)
-- OpenCode CLI (`opencode`)
-
-Codex backend highlights:
-- Typed streaming of `codex exec --json` events (`ThreadEvent`)
-- Offline parsing of saved JSONL logs into the same `ThreadEvent` model
-- Capability probing and compatibility shims for upstream drift
-- Tooling and artifacts for release-trailing parity maintenance (`cli_manifests/codex/`)
-
-Claude Code backend highlights (v1):
-- Non-interactive `--print` execution
-- Tolerant parsing of `--output-format=stream-json` (NDJSON)
-- Release-trailing parity lane (`cli_manifests/claude_code/`)
-
-OpenCode backend highlights (v1):
-- Canonical `opencode run --format json` execution only
-- Incremental JSONL event streaming with bounded parse-failure redaction
-- Session resume/fork and working-directory mapping on the supported runtime surface
-- Deterministic committed manifest root and validation lane (`cli_manifests/opencode/`)
-
-Gemini CLI backend highlights (v1):
-- Canonical headless `gemini --prompt --format stream-json` execution only
-- Incremental stream-json event streaming with bounded parse-failure redaction
-- Deterministic committed manifest root and proving-run onboarding packet (`cli_manifests/gemini_cli/`)
-
-Published Cargo package names are repo-scoped:
-- `unified-agent-api`
-- `unified-agent-api-codex`
-- `unified-agent-api-claude-code`
-- `unified-agent-api-gemini-cli`
-- `unified-agent-api-opencode`
-- `unified-agent-api-wrapper-events`
-
-Rust library import paths remain:
-- `agent_api`
-- `codex`
-- `claude_code`
-- `gemini_cli`
-- `opencode`
-- `wrapper_events`
-
-## License
-
-This repository is dual-licensed under MIT or Apache-2.0, at your option.
-See `LICENSE-MIT` and `LICENSE-APACHE`.
+This repository provides a unified Rust API over coding-agent CLIs, including Codex, Claude Code, Gemini CLI, and OpenCode.
 
 ## Start here
 
-- Unified Agent API contracts: `docs/specs/unified-agent-api/README.md`
-- Support publication contract: `docs/specs/unified-agent-api/support-matrix.md`
-- Crates.io release guide: `docs/crates-io-release.md`
-- Codex API docs: `crates/codex/README.md`
-- Examples index: `crates/codex/EXAMPLES.md`
+- Operator procedure hub: `docs/cli-agent-onboarding-factory-operator-guide.md`
+- Contributing entrypoint: `CONTRIBUTING.md`
 - Documentation index: `docs/README.md`
-- Release metadata: `VERSION`, `CHANGELOG.md`
-- Contributing: `CONTRIBUTING.md`
+- Normative contract index: `docs/specs/unified-agent-api/README.md`
 
-## Repo map
+Use the operator guide for the shipped create-mode onboarding flow, maintenance-mode refresh flow, artifact ownership boundaries, and command sequencing. This README stays as the repo-entry summary rather than a second procedure manual.
 
-- `crates/agent_api/` — unified API surface and backend harness
-- `crates/codex/` — Codex backend crate
-- `crates/claude_code/` — Claude Code backend crate
-- `crates/gemini_cli/` — Gemini CLI backend crate
-- `crates/opencode/` — OpenCode backend crate
-- `docs/` — ADRs, specs, integration notes, project management
-- `cli_manifests/codex/` — Codex CLI parity artifacts + ops docs
-- `cli_manifests/claude_code/` — Claude Code parity artifacts + ops docs
-- `cli_manifests/gemini_cli/` — Gemini CLI manifest-root artifacts + ops docs
-- `cli_manifests/opencode/` — OpenCode manifest-root artifacts + ops docs
+## Repo summary
 
-## Operations / parity maintenance
+- `crates/agent_api/` - unified API surface and backend harness
+- `crates/codex/` - Codex backend crate
+- `crates/claude_code/` - Claude Code backend crate
+- `crates/gemini_cli/` - Gemini CLI backend crate
+- `crates/opencode/` - OpenCode backend crate
+- `crates/wrapper_events/` - shared event and adapter utilities
+- `crates/xtask/` - repo automation and validation commands
+- `cli_manifests/` - committed parity artifacts and publication evidence
+- `docs/` - normative specs, ADRs, and operator-facing documentation
 
-- Ops playbook: `cli_manifests/codex/OPS_PLAYBOOK.md`
-- CLI snapshot artifacts: `cli_manifests/codex/README.md`
-- Support publication artifact: `cli_manifests/support_matrix/current.json`
-- Support publication check: `cargo run -p xtask -- support-matrix --check`
-- Decisions (ADRs): `docs/adr/`
-- Normative contracts: `docs/specs/`
+## Green gate
+
+The repo green gate is:
+
+```sh
+cargo run -p xtask -- support-matrix --check
+cargo run -p xtask -- capability-matrix --check
+cargo run -p xtask -- capability-matrix-audit
+make preflight
+```
+
+The operator guide is the procedural source of truth for when to run that gate in create mode and maintenance mode.
+
+## License
+
+This repository is dual-licensed under MIT or Apache-2.0, at your option. See `LICENSE-MIT` and `LICENSE-APACHE`.

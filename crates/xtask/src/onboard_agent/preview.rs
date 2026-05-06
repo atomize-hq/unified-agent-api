@@ -2,19 +2,20 @@ mod render;
 
 use std::{fmt::Write as _, fs, io::Write, path::Path};
 
-use crate::agent_registry::REGISTRY_RELATIVE_PATH;
+use crate::agent_registry::{AgentRegistryEntry, REGISTRY_RELATIVE_PATH};
 use crate::proving_run_closeout::{
-    load_validated_closeout_if_present, ProvingRunCloseout, ProvingRunCloseoutError,
-    ProvingRunCloseoutExpected,
+    load_validated_closeout_if_present_with_states, ProvingRunCloseout, ProvingRunCloseoutError,
+    ProvingRunCloseoutExpected, ProvingRunCloseoutState,
 };
 use crate::workspace_mutation::WorkspacePathJail;
 use toml_edit::DocumentMut;
 
 use self::render::{
+    build_closeout_docs_preview as render_closeout_docs_preview,
     build_docs_preview as render_docs_preview, closeout_relative_path, release_touchpoint_lines,
-    PacketPhase,
+    CloseoutPacketRenderInput,
 };
-use super::{ConfigGate, DraftEntry, Error, TargetGate, RELEASE_DOC_PATH};
+use super::{ConfigGate, DraftEntry, Error, LifecycleStatePreview, TargetGate, RELEASE_DOC_PATH};
 
 const RELEASE_DOC_START_MARKER: &str =
     "<!-- generated-by: xtask onboard-agent; section: crates-io-release -->";
@@ -86,11 +87,15 @@ pub(super) fn load_proving_run_metrics(
         approval_path: draft.approval_identity().map(|(path, _)| Path::new(path)),
         onboarding_pack_prefix: &draft.onboarding_pack_prefix,
     };
-    load_validated_closeout_if_present(
+    load_validated_closeout_if_present_with_states(
         workspace_root,
         Path::new(&closeout_relative_path(draft)),
         &resolved_closeout_path,
         expected,
+        &[
+            ProvingRunCloseoutState::Prepared,
+            ProvingRunCloseoutState::Closed,
+        ],
     )
     .map_err(map_closeout_error)
 }
@@ -157,6 +162,10 @@ pub(super) fn write_input_summary<W: Write>(
         draft.capability_matrix_enabled
     )
     .map_err(|err| Error::Internal(format!("write stdout: {err}")))?;
+    if let Some(target) = draft.capability_matrix_target.as_deref() {
+        writeln!(writer, "capability_matrix_target: {target}")
+            .map_err(|err| Error::Internal(format!("write stdout: {err}")))?;
+    }
     writeln!(writer, "docs_release_track: {}", draft.docs_release_track)
         .map_err(|err| Error::Internal(format!("write stdout: {err}")))?;
     writeln!(
@@ -225,6 +234,19 @@ pub(super) fn write_manifest_preview<W: Write>(
                 .map_err(|err| Error::Internal(format!("write stdout: {err}")))?;
         }
     }
+    writeln!(writer).map_err(|err| Error::Internal(format!("write stdout: {err}")))?;
+    Ok(())
+}
+
+pub(super) fn write_lifecycle_state_preview<W: Write>(
+    writer: &mut W,
+    preview: &LifecycleStatePreview,
+) -> Result<(), Error> {
+    writeln!(writer, "== LIFECYCLE STATE PREVIEW ==")
+        .map_err(|err| Error::Internal(format!("write stdout: {err}")))?;
+    writeln!(writer, "Path: {}", preview.path)
+        .map_err(|err| Error::Internal(format!("write stdout: {err}")))?;
+    write_code_block(writer, "json", &preview.contents)?;
     writeln!(writer).map_err(|err| Error::Internal(format!("write stdout: {err}")))?;
     Ok(())
 }
@@ -343,6 +365,9 @@ pub(super) fn render_registry_entry_preview(draft: &DraftEntry) -> String {
         draft.capability_matrix_enabled
     )
     .expect("write String");
+    if let Some(target) = draft.capability_matrix_target.as_deref() {
+        writeln!(&mut out, "capability_matrix_target = {:?}", target).expect("write String");
+    }
     writeln!(&mut out).expect("write String");
 
     writeln!(&mut out, "[agents.release]").expect("write String");
@@ -369,12 +394,24 @@ pub(super) fn build_docs_preview(
     release_preview: &ReleasePreview,
     closeout: Option<&ProvingRunCloseout>,
 ) -> Vec<(String, Option<String>)> {
-    let approval = approval_render_input(draft);
-    let phase = match closeout {
-        Some(closeout) => PacketPhase::Closeout(closeout),
-        None => PacketPhase::Execution,
-    };
-    render_docs_preview(draft, &release_preview.lines, phase, approval)
+    match closeout {
+        Some(closeout) => {
+            let input = CloseoutPacketRenderInput::from_draft(draft);
+            render_closeout_docs_preview(&input, closeout)
+        }
+        None => {
+            let approval = approval_render_input(draft);
+            render_docs_preview(draft, &release_preview.lines, approval)
+        }
+    }
+}
+
+pub(crate) fn build_closeout_docs_preview_for_entry(
+    entry: &AgentRegistryEntry,
+    closeout: &ProvingRunCloseout,
+) -> Vec<(String, Option<String>)> {
+    let input = CloseoutPacketRenderInput::from_registry_entry(entry);
+    render_closeout_docs_preview(&input, closeout)
 }
 
 fn approval_render_input(draft: &DraftEntry) -> Option<ApprovalRenderInput<'_>> {
@@ -445,22 +482,24 @@ pub(super) fn build_manual_follow_up(
         ],
         None => vec![
             format!(
-                "Next executable runtime step: implement the runtime-owned wrapper crate at `{}` and backend module `{}`.",
-                draft.crate_path, draft.backend_module
+                "Next executable runtime step: run `cargo run -p xtask -- scaffold-wrapper-crate --agent {} --write` to create the runtime-owned wrapper crate shell at `{}`; `onboard-agent` does not create the wrapper crate.",
+                draft.agent_id, draft.crate_path
             ),
+            "Then materialize the bounded runtime packet with `runtime-follow-on --dry-run`."
+                .to_string(),
             format!(
-                "When the wrapper crate is crates.io-publishable, include crate-local `README.md`, `LICENSE-APACHE`, `LICENSE-MIT`, and set `readme = \"README.md\"` in `{}/Cargo.toml`.",
-                draft.crate_path
+                "Implement backend/runtime details in `{}` and `{}`.",
+                draft.crate_path, draft.backend_module
             ),
             format!(
                 "Author wrapper coverage input at `{}` for binding kind `{}`.",
                 draft.wrapper_coverage_source_path, draft.wrapper_coverage_binding_kind
             ),
             format!(
-                "Populate `{}/current.json`, pointers, versions, and reports from committed runtime evidence.",
-                draft.manifest_root
+                "Populate committed runtime evidence only under `{}/snapshots/**` and `{}/supplement/**`.",
+                draft.manifest_root, draft.manifest_root
             ),
-            "Regenerate support and capability publication artifacts, then run `make preflight`."
+            "Complete `runtime-follow-on --write`; publication refresh and `make preflight` stay in the next lane."
                 .to_string(),
         ],
     }

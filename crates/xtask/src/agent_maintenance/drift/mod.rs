@@ -1,5 +1,6 @@
 mod governance;
 mod publication;
+mod runtime_evidence;
 mod shared;
 
 use std::{
@@ -27,12 +28,6 @@ const RELEASE_DOC_END_MARKER: &str =
 const SUPPORT_MARKDOWN_START_MARKER: &str = "<!-- support-matrix-published:start -->";
 const SUPPORT_MARKDOWN_END_MARKER: &str = "<!-- support-matrix-published:end -->";
 
-const CAPABILITY_MCP_LIST_V1: &str = "agent_api.tools.mcp.list.v1";
-const CAPABILITY_MCP_GET_V1: &str = "agent_api.tools.mcp.get.v1";
-const CAPABILITY_MCP_ADD_V1: &str = "agent_api.tools.mcp.add.v1";
-const CAPABILITY_MCP_REMOVE_V1: &str = "agent_api.tools.mcp.remove.v1";
-const CAPABILITY_EXTERNAL_SANDBOX_V1: &str = "agent_api.exec.external_sandbox.v1";
-
 #[derive(Debug, Parser, Clone)]
 pub struct Args {
     #[arg(long)]
@@ -45,6 +40,7 @@ pub enum DriftCategory {
     GovernanceDoc,
     RegistryManifest,
     ReleaseDoc,
+    RuntimeEvidence,
     SupportPublication,
 }
 
@@ -56,6 +52,7 @@ impl DriftCategory {
             Self::SupportPublication => "support_publication_drift",
             Self::ReleaseDoc => "release_doc_drift",
             Self::GovernanceDoc => "governance_doc_drift",
+            Self::RuntimeEvidence => "runtime_evidence_drift",
         }
     }
 }
@@ -215,13 +212,20 @@ pub fn check_agent_drift(
     if let Some(finding) = publication::inspect_release_doc(entry, workspace_root, &registry) {
         findings.push(finding);
     }
-    if let Some(finding) = governance::inspect_governance_docs(
-        entry,
-        workspace_root,
-        capability_truth.as_ref(),
-        expected_support_rows.as_ref(),
-    ) {
+    let runtime_integrated =
+        runtime_evidence::has_runtime_integrated_lifecycle(entry, workspace_root);
+    if let Some(finding) = runtime_evidence::inspect_runtime_evidence(entry, workspace_root) {
         findings.push(finding);
+    }
+    if !runtime_integrated {
+        if let Some(finding) = governance::inspect_governance_docs(
+            entry,
+            workspace_root,
+            capability_truth.as_ref(),
+            expected_support_rows.as_ref(),
+        ) {
+            findings.push(finding);
+        }
     }
 
     findings.sort_by(|left, right| left.category_id().cmp(right.category_id()));

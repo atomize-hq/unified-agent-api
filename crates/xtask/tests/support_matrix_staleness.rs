@@ -185,6 +185,19 @@ fn materialize_minimal_gemini_root(fixture_root: &Path) {
     );
 }
 
+fn materialize_minimal_aider_root(fixture_root: &Path) {
+    materialize_root(
+        &fixture_root.join("cli_manifests/aider"),
+        &["darwin-arm64"],
+        "0.0.0",
+        &["darwin-arm64"],
+        &[("0.0.0", &["darwin-arm64"])],
+        &[("darwin-arm64", "0.0.0")],
+        &[("darwin-arm64", "0.0.0")],
+        &[],
+    );
+}
+
 #[test]
 fn support_matrix_check_rejects_stale_generated_markdown_block() {
     let xtask_bin = PathBuf::from(env!("CARGO_BIN_EXE_xtask"));
@@ -251,6 +264,7 @@ fn support_matrix_check_rejects_stale_generated_markdown_block() {
     );
     materialize_minimal_valid_opencode_root(&fixture_root);
     materialize_minimal_gemini_root(&fixture_root);
+    materialize_minimal_aider_root(&fixture_root);
 
     let generate = Command::new(&xtask_bin)
         .arg("support-matrix")
@@ -352,6 +366,7 @@ fn support_matrix_check_rejects_stale_generated_json_row_order() {
     );
     materialize_minimal_valid_opencode_root(&fixture_root);
     materialize_minimal_gemini_root(&fixture_root);
+    materialize_minimal_aider_root(&fixture_root);
 
     let generate = Command::new(&xtask_bin)
         .arg("support-matrix")

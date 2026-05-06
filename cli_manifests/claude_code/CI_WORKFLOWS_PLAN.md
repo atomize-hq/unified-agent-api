@@ -51,7 +51,7 @@ Responsibilities:
 - Generate per-target snapshots (schema v1) + raw help capture (CI artifacts only).
 - Generate union snapshot (schema v2) on Linux.
 - Generate wrapper coverage + reports + version metadata; validate the parity root.
-- Generate a triad scaffold pack in `docs/project_management/next/`.
+- Generate a triad scaffold pack in `.archived/project_management/next/`.
 - Open PR branch `automation/claude-code-<version>`.
 
 ### 3) Promote (manual gate)
@@ -99,4 +99,4 @@ Each pin records:
 - `cli_manifests/claude_code/wrapper_coverage.json`
 - `cli_manifests/claude_code/reports/<version>/**`
 - `cli_manifests/claude_code/versions/<version>.json`
-- `docs/project_management/next/claude-code-cli-parity-<version>/**`
+- `.archived/project_management/next/claude-code-cli-parity-<version>/**`

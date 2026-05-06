@@ -1,0 +1,67 @@
+{
+  "candidates": {
+    "aider": {
+      "notes": "refs=aider-doc,aider-pkg",
+      "primary_sum": 11,
+      "scores": {
+        "Adoption & community pull": 3,
+        "Architecture fit for this repo": 2,
+        "CLI product maturity & release activity": 3,
+        "Capability expansion / future leverage": 2,
+        "Installability & docs quality": 3,
+        "Reproducibility & access friction": 2
+      },
+      "secondary_sum": 4
+    },
+    "goose": {
+      "notes": "refs=goose-doc,goose-repo,goose-brew",
+      "primary_sum": 11,
+      "scores": {
+        "Adoption & community pull": 3,
+        "Architecture fit for this repo": 2,
+        "CLI product maturity & release activity": 3,
+        "Capability expansion / future leverage": 2,
+        "Installability & docs quality": 3,
+        "Reproducibility & access friction": 2
+      },
+      "secondary_sum": 4
+    },
+    "openhands": {
+      "notes": "refs=openhands-doc,openhands-pkg",
+      "primary_sum": 11,
+      "scores": {
+        "Adoption & community pull": 3,
+        "Architecture fit for this repo": 2,
+        "CLI product maturity & release activity": 3,
+        "Capability expansion / future leverage": 3,
+        "Installability & docs quality": 3,
+        "Reproducibility & access friction": 2
+      },
+      "secondary_sum": 5
+    }
+  },
+  "dimensions": [
+    "Adoption & community pull",
+    "CLI product maturity & release activity",
+    "Installability & docs quality",
+    "Reproducibility & access friction",
+    "Architecture fit for this repo",
+    "Capability expansion / future leverage"
+  ],
+  "primary_dimensions": [
+    "Adoption & community pull",
+    "CLI product maturity & release activity",
+    "Installability & docs quality",
+    "Reproducibility & access friction"
+  ],
+  "recommended_agent_id": "openhands",
+  "secondary_dimensions": [
+    "Architecture fit for this repo",
+    "Capability expansion / future leverage"
+  ],
+  "shortlist_order": [
+    "openhands",
+    "aider",
+    "goose"
+  ]
+}

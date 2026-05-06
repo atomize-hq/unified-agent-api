@@ -1,0 +1,24 @@
+artifact_version = "1"
+comparison_ref = "docs/agents/selection/cli-agent-selection-packet.md"
+selection_mode = "factory_validation"
+recommended_agent_id = "aider"
+approved_agent_id = "aider"
+approval_commit = "ebbc04aec5f723e63b527351c5c1629d22489180"
+approval_recorded_at = "2026-04-28T00:00:35Z"
+
+[descriptor]
+agent_id = "aider"
+display_name = "aider"
+crate_path = "crates/aider"
+backend_module = "crates/agent_api/src/backends/aider"
+manifest_root = "cli_manifests/aider"
+package_name = "unified-agent-api-aider"
+canonical_targets = ["darwin-arm64"]
+wrapper_coverage_binding_kind = "generated_from_wrapper_crate"
+wrapper_coverage_source_path = "crates/aider"
+always_on_capabilities = ["agent_api.config.model.v1", "agent_api.events", "agent_api.events.live", "agent_api.run"]
+backend_extensions = []
+support_matrix_enabled = true
+capability_matrix_enabled = true
+docs_release_track = "crates-io"
+onboarding_pack_prefix = "aider-onboarding"

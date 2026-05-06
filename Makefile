@@ -178,6 +178,7 @@ flightcheck:
 	$(MAKE) check
 	$(MAKE) test
 	$(MAKE) support-matrix-check
+	$(MAKE) capability-matrix-guard
 	$(MAKE) publish-guards
 	$(MAKE) loc-check
 	$(MAKE) security
@@ -186,6 +187,11 @@ flightcheck:
 .PHONY: support-matrix-check
 support-matrix-check:
 	cargo run -p xtask -- support-matrix --check
+
+.PHONY: capability-matrix-guard
+capability-matrix-guard:
+	cargo run -p xtask -- capability-matrix --check
+	cargo run -p xtask -- capability-matrix-audit
 
 .PHONY: publish-guards
 publish-guards:

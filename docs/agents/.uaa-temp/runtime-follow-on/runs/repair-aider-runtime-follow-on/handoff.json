@@ -1,0 +1,13 @@
+{
+  "agent_id": "aider",
+  "blockers": [],
+  "manifest_root": "cli_manifests/aider",
+  "publication_refresh_required": true,
+  "required_commands": [
+    "cargo run -p xtask -- support-matrix --check",
+    "cargo run -p xtask -- capability-matrix --check",
+    "cargo run -p xtask -- capability-matrix-audit",
+    "make preflight"
+  ],
+  "runtime_lane_complete": true
+}

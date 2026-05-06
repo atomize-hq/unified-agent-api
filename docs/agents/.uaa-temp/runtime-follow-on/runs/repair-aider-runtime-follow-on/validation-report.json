@@ -1,0 +1,14 @@
+{
+  "checks": [
+    {
+      "message": "runtime evidence was reconstructed from committed runtime-owned outputs",
+      "name": "runtime_evidence_repair",
+      "ok": true
+    }
+  ],
+  "errors": [],
+  "generated_at": "2026-04-29T19:38:47-04:00",
+  "run_id": "repair-aider-runtime-follow-on",
+  "status": "pass",
+  "workflow_version": "runtime_follow_on_v1"
+}

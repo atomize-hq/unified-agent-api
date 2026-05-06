@@ -1,28 +1,32 @@
 mod approval;
+mod descriptor;
+mod lifecycle;
 mod mutation;
-mod preview;
+pub(crate) mod preview;
 mod validation;
 
 use std::{
-    collections::{BTreeMap, BTreeSet},
     fs,
     io::{self, Write},
     path::{Path, PathBuf},
 };
 
 use crate::agent_registry::{AgentRegistry, REGISTRY_RELATIVE_PATH};
-use crate::approval_artifact;
 use clap::{ArgGroup, Parser};
 use thiserror::Error;
 use toml_edit::DocumentMut;
 
+use self::descriptor::{
+    normalize_ordered_unique, normalize_sorted_unique, parse_config_gates, parse_target_gates,
+};
+use self::lifecycle::build_lifecycle_state_preview;
 use self::mutation::WorkspaceMutationError;
 use self::mutation::{apply_mutations, ApplySummary, PlannedMutation, WorkspacePathJail};
 use self::preview::{
     build_docs_preview, build_manifest_preview, build_manual_follow_up, build_release_preview,
     load_proving_run_metrics, render_registry_entry_preview, write_docs_preview,
-    write_input_summary, write_manifest_preview, write_manual_follow_up, write_registry_preview,
-    write_release_preview,
+    write_input_summary, write_lifecycle_state_preview, write_manifest_preview,
+    write_manual_follow_up, write_registry_preview, write_release_preview,
 };
 use self::validation::{
     desired_registry_text, map_registry_load_error, validate_candidate_registry,
@@ -31,12 +35,17 @@ use self::validation::{
 };
 
 const OWNERSHIP_MARKER: &str = "<!-- generated-by: xtask onboard-agent; owner: control-plane -->";
-const DOCS_NEXT_ROOT: &str = "docs/project_management/next";
+const DOCS_NEXT_ROOT: &str = "docs/agents/lifecycle";
 const RELEASE_DOC_PATH: &str = "docs/crates-io-release.md";
 const PUBLISH_WORKFLOW_PATH: &str = ".github/workflows/publish-crates.yml";
 const PUBLISH_SCRIPT_PATH: &str = "scripts/publish_crates.py";
 const VALIDATE_PUBLISH_SCRIPT_PATH: &str = "scripts/validate_publish_versions.py";
 const CHECK_PUBLISH_READINESS_SCRIPT_PATH: &str = "scripts/check_publish_readiness.py";
+const CURRENT_OWNER_COMMAND: &str = "onboard-agent --write";
+const LAST_TRANSITION_BY: &str = "onboard-agent --write";
+const RAW_APPROVAL_SHA256_PLACEHOLDER: &str =
+    "0000000000000000000000000000000000000000000000000000000000000000";
+const RAW_LAST_TRANSITION_AT_PLACEHOLDER: &str = "1970-01-01T00:00:00Z";
 
 #[derive(Debug, Parser, Clone)]
 #[command(group(
@@ -54,7 +63,7 @@ pub struct Args {
     #[arg(long)]
     pub write: bool,
 
-    /// Repo-relative approved onboarding artifact under docs/project_management/next/**/governance/approved-agent.toml.
+    /// Repo-relative approved onboarding artifact under docs/agents/lifecycle/**/governance/approved-agent.toml.
     #[arg(long)]
     pub approval: Option<String>,
 
@@ -118,11 +127,15 @@ pub struct Args {
     #[arg(long = "capability-matrix-enabled", action = clap::ArgAction::Set)]
     pub capability_matrix_enabled: Option<bool>,
 
+    /// Explicit target triple used for capability-matrix publication projection.
+    #[arg(long = "capability-matrix-target")]
+    pub capability_matrix_target: Option<String>,
+
     /// Release documentation track name.
     #[arg(long = "docs-release-track")]
     pub docs_release_track: Option<String>,
 
-    /// Docs onboarding pack directory prefix under `docs/project_management/next/`.
+    /// Docs onboarding pack directory prefix under `docs/agents/lifecycle/`.
     #[arg(long = "onboarding-pack-prefix")]
     pub onboarding_pack_prefix: Option<String>,
 }
@@ -170,6 +183,7 @@ struct DraftEntry {
     backend_extensions: Vec<String>,
     support_matrix_enabled: bool,
     capability_matrix_enabled: bool,
+    capability_matrix_target: Option<String>,
     docs_release_track: String,
     onboarding_pack_prefix: String,
     approval_provenance: Option<ApprovalProvenance>,
@@ -179,6 +193,7 @@ struct DraftEntry {
 struct ApprovalProvenance {
     artifact_path: String,
     artifact_sha256: String,
+    approval_recorded_at: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -211,6 +226,7 @@ struct DraftDescriptorInput {
     backend_extensions: Vec<String>,
     support_matrix_enabled: bool,
     capability_matrix_enabled: bool,
+    capability_matrix_target: Option<String>,
     docs_release_track: String,
     onboarding_pack_prefix: String,
     approval_provenance: Option<ApprovalProvenance>,
@@ -220,10 +236,17 @@ struct DraftDescriptorInput {
 struct OnboardingPlan {
     registry_entry_preview: String,
     docs_preview: Vec<(String, Option<String>)>,
+    lifecycle_state_preview: LifecycleStatePreview,
     manifest_preview: Vec<(String, Option<String>)>,
     release_preview: preview::ReleasePreview,
     manual_follow_up: Vec<String>,
     mutations: Vec<PlannedMutation>,
+}
+
+#[derive(Debug, Clone)]
+struct LifecycleStatePreview {
+    path: String,
+    contents: String,
 }
 
 pub fn run(args: Args) -> Result<(), Error> {
@@ -272,6 +295,7 @@ pub fn run_in_workspace<W: Write>(
     write_input_summary(writer, &draft)?;
     write_registry_preview(writer, &plan.registry_entry_preview)?;
     write_docs_preview(writer, &plan.docs_preview)?;
+    write_lifecycle_state_preview(writer, &plan.lifecycle_state_preview)?;
     write_manifest_preview(writer, &plan.manifest_preview)?;
     write_release_preview(writer, &plan.release_preview)?;
     write_manual_follow_up(writer, &plan.manual_follow_up)?;
@@ -306,7 +330,7 @@ impl DraftEntry {
                         "--approval cannot be mixed with semantic descriptor flags".to_string(),
                     ));
                 }
-                approval::load_descriptor_input(&approval_path, workspace_root)?
+                approval::load_descriptor_input(&approval_path, workspace_root, args.dry_run)?
             }
             None => DraftDescriptorInput::from_raw_args(args)?,
         };
@@ -316,7 +340,7 @@ impl DraftEntry {
     fn from_descriptor_input(input: DraftDescriptorInput) -> Result<Self, Error> {
         let canonical_targets =
             normalize_ordered_unique(input.canonical_targets, "--canonical-target", true)?;
-        let canonical_index = canonical_index(&canonical_targets);
+        let canonical_index = descriptor::canonical_index(&canonical_targets);
         let always_on_capabilities =
             normalize_sorted_unique(input.always_on_capabilities, "--always-on-capability")?;
         let backend_extensions =
@@ -342,6 +366,15 @@ impl DraftEntry {
                 .then_with(|| left.config_key.cmp(&right.config_key))
                 .then_with(|| left.targets.cmp(&right.targets))
         });
+        let capability_matrix_target = descriptor::normalize_capability_matrix_target(
+            input.capability_matrix_target,
+            &canonical_targets,
+            &canonical_index,
+            input.capability_matrix_enabled,
+            &target_gated_capabilities,
+            &config_gated_capabilities,
+            input.approval_provenance.is_some(),
+        )?;
 
         Ok(Self {
             agent_id: input.agent_id,
@@ -359,6 +392,7 @@ impl DraftEntry {
             backend_extensions,
             support_matrix_enabled: input.support_matrix_enabled,
             capability_matrix_enabled: input.capability_matrix_enabled,
+            capability_matrix_target,
             docs_release_track: input.docs_release_track,
             onboarding_pack_prefix: input.onboarding_pack_prefix,
             approval_provenance: input.approval_provenance,
@@ -372,75 +406,6 @@ impl DraftEntry {
     fn approval_identity(&self) -> Option<(&str, &str)> {
         let provenance = self.approval_provenance.as_ref()?;
         Some((&provenance.artifact_path, &provenance.artifact_sha256))
-    }
-}
-
-impl DraftDescriptorInput {
-    fn from_raw_args(args: Args) -> Result<Self, Error> {
-        Ok(Self {
-            agent_id: required_arg(args.agent_id, "--agent-id")?,
-            display_name: required_arg(args.display_name, "--display-name")?,
-            crate_path: required_arg(args.crate_path, "--crate-path")?,
-            backend_module: required_arg(args.backend_module, "--backend-module")?,
-            manifest_root: required_arg(args.manifest_root, "--manifest-root")?,
-            package_name: required_arg(args.package_name, "--package-name")?,
-            canonical_targets: args.canonical_targets,
-            wrapper_coverage_binding_kind: required_arg(
-                args.wrapper_coverage_binding_kind,
-                "--wrapper-coverage-binding-kind",
-            )?,
-            wrapper_coverage_source_path: required_arg(
-                args.wrapper_coverage_source_path,
-                "--wrapper-coverage-source-path",
-            )?,
-            always_on_capabilities: args.always_on_capabilities,
-            target_gated_capabilities: args.target_gated_capabilities,
-            config_gated_capabilities: args.config_gated_capabilities,
-            backend_extensions: args.backend_extensions,
-            support_matrix_enabled: required_bool(
-                args.support_matrix_enabled,
-                "--support-matrix-enabled",
-            )?,
-            capability_matrix_enabled: required_bool(
-                args.capability_matrix_enabled,
-                "--capability-matrix-enabled",
-            )?,
-            docs_release_track: required_arg(args.docs_release_track, "--docs-release-track")?,
-            onboarding_pack_prefix: required_arg(
-                args.onboarding_pack_prefix,
-                "--onboarding-pack-prefix",
-            )?,
-            approval_provenance: None,
-        })
-    }
-}
-
-impl From<approval_artifact::ApprovalArtifact> for DraftDescriptorInput {
-    fn from(artifact: approval_artifact::ApprovalArtifact) -> Self {
-        let descriptor = artifact.descriptor;
-        Self {
-            agent_id: descriptor.agent_id,
-            display_name: descriptor.display_name,
-            crate_path: descriptor.crate_path,
-            backend_module: descriptor.backend_module,
-            manifest_root: descriptor.manifest_root,
-            package_name: descriptor.package_name,
-            canonical_targets: descriptor.canonical_targets,
-            wrapper_coverage_binding_kind: descriptor.wrapper_coverage_binding_kind,
-            wrapper_coverage_source_path: descriptor.wrapper_coverage_source_path,
-            always_on_capabilities: descriptor.always_on_capabilities,
-            target_gated_capabilities: descriptor.target_gated_capabilities,
-            config_gated_capabilities: descriptor.config_gated_capabilities,
-            backend_extensions: descriptor.backend_extensions,
-            support_matrix_enabled: descriptor.support_matrix_enabled,
-            capability_matrix_enabled: descriptor.capability_matrix_enabled,
-            docs_release_track: descriptor.docs_release_track,
-            onboarding_pack_prefix: descriptor.onboarding_pack_prefix,
-            approval_provenance: Some(ApprovalProvenance {
-                artifact_path: artifact.relative_path,
-                artifact_sha256: artifact.sha256,
-            }),
-        }
     }
 }
 
@@ -461,6 +426,7 @@ impl Args {
             || !self.backend_extensions.is_empty()
             || self.support_matrix_enabled.is_some()
             || self.capability_matrix_enabled.is_some()
+            || self.capability_matrix_target.is_some()
             || self.docs_release_track.is_some()
             || self.onboarding_pack_prefix.is_some()
     }
@@ -482,10 +448,11 @@ impl OnboardingPlan {
         let proving_run_metrics = load_proving_run_metrics(workspace_root, draft)?;
         let docs_preview =
             build_docs_preview(draft, &release_preview, proving_run_metrics.as_ref());
+        let lifecycle_state_preview = build_lifecycle_state_preview(workspace_root, draft)?;
         let manifest_preview = build_manifest_preview(draft);
         let manual_follow_up = build_manual_follow_up(draft, proving_run_metrics.as_ref());
 
-        let mut mutations = Vec::with_capacity(3 + docs_preview.len() + manifest_preview.len());
+        let mut mutations = Vec::with_capacity(4 + docs_preview.len() + manifest_preview.len());
         mutations.push(PlannedMutation::replace(
             REGISTRY_RELATIVE_PATH,
             registry_text.as_bytes().to_vec(),
@@ -520,11 +487,16 @@ impl OnboardingPlan {
         // Closeout metadata is packet-local manual state. The onboarding command can read it to
         // render closeout-aware docs, but it must not rewrite or heal that file implicitly.
         mutations.extend(preview_writes(&docs_preview));
+        mutations.push(PlannedMutation::create(
+            lifecycle_state_preview.path.clone(),
+            lifecycle_state_preview.contents.clone().into_bytes(),
+        ));
         mutations.extend(preview_writes(&manifest_preview));
 
         Ok(Self {
             registry_entry_preview,
             docs_preview,
+            lifecycle_state_preview,
             manifest_preview,
             release_preview,
             manual_follow_up,
@@ -596,187 +568,4 @@ fn workspace_members(root_doc: &DocumentMut) -> Result<Vec<PathBuf>, Error> {
             Ok(PathBuf::from(member))
         })
         .collect()
-}
-
-fn normalize_ordered_unique(
-    values: Vec<String>,
-    flag_name: &str,
-    require_non_empty: bool,
-) -> Result<Vec<String>, Error> {
-    if require_non_empty && values.is_empty() {
-        return Err(Error::Validation(format!(
-            "{flag_name} must be provided at least once"
-        )));
-    }
-    let mut seen = BTreeSet::new();
-    let mut out = Vec::with_capacity(values.len());
-    for value in values {
-        let trimmed = value.trim().to_string();
-        if trimmed.is_empty() {
-            return Err(Error::Validation(format!(
-                "{flag_name} must not contain empty values"
-            )));
-        }
-        if !seen.insert(trimmed.clone()) {
-            return Err(Error::Validation(format!(
-                "{flag_name} contains duplicate value `{trimmed}`"
-            )));
-        }
-        out.push(trimmed);
-    }
-    Ok(out)
-}
-
-fn normalize_sorted_unique(values: Vec<String>, flag_name: &str) -> Result<Vec<String>, Error> {
-    let mut out = normalize_ordered_unique(values, flag_name, false)?;
-    out.sort();
-    Ok(out)
-}
-
-fn parse_target_gates(
-    values: Vec<String>,
-    flag_name: &str,
-    canonical_index: &BTreeMap<String, usize>,
-) -> Result<Vec<TargetGate>, Error> {
-    let mut seen = BTreeSet::new();
-    let mut out = Vec::with_capacity(values.len());
-    for value in values {
-        let (capability_id, raw_targets) = value.split_once(':').ok_or_else(|| {
-            Error::Validation(format!(
-                "{flag_name} must be formatted as <capability-id>:<target>[,<target>...] (got `{value}`)"
-            ))
-        })?;
-        let capability_id = validate_gate_scalar(capability_id, flag_name, &value)?;
-        let mut targets = parse_gate_targets(raw_targets, flag_name, &value, canonical_index)?;
-        if !seen.insert((capability_id.clone(), targets.clone())) {
-            return Err(Error::Validation(format!(
-                "{flag_name} contains duplicate entry `{value}`"
-            )));
-        }
-        targets.sort_by_key(|target| canonical_index[target]);
-        out.push(TargetGate {
-            capability_id,
-            targets,
-        });
-    }
-    Ok(out)
-}
-
-fn parse_config_gates(
-    values: Vec<String>,
-    flag_name: &str,
-    canonical_index: &BTreeMap<String, usize>,
-) -> Result<Vec<ConfigGate>, Error> {
-    let mut seen = BTreeSet::new();
-    let mut out = Vec::with_capacity(values.len());
-    for value in values {
-        let mut parts = value.splitn(3, ':');
-        let capability_id =
-            validate_gate_scalar(parts.next().unwrap_or_default(), flag_name, &value)?;
-        let config_key = validate_gate_scalar(parts.next().unwrap_or_default(), flag_name, &value)?;
-        let targets = match parts.next() {
-            Some(raw_targets) => {
-                let mut targets =
-                    parse_gate_targets(raw_targets, flag_name, &value, canonical_index)?;
-                targets.sort_by_key(|target| canonical_index[target]);
-                Some(targets)
-            }
-            None => None,
-        };
-        let signature = format!(
-            "{}:{}:{}",
-            capability_id,
-            config_key,
-            targets
-                .as_ref()
-                .map(|targets| targets.join(","))
-                .unwrap_or_default()
-        );
-        if !seen.insert(signature) {
-            return Err(Error::Validation(format!(
-                "{flag_name} contains duplicate entry `{value}`"
-            )));
-        }
-        out.push(ConfigGate {
-            capability_id,
-            config_key,
-            targets,
-        });
-    }
-    Ok(out)
-}
-
-fn validate_gate_scalar(value: &str, flag_name: &str, original: &str) -> Result<String, Error> {
-    let trimmed = value.trim();
-    if trimmed.is_empty() {
-        return Err(Error::Validation(format!(
-            "{flag_name} contains an empty field in `{original}`"
-        )));
-    }
-    Ok(trimmed.to_string())
-}
-
-fn parse_gate_targets(
-    raw_targets: &str,
-    flag_name: &str,
-    original: &str,
-    canonical_index: &BTreeMap<String, usize>,
-) -> Result<Vec<String>, Error> {
-    let targets = raw_targets
-        .split(',')
-        .map(str::trim)
-        .filter(|target| !target.is_empty())
-        .map(ToOwned::to_owned)
-        .collect::<Vec<_>>();
-    if targets.is_empty() {
-        return Err(Error::Validation(format!(
-            "{flag_name} must declare at least one target in `{original}`"
-        )));
-    }
-
-    let mut seen = BTreeSet::new();
-    for target in &targets {
-        if !seen.insert(target.clone()) {
-            return Err(Error::Validation(format!(
-                "{flag_name} contains duplicate target `{target}` in `{original}`"
-            )));
-        }
-        if !canonical_index.contains_key(target) {
-            return Err(Error::Validation(format!(
-                "{flag_name} target `{target}` is not present in --canonical-target"
-            )));
-        }
-    }
-    Ok(targets)
-}
-
-fn canonical_index(canonical_targets: &[String]) -> BTreeMap<String, usize> {
-    canonical_targets
-        .iter()
-        .enumerate()
-        .map(|(index, target)| (target.clone(), index))
-        .collect()
-}
-
-fn required_arg(value: Option<String>, flag_name: &str) -> Result<String, Error> {
-    let value = value.ok_or_else(|| {
-        Error::Validation(format!(
-            "{flag_name} must be provided when --approval is not used"
-        ))
-    })?;
-    let trimmed = value.trim();
-    if trimmed.is_empty() {
-        return Err(Error::Validation(format!(
-            "{flag_name} must not be empty when --approval is not used"
-        )));
-    }
-    Ok(trimmed.to_string())
-}
-
-fn required_bool(value: Option<bool>, flag_name: &str) -> Result<bool, Error> {
-    value.ok_or_else(|| {
-        Error::Validation(format!(
-            "{flag_name} must be provided when --approval is not used"
-        ))
-    })
 }

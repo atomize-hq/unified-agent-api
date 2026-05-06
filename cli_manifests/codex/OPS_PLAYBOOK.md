@@ -19,9 +19,30 @@ Key policy references:
   `cli_manifests/codex/current.json` is generated and should correspond to `latest_validated.txt`.
 - **Help/real-binary reality wins.** Snapshot diffs and real-binary validations are the primary source of truth; “additional signals” (release notes mining, doc cross-checks) are alerts only.
 
+## Live Upstream-Release Flow
+
+The shipped maintenance path for Codex parity is:
+
+1. `.github/workflows/agent-maintenance-release-watch.yml` detects stale `codex` parity from registry truth and dispatches `.github/workflows/codex-cli-update-snapshot.yml`.
+2. The worker refreshes the Codex parity artifacts, runs `prepare-agent-maintenance --write`, and opens branch `automation/codex-maintenance-<target_version>` with PR body `docs/agents/lifecycle/codex-maintenance/governance/pr-summary.md`.
+3. The maintainer reviews `docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml` and `docs/agents/lifecycle/codex-maintenance/HANDOFF.md`, then runs:
+
+```bash
+cargo run -p xtask -- execute-agent-maintenance --request docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml --dry-run
+cargo run -p xtask -- execute-agent-maintenance --request docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml --write --run-id <prepared_run_id>
+```
+
+4. `execute-agent-maintenance --dry-run` is the required trust step before write mode. It validates local Codex preflight, prints the exact writable surfaces and green gates, and prepares the frozen run packet under `docs/agents/.uaa-temp/agent-maintenance/runs/<run_id>/`.
+5. `execute-agent-maintenance --write` reuses that prepared baseline, enforces the request-owned write envelope, runs the request-owned green gates, and stops before closeout.
+6. The maintainer reviews the diff and runs `close-agent-maintenance` explicitly. Closeout is never performed by the relay.
+
+Boundaries:
+- Promotion-only pointer changes such as `latest_validated.txt` and `min_supported.txt` remain separate maintainer actions and are not part of the upstream-release relay.
+- Packet-only agents remain deferred; do not widen non-relay maintenance packets into `execute-agent-maintenance --write`.
+
 ## Release Watch: Triage Checklist
 
-When the nightly Release Watch workflow alerts (issue/comment):
+When the shared Release Watch workflow runs, or when you manually inspect a queued Codex maintenance item:
 
 1. Confirm the alert is for a **stable** upstream release (not draft/prerelease).
 2. Record:
@@ -34,14 +55,23 @@ When the nightly Release Watch workflow alerts (issue/comment):
 
 ## Run Update Snapshot (workflow_dispatch)
 
+Normal operation is the shared watcher dispatch above. Use this workflow manually only to replay or repair the worker step for a known target version.
+
 Preferred path: run the GitHub Actions workflow:
 - `.github/workflows/codex-cli-update-snapshot.yml`
 
-Required input:
-- `version`: the exact upstream version to validate (example: `0.77.0`)
+Required replay inputs:
+- `agent_id`: `codex`
+- `current_version`: the current validated Codex version from registry truth
+- `latest_stable`: the latest stable upstream version seen by the watcher
+- `target_version`: the worker target version to validate
+- `opened_from`: the repo-relative worker workflow path, `.github/workflows/codex-cli-update-snapshot.yml`
+- `detected_by`: `.github/workflows/agent-maintenance-release-watch.yml`
+- `dispatch_kind`: `workflow_dispatch`
+- `branch_name`: `automation/codex-maintenance-<target_version>`
 
 Optional inputs:
-- “update min supported” toggle (if present): **deprecated**. `min_supported.txt` is a maintainer-only policy decision and must be updated in a separate PR (the workflow rejects automated updates).
+- `update_min_supported`: keep `false`. `min_supported.txt` is a maintainer-only policy decision and must be updated in a separate PR.
 
 Notes:
 - The workflow is responsible for downloading/extracting the upstream release artifact(s) and updating `cli_manifests/codex/artifacts.lock.json`.
@@ -52,15 +82,21 @@ Notes:
 
 ## Automation PRs: Agent Instructions
 
-The Update Snapshot workflow opens a PR branch like `automation/codex-cli-<version>`.
+The Update Snapshot workflow opens a PR branch like `automation/codex-maintenance-<version>`.
 
-That PR is intentionally *not* the “fix parity” PR by itself; it is the **work queue** PR. The implementation work happens by:
-- using the generated report JSON to enumerate missing/unsupported surfaces, and
-- updating `crates/codex` + `crates/codex/src/wrapper_coverage_manifest.rs`, then regenerating reports.
+That PR is intentionally *not* self-closing. It is the maintainer handoff point for the local relay. The implementation work happens by:
+- reviewing the generated request and canonical `HANDOFF.md`
+- running `execute-agent-maintenance --dry-run`
+- running `execute-agent-maintenance --write --run-id <prepared_run_id>`
+- reviewing the resulting diff, then recording closeout explicitly with `close-agent-maintenance`
 
 Use:
 - `cli_manifests/codex/PR_BODY_TEMPLATE.md` as the PR description template (starts with `@codex`).
 - `cli_manifests/codex/CI_AGENT_RUNBOOK.md` as the detailed operating instructions for the agent.
+
+If PR creation fails after packet generation, or local relay preflight fails, use the machine-derived recovery instructions rendered in:
+- `docs/agents/lifecycle/codex-maintenance/HANDOFF.md`
+- `docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml`
 
 ### Target end state (v1)
 

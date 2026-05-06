@@ -6,27 +6,17 @@ use std::{
 
 use crate::{
     agent_registry::AgentRegistryEntry,
+    capability_publication as capability_publication_mod,
     support_matrix::{
         BackendSupportState, ManifestSupportState, PointerPromotionState, SupportRow,
         UaaSupportState,
     },
 };
-use agent_api::{
-    backends::{
-        claude_code::{ClaudeCodeBackend, ClaudeCodeBackendConfig},
-        codex::{CodexBackend, CodexBackendConfig},
-        gemini_cli::{GeminiCliBackend, GeminiCliBackendConfig},
-        opencode::{OpencodeBackend, OpencodeBackendConfig},
-    },
-    AgentWrapperBackend,
-};
 use serde::Deserialize;
 
 use super::{
-    CAPABILITY_EXTERNAL_SANDBOX_V1, CAPABILITY_MCP_ADD_V1, CAPABILITY_MCP_GET_V1,
-    CAPABILITY_MCP_LIST_V1, CAPABILITY_MCP_REMOVE_V1, RELEASE_DOC_END_MARKER,
-    RELEASE_DOC_START_MARKER, SUPPORT_MARKDOWN_END_MARKER, SUPPORT_MARKDOWN_START_MARKER,
-    SUPPORT_MATRIX_MARKDOWN_PATH,
+    RELEASE_DOC_END_MARKER, RELEASE_DOC_START_MARKER, SUPPORT_MARKDOWN_END_MARKER,
+    SUPPORT_MARKDOWN_START_MARKER, SUPPORT_MATRIX_MARKDOWN_PATH,
 };
 
 pub(super) fn collect_capability_truth(
@@ -36,68 +26,51 @@ pub(super) fn collect_capability_truth(
     let manifest_path = workspace_root
         .join(&entry.manifest_root)
         .join("current.json");
-    let manifest: ManifestCurrent = read_json(&manifest_path)?;
-    let mut capabilities = runtime_capabilities(&entry.agent_id)?;
+    let manifest = capability_publication_mod::read_manifest_current(&manifest_path)?;
+    project_capability_truth(entry, workspace_root, &manifest)
+}
 
-    match entry.agent_id.as_str() {
-        "codex" | "claude_code" => {
-            capabilities.insert(CAPABILITY_EXTERNAL_SANDBOX_V1.to_string());
-            capabilities.insert(CAPABILITY_MCP_ADD_V1.to_string());
-            capabilities.insert(CAPABILITY_MCP_REMOVE_V1.to_string());
-        }
-        "gemini_cli" | "opencode" => {}
-        other => {
-            return Err(format!(
-                "capability truth does not support backend `{other}`"
-            ));
-        }
-    }
-
-    if known_mcp_capability_ids()
-        .iter()
-        .any(|capability_id| declared_mcp_projection(entry, capability_id).is_some())
-    {
-        let primary_target = entry.canonical_targets.first().ok_or_else(|| {
+#[cfg(not(test))]
+fn project_capability_truth(
+    entry: &AgentRegistryEntry,
+    _workspace_root: &Path,
+    manifest: &capability_publication_mod::ManifestCurrent,
+) -> Result<BTreeSet<String>, String> {
+    capability_publication_mod::project_manifest_advertised_capabilities(entry, manifest).map_err(
+        |err| {
             format!(
-                "registry entry `{}` has no canonical targets",
+                "capability truth for `{}` is invalid: {err}",
                 entry.agent_id
             )
-        })?;
-        if !manifest
-            .expected_targets
-            .iter()
-            .any(|target| target == primary_target)
-        {
-            return Err(format!(
-                "{} missing primary canonical target `{primary_target}` in expected_targets",
-                manifest_path.display()
-            ));
-        }
+        },
+    )
+}
 
-        for capability_id in known_mcp_capability_ids() {
-            let declaration = declared_mcp_projection(entry, capability_id);
-            let available_on_primary_target = declaration.as_ref().is_some_and(|projection| {
-                projection.supports_target(primary_target)
-                    && command_available_on_target(
-                        &manifest,
-                        mcp_command_path(capability_id),
-                        primary_target,
-                    )
-            });
-            let advertise_when_available = declaration
-                .as_ref()
-                .is_some_and(|projection| projection.advertise_when_available);
-
-            sync_capability_from_manifest(
-                &mut capabilities,
-                capability_id,
-                available_on_primary_target,
-                advertise_when_available,
-            );
-        }
-    }
-
-    Ok(capabilities)
+#[cfg(test)]
+fn project_capability_truth(
+    entry: &AgentRegistryEntry,
+    workspace_root: &Path,
+    manifest: &capability_publication_mod::ManifestCurrent,
+) -> Result<BTreeSet<String>, String> {
+    let registry = crate::agent_registry::AgentRegistry::load(workspace_root)
+        .map_err(|err| format!("load agent registry: {err}"))?;
+    let publication_entry = registry.find(&entry.agent_id).ok_or_else(|| {
+        format!(
+            "capability truth for `{}` is invalid: registry entry is missing from {}",
+            entry.agent_id,
+            crate::agent_registry::REGISTRY_RELATIVE_PATH
+        )
+    })?;
+    capability_publication_mod::project_manifest_advertised_capabilities(
+        publication_entry,
+        manifest,
+    )
+    .map_err(|err| {
+        format!(
+            "capability truth for `{}` is invalid: {err}",
+            entry.agent_id
+        )
+    })
 }
 
 pub(super) fn parse_capability_matrix_agent_support(
@@ -330,129 +303,12 @@ where
     serde_json::from_str(&text).map_err(|err| format!("parse({}): {err}", path.display()))
 }
 
-#[derive(Debug, Deserialize)]
-pub(super) struct ManifestCurrent {
-    #[serde(default)]
-    pub expected_targets: Vec<String>,
-    #[serde(default)]
-    pub commands: Vec<ManifestCommand>,
-}
-
-#[derive(Debug, Deserialize)]
-pub(super) struct ManifestCommand {
-    pub path: Vec<String>,
-    #[serde(default)]
-    pub available_on: Vec<String>,
-}
+pub(super) type ManifestCurrent = capability_publication_mod::ManifestCurrent;
 
 #[derive(Debug)]
 pub(super) struct ReleaseDocPackages {
     pub published_crates: Vec<String>,
     pub publish_order: Vec<String>,
-}
-
-#[derive(Debug, Clone, Copy)]
-struct DeclaredMcpProjection<'a> {
-    targets: Option<&'a [String]>,
-    advertise_when_available: bool,
-}
-
-impl DeclaredMcpProjection<'_> {
-    fn supports_target(&self, target: &str) -> bool {
-        match self.targets {
-            Some(targets) => targets.iter().any(|candidate| candidate == target),
-            None => true,
-        }
-    }
-}
-
-fn runtime_capabilities(agent_id: &str) -> Result<BTreeSet<String>, String> {
-    let ids = match agent_id {
-        "codex" => {
-            CodexBackend::new(CodexBackendConfig::default())
-                .capabilities()
-                .ids
-        }
-        "claude_code" => {
-            ClaudeCodeBackend::new(ClaudeCodeBackendConfig::default())
-                .capabilities()
-                .ids
-        }
-        "gemini_cli" => {
-            GeminiCliBackend::new(GeminiCliBackendConfig::default())
-                .capabilities()
-                .ids
-        }
-        "opencode" => {
-            OpencodeBackend::new(OpencodeBackendConfig::default())
-                .capabilities()
-                .ids
-        }
-        other => {
-            return Err(format!(
-                "capability truth does not support backend `{other}`"
-            ));
-        }
-    };
-
-    Ok(ids.into_iter().collect())
-}
-
-fn declared_mcp_projection<'a>(
-    entry: &'a AgentRegistryEntry,
-    capability_id: &str,
-) -> Option<DeclaredMcpProjection<'a>> {
-    if let Some(target_gated) = entry
-        .capability_declaration
-        .target_gated
-        .iter()
-        .find(|declaration| declaration.capability_id == capability_id)
-    {
-        return Some(DeclaredMcpProjection {
-            targets: Some(target_gated.targets.as_slice()),
-            advertise_when_available: true,
-        });
-    }
-
-    entry
-        .capability_declaration
-        .config_gated
-        .iter()
-        .find(|declaration| declaration.capability_id == capability_id)
-        .map(|config_gated| DeclaredMcpProjection {
-            targets: config_gated.targets.as_deref(),
-            advertise_when_available: false,
-        })
-}
-
-fn command_available_on_target(manifest: &ManifestCurrent, path: &[&str], target: &str) -> bool {
-    manifest
-        .commands
-        .iter()
-        .find(|command| {
-            command
-                .path
-                .iter()
-                .map(String::as_str)
-                .eq(path.iter().copied())
-        })
-        .is_some_and(|command| command.available_on.iter().any(|item| item == target))
-}
-
-fn sync_capability_from_manifest(
-    capabilities: &mut BTreeSet<String>,
-    capability_id: &str,
-    available_on_target: bool,
-    advertise_when_available: bool,
-) {
-    if available_on_target {
-        if advertise_when_available {
-            capabilities.insert(capability_id.to_string());
-        }
-        return;
-    }
-
-    capabilities.remove(capability_id);
 }
 
 fn manifest_support_str(value: ManifestSupportState) -> &'static str {
@@ -484,25 +340,6 @@ fn pointer_promotion_str(value: PointerPromotionState) -> &'static str {
         PointerPromotionState::LatestSupported => "latest_supported",
         PointerPromotionState::LatestValidated => "latest_validated",
         PointerPromotionState::LatestSupportedAndValidated => "latest_supported_and_validated",
-    }
-}
-
-fn known_mcp_capability_ids() -> [&'static str; 4] {
-    [
-        CAPABILITY_MCP_LIST_V1,
-        CAPABILITY_MCP_GET_V1,
-        CAPABILITY_MCP_ADD_V1,
-        CAPABILITY_MCP_REMOVE_V1,
-    ]
-}
-
-fn mcp_command_path(capability_id: &str) -> &'static [&'static str] {
-    match capability_id {
-        CAPABILITY_MCP_LIST_V1 => &["mcp", "list"],
-        CAPABILITY_MCP_GET_V1 => &["mcp", "get"],
-        CAPABILITY_MCP_ADD_V1 => &["mcp", "add"],
-        CAPABILITY_MCP_REMOVE_V1 => &["mcp", "remove"],
-        _ => &[],
     }
 }
 

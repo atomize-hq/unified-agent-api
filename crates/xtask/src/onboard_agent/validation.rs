@@ -179,6 +179,7 @@ fn registry_entry_matches_draft(entry: &AgentRegistryEntry, draft: &DraftEntry) 
             == draft.config_gated_capabilities
         && entry.publication.support_matrix_enabled == draft.support_matrix_enabled
         && entry.publication.capability_matrix_enabled == draft.capability_matrix_enabled
+        && entry.publication.capability_matrix_target == draft.capability_matrix_target
         && entry.release.docs_release_track == draft.docs_release_track
         && entry.scaffold.onboarding_pack_prefix == draft.onboarding_pack_prefix
 }

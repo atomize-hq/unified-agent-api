@@ -23,9 +23,30 @@ Key references:
 - **Authoritative pointers:** `min_supported.txt` and `latest_validated.txt` (plus per-target pointers under `pointers/`). During bootstrap these pointers may be `none`.
 - **Promotion safety:** only promote versions that have passed validation on the required target and meet the `RULES.json` gating rules.
 
+## Live Upstream-Release Flow
+
+The shipped maintenance path for Claude Code parity is:
+
+1. `.github/workflows/agent-maintenance-release-watch.yml` detects stale `claude_code` parity from registry truth and dispatches `.github/workflows/claude-code-update-snapshot.yml`.
+2. The worker refreshes the Claude Code parity artifacts, runs `prepare-agent-maintenance --write`, and opens branch `automation/claude-code-<target_version>` with PR body `docs/agents/lifecycle/claude_code-maintenance/governance/pr-summary.md`.
+3. The maintainer reviews `docs/agents/lifecycle/claude_code-maintenance/governance/maintenance-request.toml` and `docs/agents/lifecycle/claude_code-maintenance/HANDOFF.md`, then runs:
+
+```bash
+cargo run -p xtask -- execute-agent-maintenance --request docs/agents/lifecycle/claude_code-maintenance/governance/maintenance-request.toml --dry-run
+cargo run -p xtask -- execute-agent-maintenance --request docs/agents/lifecycle/claude_code-maintenance/governance/maintenance-request.toml --write --run-id <prepared_run_id>
+```
+
+4. `execute-agent-maintenance --dry-run` is the required trust step before write mode. It validates local Codex preflight, prints the exact writable surfaces and green gates, and prepares the frozen run packet under `docs/agents/.uaa-temp/agent-maintenance/runs/<run_id>/`.
+5. `execute-agent-maintenance --write` reuses that prepared baseline, enforces the request-owned write envelope, runs the request-owned green gates, and stops before closeout.
+6. The maintainer reviews the diff and runs `close-agent-maintenance` explicitly. Closeout is never performed by the relay.
+
+Boundaries:
+- Promotion-only pointer changes remain separate maintainer actions and are not part of the upstream-release relay.
+- Packet-only agents remain deferred; do not widen non-relay maintenance packets into `execute-agent-maintenance --write`.
+
 ## Release Watch: Triage Checklist
 
-When the nightly Release Watch workflow runs (or you run it manually):
+When the shared Release Watch workflow runs, or when you manually inspect a queued Claude Code maintenance item:
 
 1. Read the upstream `stable` pointer from the Claude Code distribution bucket.
 2. Compare to `cli_manifests/claude_code/latest_validated.txt`.
@@ -33,11 +54,20 @@ When the nightly Release Watch workflow runs (or you run it manually):
 
 ## Update Snapshot (workflow_dispatch)
 
+Normal operation is the shared watcher dispatch above. Use this workflow manually only to replay or repair the worker step for a known target version.
+
 Preferred path: run the GitHub Actions workflow:
 - `.github/workflows/claude-code-update-snapshot.yml`
 
-Required input:
-- `version` (bare semver, example: `2.1.29`)
+Required replay inputs:
+- `agent_id`: `claude_code`
+- `current_version`: the current validated Claude Code version from registry truth
+- `latest_stable`: the latest stable upstream version seen by the watcher
+- `target_version`: the worker target version to validate
+- `opened_from`: the repo-relative worker workflow path, `.github/workflows/claude-code-update-snapshot.yml`
+- `detected_by`: `.github/workflows/agent-maintenance-release-watch.yml`
+- `dispatch_kind`: `workflow_dispatch`
+- `branch_name`: `automation/claude-code-<target_version>`
 
 Responsibilities (high level):
 - Download `manifest.json` and verify integrity (sha256 + size).
@@ -50,8 +80,17 @@ Responsibilities (high level):
   - `xtask codex-version-metadata --root cli_manifests/claude_code`
   - `xtask codex-validate --root cli_manifests/claude_code`
 - Generate a triad scaffold under:
-  - `docs/project_management/next/claude-code-cli-parity-<version>/`
+  - `.archived/project_management/next/claude-code-cli-parity-<version>/`
 - Open a PR branch `automation/claude-code-<version>`.
+
+After the worker PR exists, complete the maintainer-owned implementation step through the relay:
+
+```bash
+cargo run -p xtask -- execute-agent-maintenance --request docs/agents/lifecycle/claude_code-maintenance/governance/maintenance-request.toml --dry-run
+cargo run -p xtask -- execute-agent-maintenance --request docs/agents/lifecycle/claude_code-maintenance/governance/maintenance-request.toml --write --run-id <prepared_run_id>
+```
+
+Use the recovery notes rendered in `HANDOFF.md` and `maintenance-request.toml` if PR creation or local relay preflight fails. Manual closeout remains explicit and outside relay write mode.
 
 ## Promotion (manual gate)
 

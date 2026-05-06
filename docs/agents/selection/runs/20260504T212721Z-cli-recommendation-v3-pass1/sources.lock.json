@@ -1,0 +1,152 @@
+{
+  "candidates": [
+    {
+      "agent_id": "goose",
+      "evidence_refs": [
+        {
+          "captured_at": "2026-05-04T21:37:24Z",
+          "evidence_id": "goose-install",
+          "kind": "official_doc",
+          "sha256": "e84733da403fcae1e17ed01b4bda9f3a336931cf30b9a2ef0d1f36aec2c52d52",
+          "title": "Install goose | goose",
+          "url": "https://goose-docs.ai/docs/getting-started/installation/"
+        },
+        {
+          "captured_at": "2026-05-04T21:37:24Z",
+          "evidence_id": "goose-running-tasks",
+          "kind": "official_doc",
+          "sha256": "d002ed8274bbf0f8f1150461a6d9478c9f9fb117eb210c59fafe408909439781",
+          "title": "Running Tasks | goose",
+          "url": "https://goose-docs.ai/docs/guides/running-tasks/"
+        },
+        {
+          "captured_at": "2026-05-04T21:37:24Z",
+          "evidence_id": "goose-providers",
+          "kind": "official_doc",
+          "sha256": "f7d01783c49ca399ff72f9ef2fca427a1c4dde0d58b7e6c4ef924bbb539db13e",
+          "title": "Configure LLM Provider | goose",
+          "url": "https://goose-docs.ai/docs/getting-started/providers/"
+        },
+        {
+          "captured_at": "2026-05-04T21:37:24Z",
+          "evidence_id": "goose-github",
+          "kind": "github",
+          "sha256": "38447a5dc47dfa041850553e6c2ce38f1bb4b3373eef53d65a08baca8a379dd5",
+          "title": "GitHub - aaif-goose/goose",
+          "url": "https://github.com/aaif-goose/goose"
+        },
+        {
+          "captured_at": "2026-05-04T21:37:24Z",
+          "evidence_id": "goose-pypi",
+          "kind": "package_registry",
+          "sha256": "32ed63159c77e21ee19ca1b9aa3213ccf0218eb59539560b132a8e68ef0e18ea",
+          "title": "goose-ai \u00b7 PyPI",
+          "url": "https://pypi.org/project/goose-ai/"
+        }
+      ],
+      "probe_output_refs": []
+    },
+    {
+      "agent_id": "openhands",
+      "evidence_refs": [
+        {
+          "captured_at": "2026-05-04T21:37:24Z",
+          "evidence_id": "openhands-product",
+          "kind": "ancillary",
+          "sha256": "0d035d579ee1452b5c4208356a37997be58e45132a589b5adf13b49cb799b7af",
+          "title": "OpenHands CLI | Secure, Scalable Agentic Software Development",
+          "url": "https://openhands.dev/product/cli"
+        },
+        {
+          "captured_at": "2026-05-04T21:37:24Z",
+          "evidence_id": "openhands-install",
+          "kind": "official_doc",
+          "sha256": "cbc3755e7b3ac262baab6149f0f8ed1577a98d417f96a085dc069999371c1346",
+          "title": "Installation - OpenHands Docs",
+          "url": "https://docs.openhands.dev/openhands/usage/cli/installation"
+        },
+        {
+          "captured_at": "2026-05-04T21:37:24Z",
+          "evidence_id": "openhands-headless",
+          "kind": "official_doc",
+          "sha256": "e18e1dfc839bae65ea7a95f9bc05c13f34224e4bb7f47640c10c05ac6c6ea0b9",
+          "title": "Headless Mode - OpenHands Docs",
+          "url": "https://docs.openhands.dev/openhands/usage/cli/headless"
+        },
+        {
+          "captured_at": "2026-05-04T21:37:24Z",
+          "evidence_id": "openhands-command",
+          "kind": "official_doc",
+          "sha256": "6b861dbfd48fe23902d2a7f1defa04fb67ed22be548d93981e04677107e26a39",
+          "title": "Command Reference - OpenHands Docs",
+          "url": "https://docs.openhands.dev/openhands/usage/cli/command-reference"
+        },
+        {
+          "captured_at": "2026-05-04T21:37:24Z",
+          "evidence_id": "openhands-github",
+          "kind": "github",
+          "sha256": "ba39a54dd32b832a3bf580fdf668e45919374dec01fe972e2ae8b87b3691f929",
+          "title": "GitHub - OpenHands/OpenHands-CLI",
+          "url": "https://github.com/OpenHands/OpenHands-CLI"
+        },
+        {
+          "captured_at": "2026-05-04T21:37:24Z",
+          "evidence_id": "openhands-pypi",
+          "kind": "package_registry",
+          "sha256": "32ed63159c77e21ee19ca1b9aa3213ccf0218eb59539560b132a8e68ef0e18ea",
+          "title": "openhands \u00b7 PyPI",
+          "url": "https://pypi.org/project/openhands/"
+        }
+      ],
+      "probe_output_refs": []
+    },
+    {
+      "agent_id": "gptme",
+      "evidence_refs": [
+        {
+          "captured_at": "2026-05-04T21:37:24Z",
+          "evidence_id": "gptme-home",
+          "kind": "ancillary",
+          "sha256": "eadd3af65d6cbb0439d451ec605376617d3f3d6ce2db9c67750ceb79682474a4",
+          "title": "gptme - agent in your terminal",
+          "url": "https://gptme.org/"
+        },
+        {
+          "captured_at": "2026-05-04T21:37:24Z",
+          "evidence_id": "gptme-getting-started",
+          "kind": "official_doc",
+          "sha256": "472d47f2856a51bb532d590368d0e834a1fbcc0ada8ba8da154db27cc90e7796",
+          "title": "Getting Started \u2014 gptme",
+          "url": "https://gptme.org/docs/getting-started.html"
+        },
+        {
+          "captured_at": "2026-05-04T21:37:24Z",
+          "evidence_id": "gptme-config",
+          "kind": "official_doc",
+          "sha256": "8e167a80c6c8b8595c728efb8eec82a1adb2b5e5cfc35bd63f1c01811ebcdc9e",
+          "title": "Configuration \u2014 gptme",
+          "url": "https://gptme.org/docs/config.html"
+        },
+        {
+          "captured_at": "2026-05-04T21:37:24Z",
+          "evidence_id": "gptme-github",
+          "kind": "github",
+          "sha256": "2d45467c88e9fb938c159877534812f9105c30f5255efd9154b3ce350978ce9f",
+          "title": "GitHub - gptme/gptme",
+          "url": "https://github.com/gptme/gptme"
+        },
+        {
+          "captured_at": "2026-05-04T21:37:24Z",
+          "evidence_id": "gptme-pypi",
+          "kind": "package_registry",
+          "sha256": "32ed63159c77e21ee19ca1b9aa3213ccf0218eb59539560b132a8e68ef0e18ea",
+          "title": "gptme \u00b7 PyPI",
+          "url": "https://pypi.org/project/gptme/"
+        }
+      ],
+      "probe_output_refs": []
+    }
+  ],
+  "generated_at": "2026-05-04T21:44:04Z",
+  "run_id": "20260504T212721Z-cli-recommendation-v3-pass1"
+}

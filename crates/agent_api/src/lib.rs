@@ -11,16 +11,20 @@ use std::time::Duration;
 
 use futures_core::Stream;
 
+mod agent_kind;
+
 use crate::mcp::{
     normalize_mcp_add_request, normalize_mcp_get_request, normalize_mcp_remove_request,
     AgentWrapperMcpAddRequest, AgentWrapperMcpCommandOutput, AgentWrapperMcpGetRequest,
     AgentWrapperMcpListRequest, AgentWrapperMcpRemoveRequest, CAPABILITY_MCP_ADD_V1,
     CAPABILITY_MCP_GET_V1, CAPABILITY_MCP_LIST_V1, CAPABILITY_MCP_REMOVE_V1,
 };
+use agent_kind::validate_agent_kind;
 
 #[cfg(any(
     feature = "codex",
     feature = "claude_code",
+    feature = "aider",
     feature = "gemini_cli",
     feature = "opencode"
 ))]
@@ -29,6 +33,7 @@ mod bounds;
 #[cfg(any(
     feature = "codex",
     feature = "claude_code",
+    feature = "aider",
     feature = "gemini_cli",
     feature = "opencode"
 ))]
@@ -37,6 +42,7 @@ mod run_handle_gate;
 #[cfg(any(
     feature = "codex",
     feature = "claude_code",
+    feature = "aider",
     feature = "gemini_cli",
     feature = "opencode"
 ))]
@@ -50,6 +56,7 @@ const CAPABILITY_CONTROL_CANCEL_V1: &str = "agent_api.control.cancel.v1";
 #[cfg(any(
     feature = "codex",
     feature = "claude_code",
+    feature = "aider",
     feature = "gemini_cli",
     feature = "opencode",
     test
@@ -600,29 +607,6 @@ impl AgentWrapperGateway {
             backend.mcp_remove(request).await
         })
     }
-}
-
-fn validate_agent_kind(value: &str) -> Result<(), AgentWrapperError> {
-    if value.is_empty() {
-        return Err(AgentWrapperError::InvalidAgentKind {
-            message: "agent kind must not be empty".to_string(),
-        });
-    }
-    let mut chars = value.chars();
-    let first = chars.next().unwrap_or_default();
-    if !first.is_ascii_lowercase() {
-        return Err(AgentWrapperError::InvalidAgentKind {
-            message: "agent kind must start with a lowercase ASCII letter".to_string(),
-        });
-    }
-    for ch in chars {
-        if !(ch.is_ascii_lowercase() || ch.is_ascii_digit() || ch == '_') {
-            return Err(AgentWrapperError::InvalidAgentKind {
-                message: "agent kind must match ^[a-z][a-z0-9_]*$".to_string(),
-            });
-        }
-    }
-    Ok(())
 }
 
 #[cfg(test)]

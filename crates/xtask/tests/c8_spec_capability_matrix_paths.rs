@@ -54,6 +54,56 @@ fn c8_spec_capability_matrix_succeeds_outside_repo_root() {
 }
 
 #[test]
+fn c8_spec_capability_matrix_help_lists_check_flag() {
+    let xtask_bin = PathBuf::from(env!("CARGO_BIN_EXE_xtask"));
+    let workdir = repo_root().join("crates").join("xtask");
+
+    let output = Command::new(&xtask_bin)
+        .arg("capability-matrix")
+        .arg("--help")
+        .current_dir(&workdir)
+        .output()
+        .expect("spawn xtask capability-matrix --help");
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        output.status.success(),
+        "capability-matrix --help from {:?} failed\nstdout:\n{}\nstderr:\n{}",
+        workdir,
+        stdout,
+        stderr
+    );
+
+    let help_text = format!("{stdout}\n{stderr}");
+    assert!(help_text.contains("--check"));
+    assert!(help_text.contains("Verify the checked-in capability matrix"));
+}
+
+#[test]
+fn c8_spec_capability_matrix_check_succeeds_outside_repo_root() {
+    let xtask_bin = PathBuf::from(env!("CARGO_BIN_EXE_xtask"));
+    let workdir = repo_root().join("crates").join("xtask");
+
+    let output = Command::new(&xtask_bin)
+        .arg("capability-matrix")
+        .arg("--check")
+        .current_dir(&workdir)
+        .output()
+        .expect("spawn xtask capability-matrix --check");
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        output.status.success(),
+        "capability-matrix --check from {:?} failed\nstdout:\n{}\nstderr:\n{}",
+        workdir,
+        stdout,
+        stderr
+    );
+}
+
+#[test]
 fn c8_spec_capability_matrix_audit_succeeds_outside_repo_root() {
     let xtask_bin = PathBuf::from(env!("CARGO_BIN_EXE_xtask"));
     let workdir = repo_root().join("crates").join("xtask");

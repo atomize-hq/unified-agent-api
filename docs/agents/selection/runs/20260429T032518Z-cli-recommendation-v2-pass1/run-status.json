@@ -1,0 +1,41 @@
+{
+  "approval_recorded_at": "2026-04-29T03:26:45Z",
+  "approved_agent_id": "openhands",
+  "candidate_status_counts": {
+    "candidate_error": 0,
+    "candidate_rejected": 0,
+    "eligible": 3
+  },
+  "committed_approval_artifact_path": "docs/agents/lifecycle/openhands-discovery-v2-onboarding/governance/approved-agent.toml",
+  "committed_packet_path": "docs/agents/selection/cli-agent-selection-packet.md",
+  "committed_review_dir": "docs/agents/selection/runs/20260429T032518Z-cli-recommendation-v2-pass1",
+  "eligible_candidate_ids": [
+    "openhands",
+    "aider",
+    "goose"
+  ],
+  "errors": [],
+  "generated_at": "2026-04-29T03:26:22Z",
+  "metrics": {
+    "evidence_collection_time_seconds": 180,
+    "fetched_source_count": 9,
+    "later_discovered_blocker_count": null,
+    "maintainer_time_to_decision_seconds": 23,
+    "predicted_blocker_count": 1,
+    "rejected_before_scoring_count": 0,
+    "shortlist_override": false
+  },
+  "next_action": null,
+  "override_reason": null,
+  "recommended_agent_id": "openhands",
+  "research_dir": "docs/agents/.uaa-temp/recommend-next-agent/research/20260429T032518Z-cli-recommendation-v2-pass1",
+  "run_dir": "docs/agents/.uaa-temp/recommend-next-agent/runs/20260429T032518Z-cli-recommendation-v2-pass1",
+  "run_id": "20260429T032518Z-cli-recommendation-v2-pass1",
+  "shortlist_ids": [
+    "openhands",
+    "aider",
+    "goose"
+  ],
+  "status": "success",
+  "workflow_version": "discovery_enabled_v2"
+}

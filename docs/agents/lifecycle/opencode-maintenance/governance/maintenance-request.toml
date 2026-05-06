@@ -1,0 +1,14 @@
+artifact_version = "1"
+agent_id = "opencode"
+trigger_kind = "drift_detected"
+basis_ref = "docs/integrations/opencode/governance/seam-2-closeout.md"
+opened_from = "docs/integrations/opencode/governance/seam-2-closeout.md"
+requested_control_plane_actions = [
+  "packet_doc_refresh",
+]
+request_recorded_at = "2026-04-22T00:48:19Z"
+request_commit = "8e77b59"
+
+[runtime_followup_required]
+required = false
+items = []

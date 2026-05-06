@@ -1,906 +1,703 @@
-<!-- /autoplan restore point: /Users/spensermcconnell/.gstack/projects/atomize-hq-unified-agent-api/feat-cli-agent-onboarding-factory-autoplan-restore-20260421-105543.md -->
-# CLI Agent Onboarding Factory - PLAN
+# PLAN - Prove The Real Codex Stale-Maintenance Path
 
-Source:
-- `/Users/spensermcconnell/.gstack/projects/atomize-hq-unified-agent-api/spensermcconnell-main-design-20260420-151505.md`
-- `docs/project_management/next/opencode-cli-onboarding/next-steps-handoff.md`
-- `/Users/spensermcconnell/.gstack/projects/atomize-hq-unified-agent-api/spensermcconnell-main-test-outcome-20260420-091704.md`
-- `docs/project_management/next/gemini-cli-onboarding/HANDOFF.md`
+Status: proposed
+Date: 2026-05-06
+Branch: `codex/recommend-next-agent`
+Base branch: `main`
+Repo: `atomize-hq/unified-agent-api`
+Work item: `Validate the real shared-watcher -> Codex maintenance PR -> maintainer relay path`
+Plan commit baseline: `75aa237`
+Design input: `/Users/spensermcconnell/.gstack/projects/atomize-hq-unified-agent-api/spensermcconnell-codex-recommend-next-agent-design-20260506-091624.md`
+Review addendum: `/Users/spensermcconnell/.gstack/projects/atomize-hq-unified-agent-api/spensermcconnell-codex-recommend-next-agent-eng-review-test-plan-20260506-092335.md`
+Supersedes: the 2026-05-05 relay-implementation `PLAN.md`. That plan mostly described work that is already landed on this branch. This plan is the honest next seam: prove the live path.
 
-Status: M1, M2, and M3 landed on `feat/cli-agent-onboarding-factory`; M4 is the next implementation milestone
-Last updated (UTC): 2026-04-21
+## Objective
 
-## Purpose
-M4 turns post-onboarding maintenance from repo archaeology into a separate, repeatable lifecycle.
+Prove one boring, real, end-to-end Codex maintenance path:
 
-M1 created the reproducible onboarding bridge.
-M2 added write-mode and proved the bridge on one real agent.
-M3 formalized comparison -> approval -> proving-run closeout governance.
+```text
+GitHub schedule on main
+  -> shared watcher runs from default-branch workflow definition
+  -> watcher checks out staging
+  -> maintenance-watch emits stale codex queue entry
+  -> watcher dispatches codex worker with frozen queue fields
+  -> worker checks out staging
+  -> worker opens automation/codex-maintenance-<target_version> PR from generated packet docs
+  -> maintainer opens the PR, reads HANDOFF.md, runs execute-agent-maintenance --dry-run
+  -> maintainer reruns execute-agent-maintenance --write --run-id <prepared_run_id>
+  -> maintainer reviews the diff
+  -> flow stops before close-agent-maintenance
+```
 
-That leaves the next bottleneck. Once an agent is already in the repo, maintainers still have to discover drift manually across:
-- `crates/xtask/data/agent_registry.toml`
-- `cli_manifests/<agent>/**`
-- `docs/specs/unified-agent-api/support-matrix.md`
-- `docs/specs/unified-agent-api/capability-matrix.md`
-- `docs/crates-io-release.md`
-- closed onboarding and implementation packet docs
-
-`onboard-agent` is not the answer to that problem. It is the create-mode bridge for new agents. M4 needs a separate maintenance lane for already-onboarded agents.
-
-## Problem Statement
-If an onboarded agent changes upstream or repo truth drifts, the current repo has no single maintenance entrypoint.
-
-OpenCode already showed the failure shape. The landing itself succeeded, but `/Users/spensermcconnell/.gstack/projects/atomize-hq-unified-agent-api/spensermcconnell-main-test-outcome-20260420-091704.md` records that `docs/project_management/next/opencode-implementation/governance/seam-2-closeout.md` understates the landed OpenCode capability set versus:
-- `crates/agent_api/src/backends/opencode/backend.rs`
-- `docs/specs/opencode-agent-api-backend-contract.md`
-- `docs/specs/unified-agent-api/capability-matrix.md`
-
-That is exactly the class of bug M4 should eliminate:
-- landed runtime/backend truth says one thing
-- generated publication says one thing
-- closed packet/governance docs say something else
-- the operator has to manually rediscover the right repair path
-
-The repo can now onboard a new agent with governed create-mode. It still cannot repair an existing agent boringly once drift appears. M4 must fix that.
-
-## Landed Baseline
-These are already true in this branch and are not M4 work:
-
-- `crates/xtask/data/agent_registry.toml` seeds `codex`, `claude_code`, `opencode`, and `gemini_cli`.
-- `crates/xtask/src/onboard_agent.rs` implements `--dry-run`, `--write`, and `--approval` for new-agent control-plane mutation.
-- `crates/xtask/src/approval_artifact.rs` and `crates/xtask/src/proving_run_closeout.rs` validate approval and closeout truth.
-- `crates/xtask/src/close_proving_run.rs` refreshes onboarding packet docs from a validated proving-run closeout artifact.
-- `crates/xtask/src/support_matrix.rs`, `crates/xtask/src/support_matrix/derive.rs`, and `crates/xtask/src/support_matrix/consistency.rs` already derive and fail closed on support-publication drift.
-- `crates/xtask/src/capability_matrix.rs` already derives capability publication from registry enrollment plus runtime/backend truth.
-- `docs/project_management/next/gemini-cli-onboarding/**` is the first closed factory-backed proving-run packet.
-- OpenCode is already landed, and `/Users/spensermcconnell/.gstack/projects/atomize-hq-unified-agent-api/spensermcconnell-main-test-outcome-20260420-091704.md` documents a real post-onboarding drift issue to use as M4 input.
-
-M4 builds on this exact repo state. It is not M2 or M3 cleanup, and it is not permission to widen `onboard-agent` into an everything command.
-
-## Scope Lock
-In scope:
-- define a separate post-onboarding maintenance lifecycle for already-onboarded agents
-- add agent-scoped drift detection across registry truth, manifest evidence, publication outputs, release docs, and packet/governance docs
-- add a separate maintenance packet root under `docs/project_management/next/<agent>-maintenance/`
-- add separate maintenance request and maintenance closeout artifacts
-- add separate refresh ergonomics for control-plane-owned maintenance work
-- keep maintenance writes bounded to control-plane-owned and generated surfaces
-- use OpenCode as the first maintenance proving run because it has a real documented post-onboarding drift issue
-- make reopen and closeout rules explicit so closed onboarding packets stay immutable
-
-## Not In Scope
-- adding update mode to `xtask onboard-agent`
-- changing the recommendation, approval, or new-agent onboarding flow from M3
-- generating or mutating runtime-owned wrapper/backend code under `crates/<agent>/` or `crates/agent_api/src/backends/<agent>/`
-- mutating raw manifest evidence under `cli_manifests/<agent>/current.json`, `versions/`, `pointers/`, or `reports/` from the control plane
-- collapsing recommendation, onboarding, proving-run closeout, and maintenance into one universal lifecycle command family
-- changing support-matrix or capability-matrix semantics
-- automating candidate research or building `recommend-agent`
-- building a framework-scale runtime abstraction because one agent drifted
+Success is not "the code looks ready." Success is one real scheduled proof with captured evidence, with the manual closeout boundary still intact.
 
 ## Success Criteria
-M4 is complete only when all of these are true:
 
-- `xtask onboard-agent` remains create-only for new agents. Already-onboarded maintenance does not flow through it.
-- `cargo run -p xtask -- check-agent-drift --agent <agent_id>` exists and:
-  - exits `0` when the agent is clean
-  - exits `2` when drift or validation problems are found
-  - emits explicit drift categories instead of a generic failure blob
-- `cargo run -p xtask -- refresh-agent --request <path> --dry-run` exists for already-onboarded agents.
-- `cargo run -p xtask -- refresh-agent --request <path> --write` exists and shares the exact same render plan as `--dry-run`.
-- `cargo run -p xtask -- close-agent-maintenance --request <path> --closeout <path>` exists and validates maintenance closure truth.
-- Maintenance write mode mutates only:
-  - `docs/project_management/next/<agent>-maintenance/**`
-  - generated publication outputs from existing generators
-  - the generated block inside `docs/crates-io-release.md` when it drifted
-- Maintenance write mode never mutates:
-  - `crates/<agent>/**`
-  - `crates/agent_api/src/backends/<agent>/**`
-  - raw manifest evidence files under `cli_manifests/<agent>/**`
-  - historical onboarding packet roots such as `docs/project_management/next/<agent>-cli-onboarding/**`
-- Closed onboarding packets remain immutable. Maintenance history is recorded in the separate maintenance pack.
-- OpenCode is used as the proving run and the known stale capability claim in `docs/project_management/next/opencode-implementation/governance/seam-2-closeout.md` becomes legible, repairable, and closeable through the M4 flow.
-- The M4 test plan exists and remains current at `/Users/spensermcconnell/.gstack/projects/atomize-hq-unified-agent-api/spensermcconnell-feat-cli-agent-onboarding-factory-test-plan-20260421-233454.md`.
+1. A `schedule` event on `.github/workflows/agent-maintenance-release-watch.yml` runs from the default branch workflow definition.
+2. That scheduled watcher run checks out `staging`, not the triggering ref.
+3. The queue job emits a stale `codex` entry with:
+   - `current_validated = 0.97.0`
+   - `version_policy = latest_stable_minus_one`
+   - `dispatch_workflow = codex-cli-update-snapshot.yml`
+   - `branch_name = automation/codex-maintenance-<target_version>`
+4. The emitted `target_version` matches runtime release truth on the day of the run. The current expected value is `0.127.0`, but runtime watcher output wins.
+5. The dispatch job calls the Codex worker without hand-fabricated downstream inputs.
+6. The Codex worker opens a PR whose body comes from `docs/agents/lifecycle/codex-maintenance/governance/pr-summary.md`.
+7. That PR contains:
+   - `docs/agents/lifecycle/codex-maintenance/HANDOFF.md`
+   - `docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml`
+   - `docs/agents/lifecycle/codex-maintenance/governance/pr-summary.md`
+8. A maintainer can run `execute-agent-maintenance --dry-run` from repo root on the PR branch and obtain a prepared run packet under `docs/agents/.uaa-temp/agent-maintenance/runs/<run_id>/`.
+9. A maintainer can run `execute-agent-maintenance --write --run-id <prepared_run_id>` and the relay stays inside its declared write envelope.
+10. No automatic closeout occurs. `close-agent-maintenance` remains manual and untouched.
+11. The temporary cron acceleration on `main` is reverted after the scheduled proof succeeds and the PR exists.
 
-## What Already Exists
-M4 must reuse these surfaces instead of inventing a second factory:
+## Current Truth This Plan Locks In
 
-- Registry and path truth:
-  - `crates/xtask/data/agent_registry.toml`
-  - `crates/xtask/src/agent_registry.rs`
-- Existing control-plane mutation primitives:
-  - `crates/xtask/src/onboard_agent.rs`
-  - `crates/xtask/src/onboard_agent/preview.rs`
-  - `crates/xtask/src/onboard_agent/preview/render.rs`
-  - `crates/xtask/src/onboard_agent/validation.rs`
-  - `crates/xtask/src/workspace_mutation.rs`
-- Existing proving-run governance primitives:
-  - `crates/xtask/src/approval_artifact.rs`
-  - `crates/xtask/src/proving_run_closeout.rs`
-  - `crates/xtask/src/close_proving_run.rs`
-- Existing drift-sensitive publication surfaces:
-  - `crates/xtask/src/support_matrix.rs`
-  - `crates/xtask/src/support_matrix/derive.rs`
-  - `crates/xtask/src/support_matrix/consistency.rs`
-  - `crates/xtask/src/capability_matrix.rs`
-  - `docs/specs/unified-agent-api/support-matrix.md`
-  - `docs/specs/unified-agent-api/capability-matrix.md`
-- Existing release/doc generation surface:
-  - `docs/crates-io-release.md`
-- Historical maintenance input:
-  - `docs/project_management/next/opencode-cli-onboarding/next-steps-handoff.md`
-  - `docs/project_management/next/opencode-implementation/**`
-  - `/Users/spensermcconnell/.gstack/projects/atomize-hq-unified-agent-api/spensermcconnell-main-test-outcome-20260420-091704.md`
+These are the facts this plan treats as authoritative:
 
-## Chosen Approach
-M4 is a separate maintenance lane, not onboarding scope creep.
+1. Scheduled GitHub Actions workflows run from the default branch workflow definition, not this feature branch. A cron-only tweak on `codex/recommend-next-agent` does not prove the real path.
+2. `.github/workflows/agent-maintenance-release-watch.yml` currently checks out `staging`.
+3. `.github/workflows/codex-cli-update-snapshot.yml` also checks out `staging`, even when dispatched from another ref.
+4. `cli_manifests/codex/latest_validated.txt` is currently `0.97.0`.
+5. `crates/xtask/data/agent_registry.toml` records Codex maintenance policy as `version_policy = "latest_stable_minus_one"` with `dispatch_workflow = "codex-cli-update-snapshot.yml"`.
+6. On 2026-05-06, the preflight release check saw stable upstream tag `rust-v0.128.0`, so the current expected target is `0.127.0`. That value is advisory only. The scheduled watcher output is the runtime truth.
+7. Manual closeout is still the trust boundary. `execute-agent-maintenance --write` must stop before `close-agent-maintenance`.
 
-The repo already has a governed create flow:
-- comparison
-- approval
-- create-mode onboarding
-- proving-run closeout
+## Step 0 Scope Challenge
 
-The missing lifecycle is what happens after that when an onboarded agent drifts. The smallest complete M4 is:
-- one drift detector
-- one maintenance request artifact
-- one bounded control-plane refresh command
-- one maintenance closeout artifact
-- one real proving run on OpenCode
+### What This Plan Is
 
-Anything bigger is ocean-boiling. Anything smaller leaves the repo in the same archaeological post-onboarding posture that OpenCode exposed.
+- one execution plan for the real scheduled watcher path
+- one explicit branch-coordination story across `main`, `staging`, and the generated automation branch
+- one proof that the generated PR and the local maintainer relay compose correctly
+- one cleanup path that removes the temporary schedule acceleration as soon as the scheduled proof is done
 
-## Dream State Delta
+### What This Plan Is Not
+
+- another relay feature implementation plan
+- a `workflow_dispatch` success story disguised as scheduled proof
+- a worker-only proof that skips the stale watcher
+- a version-policy redesign
+- an automatic closeout plan
+- a new maintenance architecture
+
+### What Already Exists
+
+| Sub-problem | Existing surface | Reuse decision |
+| --- | --- | --- |
+| stale-agent detection | `crates/xtask/src/agent_maintenance/watch.rs` | Reuse exactly. This plan proves it, it does not redesign it. |
+| queue field freezing | `crates/xtask/tests/agent_maintenance_watch.rs` | Reuse as local proof that expected queue fields are already encoded. |
+| request + execution contract truth | `crates/xtask/src/agent_maintenance/request.rs` | Reuse exactly. The live proof must consume this request surface, not a synthetic packet. |
+| packet generation | `crates/xtask/src/agent_maintenance/prepare.rs` | Reuse exactly. The worker already writes the packet and request from repo-owned truth. |
+| packet rendering consistency | `crates/xtask/tests/agent_maintenance_prepare.rs` | Reuse as fail-closed proof for `HANDOFF.md`, `pr-summary.md`, and prompt digest lockstep. |
+| maintainer relay | `crates/xtask/src/agent_maintenance/execute.rs` | Reuse exactly. The proof must run this command, not an ad hoc substitute. |
+| relay boundary + gate coverage | `crates/xtask/tests/agent_maintenance_execute.rs` | Reuse as local proof that path jail, prompt digest, and manual closeout boundary already exist. |
+| scheduled watcher | `.github/workflows/agent-maintenance-release-watch.yml` | Reuse with one temporary cron acceleration only. |
+| worker PR creation | `.github/workflows/codex-cli-update-snapshot.yml` and `.github/workflows/agent-maintenance-open-pr.yml` | Reuse exactly. The live proof must dispatch the existing workflow path. |
+| maintainer operating contract | `cli_manifests/codex/OPS_PLAYBOOK.md` | Reuse as the human-facing policy and replay surface. |
+
+### Minimum Complete Change
+
+The minimum complete plan is:
+
+1. run local automated preflight against the already-landed maintenance code
+2. make the proof baseline real on `staging`
+3. temporarily accelerate the watcher cron on `main`
+4. wait for one real scheduled run
+5. inspect the generated Codex maintenance PR
+6. run maintainer `--dry-run` and `--write` on that PR branch
+7. capture evidence and revert the temporary cron tweak
+
+Anything smaller proves less than the repo claims.
+
+### Complexity Check
+
+This plan is operationally multi-branch, but permanent code-touch complexity is low:
+
+- one temporary workflow schedule change on `main`
+- no new services
+- no new long-lived abstractions
+- no new permanent automation unless the live proof exposes a defect
+
+That is the right shape. Boring by default.
+
+### Search / Build Decision
+
+- **[Layer 1]** Accept GitHub's native `schedule` semantics. Do not invent a branch-local workaround.
+- **[Layer 1]** Reuse the shared watcher queue and worker dispatch path. Do not create a proof-only trigger.
+- **[Layer 1]** Reuse `execute-agent-maintenance --dry-run|--write` as the only maintainer execution surface.
+- **[Layer 3]** The real bug was not missing relay code. It was reasoning about branch-local cron edits as if scheduled workflows honored them. They do not.
+
+### Distribution Check
+
+No new distributable artifact is introduced here.
+
+The deliverables are:
+
+- one scheduled GitHub Actions watcher run
+- one real Codex maintenance PR
+- one maintainer relay evidence run under `docs/agents/.uaa-temp/agent-maintenance/runs/<run_id>/`
+
+## Locked Decisions
+
+1. The success path is a real `schedule` event, not `workflow_dispatch`.
+2. `workflow_dispatch` is allowed only for debugging after a scheduled failure. It does not satisfy success criteria.
+3. The proof must respect the repo's real branch topology:
+   - `main` owns the scheduled workflow definition
+   - `staging` is the code the watcher and worker actually execute
+   - `automation/codex-maintenance-<target_version>` is the generated maintainer branch
+4. The target version is captured from live queue output at execution time. The plan does not hard-code `0.120.0` or any other stale design value.
+5. The shared watcher and Codex worker remain unchanged unless the proof exposes a real defect.
+6. The generated maintenance PR is the maintainer entrypoint. No synthetic hand-authored packet is allowed.
+7. `execute-agent-maintenance --dry-run` is mandatory before `--write`.
+8. `execute-agent-maintenance --write` must reuse one prepared `run_id`.
+9. The relay stops before `close-agent-maintenance`.
+10. The temporary cron acceleration is reverted immediately after the scheduled watcher and worker proof are complete and the PR exists. The local maintainer proof continues after the revert.
+11. The generated PR stays open by default after proof. It is a real maintenance branch unless a maintainer explicitly declares it validation-only.
+
+## Architecture
+
+### End-To-End Proof Flow
+
 ```text
-CURRENT STATE
-already-onboarded agent
-    |
-    +--> drift appears in docs, publication, or governance truth
-    +--> maintainer manually compares registry, manifests, runtime code, and packet docs
-    +--> repair path is rediscovered from repo history
-
-M4
-already-onboarded agent
-    |
-    +--> check-agent-drift --agent <id>
-    +--> maintenance-request.toml
-    +--> refresh-agent --dry-run / --write
-    +--> runtime/evidence follow-up when required
-    +--> close-agent-maintenance
-
-12-MONTH IDEAL
-already-onboarded agent
-    |
-    +--> boring per-agent drift checks
-    +--> boring maintenance packets
-    +--> boring refresh/closeout loop
-    +--> no reopen requires conversation archaeology
+main
+  -> .github/workflows/agent-maintenance-release-watch.yml
+  -> schedule event fires
+  -> watcher job checks out staging
+  -> cargo run -p xtask -- maintenance-watch --emit-json _ci_tmp/maintenance-watch.json
+  -> queue entry for codex
+       current_validated = 0.97.0
+       latest_stable = <runtime truth>
+       target_version = <runtime truth - 1>
+       dispatch_workflow = codex-cli-update-snapshot.yml
+  -> actions.createWorkflowDispatch(workflow_id = codex-cli-update-snapshot.yml, ref = staging)
+  -> worker job checks out staging
+  -> prepare-agent-maintenance --write
+  -> writes maintenance-request.toml + HANDOFF.md + pr-summary.md
+  -> opens automation/codex-maintenance-<target_version> PR
+  -> maintainer checks out PR branch locally
+  -> execute-agent-maintenance --dry-run
+  -> capture run_id + prepared packet
+  -> execute-agent-maintenance --write --run-id <same run_id>
+  -> green gates pass
+  -> maintainer reviews diff
+  -> stop before close-agent-maintenance
 ```
 
-## M4 Plan Of Record
-### Goal
-Make already-onboarded agents repairable without reopening new-agent onboarding.
+### Branch Topology
 
-### Milestone Outcome
-At the end of M4:
-
-- maintainers can detect drift for one onboarded agent in one command
-- maintainers can open one bounded maintenance packet for that agent
-- control-plane-owned repair steps are previewable and replay-safe
-- runtime/evidence follow-up stays explicit and separate
-- maintenance closure records exactly what was resolved, what was deferred, and whether `make preflight` passed
-- OpenCode proves the workflow on a real post-onboarding drift case
-
-### Maintenance Chain
 ```text
-drift trigger or stale proof
-        |
-        v
-check-agent-drift --agent <agent_id>
-        |
-        v
-maintenance-request.toml
-        |
-        v
-refresh-agent --dry-run / --write
-        |
-        +--> control-plane-owned refreshes
-        +--> explicit runtime/evidence follow-up list
-        |
-        v
-close-agent-maintenance
-        |
-        v
-closed maintenance pack + reopen trigger record
+main
+  owns:
+    - scheduled workflow definition
+    - temporary cron acceleration commit
+    - cron revert commit
+
+staging
+  owns:
+    - watcher code actually executed by the scheduled run
+    - worker code actually executed by the dispatched run
+    - proof baseline commit or deliberate descendant
+
+automation/codex-maintenance-<target_version>
+  owns:
+    - generated maintenance packet
+    - generated PR body
+    - maintainer relay branch
 ```
 
-### Step 0. Scope Challenge
-M4 should extend the existing `xtask` control plane, not create a second factory.
+If `staging` does not contain the proof baseline, the scheduled run is the wrong proof. Full stop.
 
-Existing code already solves most of the hard parts:
-- path jailing, symlink rejection, identical-write detection, and rollback already live in `crates/xtask/src/workspace_mutation.rs`
-- bounded onboarding preview and write planning already exist in `crates/xtask/src/onboard_agent.rs`
-- generated publication truth already exists in `crates/xtask/src/support_matrix.rs` and `crates/xtask/src/capability_matrix.rs`
-- closeout-style artifact validation already exists in `crates/xtask/src/approval_artifact.rs` and `crates/xtask/src/proving_run_closeout.rs`
+### Control Boundaries
 
-Minimum complete change set:
-- add one maintenance namespace under `crates/xtask/src/` for drift, refresh, and closeout logic
-- wire three new subcommands in `crates/xtask/src/main.rs`
-- reuse existing generator and mutation primitives instead of cloning onboarding logic
-- add maintenance-specific integration tests and one maintenance packet root per agent
+| Surface | Allowed responsibility | Must not do |
+| --- | --- | --- |
+| watcher workflow | trigger on schedule, build queue, dispatch worker | bypass queue generation, invent worker-only data |
+| `maintenance-watch` | compute stale queue from registry + upstream truth | fabricate proof-only target versions |
+| worker workflow | refresh parity artifacts, render packet docs, open PR | execute maintainer relay or closeout |
+| `prepare-agent-maintenance` | write request truth and packet docs | mutate maintainer-owned change surfaces |
+| `execute-agent-maintenance` | validate preflight, prepare dry-run packet, perform bounded write run | perform automatic closeout |
+| `close-agent-maintenance` | explicit post-review human attestation | be folded into write mode |
 
-Complexity guardrail:
-- no new crate
-- no lifecycle umbrella abstraction
-- no runtime-owned writes
-- no file-by-file special cases in `main.rs` beyond thin command routing
+## Execution Plan
 
-## Artifact Contract
-### 1. Maintenance request artifact
-Path: `docs/project_management/next/<agent>-maintenance/governance/maintenance-request.toml`
-Format: TOML
-Owner: maintainer workflow
+### Phase 1. Local Preflight And Runtime Truth Capture
 
-Required fields:
-- `artifact_version`
-- `agent_id`
-- `trigger_kind`
-- `basis_ref`
-- `opened_from`
-- `requested_control_plane_actions`
-- `runtime_followup_required`
-- `request_recorded_at`
-- `request_commit`
+Purpose: prove the landed maintenance surfaces are green locally before touching GitHub scheduling.
 
-Rules:
-- must reference an already-onboarded agent in `agent_registry.toml`
-- must not be used to create a new agent
-- must live under the maintenance pack root, not the onboarding pack root
-- `requested_control_plane_actions` may include only bounded maintenance actions:
-  - `packet_doc_refresh`
-  - `support_matrix_refresh`
-  - `capability_matrix_refresh`
-  - `release_doc_refresh`
+Owner branch/worktree: current feature branch or a throwaway local worktree.
 
-Exact schema rules:
-- TOML root only. Unknown top-level keys fail validation.
-- `artifact_version = "1"`
-- `agent_id = "<registry agent id>"`, non-empty, must already exist in `crates/xtask/data/agent_registry.toml`
-- `trigger_kind` is one of:
-  - `drift_detected`
-  - `manual_reopen`
-  - `post_release_audit`
-- `basis_ref` is a repo-relative path to the evidence that triggered maintenance. It must resolve inside the workspace and may point to:
-  - an existing governance closeout doc
-  - a committed spec or publication doc
-  - a committed maintenance packet doc created during the same maintenance run
-- `opened_from` is a repo-relative path to the document or artifact where the maintainer initiated the maintenance run
-- `requested_control_plane_actions` is a non-empty array of unique strings, sorted in file order as written by the maintainer; all values must come from the allowed action set above
-- `runtime_followup_required` is a table with exact fields:
-  - `required = true|false`
-  - `items = ["..."]`
-- `runtime_followup_required.required = false` requires `items = []`
-- `runtime_followup_required.required = true` requires `items` to be a non-empty array of non-blank strings
-- `request_recorded_at` must be RFC3339 UTC
-- `request_commit` must be 7-40 lowercase hex characters
+Commands:
 
-Example:
-```toml
-artifact_version = "1"
-agent_id = "opencode"
-trigger_kind = "drift_detected"
-basis_ref = "docs/project_management/next/opencode-implementation/governance/seam-2-closeout.md"
-opened_from = "docs/project_management/next/opencode-implementation/governance/seam-2-closeout.md"
-requested_control_plane_actions = [
-  "packet_doc_refresh",
-  "capability_matrix_refresh",
-]
-request_recorded_at = "2026-04-22T01:15:00Z"
-request_commit = "1adb8f1"
-
-[runtime_followup_required]
-required = false
-items = []
-```
-
-### 2. Maintenance closeout artifact
-Path: `docs/project_management/next/<agent>-maintenance/governance/maintenance-closeout.json`
-Format: JSON
-Owner: maintenance closeout
-
-Required fields:
-- `request_ref`
-- `request_sha256`
-- `resolved_findings`
-- exactly one of:
-  - `deferred_findings`
-  - `explicit_none_reason`
-- `preflight_passed`
-- `recorded_at`
-- `commit`
-
-Rules:
-- closeout must fail validation if it cannot link back to the request artifact
-- closeout must state what was resolved and whether anything remains deferred
-- maintenance closure must not mutate historical onboarding packet docs directly
-
-Exact schema rules:
-- JSON object root only. Unknown fields fail validation.
-- `request_ref` is the exact repo-relative path to `governance/maintenance-request.toml`
-- `request_sha256` must be 64 lowercase hex characters and must match the current bytes of `request_ref`
-- `resolved_findings` is a non-empty array of objects with exact fields:
-  - `category_id`
-  - `summary`
-  - `surfaces`
-- `deferred_findings`, when present, is a non-empty array of the same object shape as `resolved_findings`
-- every `category_id` in `resolved_findings` or `deferred_findings` must be one of the drift category IDs defined in the drift output contract below
-- every `surfaces` value is a non-empty array of repo-relative paths
-- exactly one of:
-  - `deferred_findings`
-  - `explicit_none_reason`
-- `explicit_none_reason` must be non-empty and is allowed only when `deferred_findings` is absent
-- `preflight_passed` is boolean
-- `recorded_at` must be RFC3339 UTC
-- `commit` must be 7-40 lowercase hex characters
-
-Example:
-```json
-{
-  "request_ref": "docs/project_management/next/opencode-maintenance/governance/maintenance-request.toml",
-  "request_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-  "resolved_findings": [
-    {
-      "category_id": "governance_doc_drift",
-      "summary": "SEAM-2 closeout now matches the landed capability advertisement boundary.",
-      "surfaces": [
-        "docs/project_management/next/opencode-implementation/governance/seam-2-closeout.md",
-        "docs/project_management/next/opencode-maintenance/HANDOFF.md"
-      ]
-    }
-  ],
-  "explicit_none_reason": "No deferred maintenance findings remain after publication and packet refresh.",
-  "preflight_passed": true,
-  "recorded_at": "2026-04-22T01:45:00Z",
-  "commit": "4adefdf"
-}
-```
-
-## Command Contract
-M4 adds a separate maintenance command set.
-
-### Drift detection
 ```bash
-cargo run -p xtask -- check-agent-drift --agent <agent_id>
+cargo test -p xtask --test agent_maintenance_watch
+cargo test -p xtask --test agent_maintenance_prepare
+cargo test -p xtask --test agent_maintenance_execute
+cargo run -p xtask -- maintenance-watch --emit-json _ci_tmp/maintenance-watch.json
 ```
+
+Required outputs:
+
+1. `_ci_tmp/maintenance-watch.json`
+2. local proof that the three maintenance suites are green
+3. captured runtime watcher target from emitted queue JSON
+
+Acceptance:
+
+1. `_ci_tmp/maintenance-watch.json` contains a `codex` stale-agent entry.
+2. `current_validated` is `0.97.0`.
+3. `dispatch_workflow` is `codex-cli-update-snapshot.yml`.
+4. `branch_name` is `automation/codex-maintenance-<target_version>`.
+5. `target_version` is recorded from runtime watcher output. If it differs from `0.127.0`, the emitted value becomes plan truth for the rest of the run.
+6. No test failures exist in the three suites above.
+
+Failure handling:
+
+- If tests fail, stop and fix the repo-owned blocker first.
+- If the watcher emits a different live target than expected, update the proof record and continue. Do not change code just to match the stale design doc.
+- If no stale `codex` entry appears, stop and inspect `latest_validated.txt`, registry metadata, and live upstream release truth before touching GitHub workflows.
+
+### Phase 2. Make The Proof Baseline Real On `staging`
+
+Purpose: ensure the scheduled run will execute the code we actually mean to prove.
+
+Owner branch/worktree: dedicated `staging` prep worktree.
+
+Required actions:
+
+1. Treat `75aa237` as the baseline commit for this proof.
+2. Ensure `staging` contains that baseline or a deliberate descendant with the same maintenance surfaces.
+3. Verify on `staging`:
+   - `crates/xtask/src/agent_maintenance/watch.rs`
+   - `crates/xtask/src/agent_maintenance/request.rs`
+   - `crates/xtask/src/agent_maintenance/prepare.rs`
+   - `crates/xtask/src/agent_maintenance/execute.rs`
+   - `.github/workflows/codex-cli-update-snapshot.yml`
+   - `.github/workflows/agent-maintenance-open-pr.yml`
+
+Acceptance:
+
+1. `staging` contains the exact proof baseline or an intentional descendant.
+2. The code and workflow surfaces above match what Phase 1 validated locally.
+3. There is no remaining ambiguity about which ref the watcher and worker will execute.
+
+Failure handling:
+
+- If `staging` is missing proof code, land the minimum required baseline there before attempting the scheduled run.
+- If `staging` contains unrelated drift that changes maintenance behavior, stop and restate the proof baseline explicitly before continuing.
+
+### Phase 3. Temporarily Accelerate The Scheduled Watcher On `main`
+
+Purpose: get one real scheduled run quickly, without waiting for the normal daily cron.
+
+Owner branch/worktree: dedicated `main` cron-tweak worktree.
+
+Touch surface:
+
+- `.github/workflows/agent-maintenance-release-watch.yml`
+
+Required change:
+
+- replace the current cron `17 3 * * *`
+- with a temporary off-peak every-5-minutes schedule such as `3-58/5 * * * *`
 
 Rules:
-- read-only
-- agent must already exist in `crates/xtask/data/agent_registry.toml`
-- exit `0` means no drift
-- exit `2` means drift or maintenance preconditions failed
-- exit `1` means internal or IO failure
-- output categories must include, when present:
-  - registry versus manifest evidence drift
-  - runtime/backend versus capability publication drift
-  - support publication drift
-  - release/doc generated-block drift
-  - closed packet/governance doc drift
 
-Stable drift category IDs:
-- `registry_manifest_drift`
-- `capability_publication_drift`
-- `support_publication_drift`
-- `release_doc_drift`
-- `governance_doc_drift`
+1. Merge this change to `main`, not the feature branch.
+2. Keep `workflow_dispatch` enabled for debugging, but do not use it as the success path.
+3. Do not change `actions/checkout` ref. `staging` checkout is part of the proof.
+4. Do not change queue-shape or dispatch logic while doing the cron acceleration.
 
-Exact stdout contract:
-- human-readable summary on stdout
-- deterministic block order:
-  1. header
-  2. agent id
-  3. status
-  4. zero or more drift records sorted by `category_id`
-- exact header line:
-  - `== AGENT DRIFT REPORT ==`
-- exact status line:
-  - clean run: `status: clean`
-  - drift run: `status: drift_detected`
+Acceptance:
 
-Exact drift record shape on stdout:
-```text
-category_id: <stable id>
-summary: <single line>
-surfaces:
-  - <repo-relative path>
-  - <repo-relative path>
-```
+1. `main` now hosts the temporary accelerated schedule.
+2. The next scheduled run should happen within 5 minutes, subject to GitHub delay.
+3. `staging` is already ready before this merge happens.
 
-Exact clean-run example:
-```text
-== AGENT DRIFT REPORT ==
-agent_id: opencode
-status: clean
-```
+Failure handling:
 
-Exact drift example:
-```text
-== AGENT DRIFT REPORT ==
-agent_id: opencode
-status: drift_detected
+- If cron acceleration is merged before `staging` is ready, back out and restart with proper branch sequencing.
+- If GitHub scheduling is delayed, keep the temporary cron in place for one bounded retry window before investigating platform delay.
 
-category_id: governance_doc_drift
-summary: maintenance-relevant closeout prose no longer matches landed capability truth.
-surfaces:
-  - docs/project_management/next/opencode-implementation/governance/seam-2-closeout.md
-  - docs/specs/unified-agent-api/capability-matrix.md
-```
+### Phase 4. Observe The Real Scheduled Watcher Run
 
-M4 deliberately does not add JSON output for `check-agent-drift`. The stdout contract above is the only drift-detector output in this milestone.
+Purpose: capture proof that the alarm rang by itself.
 
-### Maintenance refresh
+Evidence to capture from the watcher run:
+
+1. watcher workflow run URL
+2. queue job logs
+3. emitted queue JSON excerpt for the `codex` entry
+4. dispatch job logs showing:
+   - `agent_id = codex`
+   - `dispatch_workflow = codex-cli-update-snapshot.yml`
+   - `dispatch_ref = staging`
+   - `target_version = <runtime watcher value>`
+   - `branch_name = automation/codex-maintenance-<target_version>`
+
+Required assertions:
+
+1. the run was triggered by `schedule`
+2. the workflow definition came from `main`
+3. the job checked out `staging`
+4. the watcher chose the live `latest_stable_minus_one` target
+5. the dispatch job succeeded
+
+Failure handling:
+
+- If no scheduled run appears, leave the accelerated cron in place for one bounded retry window, then inspect GitHub scheduling delay.
+- If the queue is empty for `codex`, stop and inspect live release truth plus `cli_manifests/codex/latest_validated.txt`.
+- If dispatch fails, treat that as the first real defect. Capture logs before changing anything.
+
+### Phase 5. Inspect The Generated Codex Maintenance PR
+
+Purpose: verify the worker opened the PR from repo-owned packet truth.
+
+Evidence to capture:
+
+1. worker workflow run URL
+2. PR URL
+3. PR head branch
+4. file list and body source
+
+Required assertions:
+
+1. the PR branch is `automation/codex-maintenance-<target_version>`
+2. the PR body matches `docs/agents/lifecycle/codex-maintenance/governance/pr-summary.md`
+3. the PR contains:
+   - `docs/agents/lifecycle/codex-maintenance/HANDOFF.md`
+   - `docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml`
+   - `docs/agents/lifecycle/codex-maintenance/governance/pr-summary.md`
+4. the request includes an `[execution_contract]` table
+5. the request and packet agree on:
+   - target version
+   - writable surfaces
+   - ordered commands
+   - manual closeout boundary
+
+Success handling:
+
+- As soon as the watcher run succeeded, the worker run succeeded, and the PR exists, revert the temporary cron acceleration on `main`.
+- After that revert lands, continue with the local maintainer proof.
+
+Failure handling:
+
+- If packet generation succeeded but PR creation failed, follow the repo-owned recovery path already encoded in `.github/workflows/agent-maintenance-open-pr.yml`.
+- That recovery path is a valid repair path for this phase. It is not a substitute for the scheduled watcher proof in Phase 4.
+
+### Phase 6. Prove The Maintainer Path On The PR Branch
+
+Purpose: prove the human handoff the PR is actually for.
+
+Owner branch/worktree: dedicated local checkout of `automation/codex-maintenance-<target_version>`.
+
+Required commands from repo root on the generated PR branch:
+
 ```bash
-cargo run -p xtask -- refresh-agent --request docs/project_management/next/<agent>-maintenance/governance/maintenance-request.toml --dry-run
-cargo run -p xtask -- refresh-agent --request docs/project_management/next/<agent>-maintenance/governance/maintenance-request.toml --write
+cargo run -p xtask -- execute-agent-maintenance \
+  --request docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml \
+  --dry-run
 ```
 
-Rules:
-- `--dry-run` and `--write` are mutually exclusive
-- dry-run and write must share one in-memory render plan
-- request artifact path is jailed and maintenance-root validated
-- unknown agent ids fail closed
-- request actions that imply runtime-owned mutations fail closed
-- exact-byte replay after an identical write is a success no-op
-- exit `0` means success, including identical no-op replay
-- exit `2` means validation or ownership failure
-- exit `1` means internal or IO failure
+Then:
 
-### Maintenance closeout
+1. find the newest directory under `docs/agents/.uaa-temp/agent-maintenance/runs/`
+2. set `RUN_ID` to that directory name
+3. rerun:
+
 ```bash
-cargo run -p xtask -- close-agent-maintenance --request docs/project_management/next/<agent>-maintenance/governance/maintenance-request.toml --closeout docs/project_management/next/<agent>-maintenance/governance/maintenance-closeout.json
+cargo run -p xtask -- execute-agent-maintenance \
+  --request docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml \
+  --write \
+  --run-id "$RUN_ID"
 ```
 
-Rules:
-- validates request linkage and request hash
-- requires explicit resolved findings plus either deferred findings or `explicit_none_reason`
-- refreshes maintenance packet docs only
-- does not reopen or rewrite the historical onboarding packet root
-- exit `0` means validated closure
-- exit `2` means validation or unresolved-maintenance failure
-- exit `1` means internal or IO failure
+Required assertions:
 
-## Controlled Write Set
-The maintenance lane is intentionally narrow.
+1. dry-run writes only under `docs/agents/.uaa-temp/agent-maintenance/runs/<run_id>/`
+2. the prepared packet contains:
+   - `input-contract.json`
+   - `codex-prompt.md`
+   - `run-status.json`
+   - `run-summary.md`
+   - `validation-report.json`
+   - `written-paths.json`
+3. write mode succeeds without boundary violations
+4. the request-owned green gates pass
+5. the resulting diff stays inside the declared write envelope
+6. `maintenance-closeout.json` is not created or mutated by this step
+7. no automatic `close-agent-maintenance` occurs
 
-| Surface | Owner | M4 write mode |
-|---|---|---|
-| `docs/project_management/next/<agent>-maintenance/**` | maintenance control plane | write |
-| `docs/specs/unified-agent-api/support-matrix.md` and `cli_manifests/support_matrix/current.json` via existing generator | generated publication | write |
-| `docs/specs/unified-agent-api/capability-matrix.md` via existing generator | generated publication | write |
-| generated block in `docs/crates-io-release.md` between `<!-- generated-by: xtask onboard-agent; section: crates-io-release -->` and `<!-- /generated-by: xtask onboard-agent; section: crates-io-release -->` | generated publication | write when drifted |
-| `crates/xtask/data/agent_registry.toml` | registry truth | read-only in M4 unless explicit follow-on reopening is approved |
-| `cli_manifests/<agent>/current.json`, `versions/`, `pointers/`, `reports/` | manifest evidence | never |
-| `crates/<agent>/**` | runtime owner | never |
-| `crates/agent_api/src/backends/<agent>/**` | runtime owner | never |
-| `docs/project_management/next/<agent>-cli-onboarding/**` | historical onboarding packet | never |
+Failure handling:
 
-Exact maintenance packet docs surface:
-- `docs/project_management/next/<agent>-maintenance/README.md`
-- `docs/project_management/next/<agent>-maintenance/scope_brief.md`
-- `docs/project_management/next/<agent>-maintenance/seam_map.md`
-- `docs/project_management/next/<agent>-maintenance/threading.md`
-- `docs/project_management/next/<agent>-maintenance/review_surfaces.md`
-- `docs/project_management/next/<agent>-maintenance/HANDOFF.md`
-- `docs/project_management/next/<agent>-maintenance/governance/remediation-log.md`
-- `docs/project_management/next/<agent>-maintenance/governance/maintenance-request.toml`
-- `docs/project_management/next/<agent>-maintenance/governance/maintenance-closeout.json`
+- If local Codex preflight fails, fix local binary/auth and rerun dry-run. Do not force write mode.
+- If write mode fails path validation or prompt digest validation, treat that as a real defect in the relay contract and capture the failure packet before retrying.
 
-Command ownership:
-- maintainer-created only:
-  - `docs/project_management/next/<agent>-maintenance/governance/maintenance-request.toml`
-- `refresh-agent` may write only:
-  - `README.md`
-  - `scope_brief.md`
-  - `seam_map.md`
-  - `threading.md`
-  - `review_surfaces.md`
-  - `HANDOFF.md`
-  - `governance/remediation-log.md`
-- `close-agent-maintenance` may write only:
-  - `governance/maintenance-closeout.json`
-  - `HANDOFF.md`
-  - `governance/remediation-log.md`
+### Phase 7. Capture Final Evidence And Leave The Repo Clean
 
-No maintenance command may write any other docs path.
+Purpose: leave behind proof, not operational debt.
 
-## Architecture Review
-### Preferred module shape
-Keep M4 inside the existing `xtask` crate and make the new code boring:
-- `crates/xtask/src/main.rs`
-  - thin CLI routing only
-- `crates/xtask/src/lib.rs`
-  - export the maintenance namespace only if tests or shared helpers need it
-- `crates/xtask/src/agent_maintenance/`
-  - `drift.rs`
-  - `request.rs`
-  - `refresh.rs`
-  - `closeout.rs`
-  - `docs.rs` only if packet rendering grows past one file
+Required outputs:
 
-If the code stays small, `agent_maintenance.rs` plus a couple of sibling files is better than premature submodule fan-out. The rule is explicit over clever.
+1. scheduled watcher run URL
+2. worker run URL
+3. PR URL
+4. captured watcher queue excerpt
+5. captured `run_id` path used for maintainer proof
+6. final diff summary from the PR branch after `--write`
+7. commit or PR reference that reverted the temporary cron acceleration on `main`
+8. one explicit note stating whether the PR remains open for normal maintainer follow-through or is being treated as validation-only
 
-### Dependency graph
-```text
-xtask main.rs
-    |
-    +--> check-agent-drift
-    |      |
-    |      +--> agent_registry::AgentRegistry
-    |      +--> support_matrix::{derive, consistency}
-    |      +--> capability_matrix runtime/publication truth
-    |      \--> maintenance packet drift inspector
-    |
-    +--> refresh-agent
-    |      |
-    |      +--> maintenance request validator
-    |      +--> workspace_mutation::{WorkspacePathJail, apply_mutations}
-    |      +--> support_matrix generator reuse
-    |      +--> capability_matrix generator reuse
-    |      \--> crates-io generated-block refresh
-    |
-    \--> close-agent-maintenance
-           |
-           +--> maintenance closeout validator
-           +--> request hash/linkage verifier
-           +--> maintenance packet doc refresh
-           \--> workspace_mutation::{WorkspacePathJail, apply_mutations}
+Exit condition:
+
+1. the temporary cron tweak is gone from `main`
+2. the proof evidence above is recorded
+3. the manual closeout boundary is still intact
+4. no silent follow-up debt was created
+
+## Engineering Review Consolidation
+
+### Architecture Review
+
+The architecture is sound if these boundaries stay intact:
+
+1. GitHub schedule triggers the watcher. It does not bypass queue generation.
+2. `maintenance-watch` computes staleness. It does not fabricate worker-only state.
+3. `prepare-agent-maintenance` writes request truth and packet docs. It does not execute maintainer changes.
+4. `execute-agent-maintenance` executes the maintainer relay. It does not perform closeout.
+5. `close-agent-maintenance` remains explicit human attestation after diff review.
+
+This matters because the user-facing product is not "we can generate files." The product is "the repo rings the bell, opens the right PR, and hands the maintainer one safe path."
+
+### Code Quality Review
+
+The main code-quality risk is not duplication. It is humans bypassing the repo-owned surfaces because the proof plan is vague.
+
+This plan therefore chooses:
+
+- one scheduled watcher path
+- one generated PR path
+- one canonical `HANDOFF.md`
+- one `execute-agent-maintenance` relay
+- one manual closeout boundary
+
+That is explicit over clever. It also keeps the permanent diff small because no new architecture is allowed unless the live proof exposes a real defect.
+
+### Performance Review
+
+Performance is not the gating concern here. Timing and coordination are.
+
+The only performance-sensitive choice in this plan is the temporary accelerated cron:
+
+- use an off-peak every-5-minutes schedule
+- avoid top-of-hour spikes
+- revert immediately after the scheduled proof succeeds
+
+No new repo hot path is introduced unless the live proof exposes a bug that requires a separate implementation task.
+
+## Test Review
+
+### Required Automated Suites
+
+Run these before the live proof:
+
+```bash
+cargo test -p xtask --test agent_maintenance_watch
+cargo test -p xtask --test agent_maintenance_prepare
+cargo test -p xtask --test agent_maintenance_execute
 ```
 
-### Architecture decisions
-- `check-agent-drift` is a read-only aggregation layer. It should call existing truth producers and validators, then classify mismatches by agent instead of inventing a second source of truth.
-- `refresh-agent` is the only write-capable maintenance command. It should build one in-memory mutation plan, print it in `--dry-run`, and apply that exact plan in `--write`.
-- `close-agent-maintenance` is a closeout validator plus maintenance-doc refresher. It should look more like `close_proving_run` than `onboard_agent`.
-- Global generated outputs remain global. Agent scoping happens at the operator contract, not by forking support or capability generators into per-agent implementations.
+These already cover the critical repo-owned behavior:
 
-## Code Quality Guardrails
-- Keep `main.rs` as routing glue. Real logic lives in maintenance modules.
-- Model drift categories as explicit enums/structs, not ad hoc strings. The command output can still render readable prose.
-- Keep request and closeout artifact parsing symmetrical with existing approval/closeout validators: parse, validate path ownership, validate schema, then execute.
-- Reuse `workspace_mutation` for every write. No direct `fs::write` calls in maintenance commands.
-- Reuse existing generators for support/capability/release refreshes. Do not duplicate their derivation logic inside maintenance code.
-- Keep maintenance docs rendering deterministic and side-effect free before write mode.
-- If two codepaths need the same validation, extract one small helper. If only one codepath needs it, keep it local. Minimal diff over speculative abstraction.
+- queue freezing and target selection
+- packet rendering and request truth lockstep
+- dry-run packet generation
+- write-envelope enforcement
+- prompt digest fail-closed behavior
+- manual closeout boundary
 
-## Workstreams
-### W1. Agent-Scoped Drift Detection
-Goal: stop making operators manually discover which truth surfaces disagree.
+### Live Proof Coverage Diagram
 
-Deliverables:
-- `check-agent-drift` entrypoint
-- one explicit drift category taxonomy
-- agent-scoped output that aggregates existing validators instead of duplicating them
-
-Primary modules:
-- `crates/xtask/src/main.rs`
-- `crates/xtask/src/agent_registry.rs`
-- `crates/xtask/src/support_matrix.rs`
-- `crates/xtask/src/support_matrix/derive.rs`
-- `crates/xtask/src/support_matrix/consistency.rs`
-- `crates/xtask/src/capability_matrix.rs`
-- new maintenance drift module(s) under `crates/xtask/src/`
-
-Exit criteria:
-- one command can tell maintainers whether an onboarded agent is clean or which surfaces drifted
-
-### W2. Maintenance Request + Refresh
-Goal: add a separate operator path for already-onboarded agents.
-
-Deliverables:
-- `maintenance-request.toml` schema
-- `refresh-agent --dry-run`
-- `refresh-agent --write`
-- maintenance pack scaffold under `docs/project_management/next/<agent>-maintenance/`
-
-Primary modules:
-- `crates/xtask/src/main.rs`
-- new maintenance request and refresh module(s) under `crates/xtask/src/`
-- `crates/xtask/src/workspace_mutation.rs`
-- `crates/xtask/src/support_matrix.rs`
-- `crates/xtask/src/capability_matrix.rs`
-
-Exit criteria:
-- already-onboarded maintenance no longer requires `onboard-agent`
-- refresh writes stay bounded to maintenance and generated publication surfaces
-
-### W3. Maintenance Closeout + Reopen Rules
-Goal: close repairs deterministically without mutating historical onboarding truth.
-
-Deliverables:
-- `maintenance-closeout.json` schema
-- `close-agent-maintenance` entrypoint
-- explicit reopen rules for recurring drift
-
-Primary modules:
-- `crates/xtask/src/main.rs`
-- new maintenance closeout module(s) under `crates/xtask/src/`
-- `crates/xtask/src/workspace_mutation.rs`
-- maintenance packet docs under `docs/project_management/next/<agent>-maintenance/**`
-
-Exit criteria:
-- closed maintenance runs are explicit and replay-safe
-- reopening uses the maintenance lane, not edits to closed onboarding packets
-
-### W4. OpenCode Maintenance Proving Run
-Goal: prove the maintenance lane on a real post-onboarding drift issue.
-
-Deliverables:
-- `docs/project_management/next/opencode-maintenance/**`
-- a maintenance request that cites the stale capability claim
-- refreshed maintenance packet truth
-- validated maintenance closeout
-
-Primary modules:
-- `docs/project_management/next/opencode-implementation/**`
-- `docs/specs/opencode-agent-api-backend-contract.md`
-- `docs/specs/unified-agent-api/capability-matrix.md`
-
-Exit criteria:
-- the repo can repair the OpenCode stale closeout claim through the new M4 flow without conversation archaeology
-
-### OpenCode source-of-truth precedence
-To remove ambiguity in the proving run, maintenance must resolve conflicting claims in this order:
-1. landed runtime/backend behavior in `crates/agent_api/src/backends/opencode/**`
-2. canonical spec contract in `docs/specs/opencode-agent-api-backend-contract.md`
-3. generated publication outputs derived from the landed runtime/spec truth
-4. historical governance and closeout docs under `docs/project_management/next/opencode-implementation/**`
-
-Implications:
-- if historical governance prose disagrees with runtime/spec truth, governance docs are repaired
-- if generated capability publication disagrees with runtime/spec truth, the generator output is refreshed
-- M4 does not mutate runtime code or raw manifest evidence to make the docs “look consistent”
-- the OpenCode proving run is blocked only if runtime behavior and canonical spec disagree with each other, because that is a pre-existing truth conflict outside the M4 write set
-
-## Implementation Sequence
-### Phase 1. Drift Contract Lock
-Outputs:
-- drift taxonomy
-- `check-agent-drift`
-- OpenCode proving-run target confirmed
-
-Modules touched:
-- `crates/xtask/src/main.rs`
-- maintenance drift module(s)
-- `crates/xtask/src/agent_registry.rs`
-- existing support/capability matrix readers
-
-Implementation notes:
-- define the drift categories first, because every later artifact needs those names
-- keep this phase read-only
-- prove the OpenCode stale capability claim appears as one of the categories instead of a one-off doc complaint
-
-Exit gate:
-- one command can expose the OpenCode stale capability claim as maintenance drift
-
-### Phase 2. Maintenance Request + Refresh
-Outputs:
-- maintenance request schema
-- maintenance pack scaffold
-- `refresh-agent --dry-run/--write`
-
-Modules touched:
-- `crates/xtask/src/main.rs`
-- maintenance request / refresh module(s)
-- `crates/xtask/src/workspace_mutation.rs`
-- existing support/capability/release refresh call sites
-
-Implementation notes:
-- keep one request artifact as the source of truth for both dry-run and write
-- scaffold the maintenance packet root in this phase so later closeout work never has to infer paths
-- reject runtime-owned actions at request-validation time, not halfway through mutation planning
-
-Exit gate:
-- maintenance writes are bounded and replay-safe
-
-### Phase 3. Maintenance Closeout
-Outputs:
-- closeout schema
-- `close-agent-maintenance`
-- reopen rules
-
-Modules touched:
-- `crates/xtask/src/main.rs`
-- maintenance closeout module(s)
-- maintenance packet doc rendering helpers
-
-Implementation notes:
-- mirror the validation posture of `close_proving_run`
-- closeout only succeeds when request linkage, resolved findings, and deferred-or-none truth all line up
-- keep reopen rules documentary and explicit, not implicit via edits to historical onboarding docs
-
-Exit gate:
-- maintenance history closes without mutating closed onboarding packets
-
-### Phase 4. OpenCode Proving Run
-Outputs:
-- OpenCode maintenance pack
-- repaired capability-claim truth
-- validated closeout
-
-Modules touched:
-- `docs/project_management/next/opencode-maintenance/**`
-- `docs/project_management/next/opencode-implementation/governance/seam-2-closeout.md`
-- generated publication outputs touched by the repair
-
-Implementation notes:
-- treat OpenCode as a proving run, not a bespoke exception path
-- the proving run is only valid if a new maintainer can reproduce the repair from the maintenance packet and commands alone
-- if the proving run needs manual runtime or evidence follow-up, record it explicitly in the maintenance pack instead of hiding it in the closeout prose
-
-Exit gate:
-- the repo can repair one already-onboarded agent boringly
-
-## Error & Rescue Registry
-| Method / Codepath | What can go wrong | Failure class | Rescued? | Rescue action | User sees |
-|---|---|---|---|---|---|
-| `check-agent-drift --agent` | unknown or non-onboarded agent id | validation error | yes | reject before comparison work | exit `2` |
-| drift aggregation | one source loads, another source fails | partial truth | yes | fail closed with category-specific error | explicit drift/load failure |
-| maintenance request parse | malformed TOML or invalid `requested_control_plane_actions` | validation error | yes | reject before refresh plan build | exit `2` |
-| maintenance request path | request artifact escapes maintenance root | ownership violation | yes | reject before artifact load | exit `2` |
-| refresh write plan | request implies runtime-owned mutation | scope violation | yes | reject before any writes | exit `2` |
-| refresh apply | one generated surface diverges mid-transaction | mutation error | yes | rollback staged writes | repo unchanged |
-| maintenance closeout | request linkage missing or hashes do not match | validation error | yes | reject closeout | exit `2` |
-| OpenCode proving run | stale claim cannot be reconciled to runtime/spec truth | needs-context | no | block closeout until maintainer decides source of truth | blocked docs update |
-
-## Test Strategy
-### Test Diagram
 ```text
-POST-ONBOARDING MAINTENANCE
+CODE PATH COVERAGE
 ===========================
-[+] already-onboarded agent -> check-agent-drift
+[+] Shared watcher queue
     |
-    ├── [GAP -> validation] unknown agent fails closed
-    ├── [GAP -> aggregation] support publication drift is surfaced per agent
-    ├── [GAP -> aggregation] capability/runtime drift is surfaced per agent
-    └── [GAP -> aggregation] governance packet drift is surfaced per agent
+    ├── [★★★ TESTED] Frozen queue fields + latest_stable_minus_one selection
+    │                 crates/xtask/tests/agent_maintenance_watch.rs
+    └── [GAP]         Real GitHub schedule on main -> staging checkout
+                      This plan proves it live
 
-[+] maintenance-request.toml -> refresh-agent --dry-run / --write
+[+] Packet generation
     |
-    ├── [GAP -> validation] request outside maintenance root fails
-    ├── [GAP -> validation] runtime-owned actions are rejected
-    ├── [GAP -> integration] dry-run and write share the same plan
-    ├── [GAP -> integration] historical onboarding packet remains untouched
-    └── [GAP -> regression] identical replay is a no-op
+    ├── [★★★ TESTED] Request truth + execution_contract rendering
+    │                 crates/xtask/tests/agent_maintenance_prepare.rs
+    └── [GAP]         Real worker-opened PR from generated pr-summary.md
+                      This plan proves it live
 
-[+] maintenance-closeout.json -> close-agent-maintenance
+[+] Maintainer relay
     |
-    ├── [GAP -> validation] request hash/linkage is required
-    ├── [GAP -> validation] resolved plus deferred/explicit-none truth is required
-    └── [GAP -> integration] maintenance packet docs refresh without touching onboarding packet docs
+    ├── [★★★ TESTED] Dry-run packet writes only under temp run root
+    ├── [★★★ TESTED] Write-mode boundary enforcement + prompt digest fail-closed
+    └── [GAP]         Real maintainer run against a live worker-generated PR branch
+                      This plan proves it live
 
-OPENCODE PROVING RUN
-====================
-[+] stale `SEAM-2` capability claim -> maintenance request -> refresh -> closeout
+USER FLOW COVERAGE
+===========================
+[+] Alarm rings by itself
     |
-    ├── [GAP -> docs/validation] stale capability claim becomes explicit maintenance drift
-    └── [GAP -> regression] repair path is reproducible without conversation history
+    └── [GAP] [->E2E] Scheduled watcher creates real downstream work
+
+[+] Maintainer handoff
+    |
+    ├── [GAP] [->E2E] Open PR -> read HANDOFF.md -> dry-run -> write -> diff review
+    └── [★★★ TESTED] Manual closeout remains outside write mode
+                      crates/xtask/tests/agent_maintenance_execute.rs
+
+─────────────────────────────────
+COVERAGE: repo-owned behavior is well covered locally
+Live gaps: 3 critical end-to-end proofs remain
+  1. main schedule -> staging checkout
+  2. real worker-opened PR from generated packet docs
+  3. real maintainer dry-run/write path on that PR branch
+─────────────────────────────────
 ```
 
-### Required Test Surfaces
-- Add `crates/xtask/tests/agent_maintenance_drift.rs`
-  - `check_agent_drift_reports_clean_agent`
-  - `check_agent_drift_rejects_unknown_agent`
-  - `check_agent_drift_reports_support_publication_mismatch`
-  - `check_agent_drift_reports_capability_truth_mismatch`
-  - `check_agent_drift_reports_governance_doc_mismatch`
-- Add `crates/xtask/tests/agent_maintenance_refresh.rs`
-  - `refresh_agent_dry_run_matches_write_plan`
-  - `refresh_agent_rejects_request_outside_maintenance_root`
-  - `refresh_agent_rejects_runtime_owned_actions`
-  - `refresh_agent_does_not_touch_onboarding_packet_root`
-  - `refresh_agent_replay_is_noop`
-- Add `crates/xtask/tests/agent_maintenance_closeout.rs`
-  - `close_agent_maintenance_requires_request_linkage`
-  - `close_agent_maintenance_requires_resolved_and_deferred_truth`
-  - `close_agent_maintenance_rejects_symlinked_output`
-  - `opencode_maintenance_proving_run_fixes_stale_capability_claim`
+### Missing Test Requirements Added By This Plan
 
-### Verification Commands
-- `cargo run -p xtask -- check-agent-drift --agent opencode`
-- `cargo run -p xtask -- refresh-agent --request docs/project_management/next/opencode-maintenance/governance/maintenance-request.toml --dry-run`
-- `cargo run -p xtask -- refresh-agent --request docs/project_management/next/opencode-maintenance/governance/maintenance-request.toml --write`
-- `cargo run -p xtask -- close-agent-maintenance --request docs/project_management/next/opencode-maintenance/governance/maintenance-request.toml --closeout docs/project_management/next/opencode-maintenance/governance/maintenance-closeout.json`
-- `cargo run -p xtask -- support-matrix --check`
-- `cargo run -p xtask -- capability-matrix`
-- `cargo test -p xtask`
-- `make preflight`
+This plan adds three required end-to-end validation steps, not new unit tests:
 
-### Test Plan Artifact
-- `/Users/spensermcconnell/.gstack/projects/atomize-hq-unified-agent-api/spensermcconnell-feat-cli-agent-onboarding-factory-test-plan-20260421-233454.md`
+1. scheduled watcher proof on `main`
+2. worker-opened PR proof from generated packet docs
+3. maintainer dry-run/write proof on that PR branch
+
+Those are mandatory because they are exactly the unproven product claims.
+
+## Evidence Bundle
+
+| Artifact | Where it comes from | Why it matters |
+| --- | --- | --- |
+| watcher run URL | scheduled run on `.github/workflows/agent-maintenance-release-watch.yml` | proves the alarm fired by itself |
+| worker run URL | dispatched run on `.github/workflows/codex-cli-update-snapshot.yml` | proves watcher fanout reached the real worker |
+| queue JSON excerpt | `_ci_tmp/maintenance-watch.json` or watcher logs | proves runtime target version and queue fields |
+| PR URL | generated `automation/codex-maintenance-<target_version>` PR | proves packet generation and PR opening happened |
+| request file path | `docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml` | proves canonical request truth exists |
+| handoff file path | `docs/agents/lifecycle/codex-maintenance/HANDOFF.md` | proves maintainer instructions are canonical |
+| prepared run path | `docs/agents/.uaa-temp/agent-maintenance/runs/<run_id>/` | proves dry-run packetization happened |
+| final diff summary | local PR-branch review after `--write` | proves the maintainer relay mutated only allowed surfaces |
+| cron revert reference | revert commit or PR on `main` | proves the temporary proof infrastructure was cleaned up |
 
 ## Failure Modes Registry
-| Codepath | Failure mode | Test required? | Error handling required? | User sees | Logged? |
-|---|---|---|---|---|---|
-| drift detection | known drift exists but stays hidden in repo-wide generators only | yes | yes | false clean state | yes |
-| maintenance scope | maintenance path widens into new-agent onboarding or runtime mutation | yes | yes | unsafe write rejection | yes |
-| packet immutability | refresh mutates historical onboarding packets | yes | yes | validation failure | yes |
-| publication repair | agent-scoped repair misses global generated outputs | yes | yes | stale support/capability docs remain | yes |
-| governance truth | maintenance closeout claims clean state while deferrals still exist | yes | yes | closeout rejected | yes |
-| OpenCode proving run | stale capability claim remains unrepairable without archaeology | yes | yes | blocked proving run | yes |
 
-Critical gap rule:
-- if maintenance can mutate runtime-owned code or historical onboarding packet roots, M4 is not ready
-- if OpenCode cannot prove the repair lane on a real drift case, M4 is not ready
+| Flow | Failure mode | Covered by test? | Error handling exists? | User-visible outcome | Critical gap? |
+| --- | --- | --- | --- | --- | --- |
+| schedule trigger | scheduled run never fires from the workflow definition that matters | no local test, yes by plan precondition | partial, bounded retry window only | silent non-proof unless checked explicitly | yes |
+| watcher checkout | workflow runs, but the proof baseline is missing from `staging` | no | yes, by forcing Phase 2 before Phase 3 | wrong code gets "proven" | yes |
+| queue emission | live release target differs from the stale design assumption | partial, local watch tests cover policy not live data | yes, runtime watcher output wins | expectation mismatch, not code failure | no |
+| dispatch | watcher computes stale Codex entry but `createWorkflowDispatch` fails | not fully | partial, GitHub logs only | visible Actions failure | yes |
+| worker PR creation | packet writes succeed but PR creation fails | partial | yes, explicit recovery path in packet-only PR workflow | visible worker failure | no |
+| maintainer dry-run | local Codex preflight fails | yes | yes | visible CLI failure before mutation | no |
+| maintainer write | relay writes outside declared surfaces | yes | yes, fail closed | visible CLI failure | no |
+| closeout boundary | write mode performs closeout implicitly | yes | yes | silent trust-boundary violation if broken | yes |
 
-## Security Review
-- maintenance request and closeout artifacts are new trust boundaries and must be path-jailed
-- `refresh-agent` must never infer permission to mutate runtime-owned code from a maintenance request
-- agent-scoped drift checks must not trust packet docs over runtime/spec truth
-- global generated outputs must refresh deterministically or fail closed
-- the maintenance lane should reuse the same symlink and rollback protections that M2/M3 added for onboarding
+Critical gaps are exactly the live proofs this plan closes.
 
-## Performance Review
-- `check-agent-drift` should aggregate existing support/capability validators instead of re-implementing them
-- `refresh-agent` should batch planned writes into one transaction instead of re-running file updates per surface
-- maintenance should stay agent-scoped at the operator layer even when publication outputs are global files
+## NOT In Scope
+
+- redesigning `maintenance-watch`
+- changing `latest_stable_minus_one`
+- automating `close-agent-maintenance`
+- updating `min_supported.txt`
+- widening packet-only support for other agents
+- broad CI cleanup unrelated to this proof
+- speculative fixes for GitHub Actions behavior before a real failure exists
+
+If the scheduled proof exposes a real defect, that defect becomes a separate implementation task with logs and a captured first-failing surface.
+
+## TODOS.md Impact
+
+No `TODOS.md` edits are part of this plan up front.
+
+If the proof fails, create one precise follow-up item per failure. Each item must include:
+
+- the first failing surface
+- the exact log or artifact that proved the failure
+- the affected branch or workflow
+- the minimum next action
+
+Do not dump vague "maintenance proof cleanup" debt into the backlog.
 
 ## Worktree Parallelization Strategy
+
+This plan is partially parallelizable. Branch preparation and maintainer-environment readiness can move in parallel before the scheduled run happens. The scheduled proof itself stays sequential.
+
 ### Dependency Table
+
 | Step | Modules touched | Depends on |
-|---|---|---|
-| W1. drift detection | `crates/xtask/src/main.rs`, maintenance drift module(s), `support_matrix/**`, `capability_matrix.rs`, tests | — |
-| W2. request + refresh | `crates/xtask/src/main.rs`, maintenance request/refresh module(s), `workspace_mutation.rs`, tests | W1 |
-| W3. closeout + reopen rules | `crates/xtask/src/main.rs`, maintenance closeout module(s), maintenance docs templates, tests | W2 |
-| W4. OpenCode maintenance pack scaffold | `docs/project_management/next/opencode-maintenance/**`, related governance docs | W1, W2 |
-| W5. OpenCode proving run execution | generated publication outputs, maintenance packet closeout docs | W3, W4 |
+| --- | --- | --- |
+| A. Local preflight + queue capture | `crates/xtask/src/agent_maintenance/`, `crates/xtask/tests/`, `crates/xtask/data/`, `cli_manifests/codex/` | — |
+| B. Prepare `staging` proof baseline | `crates/xtask/src/agent_maintenance/`, `crates/xtask/tests/`, `.github/workflows/codex-cli-update-snapshot.yml`, `.github/workflows/agent-maintenance-open-pr.yml` | A |
+| C. Temporary `main` cron acceleration | `.github/workflows/` | A |
+| D. Observe scheduled watcher run | GitHub Actions watcher workflow + queue output | B, C |
+| E. Inspect worker-opened PR | worker workflow outputs, `docs/agents/lifecycle/codex-maintenance/` | D |
+| F. Maintainer dry-run/write proof | `docs/agents/.uaa-temp/agent-maintenance/`, generated maintenance packet, local relay run | E |
+| G. Revert temporary cron | `.github/workflows/` on `main` | E |
 
 ### Parallel Lanes
-Lane A: W1 -> W2 -> W3
-Core command lane. This stays sequential because all three steps touch `crates/xtask/src/main.rs` and the same maintenance command namespace.
 
-Lane B: W4
-Docs scaffold lane. This can start after W2 freezes the request schema and maintenance pack root shape.
-
-Lane C: W5
-Final proving-run lane. This starts only after Lane A and Lane B merge, because it consumes the final command contract plus the concrete OpenCode maintenance packet.
+- Lane 1: `A -> B`
+  - sequential because `staging` readiness depends on a green local preflight
+- Lane 2: `A -> C`
+  - sequential inside the `main` workflow-definition lane
+- Lane 3: maintainer environment preflight
+  - independent local validation that Codex binary/auth is ready before `F`
+- Lane 4: `D -> E -> G -> F`
+  - sequential because each step consumes the real output of the previous one
 
 ### Execution Order
-1. Launch Lane A alone. W1 must land first because it defines the taxonomy and exit codes the rest of the milestone depends on.
-2. After W2 stabilizes the request schema, launch W3 and W4 in separate worktrees only if W4 stays docs-only.
-3. Merge W3 first so the final closeout contract is fixed.
-4. Run W5 last in the main integration worktree using the merged command surface and packet docs.
+
+1. Run `A`.
+2. After `A`, launch `B` and `C` in separate worktrees.
+3. While `B` is finishing, run Lane 3 in parallel to confirm the maintainer environment is usable.
+4. Once `B` and `C` are both green, wait for `D`.
+5. After `D`, run `E`.
+6. As soon as `E` proves the PR exists, run `G` immediately to remove the temporary cron.
+7. Run `F` after `G`, using the generated PR branch and prepared `run_id`.
 
 ### Conflict Flags
-- W1, W2, and W3 all touch `crates/xtask/src/main.rs`. Do not parallelize those.
-- W2 and W3 both touch the maintenance module namespace and `crates/xtask/tests/**`. Split test files early if two worktrees are used after W2.
-- W4 must stay packet-doc scoped. If it starts changing command behavior, it no longer belongs in a parallel lane.
-- W5 is integration-only. If earlier lanes are still moving, W5 becomes churn and should wait.
+
+- Lane A and Lane B do not share modules, but they do require cross-branch coordination.
+- Lane B and Lane G both touch `.github/workflows/` on `main`. Treat them as one worktree lane.
+- Lane D, E, G, and F must stay sequential. They all depend on one real generated PR and one real scheduled watcher run.
+- Do not parallelize multiple scheduled proof attempts. One successful scheduled run is enough, and parallel retries create noisy duplicate automation branches.
 
 ## Completion Summary
-- Step 0: Scope challenge, separate maintenance lane confirmed. No onboarding scope creep, no new crate, no lifecycle umbrella.
-- Architecture review: one `xtask` maintenance namespace, shared generators and mutation helpers reused, global publications remain global.
-- Code quality review: explicit artifacts, explicit exit codes, deterministic dry-run/write parity, and reuse of existing validation/mutation primitives required.
-- Test review: diagram produced, 14 required coverage points identified across drift detection, refresh, closeout, and OpenCode proving-run regression coverage.
-- Performance review: aggregation reuse, batched writes, and agent-scoped operator semantics locked.
-- Not in scope: written.
-- What already exists: written.
-- Failure modes: two critical gates remain non-negotiable, runtime-owned mutation must stay impossible and OpenCode must prove the lane on a real drift case.
-- Parallelization: three lanes total, one narrow docs-only parallel window after W2, core command work remains sequential by design.
 
-## Deferred To TODOS.md
-- automate maintenance-request generation from upstream release scans only after two successful maintenance cycles prove the shape
-- add manifest-evidence refresh helpers only after the repo proves it can keep manifest evidence ownership separate from control-plane refresh
-- consider batched multi-agent maintenance scheduling only after per-agent maintenance is boring
+- Step 0: Scope Challenge — scope accepted as-is, with one major correction: the proof must run through `main` and `staging`, not this feature branch alone
+- Architecture Review: branch topology and control boundaries are now explicit
+- Code Quality Review: no new abstractions or alternate proof paths added
+- Test Review: coverage diagram produced, 3 live proof gaps identified and closed by execution steps
+- Performance Review: no repo-code hot-path blocker, temporary schedule timing is the only tuning surface
+- NOT in scope: written
+- What already exists: written
+- TODOS.md impact: no preemptive changes
+- Failure modes: critical gaps enumerated with first-failure handling
+- Parallelization: 4 lanes total, 2 meaningful pre-schedule parallel lanes, proof lane sequential
+- Lake Score: complete proof path chosen over every shortcut
 
-## GSTACK REVIEW REPORT
+## Definition Of Done
 
-| Review | Trigger | Why | Runs | Status | Findings |
-|--------|---------|-----|------|--------|----------|
-| CEO Review | `/plan-ceo-review` | Scope & strategy | 1 | issues_open via `/autoplan` | M4 must be a separate post-onboarding lifecycle, not `onboard-agent` update mode or lifecycle-command sprawl |
-| Codex Review | `codex exec` | Independent 2nd opinion | 1 | partial / timed out | outside-voice attempt timed out after repo sweep; usable signal still matched the local read that OpenCode is the right proving run because it has a real post-onboarding drift issue |
-| Eng Review | `/plan-eng-review` | Architecture & tests (required) | 1 | issues_open via `/autoplan` | drift aggregation, separate maintenance request/closeout artifacts, bounded refresh writes, and historical packet immutability must be pinned |
-| Design Review | `/plan-design-review` | UI/UX gaps | 0 | skipped | no UI scope |
+This plan is done only when all of the following are true:
 
-**CEO:** The strategic trap is obvious. If M4 widens `onboard-agent` or invents a universal lifecycle umbrella, the repo will spend a milestone rebuilding abstractions instead of fixing the first real maintenance seam.
-**ENG:** The engineering seam is also clear. The repo already has most of the primitives. M4 should compose them into agent-scoped drift detection, separate maintenance packets, and bounded refresh writes instead of duplicating generator logic.
-**CROSS-PHASE THEME:** OpenCode is the high-confidence proving run because it already produced a concrete post-onboarding drift issue in committed artifacts.
-**UNRESOLVED:** 0
-**VERDICT:** CEO + ENG CLEARED — M4 is concrete enough to implement.
+1. the scheduled watcher run happened from `main`
+2. that watcher run checked out `staging`
+3. the worker run happened from the watcher dispatch
+4. the worker opened the Codex maintenance PR from generated packet docs
+5. the maintainer completed `--dry-run` and `--write` on that PR branch
+6. the resulting diff stayed inside the declared write envelope
+7. `close-agent-maintenance` was still manual
+8. the temporary cron acceleration was reverted
+9. the evidence bundle is captured
+
+If any one of those is missing, the repo has not yet proved the real path.

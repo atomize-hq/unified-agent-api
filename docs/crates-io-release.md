@@ -23,12 +23,13 @@ The command fails closed if the resulting manifests are not in sync.
 <!-- generated-by: xtask onboard-agent; section: crates-io-release -->
 ## Published crates
 
-This repository publishes 6 Rust packages for each root `VERSION` bump:
+This repository publishes 7 Rust packages for each root `VERSION` bump:
 
 - `unified-agent-api-codex`
 - `unified-agent-api-claude-code`
 - `unified-agent-api-opencode`
 - `unified-agent-api-gemini-cli`
+- `unified-agent-api-aider`
 - `unified-agent-api-wrapper-events`
 - `unified-agent-api`
 
@@ -40,8 +41,9 @@ Always publish in this order:
 2. `unified-agent-api-claude-code`
 3. `unified-agent-api-opencode`
 4. `unified-agent-api-gemini-cli`
-5. `unified-agent-api-wrapper-events`
-6. `unified-agent-api`
+5. `unified-agent-api-aider`
+6. `unified-agent-api-wrapper-events`
+7. `unified-agent-api`
 <!-- /generated-by: xtask onboard-agent; section: crates-io-release -->
 
 The dependent crates (`wrapper-events` and `agent-api`) require the leaf crates

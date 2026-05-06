@@ -16,7 +16,7 @@ Implement ADR-0014 by adding an explicit cancellation API to `agent_api`:
 
 - ADR: `docs/adr/0014-agent-api-explicit-cancellation.md`
 - Planning pack:
-  - `docs/project_management/packs/active/agent-api-explicit-cancellation/`
+  - `.archived/project_management/packs/implemented/agent-api-explicit-cancellation/`
 - Normative specs:
   - `docs/specs/unified-agent-api/contract.md`
   - `docs/specs/unified-agent-api/run-protocol-spec.md`

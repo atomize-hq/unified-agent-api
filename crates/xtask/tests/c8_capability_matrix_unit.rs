@@ -2,16 +2,36 @@ mod agent_registry {
     pub use xtask::agent_registry::*;
 }
 
+mod capability_publication {
+    pub use xtask::capability_publication::*;
+}
+
+mod capability_projection {
+    #![allow(dead_code)]
+
+    include!("../src/capability_projection.rs");
+}
+
 mod capability_matrix {
     #![allow(dead_code)]
 
     include!("../src/capability_matrix.rs");
 
+    use crate::agent_registry::AgentRegistry;
+
     const SEEDED_REGISTRY: &str = include_str!("../data/agent_registry.toml");
 
     fn manifest_with_commands(commands: &[(&[&str], &[&str])]) -> UnionManifest {
+        let expected_targets = commands
+            .iter()
+            .flat_map(|(_, available_on)| available_on.iter().copied())
+            .collect::<std::collections::BTreeSet<_>>()
+            .into_iter()
+            .map(str::to_string)
+            .collect();
+
         UnionManifest {
-            expected_targets: Vec::new(),
+            expected_targets,
             commands: commands
                 .iter()
                 .map(|(path, available_on)| UnionCommand {
@@ -68,46 +88,41 @@ mod capability_matrix {
         ]);
         let registry = seeded_registry();
         let codex = registry.find("codex").expect("seeded codex entry");
-        let mut capabilities = AgentWrapperCapabilities {
-            ids: [
-                CAPABILITY_MCP_ADD_V1.to_string(),
-                CAPABILITY_MCP_REMOVE_V1.to_string(),
-            ]
-            .into_iter()
-            .collect(),
-        };
+        let projected =
+            projected_advertised_capabilities(codex, &manifest).expect("projected capabilities");
 
-        apply_manifest_mcp_projection(
-            &mut capabilities,
-            codex,
-            &manifest,
-            "x86_64-unknown-linux-musl",
-        );
-
-        assert!(capabilities.contains(CAPABILITY_MCP_LIST_V1));
-        assert!(capabilities.contains(CAPABILITY_MCP_GET_V1));
-        assert!(!capabilities.contains(CAPABILITY_MCP_ADD_V1));
-        assert!(!capabilities.contains(CAPABILITY_MCP_REMOVE_V1));
+        assert!(projected.contains("agent_api.tools.mcp.list.v1"));
+        assert!(projected.contains("agent_api.tools.mcp.get.v1"));
+        assert!(!projected.contains("agent_api.tools.mcp.add.v1"));
+        assert!(!projected.contains("agent_api.tools.mcp.remove.v1"));
     }
 
     #[test]
     fn resolve_output_path_defaults_to_workspace_root() {
         assert_eq!(
-            resolve_output_path(None),
-            workspace_root().join(DEFAULT_OUT_PATH)
+            resolve_output_path(None).expect("resolve default output path"),
+            resolve_workspace_root()
+                .expect("resolve workspace root")
+                .join(DEFAULT_OUT_PATH)
         );
     }
 
     #[test]
     fn resolve_output_path_preserves_absolute_path() {
         let absolute = std::env::temp_dir().join("capability-matrix-absolute.md");
-        assert_eq!(resolve_output_path(Some(absolute.as_path())), absolute);
+        assert_eq!(
+            resolve_output_path(Some(absolute.as_path())).expect("resolve absolute output path"),
+            absolute
+        );
     }
 
     #[test]
     fn resolve_output_path_preserves_explicit_relative_path() {
         let relative = Path::new("tmp/capability-matrix.md");
-        assert_eq!(resolve_output_path(Some(relative)), relative);
+        assert_eq!(
+            resolve_output_path(Some(relative)).expect("resolve relative output path"),
+            relative
+        );
     }
 
     #[test]
@@ -140,7 +155,8 @@ mod capability_matrix {
                 "codex".to_string(),
                 "claude_code".to_string(),
                 "opencode".to_string(),
-                "gemini_cli".to_string()
+                "gemini_cli".to_string(),
+                "aider".to_string()
             ]
         );
     }
@@ -157,18 +173,18 @@ mod capability_matrix {
     }
 
     #[test]
-    fn canonical_target_header_uses_registry_primary_targets() {
+    fn canonical_target_header_uses_registry_publication_targets() {
         let registry = seeded_registry();
         let entries: Vec<&AgentRegistryEntry> = registry.capability_matrix_entries().collect();
 
         assert_eq!(
-            render_canonical_target_header(&entries),
-            "Canonical target profile: `codex=x86_64-unknown-linux-musl`, `claude_code=linux-x64`; `opencode`, `gemini_cli` use the default built-in backend config.\n"
+            render_canonical_target_header(&entries).expect("render header"),
+            "Canonical publication target profile: `codex=x86_64-unknown-linux-musl`, `claude_code=linux-x64`; `opencode`, `gemini_cli`, `aider` use their default lifecycle-backed target profile.\n"
         );
     }
 
     #[test]
-    fn registry_driven_mcp_projection_uses_primary_canonical_target() {
+    fn registry_driven_mcp_projection_uses_explicit_publication_target() {
         let registry = seeded_registry();
         let claude = registry
             .find("claude_code")
@@ -181,25 +197,22 @@ mod capability_matrix {
         ]);
         let mut capabilities = AgentWrapperCapabilities {
             ids: [
-                CAPABILITY_MCP_LIST_V1.to_string(),
-                CAPABILITY_MCP_GET_V1.to_string(),
-                CAPABILITY_MCP_ADD_V1.to_string(),
-                CAPABILITY_MCP_REMOVE_V1.to_string(),
+                "agent_api.tools.mcp.list.v1".to_string(),
+                "agent_api.tools.mcp.get.v1".to_string(),
+                "agent_api.tools.mcp.add.v1".to_string(),
+                "agent_api.tools.mcp.remove.v1".to_string(),
             ]
             .into_iter()
             .collect(),
         };
 
-        apply_manifest_mcp_projection(
-            &mut capabilities,
-            claude,
-            &manifest,
-            primary_canonical_target(claude),
-        );
+        let advertised =
+            projected_advertised_capabilities(claude, &manifest).expect("projected capabilities");
 
-        assert!(capabilities.contains(CAPABILITY_MCP_LIST_V1));
-        assert!(!capabilities.contains(CAPABILITY_MCP_GET_V1));
-        assert!(!capabilities.contains(CAPABILITY_MCP_ADD_V1));
-        assert!(!capabilities.contains(CAPABILITY_MCP_REMOVE_V1));
+        capabilities.ids = advertised;
+        assert!(capabilities.contains("agent_api.tools.mcp.list.v1"));
+        assert!(!capabilities.contains("agent_api.tools.mcp.get.v1"));
+        assert!(!capabilities.contains("agent_api.tools.mcp.add.v1"));
+        assert!(!capabilities.contains("agent_api.tools.mcp.remove.v1"));
     }
 }

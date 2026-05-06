@@ -60,8 +60,8 @@ pub(super) fn apply_cli_overrides(
 
 /// Builder for [`crate::CodexClient`].
 ///
-/// CLI parity planning and implementation history lives under `docs/project_management/next/`
-/// (see `docs/project_management/next/codex-cli-parity/`) and the parity ADRs in `docs/adr/`.
+/// CLI parity planning and implementation history lives under `.archived/project_management/next/`
+/// (see `.archived/project_management/next/codex-cli-parity/`) and the parity ADRs in `docs/adr/`.
 #[derive(Clone, Debug)]
 pub struct CodexClientBuilder {
     pub(super) binary: PathBuf,

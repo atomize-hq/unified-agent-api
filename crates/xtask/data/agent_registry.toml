@@ -58,12 +58,26 @@ config_key = "allow_external_sandbox_exec"
 [agents.publication]
 support_matrix_enabled = true
 capability_matrix_enabled = true
+capability_matrix_target = "x86_64-unknown-linux-musl"
 
 [agents.release]
 docs_release_track = "crates-io"
 
 [agents.scaffold]
 onboarding_pack_prefix = "codex-cli-onboarding"
+
+[agents.maintenance]
+[agents.maintenance.release_watch]
+enabled = true
+version_policy = "latest_stable_minus_one"
+dispatch_kind = "workflow_dispatch"
+dispatch_workflow = "codex-cli-update-snapshot.yml"
+
+[agents.maintenance.release_watch.upstream]
+source_kind = "github_releases"
+owner = "openai"
+repo = "codex"
+tag_prefix = "rust-v"
 
 [[agents]]
 agent_id = "claude_code"
@@ -123,12 +137,26 @@ config_key = "allow_external_sandbox_exec"
 [agents.publication]
 support_matrix_enabled = true
 capability_matrix_enabled = true
+capability_matrix_target = "linux-x64"
 
 [agents.release]
 docs_release_track = "crates-io"
 
 [agents.scaffold]
 onboarding_pack_prefix = "claude-code-cli-onboarding"
+
+[agents.maintenance]
+[agents.maintenance.release_watch]
+enabled = true
+version_policy = "latest_stable_minus_one"
+dispatch_kind = "workflow_dispatch"
+dispatch_workflow = "claude-code-update-snapshot.yml"
+
+[agents.maintenance.release_watch.upstream]
+source_kind = "gcs_object_listing"
+bucket = "claude-code-dist-86c565f3-f756-42ad-8dfa-d59b1c096819"
+prefix = "claude-code-releases"
+version_marker = "manifest.json"
 
 [[agents]]
 agent_id = "opencode"
@@ -167,7 +195,7 @@ onboarding_pack_prefix = "opencode-cli-onboarding"
 [agents.maintenance]
 
 [[agents.maintenance.governance_checks]]
-path = "docs/project_management/next/opencode-implementation/governance/seam-2-closeout.md"
+path = "docs/integrations/opencode/governance/seam-2-closeout.md"
 required = true
 comparison_kind = "markdown_capability_claim"
 start_marker = "<!-- xtask-governance-check:opencode-capabilities:start -->"
@@ -175,7 +203,7 @@ end_marker = "<!-- xtask-governance-check:opencode-capabilities:end -->"
 extraction_mode = "inline_code_ids"
 
 [[agents.maintenance.governance_checks]]
-path = "docs/project_management/next/opencode-implementation/governance/seam-3-closeout.md"
+path = "docs/integrations/opencode/governance/seam-3-closeout.md"
 required = true
 comparison_kind = "markdown_support_claim"
 start_marker = "<!-- xtask-governance-check:opencode-support:start -->"
@@ -211,6 +239,32 @@ onboarding_pack_prefix = "gemini-cli-onboarding"
 [agents.maintenance]
 
 [[agents.maintenance.governance_checks]]
-path = "docs/project_management/next/gemini-cli-onboarding/governance/approved-agent.toml"
+path = "docs/agents/lifecycle/gemini-cli-onboarding/governance/approved-agent.toml"
 required = true
 comparison_kind = "approved_agent_descriptor"
+
+[[agents]]
+agent_id = "aider"
+display_name = "aider"
+crate_path = "crates/aider"
+backend_module = "crates/agent_api/src/backends/aider"
+manifest_root = "cli_manifests/aider"
+package_name = "unified-agent-api-aider"
+canonical_targets = ["darwin-arm64"]
+
+[agents.wrapper_coverage]
+binding_kind = "generated_from_wrapper_crate"
+source_path = "crates/aider"
+
+[agents.capability_declaration]
+always_on = ["agent_api.config.model.v1", "agent_api.events", "agent_api.events.live", "agent_api.run"]
+backend_extensions = []
+[agents.publication]
+support_matrix_enabled = true
+capability_matrix_enabled = true
+
+[agents.release]
+docs_release_track = "crates-io"
+
+[agents.scaffold]
+onboarding_pack_prefix = "aider-onboarding"
