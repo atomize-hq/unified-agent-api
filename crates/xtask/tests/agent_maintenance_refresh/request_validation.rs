@@ -6,7 +6,7 @@ fn request_outside_maintenance_root_rejected() {
     seed_publication_inputs(&fixture);
 
     let invalid_request =
-        "docs/project_management/next/opencode-implementation/governance/maintenance-request.toml";
+        "docs/agents/lifecycle/opencode-cli-onboarding/governance/maintenance-request.toml";
     write_text(
         &fixture.join(invalid_request),
         &request_toml("opencode", &["packet_doc_refresh"], false, &[]),

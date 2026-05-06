@@ -85,7 +85,7 @@ fn onboarding_and_implementation_historical_roots_untouched() {
     let fixture = fixture_root("agent-maintenance-historical-roots");
     seed_publication_inputs(&fixture);
 
-    let onboarding_root = fixture.join("docs/project_management/next/opencode-cli-onboarding");
+    let onboarding_root = fixture.join("docs/agents/lifecycle/opencode-cli-onboarding");
     let implementation_closeout =
         fixture.join("docs/integrations/opencode/governance/seam-2-closeout.md");
     write_text(
