@@ -1,0 +1,14 @@
+{
+  "state": "closed",
+  "approval_ref": "docs/project_management/next/gemini-cli-onboarding/governance/approved-agent.toml",
+  "approval_sha256": "a935c753a6e9d7084af1aedff39a84a48199cea33f43c48a7bbe828d6b44efab",
+  "approval_source": "historical-m3-backfill",
+  "manual_control_plane_edits": 0,
+  "partial_write_incidents": 0,
+  "ambiguous_ownership_incidents": 0,
+  "duration_missing_reason": "Exact duration not recoverable from committed evidence.",
+  "explicit_none_reason": "No residual friction remained in the committed proving-run evidence.",
+  "preflight_passed": true,
+  "recorded_at": "2026-04-21T11:23:09Z",
+  "commit": "6b7d5f6e9cf2bf54933659f5700bb59d1f8a95e8"
+}
