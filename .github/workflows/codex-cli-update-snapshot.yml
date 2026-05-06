@@ -3,8 +3,36 @@ name: Codex CLI update snapshot
 on:
   workflow_dispatch:
     inputs:
-      version:
-        description: "Bare semver (example: 0.77.0)"
+      agent_id:
+        description: "Frozen shared watcher agent id"
+        required: true
+        type: string
+      current_version:
+        description: "Current validated codex version from registry truth"
+        required: true
+        type: string
+      latest_stable:
+        description: "Latest stable upstream release observed by maintenance-watch"
+        required: true
+        type: string
+      target_version:
+        description: "Worker target version from shared watcher queue"
+        required: true
+        type: string
+      opened_from:
+        description: "Repo-relative workflow path that opens this maintenance lane"
+        required: true
+        type: string
+      detected_by:
+        description: "Repo-relative shared watcher workflow path"
+        required: true
+        type: string
+      dispatch_kind:
+        description: "Frozen shared dispatch kind"
+        required: true
+        type: string
+      branch_name:
+        description: "Frozen automation branch name for the maintenance PR"
         required: true
         type: string
       update_min_supported:
@@ -13,8 +41,13 @@ on:
         default: false
         type: boolean
 
+concurrency:
+  group: agent-maintenance-${{ inputs.branch_name }}
+  cancel-in-progress: false
+
 permissions:
-  contents: read
+  contents: write
+  pull-requests: write
 
 jobs:
   # IMPORTANT: This workflow always checks out and builds from the `staging` branch so that
@@ -48,7 +81,7 @@ jobs:
         id: upstream
         shell: bash
         env:
-          VERSION: ${{ inputs.version }}
+          VERSION: ${{ inputs.target_version }}
         run: |
           set -euo pipefail
           TAG="rust-v${VERSION}"
@@ -96,7 +129,7 @@ jobs:
       - name: Download artifacts + update lockfile
         shell: bash
         env:
-          VERSION: ${{ inputs.version }}
+          VERSION: ${{ inputs.target_version }}
           TAG: ${{ steps.upstream.outputs.tag }}
         run: |
           set -euo pipefail
@@ -147,7 +180,7 @@ jobs:
       - name: Upload pins + downloads
         uses: actions/upload-artifact@v6
         with:
-          name: "codex-cli-pins-${{ inputs.version }}"
+          name: "codex-cli-pins-${{ inputs.target_version }}"
           if-no-files-found: error
           path: |
             cli_manifests/codex/artifacts.lock.json
@@ -173,13 +206,13 @@ jobs:
       - name: Download pins + downloads
         uses: actions/download-artifact@v7
         with:
-          name: "codex-cli-pins-${{ inputs.version }}"
+          name: "codex-cli-pins-${{ inputs.target_version }}"
           path: .
 
       - name: Acquire pinned Codex CLI
         shell: bash
         env:
-          VERSION: ${{ inputs.version }}
+          VERSION: ${{ inputs.target_version }}
           TARGET: ${{ matrix.target_triple }}
           ASSET: ${{ matrix.asset_name }}
           BIN: ${{ matrix.binary_path }}
@@ -215,7 +248,7 @@ jobs:
       - name: Generate per-target snapshot (+ raw help)
         shell: bash
         env:
-          VERSION: ${{ inputs.version }}
+          VERSION: ${{ inputs.target_version }}
           TARGET: ${{ matrix.target_triple }}
           BIN: ${{ matrix.binary_path }}
           SOURCE_DATE_EPOCH: ${{ needs.prepare.outputs.source_date_epoch }}
@@ -233,18 +266,18 @@ jobs:
       - name: Upload snapshot JSON
         uses: actions/upload-artifact@v6
         with:
-          name: "codex-cli-snapshot-${{ inputs.version }}-${{ matrix.target_triple }}"
+          name: "codex-cli-snapshot-${{ inputs.target_version }}-${{ matrix.target_triple }}"
           if-no-files-found: error
           path: |
-            cli_manifests/codex/snapshots/${{ inputs.version }}/${{ matrix.target_triple }}.json
+            cli_manifests/codex/snapshots/${{ inputs.target_version }}/${{ matrix.target_triple }}.json
 
       - name: Upload raw help capture (not committed)
         uses: actions/upload-artifact@v6
         with:
-          name: "codex-cli-raw-help-${{ inputs.version }}-${{ matrix.target_triple }}"
+          name: "codex-cli-raw-help-${{ inputs.target_version }}-${{ matrix.target_triple }}"
           if-no-files-found: error
           path: |
-            cli_manifests/codex/raw_help/${{ inputs.version }}/${{ matrix.target_triple }}/
+            cli_manifests/codex/raw_help/${{ inputs.target_version }}/${{ matrix.target_triple }}/
 
   union-report-validate:
     name: Union → Report → Validate (Linux)
@@ -259,34 +292,34 @@ jobs:
       - name: Download pins + downloads
         uses: actions/download-artifact@v7
         with:
-          name: "codex-cli-pins-${{ inputs.version }}"
+          name: "codex-cli-pins-${{ inputs.target_version }}"
           path: .
 
       - name: Download required Linux snapshot
         uses: actions/download-artifact@v7
         with:
-          name: "codex-cli-snapshot-${{ inputs.version }}-x86_64-unknown-linux-musl"
+          name: "codex-cli-snapshot-${{ inputs.target_version }}-x86_64-unknown-linux-musl"
           path: .
 
       - name: Download macOS snapshot (best effort)
         continue-on-error: true
         uses: actions/download-artifact@v7
         with:
-          name: "codex-cli-snapshot-${{ inputs.version }}-aarch64-apple-darwin"
+          name: "codex-cli-snapshot-${{ inputs.target_version }}-aarch64-apple-darwin"
           path: .
 
       - name: Download Windows snapshot (best effort)
         continue-on-error: true
         uses: actions/download-artifact@v7
         with:
-          name: "codex-cli-snapshot-${{ inputs.version }}-x86_64-pc-windows-msvc"
+          name: "codex-cli-snapshot-${{ inputs.target_version }}-x86_64-pc-windows-msvc"
           path: .
 
       - name: Ensure required snapshot exists
         id: ensure-linux-snapshot
         shell: bash
         env:
-          VERSION: ${{ inputs.version }}
+          VERSION: ${{ inputs.target_version }}
           SOURCE_DATE_EPOCH: ${{ needs.prepare.outputs.source_date_epoch }}
         run: |
           set -euo pipefail
@@ -336,7 +369,7 @@ jobs:
       - name: Merge union snapshot
         shell: bash
         env:
-          VERSION: ${{ inputs.version }}
+          VERSION: ${{ inputs.target_version }}
           SOURCE_DATE_EPOCH: ${{ needs.prepare.outputs.source_date_epoch }}
         run: |
           set -euo pipefail
@@ -355,7 +388,7 @@ jobs:
       - name: Generate coverage reports
         shell: bash
         env:
-          VERSION: ${{ inputs.version }}
+          VERSION: ${{ inputs.target_version }}
           SOURCE_DATE_EPOCH: ${{ needs.prepare.outputs.source_date_epoch }}
         run: |
           set -euo pipefail
@@ -364,7 +397,7 @@ jobs:
       - name: Generate version metadata (status=reported)
         shell: bash
         env:
-          VERSION: ${{ inputs.version }}
+          VERSION: ${{ inputs.target_version }}
           SOURCE_DATE_EPOCH: ${{ needs.prepare.outputs.source_date_epoch }}
         run: |
           set -euo pipefail
@@ -382,155 +415,15 @@ jobs:
           set -euo pipefail
           cargo run -p xtask -- codex-validate --root cli_manifests/codex
 
-      - name: Generate work queue summary (append to PR body)
-        shell: bash
-        env:
-          VERSION: ${{ inputs.version }}
-        run: |
-          set -euo pipefail
-          mkdir -p _ci_tmp
-          WORK_QUEUE="_ci_tmp/codex_cli_work_queue.md"
-
-          ROOT="cli_manifests/codex"
-          REPORT_ANY="${ROOT}/reports/${VERSION}/coverage.any.json"
-          test -f "$REPORT_ANY"
-
-          REQUIRED_TARGET="$(jq -r '.union.required_target' "${ROOT}/RULES.json")"
-          test -n "$REQUIRED_TARGET" && test "$REQUIRED_TARGET" != "null"
-
-          BASELINE="$(cat "${ROOT}/latest_validated.txt" 2>/dev/null || true)"
-          BASELINE="${BASELINE:-unknown}"
-
-          REPORT_REQUIRED="${ROOT}/reports/${VERSION}/coverage.${REQUIRED_TARGET}.json"
-          if [[ ! -f "$REPORT_REQUIRED" ]]; then
-            REPORT_REQUIRED="$REPORT_ANY"
-          fi
-
-          missing_commands="$(jq '.deltas.missing_commands // [] | length' "$REPORT_REQUIRED")"
-          missing_commands_help="$(jq '[.deltas.missing_commands // [] | .[] | select((.path | length > 0) and (.path[-1] == "help"))] | length' "$REPORT_REQUIRED")"
-          missing_commands_non_help="$(jq '[.deltas.missing_commands // [] | .[] | select((.path | length == 0) or (.path[-1] != "help"))] | length' "$REPORT_REQUIRED")"
-          missing_flags="$(jq '.deltas.missing_flags // [] | length' "$REPORT_REQUIRED")"
-          missing_flags_root="$(jq '[.deltas.missing_flags // [] | .[] | select(.path | length == 0)] | length' "$REPORT_REQUIRED")"
-          missing_flags_non_root="$(jq '[.deltas.missing_flags // [] | .[] | select(.path | length != 0)] | length' "$REPORT_REQUIRED")"
-          missing_args="$(jq '.deltas.missing_args // [] | length' "$REPORT_REQUIRED")"
-          unsupported="$(jq '.deltas.unsupported // [] | length' "$REPORT_REQUIRED")"
-          iu="$(jq '.deltas.intentionally_unsupported // [] | length' "$REPORT_REQUIRED")"
-          excluded_commands="$(jq '.deltas.excluded_commands // [] | length' "$REPORT_REQUIRED")"
-          excluded_flags="$(jq '.deltas.excluded_flags // [] | length' "$REPORT_REQUIRED")"
-          excluded_args="$(jq '.deltas.excluded_args // [] | length' "$REPORT_REQUIRED")"
-
-          {
-            echo ""
-            echo "## Work Queue Summary (autogenerated)"
-            echo ""
-            echo "- Version: \`${VERSION}\`"
-            echo "- Baseline: \`${BASELINE}\`"
-            echo "- Required target: \`${REQUIRED_TARGET}\`"
-            echo "- Primary report: \`${REPORT_REQUIRED}\`"
-            echo ""
-            echo "### Counts (required target)"
-            echo ""
-            echo "- missing_commands: ${missing_commands} (non-help: ${missing_commands_non_help}, help-only: ${missing_commands_help})"
-            echo "- missing_flags: ${missing_flags} (root: ${missing_flags_root}, non-root: ${missing_flags_non_root})"
-            echo "- missing_args: ${missing_args}"
-            echo "- unsupported: ${unsupported}"
-            echo "- intentionally_unsupported (audit-only): ${iu}"
-            echo "- excluded_commands/flags/args (audit-only): ${excluded_commands}/${excluded_flags}/${excluded_args}"
-            echo ""
-            echo "### Notes on inheritance / reporting"
-            echo ""
-            echo "- **IU subtree inheritance (ADR 0004):** if the wrapper marks a command path as \`intentionally_unsupported\`, all descendant commands/flags/args are treated as IU and appear under \`deltas.intentionally_unsupported\` (not \`missing_*\`). Override by adding an exact wrapper coverage entry."
-            echo "- **Global flags model:** some flags are treated as global (root) and are reported at \`path=[]\` to avoid per-command noise; fix root coverage for global flags. If you see the same flag reported missing under many subcommands, confirm whether it is truly global for that version by inspecting \`snapshots/${VERSION}/union.json\`."
-            echo ""
-            echo "### New/Removed Commands vs Baseline"
-            echo ""
-          } > "$WORK_QUEUE"
-
-          BASELINE_UNION="${ROOT}/snapshots/${BASELINE}/union.json"
-          VERSION_UNION="${ROOT}/snapshots/${VERSION}/union.json"
-          if [[ -f "$BASELINE_UNION" && -f "$VERSION_UNION" ]]; then
-            jq -r '.commands[].path | if length==0 then "<root>" else join(" ") end' \
-              "$BASELINE_UNION" | sort > /tmp/codex_cmds.baseline.txt
-            jq -r '.commands[].path | if length==0 then "<root>" else join(" ") end' \
-              "$VERSION_UNION" | sort > /tmp/codex_cmds.new.txt
-
-            {
-              echo "- Only in baseline (\`${BASELINE}\`):"
-              comm -23 /tmp/codex_cmds.baseline.txt /tmp/codex_cmds.new.txt | head -n 25 | sed -e 's/^[[:space:]]*//' -e 's/^/  - /'
-              echo "- Only in new (\`${VERSION}\`):"
-              comm -13 /tmp/codex_cmds.baseline.txt /tmp/codex_cmds.new.txt | head -n 25 | sed -e 's/^[[:space:]]*//' -e 's/^/  - /'
-              echo ""
-            } >> "$WORK_QUEUE"
-          else
-            {
-              echo "- Baseline union snapshot not available at \`${BASELINE_UNION}\`."
-              echo ""
-            } >> "$WORK_QUEUE"
-          fi
-
-          {
-            echo "### First Missing Commands (non-help)"
-            echo ""
-            jq -r '[.deltas.missing_commands // [] | .[] | select((.path | length == 0) or (.path[-1] != "help"))] | .[] | (.path | if length==0 then "<root>" else join(" ") end)' \
-              "$REPORT_REQUIRED" | head -n 25 | sed 's/^/- /'
-            echo ""
-            echo "### First Missing Commands (help-only)"
-            echo ""
-            jq -r '[.deltas.missing_commands // [] | .[] | select((.path | length > 0) and (.path[-1] == "help"))] | .[] | (.path | if length==0 then "<root>" else join(" ") end)' \
-              "$REPORT_REQUIRED" | head -n 25 | sed 's/^/- /'
-            echo ""
-            echo "### First Missing Flags (root)"
-            echo ""
-            jq -r '[.deltas.missing_flags // [] | .[] | select(.path | length == 0)] | .[] | ((.path | if length==0 then "<root>" else join(" ") end) as $p | "- [" + $p + "] " + .key)' \
-              "$REPORT_REQUIRED" | head -n 40
-            echo ""
-            echo "### First Missing Flags (non-root)"
-            echo ""
-            jq -r '[.deltas.missing_flags // [] | .[] | select(.path | length != 0)] | .[] | ((.path | if length==0 then "<root>" else join(" ") end) as $p | "- [" + $p + "] " + .key)' \
-              "$REPORT_REQUIRED" | head -n 40
-            echo ""
-            echo "### First Missing Args"
-            echo ""
-            jq -r '.deltas.missing_args // [] | .[] | ((.path | if length==0 then "<root>" else join(" ") end) as $p | "- [" + $p + "] " + .name)' \
-              "$REPORT_REQUIRED" | head -n 25
-            echo ""
-            echo "Next: open \`${REPORT_REQUIRED}\` and work missing_commands → missing_flags → missing_args."
-            echo ""
-          } >> "$WORK_QUEUE"
-
-      - name: Render PR body from template
-        shell: bash
-        env:
-          VERSION: ${{ inputs.version }}
-        run: |
-          set -euo pipefail
-          mkdir -p _ci_tmp
-          PR_BODY="_ci_tmp/codex_cli_pr_body.md"
-          WORK_QUEUE="_ci_tmp/codex_cli_work_queue.md"
-          TEMPLATE="cli_manifests/codex/PR_BODY_TEMPLATE.md"
-          test -f "$TEMPLATE"
-          sed "s/{{VERSION}}/${VERSION}/g" "$TEMPLATE" > "$PR_BODY"
-          test -f "$WORK_QUEUE"
-          cat "$WORK_QUEUE" >> "$PR_BODY"
-
-      - name: Upload CI PR-body (debug)
-        uses: actions/upload-artifact@v6
-        with:
-          name: "codex-cli-pr-body-${{ inputs.version }}"
-          if-no-files-found: error
-          path: |
-            _ci_tmp/codex_cli_pr_body.md
-            _ci_tmp/codex_cli_work_queue.md
-
       - name: Upload committed artifact bundle (PR fallback)
         uses: actions/upload-artifact@v6
         with:
-          name: "codex-cli-artifacts-${{ inputs.version }}"
+          name: "codex-cli-artifacts-${{ inputs.target_version }}"
           if-no-files-found: error
           path: |
-            cli_manifests/codex/snapshots/${{ inputs.version }}/
-            cli_manifests/codex/reports/${{ inputs.version }}/
-            cli_manifests/codex/versions/${{ inputs.version }}.json
+            cli_manifests/codex/snapshots/${{ inputs.target_version }}/
+            cli_manifests/codex/reports/${{ inputs.target_version }}/
+            cli_manifests/codex/versions/${{ inputs.target_version }}.json
             cli_manifests/codex/wrapper_coverage.json
             cli_manifests/codex/artifacts.lock.json
 
@@ -540,14 +433,48 @@ jobs:
           set -euo pipefail
           rm -rf _download _extract
 
+      - name: Prepare maintenance packet
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run -p xtask -- prepare-agent-maintenance \
+            --agent "${{ inputs.agent_id }}" \
+            --current-version "${{ inputs.current_version }}" \
+            --latest-stable "${{ inputs.latest_stable }}" \
+            --target-version "${{ inputs.target_version }}" \
+            --opened-from "${{ inputs.opened_from }}" \
+            --detected-by "${{ inputs.detected_by }}" \
+            --dispatch-kind "${{ inputs.dispatch_kind }}" \
+            --dispatch-workflow "codex-cli-update-snapshot.yml" \
+            --branch-name "${{ inputs.branch_name }}" \
+            --request-recorded-at "$(date -u +"%Y-%m-%dT%H:%M:%SZ")" \
+            --request-commit "${{ github.sha }}" \
+            --write
+
       - name: Create PR (best effort)
+        id: create_pr
         continue-on-error: true
         uses: peter-evans/create-pull-request@v8
         with:
           token: ${{ secrets.AUTOMATION_TOKEN || github.token }}
           base: staging
-          commit-message: "chore: codex cli artifacts for ${{ inputs.version }}"
-          title: "chore: codex cli artifacts for ${{ inputs.version }}"
-          body-path: _ci_tmp/codex_cli_pr_body.md
-          branch: "automation/codex-cli-${{ inputs.version }}"
+          commit-message: "chore: codex cli artifacts for ${{ inputs.target_version }}"
+          title: "chore: codex cli artifacts for ${{ inputs.target_version }}"
+          body-path: docs/agents/lifecycle/codex-maintenance/governance/pr-summary.md
+          branch: "${{ inputs.branch_name }}"
           delete-branch: true
+      - name: Print recovery guidance
+        if: ${{ steps.create_pr.outcome == 'failure' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          REQUEST_PATH="docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml"
+          PR_SUMMARY_PATH="docs/agents/lifecycle/codex-maintenance/governance/pr-summary.md"
+          PR_TITLE="chore: codex cli artifacts for ${{ inputs.target_version }}"
+          echo "::error title=Maintenance PR creation failed::Packet generation completed, but opening the PR failed." >&2
+          cat <<EOF >&2
+          Recovery path:
+          cargo run -p xtask -- prepare-agent-maintenance --request "${REQUEST_PATH}" --write
+          gh pr create --base staging --head "${{ inputs.branch_name }}" --title "${PR_TITLE}" --body-file "${PR_SUMMARY_PATH}"
+          EOF
+          exit 1
