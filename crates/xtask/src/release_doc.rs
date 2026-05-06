@@ -104,6 +104,7 @@ mod tests {
                 "unified-agent-api-claude-code".to_string(),
                 "unified-agent-api-opencode".to_string(),
                 "unified-agent-api-gemini-cli".to_string(),
+                "unified-agent-api-aider".to_string(),
                 "unified-agent-api-wrapper-events".to_string(),
                 "unified-agent-api".to_string(),
             ]

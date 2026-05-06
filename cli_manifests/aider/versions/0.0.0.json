@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "semantic_version": "0.0.0",
+  "status": "validated",
+  "updated_at": "2026-04-29T00:00:00Z",
+  "notes": "Bootstrap aider manifest root with one darwin-arm64 runtime-follow-on proof target and no committed support report yet.",
+  "coverage": {
+    "supported_targets": [
+      "darwin-arm64"
+    ]
+  },
+  "artifacts": {
+    "snapshots_dir": "snapshots/0.0.0",
+    "union_complete": true
+  }
+}

@@ -200,6 +200,17 @@ fn support_matrix_entrypoint_publishes_json_and_hybrid_markdown() {
         &[],
     );
 
+    materialize_root(
+        &fixture_root.join("cli_manifests/aider"),
+        &["darwin-arm64"],
+        "0.0.0",
+        &["darwin-arm64"],
+        &[("0.0.0", &["darwin-arm64"])],
+        &[("darwin-arm64", "0.0.0")],
+        &[("darwin-arm64", "0.0.0")],
+        &[],
+    );
+
     let help = Command::new(&xtask_bin)
         .arg("--help")
         .current_dir(&fixture_root)
@@ -272,13 +283,14 @@ fn support_matrix_entrypoint_publishes_json_and_hybrid_markdown() {
             .get("rows")
             .and_then(|value| value.as_array())
             .map(|rows| rows.len()),
-        Some(4)
+        Some(5)
     );
 
     assert!(markdown_text.contains("## Purpose\nManual contract text."));
     assert!(markdown_text.contains("## Change control\nManual footer."));
     assert!(markdown_text.contains("## Published support matrix"));
     assert!(markdown_text.contains("<!-- support-matrix-published:start -->"));
+    assert!(markdown_text.contains("| `aider` | `0.0.0` | `darwin-arm64` |"));
     assert!(markdown_text.contains("| `codex` | `1.0.0` | `linux-x64` |"));
     assert!(markdown_text.contains("| `claude_code` | `2.0.0` | `linux-x64` |"));
     assert!(markdown_text.contains("| `gemini_cli` | `0.38.2` | `darwin-arm64` |"));

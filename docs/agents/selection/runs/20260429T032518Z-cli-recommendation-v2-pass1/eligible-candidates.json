@@ -1,0 +1,44 @@
+{
+  "eligible_candidates": [
+    {
+      "agent_id": "openhands",
+      "primary_sum": 11,
+      "scores": {
+        "Adoption & community pull": 3,
+        "Architecture fit for this repo": 2,
+        "CLI product maturity & release activity": 3,
+        "Capability expansion / future leverage": 3,
+        "Installability & docs quality": 3,
+        "Reproducibility & access friction": 2
+      },
+      "secondary_sum": 5
+    },
+    {
+      "agent_id": "aider",
+      "primary_sum": 11,
+      "scores": {
+        "Adoption & community pull": 3,
+        "Architecture fit for this repo": 2,
+        "CLI product maturity & release activity": 3,
+        "Capability expansion / future leverage": 2,
+        "Installability & docs quality": 3,
+        "Reproducibility & access friction": 2
+      },
+      "secondary_sum": 4
+    },
+    {
+      "agent_id": "goose",
+      "primary_sum": 11,
+      "scores": {
+        "Adoption & community pull": 3,
+        "Architecture fit for this repo": 2,
+        "CLI product maturity & release activity": 3,
+        "Capability expansion / future leverage": 2,
+        "Installability & docs quality": 3,
+        "Reproducibility & access friction": 2
+      },
+      "secondary_sum": 4
+    }
+  ],
+  "run_id": "20260429T032518Z-cli-recommendation-v2-pass1"
+}

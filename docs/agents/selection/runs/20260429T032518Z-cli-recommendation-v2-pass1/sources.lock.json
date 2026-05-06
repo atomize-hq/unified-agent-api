@@ -1,0 +1,104 @@
+{
+  "candidates": [
+    {
+      "agent_id": "openhands",
+      "evidence_refs": [
+        {
+          "captured_at": "2026-04-28T15:31:24Z",
+          "evidence_id": "openhands-doc",
+          "kind": "official_doc",
+          "sha256": "828234f609aa686010bb8a5ecff52ca7a40004c68052f210c2e08fe3ab8e6db3",
+          "title": "Introduction - OpenHands Docs",
+          "url": "https://docs.all-hands.dev/"
+        },
+        {
+          "captured_at": "2026-04-28T15:31:24Z",
+          "evidence_id": "openhands-repo",
+          "kind": "github",
+          "sha256": "e603139f9db5f41b0d3816b02eb08230e22a70aef7b78cf57ecd08b53527a257",
+          "title": "OpenHands/OpenHands",
+          "url": "https://github.com/OpenHands/OpenHands"
+        },
+        {
+          "captured_at": "2026-04-28T15:31:24Z",
+          "evidence_id": "openhands-pkg",
+          "kind": "package_registry",
+          "sha256": "4e6043231eb3874e9f6f6b220a08ce7ea1ff0f0aadedf4078796b78964922dc1",
+          "title": "openhands-ai PyPI package",
+          "url": "https://pypi.org/project/openhands-ai/"
+        }
+      ],
+      "probe_output_refs": []
+    },
+    {
+      "agent_id": "aider",
+      "evidence_refs": [
+        {
+          "captured_at": "2026-04-28T15:31:24Z",
+          "evidence_id": "aider-doc",
+          "kind": "official_doc",
+          "sha256": "74c0259ff0502933194d175a9abe9ac02defffd2b0a4b9b4793e62052b8dc8f1",
+          "title": "Aider - AI Pair Programming in Your Terminal",
+          "url": "https://aider.chat/"
+        },
+        {
+          "captured_at": "2026-04-28T15:31:24Z",
+          "evidence_id": "aider-repo",
+          "kind": "github",
+          "sha256": "d3c1f2315db25c1c50a36bd3242922efc1b14a5a29a9f7467196faf69a4b1f7a",
+          "title": "Aider-AI/aider",
+          "url": "https://github.com/Aider-AI/aider"
+        },
+        {
+          "captured_at": "2026-04-28T15:31:24Z",
+          "evidence_id": "aider-pkg",
+          "kind": "package_registry",
+          "sha256": "f7f19af487666c70645d7fb39711319311cc4bfbbe7edb7119a970d74d7124f0",
+          "title": "aider-chat PyPI package",
+          "url": "https://pypi.org/project/aider-chat/"
+        }
+      ],
+      "probe_output_refs": []
+    },
+    {
+      "agent_id": "goose",
+      "evidence_refs": [
+        {
+          "captured_at": "2026-04-28T15:31:24Z",
+          "evidence_id": "goose-doc",
+          "kind": "official_doc",
+          "sha256": "e397d4547a83397b2ad1f1a5dcb716d261e25851da40fe2f0b017605daa6a818",
+          "title": "Getting Started | goose | Your open source AI agent",
+          "url": "https://goose-docs.ai/docs/category/getting-started"
+        },
+        {
+          "captured_at": "2026-04-28T15:31:24Z",
+          "evidence_id": "goose-repo",
+          "kind": "github",
+          "sha256": "94b2658a40019c55ae58fa254598769151d3195358fd0035bde8ddd79d104f39",
+          "title": "aaif-goose/goose",
+          "url": "https://github.com/aaif-goose/goose"
+        },
+        {
+          "captured_at": "2026-04-28T15:31:24Z",
+          "evidence_id": "goose-home",
+          "kind": "ancillary",
+          "sha256": "d4873c7747fe6f3ac2308f874a7e31143efa5d31ca6b05c620f6703763e3b167",
+          "title": "goose docs home",
+          "url": "https://goose-docs.ai"
+        },
+        {
+          "captured_at": "2026-04-28T19:06:30Z",
+          "evidence_id": "goose-brew",
+          "kind": "package_registry",
+          "sha256": "54722ccf1875d76b50bcc406ef94fad89fd92c4b671cd6d7d39e16c54ee6da3c",
+          "title": "block-goose-cli \u2014 Homebrew Formulae",
+          "url": "https://formulae.brew.sh/formula/block-goose-cli"
+        }
+      ],
+      "probe_output_refs": []
+    }
+  ],
+  "generated_at": "2026-04-29T03:26:22Z",
+  "run_id": "20260429T032518Z-cli-recommendation-v2-pass1"
+}

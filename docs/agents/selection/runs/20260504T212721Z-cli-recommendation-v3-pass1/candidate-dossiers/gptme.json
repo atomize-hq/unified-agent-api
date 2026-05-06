@@ -1,0 +1,136 @@
+{
+  "schema_version": "cli-agent-recommendation-dossier.v1",
+  "agent_id": "gptme",
+  "display_name": "gptme",
+  "generated_at": "2026-05-04T21:37:24Z",
+  "seed_snapshot_sha256": "8702b1b91e0fe730a62f9fd5e3c0c10b5cce86c36433dcf65bb3ccf08ec5f1da",
+  "official_links": [
+    "https://gptme.org/",
+    "https://gptme.org/docs/getting-started.html",
+    "https://gptme.org/docs/config.html",
+    "https://github.com/gptme/gptme",
+    "https://pypi.org/project/gptme/"
+  ],
+  "install_channels": [
+    "pipx install gptme",
+    "uv tool install gptme"
+  ],
+  "auth_prerequisites": [
+    "Set a supported provider API key in the environment or the gptme config directory, or let the first interactive run prompt and save it.",
+    "For no-API-key operation, run a local model backend such as Ollama and point gptme at it with `OPENAI_BASE_URL` plus a local model id.",
+    "Windows users need WSL or Docker rather than a direct native install."
+  ],
+  "claims": {
+    "non_interactive_execution": {
+      "state": "verified",
+      "summary": "Official docs show one-shot prompt execution, file arguments, shell pipelines, and chained tasks, so gptme clearly supports non-interactive terminal execution.",
+      "evidence_ids": [
+        "gptme-getting-started",
+        "gptme-pypi"
+      ]
+    },
+    "offline_strategy": {
+      "state": "verified",
+      "summary": "Official docs explicitly document local-model usage without an API key, and the homepage positions gptme as local-first with support for fully local runtimes.",
+      "evidence_ids": [
+        "gptme-home",
+        "gptme-getting-started"
+      ]
+    },
+    "observable_cli_surface": {
+      "state": "verified",
+      "summary": "The public docs show a text-first CLI surface with explicit one-shot invocations, stdin pipelines, and tool-rich terminal operation that a wrapper can observe directly.",
+      "evidence_ids": [
+        "gptme-getting-started",
+        "gptme-github"
+      ]
+    },
+    "redaction_fit": {
+      "state": "inferred",
+      "summary": "gptme documents a separate `config.local.toml` for secrets, environment fallbacks, and a tool allowlist, and the open-source repo gives a reasonable audit surface for wrapper-side redaction policy.",
+      "evidence_ids": [
+        "gptme-config",
+        "gptme-github"
+      ]
+    },
+    "crate_first_fit": {
+      "state": "inferred",
+      "summary": "gptme has a stable public CLI install surface, a Python package, and explicit terminal workflows, which makes it plausible for a crate-first wrapper even though it is not distributed as a Rust binary upstream.",
+      "evidence_ids": [
+        "gptme-getting-started",
+        "gptme-github",
+        "gptme-pypi"
+      ]
+    },
+    "reproducibility": {
+      "state": "inferred",
+      "summary": "The retrieved official docs and PyPI listing provide stable public install channels and published Python requirements, but the retrieved getting-started page does not itself define a version-pinning workflow.",
+      "evidence_ids": [
+        "gptme-getting-started",
+        "gptme-pypi"
+      ]
+    },
+    "future_leverage": {
+      "state": "inferred",
+      "summary": "gptme appears to have broader leverage than a simple wrapper because the official materials describe plugins, skills, lessons, MCP/ACP, autonomous agents, and an active release cadence.",
+      "evidence_ids": [
+        "gptme-home",
+        "gptme-github"
+      ]
+    }
+  },
+  "probe_requests": [],
+  "blocked_steps": [],
+  "normalized_caveats": [
+    "Native Windows is not directly supported; official guidance points users to WSL or Docker.",
+    "Some optional tools need extra system dependencies such as Playwright, tmux, or GitHub CLI.",
+    "Interactive first run will prompt for provider credentials unless a supported local model backend is preconfigured."
+  ],
+  "evidence": [
+    {
+      "evidence_id": "gptme-home",
+      "kind": "ancillary",
+      "url": "https://gptme.org/",
+      "title": "gptme - agent in your terminal",
+      "captured_at": "2026-05-04T21:37:24Z",
+      "sha256": "eadd3af65d6cbb0439d451ec605376617d3f3d6ce2db9c67750ceb79682474a4",
+      "excerpt": "The homepage says gptme runs anywhere a terminal runs, including headless servers and CI pipelines, and is provider-agnostic, local-first, and fully local via `llama.cpp`."
+    },
+    {
+      "evidence_id": "gptme-getting-started",
+      "kind": "official_doc",
+      "url": "https://gptme.org/docs/getting-started.html",
+      "title": "Getting Started — gptme",
+      "captured_at": "2026-05-04T21:37:24Z",
+      "sha256": "472d47f2856a51bb532d590368d0e834a1fbcc0ada8ba8da154db27cc90e7796",
+      "excerpt": "Getting started recommends `pipx` or `uv`, shows one-shot prompts and shell pipelines, notes WSL/Docker for Windows, and documents local-model use with Ollama and no API key."
+    },
+    {
+      "evidence_id": "gptme-config",
+      "kind": "official_doc",
+      "url": "https://gptme.org/docs/config.html",
+      "title": "Configuration — gptme",
+      "captured_at": "2026-05-04T21:37:24Z",
+      "sha256": "8e167a80c6c8b8595c728efb8eec82a1adb2b5e5cfc35bd63f1c01811ebcdc9e",
+      "excerpt": "Config docs place settings in `~/.config/gptme/config.toml`, allow `config.local.toml` for secrets, and support env fallbacks plus a tool allowlist."
+    },
+    {
+      "evidence_id": "gptme-github",
+      "kind": "github",
+      "url": "https://github.com/gptme/gptme",
+      "title": "GitHub - gptme/gptme",
+      "captured_at": "2026-05-04T21:37:24Z",
+      "sha256": "2d45467c88e9fb938c159877534812f9105c30f5255efd9154b3ce350978ce9f",
+      "excerpt": "GitHub describes gptme as free and open source, local-first, active, and extensible with plugins, skills, lessons, MCP/ACP, and autonomous-agent workflows."
+    },
+    {
+      "evidence_id": "gptme-pypi",
+      "kind": "package_registry",
+      "url": "https://pypi.org/project/gptme/",
+      "title": "gptme · PyPI",
+      "captured_at": "2026-05-04T21:37:24Z",
+      "sha256": "32ed63159c77e21ee19ca1b9aa3213ccf0218eb59539560b132a8e68ef0e18ea",
+      "excerpt": "PyPI shows `gptme 0.31.0`, Python `>=3.10`, and a terminal-first agent with shell, code execution, file editing, web, vision, and computer-use features."
+    }
+  ]
+}

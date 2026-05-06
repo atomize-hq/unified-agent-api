@@ -1,11 +1,11 @@
 mod approval;
 mod descriptor;
+mod lifecycle;
 mod mutation;
-mod preview;
+pub(crate) mod preview;
 mod validation;
 
 use std::{
-    collections::{BTreeMap, BTreeSet},
     fs,
     io::{self, Write},
     path::{Path, PathBuf},
@@ -16,13 +16,17 @@ use clap::{ArgGroup, Parser};
 use thiserror::Error;
 use toml_edit::DocumentMut;
 
+use self::descriptor::{
+    normalize_ordered_unique, normalize_sorted_unique, parse_config_gates, parse_target_gates,
+};
+use self::lifecycle::build_lifecycle_state_preview;
 use self::mutation::WorkspaceMutationError;
 use self::mutation::{apply_mutations, ApplySummary, PlannedMutation, WorkspacePathJail};
 use self::preview::{
     build_docs_preview, build_manifest_preview, build_manual_follow_up, build_release_preview,
     load_proving_run_metrics, render_registry_entry_preview, write_docs_preview,
-    write_input_summary, write_manifest_preview, write_manual_follow_up, write_registry_preview,
-    write_release_preview,
+    write_input_summary, write_lifecycle_state_preview, write_manifest_preview,
+    write_manual_follow_up, write_registry_preview, write_release_preview,
 };
 use self::validation::{
     desired_registry_text, map_registry_load_error, validate_candidate_registry,
@@ -37,6 +41,11 @@ const PUBLISH_WORKFLOW_PATH: &str = ".github/workflows/publish-crates.yml";
 const PUBLISH_SCRIPT_PATH: &str = "scripts/publish_crates.py";
 const VALIDATE_PUBLISH_SCRIPT_PATH: &str = "scripts/validate_publish_versions.py";
 const CHECK_PUBLISH_READINESS_SCRIPT_PATH: &str = "scripts/check_publish_readiness.py";
+const CURRENT_OWNER_COMMAND: &str = "onboard-agent --write";
+const LAST_TRANSITION_BY: &str = "onboard-agent --write";
+const RAW_APPROVAL_SHA256_PLACEHOLDER: &str =
+    "0000000000000000000000000000000000000000000000000000000000000000";
+const RAW_LAST_TRANSITION_AT_PLACEHOLDER: &str = "1970-01-01T00:00:00Z";
 
 #[derive(Debug, Parser, Clone)]
 #[command(group(
@@ -184,6 +193,7 @@ struct DraftEntry {
 struct ApprovalProvenance {
     artifact_path: String,
     artifact_sha256: String,
+    approval_recorded_at: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -226,10 +236,17 @@ struct DraftDescriptorInput {
 struct OnboardingPlan {
     registry_entry_preview: String,
     docs_preview: Vec<(String, Option<String>)>,
+    lifecycle_state_preview: LifecycleStatePreview,
     manifest_preview: Vec<(String, Option<String>)>,
     release_preview: preview::ReleasePreview,
     manual_follow_up: Vec<String>,
     mutations: Vec<PlannedMutation>,
+}
+
+#[derive(Debug, Clone)]
+struct LifecycleStatePreview {
+    path: String,
+    contents: String,
 }
 
 pub fn run(args: Args) -> Result<(), Error> {
@@ -278,6 +295,7 @@ pub fn run_in_workspace<W: Write>(
     write_input_summary(writer, &draft)?;
     write_registry_preview(writer, &plan.registry_entry_preview)?;
     write_docs_preview(writer, &plan.docs_preview)?;
+    write_lifecycle_state_preview(writer, &plan.lifecycle_state_preview)?;
     write_manifest_preview(writer, &plan.manifest_preview)?;
     write_release_preview(writer, &plan.release_preview)?;
     write_manual_follow_up(writer, &plan.manual_follow_up)?;
@@ -312,7 +330,7 @@ impl DraftEntry {
                         "--approval cannot be mixed with semantic descriptor flags".to_string(),
                     ));
                 }
-                approval::load_descriptor_input(&approval_path, workspace_root)?
+                approval::load_descriptor_input(&approval_path, workspace_root, args.dry_run)?
             }
             None => DraftDescriptorInput::from_raw_args(args)?,
         };
@@ -430,10 +448,11 @@ impl OnboardingPlan {
         let proving_run_metrics = load_proving_run_metrics(workspace_root, draft)?;
         let docs_preview =
             build_docs_preview(draft, &release_preview, proving_run_metrics.as_ref());
+        let lifecycle_state_preview = build_lifecycle_state_preview(workspace_root, draft)?;
         let manifest_preview = build_manifest_preview(draft);
         let manual_follow_up = build_manual_follow_up(draft, proving_run_metrics.as_ref());
 
-        let mut mutations = Vec::with_capacity(3 + docs_preview.len() + manifest_preview.len());
+        let mut mutations = Vec::with_capacity(4 + docs_preview.len() + manifest_preview.len());
         mutations.push(PlannedMutation::replace(
             REGISTRY_RELATIVE_PATH,
             registry_text.as_bytes().to_vec(),
@@ -468,11 +487,16 @@ impl OnboardingPlan {
         // Closeout metadata is packet-local manual state. The onboarding command can read it to
         // render closeout-aware docs, but it must not rewrite or heal that file implicitly.
         mutations.extend(preview_writes(&docs_preview));
+        mutations.push(PlannedMutation::create(
+            lifecycle_state_preview.path.clone(),
+            lifecycle_state_preview.contents.clone().into_bytes(),
+        ));
         mutations.extend(preview_writes(&manifest_preview));
 
         Ok(Self {
             registry_entry_preview,
             docs_preview,
+            lifecycle_state_preview,
             manifest_preview,
             release_preview,
             manual_follow_up,
@@ -544,156 +568,4 @@ fn workspace_members(root_doc: &DocumentMut) -> Result<Vec<PathBuf>, Error> {
             Ok(PathBuf::from(member))
         })
         .collect()
-}
-
-fn normalize_ordered_unique(
-    values: Vec<String>,
-    flag_name: &str,
-    require_non_empty: bool,
-) -> Result<Vec<String>, Error> {
-    if require_non_empty && values.is_empty() {
-        return Err(Error::Validation(format!(
-            "{flag_name} must be provided at least once"
-        )));
-    }
-    let mut seen = BTreeSet::new();
-    let mut out = Vec::with_capacity(values.len());
-    for value in values {
-        let trimmed = value.trim().to_string();
-        if trimmed.is_empty() {
-            return Err(Error::Validation(format!(
-                "{flag_name} must not contain empty values"
-            )));
-        }
-        if !seen.insert(trimmed.clone()) {
-            return Err(Error::Validation(format!(
-                "{flag_name} contains duplicate value `{trimmed}`"
-            )));
-        }
-        out.push(trimmed);
-    }
-    Ok(out)
-}
-
-fn normalize_sorted_unique(values: Vec<String>, flag_name: &str) -> Result<Vec<String>, Error> {
-    let mut out = normalize_ordered_unique(values, flag_name, false)?;
-    out.sort();
-    Ok(out)
-}
-
-fn parse_target_gates(
-    values: Vec<String>,
-    flag_name: &str,
-    canonical_index: &BTreeMap<String, usize>,
-) -> Result<Vec<TargetGate>, Error> {
-    let mut seen = BTreeSet::new();
-    let mut out = Vec::with_capacity(values.len());
-    for value in values {
-        let (capability_id, raw_targets) = value.split_once(':').ok_or_else(|| {
-            Error::Validation(format!(
-                "{flag_name} must be formatted as <capability-id>:<target>[,<target>...] (got `{value}`)"
-            ))
-        })?;
-        let capability_id = validate_gate_scalar(capability_id, flag_name, &value)?;
-        let mut targets = parse_gate_targets(raw_targets, flag_name, &value, canonical_index)?;
-        if !seen.insert((capability_id.clone(), targets.clone())) {
-            return Err(Error::Validation(format!(
-                "{flag_name} contains duplicate entry `{value}`"
-            )));
-        }
-        targets.sort_by_key(|target| canonical_index[target]);
-        out.push(TargetGate {
-            capability_id,
-            targets,
-        });
-    }
-    Ok(out)
-}
-
-fn parse_config_gates(
-    values: Vec<String>,
-    flag_name: &str,
-    canonical_index: &BTreeMap<String, usize>,
-) -> Result<Vec<ConfigGate>, Error> {
-    let mut seen = BTreeSet::new();
-    let mut out = Vec::with_capacity(values.len());
-    for value in values {
-        let mut parts = value.splitn(3, ':');
-        let capability_id =
-            validate_gate_scalar(parts.next().unwrap_or_default(), flag_name, &value)?;
-        let config_key = validate_gate_scalar(parts.next().unwrap_or_default(), flag_name, &value)?;
-        let targets = match parts.next() {
-            Some(raw_targets) => {
-                let mut targets =
-                    parse_gate_targets(raw_targets, flag_name, &value, canonical_index)?;
-                targets.sort_by_key(|target| canonical_index[target]);
-                Some(targets)
-            }
-            None => None,
-        };
-        let signature = format!(
-            "{}:{}:{}",
-            capability_id,
-            config_key,
-            targets
-                .as_ref()
-                .map(|targets| targets.join(","))
-                .unwrap_or_default()
-        );
-        if !seen.insert(signature) {
-            return Err(Error::Validation(format!(
-                "{flag_name} contains duplicate entry `{value}`"
-            )));
-        }
-        out.push(ConfigGate {
-            capability_id,
-            config_key,
-            targets,
-        });
-    }
-    Ok(out)
-}
-
-fn validate_gate_scalar(value: &str, flag_name: &str, original: &str) -> Result<String, Error> {
-    let trimmed = value.trim();
-    if trimmed.is_empty() {
-        return Err(Error::Validation(format!(
-            "{flag_name} contains an empty field in `{original}`"
-        )));
-    }
-    Ok(trimmed.to_string())
-}
-
-fn parse_gate_targets(
-    raw_targets: &str,
-    flag_name: &str,
-    original: &str,
-    canonical_index: &BTreeMap<String, usize>,
-) -> Result<Vec<String>, Error> {
-    let targets = raw_targets
-        .split(',')
-        .map(str::trim)
-        .filter(|target| !target.is_empty())
-        .map(ToOwned::to_owned)
-        .collect::<Vec<_>>();
-    if targets.is_empty() {
-        return Err(Error::Validation(format!(
-            "{flag_name} must declare at least one target in `{original}`"
-        )));
-    }
-
-    let mut seen = BTreeSet::new();
-    for target in &targets {
-        if !seen.insert(target.clone()) {
-            return Err(Error::Validation(format!(
-                "{flag_name} contains duplicate target `{target}` in `{original}`"
-            )));
-        }
-        if !canonical_index.contains_key(target) {
-            return Err(Error::Validation(format!(
-                "{flag_name} target `{target}` is not present in --canonical-target"
-            )));
-        }
-    }
-    Ok(targets)
 }

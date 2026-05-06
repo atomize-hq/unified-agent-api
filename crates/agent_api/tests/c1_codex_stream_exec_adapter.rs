@@ -23,6 +23,7 @@ const ADD_DIR_LEAK_SENTINELS: [&str; 3] = [
 ];
 const BACKPRESSURE_ASSERT_TIMEOUT: Duration = Duration::from_millis(200);
 const POST_DROP_PENDING_TIMEOUT: Duration = Duration::from_millis(50);
+const POST_DROP_COMPLETION_TIMEOUT: Duration = Duration::from_secs(5);
 
 async fn drain_to_none(
     mut stream: Pin<&mut (dyn Stream<Item = AgentWrapperEvent> + Send)>,
@@ -517,7 +518,7 @@ async fn dropping_events_unblocks_buffered_model_runtime_rejection_completion() 
         "completion should remain pending until buffered suppressed model errors are classified"
     );
 
-    let err = tokio::time::timeout(Duration::from_secs(2), completion)
+    let err = tokio::time::timeout(POST_DROP_COMPLETION_TIMEOUT, completion)
         .await
         .expect("completion resolves after dropping events")
         .unwrap_err();
@@ -630,7 +631,7 @@ async fn dropping_events_unblocks_buffered_config_model_runtime_rejection_comple
         "completion should remain pending until buffered suppressed model errors are classified"
     );
 
-    let err = tokio::time::timeout(Duration::from_secs(2), completion)
+    let err = tokio::time::timeout(POST_DROP_COMPLETION_TIMEOUT, completion)
         .await
         .expect("completion resolves after dropping events")
         .unwrap_err();

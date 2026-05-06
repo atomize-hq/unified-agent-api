@@ -3,6 +3,10 @@ use std::path::Path;
 use crate::workspace_mutation::{
     apply_mutations, plan_create_or_replace, PlannedMutation, WorkspacePathJail,
 };
+use crate::{
+    agent_lifecycle::{self, load_lifecycle_state, write_lifecycle_state, EvidenceId, SideState},
+    agent_registry::AgentRegistry,
+};
 
 use super::{
     render::{
@@ -42,6 +46,7 @@ pub fn write_closeout_outputs(
     let linked = super::load_linked_closeout(workspace_root, request_path, closeout_path)?;
     let mutations = plan_closeout_mutations(workspace_root, &linked)?;
     let apply = apply_mutations(workspace_root, &mutations)?;
+    update_lifecycle_state_after_maintenance_closeout(workspace_root, &linked)?;
     Ok(CloseoutWriteSummary {
         agent_id: linked.request.agent_id.clone(),
         maintenance_pack_prefix: linked.maintenance_pack_prefix.clone(),
@@ -49,4 +54,46 @@ pub fn write_closeout_outputs(
         closeout_path: linked.closeout_path.clone(),
         apply,
     })
+}
+
+fn update_lifecycle_state_after_maintenance_closeout(
+    workspace_root: &Path,
+    linked: &LinkedMaintenanceCloseout,
+) -> Result<(), MaintenanceCloseoutError> {
+    let registry = AgentRegistry::load(workspace_root).map_err(|err| {
+        MaintenanceCloseoutError::Validation(format!("load agent registry: {err}"))
+    })?;
+    let Some(entry) = registry.find(&linked.request.agent_id) else {
+        return Ok(());
+    };
+
+    let lifecycle_state_path =
+        agent_lifecycle::lifecycle_state_path(&entry.scaffold.onboarding_pack_prefix);
+    let lifecycle_state_absolute = workspace_root.join(&lifecycle_state_path);
+    if !lifecycle_state_absolute.is_file() {
+        return Ok(());
+    }
+
+    let mut lifecycle_state = load_lifecycle_state(workspace_root, &lifecycle_state_path)
+        .map_err(|err| MaintenanceCloseoutError::Validation(err.to_string()))?;
+    lifecycle_state.current_owner_command = "close-agent-maintenance --write".to_string();
+    lifecycle_state.expected_next_command =
+        format!("check-agent-drift --agent {}", linked.request.agent_id);
+    lifecycle_state.last_transition_at = agent_lifecycle::now_rfc3339()
+        .map_err(|err| MaintenanceCloseoutError::Internal(err.to_string()))?;
+    lifecycle_state.last_transition_by = "xtask close-agent-maintenance --write".to_string();
+    lifecycle_state
+        .side_states
+        .retain(|state| !matches!(state, SideState::Drifted));
+    lifecycle_state
+        .satisfied_evidence
+        .retain(|evidence| *evidence != EvidenceId::MaintenanceCloseoutWritten);
+    lifecycle_state
+        .satisfied_evidence
+        .push(EvidenceId::MaintenanceCloseoutWritten);
+    lifecycle_state.satisfied_evidence.sort();
+    lifecycle_state.satisfied_evidence.dedup();
+
+    write_lifecycle_state(workspace_root, &lifecycle_state_path, &lifecycle_state)
+        .map_err(|err| MaintenanceCloseoutError::Internal(format!("write lifecycle state: {err}")))
 }

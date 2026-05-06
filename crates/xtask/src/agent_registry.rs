@@ -4,11 +4,19 @@ use std::{
     path::{Component, Path},
 };
 
+#[path = "agent_registry/release_watch.rs"]
+mod release_watch;
+
 use crate::capability_projection::{
     resolve_capability_publication_target, validate_config_key_allowlist,
 };
 use serde::Deserialize;
 use thiserror::Error;
+
+pub use release_watch::{
+    ReleaseWatchDispatchKind, ReleaseWatchMetadata, ReleaseWatchSourceKind,
+    ReleaseWatchVersionPolicy,
+};
 
 pub const REGISTRY_RELATIVE_PATH: &str = "crates/xtask/data/agent_registry.toml";
 const WRAPPER_COVERAGE_BINDING_KIND_GENERATED_FROM_WRAPPER_CRATE: &str =
@@ -331,6 +339,8 @@ impl ScaffoldMetadata {
 pub struct MaintenanceMetadata {
     #[serde(default)]
     pub governance_checks: Vec<GovernanceCheck>,
+    #[serde(default)]
+    pub release_watch: Option<ReleaseWatchMetadata>,
 }
 
 impl MaintenanceMetadata {
@@ -344,6 +354,9 @@ impl MaintenanceMetadata {
                     check.path
                 )));
             }
+        }
+        if let Some(release_watch) = &self.release_watch {
+            release_watch.validate(entry)?;
         }
         Ok(())
     }

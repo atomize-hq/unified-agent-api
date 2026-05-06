@@ -1,0 +1,119 @@
+{
+  "run_id": "20260504T212721Z-cli-recommendation-v3-pass1",
+  "sources": [
+    {
+      "candidate_id": "goose",
+      "captured_at": "2026-05-04T21:40:00Z",
+      "query": "Goose developer agent command line",
+      "rank": 1,
+      "role": "frontier_signal",
+      "sha256": "cb7e28d009ab0866bb0bd3ac1b02731956110fb1c63f11bf62b7d6693352fbaa",
+      "source_kind": "web_search_result",
+      "title": "CLI Commands | goose",
+      "url": "https://goose-docs.ai/docs/guides/goose-cli-commands/"
+    },
+    {
+      "candidate_id": "goose",
+      "captured_at": "2026-05-04T21:40:00Z",
+      "role": "docs_surface",
+      "sha256": "6bea0b5ecf7453627785a43a9de7eeadbc9cd3b00a54400de5c1a68616c6567f",
+      "source_kind": "official_doc",
+      "title": "Install goose | goose",
+      "url": "https://goose-docs.ai/docs/getting-started/installation/"
+    },
+    {
+      "candidate_id": "goose",
+      "captured_at": "2026-05-04T21:40:00Z",
+      "role": "discovery_seed",
+      "sha256": "d5f65da37dd8b6cba72c5670b5f93f2cda37bad62689d63a88c41d1adff4b401",
+      "source_kind": "github",
+      "title": "GitHub - aaif-goose/goose: an open source, extensible AI agent that goes beyond code suggestions - install, execute, edit, and test with any LLM",
+      "url": "https://github.com/aaif-goose/goose"
+    },
+    {
+      "candidate_id": "goose",
+      "captured_at": "2026-05-04T21:40:00Z",
+      "role": "install_surface",
+      "sha256": "edf0d3ee20d7f4e7787a38b1c48ba26c741e05b9d89e4ac974ab00696c5a928f",
+      "source_kind": "package_registry",
+      "title": "goose-ai · PyPI",
+      "url": "https://pypi.org/project/goose-ai/"
+    },
+    {
+      "candidate_id": "openhands",
+      "captured_at": "2026-05-04T21:40:00Z",
+      "query": "OpenHands AI agent CLI tools",
+      "rank": 1,
+      "role": "frontier_signal",
+      "sha256": "66c80d1e229cb055b91c35ef22edbabce09fc9d63f8c428aaa11fe2dd9190d56",
+      "source_kind": "web_search_result",
+      "title": "OpenHands CLI | Secure, Scalable Agentic Software Development",
+      "url": "https://openhands.dev/product/cli"
+    },
+    {
+      "candidate_id": "openhands",
+      "captured_at": "2026-05-04T21:40:00Z",
+      "role": "docs_surface",
+      "sha256": "5161aaf50b8905b74cf33b0f68d07360c33a945dea9ce23dff2ec3b2647798e2",
+      "source_kind": "official_doc",
+      "title": "Installation - OpenHands Docs",
+      "url": "https://docs.openhands.dev/openhands/usage/cli/installation"
+    },
+    {
+      "candidate_id": "openhands",
+      "captured_at": "2026-05-04T21:40:00Z",
+      "role": "discovery_seed",
+      "sha256": "aab60dd9ae118cf7402d5aae4af242bce680a25402d3c42d4278b508bde50ecb",
+      "source_kind": "github",
+      "title": "GitHub - OpenHands/OpenHands-CLI: Lightweight OpenHands CLI in a binary executable",
+      "url": "https://github.com/OpenHands/OpenHands-CLI"
+    },
+    {
+      "candidate_id": "openhands",
+      "captured_at": "2026-05-04T21:40:00Z",
+      "role": "install_surface",
+      "sha256": "89105d44587a9e77f241a32ccc9b27811ba908f37c99575741d37c314847cead",
+      "source_kind": "package_registry",
+      "title": "openhands · PyPI",
+      "url": "https://pypi.org/project/openhands/"
+    },
+    {
+      "candidate_id": "gptme",
+      "captured_at": "2026-05-04T21:40:00Z",
+      "query": "gptme developer agent command line",
+      "rank": 3,
+      "role": "frontier_signal",
+      "sha256": "51757efc26b93c0dc46398686bb038a251ee5e0c7975eba4a85320479b6a5bbd",
+      "source_kind": "web_search_result",
+      "title": "gptme - agent in your terminal",
+      "url": "https://gptme.org/"
+    },
+    {
+      "candidate_id": "gptme",
+      "captured_at": "2026-05-04T21:40:00Z",
+      "role": "docs_surface",
+      "sha256": "fbbd6bf1aece7c74f4f324b91fb493f901061d1a1f6aec873ecae627a1066cae",
+      "source_kind": "official_doc",
+      "title": "Getting Started — gptme",
+      "url": "https://gptme.org/docs/getting-started.html"
+    },
+    {
+      "candidate_id": "gptme",
+      "captured_at": "2026-05-04T21:40:00Z",
+      "role": "discovery_seed",
+      "sha256": "8ae56de3594e578273ccdf92e8cd4f228b539cf2927d16cacfdd46e15e3c121d",
+      "source_kind": "github",
+      "title": "GitHub - gptme/gptme: Your agent in your terminal, equipped with local tools: writes code, uses the terminal, browses the web. Make your own persistent autonomous agent on top!",
+      "url": "https://github.com/gptme/gptme"
+    },
+    {
+      "candidate_id": "gptme",
+      "captured_at": "2026-05-04T21:40:00Z",
+      "role": "install_surface",
+      "sha256": "329279a1a9cd66d9e16cc8054b938fefaaee54c3d33ad76f3af20c69720a2348",
+      "source_kind": "package_registry",
+      "title": "gptme · PyPI",
+      "url": "https://pypi.org/project/gptme/"
+    }
+  ]
+}

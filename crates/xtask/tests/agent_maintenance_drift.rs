@@ -1,18 +1,29 @@
 #![allow(dead_code, unused_imports)]
 
-use std::{
-    fs,
-    path::{Path, PathBuf},
-    process::Command,
-};
+use std::{fs, path::PathBuf, process::Command};
 
+#[path = "support/agent_maintenance_drift_harness.rs"]
+mod drift_harness;
 #[path = "support/onboard_agent_harness.rs"]
 mod harness;
 
-#[path = "../src/agent_registry.rs"]
-mod agent_registry;
-#[path = "../src/approval_artifact.rs"]
-mod approval_artifact;
+mod agent_lifecycle {
+    pub use xtask::agent_lifecycle::*;
+}
+
+mod prepare_publication {
+    pub use xtask::prepare_publication::*;
+}
+
+mod agent_registry {
+    pub use xtask::agent_registry::*;
+}
+mod capability_publication {
+    pub use xtask::capability_publication::*;
+}
+mod approval_artifact {
+    pub use xtask::approval_artifact::*;
+}
 #[path = "../src/capability_projection.rs"]
 mod capability_projection;
 #[path = "../src/agent_maintenance/drift/mod.rs"]
@@ -27,7 +38,14 @@ mod root_intake_layout;
 mod support_matrix;
 
 use drift::{check_agent_drift, DriftCategory, DriftCheckError};
-use harness::{fixture_root, seed_gemini_approval_artifact, seed_release_touchpoints, write_text};
+use drift_harness::{
+    release_doc_with_packages, run_xtask_check_agent_drift, seed_cli_manifest_root,
+    seed_closed_governance_maintenance, seed_gemini_lifecycle_baseline,
+    seed_gemini_published_baseline, seed_gemini_runtime_integrated_state,
+    seed_governance_closeouts, seed_publication_inputs, seed_runtime_evidence_run,
+    set_support_matrix_enabled, LifecycleBaselineGap, RuntimeEvidenceTruth,
+};
+use harness::{fixture_root, write_text};
 
 #[test]
 fn check_agent_drift_reports_clean_agent() {
@@ -36,6 +54,92 @@ fn check_agent_drift_reports_clean_agent() {
 
     let report = check_agent_drift(&fixture, "gemini_cli").expect("clean report");
     assert!(report.is_clean(), "{}", report.render());
+}
+
+#[test]
+fn check_agent_drift_reports_missing_lifecycle_publication_packet_path() {
+    let fixture = fixture_root("agent-maintenance-drift-missing-packet-path");
+    seed_publication_inputs(&fixture);
+    seed_gemini_lifecycle_baseline(&fixture, LifecycleBaselineGap::MissingPublicationPacketPath);
+
+    let report = check_agent_drift(&fixture, "gemini_cli").expect("drift report");
+    let finding = report
+        .findings
+        .iter()
+        .find(|finding| finding.category == DriftCategory::GovernanceDoc)
+        .expect("governance doc finding");
+    assert!(finding
+        .summary
+        .contains("historical governance surfaces no longer match"));
+    assert!(
+        finding.summary.contains("publication_packet_path"),
+        "{}",
+        finding.summary
+    );
+}
+
+#[test]
+fn check_agent_drift_reports_missing_lifecycle_publication_packet_sha() {
+    let fixture = fixture_root("agent-maintenance-drift-missing-packet-sha");
+    seed_publication_inputs(&fixture);
+    seed_gemini_lifecycle_baseline(&fixture, LifecycleBaselineGap::MissingPublicationPacketSha);
+
+    let report = check_agent_drift(&fixture, "gemini_cli").expect("drift report");
+    let finding = report
+        .findings
+        .iter()
+        .find(|finding| finding.category == DriftCategory::GovernanceDoc)
+        .expect("governance doc finding");
+    assert!(finding.summary.contains("publication_packet_sha256"));
+}
+
+#[test]
+fn check_agent_drift_reports_missing_lifecycle_closeout_path() {
+    let fixture = fixture_root("agent-maintenance-drift-missing-closeout-path");
+    seed_publication_inputs(&fixture);
+    seed_gemini_lifecycle_baseline(&fixture, LifecycleBaselineGap::MissingCloseoutBaselinePath);
+
+    let report = check_agent_drift(&fixture, "gemini_cli").expect("drift report");
+    let finding = report
+        .findings
+        .iter()
+        .find(|finding| finding.category == DriftCategory::GovernanceDoc)
+        .expect("governance doc finding");
+    assert!(finding.summary.contains("closeout_baseline_path"));
+}
+
+#[test]
+fn check_agent_drift_accepts_published_without_closeout_path() {
+    let fixture = fixture_root("agent-maintenance-drift-published-no-closeout");
+    seed_publication_inputs(&fixture);
+    seed_gemini_published_baseline(&fixture);
+
+    let report = check_agent_drift(&fixture, "gemini_cli").expect("published report");
+    assert!(report.is_clean(), "{}", report.render());
+}
+
+#[test]
+fn check_agent_drift_entrypoint_recovers_after_lifecycle_baseline_repair() {
+    let fixture = fixture_root("agent-maintenance-drift-lifecycle-repair");
+    seed_publication_inputs(&fixture);
+    seed_gemini_lifecycle_baseline(&fixture, LifecycleBaselineGap::MissingPublicationPacketPath);
+
+    let before = run_xtask_check_agent_drift(&fixture, "gemini_cli");
+    assert_eq!(before.status.code(), Some(2));
+    let before_stdout = String::from_utf8_lossy(&before.stdout);
+    assert!(before_stdout.contains("status: drift_detected"));
+    assert!(before_stdout.contains("publication_packet_path"));
+
+    seed_gemini_lifecycle_baseline(&fixture, LifecycleBaselineGap::None);
+
+    let after = run_xtask_check_agent_drift(&fixture, "gemini_cli");
+    assert!(
+        after.status.success(),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&after.stdout),
+        String::from_utf8_lossy(&after.stderr)
+    );
+    assert!(String::from_utf8_lossy(&after.stdout).contains("status: clean"));
 }
 
 #[test]
@@ -249,6 +353,62 @@ fn check_agent_drift_reports_gemini_approval_descriptor_mismatch() {
 }
 
 #[test]
+fn check_agent_drift_reports_stale_runtime_evidence_for_runtime_integrated_agent() {
+    let fixture = fixture_root("agent-maintenance-drift-runtime-evidence-stale");
+    seed_publication_inputs(&fixture);
+    seed_gemini_runtime_integrated_state(&fixture);
+    seed_runtime_evidence_run(&fixture, RuntimeEvidenceTruth::Stale);
+
+    let report = check_agent_drift(&fixture, "gemini_cli").expect("drift report");
+    let finding = report
+        .findings
+        .iter()
+        .find(|finding| finding.category == DriftCategory::RuntimeEvidence)
+        .expect("runtime evidence finding");
+    assert!(finding.summary.contains("repair-runtime-evidence"));
+    assert!(finding.summary.contains("runtime evidence run"));
+    assert!(finding.surfaces.contains(
+        &"docs/agents/.uaa-temp/runtime-follow-on/runs/repair-gemini_cli-runtime-follow-on"
+            .to_string()
+    ));
+    assert!(
+        report
+            .findings
+            .iter()
+            .all(|finding| finding.category != DriftCategory::GovernanceDoc),
+        "{}",
+        report.render()
+    );
+}
+
+#[test]
+fn check_agent_drift_clears_runtime_evidence_finding_after_truthful_repair() {
+    let fixture = fixture_root("agent-maintenance-drift-runtime-evidence-repaired");
+    seed_publication_inputs(&fixture);
+    seed_gemini_runtime_integrated_state(&fixture);
+    seed_runtime_evidence_run(&fixture, RuntimeEvidenceTruth::Stale);
+
+    let before = check_agent_drift(&fixture, "gemini_cli").expect("stale drift report");
+    assert!(before
+        .findings
+        .iter()
+        .any(|finding| finding.category == DriftCategory::RuntimeEvidence));
+
+    seed_runtime_evidence_run(&fixture, RuntimeEvidenceTruth::Truthful);
+
+    let after = check_agent_drift(&fixture, "gemini_cli").expect("repaired report");
+    assert!(
+        after
+            .findings
+            .iter()
+            .all(|finding| finding.category != DriftCategory::RuntimeEvidence),
+        "{}",
+        after.render()
+    );
+    assert!(after.is_clean(), "{}", after.render());
+}
+
+#[test]
 fn check_agent_drift_reports_recurring_closed_governance_surface() {
     let fixture = fixture_root("agent-maintenance-drift-governance-closed");
     seed_publication_inputs(&fixture);
@@ -433,235 +593,4 @@ fn check_agent_drift_entrypoint_exits_one_when_workspace_root_is_missing() {
 
     assert_eq!(output.status.code(), Some(1));
     assert!(String::from_utf8_lossy(&output.stderr).contains("could not resolve workspace root"));
-}
-
-fn seed_publication_inputs(root: &Path) {
-    write_text(
-        &root.join("Cargo.toml"),
-        "[workspace]\nmembers = [\n  \"crates/agent_api\",\n  \"crates/codex\",\n  \"crates/claude_code\",\n  \"crates/opencode\",\n  \"crates/gemini_cli\",\n  \"crates/wrapper_events\",\n  \"crates/xtask\",\n]\n",
-    );
-    seed_release_touchpoints(root);
-    write_text(
-        &root.join("docs/specs/unified-agent-api/support-matrix.md"),
-        "# Support matrix\n\nManual contract text.\n",
-    );
-
-    seed_publishable_workspace_member(root, "crates/gemini_cli", "unified-agent-api-gemini-cli");
-    seed_cli_manifest_root(
-        root,
-        "cli_manifests/codex",
-        &["x86_64-unknown-linux-musl"],
-        &[(&["mcp", "list"], &["x86_64-unknown-linux-musl"])],
-    );
-    seed_cli_manifest_root(
-        root,
-        "cli_manifests/claude_code",
-        &["linux-x64"],
-        &[(&["mcp", "list"], &["linux-x64"])],
-    );
-    seed_cli_manifest_root(root, "cli_manifests/opencode", &["linux-x64"], &[]);
-    seed_cli_manifest_root(root, "cli_manifests/gemini_cli", &["darwin-arm64"], &[]);
-
-    let support_bundle =
-        support_matrix::generate_publication_artifacts(root).expect("generate support publication");
-    write_text(
-        &root.join("cli_manifests/support_matrix/current.json"),
-        &support_bundle.json,
-    );
-    write_text(
-        &root.join("docs/specs/unified-agent-api/support-matrix.md"),
-        &support_bundle.markdown,
-    );
-
-    write_text(
-        &root.join("docs/specs/unified-agent-api/capability-matrix.md"),
-        &default_capability_matrix_markdown(),
-    );
-
-    seed_gemini_approval_artifact(
-        root,
-        "docs/agents/lifecycle/gemini-cli-onboarding/governance/approved-agent.toml",
-        "gemini-cli-onboarding",
-    );
-
-    let release_doc = release_doc::render_release_doc(root).expect("render release doc");
-    write_text(&root.join(release_doc::RELEASE_DOC_PATH), &release_doc);
-}
-
-fn seed_governance_closeouts(
-    root: &Path,
-    opencode_capabilities: &[&str],
-    support_unsupported: bool,
-) {
-    let capability_lines = opencode_capabilities
-        .iter()
-        .map(|capability| format!("`{capability}`"))
-        .collect::<Vec<_>>()
-        .join(", ");
-    write_text(
-        &root.join(
-            "docs/integrations/opencode/governance/seam-2-closeout.md",
-        ),
-        &format!(
-            "# Closeout\n\n- capability advertisement is intentionally conservative and now matches the landed backend contract and generated capability inventory:\n  <!-- xtask-governance-check:opencode-capabilities:start -->\n  {capability_lines}\n  <!-- xtask-governance-check:opencode-capabilities:end -->\n  are the claimed OpenCode v1 capability ids under the current runtime evidence\n"
-        ),
-    );
-
-    let seam3_text = if support_unsupported {
-        "# Closeout\n\n- the support publication artifacts now show OpenCode as manifest-supported only where committed root evidence justifies it, while\n  <!-- xtask-governance-check:opencode-support:start -->\n  backend_support = unsupported\n  uaa_support = unsupported\n  <!-- xtask-governance-check:opencode-support:end -->\n  under the current backend evidence and pointer posture\n"
-    } else {
-        "# Closeout\n\n- the support publication artifacts now show OpenCode as manifest-supported only where committed root evidence justifies it, while\n  <!-- xtask-governance-check:opencode-support:start -->\n  backend_support = supported\n  uaa_support = supported\n  <!-- xtask-governance-check:opencode-support:end -->\n  under the current backend evidence and pointer posture\n"
-    };
-    write_text(
-        &root.join("docs/integrations/opencode/governance/seam-3-closeout.md"),
-        seam3_text,
-    );
-}
-
-fn default_capability_matrix_markdown() -> String {
-    "# Capability matrix — Unified Agent API\n\nStatus: Approved  \nApproved (UTC): 2026-02-21\n\nThis file is generated by `cargo run -p xtask -- capability-matrix`.\nCanonical target profile: `codex=x86_64-unknown-linux-musl`, `claude_code=linux-x64`; `opencode`, `gemini_cli` use the default built-in backend config.\nThis inventory documents backend capability advertising, not support or promotion status.\nDo not edit by hand.\n\n## `agent_api.core`\n\n| capability id | `claude_code` | `codex` | `gemini_cli` | `opencode` |\n|---|---|---|---|---|\n| `agent_api.events` | ✅ | ✅ | ✅ | ✅ |\n| `agent_api.run` | ✅ | ✅ | ✅ | ✅ |\n\n## `agent_api.events`\n\n| capability id | `claude_code` | `codex` | `gemini_cli` | `opencode` |\n|---|---|---|---|---|\n| `agent_api.events.live` | ✅ | ✅ | ✅ | ✅ |\n\n## `agent_api.session`\n\n| capability id | `claude_code` | `codex` | `gemini_cli` | `opencode` |\n|---|---|---|---|---|\n| `agent_api.session.fork.v1` | ✅ | ✅ | — | ✅ |\n| `agent_api.session.resume.v1` | ✅ | ✅ | — | ✅ |\n\n## `agent_api.config`\n\n| capability id | `claude_code` | `codex` | `gemini_cli` | `opencode` |\n|---|---|---|---|---|\n| `agent_api.config.model.v1` | ✅ | ✅ | ✅ | ✅ |\n\n## `agent_api.tools.mcp`\n\n| capability id | `claude_code` | `codex` | `gemini_cli` | `opencode` |\n|---|---|---|---|---|\n| `agent_api.tools.mcp.list.v1` | ✅ | ✅ | — | — |\n".to_string()
-}
-
-fn seed_closed_governance_maintenance(root: &Path, resolved_surface: &str) {
-    write_text(
-        &root.join(
-            "docs/agents/lifecycle/opencode-maintenance/governance/maintenance-closeout.json",
-        ),
-        &serde_json::to_string_pretty(&serde_json::json!({
-            "resolved_findings": [{
-                "category_id": "governance_doc_drift",
-                "surfaces": [resolved_surface],
-            }]
-        }))
-        .expect("serialize maintenance closeout"),
-    );
-}
-
-fn run_xtask_check_agent_drift(fixture_root: &Path, agent_id: &str) -> std::process::Output {
-    let xtask_bin = PathBuf::from(env!("CARGO_BIN_EXE_xtask"));
-    Command::new(xtask_bin)
-        .arg("check-agent-drift")
-        .arg("--agent")
-        .arg(agent_id)
-        .current_dir(fixture_root)
-        .output()
-        .expect("spawn xtask check-agent-drift")
-}
-
-fn release_doc_with_packages(packages: &[&str]) -> String {
-    let packages = packages
-        .iter()
-        .map(|package| package.to_string())
-        .collect::<Vec<_>>();
-    release_doc::splice_release_doc_block(
-        "# Release docs\n\nManual contract text.\n",
-        &release_doc::render_release_doc_block(&packages),
-    )
-}
-
-fn set_support_matrix_enabled(root: &Path, agent_id: &str, enabled: bool) {
-    let registry_path = root.join("crates/xtask/data/agent_registry.toml");
-    let registry = fs::read_to_string(&registry_path).expect("read registry");
-    let agent_marker = format!("agent_id = \"{agent_id}\"");
-    let agent_start = registry.find(&agent_marker).expect("agent in registry");
-    let support_marker = "support_matrix_enabled = true";
-    let support_start = registry[agent_start..]
-        .find(support_marker)
-        .map(|offset| agent_start + offset)
-        .expect("support flag after agent entry");
-    let mut updated = registry;
-    updated.replace_range(
-        support_start..support_start + support_marker.len(),
-        if enabled {
-            "support_matrix_enabled = true"
-        } else {
-            "support_matrix_enabled = false"
-        },
-    );
-    write_text(&registry_path, &updated);
-}
-
-fn seed_publishable_workspace_member(root: &Path, member_path: &str, package_name: &str) {
-    write_text(
-        &root.join(member_path).join("Cargo.toml"),
-        &format!("[package]\nname = \"{package_name}\"\nversion = \"0.2.3\"\nedition = \"2021\"\n"),
-    );
-}
-
-fn seed_cli_manifest_root(
-    root: &Path,
-    manifest_root: &str,
-    canonical_targets: &[&str],
-    commands: &[(&[&str], &[&str])],
-) {
-    let current = serde_json::json!({
-        "expected_targets": canonical_targets,
-        "inputs": [{
-            "target_triple": canonical_targets[0],
-            "binary": { "semantic_version": "1.0.0" }
-        }],
-        "commands": commands
-            .iter()
-            .map(|(path, available_on)| serde_json::json!({
-                "path": path,
-                "available_on": available_on,
-            }))
-            .collect::<Vec<_>>(),
-    });
-    write_text(
-        &root.join(manifest_root).join("current.json"),
-        &format!(
-            "{}\n",
-            serde_json::to_string_pretty(&current).expect("serialize current manifest")
-        ),
-    );
-
-    let version = serde_json::json!({
-        "semantic_version": "1.0.0",
-        "status": "supported",
-        "coverage": { "supported_targets": canonical_targets },
-    });
-    write_text(
-        &root.join(manifest_root).join("versions/1.0.0.json"),
-        &format!(
-            "{}\n",
-            serde_json::to_string_pretty(&version).expect("serialize version metadata")
-        ),
-    );
-
-    for target in canonical_targets {
-        write_text(
-            &root
-                .join(manifest_root)
-                .join(format!("pointers/latest_supported/{target}.txt")),
-            "1.0.0\n",
-        );
-        write_text(
-            &root
-                .join(manifest_root)
-                .join(format!("pointers/latest_validated/{target}.txt")),
-            "1.0.0\n",
-        );
-        let report = serde_json::json!({
-            "inputs": { "upstream": { "targets": [target] } },
-            "deltas": {
-                "missing_commands": [],
-                "missing_flags": [],
-                "missing_args": [],
-                "intentionally_unsupported": [],
-                "wrapper_only_commands": [],
-                "wrapper_only_flags": [],
-                "wrapper_only_args": [],
-            }
-        });
-        write_text(
-            &root
-                .join(manifest_root)
-                .join(format!("reports/1.0.0/coverage.{target}.json")),
-            &format!(
-                "{}\n",
-                serde_json::to_string_pretty(&report).expect("serialize report")
-            ),
-        );
-    }
 }

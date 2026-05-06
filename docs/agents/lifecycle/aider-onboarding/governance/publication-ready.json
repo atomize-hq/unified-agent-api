@@ -1,0 +1,57 @@
+{
+  "schema_version": "1",
+  "agent_id": "aider",
+  "approval_artifact_path": "docs/agents/lifecycle/aider-onboarding/governance/approved-agent.toml",
+  "approval_artifact_sha256": "bc02f5f9b7fe7880446c4cb04b33a9f7c419008755b2229a8243ba878441a854",
+  "lifecycle_state_path": "docs/agents/lifecycle/aider-onboarding/governance/lifecycle-state.json",
+  "lifecycle_state_sha256": "42550ed444e5200d29d52963b066cfe84db2fe7581e49d3bce8dbf5e9a188603",
+  "lifecycle_stage": "publication_ready",
+  "support_tier_at_emit": "baseline_runtime",
+  "manifest_root": "cli_manifests/aider",
+  "expected_targets": [
+    "darwin-arm64"
+  ],
+  "capability_publication_enabled": true,
+  "support_publication_enabled": true,
+  "capability_matrix_target": null,
+  "required_commands": [
+    "cargo run -p xtask -- support-matrix --check",
+    "cargo run -p xtask -- capability-matrix --check",
+    "cargo run -p xtask -- capability-matrix-audit",
+    "make preflight"
+  ],
+  "required_publication_outputs": [
+    "cli_manifests/support_matrix/current.json",
+    "docs/specs/unified-agent-api/support-matrix.md",
+    "docs/specs/unified-agent-api/capability-matrix.md"
+  ],
+  "runtime_evidence_paths": [
+    "docs/agents/.uaa-temp/runtime-follow-on/runs/repair-aider-runtime-follow-on/input-contract.json",
+    "docs/agents/.uaa-temp/runtime-follow-on/runs/repair-aider-runtime-follow-on/run-status.json",
+    "docs/agents/.uaa-temp/runtime-follow-on/runs/repair-aider-runtime-follow-on/run-summary.md",
+    "docs/agents/.uaa-temp/runtime-follow-on/runs/repair-aider-runtime-follow-on/validation-report.json",
+    "docs/agents/.uaa-temp/runtime-follow-on/runs/repair-aider-runtime-follow-on/written-paths.json",
+    "docs/agents/.uaa-temp/runtime-follow-on/runs/repair-aider-runtime-follow-on/handoff.json"
+  ],
+  "publication_owned_paths": [
+    "docs/agents/lifecycle/aider-onboarding/governance/lifecycle-state.json",
+    "docs/agents/lifecycle/aider-onboarding/governance/publication-ready.json"
+  ],
+  "blocking_issues": [],
+  "implementation_summary": {
+    "requested_runtime_profile": "default",
+    "achieved_runtime_profile": "default",
+    "primary_template": "aider",
+    "template_lineage": [
+      "aider"
+    ],
+    "landed_surfaces": [
+      "wrapper_runtime",
+      "backend_harness",
+      "wrapper_coverage_source",
+      "runtime_manifest_evidence"
+    ],
+    "deferred_surfaces": [],
+    "minimal_profile_justification": null
+  }
+}

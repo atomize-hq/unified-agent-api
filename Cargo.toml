@@ -3,7 +3,7 @@ members = [
     "crates/agent_api",
     "crates/codex",
     "crates/claude_code",
-    "crates/opencode", "crates/gemini_cli",
+    "crates/opencode", "crates/gemini_cli", "crates/aider",
     "crates/wrapper_events",
     "crates/xtask",
 ]

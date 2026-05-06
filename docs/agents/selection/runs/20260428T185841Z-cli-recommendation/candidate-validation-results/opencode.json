@@ -1,0 +1,79 @@
+{
+  "agent_id": "opencode",
+  "error_reasons": [],
+  "evidence_ids_used": [
+    "opencode-doc",
+    "opencode-repo",
+    "opencode-pkg"
+  ],
+  "hard_gate_results": {
+    "crate_first_fit": {
+      "evidence_ids": [
+        "opencode-doc",
+        "opencode-pkg"
+      ],
+      "notes": "Installable external CLI posture matches the repo crate-first onboarding ladder.",
+      "rejection_reason": "",
+      "rule_id": "hard_gate.crate_first_fit.doc_or_repo_or_package_backed",
+      "status": "pass"
+    },
+    "non_interactive_execution": {
+      "evidence_ids": [
+        "opencode-doc",
+        "opencode-pkg"
+      ],
+      "notes": "Documented CLI install surface is public and stable enough for wrapper invocation.",
+      "rejection_reason": "",
+      "rule_id": "hard_gate.non_interactive_execution.verified_doc_and_package_or_probe",
+      "status": "pass"
+    },
+    "observable_cli_surface": {
+      "evidence_ids": [
+        "opencode-doc",
+        "opencode-repo"
+      ],
+      "notes": "Observable CLI surface is grounded in public docs and repo presentation.",
+      "rejection_reason": "",
+      "rule_id": "hard_gate.observable_cli_surface.verified_doc_or_repo_or_probe",
+      "status": "pass"
+    },
+    "offline_strategy": {
+      "evidence_ids": [
+        "opencode-doc",
+        "opencode-repo"
+      ],
+      "notes": "The recommendation lane only needs fixture and fake-binary coverage, not live provider execution.",
+      "rejection_reason": "",
+      "rule_id": "hard_gate.offline_strategy.doc_or_repo_backed",
+      "status": "pass"
+    },
+    "redaction_fit": {
+      "evidence_ids": [
+        "opencode-repo"
+      ],
+      "notes": "Repo-fit inference is based on the agent shipping as an external terminal program.",
+      "rejection_reason": "",
+      "rule_id": "hard_gate.redaction_fit.repo_or_probe_backed",
+      "status": "pass"
+    },
+    "reproducibility": {
+      "evidence_ids": [
+        "opencode-doc",
+        "opencode-pkg"
+      ],
+      "notes": "Local reproducibility is public; provider-backed evaluation remains a later gated step.",
+      "rejection_reason": "",
+      "rule_id": "hard_gate.reproducibility.doc_and_package",
+      "status": "pass"
+    }
+  },
+  "notes": [
+    "schema validation passed"
+  ],
+  "probe_results": [],
+  "rejection_reasons": [
+    "agent_id `opencode` already exists in crates/xtask/data/agent_registry.toml and is already onboarded"
+  ],
+  "schema_valid": true,
+  "status": "candidate_rejected"
+}

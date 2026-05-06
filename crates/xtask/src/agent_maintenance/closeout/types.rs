@@ -25,6 +25,7 @@ pub struct MaintenanceRequest {
     pub opened_from: String,
     pub requested_control_plane_actions: Vec<MaintenanceControlPlaneAction>,
     pub runtime_followup_required: RuntimeFollowupRequired,
+    pub detected_release: Option<DetectedRelease>,
     pub request_recorded_at: String,
     pub request_commit: String,
 }
@@ -34,6 +35,7 @@ pub enum MaintenanceTriggerKind {
     DriftDetected,
     ManualReopen,
     PostReleaseAudit,
+    UpstreamReleaseDetected,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -48,6 +50,20 @@ pub enum MaintenanceControlPlaneAction {
 pub struct RuntimeFollowupRequired {
     pub required: bool,
     pub items: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DetectedRelease {
+    pub detected_by: String,
+    pub current_validated: String,
+    pub target_version: String,
+    pub latest_stable: String,
+    pub version_policy: String,
+    pub source_kind: String,
+    pub source_ref: String,
+    pub dispatch_kind: String,
+    pub dispatch_workflow: String,
+    pub branch_name: String,
 }
 
 #[derive(Debug, Clone)]
@@ -151,6 +167,7 @@ impl MaintenanceTriggerKind {
             Self::DriftDetected => "drift_detected",
             Self::ManualReopen => "manual_reopen",
             Self::PostReleaseAudit => "post_release_audit",
+            Self::UpstreamReleaseDetected => "upstream_release_detected",
         }
     }
 }
@@ -168,6 +185,7 @@ impl From<request::MaintenanceRequest> for MaintenanceRequest {
                 .map(Into::into)
                 .collect(),
             runtime_followup_required: value.runtime_followup_required.into(),
+            detected_release: value.detected_release.map(Into::into),
             request_recorded_at: value.request_recorded_at,
             request_commit: value.request_commit,
         }
@@ -180,6 +198,7 @@ impl From<request::TriggerKind> for MaintenanceTriggerKind {
             request::TriggerKind::DriftDetected => Self::DriftDetected,
             request::TriggerKind::ManualReopen => Self::ManualReopen,
             request::TriggerKind::PostReleaseAudit => Self::PostReleaseAudit,
+            request::TriggerKind::UpstreamReleaseDetected => Self::UpstreamReleaseDetected,
         }
     }
 }
@@ -200,6 +219,23 @@ impl From<request::RuntimeFollowupRequired> for RuntimeFollowupRequired {
         Self {
             required: value.required,
             items: value.items,
+        }
+    }
+}
+
+impl From<request::DetectedRelease> for DetectedRelease {
+    fn from(value: request::DetectedRelease) -> Self {
+        Self {
+            detected_by: value.detected_by,
+            current_validated: value.current_validated,
+            target_version: value.target_version,
+            latest_stable: value.latest_stable,
+            version_policy: value.version_policy,
+            source_kind: value.source_kind,
+            source_ref: value.source_ref,
+            dispatch_kind: value.dispatch_kind,
+            dispatch_workflow: value.dispatch_workflow,
+            branch_name: value.branch_name,
         }
     }
 }

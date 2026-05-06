@@ -1,711 +1,703 @@
-# PLAN — Recommendation Lane For The Next CLI Agent
+# PLAN - Prove The Real Codex Stale-Maintenance Path
 
-Status: ready for implementation  
-Date: 2026-04-27  
-Branch: `staging`  
+Status: proposed
+Date: 2026-05-06
+Branch: `codex/recommend-next-agent`
+Base branch: `main`
 Repo: `atomize-hq/unified-agent-api`
+Work item: `Validate the real shared-watcher -> Codex maintenance PR -> maintainer relay path`
+Plan commit baseline: `75aa237`
+Design input: `/Users/spensermcconnell/.gstack/projects/atomize-hq-unified-agent-api/spensermcconnell-codex-recommend-next-agent-design-20260506-091624.md`
+Review addendum: `/Users/spensermcconnell/.gstack/projects/atomize-hq-unified-agent-api/spensermcconnell-codex-recommend-next-agent-eng-review-test-plan-20260506-092335.md`
+Supersedes: the 2026-05-05 relay-implementation `PLAN.md`. That plan mostly described work that is already landed on this branch. This plan is the honest next seam: prove the live path.
 
-## Source Inputs
+## Objective
 
-- Approved design artifact: `~/.gstack/projects/atomize-hq-unified-agent-api/spensermcconnell-staging-design-20260427-151419.md`
-- Eng-review test artifact: `~/.gstack/projects/atomize-hq-unified-agent-api/spensermcconnell-staging-eng-review-test-plan-20260427-153026.md`
-- Normative contracts:
-  - `docs/specs/cli-agent-onboarding-charter.md`
-  - `docs/templates/agent-selection/cli-agent-selection-packet-template.md`
-  - `docs/cli-agent-onboarding-factory-operator-guide.md`
-  - `crates/xtask/src/approval_artifact.rs`
+Prove one boring, real, end-to-end Codex maintenance path:
 
-## Outcome
+```text
+GitHub schedule on main
+  -> shared watcher runs from default-branch workflow definition
+  -> watcher checks out staging
+  -> maintenance-watch emits stale codex queue entry
+  -> watcher dispatches codex worker with frozen queue fields
+  -> worker checks out staging
+  -> worker opens automation/codex-maintenance-<target_version> PR from generated packet docs
+  -> maintainer opens the PR, reads HANDOFF.md, runs execute-agent-maintenance --dry-run
+  -> maintainer reruns execute-agent-maintenance --write --run-id <prepared_run_id>
+  -> maintainer reviews the diff
+  -> flow stops before close-agent-maintenance
+```
 
-Build the missing pre-create recommendation lane for onboarding a new CLI agent.
+Success is not "the code looks ready." Success is one real scheduled proof with captured evidence, with the manual closeout boundary still intact.
 
-The lane starts from maintainer seed hints, gathers dated evidence, hard-rejects ineligible candidates, compares exactly 3 eligible candidates, promotes one canonical selection packet, drafts `approved-agent.toml`, then stops for maintainer approve-or-override before the existing `cargo run -p xtask -- onboard-agent --approval ...` lane begins.
+## Success Criteria
 
-This plan does not reopen the shipped create-mode factory. It feeds it.
+1. A `schedule` event on `.github/workflows/agent-maintenance-release-watch.yml` runs from the default branch workflow definition.
+2. That scheduled watcher run checks out `staging`, not the triggering ref.
+3. The queue job emits a stale `codex` entry with:
+   - `current_validated = 0.97.0`
+   - `version_policy = latest_stable_minus_one`
+   - `dispatch_workflow = codex-cli-update-snapshot.yml`
+   - `branch_name = automation/codex-maintenance-<target_version>`
+4. The emitted `target_version` matches runtime release truth on the day of the run. The current expected value is `0.127.0`, but runtime watcher output wins.
+5. The dispatch job calls the Codex worker without hand-fabricated downstream inputs.
+6. The Codex worker opens a PR whose body comes from `docs/agents/lifecycle/codex-maintenance/governance/pr-summary.md`.
+7. That PR contains:
+   - `docs/agents/lifecycle/codex-maintenance/HANDOFF.md`
+   - `docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml`
+   - `docs/agents/lifecycle/codex-maintenance/governance/pr-summary.md`
+8. A maintainer can run `execute-agent-maintenance --dry-run` from repo root on the PR branch and obtain a prepared run packet under `docs/agents/.uaa-temp/agent-maintenance/runs/<run_id>/`.
+9. A maintainer can run `execute-agent-maintenance --write --run-id <prepared_run_id>` and the relay stays inside its declared write envelope.
+10. No automatic closeout occurs. `close-agent-maintenance` remains manual and untouched.
+11. The temporary cron acceleration on `main` is reverted after the scheduled proof succeeds and the PR exists.
 
-## Scope Lock
+## Current Truth This Plan Locks In
 
-### In scope
+These are the facts this plan treats as authoritative:
 
-- One committed repo-local skill at `.codex/skills/recommend-next-agent/SKILL.md`
-- One deterministic runner at `scripts/recommend_next_agent.py`
-- One committed Python test module for runner logic and golden rendering
-- One committed validation path that proves the generated approval draft satisfies the existing Rust approval-artifact contract
-- One canonical promotion flow into `docs/agents/selection/cli-agent-selection-packet.md`
-- One approval-draft flow that ends at `docs/agents/lifecycle/<onboarding_pack_prefix>/governance/approved-agent.toml`
-- One proving run against a real candidate set
+1. Scheduled GitHub Actions workflows run from the default branch workflow definition, not this feature branch. A cron-only tweak on `codex/recommend-next-agent` does not prove the real path.
+2. `.github/workflows/agent-maintenance-release-watch.yml` currently checks out `staging`.
+3. `.github/workflows/codex-cli-update-snapshot.yml` also checks out `staging`, even when dispatched from another ref.
+4. `cli_manifests/codex/latest_validated.txt` is currently `0.97.0`.
+5. `crates/xtask/data/agent_registry.toml` records Codex maintenance policy as `version_policy = "latest_stable_minus_one"` with `dispatch_workflow = "codex-cli-update-snapshot.yml"`.
+6. On 2026-05-06, the preflight release check saw stable upstream tag `rust-v0.128.0`, so the current expected target is `0.127.0`. That value is advisory only. The scheduled watcher output is the runtime truth.
+7. Manual closeout is still the trust boundary. `execute-agent-maintenance --write` must stop before `close-agent-maintenance`.
 
-### Out of scope
+## Step 0 Scope Challenge
 
-- `xtask recommend-agent`
-- Wrapper or `agent_api` implementation for the eventual winning agent
-- Generalized cross-repo recommendation tooling
-- Dynamic candidate-count configuration
-- Upgrade-lane or maintenance-lane redesign
+### What This Plan Is
 
-## Step 0: Scope Challenge
+- one execution plan for the real scheduled watcher path
+- one explicit branch-coordination story across `main`, `staging`, and the generated automation branch
+- one proof that the generated PR and the local maintainer relay compose correctly
+- one cleanup path that removes the temporary schedule acceleration as soon as the scheduled proof is done
 
-### What already exists
+### What This Plan Is Not
 
-The repo already owns the post-approval create lane.
+- another relay feature implementation plan
+- a `workflow_dispatch` success story disguised as scheduled proof
+- a worker-only proof that skips the stale watcher
+- a version-policy redesign
+- an automatic closeout plan
+- a new maintenance architecture
 
-- `docs/cli-agent-onboarding-factory-operator-guide.md` is the live operator procedure.
-- `docs/specs/cli-agent-onboarding-charter.md` defines the onboarding gates.
-- `docs/agents/selection/cli-agent-selection-packet.md` is the canonical comparison packet path.
-- `docs/templates/agent-selection/cli-agent-selection-packet-template.md` already fixes the packet shape around exactly 3 candidates.
-- `crates/xtask/src/approval_artifact.rs` already defines the approval-artifact contract and hard-codes `comparison_ref = "docs/agents/selection/cli-agent-selection-packet.md"`.
-- `crates/xtask/src/onboard_agent.rs` and `crates/xtask/src/onboard_agent/approval.rs` already own the post-approval control-plane enrollment.
-- `crates/xtask/src/wrapper_scaffold.rs` already owns the runtime shell step after onboarding.
+### What Already Exists
 
-### Minimum diff that achieves the goal
+| Sub-problem | Existing surface | Reuse decision |
+| --- | --- | --- |
+| stale-agent detection | `crates/xtask/src/agent_maintenance/watch.rs` | Reuse exactly. This plan proves it, it does not redesign it. |
+| queue field freezing | `crates/xtask/tests/agent_maintenance_watch.rs` | Reuse as local proof that expected queue fields are already encoded. |
+| request + execution contract truth | `crates/xtask/src/agent_maintenance/request.rs` | Reuse exactly. The live proof must consume this request surface, not a synthetic packet. |
+| packet generation | `crates/xtask/src/agent_maintenance/prepare.rs` | Reuse exactly. The worker already writes the packet and request from repo-owned truth. |
+| packet rendering consistency | `crates/xtask/tests/agent_maintenance_prepare.rs` | Reuse as fail-closed proof for `HANDOFF.md`, `pr-summary.md`, and prompt digest lockstep. |
+| maintainer relay | `crates/xtask/src/agent_maintenance/execute.rs` | Reuse exactly. The proof must run this command, not an ad hoc substitute. |
+| relay boundary + gate coverage | `crates/xtask/tests/agent_maintenance_execute.rs` | Reuse as local proof that path jail, prompt digest, and manual closeout boundary already exist. |
+| scheduled watcher | `.github/workflows/agent-maintenance-release-watch.yml` | Reuse with one temporary cron acceleration only. |
+| worker PR creation | `.github/workflows/codex-cli-update-snapshot.yml` and `.github/workflows/agent-maintenance-open-pr.yml` | Reuse exactly. The live proof must dispatch the existing workflow path. |
+| maintainer operating contract | `cli_manifests/codex/OPS_PLAYBOOK.md` | Reuse as the human-facing policy and replay surface. |
 
-The smallest complete version is:
+### Minimum Complete Change
 
-1. Add one repo-local skill.
-2. Add one script-first deterministic runner.
-3. Reuse the existing canonical packet path and approval-artifact schema.
-4. Validate the generated approval draft by running the existing `xtask` approval flow in dry-run mode.
+The minimum complete plan is:
 
-Anything bigger is premature.
+1. run local automated preflight against the already-landed maintenance code
+2. make the proof baseline real on `staging`
+3. temporarily accelerate the watcher cron on `main`
+4. wait for one real scheduled run
+5. inspect the generated Codex maintenance PR
+6. run maintainer `--dry-run` and `--write` on that PR branch
+7. capture evidence and revert the temporary cron tweak
 
-### Complexity call
+Anything smaller proves less than the repo claims.
 
-This plan intentionally stays below a new-control-plane threshold.
+### Complexity Check
 
-- New primary implementation surfaces: `.codex/skills/`, `scripts/`, and a narrow set of docs/test touchpoints
-- No new crate
-- No new `xtask` command
-- No `agent_api` churn
+This plan is operationally multi-branch, but permanent code-touch complexity is low:
 
-That keeps the blast radius small enough to land as one focused slice.
+- one temporary workflow schedule change on `main`
+- no new services
+- no new long-lived abstractions
+- no new permanent automation unless the live proof exposes a defect
+
+That is the right shape. Boring by default.
+
+### Search / Build Decision
+
+- **[Layer 1]** Accept GitHub's native `schedule` semantics. Do not invent a branch-local workaround.
+- **[Layer 1]** Reuse the shared watcher queue and worker dispatch path. Do not create a proof-only trigger.
+- **[Layer 1]** Reuse `execute-agent-maintenance --dry-run|--write` as the only maintainer execution surface.
+- **[Layer 3]** The real bug was not missing relay code. It was reasoning about branch-local cron edits as if scheduled workflows honored them. They do not.
+
+### Distribution Check
+
+No new distributable artifact is introduced here.
+
+The deliverables are:
+
+- one scheduled GitHub Actions watcher run
+- one real Codex maintenance PR
+- one maintainer relay evidence run under `docs/agents/.uaa-temp/agent-maintenance/runs/<run_id>/`
 
 ## Locked Decisions
 
-| Decision | Why it is locked |
-| --- | --- |
-| V1 compares exactly 3 candidates | The canonical packet template already assumes exactly 3 rows. |
-| Eligibility gating happens before scoring | Ranking infeasible candidates creates fake confidence and wasted maintainer review. |
-| Run-local artifacts and canonical promotion are separate steps | `approved-agent.toml` points at one canonical packet path, so promotion must be explicit. |
-| The runner is script-first, not `xtask`-first | External evidence collection will change faster than the stable control-plane contract. |
-| The lane must emit an approval draft, not just a packet | The create-mode input is `approved-agent.toml`, not a narrative summary. |
-| Maintainer override is first-class | Override is part of the product, not an error condition. |
-| The skill is the orchestration surface and the script is the deterministic engine | This preserves discoverability while keeping evidence capture replayable. |
+1. The success path is a real `schedule` event, not `workflow_dispatch`.
+2. `workflow_dispatch` is allowed only for debugging after a scheduled failure. It does not satisfy success criteria.
+3. The proof must respect the repo's real branch topology:
+   - `main` owns the scheduled workflow definition
+   - `staging` is the code the watcher and worker actually execute
+   - `automation/codex-maintenance-<target_version>` is the generated maintainer branch
+4. The target version is captured from live queue output at execution time. The plan does not hard-code `0.120.0` or any other stale design value.
+5. The shared watcher and Codex worker remain unchanged unless the proof exposes a real defect.
+6. The generated maintenance PR is the maintainer entrypoint. No synthetic hand-authored packet is allowed.
+7. `execute-agent-maintenance --dry-run` is mandatory before `--write`.
+8. `execute-agent-maintenance --write` must reuse one prepared `run_id`.
+9. The relay stops before `close-agent-maintenance`.
+10. The temporary cron acceleration is reverted immediately after the scheduled watcher and worker proof are complete and the PR exists. The local maintainer proof continues after the revert.
+11. The generated PR stays open by default after proof. It is a real maintenance branch unless a maintainer explicitly declares it validation-only.
 
 ## Architecture
 
+### End-To-End Proof Flow
+
 ```text
-maintainer seed / optional shortlist hints
-                |
-                v
-  .codex/skills/recommend-next-agent/SKILL.md
-                |
-                v
-     scripts/recommend_next_agent.py
-                |
-                +------------------------------+
-                |                              |
-                v                              v
-       discovery candidate pool         dated raw source capture
-                |                              |
-                +--------------+---------------+
-                               |
-                               v
-                      hard eligibility gate
-                               |
-                  +------------+------------+
-                  |                         |
-                  v                         v
-        rejected candidates log      eligible candidates
-                                            |
-                                            v
-                                 fixed exactly-3 evaluation
-                                            |
-                                            v
-                            run-local dossiers + scorecard + packet
-                                            |
-                                  explicit promotion step
-                                            |
-                    +-----------------------+----------------------+
-                    |                                              |
-                    v                                              v
-  docs/agents/selection/cli-agent-selection-packet.md   approval-draft.generated.toml
-                                                                    |
-                                                                    v
-                                       docs/agents/lifecycle/<pack>/governance/approved-agent.toml
-                                                                    |
-                                                                    v
-                                         maintainer approve or override
-                                                                    |
-                                                                    v
-                         cargo run -p xtask -- onboard-agent --approval ...
+main
+  -> .github/workflows/agent-maintenance-release-watch.yml
+  -> schedule event fires
+  -> watcher job checks out staging
+  -> cargo run -p xtask -- maintenance-watch --emit-json _ci_tmp/maintenance-watch.json
+  -> queue entry for codex
+       current_validated = 0.97.0
+       latest_stable = <runtime truth>
+       target_version = <runtime truth - 1>
+       dispatch_workflow = codex-cli-update-snapshot.yml
+  -> actions.createWorkflowDispatch(workflow_id = codex-cli-update-snapshot.yml, ref = staging)
+  -> worker job checks out staging
+  -> prepare-agent-maintenance --write
+  -> writes maintenance-request.toml + HANDOFF.md + pr-summary.md
+  -> opens automation/codex-maintenance-<target_version> PR
+  -> maintainer checks out PR branch locally
+  -> execute-agent-maintenance --dry-run
+  -> capture run_id + prepared packet
+  -> execute-agent-maintenance --write --run-id <same run_id>
+  -> green gates pass
+  -> maintainer reviews diff
+  -> stop before close-agent-maintenance
 ```
 
-## Artifact Contract
+### Branch Topology
 
-### Committed source surfaces
+```text
+main
+  owns:
+    - scheduled workflow definition
+    - temporary cron acceleration commit
+    - cron revert commit
 
-| Path | Owner | Purpose |
+staging
+  owns:
+    - watcher code actually executed by the scheduled run
+    - worker code actually executed by the dispatched run
+    - proof baseline commit or deliberate descendant
+
+automation/codex-maintenance-<target_version>
+  owns:
+    - generated maintenance packet
+    - generated PR body
+    - maintainer relay branch
+```
+
+If `staging` does not contain the proof baseline, the scheduled run is the wrong proof. Full stop.
+
+### Control Boundaries
+
+| Surface | Allowed responsibility | Must not do |
 | --- | --- | --- |
-| `.codex/skills/recommend-next-agent/SKILL.md` | repo | operator workflow and maintainer decision framing |
-| `scripts/recommend_next_agent.py` | repo | deterministic evidence capture, gating, scoring, rendering, promotion |
-| `scripts/test_recommend_next_agent.py` | repo | unit and golden coverage for runner behavior |
-| `docs/agents/selection/candidate-seed.toml` | repo | exact candidate pool plus descriptor defaults and per-candidate overrides |
-| `docs/cli-agent-onboarding-factory-operator-guide.md` | repo | operator-procedure update for the new pre-create lane |
+| watcher workflow | trigger on schedule, build queue, dispatch worker | bypass queue generation, invent worker-only data |
+| `maintenance-watch` | compute stale queue from registry + upstream truth | fabricate proof-only target versions |
+| worker workflow | refresh parity artifacts, render packet docs, open PR | execute maintainer relay or closeout |
+| `prepare-agent-maintenance` | write request truth and packet docs | mutate maintainer-owned change surfaces |
+| `execute-agent-maintenance` | validate preflight, prepare dry-run packet, perform bounded write run | perform automatic closeout |
+| `close-agent-maintenance` | explicit post-review human attestation | be folded into write mode |
 
-### Scratch outputs
+## Execution Plan
 
-Root: `~/.gstack/projects/<repo-slug>/recommend-next-agent-runs/<run_id>/`
+### Phase 1. Local Preflight And Runtime Truth Capture
 
-| Path | Purpose |
-| --- | --- |
-| `candidate-pool.json` | full discovered pool, including rejected candidates and rejection reasons |
-| `eligible-candidates.json` | candidates that survive hard gating |
-| `candidate-dossiers/<agent_id>.json` | normalized per-candidate evidence |
-| `scorecard.json` | fixed-dimension scores for the exactly-3 comparison set |
-| `sources.lock.json` | dated source provenance and fetch metadata |
-| `comparison.generated.md` | run-local comparison packet render |
-| `approval-draft.generated.toml` | run-local approval artifact draft before canonical promotion |
-| `run-summary.md` | human-readable summary of what happened and why |
+Purpose: prove the landed maintenance surfaces are green locally before touching GitHub scheduling.
 
-### Committed review outputs
+Owner branch/worktree: current feature branch or a throwaway local worktree.
 
-Root: `docs/agents/selection/runs/<run_id>/`
+Commands:
 
-This root exists only for the promoted run that supports the merged recommendation.
-
-- copy of `candidate-pool.json`
-- copy of `eligible-candidates.json`
-- copy of `candidate-dossiers/**`
-- copy of `scorecard.json`
-- copy of `sources.lock.json`
-- copy of `comparison.generated.md`
-- copy of `approval-draft.generated.toml`
-- copy of `run-summary.md`
-
-### Canonical promoted outputs
-
-| Path | Purpose |
-| --- | --- |
-| `docs/agents/selection/cli-agent-selection-packet.md` | one canonical comparison packet referenced by approval artifacts |
-| `docs/agents/lifecycle/<onboarding_pack_prefix>/governance/approved-agent.toml` | maintainer-approved create-mode input |
-
-### Commit policy
-
-The commit policy is strict.
-
-1. Scratch runs under `~/.gstack/projects/**` are never committed.
-2. `docs/agents/selection/runs/<run_id>/` is committed only for the one promoted run that backs the current recommendation.
-3. Unpromoted or superseded repo-local run directories must be deleted before merge.
-4. A PR for this slice must contain exactly one canonical packet update and exactly one matching committed review run directory.
-5. The committed review run directory, canonical packet update, and approval draft must all describe the same `recommended_agent_id`.
-
-## Runner CLI Contract
-
-The runner uses two subcommands. No hidden modes.
-
-### Generate
-
-```sh
-python3 scripts/recommend_next_agent.py generate \
-  --seed-file docs/agents/selection/candidate-seed.toml \
-  --run-id <timestamp>-<shortlist_slug> \
-  --scratch-root ~/.gstack/projects/<repo-slug>/recommend-next-agent-runs
+```bash
+cargo test -p xtask --test agent_maintenance_watch
+cargo test -p xtask --test agent_maintenance_prepare
+cargo test -p xtask --test agent_maintenance_execute
+cargo run -p xtask -- maintenance-watch --emit-json _ci_tmp/maintenance-watch.json
 ```
 
-Behavior:
+Required outputs:
 
-- reads one seed file
-- performs discovery and evidence capture
-- applies the hard eligibility gate
-- scores only eligible candidates
-- selects exactly 3 candidates
-- writes a complete scratch run under `~/.gstack/projects/<repo-slug>/recommend-next-agent-runs/<run_id>/`
-- does not mutate any repo-tracked file
+1. `_ci_tmp/maintenance-watch.json`
+2. local proof that the three maintenance suites are green
+3. captured runtime watcher target from emitted queue JSON
 
-Exit rules:
+Acceptance:
 
-- exit `0` only when exactly 3 eligible candidates were selected and all scratch artifacts were written
-- non-zero if fewer than 3 eligible candidates remain after gating
-- non-zero if any required source capture or normalization step fails
+1. `_ci_tmp/maintenance-watch.json` contains a `codex` stale-agent entry.
+2. `current_validated` is `0.97.0`.
+3. `dispatch_workflow` is `codex-cli-update-snapshot.yml`.
+4. `branch_name` is `automation/codex-maintenance-<target_version>`.
+5. `target_version` is recorded from runtime watcher output. If it differs from `0.127.0`, the emitted value becomes plan truth for the rest of the run.
+6. No test failures exist in the three suites above.
 
-### Promote
+Failure handling:
 
-```sh
-python3 scripts/recommend_next_agent.py promote \
-  --run-dir ~/.gstack/projects/<repo-slug>/recommend-next-agent-runs/<run_id> \
-  --repo-run-root docs/agents/selection/runs \
-  --approved-agent-id <agent_id> \
-  --onboarding-pack-prefix <kebab-case-pack-prefix> \
-  [--override-reason "<required when approved agent differs from recommended>"]
+- If tests fail, stop and fix the repo-owned blocker first.
+- If the watcher emits a different live target than expected, update the proof record and continue. Do not change code just to match the stale design doc.
+- If no stale `codex` entry appears, stop and inspect `latest_validated.txt`, registry metadata, and live upstream release truth before touching GitHub workflows.
+
+### Phase 2. Make The Proof Baseline Real On `staging`
+
+Purpose: ensure the scheduled run will execute the code we actually mean to prove.
+
+Owner branch/worktree: dedicated `staging` prep worktree.
+
+Required actions:
+
+1. Treat `75aa237` as the baseline commit for this proof.
+2. Ensure `staging` contains that baseline or a deliberate descendant with the same maintenance surfaces.
+3. Verify on `staging`:
+   - `crates/xtask/src/agent_maintenance/watch.rs`
+   - `crates/xtask/src/agent_maintenance/request.rs`
+   - `crates/xtask/src/agent_maintenance/prepare.rs`
+   - `crates/xtask/src/agent_maintenance/execute.rs`
+   - `.github/workflows/codex-cli-update-snapshot.yml`
+   - `.github/workflows/agent-maintenance-open-pr.yml`
+
+Acceptance:
+
+1. `staging` contains the exact proof baseline or an intentional descendant.
+2. The code and workflow surfaces above match what Phase 1 validated locally.
+3. There is no remaining ambiguity about which ref the watcher and worker will execute.
+
+Failure handling:
+
+- If `staging` is missing proof code, land the minimum required baseline there before attempting the scheduled run.
+- If `staging` contains unrelated drift that changes maintenance behavior, stop and restate the proof baseline explicitly before continuing.
+
+### Phase 3. Temporarily Accelerate The Scheduled Watcher On `main`
+
+Purpose: get one real scheduled run quickly, without waiting for the normal daily cron.
+
+Owner branch/worktree: dedicated `main` cron-tweak worktree.
+
+Touch surface:
+
+- `.github/workflows/agent-maintenance-release-watch.yml`
+
+Required change:
+
+- replace the current cron `17 3 * * *`
+- with a temporary off-peak every-5-minutes schedule such as `3-58/5 * * * *`
+
+Rules:
+
+1. Merge this change to `main`, not the feature branch.
+2. Keep `workflow_dispatch` enabled for debugging, but do not use it as the success path.
+3. Do not change `actions/checkout` ref. `staging` checkout is part of the proof.
+4. Do not change queue-shape or dispatch logic while doing the cron acceleration.
+
+Acceptance:
+
+1. `main` now hosts the temporary accelerated schedule.
+2. The next scheduled run should happen within 5 minutes, subject to GitHub delay.
+3. `staging` is already ready before this merge happens.
+
+Failure handling:
+
+- If cron acceleration is merged before `staging` is ready, back out and restart with proper branch sequencing.
+- If GitHub scheduling is delayed, keep the temporary cron in place for one bounded retry window before investigating platform delay.
+
+### Phase 4. Observe The Real Scheduled Watcher Run
+
+Purpose: capture proof that the alarm rang by itself.
+
+Evidence to capture from the watcher run:
+
+1. watcher workflow run URL
+2. queue job logs
+3. emitted queue JSON excerpt for the `codex` entry
+4. dispatch job logs showing:
+   - `agent_id = codex`
+   - `dispatch_workflow = codex-cli-update-snapshot.yml`
+   - `dispatch_ref = staging`
+   - `target_version = <runtime watcher value>`
+   - `branch_name = automation/codex-maintenance-<target_version>`
+
+Required assertions:
+
+1. the run was triggered by `schedule`
+2. the workflow definition came from `main`
+3. the job checked out `staging`
+4. the watcher chose the live `latest_stable_minus_one` target
+5. the dispatch job succeeded
+
+Failure handling:
+
+- If no scheduled run appears, leave the accelerated cron in place for one bounded retry window, then inspect GitHub scheduling delay.
+- If the queue is empty for `codex`, stop and inspect live release truth plus `cli_manifests/codex/latest_validated.txt`.
+- If dispatch fails, treat that as the first real defect. Capture logs before changing anything.
+
+### Phase 5. Inspect The Generated Codex Maintenance PR
+
+Purpose: verify the worker opened the PR from repo-owned packet truth.
+
+Evidence to capture:
+
+1. worker workflow run URL
+2. PR URL
+3. PR head branch
+4. file list and body source
+
+Required assertions:
+
+1. the PR branch is `automation/codex-maintenance-<target_version>`
+2. the PR body matches `docs/agents/lifecycle/codex-maintenance/governance/pr-summary.md`
+3. the PR contains:
+   - `docs/agents/lifecycle/codex-maintenance/HANDOFF.md`
+   - `docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml`
+   - `docs/agents/lifecycle/codex-maintenance/governance/pr-summary.md`
+4. the request includes an `[execution_contract]` table
+5. the request and packet agree on:
+   - target version
+   - writable surfaces
+   - ordered commands
+   - manual closeout boundary
+
+Success handling:
+
+- As soon as the watcher run succeeded, the worker run succeeded, and the PR exists, revert the temporary cron acceleration on `main`.
+- After that revert lands, continue with the local maintainer proof.
+
+Failure handling:
+
+- If packet generation succeeded but PR creation failed, follow the repo-owned recovery path already encoded in `.github/workflows/agent-maintenance-open-pr.yml`.
+- That recovery path is a valid repair path for this phase. It is not a substitute for the scheduled watcher proof in Phase 4.
+
+### Phase 6. Prove The Maintainer Path On The PR Branch
+
+Purpose: prove the human handoff the PR is actually for.
+
+Owner branch/worktree: dedicated local checkout of `automation/codex-maintenance-<target_version>`.
+
+Required commands from repo root on the generated PR branch:
+
+```bash
+cargo run -p xtask -- execute-agent-maintenance \
+  --request docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml \
+  --dry-run
 ```
 
-Behavior:
+Then:
 
-- reads one previously generated scratch run
-- copies that run into `docs/agents/selection/runs/<run_id>/`
-- promotes `comparison.generated.md` into `docs/agents/selection/cli-agent-selection-packet.md`
-- writes `docs/agents/lifecycle/<onboarding_pack_prefix>/governance/approved-agent.toml`
-- validates the generated approval artifact by running `cargo run -p xtask -- onboard-agent --approval <path> --dry-run`
+1. find the newest directory under `docs/agents/.uaa-temp/agent-maintenance/runs/`
+2. set `RUN_ID` to that directory name
+3. rerun:
 
-Promotion guards:
+```bash
+cargo run -p xtask -- execute-agent-maintenance \
+  --request docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml \
+  --write \
+  --run-id "$RUN_ID"
+```
 
-- fail if `docs/agents/selection/runs/<run_id>/` already exists
-- fail if the scratch run is missing any required artifact
-- fail if `approved_agent_id` is not one of the 3 shortlisted candidates
-- fail if `approved_agent_id != recommended_agent_id` and `--override-reason` is absent
-- fail if the approval dry-run validation fails
+Required assertions:
 
-Write ordering:
+1. dry-run writes only under `docs/agents/.uaa-temp/agent-maintenance/runs/<run_id>/`
+2. the prepared packet contains:
+   - `input-contract.json`
+   - `codex-prompt.md`
+   - `run-status.json`
+   - `run-summary.md`
+   - `validation-report.json`
+   - `written-paths.json`
+3. write mode succeeds without boundary violations
+4. the request-owned green gates pass
+5. the resulting diff stays inside the declared write envelope
+6. `maintenance-closeout.json` is not created or mutated by this step
+7. no automatic `close-agent-maintenance` occurs
 
-1. copy scratch run into repo review root
-2. write approval artifact to a temp path
-3. validate approval artifact with `xtask --dry-run`
-4. replace canonical packet and final approval artifact atomically via rename
+Failure handling:
 
-This keeps canonical surfaces unchanged when validation fails.
+- If local Codex preflight fails, fix local binary/auth and rerun dry-run. Do not force write mode.
+- If write mode fails path validation or prompt digest validation, treat that as a real defect in the relay contract and capture the failure packet before retrying.
 
-### Seed file contract
+### Phase 7. Capture Final Evidence And Leave The Repo Clean
 
-Path:
+Purpose: leave behind proof, not operational debt.
 
-- `docs/agents/selection/candidate-seed.toml`
+Required outputs:
 
-The seed file is required. It provides the exact candidate pool plus descriptor defaults that research cannot infer safely.
+1. scheduled watcher run URL
+2. worker run URL
+3. PR URL
+4. captured watcher queue excerpt
+5. captured `run_id` path used for maintainer proof
+6. final diff summary from the PR branch after `--write`
+7. commit or PR reference that reverted the temporary cron acceleration on `main`
+8. one explicit note stating whether the PR remains open for normal maintainer follow-through or is being treated as validation-only
 
-Required top-level tables:
+Exit condition:
 
-- `[defaults.descriptor]`
-- `[candidate.<agent_id>]` for each seed candidate
+1. the temporary cron tweak is gone from `main`
+2. the proof evidence above is recorded
+3. the manual closeout boundary is still intact
+4. no silent follow-up debt was created
 
-Required `[defaults.descriptor]` keys:
+## Engineering Review Consolidation
 
-- `canonical_targets = ["darwin-arm64"]`
-- `wrapper_coverage_binding_kind = "generated_from_wrapper_crate"`
-- `always_on_capabilities = ["agent_api.config.model.v1", "agent_api.events", "agent_api.events.live", "agent_api.run"]`
-- `target_gated_capabilities = []`
-- `config_gated_capabilities = []`
-- `backend_extensions = []`
-- `support_matrix_enabled = true`
-- `capability_matrix_enabled = true`
-- `capability_matrix_target = ""`
-- `docs_release_track = "crates-io"`
+### Architecture Review
 
-Required `[candidate.<agent_id>]` keys:
+The architecture is sound if these boundaries stay intact:
 
-- `display_name`
-- `research_urls`
-- `install_channels`
-- `auth_notes`
+1. GitHub schedule triggers the watcher. It does not bypass queue generation.
+2. `maintenance-watch` computes staleness. It does not fabricate worker-only state.
+3. `prepare-agent-maintenance` writes request truth and packet docs. It does not execute maintainer changes.
+4. `execute-agent-maintenance` executes the maintainer relay. It does not perform closeout.
+5. `close-agent-maintenance` remains explicit human attestation after diff review.
 
-Allowed optional `[candidate.<agent_id>]` override keys:
+This matters because the user-facing product is not "we can generate files." The product is "the repo rings the bell, opens the right PR, and hands the maintainer one safe path."
 
-- `crate_path`
-- `backend_module`
-- `manifest_root`
-- `package_name`
-- `canonical_targets`
-- `wrapper_coverage_binding_kind`
-- `wrapper_coverage_source_path`
-- `always_on_capabilities`
-- `target_gated_capabilities`
-- `config_gated_capabilities`
-- `backend_extensions`
-- `support_matrix_enabled`
-- `capability_matrix_enabled`
-- `capability_matrix_target`
-- `docs_release_track`
-- `onboarding_pack_prefix`
+### Code Quality Review
 
-Derived defaults when omitted:
+The main code-quality risk is not duplication. It is humans bypassing the repo-owned surfaces because the proof plan is vague.
 
-- `crate_path = "crates/<agent_id>"`
-- `backend_module = "crates/agent_api/src/backends/<agent_id>"`
-- `manifest_root = "cli_manifests/<agent_id>"`
-- `package_name = "unified-agent-api-<agent_id with underscores replaced by hyphens>"`
-- `onboarding_pack_prefix = "<agent_id with underscores replaced by hyphens>-onboarding"`
+This plan therefore chooses:
 
-## Eligibility Gate
+- one scheduled watcher path
+- one generated PR path
+- one canonical `HANDOFF.md`
+- one `execute-agent-maintenance` relay
+- one manual closeout boundary
 
-Every candidate must pass these checks before it can enter the 3-row comparison:
+That is explicit over clever. It also keeps the permanent diff small because no new architecture is allowed unless the live proof exposes a real defect.
 
-1. It exposes a plausible deterministic non-interactive CLI surface.
-2. It has a credible offline parser, fixture, or fake-binary strategy.
-3. It can fit the repo's redaction posture without raw backend leakage.
-4. It supports a crate-first onboarding path without forcing `agent_api` design churn up front.
-5. Its external evidence is inspectable and reproducible enough for future maintainers.
+### Performance Review
 
-Candidates that fail are recorded in `candidate-pool.json` with rejection reasons. They never appear in the final comparison table.
+Performance is not the gating concern here. Timing and coordination are.
 
-## Scoring Contract
+The only performance-sensitive choice in this plan is the temporary accelerated cron:
 
-Only eligible candidates are scored.
+- use an off-peak every-5-minutes schedule
+- avoid top-of-hour spikes
+- revert immediately after the scheduled proof succeeds
 
-### Fixed dimensions
+No new repo hot path is introduced unless the live proof exposes a bug that requires a separate implementation task.
 
-Primary dimensions:
+## Test Review
 
-- `Adoption & community pull`
-- `CLI product maturity & release activity`
-- `Installability & docs quality`
-- `Reproducibility & access friction`
+### Required Automated Suites
 
-Secondary dimensions:
-
-- `Architecture fit for this repo`
-- `Capability expansion / future leverage`
-
-### Score buckets
-
-- `0` = weak, missing, or materially blocked
-- `1` = partial, with notable caveats
-- `2` = solid, usable with caveats
-- `3` = strong, clearly favorable
-
-### Deterministic shortlist algorithm
-
-If more than 3 candidates survive eligibility gating, sort eligible candidates by this exact tuple:
-
-1. primary-dimension sum, descending
-2. `Architecture fit for this repo`, descending
-3. `Reproducibility & access friction`, descending
-4. secondary-dimension sum, descending
-5. `CLI product maturity & release activity`, descending
-6. `Adoption & community pull`, descending
-7. `agent_id`, ascending lexical
-
-Take the first 3 after sorting.
-
-### Recommendation algorithm
-
-The `recommended_agent_id` is candidate rank 1 from the deterministic shortlist algorithm above.
-
-The published packet must not show a weighted total column, but the runner may store per-candidate aggregate numbers in `scorecard.json` for deterministic ordering and replay.
-
-### Tie policy
-
-If two candidates tie across all ordering fields above, lexical `agent_id` order wins. No human tie-break at generation time.
-
-## Workstreams
-
-### Workstream 1: Lock the contract surfaces
-
-Modules touched:
-
-- `.codex/skills/`
-- `docs/cli-agent-onboarding-factory-operator-guide.md`
-- `docs/agents/selection/`
-
-Deliverables:
-
-- Skill contract committed at `.codex/skills/recommend-next-agent/SKILL.md`
-- Seed-file contract committed at `docs/agents/selection/candidate-seed.toml`
-- Operator guide updated to describe the pre-create recommendation lane
-- Artifact-root rules documented, including run-local root versus canonical promoted outputs
-
-Acceptance:
-
-- A maintainer can read one committed skill and understand when to run it, what artifacts it produces, and where approve-or-override happens.
-
-### Workstream 2: Implement deterministic runner core
-
-Modules touched:
-
-- `scripts/`
-
-Deliverables:
-
-- `scripts/recommend_next_agent.py`
-- explicit typed data model for candidate pool, dossier, scorecard, and source lock
-- deterministic ordering and stable serialization
-- hard eligibility gate
-- fixed exactly-3 shortlist selection
-
-Implementation notes:
-
-- Keep the runner explicit and boring. Plain Python, standard library where possible.
-- Use one normalization path for all candidates. No candidate-specific ad hoc formatting branches unless proven necessary.
-- Fail closed when required evidence is missing.
-
-Acceptance:
-
-- Re-running the same inputs against the same source snapshots produces byte-stable JSON and markdown outputs.
-
-### Workstream 3: Render, promote, and draft approval artifacts
-
-Modules touched:
-
-- `scripts/`
-- `docs/agents/selection/`
-- `docs/agents/lifecycle/`
-
-Deliverables:
-
-- canonical packet renderer that preserves the 3-candidate contract
-- explicit promotion step from `comparison.generated.md` to `docs/agents/selection/cli-agent-selection-packet.md`
-- approval-draft renderer that emits a valid `approved-agent.toml` shape
-- override path that requires `override_reason` when `approved_agent_id != recommended_agent_id`
-
-Implementation notes:
-
-- The approval draft must reuse the real repo rules from `crates/xtask/src/approval_artifact.rs`.
-- Do not duplicate the Rust schema by hand in multiple places if one shared output builder can keep fields aligned.
-
-Acceptance:
-
-- `cargo run -p xtask -- onboard-agent --approval <generated approval path> --dry-run` succeeds on the proving-run output.
-
-### Approval artifact field mapping
-
-The generated `docs/agents/lifecycle/<onboarding_pack_prefix>/governance/approved-agent.toml` must map fields exactly as follows:
-
-| Field | Source |
-| --- | --- |
-| `artifact_version` | literal `"1"` |
-| `comparison_ref` | literal `"docs/agents/selection/cli-agent-selection-packet.md"` |
-| `selection_mode` | literal `"factory_validation"` for v1 |
-| `recommended_agent_id` | rank-1 candidate from the deterministic shortlist |
-| `approved_agent_id` | `--approved-agent-id` from `promote` |
-| `approval_commit` | `git rev-parse HEAD` at promotion time |
-| `approval_recorded_at` | UTC RFC3339 timestamp at promotion time |
-| `override_reason` | required `--override-reason` when `approved_agent_id != recommended_agent_id`; otherwise omitted |
-| `descriptor.agent_id` | `approved_agent_id` |
-| `descriptor.display_name` | `[candidate.<approved_agent_id>].display_name` from seed file |
-| `descriptor.crate_path` | `[candidate.<approved_agent_id>].crate_path` if present, else default derived path |
-| `descriptor.backend_module` | `[candidate.<approved_agent_id>].backend_module` if present, else default derived path |
-| `descriptor.manifest_root` | `[candidate.<approved_agent_id>].manifest_root` if present, else default derived path |
-| `descriptor.package_name` | `[candidate.<approved_agent_id>].package_name` if present, else default derived package name |
-| `descriptor.canonical_targets` | `[candidate.<approved_agent_id>].canonical_targets` if present, else `[defaults.descriptor].canonical_targets` |
-| `descriptor.wrapper_coverage_binding_kind` | candidate override if present, else `[defaults.descriptor].wrapper_coverage_binding_kind` |
-| `descriptor.wrapper_coverage_source_path` | `[candidate.<approved_agent_id>].wrapper_coverage_source_path` if present, else `descriptor.crate_path` |
-| `descriptor.always_on_capabilities` | candidate override if present, else `[defaults.descriptor].always_on_capabilities` |
-| `descriptor.target_gated_capabilities` | candidate override if present, else `[defaults.descriptor].target_gated_capabilities` |
-| `descriptor.config_gated_capabilities` | candidate override if present, else `[defaults.descriptor].config_gated_capabilities` |
-| `descriptor.backend_extensions` | candidate override if present, else `[defaults.descriptor].backend_extensions` |
-| `descriptor.support_matrix_enabled` | candidate override if present, else `[defaults.descriptor].support_matrix_enabled` |
-| `descriptor.capability_matrix_enabled` | candidate override if present, else `[defaults.descriptor].capability_matrix_enabled` |
-| `descriptor.capability_matrix_target` | candidate override if present; else omit when empty-string default is supplied |
-| `descriptor.docs_release_track` | candidate override if present, else `[defaults.descriptor].docs_release_track` |
-| `descriptor.onboarding_pack_prefix` | `--onboarding-pack-prefix` from `promote` |
-
-Validation rules:
-
-- `descriptor.agent_id` must equal `approved_agent_id`
-- `descriptor.onboarding_pack_prefix` must equal the `<onboarding_pack_prefix>` path segment in the output path
-- `comparison_ref` must point to the canonical packet path and that file must exist
-- when `approved_agent_id != recommended_agent_id`, `override_reason` is required and must be non-empty
-
-### Workstream 4: Add proving-run and validation coverage
-
-Modules touched:
-
-- `scripts/`
-- `crates/xtask/tests/`
-- `docs/agents/selection/`
-
-Deliverables:
-
-- Python unit and golden tests for gating, scoring, ordering, rendering, and promotion guards
-- Rust-side validation or integration coverage that proves generated approval drafts satisfy the real approval contract
-- one real proving run committed as reviewable evidence
-
-Acceptance:
-
-- The proving run leaves one timestamped run directory, one canonical packet update, and one valid approval draft.
-
-## Code Quality Guardrails
-
-- Keep discovery and evaluation separate. Discovery may inspect a wider seed set. Evaluation is the narrow exactly-3 path.
-- Do not split the scoring rubric across the skill and the runner. The skill orchestrates. The runner computes.
-- Keep output formats textual and diff-friendly. No binary captures.
-- Keep the first version script-first. If the proving run reveals stable repetition, then consider `xtask recommend-agent`.
-- Reuse existing packet/docs contracts instead of creating a second comparison or approval shape.
-
-## Performance And Reliability
-
-- Candidate count is intentionally small. Latency is dominated by external evidence capture, not local computation.
-- Prefer bounded or serial fetches over complex async orchestration. This lane is review-path tooling, not a throughput system.
-- Persist `sources.lock.json` so the run can explain why repeated executions differ after upstream drift.
-- Time out evidence collection per source and fail closed with a clear rejection or incomplete-run error.
-- Promotion must be atomic enough that the repo never claims a canonical packet refresh when only run-local artifacts were written.
-
-## Test Strategy
-
-### Primary commands
-
-- `python3 scripts/recommend_next_agent.py generate --seed-file docs/agents/selection/candidate-seed.toml --run-id <timestamp>-<shortlist_slug> --scratch-root ~/.gstack/projects/<repo-slug>/recommend-next-agent-runs`
-- `python3 scripts/recommend_next_agent.py promote --run-dir ~/.gstack/projects/<repo-slug>/recommend-next-agent-runs/<run_id> --repo-run-root docs/agents/selection/runs --approved-agent-id <agent_id> --onboarding-pack-prefix <pack-prefix> [--override-reason "..."]`
-- `python3 -m unittest scripts.test_recommend_next_agent`
-- targeted Rust validation coverage for generated approval artifacts
-- `cargo run -p xtask -- onboard-agent --approval <generated approval path> --dry-run`
-- `make preflight` before merge
-
-### Code path coverage
+Run these before the live proof:
+
+```bash
+cargo test -p xtask --test agent_maintenance_watch
+cargo test -p xtask --test agent_maintenance_prepare
+cargo test -p xtask --test agent_maintenance_execute
+```
+
+These already cover the critical repo-owned behavior:
+
+- queue freezing and target selection
+- packet rendering and request truth lockstep
+- dry-run packet generation
+- write-envelope enforcement
+- prompt digest fail-closed behavior
+- manual closeout boundary
+
+### Live Proof Coverage Diagram
 
 ```text
 CODE PATH COVERAGE
 ===========================
-[+] scripts/recommend_next_agent.py
-    │
-    ├── parse_seed_input()
-    │   └── unit: stable defaults, explicit shortlist hints, bad input rejection
-    │
-    ├── capture_sources()
-    │   └── integration: dated source capture + reproducible sources.lock.json
-    │
-    ├── apply_eligibility_gate()
-    │   └── unit: reject missing non-interactive, fixture, or evidence story
-    │
-    ├── select_exactly_three()
-    │   └── unit: deterministic ordering, hard fail on 2-or-4 candidate output
-    │
-    ├── render_candidate_dossiers()
-    │   └── unit/golden: stable dossier JSON shape
-    │
-    ├── render_comparison_packet()
-    │   └── golden: markdown matches canonical 3-row packet contract
-    │
-    ├── promote_canonical_packet()
-    │   └── integration: writes docs/agents/selection/cli-agent-selection-packet.md explicitly
-    │
-    └── render_approval_draft()
-        └── integration: generated approved-agent.toml passes xtask dry-run validation
-```
+[+] Shared watcher queue
+    |
+    ├── [★★★ TESTED] Frozen queue fields + latest_stable_minus_one selection
+    │                 crates/xtask/tests/agent_maintenance_watch.rs
+    └── [GAP]         Real GitHub schedule on main -> staging checkout
+                      This plan proves it live
 
-### Maintainer-flow coverage
+[+] Packet generation
+    |
+    ├── [★★★ TESTED] Request truth + execution_contract rendering
+    │                 crates/xtask/tests/agent_maintenance_prepare.rs
+    └── [GAP]         Real worker-opened PR from generated pr-summary.md
+                      This plan proves it live
 
-```text
+[+] Maintainer relay
+    |
+    ├── [★★★ TESTED] Dry-run packet writes only under temp run root
+    ├── [★★★ TESTED] Write-mode boundary enforcement + prompt digest fail-closed
+    └── [GAP]         Real maintainer run against a live worker-generated PR branch
+                      This plan proves it live
+
 USER FLOW COVERAGE
 ===========================
-[+] Clean recommendation run
-    ├── seed -> discovery -> gate -> shortlist -> score -> packet -> approval draft
-    └── integration: one end-to-end dry run with durable artifacts
+[+] Alarm rings by itself
+    |
+    └── [GAP] [->E2E] Scheduled watcher creates real downstream work
 
-[+] Candidate rejection path
-    ├── ineligible candidate recorded with rejection reason
-    └── unit/integration: rejection reason survives into candidate-pool.json and run-summary.md
+[+] Maintainer handoff
+    |
+    ├── [GAP] [->E2E] Open PR -> read HANDOFF.md -> dry-run -> write -> diff review
+    └── [★★★ TESTED] Manual closeout remains outside write mode
+                      crates/xtask/tests/agent_maintenance_execute.rs
 
-[+] Canonical promotion path
-    ├── run-local artifacts exist
-    └── integration: canonical packet refresh is explicit, reproducible, and never implicit
-
-[+] Maintainer override path
-    ├── approved candidate differs from recommended candidate
-    └── integration: override_reason required and copied into approval artifact
+─────────────────────────────────
+COVERAGE: repo-owned behavior is well covered locally
+Live gaps: 3 critical end-to-end proofs remain
+  1. main schedule -> staging checkout
+  2. real worker-opened PR from generated packet docs
+  3. real maintainer dry-run/write path on that PR branch
+─────────────────────────────────
 ```
 
-### Required test additions
+### Missing Test Requirements Added By This Plan
 
-- `scripts/test_recommend_next_agent.py`
-  - seed parsing defaults
-  - hard gate rejection reasons
-  - deterministic exactly-3 ordering
-  - golden render for `comparison.generated.md`
-  - promotion guard when canonical target is missing or stale
-  - override draft generation requiring `override_reason`
-- Rust validation coverage in `crates/xtask/tests/`
-  - generated approval draft accepted by the existing approval loader
-  - generated override artifact rejected when `override_reason` is absent
-  - generated comparison ref must match `docs/agents/selection/cli-agent-selection-packet.md`
-- proving-run validation
-  - one committed end-to-end run against real candidate inputs
-  - `cargo run -p xtask -- onboard-agent --approval ... --dry-run` passes
+This plan adds three required end-to-end validation steps, not new unit tests:
 
-### QA handoff artifact
+1. scheduled watcher proof on `main`
+2. worker-opened PR proof from generated packet docs
+3. maintainer dry-run/write proof on that PR branch
 
-Primary QA input for this slice already exists at:
+Those are mandatory because they are exactly the unproven product claims.
 
-`~/.gstack/projects/atomize-hq-unified-agent-api/spensermcconnell-staging-eng-review-test-plan-20260427-153026.md`
+## Evidence Bundle
 
-The implementation should keep that artifact in sync if the execution flow changes materially.
+| Artifact | Where it comes from | Why it matters |
+| --- | --- | --- |
+| watcher run URL | scheduled run on `.github/workflows/agent-maintenance-release-watch.yml` | proves the alarm fired by itself |
+| worker run URL | dispatched run on `.github/workflows/codex-cli-update-snapshot.yml` | proves watcher fanout reached the real worker |
+| queue JSON excerpt | `_ci_tmp/maintenance-watch.json` or watcher logs | proves runtime target version and queue fields |
+| PR URL | generated `automation/codex-maintenance-<target_version>` PR | proves packet generation and PR opening happened |
+| request file path | `docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml` | proves canonical request truth exists |
+| handoff file path | `docs/agents/lifecycle/codex-maintenance/HANDOFF.md` | proves maintainer instructions are canonical |
+| prepared run path | `docs/agents/.uaa-temp/agent-maintenance/runs/<run_id>/` | proves dry-run packetization happened |
+| final diff summary | local PR-branch review after `--write` | proves the maintainer relay mutated only allowed surfaces |
+| cron revert reference | revert commit or PR on `main` | proves the temporary proof infrastructure was cleaned up |
 
 ## Failure Modes Registry
 
-| Codepath | Likely failure | Required test | Required handling | Visible outcome |
-| --- | --- | --- | --- | --- |
-| Discovery | upstream page or API shape drift | integration fixture for source parsing | fail closed with source citation | clear "source changed" error |
-| Eligibility gate | ineligible candidate reaches scoring | unit per rejection reason | reject before scoring | clear rejection summary |
-| Exactly-3 selection | runner emits 2 or 4 comparison rows | unit on count invariant | hard fail before render | clear invariant failure |
-| Dossier normalization | per-candidate JSON shapes drift | golden tests | fail before packet render | clear normalization failure |
-| Packet rendering | packet shape drifts from canonical template | golden tests | block promotion | clear render-drift failure |
-| Canonical promotion | run-local packet exists but canonical packet stays stale | integration on target-path write | fail before approval draft finalization | clear stale-canonical failure |
-| Approval draft | descriptor fields wrong or incomplete | integration through real approval loader | block handoff | clear validation error |
-| Override path | approved candidate differs without rationale | integration on override branch | block artifact finalization | clear override-contract error |
+| Flow | Failure mode | Covered by test? | Error handling exists? | User-visible outcome | Critical gap? |
+| --- | --- | --- | --- | --- | --- |
+| schedule trigger | scheduled run never fires from the workflow definition that matters | no local test, yes by plan precondition | partial, bounded retry window only | silent non-proof unless checked explicitly | yes |
+| watcher checkout | workflow runs, but the proof baseline is missing from `staging` | no | yes, by forcing Phase 2 before Phase 3 | wrong code gets "proven" | yes |
+| queue emission | live release target differs from the stale design assumption | partial, local watch tests cover policy not live data | yes, runtime watcher output wins | expectation mismatch, not code failure | no |
+| dispatch | watcher computes stale Codex entry but `createWorkflowDispatch` fails | not fully | partial, GitHub logs only | visible Actions failure | yes |
+| worker PR creation | packet writes succeed but PR creation fails | partial | yes, explicit recovery path in packet-only PR workflow | visible worker failure | no |
+| maintainer dry-run | local Codex preflight fails | yes | yes | visible CLI failure before mutation | no |
+| maintainer write | relay writes outside declared surfaces | yes | yes, fail closed | visible CLI failure | no |
+| closeout boundary | write mode performs closeout implicitly | yes | yes | silent trust-boundary violation if broken | yes |
 
-Critical gap rule:
-
-Any path that can silently produce a stale canonical packet or an invalid approval artifact is a release blocker.
-
-## Acceptance Gates
-
-The slice is complete only when all of the following are true:
-
-1. The skill exists at `.codex/skills/recommend-next-agent/SKILL.md`.
-2. The seed file exists at `docs/agents/selection/candidate-seed.toml`.
-3. The runner exists at `scripts/recommend_next_agent.py`.
-4. `generate` writes the full scratch artifact set under `~/.gstack/projects/<repo-slug>/recommend-next-agent-runs/<run_id>/`.
-5. `promote` writes exactly one committed review run under `docs/agents/selection/runs/<run_id>/`.
-6. The final comparison packet contains exactly 3 candidates.
-7. Rejected candidates are preserved with rejection reasons.
-8. The canonical packet update is explicit and reproducible.
-9. The generated approval artifact passes the real `xtask` approval dry run.
-10. The override path is supported and requires `override_reason`.
-11. Python unit/golden tests pass.
-12. Targeted Rust validation coverage passes.
-13. `make preflight` passes before merge.
+Critical gaps are exactly the live proofs this plan closes.
 
 ## NOT In Scope
 
-- `xtask recommend-agent`
-  The contract needs one proving run before it deserves a new Rust command surface.
-- Runtime onboarding for the selected agent
-  This slice ends before wrapper/backend implementation begins.
-- Generalized recommendation-service work
-  The problem is repo-local approvability, not global discovery infrastructure.
-- Candidate-count configurability
-  V1 stays fixed at 3 to match the canonical packet shape.
-- Maintenance or upgrade-lane automation
-  That is a later lifecycle concern.
+- redesigning `maintenance-watch`
+- changing `latest_stable_minus_one`
+- automating `close-agent-maintenance`
+- updating `min_supported.txt`
+- widening packet-only support for other agents
+- broad CI cleanup unrelated to this proof
+- speculative fixes for GitHub Actions behavior before a real failure exists
+
+If the scheduled proof exposes a real defect, that defect becomes a separate implementation task with logs and a captured first-failing surface.
+
+## TODOS.md Impact
+
+No `TODOS.md` edits are part of this plan up front.
+
+If the proof fails, create one precise follow-up item per failure. Each item must include:
+
+- the first failing surface
+- the exact log or artifact that proved the failure
+- the affected branch or workflow
+- the minimum next action
+
+Do not dump vague "maintenance proof cleanup" debt into the backlog.
 
 ## Worktree Parallelization Strategy
 
-This plan has real parallelization value once the artifact contract is fixed.
+This plan is partially parallelizable. Branch preparation and maintainer-environment readiness can move in parallel before the scheduled run happens. The scheduled proof itself stays sequential.
 
-### Dependency table
+### Dependency Table
 
 | Step | Modules touched | Depends on |
 | --- | --- | --- |
-| Lock skill + operator contract | `.codex/skills/`, `docs/cli-agent-onboarding-factory-operator-guide.md`, `docs/agents/selection/` | — |
-| Build runner core | `scripts/` | contract lock |
-| Add packet promotion + approval drafting | `scripts/`, `docs/agents/selection/`, `docs/agents/lifecycle/` | runner core |
-| Add proving-run validation | `scripts/`, `crates/xtask/tests/`, `docs/agents/selection/` | runner core + promotion/drafting |
+| A. Local preflight + queue capture | `crates/xtask/src/agent_maintenance/`, `crates/xtask/tests/`, `crates/xtask/data/`, `cli_manifests/codex/` | — |
+| B. Prepare `staging` proof baseline | `crates/xtask/src/agent_maintenance/`, `crates/xtask/tests/`, `.github/workflows/codex-cli-update-snapshot.yml`, `.github/workflows/agent-maintenance-open-pr.yml` | A |
+| C. Temporary `main` cron acceleration | `.github/workflows/` | A |
+| D. Observe scheduled watcher run | GitHub Actions watcher workflow + queue output | B, C |
+| E. Inspect worker-opened PR | worker workflow outputs, `docs/agents/lifecycle/codex-maintenance/` | D |
+| F. Maintainer dry-run/write proof | `docs/agents/.uaa-temp/agent-maintenance/`, generated maintenance packet, local relay run | E |
+| G. Revert temporary cron | `.github/workflows/` on `main` | E |
 
-### Parallel lanes
+### Parallel Lanes
 
-- Lane A: lock skill contract and operator-doc updates
-- Lane B: runner core and normalization schema
-- Lane C: promotion and approval drafting, after Lane B
-- Lane D: proving-run validation, after Lanes B and C
+- Lane 1: `A -> B`
+  - sequential because `staging` readiness depends on a green local preflight
+- Lane 2: `A -> C`
+  - sequential inside the `main` workflow-definition lane
+- Lane 3: maintainer environment preflight
+  - independent local validation that Codex binary/auth is ready before `F`
+- Lane 4: `D -> E -> G -> F`
+  - sequential because each step consumes the real output of the previous one
 
-### Execution order
+### Execution Order
 
-1. Launch Lane A and Lane B in parallel worktrees.
-2. Merge Lane B first because it establishes the real runner contract.
-3. Run Lane C next.
-4. Run Lane D last because it depends on the real runner outputs and the real promoted packet path.
+1. Run `A`.
+2. After `A`, launch `B` and `C` in separate worktrees.
+3. While `B` is finishing, run Lane 3 in parallel to confirm the maintainer environment is usable.
+4. Once `B` and `C` are both green, wait for `D`.
+5. After `D`, run `E`.
+6. As soon as `E` proves the PR exists, run `G` immediately to remove the temporary cron.
+7. Run `F` after `G`, using the generated PR branch and prepared `run_id`.
 
-### Conflict flags
+### Conflict Flags
 
-- Lanes A and C both touch docs under `docs/agents/selection/`, so do not run them in parallel.
-- Lanes B and C both touch `scripts/`, so they must stay sequential.
-- Lane D will read real outputs from B and C, so it should not start until both are merged.
+- Lane A and Lane B do not share modules, but they do require cross-branch coordination.
+- Lane B and Lane G both touch `.github/workflows/` on `main`. Treat them as one worktree lane.
+- Lane D, E, G, and F must stay sequential. They all depend on one real generated PR and one real scheduled watcher run.
+- Do not parallelize multiple scheduled proof attempts. One successful scheduled run is enough, and parallel retries create noisy duplicate automation branches.
+
+## Completion Summary
+
+- Step 0: Scope Challenge — scope accepted as-is, with one major correction: the proof must run through `main` and `staging`, not this feature branch alone
+- Architecture Review: branch topology and control boundaries are now explicit
+- Code Quality Review: no new abstractions or alternate proof paths added
+- Test Review: coverage diagram produced, 3 live proof gaps identified and closed by execution steps
+- Performance Review: no repo-code hot-path blocker, temporary schedule timing is the only tuning surface
+- NOT in scope: written
+- What already exists: written
+- TODOS.md impact: no preemptive changes
+- Failure modes: critical gaps enumerated with first-failure handling
+- Parallelization: 4 lanes total, 2 meaningful pre-schedule parallel lanes, proof lane sequential
+- Lake Score: complete proof path chosen over every shortcut
 
 ## Definition Of Done
 
-- Maintainer can run one repo-local workflow and get:
-  - one timestamped run directory with durable evidence
-  - one exactly-3 comparison packet
-  - one canonical packet promotion step
-  - one valid `approved-agent.toml` draft
-  - one explicit approve-or-override decision point
-- The existing `onboard-agent` lane starts unchanged after approval.
-- No new control-plane abstraction was added prematurely.
+This plan is done only when all of the following are true:
+
+1. the scheduled watcher run happened from `main`
+2. that watcher run checked out `staging`
+3. the worker run happened from the watcher dispatch
+4. the worker opened the Codex maintenance PR from generated packet docs
+5. the maintainer completed `--dry-run` and `--write` on that PR branch
+6. the resulting diff stayed inside the declared write envelope
+7. `close-agent-maintenance` was still manual
+8. the temporary cron acceleration was reverted
+9. the evidence bundle is captured
+
+If any one of those is missing, the repo has not yet proved the real path.

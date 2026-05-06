@@ -15,6 +15,11 @@ Procedure note:
 - the shipped operator workflow lives in `docs/cli-agent-onboarding-factory-operator-guide.md`
 - if the charter and an operator step summary ever diverge, the charter and `docs/specs/**` own the contract truth
 
+Maintenance request note:
+- maintainer-authored maintenance requests remain valid under the legacy request format
+- automated release-watch maintenance requests use `artifact_version = "2"` and `trigger_kind = "upstream_release_detected"`
+- automated release-watch requests MUST carry a `[detected_release]` table and MUST freeze `requested_control_plane_actions = ["packet_doc_refresh"]`
+
 ## Goals
 
 - Make adding “CLI Agent X” a deterministic process:
@@ -81,7 +86,8 @@ Rules are owned by:
 ### Capability promotion rule
 
 To keep the universal facade orthogonal, any new `agent_api.*` capability id (except the allowlist
-below) is only considered “promoted” once it is supported by **≥2 built-in backends**.
+below) is only considered “promoted” once it is supported by **≥2 lifecycle-eligible agent
+backends in capability publication truth**.
 
 This is CI-enforced by:
 - regenerating and diff-checking `docs/specs/unified-agent-api/capability-matrix.md`
@@ -133,6 +139,13 @@ Backend-specific exec-policy knobs (pattern):
 
 ## Onboarding checklist (new CLI agent)
 
+Canonical lifecycle record:
+- `docs/agents/lifecycle/<onboarding_pack_prefix>/governance/lifecycle-state.json`
+- this file owns committed lifecycle stage, support tier, evidence satisfaction, and next-command truth for create mode
+- at `lifecycle_stage = runtime_integrated`, this file also owns `active_runtime_evidence_run_id`, the only canonical selector for the authoritative runtime-evidence run under `docs/agents/.uaa-temp/runtime-follow-on/runs/<run_id>/`
+- generated packet docs and handoff prose are evidence, not lifecycle authority
+- maintenance comparisons must anchor to the committed lifecycle record rather than reconstructing state from scattered packet artifacts
+
 1) Run `onboard-agent --write` to enroll the control-plane surfaces:
    - registry entry
    - docs pack
@@ -158,8 +171,48 @@ Backend-specific exec-policy knobs (pattern):
    - “live event before completion”
    - redaction (no raw line leakage)
    - exec-policy default behavior (non-interactive) and override levers if applicable
-6) Populate manifest evidence and regenerate publication outputs from committed runtime evidence.
-7) Ensure required CI workflows pass (see below).
+6) Run `prepare-publication --approval docs/agents/lifecycle/<onboarding_pack_prefix>/governance/approved-agent.toml --write` after committed runtime evidence exists:
+   - validate approval SHA continuity, implementation-summary completeness, capability publication continuity, and the exact runtime-evidence bundle selected by `active_runtime_evidence_run_id`
+   - write only `docs/agents/lifecycle/<onboarding_pack_prefix>/governance/publication-ready.json`
+   - advance the committed lifecycle record to `publication_ready`, the pre-refresh-only stage in the canonical path `publication_ready -> published -> closed_baseline`
+   - clear `active_runtime_evidence_run_id` as part of that stage transition
+   - the next command template remains `refresh-publication --approval <path> --write`
+7) `refresh-publication --approval <path> --check|--write` is the only publication consumer command; run `refresh-publication --approval docs/agents/lifecycle/<onboarding_pack_prefix>/governance/approved-agent.toml --write` to consume the committed handoff packet:
+   - refresh publication outputs from the committed handoff packet
+   - own publication output writes, the required green gate, and rollback if a publication write or gate step fails
+   - keep the required publication command inventory fixed to:
+     - `cargo run -p xtask -- support-matrix --check`
+     - `cargo run -p xtask -- capability-matrix --check`
+     - `cargo run -p xtask -- capability-matrix-audit`
+     - `make preflight`
+   - on success, commit lifecycle stage `published` in `lifecycle-state.json` and record packet continuity there while leaving `publication-ready.json` as the pre-refresh handoff packet
+   - the next command template after refresh remains `prepare-proving-run-closeout --approval <path> --write`
+8) Run `prepare-proving-run-closeout --approval docs/agents/lifecycle/<onboarding_pack_prefix>/governance/approved-agent.toml --write` after publication refresh succeeds:
+   - write the canonical closeout artifact only at `docs/agents/lifecycle/<prefix>/governance/proving-run-closeout.json`
+   - materialize that closeout artifact with `state = prepared`
+   - keep lifecycle stage `published` until final closeout succeeds
+   - prepare the generated onboarding packet in preview phase `closeout_prepared`
+   - hand bounded human edits on the prepared closeout artifact to the maintainer before final closeout
+9) Complete bounded human edits in `docs/agents/lifecycle/<prefix>/governance/proving-run-closeout.json`, then run `close-proving-run --approval <path> --closeout docs/agents/lifecycle/<prefix>/governance/proving-run-closeout.json`:
+   - the committed closeout artifact must remain on the canonical path above
+   - closeout states are exactly `prepared` and `closed`
+   - prepared packet surfaces must not present the proving run as closed
+10) Ensure required CI workflows pass (see below).
+
+Publication handoff rule:
+- `docs/agents/lifecycle/<onboarding_pack_prefix>/governance/publication-ready.json` is the only committed publication handoff packet
+- once `publication-ready.json` exists, its `runtime_evidence_paths` become the only frozen committed authority for runtime evidence; sibling `.uaa-temp` runs are never authoritative by sort order
+- `publication_ready` means that committed handoff packet exists and refresh is the next required command; it is not a second steady-state publication meaning
+- after publication refresh, the required post-publication flow is `refresh-publication -> prepare-proving-run-closeout -> bounded human edits -> close-proving-run`
+- `prepare-proving-run-closeout` consumes committed `published` state on the normal path and writes the canonical closeout artifact in `state = prepared`
+- `close-proving-run` is the final transition that consumes the prepared closeout artifact and records `state = closed`
+- any remaining `publication_ready` acceptance is limited to narrow transitional compatibility for legacy/manual records
+- scratch runtime `handoff.json` files remain run evidence only
+
+Runtime evidence repair rule:
+- `repair-runtime-evidence --write` may repoint `active_runtime_evidence_run_id` while leaving lifecycle stage unchanged
+- that selector change is a lifecycle mutation and must update lifecycle provenance fields (`current_owner_command`, `last_transition_at`, `last_transition_by`)
+- repair must be transactional across the canonical repair bundle and lifecycle state: on failure, neither authoritative surface may change
 
 ## CI expectations (must stay green)
 

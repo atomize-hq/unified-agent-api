@@ -1527,11 +1527,23 @@ dependencies = [
  "tempfile",
  "thiserror",
  "tokio",
+ "unified-agent-api-aider",
  "unified-agent-api-claude-code",
  "unified-agent-api-codex",
  "unified-agent-api-gemini-cli",
  "unified-agent-api-opencode",
  "url",
+]
+
+[[package]]
+name = "unified-agent-api-aider"
+version = "0.3.0"
+dependencies = [
+ "futures-core",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
 ]
 
 [[package]]

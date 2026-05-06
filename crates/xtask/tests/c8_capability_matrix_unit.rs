@@ -2,6 +2,10 @@ mod agent_registry {
     pub use xtask::agent_registry::*;
 }
 
+mod capability_publication {
+    pub use xtask::capability_publication::*;
+}
+
 mod capability_projection {
     #![allow(dead_code)]
 
@@ -12,6 +16,8 @@ mod capability_matrix {
     #![allow(dead_code)]
 
     include!("../src/capability_matrix.rs");
+
+    use crate::agent_registry::AgentRegistry;
 
     const SEEDED_REGISTRY: &str = include_str!("../data/agent_registry.toml");
 
@@ -149,7 +155,8 @@ mod capability_matrix {
                 "codex".to_string(),
                 "claude_code".to_string(),
                 "opencode".to_string(),
-                "gemini_cli".to_string()
+                "gemini_cli".to_string(),
+                "aider".to_string()
             ]
         );
     }
@@ -172,7 +179,7 @@ mod capability_matrix {
 
         assert_eq!(
             render_canonical_target_header(&entries).expect("render header"),
-            "Canonical target profile: `codex=x86_64-unknown-linux-musl`, `claude_code=linux-x64`; `opencode`, `gemini_cli` use the default built-in backend config.\n"
+            "Canonical publication target profile: `codex=x86_64-unknown-linux-musl`, `claude_code=linux-x64`; `opencode`, `gemini_cli`, `aider` use their default lifecycle-backed target profile.\n"
         );
     }
 

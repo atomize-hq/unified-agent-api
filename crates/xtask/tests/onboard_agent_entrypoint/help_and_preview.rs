@@ -196,6 +196,7 @@ fn onboard_agent_dry_run_preview_is_deterministic_and_writes_nothing() {
         "== INPUT SUMMARY ==",
         "== REGISTRY ENTRY PREVIEW ==",
         "== DOCS SCAFFOLD PREVIEW ==",
+        "== LIFECYCLE STATE PREVIEW ==",
         "== MANIFEST ROOT PREVIEW ==",
         "== RELEASE/PUBLICATION TOUCHPOINTS ==",
         "== MANUAL FOLLOW-UP ==",
@@ -220,6 +221,22 @@ fn onboard_agent_dry_run_preview_is_deterministic_and_writes_nothing() {
     assert!(first
         .stdout
         .contains("Path: docs/agents/lifecycle/cursor-cli-onboarding/README.md"));
+    assert!(first.stdout.contains(
+        "Path: docs/agents/lifecycle/cursor-cli-onboarding/governance/lifecycle-state.json"
+    ));
+    assert!(first.stdout.contains("\"lifecycle_stage\": \"enrolled\""));
+    assert!(first.stdout.contains("\"support_tier\": \"bootstrap\""));
+    assert!(first
+        .stdout
+        .contains("\"current_owner_command\": \"onboard-agent --write\""));
+    assert!(first
+        .stdout
+        .contains("\"expected_next_command\": \"scaffold-wrapper-crate --agent cursor --write\""));
+    assert!(first.stdout.contains("\"required_evidence\": ["));
+    assert!(first.stdout.contains("\"registry_entry\""));
+    assert!(first.stdout.contains("\"docs_pack\""));
+    assert!(first.stdout.contains("\"manifest_root_skeleton\""));
+    assert!(first.stdout.contains("\"satisfied_evidence\": ["));
     assert!(first
         .stdout
         .contains("Path: cli_manifests/cursor/current.json"));
@@ -238,6 +255,10 @@ fn onboard_agent_dry_run_preview_is_deterministic_and_writes_nothing() {
     assert!(first
         .stdout
         .contains("cargo run -p xtask -- scaffold-wrapper-crate --agent cursor --write"));
+    assert!(first.stdout.contains("runtime-follow-on --dry-run"));
+    assert!(first
+        .stdout
+        .contains("Populate committed runtime evidence only under `cli_manifests/cursor/snapshots/**` and `cli_manifests/cursor/supplement/**`."));
     assert!(first
         .stdout
         .contains("`onboard-agent` does not create the wrapper crate."));
@@ -251,6 +272,12 @@ fn onboard_agent_dry_run_preview_is_deterministic_and_writes_nothing() {
     assert!(!first
         .stdout
         .contains("Next executable runtime step: implement the runtime-owned wrapper crate"));
+    assert!(!first
+        .stdout
+        .contains("current.json`, pointers, versions, and reports"));
+    assert!(!first
+        .stdout
+        .contains("Regenerate support and capability publication artifacts"));
     assert!(!first
         .stdout
         .contains("When the wrapper crate is crates.io-publishable"));

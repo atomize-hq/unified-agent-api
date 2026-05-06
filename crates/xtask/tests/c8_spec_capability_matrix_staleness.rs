@@ -49,6 +49,7 @@ fn seed_fixture_workspace(fixture_root: &Path) {
     copy_repo_file(fixture_root, "cli_manifests/claude_code/current.json");
     copy_repo_file(fixture_root, "cli_manifests/opencode/current.json");
     copy_repo_file(fixture_root, "cli_manifests/gemini_cli/current.json");
+    copy_repo_file(fixture_root, "cli_manifests/aider/current.json");
 }
 
 #[test]
@@ -98,9 +99,13 @@ fn c8_spec_capability_matrix_check_passes_when_fresh_and_fails_without_rewriting
     );
 
     let mutated = baseline.replacen(
-        "| `agent_api.run` |",
-        "| `agent_api.run.local-mutation` |",
+        "# Capability matrix",
+        "# Capability matrix (locally mutated)",
         1,
+    );
+    assert_ne!(
+        mutated, baseline,
+        "deliberate local mutation must change the generated capability matrix fixture"
     );
     fs::write(&checked_in, &mutated).expect("write deliberate local mutation");
 
