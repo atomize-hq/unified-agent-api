@@ -28,8 +28,7 @@ KNOWN_PUBLISH_PRIORITY = {
 
 class PublishStrategy(str, Enum):
     SKIP = "skip"
-    PUBLISH_WITH_OIDC = "publish-with-oidc"
-    PUBLISH_WITH_BOOTSTRAP_TOKEN = "publish-with-bootstrap-token"
+    PUBLISH_WITH_TOKEN = "publish-with-token"
 
 
 @dataclass(frozen=True)
@@ -274,9 +273,7 @@ def determine_strategy(
 ) -> PublishStrategy:
     if registry_client.crate_version_exists(package.name, package.version):
         return PublishStrategy.SKIP
-    if not registry_client.crate_exists(package.name):
-        return PublishStrategy.PUBLISH_WITH_BOOTSTRAP_TOKEN
-    return PublishStrategy.PUBLISH_WITH_OIDC
+    return PublishStrategy.PUBLISH_WITH_TOKEN
 
 
 def plan_publish_actions(

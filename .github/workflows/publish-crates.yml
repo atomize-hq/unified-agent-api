@@ -8,7 +8,6 @@ on:
 
 permissions:
   contents: read
-  id-token: write
 
 concurrency:
   group: publish-crates-main
@@ -122,14 +121,10 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
 
-      - uses: rust-lang/crates-io-auth-action@v1
-        id: auth
-
       - name: Publish crates in dependency order
         shell: bash
         env:
-          OIDC_CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
-          BOOTSTRAP_CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
+          CRATES_IO_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
         run: |
           set -euo pipefail
           python3 scripts/publish_crates.py \

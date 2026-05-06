@@ -21,9 +21,8 @@ from publish_planner import (
     run,
 )
 
-OIDC_TOKEN_ENV = "OIDC_CARGO_REGISTRY_TOKEN"
-LEGACY_OIDC_TOKEN_ENV = "CARGO_REGISTRY_TOKEN"
-BOOTSTRAP_TOKEN_ENV = "BOOTSTRAP_CARGO_REGISTRY_TOKEN"
+TOKEN_ENV = "CRATES_IO_TOKEN"
+LEGACY_TOKEN_ENV = "CARGO_REGISTRY_TOKEN"
 
 
 def parse_args() -> argparse.Namespace:
@@ -57,21 +56,12 @@ def select_registry_token(strategy: PublishStrategy, env: dict[str, str]) -> str
     if strategy is PublishStrategy.SKIP:
         return None
 
-    if strategy is PublishStrategy.PUBLISH_WITH_OIDC:
-        token = env.get(OIDC_TOKEN_ENV) or env.get(LEGACY_OIDC_TOKEN_ENV)
-        if token:
-            return token
-        raise RuntimeError(
-            "Missing OIDC token for existing-crate publish. Set "
-            f"{OIDC_TOKEN_ENV} (or {LEGACY_OIDC_TOKEN_ENV}) before running --execute."
-        )
-
-    token = env.get(BOOTSTRAP_TOKEN_ENV)
+    token = env.get(TOKEN_ENV) or env.get(LEGACY_TOKEN_ENV)
     if token:
         return token
     raise RuntimeError(
-        "Detected first-publish crate but no bootstrap token is available. Set "
-        f"{BOOTSTRAP_TOKEN_ENV} from the protected release secret before running --execute."
+        "Missing crates.io token for publish. Set "
+        f"{TOKEN_ENV} (or {LEGACY_TOKEN_ENV}) before running --execute."
     )
 
 
@@ -191,7 +181,7 @@ def publish_package(
         f"{planned.strategy.value}."
     )
     publish_env = os.environ.copy()
-    publish_env[LEGACY_OIDC_TOKEN_ENV] = token
+    publish_env[LEGACY_TOKEN_ENV] = token
     run(
         ["cargo", "publish", "--locked", "-p", planned.package.name],
         cwd=root,
