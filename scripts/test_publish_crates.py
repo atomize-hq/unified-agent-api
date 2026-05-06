@@ -3,8 +3,8 @@ from __future__ import annotations
 import unittest
 
 from publish_crates import (
-    BOOTSTRAP_TOKEN_ENV,
-    OIDC_TOKEN_ENV,
+    LEGACY_TOKEN_ENV,
+    TOKEN_ENV,
     select_registry_token,
 )
 from publish_planner import (
@@ -228,15 +228,15 @@ class PublishPlannerTests(unittest.TestCase):
         strategies = {item.package.name: item.strategy for item in planned}
         self.assertEqual(
             strategies["unified-agent-api-opencode"],
-            PublishStrategy.PUBLISH_WITH_BOOTSTRAP_TOKEN,
+            PublishStrategy.PUBLISH_WITH_TOKEN,
         )
         self.assertEqual(
             strategies["unified-agent-api-wrapper-events"],
-            PublishStrategy.PUBLISH_WITH_OIDC,
+            PublishStrategy.PUBLISH_WITH_TOKEN,
         )
         self.assertEqual(
             strategies["unified-agent-api"],
-            PublishStrategy.PUBLISH_WITH_OIDC,
+            PublishStrategy.PUBLISH_WITH_TOKEN,
         )
 
     def test_plan_handles_new_dependent_crate(self) -> None:
@@ -264,7 +264,7 @@ class PublishPlannerTests(unittest.TestCase):
         strategies = {item.package.name: item.strategy for item in planned}
         self.assertEqual(
             strategies["unified-agent-api"],
-            PublishStrategy.PUBLISH_WITH_BOOTSTRAP_TOKEN,
+            PublishStrategy.PUBLISH_WITH_TOKEN,
         )
 
     def test_plan_excludes_alternate_registry_only_crates(self) -> None:
@@ -299,28 +299,28 @@ class PublishPlannerTests(unittest.TestCase):
             release_version="0.2.3",
         )
         self.assertEqual(planned[0].strategy, PublishStrategy.SKIP)
-        self.assertEqual(planned[1].strategy, PublishStrategy.PUBLISH_WITH_OIDC)
-        self.assertEqual(planned[2].strategy, PublishStrategy.PUBLISH_WITH_BOOTSTRAP_TOKEN)
+        self.assertEqual(planned[1].strategy, PublishStrategy.PUBLISH_WITH_TOKEN)
+        self.assertEqual(planned[2].strategy, PublishStrategy.PUBLISH_WITH_TOKEN)
 
 
 class TokenSelectionTests(unittest.TestCase):
-    def test_existing_crate_publish_uses_oidc_token(self) -> None:
+    def test_publish_uses_crates_io_token(self) -> None:
         token = select_registry_token(
-            PublishStrategy.PUBLISH_WITH_OIDC,
-            {OIDC_TOKEN_ENV: "oidc-token"},
+            PublishStrategy.PUBLISH_WITH_TOKEN,
+            {TOKEN_ENV: "crates-token"},
         )
-        self.assertEqual(token, "oidc-token")
+        self.assertEqual(token, "crates-token")
 
-    def test_first_publish_uses_bootstrap_token(self) -> None:
+    def test_publish_uses_legacy_cargo_registry_token(self) -> None:
         token = select_registry_token(
-            PublishStrategy.PUBLISH_WITH_BOOTSTRAP_TOKEN,
-            {BOOTSTRAP_TOKEN_ENV: "bootstrap-token"},
+            PublishStrategy.PUBLISH_WITH_TOKEN,
+            {LEGACY_TOKEN_ENV: "cargo-token"},
         )
-        self.assertEqual(token, "bootstrap-token")
+        self.assertEqual(token, "cargo-token")
 
-    def test_missing_bootstrap_token_fails_clearly(self) -> None:
-        with self.assertRaisesRegex(RuntimeError, BOOTSTRAP_TOKEN_ENV):
-            select_registry_token(PublishStrategy.PUBLISH_WITH_BOOTSTRAP_TOKEN, {})
+    def test_missing_publish_token_fails_clearly(self) -> None:
+        with self.assertRaisesRegex(RuntimeError, TOKEN_ENV):
+            select_registry_token(PublishStrategy.PUBLISH_WITH_TOKEN, {})
 
 
 if __name__ == "__main__":

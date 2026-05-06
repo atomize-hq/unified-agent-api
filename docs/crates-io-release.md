@@ -50,24 +50,20 @@ The dependent crates (`wrapper-events` and `agent-api`) require the leaf crates
 to be visible in the crates.io index before `cargo publish --dry-run` can
 succeed for the same version.
 
-## Automated bootstrap
+## Automated publishing
 
-Trusted Publishing still cannot create a brand-new crate on crates.io. The
-first publish for a crate must use a normal crates.io API token, after which
-Trusted Publishing can handle future releases.
+This repository uses the `CRATES_IO_TOKEN` release secret for every crates.io
+publish, including both first publish and subsequent version bumps.
 
-This repository automates that boundary inside
-`.github/workflows/publish-crates.yml`:
+The workflow in `.github/workflows/publish-crates.yml`:
 
 1. The workflow computes the crates.io-publishable workspace graph from `cargo metadata`.
    Crates restricted to alternate registries (for example `publish = ["internal"]`)
    are excluded from this release plan.
 2. For each crate at the target `VERSION`, it checks crates.io:
    - if `crate/version` already exists, the crate is skipped
-   - if the crate exists but the version is new, the crate is published with
-     Trusted Publishing / OIDC
-   - if the crate does not exist at all, the crate is published with the
-     protected bootstrap token
+   - if the crate/version does not exist, the crate is published with the
+     protected `CRATES_IO_TOKEN`
 3. After each publish, the workflow waits until downstream crates pass
    `cargo publish --dry-run` or the just-published crate version becomes visible
    in the registry.
@@ -76,12 +72,10 @@ This repository automates that boundary inside
 
 The GitHub `release` environment must define:
 
-- `CRATES_IO_TOKEN`: normal crates.io API token used only when the workflow
-  encounters a crate that does not yet exist on crates.io
+- `CRATES_IO_TOKEN`: crates.io API token used for all publish operations
 
-The publish job passes that secret as `BOOTSTRAP_CARGO_REGISTRY_TOKEN`. Existing
-crates still publish through `rust-lang/crates-io-auth-action@v1` and the
-short-lived OIDC token path.
+The publish job passes that secret to `cargo publish` as the registry token for
+every crate publish.
 
 ### Validation and plan preview
 
@@ -96,18 +90,7 @@ Release validation now includes:
 The `--plan` output shows the computed dependency order and one of:
 
 - `skip`
-- `publish-with-oidc`
-- `publish-with-bootstrap-token`
-
-## Trusted Publishing
-
-Trusted Publishing remains the default publish path for existing crates. Each
-published crate should be configured on crates.io to trust this repository and
-`.github/workflows/publish-crates.yml`.
-
-When a newly added crate is bootstrapped by the workflow, configure Trusted
-Publishing for that crate in crates.io afterward so the next release uses OIDC
-automatically.
+- `publish-with-token`
 
 ## Manual fallback
 
@@ -123,9 +106,7 @@ published manually from a maintainer machine:
 5. Preview the computed order with:
    - `python3 scripts/publish_crates.py --plan --root . --release-version <VERSION>`
 6. Publish crates in that order:
-   - for a brand-new crate, use the normal crates.io token path
-   - for an existing crate, either use `cargo publish` with a normal token or
-     rerun the GitHub workflow once the secret / ownership issue is fixed
+   - use a normal crates.io token for every crate publish
 
 Rotate `CRATES_IO_TOKEN` after a bootstrap publish or on the normal secret
 rotation schedule.
@@ -136,17 +117,13 @@ The publish executor is idempotent across partial runs:
 
 - `Skipping <crate>@<version>; already published.` means the exact version
   already exists on crates.io.
-- `Publishing <crate>@<version> via publish-with-oidc.` means the crate already
-  exists and is using Trusted Publishing.
-- `Publishing <crate>@<version> via publish-with-bootstrap-token.` means the
-  crate did not exist on crates.io and is being bootstrapped with the protected
-  release secret.
+- `Publishing <crate>@<version> via publish-with-token.` means the crate is
+  being published with the configured crates.io API token.
 
 References:
 
 - `https://crates.io/docs/trusted-publishing`
 - `https://blog.rust-lang.org/2025/07/11/crates-io-development-update-2025-07/`
 
-The GitHub Actions workflow in this repository uses `rust-lang/crates-io-auth-action@v1`
-to exchange GitHub OIDC credentials for a short-lived crates.io token at
-publish time.
+The GitHub Actions workflow in this repository passes the protected
+`CRATES_IO_TOKEN` secret directly to `cargo publish`.
