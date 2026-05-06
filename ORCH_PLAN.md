@@ -1,569 +1,697 @@
-# ORCH_PLAN - Enclose The Agent-Maintenance Execution Relay
+# ORCH_PLAN - Prove The Real Codex Stale-Maintenance Path
 
 ## Summary
 
-This orchestration plan owns the current milestone in
-`/Users/spensermcconnell/__Active_Code/atomize-hq/unified-agent-api` on branch
-`codex/recommend-next-agent`.
+Authoritative milestone source: `PLAN.md` in the repo root. This file is an execution aid only.
 
-Authoritative milestone source: `PLAN.md`
-Milestone: `Enclose The Agent-Maintenance Execution Relay`
-
-This is a follow-on to already-landed shared watcher plus packet-first PR work. The job here is
-to enclose the local maintainer execution seam with:
-
-- structured `[execution_contract]` request truth
-- one shared execution-packet renderer
-- `execute-agent-maintenance --dry-run|--write`
-- one prepared `run_id` baseline
-- temp relay evidence under `docs/agents/.uaa-temp/agent-maintenance/runs/<run_id>/`
-- bounded write enforcement plus diff validation
-- workflow recovery hardening
-- docs and playbook alignment
-- final proving
-
-This milestone does not redesign the watcher, does not widen to packet-only relay execution, does
-not widen beyond local Codex execution, and does not automate closeout.
-
-Completion definition:
-
-- lanes A through G below are merged back onto `codex/recommend-next-agent`
-- the serial spine from schema -> shared renderer is preserved before downstream lane launch
-- `execute-agent-maintenance --dry-run` and `--write` behave exactly as specified in `PLAN.md`
-- manual closeout remains outside relay write mode
-- all commands in `PLAN.md` section `Commands That Must Pass Before Landing` pass on the parent branch
-
-## Parent Critical Path
-
-Frozen parent spine:
+This orchestration replaces the stale relay-implementation plan. The current session must prove the
+real path described in `PLAN.md`:
 
 ```text
-P0 baseline capture + stale-scope rejection
--> P1 schema lane launch and merge (Lane A)
--> P2 shared renderer lane plus closeout compatibility launch (Lanes B, E)
--> P3 packet generation and relay launch after renderer merge (Lanes C, D)
--> P4 workflow recovery hardening after packet generation is merged (Lane F)
--> P5 docs and playbook closeout after relay + workflow semantics are stable (Lane G)
--> P6 parent-only proving and acceptance
+main scheduled workflow definition
+  -> scheduled watcher run fires from main
+  -> watcher checks out staging
+  -> watcher emits stale codex queue entry using runtime truth
+  -> watcher dispatches the Codex worker with frozen queue fields
+  -> worker checks out staging
+  -> worker opens automation/codex-maintenance-<target_version>
+  -> parent checks out that generated PR branch
+  -> parent runs execute-agent-maintenance --dry-run
+  -> parent reruns execute-agent-maintenance --write --run-id <prepared_run_id>
+  -> parent captures evidence and leaves close-agent-maintenance manual
+  -> parent reverts the temporary cron acceleration on main
 ```
 
-Parent-only completion gate:
+This is primarily an operational proof, not a feature-build milestone. The parent agent is the
+only integrator and the only actor allowed to push `main`, push `staging`, observe the scheduled
+run, inspect the generated PR, revert the temporary cron change, run the maintainer proof, and
+declare acceptance.
 
-1. Lane A is merged before Lane B starts.
-2. Lane A is merged before Lane E starts.
-3. Lane B is merged before Lanes C and D start.
-4. Lane C is merged before Lane F starts.
-5. Lane G waits until C, D, and F are stable enough that docs will not churn.
-6. Final proving runs only on the parent branch after all lane merges are complete.
+Concurrency policy:
+
+- Live cap: `2` worker lanes, plus the parent.
+- Reason: only `staging` readiness and `main` cron prep are worth parallelizing up front. The real
+  bottleneck is serialized branch coordination plus GitHub schedule latency. Adding more workers
+  before the generated PR exists increases drift and merge overhead without shortening the critical
+  path.
+
+## Completion Definition
+
+This session is done only when all of the following are true:
+
+1. Local preflight passed and the local watcher output recorded a stale `codex` entry with
+   `dispatch_workflow = codex-cli-update-snapshot.yml`.
+2. `staging` was proven or updated to the exact watcher/worker baseline that the scheduled proof is
+   meant to exercise.
+3. `main` temporarily carried the accelerated cron and then had that acceleration reverted after
+   the scheduled proof succeeded.
+4. One real `schedule` run fired from `.github/workflows/agent-maintenance-release-watch.yml` on
+   `main`.
+5. That scheduled watcher checked out `staging`, emitted the stale `codex` queue entry, and
+   dispatched the Codex worker using queue-owned data.
+6. The worker opened `automation/codex-maintenance-<target_version>`, where `target_version` is
+   the runtime watcher value recorded for this session.
+7. The generated PR body came from
+   `docs/agents/lifecycle/codex-maintenance/governance/pr-summary.md` and the required packet files
+   exist in the PR.
+8. The parent ran `execute-agent-maintenance --dry-run` on that generated PR branch, then reran
+   `execute-agent-maintenance --write --run-id <prepared_run_id>`.
+9. Dry-run and write-mode evidence was captured under the session `.runs/...` root, and write mode
+   stayed inside its declared envelope.
+10. `close-agent-maintenance` remained manual and untouched by write mode.
+11. The parent recorded watcher evidence, worker evidence, PR evidence, maintainer-proof evidence,
+    and the cron-revert reference, then marked acceptance against `PLAN.md`.
 
 ## Hard Guards
 
-- `PLAN.md` is the only milestone authority. The previous `ORCH_PLAN.md` is stale and is valid
-  only as a rejection source for outdated goals.
-- Shared watcher topology and packet-first PR flow are already landed. Do not reopen watcher
-  architecture, queue math, registry enrollment, or worker migration as new milestone goals.
-- No watcher redesign.
-- No earlier registry/watcher revamp scope.
-- No packet-only relay executor in milestone 1. Packet-only agents remain on the existing packet PR path.
-- No executor widening beyond local Codex.
-- No GitHub-hosted or cloud-hosted autonomous relay execution.
-- No automatic closeout. `close-agent-maintenance` remains manual and outside relay write mode.
-- No promotion-pointer or publication-surface writes inside relay write mode.
-- Temp relay evidence is host-owned and stays under
-  `docs/agents/.uaa-temp/agent-maintenance/runs/<run_id>/`.
-- Relay write-boundary enforcement must reuse the repo's existing path-jail machinery. Do not
-  invent a second boundary system.
-- `HANDOFF.md` remains the human entrypoint, but machine truth comes from structured request truth
-  and the frozen dry-run packet, never from parsing rendered markdown.
-- Any proposal that reintroduces stale ORCH scope such as watcher replacement,
-  worker-entrypoint migration, or goose follow-on work halts the lane immediately.
+- `PLAN.md` is the sole milestone authority. If this file conflicts with `PLAN.md`, `PLAN.md` wins.
+- `main` owns the scheduled workflow definition, including the temporary cron acceleration and its
+  revert.
+- `staging` owns the code actually executed by both the watcher and the worker.
+- Runtime watcher output is truth for `target_version`. The current expected value is advisory
+  only; the emitted queue value wins.
+- The generated PR branch name must be `automation/codex-maintenance-<target_version>`.
+- Success requires one real `schedule` event. `workflow_dispatch` is debug-only and does not count
+  as success.
+- Success requires the maintainer proof on the generated PR branch:
+  `execute-agent-maintenance --dry-run` first, then
+  `execute-agent-maintenance --write --run-id <prepared_run_id>`.
+- `close-agent-maintenance` remains manual and out of scope for write mode.
+- The temporary cron acceleration must be reverted on `main` after the scheduled watcher succeeds
+  and the PR exists, even if local maintainer proof continues afterward.
+- The parent is the only integrator. Workers do not merge, do not push `main`, do not push
+  `staging`, do not touch the generated automation branch, and do not write orchestration state.
+- No worker or parent step may assume unrelated modified files are safe to edit. Only files needed
+  for the active lane may be touched.
+- Stop immediately if the scheduled watcher does not check out `staging`, if the worker is
+  dispatched with fabricated inputs, if the PR body does not come from
+  `docs/agents/lifecycle/codex-maintenance/governance/pr-summary.md`, or if write mode crosses its
+  declared envelope.
 
 ## Authority Model
 
 Parent-only authority:
 
-- owns `PLAN.md` interpretation for this milestone
-- owns this orchestration document
-- owns launch order, relaunch decisions, and dependency freezes
-- owns merge decisions onto `codex/recommend-next-agent`
-- owns integration conflict resolution
-- owns final proving, acceptance, and landing recommendation
-- owns orchestration state under the `.runs/...` root below
+- interprets `PLAN.md` for this session and owns this orchestration file
+- creates and maintains `.runs/prove-real-codex-stale-maintenance/**`
+- decides lane launch order, lane freeze SHAs, and any relaunch
+- is the only actor allowed to push `main`
+- is the only actor allowed to push `staging`
+- is the only actor allowed to observe GitHub Actions runs and record watcher/worker evidence
+- is the only actor allowed to inspect the generated automation PR and decide whether it satisfies
+  the packet contract
+- is the only actor allowed to check out the generated
+  `automation/codex-maintenance-<target_version>` branch locally
+- is the only actor allowed to run `execute-agent-maintenance --dry-run`
+- is the only actor allowed to run `execute-agent-maintenance --write --run-id <prepared_run_id>`
+- is the only actor allowed to revert the temporary cron acceleration on `main`
+- is the only actor allowed to declare acceptance or failure for the proof
 
 Worker authority:
 
-- may edit only the files assigned to the worker lane
-- may run only the lane-scoped tests and validation called out for that lane
-- may not merge, rebase other lanes, or update orchestration state
-- may not widen milestone scope or alter frozen boundaries
-- must report exact commands run, exact files changed, blockers, and unresolved assumptions
+- may prepare lane-scoped changes only on the assigned worker branch and worktree
+- may run only the lane-scoped validation commands assigned to that lane
+- may report `ready-for-parent`, `blocked`, or `no-op`
+- may not merge
+- may not push `main`
+- may not push `staging`
+- may not push or touch the generated automation branch
+- may not observe or interpret live GitHub run evidence as acceptance proof
+- may not inspect the generated PR as the authoritative acceptance actor
+- may not run the maintainer proof commands
+- may not write `.runs/**`
+- may not widen scope beyond the active lane contract
 
-Merge policy:
-
-- all worker branches fork from `codex/recommend-next-agent`
-- workers should keep output to one reviewable commit when practical
-- parent integrates worker output onto `codex/recommend-next-agent`
-- preferred integration is `git cherry-pick -x <worker-commit>`; if drift makes that unsafe,
-  parent manually reapplies the worker diff on the parent branch
-- workers do not merge each other
-- if a dependency freeze changes after a lane launches, parent stops the affected lane and relaunches it from the new freeze SHA
-
-Concurrency cap:
-
-- maximum concurrent workers: `3`
-- recommended live cap for this milestone: `3`
-- safe overlap is:
-  - Lane A alone
-  - Lanes B and E together
-  - Lanes C, D, and E together after Lane B merges, if E is still open
-  - Lane F alone or alongside only parent integration work
-  - Lane G alone
-- parent does not exceed the cap even if more lanes are technically unblocked; preserving the schema -> renderer -> packet/relay spine is more important than maximizing parallelism
-
-## Orchestration State
+## Run-State Source Of Truth
 
 Parent-owned orchestration root:
 
 ```text
-/Users/spensermcconnell/__Active_Code/atomize-hq/unified-agent-api/.runs/enclose-agent-maintenance-execution-relay
+/Users/spensermcconnell/__Active_Code/atomize-hq/unified-agent-api/.runs/prove-real-codex-stale-maintenance
 ```
 
-Concrete state files:
+Parent initializes it once:
+
+```bash
+mkdir -p .runs/prove-real-codex-stale-maintenance/artifacts
+```
+
+Required parent-owned records:
 
 - `baseline.json`
+  - parent branch, parent SHA, dirty-state summary, `PLAN.md` hash, timestamp
 - `freeze.json`
+  - lane table, worktree paths, launch SHAs, stop conditions, acceptance gates
 - `lane-status.json`
-- `worker-launches.json`
-- `merge-log.md`
-- `session-log.md`
+  - lane status: `pending|running|blocked|ready-for-parent|merged|no-op|aborted`
+- `artifacts/local-watch.json`
+  - local `maintenance-watch` output captured during baseline
+- `artifacts/watcher-run.md`
+  - scheduled run URL, event type, checkout ref proof, queue excerpt
+- `artifacts/worker-run.md`
+  - worker run URL, dispatch inputs, result
+- `artifacts/pr.md`
+  - PR URL, branch name, required files, PR body source verification
+- `artifacts/maintainer-proof.md`
+  - exact dry-run command, `run_id`, exact write command, result, diff summary
+- `artifacts/cron-revert.md`
+  - revert commit/PR reference on `main`
 - `acceptance.md`
-- `final-proving.md`
+  - success criteria checklist mapped directly to `PLAN.md`
 
-Per-lane state records:
+Workers never write under `.runs/prove-real-codex-stale-maintenance`.
 
-- `lane-a-schema.json`
-- `lane-b-renderer.json`
-- `lane-c-prepare.json`
-- `lane-d-execute.json`
-- `lane-e-closeout.json`
-- `lane-f-workflows.json`
-- `lane-g-docs.json`
+## Workstream Plan
 
-Required contents:
+### Branch And Worktree Layout
 
-- `baseline.json`
-  - parent branch
-  - parent HEAD SHA
-  - dirty-worktree summary
-  - `PLAN.md` hash
-  - stale-ORCH rejection notes
-- `freeze.json`
-  - locked milestone boundaries
-  - dependency order
-  - lane ownership table
-  - exact final proving commands
-  - relaunch triggers
-- `lane-status.json`
-  - each lane status: `pending|running|blocked|merged|relaunch-required`
-  - launch SHA
-  - dependency SHA
-  - blocking issue, if any
-- `worker-launches.json`
-  - lane id
-  - branch
-  - worktree path
-  - launch timestamp
-  - worker handoff packet version
-- `merge-log.md`
-  - merge order
-  - conflicts encountered
-  - post-merge smoke results
-- `session-log.md`
-  - parent decisions
-  - halt events
-  - relaunch reasons
-- `acceptance.md`
-  - milestone acceptance checklist mapped to `PLAN.md`
-- `final-proving.md`
-  - exact command results
-  - final manual inspections
-  - residual risk notes
-
-Workers never write any file under the orchestration root.
-
-## Branch And Worktree Layout
-
-Repository root:
+Repo root:
 
 ```text
 /Users/spensermcconnell/__Active_Code/atomize-hq/unified-agent-api
 ```
 
-Parent branch:
-
-```text
-codex/recommend-next-agent
-```
-
-Worker worktree root:
+Shared worktree root:
 
 ```text
 /Users/spensermcconnell/__Active_Code/atomize-hq/wt
 ```
 
-Frozen lane branches and worktrees:
+Parent live worktrees:
 
-| Lane | Purpose | Branch | Worktree |
-| --- | --- | --- | --- |
-| A | execution-contract schema | `codex/recommend-next-agent-relay-a-schema` | `/Users/spensermcconnell/__Active_Code/atomize-hq/wt/unified-agent-api-relay-a-schema` |
-| B | shared execution-packet renderer | `codex/recommend-next-agent-relay-b-renderer` | `/Users/spensermcconnell/__Active_Code/atomize-hq/wt/unified-agent-api-relay-b-renderer` |
-| C | packet generation | `codex/recommend-next-agent-relay-c-prepare` | `/Users/spensermcconnell/__Active_Code/atomize-hq/wt/unified-agent-api-relay-c-prepare` |
-| D | relay command | `codex/recommend-next-agent-relay-d-execute` | `/Users/spensermcconnell/__Active_Code/atomize-hq/wt/unified-agent-api-relay-d-execute` |
-| E | closeout compatibility | `codex/recommend-next-agent-relay-e-closeout` | `/Users/spensermcconnell/__Active_Code/atomize-hq/wt/unified-agent-api-relay-e-closeout` |
-| F | workflow recovery hardening | `codex/recommend-next-agent-relay-f-workflows` | `/Users/spensermcconnell/__Active_Code/atomize-hq/wt/unified-agent-api-relay-f-workflows` |
-| G | docs and playbooks | `codex/recommend-next-agent-relay-g-docs` | `/Users/spensermcconnell/__Active_Code/atomize-hq/wt/unified-agent-api-relay-g-docs` |
+- `main`: `/Users/spensermcconnell/__Active_Code/atomize-hq/wt/unified-agent-api-main-live`
+- `staging`: `/Users/spensermcconnell/__Active_Code/atomize-hq/wt/unified-agent-api-staging-live`
+- generated PR branch:
+  `/Users/spensermcconnell/__Active_Code/atomize-hq/wt/unified-agent-api-proof-pr-<target_version>`
 
-Recommended creation pattern:
+Worker lanes:
 
-```sh
-git worktree add /Users/spensermcconnell/__Active_Code/atomize-hq/wt/unified-agent-api-relay-a-schema -b codex/recommend-next-agent-relay-a-schema codex/recommend-next-agent
+| Lane | Purpose | Base ref | Worker branch | Worktree |
+| --- | --- | --- | --- | --- |
+| A | prove or land the exact watcher/worker baseline onto `staging` | `origin/staging` | `codex/recommend-next-agent-orch-a-staging-proof` | `/Users/spensermcconnell/__Active_Code/atomize-hq/wt/unified-agent-api-orch-a-staging-proof` |
+| B | prepare the temporary `main` cron acceleration and paired revert | `origin/main` | `codex/recommend-next-agent-orch-b-main-cron` | `/Users/spensermcconnell/__Active_Code/atomize-hq/wt/unified-agent-api-orch-b-main-cron` |
+
+Valid parent live-worktree setup forms:
+
+- If local branches `main` and `staging` already exist and track the intended remotes:
+
+```bash
+git worktree add /Users/spensermcconnell/__Active_Code/atomize-hq/wt/unified-agent-api-staging-live staging
+git worktree add /Users/spensermcconnell/__Active_Code/atomize-hq/wt/unified-agent-api-main-live main
 ```
 
-Repeat with the lane-specific path and branch for each worker.
+- If local branches do not yet exist, create them explicitly from the remote-tracking refs:
 
-## Ownership Split
+```bash
+git worktree add -b staging /Users/spensermcconnell/__Active_Code/atomize-hq/wt/unified-agent-api-staging-live origin/staging
+git worktree add -b main /Users/spensermcconnell/__Active_Code/atomize-hq/wt/unified-agent-api-main-live origin/main
+```
 
-Parent-only surfaces:
+Worker-lane setup commands:
 
+```bash
+git worktree add /Users/spensermcconnell/__Active_Code/atomize-hq/wt/unified-agent-api-orch-a-staging-proof -b codex/recommend-next-agent-orch-a-staging-proof origin/staging
+git worktree add /Users/spensermcconnell/__Active_Code/atomize-hq/wt/unified-agent-api-orch-b-main-cron -b codex/recommend-next-agent-orch-b-main-cron origin/main
+```
+
+When the PR exists, parent adds the proof branch worktree:
+
+```bash
+git worktree add /Users/spensermcconnell/__Active_Code/atomize-hq/wt/unified-agent-api-proof-pr-<target_version> automation/codex-maintenance-<target_version>
+```
+
+### Lane Breakdown
+
+#### Parent P0 - Baseline Capture And Freeze
+
+Parent-only. No workers yet.
+
+Actions:
+
+1. Record current baseline in `.runs/.../baseline.json`.
+2. Hash `PLAN.md` and record it in `.runs/.../baseline.json`.
+3. Record that the old relay-implementation `ORCH_PLAN.md` is rejected as scope authority.
+4. Run the local preflight that `PLAN.md` requires before any branch choreography:
+
+```bash
+cargo test -p xtask --test agent_maintenance_watch
+cargo test -p xtask --test agent_maintenance_prepare
+cargo test -p xtask --test agent_maintenance_execute
+cargo run -p xtask -- maintenance-watch --emit-json _ci_tmp/maintenance-watch.json
+```
+
+5. Copy `_ci_tmp/maintenance-watch.json` into
+   `.runs/prove-real-codex-stale-maintenance/artifacts/local-watch.json`.
+6. Freeze the emitted `current_validated`, `dispatch_workflow`, and runtime `target_version` in
+   `.runs/.../freeze.json`.
+
+P0 stopping conditions:
+
+- the local watcher output has no stale `codex` entry
+- the output does not point at `codex-cli-update-snapshot.yml`
+- the output branch name does not match `automation/codex-maintenance-<target_version>`
+- any of the three required `xtask` suites fail
+
+#### Lane A - `staging` Proof Baseline
+
+Delegatable. Parent integrates.
+
+Mission:
+
+- prove that `staging` already contains the required proof baseline from `PLAN.md`, or
+- land the minimum missing commits onto a worker branch rooted from `origin/staging` so the parent
+  can integrate them onto `staging`
+
+Owned surfaces:
+
+- `crates/xtask/src/agent_maintenance/watch.rs`
+- `crates/xtask/src/agent_maintenance/request.rs`
+- `crates/xtask/src/agent_maintenance/prepare.rs`
+- `crates/xtask/src/agent_maintenance/execute.rs`
+- `.github/workflows/codex-cli-update-snapshot.yml`
+- `.github/workflows/agent-maintenance-open-pr.yml`
+
+Explicitly forbidden:
+
+- `.github/workflows/agent-maintenance-release-watch.yml`
 - `PLAN.md`
 - `ORCH_PLAN.md`
-- `.runs/enclose-agent-maintenance-execution-relay/**`
-- final parent integration on `codex/recommend-next-agent`
+- `.runs/**`
+- the generated automation PR branch
 
-Lane A: Execution-contract schema
+Lane A required validation:
 
-- Owns:
-  - `crates/xtask/src/agent_maintenance/request.rs`
-  - `crates/xtask/tests/agent_maintenance_refresh.rs`
-- Goal:
-  - add `[execution_contract]` parsing and validation
-  - preserve compatibility for manual requests without `[execution_contract]`
-- Forbidden:
-  - `docs.rs`
-  - `prepare.rs`
-  - `execute.rs`
-  - workflows
-  - docs and playbooks
-
-Lane B: Shared execution-packet renderer
-
-- Owns:
-  - `crates/xtask/src/agent_maintenance/docs.rs`
-  - renderer-specific assertions in `crates/xtask/tests/agent_maintenance_prepare.rs`
-- Goal:
-  - one shared renderer for `HANDOFF.md`, `governance/pr-summary.md`, and frozen relay prompt artifacts
-  - prompt digest and linkage fail closed
-- Forbidden:
-  - `request.rs`
-  - `prepare.rs`
-  - `execute.rs`
-  - workflows
-
-Lane C: Packet generation
-
-- Owns:
-  - `crates/xtask/src/agent_maintenance/prepare.rs`
-  - packet-generation assertions in `crates/xtask/tests/agent_maintenance_prepare.rs`
-- Goal:
-  - `prepare-agent-maintenance --write` becomes the sole writer of request truth plus packet docs
-  - automated requests emit deterministic `execution_contract` and recovery data
-- Forbidden:
-  - `request.rs`
-  - `docs.rs`
-  - `execute.rs`
-  - workflows
-
-Lane D: Relay command
-
-- Owns:
-  - `crates/xtask/src/agent_maintenance/execute.rs`
-  - `crates/xtask/src/agent_maintenance/mod.rs`
-  - `crates/xtask/src/main.rs`
-  - `crates/xtask/tests/agent_maintenance_execute.rs`
-  - `crates/xtask/tests/support/agent_maintenance_harness.rs`
-- Goal:
-  - add `execute-agent-maintenance --dry-run|--write`
-  - persist prepared run artifacts
-  - enforce path jail plus diff validation
-  - keep closeout manual
-- Forbidden:
-  - workflows
-  - playbooks
-  - closeout ownership outside compatibility hooks already merged from E
-
-Lane E: Closeout compatibility
-
-- Owns:
-  - `crates/xtask/src/agent_maintenance/closeout/**`
-  - `crates/xtask/tests/agent_maintenance_closeout.rs`
-- Goal:
-  - preserve manual closeout semantics while remaining compatible with new request metadata
-- Forbidden:
-  - relay command
-  - workflows
-  - docs/playbooks
-
-Lane F: Workflow recovery hardening
-
-- Owns:
-  - `.github/workflows/agent-maintenance-release-watch.yml`
-  - `.github/workflows/agent-maintenance-open-pr.yml`
-  - `.github/workflows/codex-cli-update-snapshot.yml`
-  - `.github/workflows/claude-code-update-snapshot.yml`
-  - `crates/xtask/tests/c4_spec_ci_wiring.rs`
-  - `crates/xtask/tests/agent_maintenance_watch.rs` if workflow-facing assertions need updates
-- Goal:
-  - preserve existing topology
-  - ensure packet generation precedes PR creation
-  - ensure `governance/pr-summary.md` remains the PR body source
-  - make PR-creation recovery explicit
-  - preserve one stale agent/version -> one branch/PR concurrency
-- Forbidden:
-  - watcher redesign
-  - registry enrollment changes
-  - relay execution logic
-
-Lane G: Docs and playbooks
-
-- Owns:
-  - `docs/cli-agent-onboarding-factory-operator-guide.md`
-  - `cli_manifests/codex/OPS_PLAYBOOK.md`
-  - `cli_manifests/claude_code/OPS_PLAYBOOK.md`
-- Goal:
-  - document the relay dry-run/write flow
-  - freeze packet-only agents as deferred
-  - make the manual-closeout boundary explicit
-- Forbidden:
-  - code changes
-  - workflow edits
-
-## Workstream Plan
-
-### Parent-only serialized phases
-
-P0. Baseline and freeze
-
-- capture current parent SHA and dirty-state summary
-- hash `PLAN.md`
-- record stale assumptions rejected from the old `ORCH_PLAN.md`
-- freeze the lane ownership table and proving commands
-
-P1. Schema lane
-
-- launch Lane A alone
-- worker runs before handoff:
-  - `cargo test -p xtask --test agent_maintenance_refresh`
-- merge only after request parsing coverage is green
-- record the schema freeze SHA in orchestration state
-
-P2. Renderer lane
-
-- launch Lanes B and E from the schema freeze SHA
-- Lane B worker runs before handoff:
-  - `cargo test -p xtask --test agent_maintenance_prepare`
-- Lane E worker runs before handoff:
-  - `cargo test -p xtask --test agent_maintenance_closeout`
-- merge only after renderer exactness and digest checks are green
-- record the renderer freeze SHA
-- merge E whenever its compatibility tests are green; it does not wait on the renderer
-
-P3. Parallel core execution lanes
-
-- launch Lanes C and D from the renderer freeze SHA
-- Lane C worker runs before handoff:
-  - `cargo test -p xtask --test agent_maintenance_prepare`
-- Lane D worker runs before handoff:
-  - `cargo test -p xtask --test agent_maintenance_execute`
-- merge C only after packet-generation behavior is stable
-- merge D only after relay dry-run/write behavior is stable
-
-P4. Workflow lane
-
-- launch Lane F only after Lane C is merged
-- worker runs before handoff:
-  - `cargo test -p xtask --test agent_maintenance_watch`
-  - `cargo test -p xtask --test c4_spec_ci_wiring`
-- merge only after workflow contract tests confirm packet-first PR behavior and recovery semantics
-
-P5. Docs lane
-
-- launch Lane G only after D and F are stable enough that docs will not immediately drift
-- worker runs before handoff:
-  - no additional lane-only command is required beyond keeping docs aligned to the merged command surface from Lanes C, D, and F
-- merge only after docs reflect the final command surface and boundaries
-
-P6. Parent integration and final proving
-
-- run the full required command set on the parent branch
-- manually verify milestone boundary rules that are not fully encoded by tests
-- record acceptance and residual risk
-
-### Parallel worker phases
-
-Phase 1:
-
-- Lane A only
-
-Phase 2:
-
-- Lanes B and E may overlap only if E starts from the Lane A merge SHA
-- B remains the serial spine and must merge before C or D launch
-
-Phase 3:
-
-- Lanes C and D can run in parallel from the Lane B merge SHA
-- Lane E may still be running in parallel if it launched from the Lane A merge SHA
-- C and D must treat the renderer contract from B as frozen
-
-Phase 4:
-
-- Lane F runs after C merges
-- Lane G runs last after D and F stabilize
-
-## Stop And Halt Conditions
-
-- Halt any lane that proposes watcher redesign, worker-topology redesign, or registry-enrollment changes.
-- Halt any lane that widens executor scope beyond local Codex.
-- Halt any lane that tries to pull packet-only agents into relay write mode.
-- Halt any lane that moves closeout into relay write mode.
-- Halt any lane that writes outside its owned file set.
-- Halt C, D, F, and G if Lane A or B contract changes after those lanes launch; relaunch them from the new freeze SHA.
-- Halt F if packet generation truth is still moving.
-- Halt G if relay or workflow semantics are not yet stable.
-- Halt final landing if any required proving command fails.
-- Halt final landing if dry-run or write mode writes outside the declared envelope or if the run artifact root is not the temp path required by `PLAN.md`.
-
-## Parent-Only Proving And Integration Gates
-
-Parent-only merge checklist for each lane:
-
-1. worker diff touches only owned files
-2. lane-scoped tests passed in the worker report
-3. no milestone-boundary violation is visible in the diff
-4. parent smoke-check after merge still passes for the merged surface
-
-Parent-only final proving commands, copied exactly from `PLAN.md`:
-
-```sh
-cargo test -p xtask --test agent_maintenance_prepare
-cargo test -p xtask --test agent_maintenance_refresh
-cargo test -p xtask --test agent_maintenance_execute
-cargo test -p xtask --test agent_maintenance_closeout
+```bash
 cargo test -p xtask --test agent_maintenance_watch
-cargo test -p xtask --test c4_spec_ci_wiring
-make preflight
+cargo test -p xtask --test agent_maintenance_prepare
+cargo test -p xtask --test agent_maintenance_execute
 ```
 
-Parent merge and prove flow:
+Lane A handoff must include:
 
-1. Merge Lane A, then run `cargo test -p xtask --test agent_maintenance_refresh`.
-2. Launch or continue Lanes B and E from the Lane A merge SHA.
-3. Merge Lane B, then run `cargo test -p xtask --test agent_maintenance_prepare`.
-4. Merge Lane E whenever ready, then run `cargo test -p xtask --test agent_maintenance_closeout`.
-5. Merge Lane C, then run `cargo test -p xtask --test agent_maintenance_prepare`.
-6. Merge Lane D, then run `cargo test -p xtask --test agent_maintenance_execute`.
-7. Merge Lane F, then run:
-   `cargo test -p xtask --test agent_maintenance_watch`
-   `cargo test -p xtask --test c4_spec_ci_wiring`
-8. Merge Lane G after C, D, and F are stable.
-9. Run the full final proving command set on `codex/recommend-next-agent`.
-10. Accept the milestone only if the final command set passes and the relay boundary checks below still hold.
+- lane status: `ready-for-parent`, `blocked`, or `no-op`
+- lane base SHA from `origin/staging` at launch time
+- whether `staging` was already sufficient or required a patch
+- exact commits needed from `codex/recommend-next-agent` if cherry-picks are required
+- exact files changed
+- exact commands run
+- exact tests run
+- unresolved risks or assumptions, if any
 
-Parent-only acceptance checks after commands pass:
+Acceptance gate for Lane A:
 
-- automated upstream-release requests require `[execution_contract]`
-- `HANDOFF.md`, `governance/pr-summary.md`, and frozen prompt artifacts come from one shared renderer contract
-- `execute-agent-maintenance --dry-run` persists only temp evidence under
-  `docs/agents/.uaa-temp/agent-maintenance/runs/<run_id>/`
-- `execute-agent-maintenance --write` requires a prepared `run_id`
-- relay write mode reuses the frozen dry-run baseline instead of reconstructing state from markdown
-- diff validation and path jail enforce `execution_contract.writable_surfaces`
-- write mode stops before closeout and prints the manual closeout step
-- workflow recovery path is explicit when PR creation fails after packet generation
-- docs and playbooks tell the same local relay story as the shipped command surface
+- parent can state, with SHA evidence, that the scheduled watcher and dispatched worker will
+  execute the intended maintenance code from `staging`
+
+#### Lane B - `main` Cron Acceleration And Revert Prep
+
+Delegatable. Parent integrates only after Lane A is live on `staging`.
+
+Mission:
+
+- prepare the temporary schedule acceleration on `main`
+- prepare the paired revert so cleanup is immediate after the scheduled proof succeeds
+
+Owned surface:
+
+- `.github/workflows/agent-maintenance-release-watch.yml`
+
+Exact allowed change:
+
+- replace the normal cron with a temporary every-5-minutes off-peak schedule such as
+  `3-58/5 * * * *`
+
+Explicitly forbidden:
+
+- changing checkout from `staging`
+- changing dispatch logic
+- changing queue shape
+- changing any worker workflow
+- touching `PLAN.md`, `ORCH_PLAN.md`, or `.runs/**`
+
+Lane B required validation:
+
+- inspect the workflow diff and prove only the schedule changed
+
+Lane B handoff must include:
+
+- lane status: `ready-for-parent`, `blocked`, or `no-op`
+- lane base SHA from `origin/main` at launch time
+- the acceleration commit
+- the revert commit or exact reverse patch prepared from the same worker branch
+- exact files changed
+- exact commands run
+- confirmation that `workflow_dispatch` remains present only for debugging
+- unresolved risks or assumptions, if any
+
+Acceptance gate for Lane B:
+
+- parent has a minimal `main` patch ready to accelerate the real schedule and a clean, immediate
+  revert path
+
+### Worker Handoff Contract
+
+Every worker lane returns one compact handoff packet to the parent containing exactly:
+
+- lane id
+- lane status: `ready-for-parent`, `blocked`, or `no-op`
+- launch base ref and exact base SHA
+- changed files, or explicit statement that nothing changed
+- exact commands run
+- exact validation result summary
+- commit SHA to review, if changes exist
+- unresolved risks, assumptions, or follow-up notes
+
+Parent live-context rule:
+
+- the parent retains only the compact worker handoff summary in active context
+- the parent drops worker scratch reasoning after extracting branch SHA, changed files, commands
+  run, status, and unresolved risks
+- the authoritative durable record is the parent-written `.runs/...` state root, not the worker’s
+  local notes
+
+#### Parent O1 - Live Branch Integration Gate
+
+Parent-only.
+
+Actions:
+
+1. Integrate Lane A onto `staging` or mark it `no-op` if `staging` was already correct.
+2. Push `staging` live.
+3. Re-verify the `staging` worktree at the pushed SHA.
+4. Only then integrate Lane B onto `main`.
+5. Push the temporary cron acceleration live on `main`.
+6. Record both pushed SHAs in `.runs/.../freeze.json`.
+
+Parent O1 stopping conditions:
+
+- `staging` is not ready when the `main` cron acceleration would go live
+- the `main` patch includes anything beyond the temporary schedule edit
+- another actor changes `main` or `staging` in a way that affects the maintenance path before the
+  parent pushes
+
+#### Parent O2 - Scheduled Watcher Observation
+
+Parent-only. This is the first real proof gate.
+
+Actions:
+
+1. Wait for a real `schedule` event on
+   `.github/workflows/agent-maintenance-release-watch.yml`.
+2. Observe the watcher run and capture evidence.
+3. Confirm the queue contains the stale `codex` entry with runtime truth.
+4. Confirm the dispatch job calls `codex-cli-update-snapshot.yml` against `staging`.
+
+Helpful commands:
+
+```bash
+gh run list --workflow agent-maintenance-release-watch.yml --event schedule --branch main --limit 5
+gh run view <watcher_run_id> --log
+```
+
+Required assertions:
+
+- event is `schedule`
+- workflow definition is from `main`
+- checkout ref is `staging`
+- emitted `current_validated` is `0.97.0`
+- emitted `version_policy` is `latest_stable_minus_one`
+- emitted `dispatch_workflow` is `codex-cli-update-snapshot.yml`
+- emitted branch name is `automation/codex-maintenance-<target_version>`
+- runtime emitted `target_version` is recorded as truth for the rest of the session
+
+Parent O2 stopping conditions:
+
+- no scheduled run appears within the bounded retry window
+- the queue does not include stale `codex`
+- dispatch is attempted with hand-fabricated inputs or the wrong ref
+
+#### Parent O3 - Worker Run, PR Inspection, And Cron Revert
+
+Parent-only.
+
+Actions:
+
+1. Observe the dispatched worker run.
+2. Confirm the PR exists and the branch matches the emitted queue value.
+3. Confirm the PR body comes from
+   `docs/agents/lifecycle/codex-maintenance/governance/pr-summary.md`.
+4. Confirm the PR includes:
+   - `docs/agents/lifecycle/codex-maintenance/HANDOFF.md`
+   - `docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml`
+   - `docs/agents/lifecycle/codex-maintenance/governance/pr-summary.md`
+5. As soon as the watcher succeeded, the worker succeeded, and the PR exists, revert the temporary
+   cron acceleration on `main`.
+
+Helpful commands:
+
+```bash
+gh run view <worker_run_id> --log
+gh pr list --head automation/codex-maintenance-<target_version> --state open
+gh pr view <pr_number> --json url,headRefName,body,files
+```
+
+Required assertions:
+
+- PR head branch is `automation/codex-maintenance-<target_version>`
+- request + packet agree on target version and manual closeout boundary
+- `close-agent-maintenance` has not run
+- the revert reaches `main` before the session proceeds to the local maintainer proof
+
+Parent O3 stopping conditions:
+
+- worker run fails before PR creation
+- PR body source is wrong
+- required packet files are missing
+- cron revert cannot be applied cleanly on `main`
+
+#### Parent O4 - Maintainer Proof On The Generated PR Branch
+
+Parent-only.
+
+Actions:
+
+1. Add the generated automation branch as its own worktree.
+2. Run the exact dry-run command from repo root in that worktree:
+
+```bash
+cargo run -p xtask -- execute-agent-maintenance \
+  --request docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml \
+  --dry-run
+```
+
+3. Discover the newest `run_id` under
+   `docs/agents/.uaa-temp/agent-maintenance/runs/`.
+4. Re-run with the same `run_id`:
+
+```bash
+cargo run -p xtask -- execute-agent-maintenance \
+  --request docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml \
+  --write \
+  --run-id "$RUN_ID"
+```
+
+5. Capture the resulting diff summary and artifact paths in `.runs/.../artifacts/maintainer-proof.md`.
+
+Required assertions:
+
+- dry-run writes only under `docs/agents/.uaa-temp/agent-maintenance/runs/<run_id>/`
+- the prepared packet includes the expected run artifacts from `PLAN.md`
+- write mode succeeds using the prepared `run_id`
+- write mode stays inside the declared write envelope
+- `maintenance-closeout.json` is not created or mutated
+- the flow stops before `close-agent-maintenance`
+
+Parent O4 stopping conditions:
+
+- dry-run fails
+- `run_id` cannot be identified cleanly
+- write mode reconstructs state instead of reusing the prepared run
+- any write escapes the request-owned boundary
+
+#### Parent O5 - Evidence And Acceptance
+
+Parent-only.
+
+Actions:
+
+1. Finalize all records under `.runs/prove-real-codex-stale-maintenance`.
+2. Write `acceptance.md` against the numbered success criteria in `PLAN.md`.
+3. Record whether the generated PR remains open for normal maintainer follow-through or is being
+   treated as validation-only.
+4. Leave `close-agent-maintenance` untouched.
+
+Exit condition:
+
+- cron acceleration is reverted on `main`
+- watcher evidence, worker evidence, PR evidence, and maintainer-proof evidence are all captured
+- the manual closeout boundary is still intact
+
+## Parent Critical Path
+
+Serialized gates the parent must enforce:
+
+```text
+P0 baseline capture and local preflight
+-> launch Lane A and Lane B in parallel
+-> Gate 1: Lane A integrated or proven no-op on staging
+-> Gate 2: only after Gate 1, Lane B integrated onto main
+-> Gate 3: wait for one real scheduled watcher run from main
+-> Gate 4: confirm worker run and generated PR
+-> Gate 5: revert temporary cron on main immediately
+-> Gate 6: check out automation/codex-maintenance-<target_version>
+-> Gate 7: run --dry-run, then --write --run-id <prepared_run_id>
+-> Gate 8: capture evidence and declare acceptance
+```
+
+Critical path rules:
+
+- Lane B can be prepared early, but it cannot be merged until Lane A is live on `staging`.
+- No worker lane is launched for the generated PR branch before the branch actually exists.
+- Parent does not start the maintainer proof until the cron revert is already pushed to `main`.
+- If the scheduled run fails for environmental reasons, parent captures evidence first, then opens
+  a new defect loop from the failing branch. The failed run still does not count as success.
+
+## Merge And Integration Policy
+
+- Workers branch from the lane base ref listed above and commit only lane-owned changes.
+- Parent is the only integrator and uses one of:
+  - `git cherry-pick -x <worker_commit>` into the live `main` or `staging` worktree
+  - manual reapplication by the parent if drift makes cherry-pick unsafe
+- Workers never merge each other.
+- Lane A integrates only into `staging`.
+- Lane B integrates only into `main`.
+- The generated branch `automation/codex-maintenance-<target_version>` is never hand-authored by a
+  worker. It must come from the real worker run.
+- If a lane becomes unnecessary because the target branch already matches the proof baseline, the
+  parent marks it `no-op` in `lane-status.json` instead of forcing a cosmetic merge.
+- If Lane A is `no-op`, the parent records the inspected `staging` SHA in `lane-status.json` and
+  proceeds directly to the `staging` push/re-verify gate without creating a cosmetic branch merge.
+- If Lane B is `no-op` because there is no safe or necessary cron patch to land yet, the parent
+  records that status in `lane-status.json` and does not advance to scheduled proof until a valid
+  temporary acceleration patch exists.
+- If the scheduled run or maintainer proof uncovers a real defect, parent creates a new repair lane
+  from the branch that actually failed, updates `.runs/.../freeze.json`, and relaunches only the
+  minimal necessary repair scope.
+
+## Relaunch / Restart Rules
+
+- If `staging` changes in a way that affects the proof baseline after Lane A launches but before the
+  parent pushes or marks it `no-op`, Lane A is stale. Parent records the new `staging` SHA in
+  `.runs/.../freeze.json`, marks Lane A `aborted`, and relaunches Lane A from the new `origin/staging`
+  base.
+- If `main` changes in a way that affects `.github/workflows/agent-maintenance-release-watch.yml`
+  after Lane B launches but before the parent pushes, Lane B is stale. Parent records the new
+  `main` SHA, marks Lane B `aborted`, and relaunches Lane B from the new `origin/main` base.
+- If the scheduled run fails for environmental reasons, such as GitHub schedule delay, transient
+  runner failure, or temporary Actions platform issues, parent does not relaunch Lane A or Lane B
+  automatically. Parent records the failed run, keeps the same branch freeze if still valid, and
+  retries the operational wait window or reruns only the minimum parent-owned operational step.
+- If the scheduled run fails for contract reasons, such as wrong checkout ref, wrong queue fields,
+  wrong dispatch workflow, or missing PR artifacts, parent records the failing run as proof of a
+  real defect, freezes the failing SHA pair from `main` and `staging`, and launches the minimum
+  repair lane from the branch that actually owns the defect.
+- If the generated PR branch target version differs from the earlier expected advisory value, the
+  runtime watcher value becomes the new session truth immediately. No existing worker lane is
+  relaunched solely because the advisory expected value changed, because Lane A and Lane B are not
+  allowed to hard-code the target version.
+- If the generated PR branch already exists before the current scheduled proof and the new worker
+  run reuses it with the runtime watcher target, parent records that fact in `.runs/.../artifacts/pr.md`
+  and continues only if the run evidence still proves the current session path end-to-end.
 
 ## Context-Control Rules
 
-- Parent context stays anchored to:
-  - the milestone sections of `PLAN.md`
-  - this orchestration file
-  - the active lane ownership table
-  - merge status and proving results
+- Parent context stays anchored to `PLAN.md`, this orchestration file, the `.runs/...` state root,
+  and the currently pushed SHAs for `main`, `staging`, and the generated automation branch.
 - Workers receive only:
-  - milestone summary
-  - locked decisions relevant to the lane
-  - exact owned files
-  - exact dependency SHA
-  - required tests
-  - explicit forbidden surfaces
-- Do not hand workers the stale `ORCH_PLAN.md` content except as a warning about rejected goals.
-- After a lane merges, parent drops that worker's detailed context and keeps only the merged outcome and any remaining risks.
-- If a lane is relaunched, parent issues a new freeze SHA and treats prior worker context as stale.
-- Parent never lets downstream lanes infer machine truth from rendered markdown. Frozen input contract plus renderer output remain the only execution basis.
+  - the relevant `PLAN.md` success criteria
+  - the branch topology
+  - the lane-owned file list
+  - the lane base ref and worktree path
+  - the exact validation commands
+  - the hard forbidden surfaces
+- Workers are not given the stale prior milestone as design input except as a warning that it is
+  obsolete.
+- Parent strips worker-local reasoning after handoff and keeps only: branch SHA, files touched,
+  commands run, and unresolved risks.
+- No worker may hard-code a target version. All target-version references must be phrased as
+  `automation/codex-maintenance-<target_version>` until the parent records the runtime watcher
+  output.
+- Parent-only data:
+  - GitHub run URLs
+  - PR URL
+  - pushed SHAs on `main` and `staging`
+  - maintainer `run_id`
+  - `.runs/**`
 
-## Tests And Acceptance By Lane
+## Tests And Acceptance
 
-Lane A acceptance:
+### Required Local Preflight Before Live Branch Changes
 
-- `crates/xtask/tests/agent_maintenance_refresh.rs` covers valid and invalid `[execution_contract]`
-- manual requests remain loadable without `[execution_contract]`
+Run from the repo root on the parent branch:
 
-Lane B acceptance:
+```bash
+cargo test -p xtask --test agent_maintenance_watch
+cargo test -p xtask --test agent_maintenance_prepare
+cargo test -p xtask --test agent_maintenance_execute
+cargo run -p xtask -- maintenance-watch --emit-json _ci_tmp/maintenance-watch.json
+```
 
-- shared renderer drives `HANDOFF.md`, `governance/pr-summary.md`, and frozen prompt output
-- prompt digest and maintenance-root linkage fail closed
+Acceptance:
 
-Lane C acceptance:
+- the three suites pass
+- local watcher output contains stale `codex`
+- emitted branch name matches `automation/codex-maintenance-<target_version>`
 
-- `prepare-agent-maintenance --write` emits structured execution contract for automated requests
-- writable surfaces, green gates, and recovery data are deterministic
+### `staging` Readiness Acceptance
 
-Lane D acceptance:
+- the pushed `staging` SHA contains the proof baseline from `PLAN.md` or a deliberate descendant
+- watcher and worker surfaces on `staging` match what local preflight validated
 
-- dry-run emits one `run_id` and one frozen packet under the temp run root
-- write mode requires `--run-id`
-- relay reuses the prepared baseline
-- path-jail plus diff validation reject out-of-bounds writes
-- no-op write and prompt mismatch fail closed
-- closeout is not run automatically
+### `main` Schedule Acceptance
 
-Lane E acceptance:
+- only the cron schedule changed
+- `workflow_dispatch` remains debug-only
+- checkout remains `staging`
 
-- closeout remains explicit and manual
-- new request metadata does not break closeout compatibility
+### Scheduled Proof Acceptance
 
-Lane F acceptance:
+- one `schedule` run fired from the `main` workflow definition
+- watcher checked out `staging`
+- emitted queue entry matches `PLAN.md`
+- dispatched worker was `codex-cli-update-snapshot.yml`
+- runtime watcher output is recorded as target-version truth
 
-- packet generation happens before PR creation
-- `governance/pr-summary.md` remains the PR body source
-- one stale agent/version still maps to one branch/PR
-- recovery guidance is explicit when PR opening fails
+### Generated PR Acceptance
 
-Lane G acceptance:
+- PR head branch is `automation/codex-maintenance-<target_version>`
+- PR body comes from `governance/pr-summary.md`
+- required packet files are present
+- manual closeout boundary is still visible and intact
 
-- operator guide and playbooks match the final relay flow
-- packet-only agents are still explicitly deferred
-- manual closeout boundary is visible in maintainer-facing docs
+### Maintainer Proof Acceptance
 
-Milestone acceptance:
+- `execute-agent-maintenance --dry-run` succeeds first
+- `execute-agent-maintenance --write --run-id <prepared_run_id>` succeeds second
+- dry-run artifact root is under `docs/agents/.uaa-temp/agent-maintenance/runs/<run_id>/`
+- write mode stays inside the declared envelope
+- `close-agent-maintenance` is not run
 
-- all lane acceptances above are satisfied
-- all final proving commands pass on `codex/recommend-next-agent`
-- no stale watcher-revamp work leaked back into scope
+### Final Session Acceptance
+
+- `main` temporary cron acceleration is reverted
+- `.runs/prove-real-codex-stale-maintenance` contains enough evidence for replay
+- success criteria `1` through `11` from `PLAN.md` are checked off explicitly in `acceptance.md`
 
 ## Assumptions
 
-- worker worktrees will be created under `/Users/spensermcconnell/__Active_Code/atomize-hq/wt`
-- each lane can be reviewed and merged independently once its declared dependencies are merged
-- the repo keeps the current test file layout from `PLAN.md`; if a lane must introduce a new focused test file to avoid unsafe overlap, parent records that deviation in `freeze.json` before launch
-- no hidden milestone requirement exists beyond `PLAN.md` for human approvals or extra landing gates
+- the parent can push to `main` and `staging`, or can obtain the required approvals without
+  changing the branch topology described here
+- `gh` CLI is authenticated for viewing Actions runs and PR metadata; GitHub UI is acceptable as a
+  fallback, but the same evidence must still be copied into `.runs/...`
+- `staging` and `main` will not receive conflicting workflow or maintenance-path edits during the
+  proof window; if they do, the parent pauses and refreshes the freeze state before continuing
+- the scheduled watcher is allowed a bounded delay window by GitHub Actions; this is a wait state,
+  not a reason to widen scope
+- the generated PR branch remains open after proof unless a human maintainer explicitly decides it
+  is validation-only

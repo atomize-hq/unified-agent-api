@@ -270,11 +270,7 @@ pub fn execute_args(mode_flag: &str, codex_binary: Option<&Path>) -> Vec<String>
         "--request".to_string(),
         "docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml".to_string(),
     ];
-    if mode_flag == "--write" {
-        args.extend(["--run-id".to_string(), EXECUTE_WRITE_RUN_ID.to_string()]);
-    } else {
-        args.extend(["--run-id".to_string(), EXECUTE_WRITE_RUN_ID.to_string()]);
-    }
+    args.extend(["--run-id".to_string(), EXECUTE_WRITE_RUN_ID.to_string()]);
     if let Some(binary) = codex_binary {
         args.extend(["--codex-binary".to_string(), binary.display().to_string()]);
     }
