@@ -140,7 +140,7 @@ pub(super) fn validate_runtime_evidence_directory(
 fn inspect_runtime_run_at(
     approval: &ApprovalArtifact,
     run_id: &str,
-    _relative_run_root: &str,
+    relative_run_root: &str,
     absolute_run_root: &Path,
 ) -> Result<Option<RuntimeEvidenceBundle>, Error> {
     let status_path = absolute_run_root.join("run-status.json");
@@ -161,14 +161,16 @@ fn inspect_runtime_run_at(
             "is not a validated runtime handoff",
         ));
     }
-    if status.run_dir != absolute_run_root.to_string_lossy() {
+    let expected_absolute_run_dir = absolute_run_root.to_string_lossy();
+    if status.run_dir != expected_absolute_run_dir && status.run_dir != relative_run_root {
         return Err(stale_runtime_evidence_error(
             approval,
             run_id,
             &format!(
-                "recorded run_dir `{}` but expected `{}`",
+                "recorded run_dir `{}` but expected `{}` or `{}`",
                 status.run_dir,
-                absolute_run_root.display()
+                absolute_run_root.display(),
+                relative_run_root
             ),
         ));
     }

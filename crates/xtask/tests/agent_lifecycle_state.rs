@@ -294,6 +294,9 @@ fn runtime_evidence_validation_root(
     let run_status: serde_json::Value =
         serde_json::from_slice(&fs::read(workspace_root.join(run_status_path)).ok()?).ok()?;
     let recorded_run_dir = PathBuf::from(run_status.get("run_dir")?.as_str()?);
+    if recorded_run_dir.is_relative() {
+        return Some(workspace_root.to_path_buf());
+    }
     let run_root_relative = Path::new(run_status_path).parent()?;
     recorded_run_dir
         .ancestors()
