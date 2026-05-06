@@ -155,7 +155,7 @@ fn write_fixture_workspace_manifest(fixture: &Path) {
             "resolver = \"2\"\n",
             "\n",
             "[workspace.package]\n",
-            "version = \"0.3.0\"\n",
+            "version = \"0.3.4\"\n",
             "edition = \"2021\"\n",
             "rust-version = \"1.78\"\n",
             "license = \"MIT OR Apache-2.0\"\n",
