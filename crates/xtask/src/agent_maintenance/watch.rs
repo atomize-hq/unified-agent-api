@@ -150,6 +150,13 @@ where
             .map_err(|err| Error::Internal(format!("write stdout: {err}")))?;
     }
 
+    if args.check && !queue.stale_agents.is_empty() {
+        return Err(Error::Validation(format!(
+            "maintenance-watch found {} stale enrolled agent(s); rerun with --emit-json to inspect the queue",
+            queue.stale_agents.len()
+        )));
+    }
+
     Ok(())
 }
 
@@ -346,6 +353,17 @@ fn fetch_gcs_versions(
     entry: &AgentRegistryEntry,
     release_watch: &ReleaseWatchMetadata,
 ) -> Result<Vec<Version>, Error> {
+    fetch_gcs_versions_with_fetcher(entry, release_watch, fetch_text)
+}
+
+pub(crate) fn fetch_gcs_versions_with_fetcher<F>(
+    entry: &AgentRegistryEntry,
+    release_watch: &ReleaseWatchMetadata,
+    mut fetch: F,
+) -> Result<Vec<Version>, Error>
+where
+    F: FnMut(&str) -> Result<String, Error>,
+{
     let bucket = release_watch.upstream.bucket.as_deref().ok_or_else(|| {
         Error::Validation(format!(
             "release_watch bucket missing for gcs_object_listing agent `{}`",
@@ -382,9 +400,9 @@ fn fetch_gcs_versions(
         );
         if let Some(token) = page_token.as_deref() {
             url.push_str("&pageToken=");
-            url.push_str(token);
+            url.push_str(&percent_encode_query_value(token));
         }
-        let body = fetch_text(&url)?;
+        let body = fetch(&url)?;
         let listing: GcsListingResponse = serde_json::from_str(&body).map_err(|err| {
             Error::Validation(format!(
                 "parse GCS listing for agent `{}` from {url}: {err}",
@@ -412,6 +430,22 @@ fn fetch_gcs_versions(
         page_token = Some(next_page_token);
     }
     Ok(versions)
+}
+
+fn percent_encode_query_value(value: &str) -> String {
+    let mut encoded = String::with_capacity(value.len());
+    for byte in value.bytes() {
+        match byte {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'.' | b'_' | b'~' => {
+                encoded.push(byte as char)
+            }
+            _ => {
+                use std::fmt::Write as _;
+                let _ = write!(&mut encoded, "%{byte:02X}");
+            }
+        }
+    }
+    encoded
 }
 
 fn fetch_text(url: &str) -> Result<String, Error> {

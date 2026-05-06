@@ -105,6 +105,32 @@ fn run_in_workspace_emits_json_queue_file() {
 }
 
 #[test]
+fn run_in_workspace_check_fails_when_stale_agents_are_present() {
+    let fixture = fixture_root("agent-maintenance-watch-check");
+    seed_registry(&fixture);
+    seed_latest_validated(&fixture, "cli_manifests/codex", "0.97.0");
+    seed_latest_validated(&fixture, "cli_manifests/claude_code", "1.2.3");
+
+    let mut stdout = Vec::new();
+    let err = run_in_workspace_with_resolver(
+        &fixture,
+        Args {
+            check: true,
+            emit_json: None,
+        },
+        &mut stdout,
+        resolver_for_queue,
+    )
+    .expect_err("check mode should fail when stale agents exist");
+
+    assert!(matches!(err, Error::Validation(_)));
+    assert!(err.to_string().contains("found 2 stale enrolled agent"));
+
+    let output = String::from_utf8(stdout).expect("stdout utf8");
+    assert!(output.contains("stale_agents: 2"));
+}
+
+#[test]
 fn clean_or_not_newer_agents_are_not_emitted() {
     let fixture = fixture_root("agent-maintenance-watch-clean");
     seed_registry(&fixture);
@@ -159,6 +185,46 @@ fn packet_pr_enrollment_uses_generic_open_pr_workflow() {
         codex.opened_from,
         ".github/workflows/agent-maintenance-open-pr.yml"
     );
+}
+
+#[test]
+fn gcs_page_tokens_are_percent_encoded_for_pagination() {
+    let fixture = fixture_root("agent-maintenance-watch-gcs-page-token");
+    seed_registry(&fixture);
+
+    let registry =
+        xtask::agent_registry::AgentRegistry::load(&fixture).expect("seeded registry loads");
+    let entry = registry
+        .agents
+        .iter()
+        .find(|entry| entry.agent_id == "claude_code")
+        .expect("claude_code registry entry");
+    let release_watch = entry
+        .maintenance
+        .release_watch
+        .as_ref()
+        .expect("claude_code release watch");
+
+    let mut urls = Vec::new();
+    let versions = watch::fetch_gcs_versions_with_fetcher(entry, release_watch, |url| {
+        urls.push(url.to_string());
+        if url.contains("pageToken=") {
+            Ok(r#"{"items":[{"name":"claude-code-releases/1.2.5/manifest.json"}]}"#.to_string())
+        } else {
+            Ok(
+                r#"{"items":[{"name":"claude-code-releases/1.2.4/manifest.json"}],"nextPageToken":"token+/="}"#
+                    .to_string(),
+            )
+        }
+    })
+    .expect("gcs pagination fetch succeeds");
+
+    assert_eq!(
+        versions,
+        vec!["1.2.4".parse().unwrap(), "1.2.5".parse().unwrap(),]
+    );
+    assert_eq!(urls.len(), 2);
+    assert!(urls[1].contains("pageToken=token%2B%2F%3D"));
 }
 
 fn resolver_for_queue(
