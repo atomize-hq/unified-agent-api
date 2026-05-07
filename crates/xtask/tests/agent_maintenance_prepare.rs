@@ -88,6 +88,9 @@ fn prepare_agent_maintenance_write_creates_packet_root() {
     assert!(handoff.contains("Follow the maintained PR template for 0.98.0."));
     assert!(handoff.contains("docs/agents/lifecycle/codex-maintenance/**"));
     assert!(handoff.contains("crates/agent_api/**"));
+    assert!(handoff.contains("cli_manifests/support_matrix/current.json"));
+    assert!(handoff.contains("docs/specs/unified-agent-api/support-matrix.md"));
+    assert!(handoff.contains("docs/specs/codex-wrapper-coverage-scenarios-v1.md"));
     assert!(handoff.contains("cli_manifests/codex/OPS_PLAYBOOK.md"));
     assert!(handoff.contains("cli_manifests/codex/CI_WORKFLOWS_PLAN.md"));
     assert!(handoff.contains("cli_manifests/codex/PR_BODY_TEMPLATE.md"));
@@ -326,6 +329,9 @@ fn automated_request_with_execution_contract_toml() -> String {
             "  \"cli_manifests/codex/reports/0.98.0/**\",\n",
             "  \"cli_manifests/codex/versions/0.98.0.json\",\n",
             "  \"cli_manifests/codex/wrapper_coverage.json\",\n",
+            "  \"cli_manifests/support_matrix/current.json\",\n",
+            "  \"docs/specs/unified-agent-api/support-matrix.md\",\n",
+            "  \"docs/specs/codex-wrapper-coverage-scenarios-v1.md\",\n",
             "]\n",
             "read_only_inputs = [\n",
             "  \"cli_manifests/codex/OPS_PLAYBOOK.md\",\n",
