@@ -198,16 +198,13 @@ fn spawn_codex_exec(
     workspace_root: &Path,
     prompt: &str,
     envs: &[(String, String)],
-    quiet: bool,
+    _quiet: bool,
 ) -> Result<(Vec<String>, Output), Error> {
     let mut argv = vec![
         "exec".to_string(),
         "--skip-git-repo-check".to_string(),
         "--dangerously-bypass-approvals-and-sandbox".to_string(),
     ];
-    if quiet {
-        argv.push("--quiet".to_string());
-    }
     argv.extend([
         "--cd".to_string(),
         workspace_root.to_string_lossy().into_owned(),
