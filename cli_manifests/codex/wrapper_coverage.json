@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-02-14T12:38:36.156165Z",
-  "wrapper_version": "0.2.0",
+  "generated_at": "2026-04-24T18:00:38Z",
+  "wrapper_version": "0.3.4",
   "coverage": [
     {
       "path": [],
