@@ -312,9 +312,13 @@ elif [[ "$1" == "features" && "$2" == "list" ]]; then
   {text_probe}
 elif [[ "$1" == "--help" ]]; then
   {help_output}
-elif [[ "$1" == "exec" ]]; then
-  echo "$@ probe_env=${{FAKE_CODEX_ENABLE_ADD_DIR_PROBE:-unset}}" >> "$log"
-  exit 99
+else
+  for arg in "$@"; do
+    if [[ "$arg" == "exec" ]]; then
+      echo "$@ probe_env=${{FAKE_CODEX_ENABLE_ADD_DIR_PROBE:-unset}}" >> "$log"
+      exit 99
+    fi
+  done
 fi
 "#,
         log = exec_log_path.display(),
