@@ -7,8 +7,11 @@ use std::{
 };
 
 use codex::{
-    AppServerCodegenRequest, CodexClient, DebugAppServerSendMessageV2Request,
-    FeaturesDisableRequest, FeaturesEnableRequest,
+    AppServerCodegenRequest, AppServerProxyRequest, AppServerRequest, CodexClient,
+    DebugAppServerSendMessageV2Request, DebugModelsRequest, DebugPromptInputRequest,
+    ExecServerRequest, FeaturesDisableRequest, FeaturesEnableRequest, PluginCommandRequest,
+    PluginMarketplaceAddRequest, PluginMarketplaceCommandRequest, PluginMarketplaceRemoveRequest,
+    PluginMarketplaceUpgradeRequest,
 };
 use serde::Deserialize;
 
@@ -127,6 +130,182 @@ async fn app_server_codegen_experimental_emits_flag() -> Result<(), Box<dyn std:
     Ok(())
 }
 
+#[tokio::test]
+async fn new_0125_surfaces_spawn_expected_subcommands() -> Result<(), Box<dyn std::error::Error>> {
+    let temp = tempfile::tempdir()?;
+    let log_path = temp.path().join("invocations.jsonl");
+    let fake_codex = write_fake_codex(&log_path)?;
+
+    let client = CodexClient::builder()
+        .binary(&fake_codex)
+        .mirror_stdout(false)
+        .quiet(true)
+        .build();
+
+    client
+        .debug_models(DebugModelsRequest::new().bundled(true))
+        .await?;
+    client
+        .debug_prompt_input(
+            DebugPromptInputRequest::new()
+                .image(temp.path().join("one.png"))
+                .image(temp.path().join("two.png"))
+                .prompt("hello"),
+        )
+        .await?;
+    client.plugin(PluginCommandRequest::new()).await?;
+    client
+        .plugin_marketplace(PluginMarketplaceCommandRequest::new())
+        .await?;
+    client
+        .plugin_marketplace_add(
+            PluginMarketplaceAddRequest::new("owner/repo")
+                .source_ref("main")
+                .sparse_path("marketplaces/core"),
+        )
+        .await?;
+    client
+        .plugin_marketplace_remove(PluginMarketplaceRemoveRequest::new("primary"))
+        .await?;
+    client
+        .plugin_marketplace_upgrade(
+            PluginMarketplaceUpgradeRequest::new().marketplace_name("primary"),
+        )
+        .await?;
+
+    let mut app_server_proxy = client.start_app_server_proxy(
+        AppServerProxyRequest::new().socket_path(temp.path().join("app-server.sock")),
+    )?;
+    let app_server_proxy_status = app_server_proxy.wait().await?;
+    assert!(app_server_proxy_status.success());
+
+    let mut app_server = client.start_app_server(
+        AppServerRequest::new()
+            .listen("127.0.0.1:9090")
+            .ws_audience("aud")
+            .ws_auth("shared-secret")
+            .ws_issuer("issuer")
+            .ws_max_clock_skew_seconds(15)
+            .ws_shared_secret_file(temp.path().join("shared.secret"))
+            .ws_token_file(temp.path().join("token.jwt"))
+            .ws_token_sha256("abc123"),
+    )?;
+    let app_server_status = app_server.wait().await?;
+    assert!(app_server_status.success());
+
+    let mut exec_server = client.start_exec_server(ExecServerRequest::new().listen("stdio"))?;
+    let exec_server_status = exec_server.wait().await?;
+    assert!(exec_server_status.success());
+
+    let invocations = read_invocations(&log_path)?;
+    let argv_sets: Vec<_> = invocations
+        .iter()
+        .map(|inv| inv.argv.as_slice())
+        .collect::<Vec<_>>();
+
+    assert!(
+        invocations
+            .iter()
+            .any(|inv| inv.argv == ["debug", "models", "--bundled"]),
+        "missing debug models invocation: {:?}",
+        argv_sets
+    );
+    assert!(
+        invocations.iter().any(|inv| {
+            inv.argv.first().map(|value| value.as_str()) == Some("debug")
+                && inv.argv.get(1).map(|value| value.as_str()) == Some("prompt-input")
+                && inv.argv.iter().any(|value| value == "--image")
+                && inv.argv.last().map(|value| value.as_str()) == Some("hello")
+        }),
+        "missing debug prompt-input invocation: {:?}",
+        argv_sets
+    );
+    assert!(
+        invocations.iter().any(|inv| inv.argv == ["plugin"]),
+        "missing plugin invocation: {:?}",
+        argv_sets
+    );
+    assert!(
+        invocations
+            .iter()
+            .any(|inv| inv.argv == ["plugin", "marketplace"]),
+        "missing plugin marketplace invocation: {:?}",
+        argv_sets
+    );
+    assert!(
+        invocations.iter().any(|inv| {
+            inv.argv
+                == [
+                    "plugin",
+                    "marketplace",
+                    "add",
+                    "--ref",
+                    "main",
+                    "--sparse",
+                    "marketplaces/core",
+                    "owner/repo",
+                ]
+        }),
+        "missing plugin marketplace add invocation: {:?}",
+        argv_sets
+    );
+    assert!(
+        invocations
+            .iter()
+            .any(|inv| { inv.argv == ["plugin", "marketplace", "remove", "primary"] }),
+        "missing plugin marketplace remove invocation: {:?}",
+        argv_sets
+    );
+    assert!(
+        invocations
+            .iter()
+            .any(|inv| { inv.argv == ["plugin", "marketplace", "upgrade", "primary"] }),
+        "missing plugin marketplace upgrade invocation: {:?}",
+        argv_sets
+    );
+    assert!(
+        invocations.iter().any(|inv| {
+            inv.argv.first().map(|value| value.as_str()) == Some("app-server")
+                && inv.argv.get(1).map(|value| value.as_str()) == Some("proxy")
+                && inv.argv.iter().any(|value| value == "--sock")
+        }),
+        "missing app-server proxy invocation: {:?}",
+        argv_sets
+    );
+    assert!(
+        invocations.iter().any(|inv| {
+            inv.argv.first().map(|value| value.as_str()) == Some("app-server")
+                && inv.argv.get(1).map(|value| value.as_str()) != Some("proxy")
+                && inv.argv.iter().any(|value| value == "--listen")
+                && inv.argv.iter().any(|value| value == "--ws-audience")
+                && inv.argv.iter().any(|value| value == "--ws-auth")
+                && inv.argv.iter().any(|value| value == "--ws-issuer")
+                && inv
+                    .argv
+                    .iter()
+                    .any(|value| value == "--ws-max-clock-skew-seconds")
+                && inv
+                    .argv
+                    .iter()
+                    .any(|value| value == "--ws-shared-secret-file")
+                && inv.argv.iter().any(|value| value == "--ws-token-file")
+                && inv.argv.iter().any(|value| value == "--ws-token-sha256")
+        }),
+        "missing app-server invocation: {:?}",
+        argv_sets
+    );
+    assert!(
+        invocations.iter().any(|inv| {
+            inv.argv.first().map(|value| value.as_str()) == Some("exec-server")
+                && inv.argv.iter().any(|value| value == "--listen")
+        }),
+        "missing exec-server listen invocation: {:?}",
+        argv_sets
+    );
+
+    Ok(())
+}
+
 fn write_fake_codex(log_path: &Path) -> Result<PathBuf, Box<dyn std::error::Error>> {
     let script_path = log_path
         .parent()
@@ -160,8 +339,38 @@ if [[ $# -ge 4 && $1 == "debug" && $2 == "app-server" && $3 == "send-message-v2"
   exit 0
 fi
 
+if [[ $# -ge 2 && $1 == "debug" && $2 == "models" ]]; then
+  echo "debug-models-ok"
+  exit 0
+fi
+
+if [[ $# -ge 2 && $1 == "debug" && $2 == "prompt-input" ]]; then
+  echo "debug-prompt-input-ok"
+  exit 0
+fi
+
 if [[ $# -ge 2 && $1 == "app-server" && ( $2 == "generate-ts" || $2 == "generate-json-schema" ) ]]; then
   echo "app-server-ok"
+  exit 0
+fi
+
+if [[ $# -ge 2 && $1 == "app-server" && $2 == "proxy" ]]; then
+  echo "app-server-proxy-ok"
+  exit 0
+fi
+
+if [[ $# -ge 1 && $1 == "app-server" ]]; then
+  echo "app-server-root-ok"
+  exit 0
+fi
+
+if [[ $# -ge 1 && $1 == "exec-server" ]]; then
+  echo "exec-server-ok"
+  exit 0
+fi
+
+if [[ $# -ge 1 && $1 == "plugin" ]]; then
+  echo "plugin-ok"
   exit 0
 fi
 

@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-04-24T18:00:38Z",
-  "wrapper_version": "0.3.4",
+  "generated_at": "2026-05-07T17:12:53.003778Z",
+  "wrapper_version": "0.3.5",
   "coverage": [
     {
       "path": [],
@@ -68,6 +68,14 @@
           "level": "explicit"
         },
         {
+          "key": "--remote",
+          "level": "explicit"
+        },
+        {
+          "key": "--remote-auth-token-env",
+          "level": "explicit"
+        },
+        {
           "key": "--sandbox",
           "level": "explicit"
         },
@@ -89,6 +97,38 @@
       "flags": [
         {
           "key": "--analytics-default-enabled",
+          "level": "explicit"
+        },
+        {
+          "key": "--listen",
+          "level": "explicit"
+        },
+        {
+          "key": "--ws-audience",
+          "level": "explicit"
+        },
+        {
+          "key": "--ws-auth",
+          "level": "explicit"
+        },
+        {
+          "key": "--ws-issuer",
+          "level": "explicit"
+        },
+        {
+          "key": "--ws-max-clock-skew-seconds",
+          "level": "explicit"
+        },
+        {
+          "key": "--ws-shared-secret-file",
+          "level": "explicit"
+        },
+        {
+          "key": "--ws-token-file",
+          "level": "explicit"
+        },
+        {
+          "key": "--ws-token-sha256",
           "level": "explicit"
         }
       ]
@@ -140,6 +180,19 @@
       "args": [
         {
           "name": "COMMAND",
+          "level": "explicit"
+        }
+      ]
+    },
+    {
+      "path": [
+        "app-server",
+        "proxy"
+      ],
+      "level": "explicit",
+      "flags": [
+        {
+          "key": "--sock",
           "level": "explicit"
         }
       ]
@@ -348,12 +401,56 @@
     },
     {
       "path": [
+        "debug",
+        "models"
+      ],
+      "level": "explicit",
+      "flags": [
+        {
+          "key": "--bundled",
+          "level": "explicit"
+        }
+      ]
+    },
+    {
+      "path": [
+        "debug",
+        "prompt-input"
+      ],
+      "level": "explicit",
+      "flags": [
+        {
+          "key": "--image",
+          "level": "explicit"
+        }
+      ],
+      "args": [
+        {
+          "name": "PROMPT",
+          "level": "explicit"
+        }
+      ]
+    },
+    {
+      "path": [
         "exec"
       ],
       "level": "explicit",
       "flags": [
         {
           "key": "--color",
+          "level": "explicit"
+        },
+        {
+          "key": "--ephemeral",
+          "level": "explicit"
+        },
+        {
+          "key": "--ignore-rules",
+          "level": "explicit"
+        },
+        {
+          "key": "--ignore-user-config",
           "level": "explicit"
         },
         {
@@ -406,11 +503,27 @@
           "level": "explicit"
         },
         {
+          "key": "--ephemeral",
+          "level": "explicit"
+        },
+        {
+          "key": "--ignore-rules",
+          "level": "explicit"
+        },
+        {
+          "key": "--ignore-user-config",
+          "level": "explicit"
+        },
+        {
           "key": "--json",
           "level": "explicit"
         },
         {
           "key": "--last",
+          "level": "explicit"
+        },
+        {
+          "key": "--output-last-message",
           "level": "explicit"
         },
         {
@@ -445,7 +558,23 @@
           "level": "explicit"
         },
         {
+          "key": "--ephemeral",
+          "level": "explicit"
+        },
+        {
+          "key": "--ignore-rules",
+          "level": "explicit"
+        },
+        {
+          "key": "--ignore-user-config",
+          "level": "explicit"
+        },
+        {
           "key": "--json",
+          "level": "explicit"
+        },
+        {
+          "key": "--output-last-message",
           "level": "explicit"
         },
         {
@@ -464,6 +593,18 @@
       "args": [
         {
           "name": "PROMPT",
+          "level": "explicit"
+        }
+      ]
+    },
+    {
+      "path": [
+        "exec-server"
+      ],
+      "level": "explicit",
+      "flags": [
+        {
+          "key": "--listen",
           "level": "explicit"
         }
       ]
@@ -767,6 +908,98 @@
     },
     {
       "path": [
+        "plugin"
+      ],
+      "level": "explicit"
+    },
+    {
+      "path": [
+        "plugin",
+        "help"
+      ],
+      "level": "explicit",
+      "args": [
+        {
+          "name": "COMMAND",
+          "level": "explicit"
+        }
+      ]
+    },
+    {
+      "path": [
+        "plugin",
+        "marketplace"
+      ],
+      "level": "explicit"
+    },
+    {
+      "path": [
+        "plugin",
+        "marketplace",
+        "add"
+      ],
+      "level": "explicit",
+      "flags": [
+        {
+          "key": "--ref",
+          "level": "explicit"
+        },
+        {
+          "key": "--sparse",
+          "level": "explicit"
+        }
+      ],
+      "args": [
+        {
+          "name": "SOURCE",
+          "level": "explicit"
+        }
+      ]
+    },
+    {
+      "path": [
+        "plugin",
+        "marketplace",
+        "help"
+      ],
+      "level": "explicit",
+      "args": [
+        {
+          "name": "COMMAND",
+          "level": "explicit"
+        }
+      ]
+    },
+    {
+      "path": [
+        "plugin",
+        "marketplace",
+        "remove"
+      ],
+      "level": "explicit",
+      "args": [
+        {
+          "name": "MARKETPLACE_NAME",
+          "level": "explicit"
+        }
+      ]
+    },
+    {
+      "path": [
+        "plugin",
+        "marketplace",
+        "upgrade"
+      ],
+      "level": "explicit",
+      "args": [
+        {
+          "name": "MARKETPLACE_NAME",
+          "level": "explicit"
+        }
+      ]
+    },
+    {
+      "path": [
         "responses-api-proxy"
       ],
       "level": "explicit",
@@ -797,6 +1030,10 @@
       "flags": [
         {
           "key": "--all",
+          "level": "explicit"
+        },
+        {
+          "key": "--include-non-interactive",
           "level": "explicit"
         },
         {
@@ -884,6 +1121,10 @@
       ],
       "level": "explicit",
       "flags": [
+        {
+          "key": "--allow-unix-socket",
+          "level": "explicit"
+        },
         {
           "key": "--log-denials",
           "level": "explicit"

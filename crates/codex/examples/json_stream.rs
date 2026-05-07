@@ -22,6 +22,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let mut stream = client
         .stream_exec(ExecStreamRequest {
             prompt,
+            ephemeral: false,
+            ignore_rules: false,
+            ignore_user_config: false,
             idle_timeout: Some(Duration::from_secs(30)),
             output_last_message,
             output_schema: None,

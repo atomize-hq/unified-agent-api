@@ -212,6 +212,8 @@ fn cli_override_args_apply_safety_precedence() {
         safety_override: SafetyOverride::FullAuto,
         profile: None,
         cd: None,
+        remote: None,
+        remote_auth_token_env: None,
         local_provider: None,
         oss: false,
         search: FlagState::Enable,
@@ -242,6 +244,8 @@ fn cli_override_args_apply_safety_precedence() {
         safety_override: SafetyOverride::DangerouslyBypass,
         profile: Some("team".to_string()),
         cd: Some(PathBuf::from("/tmp/worktree")),
+        remote: Some("staging".to_string()),
+        remote_auth_token_env: Some("CODEX_REMOTE_TOKEN".to_string()),
         local_provider: Some(LocalProvider::Ollama),
         oss: false,
         search: FlagState::Enable,
@@ -258,6 +262,10 @@ fn cli_override_args_apply_safety_precedence() {
     assert!(args.contains(&"team".to_string()));
     assert!(args.contains(&"--cd".to_string()));
     assert!(args.contains(&"/tmp/worktree".to_string()));
+    assert!(args.contains(&"--remote".to_string()));
+    assert!(args.contains(&"staging".to_string()));
+    assert!(args.contains(&"--remote-auth-token-env".to_string()));
+    assert!(args.contains(&"CODEX_REMOTE_TOKEN".to_string()));
     assert!(args.contains(&"--local-provider".to_string()));
     assert!(args.contains(&"ollama".to_string()));
     assert!(args.contains(&"--search".to_string()));
@@ -284,7 +292,7 @@ async fn exec_applies_cli_overrides_and_request_patch() {
     let script = format!(
         r#"#!/bin/bash
 echo "$@" >> "{log}"
-if [[ "$1" == "exec" ]]; then
+if printf '%s\n' "$@" | grep -qx "exec"; then
   echo "ok"
 fi
 "#,
@@ -355,7 +363,7 @@ async fn resume_applies_search_and_selector_overrides() {
     let script = format!(
         r#"#!/bin/bash
 echo "$@" >> "{log}"
-if [[ "$1" == "exec" ]]; then
+if printf '%s\n' "$@" | grep -qx "exec"; then
   echo '{{"type":"thread.started","thread_id":"thread-1"}}'
   echo '{{"type":"turn.started","thread_id":"thread-1","turn_id":"turn-1"}}'
   echo '{{"type":"turn.completed","thread_id":"thread-1","turn_id":"turn-1"}}'
@@ -425,7 +433,7 @@ async fn apply_respects_cli_overrides_without_search() {
     let script = format!(
         r#"#!/bin/bash
 echo "$@" >> "{log}"
-if [[ "$1" == "apply" ]]; then
+if printf '%s\n' "$@" | grep -qx "apply"; then
   echo "applied"
 fi
 "#,

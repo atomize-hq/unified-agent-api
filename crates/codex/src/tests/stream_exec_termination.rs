@@ -33,6 +33,9 @@ exec sleep 1000000
         .stream_exec_with_env_overrides_control(
             ExecStreamRequest {
                 prompt: "hello".to_string(),
+                ephemeral: false,
+                ignore_rules: false,
+                ignore_user_config: false,
                 idle_timeout: None,
                 output_last_message: None,
                 output_schema: None,

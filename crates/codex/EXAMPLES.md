@@ -24,6 +24,9 @@ The Cargo package name is `unified-agent-api-codex`; the Rust library crate rema
 | `cargo run -p unified-agent-api-codex --example features_toggle -- enable unified_exec` | `codex features enable unified_exec` | Enables a named feature key. |
 | `cargo run -p unified-agent-api-codex --example features_toggle -- disable unified_exec` | `codex features disable unified_exec` | Disables a named feature key. |
 | `cargo run -p unified-agent-api-codex --example debug_cmd -- app-server send-message-v2 "hello"` | `codex debug app-server send-message-v2 "hello"` | Calls the debug app-server shim for smoke testing. |
+| `cargo run -p unified-agent-api-codex --example debug_cmd -- models --bundled` | `codex debug models --bundled` | Prints the bundled model inventory when the binary exposes it. |
+| `cargo run -p unified-agent-api-codex --example debug_cmd -- prompt-input --image ./diagram.png "summarize this prompt payload"` | `codex debug prompt-input --image ./diagram.png "summarize this prompt payload"` | Echoes prompt-input normalization with optional image attachments. |
+| `cargo run -p unified-agent-api-codex --example plugin_cmd -- marketplace add github.com/acme/codex-marketplace --ref main --sparse packages/demo` | `codex plugin marketplace add --ref main --sparse packages/demo github.com/acme/codex-marketplace` | Exercises the 0.125.0 plugin marketplace wrapper family. |
 
 ## Binary & CODEX_HOME
 
@@ -62,12 +65,14 @@ The Cargo package name is `unified-agent-api-codex`; the Rust library crate rema
 | `cargo run -p unified-agent-api-codex --example app_server_thread_turn -- "Draft a release note"` | `codex app-server` then send `thread/start` and `turn/start` | App-server thread/turn notifications; supports `--sample` and optional `CODEX_HOME` for state isolation. |
 | `cargo run -p unified-agent-api-codex --example app_server_codegen -- ts ./gen/app --prettier ./node_modules/.bin/prettier` | `codex app-server generate-ts --out ./gen/app --prettier ./node_modules/.bin/prettier` | Refresh TypeScript bindings (or `json ./gen/app` for schemas) with shared config/profile flags; ensures the output directory exists first and surfaces non-zero exits as `CodexError::NonZeroExit`. |
 | `cargo run -p unified-agent-api-codex --example app_server_codegen -- json ./gen/app --experimental` | `codex app-server generate-json-schema --out ./gen/app --experimental` | Requests experimental codegen surfaces when supported by the binary. |
+| `cargo run -p unified-agent-api-codex --example server_helpers -- app-proxy /tmp/codex-app.sock` | `codex app-server proxy --sock /tmp/codex-app.sock` | Starts the app-server proxy helper under host-managed stdio, prints the child pid, then shuts it down. |
 
 ## Proxies & Bridges
 
 | Wrapper example | Native command | Notes |
 | --- | --- | --- |
 | `cargo run -p unified-agent-api-codex --example responses_api_proxy` | `echo "$OPENAI_API_KEY" \| codex responses-api-proxy [--port <PORT>] [--server-info <FILE>] [--http-shutdown] [--upstream-url <URL>]` | Starts the API-key-injecting responses proxy with piped stdin; requires `OPENAI_API_KEY`/`CODEX_API_KEY` for live runs, otherwise the example falls back to a stub `--sample` server-info output. Polls `--server-info` for `{port,pid}` when requested. |
+| `cargo run -p unified-agent-api-codex --example server_helpers -- exec-server 127.0.0.1:7777` | `codex exec-server --listen 127.0.0.1:7777` | Starts the exec-server helper under host-managed stdio, prints the child pid, then shuts it down. |
 | `cargo run -p unified-agent-api-codex --example stdio_to_uds_live` | `codex stdio-to-uds <temp.sock>` | Unix-only live demo: spawns a temp UDS listener, bridges via `codex stdio-to-uds`, sends `ping`, and prints the echoed `pong`; set `CODEX_BINARY` to pick a specific CLI. |
 
 ## Capabilities
