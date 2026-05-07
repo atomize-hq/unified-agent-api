@@ -542,8 +542,7 @@ fn automated_writable_surfaces(
             entry.manifest_root
         ),
         "support publication `cli_manifests/support_matrix/current.json`".to_string(),
-        "support publication markdown `docs/specs/unified-agent-api/support-matrix.md`"
-            .to_string(),
+        "support publication markdown `docs/specs/unified-agent-api/support-matrix.md`".to_string(),
     ];
     if entry.agent_id == "codex" {
         writable_surfaces.push(

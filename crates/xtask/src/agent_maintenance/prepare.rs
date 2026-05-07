@@ -478,6 +478,7 @@ fn render_execution_prompt(
 
 fn execution_green_gates(entry: &AgentRegistryEntry) -> Vec<String> {
     vec![
+        "cargo fmt --all".to_string(),
         format!(
             "cargo run -p xtask -- codex-validate --root {}",
             entry.manifest_root
