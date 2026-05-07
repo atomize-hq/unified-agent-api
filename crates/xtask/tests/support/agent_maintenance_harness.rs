@@ -525,6 +525,22 @@ EOF
 }}
 EOF
     ;;
+  success_with_pycache)
+    mkdir -p "$workspace_root/docs/agents/lifecycle/codex-maintenance"
+    cat > "$workspace_root/docs/agents/lifecycle/codex-maintenance/runtime-note.md" <<'EOF'
+# Runtime note
+
+Relay write completed.
+EOF
+    cat > "$workspace_root/cli_manifests/codex/versions/0.98.0.json" <<'EOF'
+{{
+  "semantic_version": "0.98.0",
+  "status": "validated"
+}}
+EOF
+    mkdir -p "$workspace_root/scripts/__pycache__"
+    printf 'bytecode\n' > "$workspace_root/scripts/__pycache__/publish_planner.cpython-313.pyc"
+    ;;
   out_of_bounds)
     mkdir -p "$workspace_root/docs"
     printf 'not allowed\n' > "$workspace_root/docs/unowned.md"

@@ -179,3 +179,26 @@ fn execute_agent_maintenance_write_reuses_prepared_baseline_runs_gates_and_keeps
     let report = read_json(&run_dir.join("validation-report.json"));
     assert_eq!(report.get("status").and_then(Value::as_str), Some("pass"));
 }
+
+#[test]
+fn execute_agent_maintenance_write_ignores_generated_python_bytecode_caches() {
+    let fixture = prepare_execute_fixture("agent-maintenance-execute-pyc");
+    let codex_binary = fake_execute_codex_binary(&fixture);
+    let dry_run = run_execute_cli(execute_args("--dry-run", Some(&codex_binary)), &fixture);
+    assert_eq!(dry_run.exit_code, 0, "stderr:\n{}", dry_run.stderr);
+    write_fake_execute_codex_scenario(&fixture, "success_with_pycache");
+
+    let output = run_execute_cli(execute_args("--write", Some(&codex_binary)), &fixture);
+
+    assert_eq!(output.exit_code, 0, "stderr:\n{}", output.stderr);
+    let run_dir = fixture.join(EXECUTE_RUNS_ROOT).join(EXECUTE_WRITE_RUN_ID);
+    let written_paths: Vec<String> = serde_json::from_slice(
+        &fs::read(run_dir.join("written-paths.json")).expect("read written paths"),
+    )
+    .expect("parse written paths");
+    assert!(!written_paths
+        .iter()
+        .any(|path| path.ends_with(".pyc") || path.contains("__pycache__")));
+    let report = read_json(&run_dir.join("validation-report.json"));
+    assert_eq!(report.get("status").and_then(Value::as_str), Some("pass"));
+}
