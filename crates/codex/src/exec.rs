@@ -229,6 +229,9 @@ impl CodexClient {
         if request.all {
             args.push(OsString::from("--all"));
         }
+        if request.include_non_interactive {
+            args.push(OsString::from("--include-non-interactive"));
+        }
         if request.last {
             args.push(OsString::from("--last"));
         }
@@ -248,7 +251,13 @@ impl CodexClient {
     }
 
     async fn invoke_codex_exec(&self, request: ExecRequest) -> Result<String, CodexError> {
-        let ExecRequest { prompt, overrides } = request;
+        let ExecRequest {
+            prompt,
+            ephemeral,
+            ignore_rules,
+            ignore_user_config,
+            overrides,
+        } = request;
         let dir_ctx = self.directory_context()?;
         let dir_path = dir_ctx.path().to_path_buf();
         let needs_capabilities = self.output_schema || !self.add_dirs.is_empty();
@@ -262,16 +271,27 @@ impl CodexClient {
             resolve_cli_overrides(&self.cli_overrides, &overrides, self.model.as_deref());
         let mut command = Command::new(self.command_env.binary_path());
         command
-            .arg("exec")
-            .arg("--color")
-            .arg(self.color_mode.as_str())
-            .arg("--skip-git-repo-check")
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::piped())
             .kill_on_drop(true)
             .current_dir(&dir_path);
 
         apply_cli_overrides(&mut command, &resolved_overrides, true);
+        command
+            .arg("exec")
+            .arg("--color")
+            .arg(self.color_mode.as_str())
+            .arg("--skip-git-repo-check");
+
+        if ephemeral {
+            command.arg("--ephemeral");
+        }
+        if ignore_rules {
+            command.arg("--ignore-rules");
+        }
+        if ignore_user_config {
+            command.arg("--ignore-user-config");
+        }
 
         let send_prompt_via_stdin = self.json_output;
         if !send_prompt_via_stdin {
@@ -414,6 +434,12 @@ impl CodexClient {
 pub struct ExecStreamRequest {
     /// User prompt that will be forwarded to `codex exec`.
     pub prompt: String,
+    /// Passes `--ephemeral` to avoid writing conversation history.
+    pub ephemeral: bool,
+    /// Passes `--ignore-rules` to bypass repo-specific rule loading.
+    pub ignore_rules: bool,
+    /// Passes `--ignore-user-config` to bypass user config loading.
+    pub ignore_user_config: bool,
     /// Per-event idle timeout. If no JSON lines arrive before the duration elapses,
     /// [`ExecStreamError::IdleTimeout`] is returned.
     pub idle_timeout: Option<Duration>,
@@ -442,6 +468,9 @@ pub enum ResumeSelector {
 pub struct ResumeRequest {
     pub selector: ResumeSelector,
     pub prompt: Option<String>,
+    pub ephemeral: bool,
+    pub ignore_rules: bool,
+    pub ignore_user_config: bool,
     pub idle_timeout: Option<Duration>,
     pub output_last_message: Option<PathBuf>,
     pub output_schema: Option<PathBuf>,
@@ -454,6 +483,9 @@ impl ResumeRequest {
         Self {
             selector,
             prompt: None,
+            ephemeral: false,
+            ignore_rules: false,
+            ignore_user_config: false,
             idle_timeout: None,
             output_last_message: None,
             output_schema: None,
@@ -481,6 +513,21 @@ impl ResumeRequest {
 
     pub fn idle_timeout(mut self, idle_timeout: Duration) -> Self {
         self.idle_timeout = Some(idle_timeout);
+        self
+    }
+
+    pub fn ephemeral(mut self, enable: bool) -> Self {
+        self.ephemeral = enable;
+        self
+    }
+
+    pub fn ignore_rules(mut self, enable: bool) -> Self {
+        self.ignore_rules = enable;
+        self
+    }
+
+    pub fn ignore_user_config(mut self, enable: bool) -> Self {
+        self.ignore_user_config = enable;
         self
     }
 

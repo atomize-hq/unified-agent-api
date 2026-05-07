@@ -286,6 +286,9 @@ async fn stream_exec_probes_relative_binary_from_effective_working_dir() {
     let stream = client
         .stream_exec(ExecStreamRequest {
             prompt: "hello".to_string(),
+            ephemeral: false,
+            ignore_rules: false,
+            ignore_user_config: false,
             idle_timeout: None,
             output_last_message: None,
             output_schema: None,
@@ -384,6 +387,9 @@ async fn stream_exec_probes_default_bare_binary_from_path() {
     let stream = client
         .stream_exec(ExecStreamRequest {
             prompt: "hello".to_string(),
+            ephemeral: false,
+            ignore_rules: false,
+            ignore_user_config: false,
             idle_timeout: None,
             output_last_message: None,
             output_schema: None,
@@ -471,6 +477,9 @@ async fn stream_exec_with_env_overrides_uses_path_case_insensitively_for_add_dir
         .stream_exec_with_env_overrides(
             ExecStreamRequest {
                 prompt: "hello".to_string(),
+                ephemeral: false,
+                ignore_rules: false,
+                ignore_user_config: false,
                 idle_timeout: None,
                 output_last_message: None,
                 output_schema: None,

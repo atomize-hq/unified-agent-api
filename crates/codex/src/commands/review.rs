@@ -55,41 +55,69 @@ impl CodexClient {
             return Err(CodexError::EmptyPrompt);
         }
 
+        let ExecReviewCommandRequest {
+            prompt,
+            base,
+            commit,
+            title,
+            uncommitted,
+            ephemeral,
+            ignore_rules,
+            ignore_user_config,
+            json,
+            output_last_message,
+            skip_git_repo_check,
+            overrides,
+        } = request;
+
         let mut args = vec![OsString::from("exec"), OsString::from("review")];
-        if let Some(base) = request.base {
+        if let Some(base) = base {
             if !base.trim().is_empty() {
                 args.push(OsString::from("--base"));
                 args.push(OsString::from(base));
             }
         }
-        if let Some(commit) = request.commit {
+        if let Some(commit) = commit {
             if !commit.trim().is_empty() {
                 args.push(OsString::from("--commit"));
                 args.push(OsString::from(commit));
             }
         }
-        if request.json {
+        if ephemeral {
+            args.push(OsString::from("--ephemeral"));
+        }
+        if ignore_rules {
+            args.push(OsString::from("--ignore-rules"));
+        }
+        if ignore_user_config {
+            args.push(OsString::from("--ignore-user-config"));
+        }
+        if json {
             args.push(OsString::from("--json"));
         }
-        if request.skip_git_repo_check {
+        if let Some(output_last_message) = output_last_message {
+            args.push(OsString::from("--output-last-message"));
+            args.push(output_last_message.into_os_string());
+        }
+        if skip_git_repo_check {
             args.push(OsString::from("--skip-git-repo-check"));
         }
-        if let Some(title) = request.title {
+        if let Some(title) = title {
             if !title.trim().is_empty() {
                 args.push(OsString::from("--title"));
                 args.push(OsString::from(title));
             }
         }
-        if request.uncommitted {
+        if uncommitted {
             args.push(OsString::from("--uncommitted"));
         }
-        if let Some(prompt) = request.prompt {
+        if let Some(prompt) = prompt {
             if !prompt.trim().is_empty() {
                 args.push(OsString::from(prompt));
             }
         }
 
-        self.run_simple_command_with_overrides(args, request.overrides)
+        self.run_simple_command_with_overrides(args, overrides)
             .await
     }
 }

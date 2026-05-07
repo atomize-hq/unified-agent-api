@@ -44,24 +44,31 @@ fn write_fake_codex_binary(root: &Path, exec_jsonl: &str, resume_jsonl: &str) ->
         r#"#!/usr/bin/env bash
 set -euo pipefail
 
-cmd="${{1:-}}"
-shift || true
+	is_exec=0
+	is_resume=0
+	for arg in "$@"; do
+	  if [[ "$arg" == "exec" ]]; then
+	    is_exec=1
+	  elif [[ "$arg" == "resume" ]]; then
+	    is_resume=1
+	  fi
+	done
 
-if [[ "$cmd" == "exec" ]]; then
-  cat >/dev/null || true
-  cat "{exec}"
-  exit 0
-fi
+	if [[ "$is_resume" == "1" ]]; then
+	  cat >/dev/null || true
+	  cat "{resume}"
+	  exit 0
+	fi
 
-if [[ "$cmd" == "resume" ]]; then
-  cat >/dev/null || true
-  cat "{resume}"
-  exit 0
-fi
+	if [[ "$is_exec" == "1" ]]; then
+	  cat >/dev/null || true
+	  cat "{exec}"
+	  exit 0
+	fi
 
-echo "unexpected args: $cmd $*" >&2
-exit 2
-"#,
+	echo "unexpected args: $*" >&2
+	exit 2
+	"#,
         exec = exec_path.display(),
         resume = resume_path.display()
     );
@@ -95,6 +102,9 @@ async fn collect_exec_events(
     let mut stream = client
         .stream_exec(ExecStreamRequest {
             prompt: "fixture prompt".to_string(),
+            ephemeral: false,
+            ignore_rules: false,
+            ignore_user_config: false,
             idle_timeout: None,
             output_last_message: None,
             output_schema: None,

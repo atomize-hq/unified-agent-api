@@ -122,10 +122,10 @@ fn main() -> io::Result<()> {
     let args: Vec<String> = env::args().collect();
     let mut out = io::stdout().lock();
 
-    if !args.get(1).is_some_and(|arg| arg == "exec") {
+    if !args.iter().any(|arg| arg == "exec") {
         emit_jsonl(
             &mut out,
-            r#"{"type":"error","message":"expected argv[1] to be \"exec\""}"#,
+            r#"{"type":"error","message":"expected argv to include \"exec\""}"#,
         )?;
         std::process::exit(2);
     }

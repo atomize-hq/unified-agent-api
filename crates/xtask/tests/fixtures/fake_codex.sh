@@ -31,7 +31,6 @@ ${extra_line}  features  Inspect feature flags
   help     Print this message or the help of the given subcommand(s)
 
 Options:
-  -q, --quiet        Suppress output
   --json             Emit JSON
   -v                 Verbose output
 EOF
@@ -130,7 +129,7 @@ run_exec() {
         argv+=("$1" "${2:-}")
         shift 2
         ;;
-      --skip-git-repo-check|--dangerously-bypass-approvals-and-sandbox|--json|--quiet)
+      --skip-git-repo-check|--dangerously-bypass-approvals-and-sandbox|--json)
         argv+=("$1")
         shift
         ;;
@@ -302,7 +301,6 @@ Usage: codex exec resume [OPTIONS]
 
 Options:
   --json            Emit JSON
-  -q, --quiet       Suppress output
 EOF
     ;;
   "alpha")

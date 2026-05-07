@@ -165,6 +165,7 @@ fn execute_agent_maintenance_write_reuses_prepared_baseline_runs_gates_and_keeps
         fs::read_to_string(run_dir.join(FAKE_EXECUTE_CODEX_LOG_FILE)).expect("read invocation log");
     assert!(invocation_log.contains("--skip-git-repo-check"));
     assert!(invocation_log.contains("--cd"));
+    assert!(!invocation_log.contains("--quiet"));
     assert!(!fixture
         .join("docs/agents/lifecycle/codex-maintenance/governance/maintenance-closeout.json")
         .exists());
@@ -176,6 +177,10 @@ fn execute_agent_maintenance_write_reuses_prepared_baseline_runs_gates_and_keeps
         .and_then(Value::as_array)
         .expect("argv array");
     assert_eq!(argv.first().and_then(Value::as_str), Some("exec"));
+    assert!(!argv
+        .iter()
+        .filter_map(Value::as_str)
+        .any(|arg| arg == "--quiet"));
     let report = read_json(&run_dir.join("validation-report.json"));
     assert_eq!(report.get("status").and_then(Value::as_str), Some("pass"));
 }

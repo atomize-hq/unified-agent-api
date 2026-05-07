@@ -106,6 +106,9 @@ exit 0
         .stream_exec_with_env_overrides(
             ExecStreamRequest {
                 prompt: "hello".to_string(),
+                ephemeral: false,
+                ignore_rules: false,
+                ignore_user_config: false,
                 idle_timeout: None,
                 output_last_message: None,
                 output_schema: None,
@@ -179,6 +182,9 @@ exit 0
         .stream_exec_with_env_overrides(
             ExecStreamRequest {
                 prompt: "hello".to_string(),
+                ephemeral: false,
+                ignore_rules: false,
+                ignore_user_config: false,
                 idle_timeout: None,
                 output_last_message: None,
                 output_schema: None,
@@ -200,6 +206,9 @@ exit 0
         .stream_exec_with_env_overrides(
             ExecStreamRequest {
                 prompt: "hello".to_string(),
+                ephemeral: false,
+                ignore_rules: false,
+                ignore_user_config: false,
                 idle_timeout: None,
                 output_last_message: None,
                 output_schema: None,
@@ -219,6 +228,9 @@ exit 0
     let third = client
         .stream_exec(ExecStreamRequest {
             prompt: "hello".to_string(),
+            ephemeral: false,
+            ignore_rules: false,
+            ignore_user_config: false,
             idle_timeout: None,
             output_last_message: None,
             output_schema: None,

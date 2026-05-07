@@ -257,6 +257,9 @@ pub(super) async fn spawn_exec_or_resume_flow(
                 .stream_exec_with_env_overrides_control(
                     ExecStreamRequest {
                         prompt,
+                        ephemeral: false,
+                        ignore_rules: false,
+                        ignore_user_config: false,
                         idle_timeout: None,
                         output_last_message: None,
                         output_schema: None,

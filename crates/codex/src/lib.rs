@@ -37,9 +37,11 @@
 //! - [`CodexClient::stream_exec`] for typed, real-time JSONL events from `codex exec --json`, returning an [`ExecStream`] with an event stream plus a completion future.
 //! - [`CodexClient::apply`] / [`CodexClient::diff`] to run `codex apply <TASK_ID>` and `codex cloud diff <TASK_ID>`, echo stdout/stderr according to the builder (`mirror_stdout` / `quiet`), and return captured output + exit status.
 //! - [`CodexClient::generate_app_server_bindings`] to refresh app-server protocol bindings via `codex app-server generate-ts` (optional `--prettier`) or `generate-json-schema`, returning captured stdout/stderr plus the exit status.
+//! - [`CodexClient::start_app_server_proxy`] and [`CodexClient::start_exec_server`] to spawn the newer `codex app-server proxy` and `codex exec-server` helpers with piped stdio for host-managed lifecycles.
 //! - [`CodexClient::run_sandbox`] to wrap `codex sandbox <platform>` (macOS/Linux/Windows), pass `--full-auto`/`--log-denials`/`--config`/`--enable`/`--disable`, and return the inner command status + output. macOS is the only platform that emits denial logs; Linux depends on the bundled `codex-linux-sandbox`; Windows sandboxing is experimental and relies on the upstream helper (no capability gating—non-zero exits bubble through).
 //! - [`CodexClient::check_execpolicy`] to evaluate shell commands against Starlark execpolicy files with repeatable `--policy` flags, optional pretty JSON, and parsed decision output (allow/prompt/forbidden or noMatch).
 //! - [`CodexClient::list_features`] to wrap `codex features list` with optional `--json` parsing, shared config/profile overrides, and parsed feature entries (name/stage/enabled).
+//! - [`CodexClient::debug_models`], [`CodexClient::debug_prompt_input`], and the `plugin*` helpers expose the additive 0.125.0 debug/plugin command families without dropping to raw process management.
 //! - [`CodexClient::start_responses_api_proxy`] to launch the `codex responses-api-proxy` helper with an API key piped via stdin plus optional port/server-info/upstream/shutdown flags.
 //! - [`CodexClient::stdio_to_uds`] to spawn `codex stdio-to-uds <SOCKET_PATH>` with piped stdio so callers can bridge Unix domain sockets manually.
 //!
@@ -100,17 +102,20 @@ pub use bundled_binary::{
     BundledBinarySpec,
 };
 pub use cli::{
-    AppServerCodegenOutput, AppServerCodegenRequest, AppServerCodegenTarget, CloudExecRequest,
-    CloudListOutput, CloudListRequest, CloudOverviewRequest, CloudStatusRequest, CodexFeature,
-    CodexFeatureStage, DebugAppServerHelpRequest, DebugAppServerRequest,
-    DebugAppServerSendMessageV2Request, DebugCommandRequest, DebugHelpRequest, ExecRequest,
-    ExecReviewCommandRequest, FeaturesCommandRequest, FeaturesDisableRequest,
+    AppServerCodegenOutput, AppServerCodegenRequest, AppServerCodegenTarget, AppServerProxyRequest,
+    AppServerRequest, CloudExecRequest, CloudListOutput, CloudListRequest, CloudOverviewRequest,
+    CloudStatusRequest, CodexFeature, CodexFeatureStage, DebugAppServerHelpRequest,
+    DebugAppServerRequest, DebugAppServerSendMessageV2Request, DebugCommandRequest,
+    DebugHelpRequest, DebugModelsRequest, DebugPromptInputRequest, ExecRequest,
+    ExecReviewCommandRequest, ExecServerRequest, FeaturesCommandRequest, FeaturesDisableRequest,
     FeaturesEnableRequest, FeaturesListFormat, FeaturesListOutput, FeaturesListRequest,
     ForkSessionRequest, HelpCommandRequest, HelpScope, McpAddRequest, McpAddTransport,
     McpGetRequest, McpListOutput, McpListRequest, McpLogoutRequest, McpOauthLoginRequest,
-    McpOverviewRequest, McpRemoveRequest, ResponsesApiProxyHandle, ResponsesApiProxyInfo,
-    ResponsesApiProxyRequest, ResumeSessionRequest, ReviewCommandRequest, SandboxCommandRequest,
-    SandboxPlatform, SandboxRun, StdioToUdsRequest,
+    McpOverviewRequest, McpRemoveRequest, PluginCommandRequest, PluginHelpRequest,
+    PluginMarketplaceAddRequest, PluginMarketplaceCommandRequest, PluginMarketplaceHelpRequest,
+    PluginMarketplaceRemoveRequest, PluginMarketplaceUpgradeRequest, ResponsesApiProxyHandle,
+    ResponsesApiProxyInfo, ResponsesApiProxyRequest, ResumeSessionRequest, ReviewCommandRequest,
+    SandboxCommandRequest, SandboxPlatform, SandboxRun, StdioToUdsRequest,
 };
 pub use events::{
     CommandExecutionDelta, CommandExecutionState, EventError, FileChangeDelta, FileChangeKind,

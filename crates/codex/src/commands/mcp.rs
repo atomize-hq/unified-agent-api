@@ -201,18 +201,17 @@ impl CodexClient {
 
         let mut command = Command::new(self.command_env.binary_path());
         command
-            .arg("mcp")
-            .arg("login")
-            .arg(name)
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::piped())
             .kill_on_drop(true);
+
+        apply_cli_overrides(&mut command, &resolved_overrides, true);
+        command.arg("mcp").arg("login").arg(name);
 
         if !request.scopes.is_empty() {
             command.arg("--scopes").arg(request.scopes.join(","));
         }
 
-        apply_cli_overrides(&mut command, &resolved_overrides, true);
         self.command_env.apply(&mut command)?;
 
         spawn_with_retry(&mut command, self.command_env.binary_path())

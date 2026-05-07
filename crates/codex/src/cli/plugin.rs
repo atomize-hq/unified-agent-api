@@ -1,15 +1,13 @@
-use std::path::PathBuf;
-
 use crate::CliOverridesPatch;
 
-/// Request for `codex debug`.
+/// Request for `codex plugin`.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct DebugCommandRequest {
+pub struct PluginCommandRequest {
     /// Per-call CLI overrides layered on top of the builder.
     pub overrides: CliOverridesPatch,
 }
 
-impl DebugCommandRequest {
+impl PluginCommandRequest {
     pub fn new() -> Self {
         Self {
             overrides: CliOverridesPatch::default(),
@@ -23,22 +21,22 @@ impl DebugCommandRequest {
     }
 }
 
-impl Default for DebugCommandRequest {
+impl Default for PluginCommandRequest {
     fn default() -> Self {
         Self::new()
     }
 }
 
-/// Request for `codex debug help [COMMAND]...`.
+/// Request for `codex plugin help [COMMAND]...`.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct DebugHelpRequest {
+pub struct PluginHelpRequest {
     /// Optional command tokens passed after `help` (variadic).
     pub command: Vec<String>,
     /// Per-call CLI overrides layered on top of the builder.
     pub overrides: CliOverridesPatch,
 }
 
-impl DebugHelpRequest {
+impl PluginHelpRequest {
     pub fn new() -> Self {
         Self {
             command: Vec::new(),
@@ -59,20 +57,20 @@ impl DebugHelpRequest {
     }
 }
 
-impl Default for DebugHelpRequest {
+impl Default for PluginHelpRequest {
     fn default() -> Self {
         Self::new()
     }
 }
 
-/// Request for `codex debug app-server`.
+/// Request for `codex plugin marketplace`.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct DebugAppServerRequest {
+pub struct PluginMarketplaceCommandRequest {
     /// Per-call CLI overrides layered on top of the builder.
     pub overrides: CliOverridesPatch,
 }
 
-impl DebugAppServerRequest {
+impl PluginMarketplaceCommandRequest {
     pub fn new() -> Self {
         Self {
             overrides: CliOverridesPatch::default(),
@@ -86,22 +84,22 @@ impl DebugAppServerRequest {
     }
 }
 
-impl Default for DebugAppServerRequest {
+impl Default for PluginMarketplaceCommandRequest {
     fn default() -> Self {
         Self::new()
     }
 }
 
-/// Request for `codex debug app-server help [COMMAND]...`.
+/// Request for `codex plugin marketplace help [COMMAND]...`.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct DebugAppServerHelpRequest {
+pub struct PluginMarketplaceHelpRequest {
     /// Optional command tokens passed after `help` (variadic).
     pub command: Vec<String>,
     /// Per-call CLI overrides layered on top of the builder.
     pub overrides: CliOverridesPatch,
 }
 
-impl DebugAppServerHelpRequest {
+impl PluginMarketplaceHelpRequest {
     pub fn new() -> Self {
         Self {
             command: Vec::new(),
@@ -122,25 +120,69 @@ impl DebugAppServerHelpRequest {
     }
 }
 
-impl Default for DebugAppServerHelpRequest {
+impl Default for PluginMarketplaceHelpRequest {
     fn default() -> Self {
         Self::new()
     }
 }
 
-/// Request for `codex debug app-server send-message-v2 <USER_MESSAGE>`.
+/// Request for `codex plugin marketplace add <SOURCE>`.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct DebugAppServerSendMessageV2Request {
-    /// Message payload sent to the app-server debug shim.
-    pub user_message: String,
+pub struct PluginMarketplaceAddRequest {
+    /// Marketplace source to install.
+    pub source: String,
+    /// Optional ref passed via `--ref`.
+    pub source_ref: Option<String>,
+    /// Optional sparse path passed via `--sparse`.
+    pub sparse_path: Option<String>,
     /// Per-call CLI overrides layered on top of the builder.
     pub overrides: CliOverridesPatch,
 }
 
-impl DebugAppServerSendMessageV2Request {
-    pub fn new(user_message: impl Into<String>) -> Self {
+impl PluginMarketplaceAddRequest {
+    pub fn new(source: impl Into<String>) -> Self {
         Self {
-            user_message: user_message.into(),
+            source: source.into(),
+            source_ref: None,
+            sparse_path: None,
+            overrides: CliOverridesPatch::default(),
+        }
+    }
+
+    /// Sets the optional `--ref` value.
+    pub fn source_ref(mut self, source_ref: impl Into<String>) -> Self {
+        let source_ref = source_ref.into();
+        self.source_ref = (!source_ref.trim().is_empty()).then_some(source_ref);
+        self
+    }
+
+    /// Sets the optional `--sparse` value.
+    pub fn sparse_path(mut self, sparse_path: impl Into<String>) -> Self {
+        let sparse_path = sparse_path.into();
+        self.sparse_path = (!sparse_path.trim().is_empty()).then_some(sparse_path);
+        self
+    }
+
+    /// Replaces the default CLI overrides for this request.
+    pub fn with_overrides(mut self, overrides: CliOverridesPatch) -> Self {
+        self.overrides = overrides;
+        self
+    }
+}
+
+/// Request for `codex plugin marketplace remove <MARKETPLACE_NAME>`.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PluginMarketplaceRemoveRequest {
+    /// Configured marketplace name to remove.
+    pub marketplace_name: String,
+    /// Per-call CLI overrides layered on top of the builder.
+    pub overrides: CliOverridesPatch,
+}
+
+impl PluginMarketplaceRemoveRequest {
+    pub fn new(marketplace_name: impl Into<String>) -> Self {
+        Self {
+            marketplace_name: marketplace_name.into(),
             overrides: CliOverridesPatch::default(),
         }
     }
@@ -152,26 +194,27 @@ impl DebugAppServerSendMessageV2Request {
     }
 }
 
-/// Request for `codex debug models`.
+/// Request for `codex plugin marketplace upgrade [MARKETPLACE_NAME]`.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct DebugModelsRequest {
-    /// Requests the `--bundled` flag when enabled.
-    pub bundled: bool,
+pub struct PluginMarketplaceUpgradeRequest {
+    /// Optional configured marketplace name to upgrade.
+    pub marketplace_name: Option<String>,
     /// Per-call CLI overrides layered on top of the builder.
     pub overrides: CliOverridesPatch,
 }
 
-impl DebugModelsRequest {
+impl PluginMarketplaceUpgradeRequest {
     pub fn new() -> Self {
         Self {
-            bundled: false,
+            marketplace_name: None,
             overrides: CliOverridesPatch::default(),
         }
     }
 
-    /// Controls whether `--bundled` is passed to the command.
-    pub fn bundled(mut self, enable: bool) -> Self {
-        self.bundled = enable;
+    /// Sets the optional marketplace name.
+    pub fn marketplace_name(mut self, marketplace_name: impl Into<String>) -> Self {
+        let marketplace_name = marketplace_name.into();
+        self.marketplace_name = (!marketplace_name.trim().is_empty()).then_some(marketplace_name);
         self
     }
 
@@ -182,62 +225,7 @@ impl DebugModelsRequest {
     }
 }
 
-impl Default for DebugModelsRequest {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-/// Request for `codex debug prompt-input [PROMPT]`.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct DebugPromptInputRequest {
-    /// Optional prompt payload appended after the debug context.
-    pub prompt: Option<String>,
-    /// Image paths forwarded via repeated `--image <FILE>` flags.
-    pub images: Vec<PathBuf>,
-    /// Per-call CLI overrides layered on top of the builder.
-    pub overrides: CliOverridesPatch,
-}
-
-impl DebugPromptInputRequest {
-    pub fn new() -> Self {
-        Self {
-            prompt: None,
-            images: Vec::new(),
-            overrides: CliOverridesPatch::default(),
-        }
-    }
-
-    /// Sets the optional prompt payload.
-    pub fn prompt(mut self, prompt: impl Into<String>) -> Self {
-        self.prompt = Some(prompt.into());
-        self
-    }
-
-    /// Appends a single `--image <FILE>` argument.
-    pub fn image(mut self, image: impl Into<PathBuf>) -> Self {
-        self.images.push(image.into());
-        self
-    }
-
-    /// Extends the repeated `--image <FILE>` arguments.
-    pub fn images<I, P>(mut self, images: I) -> Self
-    where
-        I: IntoIterator<Item = P>,
-        P: Into<PathBuf>,
-    {
-        self.images.extend(images.into_iter().map(Into::into));
-        self
-    }
-
-    /// Replaces the default CLI overrides for this request.
-    pub fn with_overrides(mut self, overrides: CliOverridesPatch) -> Self {
-        self.overrides = overrides;
-        self
-    }
-}
-
-impl Default for DebugPromptInputRequest {
+impl Default for PluginMarketplaceUpgradeRequest {
     fn default() -> Self {
         Self::new()
     }

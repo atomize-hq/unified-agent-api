@@ -122,6 +122,9 @@ async fn exec_resume_diff_apply_live_roundtrip() -> Result<(), Box<dyn std::erro
     let prompt = "You are running a Codex e2e check. Create hello.txt containing only \"hello world\" using apply_patch. Do not run other shell commands. Stop after writing.";
     let exec_request = ExecStreamRequest {
         prompt: prompt.to_string(),
+        ephemeral: false,
+        ignore_rules: false,
+        ignore_user_config: false,
         idle_timeout: Some(Duration::from_secs(120)),
         output_last_message: Some(workspace.path.join("exec-last.txt")),
         output_schema: None,
@@ -214,6 +217,9 @@ async fn exec_resume_diff_apply_live_roundtrip() -> Result<(), Box<dyn std::erro
     let resume_request = ResumeRequest {
         selector: ResumeSelector::Id(thread_id),
         prompt: Some(resume_prompt.to_string()),
+        ephemeral: false,
+        ignore_rules: false,
+        ignore_user_config: false,
         idle_timeout: Some(Duration::from_secs(120)),
         output_last_message: Some(workspace.path.join("resume-last.txt")),
         output_schema: None,

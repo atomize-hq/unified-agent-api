@@ -53,8 +53,8 @@ fn main() -> io::Result<()> {
     // Scenario is selected via `FAKE_CODEX_APP_SERVER_SCENARIO`. Each scenario asserts request
     // shapes and ordering, and fails loudly on drift.
     let args: Vec<String> = env::args().collect();
-    if args.get(1).map(String::as_str) != Some("app-server") {
-        eprintln!("expected argv[1] to be \"app-server\"");
+    if !args.iter().any(|arg| arg == "app-server") {
+        eprintln!("expected argv to include \"app-server\"");
         std::process::exit(2);
     }
 

@@ -54,8 +54,6 @@ JSON
     assert_eq!(
         args,
         vec![
-            "features",
-            "list",
             "--config",
             "features.extras=true",
             "--profile",
@@ -63,6 +61,8 @@ JSON
             "--ask-for-approval",
             "on-request",
             "--search",
+            "features",
+            "list",
             "--json"
         ]
     );
@@ -188,5 +188,133 @@ printf "%s\n" "$@"
     assert_eq!(
         fork.stdout.lines().collect::<Vec<_>>(),
         vec!["fork", "--all", "--last", "sess-1", "fork prompt"]
+    );
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn supports_debug_models_prompt_input_and_plugin_commands() {
+    let _guard = env_guard_async().await;
+    let dir = tempfile::tempdir().unwrap();
+    let script_path = write_fake_codex(
+        dir.path(),
+        r#"#!/usr/bin/env bash
+printf "%s\n" "$@"
+"#,
+    );
+
+    let image_one = dir.path().join("prompt-1.png");
+    let image_two = dir.path().join("prompt-2.png");
+
+    let client = CodexClient::builder()
+        .binary(&script_path)
+        .mirror_stdout(false)
+        .quiet(true)
+        .build();
+
+    let debug_models = client
+        .debug_models(DebugModelsRequest::new().bundled(true))
+        .await
+        .unwrap();
+    assert_eq!(
+        debug_models.stdout.lines().collect::<Vec<_>>(),
+        vec!["debug", "models", "--bundled"]
+    );
+
+    let prompt_input = client
+        .debug_prompt_input(
+            DebugPromptInputRequest::new()
+                .image(&image_one)
+                .image(&image_two)
+                .prompt("hello"),
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        prompt_input.stdout.lines().collect::<Vec<_>>(),
+        vec![
+            "debug",
+            "prompt-input",
+            "--image",
+            image_one.to_string_lossy().as_ref(),
+            "--image",
+            image_two.to_string_lossy().as_ref(),
+            "hello",
+        ]
+    );
+
+    let plugin = client.plugin(PluginCommandRequest::new()).await.unwrap();
+    assert_eq!(plugin.stdout.lines().collect::<Vec<_>>(), vec!["plugin"]);
+
+    let plugin_help = client
+        .plugin_help(PluginHelpRequest::new().command(["marketplace", "add"]))
+        .await
+        .unwrap();
+    assert_eq!(
+        plugin_help.stdout.lines().collect::<Vec<_>>(),
+        vec!["plugin", "help", "marketplace", "add"]
+    );
+
+    let plugin_marketplace = client
+        .plugin_marketplace(PluginMarketplaceCommandRequest::new())
+        .await
+        .unwrap();
+    assert_eq!(
+        plugin_marketplace.stdout.lines().collect::<Vec<_>>(),
+        vec!["plugin", "marketplace"]
+    );
+
+    let plugin_marketplace_help = client
+        .plugin_marketplace_help(PluginMarketplaceHelpRequest::new().command(["upgrade"]))
+        .await
+        .unwrap();
+    assert_eq!(
+        plugin_marketplace_help.stdout.lines().collect::<Vec<_>>(),
+        vec!["plugin", "marketplace", "help", "upgrade"]
+    );
+
+    let plugin_marketplace_add = client
+        .plugin_marketplace_add(
+            PluginMarketplaceAddRequest::new("owner/repo")
+                .source_ref("main")
+                .sparse_path("marketplaces/core"),
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        plugin_marketplace_add.stdout.lines().collect::<Vec<_>>(),
+        vec![
+            "plugin",
+            "marketplace",
+            "add",
+            "--ref",
+            "main",
+            "--sparse",
+            "marketplaces/core",
+            "owner/repo",
+        ]
+    );
+
+    let plugin_marketplace_remove = client
+        .plugin_marketplace_remove(PluginMarketplaceRemoveRequest::new("primary"))
+        .await
+        .unwrap();
+    assert_eq!(
+        plugin_marketplace_remove.stdout.lines().collect::<Vec<_>>(),
+        vec!["plugin", "marketplace", "remove", "primary"]
+    );
+
+    let plugin_marketplace_upgrade = client
+        .plugin_marketplace_upgrade(
+            PluginMarketplaceUpgradeRequest::new().marketplace_name("primary"),
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        plugin_marketplace_upgrade
+            .stdout
+            .lines()
+            .collect::<Vec<_>>(),
+        vec!["plugin", "marketplace", "upgrade", "primary"]
     );
 }

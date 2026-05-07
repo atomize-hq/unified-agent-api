@@ -34,6 +34,8 @@ pub(crate) struct ResolvedCliOverrides {
     pub(crate) safety_override: SafetyOverride,
     pub(crate) profile: Option<String>,
     pub(crate) cd: Option<PathBuf>,
+    pub(crate) remote: Option<String>,
+    pub(crate) remote_auth_token_env: Option<String>,
     pub(crate) local_provider: Option<LocalProvider>,
     pub(crate) oss: bool,
     pub(crate) search: FlagState,
@@ -95,6 +97,11 @@ pub(super) fn resolve_cli_overrides(
     let safety_override = patch.safety_override.unwrap_or(builder.safety_override);
     let profile = patch.profile.clone().or_else(|| builder.profile.clone());
     let cd = patch.cd.clone().or_else(|| builder.cd.clone());
+    let remote = patch.remote.clone().or_else(|| builder.remote.clone());
+    let remote_auth_token_env = patch
+        .remote_auth_token_env
+        .clone()
+        .or_else(|| builder.remote_auth_token_env.clone());
     let local_provider = patch.local_provider.or(builder.local_provider);
     let search = match patch.search {
         FlagState::Inherit => builder.search,
@@ -120,6 +127,8 @@ pub(super) fn resolve_cli_overrides(
         safety_override,
         profile,
         cd,
+        remote,
+        remote_auth_token_env,
         local_provider,
         oss: matches!(oss, FlagState::Enable),
         search,
@@ -175,6 +184,16 @@ pub(super) fn cli_override_args(
     if let Some(cd) = &resolved.cd {
         args.push(OsString::from("--cd"));
         args.push(cd.as_os_str().to_os_string());
+    }
+
+    if let Some(remote) = &resolved.remote {
+        args.push(OsString::from("--remote"));
+        args.push(OsString::from(remote));
+    }
+
+    if let Some(remote_auth_token_env) = &resolved.remote_auth_token_env {
+        args.push(OsString::from("--remote-auth-token-env"));
+        args.push(OsString::from(remote_auth_token_env));
     }
 
     if let Some(provider) = resolved.local_provider {

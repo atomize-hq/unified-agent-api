@@ -236,12 +236,13 @@ impl CodexClient {
 
         let mut process = Command::new(self.command_env.binary_path());
         process
-            .arg("execpolicy")
-            .arg("check")
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .kill_on_drop(true)
             .current_dir(dir_ctx.path());
+
+        apply_cli_overrides(&mut process, &resolved_overrides, true);
+        process.arg("execpolicy").arg("check");
 
         for policy in policies {
             process.arg("--policy").arg(policy);
@@ -250,8 +251,6 @@ impl CodexClient {
         if pretty {
             process.arg("--pretty");
         }
-
-        apply_cli_overrides(&mut process, &resolved_overrides, true);
 
         process.arg("--");
         process.args(&command);
