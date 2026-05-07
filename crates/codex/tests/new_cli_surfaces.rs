@@ -280,10 +280,12 @@ async fn new_0125_surfaces_spawn_expected_subcommands() -> Result<(), Box<dyn st
                 && inv.argv.iter().any(|value| value == "--ws-audience")
                 && inv.argv.iter().any(|value| value == "--ws-auth")
                 && inv.argv.iter().any(|value| value == "--ws-issuer")
-                && inv.argv
+                && inv
+                    .argv
                     .iter()
                     .any(|value| value == "--ws-max-clock-skew-seconds")
-                && inv.argv
+                && inv
+                    .argv
                     .iter()
                     .any(|value| value == "--ws-shared-secret-file")
                 && inv.argv.iter().any(|value| value == "--ws-token-file")
