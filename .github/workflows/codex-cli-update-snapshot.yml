@@ -407,6 +407,14 @@ jobs:
             --status reported \
             --root cli_manifests/codex
 
+      - name: Refresh support matrix publication
+        shell: bash
+        env:
+          SOURCE_DATE_EPOCH: ${{ needs.prepare.outputs.source_date_epoch }}
+        run: |
+          set -euo pipefail
+          cargo run -p xtask -- support-matrix
+
       - name: Validate committed artifacts (hard gate)
         shell: bash
         env:
