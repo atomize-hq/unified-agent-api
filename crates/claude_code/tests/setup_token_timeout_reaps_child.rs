@@ -34,20 +34,23 @@ mod unix {
 
     async fn wait_for_pid_file(pid_file: &std::path::Path) -> i32 {
         let deadline = time::Instant::now() + Duration::from_secs(1);
-        let contents = loop {
+        loop {
             match fs::read_to_string(pid_file) {
-                Ok(contents) => break contents,
-                Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
-                    if time::Instant::now() >= deadline {
-                        panic!("pid file was not created before timeout");
+                Ok(contents) => {
+                    let trimmed = contents.trim();
+                    if let Ok(pid) = trimmed.parse() {
+                        return pid;
                     }
-                    time::sleep(Duration::from_millis(25)).await;
                 }
+                Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
                 Err(err) => panic!("failed to read pid file: {err}"),
             }
-        };
 
-        contents.trim().parse().expect("pid parse")
+            if time::Instant::now() >= deadline {
+                panic!("pid file was not populated before timeout");
+            }
+            time::sleep(Duration::from_millis(25)).await;
+        }
     }
 
     #[tokio::test]
