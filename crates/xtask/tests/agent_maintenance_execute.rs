@@ -185,7 +185,6 @@ fn execute_agent_maintenance_write_reuses_prepared_baseline_runs_gates_and_keeps
     assert_eq!(report.get("status").and_then(Value::as_str), Some("pass"));
 }
 
-
 #[test]
 fn execute_agent_maintenance_write_ignores_generated_python_bytecode_caches() {
     let fixture = prepare_execute_fixture("agent-maintenance-execute-pyc");
