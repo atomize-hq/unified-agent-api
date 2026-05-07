@@ -70,7 +70,7 @@ This file is the canonical contributor execution contract for `codex` maintenanc
 
 ## Recovery
 
-- recreate packet command: `cargo run -p xtask -- prepare-agent-maintenance --request docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml --write`
+- recreate packet command: `cargo run -p xtask -- refresh-agent --request docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml --write`
 - reopen pr body path: `docs/agents/lifecycle/codex-maintenance/governance/pr-summary.md`
 - reopen pr branch: `automation/codex-maintenance-0.125.0`
 - notes:

@@ -450,7 +450,7 @@ fn build_execution_contract(
         green_gates,
         recovery: ExecutionContractRecovery {
             recreate_packet_command: format!(
-                "cargo run -p xtask -- prepare-agent-maintenance --request {request_path} --write"
+                "cargo run -p xtask -- refresh-agent --request {request_path} --write"
             ),
             reopen_pr_body_path: pr_summary_path,
             reopen_pr_branch: args.branch_name.clone(),

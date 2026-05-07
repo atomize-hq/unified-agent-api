@@ -52,7 +52,7 @@ fn prepare_agent_maintenance_builds_packet_first_plan() {
         "pr_summary_path = \"docs/agents/lifecycle/codex-maintenance/governance/pr-summary.md\""
     ));
     assert!(request_text.contains(
-        "recreate_packet_command = \"cargo run -p xtask -- prepare-agent-maintenance --request docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml --write\""
+        "recreate_packet_command = \"cargo run -p xtask -- refresh-agent --request docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml --write\""
     ));
     assert!(plan
         .planned_paths()
@@ -97,7 +97,7 @@ fn prepare_agent_maintenance_write_creates_packet_root() {
     assert!(handoff.contains(".github/workflows/codex-cli-update-snapshot.yml"));
     assert!(handoff.contains("cargo run -p xtask -- capability-matrix-audit"));
     assert!(handoff.contains(
-        "cargo run -p xtask -- prepare-agent-maintenance --request docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml --write"
+        "cargo run -p xtask -- refresh-agent --request docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml --write"
     ));
     assert!(handoff.contains(
         "If local Codex preflight fails, fix binary/auth and rerun execute-agent-maintenance --dry-run before write mode."
@@ -357,7 +357,7 @@ fn automated_request_with_execution_contract_toml() -> String {
             "]\n",
             "\n",
             "[execution_contract.recovery]\n",
-            "recreate_packet_command = \"cargo run -p xtask -- prepare-agent-maintenance --request docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml --write\"\n",
+            "recreate_packet_command = \"cargo run -p xtask -- refresh-agent --request docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml --write\"\n",
             "reopen_pr_body_path = \"docs/agents/lifecycle/codex-maintenance/governance/pr-summary.md\"\n",
             "reopen_pr_branch = \"automation/codex-maintenance-0.98.0\"\n",
             "notes = [\n",

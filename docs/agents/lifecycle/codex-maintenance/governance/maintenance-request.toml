@@ -69,7 +69,7 @@ green_gates = [
 ]
 
 [execution_contract.recovery]
-recreate_packet_command = "cargo run -p xtask -- prepare-agent-maintenance --request docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml --write"
+recreate_packet_command = "cargo run -p xtask -- refresh-agent --request docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml --write"
 reopen_pr_body_path = "docs/agents/lifecycle/codex-maintenance/governance/pr-summary.md"
 reopen_pr_branch = "automation/codex-maintenance-0.125.0"
 notes = [
