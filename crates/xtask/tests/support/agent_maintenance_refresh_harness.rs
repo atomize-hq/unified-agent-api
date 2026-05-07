@@ -249,7 +249,7 @@ pub fn automated_request_with_execution_contract_toml(agent_id: &str, basis_ref:
             "]\n",
             "\n",
             "[execution_contract.recovery]\n",
-            "recreate_packet_command = \"cargo run -p xtask -- prepare-agent-maintenance --request docs/agents/lifecycle/{agent_id}-maintenance/governance/maintenance-request.toml --write\"\n",
+            "recreate_packet_command = \"cargo run -p xtask -- refresh-agent --request docs/agents/lifecycle/{agent_id}-maintenance/governance/maintenance-request.toml --write\"\n",
             "reopen_pr_body_path = \"docs/agents/lifecycle/{agent_id}-maintenance/governance/pr-summary.md\"\n",
             "reopen_pr_branch = \"automation/{agent_id}-maintenance-0.98.0\"\n",
             "notes = [\n",

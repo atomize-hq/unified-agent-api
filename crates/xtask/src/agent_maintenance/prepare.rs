@@ -439,22 +439,7 @@ fn build_execution_contract(
         pr_summary_path: pr_summary_path.clone(),
         closeout_path,
         requires_manual_closeout: true,
-        writable_surfaces: vec![
-            format!("{maintenance_root}/**"),
-            format!("{}/**", entry.crate_path),
-            "crates/agent_api/**".to_string(),
-            format!("{}/artifacts.lock.json", entry.manifest_root),
-            format!(
-                "{}/snapshots/{}/**",
-                entry.manifest_root, args.target_version
-            ),
-            format!("{}/reports/{}/**", entry.manifest_root, args.target_version),
-            format!(
-                "{}/versions/{}.json",
-                entry.manifest_root, args.target_version
-            ),
-            format!("{}/wrapper_coverage.json", entry.manifest_root),
-        ],
+        writable_surfaces: execution_writable_surfaces(entry, maintenance_root, args),
         read_only_inputs: vec![
             format!("{}/OPS_PLAYBOOK.md", entry.manifest_root),
             format!("{}/CI_WORKFLOWS_PLAN.md", entry.manifest_root),
@@ -465,7 +450,7 @@ fn build_execution_contract(
         green_gates,
         recovery: ExecutionContractRecovery {
             recreate_packet_command: format!(
-                "cargo run -p xtask -- prepare-agent-maintenance --request {request_path} --write"
+                "cargo run -p xtask -- refresh-agent --request {request_path} --write"
             ),
             reopen_pr_body_path: pr_summary_path,
             reopen_pr_branch: args.branch_name.clone(),
@@ -493,6 +478,7 @@ fn render_execution_prompt(
 
 fn execution_green_gates(entry: &AgentRegistryEntry) -> Vec<String> {
     vec![
+        "cargo fmt --all".to_string(),
         format!(
             "cargo run -p xtask -- codex-validate --root {}",
             entry.manifest_root
@@ -502,6 +488,35 @@ fn execution_green_gates(entry: &AgentRegistryEntry) -> Vec<String> {
         "cargo run -p xtask -- capability-matrix-audit".to_string(),
         "make preflight".to_string(),
     ]
+}
+
+fn execution_writable_surfaces(
+    entry: &AgentRegistryEntry,
+    maintenance_root: &str,
+    args: &Args,
+) -> Vec<String> {
+    let mut writable_surfaces = vec![
+        format!("{maintenance_root}/**"),
+        format!("{}/**", entry.crate_path),
+        "crates/agent_api/**".to_string(),
+        format!("{}/artifacts.lock.json", entry.manifest_root),
+        format!(
+            "{}/snapshots/{}/**",
+            entry.manifest_root, args.target_version
+        ),
+        format!("{}/reports/{}/**", entry.manifest_root, args.target_version),
+        format!(
+            "{}/versions/{}.json",
+            entry.manifest_root, args.target_version
+        ),
+        format!("{}/wrapper_coverage.json", entry.manifest_root),
+        "cli_manifests/support_matrix/current.json".to_string(),
+        "docs/specs/unified-agent-api/support-matrix.md".to_string(),
+    ];
+    if entry.agent_id == "codex" {
+        writable_surfaces.push("docs/specs/codex-wrapper-coverage-scenarios-v1.md".to_string());
+    }
+    writable_surfaces
 }
 
 fn push_toml_line(out: &mut String, key: &str, value: &str) {

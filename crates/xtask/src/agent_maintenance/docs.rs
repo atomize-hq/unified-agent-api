@@ -514,7 +514,7 @@ fn automated_writable_surfaces(
     entry: &AgentRegistryEntry,
     detected_release: &DetectedRelease,
 ) -> Vec<String> {
-    vec![
+    let mut writable_surfaces = vec![
         format!(
             "maintenance packet docs under `{}`",
             request.maintenance_root
@@ -541,7 +541,16 @@ fn automated_writable_surfaces(
             "generated wrapper coverage `{}/wrapper_coverage.json`",
             entry.manifest_root
         ),
-    ]
+        "support publication `cli_manifests/support_matrix/current.json`".to_string(),
+        "support publication markdown `docs/specs/unified-agent-api/support-matrix.md`".to_string(),
+    ];
+    if entry.agent_id == "codex" {
+        writable_surfaces.push(
+            "wrapper coverage scenario catalog `docs/specs/codex-wrapper-coverage-scenarios-v1.md`"
+                .to_string(),
+        );
+    }
+    writable_surfaces
 }
 
 fn automated_read_only_inputs(
@@ -568,7 +577,7 @@ fn automated_read_only_inputs(
 }
 
 fn automated_excluded_surfaces(entry: &AgentRegistryEntry) -> Vec<String> {
-    vec![
+    let mut excluded = vec![
         format!(
             "promotion pointer `{}/latest_validated.txt`",
             entry.manifest_root
@@ -577,14 +586,18 @@ fn automated_excluded_surfaces(entry: &AgentRegistryEntry) -> Vec<String> {
             "promotion policy `{}/min_supported.txt`",
             entry.manifest_root
         ),
-        "support publication `cli_manifests/support_matrix/current.json`".to_string(),
-        "support publication markdown `docs/specs/unified-agent-api/support-matrix.md`"
-            .to_string(),
         "capability publication `docs/specs/unified-agent-api/capability-matrix.md`"
             .to_string(),
         "release documentation `docs/crates-io-release.md`".to_string(),
-        "note: those support/capability/release-doc surfaces remain part of the broader maintenance framework, but this automated upstream-release lane is packet-only and does not request them".to_string(),
-    ]
+        "note: capability-matrix and release-doc surfaces remain out of scope for this automated upstream-release lane unless a maintainer widens the request explicitly".to_string(),
+    ];
+    if entry.agent_id == "codex" {
+        excluded.push(
+            "wrapper coverage generator contract `docs/specs/codex-wrapper-coverage-generator-contract.md`"
+                .to_string(),
+        );
+    }
+    excluded
 }
 
 fn automated_ordered_commands(

@@ -407,6 +407,14 @@ jobs:
             --status reported \
             --root cli_manifests/codex
 
+      - name: Refresh support matrix publication
+        shell: bash
+        env:
+          SOURCE_DATE_EPOCH: ${{ needs.prepare.outputs.source_date_epoch }}
+        run: |
+          set -euo pipefail
+          cargo run -p xtask -- support-matrix
+
       - name: Validate committed artifacts (hard gate)
         shell: bash
         env:
@@ -474,7 +482,7 @@ jobs:
           echo "::error title=Maintenance PR creation failed::Packet generation completed, but opening the PR failed." >&2
           cat <<EOF >&2
           Recovery path:
-          cargo run -p xtask -- prepare-agent-maintenance --request "${REQUEST_PATH}" --write
+          cargo run -p xtask -- refresh-agent --request "${REQUEST_PATH}" --write
           gh pr create --base staging --head "${{ inputs.branch_name }}" --title "${PR_TITLE}" --body-file "${PR_SUMMARY_PATH}"
           EOF
           exit 1

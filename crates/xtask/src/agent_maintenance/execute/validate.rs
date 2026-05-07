@@ -264,7 +264,7 @@ fn collect_snapshot_files(
             {
                 return Ok(());
             }
-            if relative == Path::new(".git") || relative.starts_with("target") {
+            if should_ignore_snapshot_path(relative) {
                 return Ok(());
             }
         }
@@ -291,4 +291,15 @@ fn collect_snapshot_files(
         sha256: hex::encode(Sha256::digest(bytes)),
     });
     Ok(())
+}
+
+fn should_ignore_snapshot_path(relative: &Path) -> bool {
+    relative == Path::new(".git")
+        || relative.starts_with("target")
+        || relative
+            .components()
+            .any(|component| component.as_os_str() == "__pycache__")
+        || relative
+            .extension()
+            .is_some_and(|extension| extension == "pyc")
 }

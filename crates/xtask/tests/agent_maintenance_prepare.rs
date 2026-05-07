@@ -52,7 +52,7 @@ fn prepare_agent_maintenance_builds_packet_first_plan() {
         "pr_summary_path = \"docs/agents/lifecycle/codex-maintenance/governance/pr-summary.md\""
     ));
     assert!(request_text.contains(
-        "recreate_packet_command = \"cargo run -p xtask -- prepare-agent-maintenance --request docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml --write\""
+        "recreate_packet_command = \"cargo run -p xtask -- refresh-agent --request docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml --write\""
     ));
     assert!(plan
         .planned_paths()
@@ -88,13 +88,16 @@ fn prepare_agent_maintenance_write_creates_packet_root() {
     assert!(handoff.contains("Follow the maintained PR template for 0.98.0."));
     assert!(handoff.contains("docs/agents/lifecycle/codex-maintenance/**"));
     assert!(handoff.contains("crates/agent_api/**"));
+    assert!(handoff.contains("cli_manifests/support_matrix/current.json"));
+    assert!(handoff.contains("docs/specs/unified-agent-api/support-matrix.md"));
+    assert!(handoff.contains("docs/specs/codex-wrapper-coverage-scenarios-v1.md"));
     assert!(handoff.contains("cli_manifests/codex/OPS_PLAYBOOK.md"));
     assert!(handoff.contains("cli_manifests/codex/CI_WORKFLOWS_PLAN.md"));
     assert!(handoff.contains("cli_manifests/codex/PR_BODY_TEMPLATE.md"));
     assert!(handoff.contains(".github/workflows/codex-cli-update-snapshot.yml"));
     assert!(handoff.contains("cargo run -p xtask -- capability-matrix-audit"));
     assert!(handoff.contains(
-        "cargo run -p xtask -- prepare-agent-maintenance --request docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml --write"
+        "cargo run -p xtask -- refresh-agent --request docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml --write"
     ));
     assert!(handoff.contains(
         "If local Codex preflight fails, fix binary/auth and rerun execute-agent-maintenance --dry-run before write mode."
@@ -326,6 +329,9 @@ fn automated_request_with_execution_contract_toml() -> String {
             "  \"cli_manifests/codex/reports/0.98.0/**\",\n",
             "  \"cli_manifests/codex/versions/0.98.0.json\",\n",
             "  \"cli_manifests/codex/wrapper_coverage.json\",\n",
+            "  \"cli_manifests/support_matrix/current.json\",\n",
+            "  \"docs/specs/unified-agent-api/support-matrix.md\",\n",
+            "  \"docs/specs/codex-wrapper-coverage-scenarios-v1.md\",\n",
             "]\n",
             "read_only_inputs = [\n",
             "  \"cli_manifests/codex/OPS_PLAYBOOK.md\",\n",
@@ -334,6 +340,7 @@ fn automated_request_with_execution_contract_toml() -> String {
             "  \".github/workflows/codex-cli-update-snapshot.yml\",\n",
             "]\n",
             "ordered_commands = [\n",
+            "  \"cargo fmt --all\",\n",
             "  \"cargo run -p xtask -- codex-validate --root cli_manifests/codex\",\n",
             "  \"cargo run -p xtask -- support-matrix --check\",\n",
             "  \"cargo run -p xtask -- capability-matrix --check\",\n",
@@ -341,6 +348,7 @@ fn automated_request_with_execution_contract_toml() -> String {
             "  \"make preflight\",\n",
             "]\n",
             "green_gates = [\n",
+            "  \"cargo fmt --all\",\n",
             "  \"cargo run -p xtask -- codex-validate --root cli_manifests/codex\",\n",
             "  \"cargo run -p xtask -- support-matrix --check\",\n",
             "  \"cargo run -p xtask -- capability-matrix --check\",\n",
@@ -349,7 +357,7 @@ fn automated_request_with_execution_contract_toml() -> String {
             "]\n",
             "\n",
             "[execution_contract.recovery]\n",
-            "recreate_packet_command = \"cargo run -p xtask -- prepare-agent-maintenance --request docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml --write\"\n",
+            "recreate_packet_command = \"cargo run -p xtask -- refresh-agent --request docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml --write\"\n",
             "reopen_pr_body_path = \"docs/agents/lifecycle/codex-maintenance/governance/pr-summary.md\"\n",
             "reopen_pr_branch = \"automation/codex-maintenance-0.98.0\"\n",
             "notes = [\n",
