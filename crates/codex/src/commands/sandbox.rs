@@ -60,6 +60,7 @@ impl CodexClient {
             command,
             full_auto,
             log_denials,
+            allow_unix_socket,
             config_overrides,
             feature_toggles,
             working_dir,
@@ -82,6 +83,10 @@ impl CodexClient {
 
         if log_denials && matches!(platform, SandboxPlatform::Macos) {
             process.arg("--log-denials");
+        }
+
+        if allow_unix_socket && matches!(platform, SandboxPlatform::Macos) {
+            process.arg("--allow-unix-socket");
         }
 
         for override_ in config_overrides {

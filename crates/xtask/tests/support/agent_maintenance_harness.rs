@@ -471,7 +471,7 @@ while (($#)); do
       argv+=("$1" "${{2:-}}")
       shift 2
       ;;
-    --skip-git-repo-check|--dangerously-bypass-approvals-and-sandbox|--quiet)
+    --skip-git-repo-check|--dangerously-bypass-approvals-and-sandbox)
       argv+=("$1")
       shift
       ;;

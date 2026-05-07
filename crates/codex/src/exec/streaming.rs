@@ -81,6 +81,9 @@ pub(super) async fn stream_exec_with_overrides_and_env_overrides_control(
 
     let ExecStreamRequest {
         prompt,
+        ephemeral,
+        ignore_rules,
+        ignore_user_config,
         idle_timeout,
         output_last_message,
         output_schema,
@@ -115,11 +118,6 @@ pub(super) async fn stream_exec_with_overrides_and_env_overrides_control(
 
     let mut command = Command::new(client.command_env.binary_path());
     command
-        .arg("exec")
-        .arg("--color")
-        .arg(client.color_mode.as_str())
-        .arg("--skip-git-repo-check")
-        .arg("--json")
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
         .stdin(std::process::Stdio::piped())
@@ -127,6 +125,22 @@ pub(super) async fn stream_exec_with_overrides_and_env_overrides_control(
         .current_dir(&dir_path);
 
     apply_cli_overrides(&mut command, &resolved_overrides, true);
+    command
+        .arg("exec")
+        .arg("--color")
+        .arg(client.color_mode.as_str())
+        .arg("--skip-git-repo-check")
+        .arg("--json");
+
+    if ephemeral {
+        command.arg("--ephemeral");
+    }
+    if ignore_rules {
+        command.arg("--ignore-rules");
+    }
+    if ignore_user_config {
+        command.arg("--ignore-user-config");
+    }
 
     if let Some(model) = &client.model {
         command.arg("--model").arg(model);
@@ -293,6 +307,9 @@ pub(super) async fn stream_resume_with_env_overrides_control(
     let ResumeRequest {
         selector,
         prompt,
+        ephemeral,
+        ignore_rules,
+        ignore_user_config,
         idle_timeout,
         output_last_message,
         output_schema,
@@ -328,11 +345,6 @@ pub(super) async fn stream_resume_with_env_overrides_control(
 
     let mut command = Command::new(client.command_env.binary_path());
     command
-        .arg("exec")
-        .arg("--color")
-        .arg(client.color_mode.as_str())
-        .arg("--skip-git-repo-check")
-        .arg("--json")
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
         .stdin(std::process::Stdio::piped())
@@ -340,6 +352,22 @@ pub(super) async fn stream_resume_with_env_overrides_control(
         .current_dir(&dir_path);
 
     apply_cli_overrides(&mut command, &resolved_overrides, true);
+    command
+        .arg("exec")
+        .arg("--color")
+        .arg(client.color_mode.as_str())
+        .arg("--skip-git-repo-check")
+        .arg("--json");
+
+    if ephemeral {
+        command.arg("--ephemeral");
+    }
+    if ignore_rules {
+        command.arg("--ignore-rules");
+    }
+    if ignore_user_config {
+        command.arg("--ignore-user-config");
+    }
 
     if let Some(model) = &client.model {
         command.arg("--model").arg(model);

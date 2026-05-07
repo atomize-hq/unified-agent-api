@@ -324,6 +324,20 @@ impl CodexClientBuilder {
         self
     }
 
+    /// Selects a remote Codex target (`--remote`).
+    pub fn remote(mut self, remote: impl Into<String>) -> Self {
+        let remote = remote.into();
+        self.cli_overrides.remote = (!remote.trim().is_empty()).then_some(remote);
+        self
+    }
+
+    /// Selects the env var that provides the remote auth token (`--remote-auth-token-env`).
+    pub fn remote_auth_token_env(mut self, env_var: impl Into<String>) -> Self {
+        let env_var = env_var.into();
+        self.cli_overrides.remote_auth_token_env = (!env_var.trim().is_empty()).then_some(env_var);
+        self
+    }
+
     /// Selects a local provider backend (`--local-provider`).
     pub fn local_provider(mut self, provider: LocalProvider) -> Self {
         self.cli_overrides.local_provider = Some(provider);

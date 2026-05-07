@@ -30,6 +30,8 @@ pub struct SandboxCommandRequest {
     pub full_auto: bool,
     /// Stream macOS sandbox denials after the child process exits (no-op on other platforms).
     pub log_denials: bool,
+    /// Allow Unix sockets on macOS (`--allow-unix-socket`).
+    pub allow_unix_socket: bool,
     /// Additional `--config key=value` overrides to pass through.
     pub config_overrides: Vec<ConfigOverride>,
     /// Feature toggles forwarded to `--enable`/`--disable`.
@@ -49,6 +51,7 @@ impl SandboxCommandRequest {
             command: command.into_iter().map(Into::into).collect(),
             full_auto: false,
             log_denials: false,
+            allow_unix_socket: false,
             config_overrides: Vec::new(),
             feature_toggles: FeatureToggles::default(),
             working_dir: None,
@@ -62,6 +65,11 @@ impl SandboxCommandRequest {
 
     pub fn log_denials(mut self, enable: bool) -> Self {
         self.log_denials = enable;
+        self
+    }
+
+    pub fn allow_unix_socket(mut self, enable: bool) -> Self {
+        self.allow_unix_socket = enable;
         self
     }
 

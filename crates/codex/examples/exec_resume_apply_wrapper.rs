@@ -39,6 +39,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .stream_resume(ResumeRequest {
             selector,
             prompt: Some(prompt),
+            ephemeral: false,
+            ignore_rules: false,
+            ignore_user_config: false,
             idle_timeout: None,
             output_last_message: None,
             output_schema: None,

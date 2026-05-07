@@ -46,10 +46,6 @@ printf "%s\n" "$@"
     assert_eq!(
         args,
         vec![
-            "app-server",
-            "generate-ts",
-            "--out",
-            out_dir.to_string_lossy().as_ref(),
             "--config",
             "features.codegen=true",
             "--profile",
@@ -57,6 +53,10 @@ printf "%s\n" "$@"
             "--ask-for-approval",
             "on-request",
             "--search",
+            "app-server",
+            "generate-ts",
+            "--out",
+            out_dir.to_string_lossy().as_ref(),
             "--prettier",
             prettier.to_string_lossy().as_ref(),
         ]
@@ -99,6 +99,76 @@ exit 5
         other => panic!("expected NonZeroExit, got {other:?}"),
     }
     assert!(out_dir.is_dir());
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn app_server_proxy_maps_sock_and_overrides() {
+    let dir = tempfile::tempdir().unwrap();
+    let socket_path = dir.path().join("proxy.sock");
+    let script_path = write_fake_codex(
+        dir.path(),
+        r#"#!/usr/bin/env bash
+echo "$PWD"
+printf "%s\n" "$@"
+"#,
+    );
+
+    let client_workdir = dir.path().join("client-workdir");
+    let request_workdir = dir.path().join("proxy-workdir");
+    std_fs::create_dir_all(&client_workdir).unwrap();
+    std_fs::create_dir_all(&request_workdir).unwrap();
+
+    let client = CodexClient::builder()
+        .binary(&script_path)
+        .mirror_stdout(false)
+        .quiet(true)
+        .working_dir(&client_workdir)
+        .approval_policy(ApprovalPolicy::OnRequest)
+        .build();
+
+    let mut child = client
+        .start_app_server_proxy(
+            AppServerProxyRequest::new()
+                .socket_path(&socket_path)
+                .working_dir(&request_workdir)
+                .profile("dev")
+                .config_override("features.proxy", "true")
+                .search(true),
+        )
+        .unwrap();
+
+    let stdout = child.stdout.take().unwrap();
+    let mut lines = BufReader::new(stdout).lines();
+
+    let pwd = lines.next_line().await.unwrap().unwrap();
+    let pwd = std_fs::canonicalize(Path::new(&pwd)).unwrap();
+    let request_workdir = std_fs::canonicalize(&request_workdir).unwrap();
+    assert_eq!(pwd, request_workdir);
+
+    let mut args = Vec::new();
+    while let Some(line) = lines.next_line().await.unwrap() {
+        args.push(line);
+    }
+    assert_eq!(
+        args,
+        vec![
+            "--config",
+            "features.proxy=true",
+            "--profile",
+            "dev",
+            "--ask-for-approval",
+            "on-request",
+            "--search",
+            "app-server",
+            "proxy",
+            "--sock",
+            socket_path.to_string_lossy().as_ref(),
+        ]
+    );
+
+    let status = child.wait().await.unwrap();
+    assert!(status.success());
 }
 
 #[cfg(unix)]
@@ -197,6 +267,68 @@ async fn responses_api_proxy_rejects_empty_api_key() {
         .await
         .unwrap_err();
     assert!(matches!(err, CodexError::EmptyApiKey));
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn exec_server_maps_overrides_and_request_workdir() {
+    let dir = tempfile::tempdir().unwrap();
+    let script_path = write_fake_codex(
+        dir.path(),
+        r#"#!/usr/bin/env bash
+echo "$PWD"
+printf "%s\n" "$@"
+"#,
+    );
+
+    let request_workdir = dir.path().join("exec-server-workdir");
+    std_fs::create_dir_all(&request_workdir).unwrap();
+
+    let client = CodexClient::builder()
+        .binary(&script_path)
+        .mirror_stdout(false)
+        .quiet(true)
+        .approval_policy(ApprovalPolicy::OnRequest)
+        .build();
+
+    let mut child = client
+        .start_exec_server(
+            ExecServerRequest::new()
+                .working_dir(&request_workdir)
+                .profile("dev")
+                .config_override("exec.mode", "server")
+                .search(true),
+        )
+        .unwrap();
+
+    let stdout = child.stdout.take().unwrap();
+    let mut lines = BufReader::new(stdout).lines();
+
+    let pwd = lines.next_line().await.unwrap().unwrap();
+    let pwd = std_fs::canonicalize(Path::new(&pwd)).unwrap();
+    let request_workdir = std_fs::canonicalize(&request_workdir).unwrap();
+    assert_eq!(pwd, request_workdir);
+
+    let mut args = Vec::new();
+    while let Some(line) = lines.next_line().await.unwrap() {
+        args.push(line);
+    }
+    assert_eq!(
+        args,
+        vec![
+            "--config",
+            "exec.mode=server",
+            "--profile",
+            "dev",
+            "--ask-for-approval",
+            "on-request",
+            "--search",
+            "exec-server",
+        ]
+    );
+
+    let status = child.wait().await.unwrap();
+    assert!(status.success());
 }
 
 #[cfg(unix)]

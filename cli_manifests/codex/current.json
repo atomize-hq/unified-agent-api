@@ -2,7 +2,7 @@
   "snapshot_schema_version": 2,
   "tool": "codex-cli",
   "mode": "union",
-  "collected_at": "2026-02-05T05:11:10Z",
+  "collected_at": "2026-04-24T18:00:38Z",
   "expected_targets": [
     "x86_64-unknown-linux-musl",
     "aarch64-apple-darwin",
@@ -16,56 +16,154 @@
   "inputs": [
     {
       "target_triple": "x86_64-unknown-linux-musl",
-      "collected_at": "2026-02-05T05:11:10Z",
+      "collected_at": "2026-04-24T18:00:38Z",
       "binary": {
-        "sha256": "1a661731a8ea4bd836b84eaa056ad6f637eacb6dbac887581e2af4304285b1df",
-        "size_bytes": 73049256,
+        "sha256": "86dc42ac5823f25233d6dc4ec5ff34693afd8c32ff2d17b54c5eb0d15bc7d902",
+        "size_bytes": 205640008,
         "platform": {
           "os": "linux",
           "arch": "x86_64"
         },
         "target_triple": "x86_64-unknown-linux-musl",
-        "version_output": "codex-cli 0.97.0",
-        "semantic_version": "0.97.0",
+        "version_output": "codex-cli 0.125.0",
+        "semantic_version": "0.125.0",
         "channel": "stable"
       },
       "features": {
         "commands_added_when_all_enabled": [],
         "enabled_for_snapshot": [
           "apps",
-          "collab",
+          "browser_use",
+          "codex_hooks",
           "collaboration_modes",
+          "computer_use",
+          "elevated_windows_sandbox",
           "enable_request_compression",
+          "experimental_windows_sandbox",
+          "external_migration",
+          "fast_mode",
+          "general_analytics",
+          "guardian_approval",
+          "image_detail_original",
+          "image_generation",
+          "in_app_browser",
+          "js_repl",
+          "memories",
+          "multi_agent",
           "personality",
+          "plugins",
+          "prevent_idle_sleep",
+          "remote_models",
           "request_rule",
+          "responses_websockets",
+          "responses_websockets_v2",
+          "search_tool",
           "shell_snapshot",
           "shell_tool",
           "skill_mcp_dependency_install",
+          "sqlite",
           "steer",
+          "tool_call_mcp_elicitation",
+          "tool_search",
+          "tool_suggest",
+          "tui_app_server",
           "undo",
           "unified_exec",
+          "use_legacy_landlock",
+          "use_linux_sandbox_bwrap",
           "web_search_cached",
-          "web_search_request"
+          "web_search_request",
+          "workspace_dependencies"
         ],
         "listed": [
           {
-            "effective": false,
-            "name": "apps",
-            "stage": "experimental"
-          },
-          {
-            "effective": false,
-            "name": "collab",
-            "stage": "experimental"
-          },
-          {
             "effective": true,
-            "name": "collaboration_modes",
+            "name": "apps",
             "stage": "stable"
           },
           {
             "effective": true,
+            "name": "browser_use",
+            "stage": "stable"
+          },
+          {
+            "effective": true,
+            "name": "codex_hooks",
+            "stage": "stable"
+          },
+          {
+            "effective": true,
+            "name": "collaboration_modes",
+            "stage": "removed"
+          },
+          {
+            "effective": true,
+            "name": "computer_use",
+            "stage": "stable"
+          },
+          {
+            "effective": false,
+            "name": "elevated_windows_sandbox",
+            "stage": "removed"
+          },
+          {
+            "effective": true,
             "name": "enable_request_compression",
+            "stage": "stable"
+          },
+          {
+            "effective": false,
+            "name": "experimental_windows_sandbox",
+            "stage": "removed"
+          },
+          {
+            "effective": false,
+            "name": "external_migration",
+            "stage": "experimental"
+          },
+          {
+            "effective": true,
+            "name": "fast_mode",
+            "stage": "stable"
+          },
+          {
+            "effective": true,
+            "name": "general_analytics",
+            "stage": "stable"
+          },
+          {
+            "effective": true,
+            "name": "guardian_approval",
+            "stage": "stable"
+          },
+          {
+            "effective": false,
+            "name": "image_detail_original",
+            "stage": "removed"
+          },
+          {
+            "effective": true,
+            "name": "image_generation",
+            "stage": "stable"
+          },
+          {
+            "effective": true,
+            "name": "in_app_browser",
+            "stage": "stable"
+          },
+          {
+            "effective": false,
+            "name": "js_repl",
+            "stage": "experimental"
+          },
+          {
+            "effective": false,
+            "name": "memories",
+            "stage": "experimental"
+          },
+          {
+            "effective": true,
+            "name": "multi_agent",
             "stage": "stable"
           },
           {
@@ -75,13 +173,43 @@
           },
           {
             "effective": true,
-            "name": "request_rule",
+            "name": "plugins",
             "stage": "stable"
           },
           {
             "effective": false,
-            "name": "shell_snapshot",
+            "name": "prevent_idle_sleep",
             "stage": "experimental"
+          },
+          {
+            "effective": false,
+            "name": "remote_models",
+            "stage": "removed"
+          },
+          {
+            "effective": false,
+            "name": "request_rule",
+            "stage": "removed"
+          },
+          {
+            "effective": false,
+            "name": "responses_websockets",
+            "stage": "removed"
+          },
+          {
+            "effective": false,
+            "name": "responses_websockets_v2",
+            "stage": "removed"
+          },
+          {
+            "effective": false,
+            "name": "search_tool",
+            "stage": "removed"
+          },
+          {
+            "effective": true,
+            "name": "shell_snapshot",
+            "stage": "stable"
           },
           {
             "effective": true,
@@ -94,9 +222,34 @@
             "stage": "stable"
           },
           {
-            "effective": false,
+            "effective": true,
+            "name": "sqlite",
+            "stage": "removed"
+          },
+          {
+            "effective": true,
             "name": "steer",
-            "stage": "experimental"
+            "stage": "removed"
+          },
+          {
+            "effective": true,
+            "name": "tool_call_mcp_elicitation",
+            "stage": "stable"
+          },
+          {
+            "effective": true,
+            "name": "tool_search",
+            "stage": "stable"
+          },
+          {
+            "effective": true,
+            "name": "tool_suggest",
+            "stage": "stable"
+          },
+          {
+            "effective": true,
+            "name": "tui_app_server",
+            "stage": "removed"
           },
           {
             "effective": false,
@@ -110,6 +263,16 @@
           },
           {
             "effective": false,
+            "name": "use_legacy_landlock",
+            "stage": "deprecated"
+          },
+          {
+            "effective": false,
+            "name": "use_linux_sandbox_bwrap",
+            "stage": "removed"
+          },
+          {
+            "effective": false,
             "name": "web_search_cached",
             "stage": "deprecated"
           },
@@ -117,6 +280,11 @@
             "effective": false,
             "name": "web_search_request",
             "stage": "deprecated"
+          },
+          {
+            "effective": true,
+            "name": "workspace_dependencies",
+            "stage": "stable"
           }
         ],
         "mode": "default_plus_all_enabled"
@@ -282,6 +450,24 @@
           ]
         },
         {
+          "key": "--remote",
+          "long": "--remote",
+          "takes_value": true,
+          "value_name": "ADDR",
+          "available_on": [
+            "x86_64-unknown-linux-musl"
+          ]
+        },
+        {
+          "key": "--remote-auth-token-env",
+          "long": "--remote-auth-token-env",
+          "takes_value": true,
+          "value_name": "ENV_VAR",
+          "available_on": [
+            "x86_64-unknown-linux-musl"
+          ]
+        },
+        {
           "key": "--sandbox",
           "long": "--sandbox",
           "short": "-s",
@@ -323,6 +509,78 @@
           "key": "--analytics-default-enabled",
           "long": "--analytics-default-enabled",
           "takes_value": false,
+          "available_on": [
+            "x86_64-unknown-linux-musl"
+          ]
+        },
+        {
+          "key": "--listen",
+          "long": "--listen",
+          "takes_value": true,
+          "value_name": "URL",
+          "available_on": [
+            "x86_64-unknown-linux-musl"
+          ]
+        },
+        {
+          "key": "--ws-audience",
+          "long": "--ws-audience",
+          "takes_value": true,
+          "value_name": "AUDIENCE",
+          "available_on": [
+            "x86_64-unknown-linux-musl"
+          ]
+        },
+        {
+          "key": "--ws-auth",
+          "long": "--ws-auth",
+          "takes_value": true,
+          "value_name": "MODE",
+          "available_on": [
+            "x86_64-unknown-linux-musl"
+          ]
+        },
+        {
+          "key": "--ws-issuer",
+          "long": "--ws-issuer",
+          "takes_value": true,
+          "value_name": "ISSUER",
+          "available_on": [
+            "x86_64-unknown-linux-musl"
+          ]
+        },
+        {
+          "key": "--ws-max-clock-skew-seconds",
+          "long": "--ws-max-clock-skew-seconds",
+          "takes_value": true,
+          "value_name": "SECONDS",
+          "available_on": [
+            "x86_64-unknown-linux-musl"
+          ]
+        },
+        {
+          "key": "--ws-shared-secret-file",
+          "long": "--ws-shared-secret-file",
+          "takes_value": true,
+          "value_name": "PATH",
+          "available_on": [
+            "x86_64-unknown-linux-musl"
+          ]
+        },
+        {
+          "key": "--ws-token-file",
+          "long": "--ws-token-file",
+          "takes_value": true,
+          "value_name": "PATH",
+          "available_on": [
+            "x86_64-unknown-linux-musl"
+          ]
+        },
+        {
+          "key": "--ws-token-sha256",
+          "long": "--ws-token-sha256",
+          "takes_value": true,
+          "value_name": "HEX",
           "available_on": [
             "x86_64-unknown-linux-musl"
           ]
@@ -414,6 +672,27 @@
           "required": false,
           "variadic": true,
           "note": "Print help for the subcommand(s)",
+          "available_on": [
+            "x86_64-unknown-linux-musl"
+          ]
+        }
+      ]
+    },
+    {
+      "path": [
+        "app-server",
+        "proxy"
+      ],
+      "available_on": [
+        "x86_64-unknown-linux-musl"
+      ],
+      "usage": "codex app-server proxy [OPTIONS]",
+      "flags": [
+        {
+          "key": "--sock",
+          "long": "--sock",
+          "takes_value": true,
+          "value_name": "SOCKET_PATH",
           "available_on": [
             "x86_64-unknown-linux-musl"
           ]
@@ -760,18 +1039,59 @@
     },
     {
       "path": [
-        "exec"
+        "debug",
+        "models"
       ],
       "available_on": [
         "x86_64-unknown-linux-musl"
       ],
-      "usage": "codex exec [OPTIONS] [PROMPT] [COMMAND]",
+      "usage": "codex debug models [OPTIONS]",
+      "flags": [
+        {
+          "key": "--bundled",
+          "long": "--bundled",
+          "takes_value": false,
+          "available_on": [
+            "x86_64-unknown-linux-musl"
+          ]
+        }
+      ]
+    },
+    {
+      "path": [
+        "debug",
+        "prompt-input"
+      ],
+      "available_on": [
+        "x86_64-unknown-linux-musl"
+      ],
+      "usage": "codex debug prompt-input [OPTIONS] [PROMPT]",
       "args": [
         {
           "name": "PROMPT",
           "required": false,
           "variadic": false,
-          "note": "Initial instructions for the agent. If not provided as an argument (or if `-` is used),\ninstructions are read from stdin",
+          "note": "Optional user prompt to append after session context",
+          "available_on": [
+            "x86_64-unknown-linux-musl"
+          ]
+        }
+      ]
+    },
+    {
+      "path": [
+        "exec"
+      ],
+      "available_on": [
+        "x86_64-unknown-linux-musl"
+      ],
+      "usage": "codex exec [OPTIONS] [PROMPT]\ncodex exec [OPTIONS] <COMMAND> [ARGS]",
+      "args": [
+        {
+          "name": "PROMPT",
+          "required": false,
+          "variadic": false,
+          "note": "Initial instructions for the agent. If not provided as an argument (or if `-` is used),\ninstructions are read from stdin. If stdin is piped and a prompt is also provided, stdin\nis appended as a `<stdin>` block",
           "available_on": [
             "x86_64-unknown-linux-musl"
           ]
@@ -783,6 +1103,30 @@
           "long": "--color",
           "takes_value": true,
           "value_name": "COLOR",
+          "available_on": [
+            "x86_64-unknown-linux-musl"
+          ]
+        },
+        {
+          "key": "--ephemeral",
+          "long": "--ephemeral",
+          "takes_value": false,
+          "available_on": [
+            "x86_64-unknown-linux-musl"
+          ]
+        },
+        {
+          "key": "--ignore-rules",
+          "long": "--ignore-rules",
+          "takes_value": false,
+          "available_on": [
+            "x86_64-unknown-linux-musl"
+          ]
+        },
+        {
+          "key": "--ignore-user-config",
+          "long": "--ignore-user-config",
+          "takes_value": false,
           "available_on": [
             "x86_64-unknown-linux-musl"
           ]
@@ -884,6 +1228,30 @@
           ]
         },
         {
+          "key": "--ephemeral",
+          "long": "--ephemeral",
+          "takes_value": false,
+          "available_on": [
+            "x86_64-unknown-linux-musl"
+          ]
+        },
+        {
+          "key": "--ignore-rules",
+          "long": "--ignore-rules",
+          "takes_value": false,
+          "available_on": [
+            "x86_64-unknown-linux-musl"
+          ]
+        },
+        {
+          "key": "--ignore-user-config",
+          "long": "--ignore-user-config",
+          "takes_value": false,
+          "available_on": [
+            "x86_64-unknown-linux-musl"
+          ]
+        },
+        {
           "key": "--json",
           "long": "--json",
           "takes_value": false,
@@ -895,6 +1263,16 @@
           "key": "--last",
           "long": "--last",
           "takes_value": false,
+          "available_on": [
+            "x86_64-unknown-linux-musl"
+          ]
+        },
+        {
+          "key": "--output-last-message",
+          "long": "--output-last-message",
+          "short": "-o",
+          "takes_value": true,
+          "value_name": "FILE",
           "available_on": [
             "x86_64-unknown-linux-musl"
           ]
@@ -949,9 +1327,43 @@
           ]
         },
         {
+          "key": "--ephemeral",
+          "long": "--ephemeral",
+          "takes_value": false,
+          "available_on": [
+            "x86_64-unknown-linux-musl"
+          ]
+        },
+        {
+          "key": "--ignore-rules",
+          "long": "--ignore-rules",
+          "takes_value": false,
+          "available_on": [
+            "x86_64-unknown-linux-musl"
+          ]
+        },
+        {
+          "key": "--ignore-user-config",
+          "long": "--ignore-user-config",
+          "takes_value": false,
+          "available_on": [
+            "x86_64-unknown-linux-musl"
+          ]
+        },
+        {
           "key": "--json",
           "long": "--json",
           "takes_value": false,
+          "available_on": [
+            "x86_64-unknown-linux-musl"
+          ]
+        },
+        {
+          "key": "--output-last-message",
+          "long": "--output-last-message",
+          "short": "-o",
+          "takes_value": true,
+          "value_name": "FILE",
           "available_on": [
             "x86_64-unknown-linux-musl"
           ]
@@ -977,6 +1389,26 @@
           "key": "--uncommitted",
           "long": "--uncommitted",
           "takes_value": false,
+          "available_on": [
+            "x86_64-unknown-linux-musl"
+          ]
+        }
+      ]
+    },
+    {
+      "path": [
+        "exec-server"
+      ],
+      "available_on": [
+        "x86_64-unknown-linux-musl"
+      ],
+      "usage": "codex exec-server [OPTIONS]",
+      "flags": [
+        {
+          "key": "--listen",
+          "long": "--listen",
+          "takes_value": true,
+          "value_name": "URL",
           "available_on": [
             "x86_64-unknown-linux-musl"
           ]
@@ -1424,6 +1856,155 @@
     },
     {
       "path": [
+        "plugin"
+      ],
+      "available_on": [
+        "x86_64-unknown-linux-musl"
+      ],
+      "usage": "codex plugin [OPTIONS] <COMMAND>"
+    },
+    {
+      "path": [
+        "plugin",
+        "help"
+      ],
+      "available_on": [
+        "x86_64-unknown-linux-musl"
+      ],
+      "usage": "codex plugin help [COMMAND]...",
+      "args": [
+        {
+          "name": "COMMAND",
+          "required": false,
+          "variadic": true,
+          "note": "Print help for the subcommand(s)",
+          "available_on": [
+            "x86_64-unknown-linux-musl"
+          ]
+        }
+      ]
+    },
+    {
+      "path": [
+        "plugin",
+        "marketplace"
+      ],
+      "available_on": [
+        "x86_64-unknown-linux-musl"
+      ],
+      "usage": "codex plugin marketplace [OPTIONS] <COMMAND>"
+    },
+    {
+      "path": [
+        "plugin",
+        "marketplace",
+        "add"
+      ],
+      "available_on": [
+        "x86_64-unknown-linux-musl"
+      ],
+      "usage": "codex plugin marketplace add [OPTIONS] <SOURCE>",
+      "args": [
+        {
+          "name": "SOURCE",
+          "required": true,
+          "variadic": false,
+          "note": "Marketplace source. Supports owner/repo[@ref], HTTP(S) Git URLs, SSH URLs, or local\nmarketplace root directories",
+          "available_on": [
+            "x86_64-unknown-linux-musl"
+          ]
+        }
+      ],
+      "flags": [
+        {
+          "key": "--ref",
+          "long": "--ref",
+          "takes_value": true,
+          "value_name": "REF",
+          "available_on": [
+            "x86_64-unknown-linux-musl"
+          ]
+        },
+        {
+          "key": "--sparse",
+          "long": "--sparse",
+          "takes_value": true,
+          "value_name": "PATH",
+          "available_on": [
+            "x86_64-unknown-linux-musl"
+          ]
+        }
+      ]
+    },
+    {
+      "path": [
+        "plugin",
+        "marketplace",
+        "help"
+      ],
+      "available_on": [
+        "x86_64-unknown-linux-musl"
+      ],
+      "usage": "codex plugin marketplace help [COMMAND]...",
+      "args": [
+        {
+          "name": "COMMAND",
+          "required": false,
+          "variadic": true,
+          "note": "Print help for the subcommand(s)",
+          "available_on": [
+            "x86_64-unknown-linux-musl"
+          ]
+        }
+      ]
+    },
+    {
+      "path": [
+        "plugin",
+        "marketplace",
+        "remove"
+      ],
+      "available_on": [
+        "x86_64-unknown-linux-musl"
+      ],
+      "usage": "codex plugin marketplace remove [OPTIONS] <MARKETPLACE_NAME>",
+      "args": [
+        {
+          "name": "MARKETPLACE_NAME",
+          "required": true,
+          "variadic": false,
+          "note": "Configured marketplace name to remove",
+          "available_on": [
+            "x86_64-unknown-linux-musl"
+          ]
+        }
+      ]
+    },
+    {
+      "path": [
+        "plugin",
+        "marketplace",
+        "upgrade"
+      ],
+      "available_on": [
+        "x86_64-unknown-linux-musl"
+      ],
+      "usage": "codex plugin marketplace upgrade [OPTIONS] [MARKETPLACE_NAME]",
+      "args": [
+        {
+          "name": "MARKETPLACE_NAME",
+          "required": false,
+          "variadic": false,
+          "inferred_from_usage": true,
+          "note": "inferred from usage",
+          "available_on": [
+            "x86_64-unknown-linux-musl"
+          ]
+        }
+      ]
+    },
+    {
+      "path": [
         "resume"
       ],
       "available_on": [
@@ -1454,6 +2035,14 @@
         {
           "key": "--all",
           "long": "--all",
+          "takes_value": false,
+          "available_on": [
+            "x86_64-unknown-linux-musl"
+          ]
+        },
+        {
+          "key": "--include-non-interactive",
+          "long": "--include-non-interactive",
           "takes_value": false,
           "available_on": [
             "x86_64-unknown-linux-musl"
@@ -1570,7 +2159,7 @@
           "name": "COMMAND",
           "required": false,
           "variadic": true,
-          "note": "Full command args to run under landlock",
+          "note": "Full command args to run under the Linux sandbox",
           "available_on": [
             "x86_64-unknown-linux-musl"
           ]
@@ -1598,6 +2187,15 @@
         }
       ],
       "flags": [
+        {
+          "key": "--allow-unix-socket",
+          "long": "--allow-unix-socket",
+          "takes_value": true,
+          "value_name": "ALLOW_UNIX_SOCKETS",
+          "available_on": [
+            "x86_64-unknown-linux-musl"
+          ]
+        },
         {
           "key": "--log-denials",
           "long": "--log-denials",

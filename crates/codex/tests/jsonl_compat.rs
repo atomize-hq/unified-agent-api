@@ -95,6 +95,9 @@ async fn collect_exec_events(
     let mut stream = client
         .stream_exec(ExecStreamRequest {
             prompt: "fixture prompt".to_string(),
+            ephemeral: false,
+            ignore_rules: false,
+            ignore_user_config: false,
             idle_timeout: None,
             output_last_message: None,
             output_schema: None,

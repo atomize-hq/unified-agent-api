@@ -7,6 +7,7 @@ pub struct ResumeSessionRequest {
     pub prompt: Option<String>,
     pub all: bool,
     pub last: bool,
+    pub include_non_interactive: bool,
     /// Per-call CLI overrides layered on top of the builder.
     pub overrides: CliOverridesPatch,
 }
@@ -18,6 +19,7 @@ impl ResumeSessionRequest {
             prompt: None,
             all: false,
             last: false,
+            include_non_interactive: false,
             overrides: CliOverridesPatch::default(),
         }
     }
@@ -41,6 +43,11 @@ impl ResumeSessionRequest {
 
     pub fn last(mut self, enable: bool) -> Self {
         self.last = enable;
+        self
+    }
+
+    pub fn include_non_interactive(mut self, enable: bool) -> Self {
+        self.include_non_interactive = enable;
         self
     }
 

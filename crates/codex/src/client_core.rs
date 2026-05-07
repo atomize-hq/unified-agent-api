@@ -50,13 +50,13 @@ impl CodexClient {
 
         let mut command = Command::new(self.command_env.binary_path());
         command
-            .args(args)
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::piped())
             .kill_on_drop(true)
             .current_dir(dir_ctx.path());
 
         apply_cli_overrides(&mut command, &resolved_overrides, true);
+        command.args(args);
 
         self.command_env.apply(&mut command)?;
 

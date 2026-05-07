@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use crate::CliOverridesPatch;
 
 /// Request for `codex review [OPTIONS] [PROMPT]`.
@@ -73,7 +75,11 @@ pub struct ExecReviewCommandRequest {
     pub commit: Option<String>,
     pub title: Option<String>,
     pub uncommitted: bool,
+    pub ephemeral: bool,
+    pub ignore_rules: bool,
+    pub ignore_user_config: bool,
     pub json: bool,
+    pub output_last_message: Option<PathBuf>,
     pub skip_git_repo_check: bool,
     /// Per-call CLI overrides layered on top of the builder.
     pub overrides: CliOverridesPatch,
@@ -87,7 +93,11 @@ impl ExecReviewCommandRequest {
             commit: None,
             title: None,
             uncommitted: false,
+            ephemeral: false,
+            ignore_rules: false,
+            ignore_user_config: false,
             json: false,
+            output_last_message: None,
             skip_git_repo_check: true,
             overrides: CliOverridesPatch::default(),
         }
@@ -122,8 +132,28 @@ impl ExecReviewCommandRequest {
         self
     }
 
+    pub fn ephemeral(mut self, enable: bool) -> Self {
+        self.ephemeral = enable;
+        self
+    }
+
+    pub fn ignore_rules(mut self, enable: bool) -> Self {
+        self.ignore_rules = enable;
+        self
+    }
+
+    pub fn ignore_user_config(mut self, enable: bool) -> Self {
+        self.ignore_user_config = enable;
+        self
+    }
+
     pub fn json(mut self, enable: bool) -> Self {
         self.json = enable;
+        self
+    }
+
+    pub fn output_last_message(mut self, path: impl Into<PathBuf>) -> Self {
+        self.output_last_message = Some(path.into());
         self
     }
 
