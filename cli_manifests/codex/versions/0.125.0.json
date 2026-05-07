@@ -2,7 +2,7 @@
   "schema_version": 1,
   "semantic_version": "0.125.0",
   "status": "validated",
-  "updated_at": "2026-05-07T15:49:20.759594Z",
+  "updated_at": "2026-05-07T17:12:53.002037Z",
   "artifacts": {
     "snapshots_dir": "snapshots/0.125.0",
     "reports_dir": "reports/0.125.0",
