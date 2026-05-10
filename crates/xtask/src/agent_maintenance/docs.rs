@@ -5,11 +5,13 @@ use sha2::Digest;
 use crate::agent_registry::{AgentRegistry, AgentRegistryEntry};
 
 use super::contract_policy::{
-    build_execution_contract_for_request, render_prompt_template, EXECUTE_HOST_SURFACE,
+    build_execution_contract_for_request, render_prompt_template, EXECUTION_HOST_LABEL,
+    EXECUTE_HOST_SURFACE,
 };
 use super::request::{ExecutionContract, MaintenanceRequest, MaintenanceRequestEnvelope};
 
-const OWNERSHIP_MARKER: &str = "<!-- generated-by: xtask refresh-agent; owner: control-plane -->";
+const OWNERSHIP_MARKER: &str =
+    "<!-- generated-by: xtask agent-maintenance renderer; source-of-truth: governance/maintenance-request.toml -->";
 const PR_SUMMARY_FILE_NAME: &str = "governance/pr-summary.md";
 const CLOSEOUT_FILE_NAME: &str = "governance/maintenance-closeout.json";
 
@@ -233,11 +235,13 @@ pub fn render_execution_packet(
 
     let trigger_context = render_trigger_context(request);
     let handoff_contents = wrap_markdown(&format!(
-        "# Handoff\n\nThis file is the canonical contributor execution contract for `{}` maintenance.\n\n## Packet origin\n\n{}\n\n## Relay contract\n\n- request artifact: `{}`\n- executor: `{}`\n- prompt template path: `{}`\n- prompt sha256: `{}`\n- canonical handoff: `{}`\n- derivative pr summary: `{}`\n- exact closeout artifact: `{}`\n- branch linkage: `{}`\n- manual closeout required: `{}`\n\n## Writable surfaces\n\n{}\n\n## Read-only inputs\n\n{}\n\n## Ordered repo commands\n\n{}\n\n## Exact green gates\n\n{}\n\n## Recovery\n\n- recreate packet command: `{}`\n- reopen pr body path: `{}`\n- reopen pr branch: `{}`\n- notes:\n{}\n\n## Exact closeout command\n\n```sh\ncargo run -p xtask -- close-agent-maintenance --request {} --closeout {}\n```\n\n## Exact coding-agent prompt\n\n```md\n{}\n```\n",
+        "# Handoff\n\nThis file is the canonical contributor execution contract for `{}` maintenance.\n\n## Packet origin\n\n{}\n\n## Relay contract\n\n- maintained agent packet: `{}`\n- local execution host: `{}`\n- executor surface: `{}`\n- request artifact: `{}`\n- prompt template path: `{}`\n- prompt sha256: `{}`\n- canonical handoff: `{}`\n- derivative pr summary: `{}`\n- exact closeout artifact: `{}`\n- branch linkage: `{}`\n- manual closeout required: `{}`\n\n## Writable surfaces\n\n{}\n\n## Read-only inputs\n\n{}\n\n## Ordered repo commands\n\n{}\n\n## Exact green gates\n\n{}\n\n## Recovery\n\n- recreate packet command: `{}`\n- reopen pr body path: `{}`\n- reopen pr branch: `{}`\n- notes:\n{}\n\n## Exact closeout command\n\n```sh\ncargo run -p xtask -- close-agent-maintenance --request {} --closeout {}\n```\n\n## Exact maintained-agent prompt\n\n```md\n{}\n```\n",
         request.agent_id,
         trigger_context,
-        request.relative_path,
+        request.agent_id,
+        EXECUTION_HOST_LABEL,
         execution_contract.executor,
+        request.relative_path,
         execution_contract.prompt_template_path,
         execution_contract.prompt_sha256,
         handoff_relative_path,
@@ -263,7 +267,7 @@ pub fn render_execution_packet(
     ));
 
     let pr_summary_contents = wrap_markdown(&format!(
-        "# PR summary\n\nAutomated maintenance packet for `{}` target `{}`.\n\n- canonical execution contract: `{}`\n- request artifact: `{}`\n- branch: `{}`\n- opened from: `{}`\n- prompt sha256: `{}`\n\n## Next step\n\nFollow `{}` exactly. This PR summary is derivative from the same execution-packet renderer.\n\n## Exact coding-agent prompt\n\n```md\n{}\n```\n",
+        "# PR summary\n\nAutomated maintenance packet for `{}` target `{}`.\n\n- canonical execution contract: `{}`\n- request artifact: `{}`\n- branch: `{}`\n- opened from: `{}`\n- prompt sha256: `{}`\n\n## Next step\n\nFollow `{}` exactly. This PR summary is derivative from the same execution-packet renderer.\n\n## Exact maintained-agent prompt\n\n```md\n{}\n```\n",
         request.agent_id,
         detected_release.target_version,
         handoff_relative_path,
@@ -316,7 +320,7 @@ fn build_automated_packet_docs_from_contract(
         RenderedPacketDoc {
             relative_path: format!("{root}/scope_brief.md"),
             contents: wrap_markdown(&format!(
-                "# Scope brief\n\nThis automated maintenance lane is limited to the contributor-ready packet and the worker-owned parity surfaces for `{}`.\n\n## Writable surfaces\n\n{}\n",
+                "# Scope brief\n\nThis automated maintenance lane is limited to the frozen shared packet for `{}` and the declared writable surfaces below.\n\n## Writable surfaces\n\n{}\n",
                 request.agent_id,
                 markdown_repo_path_list(&execution_contract.writable_surfaces)
             )),

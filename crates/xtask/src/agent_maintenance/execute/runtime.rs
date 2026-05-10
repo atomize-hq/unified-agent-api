@@ -16,6 +16,8 @@ use super::{
     PROMPT_FILE_NAME, WORKFLOW_VERSION,
 };
 
+const EXECUTION_HOST_PREFLIGHT: &str = "local execution-host preflight";
+
 pub(super) fn run_codex_preflight(
     workspace_root: &Path,
     context: &Context,
@@ -53,7 +55,7 @@ pub(super) fn run_codex_preflight(
     });
     if !exit_ok {
         errors.push(format!(
-            "local Codex preflight failed; fix binary/auth and rerun `execute-agent-maintenance --dry-run --request {}` before write mode",
+            "{EXECUTION_HOST_PREFLIGHT} failed; fix the Codex binary/auth state and rerun `execute-agent-maintenance --dry-run --request {}` before write mode",
             context.envelope.request.relative_path
         ));
     }
@@ -70,7 +72,7 @@ pub(super) fn run_codex_preflight(
     });
     if !output_ok {
         errors.push(format!(
-            "local Codex preflight did not confirm readiness with `{PREFLIGHT_SENTINEL}`"
+            "{EXECUTION_HOST_PREFLIGHT} did not confirm readiness with `{PREFLIGHT_SENTINEL}`"
         ));
     }
 
@@ -89,7 +91,7 @@ pub(super) fn run_codex_preflight(
     });
     if !diff_ok {
         errors.push(format!(
-            "local Codex preflight must not mutate the workspace; changed paths: {}",
+            "{EXECUTION_HOST_PREFLIGHT} must not mutate the workspace; changed paths: {}",
             changed_paths.join(", ")
         ));
     }

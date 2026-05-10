@@ -16,6 +16,7 @@ pub(crate) const GENERATED_BY_WORKFLOW: &str =
 pub(crate) const GENERIC_PACKET_PR_WORKFLOW: &str = "agent-maintenance-open-pr.yml";
 pub(crate) const LEGACY_EXECUTOR_ALIAS: &str = "codex";
 pub(crate) const EXECUTE_HOST_SURFACE: &str = "execute-agent-maintenance";
+pub(crate) const EXECUTION_HOST_LABEL: &str = "local Codex CLI host via execute-agent-maintenance";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct DerivedDetectedReleaseFields {
@@ -158,8 +159,10 @@ pub(crate) fn build_execution_contract(
             reopen_pr_body_path: pr_summary_path,
             reopen_pr_branch: branch_name.to_string(),
             notes: vec![
-                "If PR creation fails after packet generation, rerun packet creation and reopen the PR from the generated pr-summary path.".to_string(),
-                "If local Codex preflight fails, fix binary/auth and rerun execute-agent-maintenance --dry-run before write mode.".to_string(),
+                "If PR creation fails after packet generation, rerun packet regeneration from the frozen request and reopen the PR from the generated pr-summary path.".to_string(),
+                format!(
+                    "If the local execution-host preflight ({EXECUTION_HOST_LABEL}) fails, fix the Codex binary/auth state and rerun `execute-agent-maintenance --dry-run` before write mode."
+                ),
             ],
         },
     })
