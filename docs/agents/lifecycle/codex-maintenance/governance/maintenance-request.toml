@@ -6,8 +6,8 @@ opened_from = ".github/workflows/codex-cli-update-snapshot.yml"
 requested_control_plane_actions = [
   "packet_doc_refresh",
 ]
-request_recorded_at = "2026-05-07T06:24:24Z"
-request_commit = "1e44a63ca3d2b0de4686725ca7a79793b90f8b57"
+request_recorded_at = "2026-05-10T06:24:30Z"
+request_commit = "492356ca427a198f1ba06eb07bc1eb77298e9a42"
 
 [runtime_followup_required]
 required = false
@@ -15,20 +15,20 @@ items = []
 
 [detected_release]
 detected_by = ".github/workflows/agent-maintenance-release-watch.yml"
-current_validated = "0.97.0"
-target_version = "0.125.0"
-latest_stable = "0.128.0"
+current_validated = "0.125.0"
+target_version = "0.129.0"
+latest_stable = "0.130.0"
 version_policy = "latest_stable_minus_one"
 source_kind = "github_releases"
 source_ref = "openai/codex"
 dispatch_kind = "workflow_dispatch"
 dispatch_workflow = "codex-cli-update-snapshot.yml"
-branch_name = "automation/codex-maintenance-0.125.0"
+branch_name = "automation/codex-maintenance-0.129.0"
 
 [execution_contract]
 executor = "codex"
 prompt_template_path = "cli_manifests/codex/PR_BODY_TEMPLATE.md"
-prompt_sha256 = "252a9de88c1b18791e9a7805b9dfbcf2bba26686a58412db4455cd443f5f3dbc"
+prompt_sha256 = "93fb461c4af8cedd062a86cd0c9c3b09e6a737d6a18f81da895d6f54447a347a"
 pr_summary_path = "docs/agents/lifecycle/codex-maintenance/governance/pr-summary.md"
 closeout_path = "docs/agents/lifecycle/codex-maintenance/governance/maintenance-closeout.json"
 requires_manual_closeout = true
@@ -37,9 +37,9 @@ writable_surfaces = [
   "crates/codex/**",
   "crates/agent_api/**",
   "cli_manifests/codex/artifacts.lock.json",
-  "cli_manifests/codex/snapshots/0.125.0/**",
-  "cli_manifests/codex/reports/0.125.0/**",
-  "cli_manifests/codex/versions/0.125.0.json",
+  "cli_manifests/codex/snapshots/0.129.0/**",
+  "cli_manifests/codex/reports/0.129.0/**",
+  "cli_manifests/codex/versions/0.129.0.json",
   "cli_manifests/codex/wrapper_coverage.json",
   "cli_manifests/support_matrix/current.json",
   "docs/specs/unified-agent-api/support-matrix.md",
@@ -71,7 +71,7 @@ green_gates = [
 [execution_contract.recovery]
 recreate_packet_command = "cargo run -p xtask -- refresh-agent --request docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml --write"
 reopen_pr_body_path = "docs/agents/lifecycle/codex-maintenance/governance/pr-summary.md"
-reopen_pr_branch = "automation/codex-maintenance-0.125.0"
+reopen_pr_branch = "automation/codex-maintenance-0.129.0"
 notes = [
   "If PR creation fails after packet generation, rerun packet creation and reopen the PR from the generated pr-summary path.",
   "If local Codex preflight fails, fix binary/auth and rerun execute-agent-maintenance --dry-run before write mode.",

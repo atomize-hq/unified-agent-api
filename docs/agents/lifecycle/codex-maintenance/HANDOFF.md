@@ -7,26 +7,26 @@ This file is the canonical contributor execution contract for `codex` maintenanc
 ## Packet origin
 
 - detected_by: `.github/workflows/agent-maintenance-release-watch.yml`
-- current_validated: `0.97.0`
-- target_version: `0.125.0`
-- latest_stable: `0.128.0`
+- current_validated: `0.125.0`
+- target_version: `0.129.0`
+- latest_stable: `0.130.0`
 - version_policy: `latest_stable_minus_one`
 - source_kind: `github_releases`
 - source_ref: `openai/codex`
 - dispatch_kind: `workflow_dispatch`
 - dispatch_workflow: `codex-cli-update-snapshot.yml`
-- branch_name: `automation/codex-maintenance-0.125.0`
+- branch_name: `automation/codex-maintenance-0.129.0`
 
 ## Relay contract
 
 - request artifact: `docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml`
 - executor: `codex`
 - prompt template path: `cli_manifests/codex/PR_BODY_TEMPLATE.md`
-- prompt sha256: `252a9de88c1b18791e9a7805b9dfbcf2bba26686a58412db4455cd443f5f3dbc`
+- prompt sha256: `93fb461c4af8cedd062a86cd0c9c3b09e6a737d6a18f81da895d6f54447a347a`
 - canonical handoff: `docs/agents/lifecycle/codex-maintenance/HANDOFF.md`
 - derivative pr summary: `docs/agents/lifecycle/codex-maintenance/governance/pr-summary.md`
 - exact closeout artifact: `docs/agents/lifecycle/codex-maintenance/governance/maintenance-closeout.json`
-- branch linkage: `automation/codex-maintenance-0.125.0`
+- branch linkage: `automation/codex-maintenance-0.129.0`
 - manual closeout required: `true`
 
 ## Writable surfaces
@@ -35,9 +35,9 @@ This file is the canonical contributor execution contract for `codex` maintenanc
 - `crates/codex/**`
 - `crates/agent_api/**`
 - `cli_manifests/codex/artifacts.lock.json`
-- `cli_manifests/codex/snapshots/0.125.0/**`
-- `cli_manifests/codex/reports/0.125.0/**`
-- `cli_manifests/codex/versions/0.125.0.json`
+- `cli_manifests/codex/snapshots/0.129.0/**`
+- `cli_manifests/codex/reports/0.129.0/**`
+- `cli_manifests/codex/versions/0.129.0.json`
 - `cli_manifests/codex/wrapper_coverage.json`
 - `cli_manifests/support_matrix/current.json`
 - `docs/specs/unified-agent-api/support-matrix.md`
@@ -72,7 +72,7 @@ This file is the canonical contributor execution contract for `codex` maintenanc
 
 - recreate packet command: `cargo run -p xtask -- refresh-agent --request docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml --write`
 - reopen pr body path: `docs/agents/lifecycle/codex-maintenance/governance/pr-summary.md`
-- reopen pr branch: `automation/codex-maintenance-0.125.0`
+- reopen pr branch: `automation/codex-maintenance-0.129.0`
 - notes:
 - If PR creation fails after packet generation, rerun packet creation and reopen the PR from the generated pr-summary path.
 - If local Codex preflight fails, fix binary/auth and rerun execute-agent-maintenance --dry-run before write mode.
@@ -92,21 +92,21 @@ cargo run -p xtask -- close-agent-maintenance --request docs/agents/lifecycle/co
 
 ## Goal
 
-Bring the Rust wrapper (`crates/codex`) into parity with upstream `codex` **rust-v0.125.0** by using the generated parity artifacts in `cli_manifests/codex/`.
+Bring the Rust wrapper (`crates/codex`) into parity with upstream `codex` **rust-v0.129.0** by using the generated parity artifacts in `cli_manifests/codex/`.
 
 This PR already contains:
 - pinned upstream release assets (`cli_manifests/codex/artifacts.lock.json`)
-- upstream CLI snapshots (`cli_manifests/codex/snapshots/0.125.0/**`)
-- deterministic coverage reports (work queue) (`cli_manifests/codex/reports/0.125.0/**`)
-- version metadata (`cli_manifests/codex/versions/0.125.0.json`)
+- upstream CLI snapshots (`cli_manifests/codex/snapshots/0.129.0/**`)
+- deterministic coverage reports (work queue) (`cli_manifests/codex/reports/0.129.0/**`)
+- version metadata (`cli_manifests/codex/versions/0.129.0.json`)
 
 Your job is to use those outputs to implement/waive wrapper support until the report no longer contains uncovered surfaces for the required target (and, when union is complete, for all expected targets).
 
 ## Where To Look (Source Of Truth)
 
-- Upstream union snapshot: `cli_manifests/codex/snapshots/0.125.0/union.json`
-- Coverage work queue: `cli_manifests/codex/reports/0.125.0/coverage.any.json`
-- Per-target work queue(s): `cli_manifests/codex/reports/0.125.0/coverage.<target_triple>.json`
+- Upstream union snapshot: `cli_manifests/codex/snapshots/0.129.0/union.json`
+- Coverage work queue: `cli_manifests/codex/reports/0.129.0/coverage.any.json`
+- Per-target work queue(s): `cli_manifests/codex/reports/0.129.0/coverage.<target_triple>.json`
 - Wrapper coverage manifest (generated): `cli_manifests/codex/wrapper_coverage.json`
 - Wrapper coverage source-of-truth (edit this, not the JSON): `crates/codex/src/wrapper_coverage_manifest.rs`
 - Wrapper coverage scenario catalog (normative): `docs/specs/codex-wrapper-coverage-scenarios-v1.md`
@@ -125,8 +125,8 @@ Pointer policy:
 
 ## What To Do (Operational Steps)
 
-1) **Triage the delta for 0.125.0**
-- Open `cli_manifests/codex/reports/0.125.0/coverage.any.json`
+1) **Triage the delta for 0.129.0**
+- Open `cli_manifests/codex/reports/0.129.0/coverage.any.json`
 - Work the lists in this order:
   - `deltas.missing_commands`
   - `deltas.missing_flags`
@@ -144,19 +144,19 @@ Guardrails:
 - Do **not** hand-edit `cli_manifests/codex/wrapper_coverage.json` (it is generated).
 - Do **not** modify snapshots/reports by hand; re-run generators instead.
 
-3) **Compare 0.125.0 to the current supported baseline**
+3) **Compare 0.129.0 to the current supported baseline**
 - Read baseline version: `BASELINE="$(cat cli_manifests/codex/latest_validated.txt)"`
 - Determine what’s new/removed at the CLI surface layer by diffing the two union snapshots:
-  - New surfaces = present in `snapshots/0.125.0/union.json` but not present in `snapshots/$BASELINE/union.json`
-  - Removed surfaces = present in baseline union but not present in 0.125.0 union
+  - New surfaces = present in `snapshots/0.129.0/union.json` but not present in `snapshots/$BASELINE/union.json`
+  - Removed surfaces = present in baseline union but not present in 0.129.0 union
   - Treat “new surfaces” as high priority to assess for wrapper support.
   - Treat “removed surfaces” as potential wrapper deprecations (or leave as wrapper-only if still needed).
 
 4) **Regenerate + validate after changes**
 Run these from repo root:
 - `cargo run -p xtask -- codex-wrapper-coverage --out cli_manifests/codex/wrapper_coverage.json`
-- `cargo run -p xtask -- codex-report --version 0.125.0 --root cli_manifests/codex`
-- `cargo run -p xtask -- codex-version-metadata --version 0.125.0 --status reported --root cli_manifests/codex`
+- `cargo run -p xtask -- codex-report --version 0.129.0 --root cli_manifests/codex`
+- `cargo run -p xtask -- codex-version-metadata --version 0.129.0 --status reported --root cli_manifests/codex`
 - `cargo run -p xtask -- codex-validate --root cli_manifests/codex`
 
 Then run wrapper tests (Linux required):
@@ -168,8 +168,8 @@ Then run wrapper tests (Linux required):
 ## Done Criteria
 
 - `cargo run -p xtask -- codex-validate --root cli_manifests/codex` passes.
-- For the required target (`x86_64-unknown-linux-musl`), `cli_manifests/codex/reports/0.125.0/coverage.x86_64-unknown-linux-musl.json` has:
+- For the required target (`x86_64-unknown-linux-musl`), `cli_manifests/codex/reports/0.129.0/coverage.x86_64-unknown-linux-musl.json` has:
   - no missing/unknown/unsupported surfaces after regeneration, OR all remaining gaps are explicitly `intentionally_unsupported` with rationale notes.
-- If `snapshots/0.125.0/union.json.complete == true`, meet the same criterion for all expected targets.
+- If `snapshots/0.129.0/union.json.complete == true`, meet the same criterion for all expected targets.
 
 ```
