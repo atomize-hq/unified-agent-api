@@ -1,4 +1,7 @@
-# Codex CLI Parity PR Body Template (for `automation/codex-cli-<version>` PRs)
+# Codex CLI Parity PR Body Template (for `automation/codex-maintenance-<target_version>` PRs)
+
+This template renders the generated PR body at `docs/agents/lifecycle/codex-maintenance/governance/pr-summary.md`.
+`docs/agents/lifecycle/codex-maintenance/HANDOFF.md` remains canonical; the generated PR summary is derivative.
 
 @codex
 

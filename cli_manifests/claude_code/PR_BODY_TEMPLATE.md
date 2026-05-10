@@ -1,4 +1,7 @@
-# Claude Code CLI Parity PR Body Template (for `automation/claude-code-<version>` PRs)
+# Claude Code CLI Parity PR Body Template (for `automation/claude_code-maintenance-<target_version>` PRs)
+
+This template renders the generated PR body at `docs/agents/lifecycle/claude_code-maintenance/governance/pr-summary.md`.
+`docs/agents/lifecycle/claude_code-maintenance/HANDOFF.md` remains canonical; the generated PR summary is derivative.
 
 ## Goal
 

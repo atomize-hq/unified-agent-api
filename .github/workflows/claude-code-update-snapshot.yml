@@ -401,9 +401,10 @@ jobs:
           REQUEST_PATH="docs/agents/lifecycle/claude_code-maintenance/governance/maintenance-request.toml"
           PR_SUMMARY_PATH="docs/agents/lifecycle/claude_code-maintenance/governance/pr-summary.md"
           PR_TITLE="chore: snapshot claude code ${{ inputs.target_version }}"
-          echo "::error title=Maintenance PR creation failed::Packet generation completed, but opening the PR failed." >&2
+          echo "::error title=Maintenance PR creation failed::Generated packet replay required." >&2
           cat <<EOF >&2
           Recovery path:
+          If PR creation fails after packet generation, rerun packet regeneration from the frozen request and reopen the PR from the generated pr-summary path.
           cargo run -p xtask -- refresh-agent --request "${REQUEST_PATH}" --write
           gh pr create --base staging --head "${{ inputs.branch_name }}" --title "${PR_TITLE}" --body-file "${PR_SUMMARY_PATH}"
           EOF

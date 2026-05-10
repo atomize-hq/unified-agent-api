@@ -650,12 +650,13 @@ cargo run -p xtask -- prepare-agent-maintenance \
 Use `--write` to materialize the request and packet docs. Automated requests are packet-first, carry the relay `[execution_contract]`, and should not be hand-edited to remove the `[detected_release]` linkage.
 
 For automated upstream-release lanes:
-- `docs/agents/lifecycle/<agent_id>-maintenance/HANDOFF.md` is the canonical contributor execution contract.
-- `docs/agents/lifecycle/<agent_id>-maintenance/governance/pr-summary.md` is a derivative PR presentation surface rendered from the same packet context.
-- `docs/agents/lifecycle/<agent_id>-maintenance/governance/maintenance-request.toml` is the frozen relay input and owns `writable_surfaces`, `ordered_commands`, `green_gates`, recovery notes, and the manual-closeout requirement.
+- `docs/agents/lifecycle/<agent_id>-maintenance/HANDOFF.md` is canonical.
+- `docs/agents/lifecycle/<agent_id>-maintenance/governance/pr-summary.md` is derivative.
+- `docs/agents/lifecycle/<agent_id>-maintenance/governance/maintenance-request.toml` owns relay/write envelope/gates/recovery and the manual-closeout requirement.
 - the exact coding-agent prompt and PR-body tail both come from `cli_manifests/<agent_id>/PR_BODY_TEMPLATE.md`
 - promotion-only files such as `cli_manifests/<agent_id>/latest_validated.txt` and `cli_manifests/<agent_id>/min_supported.txt` remain out of scope for this packet-first follow-on
-- support/capability/release-doc publication surfaces such as `cli_manifests/support_matrix/current.json`, `docs/specs/unified-agent-api/support-matrix.md`, `docs/specs/unified-agent-api/capability-matrix.md`, and `docs/crates-io-release.md` still exist in the broader maintenance framework, but this automated upstream-release lane is packet-only and does not request or rewrite them
+- automated scope is the frozen shared packet + declared writable surfaces
+- support/capability/release-doc publication surfaces such as `cli_manifests/support_matrix/current.json`, `docs/specs/unified-agent-api/support-matrix.md`, `docs/specs/unified-agent-api/capability-matrix.md`, and `docs/crates-io-release.md` still exist in the broader maintenance framework, but this automated upstream-release lane does not request or rewrite them
 
 ### 3. Choose the maintenance execution path
 
@@ -675,9 +676,13 @@ cargo run -p xtask -- execute-agent-maintenance --request docs/agents/lifecycle/
 cargo run -p xtask -- execute-agent-maintenance --request docs/agents/lifecycle/<agent_id>-maintenance/governance/maintenance-request.toml --write --run-id <prepared_run_id>
 ```
 
-`execute-agent-maintenance` is valid only for automated upstream-release requests that already carry the generated relay contract. `--dry-run` validates the frozen request, local Codex preflight, and the exact write envelope, then writes temp evidence only under `docs/agents/.uaa-temp/agent-maintenance/runs/<run_id>/`. `--write` must reuse that prepared `run_id`, enforces the declared `writable_surfaces`, runs the exact `green_gates` from the request, and stops before closeout.
+`execute-agent-maintenance` is valid only for automated upstream-release requests that already carry the generated relay contract. `--dry-run` validates the frozen request, the local execution host, and the exact write envelope, then writes temp evidence only under `docs/agents/.uaa-temp/agent-maintenance/runs/<run_id>/`. `--write` must reuse that prepared `run_id`, enforces the declared `writable_surfaces`, runs the exact `green_gates` from the request, and stops before closeout.
 
 Packet-only agents remain explicitly deferred. If a maintenance lane does not carry the automated relay contract, do not widen it into `execute-agent-maintenance --write`; keep the packet-only PR handoff and resolve it with the existing maintainer flow.
+
+Recovery wording is frozen:
+- If PR creation fails after packet generation, rerun packet regeneration from the frozen request and reopen the PR from the generated pr-summary path.
+- If the local execution-host preflight (local Codex CLI host via execute-agent-maintenance) fails, fix the Codex binary/auth state and rerun `execute-agent-maintenance --dry-run` before write mode.
 
 ### 4. Close the maintenance run
 

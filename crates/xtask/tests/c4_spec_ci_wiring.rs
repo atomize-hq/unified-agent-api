@@ -74,6 +74,7 @@ fn c4_spec_agent_maintenance_workflows_share_the_release_watch_and_packet_only_p
         "cancel-in-progress: false",
         "continue-on-error: true",
         "steps.create_pr.outcome == 'failure'",
+        "If PR creation fails after packet generation, rerun packet regeneration from the frozen request and reopen the PR from the generated pr-summary path.",
         "cargo run -p xtask -- refresh-agent --request \"${REQUEST_PATH}\" --write",
         "gh pr create --base staging --head \"${{ inputs.branch_name }}\"",
     ] {
@@ -261,6 +262,7 @@ fn c4_spec_worker_update_snapshot_workflows_consume_shared_maintenance_inputs() 
             "cancel-in-progress: false",
             "continue-on-error: true",
             "steps.create_pr.outcome == 'failure'",
+            "If PR creation fails after packet generation, rerun packet regeneration from the frozen request and reopen the PR from the generated pr-summary path.",
             "cargo run -p xtask -- refresh-agent --request \"${REQUEST_PATH}\" --write",
             "gh pr create --base staging --head \"${{ inputs.branch_name }}\"",
         ] {
