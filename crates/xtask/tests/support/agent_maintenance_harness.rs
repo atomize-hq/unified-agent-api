@@ -296,6 +296,13 @@ pub fn write_fake_execute_codex_scenario(fixture: &Path, scenario: &str) {
     );
 }
 
+pub fn write_fake_execute_codex_preflight_scenario(fixture: &Path, scenario: &str) {
+    write_text(
+        &fixture.join(FAKE_EXECUTE_CODEX_SCENARIO_FILE),
+        &format!("{scenario}\n"),
+    );
+}
+
 pub fn read_json(path: &Path) -> Value {
     serde_json::from_slice(&fs::read(path).expect("read json")).expect("parse json")
 }
@@ -413,11 +420,12 @@ fn execution_request_toml(run_id: &str) -> String {
             "]\n",
             "\n",
             "[execution_contract.recovery]\n",
-            "recreate_packet_command = \"cargo run -p xtask -- prepare-agent-maintenance --write\"\n",
+            "recreate_packet_command = \"cargo run -p xtask -- refresh-agent --request docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml --write\"\n",
             "reopen_pr_body_path = \"docs/agents/lifecycle/codex-maintenance/governance/pr-summary.md\"\n",
             "reopen_pr_branch = \"automation/codex-maintenance-0.98.0\"\n",
             "notes = [\n",
-            "  \"If local Codex preflight fails, fix binary/auth and rerun execute-agent-maintenance --dry-run before write mode.\",\n",
+            "  \"If PR creation fails after packet generation, rerun packet regeneration from the frozen request and reopen the PR from the generated pr-summary path.\",\n",
+            "  \"If the local execution-host preflight (local Codex CLI host via execute-agent-maintenance) fails, fix the Codex binary/auth state and rerun `execute-agent-maintenance --dry-run` before write mode.\",\n",
             "]\n"
         ),
         prompt_sha256 = prompt_sha256,

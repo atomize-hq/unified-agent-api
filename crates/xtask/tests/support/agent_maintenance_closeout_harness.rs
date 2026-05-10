@@ -126,8 +126,8 @@ pub fn automated_maintenance_request_with_execution_contract_toml(
             "reopen_pr_body_path = \"docs/agents/lifecycle/{agent_id}-maintenance/governance/pr-summary.md\"\n",
             "reopen_pr_branch = \"automation/{agent_id}-maintenance-0.98.0\"\n",
             "notes = [\n",
-            "  \"If PR creation fails after packet generation, rerun packet creation and reopen the PR from the generated pr-summary path.\",\n",
-            "  \"If local Codex preflight fails, fix binary/auth and rerun execute-agent-maintenance --dry-run before write mode.\",\n",
+            "  \"If PR creation fails after packet generation, rerun packet regeneration from the frozen request and reopen the PR from the generated pr-summary path.\",\n",
+            "  \"If the local execution-host preflight (local Codex CLI host via execute-agent-maintenance) fails, fix the Codex binary/auth state and rerun `execute-agent-maintenance --dry-run` before write mode.\",\n",
             "]\n"
         ),
         automated_maintenance_request_toml(agent_id, basis_ref),
