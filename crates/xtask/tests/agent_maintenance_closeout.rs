@@ -34,6 +34,8 @@ mod approval_artifact {
 mod capability_projection;
 #[path = "../src/agent_maintenance/closeout.rs"]
 mod closeout;
+#[path = "../src/agent_maintenance/contract_policy.rs"]
+mod contract_policy;
 #[path = "../src/agent_maintenance/drift/mod.rs"]
 mod drift;
 #[path = "../src/release_doc.rs"]

@@ -211,7 +211,7 @@ pub fn automated_request_with_execution_contract_toml(agent_id: &str, basis_ref:
         concat!(
             "{}\n",
             "[execution_contract]\n",
-            "executor = \"codex\"\n",
+            "executor = \"execute-agent-maintenance\"\n",
             "prompt_template_path = \"cli_manifests/{agent_id}/PR_BODY_TEMPLATE.md\"\n",
             "prompt_sha256 = \"{prompt_sha256}\"\n",
             "pr_summary_path = \"docs/agents/lifecycle/{agent_id}-maintenance/governance/pr-summary.md\"\n",

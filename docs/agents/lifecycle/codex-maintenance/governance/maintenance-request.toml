@@ -26,7 +26,7 @@ dispatch_workflow = "codex-cli-update-snapshot.yml"
 branch_name = "automation/codex-maintenance-0.125.0"
 
 [execution_contract]
-executor = "codex"
+executor = "execute-agent-maintenance"
 prompt_template_path = "cli_manifests/codex/PR_BODY_TEMPLATE.md"
 prompt_sha256 = "252a9de88c1b18791e9a7805b9dfbcf2bba26686a58412db4455cd443f5f3dbc"
 pr_summary_path = "docs/agents/lifecycle/codex-maintenance/governance/pr-summary.md"

@@ -2,6 +2,18 @@
 
 ## Pending
 
+### Decide Whether Maintenance Transport Topology Still Needs Convergence After Worker/Runbook Cleanup
+
+**What:** After the `worker/runbook convergence` milestone lands, decide whether the maintenance transport model itself should change further, including worker split, replay/regeneration surface, and `packet_pr` versus worker-dispatch topology.
+
+**Why:** The current repo now has a stable shared maintenance packet contract, but the next plan review found that the broader transport question is larger than the worker/runbook cleanup milestone. If that decision is not recorded explicitly, it will either get smuggled into the wrong milestone or disappear into vague prose.
+
+**Context:** The 2026-05-10 `/autoplan` for the worker/runbook convergence follow-up recommended keeping the current milestone focused on operational convergence across generator wording, worker docs, branch naming, replay instructions, operator docs, and locking tests. Both the primary review and the independent Codex pass agreed that deciding or changing the transport topology is a separate follow-up question once the operational surface is truthful.
+
+**Effort:** M
+**Priority:** P2
+**Depends on:** Landing `worker/runbook convergence` so the current transport model can be judged from a truthful worker/runbook surface instead of stale docs and stale tests
+
 ### Make Goose The Explicit P1 End-To-End Lifecycle Validation
 
 **What:** Take `docs/agents/lifecycle/goose/governance/approved-agent.toml` through the full repo-owned create lane: `scaffold-wrapper-crate`, `runtime-follow-on`, `prepare-publication`, `refresh-publication`, `prepare-proving-run-closeout`, and `close-proving-run`.

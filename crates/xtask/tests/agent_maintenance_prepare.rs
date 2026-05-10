@@ -13,6 +13,8 @@ mod agent_lifecycle {
 mod agent_registry {
     pub use xtask::agent_registry::*;
 }
+#[path = "../src/agent_maintenance/contract_policy.rs"]
+mod contract_policy;
 #[path = "../src/agent_maintenance/docs.rs"]
 mod docs;
 #[path = "../src/agent_maintenance/prepare.rs"]
@@ -44,7 +46,7 @@ fn prepare_agent_maintenance_builds_packet_first_plan() {
     assert!(request_text.contains("trigger_kind = \"upstream_release_detected\""));
     assert!(request_text.contains("branch_name = \"automation/codex-maintenance-0.98.0\""));
     assert!(request_text.contains("[execution_contract]"));
-    assert!(request_text.contains("executor = \"codex\""));
+    assert!(request_text.contains("executor = \"execute-agent-maintenance\""));
     assert!(
         request_text.contains("prompt_template_path = \"cli_manifests/codex/PR_BODY_TEMPLATE.md\"")
     );
@@ -118,12 +120,19 @@ fn prepare_agent_maintenance_write_creates_packet_root() {
 #[test]
 fn prepare_agent_maintenance_packet_pr_defaults_to_generic_open_pr_workflow() {
     let fixture = fixture_root("prepare-agent-maintenance-packet-pr");
-    seed_registry(&fixture);
+    seed_registry_with(
+        &fixture,
+        &SEEDED_REGISTRY.replace(
+            "dispatch_kind = \"workflow_dispatch\"\ndispatch_workflow = \"codex-cli-update-snapshot.yml\"",
+            "dispatch_kind = \"packet_pr\"",
+        ),
+    );
     seed_support_files(&fixture);
 
     let mut args = args();
     args.dispatch_kind = "packet_pr".to_string();
     args.dispatch_workflow = None;
+    args.opened_from = Path::new(".github/workflows/agent-maintenance-open-pr.yml").to_path_buf();
 
     let plan = build_prepare_plan(&fixture, &args).expect("build plan");
     let request_text = String::from_utf8(plan.files[0].contents.clone()).expect("utf8");
@@ -251,9 +260,13 @@ fn args() -> Args {
 }
 
 fn seed_registry(root: &Path) {
+    seed_registry_with(root, SEEDED_REGISTRY);
+}
+
+fn seed_registry_with(root: &Path, registry: &str) {
     write_text(
         &root.join("crates/xtask/data/agent_registry.toml"),
-        SEEDED_REGISTRY,
+        registry,
     );
 }
 
@@ -261,6 +274,10 @@ fn seed_support_files(root: &Path) {
     write_text(
         &root.join(".github/workflows/codex-cli-update-snapshot.yml"),
         "name: Codex worker\n",
+    );
+    write_text(
+        &root.join(".github/workflows/agent-maintenance-open-pr.yml"),
+        "name: Packet PR worker\n",
     );
     write_text(
         &root.join("cli_manifests/codex/PR_BODY_TEMPLATE.md"),
@@ -314,7 +331,7 @@ fn automated_request_with_execution_contract_toml() -> String {
             "branch_name = \"automation/codex-maintenance-0.98.0\"\n",
             "\n",
             "[execution_contract]\n",
-            "executor = \"codex\"\n",
+            "executor = \"execute-agent-maintenance\"\n",
             "prompt_template_path = \"cli_manifests/codex/PR_BODY_TEMPLATE.md\"\n",
             "prompt_sha256 = \"{prompt_sha256}\"\n",
             "pr_summary_path = \"docs/agents/lifecycle/codex-maintenance/governance/pr-summary.md\"\n",

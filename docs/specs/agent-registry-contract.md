@@ -102,6 +102,9 @@ Dispatch rules:
 - `dispatch_workflow` MUST be present only when `dispatch_kind = "workflow_dispatch"`.
 - `dispatch_workflow` MUST be omitted when `dispatch_kind = "packet_pr"`.
 - `dispatch_workflow`, when present, MUST be a non-empty workflow filename.
+- The registry omission for `packet_pr` is intentional. Packet generation MUST materialize
+  `detected_release.dispatch_workflow = "agent-maintenance-open-pr.yml"` in the request packet so
+  the frozen packet still carries one fully resolved dispatch contract.
 
 Upstream rules:
 

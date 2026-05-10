@@ -1,4 +1,5 @@
 pub mod closeout;
+pub mod contract_policy;
 pub mod docs;
 pub mod drift;
 pub mod execute;

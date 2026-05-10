@@ -86,7 +86,7 @@ Automated upstream-release requests MUST carry one shared `[detected_release]` s
 | `source_kind` | MUST describe the upstream discovery mechanism. |
 | `source_ref` | MUST contain the normalized source identity for the chosen `source_kind`. |
 | `dispatch_kind` | MUST match the registry-owned release-watch dispatch contract. |
-| `dispatch_workflow` | MUST be present for `workflow_dispatch` and omitted for `packet_pr`. |
+| `dispatch_workflow` | MUST be materialized in the packet for both dispatch kinds. `workflow_dispatch` uses the registry-owned worker workflow filename; `packet_pr` uses the shared workflow `agent-maintenance-open-pr.yml`. |
 | `branch_name` | MUST be the PR branch reserved for this maintenance run. |
 
 The detected-release table is universal in structure. Worker-specific transport differences MUST be
@@ -99,7 +99,7 @@ Automated upstream-release requests that are intended for relay execution MUST c
 
 | Field | Rule |
 | --- | --- |
-| `executor` | MUST identify the local relay contract, not the wrapper crate being maintained. |
+| `executor` | MUST identify the local relay contract, not the wrapper crate being maintained. Steady-state packets MUST use `execute-agent-maintenance`. |
 | `prompt_template_path` | MUST be a repo-relative prompt template path. |
 | `prompt_sha256` | MUST match the rendered prompt template digest for `target_version`. |
 | `pr_summary_path` | MUST be the repo-relative PR summary artifact for this maintenance root. |
@@ -127,7 +127,7 @@ built from registry truth. Callers MUST NOT maintain parallel copies of these fa
 | `detected_release.source_kind` | `maintenance.release_watch.upstream.source_kind` | MUST match registry truth. |
 | `detected_release.source_ref` | `maintenance.release_watch.upstream.*` | MUST normalize the chosen upstream source into one comparable value. |
 | `detected_release.dispatch_kind` | `maintenance.release_watch.dispatch_kind` | MUST match registry truth. |
-| `detected_release.dispatch_workflow` | `maintenance.release_watch.dispatch_workflow` | MUST match registry truth when dispatch uses `workflow_dispatch`. |
+| `detected_release.dispatch_workflow` | `maintenance.release_watch.dispatch_workflow` plus shared packet resolver | MUST match registry truth when dispatch uses `workflow_dispatch`, and MUST resolve to `agent-maintenance-open-pr.yml` when dispatch uses `packet_pr`. |
 | `execution_contract.prompt_template_path` | `[[agents]].manifest_root` | MUST derive from the manifest root prompt template path. |
 | `execution_contract.read_only_inputs` | `[[agents]].manifest_root` plus `opened_from` | MUST include the packet-owned playbook, workflow plan, prompt template, and opening workflow path. |
 | `execution_contract.writable_surfaces` | `[[agents]].crate_path`, `[[agents]].manifest_root`, publication flags | MUST be derived from registry-owned write surfaces plus shared maintenance policy. |
@@ -145,7 +145,7 @@ allowed override hooks for v1.
 | --- | --- |
 | `basis_ref` path | Different agents have different manifest roots and validated-version pointers. |
 | `detected_release.source_ref` | Upstreams differ, for example GitHub releases versus GCS object listings. |
-| `detected_release.dispatch_workflow` | Different enrolled agents may still use different worker transport files. |
+| `detected_release.dispatch_workflow` | Different enrolled agents may still use different worker transport files for `workflow_dispatch`, while `packet_pr` materializes the shared `agent-maintenance-open-pr.yml` workflow. |
 | `execution_contract.prompt_template_path` | Each agent may keep its own prompt template under its manifest root. |
 | `execution_contract.writable_surfaces` | Wrapper crate paths, manifest artifacts, and approved spec writes differ by agent. |
 | `execution_contract.read_only_inputs` | Agent-specific playbooks and workflow plans differ by manifest root. |
@@ -194,8 +194,9 @@ target contract in some places.
 
 During the transition to full v1:
 
-- historical or currently generated packets MAY still carry `execution_contract.executor = "codex"`
-- validators MAY continue to accept that legacy executor value temporarily
+- historical packets and compatibility fixtures MAY still carry `execution_contract.executor = "codex"`
+- validators MAY continue to accept that legacy executor value on the read path temporarily
+- newly generated automated packets MUST use `execution_contract.executor = "execute-agent-maintenance"`
 - new contract work MUST treat agent-specific executor naming as a compatibility artifact, not as
   the desired steady-state schema
 

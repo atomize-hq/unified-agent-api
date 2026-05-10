@@ -12,6 +12,12 @@ mod agent_lifecycle {
 mod agent_registry {
     pub use xtask::agent_registry::*;
 }
+#[path = "../src/agent_maintenance/contract_policy.rs"]
+mod contract_policy;
+#[path = "../src/agent_maintenance/request.rs"]
+mod request;
+#[path = "../src/workspace_mutation.rs"]
+mod workspace_mutation;
 
 #[path = "../src/agent_maintenance/watch.rs"]
 mod watch;

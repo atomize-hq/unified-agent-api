@@ -28,7 +28,7 @@ Key references:
 The shipped maintenance path for Claude Code parity is:
 
 1. `.github/workflows/agent-maintenance-release-watch.yml` detects stale `claude_code` parity from registry truth and dispatches `.github/workflows/claude-code-update-snapshot.yml`.
-2. The worker refreshes the Claude Code parity artifacts, runs `prepare-agent-maintenance --write`, and opens branch `automation/claude-code-<target_version>` with PR body `docs/agents/lifecycle/claude_code-maintenance/governance/pr-summary.md`.
+2. The worker refreshes the Claude Code parity artifacts, runs `prepare-agent-maintenance --write`, and opens branch `automation/claude_code-maintenance-<target_version>` with PR body `docs/agents/lifecycle/claude_code-maintenance/governance/pr-summary.md`.
 3. The maintainer reviews `docs/agents/lifecycle/claude_code-maintenance/governance/maintenance-request.toml` and `docs/agents/lifecycle/claude_code-maintenance/HANDOFF.md`, then runs:
 
 ```bash
@@ -67,7 +67,7 @@ Required replay inputs:
 - `opened_from`: the repo-relative worker workflow path, `.github/workflows/claude-code-update-snapshot.yml`
 - `detected_by`: `.github/workflows/agent-maintenance-release-watch.yml`
 - `dispatch_kind`: `workflow_dispatch`
-- `branch_name`: `automation/claude-code-<target_version>`
+- `branch_name`: `automation/claude_code-maintenance-<target_version>`
 
 Responsibilities (high level):
 - Download `manifest.json` and verify integrity (sha256 + size).

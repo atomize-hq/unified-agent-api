@@ -55,7 +55,7 @@ fn automated_request_with_execution_contract_parses_and_validates() {
         .require_execution_contract_for_relay()
         .expect("execution contract");
 
-    assert_eq!(contract.executor, "codex");
+    assert_eq!(contract.executor, "execute-agent-maintenance");
     assert_eq!(
         contract.prompt_template_path,
         "cli_manifests/opencode/PR_BODY_TEMPLATE.md"
@@ -183,13 +183,18 @@ fn automated_request_execution_contract_rejects_non_codex_executor() {
             "opencode",
             "docs/integrations/opencode/governance/seam-2-closeout.md",
         )
-        .replace("executor = \"codex\"", "executor = \"claude_code\""),
+        .replace(
+            "executor = \"execute-agent-maintenance\"",
+            "executor = \"claude_code\"",
+        ),
     );
 
     let err = load_request_envelope(&fixture, Path::new(request_path))
         .expect_err("non-codex executor should fail");
     assert!(err.to_string().contains("execution_contract.executor"));
-    assert!(err.to_string().contains("must be `codex`"));
+    assert!(err
+        .to_string()
+        .contains("must be `execute-agent-maintenance`"));
 }
 
 #[test]
@@ -258,7 +263,9 @@ fn automated_packet_refresh_renders_canonical_handoff_and_pr_summary() {
     assert!(handoff.contains("## Exact green gates"));
     assert!(handoff.contains("## Exact closeout command"));
     assert!(handoff.contains("Follow the maintained PR template for 0.98.0."));
-    assert!(handoff.contains("cli_manifests/opencode/latest_validated.txt"));
+    assert!(handoff.contains(
+        "docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml"
+    ));
 
     let pr_summary = planned_utf8(
         &plan,

@@ -295,8 +295,12 @@ pub fn load_request_envelope(
         validate_actions(&relative_path, &raw.requested_control_plane_actions)?;
     let runtime_followup_required =
         validate_runtime_followup_required(&relative_path, raw.runtime_followup_required)?;
-    let detected_release =
-        validate_detected_release(&relative_path, trigger_kind, raw.detected_release)?;
+    let detected_release = validate_detected_release(
+        registry_entry,
+        &relative_path,
+        trigger_kind,
+        raw.detected_release,
+    )?;
     let execution_contract = validate_execution_contract(
         &workspace_root,
         &jail,

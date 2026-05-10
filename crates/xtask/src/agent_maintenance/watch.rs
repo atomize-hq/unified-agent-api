@@ -13,13 +13,16 @@ use time::{format_description::well_known::Rfc3339, OffsetDateTime};
 use crate::{
     agent_lifecycle::maintenance_request_path,
     agent_registry::{
-        AgentRegistry, AgentRegistryEntry, AgentRegistryError, ReleaseWatchDispatchKind,
-        ReleaseWatchMetadata, ReleaseWatchSourceKind, ReleaseWatchVersionPolicy,
+        AgentRegistry, AgentRegistryEntry, AgentRegistryError, ReleaseWatchMetadata,
+        ReleaseWatchSourceKind, ReleaseWatchVersionPolicy,
     },
 };
 
-const GENERATED_BY_WORKFLOW: &str = ".github/workflows/agent-maintenance-release-watch.yml";
-const GENERIC_PACKET_PR_WORKFLOW: &str = "agent-maintenance-open-pr.yml";
+use super::contract_policy::{
+    dispatch_kind_str, dispatch_workflow_value, opened_from_path, version_policy_str,
+    GENERATED_BY_WORKFLOW,
+};
+
 const QUEUE_SCHEMA_VERSION: u32 = 1;
 
 #[derive(Debug, Parser, Clone)]
@@ -204,7 +207,8 @@ where
             continue;
         }
 
-        let dispatch_workflow = dispatch_workflow_value(&entry.agent_id, release_watch)?;
+        let dispatch_workflow =
+            dispatch_workflow_value(&entry.agent_id, release_watch).map_err(Error::Validation)?;
         let maintenance_root = format!("docs/agents/lifecycle/{}-maintenance", entry.agent_id);
         stale_agents.push(MaintenanceWatchQueueEntry {
             agent_id: entry.agent_id.clone(),
@@ -217,7 +221,7 @@ where
             dispatch_workflow: dispatch_workflow.clone(),
             maintenance_root: maintenance_root.clone(),
             request_path: maintenance_request_path(&entry.agent_id),
-            opened_from: format!(".github/workflows/{dispatch_workflow}"),
+            opened_from: opened_from_path(&dispatch_workflow),
             detected_by: GENERATED_BY_WORKFLOW.to_string(),
             branch_name: format!(
                 "automation/{}-maintenance-{}",
@@ -233,23 +237,6 @@ where
             .map_err(|err| Error::Internal(format!("format queue timestamp: {err}")))?,
         stale_agents,
     })
-}
-
-fn dispatch_workflow_value(
-    agent_id: &str,
-    release_watch: &ReleaseWatchMetadata,
-) -> Result<String, Error> {
-    match release_watch.dispatch_kind {
-        ReleaseWatchDispatchKind::WorkflowDispatch => release_watch
-            .dispatch_workflow
-            .clone()
-            .ok_or_else(|| {
-                Error::Validation(format!(
-                    "maintenance-watch requires dispatch_workflow for agent `{agent_id}` when dispatch_kind = workflow_dispatch"
-                ))
-            }),
-        ReleaseWatchDispatchKind::PacketPr => Ok(GENERIC_PACKET_PR_WORKFLOW.to_string()),
-    }
 }
 
 fn read_current_validated(
@@ -479,19 +466,6 @@ fn write_queue_json(
     bytes.push(b'\n');
     fs::write(&output_path, bytes)
         .map_err(|err| Error::Internal(format!("write {}: {err}", output_path.display())))
-}
-
-fn version_policy_str(value: ReleaseWatchVersionPolicy) -> &'static str {
-    match value {
-        ReleaseWatchVersionPolicy::LatestStableMinusOne => "latest_stable_minus_one",
-    }
-}
-
-fn dispatch_kind_str(value: ReleaseWatchDispatchKind) -> &'static str {
-    match value {
-        ReleaseWatchDispatchKind::WorkflowDispatch => "workflow_dispatch",
-        ReleaseWatchDispatchKind::PacketPr => "packet_pr",
-    }
 }
 
 fn parse_semver(raw: &str, context: &str) -> Result<Version, Error> {

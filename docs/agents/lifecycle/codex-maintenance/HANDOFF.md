@@ -20,7 +20,7 @@ This file is the canonical contributor execution contract for `codex` maintenanc
 ## Relay contract
 
 - request artifact: `docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml`
-- executor: `codex`
+- executor: `execute-agent-maintenance`
 - prompt template path: `cli_manifests/codex/PR_BODY_TEMPLATE.md`
 - prompt sha256: `252a9de88c1b18791e9a7805b9dfbcf2bba26686a58412db4455cd443f5f3dbc`
 - canonical handoff: `docs/agents/lifecycle/codex-maintenance/HANDOFF.md`

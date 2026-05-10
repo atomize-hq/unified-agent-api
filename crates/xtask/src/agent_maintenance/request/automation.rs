@@ -4,6 +4,9 @@ use sha2::{Digest, Sha256};
 
 use crate::{agent_registry::AgentRegistryEntry, workspace_mutation::WorkspacePathJail};
 
+use super::super::contract_policy::{
+    build_execution_contract, derive_detected_release_fields, LEGACY_EXECUTOR_ALIAS,
+};
 use super::{
     raw::{RawDetectedRelease, RawExecutionContract},
     validate::{
@@ -36,31 +39,45 @@ pub(super) fn validate_execution_contract(
                     request_path.display()
                 ))
             })?;
+            let expected_contract = build_execution_contract(
+                workspace_root,
+                registry_entry,
+                &request_path.display().to_string(),
+                &maintenance_root.display().to_string(),
+                &format!(".github/workflows/{}", detected_release.dispatch_workflow),
+                &detected_release.target_version,
+                &detected_release.branch_name,
+            )
+            .map_err(MaintenanceRequestError::Internal)?;
 
             validate_non_empty_scalar(
                 request_path,
                 "execution_contract.executor",
                 &raw_execution_contract.executor,
             )?;
-            if raw_execution_contract.executor != "codex" {
+            let legacy_executor = raw_execution_contract.executor == LEGACY_EXECUTOR_ALIAS;
+            if raw_execution_contract.executor != expected_contract.executor && !legacy_executor {
                 return Err(MaintenanceRequestError::Validation(format!(
-                    "maintenance request `{}` field `execution_contract.executor` must be `codex` in milestone 1",
-                    request_path.display()
+                    "maintenance request `{}` field `execution_contract.executor` must be `{}` (legacy `{}` accepted only for read compatibility)",
+                    request_path.display(),
+                    expected_contract.executor,
+                    LEGACY_EXECUTOR_ALIAS
                 )));
             }
 
-            let expected_prompt_template_path =
-                format!("{}/PR_BODY_TEMPLATE.md", registry_entry.manifest_root);
             validate_repo_relative_reference(
                 jail,
                 request_path,
                 "execution_contract.prompt_template_path",
                 &raw_execution_contract.prompt_template_path,
             )?;
-            if raw_execution_contract.prompt_template_path != expected_prompt_template_path {
+            if raw_execution_contract.prompt_template_path
+                != expected_contract.prompt_template_path
+            {
                 return Err(MaintenanceRequestError::Validation(format!(
-                    "maintenance request `{}` field `execution_contract.prompt_template_path` must be `{expected_prompt_template_path}` for agent `{}`",
+                    "maintenance request `{}` field `execution_contract.prompt_template_path` must be `{}` for agent `{}`",
                     request_path.display(),
+                    expected_contract.prompt_template_path,
                     registry_entry.agent_id
                 )));
             }
@@ -75,46 +92,45 @@ pub(super) fn validate_execution_contract(
                 &detected_release.target_version,
             )?;
             let rendered_prompt_sha256 = hex::encode(Sha256::digest(rendered_prompt.as_bytes()));
-            if raw_execution_contract.prompt_sha256 != rendered_prompt_sha256 {
+            if raw_execution_contract.prompt_sha256 != rendered_prompt_sha256
+                || raw_execution_contract.prompt_sha256 != expected_contract.prompt_sha256
+            {
                 return Err(MaintenanceRequestError::Validation(format!(
-                    "maintenance request `{}` field `execution_contract.prompt_sha256` must match the rendered prompt template digest `{rendered_prompt_sha256}`",
-                    request_path.display()
+                    "maintenance request `{}` field `execution_contract.prompt_sha256` must match the rendered prompt template digest `{}`",
+                    request_path.display(),
+                    expected_contract.prompt_sha256
                 )));
             }
 
-            let expected_pr_summary_path =
-                format!("{}/governance/pr-summary.md", maintenance_root.display());
             validate_repo_relative_glob_path(
                 request_path,
                 "execution_contract.pr_summary_path",
                 &raw_execution_contract.pr_summary_path,
             )?;
-            if raw_execution_contract.pr_summary_path != expected_pr_summary_path {
+            if raw_execution_contract.pr_summary_path != expected_contract.pr_summary_path {
                 return Err(MaintenanceRequestError::Validation(format!(
-                    "maintenance request `{}` field `execution_contract.pr_summary_path` must be `{expected_pr_summary_path}` under the same maintenance root",
-                    request_path.display()
+                    "maintenance request `{}` field `execution_contract.pr_summary_path` must be `{}` under the same maintenance root",
+                    request_path.display(),
+                    expected_contract.pr_summary_path
                 )));
             }
 
-            let expected_closeout_path = format!(
-                "{}/governance/maintenance-closeout.json",
-                maintenance_root.display()
-            );
             validate_repo_relative_glob_path(
                 request_path,
                 "execution_contract.closeout_path",
                 &raw_execution_contract.closeout_path,
             )?;
-            if raw_execution_contract.closeout_path != expected_closeout_path {
+            if raw_execution_contract.closeout_path != expected_contract.closeout_path {
                 return Err(MaintenanceRequestError::Validation(format!(
-                    "maintenance request `{}` field `execution_contract.closeout_path` must be `{expected_closeout_path}` under the same maintenance root",
-                    request_path.display()
+                    "maintenance request `{}` field `execution_contract.closeout_path` must be `{}` under the same maintenance root",
+                    request_path.display(),
+                    expected_contract.closeout_path
                 )));
             }
 
             if !raw_execution_contract.requires_manual_closeout {
                 return Err(MaintenanceRequestError::Validation(format!(
-                    "maintenance request `{}` field `execution_contract.requires_manual_closeout` must be `true` in milestone 1",
+                    "maintenance request `{}` field `execution_contract.requires_manual_closeout` must be `true`",
                     request_path.display()
                 )));
             }
@@ -143,21 +159,61 @@ pub(super) fn validate_execution_contract(
                 &raw_execution_contract.green_gates,
                 true,
             )?;
+            if registry_entry.maintenance.release_watch.is_some() && !legacy_executor {
+                validate_exact_array(
+                    request_path,
+                    "execution_contract.writable_surfaces",
+                    &writable_surfaces,
+                    &expected_contract.writable_surfaces,
+                )?;
+                validate_exact_array(
+                    request_path,
+                    "execution_contract.read_only_inputs",
+                    &read_only_inputs,
+                    &expected_contract.read_only_inputs,
+                )?;
+                validate_exact_array(
+                    request_path,
+                    "execution_contract.ordered_commands",
+                    &ordered_commands,
+                    &expected_contract.ordered_commands,
+                )?;
+                validate_exact_array(
+                    request_path,
+                    "execution_contract.green_gates",
+                    &green_gates,
+                    &expected_contract.green_gates,
+                )?;
+            }
 
             validate_non_empty_scalar(
                 request_path,
                 "execution_contract.recovery.recreate_packet_command",
                 &raw_execution_contract.recovery.recreate_packet_command,
             )?;
+            if registry_entry.maintenance.release_watch.is_some()
+                && !legacy_executor
+                && raw_execution_contract.recovery.recreate_packet_command
+                    != expected_contract.recovery.recreate_packet_command
+            {
+                return Err(MaintenanceRequestError::Validation(format!(
+                    "maintenance request `{}` field `execution_contract.recovery.recreate_packet_command` must be `{}`",
+                    request_path.display(),
+                    expected_contract.recovery.recreate_packet_command
+                )));
+            }
             validate_repo_relative_glob_path(
                 request_path,
                 "execution_contract.recovery.reopen_pr_body_path",
                 &raw_execution_contract.recovery.reopen_pr_body_path,
             )?;
-            if raw_execution_contract.recovery.reopen_pr_body_path != expected_pr_summary_path {
+            if raw_execution_contract.recovery.reopen_pr_body_path
+                != expected_contract.recovery.reopen_pr_body_path
+            {
                 return Err(MaintenanceRequestError::Validation(format!(
-                    "maintenance request `{}` field `execution_contract.recovery.reopen_pr_body_path` must match `execution_contract.pr_summary_path` `{expected_pr_summary_path}`",
-                    request_path.display()
+                    "maintenance request `{}` field `execution_contract.recovery.reopen_pr_body_path` must match `execution_contract.pr_summary_path` `{}`",
+                    request_path.display(),
+                    expected_contract.recovery.reopen_pr_body_path
                 )));
             }
             validate_non_empty_scalar(
@@ -178,27 +234,39 @@ pub(super) fn validate_execution_contract(
                 &raw_execution_contract.recovery.notes,
                 true,
             )?;
+            if registry_entry.maintenance.release_watch.is_some() && !legacy_executor {
+                validate_exact_array(
+                    request_path,
+                    "execution_contract.recovery.notes",
+                    &recovery_notes,
+                    &expected_contract.recovery.notes,
+                )?;
+            }
 
-            Ok(Some(ExecutionContract {
-                executor: raw_execution_contract.executor,
-                prompt_template_path: raw_execution_contract.prompt_template_path,
-                prompt_sha256: raw_execution_contract.prompt_sha256,
-                pr_summary_path: raw_execution_contract.pr_summary_path,
-                closeout_path: raw_execution_contract.closeout_path,
-                requires_manual_closeout: raw_execution_contract.requires_manual_closeout,
-                writable_surfaces,
-                read_only_inputs,
-                ordered_commands,
-                green_gates,
-                recovery: ExecutionContractRecovery {
-                    recreate_packet_command: raw_execution_contract
-                        .recovery
-                        .recreate_packet_command,
-                    reopen_pr_body_path: raw_execution_contract.recovery.reopen_pr_body_path,
-                    reopen_pr_branch: raw_execution_contract.recovery.reopen_pr_branch,
-                    notes: recovery_notes,
-                },
-            }))
+            if legacy_executor {
+                Ok(Some(ExecutionContract {
+                    executor: raw_execution_contract.executor,
+                    prompt_template_path: raw_execution_contract.prompt_template_path,
+                    prompt_sha256: raw_execution_contract.prompt_sha256,
+                    pr_summary_path: raw_execution_contract.pr_summary_path,
+                    closeout_path: raw_execution_contract.closeout_path,
+                    requires_manual_closeout: raw_execution_contract.requires_manual_closeout,
+                    writable_surfaces,
+                    read_only_inputs,
+                    ordered_commands,
+                    green_gates,
+                    recovery: ExecutionContractRecovery {
+                        recreate_packet_command: raw_execution_contract
+                            .recovery
+                            .recreate_packet_command,
+                        reopen_pr_body_path: raw_execution_contract.recovery.reopen_pr_body_path,
+                        reopen_pr_branch: raw_execution_contract.recovery.reopen_pr_branch,
+                        notes: recovery_notes,
+                    },
+                }))
+            } else {
+                Ok(Some(expected_contract))
+            }
         }
         (_, Some(_)) => Err(MaintenanceRequestError::Validation(format!(
             "maintenance request `{}` may only include `[execution_contract]` when `trigger_kind = \"upstream_release_detected\"`",
@@ -209,6 +277,7 @@ pub(super) fn validate_execution_contract(
 }
 
 pub(super) fn validate_detected_release(
+    registry_entry: &AgentRegistryEntry,
     request_path: &Path,
     trigger_kind: TriggerKind,
     raw: Option<RawDetectedRelease>,
@@ -257,7 +326,7 @@ pub(super) fn validate_detected_release(
                 "detected_release.branch_name",
                 &raw.branch_name,
             )?;
-            Ok(Some(DetectedRelease {
+            let raw_detected_release = DetectedRelease {
                 detected_by: raw.detected_by,
                 current_validated: raw.current_validated,
                 target_version: raw.target_version,
@@ -268,7 +337,47 @@ pub(super) fn validate_detected_release(
                 dispatch_kind: raw.dispatch_kind,
                 dispatch_workflow: raw.dispatch_workflow,
                 branch_name: raw.branch_name,
-            }))
+            };
+            if let Some(release_watch) = registry_entry.maintenance.release_watch.as_ref() {
+                let derived = derive_detected_release_fields(&registry_entry.agent_id, release_watch)
+                    .map_err(MaintenanceRequestError::Internal)?;
+                validate_exact_field(
+                    request_path,
+                    "detected_release.version_policy",
+                    &raw_detected_release.version_policy,
+                    &derived.version_policy,
+                )?;
+                validate_exact_field(
+                    request_path,
+                    "detected_release.source_kind",
+                    &raw_detected_release.source_kind,
+                    &derived.source_kind,
+                )?;
+                validate_exact_field(
+                    request_path,
+                    "detected_release.source_ref",
+                    &raw_detected_release.source_ref,
+                    &derived.source_ref,
+                )?;
+                validate_exact_field(
+                    request_path,
+                    "detected_release.dispatch_kind",
+                    &raw_detected_release.dispatch_kind,
+                    &derived.dispatch_kind,
+                )?;
+                validate_exact_field(
+                    request_path,
+                    "detected_release.dispatch_workflow",
+                    &raw_detected_release.dispatch_workflow,
+                    &derived.dispatch_workflow,
+                )?;
+                Ok(Some(super::super::contract_policy::normalize_detected_release(
+                    &raw_detected_release,
+                    &derived,
+                )))
+            } else {
+                Ok(Some(raw_detected_release))
+            }
         }
         (TriggerKind::UpstreamReleaseDetected, None) => Err(MaintenanceRequestError::Validation(
             format!(
@@ -320,4 +429,34 @@ fn render_execution_prompt(
             ))
         })?;
     Ok(prompt_template.replace("{{VERSION}}", target_version))
+}
+
+fn validate_exact_field(
+    request_path: &Path,
+    field_name: &str,
+    actual: &str,
+    expected: &str,
+) -> Result<(), MaintenanceRequestError> {
+    if actual == expected {
+        return Ok(());
+    }
+    Err(MaintenanceRequestError::Validation(format!(
+        "maintenance request `{}` field `{field_name}` must be `{expected}`",
+        request_path.display()
+    )))
+}
+
+fn validate_exact_array(
+    request_path: &Path,
+    field_name: &str,
+    actual: &[String],
+    expected: &[String],
+) -> Result<(), MaintenanceRequestError> {
+    if actual == expected {
+        return Ok(());
+    }
+    Err(MaintenanceRequestError::Validation(format!(
+        "maintenance request `{}` field `{field_name}` must match the shared maintenance contract",
+        request_path.display()
+    )))
 }

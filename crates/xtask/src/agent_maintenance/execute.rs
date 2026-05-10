@@ -20,7 +20,7 @@ use time::{format_description::well_known::Rfc3339, OffsetDateTime};
 
 use crate::workspace_mutation::WorkspaceMutationError;
 
-use super::request;
+use super::{contract_policy::EXECUTE_HOST_SURFACE, request};
 
 pub(super) const EXECUTION_RUNS_ROOT: &str = "docs/agents/.uaa-temp/agent-maintenance/runs";
 pub(super) const INPUT_CONTRACT_FILE_NAME: &str = "input-contract.json";
@@ -35,7 +35,6 @@ pub(super) const CODEX_STDERR_FILE_NAME: &str = "codex-stderr.log";
 pub(super) const WORKFLOW_VERSION: &str = "agent_maintenance_execute_v1";
 pub(super) const CODEX_BINARY_ENV: &str = "XTASK_AGENT_MAINTENANCE_CODEX_BINARY";
 pub(super) const PREFLIGHT_SENTINEL: &str = "UAA_AGENT_MAINTENANCE_PREFLIGHT_OK";
-pub(super) const EXECUTE_HOST_SURFACE: &str = "execute-agent-maintenance";
 
 #[derive(Debug, Parser, Clone)]
 #[command(group(
