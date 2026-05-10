@@ -261,9 +261,8 @@ fn automated_packet_refresh_renders_canonical_handoff_and_pr_summary() {
         "<!-- generated-by: xtask agent-maintenance renderer; source-of-truth: governance/maintenance-request.toml -->"
     ));
     assert!(handoff.contains("maintained agent packet: `opencode`"));
-    assert!(handoff.contains(
-        "local execution host: `local Codex CLI host via execute-agent-maintenance`"
-    ));
+    assert!(handoff
+        .contains("local execution host: `local Codex CLI host via execute-agent-maintenance`"));
     assert!(handoff.contains("## Writable surfaces"));
     assert!(handoff.contains("## Read-only inputs"));
     assert!(handoff.contains("## Ordered repo commands"));

@@ -1,8 +1,8 @@
-<!-- generated-by: xtask refresh-agent; owner: control-plane -->
+<!-- generated-by: xtask agent-maintenance renderer; source-of-truth: governance/maintenance-request.toml -->
 
 # Scope brief
 
-This automated maintenance lane is limited to the contributor-ready packet and the worker-owned parity surfaces for `codex`.
+This automated maintenance lane is limited to the frozen shared packet for `codex` and the declared writable surfaces below.
 
 ## Writable surfaces
 

@@ -99,6 +99,7 @@ Required top-level fields:
 
 Dispatch rules:
 
+- The only live scheduled release-detection entrypoint is `.github/workflows/agent-maintenance-release-watch.yml`. Per-agent watcher workflows MUST NOT be treated as active release-watch entrypoints.
 - `dispatch_workflow` MUST be present only when `dispatch_kind = "workflow_dispatch"`.
 - `dispatch_workflow` MUST be omitted when `dispatch_kind = "packet_pr"`.
 - `dispatch_workflow`, when present, MUST be a non-empty workflow filename.

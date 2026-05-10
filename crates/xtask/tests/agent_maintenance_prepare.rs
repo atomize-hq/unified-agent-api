@@ -85,9 +85,8 @@ fn prepare_agent_maintenance_write_creates_packet_root() {
     assert!(handoff.contains("This file is the canonical contributor execution contract"));
     assert!(handoff.contains("## Relay contract"));
     assert!(handoff.contains("maintained agent packet: `codex`"));
-    assert!(handoff.contains(
-        "local execution host: `local Codex CLI host via execute-agent-maintenance`"
-    ));
+    assert!(handoff
+        .contains("local execution host: `local Codex CLI host via execute-agent-maintenance`"));
     assert!(handoff.contains("## Writable surfaces"));
     assert!(handoff.contains("## Read-only inputs"));
     assert!(handoff.contains("## Ordered repo commands"));

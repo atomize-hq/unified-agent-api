@@ -1,4 +1,4 @@
-<!-- generated-by: xtask refresh-agent; owner: control-plane -->
+<!-- generated-by: xtask agent-maintenance renderer; source-of-truth: governance/maintenance-request.toml -->
 
 # PR summary
 
@@ -8,16 +8,19 @@ Automated maintenance packet for `codex` target `0.125.0`.
 - request artifact: `docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml`
 - branch: `automation/codex-maintenance-0.125.0`
 - opened from: `.github/workflows/codex-cli-update-snapshot.yml`
-- prompt sha256: `252a9de88c1b18791e9a7805b9dfbcf2bba26686a58412db4455cd443f5f3dbc`
+- prompt sha256: `af8a8a993c4d0fe8cf4197061be18690d46cf738e7671a5a8c991f65884a9e4c`
 
 ## Next step
 
 Follow `docs/agents/lifecycle/codex-maintenance/HANDOFF.md` exactly. This PR summary is derivative from the same execution-packet renderer.
 
-## Exact coding-agent prompt
+## Exact maintained-agent prompt
 
 ```md
-# Codex CLI Parity PR Body Template (for `automation/codex-cli-<version>` PRs)
+# Codex CLI Parity PR Body Template (for `automation/codex-maintenance-<target_version>` PRs)
+
+This template renders the generated PR body at `docs/agents/lifecycle/codex-maintenance/governance/pr-summary.md`.
+`docs/agents/lifecycle/codex-maintenance/HANDOFF.md` remains canonical; the generated PR summary is derivative.
 
 @codex
 

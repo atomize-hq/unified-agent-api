@@ -1,4 +1,4 @@
-<!-- generated-by: xtask refresh-agent; owner: control-plane -->
+<!-- generated-by: xtask agent-maintenance renderer; source-of-truth: governance/maintenance-request.toml -->
 
 # Threading
 

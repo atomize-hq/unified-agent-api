@@ -1,4 +1,4 @@
-<!-- generated-by: xtask refresh-agent; owner: control-plane -->
+<!-- generated-by: xtask agent-maintenance renderer; source-of-truth: governance/maintenance-request.toml -->
 
 # codex maintenance
 
@@ -10,8 +10,8 @@ This packet tracks automated upstream-release maintenance for `codex`.
 - trigger kind: `upstream_release_detected`
 - basis ref: `cli_manifests/codex/latest_validated.txt`
 - opened from: `.github/workflows/codex-cli-update-snapshot.yml`
-- recorded at: `2026-05-07T06:24:24Z`
-- request commit: `1e44a63ca3d2b0de4686725ca7a79793b90f8b57`
+- recorded at: `2026-05-10T23:22:00Z`
+- request commit: `99b0979bcf13f83b9c0545da6a9cdf9637dcbd97`
 
 ## Trigger context
 

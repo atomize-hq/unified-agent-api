@@ -1,4 +1,4 @@
-<!-- generated-by: xtask refresh-agent; owner: control-plane -->
+<!-- generated-by: xtask agent-maintenance renderer; source-of-truth: governance/maintenance-request.toml -->
 
 # Handoff
 
@@ -19,10 +19,12 @@ This file is the canonical contributor execution contract for `codex` maintenanc
 
 ## Relay contract
 
+- maintained agent packet: `codex`
+- local execution host: `local Codex CLI host via execute-agent-maintenance`
+- executor surface: `execute-agent-maintenance`
 - request artifact: `docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml`
-- executor: `execute-agent-maintenance`
 - prompt template path: `cli_manifests/codex/PR_BODY_TEMPLATE.md`
-- prompt sha256: `252a9de88c1b18791e9a7805b9dfbcf2bba26686a58412db4455cd443f5f3dbc`
+- prompt sha256: `af8a8a993c4d0fe8cf4197061be18690d46cf738e7671a5a8c991f65884a9e4c`
 - canonical handoff: `docs/agents/lifecycle/codex-maintenance/HANDOFF.md`
 - derivative pr summary: `docs/agents/lifecycle/codex-maintenance/governance/pr-summary.md`
 - exact closeout artifact: `docs/agents/lifecycle/codex-maintenance/governance/maintenance-closeout.json`
@@ -74,8 +76,8 @@ This file is the canonical contributor execution contract for `codex` maintenanc
 - reopen pr body path: `docs/agents/lifecycle/codex-maintenance/governance/pr-summary.md`
 - reopen pr branch: `automation/codex-maintenance-0.125.0`
 - notes:
-- If PR creation fails after packet generation, rerun packet creation and reopen the PR from the generated pr-summary path.
-- If local Codex preflight fails, fix binary/auth and rerun execute-agent-maintenance --dry-run before write mode.
+- If PR creation fails after packet generation, rerun packet regeneration from the frozen request and reopen the PR from the generated pr-summary path.
+- If the local execution-host preflight (local Codex CLI host via execute-agent-maintenance) fails, fix the Codex binary/auth state and rerun `execute-agent-maintenance --dry-run` before write mode.
 
 ## Exact closeout command
 
@@ -83,10 +85,13 @@ This file is the canonical contributor execution contract for `codex` maintenanc
 cargo run -p xtask -- close-agent-maintenance --request docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml --closeout docs/agents/lifecycle/codex-maintenance/governance/maintenance-closeout.json
 ```
 
-## Exact coding-agent prompt
+## Exact maintained-agent prompt
 
 ```md
-# Codex CLI Parity PR Body Template (for `automation/codex-cli-<version>` PRs)
+# Codex CLI Parity PR Body Template (for `automation/codex-maintenance-<target_version>` PRs)
+
+This template renders the generated PR body at `docs/agents/lifecycle/codex-maintenance/governance/pr-summary.md`.
+`docs/agents/lifecycle/codex-maintenance/HANDOFF.md` remains canonical; the generated PR summary is derivative.
 
 @codex
 

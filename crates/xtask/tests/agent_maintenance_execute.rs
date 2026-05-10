@@ -112,9 +112,8 @@ fn execute_agent_maintenance_dry_run_locks_relay_wording_and_distinction() {
         .map(|doc| doc.contents.as_str())
         .expect("handoff contents");
     assert!(handoff.contains("maintained agent packet: `codex`"));
-    assert!(handoff.contains(
-        "local execution host: `local Codex CLI host via execute-agent-maintenance`"
-    ));
+    assert!(handoff
+        .contains("local execution host: `local Codex CLI host via execute-agent-maintenance`"));
     assert!(handoff.contains(
         "If PR creation fails after packet generation, rerun packet regeneration from the frozen request and reopen the PR from the generated pr-summary path."
     ));
@@ -299,12 +298,11 @@ fn execute_agent_maintenance_write_ignores_generated_python_bytecode_caches() {
 fn execute_agent_maintenance_closeout_harness_keeps_claude_code_recovery_parity() {
     let harness_source = include_str!("support/agent_maintenance_closeout_harness.rs");
 
-    assert!(harness_source.contains(
-        "branch_name = \\\"automation/{agent_id}-maintenance-0.98.0\\\""
-    ));
-    assert!(harness_source.contains(
-        "prompt_template_path = \\\"cli_manifests/{agent_id}/PR_BODY_TEMPLATE.md\\\""
-    ));
+    assert!(
+        harness_source.contains("branch_name = \\\"automation/{agent_id}-maintenance-0.98.0\\\"")
+    );
+    assert!(harness_source
+        .contains("prompt_template_path = \\\"cli_manifests/{agent_id}/PR_BODY_TEMPLATE.md\\\""));
     assert!(harness_source.contains(
         "pr_summary_path = \\\"docs/agents/lifecycle/{agent_id}-maintenance/governance/pr-summary.md\\\""
     ));

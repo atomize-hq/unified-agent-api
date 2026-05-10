@@ -5,8 +5,8 @@ use sha2::Digest;
 use crate::agent_registry::{AgentRegistry, AgentRegistryEntry};
 
 use super::contract_policy::{
-    build_execution_contract_for_request, render_prompt_template, EXECUTION_HOST_LABEL,
-    EXECUTE_HOST_SURFACE,
+    build_execution_contract_for_request, render_prompt_template, EXECUTE_HOST_SURFACE,
+    EXECUTION_HOST_LABEL,
 };
 use super::request::{ExecutionContract, MaintenanceRequest, MaintenanceRequestEnvelope};
 

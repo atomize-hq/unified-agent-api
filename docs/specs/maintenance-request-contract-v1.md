@@ -71,6 +71,8 @@ For release-watch packets in this milestone:
 - `requested_control_plane_actions` MUST remain `["packet_doc_refresh"]`
 - the packet MUST describe implementation and relay work through `[execution_contract]`, not by
   expanding `requested_control_plane_actions` into a second command queue
+- `HANDOFF.md` under the maintenance root MUST remain the canonical contributor execution
+  contract, while `governance/pr-summary.md` MUST remain derivative from the same packet context
 
 ## Universal detected-release fields
 
@@ -113,6 +115,9 @@ Automated upstream-release requests that are intended for relay execution MUST c
 
 The relay MUST validate packet contents against this contract and MUST NOT derive a second hidden
 write envelope or gate set from `agent_id`.
+
+Recovery notes rendered into the packet SHOULD describe execution-host repair in terms of the
+local execution host, not the maintained agent being updated.
 
 ## Registry-derived fields
 
