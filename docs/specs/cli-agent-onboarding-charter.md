@@ -16,6 +16,7 @@ Procedure note:
 - if the charter and an operator step summary ever diverge, the charter and `docs/specs/**` own the contract truth
 
 Maintenance request note:
+- the canonical automated maintenance packet contract lives in `docs/specs/maintenance-request-contract-v1.md`
 - maintainer-authored maintenance requests remain valid under the legacy request format
 - automated release-watch maintenance requests use `artifact_version = "2"` and `trigger_kind = "upstream_release_detected"`
 - automated release-watch requests MUST carry a `[detected_release]` table and MUST freeze `requested_control_plane_actions = ["packet_doc_refresh"]`
@@ -32,6 +33,7 @@ Maintenance request note:
 ## Normative references
 
 - `docs/specs/agent-registry-contract.md`
+- `docs/specs/maintenance-request-contract-v1.md`
 - `docs/specs/unified-agent-api/capabilities-schema-spec.md`
 - `docs/specs/unified-agent-api/extensions-spec.md`
 

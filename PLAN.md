@@ -1,703 +1,499 @@
-# PLAN - Prove The Real Codex Stale-Maintenance Path
+# PLAN - Packet-First Contract With Narrow C-Tail
 
-Status: proposed
-Date: 2026-05-06
-Branch: `codex/recommend-next-agent`
-Base branch: `main`
-Repo: `atomize-hq/unified-agent-api`
-Work item: `Validate the real shared-watcher -> Codex maintenance PR -> maintainer relay path`
-Plan commit baseline: `75aa237`
-Design input: `/Users/spensermcconnell/.gstack/projects/atomize-hq-unified-agent-api/spensermcconnell-codex-recommend-next-agent-design-20260506-091624.md`
-Review addendum: `/Users/spensermcconnell/.gstack/projects/atomize-hq-unified-agent-api/spensermcconnell-codex-recommend-next-agent-eng-review-test-plan-20260506-092335.md`
-Supersedes: the 2026-05-05 relay-implementation `PLAN.md`. That plan mostly described work that is already landed on this branch. This plan is the honest next seam: prove the live path.
+Status: proposed  
+Date: 2026-05-10  
+Branch: `staging`  
+Base branch: `main`  
+Repo: `atomize-hq/unified-agent-api`  
+Work item: `Make the maintenance request packet plus relay contract the single source of truth for live maintenance enrollment`  
+Plan commit baseline: `492356c`  
+Design input: `/Users/spensermcconnell/.gstack/projects/atomize-hq-unified-agent-api/spensermcconnell-staging-design-20260510-101355.md`  
+Supersedes: the current repo-root `PLAN.md`, which is about the older Codex stale-maintenance proof milestone and is no longer the right plan of record for `staging`.
 
 ## Objective
 
-Prove one boring, real, end-to-end Codex maintenance path:
+Land the approved `packet-first-contract-with-c-tail` milestone.
 
-```text
-GitHub schedule on main
-  -> shared watcher runs from default-branch workflow definition
-  -> watcher checks out staging
-  -> maintenance-watch emits stale codex queue entry
-  -> watcher dispatches codex worker with frozen queue fields
-  -> worker checks out staging
-  -> worker opens automation/codex-maintenance-<target_version> PR from generated packet docs
-  -> maintainer opens the PR, reads HANDOFF.md, runs execute-agent-maintenance --dry-run
-  -> maintainer reruns execute-agent-maintenance --write --run-id <prepared_run_id>
-  -> maintainer reviews the diff
-  -> flow stops before close-agent-maintenance
-```
+The repo already has a real maintenance factory:
 
-Success is not "the code looks ready." Success is one real scheduled proof with captured evidence, with the manual closeout boundary still intact.
+- shared watcher: `.github/workflows/agent-maintenance-release-watch.yml`
+- live workers: `.github/workflows/codex-cli-update-snapshot.yml`, `.github/workflows/claude-code-update-snapshot.yml`
+- packet builder: `crates/xtask/src/agent_maintenance/prepare.rs`
+- packet validator: `crates/xtask/src/agent_maintenance/request/automation.rs`
+- local relay: `crates/xtask/src/agent_maintenance/execute.rs`
+
+The problem is not missing machinery. The problem is split truth. The contract doc says the packet and relay should be shared, but the code and generated artifacts still leak milestone-1 assumptions like `execution_contract.executor = "codex"` and duplicated command/gate derivation.
+
+This milestone fixes that seam without trying to unify all workers or rewrite every maintainer doc.
 
 ## Success Criteria
 
-1. A `schedule` event on `.github/workflows/agent-maintenance-release-watch.yml` runs from the default branch workflow definition.
-2. That scheduled watcher run checks out `staging`, not the triggering ref.
-3. The queue job emits a stale `codex` entry with:
-   - `current_validated = 0.97.0`
-   - `version_policy = latest_stable_minus_one`
-   - `dispatch_workflow = codex-cli-update-snapshot.yml`
-   - `branch_name = automation/codex-maintenance-<target_version>`
-4. The emitted `target_version` matches runtime release truth on the day of the run. The current expected value is `0.127.0`, but runtime watcher output wins.
-5. The dispatch job calls the Codex worker without hand-fabricated downstream inputs.
-6. The Codex worker opens a PR whose body comes from `docs/agents/lifecycle/codex-maintenance/governance/pr-summary.md`.
-7. That PR contains:
-   - `docs/agents/lifecycle/codex-maintenance/HANDOFF.md`
-   - `docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml`
-   - `docs/agents/lifecycle/codex-maintenance/governance/pr-summary.md`
-8. A maintainer can run `execute-agent-maintenance --dry-run` from repo root on the PR branch and obtain a prepared run packet under `docs/agents/.uaa-temp/agent-maintenance/runs/<run_id>/`.
-9. A maintainer can run `execute-agent-maintenance --write --run-id <prepared_run_id>` and the relay stays inside its declared write envelope.
-10. No automatic closeout occurs. `close-agent-maintenance` remains manual and untouched.
-11. The temporary cron acceleration on `main` is reverted after the scheduled proof succeeds and the PR exists.
-
-## Current Truth This Plan Locks In
-
-These are the facts this plan treats as authoritative:
-
-1. Scheduled GitHub Actions workflows run from the default branch workflow definition, not this feature branch. A cron-only tweak on `codex/recommend-next-agent` does not prove the real path.
-2. `.github/workflows/agent-maintenance-release-watch.yml` currently checks out `staging`.
-3. `.github/workflows/codex-cli-update-snapshot.yml` also checks out `staging`, even when dispatched from another ref.
-4. `cli_manifests/codex/latest_validated.txt` is currently `0.97.0`.
-5. `crates/xtask/data/agent_registry.toml` records Codex maintenance policy as `version_policy = "latest_stable_minus_one"` with `dispatch_workflow = "codex-cli-update-snapshot.yml"`.
-6. On 2026-05-06, the preflight release check saw stable upstream tag `rust-v0.128.0`, so the current expected target is `0.127.0`. That value is advisory only. The scheduled watcher output is the runtime truth.
-7. Manual closeout is still the trust boundary. `execute-agent-maintenance --write` must stop before `close-agent-maintenance`.
+1. `prepare-agent-maintenance` emits Codex and Claude Code automated packets with one shared top-level envelope, one shared `[detected_release]` field set, and one shared `[execution_contract]` field set.
+2. Newly generated packets use one shared relay executor identity, not an agent-specific wrapper identity.
+3. `execute-agent-maintenance` validates the shared executor identity without requiring target-agent-specific branching.
+4. Packet-owned fields that are currently hardcoded are derived from registry truth or one shared maintenance-policy module:
+   - `detected_release.version_policy`
+   - `detected_release.source_kind`
+   - `detected_release.source_ref`
+   - `detected_release.dispatch_kind`
+   - `detected_release.dispatch_workflow`
+   - `execution_contract.writable_surfaces`
+   - `execution_contract.read_only_inputs`
+   - `execution_contract.ordered_commands`
+   - `execution_contract.green_gates`
+   - `execution_contract.recovery.*`
+5. Normative docs under `docs/specs/**` match the live packet behavior. No spec/code contradiction remains around executor identity or packet transport metadata.
+6. Generated maintainer surfaces stay in lockstep:
+   - `docs/agents/lifecycle/*-maintenance/governance/maintenance-request.toml`
+   - `docs/agents/lifecycle/*-maintenance/HANDOFF.md`
+   - `docs/agents/lifecycle/*-maintenance/governance/pr-summary.md`
+7. Regression coverage proves:
+   - Codex packet generation
+   - Claude Code packet generation
+   - `workflow_dispatch` transport
+   - `packet_pr` transport
+   - legacy packet compatibility for already-committed artifacts
+   - prompt-digest and write-envelope fail-closed behavior
+8. The follow-up milestone is recorded explicitly as `worker/runbook convergence`, not implied by vague TODO prose.
 
 ## Step 0 Scope Challenge
-
-### What This Plan Is
-
-- one execution plan for the real scheduled watcher path
-- one explicit branch-coordination story across `main`, `staging`, and the generated automation branch
-- one proof that the generated PR and the local maintainer relay compose correctly
-- one cleanup path that removes the temporary schedule acceleration as soon as the scheduled proof is done
-
-### What This Plan Is Not
-
-- another relay feature implementation plan
-- a `workflow_dispatch` success story disguised as scheduled proof
-- a worker-only proof that skips the stale watcher
-- a version-policy redesign
-- an automatic closeout plan
-- a new maintenance architecture
 
 ### What Already Exists
 
 | Sub-problem | Existing surface | Reuse decision |
 | --- | --- | --- |
-| stale-agent detection | `crates/xtask/src/agent_maintenance/watch.rs` | Reuse exactly. This plan proves it, it does not redesign it. |
-| queue field freezing | `crates/xtask/tests/agent_maintenance_watch.rs` | Reuse as local proof that expected queue fields are already encoded. |
-| request + execution contract truth | `crates/xtask/src/agent_maintenance/request.rs` | Reuse exactly. The live proof must consume this request surface, not a synthetic packet. |
-| packet generation | `crates/xtask/src/agent_maintenance/prepare.rs` | Reuse exactly. The worker already writes the packet and request from repo-owned truth. |
-| packet rendering consistency | `crates/xtask/tests/agent_maintenance_prepare.rs` | Reuse as fail-closed proof for `HANDOFF.md`, `pr-summary.md`, and prompt digest lockstep. |
-| maintainer relay | `crates/xtask/src/agent_maintenance/execute.rs` | Reuse exactly. The proof must run this command, not an ad hoc substitute. |
-| relay boundary + gate coverage | `crates/xtask/tests/agent_maintenance_execute.rs` | Reuse as local proof that path jail, prompt digest, and manual closeout boundary already exist. |
-| scheduled watcher | `.github/workflows/agent-maintenance-release-watch.yml` | Reuse with one temporary cron acceleration only. |
-| worker PR creation | `.github/workflows/codex-cli-update-snapshot.yml` and `.github/workflows/agent-maintenance-open-pr.yml` | Reuse exactly. The live proof must dispatch the existing workflow path. |
-| maintainer operating contract | `cli_manifests/codex/OPS_PLAYBOOK.md` | Reuse as the human-facing policy and replay surface. |
+| Release-watch enrollment truth | [`crates/xtask/data/agent_registry.toml`](/Users/spensermcconnell/__Active_Code/atomize-hq/unified-agent-api/crates/xtask/data/agent_registry.toml) | Reuse. Registry remains the only enrollment source. |
+| Shared stale-agent queue | [`crates/xtask/src/agent_maintenance/watch.rs`](/Users/spensermcconnell/__Active_Code/atomize-hq/unified-agent-api/crates/xtask/src/agent_maintenance/watch.rs) | Reuse. No new watcher architecture. |
+| Packet parsing + validation | [`crates/xtask/src/agent_maintenance/request.rs`](/Users/spensermcconnell/__Active_Code/atomize-hq/unified-agent-api/crates/xtask/src/agent_maintenance/request.rs), [`request/automation.rs`](/Users/spensermcconnell/__Active_Code/atomize-hq/unified-agent-api/crates/xtask/src/agent_maintenance/request/automation.rs) | Reuse and tighten. Remove milestone-1 assumptions here. |
+| Packet generation | [`crates/xtask/src/agent_maintenance/prepare.rs`](/Users/spensermcconnell/__Active_Code/atomize-hq/unified-agent-api/crates/xtask/src/agent_maintenance/prepare.rs) | Reuse and refactor. This is the main code seam. |
+| Generated packet docs | [`crates/xtask/src/agent_maintenance/docs.rs`](/Users/spensermcconnell/__Active_Code/atomize-hq/unified-agent-api/crates/xtask/src/agent_maintenance/docs.rs) | Reuse and deduplicate against packet policy code. |
+| Relay execution boundary | [`crates/xtask/src/agent_maintenance/execute.rs`](/Users/spensermcconnell/__Active_Code/atomize-hq/unified-agent-api/crates/xtask/src/agent_maintenance/execute.rs) | Reuse. Keep dry-run/write/manual-closeout boundary intact. |
+| Live watcher and worker transport | [`.github/workflows/agent-maintenance-release-watch.yml`](/Users/spensermcconnell/__Active_Code/atomize-hq/unified-agent-api/.github/workflows/agent-maintenance-release-watch.yml), [`.github/workflows/codex-cli-update-snapshot.yml`](/Users/spensermcconnell/__Active_Code/atomize-hq/unified-agent-api/.github/workflows/codex-cli-update-snapshot.yml), [`.github/workflows/claude-code-update-snapshot.yml`](/Users/spensermcconnell/__Active_Code/atomize-hq/unified-agent-api/.github/workflows/claude-code-update-snapshot.yml), [`.github/workflows/agent-maintenance-open-pr.yml`](/Users/spensermcconnell/__Active_Code/atomize-hq/unified-agent-api/.github/workflows/agent-maintenance-open-pr.yml) | Reuse as transport only. No worker convergence in this milestone. |
+| Normative packet contract | [`docs/specs/maintenance-request-contract-v1.md`](/Users/spensermcconnell/__Active_Code/atomize-hq/unified-agent-api/docs/specs/maintenance-request-contract-v1.md) | Reuse as canonical contract, but tighten it to the actual implementation target. |
+| Registry schema contract | [`docs/specs/agent-registry-contract.md`](/Users/spensermcconnell/__Active_Code/atomize-hq/unified-agent-api/docs/specs/agent-registry-contract.md) | Reuse with narrow clarifications only. |
 
 ### Minimum Complete Change
 
-The minimum complete plan is:
+The minimum complete milestone is:
 
-1. run local automated preflight against the already-landed maintenance code
-2. make the proof baseline real on `staging`
-3. temporarily accelerate the watcher cron on `main`
-4. wait for one real scheduled run
-5. inspect the generated Codex maintenance PR
-6. run maintainer `--dry-run` and `--write` on that PR branch
-7. capture evidence and revert the temporary cron tweak
+1. define one shared packet/relay policy source in `xtask`
+2. make packet generation and validation consume that source
+3. make generated maintainer docs consume that same source
+4. update the normative contract docs to match the chosen steady-state packet shape
+5. add the regression coverage proving Codex and Claude Code now share the same contract shape
 
-Anything smaller proves less than the repo claims.
+Anything smaller leaves hidden truth behind.
 
 ### Complexity Check
 
-This plan is operationally multi-branch, but permanent code-touch complexity is low:
+This will touch more than 8 files. That is acceptable here because the current problem is cross-surface contract drift. Pretending this can be fixed in two files is how the repo got split truth in the first place.
 
-- one temporary workflow schedule change on `main`
-- no new services
-- no new long-lived abstractions
-- no new permanent automation unless the live proof exposes a defect
+The important constraint is different:
 
-That is the right shape. Boring by default.
+- no new infrastructure
+- at most one new `xtask` helper module for shared packet policy
+- no new workflow family
+- no new registry-owned freeform command arrays
+
+That keeps the change engineered enough, not ornamental.
 
 ### Search / Build Decision
 
-- **[Layer 1]** Accept GitHub's native `schedule` semantics. Do not invent a branch-local workaround.
-- **[Layer 1]** Reuse the shared watcher queue and worker dispatch path. Do not create a proof-only trigger.
-- **[Layer 1]** Reuse `execute-agent-maintenance --dry-run|--write` as the only maintainer execution surface.
-- **[Layer 3]** The real bug was not missing relay code. It was reasoning about branch-local cron edits as if scheduled workflows honored them. They do not.
+- **[Layer 1]** Reuse the existing watcher, worker, packet, and relay surfaces. No new maintenance control plane.
+- **[Layer 1]** Keep workflow YAML transport-only. Do not move gates or write-envelope truth into workflow inputs.
+- **[Layer 1]** Keep registry truth in `agent_registry.toml`. Do not create a second maintenance-contract store.
+- **[Layer 3]** Treat `execution_contract.executor` as the relay identity, not the maintained agent identity. The executor field is naming *who executes the packet contract*, not *which agent is being updated*.
 
 ### Distribution Check
 
-No new distributable artifact is introduced here.
+No new user-distributed artifact is introduced.
 
-The deliverables are:
+The deliverables are internal control-plane truth surfaces:
 
-- one scheduled GitHub Actions watcher run
-- one real Codex maintenance PR
-- one maintainer relay evidence run under `docs/agents/.uaa-temp/agent-maintenance/runs/<run_id>/`
+- normative docs under `docs/specs/**`
+- `xtask` packet generation and validation code
+- generated maintainer packet docs under `docs/agents/lifecycle/*-maintenance/**`
 
 ## Locked Decisions
 
-1. The success path is a real `schedule` event, not `workflow_dispatch`.
-2. `workflow_dispatch` is allowed only for debugging after a scheduled failure. It does not satisfy success criteria.
-3. The proof must respect the repo's real branch topology:
-   - `main` owns the scheduled workflow definition
-   - `staging` is the code the watcher and worker actually execute
-   - `automation/codex-maintenance-<target_version>` is the generated maintainer branch
-4. The target version is captured from live queue output at execution time. The plan does not hard-code `0.120.0` or any other stale design value.
-5. The shared watcher and Codex worker remain unchanged unless the proof exposes a real defect.
-6. The generated maintenance PR is the maintainer entrypoint. No synthetic hand-authored packet is allowed.
-7. `execute-agent-maintenance --dry-run` is mandatory before `--write`.
-8. `execute-agent-maintenance --write` must reuse one prepared `run_id`.
-9. The relay stops before `close-agent-maintenance`.
-10. The temporary cron acceleration is reverted immediately after the scheduled watcher and worker proof are complete and the PR exists. The local maintainer proof continues after the revert.
-11. The generated PR stays open by default after proof. It is a real maintenance branch unless a maintainer explicitly declares it validation-only.
+These are the decisions that remove ambiguity from the design doc.
+
+1. `execution_contract.executor` will be the shared relay identifier `execute-agent-maintenance`.
+2. `prepare-agent-maintenance` will emit only `execute-agent-maintenance` for new packets.
+3. Request validation will accept legacy `executor = "codex"` only as a backward-compatibility alias for already-committed packets and fixtures. Refreshing or regenerating a packet must normalize it to `execute-agent-maintenance`.
+4. `detected_release.dispatch_workflow` will be present in the request packet for both dispatch kinds:
+   - `workflow_dispatch` uses the registry-owned worker workflow filename
+   - `packet_pr` uses the shared derived value `agent-maintenance-open-pr.yml`
+5. The registry schema stays strict:
+   - registry continues to omit `dispatch_workflow` for `packet_pr`
+   - packet generation resolves the final workflow path
+6. `ordered_commands` and `green_gates` remain shared-policy-generated in Rust. They will not move into freeform registry string arrays in this milestone.
+7. `version_policy` in the packet will be read from registry truth, not hardcoded in `prepare.rs`.
+8. Narrow C-tail means only docs that currently lie about the live topology or contract truth get edited. No broad runbook rewrite.
+9. The explicit follow-up milestone after this lands is `worker/runbook convergence`.
 
 ## Architecture
 
-### End-To-End Proof Flow
+### Current Drift
 
 ```text
-main
-  -> .github/workflows/agent-maintenance-release-watch.yml
-  -> schedule event fires
-  -> watcher job checks out staging
-  -> cargo run -p xtask -- maintenance-watch --emit-json _ci_tmp/maintenance-watch.json
-  -> queue entry for codex
-       current_validated = 0.97.0
-       latest_stable = <runtime truth>
-       target_version = <runtime truth - 1>
-       dispatch_workflow = codex-cli-update-snapshot.yml
-  -> actions.createWorkflowDispatch(workflow_id = codex-cli-update-snapshot.yml, ref = staging)
-  -> worker job checks out staging
-  -> prepare-agent-maintenance --write
-  -> writes maintenance-request.toml + HANDOFF.md + pr-summary.md
-  -> opens automation/codex-maintenance-<target_version> PR
-  -> maintainer checks out PR branch locally
-  -> execute-agent-maintenance --dry-run
-  -> capture run_id + prepared packet
-  -> execute-agent-maintenance --write --run-id <same run_id>
-  -> green gates pass
-  -> maintainer reviews diff
-  -> stop before close-agent-maintenance
+agent_registry.toml
+  -> watcher queue
+  -> prepare.rs
+       -> hardcodes version_policy
+       -> hardcodes executor = "codex"
+       -> derives gates/write set in one place
+  -> request/automation.rs
+       -> enforces milestone-1 executor = "codex"
+  -> docs.rs
+       -> derives similar gates/commands again
+  -> generated HANDOFF.md / pr-summary.md
+  -> execute-agent-maintenance
+
+Result:
+  one intended contract
+  but multiple partially independent derivations
 ```
 
-### Branch Topology
+### Target Shape
 
 ```text
-main
-  owns:
-    - scheduled workflow definition
-    - temporary cron acceleration commit
-    - cron revert commit
+agent_registry.toml
+  -> shared contract-policy module
+       -> resolved detected_release values
+       -> shared executor id
+       -> writable surfaces
+       -> read-only inputs
+       -> ordered_commands
+       -> green_gates
+       -> recovery metadata
+  -> prepare.rs
+  -> request/automation.rs
+  -> docs.rs
+  -> closeout/render.rs (read path only if needed)
+  -> generated request + HANDOFF + pr-summary
+  -> execute-agent-maintenance
 
-staging
-  owns:
-    - watcher code actually executed by the scheduled run
-    - worker code actually executed by the dispatched run
-    - proof baseline commit or deliberate descendant
-
-automation/codex-maintenance-<target_version>
-  owns:
-    - generated maintenance packet
-    - generated PR body
-    - maintainer relay branch
+Result:
+  one source of truth
+  many projections
 ```
 
-If `staging` does not contain the proof baseline, the scheduled run is the wrong proof. Full stop.
+### Ownership Map
 
-### Control Boundaries
+| Surface | Owner | Consumers | Rule |
+| --- | --- | --- | --- |
+| `agent_id`, `manifest_root`, release-watch enrollment | registry | watcher, prepare, docs, validation | registry is canonical |
+| `detected_release.version_policy`, `source_kind`, `source_ref`, `dispatch_kind` | registry + shared resolver | prepare, validation, docs | packet is a resolved projection |
+| `detected_release.dispatch_workflow` | shared resolver | prepare, validation, docs, workflow specs | always materialized in packet |
+| `execution_contract.executor` | shared relay constant | prepare, validation, docs, execute | one value, not per-agent |
+| `writable_surfaces`, `read_only_inputs`, `ordered_commands`, `green_gates` | shared policy module | prepare, docs, execute validation | no duplicated derivation |
+| request packet TOML | prepare renderer | execute, refresh, docs | frozen per run |
+| `HANDOFF.md` and `pr-summary.md` | shared packet doc renderer | maintainers, PR creation | derivative from packet truth, not hand-edited |
 
-| Surface | Allowed responsibility | Must not do |
-| --- | --- | --- |
-| watcher workflow | trigger on schedule, build queue, dispatch worker | bypass queue generation, invent worker-only data |
-| `maintenance-watch` | compute stale queue from registry + upstream truth | fabricate proof-only target versions |
-| worker workflow | refresh parity artifacts, render packet docs, open PR | execute maintainer relay or closeout |
-| `prepare-agent-maintenance` | write request truth and packet docs | mutate maintainer-owned change surfaces |
-| `execute-agent-maintenance` | validate preflight, prepare dry-run packet, perform bounded write run | perform automatic closeout |
-| `close-agent-maintenance` | explicit post-review human attestation | be folded into write mode |
+## Implementation Plan
 
-## Execution Plan
+### Phase 1. Extract Shared Contract Policy
 
-### Phase 1. Local Preflight And Runtime Truth Capture
+Purpose: remove duplicate policy derivation and define the steady-state packet shape in code once.
 
-Purpose: prove the landed maintenance surfaces are green locally before touching GitHub scheduling.
+Primary modules:
 
-Owner branch/worktree: current feature branch or a throwaway local worktree.
+- `crates/xtask/src/agent_maintenance/prepare.rs`
+- `crates/xtask/src/agent_maintenance/docs.rs`
+- `crates/xtask/src/agent_maintenance/request/automation.rs`
+- new shared helper module under `crates/xtask/src/agent_maintenance/` for packet policy
 
-Commands:
+Exact changes:
 
-```bash
-cargo test -p xtask --test agent_maintenance_watch
-cargo test -p xtask --test agent_maintenance_prepare
-cargo test -p xtask --test agent_maintenance_execute
-cargo run -p xtask -- maintenance-watch --emit-json _ci_tmp/maintenance-watch.json
-```
-
-Required outputs:
-
-1. `_ci_tmp/maintenance-watch.json`
-2. local proof that the three maintenance suites are green
-3. captured runtime watcher target from emitted queue JSON
-
-Acceptance:
-
-1. `_ci_tmp/maintenance-watch.json` contains a `codex` stale-agent entry.
-2. `current_validated` is `0.97.0`.
-3. `dispatch_workflow` is `codex-cli-update-snapshot.yml`.
-4. `branch_name` is `automation/codex-maintenance-<target_version>`.
-5. `target_version` is recorded from runtime watcher output. If it differs from `0.127.0`, the emitted value becomes plan truth for the rest of the run.
-6. No test failures exist in the three suites above.
-
-Failure handling:
-
-- If tests fail, stop and fix the repo-owned blocker first.
-- If the watcher emits a different live target than expected, update the proof record and continue. Do not change code just to match the stale design doc.
-- If no stale `codex` entry appears, stop and inspect `latest_validated.txt`, registry metadata, and live upstream release truth before touching GitHub workflows.
-
-### Phase 2. Make The Proof Baseline Real On `staging`
-
-Purpose: ensure the scheduled run will execute the code we actually mean to prove.
-
-Owner branch/worktree: dedicated `staging` prep worktree.
-
-Required actions:
-
-1. Treat `75aa237` as the baseline commit for this proof.
-2. Ensure `staging` contains that baseline or a deliberate descendant with the same maintenance surfaces.
-3. Verify on `staging`:
-   - `crates/xtask/src/agent_maintenance/watch.rs`
-   - `crates/xtask/src/agent_maintenance/request.rs`
-   - `crates/xtask/src/agent_maintenance/prepare.rs`
-   - `crates/xtask/src/agent_maintenance/execute.rs`
-   - `.github/workflows/codex-cli-update-snapshot.yml`
-   - `.github/workflows/agent-maintenance-open-pr.yml`
-
-Acceptance:
-
-1. `staging` contains the exact proof baseline or an intentional descendant.
-2. The code and workflow surfaces above match what Phase 1 validated locally.
-3. There is no remaining ambiguity about which ref the watcher and worker will execute.
-
-Failure handling:
-
-- If `staging` is missing proof code, land the minimum required baseline there before attempting the scheduled run.
-- If `staging` contains unrelated drift that changes maintenance behavior, stop and restate the proof baseline explicitly before continuing.
-
-### Phase 3. Temporarily Accelerate The Scheduled Watcher On `main`
-
-Purpose: get one real scheduled run quickly, without waiting for the normal daily cron.
-
-Owner branch/worktree: dedicated `main` cron-tweak worktree.
-
-Touch surface:
-
-- `.github/workflows/agent-maintenance-release-watch.yml`
-
-Required change:
-
-- replace the current cron `17 3 * * *`
-- with a temporary off-peak every-5-minutes schedule such as `3-58/5 * * * *`
-
-Rules:
-
-1. Merge this change to `main`, not the feature branch.
-2. Keep `workflow_dispatch` enabled for debugging, but do not use it as the success path.
-3. Do not change `actions/checkout` ref. `staging` checkout is part of the proof.
-4. Do not change queue-shape or dispatch logic while doing the cron acceleration.
-
-Acceptance:
-
-1. `main` now hosts the temporary accelerated schedule.
-2. The next scheduled run should happen within 5 minutes, subject to GitHub delay.
-3. `staging` is already ready before this merge happens.
-
-Failure handling:
-
-- If cron acceleration is merged before `staging` is ready, back out and restart with proper branch sequencing.
-- If GitHub scheduling is delayed, keep the temporary cron in place for one bounded retry window before investigating platform delay.
-
-### Phase 4. Observe The Real Scheduled Watcher Run
-
-Purpose: capture proof that the alarm rang by itself.
-
-Evidence to capture from the watcher run:
-
-1. watcher workflow run URL
-2. queue job logs
-3. emitted queue JSON excerpt for the `codex` entry
-4. dispatch job logs showing:
-   - `agent_id = codex`
-   - `dispatch_workflow = codex-cli-update-snapshot.yml`
-   - `dispatch_ref = staging`
-   - `target_version = <runtime watcher value>`
-   - `branch_name = automation/codex-maintenance-<target_version>`
-
-Required assertions:
-
-1. the run was triggered by `schedule`
-2. the workflow definition came from `main`
-3. the job checked out `staging`
-4. the watcher chose the live `latest_stable_minus_one` target
-5. the dispatch job succeeded
-
-Failure handling:
-
-- If no scheduled run appears, leave the accelerated cron in place for one bounded retry window, then inspect GitHub scheduling delay.
-- If the queue is empty for `codex`, stop and inspect live release truth plus `cli_manifests/codex/latest_validated.txt`.
-- If dispatch fails, treat that as the first real defect. Capture logs before changing anything.
-
-### Phase 5. Inspect The Generated Codex Maintenance PR
-
-Purpose: verify the worker opened the PR from repo-owned packet truth.
-
-Evidence to capture:
-
-1. worker workflow run URL
-2. PR URL
-3. PR head branch
-4. file list and body source
-
-Required assertions:
-
-1. the PR branch is `automation/codex-maintenance-<target_version>`
-2. the PR body matches `docs/agents/lifecycle/codex-maintenance/governance/pr-summary.md`
-3. the PR contains:
-   - `docs/agents/lifecycle/codex-maintenance/HANDOFF.md`
-   - `docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml`
-   - `docs/agents/lifecycle/codex-maintenance/governance/pr-summary.md`
-4. the request includes an `[execution_contract]` table
-5. the request and packet agree on:
-   - target version
+1. Add one shared helper module for:
+   - shared executor id
+   - resolved dispatch workflow
+   - prompt template path
+   - read-only inputs
    - writable surfaces
    - ordered commands
-   - manual closeout boundary
+   - green gates
+   - recovery notes
+2. Move duplicated command/gate and write-surface derivation out of `prepare.rs` and `docs.rs`.
+3. Keep policy generation deterministic and pure. No network calls, no workspace mutation inside the helper.
 
-Success handling:
+Acceptance:
 
-- As soon as the watcher run succeeded, the worker run succeeded, and the PR exists, revert the temporary cron acceleration on `main`.
-- After that revert lands, continue with the local maintainer proof.
+1. `prepare.rs` and `docs.rs` no longer each own independent copies of green-gate policy.
+2. One constant defines the steady-state executor identity.
+3. One helper resolves `packet_pr` to `agent-maintenance-open-pr.yml`.
 
-Failure handling:
+### Phase 2. Converge Packet Builder And Validator
 
-- If packet generation succeeded but PR creation failed, follow the repo-owned recovery path already encoded in `.github/workflows/agent-maintenance-open-pr.yml`.
-- That recovery path is a valid repair path for this phase. It is not a substitute for the scheduled watcher proof in Phase 4.
+Purpose: make the packet that gets written match the contract that gets enforced.
 
-### Phase 6. Prove The Maintainer Path On The PR Branch
+Primary modules:
 
-Purpose: prove the human handoff the PR is actually for.
+- `crates/xtask/src/agent_maintenance/prepare.rs`
+- `crates/xtask/src/agent_maintenance/request.rs`
+- `crates/xtask/src/agent_maintenance/request/automation.rs`
+- `crates/xtask/src/agent_maintenance/execute/*`
 
-Owner branch/worktree: dedicated local checkout of `automation/codex-maintenance-<target_version>`.
+Exact changes:
 
-Required commands from repo root on the generated PR branch:
+1. In `prepare.rs`, derive `detected_release.version_policy` from `entry.maintenance.release_watch.version_policy`, not the literal `"latest_stable_minus_one"`.
+2. Emit `execution_contract.executor = "execute-agent-maintenance"`.
+3. Validate the shared executor identity in `request/automation.rs`.
+4. Keep read compatibility for legacy `executor = "codex"` packets so already-committed packet fixtures and closeout paths still load.
+5. Materialize `dispatch_workflow` consistently in packet generation and validation for both `workflow_dispatch` and `packet_pr`.
+6. Ensure `execute-agent-maintenance` continues to treat the request packet as the authority for writable surfaces, prompt digest, and gates. No new hidden relay defaults.
 
-```bash
-cargo run -p xtask -- execute-agent-maintenance \
-  --request docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml \
-  --dry-run
-```
+Acceptance:
 
-Then:
+1. A Codex automated packet and a Claude Code automated packet parse under the same validator rules.
+2. Historical packet fixtures with `executor = "codex"` still load where backward compatibility is required.
+3. Newly generated packets always normalize to the shared executor.
 
-1. find the newest directory under `docs/agents/.uaa-temp/agent-maintenance/runs/`
-2. set `RUN_ID` to that directory name
-3. rerun:
+### Phase 3. Refresh Generated Docs And Patch Narrow Truth Surfaces
 
-```bash
-cargo run -p xtask -- execute-agent-maintenance \
-  --request docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml \
-  --write \
-  --run-id "$RUN_ID"
-```
+Purpose: stop maintainer-facing docs from contradicting live code.
 
-Required assertions:
+Primary modules and files:
 
-1. dry-run writes only under `docs/agents/.uaa-temp/agent-maintenance/runs/<run_id>/`
-2. the prepared packet contains:
-   - `input-contract.json`
-   - `codex-prompt.md`
-   - `run-status.json`
-   - `run-summary.md`
-   - `validation-report.json`
-   - `written-paths.json`
-3. write mode succeeds without boundary violations
-4. the request-owned green gates pass
-5. the resulting diff stays inside the declared write envelope
-6. `maintenance-closeout.json` is not created or mutated by this step
-7. no automatic `close-agent-maintenance` occurs
+- `crates/xtask/src/agent_maintenance/docs.rs`
+- `docs/specs/maintenance-request-contract-v1.md`
+- `docs/specs/agent-registry-contract.md`
+- `cli_manifests/codex/OPS_PLAYBOOK.md`
+- `cli_manifests/claude_code/OPS_PLAYBOOK.md`
+- generated maintenance surfaces under `docs/agents/lifecycle/codex-maintenance/**`
+- generated maintenance surfaces under `docs/agents/lifecycle/claude_code-maintenance/**` if committed outputs exist
 
-Failure handling:
+Exact changes:
 
-- If local Codex preflight fails, fix local binary/auth and rerun dry-run. Do not force write mode.
-- If write mode fails path validation or prompt digest validation, treat that as a real defect in the relay contract and capture the failure packet before retrying.
+1. Update the normative packet contract doc to reflect the locked decisions above.
+2. Clarify in the registry contract that registry omits `dispatch_workflow` for `packet_pr`, while packet generation resolves the final workflow path.
+3. Refresh generated packet docs so `HANDOFF.md` and `pr-summary.md` display the shared executor identity and the resolved workflow truth.
+4. Patch maintainer playbooks only where they currently imply:
+   - agent-specific executor identity
+   - workflow-owned gate truth
+   - stale packet field semantics
 
-### Phase 7. Capture Final Evidence And Leave The Repo Clean
+Acceptance:
 
-Purpose: leave behind proof, not operational debt.
+1. No maintainer doc claims `execution_contract.executor` names the maintained agent.
+2. No doc claims workflow YAML is the owner of gate or write-envelope policy.
+3. Generated maintenance docs remain renderer-owned. No manual edits to generated packet docs.
 
-Required outputs:
+### Phase 4. Add Regression Coverage And Verification
 
-1. scheduled watcher run URL
-2. worker run URL
-3. PR URL
-4. captured watcher queue excerpt
-5. captured `run_id` path used for maintainer proof
-6. final diff summary from the PR branch after `--write`
-7. commit or PR reference that reverted the temporary cron acceleration on `main`
-8. one explicit note stating whether the PR remains open for normal maintainer follow-through or is being treated as validation-only
+Purpose: prove the new contract shape and prevent relapse.
 
-Exit condition:
+Primary test files:
 
-1. the temporary cron tweak is gone from `main`
-2. the proof evidence above is recorded
-3. the manual closeout boundary is still intact
-4. no silent follow-up debt was created
+- `crates/xtask/tests/agent_maintenance_prepare.rs`
+- `crates/xtask/tests/agent_maintenance_execute.rs`
+- `crates/xtask/tests/agent_maintenance_closeout/request_and_schema.rs`
+- `crates/xtask/tests/agent_maintenance_watch.rs`
+- `crates/xtask/tests/c4_spec_ci_wiring.rs`
+- harness files under `crates/xtask/tests/support/agent_maintenance_*`
 
-## Engineering Review Consolidation
+Exact changes:
 
-### Architecture Review
+1. Add a Claude Code packet-generation regression test, not just Codex.
+2. Add a validator compatibility test covering:
+   - shared executor accepted
+   - legacy `codex` executor alias accepted where intended
+   - mismatched executor rejected
+3. Add a packet-pr contract test proving the packet carries `dispatch_workflow = "agent-maintenance-open-pr.yml"`.
+4. Update handoff/pr-summary lockstep tests to assert shared executor identity and shared policy outputs.
+5. Preserve the existing fail-closed coverage:
+   - prompt digest mismatch
+   - out-of-bounds writes
+   - noop runtime execution
+   - manual closeout remains manual
 
-The architecture is sound if these boundaries stay intact:
+Acceptance:
 
-1. GitHub schedule triggers the watcher. It does not bypass queue generation.
-2. `maintenance-watch` computes staleness. It does not fabricate worker-only state.
-3. `prepare-agent-maintenance` writes request truth and packet docs. It does not execute maintainer changes.
-4. `execute-agent-maintenance` executes the maintainer relay. It does not perform closeout.
-5. `close-agent-maintenance` remains explicit human attestation after diff review.
-
-This matters because the user-facing product is not "we can generate files." The product is "the repo rings the bell, opens the right PR, and hands the maintainer one safe path."
-
-### Code Quality Review
-
-The main code-quality risk is not duplication. It is humans bypassing the repo-owned surfaces because the proof plan is vague.
-
-This plan therefore chooses:
-
-- one scheduled watcher path
-- one generated PR path
-- one canonical `HANDOFF.md`
-- one `execute-agent-maintenance` relay
-- one manual closeout boundary
-
-That is explicit over clever. It also keeps the permanent diff small because no new architecture is allowed unless the live proof exposes a real defect.
-
-### Performance Review
-
-Performance is not the gating concern here. Timing and coordination are.
-
-The only performance-sensitive choice in this plan is the temporary accelerated cron:
-
-- use an off-peak every-5-minutes schedule
-- avoid top-of-hour spikes
-- revert immediately after the scheduled proof succeeds
-
-No new repo hot path is introduced unless the live proof exposes a bug that requires a separate implementation task.
+1. The request contract can no longer drift without a failing test.
+2. Cross-agent packet parity is explicitly tested.
+3. Legacy compatibility is deliberate, not accidental.
 
 ## Test Review
 
-### Required Automated Suites
-
-Run these before the live proof:
-
-```bash
-cargo test -p xtask --test agent_maintenance_watch
-cargo test -p xtask --test agent_maintenance_prepare
-cargo test -p xtask --test agent_maintenance_execute
-```
-
-These already cover the critical repo-owned behavior:
-
-- queue freezing and target selection
-- packet rendering and request truth lockstep
-- dry-run packet generation
-- write-envelope enforcement
-- prompt digest fail-closed behavior
-- manual closeout boundary
-
-### Live Proof Coverage Diagram
+### Code Path Coverage
 
 ```text
 CODE PATH COVERAGE
 ===========================
-[+] Shared watcher queue
-    |
-    ├── [★★★ TESTED] Frozen queue fields + latest_stable_minus_one selection
-    │                 crates/xtask/tests/agent_maintenance_watch.rs
-    └── [GAP]         Real GitHub schedule on main -> staging checkout
-                      This plan proves it live
+[+] crates/xtask/src/agent_maintenance/prepare.rs
+    ├── build_prepare_plan()
+    │   ├── [ADD] Codex workflow_dispatch packet emits shared executor
+    │   ├── [ADD] Claude workflow_dispatch packet emits same schema
+    │   ├── [ADD] packet_pr packet emits resolved open-pr workflow
+    │   └── [ADD] version_policy comes from registry, not a literal
+    │
+    └── build_execution_contract()
+        ├── [ADD] shared executor constant
+        ├── [ADD] shared gate derivation helper
+        └── [ADD] shared writable/read-only derivation helper
 
-[+] Packet generation
-    |
-    ├── [★★★ TESTED] Request truth + execution_contract rendering
-    │                 crates/xtask/tests/agent_maintenance_prepare.rs
-    └── [GAP]         Real worker-opened PR from generated pr-summary.md
-                      This plan proves it live
+[+] crates/xtask/src/agent_maintenance/request/automation.rs
+    ├── validate_detected_release()
+    │   ├── [ADD] workflow_dispatch packet accepted
+    │   └── [ADD] packet_pr packet accepted with resolved generic workflow
+    │
+    └── validate_execution_contract()
+        ├── [ADD] shared executor accepted
+        ├── [ADD] legacy "codex" alias accepted where compatibility is required
+        ├── [ADD] mismatched executor rejected
+        └── [EXISTING] prompt digest mismatch rejected
 
-[+] Maintainer relay
-    |
-    ├── [★★★ TESTED] Dry-run packet writes only under temp run root
-    ├── [★★★ TESTED] Write-mode boundary enforcement + prompt digest fail-closed
-    └── [GAP]         Real maintainer run against a live worker-generated PR branch
-                      This plan proves it live
+[+] crates/xtask/src/agent_maintenance/docs.rs
+    └── build_packet_docs_from_envelope()
+        ├── [ADD] handoff renders shared executor
+        ├── [ADD] pr-summary stays lockstep with same contract helper
+        └── [ADD] packet_pr/workflow_dispatch truth matches request packet
 
-USER FLOW COVERAGE
-===========================
-[+] Alarm rings by itself
-    |
-    └── [GAP] [->E2E] Scheduled watcher creates real downstream work
-
-[+] Maintainer handoff
-    |
-    ├── [GAP] [->E2E] Open PR -> read HANDOFF.md -> dry-run -> write -> diff review
-    └── [★★★ TESTED] Manual closeout remains outside write mode
-                      crates/xtask/tests/agent_maintenance_execute.rs
-
-─────────────────────────────────
-COVERAGE: repo-owned behavior is well covered locally
-Live gaps: 3 critical end-to-end proofs remain
-  1. main schedule -> staging checkout
-  2. real worker-opened PR from generated packet docs
-  3. real maintainer dry-run/write path on that PR branch
-─────────────────────────────────
+[+] crates/xtask/src/agent_maintenance/execute/*
+    └── dry-run/write context loading
+        ├── [ADD] shared-executor packet accepted
+        ├── [ADD] legacy packet still readable
+        └── [EXISTING] prompt drift and write-boundary checks remain fail-closed
 ```
 
-### Missing Test Requirements Added By This Plan
+### Maintainer Flow Coverage
 
-This plan adds three required end-to-end validation steps, not new unit tests:
+```text
+USER FLOW COVERAGE
+===========================
+[+] Shared watcher -> Codex worker -> packet generation
+    ├── [EXISTING] watcher queue frozen-field coverage
+    └── [ADD] packet contract schema assertions
 
-1. scheduled watcher proof on `main`
-2. worker-opened PR proof from generated packet docs
-3. maintainer dry-run/write proof on that PR branch
+[+] Shared watcher -> Claude worker -> packet generation
+    ├── [EXISTING] watcher queue frozen-field coverage
+    └── [ADD] generated packet parity coverage
 
-Those are mandatory because they are exactly the unproven product claims.
+[+] packet_pr future-agent transport
+    ├── [EXISTING] watcher and prepare packet_pr path coverage
+    └── [ADD] request-schema coverage for resolved generic workflow
 
-## Evidence Bundle
+[+] Maintainer relay
+    ├── [EXISTING] dry-run creates frozen packet
+    ├── [EXISTING] write mode enforces writable envelope
+    ├── [EXISTING] prompt drift fails closed
+    └── [ADD] shared executor packet loads the same relay path
+```
 
-| Artifact | Where it comes from | Why it matters |
-| --- | --- | --- |
-| watcher run URL | scheduled run on `.github/workflows/agent-maintenance-release-watch.yml` | proves the alarm fired by itself |
-| worker run URL | dispatched run on `.github/workflows/codex-cli-update-snapshot.yml` | proves watcher fanout reached the real worker |
-| queue JSON excerpt | `_ci_tmp/maintenance-watch.json` or watcher logs | proves runtime target version and queue fields |
-| PR URL | generated `automation/codex-maintenance-<target_version>` PR | proves packet generation and PR opening happened |
-| request file path | `docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml` | proves canonical request truth exists |
-| handoff file path | `docs/agents/lifecycle/codex-maintenance/HANDOFF.md` | proves maintainer instructions are canonical |
-| prepared run path | `docs/agents/.uaa-temp/agent-maintenance/runs/<run_id>/` | proves dry-run packetization happened |
-| final diff summary | local PR-branch review after `--write` | proves the maintainer relay mutated only allowed surfaces |
-| cron revert reference | revert commit or PR on `main` | proves the temporary proof infrastructure was cleaned up |
+### Required Test Commands
+
+Run at minimum:
+
+```bash
+cargo test -p xtask --test agent_maintenance_watch
+cargo test -p xtask --test agent_maintenance_prepare
+cargo test -p xtask --test agent_maintenance_execute
+cargo test -p xtask --test agent_maintenance_closeout
+cargo test -p xtask --test c4_spec_ci_wiring
+cargo test -p xtask --test c0_spec_validate
+make fmt-check
+make clippy
+make check
+make test
+```
 
 ## Failure Modes Registry
 
-| Flow | Failure mode | Covered by test? | Error handling exists? | User-visible outcome | Critical gap? |
-| --- | --- | --- | --- | --- | --- |
-| schedule trigger | scheduled run never fires from the workflow definition that matters | no local test, yes by plan precondition | partial, bounded retry window only | silent non-proof unless checked explicitly | yes |
-| watcher checkout | workflow runs, but the proof baseline is missing from `staging` | no | yes, by forcing Phase 2 before Phase 3 | wrong code gets "proven" | yes |
-| queue emission | live release target differs from the stale design assumption | partial, local watch tests cover policy not live data | yes, runtime watcher output wins | expectation mismatch, not code failure | no |
-| dispatch | watcher computes stale Codex entry but `createWorkflowDispatch` fails | not fully | partial, GitHub logs only | visible Actions failure | yes |
-| worker PR creation | packet writes succeed but PR creation fails | partial | yes, explicit recovery path in packet-only PR workflow | visible worker failure | no |
-| maintainer dry-run | local Codex preflight fails | yes | yes | visible CLI failure before mutation | no |
-| maintainer write | relay writes outside declared surfaces | yes | yes, fail closed | visible CLI failure | no |
-| closeout boundary | write mode performs closeout implicitly | yes | yes | silent trust-boundary violation if broken | yes |
+| Failure mode | Surface | User impact | Detection | Handling |
+| --- | --- | --- | --- | --- |
+| Shared contract doc says one thing, packet builder emits another | `docs/specs/**` vs `prepare.rs` | next maintainer inherits a hidden contract | spec + packet regression tests | single shared policy module and doc refresh |
+| Claude packet generation still leaks Codex-specific executor or gate assumptions | `prepare.rs`, `docs.rs` | next live agent enrollment is fake, not real | new Claude packet tests | normalize shared executor and shared policy derivation |
+| Legacy committed packets stop loading after validator hardening | `request/automation.rs`, closeout/read paths | historical closeout or replay breaks | compatibility tests | accept `codex` as read-only compatibility alias |
+| `packet_pr` transport metadata stays contradictory | packet contract vs registry contract vs request packet | maintainers cannot trust recovery and transport instructions | request schema tests + spec updates | packet always carries resolved workflow path |
+| Handoff and packet diverge again because command/gate derivation is duplicated | `docs.rs` vs `prepare.rs` | maintainer sees one gate list, relay enforces another | lockstep rendering tests | one helper reused by both surfaces |
+| Dry-run packet becomes stale after prompt/template change | `execute/*` | write mode could apply unreviewed work | existing prompt-sha fail-closed test | preserve current dry-run/write validation boundary |
 
-Critical gaps are exactly the live proofs this plan closes.
+### Critical Gaps This Plan Must Close
+
+1. There is no explicit cross-agent generated-packet parity test today.
+2. The normative contract and the live packet behavior disagree on executor semantics.
+3. The packet builder and the packet docs still duplicate policy derivation.
+
+## Performance Review
+
+No meaningful runtime performance work is required here. This milestone is about truth, not throughput.
+
+Performance constraints:
+
+1. Keep policy derivation pure and in-process. No network or shell calls in validation or doc rendering.
+2. Do not widen relay write-envelope scans beyond the existing packet-owned surfaces.
+3. Do not add repeated registry reloads in hot paths if the caller already has the entry loaded.
+
+The only performance regression worth worrying about would be accidental extra filesystem churn from regenerating more packet docs than necessary. Avoid that by keeping the renderer ownership unchanged.
 
 ## NOT In Scope
 
-- redesigning `maintenance-watch`
-- changing `latest_stable_minus_one`
-- automating `close-agent-maintenance`
-- updating `min_supported.txt`
-- widening packet-only support for other agents
-- broad CI cleanup unrelated to this proof
-- speculative fixes for GitHub Actions behavior before a real failure exists
-
-If the scheduled proof exposes a real defect, that defect becomes a separate implementation task with logs and a captured first-failing surface.
-
-## TODOS.md Impact
-
-No `TODOS.md` edits are part of this plan up front.
-
-If the proof fails, create one precise follow-up item per failure. Each item must include:
-
-- the first failing surface
-- the exact log or artifact that proved the failure
-- the affected branch or workflow
-- the minimum next action
-
-Do not dump vague "maintenance proof cleanup" debt into the backlog.
+1. Full worker YAML unification across Codex and Claude Code.
+2. Broad maintainer runbook rewrite.
+3. New-agent enrollment for `opencode`, `goose`, or any other candidate.
+4. Changing the manual closeout boundary.
+5. Replacing `xtask codex-validate` with a newly named generic validator subcommand.
+6. Reworking watcher scheduling, concurrency, or dispatch fanout architecture.
+7. Expanding registry schema into freeform command-list storage.
 
 ## Worktree Parallelization Strategy
-
-This plan is partially parallelizable. Branch preparation and maintainer-environment readiness can move in parallel before the scheduled run happens. The scheduled proof itself stays sequential.
 
 ### Dependency Table
 
 | Step | Modules touched | Depends on |
 | --- | --- | --- |
-| A. Local preflight + queue capture | `crates/xtask/src/agent_maintenance/`, `crates/xtask/tests/`, `crates/xtask/data/`, `cli_manifests/codex/` | — |
-| B. Prepare `staging` proof baseline | `crates/xtask/src/agent_maintenance/`, `crates/xtask/tests/`, `.github/workflows/codex-cli-update-snapshot.yml`, `.github/workflows/agent-maintenance-open-pr.yml` | A |
-| C. Temporary `main` cron acceleration | `.github/workflows/` | A |
-| D. Observe scheduled watcher run | GitHub Actions watcher workflow + queue output | B, C |
-| E. Inspect worker-opened PR | worker workflow outputs, `docs/agents/lifecycle/codex-maintenance/` | D |
-| F. Maintainer dry-run/write proof | `docs/agents/.uaa-temp/agent-maintenance/`, generated maintenance packet, local relay run | E |
-| G. Revert temporary cron | `.github/workflows/` on `main` | E |
+| 1. Lock contract decisions | `docs/specs/`, `PLAN.md` | — |
+| 2. Extract shared packet policy | `crates/xtask/src/agent_maintenance/` | 1 |
+| 3. Converge request builder + validator | `crates/xtask/src/agent_maintenance/`, `crates/xtask/src/agent_maintenance/request/` | 2 |
+| 4. Refresh generated packet docs + narrow playbook patches | `crates/xtask/src/agent_maintenance/`, `docs/agents/lifecycle/`, `cli_manifests/*/OPS_PLAYBOOK.md`, `docs/specs/` | 2 |
+| 5. Add regression tests and harness updates | `crates/xtask/tests/`, `crates/xtask/tests/support/` | 3 |
+| 6. Final verification run | repo-wide validation commands | 4, 5 |
 
 ### Parallel Lanes
 
-- Lane 1: `A -> B`
-  - sequential because `staging` readiness depends on a green local preflight
-- Lane 2: `A -> C`
-  - sequential inside the `main` workflow-definition lane
-- Lane 3: maintainer environment preflight
-  - independent local validation that Codex binary/auth is ready before `F`
-- Lane 4: `D -> E -> G -> F`
-  - sequential because each step consumes the real output of the previous one
+Lane A: Step 2 -> Step 3  
+Sequential. Shared `crates/xtask/src/agent_maintenance/` ownership. This is the critical path.
+
+Lane B: Step 4  
+Can start after Step 2 stabilizes the constant names and helper signatures. Mostly docs and generated-surface convergence.
+
+Lane C: Step 5  
+Can start after Step 3 lands the final packet shape. Test ownership only.
 
 ### Execution Order
 
-1. Run `A`.
-2. After `A`, launch `B` and `C` in separate worktrees.
-3. While `B` is finishing, run Lane 3 in parallel to confirm the maintainer environment is usable.
-4. Once `B` and `C` are both green, wait for `D`.
-5. After `D`, run `E`.
-6. As soon as `E` proves the PR exists, run `G` immediately to remove the temporary cron.
-7. Run `F` after `G`, using the generated PR branch and prepared `run_id`.
+1. Launch Lane A first.
+2. Once the shared helper and constant names are stable, launch Lane B and Lane C in parallel worktrees.
+3. Merge Lane B and Lane C back into the main branch.
+4. Run Step 6 once both are in.
 
 ### Conflict Flags
 
-- Lane A and Lane B do not share modules, but they do require cross-branch coordination.
-- Lane B and Lane G both touch `.github/workflows/` on `main`. Treat them as one worktree lane.
-- Lane D, E, G, and F must stay sequential. They all depend on one real generated PR and one real scheduled watcher run.
-- Do not parallelize multiple scheduled proof attempts. One successful scheduled run is enough, and parallel retries create noisy duplicate automation branches.
+1. Lane A and Lane B both touch `crates/xtask/src/agent_maintenance/`. Do not start Lane B before the shared helper API is settled.
+2. Lane C will likely touch assertions that depend on the final executor string and dispatch-workflow rules. Keep those constants fixed before parallelizing tests.
 
-## Completion Summary
+## Follow-Up Milestone
 
-- Step 0: Scope Challenge — scope accepted as-is, with one major correction: the proof must run through `main` and `staging`, not this feature branch alone
-- Architecture Review: branch topology and control boundaries are now explicit
-- Code Quality Review: no new abstractions or alternate proof paths added
-- Test Review: coverage diagram produced, 3 live proof gaps identified and closed by execution steps
-- Performance Review: no repo-code hot-path blocker, temporary schedule timing is the only tuning surface
-- NOT in scope: written
-- What already exists: written
-- TODOS.md impact: no preemptive changes
-- Failure modes: critical gaps enumerated with first-failure handling
-- Parallelization: 4 lanes total, 2 meaningful pre-schedule parallel lanes, proof lane sequential
-- Lake Score: complete proof path chosen over every shortcut
+After this plan lands, the next planning session is:
 
-## Definition Of Done
+`worker/runbook convergence`
 
-This plan is done only when all of the following are true:
+That follow-up owns:
 
-1. the scheduled watcher run happened from `main`
-2. that watcher run checked out `staging`
-3. the worker run happened from the watcher dispatch
-4. the worker opened the Codex maintenance PR from generated packet docs
-5. the maintainer completed `--dry-run` and `--write` on that PR branch
-6. the resulting diff stayed inside the declared write envelope
-7. `close-agent-maintenance` was still manual
-8. the temporary cron acceleration was reverted
-9. the evidence bundle is captured
+1. reducing worker-specific YAML differences
+2. converging Codex and Claude worker flow shape around the now-trusted packet contract
+3. simplifying the maintainer story further once the contract is actually true
+4. preparing the next live agent enrollment seam without bespoke worker contracts
 
-If any one of those is missing, the repo has not yet proved the real path.
+It does **not** belong inside this milestone.
+
+## Exit Criteria
+
+This plan is done when:
+
+1. the shared executor identity is live in newly generated packets
+2. Codex and Claude generated packets prove the same schema
+3. the contract docs no longer contradict the implementation
+4. the generated maintainer docs are derived from the same shared policy code
+5. the regression suite prevents the repo from sliding back into split truth
