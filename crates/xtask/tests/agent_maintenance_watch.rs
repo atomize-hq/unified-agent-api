@@ -33,6 +33,7 @@ fn build_watch_queue_emits_frozen_fields_for_stale_agents() {
     seed_registry(&fixture);
     seed_latest_validated(&fixture, "cli_manifests/codex", "0.97.0");
     seed_latest_validated(&fixture, "cli_manifests/claude_code", "1.2.3");
+    seed_latest_validated(&fixture, "cli_manifests/opencode", "1.4.9");
 
     let queue = build_watch_queue_with_resolver(&fixture, resolver_for_queue).expect("queue");
 
@@ -74,7 +75,24 @@ fn build_watch_queue_emits_frozen_fields_for_stale_agents() {
                 opened_from: ".github/workflows/claude-code-update-snapshot.yml".to_string(),
                 detected_by: ".github/workflows/agent-maintenance-release-watch.yml".to_string(),
                 branch_name: "automation/claude_code-maintenance-1.2.4".to_string(),
-            }
+            },
+            watch::MaintenanceWatchQueueEntry {
+                agent_id: "opencode".to_string(),
+                manifest_root: "cli_manifests/opencode".to_string(),
+                current_validated: "1.4.9".to_string(),
+                latest_stable: "1.4.12".to_string(),
+                target_version: "1.4.11".to_string(),
+                version_policy: "latest_stable_minus_one".to_string(),
+                dispatch_kind: "packet_pr".to_string(),
+                dispatch_workflow: "agent-maintenance-open-pr.yml".to_string(),
+                maintenance_root: "docs/agents/lifecycle/opencode-maintenance".to_string(),
+                request_path:
+                    "docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml"
+                        .to_string(),
+                opened_from: ".github/workflows/agent-maintenance-open-pr.yml".to_string(),
+                detected_by: ".github/workflows/agent-maintenance-release-watch.yml".to_string(),
+                branch_name: "automation/opencode-maintenance-1.4.11".to_string(),
+            },
         ]
     );
 }
@@ -85,6 +103,7 @@ fn run_in_workspace_emits_json_queue_file() {
     seed_registry(&fixture);
     seed_latest_validated(&fixture, "cli_manifests/codex", "0.97.0");
     seed_latest_validated(&fixture, "cli_manifests/claude_code", "1.2.3");
+    seed_latest_validated(&fixture, "cli_manifests/opencode", "1.4.9");
 
     let mut stdout = Vec::new();
     run_in_workspace_with_resolver(
@@ -99,7 +118,7 @@ fn run_in_workspace_emits_json_queue_file() {
     .expect("emit queue");
 
     let output = String::from_utf8(stdout).expect("stdout utf8");
-    assert!(output.contains("stale_agents: 2"));
+    assert!(output.contains("stale_agents: 3"));
     assert!(output.contains("emitted_json: _ci_tmp/maintenance-watch.json"));
 
     let written = fs::read_to_string(fixture.join("_ci_tmp/maintenance-watch.json"))
@@ -107,7 +126,7 @@ fn run_in_workspace_emits_json_queue_file() {
     let parsed: watch::MaintenanceWatchQueue =
         serde_json::from_str(&written).expect("parse queue json");
     assert_eq!(parsed.schema_version, 1);
-    assert_eq!(parsed.stale_agents.len(), 2);
+    assert_eq!(parsed.stale_agents.len(), 3);
 }
 
 #[test]
@@ -116,6 +135,7 @@ fn run_in_workspace_check_fails_when_stale_agents_are_present() {
     seed_registry(&fixture);
     seed_latest_validated(&fixture, "cli_manifests/codex", "0.97.0");
     seed_latest_validated(&fixture, "cli_manifests/claude_code", "1.2.3");
+    seed_latest_validated(&fixture, "cli_manifests/opencode", "1.4.9");
 
     let mut stdout = Vec::new();
     let err = run_in_workspace_with_resolver(
@@ -130,10 +150,10 @@ fn run_in_workspace_check_fails_when_stale_agents_are_present() {
     .expect_err("check mode should fail when stale agents exist");
 
     assert!(matches!(err, Error::Validation(_)));
-    assert!(err.to_string().contains("found 2 stale enrolled agent"));
+    assert!(err.to_string().contains("found 3 stale enrolled agent"));
 
     let output = String::from_utf8(stdout).expect("stdout utf8");
-    assert!(output.contains("stale_agents: 2"));
+    assert!(output.contains("stale_agents: 3"));
 }
 
 #[test]
@@ -142,6 +162,7 @@ fn clean_or_not_newer_agents_are_not_emitted() {
     seed_registry(&fixture);
     seed_latest_validated(&fixture, "cli_manifests/codex", "0.98.0");
     seed_latest_validated(&fixture, "cli_manifests/claude_code", "1.2.4");
+    seed_latest_validated(&fixture, "cli_manifests/opencode", "1.4.11");
 
     let queue = build_watch_queue_with_resolver(&fixture, resolver_for_queue).expect("queue");
     assert!(queue.stale_agents.is_empty());
@@ -153,10 +174,13 @@ fn malformed_upstream_history_fails_closed() {
     seed_registry(&fixture);
     seed_latest_validated(&fixture, "cli_manifests/codex", "0.97.0");
     seed_latest_validated(&fixture, "cli_manifests/claude_code", "1.2.3");
+    seed_latest_validated(&fixture, "cli_manifests/opencode", "1.4.9");
 
     let err = build_watch_queue_with_resolver(&fixture, |entry, _| {
         if entry.agent_id == "codex" {
             Err(Error::Validation("synthetic upstream failure".to_string()))
+        } else if entry.agent_id == "opencode" {
+            Ok(vec!["1.4.12".parse().unwrap(), "1.4.11".parse().unwrap()])
         } else {
             Ok(vec!["1.2.5".parse().unwrap(), "1.2.4".parse().unwrap()])
         }
@@ -169,26 +193,21 @@ fn malformed_upstream_history_fails_closed() {
 #[test]
 fn packet_pr_enrollment_uses_generic_open_pr_workflow() {
     let fixture = fixture_root("agent-maintenance-watch-packet-pr");
-    seed_registry_with(
-        &fixture,
-        &SEEDED_REGISTRY.replace(
-            "dispatch_kind = \"workflow_dispatch\"\ndispatch_workflow = \"codex-cli-update-snapshot.yml\"",
-            "dispatch_kind = \"packet_pr\"",
-        ),
-    );
-    seed_latest_validated(&fixture, "cli_manifests/codex", "0.97.0");
+    seed_registry(&fixture);
+    seed_latest_validated(&fixture, "cli_manifests/codex", "0.98.0");
     seed_latest_validated(&fixture, "cli_manifests/claude_code", "1.2.4");
+    seed_latest_validated(&fixture, "cli_manifests/opencode", "1.4.9");
 
     let queue = build_watch_queue_with_resolver(&fixture, resolver_for_queue).expect("queue");
-    let codex = queue
+    let opencode = queue
         .stale_agents
         .iter()
-        .find(|entry| entry.agent_id == "codex")
-        .expect("codex stale agent");
-    assert_eq!(codex.dispatch_kind, "packet_pr");
-    assert_eq!(codex.dispatch_workflow, "agent-maintenance-open-pr.yml");
+        .find(|entry| entry.agent_id == "opencode")
+        .expect("opencode stale agent");
+    assert_eq!(opencode.dispatch_kind, "packet_pr");
+    assert_eq!(opencode.dispatch_workflow, "agent-maintenance-open-pr.yml");
     assert_eq!(
-        codex.opened_from,
+        opencode.opened_from,
         ".github/workflows/agent-maintenance-open-pr.yml"
     );
 }
@@ -240,6 +259,7 @@ fn resolver_for_queue(
     let versions = match entry.agent_id.as_str() {
         "codex" => vec!["0.99.0", "0.98.0", "0.97.0"],
         "claude_code" => vec!["1.2.5", "1.2.4", "1.2.3"],
+        "opencode" => vec!["1.4.12", "1.4.11", "1.4.9"],
         other => panic!("unexpected agent {other}"),
     };
     Ok(versions
