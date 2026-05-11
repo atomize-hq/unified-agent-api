@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-05-11T19:47:31.280469Z",
+  "stale_agents": [
+    {
+      "agent_id": "codex",
+      "manifest_root": "cli_manifests/codex",
+      "current_validated": "0.125.0",
+      "latest_stable": "0.130.0",
+      "target_version": "0.129.0",
+      "version_policy": "latest_stable_minus_one",
+      "dispatch_kind": "workflow_dispatch",
+      "dispatch_workflow": "codex-cli-update-snapshot.yml",
+      "maintenance_root": "docs/agents/lifecycle/codex-maintenance",
+      "request_path": "docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml",
+      "opened_from": ".github/workflows/codex-cli-update-snapshot.yml",
+      "detected_by": ".github/workflows/agent-maintenance-release-watch.yml",
+      "branch_name": "automation/codex-maintenance-0.129.0"
+    },
+    {
+      "agent_id": "claude_code",
+      "manifest_root": "cli_manifests/claude_code",
+      "current_validated": "2.1.29",
+      "latest_stable": "2.1.139",
+      "target_version": "2.1.138",
+      "version_policy": "latest_stable_minus_one",
+      "dispatch_kind": "workflow_dispatch",
+      "dispatch_workflow": "claude-code-update-snapshot.yml",
+      "maintenance_root": "docs/agents/lifecycle/claude_code-maintenance",
+      "request_path": "docs/agents/lifecycle/claude_code-maintenance/governance/maintenance-request.toml",
+      "opened_from": ".github/workflows/claude-code-update-snapshot.yml",
+      "detected_by": ".github/workflows/agent-maintenance-release-watch.yml",
+      "branch_name": "automation/claude_code-maintenance-2.1.138"
+    },
+    {
+      "agent_id": "opencode",
+      "manifest_root": "cli_manifests/opencode",
+      "current_validated": "1.4.11",
+      "latest_stable": "1.14.48",
+      "target_version": "1.14.47",
+      "version_policy": "latest_stable_minus_one",
+      "dispatch_kind": "packet_pr",
+      "dispatch_workflow": "agent-maintenance-open-pr.yml",
+      "maintenance_root": "docs/agents/lifecycle/opencode-maintenance",
+      "request_path": "docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml",
+      "opened_from": ".github/workflows/agent-maintenance-open-pr.yml",
+      "detected_by": ".github/workflows/agent-maintenance-release-watch.yml",
+      "branch_name": "automation/opencode-maintenance-1.14.47"
+    }
+  ]
+}

@@ -8,14 +8,14 @@ This file is the canonical contributor execution contract for `opencode` mainten
 
 - detected_by: `.github/workflows/agent-maintenance-release-watch.yml`
 - current_validated: `1.4.11`
-- target_version: `1.14.40`
-- latest_stable: `1.14.41`
+- target_version: `1.14.47`
+- latest_stable: `1.14.48`
 - version_policy: `latest_stable_minus_one`
 - source_kind: `github_releases`
 - source_ref: `anomalyco/opencode`
 - dispatch_kind: `packet_pr`
 - dispatch_workflow: `agent-maintenance-open-pr.yml`
-- branch_name: `automation/opencode-maintenance-1.14.40`
+- branch_name: `automation/opencode-maintenance-1.14.47`
 
 ## Relay contract
 
@@ -24,11 +24,11 @@ This file is the canonical contributor execution contract for `opencode` mainten
 - executor surface: `execute-agent-maintenance`
 - request artifact: `docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml`
 - prompt template path: `docs/agents/lifecycle/opencode-maintenance/governance/execute-agent-maintenance-prompt.md`
-- prompt sha256: `0060876bb5f17815a560ddee0f7f010ed32587b3fbecd5a47061b44be3d7327b`
+- prompt sha256: `f68f4a5c6cc09a186256fe475e311bd4881e6dfeabd7852f1ed62cf659ce9685`
 - canonical handoff: `docs/agents/lifecycle/opencode-maintenance/HANDOFF.md`
 - derivative pr summary: `docs/agents/lifecycle/opencode-maintenance/governance/pr-summary.md`
 - exact closeout artifact: `docs/agents/lifecycle/opencode-maintenance/governance/maintenance-closeout.json`
-- branch linkage: `automation/opencode-maintenance-1.14.40`
+- branch linkage: `automation/opencode-maintenance-1.14.47`
 - manual closeout required: `true`
 
 ## Writable surfaces
@@ -37,9 +37,9 @@ This file is the canonical contributor execution contract for `opencode` mainten
 - `crates/opencode/**`
 - `crates/agent_api/**`
 - `cli_manifests/opencode/artifacts.lock.json`
-- `cli_manifests/opencode/snapshots/1.14.40/**`
-- `cli_manifests/opencode/reports/1.14.40/**`
-- `cli_manifests/opencode/versions/1.14.40.json`
+- `cli_manifests/opencode/snapshots/1.14.47/**`
+- `cli_manifests/opencode/reports/1.14.47/**`
+- `cli_manifests/opencode/versions/1.14.47.json`
 - `cli_manifests/opencode/wrapper_coverage.json`
 - `cli_manifests/support_matrix/current.json`
 - `docs/specs/unified-agent-api/support-matrix.md`
@@ -73,7 +73,7 @@ This file is the canonical contributor execution contract for `opencode` mainten
 
 - recreate packet command: `cargo run -p xtask -- refresh-agent --request docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml --write`
 - reopen pr body path: `docs/agents/lifecycle/opencode-maintenance/governance/pr-summary.md`
-- reopen pr branch: `automation/opencode-maintenance-1.14.40`
+- reopen pr branch: `automation/opencode-maintenance-1.14.47`
 - notes:
 - If PR creation fails after packet generation, rerun packet regeneration from the frozen request and reopen the PR from the generated pr-summary path.
 - If the local execution-host preflight (local Codex CLI host via execute-agent-maintenance) fails, fix the Codex binary/auth state and rerun `execute-agent-maintenance --dry-run` before write mode.
@@ -87,7 +87,7 @@ cargo run -p xtask -- close-agent-maintenance --request docs/agents/lifecycle/op
 ## Exact maintained-agent prompt
 
 ```md
-# Packet PR Maintenance Prompt (`1.14.40`)
+# Packet PR Maintenance Prompt (`1.14.47`)
 
 This template renders the exact maintained-agent prompt for `opencode` packet execution.
 `docs/agents/lifecycle/opencode-maintenance/HANDOFF.md` remains canonical and `governance/pr-summary.md` is derivative.
@@ -96,7 +96,7 @@ This template renders the exact maintained-agent prompt for `opencode` packet ex
 
 ## Goal
 
-Execute the automated maintenance packet for `opencode` target `1.14.40`.
+Execute the automated maintenance packet for `opencode` target `1.14.47`.
 
 ## Frozen request contract
 
@@ -117,8 +117,8 @@ Execute the automated maintenance packet for `opencode` target `1.14.40`.
 
 ## Required workflow
 
-1. Compare the current validated baseline from `cli_manifests/opencode/latest_validated.txt` against the target `1.14.40` artifacts.
-2. Refresh or create version-scoped manifest artifacts under `cli_manifests/opencode/snapshots/1.14.40/`, `cli_manifests/opencode/reports/1.14.40/`, and `cli_manifests/opencode/versions/1.14.40.json` as required by the packet.
+1. Compare the current validated baseline from `cli_manifests/opencode/latest_validated.txt` against the target `1.14.47` artifacts.
+2. Refresh or create version-scoped manifest artifacts under `cli_manifests/opencode/snapshots/1.14.47/`, `cli_manifests/opencode/reports/1.14.47/`, and `cli_manifests/opencode/versions/1.14.47.json` as required by the packet.
 3. Update `crates/opencode/**` and `crates/agent_api/**` only when the target artifact delta requires wrapper or backend changes.
 4. Leave closeout manual; record it only with `close-agent-maintenance` after the declared green gates pass.
 
