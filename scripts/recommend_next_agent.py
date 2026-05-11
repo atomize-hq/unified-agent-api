@@ -18,7 +18,13 @@ from typing import Any
 try:
     import tomllib
 except ModuleNotFoundError:  # pragma: no cover - Python <3.11 compatibility.
-    import tomli as tomllib
+    try:
+        import tomli as tomllib
+    except ModuleNotFoundError as exc:  # pragma: no cover - dependency missing.
+        raise RuntimeError(
+            "recommend_next_agent.py requires Python 3.11+ or the `tomli` package "
+            "when running on Python 3.10 and earlier"
+        ) from exc
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CANONICAL_PACKET_REL = "docs/agents/selection/cli-agent-selection-packet.md"
