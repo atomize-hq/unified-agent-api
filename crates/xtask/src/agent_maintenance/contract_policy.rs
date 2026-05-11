@@ -17,6 +17,10 @@ pub(crate) const GENERIC_PACKET_PR_WORKFLOW: &str = "agent-maintenance-open-pr.y
 pub(crate) const LEGACY_EXECUTOR_ALIAS: &str = "codex";
 pub(crate) const EXECUTE_HOST_SURFACE: &str = "execute-agent-maintenance";
 pub(crate) const EXECUTION_HOST_LABEL: &str = "local Codex CLI host via execute-agent-maintenance";
+pub(crate) const PACKET_OWNED_OPS_PLAYBOOK_FILE: &str = "OPS_PLAYBOOK.md";
+pub(crate) const PACKET_OWNED_WORKFLOW_PLAN_FILE: &str = "CI_WORKFLOWS_PLAN.md";
+pub(crate) const PACKET_OWNED_PROMPT_TEMPLATE_FILE: &str =
+    "governance/execute-agent-maintenance-prompt.md";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct DerivedDetectedReleaseFields {
@@ -129,9 +133,20 @@ pub(crate) fn build_execution_contract(
     target_version: &str,
     branch_name: &str,
 ) -> Result<ExecutionContract, String> {
-    let prompt_template_path = format!("{}/PR_BODY_TEMPLATE.md", entry.manifest_root);
-    let prompt_contents =
-        render_prompt_template(workspace_root, &prompt_template_path, target_version)?;
+    let release_watch = entry.maintenance.release_watch.as_ref().ok_or_else(|| {
+        format!(
+            "maintenance release-watch metadata is required to build execution_contract for agent `{}`",
+            entry.agent_id
+        )
+    })?;
+    let prompt_template_path = prompt_template_path(entry, maintenance_root, release_watch);
+    let prompt_contents = render_prompt_template_for_contract(
+        workspace_root,
+        entry,
+        maintenance_root,
+        &prompt_template_path,
+        target_version,
+    )?;
     let pr_summary_path = format!("{maintenance_root}/governance/pr-summary.md");
     let closeout_path = format!("{maintenance_root}/governance/maintenance-closeout.json");
     let green_gates = green_gates(entry);
@@ -144,12 +159,7 @@ pub(crate) fn build_execution_contract(
         closeout_path,
         requires_manual_closeout: true,
         writable_surfaces: writable_surfaces(entry, maintenance_root, target_version),
-        read_only_inputs: vec![
-            format!("{}/OPS_PLAYBOOK.md", entry.manifest_root),
-            format!("{}/CI_WORKFLOWS_PLAN.md", entry.manifest_root),
-            format!("{}/PR_BODY_TEMPLATE.md", entry.manifest_root),
-            opened_from.to_string(),
-        ],
+        read_only_inputs: read_only_inputs(entry, maintenance_root, opened_from, release_watch),
         ordered_commands: green_gates.clone(),
         green_gates,
         recovery: ExecutionContractRecovery {
@@ -166,6 +176,60 @@ pub(crate) fn build_execution_contract(
             ],
         },
     })
+}
+
+pub(crate) fn packet_owned_ops_playbook_path(maintenance_root: &str) -> String {
+    format!("{maintenance_root}/{PACKET_OWNED_OPS_PLAYBOOK_FILE}")
+}
+
+pub(crate) fn packet_owned_workflow_plan_path(maintenance_root: &str) -> String {
+    format!("{maintenance_root}/{PACKET_OWNED_WORKFLOW_PLAN_FILE}")
+}
+
+pub(crate) fn packet_owned_prompt_template_path(maintenance_root: &str) -> String {
+    format!("{maintenance_root}/{PACKET_OWNED_PROMPT_TEMPLATE_FILE}")
+}
+
+pub(crate) fn packet_pr_prompt_template(
+    entry: &AgentRegistryEntry,
+    maintenance_root: &str,
+) -> String {
+    format!(
+        concat!(
+            "# Packet PR Maintenance Prompt (`{{{{VERSION}}}}`)\n\n",
+            "This template renders the exact maintained-agent prompt for `{agent_id}` packet execution.\n",
+            "`{handoff_path}` remains canonical and `governance/pr-summary.md` is derivative.\n\n",
+            "@codex\n\n",
+            "## Goal\n\n",
+            "Execute the automated maintenance packet for `{agent_id}` target `{{{{VERSION}}}}`.\n\n",
+            "## Frozen request contract\n\n",
+            "- Read `{request_path}` before changing code or docs.\n",
+            "- Treat `{handoff_path}` as canonical for writable surfaces, read-only inputs, ordered commands, green gates, and recovery.\n",
+            "- Treat `.github/workflows/{workflow}` as the opening workflow source.\n",
+            "- Do not write outside the execution contract frozen in the request packet.\n\n",
+            "## Manifest inputs\n\n",
+            "- `cli_manifests/{agent_id}/README.md`\n",
+            "- `cli_manifests/{agent_id}/VALIDATOR_SPEC.md`\n",
+            "- `cli_manifests/{agent_id}/RULES.json`\n",
+            "- `cli_manifests/{agent_id}/SCHEMA.json`\n",
+            "- `cli_manifests/{agent_id}/current.json`\n",
+            "- `cli_manifests/{agent_id}/latest_validated.txt`\n",
+            "- `cli_manifests/{agent_id}/wrapper_coverage.json`\n\n",
+            "## Required workflow\n\n",
+            "1. Compare the current validated baseline from `cli_manifests/{agent_id}/latest_validated.txt` against the target `{{{{VERSION}}}}` artifacts.\n",
+            "2. Refresh or create version-scoped manifest artifacts under `cli_manifests/{agent_id}/snapshots/{{{{VERSION}}}}/`, `cli_manifests/{agent_id}/reports/{{{{VERSION}}}}/`, and `cli_manifests/{agent_id}/versions/{{{{VERSION}}}}.json` as required by the packet.\n",
+            "3. Update `crates/{agent_id}/**` and `crates/agent_api/**` only when the target artifact delta requires wrapper or backend changes.\n",
+            "4. Leave closeout manual; record it only with `close-agent-maintenance` after the declared green gates pass.\n\n",
+            "## Done criteria\n\n",
+            "- Changes stay within the writable surfaces frozen in `{request_path}`.\n",
+            "- `cargo run -p xtask -- codex-validate --root cli_manifests/{agent_id}` passes.\n",
+            "- The remaining ordered commands and green gates from `{handoff_path}` pass or are captured in maintainer follow-up notes.\n"
+        ),
+        agent_id = entry.agent_id,
+        handoff_path = format!("{maintenance_root}/HANDOFF.md"),
+        request_path = format!("{maintenance_root}/governance/maintenance-request.toml"),
+        workflow = GENERIC_PACKET_PR_WORKFLOW,
+    )
 }
 
 pub(crate) fn normalize_detected_release(
@@ -195,6 +259,68 @@ pub(crate) fn render_prompt_template(
     let template = fs::read_to_string(&template_path)
         .map_err(|err| format!("read {}: {err}", template_path.display()))?;
     Ok(template.replace("{{VERSION}}", target_version))
+}
+
+pub(crate) fn render_prompt_template_for_contract(
+    workspace_root: &Path,
+    entry: &AgentRegistryEntry,
+    maintenance_root: &str,
+    prompt_template_path: &str,
+    target_version: &str,
+) -> Result<String, String> {
+    let Some(release_watch) = entry.maintenance.release_watch.as_ref() else {
+        return render_prompt_template(workspace_root, prompt_template_path, target_version);
+    };
+    match release_watch.dispatch_kind {
+        ReleaseWatchDispatchKind::WorkflowDispatch => {
+            render_prompt_template(workspace_root, prompt_template_path, target_version)
+        }
+        ReleaseWatchDispatchKind::PacketPr => {
+            let expected_path = packet_owned_prompt_template_path(maintenance_root);
+            if prompt_template_path != expected_path {
+                return Err(format!(
+                    "packet_pr execution contract for agent `{}` must use prompt template path `{expected_path}`",
+                    entry.agent_id
+                ));
+            }
+            Ok(packet_pr_prompt_template(entry, maintenance_root).replace("{{VERSION}}", target_version))
+        }
+    }
+}
+
+fn prompt_template_path(
+    entry: &AgentRegistryEntry,
+    maintenance_root: &str,
+    release_watch: &ReleaseWatchMetadata,
+) -> String {
+    match release_watch.dispatch_kind {
+        ReleaseWatchDispatchKind::WorkflowDispatch => {
+            format!("{}/PR_BODY_TEMPLATE.md", entry.manifest_root)
+        }
+        ReleaseWatchDispatchKind::PacketPr => packet_owned_prompt_template_path(maintenance_root),
+    }
+}
+
+fn read_only_inputs(
+    entry: &AgentRegistryEntry,
+    maintenance_root: &str,
+    opened_from: &str,
+    release_watch: &ReleaseWatchMetadata,
+) -> Vec<String> {
+    match release_watch.dispatch_kind {
+        ReleaseWatchDispatchKind::WorkflowDispatch => vec![
+            format!("{}/OPS_PLAYBOOK.md", entry.manifest_root),
+            format!("{}/CI_WORKFLOWS_PLAN.md", entry.manifest_root),
+            format!("{}/PR_BODY_TEMPLATE.md", entry.manifest_root),
+            opened_from.to_string(),
+        ],
+        ReleaseWatchDispatchKind::PacketPr => vec![
+            packet_owned_ops_playbook_path(maintenance_root),
+            packet_owned_workflow_plan_path(maintenance_root),
+            packet_owned_prompt_template_path(maintenance_root),
+            opened_from.to_string(),
+        ],
+    }
 }
 
 fn green_gates(entry: &AgentRegistryEntry) -> Vec<String> {

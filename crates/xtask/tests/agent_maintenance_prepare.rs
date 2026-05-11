@@ -146,6 +146,24 @@ fn prepare_agent_maintenance_packet_pr_defaults_to_generic_open_pr_workflow() {
     let request_text = String::from_utf8(plan.files[0].contents.clone()).expect("utf8");
     assert!(request_text.contains("dispatch_kind = \"packet_pr\""));
     assert!(request_text.contains("dispatch_workflow = \"agent-maintenance-open-pr.yml\""));
+    assert!(request_text.contains(
+        "prompt_template_path = \"docs/agents/lifecycle/codex-maintenance/governance/execute-agent-maintenance-prompt.md\""
+    ));
+    assert!(request_text.contains(
+        "\"docs/agents/lifecycle/codex-maintenance/OPS_PLAYBOOK.md\""
+    ));
+    assert!(request_text.contains(
+        "\"docs/agents/lifecycle/codex-maintenance/CI_WORKFLOWS_PLAN.md\""
+    ));
+    assert!(plan.planned_paths().contains(
+        &"docs/agents/lifecycle/codex-maintenance/OPS_PLAYBOOK.md"
+    ));
+    assert!(plan.planned_paths().contains(
+        &"docs/agents/lifecycle/codex-maintenance/CI_WORKFLOWS_PLAN.md"
+    ));
+    assert!(plan.planned_paths().contains(
+        &"docs/agents/lifecycle/codex-maintenance/governance/execute-agent-maintenance-prompt.md"
+    ));
 }
 
 #[test]

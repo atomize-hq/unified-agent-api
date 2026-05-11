@@ -1,11 +1,23 @@
-<!-- generated-by: xtask refresh-agent; owner: control-plane -->
+<!-- generated-by: xtask agent-maintenance renderer; source-of-truth: governance/maintenance-request.toml -->
 
 # Review surfaces
 
-- `docs/integrations/opencode/governance/seam-2-closeout.md`
-- `docs/integrations/opencode/governance/seam-2-closeout.md`
-- `docs/specs/unified-agent-api/support-matrix.md`
+## Writable surfaces
+
+- `docs/agents/lifecycle/opencode-maintenance/**`
+- `crates/opencode/**`
+- `crates/agent_api/**`
+- `cli_manifests/opencode/artifacts.lock.json`
+- `cli_manifests/opencode/snapshots/1.14.40/**`
+- `cli_manifests/opencode/reports/1.14.40/**`
+- `cli_manifests/opencode/versions/1.14.40.json`
+- `cli_manifests/opencode/wrapper_coverage.json`
 - `cli_manifests/support_matrix/current.json`
-- `docs/specs/unified-agent-api/capability-matrix.md`
-- `docs/crates-io-release.md`
-- historical packet docs are detector inputs only and remain read-only
+- `docs/specs/unified-agent-api/support-matrix.md`
+
+## Read-only inputs
+
+- `docs/agents/lifecycle/opencode-maintenance/OPS_PLAYBOOK.md`
+- `docs/agents/lifecycle/opencode-maintenance/CI_WORKFLOWS_PLAN.md`
+- `docs/agents/lifecycle/opencode-maintenance/governance/execute-agent-maintenance-prompt.md`
+- `.github/workflows/agent-maintenance-open-pr.yml`

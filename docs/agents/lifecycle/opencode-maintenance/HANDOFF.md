@@ -1,41 +1,131 @@
-<!-- generated-by: xtask close-agent-maintenance; owner: maintenance-control-plane -->
+<!-- generated-by: xtask agent-maintenance renderer; source-of-truth: governance/maintenance-request.toml -->
 
 # Handoff
 
-This packet records the closed maintenance run for `opencode`.
+This file is the canonical contributor execution contract for `opencode` maintenance.
 
-## Request linkage
+## Packet origin
 
-- request ref: `docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml`
-- request sha256: `43143c88d2ed79e80f7e0f843a7e9a6e4ad60e8261522a62f3695763cf1e89ea`
-- trigger kind: `drift_detected`
-- basis ref: `docs/integrations/opencode/governance/seam-2-closeout.md`
-- opened from: `docs/integrations/opencode/governance/seam-2-closeout.md`
-- requested control-plane actions:
-- `packet_doc_refresh`
+- detected_by: `.github/workflows/agent-maintenance-release-watch.yml`
+- current_validated: `1.4.11`
+- target_version: `1.14.40`
+- latest_stable: `1.14.41`
+- version_policy: `latest_stable_minus_one`
+- source_kind: `github_releases`
+- source_ref: `anomalyco/opencode`
+- dispatch_kind: `packet_pr`
+- dispatch_workflow: `agent-maintenance-open-pr.yml`
+- branch_name: `automation/opencode-maintenance-1.14.40`
 
-## Closeout
+## Relay contract
 
-- closeout metadata: `docs/agents/lifecycle/opencode-maintenance/governance/maintenance-closeout.json`
-- preflight passed: `false`
-- recorded at: `2026-04-22T01:04:31Z`
-- commit: `8e77b59`
+- maintained agent packet: `opencode`
+- local execution host: `local Codex CLI host via execute-agent-maintenance`
+- executor surface: `execute-agent-maintenance`
+- request artifact: `docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml`
+- prompt template path: `docs/agents/lifecycle/opencode-maintenance/governance/execute-agent-maintenance-prompt.md`
+- prompt sha256: `0060876bb5f17815a560ddee0f7f010ed32587b3fbecd5a47061b44be3d7327b`
+- canonical handoff: `docs/agents/lifecycle/opencode-maintenance/HANDOFF.md`
+- derivative pr summary: `docs/agents/lifecycle/opencode-maintenance/governance/pr-summary.md`
+- exact closeout artifact: `docs/agents/lifecycle/opencode-maintenance/governance/maintenance-closeout.json`
+- branch linkage: `automation/opencode-maintenance-1.14.40`
+- manual closeout required: `true`
 
-## Resolved findings
+## Writable surfaces
 
-- [governance_doc_drift] The stale OpenCode SEAM-2 capability claim is now superseded by the maintenance packet and linked back to the current backend contract and generated capability publication.
-  surfaces:
-  - docs/integrations/opencode/governance/seam-2-closeout.md
-  - crates/agent_api/src/backends/opencode/backend.rs
-  - docs/specs/opencode-agent-api-backend-contract.md
-  - docs/specs/unified-agent-api/capability-matrix.md
-  - docs/agents/lifecycle/opencode-maintenance/HANDOFF.md
-  - docs/agents/lifecycle/opencode-maintenance/review_surfaces.md
+- `docs/agents/lifecycle/opencode-maintenance/**`
+- `crates/opencode/**`
+- `crates/agent_api/**`
+- `cli_manifests/opencode/artifacts.lock.json`
+- `cli_manifests/opencode/snapshots/1.14.40/**`
+- `cli_manifests/opencode/reports/1.14.40/**`
+- `cli_manifests/opencode/versions/1.14.40.json`
+- `cli_manifests/opencode/wrapper_coverage.json`
+- `cli_manifests/support_matrix/current.json`
+- `docs/specs/unified-agent-api/support-matrix.md`
 
-## Deferred findings
+## Read-only inputs
 
-- No deferred findings remain: No deferred maintenance findings remain after the maintenance packet refresh. Repo-level preflight is still blocked by unrelated pre-existing loc-cap debt outside the M4 maintenance lane.
+- `docs/agents/lifecycle/opencode-maintenance/OPS_PLAYBOOK.md`
+- `docs/agents/lifecycle/opencode-maintenance/CI_WORKFLOWS_PLAN.md`
+- `docs/agents/lifecycle/opencode-maintenance/governance/execute-agent-maintenance-prompt.md`
+- `.github/workflows/agent-maintenance-open-pr.yml`
 
-## Runtime follow-up
+## Ordered repo commands
 
-- No runtime follow-up is currently required.
+- `cargo fmt --all`
+- `cargo run -p xtask -- codex-validate --root cli_manifests/opencode`
+- `cargo run -p xtask -- support-matrix --check`
+- `cargo run -p xtask -- capability-matrix --check`
+- `cargo run -p xtask -- capability-matrix-audit`
+- `make preflight`
+
+## Exact green gates
+
+- `cargo fmt --all`
+- `cargo run -p xtask -- codex-validate --root cli_manifests/opencode`
+- `cargo run -p xtask -- support-matrix --check`
+- `cargo run -p xtask -- capability-matrix --check`
+- `cargo run -p xtask -- capability-matrix-audit`
+- `make preflight`
+
+## Recovery
+
+- recreate packet command: `cargo run -p xtask -- refresh-agent --request docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml --write`
+- reopen pr body path: `docs/agents/lifecycle/opencode-maintenance/governance/pr-summary.md`
+- reopen pr branch: `automation/opencode-maintenance-1.14.40`
+- notes:
+- If PR creation fails after packet generation, rerun packet regeneration from the frozen request and reopen the PR from the generated pr-summary path.
+- If the local execution-host preflight (local Codex CLI host via execute-agent-maintenance) fails, fix the Codex binary/auth state and rerun `execute-agent-maintenance --dry-run` before write mode.
+
+## Exact closeout command
+
+```sh
+cargo run -p xtask -- close-agent-maintenance --request docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml --closeout docs/agents/lifecycle/opencode-maintenance/governance/maintenance-closeout.json
+```
+
+## Exact maintained-agent prompt
+
+```md
+# Packet PR Maintenance Prompt (`1.14.40`)
+
+This template renders the exact maintained-agent prompt for `opencode` packet execution.
+`docs/agents/lifecycle/opencode-maintenance/HANDOFF.md` remains canonical and `governance/pr-summary.md` is derivative.
+
+@codex
+
+## Goal
+
+Execute the automated maintenance packet for `opencode` target `1.14.40`.
+
+## Frozen request contract
+
+- Read `docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml` before changing code or docs.
+- Treat `docs/agents/lifecycle/opencode-maintenance/HANDOFF.md` as canonical for writable surfaces, read-only inputs, ordered commands, green gates, and recovery.
+- Treat `.github/workflows/agent-maintenance-open-pr.yml` as the opening workflow source.
+- Do not write outside the execution contract frozen in the request packet.
+
+## Manifest inputs
+
+- `cli_manifests/opencode/README.md`
+- `cli_manifests/opencode/VALIDATOR_SPEC.md`
+- `cli_manifests/opencode/RULES.json`
+- `cli_manifests/opencode/SCHEMA.json`
+- `cli_manifests/opencode/current.json`
+- `cli_manifests/opencode/latest_validated.txt`
+- `cli_manifests/opencode/wrapper_coverage.json`
+
+## Required workflow
+
+1. Compare the current validated baseline from `cli_manifests/opencode/latest_validated.txt` against the target `1.14.40` artifacts.
+2. Refresh or create version-scoped manifest artifacts under `cli_manifests/opencode/snapshots/1.14.40/`, `cli_manifests/opencode/reports/1.14.40/`, and `cli_manifests/opencode/versions/1.14.40.json` as required by the packet.
+3. Update `crates/opencode/**` and `crates/agent_api/**` only when the target artifact delta requires wrapper or backend changes.
+4. Leave closeout manual; record it only with `close-agent-maintenance` after the declared green gates pass.
+
+## Done criteria
+
+- Changes stay within the writable surfaces frozen in `docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml`.
+- `cargo run -p xtask -- codex-validate --root cli_manifests/opencode` passes.
+- The remaining ordered commands and green gates from `docs/agents/lifecycle/opencode-maintenance/HANDOFF.md` pass or are captured in maintainer follow-up notes.
+
+```

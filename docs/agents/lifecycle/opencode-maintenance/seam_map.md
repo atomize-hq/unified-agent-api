@@ -1,5 +1,5 @@
-<!-- generated-by: xtask refresh-agent; owner: control-plane -->
+<!-- generated-by: xtask agent-maintenance renderer; source-of-truth: governance/maintenance-request.toml -->
 
 # Seam map
 
-This maintenance packet has one bounded seam: reconcile maintenance-owned docs and generated publication surfaces with the detector-emitted drift basis.
+This maintenance packet has one bounded seam: render a contributor-ready execution contract for the detected upstream release while keeping `HANDOFF.md` canonical and `governance/pr-summary.md` derivative.

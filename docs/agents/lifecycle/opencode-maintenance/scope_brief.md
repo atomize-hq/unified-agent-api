@@ -1,15 +1,18 @@
-<!-- generated-by: xtask refresh-agent; owner: control-plane -->
+<!-- generated-by: xtask agent-maintenance renderer; source-of-truth: governance/maintenance-request.toml -->
 
 # Scope brief
 
-This maintenance lane is limited to control-plane docs and generated publication surfaces for `opencode`.
+This automated maintenance lane is limited to the frozen shared packet for `opencode` and the declared writable surfaces below.
 
-Allowed write envelope:
+## Writable surfaces
 
-- maintenance packet docs under `docs/agents/lifecycle/opencode-maintenance`
+- `docs/agents/lifecycle/opencode-maintenance/**`
+- `crates/opencode/**`
+- `crates/agent_api/**`
+- `cli_manifests/opencode/artifacts.lock.json`
+- `cli_manifests/opencode/snapshots/1.14.40/**`
+- `cli_manifests/opencode/reports/1.14.40/**`
+- `cli_manifests/opencode/versions/1.14.40.json`
+- `cli_manifests/opencode/wrapper_coverage.json`
 - `cli_manifests/support_matrix/current.json`
 - `docs/specs/unified-agent-api/support-matrix.md`
-- `docs/specs/unified-agent-api/capability-matrix.md`
-- `docs/crates-io-release.md`
-
-Historical onboarding and implementation packet docs remain read-only inputs.

@@ -5,8 +5,9 @@ use sha2::Digest;
 use crate::agent_registry::{AgentRegistry, AgentRegistryEntry};
 
 use super::contract_policy::{
-    build_execution_contract_for_request, render_prompt_template, EXECUTE_HOST_SURFACE,
-    EXECUTION_HOST_LABEL,
+    build_execution_contract_for_request, packet_owned_ops_playbook_path,
+    packet_owned_prompt_template_path, packet_owned_workflow_plan_path, packet_pr_prompt_template,
+    render_prompt_template_for_contract, EXECUTE_HOST_SURFACE, EXECUTION_HOST_LABEL,
 };
 use super::request::{ExecutionContract, MaintenanceRequest, MaintenanceRequestEnvelope};
 
@@ -185,8 +186,11 @@ pub fn render_execution_packet(
             request.relative_path
         )
     })?;
-    let prompt_contents = render_prompt_template(
+    let entry = load_registry_entry(workspace_root, &request.agent_id)?;
+    let prompt_contents = render_prompt_template_for_contract(
         workspace_root,
+        &entry,
+        &request.maintenance_root,
         &execution_contract.prompt_template_path,
         &detected_release.target_version,
     )?;
@@ -296,10 +300,12 @@ fn build_automated_packet_docs_from_contract(
 ) -> Result<Vec<RenderedPacketDoc>, String> {
     let rendered_execution_packet =
         render_execution_packet(workspace_root, request, execution_contract)?;
+    let packet_owned_contract_inputs =
+        build_packet_owned_contract_inputs(workspace_root, request, execution_contract)?;
     let root = &request.maintenance_root;
     let trigger_context = render_trigger_context(request);
 
-    Ok(vec![
+    let mut docs = vec![
         RenderedPacketDoc {
             relative_path: format!("{root}/README.md"),
             contents: wrap_markdown(&format!(
@@ -350,14 +356,6 @@ fn build_automated_packet_docs_from_contract(
             )),
         },
         RenderedPacketDoc {
-            relative_path: rendered_execution_packet.handoff_relative_path.clone(),
-            contents: rendered_execution_packet.handoff_contents,
-        },
-        RenderedPacketDoc {
-            relative_path: rendered_execution_packet.pr_summary_relative_path.clone(),
-            contents: rendered_execution_packet.pr_summary_contents,
-        },
-        RenderedPacketDoc {
             relative_path: format!("{root}/governance/remediation-log.md"),
             contents: wrap_markdown(&format!(
                 "# Remediation log\n\nRefresh planned from `{}`.\n\n- basis ref: `{}`\n- trigger kind: `{}`\n- request sha256: `{}`\n- canonical handoff: `{}`\n- derivative pr summary: `{}`\n\nNo maintenance closeout has been recorded yet.\n",
@@ -368,6 +366,67 @@ fn build_automated_packet_docs_from_contract(
                 rendered_execution_packet.handoff_relative_path,
                 rendered_execution_packet.pr_summary_relative_path
             )),
+        },
+    ];
+    docs.extend(packet_owned_contract_inputs);
+    docs.push(RenderedPacketDoc {
+        relative_path: rendered_execution_packet.handoff_relative_path.clone(),
+        contents: rendered_execution_packet.handoff_contents,
+    });
+    docs.push(RenderedPacketDoc {
+        relative_path: rendered_execution_packet.pr_summary_relative_path.clone(),
+        contents: rendered_execution_packet.pr_summary_contents,
+    });
+    Ok(docs)
+}
+
+fn build_packet_owned_contract_inputs(
+    workspace_root: &Path,
+    request: &MaintenanceRequest,
+    execution_contract: &ExecutionContract,
+) -> Result<Vec<RenderedPacketDoc>, String> {
+    let prompt_path = packet_owned_prompt_template_path(&request.maintenance_root);
+    if execution_contract.prompt_template_path != prompt_path {
+        return Ok(Vec::new());
+    }
+
+    let entry = load_registry_entry(workspace_root, &request.agent_id)?;
+    let detected_release = request.detected_release.as_ref().ok_or_else(|| {
+        format!(
+            "packet-owned contract inputs require detected_release metadata for `{}`",
+            request.relative_path
+        )
+    })?;
+    let handoff_path = format!("{}/HANDOFF.md", request.maintenance_root);
+
+    Ok(vec![
+        RenderedPacketDoc {
+            relative_path: packet_owned_ops_playbook_path(&request.maintenance_root),
+            contents: wrap_markdown(&format!(
+                "# Ops playbook\n\nThis packet-owned playbook freezes operator context for `{}` target `{}`.\n\n- request artifact: `{}`\n- basis ref: `{}`\n- opened from: `{}`\n- branch linkage: `{}`\n- canonical handoff: `{}`\n- recovery packet regeneration: `{}`\n",
+                request.agent_id,
+                detected_release.target_version,
+                request.relative_path,
+                request.basis_ref,
+                request.opened_from,
+                detected_release.branch_name,
+                handoff_path,
+                execution_contract.recovery.recreate_packet_command
+            )),
+        },
+        RenderedPacketDoc {
+            relative_path: packet_owned_workflow_plan_path(&request.maintenance_root),
+            contents: wrap_markdown(&format!(
+                "# CI workflows plan\n\nThis packet is opened from `{}` and relayed through `{}`.\n\n## Ordered repo commands\n\n{}\n\n## Exact green gates\n\n{}\n",
+                request.opened_from,
+                handoff_path,
+                markdown_command_list(&execution_contract.ordered_commands),
+                markdown_command_list(&execution_contract.green_gates)
+            )),
+        },
+        RenderedPacketDoc {
+            relative_path: prompt_path,
+            contents: packet_pr_prompt_template(&entry, &request.maintenance_root),
         },
     ])
 }

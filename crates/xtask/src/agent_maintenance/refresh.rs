@@ -333,7 +333,13 @@ fn ensure_allowed_write_path(
         format!("{}/seam_map.md", request.maintenance_root),
         format!("{}/threading.md", request.maintenance_root),
         format!("{}/review_surfaces.md", request.maintenance_root),
+        format!("{}/OPS_PLAYBOOK.md", request.maintenance_root),
+        format!("{}/CI_WORKFLOWS_PLAN.md", request.maintenance_root),
         format!("{}/HANDOFF.md", request.maintenance_root),
+        format!(
+            "{}/governance/execute-agent-maintenance-prompt.md",
+            request.maintenance_root
+        ),
         format!("{}/governance/pr-summary.md", request.maintenance_root),
         format!("{}/governance/remediation-log.md", request.maintenance_root),
     ];
