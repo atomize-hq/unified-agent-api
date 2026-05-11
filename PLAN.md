@@ -1,7 +1,7 @@
 # PLAN - First Honest Maintenance Proof Run
 
 Status: ready for implementation  
-Date: 2026-05-10  
+Date: 2026-05-11  
 Working branch: `staging`  
 Workflow checkout ref: `staging`  
 Repo default branch: `main`  
@@ -61,18 +61,18 @@ architecture taste.
    - keep the split `codex` / `claude_code` worker topology for now, or
    - open a separate transport-topology convergence follow-up next
 
-## Step 0 Scope Challenge
+## Step 0 Scope Contract
 
 ### Premise Challenge
 
 | Premise | Assessment | Decision |
 | --- | --- | --- |
 | The current maintenance topology is finally truthful enough to be tested directly. | Accepted. The watcher, packet contract, worker/runbook wording, relay contract, and closeout surfaces now line up well enough that a proof run measures reality, not stale docs. | Prove this topology before redesigning it. |
-| `codex` is the cleanest first proving target. | Accepted. `codex` is release-watch enrolled, has a committed generated maintenance root, and already uses the shared packet/relay path. | Lock `codex` as the first proof target. |
+| `codex` is the cleanest first proving target. | Accepted. `codex` is release-watch enrolled, has a committed generated maintenance root, and already uses the shared packet and relay path. | Lock `codex` as the first proof target. |
 | A proof run that starts at the downstream worker is good enough. | Rejected. That skips the exact shared watcher seam the last milestone was trying to make truthful. | Start at `agent-maintenance-release-watch.yml`. |
 | The next milestone should also decide or implement a universal worker cutover. | Rejected. That mixes validation with redesign and makes every failure ambiguous. | Defer topology redesign unless the proof earns it. |
 | `goose` should be part of this proof. | Rejected for this milestone. `goose` remains a separate create-lane proving target already captured in `TODOS.md`. | Keep `goose` out of scope here. |
-| A proof run without an explicit exit rule is enough. | Rejected. That creates a ceremonial run with no decision value. | Use a predeclared topology decision rule. |
+| A proof run without an explicit exit rule is enough. | Rejected. That creates a ceremonial run with no decision value. | Freeze the topology decision rule before the live run. |
 
 ### What Already Exists
 
@@ -93,31 +93,32 @@ architecture taste.
 | Confirm enrolled agent truth | `crates/xtask/data/agent_registry.toml` |
 | Prove watcher queue contents locally before spending Actions time | `cargo run -p xtask -- maintenance-watch --check` and `--emit-json` |
 | Prove shared dispatch path | `.github/workflows/agent-maintenance-release-watch.yml` |
-| Prove worker-specific acquisition + packet preparation | `.github/workflows/codex-cli-update-snapshot.yml` |
+| Prove worker-specific acquisition and packet preparation | `.github/workflows/codex-cli-update-snapshot.yml` |
 | Prove generated packet truth | `docs/agents/lifecycle/codex-maintenance/{HANDOFF.md,governance/maintenance-request.toml,governance/pr-summary.md}` |
 | Prove relay trust step and write envelope | `execute-agent-maintenance` |
-| Prove manual closeout | `maintenance-closeout.json` + `close-agent-maintenance` |
+| Prove manual closeout | `maintenance-closeout.json` plus `close-agent-maintenance` |
 | Record future topology decision | `TODOS.md` |
 
 ### Minimum Complete Change
 
 The minimum complete milestone is:
 
-1. freeze the proving target, scorecard, and topology exit rule
+1. freeze the proving target, scorecard, restart rules, and topology exit rule
 2. locally preflight the shared watcher queue before spending live Actions time
 3. manually trigger the shared watcher and capture the real downstream worker evidence
 4. consume the generated packet and exercise relay dry-run plus write mode
-5. prove or truthfully fail the documented recovery path if PR opening fails
+5. prove or truthfully classify the documented recovery path if PR opening fails
 6. record maintenance closeout truth and a written topology decision
 7. lock any discovered localized bugs with regression tests before declaring the proof done
 
 Anything smaller is a demo, not a proof.
 
-### Complexity Check
+### Complexity, Completeness, And Distribution Checks
 
-This milestone should not introduce new infrastructure.
+**Complexity smell triggers**
 
-Smells that mean the plan is overbuilt:
+If any proposed fix requires one of these, stop and reclassify the work as topology evidence
+instead of sneaking it into the proof milestone:
 
 - a new proof-only xtask command
 - a new workflow family just for proving
@@ -125,17 +126,13 @@ Smells that mean the plan is overbuilt:
 - a second proving target in the same milestone
 - a universal worker redesign starting before the first proof finishes
 
-### Search / Build Decision
+**Completeness rule**
 
-- **[Layer 1]** Reuse the existing shared watcher, downstream worker, packet generator, relay,
-  and closeout commands.
-- **[Layer 1]** Reuse the existing maintenance packet surfaces and closeout JSON instead of
-  inventing a proof-run artifact family.
-- **[Layer 1]** Reuse `TODOS.md` for the topology follow-up decision.
-- **[Layer 3]** Treat the topology decision rule as a repo-specific first-principles safeguard:
-  prove the current system before changing it.
+This plan is only done if the real shared watcher, the real downstream worker, the real generated
+packet, the real local relay, and the real closeout path are all exercised or truthfully blocked.
+Anything that substitutes local prose for one of those stages is incomplete.
 
-### Distribution Check
+**Distribution check**
 
 No new external artifact is introduced.
 
@@ -149,22 +146,34 @@ This is an internal factory milestone. Its outputs are:
 
 ### Blocking Preconditions
 
-The proof MUST NOT start until all five conditions below are true.
+The proof MUST NOT start until all six conditions below are true.
 
 | Precondition | Why it matters | Required action |
 | --- | --- | --- |
 | `origin/staging` contains the intended maintenance machinery | Both live workflows explicitly check out `staging`, not the local worktree. A local-only commit means the proof runs stale code. | Run `git fetch origin`, compare `git rev-parse staging` vs `git rev-parse origin/staging`, and push `staging` first if they differ. |
 | `codex` is stale at execution time | This proof is about the real shared watcher queue, not synthetic worker inputs. | `maintenance-watch --emit-json` must surface a real `codex` queue item. If it does not, stop. Do not fabricate inputs. |
 | GitHub dispatch permissions exist | The proof requires a real shared watcher run. | Use `gh workflow run ...` if authenticated, otherwise dispatch from the GitHub UI. |
-| The local execution host is available or repairable through the documented path | `execute-agent-maintenance --dry-run` is a required trust step. | If host preflight fails, repair the local Codex CLI/auth state and rerun dry-run. Do not widen repo scope until that path is proven insufficient. |
+| The local execution host is available or repairable through the documented path | `execute-agent-maintenance --dry-run` is a required trust step. | If host preflight fails, repair the local Codex CLI and auth state through the documented path, then rerun dry-run. Do not widen repo scope until that path is proven insufficient. |
 | The queue-emitted version is treated as the only live target truth | The committed `docs/agents/lifecycle/codex-maintenance/**` surfaces currently show an older prepared lane shape. The live proof may target a newer version. | Trust the queue-generated `target_version` and branch name from the current run, not the pre-existing example packet. |
+| Every live rerun exercises a pushed remote commit | GitHub Actions is not reading the local worktree. Any local repair that has not been pushed turns the next run into bad evidence. | Push `staging` before every live workflow rerun after a code or workflow fix, and record the exercised commit SHA in the final evidence note. |
 
 If `maintenance-watch` shows no stale `codex` candidate at execution time, this milestone is
 `BLOCKED: no live stale codex target`. The correct move is to wait for the next eligible upstream
 release or intentionally create a new maintenance situation through the normal maintenance lane.
 Do not invent a proof-only stale target.
 
-## Locked Decisions
+### Restart Rules
+
+1. If local `staging` and `origin/staging` diverge before any live run, push first.
+2. If Phase 3 sees a newer release than Phase 2 and the live queue item differs, discard the old
+   local preflight evidence and restart from Phase 2. Do not mix target versions.
+3. If a localized fix changes watcher logic, registry truth, workflow dispatch, packet generation,
+   relay behavior, or closeout behavior, rerun the smallest affected proof segment and its matching
+   tests before resuming.
+4. Every watcher run URL, worker run URL, and final decision note must cite the `origin/staging`
+   commit that was actually exercised.
+
+### Locked Decisions
 
 1. The first proof target is `codex`, not `claude_code` and not `goose`.
 2. The proof must start at `.github/workflows/agent-maintenance-release-watch.yml`.
@@ -183,7 +192,18 @@ Do not invent a proof-only stale target.
 9. `claude_code` is a secondary control target only if the `codex` proof reveals ambiguity that
    looks target-specific rather than topology-wide.
 
-## Architecture
+## Proof Scorecard
+
+| Phase | Question answered | Required evidence | Pass condition | Hard fail condition |
+| --- | --- | --- | --- | --- |
+| 1. Freeze prerequisites | Are we proving the right thing on the right remote commit? | remote SHA check, locked decision rule | `origin/staging` aligned, decision rule frozen | live run starts from stale remote state |
+| 2. Local queue preflight | Does the shared watcher queue really emit `codex`? | `_ci_tmp/maintenance-watch.json` | queue contains real `codex` stale entry with canonical branch name | no live stale `codex` target or queue truth bug |
+| 3. Shared watcher proof | Does the real entrypoint dispatch the right worker with unchanged truth? | watcher run URL, worker run URL, queue-to-worker field comparison | shared watcher dispatches `codex` worker for the same target version and branch | wrong worker, wrong branch, or mixed-version evidence |
+| 4. Packet and relay proof | Can a maintainer run the generated packet without folklore? | `HANDOFF.md`, request, PR summary, dry-run, write run evidence | packet fields agree and relay dry-run and write mode are understandable | hidden steps, contradictory packet truth, or write-envelope ambiguity |
+| 5. Recovery and closeout | Can the lane recover honestly and close honestly? | replay evidence if needed, closeout JSON, closeout output | replay works when needed or is truthfully unexercised; closeout is explicit | packet surgery or ad hoc prose required to recover or close |
+| 6. Decision and lock-in | Is the outcome a localized repair or a topology problem? | regression tests, rerun gates, TODO note | evidence-backed keep-vs-cutover decision written to `TODOS.md` | decision depends on taste instead of proof evidence |
+
+## Topology And Evidence Contract
 
 ### Current Topology
 
@@ -223,12 +243,12 @@ manual closeout
 ```text
 Phase 1: prerequisite lock
   push staging if needed
-  confirm proof target + decision rule
+  freeze proof target + restart rules + decision rule
         |
         v
 Phase 2: local queue preflight
-  cargo run -p xtask -- maintenance-watch --check
-  cargo run -p xtask -- maintenance-watch --emit-json _ci_tmp/maintenance-watch.json
+  maintenance-watch --check
+  maintenance-watch --emit-json _ci_tmp/maintenance-watch.json
         |
         v
 Phase 3: shared watcher
@@ -261,16 +281,16 @@ Phase 6: localized fixes + decision
   write keep-vs-cutover verdict to TODOS.md
 ```
 
-### Source-of-Truth Boundaries
+### Source-Of-Truth Boundaries
 
 | Surface | Owner | Consumers | Rule |
 | --- | --- | --- | --- |
-| stale-agent truth | `agent_registry.toml` + `maintenance-watch` | shared watcher, downstream worker, maintainer | one source of truth |
+| stale-agent truth | `agent_registry.toml` plus `maintenance-watch` | shared watcher, downstream worker, maintainer | one source of truth |
 | transport entrypoint | `agent-maintenance-release-watch.yml` | GitHub Actions, maintainers | start here, not downstream |
 | downstream acquisition | `codex-cli-update-snapshot.yml` | automation lane | transport only, no second policy store |
 | packet truth | `prepare-agent-maintenance` output | maintainers, relay, PR body | `HANDOFF.md` remains canonical |
 | local relay truth | `execute-agent-maintenance` | maintainers | trust packet-owned write envelope and gates |
-| closeout truth | `maintenance-closeout.json` + `close-agent-maintenance` | maintainers, future reviews | one explicit maintenance closeout path |
+| closeout truth | `maintenance-closeout.json` plus `close-agent-maintenance` | maintainers, future reviews | one explicit maintenance closeout path |
 | redesign follow-up | `TODOS.md` | future planning | no silent topology drift |
 
 ### Blast Radius
@@ -296,7 +316,7 @@ Primary blast radius:
 - written decision:
   - `TODOS.md`
 
-### Evidence Packet
+### Evidence Contract
 
 This milestone is complete only if these artifacts exist and are cited in the closeout decision.
 
@@ -308,8 +328,8 @@ This milestone is complete only if these artifacts exist and are cited in the cl
 | Frozen request | `docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml` |
 | Canonical execution contract | `docs/agents/lifecycle/codex-maintenance/HANDOFF.md` |
 | Derivative PR body | `docs/agents/lifecycle/codex-maintenance/governance/pr-summary.md` |
-| Relay dry-run/write evidence | `docs/agents/.uaa-temp/agent-maintenance/runs/<run_id>/` |
-| Branch / PR result | `automation/codex-maintenance-<target_version>` plus PR URL or replay evidence |
+| Relay dry-run and write evidence | `docs/agents/.uaa-temp/agent-maintenance/runs/<run_id>/` |
+| Branch and PR result | `automation/codex-maintenance-<target_version>` plus PR URL or replay evidence |
 | Closeout truth | `docs/agents/lifecycle/codex-maintenance/governance/maintenance-closeout.json` |
 | Final topology decision | dated note under the existing transport-topology TODO in `TODOS.md` |
 
@@ -333,7 +353,8 @@ Exact tasks:
 
 1. Confirm `codex` is still the correct first proving target from registry truth and committed
    maintenance docs.
-2. Freeze the topology decision rule in this plan before any proof evidence is collected.
+2. Freeze the topology decision rule, restart rules, and evidence contract in this plan before any
+   proof evidence is collected.
 3. Verify remote branch alignment:
 
    ```bash
@@ -385,7 +406,7 @@ Exact tasks:
 4. If the queue does not produce a `codex` proof target, stop. This is not a call to handcraft
    worker inputs. It is either:
    - `blocked_no_stale_codex`, or
-   - a localized watcher / registry truth bug that must be fixed before touching live workflows
+   - a localized watcher or registry truth bug that must be fixed before touching live workflows
 5. Save the emitted JSON as proof input for Phase 3 comparison.
 
 Exit criteria:
@@ -424,7 +445,7 @@ Exact tasks:
 
 3. Verify the downstream worker inputs match the locally emitted queue:
    - same `agent_id`
-   - same `current_version` / `current_validated`
+   - same `current_version` or `current_validated`
    - same `latest_stable`
    - same `target_version`
    - same `dispatch_kind`
@@ -477,34 +498,17 @@ Exact tasks:
    cargo run -p xtask -- execute-agent-maintenance --request docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml --dry-run
    ```
 
-4. Record the prepared `run_id` and the temp evidence directory under
+4. If dry-run fails before emitting a prepared `run_id`, stop there and classify the failure
+   before attempting write mode.
+5. Record the prepared `run_id` and the temp evidence directory under
    `docs/agents/.uaa-temp/agent-maintenance/runs/<run_id>/`.
-5. Run relay write mode with the same `run_id`:
+6. Run relay write mode with the same `run_id`:
 
    ```bash
    cargo run -p xtask -- execute-agent-maintenance --request docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml --write --run-id <prepared_run_id>
    ```
 
-6. Classify any failure immediately using the table below.
-
-### Failure Classification Table
-
-| Class | Meaning | Required response |
-| --- | --- | --- |
-| `host_env` | local Codex binary, auth, or execution-host setup problem while packet and docs remain clear | repair the local host using the documented path, then rerun the same proof segment |
-| `local_bug` | code or contract bug inside the existing topology | fix locally if the blast radius stays boilable, then rerun the impacted segment |
-| `doc_drift` | instructions are wrong or incomplete | fix the docs plus the matching regression lock, then rerun the impacted segment |
-| `target_specific` | `codex`-specific issue that does not imply topology redesign | fix locally if boilable; do not escalate architecture yet |
-| `topology_issue` | the split watch -> worker -> packet -> relay model itself is the problem | stop widening scope, record the trigger evidence, move to the decision phase |
-
-Rules:
-
-1. If the failure is `host_env`, repair only through the documented host-repair path and rerun
-   the same proof segment.
-2. If the failure is `local_bug`, `doc_drift`, or `target_specific`, fix it in this milestone if
-   the fix is localized and the blast radius remains boilable.
-3. If the failure is `topology_issue`, stop widening scope. Do not start a universal workflow
-   cutover here.
+7. Classify any failure immediately using the table in `Failure Classification Contract`.
 
 Exit criteria:
 
@@ -532,24 +536,29 @@ Exact tasks:
    gh pr create --base staging --head "automation/codex-maintenance-<target_version>" --title "..." --body-file docs/agents/lifecycle/codex-maintenance/governance/pr-summary.md
    ```
 
-2. Confirm that replay does not require packet surgery, branch renaming, or ad hoc prose edits.
-3. Populate `maintenance-closeout.json` truthfully:
+2. If PR creation succeeded during Phase 3, do not manufacture a failure just to exercise replay.
+   Record the replay path as `not exercised because initial PR creation succeeded`, then continue
+   to closeout. The milestone only fails this criterion if recovery is needed and the documented
+   path is insufficient.
+3. Confirm that replay, when exercised, does not require packet surgery, branch renaming, or ad
+   hoc prose edits.
+4. Populate `maintenance-closeout.json` truthfully:
    - `resolved_findings`
    - `deferred_findings` or `explicit_none_reason`
    - `preflight_passed`
    - `recorded_at`
    - `commit`
-4. Close the run:
+5. Close the run:
 
    ```bash
    cargo run -p xtask -- close-agent-maintenance --request docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml --closeout docs/agents/lifecycle/codex-maintenance/governance/maintenance-closeout.json
    ```
 
-5. Verify the generated post-closeout packet surfaces still tell the same story.
+6. Verify the generated post-closeout packet surfaces still tell the same story.
 
 Exit criteria:
 
-1. Recovery is real if needed.
+1. Recovery is real when needed and honestly unexercised when not needed.
 2. Closeout is explicit, manual, and self-sufficient.
 
 ### Phase 6. Lock In Localized Fixes And Record The Topology Decision
@@ -568,14 +577,19 @@ Exact tasks:
 1. For each localized bug or doc drift fixed during the proof, add or strengthen the narrowest
    regression test that would have caught it.
 2. Re-run the impacted xtask test suites plus the exact packet-owned green gates.
-3. Append a dated evidence note under the existing transport-topology TODO in `TODOS.md` with:
+3. Treat a fix as still localized only if it stays inside one shared control-plane module family
+   plus matching docs and tests, or one `codex`-specific module family plus matching docs and
+   tests. If it needs a new workflow family, a new schema, or a cross-module redesign, stop and
+   classify it as topology evidence instead.
+4. Append a dated evidence note under the existing transport-topology TODO in `TODOS.md` with:
    - execution date
+   - exercised commit
    - target version
    - watcher run URL
    - worker run URL
    - verdict
    - evidence summary
-4. Write the final topology decision using this rule:
+5. Use this exact decision rule:
 
    **Keep current split topology for now** if all proof failures were `host_env`, `local_bug`,
    `doc_drift`, or `target_specific`, and all required fixes stayed localized.
@@ -589,56 +603,35 @@ Exact tasks:
    - the smallest honest fix would require a new workflow family, a new schema, or a cross-module
      redesign larger than a boilable localized repair
 
-5. If the decision is "open topology convergence next", record the trigger evidence explicitly.
-   No vague "felt awkward" rationale.
+6. If the decision is `open transport-topology convergence next`, record the trigger evidence
+   explicitly. No vague "felt awkward" rationale.
 
 Exit criteria:
 
 1. The milestone exits with a falsifiable decision and regression coverage, not just notes.
 
-## Architecture Review
+## Failure Classification Contract
 
-This plan deliberately spends zero innovation tokens on new orchestration.
+| Class | Meaning | Required response | Rerun scope |
+| --- | --- | --- | --- |
+| `host_env` | local Codex binary, auth, or execution-host setup problem while packet and docs remain clear | repair the local host using the documented path, then rerun the same proof segment | rerun Phase 4 only |
+| `local_bug` | code or contract bug inside the existing topology | fix locally if the blast radius stays boilable, then rerun the impacted segment | rerun smallest affected phase plus matching tests |
+| `doc_drift` | instructions are wrong or incomplete | fix the docs plus the matching regression lock, then rerun the impacted segment | rerun affected phase and affected docs-driven tests |
+| `target_specific` | `codex`-specific issue that does not imply topology redesign | fix locally if boilable; do not escalate architecture yet | rerun worker-specific segment and targeted tests |
+| `topology_issue` | the split watch -> worker -> packet -> relay model itself is the problem | stop widening scope, record the trigger evidence, move to the decision phase | no redesign inside this milestone |
 
-1. The repo already has the right boundary objects:
-   - shared watcher
-   - downstream worker
-   - generated packet
-   - local relay
-   - manual closeout
-2. The proof should validate those boundaries, not hide them behind a proof helper.
-3. The key architectural discipline is separating these failure classes:
-   - worker transport failure
-   - packet generation failure
-   - local host failure
-   - relay contract failure
-   - topology failure
-4. The only legitimate reason to spend an innovation token on a universal worker cutover is if
-   the proof shows the current boundary split itself is the bug.
-5. Distribution architecture is unchanged. No new binary, package, or pipeline is introduced by
-   this milestone.
+Rules:
 
-## Code Quality Review
+1. If the failure is `host_env`, repair only through the documented host-repair path and rerun
+   the same proof segment.
+2. If the failure is `local_bug`, `doc_drift`, or `target_specific`, fix it in this milestone if
+   the fix is localized and the blast radius remains boilable.
+3. If the failure is `topology_issue`, stop widening scope. Do not start a universal workflow
+   cutover here.
 
-The code-quality target is "one state transition, one owner, one repair path."
+## Verification Plan
 
-1. Do not add a proof-only command when the existing commands already represent the state machine
-   correctly.
-2. Do not hand-edit generated packet docs to rescue the proof. If the packet is wrong, fix the
-   generator or the shared source of truth.
-3. Do not bury the topology decision in freeform prose. The closeout plus `TODOS.md` should make
-   the outcome obvious to the next maintainer.
-4. Keep local repairs explicit. A 20-line fix in the right existing module beats a new
-   abstraction every time.
-5. If the proof exposes a bug in packet wording or ownership, update the matching regression test
-   in the same change. Stale truth gaps love to come back.
-6. If Phase 4 shows the packet and worker disagree on the same field, treat that as a generator or
-   ownership bug first, not as a docs cleanup task.
-
-## Test Review
-
-100 percent relevant path coverage is the goal for this milestone. The proof is only trustworthy
-if every new or newly stressed codepath has a corresponding command, artifact, or regression lock.
+One proof checkpoint, one command path, one regression lock. No hand-waving.
 
 ### Code Path Coverage
 
@@ -703,7 +696,7 @@ OPERATOR FLOW COVERAGE
     └── [FAIL]     undocumented setup or write-envelope surprises
 
 [+] "How do I recover if PR open failed?"
-    ├── [REQUIRED] refresh-agent --request ... --write replay path
+    ├── [REQUIRED] refresh-agent --request ... --write replay path when needed
     └── [FAIL]     packet regeneration or PR reopen requires improvisation
 
 [+] "Is this a local bug or a topology problem?"
@@ -711,7 +704,7 @@ OPERATOR FLOW COVERAGE
     └── [FAIL]     ambiguity remains after the proof
 ```
 
-### Required Test Commands
+### Required Commands
 
 Run at minimum:
 
@@ -735,6 +728,17 @@ cargo run -p xtask -- capability-matrix-audit
 make preflight
 ```
 
+### Rerun Rules
+
+1. If a fix touches watcher logic or registry truth, rerun the Phase 2 queue commands and
+   `agent_maintenance_watch`.
+2. If a fix touches packet generation or packet rendering, rerun the Phase 3 worker proof if
+   possible, plus `agent_maintenance_prepare`.
+3. If a fix touches relay behavior or closeout behavior, rerun the exact Phase 4 or Phase 5
+   command path, plus `agent_maintenance_execute` or `agent_maintenance_closeout`.
+4. If a fix touches workflow dispatch wiring, rerun `c4_spec_ci_wiring` and re-run the live
+   shared watcher only after the updated workflow is pushed to `origin/staging`.
+
 ### Regression Rule For This Milestone
 
 If the proof reveals a bug in a currently documented step that previously claimed to work, add a
@@ -748,21 +752,49 @@ lock it is just a better bug report.
 | Local queue does not identify `codex` correctly | `maintenance-watch`, registry | `agent_maintenance_watch` | fix registry or queue logic before live run | yes | must close |
 | Shared watcher dispatches wrong worker or wrong branch | shared watcher, registry, workflow inputs | `c4_spec_ci_wiring`, live run evidence | fix shared dispatch truth | yes | must close |
 | Worker generates packet surfaces that disagree with each other | generated maintenance root | `agent_maintenance_prepare` | fix packet generation or source-of-truth inputs | yes | must close |
-| Local relay requires undocumented setup beyond the written host-repair path | `execute-agent-maintenance`, playbooks, operator guide | `agent_maintenance_execute` + live proof | fix docs or relay validation wording/behavior | yes | must close |
-| PR-open recovery requires artifact surgery beyond `refresh-agent --request ... --write` | worker failure path, packet recovery notes | workflow replay proof + targeted tests | fix recovery contract or workflow fallback | yes | must close |
-| Closeout cannot truthfully express the result | `maintenance-closeout.json`, `close-agent-maintenance` | `agent_maintenance_closeout` | fix closeout schema/rendering or instructions | yes | must close |
-| A bug looks like topology pain only because `codex` is special | `codex` worker or wrapper specifics | targeted `codex` tests + optional `claude_code` control check | classify as target-specific, not topology-wide | no | should close |
-| The same undocumented handoff exists even when all local bugs are fixed | watch -> worker -> packet -> relay boundary | live proof + written decision rule | escalate to transport-topology follow-up | yes | topology trigger |
+| Local relay requires undocumented setup beyond the written host-repair path | `execute-agent-maintenance`, playbooks, operator guide | `agent_maintenance_execute` plus live proof | fix docs or relay validation wording and behavior | yes | must close |
+| PR-open recovery requires artifact surgery beyond `refresh-agent --request ... --write` | worker failure path, packet recovery notes | workflow replay proof plus targeted tests | fix recovery contract or workflow fallback | yes | must close |
+| Closeout cannot truthfully express the result | `maintenance-closeout.json`, `close-agent-maintenance` | `agent_maintenance_closeout` | fix closeout schema, rendering, or instructions | yes | must close |
+| A bug looks like topology pain only because `codex` is special | `codex` worker or wrapper specifics | targeted `codex` tests plus optional `claude_code` control check | classify as target-specific, not topology-wide | no | should close |
+| The same undocumented handoff exists even when all local bugs are fixed | watch -> worker -> packet -> relay boundary | live proof plus written decision rule | escalate to transport-topology follow-up | yes | topology trigger |
 
-## Performance Review
+## Engineering Constraints
 
-This is not a throughput project. The performance goal is decision latency.
+### Architecture Guardrails
 
-1. The maintainer should get to "local bug vs topology issue" quickly, without spelunking.
+1. The repo already has the right boundary objects: shared watcher, downstream worker, generated
+   packet, local relay, and manual closeout.
+2. The proof should validate those boundaries, not hide them behind a proof helper.
+3. The key architectural discipline is separating these failure classes: worker transport failure,
+   packet generation failure, local host failure, relay contract failure, and topology failure.
+4. The only legitimate reason to spend an innovation token on a universal worker cutover is if
+   the proof shows the current boundary split itself is the bug.
+5. If a localized fix materially changes the watch -> packet -> relay or closeout story, update
+   the nearby ASCII diagram in the docs or add one in the touched code or tests. Stale diagrams
+   are worse than none.
+
+### Change Rules
+
+1. Do not add a proof-only command when the existing commands already represent the state machine
+   correctly.
+2. Do not hand-edit generated packet docs to rescue the proof. If the packet is wrong, fix the
+   generator or the shared source of truth.
+3. Do not bury the topology decision in freeform prose. The closeout plus `TODOS.md` should make
+   the outcome obvious to the next maintainer.
+4. Keep local repairs explicit. A 20-line fix in the right existing module beats a new
+   abstraction every time.
+5. If the proof exposes a bug in packet wording or ownership, update the matching regression test
+   in the same change. Stale truth gaps love to come back.
+6. If Phase 4 shows the packet and worker disagree on the same field, treat that as a generator
+   or ownership bug first, not as a docs cleanup task.
+
+### Decision-Latency Guardrails
+
+1. The maintainer should get to `local_bug` versus `topology_issue` quickly, without spelunking.
 2. Avoid any fix that adds extra round-trips, extra workflow hops, or duplicate packet
    materialization steps just to make the proof look cleaner.
-3. If a localized bug fix requires touching more than one shared control-plane module and one
-   worker-specific module, re-check whether that is actually a topology signal.
+3. If a localized bug fix requires touching more than one shared control-plane module family and
+   one worker-specific module family, re-check whether that is actually a topology signal.
 4. The fastest system is the one that fails clearly. Silent ambiguity is the slow path.
 
 ## NOT In Scope
@@ -779,47 +811,48 @@ This is not a throughput project. The performance goal is decision latency.
 
 ## Worktree Parallelization Strategy
 
-Baseline: mostly sequential until the proof identifies disjoint fixes.
+This milestone is intentionally sequential until the proof tells us where the real repair seam is.
+Parallel work starts only after Phase 4 reveals disjoint localized fixes.
 
 ### Dependency Table
 
 | Step | Modules touched | Depends on |
 | --- | --- | --- |
-| 1. Freeze proof rubric + prerequisite lock | `PLAN.md`, `TODOS.md`, `crates/xtask/data/`, workflows, specs, operator docs | — |
+| 1. Freeze proof rubric and prerequisite lock | `PLAN.md`, `TODOS.md`, `crates/xtask/data/`, workflows, specs, operator docs | — |
 | 2. Local queue preflight | `crates/xtask/src/agent_maintenance/watch.rs`, `crates/xtask/data/` | 1 |
-| 3. Shared watcher + downstream worker proof | workflows, GitHub Actions runs, `docs/agents/lifecycle/codex-maintenance/**` | 2 |
-| 4. Local relay + closeout proof | `docs/agents/lifecycle/codex-maintenance/**`, `crates/xtask/src/agent_maintenance/execute*`, `crates/xtask/src/agent_maintenance/closeout*` | 3 |
-| 5A. Shared control-plane fixes (conditional) | `crates/xtask/src/agent_maintenance/**`, workflows, specs | 4 |
-| 5B. `codex`-specific fixes (conditional) | `crates/codex/**`, `cli_manifests/codex/**` | 4 |
-| 5C. Docs/tests lock-in (conditional) | `docs/**`, `crates/xtask/tests/**` | 5A and/or 5B if behavior changed |
-| 6. Final validation + written topology decision | repo-wide validation, `TODOS.md`, closeout surfaces | 5A, 5B, 5C |
+| 3. Shared watcher and downstream worker proof | workflows, GitHub Actions runs, `docs/agents/lifecycle/codex-maintenance/**` | 2 |
+| 4. Local relay and closeout proof | `docs/agents/lifecycle/codex-maintenance/**`, `crates/xtask/src/agent_maintenance/execute*`, `crates/xtask/src/agent_maintenance/closeout*` | 3 |
+| 5A. Shared control-plane fixes, conditional | `crates/xtask/src/agent_maintenance/**`, workflows, specs | 4 |
+| 5B. `codex`-specific fixes, conditional | `crates/codex/**`, `cli_manifests/codex/**` | 4 |
+| 5C. Docs and test lock-in, conditional | `docs/**`, `crates/xtask/tests/**` | 5A and or 5B if behavior changed |
+| 6. Final validation and written topology decision | repo-wide validation, closeout surfaces, `TODOS.md` | 5A, 5B, 5C |
 
 ### Parallel Lanes
 
 Lane A: Steps 1 -> 2 -> 3 -> 4  
-This is the critical path. The proof itself is sequential.
+Critical path. The proof itself is sequential.
 
 Lane B: Step 5A  
-Shared control-plane repair lane. Launch only if the proof finds a shared watcher, packet, or
-relay bug.
+Shared control-plane repair lane. Launch only if the proof finds a shared watcher, packet, relay,
+or closeout bug.
 
 Lane C: Step 5B  
 `codex`-specific repair lane. Launch only if the proof finds a target-specific worker or wrapper
-bug that does not overlap shared control-plane modules.
+bug that does not overlap the shared control-plane modules.
 
 Lane D: Step 5C -> 6  
-Docs/tests lock-in lane. Start after the behavior-changing lanes settle, then run final
+Docs and tests lock-in lane. Start only after the behavior-changing lanes settle, then run final
 validation and record the topology decision.
 
 ### Execution Order
 
 1. Launch Lane A alone.
-2. If Lane A proves the current topology cleanly, skip B/C and move straight to Lane D step 6.
+2. If Lane A proves the current topology cleanly, skip B and C and move straight to Lane D step 6.
 3. If Lane A finds disjoint localized bugs:
    - launch B and C in parallel worktrees
    - merge both
    - run D
-4. If Lane A finds a true topology issue, do not launch B/C as a disguised redesign. Move
+4. If Lane A finds a true topology issue, do not launch B or C as a disguised redesign. Move
    straight to the written follow-up decision.
 
 ### Conflict Flags
@@ -828,31 +861,21 @@ validation and record the topology decision.
    and closeout. Do not parallel-edit that root casually.
 2. `crates/xtask/tests/**` usually locks strings or packet behavior from shared control-plane
    code. Let behavior settle before updating test expectations.
-3. If a shared control-plane fix changes packet wording, docs/tests lock-in must happen after that
-   wording is final.
+3. If a shared control-plane fix changes packet wording, docs and tests lock-in must happen after
+   that wording is final.
+4. Workflow YAML plus `crates/xtask/src/agent_maintenance/watch.rs` is one ownership seam for this
+   milestone. Do not split those across repair lanes unless the proof shows the change sets are
+   truly disjoint.
 
 ## Completion Summary
 
-- Step 0: Scope Challenge, accepted with `codex` locked as the first proving target
-- Architecture Review: no new infra recommended, prove the existing state machine instead
-- Code Quality Review: one owner per state transition, no proof-only abstractions
-- Test Review: 6 critical proof checkpoints identified and mapped to commands/tests
-- Failure modes: 8 concrete proof risks identified, 6 must close, 1 should close, and 1 is the topology trigger
+- Step 0: scope accepted with `codex` locked as the first proving target
+- Architecture: reuse the existing watch -> worker -> packet -> relay -> closeout state machine, no new infra
+- Verification: 6 proof checkpoints defined, 8 failure modes classified, and concrete rerun rules written
+- Localized-repair rule: fix real bugs while context is hot, but stop if the smallest honest fix stops being boilable
 - NOT in scope: written
-- Parallelization: conditional, mostly sequential until proof findings split cleanly
+- Parallelization: conditional, sequential through proof collection, two repair lanes only after evidence reveals disjoint bugs
 - Topology decision rule: written and explicit
-
-## Exit Criteria
-
-This plan is done when:
-
-1. `codex` is proven or truthfully blocked from the shared watcher entrypoint onward
-2. the downstream worker and generated packet are exercised from real shared dispatch
-3. the local relay dry-run and write path are exercised from the generated packet
-4. recovery is either proven or truthfully flagged as insufficient
-5. maintenance closeout is recorded through the existing closeout path
-6. localized bugs found during the proof are covered by regression tests
-7. `TODOS.md` contains a written keep-vs-cutover decision backed by concrete evidence
 
 ## Decision Audit Trail
 
@@ -860,24 +883,24 @@ This plan is done when:
 | --- | --- | --- | --- | --- | --- | --- |
 | 1 | Step 0 | Lock `codex` as the first proving target. | Mechanical | P3 pragmatic | It is the cleanest enrolled maintenance target with committed packet surfaces. | Starting with `goose` or a two-target proof |
 | 2 | Step 0 | Start at the shared watcher, not the downstream worker. | Mechanical | P1 completeness | The shared watcher is the seam we actually need to prove. | Direct worker trigger as the opening move |
-| 3 | Step 0 | Add an explicit topology decision rule before the live run. | Mechanical | P5 explicit | Without it, the proof produces feelings instead of a decision. | Post-hoc interpretation |
+| 3 | Step 0 | Freeze the topology decision rule before the live run. | Mechanical | P5 explicit | Without it, the proof produces feelings instead of a decision. | Post-hoc interpretation |
 | 4 | Phase 1 | Treat remote `staging` alignment as a hard prerequisite. | Mechanical | P5 explicit | The workflows check out `origin/staging`, not the local worktree. | Running the proof on stale remote state |
 | 5 | Phase 2 | Require a real stale `codex` queue item at execution time. | Mechanical | P1 completeness | A fabricated queue item would not prove the live watcher contract. | Synthetic worker inputs |
 | 6 | Phase 4 | Reuse the existing watch -> worker -> packet -> relay -> closeout state machine. | Mechanical | P4 DRY | The repo already has the right boundary objects. | A proof-only command or workflow |
 | 7 | Phase 4 | Treat local host failures as evidence, but not topology failures by default. | Mechanical | P3 pragmatic | Bad local auth should not force a transport redesign. | Collapsing all failures into topology pain |
-| 8 | Phase 6 | Allow localized repairs inside the milestone only if the fix stays boilable. | Taste | P2 boil lakes | Small real bugs should be fixed while the context is hot. | Leaving known local bugs unfixed or starting a redesign |
+| 8 | Phase 6 | Allow localized repairs inside the milestone only if the fix stays boilable. | Taste | P2 boil lakes | Small real bugs should be fixed while the context is hot, but only if they stay local. | Leaving known local bugs unfixed or starting a redesign |
 | 9 | Phase 6 | Use the existing maintenance closeout JSON as the final evidence sink. | Mechanical | P5 explicit | One closeout format is better than a second proof artifact family. | A separate proof report schema |
 | 10 | Phase 6 | Record the final keep-vs-cutover decision in `TODOS.md`. | Mechanical | P5 explicit | Future planning already lives there; the decision must be easy to find. | Hiding the outcome in conversational history |
 | 11 | Phase 6 | Use `claude_code` only as a secondary control target if `codex` reveals target-specific ambiguity. | Taste | P3 pragmatic | Two proving targets up front would dilute the milestone. | Mandatory two-target proof |
-| 12 | Phase 6 | Open transport-topology convergence only when the proof demonstrates a shared architectural failure. | User Challenge | P3 pragmatic | Duplicate YAML alone is not enough reason to redesign. | Cutover-by-aesthetic-discomfort |
+| 12 | Phase 6 | Open transport-topology convergence only when the proof demonstrates a shared architectural failure. | Mechanical | P3 pragmatic | Duplicate YAML alone is not enough reason to redesign. | Cutover by aesthetic discomfort |
 
 ## GSTACK REVIEW REPORT
 
 | Review | Trigger | Why | Runs | Status | Findings |
 |--------|---------|-----|------|--------|----------|
-| CEO Review | `/plan-ceo-review` | Scope & strategy | 0 | — | — |
-| Codex Review | `/codex review` | Independent 2nd opinion | 0 | — | — |
-| Eng Review | `/plan-eng-review` | Architecture & tests (required) | 0 | — | — |
-| Design Review | `/plan-design-review` | UI/UX gaps | 0 | — | — |
+| CEO Review | `/plan-ceo-review` | Scope and strategy | 0 | — | — |
+| Codex Review | `/codex review` | Independent second opinion | 0 | — | — |
+| Eng Review | `/plan-eng-review` | Architecture and tests, required | 0 | — | — |
+| Design Review | `/plan-design-review` | UI and UX gaps | 0 | — | — |
 
-**VERDICT:** NO REVIEWS YET — run `/autoplan` or the individual review skills on this plan if you want the review pipeline recorded after this cohesion pass.
+**VERDICT:** This plan now has the standard eng-review structure, evidence contract, and parallelization section, but no review log entries have been recorded yet. Run `/autoplan` or the individual review skills if you want the review pipeline persisted after this cohesion pass.

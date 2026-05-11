@@ -1,620 +1,1025 @@
-# ORCH_PLAN - Worker/Runbook Convergence On Shared Packet Contract
+# ORCH_PLAN - First Honest Maintenance Proof Run
 
 ## Summary
 
-Current branch: `staging`  
-Authoritative milestone source: repo-root `PLAN.md`  
-Milestone target: `Worker/Runbook Convergence On Shared Packet Contract`  
-Plan baseline SHA: `12e373a`  
-Parent role: sole integrator, sole owner of checkpointing, regeneration, and landing  
-Worker model: `GPT-5.4` with `reasoning_effort=high`  
-Worker concurrency cap: `2` lanes plus the parent
+Current checked-out branch context: `staging`  
+Execution branch: `codex/first-honest-maintenance-proof-run`  
+Workflow checkout ref: `staging`  
+Authoritative milestone: repo-root `PLAN.md`, milestone `First Honest Maintenance Proof Run`  
+Plan revision baseline: `bbd15f6`  
+Convergence baseline: `ee8249a`  
+Authoritative decision sink: existing transport-topology item in `TODOS.md`  
+Proof target: `codex` only  
+Workflow entrypoint: `.github/workflows/agent-maintenance-release-watch.yml`  
+Remote discipline: every live workflow run must exercise pushed `origin/staging` truth  
+Parent role: sole integrator, sole live-workflow operator, sole writer of final decision and closeout  
+Worker model for launched lanes: `GPT-5.4` with `reasoning_effort=high`  
+Worker concurrency cap: `0` before `C2`; maximum `2` conditional lanes after `C2` and only when ownership is disjoint
 
-Why the cap is `2`:
+This plan is intentionally parent-serialized through the honest proof path. The shared watcher,
+downstream worker, generated packet, local relay, recovery path, and manual closeout form one
+evidence chain. Parallelism becomes honest only after that chain is complete or blocked and the
+parent has frozen what actually failed.
 
-- Phase 1 wording and contract decisions are serialized.
-- The current workspace is already dirty in core seam files, generated packet docs, specs, and some tests.
-- More fanout would create overlap on exactly the files this milestone must stabilize first.
+### Orchestration Source Of Truth
 
-Current dirty-tree constraint to honor before any implementation:
+Authoritative orchestration state:
 
-- Do not assume a clean checkout.
-- Review and snapshot the existing modified files first.
-- Parent must adopt, defer, or explicitly exclude each dirty seam file before worker launch.
-- No worker may touch a file that is already dirty in the user checkout unless the parent has first absorbed that file into the frozen checkpoint.
+- `.runs/first-honest-maintenance-proof-run/tasks.json`
+- `.runs/first-honest-maintenance-proof-run/freeze.json`
+- `.runs/first-honest-maintenance-proof-run/lane-status.json`
+- `.runs/first-honest-maintenance-proof-run/session-log.md`
 
-Worktree root:
+Most important derived evidence:
 
-```text
-/Users/spensermcconnell/__Active_Code/atomize-hq/wt/unified-agent-api-worker-runbook-convergence
-```
-
-Run-state root:
-
-```text
-/Users/spensermcconnell/__Active_Code/atomize-hq/unified-agent-api/.runs/worker-runbook-convergence-shared-packet-contract
-```
-
-This plan replaces the stale repo-root `ORCH_PLAN.md`, which still targets the prior `packet-first-contract-with-c-tail` session.
+- `.runs/first-honest-maintenance-proof-run/queue-preflight-summary.md`
+- `.runs/first-honest-maintenance-proof-run/live-runs.md`
+- `.runs/first-honest-maintenance-proof-run/packet-review.md`
+- `.runs/first-honest-maintenance-proof-run/failure-ledger.md`
+- `.runs/first-honest-maintenance-proof-run/final-gates.md`
+- `.runs/first-honest-maintenance-proof-run/decision.md`
 
 ## Hard Guards
 
-- `PLAN.md` is authoritative over this file on any conflict.
-- Parent is the only integrator.
-- No transport-topology redesign.
-- No new workflow family.
-- No closeout semantic change.
-- No second policy store.
-- No registry schema expansion for freeform worker behavior.
-- No worker acquisition unification attempt.
-- No hand-maintained generated packet docs.
-- `HANDOFF.md` remains canonical and `governance/pr-summary.md` remains derivative.
-- `.github/workflows/agent-maintenance-release-watch.yml` remains the only live scheduled release-watch entry point.
-- The canonical maintenance branch family stays `automation/<agent_id>-maintenance-<target_version>`.
-- Generated packet docs must be fixed through renderer and regeneration paths, not by ad hoc manual edits.
-- `PLAN.md` and `TODOS.md` stay parent-owned because they are already dirty and define milestone boundary.
+- `PLAN.md` wins over this file on any conflict.
+- The only live proof target in this milestone is `codex`.
+- The proof must start at `.github/workflows/agent-maintenance-release-watch.yml`.
+- Directly opening with `.github/workflows/codex-cli-update-snapshot.yml` is forbidden.
+- No synthetic stale target is allowed. If `maintenance-watch` does not emit a real stale `codex`
+  item, stop with `blocked_no_live_stale_codex`.
+- The queue-emitted `target_version` and `branch_name` are authoritative over any pre-existing
+  committed maintenance packet under `docs/agents/lifecycle/codex-maintenance/**`.
+- The parent is the only actor allowed to:
+  - trigger or rerun GitHub workflows
+  - inspect and classify live proof evidence
+  - create or reopen the maintenance PR
+  - populate `maintenance-closeout.json`
+  - run `close-agent-maintenance`
+  - edit `TODOS.md`
+  - decide keep-vs-cutover
+- Workers may not edit `PLAN.md`, `ORCH_PLAN.md`, `TODOS.md`, `docs/specs/**`, or
+  `docs/agents/lifecycle/codex-maintenance/**`.
+- No proof-only xtask commands, workflow families, packet schema, or closeout format may be
+  introduced.
+- Generated maintenance packet docs must be regenerated through the real worker or the documented
+  refresh path. Hand edits to rescue packet truth are forbidden.
+- If a fix would require a new workflow family, a new schema, or a redesign across the shared
+  watch -> worker -> packet -> relay boundary, classify it as `topology_issue` and stop widening
+  scope inside this milestone.
 
-## Authority Model
+## Worktree Strategy
 
-Parent-only authority:
+Use the existing repo checkout only for reading and final comparison. Run the proof from dedicated
+worktrees so parent integration and any later repair lanes stay isolated.
 
-- interpret milestone scope from `PLAN.md`
-- inventory and snapshot the dirty tree
-- decide file ownership and lane boundaries
-- settle the Phase 1 wording ledger
-- freeze checkpoint `C1`
-- integrate all worker output
-- own all regeneration and final verification
-- record the explicit follow-up boundary in `PLAN.md` and `TODOS.md`
-- decide whether any discovered surface is active, derived, or out of scope
-- land the reviewed stack back onto `staging-live` or `staging` only after all gates pass
+### Roots
 
-Worker authority:
+- Worktree root:
+  `/Users/spensermcconnell/__Active_Code/atomize-hq/wt/unified-agent-api-first-honest-maintenance-proof-run`
+- Run-state root:
+  `/Users/spensermcconnell/__Active_Code/atomize-hq/unified-agent-api/.runs/first-honest-maintenance-proof-run`
 
-- work only on assigned files from the frozen `C1` base
-- use only the canonical wording and branch/watcher decisions published by the parent
-- return `ready-for-parent`, `blocked`, or `no-op`
-- never merge, never rebase another lane, never widen scope
-- never touch parent-owned dirty files
-- never hand-edit generated packet roots
+### Required Worktrees
 
-## Worktree And Branch Strategy
+1. `staging-live`
+   - branch: `staging`
+   - path:
+     `/Users/spensermcconnell/__Active_Code/atomize-hq/wt/unified-agent-api-first-honest-maintenance-proof-run/staging-live`
+   - purpose: inspect remote-aligned truth and final landing smoke check
+2. `parent-proof`
+   - branch: `codex/first-honest-maintenance-proof-run`
+   - base: `origin/staging`
+   - path:
+     `/Users/spensermcconnell/__Active_Code/atomize-hq/wt/unified-agent-api-first-honest-maintenance-proof-run/parent-proof`
+   - purpose: parent critical path, integration, reruns, final validation
 
-Use the current `staging` checkout for inspection only. Do not use it as the implementation surface because it already contains user changes.
+### Conditional Worker Worktrees
 
-Initial worktrees:
+Create only after `C2_SHA` exists and the parent classifies a localized repair worth parallelizing.
 
-- `staging-live`
-  - path: `/Users/spensermcconnell/__Active_Code/atomize-hq/wt/unified-agent-api-worker-runbook-convergence/staging-live`
-  - branch: `staging`
-  - purpose: final landing and smoke diff only
-- `parent-core`
-  - path: `/Users/spensermcconnell/__Active_Code/atomize-hq/wt/unified-agent-api-worker-runbook-convergence/parent-core`
-  - branch: `codex/worker-runbook-convergence-core`
-  - purpose: parent critical path, integration, regen, final validation
+1. `ws-b-watch-packet`
+   - branch: `codex/maintenance-proof-watch-packet`
+   - base: `C2_SHA`
+2. `ws-c-relay-closeout`
+   - branch: `codex/maintenance-proof-relay-closeout`
+   - base: `C2_SHA`
 
-Worker worktrees, created only after `C1` freeze:
-
-- `lane-b-runbooks`
-  - path: `/Users/spensermcconnell/__Active_Code/atomize-hq/wt/unified-agent-api-worker-runbook-convergence/lane-b-runbooks`
-  - branch: `codex/worker-runbook-convergence-runbooks`
-- `lane-c-regressions`
-  - path: `/Users/spensermcconnell/__Active_Code/atomize-hq/wt/unified-agent-api-worker-runbook-convergence/lane-c-regressions`
-  - branch: `codex/worker-runbook-convergence-regressions`
-
-Exact creation commands:
-
-```bash
-git worktree add /Users/spensermcconnell/__Active_Code/atomize-hq/wt/unified-agent-api-worker-runbook-convergence/staging-live staging
-git worktree add -b codex/worker-runbook-convergence-core /Users/spensermcconnell/__Active_Code/atomize-hq/wt/unified-agent-api-worker-runbook-convergence/parent-core origin/staging
-```
-
-After `C1_SHA` is recorded:
+### Creation Commands
 
 ```bash
-git worktree add -b codex/worker-runbook-convergence-runbooks /Users/spensermcconnell/__Active_Code/atomize-hq/wt/unified-agent-api-worker-runbook-convergence/lane-b-runbooks "$C1_SHA"
-git worktree add -b codex/worker-runbook-convergence-regressions /Users/spensermcconnell/__Active_Code/atomize-hq/wt/unified-agent-api-worker-runbook-convergence/lane-c-regressions "$C1_SHA"
+git worktree add /Users/spensermcconnell/__Active_Code/atomize-hq/wt/unified-agent-api-first-honest-maintenance-proof-run/staging-live staging
+git worktree add -b codex/first-honest-maintenance-proof-run /Users/spensermcconnell/__Active_Code/atomize-hq/wt/unified-agent-api-first-honest-maintenance-proof-run/parent-proof origin/staging
 ```
 
-All worker branches must start from the exact frozen `C1_SHA`, not from the live dirty checkout.
+After `C2_SHA` freeze:
 
-## Run-State Source Of Truth
-
-Parent-owned run-state files under:
-
-```text
-.runs/worker-runbook-convergence-shared-packet-contract/
+```bash
+git worktree add -b codex/maintenance-proof-watch-packet /Users/spensermcconnell/__Active_Code/atomize-hq/wt/unified-agent-api-first-honest-maintenance-proof-run/ws-b-watch-packet "$C2_SHA"
+git worktree add -b codex/maintenance-proof-relay-closeout /Users/spensermcconnell/__Active_Code/atomize-hq/wt/unified-agent-api-first-honest-maintenance-proof-run/ws-c-relay-closeout "$C2_SHA"
 ```
 
-Required records:
+## Run-State And Freeze Artifacts
 
-- `baseline.json`
-- `dirty-tree.md`
-- `dirty-tree.diffstat.txt`
-- `ownership-map.md`
-- `string-ledger.md`
+The parent owns every run-state artifact. Workers do not write under `.runs/**`.
+
+### Required Files
+
+- `.runs/first-honest-maintenance-proof-run/tasks.json`
+- `.runs/first-honest-maintenance-proof-run/baseline.json`
+- `.runs/first-honest-maintenance-proof-run/remote-alignment.md`
+- `.runs/first-honest-maintenance-proof-run/queue-preflight.json`
+- `.runs/first-honest-maintenance-proof-run/queue-preflight-summary.md`
+- `.runs/first-honest-maintenance-proof-run/session-log.md`
+- `.runs/first-honest-maintenance-proof-run/live-runs.md`
+- `.runs/first-honest-maintenance-proof-run/packet-review.md`
+- `.runs/first-honest-maintenance-proof-run/recovery-log.md`
+- `.runs/first-honest-maintenance-proof-run/closeout-log.md`
+- `.runs/first-honest-maintenance-proof-run/failure-ledger.md`
+- `.runs/first-honest-maintenance-proof-run/freeze.json`
+- `.runs/first-honest-maintenance-proof-run/lane-status.json`
+- `.runs/first-honest-maintenance-proof-run/merge-log.md`
+- `.runs/first-honest-maintenance-proof-run/final-gates.md`
+- `.runs/first-honest-maintenance-proof-run/decision.md`
+- `.runs/first-honest-maintenance-proof-run/acceptance.md`
+
+### Queue And Session-Log Contract
+
+`tasks.json` is the lightweight orchestration queue. It is authoritative for workstream and task
+state. Minimum entry shape:
+
+```json
+{
+  "id": "task/p2.3",
+  "workstream": "WS-P2",
+  "title": "Capture downstream worker run URL",
+  "status": "pending|in_progress|blocked|completed",
+  "owner": "parent|ws-b|ws-c",
+  "depends_on": ["task/p2.2"],
+  "checkpoint": "C1|C2|C3|null",
+  "notes": "short current state"
+}
+```
+
+`session-log.md` is the authoritative chronological operator log. The parent records:
+
+- worktree creation
+- run-state initialization
+- every live workflow trigger
+- every freeze event
+- every worker launch and return
+- every rerun decision
+- final verdict timing
+
+Authoritative orchestration-state artifacts:
+
+- `tasks.json`
 - `freeze.json`
 - `lane-status.json`
+- `session-log.md`
+
+Derived evidence artifacts:
+
+- `queue-preflight.json`
+- `queue-preflight-summary.md`
+- `live-runs.md`
+- `packet-review.md`
+- `recovery-log.md`
+- `closeout-log.md`
+- `failure-ledger.md`
 - `merge-log.md`
-- `regen.md`
 - `final-gates.md`
+- `decision.md`
 - `acceptance.md`
 
-Minimum parent snapshot content:
+### Freeze Points
 
-- `git status --short --branch`
-- `git diff --stat`
-- file-by-file classification: `adopt-now`, `defer`, `out-of-scope`
-- explicit list of files blocked from worker ownership because they are already dirty
-- baseline reference to `PLAN.md` at commit `12e373a`
+1. `C0`
+   - remote truth frozen
+   - required fields:
+     - local `staging` SHA
+     - `origin/staging` SHA
+     - cleanliness snapshot
+     - plan baseline SHA
+2. `C1`
+   - local queue truth frozen
+   - required fields:
+     - `agent_id`
+     - `current_validated`
+     - `latest_stable`
+     - `target_version`
+     - `dispatch_workflow`
+     - `branch_name`
+     - `detected_by`
+3. `C2`
+   - live proof evidence frozen after packet review, relay attempt, and closeout/recovery branch
+     classification
+   - required fields:
+     - watcher run URL
+     - worker run URL
+     - exercised remote commit SHA
+     - branch / PR outcome
+     - prepared `run_id` if produced
+     - failure classification ledger
+4. `C3`
+   - post-repair integration frozen
+   - required fields:
+     - integrated commit SHA
+     - merged lane SHAs
+     - rerun scope
+     - final gate status
 
-Workers do not write under `.runs/**`.
+## Workstream Plan
+
+### WS-K0 - Kickoff, Worktrees, And Run-State Bootstrap
+
+Type: parent-only  
+Goal: create the execution surfaces and initialize authoritative orchestration state before any
+proof task begins
+
+Task queue:
+
+- `task/k0.1` create `staging-live` worktree from `staging`
+- `task/k0.2` create `parent-proof` worktree from `origin/staging`
+- `task/k0.3` create `.runs/first-honest-maintenance-proof-run/`
+- `task/k0.4` initialize `tasks.json`, `freeze.json`, `lane-status.json`, `session-log.md`
+- `task/k0.5` record exact paths and branch mapping in `session-log.md`
+
+Required commands:
+
+```bash
+git worktree add /Users/spensermcconnell/__Active_Code/atomize-hq/wt/unified-agent-api-first-honest-maintenance-proof-run/staging-live staging
+git worktree add -b codex/first-honest-maintenance-proof-run /Users/spensermcconnell/__Active_Code/atomize-hq/wt/unified-agent-api-first-honest-maintenance-proof-run/parent-proof origin/staging
+```
+
+Execution:
+
+1. Create the two required worktrees.
+2. Initialize the run-state root and empty authoritative orchestration files.
+3. Seed `tasks.json` with all `WS-K0` through `WS-P6` tasks in `pending` state.
+4. Seed `lane-status.json` with `ws-b = not_created`, `ws-c = not_created`.
+5. Append a kickoff entry to `session-log.md`.
+
+Acceptance:
+
+- worktree layout exists exactly once
+- authoritative orchestration files exist before `WS-P0`
+- the task queue can represent parent-only serialization and later conditional worker launch
+
+### WS-P0 - Baseline And Preconditions Lock
+
+Type: parent-only  
+Goal: freeze the exact proving target, remote truth, and stop conditions before any live run
+
+Task queue:
+
+- `task/p0.1` read `PLAN.md` and dependent proof surfaces
+- `task/p0.2` fetch `origin` and record branch cleanliness
+- `task/p0.3` compare `staging` against `origin/staging`
+- `task/p0.4` confirm `TODOS.md` decision sink and no-synthetic-target rule
+- `task/p0.5` freeze `C0`
+
+Required reads:
+
+- `PLAN.md`
+- `TODOS.md`
+- `.github/workflows/agent-maintenance-release-watch.yml`
+- `.github/workflows/codex-cli-update-snapshot.yml`
+- `crates/xtask/data/agent_registry.toml`
+- `docs/specs/maintenance-request-contract-v1.md`
+- `docs/cli-agent-onboarding-factory-operator-guide.md`
+- `cli_manifests/codex/OPS_PLAYBOOK.md`
+
+Required commands:
+
+```bash
+git fetch origin
+git status --short --branch
+git rev-parse staging
+git rev-parse origin/staging
+```
+
+Execution:
+
+1. Record baseline state in `baseline.json`.
+2. Compare local `staging` to `origin/staging`.
+3. If they differ, push `staging` before any live proof step.
+4. Confirm the existing transport-topology TODO item is the only final verdict destination.
+5. Update `tasks.json` and `session-log.md` as each task completes.
+6. Freeze `C0`.
+
+Acceptance:
+
+- `origin/staging` alignment is known and documented.
+- The parent can state the exact block condition for “no live stale codex target.”
+- No live workflow has run yet.
+
+### WS-P1 - Local Queue Preflight
+
+Type: parent-only  
+Goal: prove the shared watcher would honestly emit `codex` before spending Actions time
+
+Task queue:
+
+- `task/p1.1` run local `maintenance-watch --check`
+- `task/p1.2` emit `_ci_tmp/maintenance-watch.json`
+- `task/p1.3` copy queue artifact into run-state
+- `task/p1.4` extract canonical queue fields into summary
+- `task/p1.5` freeze `C1` or stop as `blocked_no_live_stale_codex`
+
+Required commands:
+
+```bash
+cargo run -p xtask -- maintenance-watch --check
+cargo run -p xtask -- maintenance-watch --emit-json _ci_tmp/maintenance-watch.json
+```
+
+Execution:
+
+1. Confirm the queue contains a real stale `codex` item.
+2. Copy `_ci_tmp/maintenance-watch.json` into run-state as `queue-preflight.json`.
+3. Record the emitted queue item in `queue-preflight-summary.md`.
+4. Update `tasks.json` and `session-log.md` with queue outcome and target version.
+5. Freeze `C1`.
+6. If `codex` is not emitted, stop with `blocked_no_live_stale_codex`. Do not fabricate worker
+   inputs.
+
+Acceptance:
+
+- `C1` captures the exact `target_version` and canonical
+  `automation/codex-maintenance-<target_version>` branch shape.
+- The parent can name the downstream worker before touching GitHub Actions.
+
+### WS-P2 - Shared Watcher Live Proof
+
+Type: parent-only  
+Goal: prove the real entrypoint dispatches the right worker with unchanged queue truth
+
+Task queue:
+
+- `task/p2.1` trigger `agent-maintenance-release-watch.yml`
+- `task/p2.2` capture watcher run URL and exercised remote SHA
+- `task/p2.3` capture downstream worker run URL
+- `task/p2.4` compare live dispatch fields against `C1`
+- `task/p2.5` record branch / PR outcome or replay-path outcome
+- `task/p2.6` restart from `WS-P1` if target drift invalidates `C1`
+
+Required command path:
+
+```bash
+gh workflow run agent-maintenance-release-watch.yml --ref staging
+gh run list --workflow agent-maintenance-release-watch.yml --branch staging --limit 1
+gh run list --workflow codex-cli-update-snapshot.yml --branch staging --limit 1
+```
+
+GitHub UI is acceptable if CLI auth is unavailable, but the same evidence must still be captured.
+
+Execution:
+
+1. Trigger `agent-maintenance-release-watch.yml` from `staging`.
+2. Capture the watcher run URL and exercised `origin/staging` commit SHA.
+3. Capture the downstream `codex-cli-update-snapshot.yml` run URL.
+4. Compare live watcher/worker inputs against `C1`:
+   - `agent_id`
+   - `current_validated`
+   - `latest_stable`
+   - `target_version`
+   - `dispatch_workflow`
+   - `branch_name`
+5. If the live queue sees a newer release and the target changes, discard `C1` and restart at
+   `WS-P1`.
+6. Record whether the worker:
+   - opened the expected maintenance branch and PR, or
+   - failed at PR creation with a documented replay path
+7. Update `live-runs.md`, `tasks.json`, and `session-log.md`.
+
+Acceptance:
+
+- The proof starts at the shared watcher, not the worker.
+- Queue truth survives watcher -> worker handoff unchanged, or the run is honestly restarted.
+- The generated `docs/agents/lifecycle/codex-maintenance/**` surfaces now belong to the live run.
+
+### WS-P3 - Packet Review And Relay Proof
+
+Type: parent-only  
+Goal: prove the generated packet is sufficient for a maintainer to execute the local lane
+
+Task queue:
+
+- `task/p3.1` review `HANDOFF.md`
+- `task/p3.2` review `maintenance-request.toml`
+- `task/p3.3` review `pr-summary.md`
+- `task/p3.4` record packet field agreement
+- `task/p3.5` run relay dry-run
+- `task/p3.6` record prepared `run_id` and temp evidence root if produced
+- `task/p3.7` run relay write mode on the frozen `run_id`
+- `task/p3.8` classify packet / relay failures into `failure-ledger.md`
+
+Review order:
+
+1. `docs/agents/lifecycle/codex-maintenance/HANDOFF.md`
+2. `docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml`
+3. `docs/agents/lifecycle/codex-maintenance/governance/pr-summary.md`
+
+Required field agreement:
+
+- `target_version`
+- `branch_name`
+- `detected_by`
+- `dispatch_workflow`
+- `executor = "execute-agent-maintenance"`
+- `closeout_path`
+
+Required commands:
+
+```bash
+cargo run -p xtask -- execute-agent-maintenance --request docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml --dry-run
+cargo run -p xtask -- execute-agent-maintenance --request docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml --write --run-id <prepared_run_id>
+```
+
+Execution:
+
+1. Record packet consistency findings in `packet-review.md`.
+2. Run dry-run first.
+3. If dry-run does not emit a prepared `run_id`, stop and classify the failure before attempting
+   write mode.
+4. Record the prepared `run_id` and temp evidence root under
+   `docs/agents/.uaa-temp/agent-maintenance/runs/<run_id>/`.
+5. Run write mode with the same `run_id`.
+6. Record all results in `failure-ledger.md`.
+7. Update `tasks.json` and `session-log.md`.
+
+Acceptance:
+
+- A maintainer can move from packet to relay without undocumented steps, or the exact missing step
+  is frozen as evidence.
+- `HANDOFF.md` remains canonical and `pr-summary.md` remains derivative.
+
+### WS-P4 - Recovery And Closeout Proof
+
+Type: parent-only  
+Goal: prove recovery is sufficient when needed and closeout is explicit in all cases
+
+Task queue:
+
+- `task/p4.1` decide whether recovery is required
+- `task/p4.2` run `refresh-agent --request ... --write` if required
+- `task/p4.3` reopen PR via normal branch if required
+- `task/p4.4` populate `maintenance-closeout.json`
+- `task/p4.5` run `close-agent-maintenance`
+- `task/p4.6` verify post-closeout surfaces still agree
+- `task/p4.7` freeze `C2`
+
+Recovery path, only if PR creation failed earlier:
+
+```bash
+cargo run -p xtask -- refresh-agent --request docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml --write
+gh pr create --base staging --head "automation/codex-maintenance-<target_version>" --title "..." --body-file docs/agents/lifecycle/codex-maintenance/governance/pr-summary.md
+```
+
+Closeout path:
+
+```bash
+cargo run -p xtask -- close-agent-maintenance --request docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml --closeout docs/agents/lifecycle/codex-maintenance/governance/maintenance-closeout.json
+```
+
+Execution:
+
+1. If PR creation already succeeded, record recovery as `not_exercised_initial_pr_succeeded`.
+2. If recovery is needed, prove it does not require packet surgery, branch renaming, or ad hoc
+   prose edits.
+3. Populate `maintenance-closeout.json` truthfully with:
+   - `resolved_findings`
+   - `deferred_findings` or `explicit_none_reason`
+   - `preflight_passed`
+   - `recorded_at`
+   - `commit`
+4. Run `close-agent-maintenance`.
+5. Verify post-closeout surfaces still tell the same story.
+6. Update `recovery-log.md`, `closeout-log.md`, `tasks.json`, and `session-log.md`.
+7. Freeze `C2`.
+
+Acceptance:
+
+- Recovery is either proven sufficient when needed or explicitly marked unexercised because initial
+  PR creation succeeded.
+- Closeout uses the real request and the real closeout artifact, not a proof-only substitute.
+
+### WS-P5 - Parent Decision And Optional Repair Launch
+
+Type: parent-only  
+Goal: decide whether the proof passed, is blocked, needs localized repair, or reveals topology
+pressure
+
+Task queue:
+
+- `task/p5.1` classify every finding into one failure class
+- `task/p5.2` decide whether the result is pass, block, localized repair, or topology issue
+- `task/p5.3` update `lane-status.json`
+- `task/p5.4` launch `WS-B` and/or `WS-C` only if ownership is disjoint
+- `task/p5.5` record worker launch decisions and payloads in `session-log.md`
+
+Execution:
+
+1. Classify every issue in `failure-ledger.md` as one of:
+   - `host_env`
+   - `local_bug`
+   - `doc_drift`
+   - `target_specific`
+   - `topology_issue`
+2. Decide whether any localized repair remains both honest and parallelizable.
+3. Launch zero, one, or two worker lanes according to the rules below.
+4. If the result is `host_env` only and the documented host-repair path is sufficient, the parent
+   repairs locally and reruns the same phase without launching workers.
+5. If any issue is `topology_issue`, do not launch repair workers for a redesign. Move directly to
+   final decision recording after parent validation.
+6. Update `tasks.json`, `lane-status.json`, and `session-log.md`.
+
+Acceptance:
+
+- No worker is launched on speculation.
+- Any worker that launches has a frozen `C2_SHA`, a bounded file map, and a single proven issue
+  class to address.
+
+### WS-B - Shared Watch / Worker / Packet Repair
+
+Type: conditional worker  
+Launch gate: `C2_SHA` exists and the parent has proven a localized issue in watcher truth,
+workflow dispatch, packet preparation, or packet rendering
+
+Owned surfaces:
+
+- `.github/workflows/agent-maintenance-release-watch.yml`
+- `.github/workflows/codex-cli-update-snapshot.yml`
+- `crates/xtask/src/agent_maintenance/watch.rs`
+- `crates/xtask/src/agent_maintenance/prepare.rs`
+- `crates/xtask/src/agent_maintenance/docs.rs`
+- `crates/xtask/src/agent_maintenance/contract_policy.rs`
+- `crates/xtask/src/agent_maintenance/request.rs`
+- `crates/xtask/src/agent_maintenance/request/automation.rs`
+- `crates/xtask/tests/agent_maintenance_watch.rs`
+- `crates/xtask/tests/agent_maintenance_prepare.rs`
+- `crates/xtask/tests/c4_spec_ci_wiring.rs`
+
+Required validations:
+
+```bash
+cargo test -p xtask --test agent_maintenance_watch
+cargo test -p xtask --test agent_maintenance_prepare
+cargo test -p xtask --test c4_spec_ci_wiring
+```
+
+Stop conditions:
+
+- change requires `docs/specs/**`
+- change requires hand edits under `docs/agents/lifecycle/codex-maintenance/**`
+- change requires a new workflow family
+- change requires a new packet schema
+- change crosses into relay / closeout ownership
+
+Acceptance:
+
+- the smallest honest repair is implemented
+- the narrowest regression lock is added
+- the lane returns a clean handoff for parent integration
+
+### WS-B Launch Payload
+
+Ready-to-send worker brief:
+
+```text
+Workstream: WS-B
+Base: <C2_SHA>
+Model: GPT-5.4
+Reasoning: high
+Mission: fix one localized watcher / worker / packet issue without changing topology
+Issue class: <local_bug|doc_drift|target_specific>
+Owned files:
+- .github/workflows/agent-maintenance-release-watch.yml
+- .github/workflows/codex-cli-update-snapshot.yml
+- crates/xtask/src/agent_maintenance/watch.rs
+- crates/xtask/src/agent_maintenance/prepare.rs
+- crates/xtask/src/agent_maintenance/docs.rs
+- crates/xtask/src/agent_maintenance/contract_policy.rs
+- crates/xtask/src/agent_maintenance/request.rs
+- crates/xtask/src/agent_maintenance/request/automation.rs
+- crates/xtask/tests/agent_maintenance_watch.rs
+- crates/xtask/tests/agent_maintenance_prepare.rs
+- crates/xtask/tests/c4_spec_ci_wiring.rs
+Allowed run-state inputs:
+- .runs/first-honest-maintenance-proof-run/failure-ledger.md
+- .runs/first-honest-maintenance-proof-run/live-runs.md
+- .runs/first-honest-maintenance-proof-run/queue-preflight-summary.md
+- .runs/first-honest-maintenance-proof-run/packet-review.md
+Mandatory validations:
+- cargo test -p xtask --test agent_maintenance_watch
+- cargo test -p xtask --test agent_maintenance_prepare
+- cargo test -p xtask --test c4_spec_ci_wiring
+Forbidden:
+- editing PLAN.md, ORCH_PLAN.md, TODOS.md, docs/specs/**, docs/agents/lifecycle/codex-maintenance/**
+- hand-editing generated packet surfaces
+- adding a new workflow family or schema
+- crossing into relay / closeout ownership
+Return:
+- status
+- changed files
+- commands with exit codes
+- validation results
+- commit SHA
+- residual risks
+```
+
+### WS-C - Relay / Recovery / Closeout Repair
+
+Type: conditional worker  
+Launch gate: `C2_SHA` exists and the parent has proven a localized issue in relay execution,
+recovery wording, operator guidance, or closeout behavior
+
+Owned surfaces:
+
+- `crates/xtask/src/agent_maintenance/execute.rs`
+- `crates/xtask/src/agent_maintenance/execute/**`
+- `crates/xtask/src/agent_maintenance/closeout.rs`
+- `crates/xtask/src/agent_maintenance/closeout/**`
+- `cli_manifests/codex/OPS_PLAYBOOK.md`
+- `crates/xtask/tests/agent_maintenance_execute.rs`
+- `crates/xtask/tests/agent_maintenance_closeout.rs`
+
+Required validations:
+
+```bash
+cargo test -p xtask --test agent_maintenance_execute
+cargo test -p xtask --test agent_maintenance_closeout
+```
+
+Stop conditions:
+
+- change requires `PLAN.md`, `ORCH_PLAN.md`, `TODOS.md`, or `docs/specs/**`
+- change requires hand edits under `docs/agents/lifecycle/codex-maintenance/**`
+- change is actually topology redesign rather than localized repair
+- change crosses into watcher / packet ownership
+
+Acceptance:
+
+- the smallest honest repair is implemented
+- the narrowest regression lock is added
+- the lane returns a clean handoff for parent integration
+
+### WS-C Launch Payload
+
+Ready-to-send worker brief:
+
+```text
+Workstream: WS-C
+Base: <C2_SHA>
+Model: GPT-5.4
+Reasoning: high
+Mission: fix one localized relay / recovery / closeout issue without changing topology
+Issue class: <local_bug|doc_drift|target_specific>
+Owned files:
+- crates/xtask/src/agent_maintenance/execute.rs
+- crates/xtask/src/agent_maintenance/execute/**
+- crates/xtask/src/agent_maintenance/closeout.rs
+- crates/xtask/src/agent_maintenance/closeout/**
+- cli_manifests/codex/OPS_PLAYBOOK.md
+- crates/xtask/tests/agent_maintenance_execute.rs
+- crates/xtask/tests/agent_maintenance_closeout.rs
+Allowed run-state inputs:
+- .runs/first-honest-maintenance-proof-run/failure-ledger.md
+- .runs/first-honest-maintenance-proof-run/packet-review.md
+- .runs/first-honest-maintenance-proof-run/recovery-log.md
+- .runs/first-honest-maintenance-proof-run/closeout-log.md
+Mandatory validations:
+- cargo test -p xtask --test agent_maintenance_execute
+- cargo test -p xtask --test agent_maintenance_closeout
+Forbidden:
+- editing PLAN.md, ORCH_PLAN.md, TODOS.md, docs/specs/**, docs/agents/lifecycle/codex-maintenance/**
+- hand-editing generated packet surfaces
+- changing topology instead of making a localized repair
+- crossing into watcher / packet ownership
+Return:
+- status
+- changed files
+- commands with exit codes
+- validation results
+- commit SHA
+- residual risks
+```
+
+### WS-P6 - Parent Integration, Honest Reruns, And Final Verdict
+
+Type: parent-only  
+Goal: integrate any localized repair, rerun from the earliest impacted honest phase, and write the
+final milestone decision
+
+Task queue:
+
+- `task/p6.1` integrate `WS-B` if present
+- `task/p6.2` integrate `WS-C` if present
+- `task/p6.3` regenerate stale parent-owned derived surfaces honestly after merges
+- `task/p6.4` freeze `C3`
+- `task/p6.5` rerun from the earliest impacted proof phase
+- `task/p6.6` run final validations
+- `task/p6.7` verify verdict prerequisites are satisfied
+- `task/p6.8` write dated verdict note to `TODOS.md`
+- `task/p6.9` move `staging-live` to the reviewed parent result and inspect smoke diff
+- `task/p6.10` land reviewed result onto `staging`
+
+Execution:
+
+1. Integrate `WS-B` first if it exists.
+2. Integrate `WS-C` second if it exists.
+3. Record merge outcomes in `merge-log.md`.
+4. Regenerate parent-owned derived surfaces only through honest upstream commands:
+   - rerun worker / prepare path if request-owned truth changed
+   - use `refresh-agent --request ... --write` only when the request is already current and only
+     derived docs need regeneration
+5. Never manually edit `docs/agents/lifecycle/codex-maintenance/**`.
+6. Freeze `C3`.
+7. Rerun from the earliest impacted honest phase.
+8. Run final validations and record them in `final-gates.md`.
+9. Confirm all verdict prerequisites are satisfied before touching `TODOS.md`:
+   - `C3` exists if any repair merged
+   - all required proof phases are either green or explicitly classified and accepted
+   - all required regression locks are green
+   - all stale generated maintenance surfaces have been honestly regenerated
+   - final decision evidence is summarized in `decision.md`
+10. Write the dated verdict note under the existing transport-topology TODO in `TODOS.md`.
+11. Move `staging-live` to the reviewed parent result and inspect the smoke diff there before
+    touching `staging`.
+12. Record acceptance results in `acceptance.md`.
+13. Append final landing steps and result to `session-log.md`.
+
+Acceptance:
+
+- Every localized fix is rerun from the earliest impacted phase.
+- The milestone ends with one evidence-backed keep-vs-cutover decision.
 
 ## Launch Order
 
-### P0 - Parent Baseline And Dirty-Tree Intake
+1. `WS-K0`
+2. `WS-P0`
+3. `WS-P1`
+4. `WS-P2`
+5. `WS-P3`
+6. `WS-P4`
+7. `WS-P5`
+8. `WS-B` and/or `WS-C` only if `WS-P5` proves localized repair work
+9. `WS-P6`
 
-Parent-only.
+Parallelism rule:
 
-Required review before any new work:
+- No concurrency before `C2`.
+- Maximum post-`C2` worker concurrency is `2`, and only if `WS-B` and `WS-C` have disjoint
+  ownership.
+- If either lane discovers overlap or cross-lane coupling, it must stop and return `blocked`.
 
-- `PLAN.md`
-- `TODOS.md`
-- `cli_manifests/claude_code/OPS_PLAYBOOK.md`
-- `crates/xtask/src/agent_maintenance/contract_policy.rs`
-- `crates/xtask/src/agent_maintenance/docs.rs`
-- `crates/xtask/src/agent_maintenance/execute.rs`
-- `crates/xtask/src/agent_maintenance/execute/runtime.rs`
-- `crates/xtask/src/agent_maintenance/mod.rs`
-- `crates/xtask/src/agent_maintenance/prepare.rs`
-- `crates/xtask/src/agent_maintenance/request.rs`
-- `crates/xtask/src/agent_maintenance/request/automation.rs`
-- `crates/xtask/src/agent_maintenance/watch.rs`
-- `crates/xtask/tests/agent_maintenance_closeout.rs`
-- `crates/xtask/tests/agent_maintenance_prepare.rs`
-- `crates/xtask/tests/agent_maintenance_refresh.rs`
-- `crates/xtask/tests/agent_maintenance_refresh/automated_requests.rs`
-- `crates/xtask/tests/agent_maintenance_watch.rs`
-- `crates/xtask/tests/support/agent_maintenance_refresh_harness.rs`
-- `docs/agents/lifecycle/codex-maintenance/HANDOFF.md`
-- `docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml`
-- `docs/agents/lifecycle/codex-maintenance/governance/remediation-log.md`
-- `docs/specs/agent-registry-contract.md`
-- `docs/specs/maintenance-request-contract-v1.md`
+## Worker Prompt Contract
 
-Required outcome of P0:
+Every launched worker prompt must contain only:
 
-- snapshot current modifications
-- decide which dirty files are already part of this milestone and must be preserved
-- identify which dirty files remain parent-owned through the entire run
-- publish the no-overlap ownership map before worker launch
+- workstream id
+- `C2_SHA`
+- issue class
+- owned files
+- allowed run-state files
+- required validations
+- stop conditions
+- return contract
 
-Stop immediately if:
+### Allowed Run-State Inputs
 
-- the dirty seam contains user changes whose intent cannot be classified safely
-- a worker lane would need to start on a file that is already dirty and unresolved
-- the milestone boundary in `PLAN.md` changes during intake
+- `WS-B`
+  - `failure-ledger.md`
+  - `live-runs.md`
+  - `queue-preflight-summary.md`
+  - `packet-review.md` if packet disagreement is the issue
+- `WS-C`
+  - `failure-ledger.md`
+  - `packet-review.md`
+  - `recovery-log.md`
+  - `closeout-log.md`
 
-### P1 - Parent Critical Path And Wording Freeze
+Workers may not read:
 
-Parent-only.
+- full `.runs/**` beyond their allowed summaries
+- full GitHub logs unless the parent excerpts the relevant lines into run-state
+- unrelated docs trees
+- unrelated crates
+- top-level planning docs beyond what the parent summarizes into the prompt
 
-Goal: settle the shared operational story before any parallelism.
-
-Parent-owned critical path files:
-
-- `crates/xtask/src/agent_maintenance/contract_policy.rs`
-- `crates/xtask/src/agent_maintenance/docs.rs`
-- `crates/xtask/src/agent_maintenance/execute.rs`
-- `crates/xtask/src/agent_maintenance/execute/runtime.rs`
-- `crates/xtask/src/agent_maintenance/mod.rs`
-- `crates/xtask/src/agent_maintenance/prepare.rs`
-- `crates/xtask/src/agent_maintenance/request.rs`
-- `crates/xtask/src/agent_maintenance/request/automation.rs`
-- `crates/xtask/src/agent_maintenance/watch.rs`
-- dirty seam tests tied directly to those paths:
-  - `crates/xtask/tests/agent_maintenance_prepare.rs`
-  - `crates/xtask/tests/agent_maintenance_refresh.rs`
-  - `crates/xtask/tests/agent_maintenance_refresh/automated_requests.rs`
-  - `crates/xtask/tests/agent_maintenance_watch.rs`
-  - `crates/xtask/tests/support/agent_maintenance_refresh_harness.rs`
-
-Mandatory decisions to freeze in `string-ledger.md`:
-
-- canonical live watcher reference
-- canonical branch family
-- canonical recovery and replay wording
-- canonical generated ownership marker language
-- canonical execution-agent wording
-- canonical packet ownership story
-- explicit wording for write-envelope honesty
-- explicit confirmation that workflow YAML stays transport-only
-
-`C1` freeze gate:
-
-- the shared watcher, branch, replay, recovery, and execution-agent wording are stable enough that workers can update downstream surfaces without inventing strings
-- all currently dirty core seam files needed for those decisions have been absorbed into `parent-core`
-- the parent has published a final ownership map showing which dirty files remain parent-only
-
-Required `C1` validation:
-
-```bash
-cargo test -p xtask --test agent_maintenance_watch
-cargo test -p xtask --test agent_maintenance_prepare
-cargo test -p xtask --test agent_maintenance_refresh
-```
-
-Record `C1_SHA` in `freeze.json`. No worker starts before that SHA exists.
-
-## Post-Checkpoint Parallel Worker Lanes
-
-### Lane B - Runbooks, Workflows, And Active Human Surfaces
-
-Model: `GPT-5.4` with `reasoning_effort=high`  
-Launch base: exact `C1_SHA`
-
-Owned files:
-
-- `.github/workflows/agent-maintenance-release-watch.yml`
-- `.github/workflows/agent-maintenance-open-pr.yml`
-- `.github/workflows/codex-cli-update-snapshot.yml`
-- `.github/workflows/claude-code-update-snapshot.yml`
-- `cli_manifests/codex/OPS_PLAYBOOK.md`
-- `cli_manifests/codex/CI_WORKFLOWS_PLAN.md`
-- `cli_manifests/codex/PR_BODY_TEMPLATE.md`
-- `cli_manifests/claude_code/CI_WORKFLOWS_PLAN.md`
-- `cli_manifests/claude_code/PR_BODY_TEMPLATE.md`
-- `docs/cli-agent-onboarding-factory-operator-guide.md`
-- `crates/xtask/tests/c4_spec_ci_wiring.rs`
-
-Explicitly forbidden:
-
-- `cli_manifests/claude_code/OPS_PLAYBOOK.md` because it is already dirty and stays parent-owned
-- any file under `crates/xtask/src/agent_maintenance/**`
-- any generated maintenance root under `docs/agents/lifecycle/*-maintenance/**`
-- `docs/specs/**`
-- `PLAN.md`
-- `TODOS.md`
-
-Mission:
-
-- align workflow fallback text, replay wording, and runbook wording to the frozen string ledger
-- remove live references to deleted per-agent watcher workflows
-- align branch examples and PR-template wording to `automation/<agent_id>-maintenance-<target_version>`
-- keep workflow YAML transport-only
-- make the operator guide honest about the live write envelope
-- update `c4_spec_ci_wiring.rs` to lock the new watcher and branch truth
-
-Required lane validation:
-
-```bash
-cargo test -p xtask --test c4_spec_ci_wiring
-```
-
-Lane B stop conditions:
-
-- any required change lands in a parent-owned dirty file
-- any required wording contradicts the frozen string ledger
-- the lane would require workflow-topology redesign instead of wording convergence
-
-### Lane C - Clean Regression Net
-
-Model: `GPT-5.4` with `reasoning_effort=high`  
-Launch base: exact `C1_SHA`
-
-Owned files:
-
-- `crates/xtask/tests/agent_maintenance_execute.rs`
-- `crates/xtask/tests/support/agent_maintenance_harness.rs`
-- `crates/xtask/tests/support/agent_maintenance_closeout_harness.rs`
-
-Explicitly forbidden:
-
-- dirty test files already owned by the parent
-- any source file under `crates/xtask/src/**`
-- any workflow YAML
-- any spec doc
-- any generated maintenance root
-- `PLAN.md`
-- `TODOS.md`
-
-Mission:
-
-- lock the execution-agent wording and maintained-agent/executor distinction
-- add or strengthen clean Claude Code parity coverage where this can be done without touching dirty prepare/refresh tests
-- close any clean regression gaps around active worker/runbook convergence that do not require parent-owned fixtures
-
-Required lane validation:
-
-```bash
-cargo test -p xtask --test agent_maintenance_execute
-```
-
-Lane C stop conditions:
-
-- parity coverage requires changes in dirty parent-owned prepare or refresh tests
-- the lane needs source-code changes instead of clean regression assertions
-- the lane would force closeout semantic changes
-
-### Worker Handoff Contract
+### Worker Return Contract
 
 Every worker must return:
 
-- lane id
+- workstream id
 - status: `ready-for-parent`, `blocked`, or `no-op`
-- `C1_SHA`
+- `C2_SHA`
+- issue class addressed
 - changed files
 - commands run
+- exit code for every command run
 - validation results
-- commit SHA
-- unresolved assumptions
+- resulting commit SHA
+- residual risks or assumptions
 
-## P2 - Parent Integration, Dirty-Surface Completion, And Deterministic Regen
+## Failure Classification And Response Rules
 
-Parent-only.
+| Class | Meaning | Required response | Allowed scope |
+| --- | --- | --- | --- |
+| `host_env` | local Codex CLI, auth, or host setup failed while packet truth stayed clear | parent repairs host using the documented path and reruns the same proof segment | no worker lane |
+| `local_bug` | code or contract bug inside the existing topology | fix if boilable, add regression lock, rerun earliest impacted phase | localized repair only |
+| `doc_drift` | instructions are incomplete or wrong | fix the doc plus a matching lock when possible, rerun impacted phase | localized repair only |
+| `target_specific` | `codex`-specific issue that does not imply topology redesign | fix locally if boilable and keep decision narrow | localized repair only |
+| `topology_issue` | the split watcher -> worker -> packet -> relay model itself is the problem | stop redesign work in this milestone and record trigger evidence | no architecture change here |
 
-Merge order:
+Rules:
 
-1. integrate Lane B into `parent-core`
-2. rebase Lane C onto the new parent tip only if needed
-3. integrate Lane C
-4. complete all parent-owned dirty surfaces using the now-final downstream wording
-5. run deterministic regeneration for in-scope maintenance roots
-6. update `PLAN.md` and `TODOS.md` with the explicit follow-up boundary last
+1. `host_env` is not topology failure unless the documented repair path is itself unclear or
+   broken.
+2. `topology_issue` is the only class that can justify opening transport-topology convergence next.
+3. If a change stops being boilable, reclassify it as topology evidence instead of sneaking in a
+   redesign.
 
-Parent-owned completion set after worker merge:
+## Merge Rules And Honest Reruns
 
-- `cli_manifests/claude_code/OPS_PLAYBOOK.md`
-- `docs/specs/agent-registry-contract.md`
-- `docs/specs/maintenance-request-contract-v1.md`
-- `docs/agents/lifecycle/codex-maintenance/HANDOFF.md`
-- `docs/agents/lifecycle/codex-maintenance/README.md`
-- `docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml`
-- `docs/agents/lifecycle/codex-maintenance/governance/pr-summary.md`
-- `docs/agents/lifecycle/codex-maintenance/governance/remediation-log.md`
-- `docs/agents/lifecycle/codex-maintenance/review_surfaces.md`
-- `docs/agents/lifecycle/codex-maintenance/scope_brief.md`
-- `docs/agents/lifecycle/codex-maintenance/seam_map.md`
-- `docs/agents/lifecycle/codex-maintenance/threading.md`
-- remaining dirty tests:
-  - `crates/xtask/tests/agent_maintenance_closeout.rs`
-  - `crates/xtask/tests/agent_maintenance_prepare.rs`
-  - `crates/xtask/tests/agent_maintenance_refresh.rs`
-  - `crates/xtask/tests/agent_maintenance_refresh/automated_requests.rs`
-  - `crates/xtask/tests/agent_maintenance_watch.rs`
-  - `crates/xtask/tests/support/agent_maintenance_refresh_harness.rs`
-- `PLAN.md`
-- `TODOS.md`
+Parent-only integration order:
 
-### Deterministic Validation And Regen Flow
+1. merge `WS-B` if present
+2. merge `WS-C` if present
+3. regenerate stale parent-owned derived surfaces through honest commands only
+4. rerun from the earliest impacted proof phase
+5. run final validations
+6. refresh `decision.md`, `final-gates.md`, `acceptance.md`, and `session-log.md`
+7. update `TODOS.md` only after verdict prerequisites are satisfied
 
-Use one deterministic decision tree for generated maintenance roots.
+Rerun matrix:
 
-In-scope committed maintenance roots:
+- watcher logic, registry truth, or shared watcher workflow changed:
+  rerun `WS-P1`, `WS-P2`, and matching watch/dispatch tests
+- downstream worker or packet generation changed:
+  rerun `WS-P2`, `WS-P3`, and matching packet tests
+- relay behavior or operator guidance changed without request-contract changes:
+  rerun `WS-P3` and matching relay tests
+- closeout behavior changed:
+  rerun `WS-P4` and matching closeout tests
+- request-owned fields changed:
+  regenerate through the honest upstream path first; do not use direct refresh as a shortcut
 
-- `docs/agents/lifecycle/codex-maintenance/**`
+Remote rerun rule:
 
-Explicitly not created in this milestone:
-
-- `docs/agents/lifecycle/claude_code-maintenance/**`
-
-Default out of scope unless parent proves active dependency:
-
-- `docs/agents/lifecycle/opencode-maintenance/**`
-
-Regen decision tree:
-
-1. Inspect the committed request packet and determine whether request-owned fields must change.
-2. If request-owned fields change, the parent must use the packet-preparation path first.
-3. If request-owned fields do not change and only derived packet docs need rerendering, the parent may use the refresh path directly.
-4. After any packet-preparation write, the parent must run `refresh-agent --dry-run` as a parity check.
-5. If prepare and refresh disagree, stop and fix the source-of-truth split before landing.
-6. Never hand-edit generated maintenance docs to force agreement.
-
-Request-owned fields that force packet preparation first include, at minimum:
-
-- branch family materialized in the request
-- watcher or dispatch fields materialized in the request
-- recovery or ownership fields emitted into the request contract
-- any other top-level or section-owned request data, not just renderer text
-
-Direct-refresh-only path is allowed only when:
-
-- the request packet is already current
-- the changes are limited to renderer-owned derived docs
-- `refresh-agent --dry-run` from the current request is expected to converge without request mutation
-
-Example parity check after a packet-preparation write:
-
-```bash
-cargo run -p xtask -- refresh-agent \
-  --request docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml \
-  --dry-run
-```
-
-Required parent regen evidence in `regen.md`:
-
-- whether the parent used packet preparation first or direct refresh
-- exact command path used
-- whether request fields changed or only derived docs changed
-- before/after file list for the codex maintenance root
-- final dry-run result showing no remaining drift
-
-## P3 - Parent Final Validation, Landing, And Acceptance Recording
-
-Parent-only.
-
-This phase begins only after:
-
-- all worker output is integrated into `parent-core`
-- all parent-owned dirty docs/specs/generated surfaces are complete
-- deterministic regen has converged
-- no unresolved merge hotspot remains
-
-Required final validation from `parent-core`:
-
-```bash
-cargo test -p xtask --test c0_spec_validate
-cargo test -p xtask --test c4_spec_ci_wiring
-cargo test -p xtask --test agent_maintenance_prepare
-cargo test -p xtask --test agent_maintenance_execute
-cargo test -p xtask --test agent_maintenance_watch
-cargo test -p xtask --test agent_maintenance_refresh
-cargo test -p xtask --test agent_maintenance_closeout
-make fmt-check
-make clippy
-make check
-make test
-```
-
-Landing rules:
-
-- `staging-live` stays untouched until all final gates pass on `parent-core`.
-- Parent lands back onto `staging-live` or `staging` only after the full validation set is green.
-- Preferred flow: fast-forward or cherry-pick the reviewed `parent-core` commit stack onto `staging-live`, inspect the smoke diff there, then update `staging`.
-- If the landing path cannot remain clean and reviewable, stop and resolve before touching `staging`.
-
-Required landing procedure:
-
-1. verify `parent-core` is green
-2. update `merge-log.md` and `final-gates.md`
-3. move `staging-live` to the reviewed parent result
-4. run a final smoke diff on `staging-live`
-5. record landed commit SHA(s) and gate results in `acceptance.md`
-6. only then land or fast-forward `staging`
-
-## Merge Hotspots
-
-Parent must inspect these manually before landing:
-
-- `crates/xtask/src/agent_maintenance/contract_policy.rs`
-- `crates/xtask/src/agent_maintenance/docs.rs`
-- `crates/xtask/src/agent_maintenance/execute/runtime.rs`
-- `crates/xtask/src/agent_maintenance/prepare.rs`
-- `crates/xtask/src/agent_maintenance/request/automation.rs`
-- `crates/xtask/src/agent_maintenance/watch.rs`
-- `cli_manifests/claude_code/OPS_PLAYBOOK.md`
-- `docs/specs/maintenance-request-contract-v1.md`
-- `docs/specs/agent-registry-contract.md`
-- `docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml`
-- `docs/agents/lifecycle/codex-maintenance/HANDOFF.md`
-- `docs/agents/lifecycle/codex-maintenance/governance/pr-summary.md`
-- `crates/xtask/tests/agent_maintenance_prepare.rs`
-- `crates/xtask/tests/agent_maintenance_refresh/automated_requests.rs`
-- `crates/xtask/tests/c4_spec_ci_wiring.rs`
-- `crates/xtask/tests/agent_maintenance_execute.rs`
+- after any workflow-affecting repair, push `staging` before the next live watcher rerun and
+  record the exercised remote commit SHA
 
 ## Context-Control Rules
 
-- Read only the active milestone files and their directly coupled tests.
-- Do not widen into unrelated crates or unrelated `xtask` domains.
-- Do not bulk-load `docs/`; open only named maintenance, operator, or spec surfaces.
-- Treat generated packet roots as outputs, not freeform design documents.
-- Treat current dirty files as reserved until the parent explicitly releases them.
-- If a worker discovers a needed edit outside its ownership map, it must stop and return `blocked`.
-- Do not let workers invent alternate branch families, watcher names, or replay phrasing.
+- The parent keeps these artifacts current and authoritative:
+  - `PLAN.md`
+  - `TODOS.md`
+  - `freeze.json`
+  - `failure-ledger.md`
+  - `live-runs.md`
+  - `lane-status.json`
+- Workers get summarized evidence, not the whole milestone transcript.
+- If a worker needs more context than its prompt and allowed run-state files provide, it must stop
+  as `blocked` rather than expanding scope on its own.
+- Packet truth mismatches must be summarized by the parent in `packet-review.md`; workers should
+  not reverse-engineer the entire proof from raw artifacts.
 
 ## Tests And Acceptance
 
-### Operational Story
-
-Done means:
-
-- one live watcher is named everywhere active maintenance is described
-- one maintenance branch family is named everywhere active maintenance is described
-- workflow fallbacks, playbooks, operator guide, packet docs, and tests tell the same replay and recovery story
-- shared relay wording clearly distinguishes maintained agent from execution agent
-
-### Generated Packet Surfaces
-
-Done means:
-
-- generated automated packet docs no longer carry stale ownership markers
-- generated automated packet docs no longer describe the lane with stale worker-era framing
-- `HANDOFF.md` remains canonical
-- `governance/pr-summary.md` remains derivative
-- no generated maintenance root is hand-maintained to force agreement
-
-### Regression Net
-
-Done means:
-
-- stale watcher names fail tests
-- stale branch-family examples fail tests
-- stale packet ownership wording fails tests
-- execution-agent wording is covered
-- Codex and Claude Code convergence is proven either in parent-owned prepare/refresh tests or in clean execute/harness tests, without inventing a new committed Claude maintenance root
-
-### Workspace Boundary
-
-Done means:
-
-- no transport redesign was introduced
-- no new workflow family was introduced
-- no second policy store was introduced
-- no closeout semantic change was introduced
-- worker lanes never touched parent-owned dirty files
-
-### Required Final Commands
+### Required Proof Commands
 
 ```bash
-cargo test -p xtask --test c0_spec_validate
+cargo run -p xtask -- maintenance-watch --check
+cargo run -p xtask -- maintenance-watch --emit-json _ci_tmp/maintenance-watch.json
+cargo run -p xtask -- execute-agent-maintenance --request docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml --dry-run
+cargo run -p xtask -- execute-agent-maintenance --request docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml --write --run-id <prepared_run_id>
+cargo run -p xtask -- close-agent-maintenance --request docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml --closeout docs/agents/lifecycle/codex-maintenance/governance/maintenance-closeout.json
+```
+
+### Required Regression Locks
+
+```bash
+cargo test -p xtask --test agent_maintenance_watch
 cargo test -p xtask --test c4_spec_ci_wiring
 cargo test -p xtask --test agent_maintenance_prepare
 cargo test -p xtask --test agent_maintenance_execute
-cargo test -p xtask --test agent_maintenance_watch
-cargo test -p xtask --test agent_maintenance_refresh
 cargo test -p xtask --test agent_maintenance_closeout
-make fmt-check
-make clippy
-make check
-make test
 ```
+
+If localized fixes land, also run the impacted suite plus repo gates the packet still depends on:
+
+```bash
+cargo run -p xtask -- support-matrix --check
+cargo run -p xtask -- capability-matrix --check
+cargo run -p xtask -- capability-matrix-audit
+make preflight
+```
+
+### Acceptance Checklist
+
+Queue and watcher truth:
+
+- local `maintenance-watch` preflight identified a real stale `codex` target
+- `C1` records the authoritative queue item
+- the live proof started at the shared watcher from `staging`
+- any target-version drift triggered an honest restart
+
+Worker and packet truth:
+
+- the downstream `codex` worker was dispatched from the shared watcher
+- `HANDOFF.md` remained canonical
+- `maintenance-request.toml` remained the frozen relay contract
+- `pr-summary.md` remained derivative
+- packet surfaces agreed on version, branch, dispatcher, executor, and closeout path
+
+Relay and recovery truth:
+
+- `execute-agent-maintenance --dry-run` was exercised
+- `execute-agent-maintenance --write --run-id <prepared_run_id>` was exercised if dry-run produced
+  a prepared run
+- recovery was sufficient when needed, and explicitly unexercised when not needed
+- no packet surgery or branch renaming was required
+
+Closeout truth:
+
+- `maintenance-closeout.json` was populated explicitly
+- `close-agent-maintenance` ran against the same frozen request
+- post-closeout surfaces still told the same story
+
+Decision truth:
+
+- every issue was classified explicitly
+- every localized fix gained a regression lock
+- `TODOS.md` received one dated verdict note under the existing topology item
+- the verdict cites proof evidence, not architecture taste
+
+## Final Gate Logic
+
+Before `TODOS.md` is updated, all of the following must be true:
+
+- any merged repair lanes are integrated and recorded in `merge-log.md`
+- stale generated maintenance surfaces have been regenerated honestly, never by manual edit
+- the earliest impacted proof phase has been rerun
+- required proof commands and regression locks are green, or any non-green result is explicitly
+  classified and accepted in `decision.md`
+- the parent has a final evidence summary with exercised SHA, target version, watcher run URL,
+  worker run URL, and final classification outcome
+
+Landing order is fixed:
+
+1. integrate worker lanes
+2. regenerate honest derived surfaces
+3. rerun the earliest impacted proof phase
+4. run final validations
+5. write the verdict note in `TODOS.md`
+6. move `staging-live` to the reviewed result and inspect the smoke diff
+7. land the reviewed result onto `staging`
+
+Keep the current split topology for now only if all encountered failures were `host_env`,
+`local_bug`, `doc_drift`, or `target_specific`, and every required fix stayed localized.
+
+Open transport-topology convergence next only if one or more of these are proven:
+
+- the shared watcher and worker were individually correct, but the worker -> packet -> relay split
+  still forced repeated undocumented handoffs
+- the same failure pattern would hit both `codex` and `claude_code` because it lives in the shared
+  architecture rather than target-specific acquisition
+- the smallest honest fix requires a new workflow family, a new schema, or a cross-module redesign
+  larger than a localized repair
+
+The final verdict must be written as a dated evidence note under the existing transport-topology
+TODO in `TODOS.md`, including:
+
+- execution date
+- exercised commit SHA
+- target version
+- watcher run URL
+- worker run URL
+- verdict
+- short evidence summary
 
 ## Stop Conditions
 
 Stop and re-plan immediately if any of the following occur:
 
-- the dirty-tree review cannot safely distinguish user work from lane work
-- Phase 1 cannot settle without redesigning transport topology
-- any worker needs a parent-owned dirty file
-- generated packet docs cannot be regenerated deterministically from the chosen command path
-- `refresh-agent` and packet preparation disagree after regen
-- a second policy store appears necessary
-- a new workflow family appears necessary
-- closeout behavior would need to change
-- a clean Claude proof cannot be achieved without creating a new committed `claude_code-maintenance/**` root
+- `codex` is not stale and no live queue item exists
+- `staging` cannot be aligned with `origin/staging`
+- target-version drift occurs mid-run and the proof cannot be restarted cleanly
+- generated packet docs cannot be regenerated honestly
+- recovery requires packet surgery or branch renaming
+- a needed fix becomes topology redesign
+- a worker needs a parent-owned file
 - `PLAN.md` changes milestone boundaries after `C1`
-
-## Follow-Up Boundary
-
-This milestone ends at worker/runbook convergence on the current shared packet contract.
-
-Explicitly deferred:
-
-- transport-topology convergence review
-- worker acquisition unification
-- new replay command families
-- new workflow families
-- closeout automation
-- any second store of packet policy truth
-
-The only acceptable follow-up note in `PLAN.md` and `TODOS.md` is that broader transport-topology convergence remains a separate later decision.
 
 ## Assumptions
 
-- `docs/agents/lifecycle/codex-maintenance/**` is the only committed automated maintenance root that must be regenerated for this milestone.
-- `claude_code` parity is proven through code and tests, not by creating a new committed maintenance root.
-- The currently dirty seam files are intended inputs to preserve and reconcile, not noise to discard.
-- Any additional active watcher or branch-family references discovered during P0 in the named maintenance surfaces are part of this same convergence pass, not a separate milestone.
-
-## Exit Criteria
-
-This plan is complete when:
-
-1. the parent has preserved and integrated the intended dirty seam without overwriting user work
-2. the shared watcher is the only live watcher named across active surfaces
-3. one maintenance branch family is used everywhere active maintenance is described
-4. generated packet docs, source playbooks, workflows, operator docs, and tests tell one story
-5. deterministic regeneration is proven for the codex maintenance root
-6. the final gate suite passes from `parent-core` before anything lands back on `staging`
+- `codex` remains enrolled in the shared maintenance watcher during execution.
+- `docs/agents/lifecycle/codex-maintenance/**` is the only committed maintenance root required for
+  this milestone.
+- `claude_code` is not a second live target; it matters only if the final decision needs to reason
+  about whether a failure pattern is shared or target-specific.
+- The parent has enough GitHub access to trigger workflows and inspect runs, whether through `gh`
+  or the GitHub UI.
+- The local execution host can either run the documented Codex lane or fail clearly enough to be
+  classified.
