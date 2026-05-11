@@ -461,6 +461,14 @@ async fn dropping_events_unblocks_buffered_model_runtime_rejection_completion() 
                 "2048".to_string(),
             ),
             (
+                "FAKE_CODEX_BUFFERED_EVENT_SLEEP_EVERY".to_string(),
+                "8".to_string(),
+            ),
+            (
+                "FAKE_CODEX_BUFFERED_EVENT_SLEEP_MILLIS".to_string(),
+                "1".to_string(),
+            ),
+            (
                 "FAKE_CODEX_RUNTIME_REJECTION_EXIT_CODE".to_string(),
                 "0".to_string(),
             ),
@@ -572,6 +580,14 @@ async fn dropping_events_unblocks_buffered_config_model_runtime_rejection_comple
             (
                 "FAKE_CODEX_BUFFERED_EVENT_PADDING_BYTES".to_string(),
                 "2048".to_string(),
+            ),
+            (
+                "FAKE_CODEX_BUFFERED_EVENT_SLEEP_EVERY".to_string(),
+                "8".to_string(),
+            ),
+            (
+                "FAKE_CODEX_BUFFERED_EVENT_SLEEP_MILLIS".to_string(),
+                "1".to_string(),
             ),
             (
                 "FAKE_CODEX_RUNTIME_REJECTION_EXIT_CODE".to_string(),

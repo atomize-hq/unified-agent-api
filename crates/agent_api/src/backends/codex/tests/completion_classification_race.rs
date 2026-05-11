@@ -39,7 +39,7 @@ fn buffered_env() -> [(String, String); 2] {
     ]
 }
 
-fn slow_drain_buffered_env() -> [(String, String); 2] {
+fn slow_drain_buffered_env() -> [(String, String); 4] {
     [
         (
             "FAKE_CODEX_BUFFERED_EVENT_COUNT".to_string(),
@@ -48,6 +48,14 @@ fn slow_drain_buffered_env() -> [(String, String); 2] {
         (
             "FAKE_CODEX_BUFFERED_EVENT_PADDING_BYTES".to_string(),
             "2048".to_string(),
+        ),
+        (
+            "FAKE_CODEX_BUFFERED_EVENT_SLEEP_EVERY".to_string(),
+            "8".to_string(),
+        ),
+        (
+            "FAKE_CODEX_BUFFERED_EVENT_SLEEP_MILLIS".to_string(),
+            "1".to_string(),
         ),
     ]
 }

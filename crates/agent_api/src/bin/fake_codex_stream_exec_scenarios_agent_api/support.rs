@@ -377,9 +377,65 @@ fn read_buffered_event_padding_bytes() -> io::Result<usize> {
     }
 }
 
+fn read_buffered_event_sleep_every() -> io::Result<Option<usize>> {
+    match env::var("FAKE_CODEX_BUFFERED_EVENT_SLEEP_EVERY") {
+        Ok(raw) => raw.parse::<usize>().map(Some).map_err(|err| {
+            io::Error::new(
+                io::ErrorKind::InvalidInput,
+                format!("invalid FAKE_CODEX_BUFFERED_EVENT_SLEEP_EVERY: {err}"),
+            )
+        }),
+        Err(env::VarError::NotPresent) => Ok(None),
+        Err(err) => Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            format!("failed to read FAKE_CODEX_BUFFERED_EVENT_SLEEP_EVERY: {err}"),
+        )),
+    }
+}
+
+fn read_buffered_event_sleep_millis() -> io::Result<Option<u64>> {
+    match env::var("FAKE_CODEX_BUFFERED_EVENT_SLEEP_MILLIS") {
+        Ok(raw) => raw.parse::<u64>().map(Some).map_err(|err| {
+            io::Error::new(
+                io::ErrorKind::InvalidInput,
+                format!("invalid FAKE_CODEX_BUFFERED_EVENT_SLEEP_MILLIS: {err}"),
+            )
+        }),
+        Err(env::VarError::NotPresent) => Ok(None),
+        Err(err) => Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            format!("failed to read FAKE_CODEX_BUFFERED_EVENT_SLEEP_MILLIS: {err}"),
+        )),
+    }
+}
+
+fn buffered_emit_sleep_config() -> io::Result<Option<(usize, Duration)>> {
+    let Some(every) = read_buffered_event_sleep_every()? else {
+        return Ok(None);
+    };
+    let delay = read_buffered_event_sleep_millis()?.unwrap_or(0);
+    Ok(Some((every, Duration::from_millis(delay))))
+}
+
+fn maybe_sleep_during_buffered_emit(
+    idx: usize,
+    sleep_config: Option<(usize, Duration)>,
+) -> io::Result<()> {
+    let Some((every, delay)) = sleep_config else {
+        return Ok(());
+    };
+    if every == 0 || delay.is_zero() || (idx + 1) % every != 0 {
+        return Ok(());
+    }
+
+    std::thread::sleep(delay);
+    Ok(())
+}
+
 pub(super) fn emit_buffered_turn_events(out: &mut impl Write, thread_id: &str) -> io::Result<()> {
     let count = read_buffered_event_count()?;
     let padding = "x".repeat(read_buffered_event_padding_bytes()?);
+    let sleep_config = buffered_emit_sleep_config()?;
 
     for idx in 0..count {
         emit_jsonl(
@@ -388,6 +444,7 @@ pub(super) fn emit_buffered_turn_events(out: &mut impl Write, thread_id: &str) -
                 r#"{{"type":"turn.started","thread_id":"{thread_id}","turn_id":"buffered-turn-{idx}","padding":"{padding}"}}"#
             ),
         )?;
+        maybe_sleep_during_buffered_emit(idx, sleep_config)?;
     }
 
     Ok(())
@@ -399,6 +456,7 @@ pub(super) fn emit_buffered_transport_errors(
 ) -> io::Result<()> {
     let count = read_buffered_event_count()?;
     let padding = "x".repeat(read_buffered_event_padding_bytes()?);
+    let sleep_config = buffered_emit_sleep_config()?;
 
     for idx in 0..count {
         emit_jsonl(
@@ -407,6 +465,7 @@ pub(super) fn emit_buffered_transport_errors(
                 r#"{{"type":"error","message":"transient transport failure {idx}","code":"transport_error","padding":"{padding}"}}"#
             ),
         )?;
+        maybe_sleep_during_buffered_emit(idx, sleep_config)?;
     }
 
     emit_jsonl(
