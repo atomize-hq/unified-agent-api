@@ -135,8 +135,11 @@ Upstream rules:
 - Source-specific fields from the non-selected source kind MUST NOT be present.
 
 Current committed registry truth enables release-watch metadata for `codex`, `claude_code`, and
-`opencode`. That rollout state lives in the committed registry content, not as a permanent
-schema-level allowlist for future agents.
+`opencode`. At the current checkpoint, `codex` and `claude_code` use `dispatch_kind =
+"workflow_dispatch"`, while `opencode` uses `dispatch_kind = "packet_pr"` with packet-level
+materialization of the shared `agent-maintenance-open-pr.yml` dispatch workflow. That rollout
+state lives in the committed registry content, not as a permanent schema-level allowlist for
+future agents.
 
 ## Maintenance governance checks
 

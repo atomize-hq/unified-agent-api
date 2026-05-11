@@ -638,7 +638,7 @@ This request is the control-plane input for `refresh-agent` on manual drift lane
 
 Historical onboarding and implementation packet docs remain read-only detector inputs.
 
-Automated upstream-release lanes use the prepared v2 request contract with `artifact_version = "2"` and `trigger_kind = "upstream_release_detected"`. The shared worker workflows generate that request and packet root before they open the maintenance PR:
+Automated upstream-release lanes use the prepared v2 request contract with `artifact_version = "2"` and `trigger_kind = "upstream_release_detected"`. The shared release-watch transport generates that request and packet root before it opens the maintenance PR:
 
 ```sh
 cargo run -p xtask -- prepare-agent-maintenance \
@@ -646,9 +646,9 @@ cargo run -p xtask -- prepare-agent-maintenance \
   --current-version <current_validated> \
   --latest-stable <latest_stable> \
   --target-version <target_version> \
-  --opened-from .github/workflows/<worker-workflow>.yml \
+  --opened-from .github/workflows/<opening-workflow>.yml \
   --detected-by .github/workflows/agent-maintenance-release-watch.yml \
-  --dispatch-kind workflow_dispatch \
+  --dispatch-kind <workflow_dispatch|packet_pr> \
   --branch-name automation/<agent_id>-maintenance-<target_version> \
   --request-recorded-at <rfc3339_utc> \
   --request-commit <git_sha> \
@@ -657,11 +657,21 @@ cargo run -p xtask -- prepare-agent-maintenance \
 
 Use `--write` to materialize the request and packet docs. Automated requests are packet-first, carry the relay `[execution_contract]`, and should not be hand-edited to remove the `[detected_release]` linkage.
 
+Dispatch notes:
+- `--dispatch-kind` must match the committed registry `maintenance.release_watch.dispatch_kind` for the same agent.
+- `workflow_dispatch` lanes use the enrolled worker workflow as both the packet `dispatch_workflow` source and the `--opened-from` workflow reference.
+- `packet_pr` lanes still use the same prepared v2 packet shape and relay contract; they resolve `detected_release.dispatch_workflow` to the shared `agent-maintenance-open-pr.yml` workflow.
+- The current proof-backed `opencode` upstream-release lane is this `packet_pr` shape: `--opened-from .github/workflows/agent-maintenance-open-pr.yml` plus `--dispatch-kind packet_pr`.
+
 For automated upstream-release lanes:
 - `docs/agents/lifecycle/<agent_id>-maintenance/HANDOFF.md` is canonical.
 - `docs/agents/lifecycle/<agent_id>-maintenance/governance/pr-summary.md` is derivative.
 - `docs/agents/lifecycle/<agent_id>-maintenance/governance/maintenance-request.toml` owns relay/write envelope/gates/recovery and the manual-closeout requirement.
-- the exact coding-agent prompt and PR-body tail both come from `cli_manifests/<agent_id>/PR_BODY_TEMPLATE.md`
+- packet-owned execution artifacts under the maintenance root are part of the frozen relay contract:
+- `docs/agents/lifecycle/<agent_id>-maintenance/OPS_PLAYBOOK.md`
+- `docs/agents/lifecycle/<agent_id>-maintenance/CI_WORKFLOWS_PLAN.md`
+- `docs/agents/lifecycle/<agent_id>-maintenance/governance/execute-agent-maintenance-prompt.md`
+- the exact coding-agent prompt and PR-body tail come from those packet-owned artifacts, not from `cli_manifests/<agent_id>/PR_BODY_TEMPLATE.md`
 - promotion-only files such as `cli_manifests/<agent_id>/latest_validated.txt` and `cli_manifests/<agent_id>/min_supported.txt` remain out of scope for this packet-first follow-on
 - automated scope is the frozen shared packet + declared writable surfaces
 - support/capability/release-doc publication surfaces such as `cli_manifests/support_matrix/current.json`, `docs/specs/unified-agent-api/support-matrix.md`, `docs/specs/unified-agent-api/capability-matrix.md`, and `docs/crates-io-release.md` still exist in the broader maintenance framework, but this automated upstream-release lane does not request or rewrite them

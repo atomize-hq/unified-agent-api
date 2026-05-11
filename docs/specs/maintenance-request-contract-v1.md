@@ -29,12 +29,15 @@ This document covers only automated upstream-release maintenance requests:
 - `trigger_kind = "upstream_release_detected"`
 - a required `[detected_release]` table
 - a required `[execution_contract]` table for relay execution
+- either enrolled `dispatch_kind`, `workflow_dispatch` or `packet_pr`, when packet generation
+  produces the shared prepared-run shape above
 
 This document does not redefine:
 
 - maintainer-authored legacy maintenance requests for non-release-watch flows
 - workflow-specific binary acquisition steps
-- packet-only `dispatch_kind = "packet_pr"` operation
+- packet-only maintainer handoff flows that omit the relay `[execution_contract]`, regardless of
+  how the PR was opened
 - onboarding or publication contracts outside the maintenance packet
 
 ## Canonical ownership split
@@ -93,6 +96,8 @@ Automated upstream-release requests MUST carry one shared `[detected_release]` s
 
 The detected-release table is universal in structure. Worker-specific transport differences MUST be
 expressed through values, not through a second per-agent schema.
+`dispatch_kind` selects PR-opening transport only; it MUST NOT imply a narrower packet schema or a
+missing relay execution contract.
 
 ## Universal execution-contract shape
 
@@ -133,8 +138,8 @@ built from registry truth. Callers MUST NOT maintain parallel copies of these fa
 | `detected_release.source_ref` | `maintenance.release_watch.upstream.*` | MUST normalize the chosen upstream source into one comparable value. |
 | `detected_release.dispatch_kind` | `maintenance.release_watch.dispatch_kind` | MUST match registry truth. |
 | `detected_release.dispatch_workflow` | `maintenance.release_watch.dispatch_workflow` plus shared packet resolver | MUST match registry truth when dispatch uses `workflow_dispatch`, and MUST resolve to `agent-maintenance-open-pr.yml` when dispatch uses `packet_pr`. |
-| `execution_contract.prompt_template_path` | `[[agents]].manifest_root` | MUST derive from the manifest root prompt template path. |
-| `execution_contract.read_only_inputs` | `[[agents]].manifest_root` plus `opened_from` | MUST include the packet-owned playbook, workflow plan, prompt template, and opening workflow path. |
+| `execution_contract.prompt_template_path` | `[[agents]].manifest_root` plus shared packet conventions | MUST derive from the maintenance packet root as the packet-owned prompt template path. |
+| `execution_contract.read_only_inputs` | `[[agents]].manifest_root` plus `opened_from` | MUST include the packet-owned playbook, workflow plan, prompt template, and opening workflow path under the maintenance packet root. |
 | `execution_contract.writable_surfaces` | `[[agents]].crate_path`, `[[agents]].manifest_root`, publication flags | MUST be derived from registry-owned write surfaces plus shared maintenance policy. |
 | `execution_contract.green_gates` | publication flags and shared policy | MUST be generated from shared rules, not handwritten per workflow. |
 
@@ -151,9 +156,9 @@ allowed override hooks for v1.
 | `basis_ref` path | Different agents have different manifest roots and validated-version pointers. |
 | `detected_release.source_ref` | Upstreams differ, for example GitHub releases versus GCS object listings. |
 | `detected_release.dispatch_workflow` | Different enrolled agents may still use different worker transport files for `workflow_dispatch`, while `packet_pr` materializes the shared `agent-maintenance-open-pr.yml` workflow. |
-| `execution_contract.prompt_template_path` | Each agent may keep its own prompt template under its manifest root. |
+| `execution_contract.prompt_template_path` | Each agent may keep its own packet-owned prompt template under its maintenance root. |
 | `execution_contract.writable_surfaces` | Wrapper crate paths, manifest artifacts, and approved spec writes differ by agent. |
-| `execution_contract.read_only_inputs` | Agent-specific playbooks and workflow plans differ by manifest root. |
+| `execution_contract.read_only_inputs` | Agent-specific playbooks and workflow plans differ by maintenance root. |
 | `execution_contract.ordered_commands` | Acquisition consequences and validation commands may differ by agent, but the shape remains shared. |
 | `execution_contract.green_gates` | Publication and validation obligations may differ only where registry-owned flags justify the difference. |
 | `execution_contract.recovery.notes` | Recovery guidance may mention agent-specific binary or auth repair steps. |
@@ -212,8 +217,8 @@ through the narrow override hooks above.
 
 This contract is considered adopted when all of the following are true:
 
-- an automated Codex maintenance packet and an automated Claude Code maintenance packet share the
-  same envelope, detected-release, and execution-contract schema
+- an automated packet prepared for `workflow_dispatch` and an automated packet prepared for
+  `packet_pr` share the same envelope, detected-release, and execution-contract schema
 - `execute-agent-maintenance` can validate and execute either packet without an agent-specific
   executor special case
 - registry truth remains the only enrollment and dispatch source of truth
