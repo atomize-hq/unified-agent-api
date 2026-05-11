@@ -1,4 +1,5 @@
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 
 use super::{validate_non_empty_scalar, AgentRegistryEntry, AgentRegistryError};
 
@@ -15,18 +16,119 @@ pub struct ReleaseWatchMetadata {
 
 impl ReleaseWatchMetadata {
     pub(super) fn validate(&self, _entry: &AgentRegistryEntry) -> Result<(), AgentRegistryError> {
+        validate_release_watch_metadata(self)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct NormalizedReleaseWatchMetadata {
+    pub enabled: bool,
+    pub version_policy: &'static str,
+    pub dispatch_kind: &'static str,
+    pub dispatch_workflow: Option<String>,
+    pub upstream: NormalizedReleaseWatchUpstream,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct NormalizedReleaseWatchUpstream {
+    pub source_kind: &'static str,
+    pub owner: Option<String>,
+    pub repo: Option<String>,
+    pub tag_prefix: Option<String>,
+    pub bucket: Option<String>,
+    pub prefix: Option<String>,
+    pub version_marker: Option<String>,
+}
+
+pub fn validate_release_watch_metadata(
+    metadata: &ReleaseWatchMetadata,
+) -> Result<(), AgentRegistryError> {
+    if !metadata.enabled {
+        return Err(AgentRegistryError::Validation(
+            "maintenance.release_watch.enabled=false is not allowed; omit maintenance.release_watch entirely when an agent is not enrolled".to_string(),
+        ));
+    }
+
+    metadata.upstream.validate()?;
+    metadata.validate_dispatch_contract()?;
+    Ok(())
+}
+
+pub fn normalize_release_watch_metadata(
+    metadata: &ReleaseWatchMetadata,
+) -> Result<NormalizedReleaseWatchMetadata, AgentRegistryError> {
+    validate_release_watch_metadata(metadata)?;
+    Ok(NormalizedReleaseWatchMetadata {
+        enabled: true,
+        version_policy: metadata.version_policy.as_str(),
+        dispatch_kind: metadata.dispatch_kind.as_str(),
+        dispatch_workflow: metadata
+            .dispatch_workflow
+            .as_deref()
+            .map(str::trim)
+            .map(str::to_string),
+        upstream: NormalizedReleaseWatchUpstream {
+            source_kind: metadata.upstream.source_kind.as_str(),
+            owner: metadata
+                .upstream
+                .owner
+                .as_deref()
+                .map(str::trim)
+                .map(str::to_string),
+            repo: metadata
+                .upstream
+                .repo
+                .as_deref()
+                .map(str::trim)
+                .map(str::to_string),
+            tag_prefix: metadata
+                .upstream
+                .tag_prefix
+                .as_deref()
+                .map(str::trim)
+                .map(str::to_string),
+            bucket: metadata
+                .upstream
+                .bucket
+                .as_deref()
+                .map(str::trim)
+                .map(str::to_string),
+            prefix: metadata
+                .upstream
+                .prefix
+                .as_deref()
+                .map(str::trim)
+                .map(str::to_string),
+            version_marker: metadata
+                .upstream
+                .version_marker
+                .as_deref()
+                .map(str::trim)
+                .map(str::to_string),
+        },
+    })
+}
+
+pub fn normalized_release_watch_sha256(
+    metadata: &ReleaseWatchMetadata,
+) -> Result<String, AgentRegistryError> {
+    let normalized = normalize_release_watch_metadata(metadata)?;
+    let bytes = serde_json::to_vec(&normalized).map_err(|err| {
+        AgentRegistryError::Validation(format!(
+            "serialize normalized maintenance.release_watch payload: {err}"
+        ))
+    })?;
+    Ok(hex::encode(Sha256::digest(bytes)))
+}
+
+impl ReleaseWatchMetadata {
+    fn validate_dispatch_contract(&self) -> Result<(), AgentRegistryError> {
         if !self.enabled {
             return Err(AgentRegistryError::Validation(
                 "maintenance.release_watch.enabled=false is not allowed; omit maintenance.release_watch entirely when an agent is not enrolled".to_string(),
             ));
         }
 
-        self.upstream.validate()?;
-        self.validate_dispatch_contract()?;
-        Ok(())
-    }
-
-    fn validate_dispatch_contract(&self) -> Result<(), AgentRegistryError> {
         match self.dispatch_kind {
             ReleaseWatchDispatchKind::WorkflowDispatch => {
                 let workflow = self.dispatch_workflow.as_deref().ok_or_else(|| {
@@ -60,11 +162,28 @@ pub enum ReleaseWatchVersionPolicy {
     LatestStableMinusOne,
 }
 
+impl ReleaseWatchVersionPolicy {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::LatestStableMinusOne => "latest_stable_minus_one",
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ReleaseWatchDispatchKind {
     WorkflowDispatch,
     PacketPr,
+}
+
+impl ReleaseWatchDispatchKind {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::WorkflowDispatch => "workflow_dispatch",
+            Self::PacketPr => "packet_pr",
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]

@@ -550,7 +550,10 @@ mod tests {
 
     use serde_json::json;
 
-    use crate::approval_artifact::{ApprovalArtifact, ApprovalDescriptor};
+    use crate::approval_artifact::{
+        ApprovalArtifact, ApprovalDescriptor, ApprovalMaintenance, ApprovalMaintenanceDeferral,
+        ApprovalMaintenanceMode, APPROVED_SCOPE_CREATE_LANE_CLOSEOUT,
+    };
 
     #[test]
     fn promote_repair_bundle_restores_backup_when_canonical_validation_fails() {
@@ -590,6 +593,17 @@ mod tests {
                 capability_matrix_target: None,
                 docs_release_track: "crates-io".to_string(),
                 onboarding_pack_prefix: "gemini-cli-onboarding".to_string(),
+            },
+            maintenance: ApprovalMaintenance {
+                mode: ApprovalMaintenanceMode::ExplicitlyDeferred {
+                    deferral: ApprovalMaintenanceDeferral {
+                        reason: "release watch is deferred".to_string(),
+                        follow_up: "revisit after closeout".to_string(),
+                        approved_scope: APPROVED_SCOPE_CREATE_LANE_CLOSEOUT.to_string(),
+                    },
+                    deferral_sha256: "maintenance-deferral-sha".to_string(),
+                },
+                section_sha256: "maintenance-section-sha".to_string(),
             },
         };
 
