@@ -1,7 +1,7 @@
 use std::fs;
 
 use serde_json::json;
-use xtask::{agent_lifecycle, proving_run_closeout, support_matrix};
+use xtask::{agent_lifecycle, approval_artifact, proving_run_closeout, support_matrix};
 
 use super::{
     harness::{
@@ -81,6 +81,120 @@ fn seed_cli_manifest_root(root: &std::path::Path, manifest_root: &str, canonical
     }
 }
 
+fn approval_with_release_watch_enrolled_maintenance(
+    contents: &str,
+    dispatch_workflow: &str,
+    upstream_block: &str,
+) -> String {
+    let mut updated = contents.trim_end().to_string();
+    updated.push_str(&format!(
+        concat!(
+            "\n\n",
+            "[descriptor.maintenance]\n",
+            "mode = \"release_watch_enrolled\"\n",
+            "\n",
+            "[descriptor.maintenance.release_watch]\n",
+            "enabled = true\n",
+            "version_policy = \"latest_stable_minus_one\"\n",
+            "dispatch_kind = \"workflow_dispatch\"\n",
+            "dispatch_workflow = \"{dispatch_workflow}\"\n",
+            "\n",
+            "[descriptor.maintenance.release_watch.upstream]\n",
+            "{upstream_block}\n",
+        ),
+        dispatch_workflow = dispatch_workflow,
+        upstream_block = upstream_block.trim_end(),
+    ));
+    updated.push('\n');
+    updated
+}
+
+fn refresh_publication_continuity(
+    root: &std::path::Path,
+    approval_rel: &str,
+    lifecycle_rel: &str,
+    packet_rel: &str,
+) {
+    let approval_sha256 = sha256_hex(&root.join(approval_rel));
+    let lifecycle_path = root.join(lifecycle_rel);
+    let packet_path = root.join(packet_rel);
+    let base_lifecycle: serde_json::Value = serde_json::from_str(
+        &fs::read_to_string(&lifecycle_path).expect("read lifecycle state fixture"),
+    )
+    .expect("parse lifecycle state fixture");
+    let base_packet: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&packet_path).expect("read packet fixture"))
+            .expect("parse packet fixture");
+
+    let lifecycle_json = |packet_sha256: &str| {
+        let mut lifecycle = base_lifecycle.clone();
+        lifecycle["approval_artifact_sha256"] = json!(approval_sha256);
+        lifecycle["publication_packet_sha256"] = json!(packet_sha256);
+        if lifecycle
+            .get("lifecycle_stage")
+            .and_then(serde_json::Value::as_str)
+            == Some("closed_baseline")
+        {
+            for field in ["required_evidence", "satisfied_evidence"] {
+                let entries = lifecycle[field]
+                    .as_array_mut()
+                    .expect("closed baseline evidence arrays");
+                if !entries
+                    .iter()
+                    .any(|entry| entry.as_str() == Some("maintenance_readiness_settled"))
+                {
+                    entries.push(json!("maintenance_readiness_settled"));
+                }
+            }
+        }
+        lifecycle
+    };
+    let packet_json = |lifecycle_sha256: &str| {
+        let mut packet = base_packet.clone();
+        packet["approval_artifact_sha256"] = json!(approval_sha256);
+        packet["lifecycle_state_sha256"] = json!(lifecycle_sha256);
+        packet
+    };
+
+    write_text(
+        &packet_path,
+        &format!(
+            "{}\n",
+            serde_json::to_string_pretty(&packet_json(
+                "0000000000000000000000000000000000000000000000000000000000000000",
+            ))
+            .expect("serialize packet fixture")
+        ),
+    );
+    let mut packet_sha256 = sha256_hex(&packet_path);
+    write_text(
+        &lifecycle_path,
+        &format!(
+            "{}\n",
+            serde_json::to_string_pretty(&lifecycle_json(&packet_sha256))
+                .expect("serialize lifecycle fixture")
+        ),
+    );
+    let lifecycle_sha256 = sha256_hex(&lifecycle_path);
+    write_text(
+        &packet_path,
+        &format!(
+            "{}\n",
+            serde_json::to_string_pretty(&packet_json(&lifecycle_sha256))
+                .expect("serialize packet fixture")
+        ),
+    );
+    packet_sha256 = sha256_hex(&packet_path);
+    write_text(
+        &lifecycle_path,
+        &format!(
+            "{}\n",
+            serde_json::to_string_pretty(&lifecycle_json(&packet_sha256))
+                .expect("serialize lifecycle fixture")
+        ),
+    );
+}
+
 fn seed_lifecycle_eligible_audit_peers(root: &std::path::Path) {
     write_text(
         &root.join("cli_manifests/codex/current.json"),
@@ -92,8 +206,17 @@ fn seed_lifecycle_eligible_audit_peers(root: &std::path::Path) {
     );
     write_text(
         &root.join("docs/agents/lifecycle/codex-cli-onboarding/governance/approved-agent.toml"),
-        include_str!(
-            "../../../../docs/agents/lifecycle/codex-cli-onboarding/governance/approved-agent.toml"
+        &approval_with_release_watch_enrolled_maintenance(
+            include_str!(
+                "../../../../docs/agents/lifecycle/codex-cli-onboarding/governance/approved-agent.toml"
+            ),
+            "codex-cli-update-snapshot.yml",
+            concat!(
+                "source_kind = \"github_releases\"\n",
+                "owner = \"openai\"\n",
+                "repo = \"codex\"\n",
+                "tag_prefix = \"rust-v\""
+            ),
         ),
     );
     write_text(
@@ -111,7 +234,16 @@ fn seed_lifecycle_eligible_audit_peers(root: &std::path::Path) {
 
     write_text(
         &root.join("docs/agents/lifecycle/claude-code-cli-onboarding/governance/approved-agent.toml"),
-        include_str!("../../../../docs/agents/lifecycle/claude-code-cli-onboarding/governance/approved-agent.toml"),
+        &approval_with_release_watch_enrolled_maintenance(
+            include_str!("../../../../docs/agents/lifecycle/claude-code-cli-onboarding/governance/approved-agent.toml"),
+            "claude-code-update-snapshot.yml",
+            concat!(
+                "source_kind = \"gcs_object_listing\"\n",
+                "bucket = \"claude-code-dist-86c565f3-f756-42ad-8dfa-d59b1c096819\"\n",
+                "prefix = \"claude-code-releases\"\n",
+                "version_marker = \"manifest.json\""
+            ),
+        ),
     );
     write_text(
         &root.join("docs/agents/lifecycle/claude-code-cli-onboarding/governance/lifecycle-state.json"),
@@ -124,6 +256,19 @@ fn seed_lifecycle_eligible_audit_peers(root: &std::path::Path) {
     write_text(
         &root.join("docs/agents/lifecycle/claude-code-cli-onboarding/governance/proving-run-closeout.json"),
         include_str!("../../../../docs/agents/lifecycle/claude-code-cli-onboarding/governance/proving-run-closeout.json"),
+    );
+
+    refresh_publication_continuity(
+        root,
+        "docs/agents/lifecycle/codex-cli-onboarding/governance/approved-agent.toml",
+        "docs/agents/lifecycle/codex-cli-onboarding/governance/lifecycle-state.json",
+        "docs/agents/lifecycle/codex-cli-onboarding/governance/publication-ready.json",
+    );
+    refresh_publication_continuity(
+        root,
+        "docs/agents/lifecycle/claude-code-cli-onboarding/governance/approved-agent.toml",
+        "docs/agents/lifecycle/claude-code-cli-onboarding/governance/lifecycle-state.json",
+        "docs/agents/lifecycle/claude-code-cli-onboarding/governance/publication-ready.json",
     );
 }
 
@@ -438,6 +583,42 @@ fn close_proving_run_validates_and_refreshes_packet_docs() {
     assert!(lifecycle.contains("\"lifecycle_stage\": \"closed_baseline\""));
     assert!(lifecycle.contains("\"publication_packet_path\": \"docs/agents/lifecycle/gemini-cli-onboarding/governance/publication-ready.json\""));
 
+    let finalized_closeout: serde_json::Value =
+        serde_json::from_slice(&fs::read(&closeout_path).expect("read finalized closeout"))
+            .expect("parse finalized closeout");
+    let approval = approval_artifact::load_approval_artifact(&fixture, &approval_path)
+        .expect("load approval artifact");
+    let settlement = finalized_closeout
+        .get("maintenance_settlement")
+        .expect("maintenance settlement present");
+    assert_eq!(
+        settlement.get("mode").and_then(serde_json::Value::as_str),
+        Some("explicitly_deferred")
+    );
+    assert_eq!(
+        settlement
+            .get("approval_section_sha256")
+            .and_then(serde_json::Value::as_str),
+        Some(approval.maintenance.section_sha256.as_str())
+    );
+    assert_eq!(
+        settlement
+            .get("deferral_sha256")
+            .and_then(serde_json::Value::as_str),
+        Some(match &approval.maintenance.mode {
+            approval_artifact::ApprovalMaintenanceMode::ExplicitlyDeferred {
+                deferral_sha256,
+                ..
+            } => deferral_sha256.as_str(),
+            approval_artifact::ApprovalMaintenanceMode::ReleaseWatchEnrolled { .. } => {
+                panic!("expected deferred fixture approval")
+            }
+        })
+    );
+    assert!(settlement
+        .get("release_watch_sha256")
+        .is_some_and(serde_json::Value::is_null));
+
     let preview_output = run_cli(gemini_dry_run_args(), &fixture);
     assert_eq!(
         preview_output.exit_code, 0,
@@ -472,6 +653,7 @@ fn close_proving_run_finalizes_truthful_prepared_draft() {
             approval_ref: approval_path.clone(),
             approval_sha256: sha256_hex(&fixture.join(&approval_path)),
             approval_source: "governance-review".to_string(),
+            maintenance_settlement: None,
             preflight_passed: true,
             recorded_at: "2026-04-21T11:23:09Z".to_string(),
             commit: "6b7d5f6e9cf2bf54933659f5700bb59d1f8a95e8".to_string(),
@@ -513,6 +695,38 @@ fn close_proving_run_finalizes_truthful_prepared_draft() {
         finalized.get("state").and_then(serde_json::Value::as_str),
         Some("closed")
     );
+    let approval = approval_artifact::load_approval_artifact(&fixture, &approval_path)
+        .expect("load approval artifact");
+    let settlement = finalized
+        .get("maintenance_settlement")
+        .expect("maintenance settlement present");
+    assert_eq!(
+        settlement.get("mode").and_then(serde_json::Value::as_str),
+        Some("explicitly_deferred")
+    );
+    assert_eq!(
+        settlement
+            .get("approval_section_sha256")
+            .and_then(serde_json::Value::as_str),
+        Some(approval.maintenance.section_sha256.as_str())
+    );
+    assert_eq!(
+        settlement
+            .get("deferral_sha256")
+            .and_then(serde_json::Value::as_str),
+        Some(match &approval.maintenance.mode {
+            approval_artifact::ApprovalMaintenanceMode::ExplicitlyDeferred {
+                deferral_sha256,
+                ..
+            } => deferral_sha256.as_str(),
+            approval_artifact::ApprovalMaintenanceMode::ReleaseWatchEnrolled { .. } => {
+                panic!("expected deferred fixture approval")
+            }
+        })
+    );
+    assert!(settlement
+        .get("release_watch_sha256")
+        .is_some_and(serde_json::Value::is_null));
 }
 
 #[test]
@@ -535,6 +749,7 @@ fn close_proving_run_rejects_unresolved_placeholders_in_prepared_draft() {
             approval_ref: approval_path.clone(),
             approval_sha256: sha256_hex(&fixture.join(&approval_path)),
             approval_source: "governance-review".to_string(),
+            maintenance_settlement: None,
             preflight_passed: true,
             recorded_at: "2026-04-21T11:23:09Z".to_string(),
             commit: "6b7d5f6e9cf2bf54933659f5700bb59d1f8a95e8".to_string(),

@@ -25,11 +25,16 @@ use xtask::{
         PublicationReadyPacket, SideState, SupportTier,
     },
     agent_maintenance::drift::{self, DriftCategory},
-    agent_registry::{AgentRegistry, AgentRegistryEntry, REGISTRY_RELATIVE_PATH},
-    approval_artifact::{load_approval_artifact, ApprovalArtifact, ApprovalArtifactError},
+    agent_registry::{
+        normalized_release_watch_sha256, AgentRegistry, AgentRegistryEntry, REGISTRY_RELATIVE_PATH,
+    },
+    approval_artifact::{
+        load_approval_artifact, ApprovalArtifact, ApprovalArtifactError, ApprovalMaintenanceMode,
+    },
     proving_run_closeout::{
         self, build_closeout, has_unresolved_placeholders, render_closeout_json,
-        unresolved_placeholder_fields, DurationTruth, ProvingRunCloseout, ProvingRunCloseoutError,
+        unresolved_placeholder_fields, DurationTruth, MaintenanceSettlement,
+        MaintenanceSettlementMode, ProvingRunCloseout, ProvingRunCloseoutError,
         ProvingRunCloseoutExpected, ProvingRunCloseoutHumanFields, ProvingRunCloseoutMachineFields,
         ProvingRunCloseoutState, ResidualFrictionTruth,
     },
@@ -114,7 +119,7 @@ pub fn run_in_workspace<W: Write>(
         })?;
     validate_closeout_prerequisites(workspace_root, entry, &approval, &closeout_path, &closeout)?;
     let finalized_closeout =
-        finalize_closeout(workspace_root, &approval, &closeout, &closeout_path)?;
+        finalize_closeout(workspace_root, entry, &approval, &closeout, &closeout_path)?;
     write_closeout_artifact(workspace_root, &closeout_path, &finalized_closeout)?;
 
     let docs_preview = build_docs_preview(entry, &finalized_closeout, &closeout_path);
@@ -479,16 +484,19 @@ fn validate_capability_matrix_audit_green(workspace_root: &Path) -> Result<(), E
 
 fn finalize_closeout(
     workspace_root: &Path,
+    entry: &AgentRegistryEntry,
     approval: &ApprovalArtifact,
     closeout: &ProvingRunCloseout,
     closeout_path: &Path,
 ) -> Result<ProvingRunCloseout, Error> {
+    let maintenance_settlement = settle_maintenance_readiness(entry, approval, closeout_path)?;
     build_closeout(
         ProvingRunCloseoutState::Closed,
         ProvingRunCloseoutMachineFields {
             approval_ref: approval.relative_path.clone(),
             approval_sha256: approval.sha256.clone(),
             approval_source: APPROVAL_SOURCE.to_string(),
+            maintenance_settlement: Some(maintenance_settlement),
             preflight_passed: true,
             recorded_at: agent_lifecycle::now_rfc3339()
                 .map_err(|err| Error::Internal(err.to_string()))?,
@@ -519,6 +527,65 @@ fn finalize_closeout(
         }
         other => other,
     })
+}
+
+fn settle_maintenance_readiness(
+    entry: &AgentRegistryEntry,
+    approval: &ApprovalArtifact,
+    closeout_path: &Path,
+) -> Result<MaintenanceSettlement, Error> {
+    match &approval.maintenance.mode {
+        ApprovalMaintenanceMode::ReleaseWatchEnrolled {
+            release_watch_sha256,
+            ..
+        } => {
+            let registry_release_watch = entry.maintenance.release_watch.as_ref().ok_or_else(|| {
+                Error::Validation(format!(
+                    "{}: approval maintenance mode `release_watch_enrolled` requires registry `maintenance.release_watch` for `{}`",
+                    closeout_path.display(),
+                    entry.agent_id
+                ))
+            })?;
+            let registry_release_watch_sha256 =
+                normalized_release_watch_sha256(registry_release_watch).map_err(|err| {
+                    Error::Validation(format!(
+                        "{}: registry maintenance.release_watch is invalid for `{}`: {err}",
+                        closeout_path.display(),
+                        entry.agent_id
+                    ))
+                })?;
+            if registry_release_watch_sha256 != *release_watch_sha256 {
+                return Err(Error::Validation(format!(
+                    "{}: approval and registry maintenance.release_watch truth diverge for `{}`",
+                    closeout_path.display(),
+                    entry.agent_id
+                )));
+            }
+            Ok(MaintenanceSettlement {
+                mode: MaintenanceSettlementMode::ReleaseWatchEnrolled,
+                approval_section_sha256: approval.maintenance.section_sha256.clone(),
+                release_watch_sha256: Some(registry_release_watch_sha256),
+                deferral_sha256: None,
+            })
+        }
+        ApprovalMaintenanceMode::ExplicitlyDeferred {
+            deferral_sha256, ..
+        } => {
+            if entry.maintenance.release_watch.is_some() {
+                return Err(Error::Validation(format!(
+                    "{}: approval maintenance mode `explicitly_deferred` forbids registry `maintenance.release_watch` for `{}`",
+                    closeout_path.display(),
+                    entry.agent_id
+                )));
+            }
+            Ok(MaintenanceSettlement {
+                mode: MaintenanceSettlementMode::ExplicitlyDeferred,
+                approval_section_sha256: approval.maintenance.section_sha256.clone(),
+                release_watch_sha256: None,
+                deferral_sha256: Some(deferral_sha256.clone()),
+            })
+        }
+    }
 }
 
 fn write_closeout_artifact(

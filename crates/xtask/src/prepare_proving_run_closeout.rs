@@ -120,6 +120,7 @@ pub fn run_in_workspace<W: Write>(
             approval_ref: context.approval.relative_path.clone(),
             approval_sha256: context.approval.sha256.clone(),
             approval_source: APPROVAL_SOURCE.to_string(),
+            maintenance_settlement: None,
             preflight_passed: true,
             recorded_at: recorded_at.clone(),
             commit: current_head_commit(workspace_root)?,

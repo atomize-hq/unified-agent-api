@@ -264,6 +264,7 @@ fn ensure_closeout(
             approval_ref: approval.relative_path.clone(),
             approval_sha256: approval.sha256.clone(),
             approval_source: APPROVAL_SOURCE.to_string(),
+            maintenance_settlement: None,
             preflight_passed: true,
             recorded_at: lifecycle_state.last_transition_at.clone(),
             commit: recorded_commit,

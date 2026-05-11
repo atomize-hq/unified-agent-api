@@ -8,11 +8,12 @@ pub const PREPARED_CLOSEOUT_DURATION_PLACEHOLDER: &str =
     "TODO(closeout): replace with duration_seconds or a truthful duration_missing_reason.";
 pub const PREPARED_CLOSEOUT_RESIDUAL_FRICTION_PLACEHOLDER: &str =
     "TODO(closeout): replace with residual_friction items or a truthful explicit_none_reason.";
-pub const MACHINE_OWNED_FIELDS: [&str; 7] = [
+pub const MACHINE_OWNED_FIELDS: [&str; 8] = [
     "state",
     "approval_ref",
     "approval_sha256",
     "approval_source",
+    "maintenance_settlement",
     "preflight_passed",
     "recorded_at",
     "commit",
@@ -35,6 +36,7 @@ pub struct ProvingRunCloseout {
     pub approval_ref: String,
     pub approval_sha256: String,
     pub approval_source: String,
+    pub maintenance_settlement: Option<MaintenanceSettlement>,
     pub manual_control_plane_edits: u64,
     pub partial_write_incidents: u64,
     pub ambiguous_ownership_incidents: u64,
@@ -55,6 +57,29 @@ pub enum DurationTruth {
 pub enum ResidualFrictionTruth {
     Items(Vec<String>),
     ExplicitNone(String),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MaintenanceSettlement {
+    pub mode: MaintenanceSettlementMode,
+    pub approval_section_sha256: String,
+    pub release_watch_sha256: Option<String>,
+    pub deferral_sha256: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MaintenanceSettlementMode {
+    ReleaseWatchEnrolled,
+    ExplicitlyDeferred,
+}
+
+impl MaintenanceSettlementMode {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::ReleaseWatchEnrolled => "release_watch_enrolled",
+            Self::ExplicitlyDeferred => "explicitly_deferred",
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -81,6 +106,7 @@ pub struct ProvingRunCloseoutMachineFields {
     pub approval_ref: String,
     pub approval_sha256: String,
     pub approval_source: String,
+    pub maintenance_settlement: Option<MaintenanceSettlement>,
     pub preflight_passed: bool,
     pub recorded_at: String,
     pub commit: String,
@@ -114,6 +140,7 @@ struct RawProvingRunCloseout {
     approval_ref: Option<String>,
     approval_sha256: Option<String>,
     approval_source: Option<String>,
+    maintenance_settlement: Option<RawMaintenanceSettlement>,
     manual_control_plane_edits: u64,
     partial_write_incidents: u64,
     ambiguous_ownership_incidents: u64,
@@ -124,6 +151,15 @@ struct RawProvingRunCloseout {
     preflight_passed: bool,
     recorded_at: String,
     commit: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawMaintenanceSettlement {
+    mode: String,
+    approval_section_sha256: Option<String>,
+    release_watch_sha256: Option<String>,
+    deferral_sha256: Option<String>,
 }
 
 impl fmt::Display for ProvingRunCloseoutError {
@@ -144,6 +180,7 @@ pub fn build_closeout(
         approval_ref: machine.approval_ref,
         approval_sha256: machine.approval_sha256,
         approval_source: machine.approval_source,
+        maintenance_settlement: machine.maintenance_settlement,
         manual_control_plane_edits: human.manual_control_plane_edits,
         partial_write_incidents: human.partial_write_incidents,
         ambiguous_ownership_incidents: human.ambiguous_ownership_incidents,
@@ -186,6 +223,11 @@ pub fn render_closeout_json(
         "approval_ref": closeout.approval_ref,
         "approval_sha256": closeout.approval_sha256,
         "approval_source": closeout.approval_source,
+        "maintenance_settlement": closeout
+            .maintenance_settlement
+            .as_ref()
+            .map(render_maintenance_settlement)
+            .unwrap_or(serde_json::Value::Null),
         "manual_control_plane_edits": closeout.manual_control_plane_edits,
         "partial_write_incidents": closeout.partial_write_incidents,
         "ambiguous_ownership_incidents": closeout.ambiguous_ownership_incidents,
@@ -411,6 +453,10 @@ fn validate_closeout(
         approval_ref,
         approval_sha256,
         approval_source,
+        maintenance_settlement: raw
+            .maintenance_settlement
+            .map(|settlement| parse_maintenance_settlement(closeout_path, settlement))
+            .transpose()?,
         manual_control_plane_edits: raw.manual_control_plane_edits,
         partial_write_incidents: raw.partial_write_incidents,
         ambiguous_ownership_incidents: raw.ambiguous_ownership_incidents,
@@ -465,11 +511,122 @@ fn validate_allowed_state(
     )))
 }
 
+fn parse_maintenance_settlement(
+    closeout_path: &Path,
+    raw: RawMaintenanceSettlement,
+) -> Result<MaintenanceSettlement, ProvingRunCloseoutError> {
+    let mode = match raw.mode.as_str() {
+        "release_watch_enrolled" => MaintenanceSettlementMode::ReleaseWatchEnrolled,
+        "explicitly_deferred" => MaintenanceSettlementMode::ExplicitlyDeferred,
+        _ => {
+            return Err(ProvingRunCloseoutError::Validation(format!(
+                "{}: `maintenance_settlement.mode` must equal `release_watch_enrolled` or `explicitly_deferred`",
+                closeout_path.display()
+            )));
+        }
+    };
+    let approval_section_sha256 = required_string(
+        closeout_path,
+        "maintenance_settlement.approval_section_sha256",
+        raw.approval_section_sha256.as_deref(),
+    )?;
+    validate_sha256_field(
+        closeout_path,
+        "maintenance_settlement.approval_section_sha256",
+        &approval_section_sha256,
+    )?;
+    let release_watch_sha256 = optional_sha256_field(
+        closeout_path,
+        "maintenance_settlement.release_watch_sha256",
+        raw.release_watch_sha256.as_deref(),
+    )?;
+    let deferral_sha256 = optional_sha256_field(
+        closeout_path,
+        "maintenance_settlement.deferral_sha256",
+        raw.deferral_sha256.as_deref(),
+    )?;
+
+    match mode {
+        MaintenanceSettlementMode::ReleaseWatchEnrolled => {
+            if release_watch_sha256.is_none() || deferral_sha256.is_some() {
+                return Err(ProvingRunCloseoutError::Validation(format!(
+                    "{}: enrolled `maintenance_settlement` requires `release_watch_sha256` and forbids `deferral_sha256`",
+                    closeout_path.display()
+                )));
+            }
+        }
+        MaintenanceSettlementMode::ExplicitlyDeferred => {
+            if deferral_sha256.is_none() || release_watch_sha256.is_some() {
+                return Err(ProvingRunCloseoutError::Validation(format!(
+                    "{}: deferred `maintenance_settlement` requires `deferral_sha256` and forbids `release_watch_sha256`",
+                    closeout_path.display()
+                )));
+            }
+        }
+    }
+
+    Ok(MaintenanceSettlement {
+        mode,
+        approval_section_sha256,
+        release_watch_sha256,
+        deferral_sha256,
+    })
+}
+
 fn validate_loaded_closeout_fields(
     path: &Path,
     closeout: &ProvingRunCloseout,
 ) -> Result<(), ProvingRunCloseoutError> {
     validate_lower_hex_sha256(path, &closeout.approval_sha256)?;
+    if let Some(settlement) = &closeout.maintenance_settlement {
+        validate_sha256_field(
+            path,
+            "maintenance_settlement.approval_section_sha256",
+            &settlement.approval_section_sha256,
+        )?;
+        match settlement.mode {
+            MaintenanceSettlementMode::ReleaseWatchEnrolled => {
+                let release_watch_sha256 =
+                    settlement.release_watch_sha256.as_deref().ok_or_else(|| {
+                        ProvingRunCloseoutError::Validation(format!(
+                            "{}: `maintenance_settlement.release_watch_sha256` is required when mode = `release_watch_enrolled`",
+                            path.display()
+                        ))
+                    })?;
+                validate_sha256_field(
+                    path,
+                    "maintenance_settlement.release_watch_sha256",
+                    release_watch_sha256,
+                )?;
+                if settlement.deferral_sha256.is_some() {
+                    return Err(ProvingRunCloseoutError::Validation(format!(
+                        "{}: `maintenance_settlement.deferral_sha256` must be absent when mode = `release_watch_enrolled`",
+                        path.display()
+                    )));
+                }
+            }
+            MaintenanceSettlementMode::ExplicitlyDeferred => {
+                let deferral_sha256 =
+                    settlement.deferral_sha256.as_deref().ok_or_else(|| {
+                        ProvingRunCloseoutError::Validation(format!(
+                            "{}: `maintenance_settlement.deferral_sha256` is required when mode = `explicitly_deferred`",
+                            path.display()
+                        ))
+                    })?;
+                validate_sha256_field(
+                    path,
+                    "maintenance_settlement.deferral_sha256",
+                    deferral_sha256,
+                )?;
+                if settlement.release_watch_sha256.is_some() {
+                    return Err(ProvingRunCloseoutError::Validation(format!(
+                        "{}: `maintenance_settlement.release_watch_sha256` must be absent when mode = `explicitly_deferred`",
+                        path.display()
+                    )));
+                }
+            }
+        }
+    }
     validate_recorded_at(path, &closeout.recorded_at)?;
     validate_commit(path, &closeout.commit)?;
     match &closeout.duration {
@@ -527,13 +684,34 @@ fn non_empty_field(
 }
 
 fn validate_lower_hex_sha256(path: &Path, value: &str) -> Result<(), ProvingRunCloseoutError> {
+    validate_sha256_field(path, "approval_sha256", value)
+}
+
+fn validate_sha256_field(
+    path: &Path,
+    field_name: &str,
+    value: &str,
+) -> Result<(), ProvingRunCloseoutError> {
     if value.len() != 64 || !value.chars().all(|ch| matches!(ch, '0'..='9' | 'a'..='f')) {
         return Err(ProvingRunCloseoutError::Validation(format!(
-            "{}: `approval_sha256` must be 64 lowercase hex characters",
+            "{}: `{field_name}` must be 64 lowercase hex characters",
             path.display()
         )));
     }
     Ok(())
+}
+
+fn optional_sha256_field(
+    path: &Path,
+    field_name: &str,
+    value: Option<&str>,
+) -> Result<Option<String>, ProvingRunCloseoutError> {
+    let Some(value) = value else {
+        return Ok(None);
+    };
+    let value = non_empty_field(path, field_name, value)?;
+    validate_sha256_field(path, field_name, &value)?;
+    Ok(Some(value))
 }
 
 fn validate_recorded_at(path: &Path, value: &str) -> Result<(), ProvingRunCloseoutError> {
@@ -627,4 +805,13 @@ fn map_approval_artifact_error(
         }
         ApprovalArtifactError::Internal(message) => ProvingRunCloseoutError::Internal(message),
     }
+}
+
+fn render_maintenance_settlement(settlement: &MaintenanceSettlement) -> serde_json::Value {
+    serde_json::json!({
+        "mode": settlement.mode.as_str(),
+        "approval_section_sha256": settlement.approval_section_sha256,
+        "release_watch_sha256": settlement.release_watch_sha256,
+        "deferral_sha256": settlement.deferral_sha256,
+    })
 }
