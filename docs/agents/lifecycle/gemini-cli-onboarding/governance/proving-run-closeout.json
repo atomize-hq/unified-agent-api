@@ -1,8 +1,14 @@
 {
   "state": "closed",
   "approval_ref": "docs/agents/lifecycle/gemini-cli-onboarding/governance/approved-agent.toml",
-  "approval_sha256": "aa3f57681d108fe28b64976a18799071f921086e57ab4fa9ce518186b710bb7a",
-  "approval_source": "historical-m3-backfill",
+  "approval_sha256": "171a77096888823d50c175b52a95d2876ddfe56fdd99271f7429e9aa01da600b",
+  "approval_source": "historical-lifecycle-backfill",
+  "maintenance_settlement": {
+    "mode": "explicitly_deferred",
+    "approval_section_sha256": "4db55b68f2284203b729ba0b13e1bcd7ab161ffcade360a09e5ae32fd005e25b",
+    "release_watch_sha256": null,
+    "deferral_sha256": "2ded163f3b08fd90eda52fe6d2974820cafb2dd4838be1cb41fd9b8393f734ce"
+  },
   "manual_control_plane_edits": 0,
   "partial_write_incidents": 0,
   "ambiguous_ownership_incidents": 0,

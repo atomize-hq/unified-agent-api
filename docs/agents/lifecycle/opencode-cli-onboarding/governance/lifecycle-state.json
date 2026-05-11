@@ -3,7 +3,7 @@
   "agent_id": "opencode",
   "onboarding_pack_prefix": "opencode-cli-onboarding",
   "approval_artifact_path": "docs/agents/lifecycle/opencode-cli-onboarding/governance/approved-agent.toml",
-  "approval_artifact_sha256": "83d7a804eb96578458c946419bfc1219b69029d824797b3342c65d9bddec3cdf",
+  "approval_artifact_sha256": "905bdfd0cd7ee72169fb36c546c8448619ecd5e72c98b59421c584386b1feb1f",
   "lifecycle_stage": "closed_baseline",
   "support_tier": "publication_backed",
   "side_states": [],
@@ -22,7 +22,8 @@
     "capability_matrix_check_green",
     "capability_matrix_audit_green",
     "preflight_green",
-    "proving_run_closeout_written"
+    "proving_run_closeout_written",
+    "maintenance_readiness_settled"
   ],
   "satisfied_evidence": [
     "registry_entry",
@@ -35,7 +36,8 @@
     "capability_matrix_check_green",
     "capability_matrix_audit_green",
     "preflight_green",
-    "proving_run_closeout_written"
+    "proving_run_closeout_written",
+    "maintenance_readiness_settled"
   ],
   "blocking_issues": [],
   "retryable_failures": [],
@@ -59,6 +61,6 @@
     "minimal_profile_justification": null
   },
   "publication_packet_path": "docs/agents/lifecycle/opencode-cli-onboarding/governance/publication-ready.json",
-  "publication_packet_sha256": "6ff11cc3b724b599506d056475ffd8179ed4248418e2490283e6d26cfefd6411",
+  "publication_packet_sha256": "c0e4f4cf96b9b743fa53528f6e0e54abd7e23a5e427cd23dcda60a98a5d1c21d",
   "closeout_baseline_path": "docs/agents/lifecycle/opencode-cli-onboarding/governance/proving-run-closeout.json"
 }

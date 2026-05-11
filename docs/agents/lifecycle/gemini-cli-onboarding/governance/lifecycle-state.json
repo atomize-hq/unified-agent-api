@@ -3,7 +3,7 @@
   "agent_id": "gemini_cli",
   "onboarding_pack_prefix": "gemini-cli-onboarding",
   "approval_artifact_path": "docs/agents/lifecycle/gemini-cli-onboarding/governance/approved-agent.toml",
-  "approval_artifact_sha256": "aa3f57681d108fe28b64976a18799071f921086e57ab4fa9ce518186b710bb7a",
+  "approval_artifact_sha256": "171a77096888823d50c175b52a95d2876ddfe56fdd99271f7429e9aa01da600b",
   "lifecycle_stage": "closed_baseline",
   "support_tier": "publication_backed",
   "side_states": [],
@@ -22,7 +22,8 @@
     "capability_matrix_check_green",
     "capability_matrix_audit_green",
     "preflight_green",
-    "proving_run_closeout_written"
+    "proving_run_closeout_written",
+    "maintenance_readiness_settled"
   ],
   "satisfied_evidence": [
     "registry_entry",
@@ -35,7 +36,8 @@
     "capability_matrix_check_green",
     "capability_matrix_audit_green",
     "preflight_green",
-    "proving_run_closeout_written"
+    "proving_run_closeout_written",
+    "maintenance_readiness_settled"
   ],
   "blocking_issues": [],
   "retryable_failures": [],
@@ -57,6 +59,6 @@
     "minimal_profile_justification": null
   },
   "publication_packet_path": "docs/agents/lifecycle/gemini-cli-onboarding/governance/publication-ready.json",
-  "publication_packet_sha256": "23cea4839f633a7760e28c8cad77bde90d723687dbc66028537f708abf44669c",
+  "publication_packet_sha256": "4fe0101b5e621dae027186047bc7608555ac1ebe325265d9786a4d127b0c278b",
   "closeout_baseline_path": "docs/agents/lifecycle/gemini-cli-onboarding/governance/proving-run-closeout.json"
 }

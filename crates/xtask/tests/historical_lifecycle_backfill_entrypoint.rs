@@ -5,9 +5,13 @@ use std::{
 
 use clap::{Parser, Subcommand};
 use serde_json::Value;
+use sha2::{Digest, Sha256};
 use xtask::{
-    agent_lifecycle::{load_lifecycle_state, LifecycleStage, PublicationReadyPacket},
-    approval_artifact::load_approval_artifact,
+    agent_lifecycle::{
+        load_lifecycle_state, reconstruct_publication_ready_state_from_closed_baseline,
+        LifecycleStage, PublicationReadyPacket,
+    },
+    approval_artifact::{load_approval_artifact, ApprovalMaintenanceMode},
     prepare_publication::validate_runtime_evidence_run_for_approval,
     proving_run_closeout,
 };
@@ -94,7 +98,7 @@ fn prepare_fixture(prefix: &str) -> (PathBuf, String) {
             "agent_id": "gemini_cli",
             "onboarding_pack_prefix": "gemini-cli-onboarding",
             "approval_artifact_path": approval_path,
-            "approval_artifact_sha256": approval_sha,
+            "approval_artifact_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
             "lifecycle_stage": "closed_baseline",
             "support_tier": "publication_backed",
             "side_states": [],
@@ -139,6 +143,28 @@ fn prepare_fixture(prefix: &str) -> (PathBuf, String) {
             "publication_packet_path": "docs/agents/lifecycle/gemini-cli-onboarding/governance/publication-ready.json",
             "publication_packet_sha256": "deadbeef",
             "closeout_baseline_path": "docs/agents/lifecycle/gemini-cli-onboarding/governance/proving-run-closeout.json"
+        }),
+    );
+    write_json(
+        &fixture.join(
+            "docs/agents/lifecycle/gemini-cli-onboarding/governance/proving-run-closeout.json",
+        ),
+        &serde_json::json!({
+            "state": "closed",
+            "approval_ref": approval_path,
+            "approval_sha256": approval_sha,
+            "approval_source": "historical-m3-backfill",
+            "maintenance_settlement": Value::Null,
+            "manual_control_plane_edits": 0,
+            "partial_write_incidents": 0,
+            "ambiguous_ownership_incidents": 0,
+            "duration_seconds": Value::Null,
+            "duration_missing_reason": "Exact duration not recoverable from committed evidence.",
+            "residual_friction": Value::Null,
+            "explicit_none_reason": "No residual friction remained in the committed proving-run evidence.",
+            "preflight_passed": true,
+            "recorded_at": "2026-04-21T11:23:09Z",
+            "commit": "6b7d5f6e9cf2bf54933659f5700bb59d1f8a95e8"
         }),
     );
 
@@ -249,6 +275,7 @@ fn historical_lifecycle_backfill_rebuilds_multi_file_runtime_evidence_and_downst
     )
     .expect("load lifecycle");
     assert_eq!(lifecycle.lifecycle_stage, LifecycleStage::ClosedBaseline);
+    assert_eq!(lifecycle.approval_artifact_sha256, approval.sha256);
 
     let packet_bytes = fs::read(
         fixture
@@ -260,9 +287,20 @@ fn historical_lifecycle_backfill_rebuilds_multi_file_runtime_evidence_and_downst
     packet
         .validate()
         .expect("validate publication packet schema");
+    assert_eq!(packet.approval_artifact_sha256, approval.sha256);
     assert_eq!(
         packet.runtime_evidence_paths,
         runtime.runtime_evidence_paths
+    );
+    let mut reconstructed = lifecycle.clone();
+    reconstructed.publication_packet_path = None;
+    reconstructed.publication_packet_sha256 = None;
+    reconstructed.closeout_baseline_path = None;
+    let reconstructed = reconstruct_publication_ready_state_from_closed_baseline(&reconstructed);
+    let expected_lifecycle_state_sha256 = sha256_pretty_json(&reconstructed);
+    assert_eq!(
+        packet.lifecycle_state_sha256,
+        expected_lifecycle_state_sha256
     );
     assert_eq!(
         lifecycle.publication_packet_path.as_deref(),
@@ -283,6 +321,27 @@ fn historical_lifecycle_backfill_rebuilds_multi_file_runtime_evidence_and_downst
     )
     .expect("load closeout through shared parser");
     assert_eq!(closeout.state.as_str(), "closed");
+    let maintenance = closeout
+        .maintenance_settlement
+        .as_ref()
+        .expect("historical backfill should settle maintenance");
+    assert_eq!(maintenance.mode.as_str(), "explicitly_deferred");
+    assert_eq!(
+        maintenance.approval_section_sha256,
+        approval.maintenance.section_sha256
+    );
+    match &approval.maintenance.mode {
+        ApprovalMaintenanceMode::ExplicitlyDeferred {
+            deferral_sha256, ..
+        } => assert_eq!(
+            maintenance.deferral_sha256.as_deref(),
+            Some(deferral_sha256.as_str())
+        ),
+        ApprovalMaintenanceMode::ReleaseWatchEnrolled { .. } => {
+            panic!("fixture approval must remain explicitly deferred")
+        }
+    }
+    assert!(maintenance.release_watch_sha256.is_none());
     assert_eq!(
         fs::read_to_string(&closeout_path).expect("read closeout"),
         proving_run_closeout::render_closeout_json(&closeout)
@@ -304,4 +363,10 @@ fn write_text(path: &Path, contents: &str) {
         fs::create_dir_all(parent).expect("create parent dirs");
     }
     fs::write(path, contents).expect("write text");
+}
+
+fn sha256_pretty_json<T: serde::Serialize>(value: &T) -> String {
+    let mut bytes = serde_json::to_vec_pretty(value).expect("serialize json");
+    bytes.push(b'\n');
+    hex::encode(Sha256::digest(bytes))
 }

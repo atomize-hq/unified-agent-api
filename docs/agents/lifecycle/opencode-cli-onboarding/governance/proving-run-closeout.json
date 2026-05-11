@@ -1,8 +1,14 @@
 {
   "ambiguous_ownership_incidents": 0,
   "approval_ref": "docs/agents/lifecycle/opencode-cli-onboarding/governance/approved-agent.toml",
-  "approval_sha256": "83d7a804eb96578458c946419bfc1219b69029d824797b3342c65d9bddec3cdf",
+  "approval_sha256": "905bdfd0cd7ee72169fb36c546c8448619ecd5e72c98b59421c584386b1feb1f",
   "approval_source": "historical-lifecycle-backfill",
+  "maintenance_settlement": {
+    "mode": "explicitly_deferred",
+    "approval_section_sha256": "4db55b68f2284203b729ba0b13e1bcd7ab161ffcade360a09e5ae32fd005e25b",
+    "release_watch_sha256": null,
+    "deferral_sha256": "2ded163f3b08fd90eda52fe6d2974820cafb2dd4838be1cb41fd9b8393f734ce"
+  },
   "commit": "f3954f83832380514a71b93ded10ed3b586306fd",
   "duration_missing_reason": "Exact duration not recoverable from committed evidence.",
   "explicit_none_reason": "No residual friction remained in the committed proving-run evidence.",
