@@ -2,32 +2,37 @@
   "snapshot_schema_version": 2,
   "tool": "opencode-cli",
   "mode": "union",
-  "collected_at": "2026-04-18T03:12:12Z",
+  "collected_at": "2026-04-17T00:00:00Z",
   "expected_targets": [
     "linux-x64",
+    "linux-arm64",
+    "darwin-x64",
     "darwin-arm64",
-    "win32-x64"
+    "win32-x64",
+    "win32-arm64"
   ],
   "complete": false,
   "missing_targets": [
-    "linux-x64",
-    "win32-x64"
+    "linux-arm64",
+    "darwin-x64",
+    "darwin-arm64",
+    "win32-x64",
+    "win32-arm64"
   ],
   "inputs": [
     {
-      "target_triple": "darwin-arm64",
-      "collected_at": "2026-04-18T03:12:12Z",
+      "target_triple": "linux-x64",
+      "collected_at": "2026-04-17T00:00:00Z",
       "binary": {
-        "sha256": "4557b09dfbb6e8c28b85e90e9b8d8b83361ce53f622d3e41d908f279c378f091",
-        "size_bytes": 101226400,
+        "sha256": "bfa25c08df8d37edb579f470461137ef49c11fda2f43814785a99d87da97fd85",
+        "size_bytes": 142172442,
         "platform": {
-          "os": "macos",
-          "arch": "aarch64"
+          "os": "linux",
+          "arch": "x86_64"
         },
-        "target_triple": "darwin-arm64",
-        "version_output": "1.4.9",
-        "semantic_version": "1.4.9",
-        "channel": "stable"
+        "target_triple": "linux-x64",
+        "version_output": "1.4.11",
+        "semantic_version": "1.4.11"
       }
     }
   ],
@@ -35,150 +40,145 @@
     {
       "path": [],
       "available_on": [
-        "darwin-arm64"
+        "linux-x64"
       ],
+      "about": "start opencode tui",
+      "usage": "opencode [project]",
       "args": [
         {
           "name": "project",
           "required": false,
           "variadic": false,
+          "note": "captured from root help positional usage",
           "available_on": [
-            "darwin-arm64"
+            "linux-x64"
           ]
         }
       ],
       "flags": [
         {
-          "key": "--agent",
-          "long": "--agent",
-          "takes_value": true,
-          "available_on": [
-            "darwin-arm64"
-          ]
-        },
-        {
-          "key": "--continue",
-          "long": "--continue",
-          "short": "-c",
-          "takes_value": false,
-          "available_on": [
-            "darwin-arm64"
-          ]
-        },
-        {
-          "key": "--cors",
-          "long": "--cors",
-          "takes_value": true,
-          "available_on": [
-            "darwin-arm64"
-          ]
-        },
-        {
-          "key": "--fork",
-          "long": "--fork",
-          "takes_value": false,
-          "available_on": [
-            "darwin-arm64"
-          ]
-        },
-        {
-          "key": "--help",
           "long": "--help",
           "short": "-h",
           "takes_value": false,
           "available_on": [
-            "darwin-arm64"
+            "linux-x64"
           ]
         },
         {
-          "key": "--hostname",
-          "long": "--hostname",
-          "takes_value": true,
-          "available_on": [
-            "darwin-arm64"
-          ]
-        },
-        {
-          "key": "--log-level",
-          "long": "--log-level",
-          "takes_value": true,
-          "available_on": [
-            "darwin-arm64"
-          ]
-        },
-        {
-          "key": "--mdns",
-          "long": "--mdns",
-          "takes_value": false,
-          "available_on": [
-            "darwin-arm64"
-          ]
-        },
-        {
-          "key": "--mdns-domain",
-          "long": "--mdns-domain",
-          "takes_value": true,
-          "available_on": [
-            "darwin-arm64"
-          ]
-        },
-        {
-          "key": "--model",
-          "long": "--model",
-          "short": "-m",
-          "takes_value": true,
-          "available_on": [
-            "darwin-arm64"
-          ]
-        },
-        {
-          "key": "--port",
-          "long": "--port",
-          "takes_value": true,
-          "available_on": [
-            "darwin-arm64"
-          ]
-        },
-        {
-          "key": "--print-logs",
-          "long": "--print-logs",
-          "takes_value": false,
-          "available_on": [
-            "darwin-arm64"
-          ]
-        },
-        {
-          "key": "--prompt",
-          "long": "--prompt",
-          "takes_value": true,
-          "available_on": [
-            "darwin-arm64"
-          ]
-        },
-        {
-          "key": "--pure",
-          "long": "--pure",
-          "takes_value": false,
-          "available_on": [
-            "darwin-arm64"
-          ]
-        },
-        {
-          "key": "--session",
-          "long": "--session",
-          "short": "-s",
-          "takes_value": true,
-          "available_on": [
-            "darwin-arm64"
-          ]
-        },
-        {
-          "key": "--version",
           "long": "--version",
           "short": "-v",
           "takes_value": false,
           "available_on": [
-            "darwin-arm64"
+            "linux-x64"
+          ]
+        },
+        {
+          "long": "--print-logs",
+          "takes_value": false,
+          "available_on": [
+            "linux-x64"
+          ]
+        },
+        {
+          "long": "--log-level",
+          "takes_value": true,
+          "value_name": "level",
+          "available_on": [
+            "linux-x64"
+          ]
+        },
+        {
+          "long": "--pure",
+          "takes_value": false,
+          "available_on": [
+            "linux-x64"
+          ]
+        },
+        {
+          "long": "--port",
+          "takes_value": true,
+          "value_name": "port",
+          "available_on": [
+            "linux-x64"
+          ]
+        },
+        {
+          "long": "--hostname",
+          "takes_value": true,
+          "value_name": "hostname",
+          "available_on": [
+            "linux-x64"
+          ]
+        },
+        {
+          "long": "--mdns",
+          "takes_value": false,
+          "available_on": [
+            "linux-x64"
+          ]
+        },
+        {
+          "long": "--mdns-domain",
+          "takes_value": true,
+          "value_name": "domain",
+          "available_on": [
+            "linux-x64"
+          ]
+        },
+        {
+          "long": "--cors",
+          "takes_value": true,
+          "available_on": [
+            "linux-x64"
+          ]
+        },
+        {
+          "long": "--model",
+          "short": "-m",
+          "takes_value": true,
+          "value_name": "provider/model",
+          "available_on": [
+            "linux-x64"
+          ]
+        },
+        {
+          "long": "--continue",
+          "short": "-c",
+          "takes_value": false,
+          "available_on": [
+            "linux-x64"
+          ]
+        },
+        {
+          "long": "--session",
+          "short": "-s",
+          "takes_value": true,
+          "value_name": "session",
+          "available_on": [
+            "linux-x64"
+          ]
+        },
+        {
+          "long": "--fork",
+          "takes_value": false,
+          "available_on": [
+            "linux-x64"
+          ]
+        },
+        {
+          "long": "--prompt",
+          "takes_value": true,
+          "value_name": "prompt",
+          "available_on": [
+            "linux-x64"
+          ]
+        },
+        {
+          "long": "--agent",
+          "takes_value": true,
+          "value_name": "agent",
+          "available_on": [
+            "linux-x64"
           ]
         }
       ]
@@ -188,7 +188,7 @@
         "acp"
       ],
       "available_on": [
-        "darwin-arm64"
+        "linux-x64"
       ],
       "about": "start ACP (Agent Client Protocol) server"
     },
@@ -197,7 +197,7 @@
         "agent"
       ],
       "available_on": [
-        "darwin-arm64"
+        "linux-x64"
       ],
       "about": "manage agents"
     },
@@ -206,7 +206,7 @@
         "attach"
       ],
       "available_on": [
-        "darwin-arm64"
+        "linux-x64"
       ],
       "about": "attach to a running opencode server"
     },
@@ -215,7 +215,7 @@
         "completion"
       ],
       "available_on": [
-        "darwin-arm64"
+        "linux-x64"
       ],
       "about": "generate shell completion script"
     },
@@ -224,7 +224,7 @@
         "db"
       ],
       "available_on": [
-        "darwin-arm64"
+        "linux-x64"
       ],
       "about": "database tools"
     },
@@ -233,7 +233,7 @@
         "debug"
       ],
       "available_on": [
-        "darwin-arm64"
+        "linux-x64"
       ],
       "about": "debugging and troubleshooting tools"
     },
@@ -242,7 +242,7 @@
         "export"
       ],
       "available_on": [
-        "darwin-arm64"
+        "linux-x64"
       ],
       "about": "export session data as JSON"
     },
@@ -251,7 +251,7 @@
         "github"
       ],
       "available_on": [
-        "darwin-arm64"
+        "linux-x64"
       ],
       "about": "manage GitHub agent"
     },
@@ -260,7 +260,7 @@
         "import"
       ],
       "available_on": [
-        "darwin-arm64"
+        "linux-x64"
       ],
       "about": "import session data from JSON file or URL"
     },
@@ -269,7 +269,7 @@
         "mcp"
       ],
       "available_on": [
-        "darwin-arm64"
+        "linux-x64"
       ],
       "about": "manage MCP (Model Context Protocol) servers"
     },
@@ -278,7 +278,7 @@
         "models"
       ],
       "available_on": [
-        "darwin-arm64"
+        "linux-x64"
       ],
       "about": "list all available models"
     },
@@ -287,7 +287,7 @@
         "plugin"
       ],
       "available_on": [
-        "darwin-arm64"
+        "linux-x64"
       ],
       "about": "install plugin and update config"
     },
@@ -296,7 +296,7 @@
         "pr"
       ],
       "available_on": [
-        "darwin-arm64"
+        "linux-x64"
       ],
       "about": "fetch and checkout a GitHub PR branch, then run opencode"
     },
@@ -305,7 +305,7 @@
         "providers"
       ],
       "available_on": [
-        "darwin-arm64"
+        "linux-x64"
       ],
       "about": "manage AI providers and credentials"
     },
@@ -314,7 +314,7 @@
         "run"
       ],
       "available_on": [
-        "darwin-arm64"
+        "linux-x64"
       ],
       "about": "run opencode with a message",
       "usage": "opencode run [message..]",
@@ -324,176 +324,183 @@
           "required": false,
           "variadic": true,
           "available_on": [
-            "darwin-arm64"
+            "linux-x64"
           ]
         }
       ],
       "flags": [
         {
-          "key": "--agent",
-          "long": "--agent",
-          "takes_value": true,
-          "available_on": [
-            "darwin-arm64"
-          ]
-        },
-        {
-          "key": "--attach",
-          "long": "--attach",
-          "takes_value": true,
-          "available_on": [
-            "darwin-arm64"
-          ]
-        },
-        {
-          "key": "--command",
-          "long": "--command",
-          "takes_value": true,
-          "available_on": [
-            "darwin-arm64"
-          ]
-        },
-        {
-          "key": "--continue",
-          "long": "--continue",
-          "short": "-c",
-          "takes_value": false,
-          "available_on": [
-            "darwin-arm64"
-          ]
-        },
-        {
-          "key": "--dangerously-skip-permissions",
-          "long": "--dangerously-skip-permissions",
-          "takes_value": false,
-          "available_on": [
-            "darwin-arm64"
-          ]
-        },
-        {
-          "key": "--dir",
-          "long": "--dir",
-          "takes_value": true,
-          "available_on": [
-            "darwin-arm64"
-          ]
-        },
-        {
-          "key": "--file",
-          "long": "--file",
-          "short": "-f",
-          "takes_value": true,
-          "available_on": [
-            "darwin-arm64"
-          ]
-        },
-        {
-          "key": "--fork",
-          "long": "--fork",
-          "takes_value": false,
-          "available_on": [
-            "darwin-arm64"
-          ]
-        },
-        {
-          "key": "--format",
-          "long": "--format",
-          "takes_value": true,
-          "available_on": [
-            "darwin-arm64"
-          ]
-        },
-        {
-          "key": "--help",
           "long": "--help",
           "short": "-h",
           "takes_value": false,
           "available_on": [
-            "darwin-arm64"
+            "linux-x64"
           ]
         },
         {
-          "key": "--model",
-          "long": "--model",
-          "short": "-m",
-          "takes_value": true,
-          "available_on": [
-            "darwin-arm64"
-          ]
-        },
-        {
-          "key": "--password",
-          "long": "--password",
-          "short": "-p",
-          "takes_value": true,
-          "available_on": [
-            "darwin-arm64"
-          ]
-        },
-        {
-          "key": "--port",
-          "long": "--port",
-          "takes_value": true,
-          "available_on": [
-            "darwin-arm64"
-          ]
-        },
-        {
-          "key": "--pure",
-          "long": "--pure",
-          "takes_value": false,
-          "available_on": [
-            "darwin-arm64"
-          ]
-        },
-        {
-          "key": "--session",
-          "long": "--session",
-          "short": "-s",
-          "takes_value": true,
-          "available_on": [
-            "darwin-arm64"
-          ]
-        },
-        {
-          "key": "--share",
-          "long": "--share",
-          "takes_value": false,
-          "available_on": [
-            "darwin-arm64"
-          ]
-        },
-        {
-          "key": "--thinking",
-          "long": "--thinking",
-          "takes_value": false,
-          "available_on": [
-            "darwin-arm64"
-          ]
-        },
-        {
-          "key": "--title",
-          "long": "--title",
-          "takes_value": true,
-          "available_on": [
-            "darwin-arm64"
-          ]
-        },
-        {
-          "key": "--variant",
-          "long": "--variant",
-          "takes_value": true,
-          "available_on": [
-            "darwin-arm64"
-          ]
-        },
-        {
-          "key": "--version",
           "long": "--version",
           "short": "-v",
           "takes_value": false,
           "available_on": [
-            "darwin-arm64"
+            "linux-x64"
+          ]
+        },
+        {
+          "long": "--print-logs",
+          "takes_value": false,
+          "available_on": [
+            "linux-x64"
+          ]
+        },
+        {
+          "long": "--log-level",
+          "takes_value": true,
+          "value_name": "level",
+          "available_on": [
+            "linux-x64"
+          ]
+        },
+        {
+          "long": "--pure",
+          "takes_value": false,
+          "available_on": [
+            "linux-x64"
+          ]
+        },
+        {
+          "long": "--command",
+          "takes_value": true,
+          "value_name": "command",
+          "available_on": [
+            "linux-x64"
+          ]
+        },
+        {
+          "long": "--continue",
+          "short": "-c",
+          "takes_value": false,
+          "available_on": [
+            "linux-x64"
+          ]
+        },
+        {
+          "long": "--session",
+          "short": "-s",
+          "takes_value": true,
+          "value_name": "session",
+          "available_on": [
+            "linux-x64"
+          ]
+        },
+        {
+          "long": "--fork",
+          "takes_value": false,
+          "available_on": [
+            "linux-x64"
+          ]
+        },
+        {
+          "long": "--share",
+          "takes_value": false,
+          "available_on": [
+            "linux-x64"
+          ]
+        },
+        {
+          "long": "--model",
+          "short": "-m",
+          "takes_value": true,
+          "value_name": "provider/model",
+          "available_on": [
+            "linux-x64"
+          ]
+        },
+        {
+          "long": "--agent",
+          "takes_value": true,
+          "value_name": "agent",
+          "available_on": [
+            "linux-x64"
+          ]
+        },
+        {
+          "long": "--format",
+          "takes_value": true,
+          "value_name": "default|json",
+          "available_on": [
+            "linux-x64"
+          ]
+        },
+        {
+          "long": "--file",
+          "short": "-f",
+          "takes_value": true,
+          "value_name": "files",
+          "available_on": [
+            "linux-x64"
+          ]
+        },
+        {
+          "long": "--title",
+          "takes_value": true,
+          "value_name": "title",
+          "available_on": [
+            "linux-x64"
+          ]
+        },
+        {
+          "long": "--attach",
+          "takes_value": true,
+          "value_name": "url",
+          "available_on": [
+            "linux-x64"
+          ]
+        },
+        {
+          "long": "--password",
+          "short": "-p",
+          "takes_value": true,
+          "value_name": "password",
+          "available_on": [
+            "linux-x64"
+          ]
+        },
+        {
+          "long": "--dir",
+          "takes_value": true,
+          "value_name": "directory",
+          "available_on": [
+            "linux-x64"
+          ]
+        },
+        {
+          "long": "--port",
+          "takes_value": true,
+          "value_name": "port",
+          "available_on": [
+            "linux-x64"
+          ]
+        },
+        {
+          "long": "--variant",
+          "takes_value": true,
+          "value_name": "variant",
+          "available_on": [
+            "linux-x64"
+          ]
+        },
+        {
+          "long": "--thinking",
+          "takes_value": false,
+          "available_on": [
+            "linux-x64"
+          ]
+        },
+        {
+          "long": "--dangerously-skip-permissions",
+          "takes_value": false,
+          "available_on": [
+            "linux-x64"
           ]
         }
       ]
@@ -503,7 +510,7 @@
         "serve"
       ],
       "available_on": [
-        "darwin-arm64"
+        "linux-x64"
       ],
       "about": "starts a headless opencode server"
     },
@@ -512,7 +519,7 @@
         "session"
       ],
       "available_on": [
-        "darwin-arm64"
+        "linux-x64"
       ],
       "about": "manage sessions"
     },
@@ -521,7 +528,7 @@
         "stats"
       ],
       "available_on": [
-        "darwin-arm64"
+        "linux-x64"
       ],
       "about": "show token usage and cost statistics"
     },
@@ -530,7 +537,7 @@
         "uninstall"
       ],
       "available_on": [
-        "darwin-arm64"
+        "linux-x64"
       ],
       "about": "uninstall opencode and remove all related files"
     },
@@ -539,7 +546,7 @@
         "upgrade"
       ],
       "available_on": [
-        "darwin-arm64"
+        "linux-x64"
       ],
       "about": "upgrade opencode to the latest or a specific version"
     },
@@ -548,7 +555,7 @@
         "web"
       ],
       "available_on": [
-        "darwin-arm64"
+        "linux-x64"
       ],
       "about": "start opencode server and open web interface"
     }

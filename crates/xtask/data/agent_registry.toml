@@ -193,6 +193,16 @@ docs_release_track = "crates-io"
 onboarding_pack_prefix = "opencode-cli-onboarding"
 
 [agents.maintenance]
+[agents.maintenance.release_watch]
+enabled = true
+version_policy = "latest_stable_minus_one"
+dispatch_kind = "packet_pr"
+
+[agents.maintenance.release_watch.upstream]
+source_kind = "github_releases"
+owner = "anomalyco"
+repo = "opencode"
+tag_prefix = "v"
 
 [[agents.maintenance.governance_checks]]
 path = "docs/integrations/opencode/governance/seam-2-closeout.md"

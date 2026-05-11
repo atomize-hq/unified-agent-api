@@ -230,7 +230,9 @@
       "backend_support": "unsupported",
       "uaa_support": "unsupported",
       "pointer_promotion": "none",
-      "evidence_notes": []
+      "evidence_notes": [
+        "current root snapshot omits this target"
+      ]
     },
     {
       "agent": "opencode",
@@ -245,11 +247,55 @@
     {
       "agent": "opencode",
       "version": "1.4.11",
+      "target": "darwin-x64",
+      "manifest_support": "unsupported",
+      "backend_support": "unsupported",
+      "uaa_support": "unsupported",
+      "pointer_promotion": "none",
+      "evidence_notes": [
+        "current root snapshot omits this target"
+      ]
+    },
+    {
+      "agent": "opencode",
+      "version": "1.4.9",
+      "target": "darwin-x64",
+      "manifest_support": "unsupported",
+      "backend_support": "unsupported",
+      "uaa_support": "unsupported",
+      "pointer_promotion": "none",
+      "evidence_notes": []
+    },
+    {
+      "agent": "opencode",
+      "version": "1.4.11",
+      "target": "linux-arm64",
+      "manifest_support": "unsupported",
+      "backend_support": "unsupported",
+      "uaa_support": "unsupported",
+      "pointer_promotion": "none",
+      "evidence_notes": [
+        "current root snapshot omits this target"
+      ]
+    },
+    {
+      "agent": "opencode",
+      "version": "1.4.9",
+      "target": "linux-arm64",
+      "manifest_support": "unsupported",
+      "backend_support": "unsupported",
+      "uaa_support": "unsupported",
+      "pointer_promotion": "none",
+      "evidence_notes": []
+    },
+    {
+      "agent": "opencode",
+      "version": "1.4.11",
       "target": "linux-x64",
       "manifest_support": "supported",
       "backend_support": "unsupported",
       "uaa_support": "unsupported",
-      "pointer_promotion": "none",
+      "pointer_promotion": "latest_validated",
       "evidence_notes": []
     },
     {
@@ -260,9 +306,29 @@
       "backend_support": "unsupported",
       "uaa_support": "unsupported",
       "pointer_promotion": "none",
+      "evidence_notes": []
+    },
+    {
+      "agent": "opencode",
+      "version": "1.4.11",
+      "target": "win32-arm64",
+      "manifest_support": "unsupported",
+      "backend_support": "unsupported",
+      "uaa_support": "unsupported",
+      "pointer_promotion": "none",
       "evidence_notes": [
         "current root snapshot omits this target"
       ]
+    },
+    {
+      "agent": "opencode",
+      "version": "1.4.9",
+      "target": "win32-arm64",
+      "manifest_support": "unsupported",
+      "backend_support": "unsupported",
+      "uaa_support": "unsupported",
+      "pointer_promotion": "none",
+      "evidence_notes": []
     },
     {
       "agent": "opencode",
@@ -272,7 +338,9 @@
       "backend_support": "unsupported",
       "uaa_support": "unsupported",
       "pointer_promotion": "none",
-      "evidence_notes": []
+      "evidence_notes": [
+        "current root snapshot omits this target"
+      ]
     },
     {
       "agent": "opencode",
@@ -282,9 +350,7 @@
       "backend_support": "unsupported",
       "uaa_support": "unsupported",
       "pointer_promotion": "none",
-      "evidence_notes": [
-        "current root snapshot omits this target"
-      ]
+      "evidence_notes": []
     }
   ]
 }

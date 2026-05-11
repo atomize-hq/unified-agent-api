@@ -142,8 +142,8 @@ fn seeded_registry_parses_successfully() {
         .collect();
     assert_eq!(
         release_watch_ids,
-        vec!["codex", "claude_code"],
-        "milestone 1 release_watch enrollment stays registry-only for codex and claude_code"
+        vec!["codex", "claude_code", "opencode"],
+        "current committed release_watch enrollment includes opencode alongside codex and claude_code"
     );
 
     let opencode = registry.find("opencode").expect("seeded opencode entry");
@@ -160,10 +160,28 @@ fn seeded_registry_parses_successfully() {
         2,
         "opencode seeds explicit governance checks"
     );
-    assert!(
-        opencode.maintenance.release_watch.is_none(),
-        "opencode stays unenrolled in milestone 1"
+    let opencode_watch = opencode
+        .maintenance
+        .release_watch
+        .as_ref()
+        .expect("opencode seeded release_watch enrollment");
+    assert!(opencode_watch.enabled, "opencode release watch stays enabled");
+    assert_eq!(
+        opencode_watch.version_policy,
+        ReleaseWatchVersionPolicy::LatestStableMinusOne
     );
+    assert_eq!(
+        opencode_watch.dispatch_kind,
+        ReleaseWatchDispatchKind::PacketPr
+    );
+    assert_eq!(opencode_watch.dispatch_workflow, None);
+    assert_eq!(
+        opencode_watch.upstream.source_kind,
+        ReleaseWatchSourceKind::GithubReleases
+    );
+    assert_eq!(opencode_watch.upstream.owner.as_deref(), Some("anomalyco"));
+    assert_eq!(opencode_watch.upstream.repo.as_deref(), Some("opencode"));
+    assert_eq!(opencode_watch.upstream.tag_prefix.as_deref(), Some("v"));
 
     let gemini = registry
         .find("gemini_cli")
@@ -184,13 +202,13 @@ fn seeded_registry_parses_successfully() {
     assert_eq!(gemini.publication.capability_matrix_target, None);
     assert!(
         gemini.maintenance.release_watch.is_none(),
-        "gemini_cli stays unenrolled in milestone 1"
+        "gemini_cli remains unenrolled"
     );
 
     let aider = registry.find("aider").expect("seeded aider entry");
     assert!(
         aider.maintenance.release_watch.is_none(),
-        "aider stays unenrolled in milestone 1"
+        "aider remains unenrolled"
     );
 }
 

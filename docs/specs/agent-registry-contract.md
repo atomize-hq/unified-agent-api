@@ -134,8 +134,8 @@ Upstream rules:
   - `version_marker`
 - Source-specific fields from the non-selected source kind MUST NOT be present.
 
-Current milestone-1 seeded registry truth enables release-watch metadata only for `codex` and
-`claude_code`. That rollout limit lives in the committed registry content, not as a permanent
+Current committed registry truth enables release-watch metadata for `codex`, `claude_code`, and
+`opencode`. That rollout state lives in the committed registry content, not as a permanent
 schema-level allowlist for future agents.
 
 ## Maintenance governance checks
