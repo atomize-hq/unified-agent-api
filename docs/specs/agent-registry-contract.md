@@ -75,6 +75,21 @@ Absence of `maintenance.release_watch` is the only “not enrolled” state. Cal
 second enrollment inventory outside the registry or represent unenrolled agents with
 `enabled = false` placeholders.
 
+Approval artifacts and create-lane closeout consumers MUST preserve exactly two maintenance
+approval modes:
+
+- `release_watch_enrolled`
+- `explicitly_deferred`
+
+These modes do not create a second enrollment contract:
+
+- `release_watch_enrolled` requires committed registry `maintenance.release_watch` truth for the
+  same agent
+- `explicitly_deferred` forbids committed registry `maintenance.release_watch` truth for the same
+  agent
+- callers MUST NOT introduce a third approval-maintenance mode or alternate release-watch
+  enrollment storage outside the registry
+
 ## Maintenance release watch
 
 `maintenance.release_watch` declares the machine-owned watch metadata for upstream release

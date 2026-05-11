@@ -572,6 +572,13 @@ Then refresh the generated onboarding packet to its closed state:
 - a coherent committed `publication-ready.json` packet for the same approval artifact
 - the canonical closeout artifact at `docs/agents/lifecycle/<onboarding_pack_prefix>/governance/proving-run-closeout.json`
 - closeout `state = closed` in that artifact; the only valid closeout states are `prepared` and `closed`
+- approval maintenance truth from `docs/agents/lifecycle/<onboarding_pack_prefix>/governance/approved-agent.toml` settled without inventing extra states:
+  - `descriptor.maintenance.mode = "release_watch_enrolled"` requires committed registry `maintenance.release_watch` truth for the same agent
+  - `descriptor.maintenance.mode = "explicitly_deferred"` forbids committed registry `maintenance.release_watch` truth for the same agent
+- when maintenance settlement is recorded in the closeout artifact, `maintenance_settlement.mode` must equal `release_watch_enrolled` or `explicitly_deferred`
+- every settled `maintenance_settlement` carries `approval_section_sha256`
+- `release_watch_enrolled` settlement requires `maintenance_settlement.release_watch_sha256` and forbids `maintenance_settlement.deferral_sha256`
+- `explicitly_deferred` settlement requires `maintenance_settlement.deferral_sha256` and forbids `maintenance_settlement.release_watch_sha256`
 - green published surfaces for registry/manifest continuity, support publication, capability publication, and capability-matrix audit
 - `preflight_passed = true` in the recorded proving-run closeout
 
@@ -580,6 +587,7 @@ On success it:
 - advances the committed lifecycle record to `lifecycle_stage = closed_baseline`
 - promotes `support_tier` to `publication_backed` unless the agent was already `first_class`
 - records `publication_packet_path`, `publication_packet_sha256`, and `closeout_baseline_path`
+- records `maintenance_readiness_settled` when the approval maintenance section and the closeout `maintenance_settlement` agree on the frozen normalized hashes
 - clears `blocked`, `failed_retryable`, and `drifted` while preserving `deprecated`
 - sets the next maintenance checkpoint to `check-agent-drift --agent <agent_id>`
 

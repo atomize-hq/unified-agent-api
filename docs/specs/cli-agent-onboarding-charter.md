@@ -21,6 +21,11 @@ Maintenance request note:
 - automated release-watch maintenance requests use `artifact_version = "2"` and `trigger_kind = "upstream_release_detected"`
 - automated release-watch requests MUST carry a `[detected_release]` table and MUST freeze `requested_control_plane_actions = ["packet_doc_refresh"]`
 
+Approval maintenance note:
+- the committed `approved-agent.toml` artifact MUST carry frozen `descriptor.maintenance` truth in exactly one mode: `release_watch_enrolled` or `explicitly_deferred`
+- `release_watch_enrolled` requires committed registry `maintenance.release_watch` truth for the same agent
+- `explicitly_deferred` forbids committed registry `maintenance.release_watch` truth for the same agent
+
 ## Goals
 
 - Make adding “CLI Agent X” a deterministic process:
@@ -199,6 +204,12 @@ Canonical lifecycle record:
    - the committed closeout artifact must remain on the canonical path above
    - closeout states are exactly `prepared` and `closed`
    - prepared packet surfaces must not present the proving run as closed
+   - the machine-owned closeout settlement surface is `maintenance_settlement`
+   - `maintenance_settlement.mode` MUST equal `release_watch_enrolled` or `explicitly_deferred`
+   - every `maintenance_settlement` MUST carry `approval_section_sha256`
+   - `release_watch_enrolled` requires `maintenance_settlement.release_watch_sha256` and forbids `maintenance_settlement.deferral_sha256`
+   - `explicitly_deferred` requires `maintenance_settlement.deferral_sha256` and forbids `maintenance_settlement.release_watch_sha256`
+   - successful proving-run closeout records `maintenance_readiness_settled` before the lifecycle advances to `closed_baseline`
 10) Ensure required CI workflows pass (see below).
 
 Publication handoff rule:
