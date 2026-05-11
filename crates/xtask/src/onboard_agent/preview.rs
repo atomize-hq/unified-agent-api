@@ -15,7 +15,10 @@ use self::render::{
     build_docs_preview as render_docs_preview, closeout_relative_path, release_touchpoint_lines,
     CloseoutPacketRenderInput,
 };
-use super::{ConfigGate, DraftEntry, Error, LifecycleStatePreview, TargetGate, RELEASE_DOC_PATH};
+use super::{
+    ApprovalMaintenanceModeSummary, ConfigGate, DraftEntry, Error, LifecycleStatePreview,
+    TargetGate, RELEASE_DOC_PATH,
+};
 
 const RELEASE_DOC_START_MARKER: &str =
     "<!-- generated-by: xtask onboard-agent; section: crates-io-release -->";
@@ -183,6 +186,78 @@ pub(super) fn write_input_summary<W: Write>(
             approval.artifact_sha256
         )
         .map_err(|err| Error::Internal(format!("write stdout: {err}")))?;
+    }
+    if let Some(maintenance) = draft.approval_maintenance.as_ref() {
+        writeln!(
+            writer,
+            "approval_maintenance_mode: {}",
+            maintenance.mode_name()
+        )
+        .map_err(|err| Error::Internal(format!("write stdout: {err}")))?;
+        writeln!(
+            writer,
+            "approval_maintenance_section_sha256: {}",
+            maintenance.section_sha256
+        )
+        .map_err(|err| Error::Internal(format!("write stdout: {err}")))?;
+        match &maintenance.mode {
+            ApprovalMaintenanceModeSummary::ReleaseWatchEnrolled {
+                version_policy,
+                dispatch_kind,
+                dispatch_workflow,
+                upstream,
+                release_watch_sha256,
+            } => {
+                writeln!(
+                    writer,
+                    "approval_release_watch_version_policy: {version_policy}"
+                )
+                .map_err(|err| Error::Internal(format!("write stdout: {err}")))?;
+                writeln!(
+                    writer,
+                    "approval_release_watch_dispatch_kind: {dispatch_kind}"
+                )
+                .map_err(|err| Error::Internal(format!("write stdout: {err}")))?;
+                if let Some(dispatch_workflow) = dispatch_workflow {
+                    writeln!(
+                        writer,
+                        "approval_release_watch_dispatch_workflow: {dispatch_workflow}"
+                    )
+                    .map_err(|err| Error::Internal(format!("write stdout: {err}")))?;
+                }
+                writeln!(writer, "approval_release_watch_upstream: {upstream}")
+                    .map_err(|err| Error::Internal(format!("write stdout: {err}")))?;
+                writeln!(
+                    writer,
+                    "approval_release_watch_sha256: {release_watch_sha256}"
+                )
+                .map_err(|err| Error::Internal(format!("write stdout: {err}")))?;
+            }
+            ApprovalMaintenanceModeSummary::ExplicitlyDeferred {
+                reason,
+                follow_up,
+                approved_scope,
+                deferral_sha256,
+            } => {
+                writeln!(writer, "approval_maintenance_deferral_reason: {reason}")
+                    .map_err(|err| Error::Internal(format!("write stdout: {err}")))?;
+                writeln!(
+                    writer,
+                    "approval_maintenance_deferral_follow_up: {follow_up}"
+                )
+                .map_err(|err| Error::Internal(format!("write stdout: {err}")))?;
+                writeln!(
+                    writer,
+                    "approval_maintenance_deferral_scope: {approved_scope}"
+                )
+                .map_err(|err| Error::Internal(format!("write stdout: {err}")))?;
+                writeln!(
+                    writer,
+                    "approval_maintenance_deferral_sha256: {deferral_sha256}"
+                )
+                .map_err(|err| Error::Internal(format!("write stdout: {err}")))?;
+            }
+        }
     }
     writeln!(writer).map_err(|err| Error::Internal(format!("write stdout: {err}")))?;
     Ok(())
@@ -476,32 +551,65 @@ pub(super) fn build_manual_follow_up(
     draft: &DraftEntry,
     closeout: Option<&ProvingRunCloseout>,
 ) -> Vec<String> {
+    let mut approval_maintenance_lines = Vec::new();
+    if let Some(maintenance) = draft.approval_maintenance.as_ref() {
+        match &maintenance.mode {
+            ApprovalMaintenanceModeSummary::ReleaseWatchEnrolled {
+                dispatch_kind,
+                dispatch_workflow,
+                ..
+            } => {
+                let dispatch = dispatch_workflow
+                    .as_deref()
+                    .map(|workflow| format!("{dispatch_kind} via `{workflow}`"))
+                    .unwrap_or_else(|| dispatch_kind.to_string());
+                approval_maintenance_lines.push(format!(
+                    "Approval maintenance is already enrolled for release-watch handling ({dispatch}); keep that truth intact in downstream lanes."
+                ));
+            }
+            ApprovalMaintenanceModeSummary::ExplicitlyDeferred {
+                reason, follow_up, ..
+            } => {
+                approval_maintenance_lines.push(format!(
+                    "Approval maintenance is explicitly deferred for this onboarding packet; do not write release-watch enrollment from this lane. Reason: {reason}"
+                ));
+                approval_maintenance_lines.push(format!(
+                    "Deferred maintenance follow-up remains manual until closeout: {follow_up}"
+                ));
+            }
+        }
+    }
+
     match closeout {
-        Some(_) => vec![
-            "No open runtime follow-up remains; the proving run is closed.".to_string(),
-        ],
-        None => vec![
-            format!(
-                "Next executable runtime step: run `cargo run -p xtask -- scaffold-wrapper-crate --agent {} --write` to create the runtime-owned wrapper crate shell at `{}`; `onboard-agent` does not create the wrapper crate.",
-                draft.agent_id, draft.crate_path
-            ),
-            "Then materialize the bounded runtime packet with `runtime-follow-on --dry-run`."
-                .to_string(),
-            format!(
-                "Implement backend/runtime details in `{}` and `{}`.",
-                draft.crate_path, draft.backend_module
-            ),
-            format!(
-                "Author wrapper coverage input at `{}` for binding kind `{}`.",
-                draft.wrapper_coverage_source_path, draft.wrapper_coverage_binding_kind
-            ),
-            format!(
-                "Populate committed runtime evidence only under `{}/snapshots/**` and `{}/supplement/**`.",
-                draft.manifest_root, draft.manifest_root
-            ),
-            "Complete `runtime-follow-on --write`; publication refresh and `make preflight` stay in the next lane."
-                .to_string(),
-        ],
+        Some(_) => {
+            vec!["No open runtime follow-up remains; the proving run is closed.".to_string()]
+        }
+        None => {
+            let mut lines = approval_maintenance_lines;
+            lines.extend([
+                format!(
+                    "Next executable runtime step: run `cargo run -p xtask -- scaffold-wrapper-crate --agent {} --write` to create the runtime-owned wrapper crate shell at `{}`; `onboard-agent` does not create the wrapper crate.",
+                    draft.agent_id, draft.crate_path
+                ),
+                "Then materialize the bounded runtime packet with `runtime-follow-on --dry-run`."
+                    .to_string(),
+                format!(
+                    "Implement backend/runtime details in `{}` and `{}`.",
+                    draft.crate_path, draft.backend_module
+                ),
+                format!(
+                    "Author wrapper coverage input at `{}` for binding kind `{}`.",
+                    draft.wrapper_coverage_source_path, draft.wrapper_coverage_binding_kind
+                ),
+                format!(
+                    "Populate committed runtime evidence only under `{}/snapshots/**` and `{}/supplement/**`.",
+                    draft.manifest_root, draft.manifest_root
+                ),
+                "Complete `runtime-follow-on --write`; publication refresh and `make preflight` stay in the next lane."
+                    .to_string(),
+            ]);
+            lines
+        }
     }
 }
 

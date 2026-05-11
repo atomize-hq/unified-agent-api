@@ -1,8 +1,18 @@
 use std::collections::BTreeMap;
 
-use crate::{approval_artifact, capability_projection::requires_explicit_publication_target};
+use crate::{
+    agent_registry::{
+        ReleaseWatchDispatchKind, ReleaseWatchMetadata, ReleaseWatchSourceKind,
+        ReleaseWatchVersionPolicy,
+    },
+    approval_artifact,
+    capability_projection::requires_explicit_publication_target,
+};
 
-use super::{ApprovalProvenance, Args, ConfigGate, DraftDescriptorInput, Error, TargetGate};
+use super::{
+    ApprovalMaintenanceModeSummary, ApprovalMaintenanceSummary, ApprovalProvenance, Args,
+    ConfigGate, DraftDescriptorInput, Error, TargetGate,
+};
 
 impl DraftDescriptorInput {
     pub(super) fn from_raw_args(args: Args) -> Result<Self, Error> {
@@ -41,13 +51,20 @@ impl DraftDescriptorInput {
                 "--onboarding-pack-prefix",
             )?,
             approval_provenance: None,
+            approval_maintenance: None,
         })
     }
 }
 
 impl From<approval_artifact::ApprovalArtifact> for DraftDescriptorInput {
     fn from(artifact: approval_artifact::ApprovalArtifact) -> Self {
-        let descriptor = artifact.descriptor;
+        let approval_artifact::ApprovalArtifact {
+            relative_path,
+            sha256,
+            descriptor,
+            maintenance,
+            ..
+        } = artifact;
         Self {
             agent_id: descriptor.agent_id,
             display_name: descriptor.display_name,
@@ -68,10 +85,48 @@ impl From<approval_artifact::ApprovalArtifact> for DraftDescriptorInput {
             docs_release_track: descriptor.docs_release_track,
             onboarding_pack_prefix: descriptor.onboarding_pack_prefix,
             approval_provenance: Some(ApprovalProvenance {
-                artifact_path: artifact.relative_path,
-                artifact_sha256: artifact.sha256,
+                artifact_path: relative_path,
+                artifact_sha256: sha256,
                 approval_recorded_at: String::new(),
             }),
+            approval_maintenance: Some(maintenance.into()),
+        }
+    }
+}
+
+impl From<approval_artifact::ApprovalMaintenance> for ApprovalMaintenanceSummary {
+    fn from(maintenance: approval_artifact::ApprovalMaintenance) -> Self {
+        let section_sha256 = maintenance.section_sha256;
+        let mode = match maintenance.mode {
+            approval_artifact::ApprovalMaintenanceMode::ReleaseWatchEnrolled {
+                release_watch,
+                release_watch_sha256,
+            } => {
+                let version_policy = release_watch_version_policy(&release_watch);
+                let dispatch_kind = release_watch_dispatch_kind(&release_watch);
+                let upstream = release_watch_upstream(&release_watch);
+                let dispatch_workflow = release_watch.dispatch_workflow;
+                ApprovalMaintenanceModeSummary::ReleaseWatchEnrolled {
+                    version_policy,
+                    dispatch_kind,
+                    dispatch_workflow,
+                    upstream,
+                    release_watch_sha256,
+                }
+            }
+            approval_artifact::ApprovalMaintenanceMode::ExplicitlyDeferred {
+                deferral,
+                deferral_sha256,
+            } => ApprovalMaintenanceModeSummary::ExplicitlyDeferred {
+                reason: deferral.reason,
+                follow_up: deferral.follow_up,
+                approved_scope: deferral.approved_scope,
+                deferral_sha256,
+            },
+        };
+        Self {
+            section_sha256,
+            mode,
         }
     }
 }
@@ -266,6 +321,46 @@ fn required_arg(value: Option<String>, flag_name: &str) -> Result<String, Error>
         )));
     }
     Ok(trimmed.to_string())
+}
+
+fn release_watch_version_policy(release_watch: &ReleaseWatchMetadata) -> &'static str {
+    match release_watch.version_policy {
+        ReleaseWatchVersionPolicy::LatestStableMinusOne => "latest_stable_minus_one",
+    }
+}
+
+fn release_watch_dispatch_kind(release_watch: &ReleaseWatchMetadata) -> &'static str {
+    match release_watch.dispatch_kind {
+        ReleaseWatchDispatchKind::WorkflowDispatch => "workflow_dispatch",
+        ReleaseWatchDispatchKind::PacketPr => "packet_pr",
+    }
+}
+
+fn release_watch_upstream(release_watch: &ReleaseWatchMetadata) -> String {
+    match release_watch.upstream.source_kind {
+        ReleaseWatchSourceKind::GithubReleases => format!(
+            "github_releases:{}/{}{}",
+            release_watch.upstream.owner.as_deref().unwrap_or_default(),
+            release_watch.upstream.repo.as_deref().unwrap_or_default(),
+            release_watch
+                .upstream
+                .tag_prefix
+                .as_deref()
+                .map(|tag_prefix| format!(" (tag_prefix: {tag_prefix})"))
+                .unwrap_or_default()
+        ),
+        ReleaseWatchSourceKind::GcsObjectListing => {
+            let bucket = release_watch.upstream.bucket.as_deref().unwrap_or_default();
+            let prefix = release_watch.upstream.prefix.as_deref().unwrap_or_default();
+            let marker = release_watch
+                .upstream
+                .version_marker
+                .as_deref()
+                .map(|marker| format!(" (version_marker: {marker})"))
+                .unwrap_or_default();
+            format!("gcs_object_listing:{bucket}/{prefix}{marker}")
+        }
+    }
 }
 
 fn required_bool(value: Option<bool>, flag_name: &str) -> Result<bool, Error> {
