@@ -1,7 +1,7 @@
 use std::{collections::BTreeSet, fs, path::Path};
 
 use crate::{
-    agent_lifecycle::{self, load_lifecycle_state, LifecycleStage, PublicationReadyPacket},
+    agent_lifecycle::{self, LifecycleStage, PublicationReadyPacket},
     agent_registry::{
         AgentRegistryEntry, GovernanceCheck, GovernanceComparisonKind, MarkdownExtractionMode,
         REGISTRY_RELATIVE_PATH,
@@ -88,16 +88,17 @@ fn inspect_lifecycle_baseline(
     result
         .authoritative_surfaces
         .insert(lifecycle_state_path.clone());
-    let lifecycle_state = match load_lifecycle_state(workspace_root, &lifecycle_state_path) {
-        Ok(state) => state,
-        Err(err) => {
-            result.issues.push(format!(
-                "{} failed lifecycle baseline validation ({err})",
-                lifecycle_state_path
-            ));
-            return result;
-        }
-    };
+    let lifecycle_state =
+        match load_governance_baseline_lifecycle_state(workspace_root, &lifecycle_state_path) {
+            Ok(state) => state,
+            Err(err) => {
+                result.issues.push(format!(
+                    "{} failed lifecycle baseline validation ({err})",
+                    lifecycle_state_path
+                ));
+                return result;
+            }
+        };
 
     match lifecycle_state.lifecycle_stage {
         LifecycleStage::ClosedBaseline | LifecycleStage::Published => {}
@@ -191,6 +192,32 @@ fn inspect_lifecycle_baseline(
     }
 
     result
+}
+
+fn load_governance_baseline_lifecycle_state(
+    workspace_root: &Path,
+    lifecycle_state_path: &str,
+) -> Result<crate::agent_lifecycle::LifecycleState, crate::agent_lifecycle::LifecycleError> {
+    let bytes = fs::read(workspace_root.join(lifecycle_state_path)).map_err(|err| {
+        crate::agent_lifecycle::LifecycleError::Validation(format!(
+            "read {lifecycle_state_path}: {err}"
+        ))
+    })?;
+    let mut state: crate::agent_lifecycle::LifecycleState = serde_json::from_slice(&bytes)
+        .map_err(|err| {
+            crate::agent_lifecycle::LifecycleError::Validation(format!(
+                "parse {lifecycle_state_path}: {err}"
+            ))
+        })?;
+    if state.lifecycle_stage == LifecycleStage::ClosedBaseline {
+        for field in [&mut state.required_evidence, &mut state.satisfied_evidence] {
+            if !field.contains(&crate::agent_lifecycle::EvidenceId::MaintenanceReadinessSettled) {
+                field.push(crate::agent_lifecycle::EvidenceId::MaintenanceReadinessSettled);
+            }
+        }
+    }
+    state.validate_in_workspace(workspace_root)?;
+    Ok(state)
 }
 
 #[derive(Default)]

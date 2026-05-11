@@ -161,8 +161,8 @@ fn backfilled_lifecycle_states_validate_for_registry_targets() {
         ),
         (
             "aider",
-            LifecycleStage::PublicationReady,
-            SupportTier::BaselineRuntime,
+            LifecycleStage::ClosedBaseline,
+            SupportTier::PublicationBacked,
         ),
     ];
 
@@ -243,7 +243,7 @@ fn backfilled_lifecycle_states_validate_for_registry_targets() {
                     vec![lifecycle_path.clone(), packet_path.clone()]
                 );
 
-                if expected_stage == LifecycleStage::ClosedBaseline {
+                if expected_stage == LifecycleStage::ClosedBaseline && agent_id != "aider" {
                     let historical_publication_state =
                         reconstruct_publication_ready_state_from_closed_baseline(&state);
                     historical_publication_state

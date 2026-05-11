@@ -11,6 +11,8 @@ use sha2::{Digest, Sha256};
 #[cfg(test)]
 use std::cell::RefCell;
 
+mod io_support;
+
 use crate::{
     agent_lifecycle::{
         self, file_sha256, now_rfc3339, required_evidence_for_stage, LifecycleStage,
@@ -27,6 +29,9 @@ use crate::{
         apply_mutations, plan_create_or_replace, PlannedMutation, WorkspaceMutationError,
         WorkspacePathJail,
     },
+};
+use io_support::{
+    load_lifecycle_state_relaxed, load_publication_ready_packet_relaxed, serialize_json_pretty,
 };
 
 #[derive(Debug, Parser, Clone)]
@@ -674,34 +679,6 @@ fn validate_packet_identity(
     Ok(())
 }
 
-fn load_lifecycle_state_relaxed(
-    workspace_root: &Path,
-    relative_path: &str,
-) -> Result<LifecycleState, Error> {
-    let bytes = fs::read(workspace_root.join(relative_path))
-        .map_err(|err| Error::Validation(format!("read {relative_path}: {err}")))?;
-    let state: LifecycleState = serde_json::from_slice(&bytes)
-        .map_err(|err| Error::Validation(format!("parse {relative_path}: {err}")))?;
-    state
-        .validate()
-        .map_err(|err| Error::Validation(err.to_string()))?;
-    Ok(state)
-}
-
-fn load_publication_ready_packet_relaxed(
-    workspace_root: &Path,
-    relative_path: &str,
-) -> Result<PublicationReadyPacket, Error> {
-    let bytes = fs::read(workspace_root.join(relative_path))
-        .map_err(|err| Error::Validation(format!("read {relative_path}: {err}")))?;
-    let packet: PublicationReadyPacket = serde_json::from_slice(&bytes)
-        .map_err(|err| Error::Validation(format!("parse {relative_path}: {err}")))?;
-    packet
-        .validate()
-        .map_err(|err| Error::Validation(err.to_string()))?;
-    Ok(packet)
-}
-
 fn write_header<W: Write>(
     writer: &mut W,
     context: &RefreshContext,
@@ -751,11 +728,4 @@ fn map_prepare_publication_error(err: crate::prepare_publication::Error) -> Erro
         crate::prepare_publication::Error::Validation(message) => Error::Validation(message),
         crate::prepare_publication::Error::Internal(message) => Error::Internal(message),
     }
-}
-
-fn serialize_json_pretty<T: serde::Serialize>(value: &T) -> Result<Vec<u8>, Error> {
-    let mut bytes = serde_json::to_vec_pretty(value)
-        .map_err(|err| Error::Internal(format!("serialize json: {err}")))?;
-    bytes.push(b'\n');
-    Ok(bytes)
 }

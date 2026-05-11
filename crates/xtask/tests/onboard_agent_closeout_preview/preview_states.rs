@@ -29,7 +29,7 @@ fn committed_gemini_preview_renders_closed_packet_from_valid_m3_closeout() {
     ));
     assert!(output
         .stdout
-        .contains("Approval linkage: `historical-m3-backfill` via"));
+        .contains("Approval linkage: `historical-lifecycle-backfill` via"));
 }
 
 #[test]
