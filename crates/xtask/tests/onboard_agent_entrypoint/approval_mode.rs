@@ -47,7 +47,12 @@ fn deferred_maintenance(reason: &str, follow_up: &str) -> String {
 fn append_approval_maintenance(root: &Path, approval_path: &str, maintenance: &str) {
     let approval_file = root.join(approval_path);
     let existing = fs::read_to_string(&approval_file).expect("read approval artifact");
-    write_text(&approval_file, &(existing + maintenance));
+    let marker = "\n[descriptor.maintenance]\n";
+    let prefix = existing
+        .split_once(marker)
+        .map(|(prefix, _)| prefix)
+        .unwrap_or(existing.as_str());
+    write_text(&approval_file, &(prefix.to_string() + maintenance));
 }
 
 fn seed_enrolled_approval_artifact(
