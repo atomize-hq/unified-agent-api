@@ -1,8 +1,8 @@
 {
   "agent_id": "aider",
   "approval_artifact_path": "docs/agents/lifecycle/aider-onboarding/governance/approved-agent.toml",
-  "approval_artifact_sha256": "bc02f5f9b7fe7880446c4cb04b33a9f7c419008755b2229a8243ba878441a854",
-  "generated_at": "2026-04-29T19:38:47-04:00",
+  "approval_artifact_sha256": "ad18273a921eea57f6faa6e22dbc1b9f428e0d46d266f6151038cf322e497a9f",
+  "generated_at": "2026-05-03T03:01:26.244934Z",
   "manifest_root": "cli_manifests/aider",
   "required_handoff_commands": [
     "cargo run -p xtask -- support-matrix --check",

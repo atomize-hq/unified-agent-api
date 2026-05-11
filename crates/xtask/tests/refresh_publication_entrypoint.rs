@@ -400,6 +400,47 @@ fn refresh_publication_write_advances_to_closeout_and_refreshes_outputs() {
 }
 
 #[test]
+fn refresh_publication_write_repairs_stale_approval_continuity() {
+    let fixture = prepare_publication_ready_fixture(
+        "refresh-publication-stale-approval-continuity",
+        SUPPORT_AND_CAPABILITY,
+    );
+    seed_publication_output_state(&fixture, SUPPORT_AND_CAPABILITY);
+    write_preflight_makefile(&fixture, true);
+    replace_text_once(
+        &fixture.join(APPROVAL_PATH),
+        "follow_up = \"Revisit maintenance enrollment after proving-run closeout.\"\n",
+        "follow_up = \"Refresh publication continuity after maintenance approval edits.\"\n",
+    );
+    seed_runtime_evidence_run(&fixture, RuntimeEvidenceTruth::Truthful);
+    let approval_sha = sha256_hex(&fixture.join(APPROVAL_PATH));
+
+    let output = run_cli(refresh_args("--write"), &fixture);
+
+    assert_eq!(output.exit_code, 0, "stderr:\n{}", output.stderr);
+    let lifecycle_state = read_json(&lifecycle_state_path(&fixture));
+    let packet = read_json(&publication_packet_path(&fixture));
+    assert_eq!(
+        lifecycle_state
+            .get("approval_artifact_sha256")
+            .and_then(Value::as_str),
+        Some(approval_sha.as_str())
+    );
+    assert_eq!(
+        packet
+            .get("approval_artifact_sha256")
+            .and_then(Value::as_str),
+        Some(approval_sha.as_str())
+    );
+    assert_eq!(
+        lifecycle_state
+            .get("publication_packet_sha256")
+            .and_then(Value::as_str),
+        Some(sha256_hex(&publication_packet_path(&fixture)).as_str())
+    );
+}
+
+#[test]
 fn refresh_publication_check_reports_stale_outputs() {
     let fixture = prepare_publication_ready_fixture(
         "refresh-publication-stale-check",

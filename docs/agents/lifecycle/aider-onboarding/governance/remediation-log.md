@@ -2,4 +2,5 @@
 
 # Remediation log
 
-No remediations are recorded yet. Capture residual friction or follow-up decisions here if the proving run surfaces them.
+- No residual friction recorded: No residual proving-run friction remained once approval continuity, runtime evidence, and publication continuity were refreshed on the integrated branch.
+- Duration missing reason: Exact approval-to-closeout elapsed time was not recorded during the serialized maintenance settlement repair run.

@@ -22,3 +22,11 @@ support_matrix_enabled = true
 capability_matrix_enabled = true
 docs_release_track = "crates-io"
 onboarding_pack_prefix = "aider-onboarding"
+
+[descriptor.maintenance]
+mode = "explicitly_deferred"
+
+[descriptor.maintenance.deferral]
+reason = "Release-watch enrollment remains intentionally deferred for aider in this milestone."
+follow_up = "Revisit maintenance enrollment after the tightened proving-run closeout path is fully exercised."
+approved_scope = "create_lane_closeout"
