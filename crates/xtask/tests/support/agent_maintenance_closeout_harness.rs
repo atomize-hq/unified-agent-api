@@ -1,7 +1,6 @@
 use std::path::Path;
 
 use serde_json::json;
-use sha2::Digest;
 
 use crate::{closeout, harness::sha256_hex};
 
@@ -45,7 +44,7 @@ pub fn automated_maintenance_request_toml(agent_id: &str, basis_ref: &str) -> St
             "agent_id = \"{agent_id}\"\n",
             "trigger_kind = \"upstream_release_detected\"\n",
             "basis_ref = \"{basis_ref}\"\n",
-            "opened_from = \".github/workflows/codex-cli-update-snapshot.yml\"\n",
+            "opened_from = \".github/workflows/agent-maintenance-open-pr.yml\"\n",
             "requested_control_plane_actions = [\n",
             "  \"packet_doc_refresh\",\n",
             "]\n",
@@ -58,15 +57,15 @@ pub fn automated_maintenance_request_toml(agent_id: &str, basis_ref: &str) -> St
             "\n",
             "[detected_release]\n",
             "detected_by = \".github/workflows/agent-maintenance-release-watch.yml\"\n",
-            "current_validated = \"0.97.0\"\n",
-            "target_version = \"0.98.0\"\n",
-            "latest_stable = \"0.99.0\"\n",
+            "current_validated = \"1.4.11\"\n",
+            "target_version = \"1.14.47\"\n",
+            "latest_stable = \"1.14.48\"\n",
             "version_policy = \"latest_stable_minus_one\"\n",
             "source_kind = \"github_releases\"\n",
-            "source_ref = \"openai/codex\"\n",
-            "dispatch_kind = \"workflow_dispatch\"\n",
-            "dispatch_workflow = \"codex-cli-update-snapshot.yml\"\n",
-            "branch_name = \"automation/{agent_id}-maintenance-0.98.0\"\n"
+            "source_ref = \"anomalyco/opencode\"\n",
+            "dispatch_kind = \"packet_pr\"\n",
+            "dispatch_workflow = \"agent-maintenance-open-pr.yml\"\n",
+            "branch_name = \"automation/{agent_id}-maintenance-1.14.47\"\n"
         ),
         agent_id = agent_id,
         basis_ref = basis_ref
@@ -77,15 +76,14 @@ pub fn automated_maintenance_request_with_execution_contract_toml(
     agent_id: &str,
     basis_ref: &str,
 ) -> String {
-    let prompt = "# Goal\n\nFollow the maintained PR template for 0.98.0.\n";
-    let prompt_sha256 = hex::encode(sha2::Sha256::digest(prompt.as_bytes()));
+    let prompt_sha256 = "f68f4a5c6cc09a186256fe475e311bd4881e6dfeabd7852f1ed62cf659ce9685";
 
     format!(
         concat!(
             "{}\n",
             "[execution_contract]\n",
             "executor = \"codex\"\n",
-            "prompt_template_path = \"cli_manifests/{agent_id}/PR_BODY_TEMPLATE.md\"\n",
+            "prompt_template_path = \"docs/agents/lifecycle/{agent_id}-maintenance/governance/execute-agent-maintenance-prompt.md\"\n",
             "prompt_sha256 = \"{prompt_sha256}\"\n",
             "pr_summary_path = \"docs/agents/lifecycle/{agent_id}-maintenance/governance/pr-summary.md\"\n",
             "closeout_path = \"docs/agents/lifecycle/{agent_id}-maintenance/governance/maintenance-closeout.json\"\n",
@@ -101,10 +99,10 @@ pub fn automated_maintenance_request_with_execution_contract_toml(
             "  \"cli_manifests/{agent_id}/wrapper_coverage.json\",\n",
             "]\n",
             "read_only_inputs = [\n",
-            "  \"cli_manifests/{agent_id}/OPS_PLAYBOOK.md\",\n",
-            "  \"cli_manifests/{agent_id}/CI_WORKFLOWS_PLAN.md\",\n",
-            "  \"cli_manifests/{agent_id}/PR_BODY_TEMPLATE.md\",\n",
-            "  \".github/workflows/codex-cli-update-snapshot.yml\",\n",
+            "  \"docs/agents/lifecycle/{agent_id}-maintenance/OPS_PLAYBOOK.md\",\n",
+            "  \"docs/agents/lifecycle/{agent_id}-maintenance/CI_WORKFLOWS_PLAN.md\",\n",
+            "  \"docs/agents/lifecycle/{agent_id}-maintenance/governance/execute-agent-maintenance-prompt.md\",\n",
+            "  \".github/workflows/agent-maintenance-open-pr.yml\",\n",
             "]\n",
             "ordered_commands = [\n",
             "  \"cargo run -p xtask -- codex-validate --root cli_manifests/{agent_id}\",\n",
@@ -122,9 +120,9 @@ pub fn automated_maintenance_request_with_execution_contract_toml(
             "]\n",
             "\n",
             "[execution_contract.recovery]\n",
-            "recreate_packet_command = \"cargo run -p xtask -- refresh-agent --request docs/agents/lifecycle/{agent_id}-maintenance/governance/maintenance-request.toml --write\"\n",
+            "recreate_packet_command = \"cargo run -p xtask -- prepare-agent-maintenance --agent {agent_id} --current-version 1.4.11 --latest-stable 1.14.48 --target-version 1.14.47 --opened-from .github/workflows/agent-maintenance-open-pr.yml --detected-by .github/workflows/agent-maintenance-release-watch.yml --dispatch-kind packet_pr --branch-name automation/{agent_id}-maintenance-1.14.47 --request-recorded-at 2026-05-05T15:00:00Z --request-commit abcdef1 --write\"\n",
             "reopen_pr_body_path = \"docs/agents/lifecycle/{agent_id}-maintenance/governance/pr-summary.md\"\n",
-            "reopen_pr_branch = \"automation/{agent_id}-maintenance-0.98.0\"\n",
+            "reopen_pr_branch = \"automation/{agent_id}-maintenance-1.14.47\"\n",
             "notes = [\n",
             "  \"If PR creation fails after packet generation, rerun packet regeneration from the frozen request and reopen the PR from the generated pr-summary path.\",\n",
             "  \"If the local execution-host preflight (local Codex CLI host via execute-agent-maintenance) fails, fix the Codex binary/auth state and rerun `execute-agent-maintenance --dry-run` before write mode.\",\n",

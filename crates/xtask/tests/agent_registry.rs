@@ -165,7 +165,10 @@ fn seeded_registry_parses_successfully() {
         .release_watch
         .as_ref()
         .expect("opencode seeded release_watch enrollment");
-    assert!(opencode_watch.enabled, "opencode release watch stays enabled");
+    assert!(
+        opencode_watch.enabled,
+        "opencode release watch stays enabled"
+    );
     assert_eq!(
         opencode_watch.version_policy,
         ReleaseWatchVersionPolicy::LatestStableMinusOne

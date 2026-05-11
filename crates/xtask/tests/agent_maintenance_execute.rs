@@ -299,10 +299,11 @@ fn execute_agent_maintenance_closeout_harness_keeps_claude_code_recovery_parity(
     let harness_source = include_str!("support/agent_maintenance_closeout_harness.rs");
 
     assert!(
-        harness_source.contains("branch_name = \\\"automation/{agent_id}-maintenance-0.98.0\\\"")
+        harness_source.contains("branch_name = \\\"automation/{agent_id}-maintenance-1.14.47\\\"")
     );
+    assert!(harness_source.contains("agent-maintenance-open-pr.yml"));
     assert!(harness_source
-        .contains("prompt_template_path = \\\"cli_manifests/{agent_id}/PR_BODY_TEMPLATE.md\\\""));
+        .contains("prompt_template_path = \\\"docs/agents/lifecycle/{agent_id}-maintenance/governance/execute-agent-maintenance-prompt.md\\\""));
     assert!(harness_source.contains(
         "pr_summary_path = \\\"docs/agents/lifecycle/{agent_id}-maintenance/governance/pr-summary.md\\\""
     ));

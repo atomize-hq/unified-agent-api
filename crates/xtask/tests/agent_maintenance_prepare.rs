@@ -149,18 +149,16 @@ fn prepare_agent_maintenance_packet_pr_defaults_to_generic_open_pr_workflow() {
     assert!(request_text.contains(
         "prompt_template_path = \"docs/agents/lifecycle/codex-maintenance/governance/execute-agent-maintenance-prompt.md\""
     ));
-    assert!(request_text.contains(
-        "\"docs/agents/lifecycle/codex-maintenance/OPS_PLAYBOOK.md\""
-    ));
-    assert!(request_text.contains(
-        "\"docs/agents/lifecycle/codex-maintenance/CI_WORKFLOWS_PLAN.md\""
-    ));
-    assert!(plan.planned_paths().contains(
-        &"docs/agents/lifecycle/codex-maintenance/OPS_PLAYBOOK.md"
-    ));
-    assert!(plan.planned_paths().contains(
-        &"docs/agents/lifecycle/codex-maintenance/CI_WORKFLOWS_PLAN.md"
-    ));
+    assert!(request_text.contains("\"docs/agents/lifecycle/codex-maintenance/OPS_PLAYBOOK.md\""));
+    assert!(
+        request_text.contains("\"docs/agents/lifecycle/codex-maintenance/CI_WORKFLOWS_PLAN.md\"")
+    );
+    assert!(plan
+        .planned_paths()
+        .contains(&"docs/agents/lifecycle/codex-maintenance/OPS_PLAYBOOK.md"));
+    assert!(plan
+        .planned_paths()
+        .contains(&"docs/agents/lifecycle/codex-maintenance/CI_WORKFLOWS_PLAN.md"));
     assert!(plan.planned_paths().contains(
         &"docs/agents/lifecycle/codex-maintenance/governance/execute-agent-maintenance-prompt.md"
     ));

@@ -80,8 +80,8 @@ fn automated_request_closeout_preserves_trigger_truth_in_handoff() {
     let fixture = fixture_root("automated-request-closeout-handoff");
     maintenance_harness::seed_opencode_basis(&fixture);
     write_text(
-        &fixture.join(".github/workflows/codex-cli-update-snapshot.yml"),
-        "name: Codex worker\n",
+        &fixture.join(".github/workflows/agent-maintenance-open-pr.yml"),
+        "name: Generic maintenance opener\n",
     );
     let request_path =
         Path::new("docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml");
@@ -106,28 +106,35 @@ fn automated_request_closeout_preserves_trigger_truth_in_handoff() {
         fs::read_to_string(fixture.join("docs/agents/lifecycle/opencode-maintenance/HANDOFF.md"))
             .expect("read handoff");
     assert!(handoff.contains("upstream_release_detected"));
-    assert!(handoff.contains("automation/opencode-maintenance-0.98.0"));
+    assert!(handoff.contains("automation/opencode-maintenance-1.14.47"));
 }
 
 #[test]
 fn automated_request_execution_contract_still_supports_manual_closeout() {
     let fixture = fixture_root("automated-request-closeout-execution-contract");
     maintenance_harness::seed_opencode_basis(&fixture);
+    let registry =
+        agent_registry::AgentRegistry::parse(include_str!("../../data/agent_registry.toml"))
+            .expect("parse seeded registry");
+    let entry = registry.find("opencode").expect("find opencode entry");
+    let maintenance_root = "docs/agents/lifecycle/opencode-maintenance";
     write_text(
-        &fixture.join("cli_manifests/opencode/PR_BODY_TEMPLATE.md"),
-        "# Goal\n\nFollow the maintained PR template for {{VERSION}}.\n",
+        &fixture.join(
+            "docs/agents/lifecycle/opencode-maintenance/governance/execute-agent-maintenance-prompt.md",
+        ),
+        &contract_policy::packet_pr_prompt_template(entry, maintenance_root),
     );
     write_text(
-        &fixture.join("cli_manifests/opencode/OPS_PLAYBOOK.md"),
+        &fixture.join("docs/agents/lifecycle/opencode-maintenance/OPS_PLAYBOOK.md"),
         "# Ops playbook\n",
     );
     write_text(
-        &fixture.join("cli_manifests/opencode/CI_WORKFLOWS_PLAN.md"),
+        &fixture.join("docs/agents/lifecycle/opencode-maintenance/CI_WORKFLOWS_PLAN.md"),
         "# CI workflows\n",
     );
     write_text(
-        &fixture.join(".github/workflows/codex-cli-update-snapshot.yml"),
-        "name: Codex worker\n",
+        &fixture.join(".github/workflows/agent-maintenance-open-pr.yml"),
+        "name: Generic maintenance opener\n",
     );
 
     let request_path =
@@ -153,7 +160,7 @@ fn automated_request_execution_contract_still_supports_manual_closeout() {
         fs::read_to_string(fixture.join("docs/agents/lifecycle/opencode-maintenance/HANDOFF.md"))
             .expect("read handoff");
     assert!(handoff.contains("upstream_release_detected"));
-    assert!(handoff.contains("automation/opencode-maintenance-0.98.0"));
+    assert!(handoff.contains("automation/opencode-maintenance-1.14.47"));
     assert!(handoff.contains(
         "Manual closeout remained an explicit maintainer action recorded with `close-agent-maintenance`"
     ));

@@ -283,7 +283,8 @@ pub(crate) fn render_prompt_template_for_contract(
                     entry.agent_id
                 ));
             }
-            Ok(packet_pr_prompt_template(entry, maintenance_root).replace("{{VERSION}}", target_version))
+            Ok(packet_pr_prompt_template(entry, maintenance_root)
+                .replace("{{VERSION}}", target_version))
         }
     }
 }
