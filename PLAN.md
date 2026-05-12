@@ -1,74 +1,87 @@
-# PLAN - Maintenance Settlement Must Gate `closed_baseline`
+# PLAN - Prove The Packet PR Maintenance Lane Can Actually Land
 
 Status: ready for implementation  
 Date: 2026-05-11  
 Working branch: `staging`  
-Plan revision baseline: `35cf547`  
-Design input: `/Users/spensermcconnell/.gstack/projects/atomize-hq-unified-agent-api/spensermcconnell-staging-design-20260511-000001.md`  
-Supersedes: the prior repo-root `PLAN.md` for the maintenance proof-run milestone
+Plan revision baseline: `91a3cb1c`  
+Design input: `/Users/spensermcconnell/.gstack/projects/atomize-hq-unified-agent-api/spensermcconnell-staging-design-20260511-185442.md`  
+Supersedes: the prior repo-root `PLAN.md` for packet-open and dry-run-only proof readiness
 
 ## Executive Summary
 
-The shared watcher is not the bug.
+The repo already proved the front half of this lane.
 
-The create lane is.
+`opencode` is enrolled. The shared watcher can detect it as stale. The generic `packet_pr` opener
+can materialize a truthful maintenance packet. The live request already carries the relay contract
+for `execute-agent-maintenance`, exact writable surfaces, exact green gates, and the explicit
+manual closeout command.
 
-Today an agent can finish publication honestly and still reach `closed_baseline` without ever
-settling whether ongoing maintenance is enrolled or explicitly deferred. That makes
-`closed_baseline` over-claim. This milestone fixes the seam where that lie enters the system:
-approval artifact -> `onboard-agent` -> `close-proving-run` -> lifecycle evidence.
+The missing proof is the back half:
 
-The implementation stays boring on purpose:
+1. prepare a fresh dry-run packet from the live request
+2. execute `execute-agent-maintenance --write` with that same frozen `run_id`
+3. pass the packet-declared green gates
+4. author a valid `maintenance-closeout.json`
+5. run `close-agent-maintenance`
+6. commit replayable evidence showing the lane really lands
 
-- keep `artifact_version = "1"`
-- keep `crates/xtask/data/agent_registry.toml` as the only release-watch enrollment store
-- add one bounded approval-side maintenance decision: `release_watch_enrolled` or `explicitly_deferred`
-- make `close-proving-run` fail closed unless approval truth and registry truth match one legal branch
-- snapshot the settled maintenance decision into machine-owned closeout evidence before
-  `closed_baseline` is legal
+No new architecture. No new workflow family. One honest operator-faithful run.
 
 ## Objective
 
-Make maintenance settlement part of done for create-mode onboarding so an agent cannot reach
-`closed_baseline` until the repo has one explicit, validated answer to exactly one question:
+Make the repository able to truthfully claim:
 
-1. is this agent enrolled in release-watch maintenance, or
-2. is this agent explicitly deferred from that lane for now?
+> the live `opencode` automated maintenance packet can drive a real bounded maintenance write,
+> survive the exact green gates it declares, and be explicitly closed with the repo-owned closeout
+> command, with committed evidence that another maintainer can replay.
 
 ## Success Criteria
 
-1. The approval artifact contract supports an explicit maintenance decision under
-   `[descriptor.maintenance]` without bumping `artifact_version`.
-2. `onboard-agent --write` materializes `maintenance.release_watch` into
-   `crates/xtask/data/agent_registry.toml` only when approval mode is
-   `release_watch_enrolled`.
-3. `onboard-agent --write` leaves `maintenance.release_watch` absent when approval mode is
-   `explicitly_deferred`.
-4. `close-proving-run` fails closed unless approval truth and registry truth match one of the two
-   allowed branches.
-5. `docs/agents/lifecycle/*/governance/proving-run-closeout.json` captures immutable
-   machine-owned maintenance settlement evidence for newly closed runs.
-6. `LifecycleStage::ClosedBaseline` requires a new evidence bit for settled maintenance truth.
-7. `opencode` and `gemini_cli` are backfilled to truthful committed state without inventing a
-   second enrollment inventory.
-8. `aider` proves the tightened deferred branch from its current `publication_ready` state and
-   cannot close until maintenance settlement is explicit.
-9. `make preflight` passes.
+1. The proof starts from `docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml`.
+2. A fresh `execute-agent-maintenance --dry-run` succeeds and emits a reusable `run_id`.
+3. `execute-agent-maintenance --write --run-id <run_id>` succeeds against that same frozen packet.
+4. The write-mode run records `status = "write_validated"` and `validation_passed = true` in the
+   run packet under `docs/agents/.uaa-temp/agent-maintenance/runs/<run_id>/`.
+5. All changed paths recorded by write mode stay inside the request's `writable_surfaces`.
+6. `execute-agent-maintenance --write` does not write
+   `docs/agents/lifecycle/opencode-maintenance/governance/maintenance-closeout.json`.
+7. The exact `green_gates` from the live request pass in order, without a substituted command list.
+8. The resulting diff is reviewable as one bounded maintenance run, not a spill into unrelated
+   repo surfaces.
+9. A valid `docs/agents/lifecycle/opencode-maintenance/governance/maintenance-closeout.json`
+   exists with truthful request linkage, resolved findings, and either deferred findings or an
+   explicit none reason.
+10. `close-agent-maintenance` succeeds and refreshes the owned closeout outputs for the
+    `opencode-maintenance` packet.
+11. `docs/agents/lifecycle/opencode-maintenance/governance/proof/` contains enough structured
+    evidence to replay the full operator flow without rediscovering command order.
+12. `make preflight` passes on the final proof-bearing branch head.
 
 ## Locked Decisions
 
-1. Keep `artifact_version = "1"`.
-2. The only allowed approval-side maintenance modes in this milestone are:
-   - `release_watch_enrolled`
-   - `explicitly_deferred`
-3. `crates/xtask/data/agent_registry.toml` remains the only release-watch enrollment store.
-4. Approval-side deferral is evidence, not enrollment.
-5. `opencode`, `gemini_cli`, and `aider` all use `explicitly_deferred` in this milestone.
-6. `codex` and `claude_code` registry release-watch blocks stay as they are.
-7. No watcher-topology, packet-topology, or workflow-topology redesign is in scope here.
-8. No new `manual_only` or broader maintenance taxonomy is introduced.
-9. `close-proving-run` is the only command that may write final maintenance settlement evidence
-   into the closed closeout artifact.
+1. The milestone target remains the current live `opencode` automated request. Do not switch proof
+   targets.
+2. The proof is complete only if it includes both `execute-agent-maintenance --write` and manual
+   `close-agent-maintenance`.
+3. Another dry-run-only archive does not count. The new proof must extend to write mode and
+   closeout.
+4. The existing proof archive root stays canonical:
+   `docs/agents/lifecycle/opencode-maintenance/governance/proof/`.
+5. If the live request, rendered prompt, or writable surfaces drift after dry-run, the prepared
+   packet is invalid. Rerun dry-run before write mode. Do not force stale `run_id` reuse.
+6. If write mode succeeds but exposes any contract gap or packet rough edge inside the bounded
+   surfaces, that is not "proof with follow-up." Fix it, rerender if needed, rerun dry-run, rerun
+   write, then archive the final successful run only.
+7. Manual closeout remains manual by design. Do not automate it inside `execute-agent-maintenance`.
+8. Raw `codex-stdout.txt` and `codex-stderr.txt` remain temp evidence under
+   `docs/agents/.uaa-temp/agent-maintenance/runs/<run_id>/`. The committed proof archive should
+   store structured summaries and JSON evidence, not raw noisy logs, unless debugging demands it.
+9. Do not reopen already-solved scope:
+   - no new release-watch enrollment work
+   - no new dispatch kind
+   - no new workflow YAML family
+   - no new source kind
+   - no second proof archive subsystem
 
 ## Step 0 Scope Contract
 
@@ -76,539 +89,516 @@ Make maintenance settlement part of done for create-mode onboarding so an agent 
 
 | Premise | Assessment | Decision |
 | --- | --- | --- |
-| The watcher side is wrong. | Rejected. `maintenance-watch` and `prepare-agent-maintenance` already consume registry truth consistently. | Do not change watcher topology in this milestone. |
-| The missing truth belongs in the create lane. | Accepted. Approval, onboarding, lifecycle, and closeout are the broken seam. | Fix the approval-to-closeout contract. |
-| This needs a new enrollment inventory outside the registry. | Rejected. The registry contract explicitly forbids that. | Registry remains the only enrollment store. |
-| This needs a full artifact-version bump. | Rejected. The change is additive and bounded. | Keep `artifact_version = "1"`. |
-| This needs a broader maintenance taxonomy now. | Rejected. That is bigger than the bug. | Only add `release_watch_enrolled` and `explicitly_deferred`. |
-| Already-closed agents can stay ambiguous. | Rejected. They are the current lie in committed history. | Backfill `opencode` and `gemini_cli`. |
-| The in-flight proof target should also widen release-watch rollout. | Rejected. That mixes lifecycle settlement with rollout expansion. | Keep `aider` deferred in this milestone and prove the deferred branch. |
+| The shared watcher or PR opener still needs redesign. | Rejected. The repo already proved queue emission and `packet_pr` opening on the live `opencode` lane. | Reuse the current watcher and generic opener unchanged. |
+| Another dry-run archive would finish the job. | Rejected. The missing claim is that the packet can actually land the bounded write path and closeout. | Write mode and closeout are mandatory. |
+| We should widen scope to another agent to make the proof more impressive. | Rejected. That turns a proof milestone into a rollout milestone. | `opencode` only. |
+| We can treat non-critical packet rough edges discovered after write as success. | Rejected. The proof is about truthful operator replay, not almost-truthful operator replay. | Fix any surfaced contract issue and rerun the proof. |
+| The closeout step can be implied if write mode passes. | Rejected. The contract and operator guide explicitly keep closeout manual. | Author `maintenance-closeout.json` and run `close-agent-maintenance`. |
+| We should archive only prose notes, not machine-readable evidence. | Rejected. Later maintainers need replayable proof, not a memory of the proof. | Commit structured JSON and command outputs. |
 
 ### What Already Exists
 
 | Sub-problem | Existing surface | Reuse decision |
 | --- | --- | --- |
-| Registry release-watch schema and validation | `crates/xtask/src/agent_registry/release_watch.rs`, `docs/specs/agent-registry-contract.md` | Reuse. Do not fork a second validator. |
-| Approval artifact loading and validation | `crates/xtask/src/approval_artifact.rs` | Extend additively. |
-| Approval-to-registry materialization | `crates/xtask/src/onboard_agent.rs`, `crates/xtask/src/onboard_agent/descriptor.rs`, `crates/xtask/src/onboard_agent/approval.rs`, `crates/xtask/src/onboard_agent/preview.rs` | Reuse. Add maintenance decision threading here. |
-| Closeout gate | `crates/xtask/src/close_proving_run.rs` | Tighten here. This is the final truth gate. |
-| Lifecycle evidence model | `crates/xtask/src/agent_lifecycle.rs` | Reuse. Add one evidence id, not a new stage. |
-| Closeout artifact schema | `crates/xtask/src/proving_run_closeout.rs` | Extend with machine-owned settlement snapshot. |
-| Historical closed-baseline repair | `crates/xtask/src/historical_lifecycle_backfill.rs` | Reuse for closed-agent backfill instead of manual artifact surgery. |
-| Current affected governance artifacts | `docs/agents/lifecycle/opencode-cli-onboarding/**`, `docs/agents/lifecycle/gemini-cli-onboarding/**`, `docs/agents/lifecycle/aider-onboarding/**` | Update directly as part of this PR. |
+| Canonical automated request | `docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml` | Reuse as the proof input. Regenerate only if it drifted from branch truth. |
+| Canonical operator contract | `docs/agents/lifecycle/opencode-maintenance/HANDOFF.md` and `docs/cli-agent-onboarding-factory-operator-guide.md` | Reuse as the command order and ownership source of truth. |
+| Local relay execution | `crates/xtask/src/agent_maintenance/execute/workflow.rs`, `runtime.rs`, `validate.rs`, `packet.rs` | Reuse. This already validates preflight, packet continuity, writable surfaces, and green gates. |
+| Manual closeout writer | `crates/xtask/src/agent_maintenance/closeout.rs`, `closeout/write.rs`, `closeout/validate.rs` | Reuse. This already validates request linkage, live drift truth, and owned output writes. |
+| Relay/closeout regression coverage | `crates/xtask/tests/agent_maintenance_execute.rs`, `crates/xtask/tests/agent_maintenance_closeout/**` | Reuse and extend only if the live run exposes a missing guardrail. |
+| Existing proof archive root | `docs/agents/lifecycle/opencode-maintenance/governance/proof/` | Reuse. Append execution and closeout evidence here. |
+| Existing proof state | `proof-notes.md`, `execute-dry-run.txt`, earlier queue/opener evidence | Reuse if still truthful. Regenerate only if the request or release truth moved. |
 
 ### Minimum Complete Change
 
 The minimum complete implementation is:
 
-1. add approval-side maintenance truth
-2. thread it into `onboard-agent`
-3. enforce it in `close-proving-run`
-4. persist immutable maintenance settlement in closeout evidence
-5. add the new lifecycle evidence requirement
-6. backfill `opencode` and `gemini_cli`
-7. prove `aider` on the deferred branch
-8. update normative docs and tests
+1. verify the live `opencode` request is still proof-stable for the current branch head
+2. prepare a fresh dry-run packet and record its `run_id`
+3. execute write mode against that exact `run_id`
+4. review the bounded diff and fix any contract breakage inside the declared surfaces
+5. rerun dry-run and write if any packet-affecting file changed
+6. author `maintenance-closeout.json`
+7. run `close-agent-maintenance`
+8. archive structured execution and closeout evidence under the canonical proof root
+9. rerun final verification on the finished closeout state
 
-Anything smaller leaves `closed_baseline` dishonest.
+Anything smaller still leaves the landing claim unproven.
 
-### Complexity, Completeness, And Distribution Checks
+### Complexity, Search, Completeness, And Distribution Checks
 
 **Complexity smell**
 
-This change necessarily touches more than eight files. That is acceptable because the contract
-already spans approval parsing, onboarding materialization, lifecycle evidence, closeout,
-historical backfill, committed governance artifacts, and docs. The guardrail is not "touch fewer
-files." The guardrail is "do not add a new artifact version, a new lifecycle stage, a second
-enrollment store, or a generic policy engine to paper over one in-flight agent."
+This plan may touch more than eight files if the live run exposes a real gap. That is acceptable.
+The repo already owns the machinery. The goal is to finish the live proof, not to keep the diff
+artificially tiny.
+
+**Search check**
+
+- **[Layer 1]** Reuse `execute-agent-maintenance` for write mode. The relay contract is already
+  implemented and tested.
+- **[Layer 1]** Reuse `close-agent-maintenance` for manual closeout. The contract already writes
+  the owned closeout outputs and validates live drift truth.
+- **[Layer 1]** Reuse the existing proof archive root instead of inventing a second evidence lane.
+- **[EUREKA]** The hidden landmine is not the write engine. It is packet continuity.
+  `validate_prepared_packet()` fail-closes when request SHA, rendered prompt, target version,
+  branch name, writable surfaces, green gates, or closeout command drift after dry-run. That means
+  any packet-affecting fix between dry-run and write forces a fresh dry-run. Ignore that and the
+  proof becomes fake.
 
 **Completeness rule**
 
-Do the full thing:
+Do the whole lake:
 
-- approval truth
-- registry materialization
-- final closeout predicate
-- immutable evidence
-- historical backfill
-- live proof
-- docs
-- tests
+- fresh dry-run
+- write mode
+- exact green gates
+- manual closeout
+- structured proof archive
+- final preflight
 
-There is no honest half-version of this milestone.
+Do not stop at "write mode produced a diff."
 
 **Distribution check**
 
-No external artifact is introduced. Outputs remain repo-native:
+There is no new user-facing binary or package here.
 
-- updated approval artifacts
-- updated registry truth
-- updated lifecycle and closeout governance artifacts
-- updated normative docs
-- updated tests
+The shipped artifact is committed operational truth:
 
-### Blocking Preconditions
-
-1. Release-watch validation remains single-sourced. Approval-side validation must reuse the same
-   rules as the registry block.
-2. `artifact_version` stays `1`.
-3. `closed_baseline` stays the final create-mode stage. No new lifecycle stage is introduced.
-4. `prepare-agent-maintenance` behavior stays unchanged. Deferred agents remain ineligible.
-5. The milestone treats `opencode`, `gemini_cli`, and `aider` as `explicitly_deferred`.
-6. `aider` is already at `publication_ready`, so its approval continuity files must be updated
-   atomically in this PR when the approval artifact SHA changes. Do not invent a new generic
-   continuity-refresh command just for this.
+- a closed `opencode` maintenance run
+- a bounded proof archive
+- a branch head that later maintainers can inspect and replay
 
 ## Final Contract To Land
 
-### Approval Artifact Contract
+### Proof Input Continuity Contract
 
-Add one bounded maintenance table under `descriptor`:
+The proof input remains:
 
-```toml
-[descriptor.maintenance]
-mode = "release_watch_enrolled" # or "explicitly_deferred"
+- request path: `docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml`
+- canonical handoff: `docs/agents/lifecycle/opencode-maintenance/HANDOFF.md`
+- closeout path: `docs/agents/lifecycle/opencode-maintenance/governance/maintenance-closeout.json`
 
-[descriptor.maintenance.release_watch]
-enabled = true
-version_policy = "latest_stable_minus_one"
-dispatch_kind = "workflow_dispatch" # or "packet_pr"
-dispatch_workflow = "example.yml"   # required only for workflow_dispatch
+Before dry-run:
 
-[descriptor.maintenance.release_watch.upstream]
-source_kind = "github_releases"     # or "gcs_object_listing"
-owner = "..."
-repo = "..."
-tag_prefix = "..."
+1. confirm `maintenance-request.toml` still reflects the intended proof base
+2. confirm `HANDOFF.md` still matches the request's execution contract
+3. confirm the detected release fields still describe the proof target
+4. confirm the writable surfaces still match the intended maintenance blast radius
 
-[descriptor.maintenance.deferral]
-reason = "..."
-follow_up = "..."
-approved_scope = "create_lane_closeout"
+If any of those are stale, refresh the packet truth first, then start the proof from a new dry-run.
+
+### Dry-Run Packet Contract
+
+Command:
+
+```sh
+cargo run -p xtask -- execute-agent-maintenance --request docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml --dry-run
 ```
 
-Rules:
+Expected outcomes:
 
-- `mode = "release_watch_enrolled"` requires `release_watch` and forbids `deferral`
-- `mode = "explicitly_deferred"` requires `deferral` and forbids `release_watch`
-- `descriptor.maintenance.release_watch` must satisfy the exact same field rules as registry
-  `maintenance.release_watch`
-- `deferral.reason` and `deferral.follow_up` must be non-empty
-- `approved_scope` is fixed to `create_lane_closeout`
-- parser compatibility remains additive, but every approval artifact created or edited by this
-  milestone must carry `descriptor.maintenance`
+- exit code `0`
+- CLI output includes `run_id`, `run_dir`, and the exact closeout command
+- run packet written under `docs/agents/.uaa-temp/agent-maintenance/runs/<run_id>/`
+- validation report status = `pass`
+- run status = `dry_run_ready`
 
-### Registry Materialization Invariant
+Required temp artifacts:
 
-- if approval mode is `release_watch_enrolled`, `onboard-agent --write` must materialize
-  `[agents.maintenance.release_watch]` and that block must validate under the existing registry
-  contract
-- if approval mode is `explicitly_deferred`, `onboard-agent --write` must not write
-  `maintenance.release_watch` for that agent
-- deferral never creates a second inventory. It is closeout-policy evidence only
+- `input-contract.json`
+- `codex-prompt.md`
+- `validation-report.json`
+- `run-status.json`
+- `written-paths.json`
+- `run-summary.md`
 
-### Closeout Predicate
+### Write-Mode Contract
 
-`close-proving-run` must enforce exactly one of these branches before `closed_baseline` is legal:
+Command:
+
+```sh
+cargo run -p xtask -- execute-agent-maintenance --request docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml --write --run-id <run_id>
+```
+
+Expected outcomes:
+
+- exit code `0`
+- validation report status = `pass`
+- run status = `write_validated`
+- `written_paths.json` is non-empty
+- every written path matches the frozen `writable_surfaces`
+- `maintenance-closeout.json` is not written by write mode
+- the exact `green_gates` run in order and all pass
+
+Required temp artifacts after a successful write:
+
+- `validation-report.json`
+- `run-status.json`
+- `written-paths.json`
+- `run-summary.md`
+- `codex-execution.json`
+- `codex-stdout.txt`
+- `codex-stderr.txt`
+
+If any packet-affecting file changes after dry-run and before write mode, discard the prepared
+packet and rerun dry-run.
+
+### Closeout Contract
+
+Before closeout:
+
+1. inspect the write-mode diff
+2. decide the resolved findings list truthfully
+3. decide whether deferred findings exist; if not, write `explicit_none_reason`
+
+Required JSON fields in `maintenance-closeout.json`:
+
+- `request_ref`
+- `request_sha256`
+- `resolved_findings`
+- exactly one of:
+  - `deferred_findings`
+  - `explicit_none_reason`
+- `preflight_passed`
+- `recorded_at`
+- `commit`
+
+Command:
+
+```sh
+cargo run -p xtask -- close-agent-maintenance --request docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml --closeout docs/agents/lifecycle/opencode-maintenance/governance/maintenance-closeout.json
+```
+
+Expected outcomes:
+
+- exit code `0`
+- refreshed `docs/agents/lifecycle/opencode-maintenance/HANDOFF.md`
+- refreshed `docs/agents/lifecycle/opencode-maintenance/governance/remediation-log.md`
+- written `maintenance-closeout.json`
+- live drift validation passes for all resolved findings
+
+### Proof Archive Contract
+
+The canonical proof root is:
 
 ```text
-PASS branch A: release_watch_enrolled
-  approval.mode = release_watch_enrolled
-  AND registry.maintenance.release_watch exists
-  AND normalized(approval.release_watch) == normalized(registry.release_watch)
-
-PASS branch B: explicitly_deferred
-  approval.mode = explicitly_deferred
-  AND registry.maintenance.release_watch is absent
-  AND approval.deferral.reason is non-empty
-  AND approval.deferral.follow_up is non-empty
-  AND approval.deferral.approved_scope = create_lane_closeout
-
-FAIL everything else
+docs/agents/lifecycle/opencode-maintenance/governance/proof/
 ```
 
-That includes:
+It must end the milestone containing:
 
-- missing approval maintenance table
-- enrolled approval with missing registry block
-- deferred approval with any registry release-watch block
-- normalized field mismatch in the enrolled branch
-- malformed deferral payload in the deferred branch
+- existing queue/opener evidence, if still truthful
+- `request-sha256.txt`
+- `run-id.txt`
+- `execute-dry-run.txt`
+- `execute-write.txt`
+- `validation-report-dry-run.json`
+- `validation-report-write.json`
+- `run-status-dry-run.json`
+- `run-status-write.json`
+- `written-paths-write.json`
+- `closeout-summary.md`
+- `proof-notes.md`
 
-### Machine-Owned Closeout Snapshot
-
-The final closed `proving-run-closeout.json` must gain a machine-owned
-`maintenance_settlement` object with this exact semantic payload:
-
-```json
-{
-  "maintenance_settlement": {
-    "mode": "release_watch_enrolled | explicitly_deferred",
-    "approval_section_sha256": "<sha256 of descriptor.maintenance canonical form>",
-    "normalized_release_watch": {
-      "...": "present only for release_watch_enrolled"
-    },
-    "deferral": {
-      "reason": "...",
-      "follow_up": "...",
-      "approved_scope": "create_lane_closeout"
-    }
-  }
-}
-```
-
-Rules:
-
-- `mode` is always present
-- `approval_section_sha256` is always present
-- `normalized_release_watch` is present only for `release_watch_enrolled`
-- `deferral` is present only for `explicitly_deferred`
-- `prepare-proving-run-closeout` may omit this field or leave it null in the prepared artifact
-- `close-proving-run` owns the final value and overwrites any stale or hand-authored contents
-
-### Lifecycle Rule
-
-`crates/xtask/src/agent_lifecycle.rs` must add one new evidence id,
-`maintenance_readiness_settled`, and require it for `ClosedBaseline`.
-
-This milestone does not make `published` imply maintenance truth. The hard gate is final closeout.
-
-### Deferred Steady-State Rule
-
-Deferred agents may still reach `closed_baseline`, but they remain manual-maintenance agents until
-a later enrollment change lands.
-
-Explicitly:
-
-- shared watcher fan-out is not expected
-- `prepare-agent-maintenance` remains invalid
-- `check-agent-drift` remains valid
-- no maintenance request lane is supported while deferred
-- if drift is detected while deferred, the legal next step is to update the approval artifact to
-  `release_watch_enrolled`, materialize the matching registry block, and only then use the normal
-  maintenance commands
-
-### Historical Migration Policy
-
-- `opencode` -> `explicitly_deferred`
-- `gemini_cli` -> `explicitly_deferred`
-- `aider` -> `explicitly_deferred` for this proof-run milestone
-
-No registry enrollment is added for any of those three agents in this PR.
+Raw `codex-stdout.txt` and `codex-stderr.txt` stay temp-only unless a debugging failure forces
+them into the archive.
 
 ## Architecture Review
 
 ### Boundary Decision
 
-The correct boundary is:
+The boundary stays:
 
 ```text
-approval artifact decides intent
+live maintenance request
         |
         v
-onboard-agent materializes registry truth
+execute-agent-maintenance --dry-run
         |
         v
-close-proving-run proves approval truth == registry truth
+prepared run packet with frozen run_id
         |
         v
-closed_baseline records immutable settlement evidence
+execute-agent-maintenance --write
+        |
+        v
+bounded diff inside writable_surfaces
+        |
+        v
+manual maintenance-closeout.json authoring
+        |
+        v
+close-agent-maintenance
+        |
+        v
+committed proof archive
 ```
 
-Do not move the decision into the watcher. Do not move enrollment out of the registry.
+Do not move closeout into write mode.
+
+Do not replace the request-owned green gates with a handwritten checklist.
+
+Do not turn this into a second packet generation project.
 
 ### Dependency Graph
 
 ```text
-approval_artifact.rs
-  ├── parses descriptor.maintenance
-  └── reuses release_watch validator
+docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml
+  ├── detected_release
+  ├── execution_contract
+  └── closeout_path
           |
           v
-onboard_agent/*
-  ├── preview renders approved maintenance mode
-  ├── draft carries maintenance decision
-  └── write path materializes registry branch
+crates/xtask/src/agent_maintenance/execute/workflow.rs
+  ├── runtime.rs      (Codex preflight + green gates)
+  ├── validate.rs     (prepared packet continuity + writable surface jail)
+  └── packet.rs       (run packet persistence)
           |
           v
-agent_registry.toml
+docs/agents/.uaa-temp/agent-maintenance/runs/<run_id>/
           |
           v
-close_proving_run.rs
-  ├── loads approval artifact
-  ├── loads registry entry
-  ├── evaluates exact two-branch predicate
-  └── writes maintenance_settlement snapshot
+maintainer diff review + maintenance-closeout.json
           |
           v
-proving_run_closeout.rs + agent_lifecycle.rs
-  └── closed_baseline requires maintenance_readiness_settled
+crates/xtask/src/agent_maintenance/closeout/validate.rs
+crates/xtask/src/agent_maintenance/closeout/write.rs
           |
           v
-historical_lifecycle_backfill.rs
-  └── replays the same truth onto already-closed agents
+docs/agents/lifecycle/opencode-maintenance/HANDOFF.md
+docs/agents/lifecycle/opencode-maintenance/governance/remediation-log.md
+docs/agents/lifecycle/opencode-maintenance/governance/proof/**
 ```
 
 ### File-Level Ownership
 
 | Area | Files | Purpose |
 | --- | --- | --- |
-| Shared maintenance schema | `crates/xtask/src/agent_registry/release_watch.rs`, `crates/xtask/src/approval_artifact.rs` | Reuse one validator and parse approval-side maintenance truth. |
-| Approval-mode onboarding | `crates/xtask/src/onboard_agent.rs`, `crates/xtask/src/onboard_agent/descriptor.rs`, `crates/xtask/src/onboard_agent/approval.rs`, `crates/xtask/src/onboard_agent/preview.rs` | Thread maintenance decision into draft state, preview output, registry text, and generated docs. |
-| Lifecycle evidence | `crates/xtask/src/agent_lifecycle.rs` | Add `maintenance_readiness_settled` evidence and require it for `ClosedBaseline`. |
-| Final closeout | `crates/xtask/src/close_proving_run.rs`, `crates/xtask/src/proving_run_closeout.rs` | Enforce predicate and snapshot immutable settlement evidence. |
-| Historical repair | `crates/xtask/src/historical_lifecycle_backfill.rs` | Regenerate closed-baseline artifacts with settlement evidence for legacy agents. |
-| Affected governance artifacts | `docs/agents/lifecycle/opencode-cli-onboarding/governance/approved-agent.toml`, `docs/agents/lifecycle/gemini-cli-onboarding/governance/approved-agent.toml`, `docs/agents/lifecycle/aider-onboarding/governance/approved-agent.toml` | Commit truthful maintenance decisions. |
-| Normative docs | `docs/specs/agent-registry-contract.md`, `docs/specs/cli-agent-onboarding-charter.md`, `docs/cli-agent-onboarding-factory-operator-guide.md` | Make the contract and operator story truthful. |
+| Live proof input | `docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml`, `HANDOFF.md` | Freeze the request and execution contract the proof must obey. |
+| Relay execution | `crates/xtask/src/agent_maintenance/execute/**` | Enforce preflight, continuity, writable surfaces, and green gates. |
+| Manual closeout | `crates/xtask/src/agent_maintenance/closeout/**` | Validate closeout JSON and write owned closeout outputs. |
+| Live temp evidence | `docs/agents/.uaa-temp/agent-maintenance/runs/<run_id>/**` | Capture machine-readable run evidence for dry-run and write mode. |
+| Committed proof archive | `docs/agents/lifecycle/opencode-maintenance/governance/proof/**` | Store replayable evidence for later maintainers. |
+| Operator docs | `docs/cli-agent-onboarding-factory-operator-guide.md` | Update only if the live proof exposes wording drift. |
+| Regression coverage | `crates/xtask/tests/agent_maintenance_execute.rs`, `crates/xtask/tests/agent_maintenance_closeout/**` | Lock any newly discovered failure closed. |
 
-### Production Failure Scenario Per New Path
+### Production Failure Scenario Per Path
 
 | Codepath | Real failure | Planned handling |
 | --- | --- | --- |
-| Approval parsing | Approval artifact mixes `release_watch` and `deferral` | Validation error at load time. |
-| Onboarding write | Deferred approval accidentally writes registry release-watch block | Integration test and write-path assertion. |
-| Closeout compare | Approval says enrolled but registry block differs in one field | Closeout hard-fails with mismatch detail. |
-| Closeout evidence | Prepared artifact carries stale hand-written settlement payload | `close-proving-run` overwrites machine-owned settlement fields. |
-| Historical backfill | Legacy closed agent gets new evidence id but stale closeout JSON | Backfill rewrites closeout artifact and lifecycle evidence together. |
-| `aider` proof | Approval SHA changes but lifecycle/publication continuity stays stale | Explicit continuity update in the same PR before proof commands run. |
+| Dry-run preflight | Codex binary/auth state is broken or preflight mutates the repo | Dry-run fails closed before write mode. Fix host state and rerun. |
+| Packet continuity | Request SHA, rendered prompt, or writable surfaces drift after dry-run | `validate_prepared_packet()` rejects the write. Rerun dry-run after the fix. |
+| Write boundary | Maintained agent writes outside `writable_surfaces` or touches closeout path | Write mode fails closed and records the violation in the run packet. |
+| Runtime no-op | Write mode produces no runtime-owned diff | Write mode fails closed. The lane does not get credit for doing nothing. |
+| Green gates | One declared gate fails after codex write | Write mode stops and records the failing gate. Fix the underlying issue, then restart from dry-run. |
+| Closeout truth | Resolved findings still appear in live drift | `close-agent-maintenance` fails closed. Fix or defer honestly. |
+| Proof archive drift | Committed proof notes reference the wrong request SHA or run_id | Treat as a proof failure. Rewrite the archive from the actual successful run. |
 
 ## Implementation Plan
 
-### Phase 1: Shared Contract Primitives
+### Phase 1: Freeze Proof Inputs
 
-**Goal:** model the maintenance decision once and validate it once.
+**Goal:** start from one stable request and one stable proof boundary.
 
 **Files**
 
-- `crates/xtask/src/agent_registry/release_watch.rs`
-- `crates/xtask/src/approval_artifact.rs`
+- `docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml`
+- `docs/agents/lifecycle/opencode-maintenance/HANDOFF.md`
+- `docs/agents/lifecycle/opencode-maintenance/governance/proof/proof-notes.md`
+- `docs/cli-agent-onboarding-factory-operator-guide.md` only if wording drift is already obvious
 
 **Concrete changes**
 
-1. Promote the release-watch validation entrypoint so approval parsing can reuse it instead of
-   copying field rules.
-2. Extend `ApprovalDescriptor` with a maintenance decision model: mode enum, enrolled payload, and
-   deferral payload.
-3. Add one canonical normalization and hashing path for the approval-side maintenance section.
-4. Keep parser compatibility for legacy artifacts, but make all forward-moving flows touched in
-   this milestone reject missing maintenance truth where required.
+1. Verify the request still points at the intended `target_version`, `branch_name`, and
+   `request_commit`.
+2. Verify `HANDOFF.md` still matches the request's execution contract.
+3. Decide whether existing queue/opener proof artifacts are still truthful enough to keep.
+4. If request or packet docs drifted, refresh them before any new dry-run.
 
 **Verification**
 
-- approval artifacts with either maintenance mode parse cleanly
-- malformed mixed-mode artifacts fail with precise errors
-- the release-watch field rules live in one place
+- request and handoff tell one story
+- no stale packet wording survives into the live proof run
 
 **Exit criteria**
 
-- no duplicated release-watch validation logic exists
-- normalization and settlement hashing are defined once
+- a maintainer can point at one canonical request and say "this is the packet we are proving"
 
-### Phase 2: Approval-To-Registry Materialization
+### Phase 2: Prepare A Fresh Dry-Run Packet
 
-**Goal:** make `onboard-agent --write` carry maintenance truth into committed registry state.
+**Goal:** freeze one prepared `run_id` for the actual write attempt.
 
 **Files**
 
-- `crates/xtask/src/onboard_agent.rs`
-- `crates/xtask/src/onboard_agent/descriptor.rs`
-- `crates/xtask/src/onboard_agent/approval.rs`
-- `crates/xtask/src/onboard_agent/preview.rs`
-- `crates/xtask/data/agent_registry.toml`
+- `docs/agents/.uaa-temp/agent-maintenance/runs/<run_id>/**`
+- `docs/agents/lifecycle/opencode-maintenance/governance/proof/execute-dry-run.txt`
+- `docs/agents/lifecycle/opencode-maintenance/governance/proof/request-sha256.txt`
+- `docs/agents/lifecycle/opencode-maintenance/governance/proof/run-id.txt`
+- `docs/agents/lifecycle/opencode-maintenance/governance/proof/validation-report-dry-run.json`
+- `docs/agents/lifecycle/opencode-maintenance/governance/proof/run-status-dry-run.json`
 
 **Concrete changes**
 
-1. Thread maintenance truth through `DraftDescriptorInput` and `DraftEntry`.
-2. Render the registry preview and write path so `release_watch_enrolled` writes
-   `[agents.maintenance.release_watch]`, while `explicitly_deferred` writes no registry
-   release-watch block.
-3. Surface the approved maintenance decision in dry-run output and generated packet previews so the
-   operator story is explicit before runtime work begins.
-4. Keep approval-mode `onboard-agent --write` idempotent and byte-stable on replay.
+1. Run fresh dry-run from the live request.
+2. Capture the emitted `run_id`.
+3. Copy the dry-run summary and structured JSON evidence into the committed proof root.
+4. Record the exact request SHA used for the proof.
 
 **Verification**
 
-- approval-mode preview shows the maintenance decision
-- approval-mode write produces the correct registry state for each branch
-- replaying the same approval artifact is byte-stable
+- dry-run exits `0`
+- preflight passes
+- run status is `dry_run_ready`
 
 **Exit criteria**
 
-- deferred approval cannot silently enroll
-- enrolled approval cannot silently omit the registry block
+- there is one fresh prepared run packet and one committed `run_id` file pointing at it
 
-### Phase 3: Closeout Predicate And Immutable Evidence
+### Phase 3: Execute Write Mode And Review The Bounded Diff
 
-**Goal:** make `closed_baseline` impossible until maintenance settlement is proven.
+**Goal:** prove that the packet can actually land the bounded maintenance update.
 
 **Files**
 
-- `crates/xtask/src/close_proving_run.rs`
-- `crates/xtask/src/proving_run_closeout.rs`
-- `crates/xtask/src/agent_lifecycle.rs`
-- `crates/xtask/src/prepare_proving_run_closeout.rs`
+- writable surfaces declared by the live request
+- `docs/agents/.uaa-temp/agent-maintenance/runs/<run_id>/**`
+- `docs/agents/lifecycle/opencode-maintenance/governance/proof/execute-write.txt`
+- `docs/agents/lifecycle/opencode-maintenance/governance/proof/validation-report-write.json`
+- `docs/agents/lifecycle/opencode-maintenance/governance/proof/run-status-write.json`
+- `docs/agents/lifecycle/opencode-maintenance/governance/proof/written-paths-write.json`
 
 **Concrete changes**
 
-1. Add `EvidenceId::MaintenanceReadinessSettled`.
-2. Require it in `CLOSED_BASELINE_MINIMUM_EVIDENCE`.
-3. Extend the closeout artifact with the machine-owned `maintenance_settlement` snapshot defined
-   above.
-4. Teach `close-proving-run` to:
-   - load approval maintenance truth
-   - load the registry entry
-   - evaluate the exact two-branch predicate
-   - fail closed on mismatch or absence
-   - write the final immutable settlement snapshot into the closed closeout artifact
-5. Keep `prepare-proving-run-closeout` boring. It prepares the draft; it does not decide
-   maintenance truth.
-6. Handle the in-flight `aider` continuity update explicitly in-repo:
-   update the approval artifact, `lifecycle-state.json`, and `publication-ready.json` together in
-   the same PR.
+1. Run write mode with the exact prepared `run_id`.
+2. Inspect `written-paths.json` and the repo diff for scope, truth, and packet compliance.
+3. If write mode fails because the packet or executor still has a hidden assumption:
+   - fix the issue inside the bounded blast radius
+   - rerun dry-run
+   - rerun write mode
+4. Archive only the final successful write evidence.
 
 **Verification**
 
-- `close-proving-run` rejects ambiguous or mismatched maintenance state
-- `ClosedBaseline` requires the new evidence bit
-- the closed closeout artifact carries immutable maintenance settlement proof
+- write exits `0`
+- run status is `write_validated`
+- all green gates pass in order
+- no boundary violation occurs
+- closeout path stays untouched
 
 **Exit criteria**
 
-- there is no legal `closed_baseline` path without `maintenance_readiness_settled`
-- editing the approval artifact later cannot change what a previously closed run recorded
+- the repo has one truthful write-mode diff produced by the live packet
 
-### Phase 4: Historical Backfill For Closed Agents
+### Phase 4: Author Closeout And Run Manual Closeout
 
-**Goal:** make already-closed agents truthful without widening rollout.
+**Goal:** prove the explicit maintainer closeout step the operator guide requires.
 
 **Files**
 
-- `crates/xtask/src/historical_lifecycle_backfill.rs`
-- `docs/agents/lifecycle/opencode-cli-onboarding/governance/approved-agent.toml`
-- `docs/agents/lifecycle/gemini-cli-onboarding/governance/approved-agent.toml`
-- their matching committed closeout and lifecycle artifacts
+- `docs/agents/lifecycle/opencode-maintenance/governance/maintenance-closeout.json`
+- `docs/agents/lifecycle/opencode-maintenance/HANDOFF.md`
+- `docs/agents/lifecycle/opencode-maintenance/governance/remediation-log.md`
+- `docs/agents/lifecycle/opencode-maintenance/governance/proof/closeout-summary.md`
 
 **Concrete changes**
 
-1. Extend `historical-lifecycle-backfill` so it can regenerate closed-baseline evidence with the
-   new maintenance settlement snapshot.
-2. Backfill `opencode` and `gemini_cli` approval artifacts with explicit deferral metadata.
-3. Regenerate their closed-baseline closeout and lifecycle continuity so the new evidence bit is
-   satisfied truthfully.
+1. Author `maintenance-closeout.json` from the actual write result.
+2. Record resolved findings truthfully.
+3. Use deferred findings only if live drift still exists and is intentionally left open.
+4. Run `close-agent-maintenance`.
+5. Archive a short closeout summary describing what was resolved and why any deferred item remains.
 
 **Verification**
 
-- both agents remain `closed_baseline`
-- both approval artifacts state `explicitly_deferred`
-- both closed-baseline artifacts carry immutable maintenance settlement evidence
+- closeout JSON parses and validates
+- live drift check passes for resolved findings
+- closeout write refreshes the owned outputs
 
 **Exit criteria**
 
-- historical truth matches current contract without adding registry enrollment
+- the maintenance lane is explicitly closed, not implicitly assumed closed
 
-### Phase 5: Live Proof On `aider`
+### Phase 5: Archive Final Proof And Operator Notes
 
-**Goal:** prove the tightened deferred branch on a real in-flight agent.
+**Goal:** leave behind replayable evidence, not just a passing branch.
 
 **Files**
 
-- `docs/agents/lifecycle/aider-onboarding/governance/approved-agent.toml`
-- `docs/agents/lifecycle/aider-onboarding/governance/lifecycle-state.json`
-- `docs/agents/lifecycle/aider-onboarding/governance/publication-ready.json`
-- the resulting `proving-run-closeout.json`
+- `docs/agents/lifecycle/opencode-maintenance/governance/proof/**`
+- `docs/cli-agent-onboarding-factory-operator-guide.md` only if the live proof disproves current wording
 
 **Concrete changes**
 
-1. Add `descriptor.maintenance` deferral metadata to `aider`’s approval artifact.
-2. Update committed approval continuity files for the new approval SHA.
-3. Run:
-   - `cargo run -p xtask -- refresh-publication --approval docs/agents/lifecycle/aider-onboarding/governance/approved-agent.toml --write`
-   - `cargo run -p xtask -- prepare-proving-run-closeout --approval docs/agents/lifecycle/aider-onboarding/governance/approved-agent.toml --write`
-4. Complete bounded human fields in `proving-run-closeout.json`.
-5. Run:
-   - `cargo run -p xtask -- close-proving-run --approval docs/agents/lifecycle/aider-onboarding/governance/approved-agent.toml --closeout docs/agents/lifecycle/aider-onboarding/governance/proving-run-closeout.json`
+1. Refresh `proof-notes.md` so it describes the final successful run, not just dry-run readiness.
+2. Keep existing queue/opener evidence if still truthful; regenerate only if the request or target
+   moved.
+3. Add the final write and closeout evidence files from the successful run.
+4. Update the operator guide only if the live proof exposed wording drift, command-order drift, or
+   artifact-shape drift.
 
 **Verification**
 
-- `aider` cannot close without explicit maintenance settlement
-- `aider` can close once the deferred branch is satisfied
-- `aider` remains unenrolled in the registry in this milestone
+- proof root contains a complete replay trail
+- operator wording matches the proof that just landed
 
 **Exit criteria**
 
-- the real in-flight path proves the same rules the backfill path claims
+- another maintainer can replay the lane from committed artifacts without asking "what actually happened?"
 
-### Phase 6: Docs And Final Verification
+### Phase 6: Final Verification
 
-**Goal:** make the spec, runbook, and validation suite match the landed code.
-
-**Files**
-
-- `docs/specs/agent-registry-contract.md`
-- `docs/specs/cli-agent-onboarding-charter.md`
-- `docs/cli-agent-onboarding-factory-operator-guide.md`
-
-**Concrete changes**
-
-1. Document the new approval-side maintenance table and its two allowed modes.
-2. State explicitly that registry omission remains the only unenrolled state.
-3. Document the closeout predicate and the fact that deferred agents stay ineligible for
-   `prepare-agent-maintenance`.
-4. Document the one-time `aider` continuity migration as repo work, not an operator command.
+**Goal:** make the finished closeout state green.
 
 **Final verification**
 
 ```sh
-cargo test -p xtask recommend_next_agent_approval_artifact -- --nocapture
-cargo test -p xtask onboard_agent_entrypoint -- approval_mode
-cargo test -p xtask onboard_agent_closeout_preview -- close_proving_run_write
-cargo test -p xtask historical_lifecycle_backfill_entrypoint -- --nocapture
-cargo test -p xtask prepare_proving_run_closeout_entrypoint -- --nocapture
+cargo fmt --all
+cargo run -p xtask -- codex-validate --root cli_manifests/opencode
+cargo run -p xtask -- support-matrix --check
+cargo run -p xtask -- capability-matrix --check
+cargo run -p xtask -- capability-matrix-audit
 make preflight
 ```
 
 **Exit criteria**
 
-- normative docs and code tell the same story
-- proof path and backfill path both pass
+- the exact packet-declared gates pass on the final proof-bearing commit
 
 ## Code Quality Review
 
 ### DRY Rules
 
-1. Do not duplicate release-watch validation logic in `approval_artifact.rs`.
-2. Do not add a second normalization or hashing path for maintenance settlement.
-3. Do not add a generic new command for one in-flight `aider` continuity update.
+1. Do not add a second execution surface for the same maintenance lane.
+2. Do not add a second closeout writer.
+3. Do not create a new archive format if the existing proof root can hold the evidence.
+4. Do not duplicate green gates in ad hoc docs when the request already owns them.
 
 ### Explicit Over Clever
 
-Use concrete structs and enums.
-
-Do not hide the two-branch predicate behind a generic policy engine. Two branches. Named fields.
-Readable in 30 seconds.
-
-### Minimal-Diff Rules
-
 Prefer:
 
-- one approval-side maintenance struct family
-- one new lifecycle evidence id
-- one closeout snapshot object
+- one request
+- one fresh run id
+- one successful write packet
+- one closeout artifact
+- one proof archive
 
 Avoid:
 
-- artifact version bump
-- lifecycle stage expansion
-- watcher refactor
-- generic policy engine
-- broader maintenance profile taxonomy
+- partial successes dressed up as proof
+- magic reruns that skip dry-run continuity
+- extra automation that hides the explicit maintainer closeout step
 
-### Naming And Ownership Rules
+### Minimal-Diff Rules
 
-- "enrollment" means registry `maintenance.release_watch` only
-- "deferral" means approval-side closeout policy evidence only
-- "settlement" means the final proved relationship between approval truth and registry truth
-- machine-owned settlement fields live in closeout/lifecycle artifacts, not in human-edited packet prose
+The best outcome is:
+
+- no core code changes at all
+- one live proof run
+- docs and evidence refreshed to match it
+
+If the live run exposes a hidden assumption, fix only the implicated relay, closeout, or packet
+surface. No opportunistic cleanup.
 
 ## Test Review
 
@@ -621,33 +611,31 @@ Rust integration tests under `crates/xtask/tests/` remain the primary harness.
 ```text
 CODE PATH COVERAGE
 ===========================
-[+] crates/xtask/src/approval_artifact.rs
-    ├── [ADD] release_watch_enrolled parses and validates
-    ├── [ADD] explicitly_deferred parses and validates
-    ├── [ADD] mixed-mode artifact fails
-    └── [ADD] missing maintenance table is rejected by forward-moving flows
+[+] maintenance-request.toml continuity
+    ├── [VERIFY] request sha, target_version, branch_name stay frozen for proof
+    └── [VERIFY] execution_contract matches HANDOFF.md
 
-[+] crates/xtask/src/onboard_agent/*
-    ├── [ADD] approval-mode dry-run shows maintenance decision
-    ├── [ADD] enrolled mode writes registry release_watch block
-    ├── [ADD] deferred mode omits registry release_watch block
-    └── [ADD] replay stays byte-identical
+[+] crates/xtask/src/agent_maintenance/execute/workflow.rs
+    ├── [TESTED] dry-run prepares packet and records closeout command
+    ├── [TESTED] write mode requires matching dry-run packet
+    ├── [TESTED] green gates run in order and stop on failure
+    └── [VERIFY] live opencode request reaches write_validated
 
-[+] crates/xtask/src/close_proving_run.rs
-    ├── [ADD] enrolled branch succeeds on normalized match
-    ├── [ADD] enrolled branch fails on normalized mismatch
-    ├── [ADD] deferred branch succeeds on absent registry block
-    ├── [ADD] deferred branch fails when registry block exists
-    └── [ADD] closeout writes maintenance_settlement snapshot
+[+] crates/xtask/src/agent_maintenance/execute/validate.rs
+    ├── [TESTED] prompt/request drift fail closed
+    ├── [TESTED] out-of-bounds writes fail closed
+    ├── [TESTED] closeout path write is forbidden
+    └── [TESTED] noop runtime execution fails closed
 
-[+] crates/xtask/src/historical_lifecycle_backfill.rs
-    ├── [ADD] closed legacy agent receives maintenance settlement snapshot
-    └── [ADD] lifecycle evidence includes maintenance_readiness_settled
+[+] crates/xtask/src/agent_maintenance/closeout/validate.rs
+    ├── [TESTED] request_ref and request_sha256 must match
+    ├── [TESTED] exactly one of deferred_findings or explicit_none_reason is required
+    └── [VERIFY] live opencode closeout truth matches actual resolved findings
 
-[+] aider continuity migration
-    ├── [ADD] lifecycle-state.json approval SHA continuity updates
-    ├── [ADD] publication-ready.json approval SHA continuity updates
-    └── [ADD] live proof path can continue to closeout without manual JSON surgery
+[+] crates/xtask/src/agent_maintenance/closeout/write.rs
+    ├── [TESTED] only owned closeout surfaces are written
+    ├── [TESTED] automated-request closeout preserves trigger truth
+    └── [VERIFY] final opencode closeout refreshes the maintained handoff and remediation log
 ```
 
 ### User / Operator Flow Coverage
@@ -655,164 +643,170 @@ CODE PATH COVERAGE
 ```text
 USER FLOW COVERAGE
 ===========================
-[+] New approved agent with maintenance enrollment
-    ├── [ADD] onboard-agent preview explains enrollment
-    ├── [ADD] onboard-agent write materializes registry block
-    └── [ADD] close-proving-run accepts enrolled match
+[+] Maintainer freezes the live packet
+    ├── [VERIFY] request + handoff are in sync
+    └── [VERIFY] proof notes reference the actual request sha
 
-[+] New approved agent with explicit deferral
-    ├── [ADD] onboard-agent preview explains deferral
-    ├── [ADD] registry remains unenrolled
-    └── [ADD] close-proving-run accepts deferred branch only
+[+] Maintainer prepares dry-run packet
+    ├── [VERIFY] dry-run exits 0
+    ├── [VERIFY] run_id is captured
+    └── [VERIFY] structured run packet exists under .uaa-temp
 
-[+] Already-closed agent backfill
-    ├── [ADD] approval artifact updated with deferral metadata
-    └── [ADD] backfill rewrites lifecycle + closeout evidence consistently
+[+] Maintainer executes write mode
+    ├── [VERIFY] exact green gates pass
+    ├── [VERIFY] written paths stay within writable_surfaces
+    ├── [VERIFY] resulting diff is non-empty and bounded
+    └── [VERIFY] maintenance-closeout.json remains untouched by write mode
 
-[+] In-flight agent at publication_ready
-    ├── [ADD] approval continuity update stays coherent
-    └── [ADD] closeout cannot finish until maintenance settlement is explicit
+[+] Maintainer performs manual closeout
+    ├── [VERIFY] maintenance-closeout.json is truthful
+    ├── [VERIFY] close-agent-maintenance exits 0
+    └── [VERIFY] refreshed closeout outputs match the request and live drift truth
+
+[+] Future maintainer replays the proof
+    ├── [VERIFY] proof archive has run_id + request sha + run statuses
+    └── [VERIFY] proof notes explain the command order and rerun rule when packet drift occurs
 ```
 
 ### Exact Test Files To Extend
 
-- `crates/xtask/tests/recommend_next_agent_approval_artifact.rs`
-- `crates/xtask/tests/onboard_agent_entrypoint/approval_mode.rs`
-- `crates/xtask/tests/onboard_agent_closeout_preview/close_proving_run_write.rs`
-- `crates/xtask/tests/historical_lifecycle_backfill_entrypoint.rs`
-- `crates/xtask/tests/prepare_proving_run_closeout_entrypoint.rs`
-- `crates/xtask/tests/agent_lifecycle_state.rs`
+Extend only if the live proof reveals a missing guardrail:
+
+- `crates/xtask/tests/agent_maintenance_execute.rs`
+- `crates/xtask/tests/agent_maintenance_closeout/write_outputs.rs`
+- `crates/xtask/tests/agent_maintenance_closeout/request_and_schema.rs`
+- `crates/xtask/tests/agent_maintenance_closeout/live_drift_validation.rs`
+
+If the live run does not reveal a gap, do not create speculative new tests.
 
 ### Regression Rule
 
-This is a regression if any path can still do one of these after the change:
+This is a regression if any of these happen:
 
-1. reach `closed_baseline` with no maintenance decision
-2. reach `closed_baseline` with approval truth that disagrees with registry truth
-3. rewrite the meaning of a closed run by editing the approval artifact later
+1. a stale prepared packet can still reach write mode after request or prompt drift
+2. write mode can touch `maintenance-closeout.json`
+3. write mode can exit successfully with no bounded repo-owned changes
+4. closeout accepts resolved findings that still appear in live drift
+5. the proof archive can be updated without recording the actual request SHA and run ID
+6. the operator guide still tells a different command order than the successful proof used
 
-Every one of those cases gets a regression test. No exceptions.
+Any live regression found during this milestone gets a test before the work is called done.
 
 ## Performance Review
 
-This is not a runtime-hot-path milestone. The performance risks are boring but real:
+This is operational work, not a hot path.
 
-1. Do not repeatedly reparse or rehash the same approval and registry data inside one closeout run.
-2. Keep normalization/comparison in memory. One registry load, one approval load, one normalized
-   compare.
-3. Do not add shell-outs or git invocations to the steady-state validation path. Historical
-   backfill can afford them. Closeout should not.
+The real performance constraints are:
+
+1. avoid unnecessary reruns by freezing packet truth before dry-run
+2. do not add new steady-state automation just to archive one proof
+3. accept that `make preflight` dominates runtime; that is the price of truthful proof
 
 ## Failure Modes Registry
 
 | Failure mode | Test required | Error handling | User-visible outcome |
 | --- | --- | --- | --- |
-| Approval has no maintenance table | Yes | validation error | explicit stop before write or closeout |
-| Deferred approval writes registry release-watch anyway | Yes | write-path invariant + regression test | explicit failure, no silent enrollment |
-| Enrolled approval and registry differ after normalization | Yes | closeout hard-fail | exact mismatch before `closed_baseline` |
-| Closed historical agent lacks settlement evidence after backfill | Yes | backfill rewrites lifecycle + closeout together | repo does not ship half-migrated history |
-| Prepared closeout carries stale machine-owned settlement fields | Yes | `close-proving-run` overwrites final snapshot | no silent reuse of stale truth |
-| `aider` approval SHA changes but continuity files stay stale | Yes | proof blocked until continuity updated | explicit stop, not silent drift |
+| Codex preflight fails | Already covered | dry-run fails closed | explicit stop before write mode |
+| Request/prompt drift after dry-run | Already covered | write fails closed | explicit stop, rerun dry-run required |
+| Write escapes `writable_surfaces` | Already covered | write fails closed | explicit stop with violating paths |
+| Write produces no runtime diff | Already covered | write fails closed | explicit stop, no fake success |
+| Green gate fails after write | Already covered | write fails closed | explicit stop with failing command |
+| Closeout JSON mismatches request SHA | Already covered | closeout fails closed | explicit stop before closeout outputs refresh |
+| Resolved findings still match live drift | Already covered | closeout fails closed | explicit stop, deferred/resolved truth must be fixed |
+| Proof archive records stale run metadata | New check if missing | human review + archive rewrite | explicit proof failure, not silent rot |
 
 **Critical gap definition**
 
-Any path that has:
+Any path that claims:
 
-- no maintenance settlement test
-- no closeout guard
-- and can still end in `closed_baseline`
+- the packet can land
+- the packet passed write mode
+- or the run was closed
 
-is a critical gap. The milestone is not done until that count is zero.
+without structured evidence for that exact request SHA and run ID is a critical gap.
 
 ## NOT In Scope
 
-1. Enrolling `opencode`, `gemini_cli`, or `aider` into shared release-watch maintenance.
-2. Changing `.github/workflows/agent-maintenance-release-watch.yml` or downstream maintenance
-   worker topology.
-3. Introducing a broader maintenance profile taxonomy beyond the two bounded modes above.
-4. Bumping approval artifact version to `2`.
-5. Adding a new lifecycle stage between `published` and `closed_baseline`.
-6. Building a generic "approval continuity refresh" command. `aider` gets a one-time in-repo
-   continuity migration instead.
+1. Re-enrolling `opencode` or any second agent.
+2. Changing the shared watcher topology.
+3. Introducing a new source kind or new dispatch kind.
+4. Automating closeout inside `execute-agent-maintenance`.
+5. Building a generic long-term proof archival subsystem.
+6. Promoting `opencode` to a new `latest_supported.txt` posture unless the bounded write itself
+   requires it.
+7. Opportunistic cleanup outside the request's writable surfaces.
 
 ## TODOS.md Impact
 
-No new repo-wide TODO is required for this milestone. The follow-on work is already captured by the
-existing `TODOS.md` item:
+No new repo-wide TODO is required up front.
 
-- `Make Goose The Explicit P1 End-To-End Lifecycle Validation`
-
-This milestone is one of its blocking prerequisites because Goose cannot be the honest end-to-end
-proof target until maintenance settlement semantics are truthful.
-
-If implementation uncovers desire for wider release-watch rollout, that becomes a separate future
-milestone, not an expansion of this PR.
+If the live proof exposes a genuinely separate follow-on, record it only after the proof lands.
+Do not smuggle a second milestone into this one.
 
 ## Worktree Parallelization Strategy
+
+This plan has limited parallelism. The live dry-run -> write -> closeout chain is sequential by
+design because `run_id` continuity is the contract.
+
+There is still useful pre-proof parallelism if the live run exposes code gaps.
 
 ### Dependency Table
 
 | Step | Modules touched | Depends on |
 | --- | --- | --- |
-| 1. Shared maintenance contract primitives | `crates/xtask/src/agent_registry/`, `crates/xtask/src/approval_artifact.rs` | — |
-| 2. Approval/onboarding materialization | `crates/xtask/src/onboard_agent/`, `crates/xtask/data/` | Step 1 |
-| 3. Closeout + lifecycle enforcement | `crates/xtask/src/close_proving_run.rs`, `crates/xtask/src/proving_run_closeout.rs`, `crates/xtask/src/agent_lifecycle.rs` | Step 1 |
-| 4. Historical backfill | `crates/xtask/src/historical_lifecycle_backfill.rs`, `docs/agents/lifecycle/opencode-cli-onboarding/`, `docs/agents/lifecycle/gemini-cli-onboarding/` | Steps 1 and 3 |
-| 5. Docs/spec truth update | `docs/specs/`, `docs/cli-agent-onboarding-factory-operator-guide.md` | Contract names frozen from Steps 1, 2, and 3 |
-| 6. Aider live proof + continuity update | `docs/agents/lifecycle/aider-onboarding/` | Steps 2 and 3 |
-| 7. Final verification | workspace-wide tests and `make preflight` | Steps 2, 3, 4, 5, and 6 |
+| 1. Freeze proof inputs | `docs/agents/lifecycle/opencode-maintenance/`, `docs/cli-agent-onboarding-factory-operator-guide.md` | — |
+| 2. Relay hardening, if needed | `crates/xtask/src/agent_maintenance/execute/`, `crates/xtask/tests/agent_maintenance_execute.rs` | 1 |
+| 3. Closeout hardening, if needed | `crates/xtask/src/agent_maintenance/closeout/`, `crates/xtask/tests/agent_maintenance_closeout/` | 1 |
+| 4. Proof archive scaffolding | `docs/agents/lifecycle/opencode-maintenance/governance/proof/` | 1 |
+| 5. Live dry-run -> write -> closeout | `.uaa-temp/agent-maintenance/runs/`, request writable surfaces, `docs/agents/lifecycle/opencode-maintenance/` | 2, 3, 4 |
+| 6. Final verification and doc polish | workspace-wide green gates, operator docs if needed | 5 |
 
 ### Parallel Lanes
 
-- Lane A: Step 1 -> Step 2  
-  Sequential because Step 2 depends on the shared contract model from Step 1.
-- Lane B: Step 1 -> Step 3 -> Step 4  
-  Sequential because backfill depends on the final closeout and lifecycle evidence model.
-- Lane C: Step 5  
-  Starts after exact contract names and closeout snapshot fields are frozen.
-- Lane D: Step 6  
-  Starts after Steps 2 and 3 merge because `aider` proof depends on both.
+- Lane A: Step 2  
+  Independent relay hardening if the live write path exposes a missing guardrail.
+- Lane B: Step 3  
+  Independent closeout hardening if the manual closeout validation or rendering is the problem.
+- Lane C: Step 4  
+  Proof archive scaffolding and filename conventions before the final evidence copy.
+- Lane D: Step 5  
+  Sequential live execution. No parallelism once dry-run starts.
+- Lane E: Step 6  
+  Sequential final verification after the live run and closeout are complete.
 
 ### Execution Order
 
-1. Land Step 1 first. No parallelism before that.
-2. Launch Lane A and Lane B in parallel worktrees after Step 1 merges cleanly.
-3. Start Lane C once the contract field names are stable from Lanes A and B.
-4. Start Lane D once Lanes A and B are merged, because `aider` proof needs the real code.
-5. Merge all lanes.
-6. Run the verification suite and the `aider` proof last.
+1. Freeze the proof inputs first.
+2. If no code gaps are visible, skip straight to Lane C and then Lane D.
+3. If code gaps appear, launch Lane A and Lane B in parallel while Lane C prepares the proof root.
+4. Merge A, B, and C.
+5. Run Lane D as one uninterrupted chain:
+   - dry-run
+   - write
+   - diff review
+   - closeout
+6. Run Lane E last.
 
 ### Conflict Flags
 
-- Lanes A and B both depend on Step 1 and may share touch points in `approval_artifact.rs` if
-  Step 1 is not isolated cleanly first. Do not start them before Step 1 merges.
-- Lanes B and D both touch `docs/agents/lifecycle/aider-onboarding/` if backfill logic is made
-  too generic. Keep historical backfill scoped to `opencode` and `gemini_cli`.
-- Lane C should not start early if exact field names for `maintenance_settlement` are still moving.
+- Lane A and Lane D both depend on the rendered prompt and execution contract. Do not begin dry-run
+  until Lane A is merged.
+- Lane B and Lane D both touch closeout-owned surfaces under
+  `docs/agents/lifecycle/opencode-maintenance/`. Do not author the final closeout JSON until Lane
+  B is merged.
+- Lane C and Lane D both touch the proof root. Reserve final filenames for the successful run and
+  avoid committing placeholder artifacts with real names.
 
 ## Completion Summary
 
-- Step 0: scope accepted as-is, with rollout expansion explicitly deferred
-- Architecture review: one intentional boundary, approval -> registry -> closeout -> evidence
-- Code quality review: DRY enforced around one validator and one normalization path
-- Test review: full new coverage required across approval, onboarding, closeout, backfill, and
-  `aider` continuity
-- Performance review: low-risk, but avoid repeated parse/hash work and new shell-outs
+- Step 0: scope reduced to the real missing proof, not prior enrollment work
+- Architecture review: existing shared packet lane remains intact; only the live landing proof is missing
+- Code quality review: one request, one run ID, one explicit closeout, one proof archive
+- Test review: existing relay and closeout tests are mostly in place; extend only if the live proof finds a missing guardrail
+- Performance review: sequential by contract once dry-run starts
 - NOT in scope: written
 - What already exists: written
-- TODOS.md impact: no new TODO, existing Goose follow-on remains the right next milestone
+- TODOS.md impact: no new TODO required by default
 - Failure modes: all critical gaps must be driven to zero
-- Parallelization: 4 lanes after one shared-contract foundation step
-- Lake Score: choose the complete option on approval truth, closeout truth, historical truth, and
-  live proof
-
-## GSTACK REVIEW REPORT
-
-| Review | Trigger | Why | Runs | Status | Findings |
-|--------|---------|-----|------|--------|----------|
-| CEO Review | `/plan-ceo-review` | Scope & strategy | 0 | — | — |
-| Codex Review | `/codex review` | Independent 2nd opinion | 0 | — | — |
-| Eng Review | `/plan-eng-review` | Architecture & tests (required) | 0 | — | plan hardened into an implementation contract, but no persisted review run yet |
-| Design Review | `/plan-design-review` | UI/UX gaps | 0 | — | skipped, no UI scope in this milestone |
-
-**VERDICT:** Cohesive implementation plan is ready, but no review pipeline metadata has been logged yet. Run `/autoplan` or the individual review skills if you want persisted review records.
+- Parallelization: 5 useful steps, but the live proof chain itself is strictly sequential
+- Lake Score: choose the complete option on write mode, closeout, structured evidence, and final verification
