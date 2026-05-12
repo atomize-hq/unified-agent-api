@@ -1,47 +1,48 @@
 # PLAN - Prove The Packet PR Maintenance Lane Can Actually Land
 
 Status: ready for implementation  
-Date: 2026-05-11  
+Date: 2026-05-12  
 Working branch: `staging`  
-Plan revision baseline: `91a3cb1c`  
+Plan revision baseline: `d6b86cdc`  
 Design input: `/Users/spensermcconnell/.gstack/projects/atomize-hq-unified-agent-api/spensermcconnell-staging-design-20260511-185442.md`  
-Supersedes: the prior repo-root `PLAN.md` for packet-open and dry-run-only proof readiness
+Supersedes: the prior repo-root `PLAN.md` for dry-run-only packet proof readiness
 
 ## Executive Summary
 
-The repo already proved the front half of this lane.
+The repo already proved the front half of the automated maintenance lane for `opencode`.
 
-`opencode` is enrolled. The shared watcher can detect it as stale. The generic `packet_pr` opener
-can materialize a truthful maintenance packet. The live request already carries the relay contract
-for `execute-agent-maintenance`, exact writable surfaces, exact green gates, and the explicit
-manual closeout command.
+The shared watcher can detect stale state. The generic `packet_pr` opener can materialize a
+truthful maintenance packet. The live request already freezes the executor, prompt digest,
+writable surfaces, green gates, and the exact manual closeout command.
 
-The missing proof is the back half:
+The remaining proof is the landing path:
 
 1. prepare a fresh dry-run packet from the live request
-2. execute `execute-agent-maintenance --write` with that same frozen `run_id`
-3. pass the packet-declared green gates
-4. author a valid `maintenance-closeout.json`
+2. execute `execute-agent-maintenance --write` with that exact frozen `run_id`
+3. pass the exact packet-declared green gates
+4. author a truthful `maintenance-closeout.json`
 5. run `close-agent-maintenance`
-6. commit replayable evidence showing the lane really lands
+6. commit replayable proof artifacts showing another maintainer can follow the same flow
 
-No new architecture. No new workflow family. One honest operator-faithful run.
+No new workflow family. No new transport topology. No second archive system. One honest,
+operator-faithful live run that lands and closes.
 
 ## Objective
 
 Make the repository able to truthfully claim:
 
 > the live `opencode` automated maintenance packet can drive a real bounded maintenance write,
-> survive the exact green gates it declares, and be explicitly closed with the repo-owned closeout
-> command, with committed evidence that another maintainer can replay.
+> survive the exact green gates it declares, and be explicitly closed with the repo-owned
+> closeout command, with committed evidence that another maintainer can replay.
 
 ## Success Criteria
 
-1. The proof starts from `docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml`.
+1. The proof starts from
+   `docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml`.
 2. A fresh `execute-agent-maintenance --dry-run` succeeds and emits a reusable `run_id`.
 3. `execute-agent-maintenance --write --run-id <run_id>` succeeds against that same frozen packet.
-4. The write-mode run records `status = "write_validated"` and `validation_passed = true` in the
-   run packet under `docs/agents/.uaa-temp/agent-maintenance/runs/<run_id>/`.
+4. The write-mode run records `status = "write_validated"` and `validation_passed = true` in
+   `docs/agents/.uaa-temp/agent-maintenance/runs/<run_id>/run-status.json`.
 5. All changed paths recorded by write mode stay inside the request's `writable_surfaces`.
 6. `execute-agent-maintenance --write` does not write
    `docs/agents/lifecycle/opencode-maintenance/governance/maintenance-closeout.json`.
@@ -52,36 +53,29 @@ Make the repository able to truthfully claim:
    exists with truthful request linkage, resolved findings, and either deferred findings or an
    explicit none reason.
 10. `close-agent-maintenance` succeeds and refreshes the owned closeout outputs for the
-    `opencode-maintenance` packet.
+    `opencode-maintenance` lane.
 11. `docs/agents/lifecycle/opencode-maintenance/governance/proof/` contains enough structured
     evidence to replay the full operator flow without rediscovering command order.
 12. `make preflight` passes on the final proof-bearing branch head.
 
 ## Locked Decisions
 
-1. The milestone target remains the current live `opencode` automated request. Do not switch proof
-   targets.
-2. The proof is complete only if it includes both `execute-agent-maintenance --write` and manual
+1. The proof target remains the current live `opencode` automated request. Do not switch agents.
+2. The proof is incomplete unless it includes both `execute-agent-maintenance --write` and manual
    `close-agent-maintenance`.
-3. Another dry-run-only archive does not count. The new proof must extend to write mode and
-   closeout.
-4. The existing proof archive root stays canonical:
+3. Another dry-run-only archive does not count.
+4. The canonical proof archive root stays
    `docs/agents/lifecycle/opencode-maintenance/governance/proof/`.
-5. If the live request, rendered prompt, or writable surfaces drift after dry-run, the prepared
-   packet is invalid. Rerun dry-run before write mode. Do not force stale `run_id` reuse.
-6. If write mode succeeds but exposes any contract gap or packet rough edge inside the bounded
-   surfaces, that is not "proof with follow-up." Fix it, rerender if needed, rerun dry-run, rerun
-   write, then archive the final successful run only.
-7. Manual closeout remains manual by design. Do not automate it inside `execute-agent-maintenance`.
+5. If the request, rendered prompt, writable surfaces, green gates, target version, branch name,
+   or request SHA drift after dry-run, the prepared packet is invalid. Rerun dry-run before write.
+6. If write mode succeeds but exposes any contract gap inside the bounded surfaces, that is not
+   "proof with follow-up". Fix the gap, rerender if needed, rerun dry-run, rerun write, then
+   archive only the final successful run.
+7. Manual closeout remains manual by design. Do not automate it inside
+   `execute-agent-maintenance`.
 8. Raw `codex-stdout.txt` and `codex-stderr.txt` remain temp evidence under
-   `docs/agents/.uaa-temp/agent-maintenance/runs/<run_id>/`. The committed proof archive should
-   store structured summaries and JSON evidence, not raw noisy logs, unless debugging demands it.
-9. Do not reopen already-solved scope:
-   - no new release-watch enrollment work
-   - no new dispatch kind
-   - no new workflow YAML family
-   - no new source kind
-   - no second proof archive subsystem
+   `docs/agents/.uaa-temp/agent-maintenance/runs/<run_id>/`. Commit structured summaries and JSON
+   evidence by default. Promote raw logs only if a failure requires them for diagnosis.
 
 ## Step 0 Scope Contract
 
@@ -89,38 +83,50 @@ Make the repository able to truthfully claim:
 
 | Premise | Assessment | Decision |
 | --- | --- | --- |
-| The shared watcher or PR opener still needs redesign. | Rejected. The repo already proved queue emission and `packet_pr` opening on the live `opencode` lane. | Reuse the current watcher and generic opener unchanged. |
-| Another dry-run archive would finish the job. | Rejected. The missing claim is that the packet can actually land the bounded write path and closeout. | Write mode and closeout are mandatory. |
-| We should widen scope to another agent to make the proof more impressive. | Rejected. That turns a proof milestone into a rollout milestone. | `opencode` only. |
-| We can treat non-critical packet rough edges discovered after write as success. | Rejected. The proof is about truthful operator replay, not almost-truthful operator replay. | Fix any surfaced contract issue and rerun the proof. |
-| The closeout step can be implied if write mode passes. | Rejected. The contract and operator guide explicitly keep closeout manual. | Author `maintenance-closeout.json` and run `close-agent-maintenance`. |
-| We should archive only prose notes, not machine-readable evidence. | Rejected. Later maintainers need replayable proof, not a memory of the proof. | Commit structured JSON and command outputs. |
+| The shared watcher or PR opener still needs redesign. | Rejected. The repo already proved queue emission and `packet_pr` opening for the live `opencode` lane. | Reuse the current watcher and generic opener unchanged. |
+| Another dry-run archive would finish the job. | Rejected. The missing claim is that the packet can land the bounded write path and explicit closeout. | Write mode and closeout are mandatory. |
+| We should widen scope to another agent to make the proof stronger. | Rejected. That turns a proof milestone into a rollout milestone. | `opencode` only. |
+| We can treat non-critical packet rough edges discovered after write as success. | Rejected. This milestone is about truthful replay, not almost-truthful replay. | Fix the gap and rerun. |
+| The closeout step can be implied if write mode passes. | Rejected. The contract deliberately keeps closeout manual. | Author `maintenance-closeout.json` and run `close-agent-maintenance`. |
+| We should archive only prose notes, not machine-readable evidence. | Rejected. Later maintainers need replayable proof, not a memory of the proof. | Commit structured JSON and command evidence. |
 
 ### What Already Exists
 
 | Sub-problem | Existing surface | Reuse decision |
 | --- | --- | --- |
-| Canonical automated request | `docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml` | Reuse as the proof input. Regenerate only if it drifted from branch truth. |
+| Canonical automated request | `docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml` | Reuse as the proof input. Refresh only if the request drifted from branch truth. |
 | Canonical operator contract | `docs/agents/lifecycle/opencode-maintenance/HANDOFF.md` and `docs/cli-agent-onboarding-factory-operator-guide.md` | Reuse as the command order and ownership source of truth. |
-| Local relay execution | `crates/xtask/src/agent_maintenance/execute/workflow.rs`, `runtime.rs`, `validate.rs`, `packet.rs` | Reuse. This already validates preflight, packet continuity, writable surfaces, and green gates. |
+| Local relay execution | `crates/xtask/src/agent_maintenance/execute/workflow.rs`, `runtime.rs`, `validate.rs`, `packet.rs` | Reuse. This already validates preflight, packet continuity, writable surfaces, runtime writes, and green gates. |
 | Manual closeout writer | `crates/xtask/src/agent_maintenance/closeout.rs`, `closeout/write.rs`, `closeout/validate.rs` | Reuse. This already validates request linkage, live drift truth, and owned output writes. |
-| Relay/closeout regression coverage | `crates/xtask/tests/agent_maintenance_execute.rs`, `crates/xtask/tests/agent_maintenance_closeout/**` | Reuse and extend only if the live run exposes a missing guardrail. |
+| Relay and closeout regression coverage | `crates/xtask/tests/agent_maintenance_execute.rs`, `crates/xtask/tests/agent_maintenance_closeout/**` | Reuse and extend only if the live run exposes a missing guardrail. |
 | Existing proof archive root | `docs/agents/lifecycle/opencode-maintenance/governance/proof/` | Reuse. Append execution and closeout evidence here. |
-| Existing proof state | `proof-notes.md`, `execute-dry-run.txt`, earlier queue/opener evidence | Reuse if still truthful. Regenerate only if the request or release truth moved. |
+| Existing proof state | `proof-notes.md`, `execute-dry-run.txt`, `request-sha256.txt`, queue and workflow evidence | Reuse if still truthful. Replace any artifact that no longer matches the final successful run. |
+
+### NOT In Scope
+
+1. Enrolling new agents in release watch.
+2. Redesigning `packet_pr` versus worker-dispatch topology.
+3. Adding a new workflow YAML family.
+4. Creating a second proof archive subsystem.
+5. Automating closeout inside `execute-agent-maintenance`.
+6. Promoting raw `codex-stdout.txt` and `codex-stderr.txt` into committed artifacts unless a real
+   failure requires them.
+7. Expanding the proof to `codex` or `claude_code`.
 
 ### Minimum Complete Change
 
 The minimum complete implementation is:
 
 1. verify the live `opencode` request is still proof-stable for the current branch head
-2. prepare a fresh dry-run packet and record its `run_id`
-3. execute write mode against that exact `run_id`
-4. review the bounded diff and fix any contract breakage inside the declared surfaces
-5. rerun dry-run and write if any packet-affecting file changed
-6. author `maintenance-closeout.json`
-7. run `close-agent-maintenance`
-8. archive structured execution and closeout evidence under the canonical proof root
-9. rerun final verification on the finished closeout state
+2. refresh the request packet only if that truth audit fails
+3. prepare a fresh dry-run packet and record its `run_id`
+4. execute write mode against that exact `run_id`
+5. inspect the bounded diff and fix any contract breakage inside the declared surfaces
+6. rerun dry-run and write if any packet-affecting file changed
+7. author `maintenance-closeout.json`
+8. run `close-agent-maintenance`
+9. archive structured execution and closeout evidence under the canonical proof root
+10. rerun final verification on the finished closeout state
 
 Anything smaller still leaves the landing claim unproven.
 
@@ -134,16 +140,15 @@ artificially tiny.
 
 **Search check**
 
-- **[Layer 1]** Reuse `execute-agent-maintenance` for write mode. The relay contract is already
-  implemented and tested.
-- **[Layer 1]** Reuse `close-agent-maintenance` for manual closeout. The contract already writes
-  the owned closeout outputs and validates live drift truth.
-- **[Layer 1]** Reuse the existing proof archive root instead of inventing a second evidence lane.
-- **[EUREKA]** The hidden landmine is not the write engine. It is packet continuity.
-  `validate_prepared_packet()` fail-closes when request SHA, rendered prompt, target version,
-  branch name, writable surfaces, green gates, or closeout command drift after dry-run. That means
-  any packet-affecting fix between dry-run and write forces a fresh dry-run. Ignore that and the
-  proof becomes fake.
+- **[Layer 1]** Reuse `execute-agent-maintenance` for write mode. The relay contract already
+  exists and is tested.
+- **[Layer 1]** Reuse `close-agent-maintenance` for manual closeout. The closeout contract already
+  exists and is tested.
+- **[Layer 1]** Reuse the existing proof archive root instead of inventing another evidence lane.
+- **[EUREKA]** The hidden landmine is packet continuity, not the write engine. The prepared packet
+  is invalid if request SHA, prompt contents, prompt digest, target version, branch name,
+  writable surfaces, green gates, closeout path, or closeout command drift after dry-run. Ignore
+  that and the proof becomes fake.
 
 **Completeness rule**
 
@@ -154,7 +159,7 @@ Do the whole lake:
 - exact green gates
 - manual closeout
 - structured proof archive
-- final preflight
+- final `make preflight`
 
 Do not stop at "write mode produced a diff."
 
@@ -168,146 +173,9 @@ The shipped artifact is committed operational truth:
 - a bounded proof archive
 - a branch head that later maintainers can inspect and replay
 
-## Final Contract To Land
+## Architecture Contract
 
-### Proof Input Continuity Contract
-
-The proof input remains:
-
-- request path: `docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml`
-- canonical handoff: `docs/agents/lifecycle/opencode-maintenance/HANDOFF.md`
-- closeout path: `docs/agents/lifecycle/opencode-maintenance/governance/maintenance-closeout.json`
-
-Before dry-run:
-
-1. confirm `maintenance-request.toml` still reflects the intended proof base
-2. confirm `HANDOFF.md` still matches the request's execution contract
-3. confirm the detected release fields still describe the proof target
-4. confirm the writable surfaces still match the intended maintenance blast radius
-
-If any of those are stale, refresh the packet truth first, then start the proof from a new dry-run.
-
-### Dry-Run Packet Contract
-
-Command:
-
-```sh
-cargo run -p xtask -- execute-agent-maintenance --request docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml --dry-run
-```
-
-Expected outcomes:
-
-- exit code `0`
-- CLI output includes `run_id`, `run_dir`, and the exact closeout command
-- run packet written under `docs/agents/.uaa-temp/agent-maintenance/runs/<run_id>/`
-- validation report status = `pass`
-- run status = `dry_run_ready`
-
-Required temp artifacts:
-
-- `input-contract.json`
-- `codex-prompt.md`
-- `validation-report.json`
-- `run-status.json`
-- `written-paths.json`
-- `run-summary.md`
-
-### Write-Mode Contract
-
-Command:
-
-```sh
-cargo run -p xtask -- execute-agent-maintenance --request docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml --write --run-id <run_id>
-```
-
-Expected outcomes:
-
-- exit code `0`
-- validation report status = `pass`
-- run status = `write_validated`
-- `written_paths.json` is non-empty
-- every written path matches the frozen `writable_surfaces`
-- `maintenance-closeout.json` is not written by write mode
-- the exact `green_gates` run in order and all pass
-
-Required temp artifacts after a successful write:
-
-- `validation-report.json`
-- `run-status.json`
-- `written-paths.json`
-- `run-summary.md`
-- `codex-execution.json`
-- `codex-stdout.txt`
-- `codex-stderr.txt`
-
-If any packet-affecting file changes after dry-run and before write mode, discard the prepared
-packet and rerun dry-run.
-
-### Closeout Contract
-
-Before closeout:
-
-1. inspect the write-mode diff
-2. decide the resolved findings list truthfully
-3. decide whether deferred findings exist; if not, write `explicit_none_reason`
-
-Required JSON fields in `maintenance-closeout.json`:
-
-- `request_ref`
-- `request_sha256`
-- `resolved_findings`
-- exactly one of:
-  - `deferred_findings`
-  - `explicit_none_reason`
-- `preflight_passed`
-- `recorded_at`
-- `commit`
-
-Command:
-
-```sh
-cargo run -p xtask -- close-agent-maintenance --request docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml --closeout docs/agents/lifecycle/opencode-maintenance/governance/maintenance-closeout.json
-```
-
-Expected outcomes:
-
-- exit code `0`
-- refreshed `docs/agents/lifecycle/opencode-maintenance/HANDOFF.md`
-- refreshed `docs/agents/lifecycle/opencode-maintenance/governance/remediation-log.md`
-- written `maintenance-closeout.json`
-- live drift validation passes for all resolved findings
-
-### Proof Archive Contract
-
-The canonical proof root is:
-
-```text
-docs/agents/lifecycle/opencode-maintenance/governance/proof/
-```
-
-It must end the milestone containing:
-
-- existing queue/opener evidence, if still truthful
-- `request-sha256.txt`
-- `run-id.txt`
-- `execute-dry-run.txt`
-- `execute-write.txt`
-- `validation-report-dry-run.json`
-- `validation-report-write.json`
-- `run-status-dry-run.json`
-- `run-status-write.json`
-- `written-paths-write.json`
-- `closeout-summary.md`
-- `proof-notes.md`
-
-Raw `codex-stdout.txt` and `codex-stderr.txt` stay temp-only unless a debugging failure forces
-them into the archive.
-
-## Architecture Review
-
-### Boundary Decision
-
-The boundary stays:
+### System Boundary
 
 ```text
 live maintenance request
@@ -331,7 +199,7 @@ manual maintenance-closeout.json authoring
 close-agent-maintenance
         |
         v
-committed proof archive
+committed proof archive + final preflight
 ```
 
 Do not move closeout into write mode.
@@ -346,12 +214,21 @@ Do not turn this into a second packet generation project.
 docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml
   ├── detected_release
   ├── execution_contract
+  │    ├── prompt_template_path
+  │    ├── prompt_sha256
+  │    ├── writable_surfaces
+  │    ├── ordered_commands
+  │    ├── green_gates
+  │    └── closeout_path
   └── closeout_path
           |
           v
+docs/agents/lifecycle/opencode-maintenance/HANDOFF.md
+          |
+          v
 crates/xtask/src/agent_maintenance/execute/workflow.rs
-  ├── runtime.rs      (Codex preflight + green gates)
-  ├── validate.rs     (prepared packet continuity + writable surface jail)
+  ├── runtime.rs      (Codex preflight + green gate execution)
+  ├── validate.rs     (prepared packet continuity + writable-surface jail + no-op rejection)
   └── packet.rs       (run packet persistence)
           |
           v
@@ -370,55 +247,178 @@ docs/agents/lifecycle/opencode-maintenance/governance/remediation-log.md
 docs/agents/lifecycle/opencode-maintenance/governance/proof/**
 ```
 
-### File-Level Ownership
+### Packet Invalidation Rules
 
-| Area | Files | Purpose |
+The prepared packet remains valid only until one of these changes:
+
+| Change after dry-run | Effect | Required response |
 | --- | --- | --- |
-| Live proof input | `docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml`, `HANDOFF.md` | Freeze the request and execution contract the proof must obey. |
-| Relay execution | `crates/xtask/src/agent_maintenance/execute/**` | Enforce preflight, continuity, writable surfaces, and green gates. |
-| Manual closeout | `crates/xtask/src/agent_maintenance/closeout/**` | Validate closeout JSON and write owned closeout outputs. |
-| Live temp evidence | `docs/agents/.uaa-temp/agent-maintenance/runs/<run_id>/**` | Capture machine-readable run evidence for dry-run and write mode. |
-| Committed proof archive | `docs/agents/lifecycle/opencode-maintenance/governance/proof/**` | Store replayable evidence for later maintainers. |
-| Operator docs | `docs/cli-agent-onboarding-factory-operator-guide.md` | Update only if the live proof exposes wording drift. |
-| Regression coverage | `crates/xtask/tests/agent_maintenance_execute.rs`, `crates/xtask/tests/agent_maintenance_closeout/**` | Lock any newly discovered failure closed. |
+| `maintenance-request.toml` contents or SHA | Prepared packet is invalid. | Rerun dry-run before write. |
+| Rendered prompt contents or prompt digest | Prepared packet is invalid. | Rerun dry-run before write. |
+| `target_version` or `branch_name` | Prepared packet is invalid. | Rerun dry-run before write. |
+| `writable_surfaces`, `green_gates`, `closeout_path`, or closeout command | Prepared packet is invalid. | Rerun dry-run before write. |
+| Any fix inside repo code or docs that changes packet-owned truth before write | Prepared packet may be invalid. | Re-evaluate. If the fix touched request truth, rerun dry-run. |
+| Manual closeout authoring after a successful write | Prepared packet is no longer needed. | Do not rerun write unless the write proof itself changed. |
+| Proof archive note edits after a successful write | Does not invalidate the successful write. | No rerun, unless the archive text misstates request or run truth. |
 
-### Production Failure Scenario Per Path
+### Proof Archive Contract
 
-| Codepath | Real failure | Planned handling |
-| --- | --- | --- |
-| Dry-run preflight | Codex binary/auth state is broken or preflight mutates the repo | Dry-run fails closed before write mode. Fix host state and rerun. |
-| Packet continuity | Request SHA, rendered prompt, or writable surfaces drift after dry-run | `validate_prepared_packet()` rejects the write. Rerun dry-run after the fix. |
-| Write boundary | Maintained agent writes outside `writable_surfaces` or touches closeout path | Write mode fails closed and records the violation in the run packet. |
-| Runtime no-op | Write mode produces no runtime-owned diff | Write mode fails closed. The lane does not get credit for doing nothing. |
-| Green gates | One declared gate fails after codex write | Write mode stops and records the failing gate. Fix the underlying issue, then restart from dry-run. |
-| Closeout truth | Resolved findings still appear in live drift | `close-agent-maintenance` fails closed. Fix or defer honestly. |
-| Proof archive drift | Committed proof notes reference the wrong request SHA or run_id | Treat as a proof failure. Rewrite the archive from the actual successful run. |
+The canonical proof root is:
+
+```text
+docs/agents/lifecycle/opencode-maintenance/governance/proof/
+```
+
+It must end this milestone containing:
+
+- existing queue and PR-open evidence, if still truthful
+- `request-sha256.txt`
+- `run-id.txt`
+- `execute-dry-run.txt`
+- `execute-write.txt`
+- `validation-report-dry-run.json`
+- `validation-report-write.json`
+- `run-status-dry-run.json`
+- `run-status-write.json`
+- `written-paths-write.json`
+- `closeout-summary.md`
+- `proof-notes.md`
+
+Raw `codex-stdout.txt` and `codex-stderr.txt` stay temp-only unless a real failure forces them
+into the archive for diagnosis.
+
+## Failure Modes Registry
+
+| Codepath | Real failure | Test coverage | Planned handling | Maintainer signal | Critical gap |
+| --- | --- | --- | --- | --- | --- |
+| Dry-run preflight | Codex binary or auth state is broken | Covered in `crates/xtask/tests/agent_maintenance_execute.rs` | Dry-run fails closed before write mode. Fix host state and rerun. | Explicit CLI failure with preflight message | No |
+| Prepared packet continuity | Request SHA, prompt, target version, branch name, writable surfaces, green gates, closeout path, or closeout command drift after dry-run | Covered in `workflow.rs` and `validate.rs`; prompt mismatch and drift protections are tested | Write mode blocks. Refresh request truth if needed, rerun dry-run, then rerun write. | Explicit CLI failure listing mismatches | No |
+| Write boundary | Maintained agent writes outside `writable_surfaces` or touches closeout path | Covered in `crates/xtask/tests/agent_maintenance_execute.rs` | Write mode fails closed and records the boundary violation. | Explicit CLI failure and run packet evidence | No |
+| Runtime no-op | Write mode exits cleanly but produces no runtime-owned changes | Covered in `crates/xtask/tests/agent_maintenance_execute.rs` | Treat as failure. The lane does not get credit for doing nothing. | Explicit CLI failure and validation report | No |
+| Green gates | One declared gate fails after write | Covered by gate execution flow and live run | Stop the run. Fix the underlying issue. If the fix touched packet truth, restart from dry-run. | Explicit gate failure in validation report | No |
+| Closeout truth | `resolved_findings` still match live drift, `explicit_none_reason` is used while drift exists, or deferred findings are incomplete | Covered in `crates/xtask/tests/agent_maintenance_closeout/live_drift_validation.rs` | `close-agent-maintenance` fails closed. Fix the closeout JSON or fix the remaining drift. | Explicit closeout validation error | No |
+| Proof archive truth | `proof-notes.md`, `request-sha256.txt`, or `run-id.txt` describe the wrong successful run | Not runtime-tested; operationally enforced by this plan | Treat as proof failure. Rewrite the archive from the actual successful run before claiming success. | Review-time mismatch between archive and run packet | Yes, if left uncorrected |
+
+There are no silent-failure paths in the base plan. Every meaningful failure must end in an
+explicit command error or an explicit archive review failure before the milestone can be marked
+done.
+
+## Test Review
+
+### Test Framework And Commands
+
+This is a Rust workspace. The relevant verification surfaces are:
+
+- unit and integration tests via `cargo test -p xtask`
+- command-level regression coverage in `crates/xtask/tests/agent_maintenance_execute.rs`
+- closeout truth coverage in `crates/xtask/tests/agent_maintenance_closeout/**`
+- contract and repo-wide gates via the packet-declared green commands and final `make preflight`
+
+### Code Path Coverage
+
+```text
+CODE PATH COVERAGE
+===========================
+[+] docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml
+    │
+    ├── request truth audit
+    │   ├── [LIVE PROOF REQUIRED] request fields still match branch truth
+    │   └── [LIVE PROOF REQUIRED] request SHA recorded into archive
+    │
+    └── HANDOFF.md alignment
+        ├── [★★★ TESTED] renderer owns command, surface, and closeout wording
+        └── [LIVE PROOF REQUIRED] current handoff still matches the frozen request
+
+[+] execute-agent-maintenance --dry-run
+    │
+    ├── [★★★ TESTED] preflight pass path
+    ├── [★★★ TESTED] preflight failure path
+    ├── [★★★ TESTED] dry-run writes only under temp run root
+    └── [LIVE PROOF REQUIRED] real opencode dry-run on current staging head
+
+[+] prepared packet continuity
+    │
+    ├── [★★★ TESTED] prompt mismatch rejection
+    ├── [★★★ TESTED] request and contract drift rejection
+    └── [LIVE PROOF REQUIRED] run_id reused only against unchanged packet truth
+
+[+] execute-agent-maintenance --write
+    │
+    ├── [★★★ TESTED] boundary violation rejection
+    ├── [★★★ TESTED] no-op rejection
+    ├── [★★★ TESTED] green gates run in order
+    ├── [★★★ TESTED] closeout remains manual
+    └── [LIVE PROOF REQUIRED] real opencode write succeeds on the frozen packet
+
+[+] close-agent-maintenance
+    │
+    ├── [★★★ TESTED] resolved findings cannot still match live drift
+    ├── [★★★ TESTED] explicit-none is rejected when live drift exists
+    ├── [★★★ TESTED] deferred findings must account for live drift
+    ├── [★★★ TESTED] deferred findings are rejected when live report is clean
+    ├── [★★★ TESTED] live drift re-check errors block closeout
+    └── [LIVE PROOF REQUIRED] real opencode closeout succeeds after the bounded write
+
+[+] proof archive
+    │
+    ├── [LIVE PROOF REQUIRED] archive copies match the final successful run packet
+    └── [LIVE PROOF REQUIRED] proof notes describe the actual request SHA, run_id, and closeout result
+
+─────────────────────────────────
+COVERAGE: implementation guardrails are automated; milestone proof remains operational
+AUTOMATED COVERAGE: strong on dry-run, write, boundary, and closeout truth
+LIVE GAPS TO SATISFY: 6 operational proof points, all closed by this milestone
+REGRESSION RULE: if the live run exposes a missing guardrail, add the regression test before claiming success
+─────────────────────────────────
+```
+
+### Test Requirements
+
+1. Run a focused regression pass before the live write:
+   `cargo test -p xtask agent_maintenance_execute -- --nocapture` and
+   `cargo test -p xtask agent_maintenance_closeout -- --nocapture`,
+   or fall back to `cargo test -p xtask`.
+2. Treat the live dry-run and live write as proof tests, not just operator steps. Archive their
+   outputs exactly.
+3. If the live run exposes any missing invariant in `workflow.rs`, `validate.rs`, or closeout
+   validation, add or update the matching `crates/xtask/tests/**` regression before archiving the
+   final proof.
+4. Finish with the exact green gates and final `make preflight` on the final proof-bearing head.
 
 ## Implementation Plan
 
-### Phase 1: Freeze Proof Inputs
+### Phase 1: Freeze Request Truth
 
 **Goal:** start from one stable request and one stable proof boundary.
 
-**Files**
+**Inputs**
 
 - `docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml`
 - `docs/agents/lifecycle/opencode-maintenance/HANDOFF.md`
 - `docs/agents/lifecycle/opencode-maintenance/governance/proof/proof-notes.md`
-- `docs/cli-agent-onboarding-factory-operator-guide.md` only if wording drift is already obvious
+- `docs/cli-agent-onboarding-factory-operator-guide.md`
 
-**Concrete changes**
+**Actions**
 
 1. Verify the request still points at the intended `target_version`, `branch_name`, and
    `request_commit`.
 2. Verify `HANDOFF.md` still matches the request's execution contract.
-3. Decide whether existing queue/opener proof artifacts are still truthful enough to keep.
-4. If request or packet docs drifted, refresh them before any new dry-run.
+3. Verify the rendered prompt digest in the request still matches the current prompt template.
+4. Decide whether the existing queue and PR-open proof artifacts are still truthful enough to keep.
+5. If request truth drifted, run:
 
-**Verification**
+```sh
+cargo run -p xtask -- refresh-agent --request docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml --write
+```
 
-- request and handoff tell one story
-- no stale packet wording survives into the live proof run
+6. If Phase 1 changed any request-owned truth, commit those fixes before starting the dry-run
+   proof so the request SHA and archive evidence stay crisp.
+
+**Outputs**
+
+- one canonical live request
+- one matching `HANDOFF.md`
+- proof archive notes that no longer claim stale request truth
 
 **Exit criteria**
 
@@ -428,128 +428,134 @@ docs/agents/lifecycle/opencode-maintenance/governance/proof/**
 
 **Goal:** freeze one prepared `run_id` for the actual write attempt.
 
-**Files**
+**Command**
 
-- `docs/agents/.uaa-temp/agent-maintenance/runs/<run_id>/**`
-- `docs/agents/lifecycle/opencode-maintenance/governance/proof/execute-dry-run.txt`
-- `docs/agents/lifecycle/opencode-maintenance/governance/proof/request-sha256.txt`
-- `docs/agents/lifecycle/opencode-maintenance/governance/proof/run-id.txt`
-- `docs/agents/lifecycle/opencode-maintenance/governance/proof/validation-report-dry-run.json`
-- `docs/agents/lifecycle/opencode-maintenance/governance/proof/run-status-dry-run.json`
+```sh
+cargo run -p xtask -- execute-agent-maintenance --request docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml --dry-run
+```
 
-**Concrete changes**
+**Expected outcomes**
 
-1. Run fresh dry-run from the live request.
-2. Capture the emitted `run_id`.
-3. Copy the dry-run summary and structured JSON evidence into the committed proof root.
-4. Record the exact request SHA used for the proof.
+- exit code `0`
+- CLI output includes `run_id`, `run_dir`, and the exact closeout command
+- run packet written under `docs/agents/.uaa-temp/agent-maintenance/runs/<run_id>/`
+- `validation-report.json` records `status = "pass"`
+- `run-status.json` records `status = "dry_run_ready"`
 
-**Verification**
+**Archive outputs**
 
-- dry-run exits `0`
-- preflight passes
-- run status is `dry_run_ready`
+- `request-sha256.txt`
+- `run-id.txt`
+- `execute-dry-run.txt`
+- `validation-report-dry-run.json`
+- `run-status-dry-run.json`
 
 **Exit criteria**
 
-- there is one fresh prepared run packet and one committed `run_id` file pointing at it
+- there is one fresh prepared run packet and one committed `run-id.txt` pointing at it
 
-### Phase 3: Execute Write Mode And Review The Bounded Diff
+### Phase 3: Execute Write Mode Against The Frozen Packet
 
-**Goal:** prove that the packet can actually land the bounded maintenance update.
+**Goal:** prove that the packet can land the bounded maintenance update.
 
-**Files**
+**Command**
 
-- writable surfaces declared by the live request
-- `docs/agents/.uaa-temp/agent-maintenance/runs/<run_id>/**`
-- `docs/agents/lifecycle/opencode-maintenance/governance/proof/execute-write.txt`
-- `docs/agents/lifecycle/opencode-maintenance/governance/proof/validation-report-write.json`
-- `docs/agents/lifecycle/opencode-maintenance/governance/proof/run-status-write.json`
-- `docs/agents/lifecycle/opencode-maintenance/governance/proof/written-paths-write.json`
+```sh
+cargo run -p xtask -- execute-agent-maintenance --request docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml --write --run-id <run_id>
+```
 
-**Concrete changes**
+**Expected outcomes**
 
-1. Run write mode with the exact prepared `run_id`.
-2. Inspect `written-paths.json` and the repo diff for scope, truth, and packet compliance.
-3. If write mode fails because the packet or executor still has a hidden assumption:
-   - fix the issue inside the bounded blast radius
-   - rerun dry-run
-   - rerun write mode
-4. Archive only the final successful write evidence.
+- exit code `0`
+- `validation-report.json` records `status = "pass"`
+- `run-status.json` records `status = "write_validated"`
+- `run-status.json` records `validation_passed = true`
+- `written-paths.json` is non-empty
+- every written path matches the frozen `writable_surfaces`
+- the closeout path stays untouched
+- the exact `green_gates` run in order and all pass
 
-**Verification**
+**Archive outputs**
 
-- write exits `0`
-- run status is `write_validated`
-- all green gates pass in order
-- no boundary violation occurs
-- closeout path stays untouched
+- `execute-write.txt`
+- `validation-report-write.json`
+- `run-status-write.json`
+- `written-paths-write.json`
 
 **Exit criteria**
 
 - the repo has one truthful write-mode diff produced by the live packet
 
-### Phase 4: Author Closeout And Run Manual Closeout
+### Phase 4: Resolve Any Surfaced Gap And Rerun Cleanly
+
+**Goal:** prevent false proof if the first write exposes a hidden assumption.
+
+**Loop rule**
+
+If Phase 3 fails because of packet truth, writable surfaces, a green gate, a no-op write, or a
+missing guardrail:
+
+1. fix the issue inside the bounded blast radius
+2. add or update the matching regression test if the failure exposed a missing invariant
+3. rerun Phase 2 from a fresh dry-run if the fix changed packet-owned truth
+4. rerun Phase 3
+5. archive only the final successful run
+
+Do not keep a proof archive that mixes evidence from a failed prepared packet and a later
+successful packet.
+
+### Phase 5: Author Closeout And Run Manual Closeout
 
 **Goal:** prove the explicit maintainer closeout step the operator guide requires.
 
-**Files**
+**Closeout file**
 
-- `docs/agents/lifecycle/opencode-maintenance/governance/maintenance-closeout.json`
-- `docs/agents/lifecycle/opencode-maintenance/HANDOFF.md`
-- `docs/agents/lifecycle/opencode-maintenance/governance/remediation-log.md`
-- `docs/agents/lifecycle/opencode-maintenance/governance/proof/closeout-summary.md`
+`docs/agents/lifecycle/opencode-maintenance/governance/maintenance-closeout.json`
 
-**Concrete changes**
+**Required fields**
 
-1. Author `maintenance-closeout.json` from the actual write result.
-2. Record resolved findings truthfully.
-3. Use deferred findings only if live drift still exists and is intentionally left open.
-4. Run `close-agent-maintenance`.
-5. Archive a short closeout summary describing what was resolved and why any deferred item remains.
+- `request_ref`
+- `request_sha256`
+- `resolved_findings`
+- exactly one of:
+  - `deferred_findings`
+  - `explicit_none_reason`
+- `preflight_passed`
+- `recorded_at`
+- `commit`
 
-**Verification**
+**Command**
 
-- closeout JSON parses and validates
-- live drift check passes for resolved findings
-- closeout write refreshes the owned outputs
+```sh
+cargo run -p xtask -- close-agent-maintenance --request docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml --closeout docs/agents/lifecycle/opencode-maintenance/governance/maintenance-closeout.json
+```
+
+**Expected outcomes**
+
+- exit code `0`
+- refreshed `docs/agents/lifecycle/opencode-maintenance/HANDOFF.md`
+- refreshed `docs/agents/lifecycle/opencode-maintenance/governance/remediation-log.md`
+- written `maintenance-closeout.json`
+- live drift validation passes for all resolved findings
+
+**Archive output**
+
+- `closeout-summary.md`
 
 **Exit criteria**
 
 - the maintenance lane is explicitly closed, not implicitly assumed closed
 
-### Phase 5: Archive Final Proof And Operator Notes
+### Phase 6: Finalize The Proof Archive And Re-Run Final Verification
 
-**Goal:** leave behind replayable evidence, not just a passing branch.
+**Goal:** leave one replayable, reviewable closed proof at the final branch head.
 
-**Files**
+**Actions**
 
-- `docs/agents/lifecycle/opencode-maintenance/governance/proof/**`
-- `docs/cli-agent-onboarding-factory-operator-guide.md` only if the live proof disproves current wording
-
-**Concrete changes**
-
-1. Refresh `proof-notes.md` so it describes the final successful run, not just dry-run readiness.
-2. Keep existing queue/opener evidence if still truthful; regenerate only if the request or target
-   moved.
-3. Add the final write and closeout evidence files from the successful run.
-4. Update the operator guide only if the live proof exposed wording drift, command-order drift, or
-   artifact-shape drift.
-
-**Verification**
-
-- proof root contains a complete replay trail
-- operator wording matches the proof that just landed
-
-**Exit criteria**
-
-- another maintainer can replay the lane from committed artifacts without asking "what actually happened?"
-
-### Phase 6: Final Verification
-
-**Goal:** make the finished closeout state green.
-
-**Final verification**
+1. Update `proof-notes.md` so it names the final request SHA, final `run_id`, whether a rerun was
+   required, and the final closeout result.
+2. Verify every committed proof artifact matches the final successful temp run packet.
+3. Run the final verification sequence from the final closeout state:
 
 ```sh
 cargo fmt --all
@@ -560,253 +566,84 @@ cargo run -p xtask -- capability-matrix-audit
 make preflight
 ```
 
+4. Review the final diff to confirm it still reads as one bounded maintenance run.
+
 **Exit criteria**
 
-- the exact packet-declared gates pass on the final proof-bearing commit
-
-## Code Quality Review
-
-### DRY Rules
-
-1. Do not add a second execution surface for the same maintenance lane.
-2. Do not add a second closeout writer.
-3. Do not create a new archive format if the existing proof root can hold the evidence.
-4. Do not duplicate green gates in ad hoc docs when the request already owns them.
-
-### Explicit Over Clever
-
-Prefer:
-
-- one request
-- one fresh run id
-- one successful write packet
-- one closeout artifact
-- one proof archive
-
-Avoid:
-
-- partial successes dressed up as proof
-- magic reruns that skip dry-run continuity
-- extra automation that hides the explicit maintainer closeout step
-
-### Minimal-Diff Rules
-
-The best outcome is:
-
-- no core code changes at all
-- one live proof run
-- docs and evidence refreshed to match it
-
-If the live run exposes a hidden assumption, fix only the implicated relay, closeout, or packet
-surface. No opportunistic cleanup.
-
-## Test Review
-
-### Test Framework
-
-Rust integration tests under `crates/xtask/tests/` remain the primary harness.
-
-### Code Path Coverage
-
-```text
-CODE PATH COVERAGE
-===========================
-[+] maintenance-request.toml continuity
-    ├── [VERIFY] request sha, target_version, branch_name stay frozen for proof
-    └── [VERIFY] execution_contract matches HANDOFF.md
-
-[+] crates/xtask/src/agent_maintenance/execute/workflow.rs
-    ├── [TESTED] dry-run prepares packet and records closeout command
-    ├── [TESTED] write mode requires matching dry-run packet
-    ├── [TESTED] green gates run in order and stop on failure
-    └── [VERIFY] live opencode request reaches write_validated
-
-[+] crates/xtask/src/agent_maintenance/execute/validate.rs
-    ├── [TESTED] prompt/request drift fail closed
-    ├── [TESTED] out-of-bounds writes fail closed
-    ├── [TESTED] closeout path write is forbidden
-    └── [TESTED] noop runtime execution fails closed
-
-[+] crates/xtask/src/agent_maintenance/closeout/validate.rs
-    ├── [TESTED] request_ref and request_sha256 must match
-    ├── [TESTED] exactly one of deferred_findings or explicit_none_reason is required
-    └── [VERIFY] live opencode closeout truth matches actual resolved findings
-
-[+] crates/xtask/src/agent_maintenance/closeout/write.rs
-    ├── [TESTED] only owned closeout surfaces are written
-    ├── [TESTED] automated-request closeout preserves trigger truth
-    └── [VERIFY] final opencode closeout refreshes the maintained handoff and remediation log
-```
-
-### User / Operator Flow Coverage
-
-```text
-USER FLOW COVERAGE
-===========================
-[+] Maintainer freezes the live packet
-    ├── [VERIFY] request + handoff are in sync
-    └── [VERIFY] proof notes reference the actual request sha
-
-[+] Maintainer prepares dry-run packet
-    ├── [VERIFY] dry-run exits 0
-    ├── [VERIFY] run_id is captured
-    └── [VERIFY] structured run packet exists under .uaa-temp
-
-[+] Maintainer executes write mode
-    ├── [VERIFY] exact green gates pass
-    ├── [VERIFY] written paths stay within writable_surfaces
-    ├── [VERIFY] resulting diff is non-empty and bounded
-    └── [VERIFY] maintenance-closeout.json remains untouched by write mode
-
-[+] Maintainer performs manual closeout
-    ├── [VERIFY] maintenance-closeout.json is truthful
-    ├── [VERIFY] close-agent-maintenance exits 0
-    └── [VERIFY] refreshed closeout outputs match the request and live drift truth
-
-[+] Future maintainer replays the proof
-    ├── [VERIFY] proof archive has run_id + request sha + run statuses
-    └── [VERIFY] proof notes explain the command order and rerun rule when packet drift occurs
-```
-
-### Exact Test Files To Extend
-
-Extend only if the live proof reveals a missing guardrail:
-
-- `crates/xtask/tests/agent_maintenance_execute.rs`
-- `crates/xtask/tests/agent_maintenance_closeout/write_outputs.rs`
-- `crates/xtask/tests/agent_maintenance_closeout/request_and_schema.rs`
-- `crates/xtask/tests/agent_maintenance_closeout/live_drift_validation.rs`
-
-If the live run does not reveal a gap, do not create speculative new tests.
-
-### Regression Rule
-
-This is a regression if any of these happen:
-
-1. a stale prepared packet can still reach write mode after request or prompt drift
-2. write mode can touch `maintenance-closeout.json`
-3. write mode can exit successfully with no bounded repo-owned changes
-4. closeout accepts resolved findings that still appear in live drift
-5. the proof archive can be updated without recording the actual request SHA and run ID
-6. the operator guide still tells a different command order than the successful proof used
-
-Any live regression found during this milestone gets a test before the work is called done.
-
-## Performance Review
-
-This is operational work, not a hot path.
-
-The real performance constraints are:
-
-1. avoid unnecessary reruns by freezing packet truth before dry-run
-2. do not add new steady-state automation just to archive one proof
-3. accept that `make preflight` dominates runtime; that is the price of truthful proof
-
-## Failure Modes Registry
-
-| Failure mode | Test required | Error handling | User-visible outcome |
-| --- | --- | --- | --- |
-| Codex preflight fails | Already covered | dry-run fails closed | explicit stop before write mode |
-| Request/prompt drift after dry-run | Already covered | write fails closed | explicit stop, rerun dry-run required |
-| Write escapes `writable_surfaces` | Already covered | write fails closed | explicit stop with violating paths |
-| Write produces no runtime diff | Already covered | write fails closed | explicit stop, no fake success |
-| Green gate fails after write | Already covered | write fails closed | explicit stop with failing command |
-| Closeout JSON mismatches request SHA | Already covered | closeout fails closed | explicit stop before closeout outputs refresh |
-| Resolved findings still match live drift | Already covered | closeout fails closed | explicit stop, deferred/resolved truth must be fixed |
-| Proof archive records stale run metadata | New check if missing | human review + archive rewrite | explicit proof failure, not silent rot |
-
-**Critical gap definition**
-
-Any path that claims:
-
-- the packet can land
-- the packet passed write mode
-- or the run was closed
-
-without structured evidence for that exact request SHA and run ID is a critical gap.
-
-## NOT In Scope
-
-1. Re-enrolling `opencode` or any second agent.
-2. Changing the shared watcher topology.
-3. Introducing a new source kind or new dispatch kind.
-4. Automating closeout inside `execute-agent-maintenance`.
-5. Building a generic long-term proof archival subsystem.
-6. Promoting `opencode` to a new `latest_supported.txt` posture unless the bounded write itself
-   requires it.
-7. Opportunistic cleanup outside the request's writable surfaces.
-
-## TODOS.md Impact
-
-No new repo-wide TODO is required up front.
-
-If the live proof exposes a genuinely separate follow-on, record it only after the proof lands.
-Do not smuggle a second milestone into this one.
+- proof archive is truthful
+- final branch head is green
+- the diff stays inside the expected maintenance blast radius
 
 ## Worktree Parallelization Strategy
 
-This plan has limited parallelism. The live dry-run -> write -> closeout chain is sequential by
-design because `run_id` continuity is the contract.
+This milestone needs a parallelization section, but the honest answer is that the happy path is
+mostly sequential.
 
-There is still useful pre-proof parallelism if the live run exposes code gaps.
+The same live request, the same frozen `run_id`, the same temp run packet, and the same proof root
+all form one chain of custody. Splitting that chain across worktrees before the first successful
+write is how you create stale packets and merge noise.
 
 ### Dependency Table
 
 | Step | Modules touched | Depends on |
 | --- | --- | --- |
-| 1. Freeze proof inputs | `docs/agents/lifecycle/opencode-maintenance/`, `docs/cli-agent-onboarding-factory-operator-guide.md` | — |
-| 2. Relay hardening, if needed | `crates/xtask/src/agent_maintenance/execute/`, `crates/xtask/tests/agent_maintenance_execute.rs` | 1 |
-| 3. Closeout hardening, if needed | `crates/xtask/src/agent_maintenance/closeout/`, `crates/xtask/tests/agent_maintenance_closeout/` | 1 |
-| 4. Proof archive scaffolding | `docs/agents/lifecycle/opencode-maintenance/governance/proof/` | 1 |
-| 5. Live dry-run -> write -> closeout | `.uaa-temp/agent-maintenance/runs/`, request writable surfaces, `docs/agents/lifecycle/opencode-maintenance/` | 2, 3, 4 |
-| 6. Final verification and doc polish | workspace-wide green gates, operator docs if needed | 5 |
+| Freeze request truth | `docs/agents/lifecycle/opencode-maintenance/`, `docs/cli-agent-onboarding-factory-operator-guide.md` | — |
+| Prepare dry-run packet | `docs/agents/.uaa-temp/agent-maintenance/`, `docs/agents/lifecycle/opencode-maintenance/governance/proof/` | Freeze request truth |
+| Execute write mode | `crates/opencode/`, `crates/agent_api/`, `cli_manifests/opencode/`, `docs/specs/unified-agent-api/`, `docs/agents/.uaa-temp/agent-maintenance/` | Prepare dry-run packet |
+| Fix surfaced gap, if any | Usually `crates/xtask/`, `crates/opencode/`, `crates/agent_api/`, `docs/agents/lifecycle/opencode-maintenance/`, `cli_manifests/opencode/` | Execute write mode |
+| Author closeout and close lane | `docs/agents/lifecycle/opencode-maintenance/` | Successful write mode |
+| Final archive + preflight | `docs/agents/lifecycle/opencode-maintenance/governance/proof/`, repo-wide checks | Successful closeout |
 
 ### Parallel Lanes
 
-- Lane A: Step 2  
-  Independent relay hardening if the live write path exposes a missing guardrail.
-- Lane B: Step 3  
-  Independent closeout hardening if the manual closeout validation or rendering is the problem.
-- Lane C: Step 4  
-  Proof archive scaffolding and filename conventions before the final evidence copy.
-- Lane D: Step 5  
-  Sequential live execution. No parallelism once dry-run starts.
-- Lane E: Step 6  
-  Sequential final verification after the live run and closeout are complete.
+Base case:
+
+- Lane A: Freeze request truth -> Prepare dry-run packet -> Execute write mode -> Closeout ->
+  Final archive
+
+That is sequential because each step consumes truth created by the prior step.
+
+Conditional case, only if Phase 3 exposes a real code gap:
+
+- Lane A: preserve failing run evidence and update proof notes draft
+- Lane B: fix the bounded code or contract issue and add the matching regression test
+
+Even then, merge Lane B back before rerunning dry-run. Do not let two worktrees create competing
+request truth or competing proof artifacts.
 
 ### Execution Order
 
-1. Freeze the proof inputs first.
-2. If no code gaps are visible, skip straight to Lane C and then Lane D.
-3. If code gaps appear, launch Lane A and Lane B in parallel while Lane C prepares the proof root.
-4. Merge A, B, and C.
-5. Run Lane D as one uninterrupted chain:
-   - dry-run
-   - write
-   - diff review
-   - closeout
-6. Run Lane E last.
+1. Run the happy path in one worktree.
+2. Only split into a second worktree if the first live write exposes a bounded code gap that can be
+   fixed independently.
+3. Merge the fix worktree back.
+4. Rerun dry-run and write from the merged truth in the primary worktree.
 
 ### Conflict Flags
 
-- Lane A and Lane D both depend on the rendered prompt and execution contract. Do not begin dry-run
-  until Lane A is merged.
-- Lane B and Lane D both touch closeout-owned surfaces under
-  `docs/agents/lifecycle/opencode-maintenance/`. Do not author the final closeout JSON until Lane
-  B is merged.
-- Lane C and Lane D both touch the proof root. Reserve final filenames for the successful run and
-  avoid committing placeholder artifacts with real names.
+- `docs/agents/lifecycle/opencode-maintenance/**` is shared by nearly every phase. Parallel edits
+  there are likely to conflict.
+- `docs/agents/.uaa-temp/agent-maintenance/runs/<run_id>/` is run-specific and should remain owned
+  by the active proof worktree.
+- `docs/agents/lifecycle/opencode-maintenance/governance/proof/**` must describe one final
+  successful run. Do not let multiple worktrees write competing proof narratives.
+
+**Parallelization verdict:** sequential implementation on the happy path. A second worktree is
+justified only for a bounded repair after a failed live write.
 
 ## Completion Summary
 
-- Step 0: scope reduced to the real missing proof, not prior enrollment work
-- Architecture review: existing shared packet lane remains intact; only the live landing proof is missing
-- Code quality review: one request, one run ID, one explicit closeout, one proof archive
-- Test review: existing relay and closeout tests are mostly in place; extend only if the live proof finds a missing guardrail
-- Performance review: sequential by contract once dry-run starts
-- NOT in scope: written
-- What already exists: written
-- TODOS.md impact: no new TODO required by default
-- Failure modes: all critical gaps must be driven to zero
-- Parallelization: 5 useful steps, but the live proof chain itself is strictly sequential
-- Lake Score: choose the complete option on write mode, closeout, structured evidence, and final verification
+- Step 0: Scope Challenge, complete. Scope stays on the live `opencode` packet.
+- Architecture Review: complete. No new architecture required.
+- Code Quality Review: complete. Reuse existing executor and closeout surfaces. Do not add a new
+  workflow family or archive system.
+- Test Review: complete. Guardrails are already strong; live dry-run, live write, and live closeout
+  remain the proof obligations.
+- Performance Review: complete. This milestone is bounded by command execution and repo validation,
+  not by a new hot path.
+- NOT in scope: written.
+- What already exists: written.
+- Failure modes: written. The only critical gap is proof-archive truth if it is left stale.
+- Parallelization: written. Happy path is sequential; conditional repair lane only after a failed
+  live write.
+- Lake score: the complete option wins. This plan proves the whole lane, not just packet opening.

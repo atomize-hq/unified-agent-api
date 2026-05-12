@@ -1,644 +1,805 @@
-# ORCH_PLAN - Prove The Generic Maintenance Lane With `opencode`
+# ORCH_PLAN - Prove The Packet PR Maintenance Lane Can Actually Land
+
+Status: ready for implementation  
+Date: 2026-05-12  
+Working branch: `staging`  
+Plan revision baseline: `d6b86cdc`  
+Design input: `/Users/spensermcconnell/.gstack/projects/atomize-hq-unified-agent-api/spensermcconnell-staging-design-20260511-185442.md`  
+Supersedes: prior repo-root `PLAN.md` for dry-run-only packet proof readiness
 
 ## Summary
 
-| Item | Value |
-| --- | --- |
-| Current branch context | `staging` |
-| Authoritative plan source | local `PLAN.md` in this workspace |
-| `PLAN.md` status | `ready for implementation` |
-| `PLAN.md` date | `2026-05-11` |
-| Plan title | `Prove The Generic Maintenance Lane With opencode` |
-| Plan baseline SHA | `4944c0f` |
-| Workspace members | `agent_api`, `codex`, `claude_code`, `opencode`, `gemini_cli`, `aider`, `wrapper_events`, `xtask` |
-| Existing `ORCH_PLAN.md` status | stale; fully replaced by this document |
-| Run slug | `opencode-generic-maintenance-proof` |
-| Parent role | sole critical-path integrator, sole proof operator, sole final verifier, sole merge decision-maker |
-| Worker model | `GPT-5.4` with `reasoning_effort=high` |
-| Worker concurrency cap | `0` before `C1`; maximum `2` active worker lanes after `C1` |
+- Branch context: execute on the current `staging` branch only; the live packet itself declares maintenance branch `automation/opencode-maintenance-1.14.47`.
+- Objective: prove the current live `opencode` automated maintenance packet can complete a real bounded write, pass the exact packet-declared green gates, remain inside the exact packet-declared writable surfaces, be manually closed with the repo-owned closeout command, and leave committed replayable proof artifacts.
+- Parent role: the parent agent is the sole orchestrator, sole integrator, and sole owner of all serialized critical-path operations.
+- Worker model: optional bounded worker lanes only; prefer `GPT-5.4` with `reasoning_effort=high`.
+- Concurrency cap: one optional repair lane at a time, and only after a surfaced failure. Happy path is sequential.
+- Worktree rule: the happy path stays in the primary `staging` worktree. Optional repair worktrees are allowed only for bounded remediation and may not run dry-run, write, or closeout.
+- Run-state source of truth:
+  - live request: `docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml`
+  - canonical handoff: `docs/agents/lifecycle/opencode-maintenance/HANDOFF.md`
+  - prompt template: `docs/agents/lifecycle/opencode-maintenance/governance/execute-agent-maintenance-prompt.md`
+  - active temp run state: `docs/agents/.uaa-temp/agent-maintenance/runs/<run_id>/`
+  - canonical proof root: `docs/agents/lifecycle/opencode-maintenance/governance/proof/`
+- Proof-artifact handling: `.uaa-temp/...` is run-state / derived evidence unless explicitly promoted into the proof root. Commit structured summaries and JSON by default. Raw `codex-stdout.txt` and `codex-stderr.txt` stay temp-only unless failure diagnosis requires promotion.
+- Hard truth: another dry-run-only archive does not count. Proof is incomplete without both `execute-agent-maintenance --write` and manual `close-agent-maintenance`.
 
-This orchestration plan is execution-focused. It assumes the local `PLAN.md` is authoritative because it is user-modified in the working tree. The parent agent must preserve that local truth, replace no planning inputs, and run the milestone against the current `staging` workspace state rather than recreating a clean branch from elsewhere.
+## Purpose
 
-The dependency graph is fixed:
+This orchestration plan executes the current live `PLAN.md` to completion for one target only:
 
-1. Parent-only Phase 1 freezes `opencode` upstream truth, pointer truth, and release-watch enrollment truth.
-2. Exactly two disjoint worker lanes run in parallel from the same frozen base:
-   - watcher/registry/CI truth
-   - automated request + packet normalization
-3. Parent merges both lanes and only then runs proof capture.
-4. After proof capture, one bounded post-proof docs/support publication worker lane runs from the proof-stable parent base.
-5. Parent merges that lane and then runs the final verification and final merge decision.
+`docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml`
 
-## Hard Guards
+The milestone is not watcher detection, packet opening, or packet rendering. Those are already proven. The missing proof is the landing path:
 
-- `PLAN.md` wins over this file on any conflict.
-- Treat the current local `staging` workspace as authoritative because `PLAN.md` is modified in the working tree.
-- `opencode` is the only new enrollment target in this milestone.
-- `dispatch_kind = "packet_pr"` is mandatory for `opencode`.
-- No bespoke worker workflow is allowed.
-- Upstream release detection for `opencode` is frozen to GitHub Releases from `anomalyco/opencode` with `tag_prefix = "v"`.
-- `cli_manifests/opencode/latest_validated.txt` must be promoted from `none` to a real semver baseline before enrollment is considered valid.
-- The baseline to promote is the already-committed validated root truth: `1.4.11`.
-- The proof bar is mandatory:
-  - one real shared watcher -> generic opener run
-  - one local `execute-agent-maintenance --dry-run` from the generated request
-- No new source kind is allowed.
-- No watcher topology redesign is allowed.
-- No packet schema redesign is allowed.
-- No full write-mode `opencode` maintenance closeout is allowed in this milestone.
-- No `latest_supported.txt` promotion is allowed in this milestone.
-- Support-matrix publication follow-through must happen after `latest_validated` promotion so published repo truth stops advertising `opencode` pointer promotion as `none`.
-- Parent-only ownership covers:
-  - Phase 1 freeze
-  - worker launch approval
-  - all merge decisions
-  - proof execution
-  - final verification
-  - final merge/landing decision
-- Worker lanes must stop immediately if they need:
-  - a third parallel lane
-  - edits to `PLAN.md` or `ORCH_PLAN.md`
-  - edits outside their frozen file map
-  - changes to Phase 1 frozen contract surfaces
-  - a new workflow family, source kind, or packet contract
+1. fresh dry-run from the live request
+2. one frozen reusable `run_id`
+3. write mode against that exact frozen packet
+4. exact green gates passing in order
+5. manual closeout authored after write succeeds
+6. repo-owned closeout command succeeding
+7. replayable structured proof committed under the canonical proof root
+8. final `make preflight` green on the proof-bearing head
 
-## Worktree Strategy
+## Definition Of Done
 
-### Roots
+The session is complete only when all of the following are true:
 
-- Parent live workspace:
-  `/Users/spensermcconnell/__Active_Code/atomize-hq/unified-agent-api`
-- Worker worktree root:
-  `/Users/spensermcconnell/__Active_Code/atomize-hq/wt/unified-agent-api-opencode-generic-maintenance-proof`
-- Run-state root:
-  `/Users/spensermcconnell/__Active_Code/atomize-hq/unified-agent-api/.runs/opencode-generic-maintenance-proof`
+1. `execute-agent-maintenance --dry-run` succeeds for the live request and yields a reusable `run_id`.
+2. `execute-agent-maintenance --write --run-id <run_id>` succeeds against that exact frozen packet.
+3. `docs/agents/.uaa-temp/agent-maintenance/runs/<run_id>/run-status.json` records:
+   - `status = "write_validated"`
+   - `validation_passed = true`
+4. All write-mode changes stay inside the exact request `writable_surfaces`.
+5. Write mode does not create or modify `docs/agents/lifecycle/opencode-maintenance/governance/maintenance-closeout.json`.
+6. The exact request `green_gates` pass in order:
+   - `cargo fmt --all`
+   - `cargo run -p xtask -- codex-validate --root cli_manifests/opencode`
+   - `cargo run -p xtask -- support-matrix --check`
+   - `cargo run -p xtask -- capability-matrix --check`
+   - `cargo run -p xtask -- capability-matrix-audit`
+   - `make preflight`
+7. A truthful `docs/agents/lifecycle/opencode-maintenance/governance/maintenance-closeout.json` exists.
+8. `cargo run -p xtask -- close-agent-maintenance --request docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml --closeout docs/agents/lifecycle/opencode-maintenance/governance/maintenance-closeout.json` succeeds.
+9. `docs/agents/lifecycle/opencode-maintenance/governance/proof/` contains the final structured proof set:
+   - existing queue / PR-open evidence if still truthful
+   - `request-sha256.txt`
+   - `run-id.txt`
+   - `execute-dry-run.txt`
+   - `execute-write.txt`
+   - `validation-report-dry-run.json`
+   - `validation-report-write.json`
+   - `run-status-dry-run.json`
+   - `run-status-write.json`
+   - `written-paths-write.json`
+   - `closeout-summary.md`
+   - `proof-notes.md`
+10. `make preflight` is green on the final proof-bearing head.
 
-### Required Execution Surfaces
+## Locked Decisions And Hard Guards
 
-| Surface | Branch | Base | Purpose |
-| --- | --- | --- | --- |
-| `parent-live` | local `staging` | current workspace state | authoritative execution surface because local `PLAN.md` is modified and authoritative |
-| `ws-a-watcher-registry-ci-truth` | `codex/opencode-watcher-registry-ci-truth` | `C1_SHA` | worker lane A after Phase 1 freeze |
-| `ws-b-request-packet-normalization` | `codex/opencode-request-packet-normalization` | `C1_SHA` | worker lane B after Phase 1 freeze |
-| `ws-c-post-proof-docs-publication` | `codex/opencode-post-proof-docs-publication` | `C4_SHA` | worker lane C after proof capture freeze |
+1. Proof target is the current live `opencode` automated request only.
+2. Proof is incomplete unless it includes both `execute-agent-maintenance --write` and manual `close-agent-maintenance`.
+3. Another dry-run-only archive does not count.
+4. Canonical proof archive root stays `docs/agents/lifecycle/opencode-maintenance/governance/proof/`.
+5. Parent remains sole integrator and sole owner of serialized critical-path operations.
+6. If request, prompt, writable surfaces, green gates, target version, branch name, closeout path, closeout command, or request SHA drift after dry-run, the prepared packet is invalid. Rerun dry-run before write.
+7. If write succeeds but exposes a contract gap inside bounded surfaces, fix the gap, rerender if needed, rerun dry-run, rerun write, and archive only the final successful run.
+8. Manual closeout remains manual by design; do not automate it inside `execute-agent-maintenance`.
+9. Raw `codex-stdout.txt` and `codex-stderr.txt` remain temp evidence under `.uaa-temp`; do not commit them unless a real failure requires them.
+10. No worker lane may run live dry-run, live write, or live closeout.
+11. No proof artifact may describe a failed or superseded run as the final proof.
 
-No additional worker lanes are allowed. Proof capture and final merge decisions stay on `parent-live`. Lane C is sequential after proof capture and may not overlap with proof execution.
+## Live Request Contract
 
-### Worktree Creation Rules
+### Canonical Request
 
-- Do not move `parent-live` off `staging`.
-- Do not discard or restage the local `PLAN.md` change.
-- Do not create worker worktrees until `C1_SHA` is frozen and committed on `parent-live`.
-- Create `ws-a` and `ws-b` from the exact same `C1_SHA`.
-- Create `ws-c` only from the frozen proof-stable `C4_SHA`.
+`docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml`
 
-### Worktree Creation Commands
+### Preserved Request Truth
 
-Run only after `C1_SHA` exists:
+- `agent_id = "opencode"`
+- `executor = "execute-agent-maintenance"`
+- `prompt_template_path = "docs/agents/lifecycle/opencode-maintenance/governance/execute-agent-maintenance-prompt.md"`
+- `prompt_sha256 = "f68f4a5c6cc09a186256fe475e311bd4881e6dfeabd7852f1ed62cf659ce9685"`
+- `closeout_path = "docs/agents/lifecycle/opencode-maintenance/governance/maintenance-closeout.json"`
+- `requires_manual_closeout = true`
+- `target_version = "1.14.47"`
+- `branch_name = "automation/opencode-maintenance-1.14.47"`
 
-```bash
-git worktree add -b codex/opencode-watcher-registry-ci-truth \
-  /Users/spensermcconnell/__Active_Code/atomize-hq/wt/unified-agent-api-opencode-generic-maintenance-proof/ws-a-watcher-registry-ci-truth \
-  "$C1_SHA"
+### Exact Writable Surfaces
 
-git worktree add -b codex/opencode-request-packet-normalization \
-  /Users/spensermcconnell/__Active_Code/atomize-hq/wt/unified-agent-api-opencode-generic-maintenance-proof/ws-b-request-packet-normalization \
-  "$C1_SHA"
-```
+- `docs/agents/lifecycle/opencode-maintenance/**`
+- `crates/opencode/**`
+- `crates/agent_api/**`
+- `cli_manifests/opencode/artifacts.lock.json`
+- `cli_manifests/opencode/snapshots/1.14.47/**`
+- `cli_manifests/opencode/reports/1.14.47/**`
+- `cli_manifests/opencode/versions/1.14.47.json`
+- `cli_manifests/opencode/wrapper_coverage.json`
+- `cli_manifests/support_matrix/current.json`
+- `docs/specs/unified-agent-api/support-matrix.md`
 
-Run only after `C4_SHA` exists:
+### Exact Green Gates
 
-```bash
-git worktree add -b codex/opencode-post-proof-docs-publication \
-  /Users/spensermcconnell/__Active_Code/atomize-hq/wt/unified-agent-api-opencode-generic-maintenance-proof/ws-c-post-proof-docs-publication \
-  "$C4_SHA"
-```
+- `cargo fmt --all`
+- `cargo run -p xtask -- codex-validate --root cli_manifests/opencode`
+- `cargo run -p xtask -- support-matrix --check`
+- `cargo run -p xtask -- capability-matrix --check`
+- `cargo run -p xtask -- capability-matrix-audit`
+- `make preflight`
 
-## Run-State And Freeze Artifacts
+## Run-State / Checkpoint Model
 
-### Authoritative Run-State Files
+The happy path is serialized. Each checkpoint freezes truth for the next phase. If a later action invalidates an earlier checkpoint, execution returns to the earliest invalidated checkpoint and reruns forward from there.
 
-- `.runs/opencode-generic-maintenance-proof/tasks.json`
-- `.runs/opencode-generic-maintenance-proof/freeze.json`
-- `.runs/opencode-generic-maintenance-proof/lane-status.json`
-- `.runs/opencode-generic-maintenance-proof/session-log.md`
+### Checkpoint C0 - Baseline Captured
 
-### Required Derived Artifacts
+State frozen:
 
-- `.runs/opencode-generic-maintenance-proof/baseline.json`
-- `.runs/opencode-generic-maintenance-proof/phase1-freeze.md`
-- `.runs/opencode-generic-maintenance-proof/integration-notes.md`
-- `.runs/opencode-generic-maintenance-proof/worker-briefs/ws-a.md`
-- `.runs/opencode-generic-maintenance-proof/worker-briefs/ws-b.md`
-- `.runs/opencode-generic-maintenance-proof/worker-briefs/ws-c.md`
-- `.runs/opencode-generic-maintenance-proof/proof-gate.md`
-- `.runs/opencode-generic-maintenance-proof/proof-run.md`
-- `.runs/opencode-generic-maintenance-proof/final-gates.md`
-- `.runs/opencode-generic-maintenance-proof/decision.md`
-- `.runs/opencode-generic-maintenance-proof/acceptance.md`
+- current `staging` head
+- current live request file
+- current `HANDOFF.md`
+- current proof root contents
+- current regression baseline intent
 
-### Task Queue Convention
+Invalidated by:
 
-`tasks.json` is the only queue of record. Minimum entry shape:
+- manual edits to request-owned surfaces before request freeze is completed
+- branch/head movement that changes request-owned truth before `C1`
 
-```json
-{
-  "id": "task/p1.3",
-  "workstream": "WS-P1",
-  "title": "Freeze opencode pointer and release-watch truth",
-  "status": "pending|in_progress|blocked|completed",
-  "owner": "parent|ws-a|ws-b|ws-c",
-  "depends_on": ["task/p1.2"],
-  "checkpoint": "C0|C1|C2|C3|C4|C5|null",
-  "worktree": "parent-live|ws-a-watcher-registry-ci-truth|ws-b-request-packet-normalization|ws-c-post-proof-docs-publication",
-  "notes": "short current state"
-}
-```
+Rerun implication:
 
-### Freeze Points
+- repeat baseline audit before claiming any later checkpoint
 
-| Checkpoint | Meaning | Required contents |
-| --- | --- | --- |
-| `C0` | baseline captured before implementation | current `staging` HEAD SHA, dirty-file snapshot including `PLAN.md`, plan baseline SHA `4944c0f`, workspace-member inventory, worktree root, run-state root |
-| `C1` | Phase 1 freeze complete; only legal worker launch base | promoted `latest_validated = 1.4.11`, frozen upstream source contract, committed `packet_pr` registry truth, parent validation results, worker file maps, lane launch approval |
-| `C2` | both worker lanes integrated on parent | merged lane SHAs, no unresolved file-map overlap, regenerated `opencode` maintenance root stable, proof launch approval |
-| `C3` | proof archived and stable | queue JSON, workflow dispatch summary, request SHA, dry-run output, proof path recorded, note that docs/support publication may now begin |
-| `C4` | post-proof docs lane launch base frozen | proof-stable parent SHA, allowed lane C file map, lane C brief path, impacted checks to rerun after merge |
-| `C5` | final acceptance frozen | merged lane C SHA, support-matrix refresh results, docs parity notes, targeted test matrix, `maintenance-watch` proof rerun status, `make preflight` result, final decision/acceptance |
+### Checkpoint C1 - Request Truth Frozen
+
+State frozen:
+
+- canonical request contents
+- canonical request SHA
+- prompt continuity
+- handoff alignment
+- proof-root keep/replace decisions for existing artifacts
+
+Invalidated by:
+
+- any change to request contents
+- any change to rendered prompt contents or prompt digest
+- any change to `target_version`
+- any change to `branch_name`
+- any change to `writable_surfaces`
+- any change to `green_gates`
+- any change to `closeout_path`
+- any change to the exact closeout command contract
+
+Rerun implication:
+
+- return to request freeze, then rerun regressions if affected, then rerun dry-run and everything after it
+
+### Checkpoint C2 - Regression Baseline Green
+
+State frozen:
+
+- executor and closeout regression baseline is green enough to trust the live run
+
+Invalidated by:
+
+- changes to executor surfaces
+- changes to closeout surfaces
+- changes to matching regression tests
+- any repair that touches `crates/xtask/src/agent_maintenance/**` or `crates/xtask/tests/**`
+
+Rerun implication:
+
+- rerun focused regressions before any dry-run or rerun attempt
+
+### Checkpoint C3 - Dry-Run Packet Frozen
+
+State frozen:
+
+- one active `run_id`
+- one active temp run directory
+- one active request SHA
+- one dry-run validation result
+- one dry-run-ready packet eligible for write
+
+Invalidated by:
+
+- any packet-owned truth drift after dry-run
+- any executor repair that affects packet semantics
+- any ambiguity about which `run_id` is active
+
+Rerun implication:
+
+- discard the old packet for proof purposes and rerun dry-run to mint a new active `run_id`
+
+### Checkpoint C4 - Write Proof Green
+
+State frozen:
+
+- one successful write on the frozen packet
+- one bounded diff
+- one validated run-status showing `write_validated`
+- one successful ordered green-gate sequence
+- one confirmed no-closeout-from-write proof
+
+Invalidated by:
+
+- discovery that write escaped `writable_surfaces`
+- discovery that write transcript or run-status mismatches proof claims
+- post-write repair to packet-owned truth or write-owned repo surfaces that changes what the proof run actually was
+
+Rerun implication:
+
+- repair, then rerun dry-run and write; archive only the final successful run
+
+### Checkpoint C5 - Closeout Green
+
+State frozen:
+
+- truthful `maintenance-closeout.json`
+- successful `close-agent-maintenance`
+- refreshed owned closeout outputs
+
+Invalidated by:
+
+- closeout validation finding drift or unresolved findings
+- edits to closeout surfaces that make the recorded closeout untruthful
+- final proof review showing the closeout summary misstates the actual run
+
+Rerun implication:
+
+- fix closeout truth and rerun closeout; rerun write only if closeout truth depends on invalidating the write proof itself
+
+### Checkpoint C6 - Final Proof Head Green
+
+State frozen:
+
+- proof root is truthful and complete
+- final repo verification sequence is green
+- final head remains a bounded maintenance diff
+
+Invalidated by:
+
+- any proof artifact mismatch
+- any final gate failure
+- any unrelated spillover diff that breaks bounded-scope reviewability
+
+Rerun implication:
+
+- fix only the invalidated phase, then rerun forward to final head green
+
+## Worktree And Branch Strategy
+
+### Primary Worktree
+
+All happy-path execution stays in the primary repository worktree on branch `staging`.
+
+The parent owns:
+
+- all request freeze work
+- all dry-run/write/closeout execution
+- all proof promotion and proof editing
+- final verification
+- final integration
+
+### Optional Repair Worktree Root
+
+If a surfaced failure justifies isolated repair, create it under a bounded local root such as:
+
+`wt/opencode-live-proof/`
+
+Suggested repair branches:
+
+- `codex/opencode-proof-fix-executor`
+- `codex/opencode-proof-fix-closeout`
+- `codex/opencode-proof-fix-proof-archive`
+
+### Repair Worktree Rules
+
+1. A repair worktree is optional, not default.
+2. A repair worktree must own one bounded issue only.
+3. A repair worktree may patch code, tests, or proof drafting surfaces within its assigned scope.
+4. A repair worktree may not run:
+   - `execute-agent-maintenance --dry-run`
+   - `execute-agent-maintenance --write`
+   - `close-agent-maintenance`
+5. A repair worktree may not promote proof artifacts into the canonical proof root as final truth.
+6. A repair worktree returns only:
+   - narrow diff
+   - test result summary if relevant
+   - brief explanation of what changed and why
+7. Parent merges repair worktree changes back into the primary worktree before any rerun.
+8. All rerun commands happen only from the primary worktree after integration.
+
+## Ownership Model
+
+## Parent
+
+Role: sole orchestrator, sole integrator, sole owner of critical-path serialized operations.
+
+Parent-only responsibilities:
+
+- baseline capture
+- request truth audit and freeze
+- regression gate decision
+- active `run_id` selection
+- live dry-run
+- live write
+- diff review for bounded scope
+- closeout authoring/finalization
+- live closeout command
+- proof promotion
+- final verification
+- success/failure declaration for checkpoints and workstreams
+
+## Optional Worker Lanes
+
+Preferred configuration:
+
+- model: `GPT-5.4`
+- `reasoning_effort=high`
+
+Allowed worker roles:
+
+- read-only audit
+- bounded repair
+- closeout/proof draft support after final truth is already known
+
+Prohibited worker roles:
+
+- packet authority
+- active run authority
+- dry-run authority
+- write authority
+- closeout authority
+- final proof authority
+- final gate authority
 
 ## Workstream Plan
 
-### WS-K0 - Parent Bootstrap
-
-Type: parent-only  
-Launch gate: immediate
-
-Mission:
-
-- preserve the authoritative local `PLAN.md` state
-- initialize run-state artifacts
-- capture `C0`
-
-Tasks:
-
-- record current `staging` workspace status without cleaning or rewriting it
-- initialize `.runs/opencode-generic-maintenance-proof/`
-- seed `tasks.json`, `freeze.json`, `lane-status.json`, and `session-log.md`
-- write `baseline.json`
-- freeze `C0`
-
-Acceptance:
-
-- local `PLAN.md` is explicitly recorded as authoritative
-- no code changes start before `C0`
-- worker branches are not created yet
-
-### WS-P1 - Phase 1 Freeze: Upstream, Pointer, And Enrollment Truth
-
-Type: parent-only  
-Launch gate: `C0`
-
-Owned surfaces:
-
-- `cli_manifests/opencode/latest_validated.txt`
-- `cli_manifests/opencode/VALIDATOR_SPEC.md`
-- `cli_manifests/opencode/RULES.json` only if needed for pointer-truth coherence
-- `crates/xtask/data/agent_registry.toml`
-- `docs/specs/agent-registry-contract.md`
-
-Mission:
-
-- promote `latest_validated.txt` from `none` to `1.4.11`
-- freeze upstream release detection to GitHub Releases `anomalyco/opencode` with `tag_prefix = "v"`
-- land `maintenance.release_watch` enrollment for `opencode`
-- require `dispatch_kind = "packet_pr"` and omit any registry `dispatch_workflow`
-- make pointer truth, validator truth, and registry truth coherent before any parallel work
-
-Required validation:
-
-```bash
-cargo run -p xtask -- codex-validate --root cli_manifests/opencode
-cargo test -p xtask --test agent_registry -- --nocapture
-```
-
-Stop conditions:
-
-- any proposed fix leaves `latest_validated.txt` at `none`
-- any proposed fix introduces a new upstream source kind
-- any proposed fix adds a bespoke `opencode` workflow or registry `dispatch_workflow`
-- any proposed fix depends on parallel work before Phase 1 is merged
-
-Acceptance:
-
-- `maintenance-watch` can legally parse `opencode` root pointer truth
-- `opencode` release-watch enrollment is committed and contract-valid
-- `C1_SHA` is frozen and becomes the only legal worker base
-
-Parent action at exit:
-
-- write `phase1-freeze.md`
-- freeze `C1`
-- issue worker briefs for `ws-a` and `ws-b`
-
-### WS-A - Watcher / Registry / CI Truth Lane
-
-Type: worker  
-Launch gate: `C1_SHA`
-
-Worktree:
-
-- `/Users/spensermcconnell/__Active_Code/atomize-hq/wt/unified-agent-api-opencode-generic-maintenance-proof/ws-a-watcher-registry-ci-truth`
-
-Owned surfaces:
-
-- `crates/xtask/src/agent_maintenance/watch.rs`
-- `crates/xtask/tests/agent_registry.rs`
-- `crates/xtask/tests/agent_maintenance_watch.rs`
-- `crates/xtask/tests/c4_spec_ci_wiring.rs`
-- fixtures under `crates/xtask/tests/fixtures/**` only if required by those tests
-
-Mission:
-
-- widen registry/watcher/CI truth so the repo no longer behaves like only `codex` and `claude_code` can be enrolled
-- prove `opencode` stale-agent queue emission under the shared watcher
-- prove `packet_pr` resolves to `agent-maintenance-open-pr.yml` through the shared path
-- keep watcher topology unchanged
-
-Required validation:
-
-```bash
-cargo test -p xtask --test agent_registry -- --nocapture
-cargo test -p xtask --test agent_maintenance_watch -- --nocapture
-cargo test -p xtask --test c4_spec_ci_wiring -- --nocapture
-```
-
-Stop conditions:
-
-- needs edits to Phase 1 frozen files
-- needs edits under `docs/agents/lifecycle/opencode-maintenance/**`
-- needs a new watcher topology or workflow family
-- requires more than lane A ownership to make tests pass
-
-Acceptance:
-
-- `opencode` is included in release-watch truth and queue emission truth
-- `packet_pr` materializes `agent-maintenance-open-pr.yml` through the shared lane
-- CI/spec tests no longer encode a two-agent assumption
-
-### WS-B - Automated Request + Packet Normalization Lane
-
-Type: worker  
-Launch gate: `C1_SHA`
-
-Worktree:
-
-- `/Users/spensermcconnell/__Active_Code/atomize-hq/wt/unified-agent-api-opencode-generic-maintenance-proof/ws-b-request-packet-normalization`
-
-Owned surfaces:
-
-- `crates/xtask/src/agent_maintenance/contract_policy.rs`
-- `crates/xtask/src/agent_maintenance/prepare.rs`
-- `crates/xtask/src/agent_maintenance/request/automation.rs`
-- `crates/xtask/src/agent_maintenance/docs.rs`
-- `crates/xtask/tests/agent_maintenance_prepare.rs`
-- `crates/xtask/tests/agent_maintenance_refresh/automated_requests.rs`
-- `crates/xtask/tests/agent_maintenance_execute.rs`
-- `docs/agents/lifecycle/opencode-maintenance/**`
-
-Mission:
-
-- normalize the live `opencode` maintenance root onto the automated request contract
-- generate request truth with:
-  - `artifact_version = "2"`
-  - `trigger_kind = "upstream_release_detected"`
-  - `basis_ref = "cli_manifests/opencode/latest_validated.txt"`
-  - `opened_from = ".github/workflows/agent-maintenance-open-pr.yml"`
-  - `requested_control_plane_actions = ["packet_doc_refresh"]`
-  - `[detected_release]`
-  - `[execution_contract]`
-  - `dispatch_kind = "packet_pr"`
-  - `dispatch_workflow = "agent-maintenance-open-pr.yml"`
-  - `executor = "execute-agent-maintenance"`
-- regenerate machine-owned packet docs from request truth, not legacy `drift_detected` prose
-- make the generated request dry-run executable locally
-
-Required validation:
-
-```bash
-cargo test -p xtask --test agent_maintenance_prepare -- --nocapture
-cargo test -p xtask --test agent_maintenance_refresh -- --nocapture
-cargo test -p xtask --test agent_maintenance_execute -- --nocapture
-```
-
-Stop conditions:
-
-- needs edits to Phase 1 frozen files
-- needs watcher topology or source-kind changes
-- needs proof-archive or support-matrix publication edits before lane merge
-- preserves legacy `drift_detected` request semantics in the live `opencode` maintenance root
-
-Acceptance:
-
-- the live `opencode` maintenance root matches the shared automated contract
-- packet docs are request-derived and machine-owned
-- the frozen request is locally dry-run executable
-
-### WS-P2 - Parent Integration Gate
-
-Type: parent-only  
-Launch gate: both worker lanes running from `C1_SHA`
-
-Mission:
-
-- integrate exactly two worker lanes onto `parent-live`
-- preserve the frozen dependency graph
-- refuse overlap creep
-
-Execution order:
-
-1. Review lane A and lane B independently against their frozen file maps.
-2. Merge a ready lane only if it does not cross into the other lane’s owned surfaces.
-3. Re-run the earliest impacted targeted tests after each merge.
-4. Merge the second lane.
-5. Freeze `C2` only after both lanes are merged and `opencode` maintenance root output is stable.
-
-Stop conditions:
-
-- a worker lane edits outside its file map
-- a worker lane needs a Phase 1 contract rewrite
-- a merge would force a third lane or parent-side speculative redesign
-
-Acceptance:
-
-- both lanes merge onto one parent branch head
-- watcher truth and packet truth agree on the same `opencode` basis
-- proof may begin
-
-### WS-P3 - Parent Proof Capture
-
-Type: parent-only  
-Launch gate: `C2`
-
-Owned surfaces:
-
-- `docs/agents/lifecycle/opencode-maintenance/governance/proof/**`
-- temporary captured outputs summarized into committed proof artifacts
-
-Mission:
-
-- run one real shared watcher -> generic opener proof from the merged parent branch
-- prove the generated request is executable with local dry-run
-
-Execution:
-
-1. Create the bounded stale scenario from the frozen `latest_validated = 1.4.11` baseline.
-2. Run the shared watcher manually on `staging`.
-3. Capture emitted queue truth showing:
-   - `agent_id = "opencode"`
-   - `dispatch_kind = "packet_pr"`
-   - `dispatch_workflow = "agent-maintenance-open-pr.yml"`
-4. Capture generic opener evidence for the generated request and packet docs.
-5. Run:
-   ```bash
-   cargo run -p xtask -- execute-agent-maintenance --dry-run --request docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml
-   ```
-6. Archive required proof artifacts:
-   - `watch-queue.json`
-   - `workflow-dispatch-summary.md`
-   - `request-sha256.txt`
-   - `execute-dry-run.txt`
-   - `proof-notes.md`
-7. Freeze `C3`.
-8. Freeze `C4` from the proof-stable parent branch and launch the post-proof docs/support publication lane.
-
-Stop conditions:
-
-- proof requires changing watcher/packet contract code afterward
-- proof does not go through the shared watcher and generic opener
-- dry-run fails against the generated request
-
-Acceptance:
-
-- one real proof archive exists under `docs/agents/lifecycle/opencode-maintenance/governance/proof/`
-- the archived proof matches the merged parent branch truth
-- docs/support publication may now start
-
-### WS-C - Post-Proof Docs / Support Publication Lane
-
-Type: worker  
-Launch gate: `C4_SHA`
-
-Owned surfaces:
-
-- `docs/specs/agent-registry-contract.md`
-- `docs/specs/maintenance-request-contract-v1.md`
-- `docs/cli-agent-onboarding-factory-operator-guide.md`
-- `cli_manifests/support_matrix/current.json`
-- `docs/specs/unified-agent-api/support-matrix.md`
-- `crates/xtask/src/support_matrix.rs` only if required to keep publication output truthful
-
-Mission:
-
-- update docs/specs/operator/support publication surfaces to match the proof-stable parent state
-- publish support-matrix truth after `latest_validated` promotion and after proof exists
-
-Required validation:
-
-```bash
-cargo run -p xtask -- support-matrix
-cargo run -p xtask -- support-matrix --check
-```
-
-Stop conditions:
-
-- needs edits under `docs/agents/lifecycle/opencode-maintenance/governance/proof/**`
-- needs edits outside docs/publication ownership
-- needs watcher/packet contract code changes
-- needs `latest_supported` promotion or packet-schema changes
-
-Acceptance:
-
-- docs/specs/operator outputs describe the proof-backed state
-- support-matrix outputs no longer advertise `opencode` pointer promotion as `none`
-- lane C stays inside its bounded docs/publication ownership
-
-### WS-P4 - Parent Final Integration
-
-Type: parent-only  
-Launch gate: lane C returned `ready-for-parent`
-
-Mission:
-
-- review and merge the post-proof docs/support publication lane
-- rerun impacted checks on the merged parent branch
-
-Execution:
-
-1. Review lane C strictly against its frozen file map.
-2. Merge lane C onto `parent-live`.
-3. Re-run the earliest impacted docs/publication checks.
-4. Record merge and rerun results in `integration-notes.md`.
-
-Stop conditions:
-
-- lane C touched proof artifacts
-- lane C touched code outside docs/publication ownership
-- rerun checks show post-proof publication drift
-
-Acceptance:
-
-- post-proof docs/publication changes are integrated on the parent branch
-- parent remains sole integrator before final gates
-
-### WS-P5 - Parent Final Verification And Decision
-
-Type: parent-only  
-Launch gate: `WS-P4` merged
-
-Mission:
-
-- run the full final gate matrix on the proof-carrying, lane-C-merged parent branch
-- make the final verification and merge decision
-
-Execution:
-
-1. Re-run targeted tests and publication checks on the merged parent branch.
-2. Run `maintenance-watch --emit-json` as a final sanity check on merged truth.
-3. Run `make preflight`.
-4. Freeze `C5`.
-5. Update `final-gates.md`, `decision.md`, and `acceptance.md`.
-
-Stop conditions:
-
-- proof archive is still changing
-- final verification surfaces contradictory post-proof publication state
-- final verification requires reopening lane topology or ownership
-
-Acceptance:
-
-- code, packet docs, proof archive, support publication, and specs tell one story
-- all final gates pass on the proof-carrying, lane-C-merged parent branch
-- parent can make the final merge decision
-
-### Launch Order
-
-1. `WS-K0`
-2. `WS-P1`
-3. freeze `C1`
-4. launch `WS-A` and `WS-B` in parallel
-5. `WS-P2` parent integration
-6. freeze `C2`
-7. `WS-P3` proof capture
-8. freeze `C3`
-9. freeze `C4`
-10. launch `WS-C`
-11. `WS-P4` parent final integration
-12. `WS-P5` parent final verification and decision
-13. freeze `C5`
-
-Parallelism rules:
-
-- no parallel worker activity before `C1`
-- maximum `2` active worker lanes total
-- only `WS-A` and `WS-B` may overlap
-- proof capture cannot overlap with worker lanes
-- `WS-C` is sequential after proof capture and may not overlap with proof execution
-- final verification cannot start before `WS-C` merges
+## WS0 - Baseline Capture
+
+- ID: `WS0`
+- Owner: `parent`
+- Launch gate: none
+- Owned file surfaces:
+  - `PLAN.md`
+  - `docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml`
+  - `docs/agents/lifecycle/opencode-maintenance/HANDOFF.md`
+  - `docs/agents/lifecycle/opencode-maintenance/governance/proof/**`
+  - `docs/agents/lifecycle/opencode-maintenance/governance/remediation-log.md`
+- Required commands:
+  - no mandatory mutation command
+  - read-only inspection of live plan and contract surfaces
+- Stop conditions:
+  - ambiguity about current request truth
+  - ambiguity about which prior proof artifacts remain truthful
+- Acceptance:
+  - baseline is captured
+  - parent can identify the exact live request, handoff, proof root, and prior proof status
+  - `C0` passes
+
+## WS1 - Freeze Request Truth
+
+- ID: `WS1`
+- Owner: `parent`
+- Launch gate: `C0`
+- Owned file surfaces:
+  - `docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml`
+  - `docs/agents/lifecycle/opencode-maintenance/HANDOFF.md`
+  - `docs/agents/lifecycle/opencode-maintenance/governance/execute-agent-maintenance-prompt.md`
+  - `docs/agents/lifecycle/opencode-maintenance/governance/proof/proof-notes.md`
+  - existing proof artifacts retained or replaced for truth
+- Required commands:
+  - if truth drift exists:
+    ```sh
+    cargo run -p xtask -- refresh-agent --request docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml --write
+    ```
+- Stop conditions:
+  - request drift not resolved
+  - prompt digest mismatch not resolved
+  - handoff mismatch not resolved
+  - uncertainty about retained prior proof artifacts
+- Acceptance:
+  - one canonical request SHA is frozen
+  - handoff matches request truth
+  - prompt continuity is valid
+  - retained proof artifacts are explicitly known to still be truthful
+  - `C1` passes
+
+## WS2 - Regression Baseline
+
+- ID: `WS2`
+- Owner: `parent`
+- Launch gate: `C1`
+- Owned file surfaces:
+  - `crates/xtask/src/agent_maintenance/execute/workflow.rs`
+  - `crates/xtask/src/agent_maintenance/execute/runtime.rs`
+  - `crates/xtask/src/agent_maintenance/execute/validate.rs`
+  - `crates/xtask/src/agent_maintenance/execute/packet.rs`
+  - `crates/xtask/src/agent_maintenance/closeout.rs`
+  - `crates/xtask/src/agent_maintenance/closeout/write.rs`
+  - `crates/xtask/src/agent_maintenance/closeout/validate.rs`
+  - `crates/xtask/tests/agent_maintenance_execute.rs`
+  - `crates/xtask/tests/agent_maintenance_closeout/**`
+- Required commands:
+  ```sh
+  cargo test -p xtask agent_maintenance_execute -- --nocapture
+  cargo test -p xtask agent_maintenance_closeout -- --nocapture
+  ```
+  - fallback:
+    ```sh
+    cargo test -p xtask
+    ```
+- Stop conditions:
+  - focused regression failure
+  - executor or closeout invariant gap surfaced before live write
+- Acceptance:
+  - regression baseline is green or repaired and re-green
+  - if repairs touched these surfaces, the request-freeze implications are evaluated before proceeding
+  - `C2` passes
+
+## WS3 - Prepare Fresh Dry-Run Packet
+
+- ID: `WS3`
+- Owner: `parent`
+- Launch gate: `C2`
+- Owned file surfaces:
+  - `docs/agents/.uaa-temp/agent-maintenance/runs/<run_id>/**`
+  - `docs/agents/lifecycle/opencode-maintenance/governance/proof/request-sha256.txt`
+  - `docs/agents/lifecycle/opencode-maintenance/governance/proof/run-id.txt`
+  - `docs/agents/lifecycle/opencode-maintenance/governance/proof/execute-dry-run.txt`
+  - `docs/agents/lifecycle/opencode-maintenance/governance/proof/validation-report-dry-run.json`
+  - `docs/agents/lifecycle/opencode-maintenance/governance/proof/run-status-dry-run.json`
+- Required commands:
+  ```sh
+  cargo run -p xtask -- execute-agent-maintenance --request docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml --dry-run
+  ```
+- Stop conditions:
+  - non-zero dry-run exit
+  - preflight failure
+  - missing or ambiguous `run_id`
+  - dry-run output inconsistent with request truth
+- Acceptance:
+  - one active `run_id` exists
+  - dry-run packet is ready and frozen
+  - proof seed artifacts were promoted from the matching temp run
+  - `C3` passes
+
+## WS4 - Execute Write On Frozen Packet
+
+- ID: `WS4`
+- Owner: `parent`
+- Launch gate: `C3`
+- Owned file surfaces:
+  - temp run dir for the active `run_id`
+  - all packet-declared writable surfaces only
+  - `docs/agents/lifecycle/opencode-maintenance/governance/proof/execute-write.txt`
+  - `docs/agents/lifecycle/opencode-maintenance/governance/proof/validation-report-write.json`
+  - `docs/agents/lifecycle/opencode-maintenance/governance/proof/run-status-write.json`
+  - `docs/agents/lifecycle/opencode-maintenance/governance/proof/written-paths-write.json`
+- Required commands:
+  ```sh
+  cargo run -p xtask -- execute-agent-maintenance --request docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml --write --run-id <run_id>
+  ```
+- Stop conditions:
+  - non-zero write exit
+  - packet continuity failure
+  - boundary violation
+  - no-op write rejection
+  - any green gate failure
+  - evidence that closeout path was written by write mode
+  - ambiguous or unreviewable diff scope
+- Acceptance:
+  - write succeeded on the frozen packet
+  - `run-status.json` reports `write_validated` and `validation_passed = true`
+  - all written paths stay within exact writable surfaces
+  - exact green gates passed in order
+  - closeout path remained untouched
+  - promoted write artifacts match the active successful temp run
+  - `C4` passes
+
+## WS5 - Conditional Repair Lane
+
+- ID: `WS5`
+- Owner: `optional worker lane` for patching, `parent` for integration and rerun decisions
+- Launch gate: failure in `WS2`, `WS4`, `WS6`, or `WS7`
+- Owned file surfaces:
+  - only the bounded failing surface assigned by parent
+  - examples:
+    - executor surfaces under `crates/xtask/src/agent_maintenance/**`
+    - closeout validation surfaces under `crates/xtask/src/agent_maintenance/closeout/**`
+    - matching regressions under `crates/xtask/tests/**`
+    - proof text under `docs/agents/lifecycle/opencode-maintenance/governance/proof/**`
+- Required commands:
+  - none required in worker lane
+  - worker may run only narrow local tests approved by parent
+  - parent reruns authoritative gates after integration
+- Stop conditions:
+  - repair scope expands beyond bounded assignment
+  - worker attempts to run live dry-run/write/closeout
+  - repair changes packet-owned truth without parent re-freeze
+- Acceptance:
+  - worker returns a narrow diff, concise explanation, and any relevant local test result
+  - parent integrates repair into primary worktree
+  - parent evaluates whether `C1`, `C2`, or `C3` was invalidated
+  - reruns restart from the earliest invalidated checkpoint
+  - failed run artifacts are not promoted as final proof
+
+## WS6 - Manual Closeout
+
+- ID: `WS6`
+- Owner: `parent`
+- Launch gate: `C4`
+- Owned file surfaces:
+  - `docs/agents/lifecycle/opencode-maintenance/governance/maintenance-closeout.json`
+  - `docs/agents/lifecycle/opencode-maintenance/HANDOFF.md`
+  - `docs/agents/lifecycle/opencode-maintenance/governance/remediation-log.md`
+  - `docs/agents/lifecycle/opencode-maintenance/governance/proof/closeout-summary.md`
+- Required commands:
+  ```sh
+  cargo run -p xtask -- close-agent-maintenance --request docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml --closeout docs/agents/lifecycle/opencode-maintenance/governance/maintenance-closeout.json
+  ```
+- Stop conditions:
+  - closeout JSON is untruthful or incomplete
+  - resolved findings still match live drift
+  - explicit none reason is used while drift still exists
+  - closeout command fails validation
+- Acceptance:
+  - truthful closeout JSON exists
+  - closeout command succeeds
+  - owned closeout outputs refresh successfully
+  - proof root contains truthful `closeout-summary.md`
+  - `C5` passes
+
+## WS7 - Final Proof Archive And Final Verification
+
+- ID: `WS7`
+- Owner: `parent`
+- Launch gate: `C5`
+- Owned file surfaces:
+  - full proof root:
+    - `request-sha256.txt`
+    - `run-id.txt`
+    - `execute-dry-run.txt`
+    - `execute-write.txt`
+    - `validation-report-dry-run.json`
+    - `validation-report-write.json`
+    - `run-status-dry-run.json`
+    - `run-status-write.json`
+    - `written-paths-write.json`
+    - `closeout-summary.md`
+    - `proof-notes.md`
+    - existing queue / PR-open evidence if still truthful
+  - final repo head across packet-declared writable surfaces
+- Required commands:
+  ```sh
+  cargo fmt --all
+  cargo run -p xtask -- codex-validate --root cli_manifests/opencode
+  cargo run -p xtask -- support-matrix --check
+  cargo run -p xtask -- capability-matrix --check
+  cargo run -p xtask -- capability-matrix-audit
+  make preflight
+  ```
+- Stop conditions:
+  - proof artifact mismatch with final successful run
+  - final gate failure
+  - final diff no longer reads as one bounded maintenance run
+- Acceptance:
+  - proof archive is complete and truthful
+  - final repo gates are green
+  - final head remains bounded and reviewable
+  - `C6` passes
 
 ## Context-Control Rules
 
-- Parent writes every worker brief.
-- Every worker brief must include only:
-  - workstream id
-  - `C1_SHA` or `C4_SHA` as applicable
-  - mission
-  - exact owned file map
-  - required validations
-  - stop conditions
-  - return contract
-- Allowed run-state inputs:
-  - `WS-A`
-  - `.runs/opencode-generic-maintenance-proof/phase1-freeze.md`
-  - `.runs/opencode-generic-maintenance-proof/worker-briefs/ws-a.md`
-  - `WS-B`
-  - `.runs/opencode-generic-maintenance-proof/phase1-freeze.md`
-  - `.runs/opencode-generic-maintenance-proof/worker-briefs/ws-b.md`
-  - `WS-C`
-  - `.runs/opencode-generic-maintenance-proof/proof-run.md`
-  - `.runs/opencode-generic-maintenance-proof/worker-briefs/ws-c.md`
-- Workers may not read or edit:
-  - `PLAN.md`
-  - `ORCH_PLAN.md`
-  - full `.runs/**` outside their allowed inputs
-  - the other lane’s worktree
-  - proof artifacts
-  - support-matrix publication artifacts unless they are lane C owned outputs
-- `WS-C` may edit only:
-  - `docs/specs/agent-registry-contract.md`
-  - `docs/specs/maintenance-request-contract-v1.md`
-  - `docs/cli-agent-onboarding-factory-operator-guide.md`
-  - `cli_manifests/support_matrix/current.json`
-  - `docs/specs/unified-agent-api/support-matrix.md`
-  - `crates/xtask/src/support_matrix.rs` only if required
-- `WS-C` is explicitly forbidden from touching:
-  - `docs/agents/lifecycle/opencode-maintenance/governance/proof/**`
-  - `crates/xtask/src/agent_maintenance/**`
-  - `crates/xtask/src/agent_registry/**`
-  - any workflow YAML
-- Workers must return:
-  - `workstream id`
-  - `status = ready-for-parent|blocked|no-op`
-  - `base checkpoint SHA`
-  - changed files
-  - commands run
-  - exit code for each command
-- If a worker discovers overlap, it must stop as `blocked` rather than self-expanding scope.
-- If Phase 1 contract truth moves after worker launch, parent must stop both lanes, revise on `parent-live`, freeze a new `C1`, and relaunch from the new base.
+1. Parent context retains:
+   - live request truth
+   - current checkpoint status
+   - active `run_id`
+   - packet invalidation rules
+   - proof archive promotion decisions
+   - final gate status
+2. Workers receive only the smallest context slice necessary for the assigned task.
+3. Workers must not receive broad “fix the repo” authority.
+4. Workers must not receive authority to decide checkpoint passage.
+5. Workers must not run:
+   - live dry-run
+   - live write
+   - live closeout
+   - final repo verification sequence
+6. Workers must return:
+   - narrow diff or read-only finding set
+   - concise explanation of what changed or what failed
+   - any relevant local test output summary
+   - explicit note if their change may invalidate `C1`, `C2`, or `C3`
+7. Parent reviews only narrow worker diffs and concise summaries before integration.
+8. Parent verifies every worker claim against local repo truth before merging or rerunning.
+9. Parent promotes only final successful structured evidence into the proof root.
+10. If a worker touches packet-owned truth, parent must treat the active packet as potentially invalid until request freeze is re-evaluated.
+11. If a worker patch touches executor or closeout contract logic, parent must treat regression baseline as potentially invalid until rerun.
+
+## Failure Handling And Rerun Policy
+
+### If Dry-Run Fails
+
+- fix local execution-host preflight or packet truth issue
+- rerun from `WS1` or `WS2`, depending on whether request truth changed
+- do not fabricate a `run_id`
+
+### If Write Fails
+
+- preserve temp run evidence
+- determine whether failure is:
+  - packet drift
+  - boundary violation
+  - no-op rejection
+  - green gate failure
+  - executor invariant gap
+- repair only the bounded failing surface
+- rerun from earliest invalidated checkpoint
+- archive only the final successful run
+
+### If Write Succeeds But Exposes A Contract Gap
+
+- this is not “success with follow-up”
+- fix the gap
+- add or update matching regression if invariant was missing
+- rerun dry-run and write if packet truth or write truth changed
+- only final successful rerun is archived
+
+### If Closeout Fails
+
+- fix closeout truth or underlying unresolved drift
+- rerun closeout
+- rerun write only if the closeout fix invalidates what the write proof was claiming
+
+### If Final Proof Review Fails
+
+- correct the mismatched proof artifact
+- rerun any invalidated gate
+- do not leave mixed evidence from different runs in the proof root
 
 ## Tests And Acceptance
 
-### Phase Gates
+## Request Freeze
 
-| Gate | Required proof |
-| --- | --- |
-| Phase 1 gate | `latest_validated = 1.4.11`, GitHub Releases `anomalyco/opencode` + `v`, `packet_pr` enrollment committed, no bespoke workflow |
-| Parallel merge gate | lane A and lane B both merged on parent, no file-map overlap, live `opencode` maintenance root stable |
-| Proof gate | archived watcher queue, generic opener evidence, request SHA, dry-run success |
-| Post-proof lane launch gate | `C4_SHA` frozen from the proof-stable parent branch with bounded lane C ownership |
-| Publication merge gate | lane C merged on parent and impacted docs/publication checks rerun successfully |
-| Final gate | targeted tests, `maintenance-watch --emit-json`, support-matrix checks, `make preflight`, `C5` frozen |
+Acceptance targets:
 
-### Required Final Commands
+- request still identifies `opencode`
+- prompt path is exactly `docs/agents/lifecycle/opencode-maintenance/governance/execute-agent-maintenance-prompt.md`
+- target version remains `1.14.47`
+- packet branch remains `automation/opencode-maintenance-1.14.47`
+- exact writable surfaces match live request
+- exact green gates match live request and handoff
+- handoff remains aligned with request
+- request SHA used for proof is explicit and singular
 
-```bash
-cargo run -p xtask -- support-matrix
+Failure here means no dry-run is allowed yet.
+
+## Regression Baseline
+
+Required commands:
+
+```sh
+cargo test -p xtask agent_maintenance_execute -- --nocapture
+cargo test -p xtask agent_maintenance_closeout -- --nocapture
+```
+
+Fallback:
+
+```sh
+cargo test -p xtask
+```
+
+Acceptance targets:
+
+- executor regressions are green
+- closeout regressions are green
+- any newly exposed invariant gap is repaired and covered before live proof continues
+
+## Dry-Run Proof
+
+Required command:
+
+```sh
+cargo run -p xtask -- execute-agent-maintenance --request docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml --dry-run
+```
+
+Acceptance targets:
+
+- exit code `0`
+- one active `run_id`
+- one active temp run directory
+- dry-run validation passes
+- `run-status.json` records dry-run-ready state
+- proof root contains matching dry-run artifacts
+
+## Write Proof
+
+Required command:
+
+```sh
+cargo run -p xtask -- execute-agent-maintenance --request docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml --write --run-id <run_id>
+```
+
+Acceptance targets:
+
+- exit code `0`
+- exact frozen `run_id` reused
+- `run-status.json` records `status = "write_validated"`
+- `run-status.json` records `validation_passed = true`
+- write is non-empty
+- write stays inside exact writable surfaces
+- closeout path remains untouched
+- exact green gates pass in order
+- proof root contains matching write artifacts
+
+## Closeout
+
+Required command:
+
+```sh
+cargo run -p xtask -- close-agent-maintenance --request docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml --closeout docs/agents/lifecycle/opencode-maintenance/governance/maintenance-closeout.json
+```
+
+Acceptance targets:
+
+- truthful `maintenance-closeout.json`
+- closeout validation succeeds
+- refreshed handoff and remediation outputs are consistent
+- proof root contains truthful `closeout-summary.md`
+
+## Proof Archive
+
+Acceptance targets:
+
+- proof root contains required final structured files
+- `run-id.txt` points to the final successful run only
+- `request-sha256.txt` matches the final successful run’s request truth
+- `proof-notes.md` names the final request SHA, final `run_id`, rerun status, and closeout result truthfully
+- prior queue / PR-open evidence is retained only if still truthful
+- raw temp logs stay uncommitted unless explicitly needed for failure diagnosis
+
+## Final Repo Gates
+
+Required commands:
+
+```sh
+cargo fmt --all
+cargo run -p xtask -- codex-validate --root cli_manifests/opencode
 cargo run -p xtask -- support-matrix --check
-cargo test -p xtask --test agent_registry -- --nocapture
-cargo test -p xtask --test agent_maintenance_watch -- --nocapture
-cargo test -p xtask --test c4_spec_ci_wiring -- --nocapture
-cargo test -p xtask --test agent_maintenance_prepare -- --nocapture
-cargo test -p xtask --test agent_maintenance_refresh -- --nocapture
-cargo test -p xtask --test agent_maintenance_execute -- --nocapture
-cargo run -p xtask -- maintenance-watch --emit-json _ci_tmp/maintenance-watch.json
+cargo run -p xtask -- capability-matrix --check
+cargo run -p xtask -- capability-matrix-audit
 make preflight
 ```
 
-### Milestone Acceptance Criteria
+Acceptance targets:
 
-- `opencode` is the only newly enrolled release-watch target.
-- `dispatch_kind = "packet_pr"` is committed for `opencode` and no registry `dispatch_workflow` is added.
-- `latest_validated.txt` is promoted from `none` to `1.4.11` before enrollment truth is considered complete.
-- Watcher/registry/CI truth covers a real third enrolled agent.
-- The live `opencode` maintenance root is normalized onto the automated request contract.
-- One real shared watcher -> generic opener proof is archived.
-- The generated request passes local `execute-agent-maintenance --dry-run`.
-- Support publication follows the pointer promotion and no longer reports `opencode` pointer promotion as `none`.
-- Parent executes all critical-path integration, proof, final verification, and final merge decisions.
+- all final commands pass
+- final diff remains bounded to the maintenance lane
+- final head is the proof-bearing head for the completed session
 
 ## Assumptions
 
-- `cli_manifests/opencode/versions/1.4.11.json` already exists and is valid enough to back the root-pointer promotion.
-- The repo’s shared watcher and generic opener workflows already exist and are the only intended transport surfaces for this milestone.
-- The parent can manually run the shared watcher proof on `staging` and capture the resulting evidence.
-- Any discovery that `opencode` requires a different acquisition source or a new schema is a stop-and-replan event, not an in-flight expansion.
-- The current local `PLAN.md` remains authoritative for the duration of this session unless the user changes it again.
+1. The live request at `docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml` remains the canonical proof input.
+2. The working branch remains `staging` for the full session.
+3. The proof target remains `opencode` `1.14.47` unless legitimate request rerendering in request freeze changes the canonical truth.
+4. Existing queue / PR-open proof artifacts may remain only if still truthful relative to the final successful run.
+5. `.uaa-temp` run-state is derived evidence unless explicitly promoted into the proof root.
+6. The executor and closeout implementations are expected to be largely correct; remaining work is live proof and bounded repair, not architecture redesign.
+7. Happy-path orchestration is mostly sequential, and that is a real property of the milestone rather than a planning deficiency.
+
+## Session Close Criteria
+
+The parent may close the PLAN session only after:
+
+1. `C0` through `C6` have passed in order.
+2. The final successful `run_id` is recorded in the proof root.
+3. The manual closeout command has succeeded.
+4. The proof root contains the required replayable structured artifacts.
+5. `make preflight` is green on the final proof-bearing head.
+
+Until then, the lane is not proven landed.
