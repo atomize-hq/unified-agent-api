@@ -76,6 +76,60 @@ fn opencode_maintenance_closeout_writes_only_owned_outputs_after_refresh_state()
 }
 
 #[test]
+fn closeout_write_adds_maintenance_closeout_evidence_to_required_and_satisfied_sets() {
+    let fixture = fixture_root("opencode-maintenance-closeout-lifecycle");
+    maintenance_harness::seed_opencode_basis(&fixture);
+    let request_path =
+        Path::new("docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml");
+    let request_absolute = fixture.join(request_path);
+    write_text(
+        &request_absolute,
+        &maintenance_request_toml(
+            "opencode",
+            "docs/integrations/opencode/governance/seam-2-closeout.md",
+        ),
+    );
+
+    let closeout_path = Path::new(
+        "docs/agents/lifecycle/opencode-maintenance/governance/maintenance-closeout.json",
+    );
+    write_text(
+        &fixture.join(closeout_path),
+        &valid_closeout_json(&request_absolute, request_path),
+    );
+    write_text(
+        &fixture.join("docs/agents/lifecycle/opencode-cli-onboarding/governance/lifecycle-state.json"),
+        include_str!("../../../../docs/agents/lifecycle/opencode-cli-onboarding/governance/lifecycle-state.json"),
+    );
+    write_text(
+        &fixture.join("docs/agents/lifecycle/opencode-cli-onboarding/governance/approved-agent.toml"),
+        include_str!("../../../../docs/agents/lifecycle/opencode-cli-onboarding/governance/approved-agent.toml"),
+    );
+    write_text(
+        &fixture.join("docs/agents/lifecycle/opencode-cli-onboarding/governance/publication-ready.json"),
+        include_str!("../../../../docs/agents/lifecycle/opencode-cli-onboarding/governance/publication-ready.json"),
+    );
+    write_text(
+        &fixture.join("docs/agents/lifecycle/opencode-cli-onboarding/governance/proving-run-closeout.json"),
+        include_str!("../../../../docs/agents/lifecycle/opencode-cli-onboarding/governance/proving-run-closeout.json"),
+    );
+
+    write_closeout_outputs(&fixture, request_path, closeout_path).expect("closeout write");
+
+    let state = agent_lifecycle::load_lifecycle_state(
+        &fixture,
+        "docs/agents/lifecycle/opencode-cli-onboarding/governance/lifecycle-state.json",
+    )
+    .expect("load lifecycle state");
+    assert!(state
+        .required_evidence
+        .contains(&agent_lifecycle::EvidenceId::MaintenanceCloseoutWritten));
+    assert!(state
+        .satisfied_evidence
+        .contains(&agent_lifecycle::EvidenceId::MaintenanceCloseoutWritten));
+}
+
+#[test]
 fn automated_request_closeout_preserves_trigger_truth_in_handoff() {
     let fixture = fixture_root("automated-request-closeout-handoff");
     maintenance_harness::seed_opencode_basis(&fixture);

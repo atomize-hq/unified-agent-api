@@ -1,0 +1,14 @@
+[
+  "cli_manifests/opencode/artifacts.lock.json",
+  "cli_manifests/opencode/reports/1.14.47/coverage.any.json",
+  "cli_manifests/opencode/reports/1.14.47/coverage.darwin-arm64.json",
+  "cli_manifests/opencode/snapshots/1.14.47/darwin-arm64.json",
+  "cli_manifests/opencode/snapshots/1.14.47/union.json",
+  "cli_manifests/opencode/versions/1.14.47.json",
+  "cli_manifests/support_matrix/current.json",
+  "docs/agents/lifecycle/opencode-maintenance/governance/proof/execute-dry-run.txt",
+  "docs/agents/lifecycle/opencode-maintenance/governance/proof/run-id.txt",
+  "docs/agents/lifecycle/opencode-maintenance/governance/proof/run-status-dry-run.json",
+  "docs/agents/lifecycle/opencode-maintenance/governance/proof/validation-report-dry-run.json",
+  "docs/specs/unified-agent-api/support-matrix.md"
+]

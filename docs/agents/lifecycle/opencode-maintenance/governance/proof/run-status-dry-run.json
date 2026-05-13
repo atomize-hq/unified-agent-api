@@ -1,0 +1,16 @@
+{
+  "workflow_version": "agent_maintenance_execute_v1",
+  "generated_at": "2026-05-12T23:53:37.400987Z",
+  "run_id": "20260512T235319Z",
+  "host_surface": "execute-agent-maintenance",
+  "mode": "dry_run",
+  "status": "dry_run_ready",
+  "validation_passed": true,
+  "request_path": "docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml",
+  "packet_root": "docs/agents/.uaa-temp/agent-maintenance/runs/20260512T235319Z",
+  "agent_id": "opencode",
+  "target_version": "1.14.47",
+  "branch_name": "automation/opencode-maintenance-1.14.47",
+  "written_paths": [],
+  "errors": []
+}

@@ -1,4 +1,4 @@
-Execution relay mode: DRY RUN
+Execution relay mode: WRITE
 request: docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml
 agent: opencode
 run_id: 20260512T235319Z
@@ -45,8 +45,8 @@ recovery_notes:
 - If the local execution-host preflight (local Codex CLI host via execute-agent-maintenance) fails, fix the Codex binary/auth state and rerun `execute-agent-maintenance --dry-run` before write mode.
 closeout_command: cargo run -p xtask -- close-agent-maintenance --request docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml --closeout docs/agents/lifecycle/opencode-maintenance/governance/maintenance-closeout.json
 closeout_manual: true
-OK: execute-agent-maintenance dry-run packet prepared.
+OK: execute-agent-maintenance write validation complete.
 run_id: 20260512T235319Z
-run_dir: docs/agents/.uaa-temp/agent-maintenance/runs/20260512T235319Z
+written_paths: 12
 closeout_command: cargo run -p xtask -- close-agent-maintenance --request docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml --closeout docs/agents/lifecycle/opencode-maintenance/governance/maintenance-closeout.json
 closeout remains manual; it is not run automatically.

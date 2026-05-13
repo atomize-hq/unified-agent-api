@@ -194,13 +194,26 @@ fn backfilled_lifecycle_states_validate_for_registry_targets() {
                 assert!(state.closeout_baseline_path.is_none());
             }
             LifecycleStage::Published | LifecycleStage::ClosedBaseline => {
-                assert_eq!(
-                    state.required_evidence,
-                    required_evidence_for_stage(expected_stage)
-                );
-                assert_eq!(
-                    state.satisfied_evidence,
-                    required_evidence_for_stage(expected_stage)
+                for evidence in required_evidence_for_stage(expected_stage) {
+                    assert!(
+                        state.required_evidence.contains(evidence),
+                        "required_evidence for {agent_id} missing {}",
+                        evidence.as_str()
+                    );
+                    assert!(
+                        state.satisfied_evidence.contains(evidence),
+                        "satisfied_evidence for {agent_id} missing {}",
+                        evidence.as_str()
+                    );
+                }
+                assert!(
+                    state
+                        .required_evidence
+                        .contains(&EvidenceId::MaintenanceCloseoutWritten)
+                        == state
+                            .satisfied_evidence
+                            .contains(&EvidenceId::MaintenanceCloseoutWritten),
+                    "maintenance_closeout_written must appear in both evidence sets or neither"
                 );
 
                 let packet_path = state
