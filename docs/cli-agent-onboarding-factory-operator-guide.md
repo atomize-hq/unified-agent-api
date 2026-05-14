@@ -4,6 +4,15 @@ This guide is the canonical operator procedure for the shipped post-M6 factory w
 
 It documents what to run, in what order, and which artifact roots each command owns. It does not replace the normative contracts in `docs/specs/**` or the onboarding charter in `docs/specs/cli-agent-onboarding-charter.md`.
 
+For the visual system map, see:
+
+`docs/cli-agent-onboarding-factory-workflow-atlas.md`
+
+For the planned maintenance steady-state rewrite that converges the repo on shared `packet_pr`
+transport plus non-TUI support uplift, see:
+
+`docs/cli-agent-maintenance-steady-state-plan.md`
+
 ## Truth boundaries
 
 | Surface | Authority | What it owns |
@@ -594,6 +603,14 @@ On success it:
 ## Maintenance mode
 
 Use maintenance mode for an already-onboarded agent when drift is detected or a control-plane refresh is needed.
+
+The procedure below documents the live committed workflow surfaces.
+
+It does not imply that all currently committed worker workflows are the intended long-term steady
+state. The successful `opencode` `packet_pr` proving run established the intended convergence
+direction: shared watcher, shared packet PR opener, shared prepared request schema, shared relay,
+and explicit manual closeout. The remaining `codex` and `claude_code` worker workflows are
+transitional transport surfaces until that migration lands.
 
 Maintenance reads the committed lifecycle baseline first. Generated packet docs and historical handoff text remain detector inputs, not the lifecycle authority.
 Maintenance accepts committed `published` records as valid baselines even before `closeout_baseline_path` exists; `closed_baseline` remains the post-closeout steady state.

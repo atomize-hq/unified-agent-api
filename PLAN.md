@@ -1,649 +1,858 @@
-# PLAN - Prove The Packet PR Maintenance Lane Can Actually Land
+# PLAN - Converge CLI Agent Maintenance Onto One Shared Packet-PR Support-Uplift Lane
 
 Status: ready for implementation  
-Date: 2026-05-12  
+Date: 2026-05-13  
 Working branch: `staging`  
-Plan revision baseline: `d6b86cdc`  
-Design input: `/Users/spensermcconnell/.gstack/projects/atomize-hq-unified-agent-api/spensermcconnell-staging-design-20260511-185442.md`  
-Supersedes: the prior repo-root `PLAN.md` for dry-run-only packet proof readiness
+Plan revision baseline: `b5ba0d73`  
+Primary design inputs:
+- `/Users/spensermcconnell/.gstack/projects/atomize-hq-unified-agent-api/spensermcconnell-staging-design-20260513-112453.md`
+- `docs/cli-agent-maintenance-steady-state-plan.md`
+
+Ground-truth checkpoint:
+- `docs/cli-agent-onboarding-factory-workflow-atlas.md` already exists on this branch
+- `opencode` already proved the shared `packet_pr` opening path
+- `codex` and `claude_code` still carry transitional `workflow_dispatch` maintenance transport
+
+Supersedes:
+- the prior repo-root `PLAN.md` for the `opencode` packet proof milestone
 
 ## Executive Summary
 
-The repo already proved the front half of the automated maintenance lane for `opencode`.
+The docs now describe one maintenance factory.
 
-The shared watcher can detect stale state. The generic `packet_pr` opener can materialize a
-truthful maintenance packet. The live request already freezes the executor, prompt digest,
-writable surfaces, green gates, and the exact manual closeout command.
+That claim is only half true in code.
 
-The remaining proof is the landing path:
+The shared watcher exists. The shared packet opener exists. The shared request contract exists. The
+shared relay exists. The atlas exists. But the success semantics are still too timid, and the live
+transport story is still split:
 
-1. prepare a fresh dry-run packet from the live request
-2. execute `execute-agent-maintenance --write` with that exact frozen `run_id`
-3. pass the exact packet-declared green gates
-4. author a truthful `maintenance-closeout.json`
-5. run `close-agent-maintenance`
-6. commit replayable proof artifacts showing another maintainer can follow the same flow
+- `opencode` uses the intended `packet_pr` lane
+- `codex` and `claude_code` still depend on worker-specific `workflow_dispatch` maintenance flows
+- packet docs and prompts still describe maintenance like artifact refresh plus incidental wrapper
+  edits instead of an explicit non-TUI support audit and bounded support uplift lane
 
-No new workflow family. No new transport topology. No second archive system. One honest,
-operator-faithful live run that lands and closes.
+This plan lands the actual steady state the docs are now pointing at:
+
+1. one shared release watcher
+2. one shared `packet_pr` PR-opening transport for enrolled automated maintenance
+3. one shared prepared maintenance packet contract
+4. one shared bounded relay executor
+5. one explicit support-surface audit for non-TUI CLI coverage
+6. one explicit manual closeout step
 
 ## Objective
 
 Make the repository able to truthfully claim:
 
-> the live `opencode` automated maintenance packet can drive a real bounded maintenance write,
-> survive the exact green gates it declares, and be explicitly closed with the repo-owned
-> closeout command, with committed evidence that another maintainer can replay.
+> enrolled automated CLI maintenance runs use one shared `packet_pr` transport and one shared
+> relay contract, and those runs can detect and land missing non-TUI support surface as part of
+> bounded maintenance success rather than treating runtime support as optional fallout or leaving
+> deliberate non-TUI gaps in place forever.
 
 ## Success Criteria
 
-1. The proof starts from
-   `docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml`.
-2. A fresh `execute-agent-maintenance --dry-run` succeeds and emits a reusable `run_id`.
-3. `execute-agent-maintenance --write --run-id <run_id>` succeeds against that same frozen packet.
-4. The write-mode run records `status = "write_validated"` and `validation_passed = true` in
-   `docs/agents/.uaa-temp/agent-maintenance/runs/<run_id>/run-status.json`.
-5. All changed paths recorded by write mode stay inside the request's `writable_surfaces`.
-6. `execute-agent-maintenance --write` does not write
-   `docs/agents/lifecycle/opencode-maintenance/governance/maintenance-closeout.json`.
-7. The exact `green_gates` from the live request pass in order, without a substituted command list.
-8. The resulting diff is reviewable as one bounded maintenance run, not a spill into unrelated
-   repo surfaces.
-9. A valid `docs/agents/lifecycle/opencode-maintenance/governance/maintenance-closeout.json`
-   exists with truthful request linkage, resolved findings, and either deferred findings or an
-   explicit none reason.
-10. `close-agent-maintenance` succeeds and refreshes the owned closeout outputs for the
-    `opencode-maintenance` lane.
-11. `docs/agents/lifecycle/opencode-maintenance/governance/proof/` contains enough structured
-    evidence to replay the full operator flow without rediscovering command order.
-12. `make preflight` passes on the final proof-bearing branch head.
+1. `crates/xtask/data/agent_registry.toml` records `dispatch_kind = "packet_pr"` for every
+   enrolled automated release-watch agent.
+2. `.github/workflows/agent-maintenance-release-watch.yml` fans out only to the shared
+   `agent-maintenance-open-pr.yml` PR opener for enrolled automated maintenance lanes.
+3. `.github/workflows/codex-cli-update-snapshot.yml` and
+   `.github/workflows/claude-code-update-snapshot.yml` are retired as steady-state maintenance
+   transports.
+4. `docs/specs/maintenance-request-contract-v1.md`,
+   `docs/specs/agent-registry-contract.md`, and
+   `docs/specs/cli-agent-onboarding-charter.md` tell one consistent story about transport,
+   packet ownership, relay ownership, and manual closeout.
+5. `prepare-agent-maintenance` writes automated packets whose docs and prompt explicitly require a
+   non-TUI support-surface audit across commands, subcommands, flags, global flags, and
+   positional args.
+6. `execute-agent-maintenance` validates and enforces the shared relay contract without relying on
+   agent-specific executor semantics or worker-YAML-only policy.
+7. Packet-owned docs stop describing success as "refresh artifacts and maybe touch code." They
+   describe bounded support uplift when missing non-TUI surface is discovered.
+8. The automated packet contract explicitly records the discovered upstream surface delta, the
+   current wrapper/backend/manifest support delta, and the exact required non-TUI uplifts needed
+   for the run to count as successful.
+9. Existing deliberate non-TUI unsupported posture is burned down over time rather than carried as
+   a permanent note. This includes the current `opencode` v1 restriction posture and the current
+   "intentionally unsupported surface outside unified support" notes for other CLI agents.
+10. A newly onboarded CLI agent is allowed to start at partial non-TUI support, but enrolled
+    maintenance must ratchet that support upward over time whenever new upstream surface appears or
+    previously known gaps become implementable within the bounded write envelope.
+11. Support publication surfaces stop treating deliberate non-TUI omission as normal steady state.
+    Any remaining unsupported non-TUI surface must be either:
+    - TUI-only and explicitly excluded, or
+    - blocked by a concrete upstream/platform limitation recorded in packet-owned truth.
+12. Every automated maintenance packet distinguishes between:
+    - `required_uplifts_this_run` for newly discovered or eligible preexisting gaps that must land
+    - `deferred_preexisting_gaps` for older gaps that are explicitly out of scope for this run
+13. A run cannot claim success while leaving unresolved:
+    - newly discovered non-TUI surface, or
+    - any preexisting gap that the packet marked as in-scope for this run
+14. Shared regression coverage proves packet generation, relay validation, watcher dispatch, and
+   transport convergence for `codex`, `claude_code`, and `opencode`.
+15. At least one previously worker-backed agent, `codex`, completes a post-migration proving run on
+   the shared lane or a full repo-owned dry-run plus write-mode simulation that exercises the same
+   packet and gate contract end to end.
+16. `docs/cli-agent-onboarding-factory-operator-guide.md` and
+    `docs/cli-agent-onboarding-factory-workflow-atlas.md` remain explanatory surfaces, not shadow
+    normative stores.
 
 ## Locked Decisions
 
-1. The proof target remains the current live `opencode` automated request. Do not switch agents.
-2. The proof is incomplete unless it includes both `execute-agent-maintenance --write` and manual
-   `close-agent-maintenance`.
-3. Another dry-run-only archive does not count.
-4. The canonical proof archive root stays
-   `docs/agents/lifecycle/opencode-maintenance/governance/proof/`.
-5. If the request, rendered prompt, writable surfaces, green gates, target version, branch name,
-   or request SHA drift after dry-run, the prepared packet is invalid. Rerun dry-run before write.
-6. If write mode succeeds but exposes any contract gap inside the bounded surfaces, that is not
-   "proof with follow-up". Fix the gap, rerender if needed, rerun dry-run, rerun write, then
-   archive only the final successful run.
-7. Manual closeout remains manual by design. Do not automate it inside
-   `execute-agent-maintenance`.
-8. Raw `codex-stdout.txt` and `codex-stderr.txt` remain temp evidence under
-   `docs/agents/.uaa-temp/agent-maintenance/runs/<run_id>/`. Commit structured summaries and JSON
-   evidence by default. Promote raw logs only if a failure requires them for diagnosis.
+1. The workflow atlas is already landed groundwork, not the milestone itself.
+2. `refresh-agent` remains the manual drift and publication-refresh seam. It is not the automated
+   upstream-release relay executor.
+3. `execute-agent-maintenance` remains the shared local relay surface.
+4. `close-agent-maintenance` remains explicit and manual.
+5. Automated maintenance stays bounded to non-TUI support surface plus matching manifest,
+   wrapper, backend, and packet-owned doc updates.
+6. TUI parity is out of scope for this milestone.
+7. Workflow YAML owns transport only. It must not become a second policy store for support audit,
+   writable surfaces, or green gates.
+8. The first required post-migration proving example is `codex`. `claude_code` must reach full
+   transport and contract parity in code and tests in the same milestone, but it does not need to
+   be the first live proving lane.
+9. Deliberately unsupported non-TUI surface is not an acceptable steady-state product posture.
+   It may exist temporarily for a newly onboarded agent, but maintenance must treat it as backlog
+   to burn down, not as a permanent caveat.
+10. `opencode` does not get a special carveout. Its current v1 restrictions must be removed on the
+    same policy basis as every other CLI agent.
 
-## Step 0 Scope Contract
+## Step 0 Scope Challenge
 
 ### Premise Challenge
 
 | Premise | Assessment | Decision |
 | --- | --- | --- |
-| The shared watcher or PR opener still needs redesign. | Rejected. The repo already proved queue emission and `packet_pr` opening for the live `opencode` lane. | Reuse the current watcher and generic opener unchanged. |
-| Another dry-run archive would finish the job. | Rejected. The missing claim is that the packet can land the bounded write path and explicit closeout. | Write mode and closeout are mandatory. |
-| We should widen scope to another agent to make the proof stronger. | Rejected. That turns a proof milestone into a rollout milestone. | `opencode` only. |
-| We can treat non-critical packet rough edges discovered after write as success. | Rejected. This milestone is about truthful replay, not almost-truthful replay. | Fix the gap and rerun. |
-| The closeout step can be implied if write mode passes. | Rejected. The contract deliberately keeps closeout manual. | Author `maintenance-closeout.json` and run `close-agent-maintenance`. |
-| We should archive only prose notes, not machine-readable evidence. | Rejected. Later maintainers need replayable proof, not a memory of the proof. | Commit structured JSON and command evidence. |
+| The missing milestone is still "write the workflow atlas." | Rejected. The atlas already exists and is useful, but it exposes the implementation gap instead of closing it. | Treat the atlas as shipped groundwork and focus this plan on contract and transport convergence. |
+| Worker-specific maintenance workflows are a permanent architecture feature. | Rejected. The shared watcher plus `opencode` proof show they are transition scaffolding, not the destination. | Converge enrolled automated maintenance onto shared `packet_pr`. |
+| `requested_control_plane_actions = ["packet_doc_refresh"]` is enough to describe success. | Rejected. That explains packet refresh, not support uplift. | Keep the control-plane list narrow, but make support audit and uplift explicit in the relay contract and packet docs. |
+| Runtime support uplift can stay implicit inside prompts. | Rejected. Hidden policy is exactly how this repo drifts. | Move the support-audit requirement into the normative contract, packet rendering, and relay validation. |
+| Existing "deliberately unsupported" non-TUI posture can remain as a permanent published caveat. | Rejected. That turns maintenance into a reporter of gaps instead of a closer of gaps. | Treat non-TUI unsupported posture as temporary debt that maintenance must ratchet downward. |
+| Newly onboarded agents must start fully supported before they can be enrolled. | Rejected. That is too rigid and slows onboarding for the wrong reason. | Allow an initial lower support floor, but require enrolled maintenance to raise support over time. |
+| We need another workflow family to replace the old worker flows. | Rejected. The repo already has the shared watcher and shared PR opener. | Reuse the existing watcher and `agent-maintenance-open-pr.yml`. |
+| This milestone should include broad TUI parity. | Rejected. That is a second project and will blow up the write envelope. | Limit uplift to non-TUI commands, subcommands, flags, globals, and positional args. |
+| One real `codex` proof with shared tests is too small to validate the architecture. | Rejected. The architecture is shared; one migrated live example plus strong shared tests is enough for this lake. | Require one migrated proof run, `codex`, and full shared regression coverage. |
 
 ### What Already Exists
 
 | Sub-problem | Existing surface | Reuse decision |
 | --- | --- | --- |
-| Canonical automated request | `docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml` | Reuse as the proof input. Refresh only if the request drifted from branch truth. |
-| Canonical operator contract | `docs/agents/lifecycle/opencode-maintenance/HANDOFF.md` and `docs/cli-agent-onboarding-factory-operator-guide.md` | Reuse as the command order and ownership source of truth. |
-| Local relay execution | `crates/xtask/src/agent_maintenance/execute/workflow.rs`, `runtime.rs`, `validate.rs`, `packet.rs` | Reuse. This already validates preflight, packet continuity, writable surfaces, runtime writes, and green gates. |
-| Manual closeout writer | `crates/xtask/src/agent_maintenance/closeout.rs`, `closeout/write.rs`, `closeout/validate.rs` | Reuse. This already validates request linkage, live drift truth, and owned output writes. |
-| Relay and closeout regression coverage | `crates/xtask/tests/agent_maintenance_execute.rs`, `crates/xtask/tests/agent_maintenance_closeout/**` | Reuse and extend only if the live run exposes a missing guardrail. |
-| Existing proof archive root | `docs/agents/lifecycle/opencode-maintenance/governance/proof/` | Reuse. Append execution and closeout evidence here. |
-| Existing proof state | `proof-notes.md`, `execute-dry-run.txt`, `request-sha256.txt`, queue and workflow evidence | Reuse if still truthful. Replace any artifact that no longer matches the final successful run. |
+| Shared release detection | `.github/workflows/agent-maintenance-release-watch.yml`, `crates/xtask/src/agent_maintenance/watch.rs` | Reuse. Keep one watcher. |
+| Shared PR opening | `.github/workflows/agent-maintenance-open-pr.yml` | Reuse. Promote to default enrolled transport. |
+| Shared packet generation | `crates/xtask/src/agent_maintenance/prepare.rs` | Reuse and widen. Do not create a second packet generator. |
+| Shared relay execution | `crates/xtask/src/agent_maintenance/execute/**` | Reuse and harden. Keep bounded writes and explicit gates. |
+| Shared contract-policy derivation | `crates/xtask/src/agent_maintenance/contract_policy.rs` | Reuse. This is where transport and packet defaults should stay centralized. |
+| Packet-owned docs renderer | `crates/xtask/src/agent_maintenance/docs.rs` | Reuse and rewrite wording so success semantics are truthful. |
+| Visual system map | `docs/cli-agent-onboarding-factory-workflow-atlas.md` | Reuse. Keep it aligned with the normative contracts. |
+| Existing packet-pr proof | `docs/agents/lifecycle/opencode-maintenance/governance/proof/**` | Reuse as the proof that the lane shape works. Do not repeat the `opencode` milestone. |
+| Registry-driven dispatch metadata | `crates/xtask/data/agent_registry.toml`, `crates/xtask/src/agent_registry/release_watch.rs` | Reuse. Registry stays the only enrollment truth. |
+| Worker-specific transport leftovers | `.github/workflows/codex-cli-update-snapshot.yml`, `.github/workflows/claude-code-update-snapshot.yml` | Retire as steady-state transport after shared-lane parity is green. |
+
+### TODOS Cross-Reference
+
+`TODOS.md` already carries:
+
+- `Decide Whether Maintenance Transport Topology Still Needs Convergence After Worker/Runbook Cleanup`
+
+This plan consumes that TODO directly. Landing this plan should retire or rewrite that item, not
+leave it hanging as a duplicate reminder.
+
+The other current TODOs are unrelated and do not block this milestone.
 
 ### NOT In Scope
 
-1. Enrolling new agents in release watch.
-2. Redesigning `packet_pr` versus worker-dispatch topology.
-3. Adding a new workflow YAML family.
-4. Creating a second proof archive subsystem.
-5. Automating closeout inside `execute-agent-maintenance`.
-6. Promoting raw `codex-stdout.txt` and `codex-stderr.txt` into committed artifacts unless a real
-   failure requires them.
-7. Expanding the proof to `codex` or `claude_code`.
+1. Adding TUI parity through automated maintenance.
+2. Inventing a second packet schema for migrated agents.
+3. Replacing the shared watcher.
+4. Automating `close-agent-maintenance`.
+5. Merging manual drift maintenance and automated upstream-release maintenance into one command.
+6. Reworking onboarding or publication lifecycle stages outside the maintenance blast radius.
+7. Proving a live post-migration run for every enrolled agent in the same PR.
+8. Forcing brand-new onboarded agents to launch at full parity on day one.
 
 ### Minimum Complete Change
 
 The minimum complete implementation is:
 
-1. verify the live `opencode` request is still proof-stable for the current branch head
-2. refresh the request packet only if that truth audit fails
-3. prepare a fresh dry-run packet and record its `run_id`
-4. execute write mode against that exact `run_id`
-5. inspect the bounded diff and fix any contract breakage inside the declared surfaces
-6. rerun dry-run and write if any packet-affecting file changed
-7. author `maintenance-closeout.json`
-8. run `close-agent-maintenance`
-9. archive structured execution and closeout evidence under the canonical proof root
-10. rerun final verification on the finished closeout state
+1. freeze one truthful steady-state contract across registry spec, maintenance spec, and charter
+2. rewrite packet-owned docs and prompt semantics so automated maintenance explicitly audits
+   non-TUI support surface
+3. teach the relay and validation layers to enforce the same support-aware contract
+4. migrate `codex` and `claude_code` registry truth and watcher fanout to shared `packet_pr`
+5. retire worker-specific steady-state maintenance transport
+6. prove the migrated lane through shared regression coverage and one post-migration `codex` proof
 
-Anything smaller still leaves the landing claim unproven.
+Anything smaller still leaves the docs telling a story the code does not actually implement.
 
 ### Complexity, Search, Completeness, And Distribution Checks
 
 **Complexity smell**
 
-This plan may touch more than eight files if the live run exposes a real gap. That is acceptable.
-The repo already owns the machinery. The goal is to finish the live proof, not to keep the diff
-artificially tiny.
+This plan will touch more than eight files and more than two modules.
+
+That is acceptable because the blast radius is already tightly clustered:
+
+- `docs/specs/**`
+- `.github/workflows/**`
+- `crates/xtask/src/agent_maintenance/**`
+- `crates/xtask/src/agent_registry/**`
+- `crates/xtask/tests/**`
+- packet-owned lifecycle docs under `docs/agents/lifecycle/*-maintenance/**`
+
+The right scope reduction is not "do less." It is "do not spill outside the maintenance factory."
 
 **Search check**
 
-- **[Layer 1]** Reuse `execute-agent-maintenance` for write mode. The relay contract already
-  exists and is tested.
-- **[Layer 1]** Reuse `close-agent-maintenance` for manual closeout. The closeout contract already
-  exists and is tested.
-- **[Layer 1]** Reuse the existing proof archive root instead of inventing another evidence lane.
-- **[EUREKA]** The hidden landmine is packet continuity, not the write engine. The prepared packet
-  is invalid if request SHA, prompt contents, prompt digest, target version, branch name,
-  writable surfaces, green gates, closeout path, or closeout command drift after dry-run. Ignore
-  that and the proof becomes fake.
+- **[Layer 1]** Reuse the shared watcher and shared PR opener. They already exist.
+- **[Layer 1]** Reuse the registry as the only release-watch enrollment store.
+- **[Layer 1]** Reuse the shared relay executor and packet renderer.
+- **[Layer 1]** Reuse packet-owned `HANDOFF.md`, `CI_WORKFLOWS_PLAN.md`, and `OPS_PLAYBOOK.md`
+  surfaces instead of inventing another operator note layer.
+- **[EUREKA]** The real bug is not transport fanout anymore. It is policy split. YAML, packet
+  docs, prompt wording, and relay semantics still disagree about what "maintenance success" means.
+  Fix that split and the architecture gets boring again.
 
 **Completeness rule**
 
 Do the whole lake:
 
-- fresh dry-run
-- write mode
-- exact green gates
-- manual closeout
-- structured proof archive
-- final `make preflight`
+- contract alignment
+- packet wording alignment
+- relay enforcement alignment
+- registry and watcher convergence
+- worker transport retirement
+- shared regression coverage
+- one migrated proof run
 
-Do not stop at "write mode produced a diff."
+Do not stop at "the docs look clearer."
 
 **Distribution check**
 
-There is no new user-facing binary or package here.
+There is no new binary or package artifact here.
 
-The shipped artifact is committed operational truth:
+The shipped outputs are:
 
-- a closed `opencode` maintenance run
-- a bounded proof archive
-- a branch head that later maintainers can inspect and replay
+- one truthful steady-state maintenance contract
+- one shared packet-pr transport story for enrolled agents
+- one migrated proving example
+- one docs surface that no longer lies
 
 ## Architecture Contract
 
-### System Boundary
+### Current-State Versus Target-State Boundary
 
 ```text
-live maintenance request
+CURRENT
+=======
+shared watcher
+  -> packet_pr for opencode
+  -> workflow_dispatch workers for codex and claude_code
+  -> packet docs say packet refresh first
+  -> relay exists, but success semantics are underspecified
+
+TARGET
+======
+shared watcher
+  -> shared packet_pr opener for every enrolled automated lane
+  -> shared prepared packet
+  -> shared relay
+  -> explicit non-TUI support audit
+  -> bounded support uplift
+  -> ratchet down previously known unsupported non-TUI surface
+  -> explicit manual closeout
+```
+
+### Steady-State Data Flow
+
+```text
+agent_registry.toml
+        |
+        v
+agent-maintenance-release-watch.yml
+        |
+        v
+stale_agents[] queue
+        |
+        v
+agent-maintenance-open-pr.yml
+        |
+        v
+prepare-agent-maintenance
+        |
+        v
+maintenance-request.toml
+HANDOFF.md
+execute-agent-maintenance-prompt.md
+pr-summary.md
         |
         v
 execute-agent-maintenance --dry-run
         |
         v
-prepared run packet with frozen run_id
+support-surface audit
+  - commands
+  - subcommands
+  - flags
+  - global flags
+  - positional args
+  - exclude TUI-only surface
+  - include already-known non-TUI unsupported surface
         |
         v
 execute-agent-maintenance --write
         |
         v
-bounded diff inside writable_surfaces
+bounded wrapper/backend/manifest/doc updates
         |
         v
-manual maintenance-closeout.json authoring
+green gates
         |
         v
 close-agent-maintenance
+```
+
+### Ownership Split
+
+| Layer | Owns | Must not own |
+| --- | --- | --- |
+| Registry | enrollment truth, upstream metadata, dispatch mode | packet policy, writable surfaces, gate lists |
+| Shared watcher | stale detection and queue generation | agent-specific maintenance semantics |
+| Shared PR opener | packet generation and PR creation | artifact-refresh policy, support-audit policy, runtime gate policy |
+| Prepared packet | frozen request truth, writable surfaces, prompt digest, gates, recovery | hidden agent-specific behavior outside the request |
+| Relay | validation, bounded writes, support-aware execution, green gates | transport policy, closeout automation |
+| Manual closeout | explicit maintainer settlement | write-mode execution |
+
+### Support Maturation Contract
+
+Automated maintenance needs one explicit ratchet rule:
+
+- newly onboarded agents may start with partial non-TUI support
+- once an agent is enrolled in automated release-watch maintenance, non-TUI support should trend
+  upward, not sideways
+- already-known deliberate unsupported non-TUI gaps are backlog to close when bounded uplift is
+  feasible
+- newly discovered upstream non-TUI surface must be compared against current wrapper coverage,
+  backend support, and published support posture during packet preparation
+- TUI-only surface stays excluded by contract and does not count against this ratchet
+
+Eligibility rule for preexisting gaps:
+
+- a preexisting non-TUI gap is in-scope for the current maintenance run only when at least one of
+  these is true:
+  - the target upstream release introduced or changed adjacent surface in the same command family
+  - the gap can be closed entirely inside the current packet `writable_surfaces`
+  - the gap requires no new infra, no new transport, and no new cross-cutting abstraction
+- otherwise, the gap must not be silently pulled into the run
+- instead, it must be recorded as explicit deferred work with a concrete blocker or a separately
+  planned seam
+
+Steady-state rule:
+
+```text
+new upstream non-TUI surface discovered
+        OR
+known non-TUI unsupported surface still present
         |
         v
-committed proof archive + final preflight
+prepare packet records exact delta
+        |
+        v
+relay either:
+  - lands bounded uplift, or
+  - fails/defer-with-rationale when blocked by a concrete upstream/platform limit
 ```
 
-Do not move closeout into write mode.
+### Required Packet Audit Shape
 
-Do not replace the request-owned green gates with a handwritten checklist.
+The refined steady-state packet needs an explicit machine-readable audit block. The exact TOML
+syntax can still be chosen during implementation, but the packet must carry these concepts:
 
-Do not turn this into a second packet generation project.
+| Field | Purpose |
+| --- | --- |
+| `support_surface_audit.required` | turns the support audit into a first-class gate, not prose |
+| `support_surface_audit.surface_kinds[]` | `commands`, `subcommands`, `flags`, `global_flags`, `positional_args` |
+| `support_surface_audit.excluded_surface_kinds[]` | explicit exclusions, initially TUI-only only |
+| `support_surface_audit.discovered_upstream_surface[]` | newly observed non-TUI surface from the target version |
+| `support_surface_audit.preexisting_unsupported_surface[]` | already-known non-TUI gaps that remain open on the current validated baseline |
+| `support_surface_audit.eligible_preexisting_surface[]` | subset of preexisting gaps that are justified and bounded for this run |
+| `support_surface_audit.missing_wrapper_support[]` | surface present upstream but absent from wrapper support |
+| `support_surface_audit.missing_backend_support[]` | surface present in wrapper/manifests but absent from backend/UAA support |
+| `support_surface_audit.required_uplifts_this_run[]` | exact bounded changes required for this run to count as success |
+| `support_surface_audit.deferred_preexisting_gaps[]` | older gaps explicitly left out of this run, each with a concrete reason |
+| `support_surface_audit.allowed_deferrals[]` | only concrete upstream/platform blockers, never vague “deliberately unsupported” posture |
+| `support_surface_audit.defer_reason` | machine-readable reason per deferred gap or uplift blocker |
+| `support_surface_audit.publication_impacts[]` | support-matrix or capability-publication rows/notes that must change when uplift lands |
 
-### Dependency Graph
+If this block is absent, the packet is not a valid steady-state automated maintenance packet.
 
-```text
-docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml
-  ├── detected_release
-  ├── execution_contract
-  │    ├── prompt_template_path
-  │    ├── prompt_sha256
-  │    ├── writable_surfaces
-  │    ├── ordered_commands
-  │    ├── green_gates
-  │    └── closeout_path
-  └── closeout_path
-          |
-          v
-docs/agents/lifecycle/opencode-maintenance/HANDOFF.md
-          |
-          v
-crates/xtask/src/agent_maintenance/execute/workflow.rs
-  ├── runtime.rs      (Codex preflight + green gate execution)
-  ├── validate.rs     (prepared packet continuity + writable-surface jail + no-op rejection)
-  └── packet.rs       (run packet persistence)
-          |
-          v
-docs/agents/.uaa-temp/agent-maintenance/runs/<run_id>/
-          |
-          v
-maintainer diff review + maintenance-closeout.json
-          |
-          v
-crates/xtask/src/agent_maintenance/closeout/validate.rs
-crates/xtask/src/agent_maintenance/closeout/write.rs
-          |
-          v
-docs/agents/lifecycle/opencode-maintenance/HANDOFF.md
-docs/agents/lifecycle/opencode-maintenance/governance/remediation-log.md
-docs/agents/lifecycle/opencode-maintenance/governance/proof/**
-```
+Allowed blocker taxonomy:
 
-### Packet Invalidation Rules
+- `upstream_not_machine_exposed`
+- `platform_evidence_missing`
+- `requires_new_infra`
+- `requires_new_architectural_seam`
+- `outside_current_writable_surfaces`
 
-The prepared packet remains valid only until one of these changes:
+Not valid as blocker reasons:
 
-| Change after dry-run | Effect | Required response |
-| --- | --- | --- |
-| `maintenance-request.toml` contents or SHA | Prepared packet is invalid. | Rerun dry-run before write. |
-| Rendered prompt contents or prompt digest | Prepared packet is invalid. | Rerun dry-run before write. |
-| `target_version` or `branch_name` | Prepared packet is invalid. | Rerun dry-run before write. |
-| `writable_surfaces`, `green_gates`, `closeout_path`, or closeout command | Prepared packet is invalid. | Rerun dry-run before write. |
-| Any fix inside repo code or docs that changes packet-owned truth before write | Prepared packet may be invalid. | Re-evaluate. If the fix touched request truth, rerun dry-run. |
-| Manual closeout authoring after a successful write | Prepared packet is no longer needed. | Do not rerun write unless the write proof itself changed. |
-| Proof archive note edits after a successful write | Does not invalidate the successful write. | No rerun, unless the archive text misstates request or run truth. |
+- `deliberately_unsupported`
+- `too_much_work_right_now`
+- `not_part_of_v1`
 
-### Proof Archive Contract
+### Module Seams
 
-The canonical proof root is:
+| Module | Responsibility in this milestone |
+| --- | --- |
+| `crates/xtask/src/agent_maintenance/contract_policy.rs` | derive shared transport, prompt, recovery, and support-audit defaults |
+| `crates/xtask/src/agent_maintenance/prepare.rs` | emit packet truth that matches the steady-state contract |
+| `crates/xtask/src/agent_maintenance/docs.rs` | render packet docs and prompt with truthful support-uplift semantics |
+| `crates/xtask/src/agent_maintenance/execute/**` | enforce packet continuity, support-aware execution, and bounded writes |
+| `crates/xtask/src/agent_registry/release_watch.rs` | treat `packet_pr` as normal enrolled truth, not a special case |
+| `.github/workflows/*.yml` | transport only, no shadow policy |
+| `docs/specs/**` | normative truth only, no procedural drift |
 
-```text
-docs/agents/lifecycle/opencode-maintenance/governance/proof/
-```
+## Code Quality Contract
 
-It must end this milestone containing:
-
-- existing queue and PR-open evidence, if still truthful
-- `request-sha256.txt`
-- `run-id.txt`
-- `execute-dry-run.txt`
-- `execute-write.txt`
-- `validation-report-dry-run.json`
-- `validation-report-write.json`
-- `run-status-dry-run.json`
-- `run-status-write.json`
-- `written-paths-write.json`
-- `closeout-summary.md`
-- `proof-notes.md`
-
-Raw `codex-stdout.txt` and `codex-stderr.txt` stay temp-only unless a real failure forces them
-into the archive for diagnosis.
+1. No second policy store in workflow YAML. If a rule matters, it lives in `docs/specs/**` and in
+   shared `xtask` code.
+2. No agent-specific executor naming in new code. New automated packets use
+   `execution_contract.executor = "execute-agent-maintenance"`.
+3. No duplicate support-audit logic scattered across packet rendering, relay validation, and tests.
+   Derive it once, thread it everywhere.
+4. No hidden "best effort" success path. If support uplift is expected and not performed, the lane
+   must fail or explicitly defer with packet-owned truth.
+5. No new workflow family. Reuse the shared opener.
+6. Update nearby ASCII diagrams and generated packet docs when the contract changes. Stale diagrams
+   are bugs.
+7. No published “intentionally unsupported” note for non-TUI surface unless it is backed by a
+   concrete blocker recorded in the packet or support publication truth.
 
 ## Failure Modes Registry
 
-| Codepath | Real failure | Test coverage | Planned handling | Maintainer signal | Critical gap |
+| Codepath | Real failure | Test coverage required | Planned handling | Maintainer signal | Critical gap |
 | --- | --- | --- | --- | --- | --- |
-| Dry-run preflight | Codex binary or auth state is broken | Covered in `crates/xtask/tests/agent_maintenance_execute.rs` | Dry-run fails closed before write mode. Fix host state and rerun. | Explicit CLI failure with preflight message | No |
-| Prepared packet continuity | Request SHA, prompt, target version, branch name, writable surfaces, green gates, closeout path, or closeout command drift after dry-run | Covered in `workflow.rs` and `validate.rs`; prompt mismatch and drift protections are tested | Write mode blocks. Refresh request truth if needed, rerun dry-run, then rerun write. | Explicit CLI failure listing mismatches | No |
-| Write boundary | Maintained agent writes outside `writable_surfaces` or touches closeout path | Covered in `crates/xtask/tests/agent_maintenance_execute.rs` | Write mode fails closed and records the boundary violation. | Explicit CLI failure and run packet evidence | No |
-| Runtime no-op | Write mode exits cleanly but produces no runtime-owned changes | Covered in `crates/xtask/tests/agent_maintenance_execute.rs` | Treat as failure. The lane does not get credit for doing nothing. | Explicit CLI failure and validation report | No |
-| Green gates | One declared gate fails after write | Covered by gate execution flow and live run | Stop the run. Fix the underlying issue. If the fix touched packet truth, restart from dry-run. | Explicit gate failure in validation report | No |
-| Closeout truth | `resolved_findings` still match live drift, `explicit_none_reason` is used while drift exists, or deferred findings are incomplete | Covered in `crates/xtask/tests/agent_maintenance_closeout/live_drift_validation.rs` | `close-agent-maintenance` fails closed. Fix the closeout JSON or fix the remaining drift. | Explicit closeout validation error | No |
-| Proof archive truth | `proof-notes.md`, `request-sha256.txt`, or `run-id.txt` describe the wrong successful run | Not runtime-tested; operationally enforced by this plan | Treat as proof failure. Rewrite the archive from the actual successful run before claiming success. | Review-time mismatch between archive and run packet | Yes, if left uncorrected |
-
-There are no silent-failure paths in the base plan. Every meaningful failure must end in an
-explicit command error or an explicit archive review failure before the milestone can be marked
-done.
+| Watcher dispatch resolution | watcher still emits worker workflows for migrated agents | `agent_maintenance_watch.rs`, `agent_registry.rs` | fail tests, block merge | explicit test failure | Yes |
+| Packet generation | request still encodes artifact-refresh-only success wording | `agent_maintenance_prepare.rs`, doc-render tests | rewrite packet and prompt rendering | explicit diff and renderer test failure | Yes |
+| Relay validation | write mode succeeds without an explicit support audit | `agent_maintenance_execute.rs` | add invariant, reject packet or run | explicit CLI validation failure | Yes |
+| Support publication truth | support matrix still carries deliberate non-TUI unsupported notes after uplift should have landed | publication checks and packet proof review | rewrite publication surfaces and fail if stale | explicit support-matrix mismatch | Yes |
+| Worker retirement | stale workflow still acts like source of truth | workflow wiring tests, spec CI wiring | delete or demote workflow, update references | explicit workflow or docs mismatch | No |
+| Support uplift boundary | relay widens into TUI or unrelated runtime work | relay tests plus proof run diff review | bound writes to non-TUI surfaces only | explicit diff escape or validation failure | Yes |
+| Support ratchet failure | newly discovered or preexisting non-TUI gaps remain open with no blocker and the run still claims success | execute tests, publication tests, proof review | fail closed until uplift lands or blocker is recorded | explicit packet audit failure | Yes |
+| Backlog bucket creep | packet drags unrelated historic gaps into the run without eligibility proof | prepare/execute tests, packet proof review | require packet-scoped eligibility or explicit deferral | explicit packet audit failure | Yes |
+| Docs drift | operator guide, atlas, spec, and packet docs disagree again | doc snapshot tests plus review diff | update all truth surfaces in same PR | review-time mismatch | No |
+| Proving run | migrated `codex` lane cannot open or validate from shared packet_pr flow | live proof or full end-to-end simulation | fix within blast radius, rerun proof | explicit run failure | Yes |
 
 ## Test Review
 
 ### Test Framework And Commands
 
-This is a Rust workspace. The relevant verification surfaces are:
+This is a Rust workspace.
 
-- unit and integration tests via `cargo test -p xtask`
-- command-level regression coverage in `crates/xtask/tests/agent_maintenance_execute.rs`
-- closeout truth coverage in `crates/xtask/tests/agent_maintenance_closeout/**`
-- contract and repo-wide gates via the packet-declared green commands and final `make preflight`
+Primary verification surfaces:
+
+- `cargo test -p xtask`
+- targeted suites under `crates/xtask/tests/agent_maintenance_*`
+- `cargo test -p xtask agent_registry -- --nocapture`
+- `cargo test -p xtask c4_spec_ci_wiring -- --nocapture`
+- final `make preflight`
 
 ### Code Path Coverage
 
 ```text
 CODE PATH COVERAGE
 ===========================
-[+] docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml
+[+] watcher + registry dispatch
     │
-    ├── request truth audit
-    │   ├── [LIVE PROOF REQUIRED] request fields still match branch truth
-    │   └── [LIVE PROOF REQUIRED] request SHA recorded into archive
-    │
-    └── HANDOFF.md alignment
-        ├── [★★★ TESTED] renderer owns command, surface, and closeout wording
-        └── [LIVE PROOF REQUIRED] current handoff still matches the frozen request
+    ├── [★★★ TESTED] workflow_dispatch entries stay valid while transitional
+    ├── [GAP]         migrated codex resolves to packet_pr only
+    ├── [GAP]         migrated claude_code resolves to packet_pr only
+    └── [★★★ TESTED] opencode packet_pr dispatch stays valid
 
-[+] execute-agent-maintenance --dry-run
+[+] prepare-agent-maintenance
     │
-    ├── [★★★ TESTED] preflight pass path
-    ├── [★★★ TESTED] preflight failure path
-    ├── [★★★ TESTED] dry-run writes only under temp run root
-    └── [LIVE PROOF REQUIRED] real opencode dry-run on current staging head
+    ├── [★★★ TESTED] shared automated packet envelope renders
+    ├── [★★★ TESTED] packet_pr dispatch_workflow materializes shared opener
+    ├── [GAP]         support-audit language is explicit in request-owned docs
+    ├── [GAP]         packet records discovered surface, eligible preexisting surface, deferred preexisting surface, and required uplifts for this run
+    └── [GAP]         recreate/recovery guidance stops pointing at refresh-agent as the main story
 
-[+] prepared packet continuity
+[+] packet-owned docs
     │
-    ├── [★★★ TESTED] prompt mismatch rejection
-    ├── [★★★ TESTED] request and contract drift rejection
-    └── [LIVE PROOF REQUIRED] run_id reused only against unchanged packet truth
+    ├── [★★★ TESTED] HANDOFF/pr-summary/prompt render from request
+    ├── [GAP]         prompt requires non-TUI support audit before success
+    ├── [GAP]         HANDOFF describes support uplift as bounded relay work
+    ├── [GAP]         CI_WORKFLOWS_PLAN/OPS_PLAYBOOK match the same contract
+    └── [GAP]         opencode/other agent docs stop normalizing “deliberately unsupported” non-TUI posture
 
-[+] execute-agent-maintenance --write
+[+] execute-agent-maintenance
     │
-    ├── [★★★ TESTED] boundary violation rejection
-    ├── [★★★ TESTED] no-op rejection
-    ├── [★★★ TESTED] green gates run in order
-    ├── [★★★ TESTED] closeout remains manual
-    └── [LIVE PROOF REQUIRED] real opencode write succeeds on the frozen packet
+    ├── [★★★ TESTED] packet continuity checks
+    ├── [★★★ TESTED] writable-surface jail
+    ├── [★★★ TESTED] green-gate execution
+    ├── [GAP]         packet without support-audit truth is rejected or fails closed
+    ├── [GAP]         packet with unresolved non-TUI uplift and no blocker cannot claim success
+    ├── [GAP]         packet cannot silently absorb unrelated historic gaps with no eligibility proof
+    └── [GAP]         migrated codex packet succeeds through shared relay path
 
-[+] close-agent-maintenance
+[+] support publication truth
     │
-    ├── [★★★ TESTED] resolved findings cannot still match live drift
-    ├── [★★★ TESTED] explicit-none is rejected when live drift exists
-    ├── [★★★ TESTED] deferred findings must account for live drift
-    ├── [★★★ TESTED] deferred findings are rejected when live report is clean
-    ├── [★★★ TESTED] live drift re-check errors block closeout
-    └── [LIVE PROOF REQUIRED] real opencode closeout succeeds after the bounded write
+    ├── [GAP]         support matrix stops carrying stale “intentionally unsupported” notes for non-TUI surface
+    ├── [GAP]         opencode v1 restriction posture is removed from steady-state support publication
+    └── [GAP]         newly onboarded agents can start partial, but later maintenance ratchets support upward
 
-[+] proof archive
+[+] workflow transport
     │
-    ├── [LIVE PROOF REQUIRED] archive copies match the final successful run packet
-    └── [LIVE PROOF REQUIRED] proof notes describe the actual request SHA, run_id, and closeout result
+    ├── [★★★ TESTED] shared packet_pr opener exists
+    ├── [GAP]         release watch fans out only to shared opener for enrolled agents
+    └── [GAP] [→E2E] migrated codex PR-open path from watcher queue to packet render
 
 ─────────────────────────────────
-COVERAGE: implementation guardrails are automated; milestone proof remains operational
-AUTOMATED COVERAGE: strong on dry-run, write, boundary, and closeout truth
-LIVE GAPS TO SATISFY: 6 operational proof points, all closed by this milestone
-REGRESSION RULE: if the live run exposes a missing guardrail, add the regression test before claiming success
+COVERAGE: core relay and packet plumbing exist, steady-state semantics still incomplete
+GAPS: 13 concrete contract, publication, and migration gaps
+REGRESSION RULE: any migrated-lane failure becomes a required regression test before merge
 ─────────────────────────────────
 ```
 
 ### Test Requirements
 
-1. Run a focused regression pass before the live write:
-   `cargo test -p xtask agent_maintenance_execute -- --nocapture` and
-   `cargo test -p xtask agent_maintenance_closeout -- --nocapture`,
-   or fall back to `cargo test -p xtask`.
-2. Treat the live dry-run and live write as proof tests, not just operator steps. Archive their
-   outputs exactly.
-3. If the live run exposes any missing invariant in `workflow.rs`, `validate.rs`, or closeout
-   validation, add or update the matching `crates/xtask/tests/**` regression before archiving the
-   final proof.
-4. Finish with the exact green gates and final `make preflight` on the final proof-bearing head.
+1. Expand `crates/xtask/tests/agent_maintenance_watch.rs` and `agent_registry.rs` to assert that
+   migrated `codex` and `claude_code` now resolve to `packet_pr` and the shared opener.
+2. Expand `crates/xtask/tests/agent_maintenance_prepare.rs` and renderer tests to assert that the
+   packet-owned prompt, `HANDOFF.md`, and `pr-summary.md` explicitly require support audit and
+   bounded support uplift.
+3. Expand `crates/xtask/tests/agent_maintenance_execute.rs` to fail closed when the support-audit
+   contract is missing or inconsistent.
+4. Expand support publication checks so stale “deliberately unsupported” non-TUI notes fail once
+   uplift should have landed.
+5. Add explicit regression coverage for the ratchet rule:
+   a packet with preexisting non-TUI gaps and no blocker cannot succeed unchanged.
+6. Add explicit regression coverage for the eligibility rule:
+   a packet cannot pull unrelated preexisting gaps into `required_uplifts_this_run[]` without
+   adjacent surface change, bounded writable surfaces, or a no-new-seam proof.
+7. Add at least one focused test covering `opencode` restriction removal in support publication
+   truth so it does not regress back to a carved-out posture.
+8. Add explicit regression coverage for blocker taxonomy:
+   invalid reasons like `deliberately_unsupported` or `not_part_of_v1` fail packet validation.
+9. Keep `opencode` packet-pr coverage green while migrating the other agents. Do not regress the
+   already-proved lane.
+10. Prove one migrated `codex` path end to end, either as a real maintenance run or a full
+   repo-owned simulation that uses the actual shared packet-pr transport and relay contract.
+11. Finish with `make preflight`.
+
+## Performance Review
+
+This milestone is policy-heavy, not throughput-heavy, but there are still a few real performance
+and operability constraints:
+
+1. Do not duplicate artifact acquisition or packet rendering work across multiple workflows when
+   one shared opener and one shared relay path can do it once.
+2. Keep watcher fanout data-driven from registry truth so adding future agents does not turn into
+   O(number of workflows) maintenance edits.
+3. Keep relay validation deterministic and cheap. Digest checks, surface derivation, and support
+   comparison must stay local and bounded.
+4. Prefer targeted xtask tests while iterating, then one final `make preflight`. The full suite is
+   expensive enough already.
 
 ## Implementation Plan
 
-### Phase 1: Freeze Request Truth
+### Phase 1: Freeze The Normative Steady-State Contract
 
-**Goal:** start from one stable request and one stable proof boundary.
+**Goal**
 
-**Inputs**
+Make the specs and charter say exactly the same thing about automated maintenance.
 
-- `docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml`
-- `docs/agents/lifecycle/opencode-maintenance/HANDOFF.md`
-- `docs/agents/lifecycle/opencode-maintenance/governance/proof/proof-notes.md`
+**Primary files**
+
+- `docs/specs/maintenance-request-contract-v1.md`
+- `docs/specs/agent-registry-contract.md`
+- `docs/specs/cli-agent-onboarding-charter.md`
+- `docs/specs/unified-agent-api/support-matrix.md`
 - `docs/cli-agent-onboarding-factory-operator-guide.md`
+- `docs/cli-agent-onboarding-factory-workflow-atlas.md`
 
 **Actions**
 
-1. Verify the request still points at the intended `target_version`, `branch_name`, and
-   `request_commit`.
-2. Verify `HANDOFF.md` still matches the request's execution contract.
-3. Verify the rendered prompt digest in the request still matches the current prompt template.
-4. Decide whether the existing queue and PR-open proof artifacts are still truthful enough to keep.
-5. If request truth drifted, run:
-
-```sh
-cargo run -p xtask -- refresh-agent --request docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml --write
-```
-
-6. If Phase 1 changed any request-owned truth, commit those fixes before starting the dry-run
-   proof so the request SHA and archive evidence stay crisp.
+1. Freeze one definition of automated maintenance success:
+   support audit first, bounded non-TUI uplift second, green gates third, manual closeout last.
+2. Make the registry spec explicit that enrolled `packet_pr` dispatch is the steady state and
+   `workflow_dispatch` for `codex` and `claude_code` is transitional, not schema doctrine.
+3. Keep `requested_control_plane_actions = ["packet_doc_refresh"]` narrow, but define the support
+   uplift obligation in the execution contract and supporting prose.
+4. Define the ratchet rule in normative prose:
+   newly onboarded agents may begin partial, but enrolled automated maintenance must raise non-TUI
+   support over time and must not preserve deliberate unsupported posture as steady state.
+5. Align support publication rules so only TUI exclusions and concrete blockers can justify
+   remaining non-TUI unsupported surface.
+6. Define the eligibility rule for preexisting gaps:
+   only packet-bounded, justified older gaps become `required_uplifts_this_run`; everything else
+   becomes explicit deferred work.
+7. Align the operator guide and atlas so they both point back to the same normative contract and
+   no longer imply artifact-refresh-only semantics.
 
 **Outputs**
 
-- one canonical live request
-- one matching `HANDOFF.md`
-- proof archive notes that no longer claim stale request truth
+- one normative story
+- one operator story
+- one atlas story
 
 **Exit criteria**
 
-- a maintainer can point at one canonical request and say "this is the packet we are proving"
+- a reader can move from spec to guide to atlas without seeing contradictory success semantics
 
-### Phase 2: Prepare A Fresh Dry-Run Packet
+### Phase 2: Rewrite Packet Generation And Packet-Owned Docs Around Support Audit
 
-**Goal:** freeze one prepared `run_id` for the actual write attempt.
+**Goal**
 
-**Command**
+Make generated maintenance packets describe the real job.
 
-```sh
-cargo run -p xtask -- execute-agent-maintenance --request docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml --dry-run
-```
+**Primary files**
 
-**Expected outcomes**
-
-- exit code `0`
-- CLI output includes `run_id`, `run_dir`, and the exact closeout command
-- run packet written under `docs/agents/.uaa-temp/agent-maintenance/runs/<run_id>/`
-- `validation-report.json` records `status = "pass"`
-- `run-status.json` records `status = "dry_run_ready"`
-
-**Archive outputs**
-
-- `request-sha256.txt`
-- `run-id.txt`
-- `execute-dry-run.txt`
-- `validation-report-dry-run.json`
-- `run-status-dry-run.json`
-
-**Exit criteria**
-
-- there is one fresh prepared run packet and one committed `run-id.txt` pointing at it
-
-### Phase 3: Execute Write Mode Against The Frozen Packet
-
-**Goal:** prove that the packet can land the bounded maintenance update.
-
-**Command**
-
-```sh
-cargo run -p xtask -- execute-agent-maintenance --request docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml --write --run-id <run_id>
-```
-
-**Expected outcomes**
-
-- exit code `0`
-- `validation-report.json` records `status = "pass"`
-- `run-status.json` records `status = "write_validated"`
-- `run-status.json` records `validation_passed = true`
-- `written-paths.json` is non-empty
-- every written path matches the frozen `writable_surfaces`
-- the closeout path stays untouched
-- the exact `green_gates` run in order and all pass
-
-**Archive outputs**
-
-- `execute-write.txt`
-- `validation-report-write.json`
-- `run-status-write.json`
-- `written-paths-write.json`
-
-**Exit criteria**
-
-- the repo has one truthful write-mode diff produced by the live packet
-
-### Phase 4: Resolve Any Surfaced Gap And Rerun Cleanly
-
-**Goal:** prevent false proof if the first write exposes a hidden assumption.
-
-**Loop rule**
-
-If Phase 3 fails because of packet truth, writable surfaces, a green gate, a no-op write, or a
-missing guardrail:
-
-1. fix the issue inside the bounded blast radius
-2. add or update the matching regression test if the failure exposed a missing invariant
-3. rerun Phase 2 from a fresh dry-run if the fix changed packet-owned truth
-4. rerun Phase 3
-5. archive only the final successful run
-
-Do not keep a proof archive that mixes evidence from a failed prepared packet and a later
-successful packet.
-
-### Phase 5: Author Closeout And Run Manual Closeout
-
-**Goal:** prove the explicit maintainer closeout step the operator guide requires.
-
-**Closeout file**
-
-`docs/agents/lifecycle/opencode-maintenance/governance/maintenance-closeout.json`
-
-**Required fields**
-
-- `request_ref`
-- `request_sha256`
-- `resolved_findings`
-- exactly one of:
-  - `deferred_findings`
-  - `explicit_none_reason`
-- `preflight_passed`
-- `recorded_at`
-- `commit`
-
-**Command**
-
-```sh
-cargo run -p xtask -- close-agent-maintenance --request docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml --closeout docs/agents/lifecycle/opencode-maintenance/governance/maintenance-closeout.json
-```
-
-**Expected outcomes**
-
-- exit code `0`
-- refreshed `docs/agents/lifecycle/opencode-maintenance/HANDOFF.md`
-- refreshed `docs/agents/lifecycle/opencode-maintenance/governance/remediation-log.md`
-- written `maintenance-closeout.json`
-- live drift validation passes for all resolved findings
-
-**Archive output**
-
-- `closeout-summary.md`
-
-**Exit criteria**
-
-- the maintenance lane is explicitly closed, not implicitly assumed closed
-
-### Phase 6: Finalize The Proof Archive And Re-Run Final Verification
-
-**Goal:** leave one replayable, reviewable closed proof at the final branch head.
+- `crates/xtask/src/agent_maintenance/contract_policy.rs`
+- `crates/xtask/src/agent_maintenance/prepare.rs`
+- `crates/xtask/src/agent_maintenance/docs.rs`
+- `crates/xtask/src/agent_maintenance/request.rs`
+- `crates/xtask/src/agent_maintenance/request/automation.rs`
+- `cli_manifests/support_matrix/current.json`
+- `docs/agents/lifecycle/*-maintenance/CI_WORKFLOWS_PLAN.md`
+- `docs/agents/lifecycle/*-maintenance/OPS_PLAYBOOK.md`
 
 **Actions**
 
-1. Update `proof-notes.md` so it names the final request SHA, final `run_id`, whether a rerun was
-   required, and the final closeout result.
-2. Verify every committed proof artifact matches the final successful temp run packet.
-3. Run the final verification sequence from the final closeout state:
+1. Centralize the support-audit contract in shared derivation code, not per-agent text.
+2. Rewrite prompt rendering so support audit is explicit:
+   compare upstream surface against wrapper coverage, backend support, and manifest truth.
+3. Rewrite `HANDOFF.md` and `pr-summary.md` so the relay job is described as bounded support-aware
+   maintenance, not packet refresh plus incidental edits.
+4. Make the packet carry explicit deltas:
+   discovered upstream surface, eligible preexisting surface, deferred preexisting surface,
+   missing wrapper/backend support, required uplifts for this run, and allowed blocker-based
+   deferrals.
+5. Update packet-owned playbooks so `codex`, `claude_code`, and `opencode` all read like the same
+   factory with narrow per-agent value differences.
 
-```sh
-cargo fmt --all
-cargo run -p xtask -- codex-validate --root cli_manifests/opencode
-cargo run -p xtask -- support-matrix --check
-cargo run -p xtask -- capability-matrix --check
-cargo run -p xtask -- capability-matrix-audit
-make preflight
-```
+**Outputs**
 
-4. Review the final diff to confirm it still reads as one bounded maintenance run.
+- regenerated maintenance packet docs with truthful wording
+- support-aware prompt template semantics
 
 **Exit criteria**
 
-- proof archive is truthful
-- final branch head is green
-- the diff stays inside the expected maintenance blast radius
+- packet docs alone are sufficient to explain the real maintenance job without reading workflow YAML
+
+### Phase 3: Enforce Support-Aware Relay Semantics
+
+**Goal**
+
+Make `execute-agent-maintenance` fail closed when the support-aware contract is missing or broken.
+
+**Primary files**
+
+- `crates/xtask/src/agent_maintenance/execute.rs`
+- `crates/xtask/src/agent_maintenance/execute/runtime.rs`
+- `crates/xtask/src/agent_maintenance/execute/validate.rs`
+- `crates/xtask/src/agent_maintenance/execute/workflow.rs`
+- `crates/xtask/src/agent_maintenance/refresh.rs`
+
+**Actions**
+
+1. Add explicit validation that the prepared request and rendered docs carry the support-audit
+   contract expected by the steady-state packet.
+2. Ensure relay recovery guidance points back to shared packet regeneration and shared relay use,
+   not back to the old worker-centered worldview.
+3. Keep the write envelope tight:
+   wrapper crate, backend module, manifest root, packet-owned docs, no TUI spillover.
+4. Fail closed when a run leaves preexisting or newly discovered non-TUI gaps unresolved without a
+   concrete blocker recorded in packet truth.
+5. Fail closed when a packet marks preexisting gaps as in-scope without satisfying the eligibility
+   rule for this run.
+6. Keep closeout manual and untouched by write mode.
+
+**Outputs**
+
+- support-aware relay invariants
+- shared failure-closed behavior
+
+**Exit criteria**
+
+- a packet that describes artifact refresh only cannot pass as a valid steady-state automated run
+
+### Phase 4: Converge `codex` And `claude_code` Transport Onto Shared `packet_pr`
+
+**Goal**
+
+Make the live enrolled transport story match the docs.
+
+**Primary files**
+
+- `crates/xtask/data/agent_registry.toml`
+- `crates/xtask/src/agent_registry/release_watch.rs`
+- `crates/xtask/src/agent_maintenance/watch.rs`
+- `.github/workflows/agent-maintenance-release-watch.yml`
+- `.github/workflows/agent-maintenance-open-pr.yml`
+- `.github/workflows/codex-cli-update-snapshot.yml`
+- `.github/workflows/claude-code-update-snapshot.yml`
+
+**Actions**
+
+1. Migrate `codex` and `claude_code` registry truth from `workflow_dispatch` to `packet_pr`.
+2. Make the shared watcher emit the shared opener for all enrolled agents.
+3. Remove or clearly retire worker-specific workflow dispatch as steady-state transport.
+4. Keep any agent-specific acquisition detail outside the policy layer. If the opener needs more
+   inputs, derive them from registry truth and the packet, not from hidden YAML policy.
+
+**Outputs**
+
+- one shared enrolled transport story
+- no worker-specific steady-state transport dependency
+
+**Exit criteria**
+
+- the registry, watcher, and workflows all agree that enrolled automated maintenance opens via
+  `agent-maintenance-open-pr.yml`
+
+### Phase 5: Refresh Historical Maintenance Packet Surfaces
+
+**Goal**
+
+Bring generated and committed lifecycle maintenance docs back into alignment after the contract
+shift.
+
+**Primary files**
+
+- `docs/agents/lifecycle/codex-maintenance/**`
+- `docs/agents/lifecycle/opencode-maintenance/**`
+- `docs/agents/lifecycle/<agent_id>-maintenance/**` for any migrated packet surfaces that still
+  need to be materialized or refreshed
+- `docs/specs/unified-agent-api/support-matrix.md`
+- `cli_manifests/support_matrix/current.json`
+
+**Actions**
+
+1. Regenerate packet-owned docs for migrated agents so they describe the same relay job.
+2. Keep `opencode` truthful to the already-proved `packet_pr` lane while removing its v1
+   deliberate unsupported posture from the steady-state story.
+3. Update support publication surfaces so they stop normalizing deliberate non-TUI unsupported
+   posture for any enrolled CLI agent.
+4. Update packet-owned playbooks and workflow plans that still talk like worker transport is the
+   normal path.
+
+**Outputs**
+
+- committed lifecycle maintenance docs that match the migrated contract
+
+**Exit criteria**
+
+- there is no packet-owned maintenance doc left that treats worker transport as the steady state
+
+### Phase 6: Land Regression Coverage And One Migrated Proof
+
+**Goal**
+
+Prove that the new story works for a formerly worker-backed agent.
+
+**Primary files**
+
+- `crates/xtask/tests/agent_maintenance_prepare.rs`
+- `crates/xtask/tests/agent_maintenance_execute.rs`
+- `crates/xtask/tests/agent_maintenance_watch.rs`
+- `crates/xtask/tests/agent_registry.rs`
+- `crates/xtask/tests/c4_spec_ci_wiring.rs`
+- migrated `codex` maintenance packet/proof surfaces as needed
+
+**Actions**
+
+1. Add regression coverage for transport convergence, support-aware packet rendering, and
+   support-aware relay validation.
+2. Run targeted xtask suites until green.
+3. Prepare and validate one migrated `codex` maintenance lane through the shared `packet_pr`
+   contract.
+4. If the proof exposes a missing invariant, add the test first, then rerun the proof.
+5. Finish with `make preflight`.
+
+**Outputs**
+
+- shared regression protection
+- one migrated proof example
+
+**Exit criteria**
+
+- the repo can point to one previously worker-backed agent and show that the shared lane is real
 
 ## Worktree Parallelization Strategy
-
-This milestone needs a parallelization section, but the honest answer is that the happy path is
-mostly sequential.
-
-The same live request, the same frozen `run_id`, the same temp run packet, and the same proof root
-all form one chain of custody. Splitting that chain across worktrees before the first successful
-write is how you create stale packets and merge noise.
 
 ### Dependency Table
 
 | Step | Modules touched | Depends on |
 | --- | --- | --- |
-| Freeze request truth | `docs/agents/lifecycle/opencode-maintenance/`, `docs/cli-agent-onboarding-factory-operator-guide.md` | — |
-| Prepare dry-run packet | `docs/agents/.uaa-temp/agent-maintenance/`, `docs/agents/lifecycle/opencode-maintenance/governance/proof/` | Freeze request truth |
-| Execute write mode | `crates/opencode/`, `crates/agent_api/`, `cli_manifests/opencode/`, `docs/specs/unified-agent-api/`, `docs/agents/.uaa-temp/agent-maintenance/` | Prepare dry-run packet |
-| Fix surfaced gap, if any | Usually `crates/xtask/`, `crates/opencode/`, `crates/agent_api/`, `docs/agents/lifecycle/opencode-maintenance/`, `cli_manifests/opencode/` | Execute write mode |
-| Author closeout and close lane | `docs/agents/lifecycle/opencode-maintenance/` | Successful write mode |
-| Final archive + preflight | `docs/agents/lifecycle/opencode-maintenance/governance/proof/`, repo-wide checks | Successful closeout |
+| 1. Normative contract freeze | `docs/specs/`, `docs/` | — |
+| 2. Packet rendering rewrite | `crates/xtask/src/agent_maintenance/`, `docs/agents/lifecycle/*-maintenance/` | 1 |
+| 3. Relay enforcement | `crates/xtask/src/agent_maintenance/execute/`, `crates/xtask/src/agent_maintenance/` | 1 |
+| 4. Transport convergence | `crates/xtask/data/`, `crates/xtask/src/agent_registry/`, `.github/workflows/` | 1 |
+| 5. Regression coverage | `crates/xtask/tests/` | 2, 3, 4 |
+| 6. Migrated proof and doc refresh | `docs/agents/lifecycle/*-maintenance/`, temp run outputs, proof surfaces | 2, 3, 4, 5 |
 
 ### Parallel Lanes
 
-Base case:
+Lane A: Step 1 → Step 2  
+Sequential, shared contract and packet-doc surfaces.
 
-- Lane A: Freeze request truth -> Prepare dry-run packet -> Execute write mode -> Closeout ->
-  Final archive
+Lane B: Step 1 → Step 3  
+Sequential after the contract freeze, but independent from packet-doc wording changes once the
+contract is fixed.
 
-That is sequential because each step consumes truth created by the prior step.
+Lane C: Step 1 → Step 4  
+Sequential after the contract freeze, independent from most relay code changes.
 
-Conditional case, only if Phase 3 exposes a real code gap:
-
-- Lane A: preserve failing run evidence and update proof notes draft
-- Lane B: fix the bounded code or contract issue and add the matching regression test
-
-Even then, merge Lane B back before rerunning dry-run. Do not let two worktrees create competing
-request truth or competing proof artifacts.
+Lane D: Step 5 → Step 6  
+Sequential, shared test and proof surfaces.
 
 ### Execution Order
 
-1. Run the happy path in one worktree.
-2. Only split into a second worktree if the first live write exposes a bounded code gap that can be
-   fixed independently.
-3. Merge the fix worktree back.
-4. Rerun dry-run and write from the merged truth in the primary worktree.
+1. Launch Step 1 first. It sets the contract truth everyone else depends on.
+2. After Step 1 lands or is at least text-stable, launch Lanes A, B, and C in parallel worktrees.
+3. Merge A, B, and C.
+4. Run Step 5 in a clean follow-up worktree once the shared code paths settle.
+5. Run Step 6 last so the migrated proof reflects the final merged contract, renderer, relay, and
+   transport state.
 
 ### Conflict Flags
 
-- `docs/agents/lifecycle/opencode-maintenance/**` is shared by nearly every phase. Parallel edits
-  there are likely to conflict.
-- `docs/agents/.uaa-temp/agent-maintenance/runs/<run_id>/` is run-specific and should remain owned
-  by the active proof worktree.
-- `docs/agents/lifecycle/opencode-maintenance/governance/proof/**` must describe one final
-  successful run. Do not let multiple worktrees write competing proof narratives.
-
-**Parallelization verdict:** sequential implementation on the happy path. A second worktree is
-justified only for a bounded repair after a failed live write.
+1. Lanes A and B both touch `crates/xtask/src/agent_maintenance/contract_policy.rs` indirectly if
+   the support-audit shape changes mid-implementation. Freeze the shared struct and field names
+   before parallelizing.
+2. Lanes A and C can both touch maintenance prose under `docs/` if workflow wording is edited
+   twice. Keep Step 1 authoritative and avoid restating policy in Step 4.
+3. Lanes B and C can both affect watcher or packet expectations used by shared tests. Do not start
+   Step 5 until both are merged.
 
 ## Completion Summary
 
-- Step 0: Scope Challenge, complete. Scope stays on the live `opencode` packet.
-- Architecture Review: complete. No new architecture required.
-- Code Quality Review: complete. Reuse existing executor and closeout surfaces. Do not add a new
-  workflow family or archive system.
-- Test Review: complete. Guardrails are already strong; live dry-run, live write, and live closeout
-  remain the proof obligations.
-- Performance Review: complete. This milestone is bounded by command execution and repo validation,
-  not by a new hot path.
-- NOT in scope: written.
-- What already exists: written.
-- Failure modes: written. The only critical gap is proof-archive truth if it is left stale.
-- Parallelization: written. Happy path is sequential; conditional repair lane only after a failed
-  live write.
-- Lake score: the complete option wins. This plan proves the whole lane, not just packet opening.
+- Step 0: Scope Challenge, scope accepted as the minimum complete steady-state rewrite
+- Architecture Review: one shared watcher, one shared packet_pr opener, one shared relay, explicit
+  support audit, support ratchet, explicit manual closeout
+- Code Quality Review: no shadow policy in YAML, no agent-specific packet schema, no hidden
+  success semantics
+- Test Review: coverage diagram produced, 13 concrete gaps identified
+- Performance Review: no throughput blocker, but watcher and relay must stay data-driven and cheap
+- NOT in scope: written
+- What already exists: written
+- TODOS cross-reference: one existing topology TODO is consumed by this plan
+- Failure modes: 6 critical gaps flagged
+- Parallelization: 4 lanes, 3 parallel after contract freeze, 1 final sequential proof lane
+- Lake Score: choose the complete transport-and-contract convergence, not another docs-only pass
+
+## Definition Of Done
+
+This plan is done only when all of the following are true:
+
+1. The specs, charter, operator guide, atlas, and packet-owned docs all describe the same steady
+   state.
+2. `codex` and `claude_code` no longer rely on worker-specific steady-state maintenance transport.
+3. Shared packet rendering explicitly requires support audit, required uplift deltas, and
+   blocker-only deferrals.
+4. Shared relay validation enforces the same contract.
+5. `opencode` and the other enrolled CLI agents no longer publish deliberate non-TUI unsupported
+   posture as normal steady state.
+6. Shared regression coverage protects the migrated lane and the support ratchet rule.
+7. One migrated `codex` proof demonstrates that the post-`opencode` steady-state story is real.
