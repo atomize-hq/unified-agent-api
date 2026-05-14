@@ -10,21 +10,21 @@ This packet tracks automated upstream-release maintenance for `opencode`.
 - trigger kind: `upstream_release_detected`
 - basis ref: `cli_manifests/opencode/latest_validated.txt`
 - opened from: `.github/workflows/agent-maintenance-open-pr.yml`
-- recorded at: `2026-05-11T19:47:31Z`
-- request commit: `1673a34b6eb1e2cf7d6a3bfef229f668c02746f9`
+- recorded at: `2026-05-14T06:32:36Z`
+- request commit: `b5ba0d73784f4c260737c958b4a9e0cc83c399e3`
 
 ## Trigger context
 
 - detected_by: `.github/workflows/agent-maintenance-release-watch.yml`
 - current_validated: `1.4.11`
-- target_version: `1.14.47`
-- latest_stable: `1.14.48`
+- target_version: `1.14.49`
+- latest_stable: `1.14.50`
 - version_policy: `latest_stable_minus_one`
 - source_kind: `github_releases`
 - source_ref: `anomalyco/opencode`
 - dispatch_kind: `packet_pr`
 - dispatch_workflow: `agent-maintenance-open-pr.yml`
-- branch_name: `automation/opencode-maintenance-1.14.47`
+- branch_name: `automation/opencode-maintenance-1.14.49`
 
 ## Canonical execution contract
 
