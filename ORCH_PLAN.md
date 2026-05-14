@@ -1,691 +1,873 @@
-# ORCH_PLAN - Prove The Packet PR Maintenance Lane Can Actually Land
+# ORCH_PLAN - Execute Shared Packet-PR Support-Uplift Convergence
 
 Status: ready for implementation  
-Date: 2026-05-12  
+Date: 2026-05-13  
 Working branch: `staging`  
-Plan revision baseline: `d6b86cdc`  
-Design input: `/Users/spensermcconnell/.gstack/projects/atomize-hq-unified-agent-api/spensermcconnell-staging-design-20260511-185442.md`  
-Supersedes: prior repo-root `PLAN.md` for dry-run-only packet proof readiness
+Plan revision baseline: `b5ba0d73`  
+Primary design input:
+- `/Users/spensermcconnell/.gstack/projects/atomize-hq-unified-agent-api/spensermcconnell-staging-design-20260513-112453.md`
+
+Supersedes:
+- the prior repo-root `ORCH_PLAN.md` for the `opencode`-only proof session
 
 ## Summary
 
-- Branch context: execute on the current `staging` branch only; the live packet itself declares maintenance branch `automation/opencode-maintenance-1.14.47`.
-- Objective: prove the current live `opencode` automated maintenance packet can complete a real bounded write, pass the exact packet-declared green gates, remain inside the exact packet-declared writable surfaces, be manually closed with the repo-owned closeout command, and leave committed replayable proof artifacts.
-- Parent role: the parent agent is the sole orchestrator, sole integrator, and sole owner of all serialized critical-path operations.
-- Worker model: optional bounded worker lanes only; prefer `GPT-5.4` with `reasoning_effort=high`.
-- Concurrency cap: one optional repair lane at a time, and only after a surfaced failure. Happy path is sequential.
-- Worktree rule: the happy path stays in the primary `staging` worktree. Optional repair worktrees are allowed only for bounded remediation and may not run dry-run, write, or closeout.
-- Run-state source of truth:
-  - live request: `docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml`
-  - canonical handoff: `docs/agents/lifecycle/opencode-maintenance/HANDOFF.md`
-  - prompt template: `docs/agents/lifecycle/opencode-maintenance/governance/execute-agent-maintenance-prompt.md`
-  - active temp run state: `docs/agents/.uaa-temp/agent-maintenance/runs/<run_id>/`
-  - canonical proof root: `docs/agents/lifecycle/opencode-maintenance/governance/proof/`
-- Proof-artifact handling: `.uaa-temp/...` is run-state / derived evidence unless explicitly promoted into the proof root. Commit structured summaries and JSON by default. Raw `codex-stdout.txt` and `codex-stderr.txt` stay temp-only unless failure diagnosis requires promotion.
-- Hard truth: another dry-run-only archive does not count. Proof is incomplete without both `execute-agent-maintenance --write` and manual `close-agent-maintenance`.
+- Branch context: the parent agent integrates on the existing `staging` branch. No long-lived
+  alternate integration branch is introduced for this session.
+- Objective: execute the current `PLAN.md` to completion by freezing the support-aware maintenance
+  contract, converging `codex` and `claude_code` onto shared `packet_pr`, aligning packet
+  derivation plus relay semantics, refreshing committed lifecycle and publication surfaces, and
+  finishing with shared regression coverage plus one real migrated `codex` proof.
+- Parent role: the parent agent is the sole orchestrator, sole integrator, sole checkpoint owner,
+  and sole final gate owner.
+- Parallelization model:
+  - Phase 1 is fully serial and ends with one frozen contract baseline commit.
+  - After that freeze, three disjoint code lanes may run in parallel:
+    - Lane A: packet derivation plus packet-owned docs
+    - Lane B: relay validation and execution enforcement
+    - Lane C: transport convergence
+  - Integration doc refresh is serial after A, B, and C merge.
+  - Regression coverage plus the migrated `codex` proof is last.
+- Worktree model: lane worktrees branch from the exact Phase 1 freeze commit under local `wt/`
+  roots and return bounded diffs only. The parent merges them one at a time back into `staging`.
+- Proof model: `codex` is the required first migrated proof. `claude_code` must reach transport and
+  contract parity in code and tests in the same milestone, but it does not need to be the first
+  live proof lane.
+- Hard truth: the support-audit schema frozen in `PLAN.md` Phase 1 is not negotiable downstream.
+  If that schema changes, parallelization stops and every downstream lane re-bases from a new
+  contract-freeze commit.
 
-## Purpose
+## Run-State Sources Of Truth
 
-This orchestration plan executes the current live `PLAN.md` to completion for one target only:
-
-`docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml`
-
-The milestone is not watcher detection, packet opening, or packet rendering. Those are already proven. The missing proof is the landing path:
-
-1. fresh dry-run from the live request
-2. one frozen reusable `run_id`
-3. write mode against that exact frozen packet
-4. exact green gates passing in order
-5. manual closeout authored after write succeeds
-6. repo-owned closeout command succeeding
-7. replayable structured proof committed under the canonical proof root
-8. final `make preflight` green on the proof-bearing head
+- current plan intent: `PLAN.md`
+- current orchestration contract: `ORCH_PLAN.md`
+- serial-to-parallel baseline: the recorded Phase 1 freeze SHA on `staging`
+- active lane map: parent-maintained worktree path -> branch -> owned-surface mapping for A, B,
+  and C
+- canonical migrated proof request: `docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml`
+- canonical migrated proof root: `docs/agents/lifecycle/codex-maintenance/governance/proof/`
+- local parallel scratch root: `wt/` only; never committed
 
 ## Definition Of Done
 
 The session is complete only when all of the following are true:
 
-1. `execute-agent-maintenance --dry-run` succeeds for the live request and yields a reusable `run_id`.
-2. `execute-agent-maintenance --write --run-id <run_id>` succeeds against that exact frozen packet.
-3. `docs/agents/.uaa-temp/agent-maintenance/runs/<run_id>/run-status.json` records:
-   - `status = "write_validated"`
-   - `validation_passed = true`
-4. All write-mode changes stay inside the exact request `writable_surfaces`.
-5. Write mode does not create or modify `docs/agents/lifecycle/opencode-maintenance/governance/maintenance-closeout.json`.
-6. The exact request `green_gates` pass in order:
-   - `cargo fmt --all`
-   - `cargo run -p xtask -- codex-validate --root cli_manifests/opencode`
-   - `cargo run -p xtask -- support-matrix --check`
-   - `cargo run -p xtask -- capability-matrix --check`
-   - `cargo run -p xtask -- capability-matrix-audit`
-   - `make preflight`
-7. A truthful `docs/agents/lifecycle/opencode-maintenance/governance/maintenance-closeout.json` exists.
-8. `cargo run -p xtask -- close-agent-maintenance --request docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml --closeout docs/agents/lifecycle/opencode-maintenance/governance/maintenance-closeout.json` succeeds.
-9. `docs/agents/lifecycle/opencode-maintenance/governance/proof/` contains the final structured proof set:
-   - existing queue / PR-open evidence if still truthful
-   - `request-sha256.txt`
-   - `run-id.txt`
-   - `execute-dry-run.txt`
-   - `execute-write.txt`
-   - `validation-report-dry-run.json`
-   - `validation-report-write.json`
-   - `run-status-dry-run.json`
-   - `run-status-write.json`
-   - `written-paths-write.json`
-   - `closeout-summary.md`
-   - `proof-notes.md`
-10. `make preflight` is green on the final proof-bearing head.
+1. Phase 1 leaves one frozen normative contract across:
+   - `docs/specs/maintenance-request-contract-v1.md`
+   - `docs/specs/agent-registry-contract.md`
+   - `docs/specs/cli-agent-onboarding-charter.md`
+   - `docs/specs/unified-agent-api/support-matrix.md`
+   - `docs/specs/unified-agent-api/non-tui-support-debt.md`
+2. `docs/cli-agent-maintenance-steady-state-plan.md` is retired as a live planning surface and the
+   operator guide plus workflow atlas point back to the same normative contract.
+3. Shared packet derivation emits the frozen `support_surface_audit` schema and shared packet-owned
+   docs describe bounded non-TUI support uplift rather than artifact refresh only.
+4. Shared relay validation fails closed when the support-aware contract is missing, inconsistent,
+   under-scoped, or launders unsupported gaps through invalid deferrals.
+5. `crates/xtask/data/agent_registry.toml`, watcher code, and workflow YAML all treat shared
+   `packet_pr` plus `agent-maintenance-open-pr.yml` as the live enrolled transport for `codex`,
+   `claude_code`, and `opencode`.
+6. Worker-specific steady-state transport for `codex` and `claude_code` is retired or explicitly
+   demoted to unscheduled historical/manual-only status with no registry-driven role.
+7. Integration doc refresh lands after the merged code lanes and materializes any now-required
+   `claude_code` maintenance packet surface at the shared renderer's `agent_id`-derived
+   maintenance root, for example `docs/agents/lifecycle/claude_code-maintenance/**`, if transport
+   convergence makes it a steady-state lane.
+8. Shared regression coverage protects packet derivation, relay enforcement, registry/watcher
+   convergence, blocker taxonomy, debt-count ratchet, support publication contraction, and the
+   migrated lane.
+9. One real `codex` maintenance run succeeds through the shared watcher, shared opener, shared
+   packet, shared relay, and manual closeout path, producing committed proof artifacts.
+10. Final verification is green, including `make preflight`.
 
-## Locked Decisions And Hard Guards
+## Hard Guards
 
-1. Proof target is the current live `opencode` automated request only.
-2. Proof is incomplete unless it includes both `execute-agent-maintenance --write` and manual `close-agent-maintenance`.
-3. Another dry-run-only archive does not count.
-4. Canonical proof archive root stays `docs/agents/lifecycle/opencode-maintenance/governance/proof/`.
-5. Parent remains sole integrator and sole owner of serialized critical-path operations.
-6. If request, prompt, writable surfaces, green gates, target version, branch name, closeout path, closeout command, or request SHA drift after dry-run, the prepared packet is invalid. Rerun dry-run before write.
-7. If write succeeds but exposes a contract gap inside bounded surfaces, fix the gap, rerender if needed, rerun dry-run, rerun write, and archive only the final successful run.
-8. Manual closeout remains manual by design; do not automate it inside `execute-agent-maintenance`.
-9. Raw `codex-stdout.txt` and `codex-stderr.txt` remain temp evidence under `.uaa-temp`; do not commit them unless a real failure requires them.
-10. No worker lane may run live dry-run, live write, or live closeout.
-11. No proof artifact may describe a failed or superseded run as the final proof.
-
-## Live Request Contract
-
-### Canonical Request
-
-`docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml`
-
-### Preserved Request Truth
-
-- `agent_id = "opencode"`
-- `executor = "execute-agent-maintenance"`
-- `prompt_template_path = "docs/agents/lifecycle/opencode-maintenance/governance/execute-agent-maintenance-prompt.md"`
-- `prompt_sha256 = "f68f4a5c6cc09a186256fe475e311bd4881e6dfeabd7852f1ed62cf659ce9685"`
-- `closeout_path = "docs/agents/lifecycle/opencode-maintenance/governance/maintenance-closeout.json"`
-- `requires_manual_closeout = true`
-- `target_version = "1.14.47"`
-- `branch_name = "automation/opencode-maintenance-1.14.47"`
-
-### Exact Writable Surfaces
-
-- `docs/agents/lifecycle/opencode-maintenance/**`
-- `crates/opencode/**`
-- `crates/agent_api/**`
-- `cli_manifests/opencode/artifacts.lock.json`
-- `cli_manifests/opencode/snapshots/1.14.47/**`
-- `cli_manifests/opencode/reports/1.14.47/**`
-- `cli_manifests/opencode/versions/1.14.47.json`
-- `cli_manifests/opencode/wrapper_coverage.json`
-- `cli_manifests/support_matrix/current.json`
-- `docs/specs/unified-agent-api/support-matrix.md`
-
-### Exact Green Gates
-
-- `cargo fmt --all`
-- `cargo run -p xtask -- codex-validate --root cli_manifests/opencode`
-- `cargo run -p xtask -- support-matrix --check`
-- `cargo run -p xtask -- capability-matrix --check`
-- `cargo run -p xtask -- capability-matrix-audit`
-- `make preflight`
+1. The parent agent is the only checkpoint authority and the only agent allowed to declare a phase
+   complete.
+2. The existing `staging` branch remains the primary integration branch for the full session.
+3. Phase 1 is serial. No downstream lane starts before the parent records the exact contract-freeze
+   commit SHA.
+4. The Phase 1 freeze locks:
+   - `support_surface_audit` field names
+   - debt inventory row shape
+   - allowed deferral taxonomy
+   - eligibility reasons
+   - the meaning of `required_uplifts_this_run[]`
+5. The frozen support-audit schema is not renegotiated in packet prose, relay logic, workflow YAML,
+   test fixtures, or downstream lane-local docs.
+6. Workflow YAML owns transport only. It must not become a second policy store for support audit,
+   writable-surface narrowing, ratchet rules, or green-gate semantics.
+7. Lane A may not invent relay-only validation rules. Lane B may not rename packet schema or write
+   new policy prose. Lane C may not encode agent-specific maintenance semantics in workflow YAML.
+8. Phase 5 is serial by design. Do not materialize `claude_code` maintenance packet roots under
+   the shared renderer's `agent_id`-derived maintenance path, for example
+   `docs/agents/lifecycle/claude_code-maintenance/**`, or rewrite support publication while A, B,
+   and C are still moving independently.
+9. `claude_code` packet-surface materialization happens only if transport convergence makes
+   steady-state committed maintenance surfaces necessary and they do not already exist at that
+   `agent_id`-derived maintenance root.
+10. `opencode` does not keep a special carveout. Historical proof artifacts stay intact, but its
+    steady-state support posture must align with the same ratchet contract as every other agent.
+11. No worker lane may run the authoritative live proof flow:
+    - shared watcher proof capture
+    - shared opener packet materialization for the final proof packet
+    - `execute-agent-maintenance --dry-run`
+    - `execute-agent-maintenance --write`
+    - `close-agent-maintenance`
+    - final `make preflight`
+12. If the contract freeze changes after A, B, or C starts, the parent stops parallel work, records
+    the new freeze commit, and re-bases or reruns all affected lanes from that new baseline.
+13. Any proof failure that exposes a missing invariant must add or tighten regression coverage
+    before the proof is rerun.
+14. Do not revert unrelated user or teammate changes. Integrate around the current repo state and
+    keep lane diffs bounded to their declared surfaces.
+15. The parent owns the final merged diff review and must reject any lane that spills into TUI
+    parity, unrelated runtime work, or ad hoc publication policy.
 
 ## Run-State / Checkpoint Model
 
-The happy path is serialized. Each checkpoint freezes truth for the next phase. If a later action invalidates an earlier checkpoint, execution returns to the earliest invalidated checkpoint and reruns forward from there.
+The session is controlled through explicit checkpoints. If a later step invalidates an earlier
+checkpoint, execution returns to the earliest invalidated checkpoint and reruns forward from there.
 
 ### Checkpoint C0 - Baseline Captured
 
 State frozen:
 
 - current `staging` head
-- current live request file
-- current `HANDOFF.md`
-- current proof root contents
-- current regression baseline intent
+- current `PLAN.md`
+- current stale `ORCH_PLAN.md` replacement intent
+- current status of:
+  - `docs/specs/**`
+  - `docs/agents/lifecycle/codex-maintenance/**`
+  - `docs/agents/lifecycle/opencode-maintenance/**`
+  - `docs/agents/lifecycle/claude-code-cli-onboarding/**`
+  - `.github/workflows/*.yml`
+  - `crates/xtask/src/agent_maintenance/**`
+  - `crates/xtask/src/agent_registry/**`
 
 Invalidated by:
 
-- manual edits to request-owned surfaces before request freeze is completed
-- branch/head movement that changes request-owned truth before `C1`
+- unexpected branch movement before the Phase 1 freeze is recorded
+- unrelated repo churn that changes owned surfaces before C1
 
 Rerun implication:
 
-- repeat baseline audit before claiming any later checkpoint
+- repeat baseline capture before claiming any later checkpoint
 
-### Checkpoint C1 - Request Truth Frozen
+### Checkpoint C1 - Contract Freeze Commit Recorded
 
 State frozen:
 
-- canonical request contents
-- canonical request SHA
-- prompt continuity
-- handoff alignment
-- proof-root keep/replace decisions for existing artifacts
+- exact Phase 1 baseline commit SHA
+- exact support-audit schema
+- exact debt inventory row shape
+- exact blocker taxonomy
+- explicit ownership map across specs and explanatory docs
 
 Invalidated by:
 
-- any change to request contents
-- any change to rendered prompt contents or prompt digest
-- any change to `target_version`
-- any change to `branch_name`
-- any change to `writable_surfaces`
-- any change to `green_gates`
-- any change to `closeout_path`
-- any change to the exact closeout command contract
+- any post-freeze rename to support-audit fields
+- any blocker taxonomy drift
+- any debt-row schema drift
+- any new live policy inserted into workflow YAML or packet prose
 
 Rerun implication:
 
-- return to request freeze, then rerun regressions if affected, then rerun dry-run and everything after it
+- redo the Phase 1 freeze, capture the new SHA, and rebase or restart A, B, and C from that commit
 
-### Checkpoint C2 - Regression Baseline Green
+### Checkpoint C2 - Parallel Lanes Launched From One Baseline
 
 State frozen:
 
-- executor and closeout regression baseline is green enough to trust the live run
+- three lane branches created from the exact C1 SHA
+- lane ownership boundaries acknowledged
+- lane-local test targets agreed
 
 Invalidated by:
 
-- changes to executor surfaces
-- changes to closeout surfaces
-- changes to matching regression tests
-- any repair that touches `crates/xtask/src/agent_maintenance/**` or `crates/xtask/tests/**`
+- a lane branching from the wrong commit
+- scope creep that crosses lane ownership without parent approval
 
 Rerun implication:
 
-- rerun focused regressions before any dry-run or rerun attempt
+- respawn the affected lane from C1 and discard mismatched branch work
 
-### Checkpoint C3 - Dry-Run Packet Frozen
+### Checkpoint C3 - Lanes A, B, And C Merged
 
 State frozen:
 
+- packet derivation plus packet docs lane merged
+- relay enforcement lane merged
+- transport convergence lane merged
+- merged `staging` head carries one stable steady-state implementation baseline
+
+Invalidated by:
+
+- merge conflict resolution that changes frozen policy without returning to C1
+- post-merge discovery that any lane skipped its required acceptance
+
+Rerun implication:
+
+- repair the affected lane, rerun its tests, and re-merge before Phase 5 starts
+
+### Checkpoint C4 - Integration Docs And Publication Refreshed
+
+State frozen:
+
+- committed lifecycle maintenance docs aligned to merged code
+- support publication aligned to debt truth
+- any required `claude_code` maintenance packet root materialized
+
+Invalidated by:
+
+- lifecycle docs still describing worker transport as steady state
+- support publication caveats lacking debt rows or concrete blockers
+- generated packet surfaces still encoding pre-freeze semantics
+
+Rerun implication:
+
+- rerun the integration doc refresh pass before starting Phase 6
+
+### Checkpoint C5 - Regression Baseline Green
+
+State frozen:
+
+- shared tests for prepare, execute, registry/watcher, and CI wiring are green
+- lane-local invariants are covered
+- proof can start without known untested contract gaps
+
+Invalidated by:
+
+- any code or doc fix touching covered behavior after tests pass
+- any proof failure revealing a missing invariant
+
+Rerun implication:
+
+- add or update the test first, rerun the targeted suites, then rerun forward
+
+### Checkpoint C6 - Migrated `codex` Proof Green
+
+State frozen:
+
+- shared watcher resolves `codex` to shared opener
+- shared opener or equivalent packet materialization yields a fresh migrated `codex` packet
 - one active `run_id`
-- one active temp run directory
-- one active request SHA
-- one dry-run validation result
-- one dry-run-ready packet eligible for write
+- successful dry-run and write on that exact packet
+- successful manual closeout
+- committed proof artifacts under the canonical `codex` proof root
 
 Invalidated by:
 
-- any packet-owned truth drift after dry-run
-- any executor repair that affects packet semantics
-- any ambiguity about which `run_id` is active
+- request truth drift after packet generation
+- dry-run or write mismatch against proof claims
+- proof artifacts mixing evidence from different runs
 
 Rerun implication:
 
-- discard the old packet for proof purposes and rerun dry-run to mint a new active `run_id`
+- preserve failed evidence separately, fix the cause, then rerun from the earliest invalidated
+  proof-prep checkpoint
 
-### Checkpoint C4 - Write Proof Green
-
-State frozen:
-
-- one successful write on the frozen packet
-- one bounded diff
-- one validated run-status showing `write_validated`
-- one successful ordered green-gate sequence
-- one confirmed no-closeout-from-write proof
-
-Invalidated by:
-
-- discovery that write escaped `writable_surfaces`
-- discovery that write transcript or run-status mismatches proof claims
-- post-write repair to packet-owned truth or write-owned repo surfaces that changes what the proof run actually was
-
-Rerun implication:
-
-- repair, then rerun dry-run and write; archive only the final successful run
-
-### Checkpoint C5 - Closeout Green
+### Checkpoint C7 - Final Head Green
 
 State frozen:
 
-- truthful `maintenance-closeout.json`
-- successful `close-agent-maintenance`
-- refreshed owned closeout outputs
+- final proof-bearing head remains bounded and reviewable
+- final repo verification is green
+- no open conflict remains between contract, code, docs, publication truth, and proof artifacts
 
 Invalidated by:
 
-- closeout validation finding drift or unresolved findings
-- edits to closeout surfaces that make the recorded closeout untruthful
-- final proof review showing the closeout summary misstates the actual run
-
-Rerun implication:
-
-- fix closeout truth and rerun closeout; rerun write only if closeout truth depends on invalidating the write proof itself
-
-### Checkpoint C6 - Final Proof Head Green
-
-State frozen:
-
-- proof root is truthful and complete
-- final repo verification sequence is green
-- final head remains a bounded maintenance diff
-
-Invalidated by:
-
-- any proof artifact mismatch
 - any final gate failure
-- any unrelated spillover diff that breaks bounded-scope reviewability
+- any bounded-scope violation discovered in final diff review
 
 Rerun implication:
 
-- fix only the invalidated phase, then rerun forward to final head green
+- fix only the invalidated surface, rerun affected gates, and restore final head green
 
 ## Worktree And Branch Strategy
 
 ### Primary Worktree
 
-All happy-path execution stays in the primary repository worktree on branch `staging`.
+The parent stays in the primary repository worktree at:
+
+`/Users/spensermcconnell/__Active_Code/atomize-hq/unified-agent-api`
 
 The parent owns:
 
-- all request freeze work
-- all dry-run/write/closeout execution
-- all proof promotion and proof editing
-- final verification
-- final integration
+- baseline capture
+- Phase 1 contract freeze
+- recording the freeze SHA
+- lane launch and merge sequencing
+- Phase 5 integration doc refresh
+- all proof preparation and proof execution
+- final verification and closeout
 
-### Optional Repair Worktree Root
+### Parallel Worktree Root
 
-If a surfaced failure justifies isolated repair, create it under a bounded local root such as:
+All optional lane worktrees live under an uncommitted local root:
 
-`wt/opencode-live-proof/`
+`/Users/spensermcconnell/__Active_Code/atomize-hq/unified-agent-api/wt/orch-maintenance-convergence/`
 
-Suggested repair branches:
+This root is scratch only. Nothing under `wt/` is committed.
 
-- `codex/opencode-proof-fix-executor`
-- `codex/opencode-proof-fix-closeout`
-- `codex/opencode-proof-fix-proof-archive`
+### Lane Branch Names
 
-### Repair Worktree Rules
+Branch names are fixed up front so another agent can execute without guessing:
 
-1. A repair worktree is optional, not default.
-2. A repair worktree must own one bounded issue only.
-3. A repair worktree may patch code, tests, or proof drafting surfaces within its assigned scope.
-4. A repair worktree may not run:
-   - `execute-agent-maintenance --dry-run`
-   - `execute-agent-maintenance --write`
-   - `close-agent-maintenance`
-5. A repair worktree may not promote proof artifacts into the canonical proof root as final truth.
-6. A repair worktree returns only:
-   - narrow diff
-   - test result summary if relevant
-   - brief explanation of what changed and why
-7. Parent merges repair worktree changes back into the primary worktree before any rerun.
-8. All rerun commands happen only from the primary worktree after integration.
+- Phase 1 baseline note only, no long-lived branch:
+  - record the exact freeze SHA from `staging`
+- Lane A:
+  - worktree path: `wt/orch-maintenance-convergence/lane-a-packet-derivation`
+  - branch: `codex/orch-lane-a-packet-derivation`
+- Lane B:
+  - worktree path: `wt/orch-maintenance-convergence/lane-b-relay-enforcement`
+  - branch: `codex/orch-lane-b-relay-enforcement`
+- Lane C:
+  - worktree path: `wt/orch-maintenance-convergence/lane-c-transport-convergence`
+  - branch: `codex/orch-lane-c-transport-convergence`
+- Optional bounded repair:
+  - worktree path: `wt/orch-maintenance-convergence/fix-<scope>`
+  - branch: `codex/orch-fix-<scope>`
+
+### Integration Rules
+
+1. Every lane branches from the exact recorded C1 SHA, not from a moving `staging`.
+2. The parent merges or cherry-picks lane work back into `staging` one lane at a time after lane
+   acceptance is satisfied.
+3. No lane may merge directly into another lane worktree. Cross-lane integration happens only in
+   the parent worktree.
+4. Phase 5 and later run only on merged `staging`, never in a parallel lane worktree.
+5. If the parent needs a local merge rehearsal before integrating into `staging`, it may create a
+   disposable local branch, but `staging` remains the authoritative session branch.
 
 ## Ownership Model
 
 ## Parent
 
-Role: sole orchestrator, sole integrator, sole owner of critical-path serialized operations.
+Role: sole orchestrator, sole integrator, sole final gate owner.
 
 Parent-only responsibilities:
 
-- baseline capture
-- request truth audit and freeze
-- regression gate decision
-- active `run_id` selection
-- live dry-run
-- live write
-- diff review for bounded scope
-- closeout authoring/finalization
-- live closeout command
-- proof promotion
-- final verification
-- success/failure declaration for checkpoints and workstreams
+- declare checkpoint passage
+- own the contract freeze and baseline SHA
+- approve lane scope and launch
+- merge lane work into `staging`
+- decide whether `claude_code` maintenance roots must be materialized in Phase 5
+- run shared watcher or opener proof capture for the final `codex` packet
+- run authoritative dry-run, write, closeout, and final verification commands
+- promote final proof artifacts
+- declare the session complete or failed
 
 ## Optional Worker Lanes
 
-Preferred configuration:
+Preferred worker configuration:
 
 - model: `GPT-5.4`
 - `reasoning_effort=high`
 
 Allowed worker roles:
 
-- read-only audit
-- bounded repair
-- closeout/proof draft support after final truth is already known
+- bounded implementation on one declared lane
+- read-only audit of one declared surface
+- bounded repair after a surfaced failure
 
 Prohibited worker roles:
 
-- packet authority
-- active run authority
-- dry-run authority
-- write authority
-- closeout authority
+- contract-freeze authority
 - final proof authority
+- lane merge authority
+- final publication truth authority
 - final gate authority
 
 ## Workstream Plan
 
-## WS0 - Baseline Capture
+## WS0 - Baseline Capture And Scope Lock
 
 - ID: `WS0`
 - Owner: `parent`
 - Launch gate: none
-- Owned file surfaces:
+- Owned surfaces:
   - `PLAN.md`
-  - `docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml`
-  - `docs/agents/lifecycle/opencode-maintenance/HANDOFF.md`
-  - `docs/agents/lifecycle/opencode-maintenance/governance/proof/**`
-  - `docs/agents/lifecycle/opencode-maintenance/governance/remediation-log.md`
-- Required commands:
-  - no mandatory mutation command
-  - read-only inspection of live plan and contract surfaces
+  - `ORCH_PLAN.md`
+  - current `staging` branch state
+  - existing lifecycle, spec, workflow, and xtask surfaces listed in `C0`
+- Actions:
+  1. Capture current `staging` head and current dirty-state context.
+  2. Verify the old orchestration plan is stale relative to the current `PLAN.md`.
+  3. Identify the exact serial-to-parallel boundary: end of Phase 1 contract freeze.
 - Stop conditions:
-  - ambiguity about current request truth
-  - ambiguity about which prior proof artifacts remain truthful
+  - ambiguity about the milestone or branch context
+  - ambiguity about whether Phase 1 is still open
 - Acceptance:
-  - baseline is captured
-  - parent can identify the exact live request, handoff, proof root, and prior proof status
+  - parent can name the serial critical path, parallel lanes, and final proof target
   - `C0` passes
 
-## WS1 - Freeze Request Truth
+## WS1 - Phase 1 Contract Freeze
 
 - ID: `WS1`
 - Owner: `parent`
 - Launch gate: `C0`
-- Owned file surfaces:
-  - `docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml`
-  - `docs/agents/lifecycle/opencode-maintenance/HANDOFF.md`
-  - `docs/agents/lifecycle/opencode-maintenance/governance/execute-agent-maintenance-prompt.md`
-  - `docs/agents/lifecycle/opencode-maintenance/governance/proof/proof-notes.md`
-  - existing proof artifacts retained or replaced for truth
-- Required commands:
-  - if truth drift exists:
-    ```sh
-    cargo run -p xtask -- refresh-agent --request docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml --write
-    ```
+- Owned surfaces:
+  - `docs/specs/maintenance-request-contract-v1.md`
+  - `docs/specs/agent-registry-contract.md`
+  - `docs/specs/cli-agent-onboarding-charter.md`
+  - `docs/specs/unified-agent-api/support-matrix.md`
+  - `docs/specs/unified-agent-api/non-tui-support-debt.md`
+  - `docs/cli-agent-onboarding-factory-operator-guide.md`
+  - `docs/cli-agent-onboarding-factory-workflow-atlas.md`
+  - `docs/cli-agent-maintenance-steady-state-plan.md`
+- Actions:
+  1. Freeze one normative success definition: support audit first, bounded support uplift second,
+     green gates third, manual closeout last.
+  2. Make the exact `support_surface_audit` schema normative, including:
+     - field names
+     - enum values
+     - eligibility reasons
+     - allowed deferrals
+     - debt-count invariants
+  3. Create or align `non-tui-support-debt.md` as the machine-checkable baseline inventory.
+  4. Demote `docs/cli-agent-maintenance-steady-state-plan.md` to archived-pointer status.
+  5. Align the operator guide and atlas to explanatory-only status with no shadow policy.
+  6. Record the exact resulting `staging` commit SHA as the only valid baseline for A, B, and C.
 - Stop conditions:
-  - request drift not resolved
-  - prompt digest mismatch not resolved
-  - handoff mismatch not resolved
-  - uncertainty about retained prior proof artifacts
+  - unresolved disagreement across the normative specs
+  - debt inventory row shape still ambiguous
+  - packet success semantics still split between specs and explanatory docs
 - Acceptance:
-  - one canonical request SHA is frozen
-  - handoff matches request truth
-  - prompt continuity is valid
-  - retained proof artifacts are explicitly known to still be truthful
+  - one frozen contract story exists
+  - one exact baseline SHA is recorded
   - `C1` passes
 
-## WS2 - Regression Baseline
+## WS2 - Lane A Packet Derivation Plus Packet-Owned Docs
 
 - ID: `WS2`
-- Owner: `parent`
+- Owner: `worker lane A` or `parent`
 - Launch gate: `C1`
-- Owned file surfaces:
-  - `crates/xtask/src/agent_maintenance/execute/workflow.rs`
-  - `crates/xtask/src/agent_maintenance/execute/runtime.rs`
-  - `crates/xtask/src/agent_maintenance/execute/validate.rs`
-  - `crates/xtask/src/agent_maintenance/execute/packet.rs`
-  - `crates/xtask/src/agent_maintenance/closeout.rs`
-  - `crates/xtask/src/agent_maintenance/closeout/write.rs`
-  - `crates/xtask/src/agent_maintenance/closeout/validate.rs`
-  - `crates/xtask/tests/agent_maintenance_execute.rs`
-  - `crates/xtask/tests/agent_maintenance_closeout/**`
-- Required commands:
-  ```sh
-  cargo test -p xtask agent_maintenance_execute -- --nocapture
-  cargo test -p xtask agent_maintenance_closeout -- --nocapture
-  ```
-  - fallback:
-    ```sh
-    cargo test -p xtask
-    ```
+- Branch: `codex/orch-lane-a-packet-derivation`
+- Owned surfaces:
+  - `crates/xtask/src/agent_maintenance/contract_policy.rs`
+  - `crates/xtask/src/agent_maintenance/prepare.rs`
+  - `crates/xtask/src/agent_maintenance/docs.rs`
+  - `crates/xtask/src/agent_maintenance/request.rs`
+  - `crates/xtask/src/agent_maintenance/request/automation.rs`
+  - `crates/xtask/tests/agent_maintenance_prepare.rs`
+  - committed `codex` and `opencode` maintenance packet surfaces generated by the shared renderer
+- Actions:
+  1. Add one shared typed support-audit representation in the prepare/request layer.
+  2. Derive the audit block from upstream evidence, wrapper coverage, backend truth, support
+     publication truth, and the debt inventory.
+  3. Rewrite prompt, `HANDOFF.md`, and `pr-summary.md` semantics around support uplift.
+  4. Keep lane A out of relay validation and watcher transport logic.
 - Stop conditions:
-  - focused regression failure
-  - executor or closeout invariant gap surfaced before live write
+  - lane A needs to rename the frozen support-audit schema
+  - lane A starts inventing relay-only policy or transport logic
+  - generated docs still describe artifact-refresh-only success
 - Acceptance:
-  - regression baseline is green or repaired and re-green
-  - if repairs touched these surfaces, the request-freeze implications are evaluated before proceeding
-  - `C2` passes
+  - prepare-layer schema and generated docs match the Phase 1 freeze exactly
+  - focused prepare tests are green
+  - lane returns a bounded diff for merge
 
-## WS3 - Prepare Fresh Dry-Run Packet
+## WS3 - Lane B Relay Enforcement
 
 - ID: `WS3`
-- Owner: `parent`
-- Launch gate: `C2`
-- Owned file surfaces:
-  - `docs/agents/.uaa-temp/agent-maintenance/runs/<run_id>/**`
-  - `docs/agents/lifecycle/opencode-maintenance/governance/proof/request-sha256.txt`
-  - `docs/agents/lifecycle/opencode-maintenance/governance/proof/run-id.txt`
-  - `docs/agents/lifecycle/opencode-maintenance/governance/proof/execute-dry-run.txt`
-  - `docs/agents/lifecycle/opencode-maintenance/governance/proof/validation-report-dry-run.json`
-  - `docs/agents/lifecycle/opencode-maintenance/governance/proof/run-status-dry-run.json`
-- Required commands:
-  ```sh
-  cargo run -p xtask -- execute-agent-maintenance --request docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml --dry-run
-  ```
+- Owner: `worker lane B` or `parent`
+- Launch gate: `C1`
+- Branch: `codex/orch-lane-b-relay-enforcement`
+- Owned surfaces:
+  - `crates/xtask/src/agent_maintenance/execute.rs`
+  - `crates/xtask/src/agent_maintenance/execute/runtime.rs`
+  - `crates/xtask/src/agent_maintenance/execute/validate.rs`
+  - `crates/xtask/src/agent_maintenance/execute/workflow.rs`
+  - `crates/xtask/src/agent_maintenance/execute/packet.rs`
+  - `crates/xtask/src/agent_maintenance/execute/types.rs`
+  - `crates/xtask/tests/agent_maintenance_execute.rs`
+- Actions:
+  1. Enforce required presence and continuity of the support-audit block before write mode.
+  2. Fail closed on:
+     - missing newly discovered uplift rows
+     - invalid eligibility on preexisting gaps
+     - invalid blocker taxonomy
+     - repo-owned deferrals with no tracked follow-on seam, owner, and milestone
+     - debt-count regression
+  3. Keep closeout manual and keep the writable envelope bounded to non-TUI surfaces only.
+  4. Keep lane B out of packet rendering semantics except where needed to validate frozen fields.
 - Stop conditions:
-  - non-zero dry-run exit
-  - preflight failure
-  - missing or ambiguous `run_id`
-  - dry-run output inconsistent with request truth
+  - lane B attempts to rename or redefine the frozen schema
+  - lane B widens write scope into TUI or unrelated runtime work
+  - lane B relies on agent-specific hidden policy
 - Acceptance:
-  - one active `run_id` exists
-  - dry-run packet is ready and frozen
-  - proof seed artifacts were promoted from the matching temp run
-  - `C3` passes
+  - relay invariants are shared and fail closed
+  - focused execute tests are green
+  - lane returns a bounded diff for merge
 
-## WS4 - Execute Write On Frozen Packet
+## WS4 - Lane C Transport Convergence
 
 - ID: `WS4`
-- Owner: `parent`
-- Launch gate: `C3`
-- Owned file surfaces:
-  - temp run dir for the active `run_id`
-  - all packet-declared writable surfaces only
-  - `docs/agents/lifecycle/opencode-maintenance/governance/proof/execute-write.txt`
-  - `docs/agents/lifecycle/opencode-maintenance/governance/proof/validation-report-write.json`
-  - `docs/agents/lifecycle/opencode-maintenance/governance/proof/run-status-write.json`
-  - `docs/agents/lifecycle/opencode-maintenance/governance/proof/written-paths-write.json`
-- Required commands:
-  ```sh
-  cargo run -p xtask -- execute-agent-maintenance --request docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml --write --run-id <run_id>
-  ```
+- Owner: `worker lane C` or `parent`
+- Launch gate: `C1`
+- Branch: `codex/orch-lane-c-transport-convergence`
+- Owned surfaces:
+  - `crates/xtask/data/agent_registry.toml`
+  - `crates/xtask/src/agent_registry.rs`
+  - `crates/xtask/src/agent_registry/release_watch.rs`
+  - `crates/xtask/src/agent_maintenance/watch.rs`
+  - `.github/workflows/agent-maintenance-release-watch.yml`
+  - `.github/workflows/agent-maintenance-open-pr.yml`
+  - `.github/workflows/codex-cli-update-snapshot.yml`
+  - `.github/workflows/claude-code-update-snapshot.yml`
+  - `crates/xtask/tests/agent_maintenance_watch.rs`
+  - `crates/xtask/tests/agent_registry.rs`
+  - `crates/xtask/tests/c4_spec_ci_wiring.rs`
+- Actions:
+  1. Migrate `codex` and `claude_code` registry truth to `dispatch_kind = "packet_pr"`.
+  2. Make the shared watcher fan out to the shared opener for all enrolled automated lanes.
+  3. Retire worker-specific steady-state transport:
+     - default: delete the worker snapshot workflows
+     - fallback: keep them unscheduled and clearly historical/manual-only if deletion is blocked
+  4. Keep lane C out of support-policy prose and relay semantics.
 - Stop conditions:
-  - non-zero write exit
-  - packet continuity failure
-  - boundary violation
-  - no-op write rejection
-  - any green gate failure
-  - evidence that closeout path was written by write mode
-  - ambiguous or unreviewable diff scope
+  - workflow YAML becomes a second policy store
+  - `codex` or `claude_code` still resolve to worker transport after migration
+  - lane C starts materializing lifecycle docs that belong to Phase 5
 - Acceptance:
-  - write succeeded on the frozen packet
-  - `run-status.json` reports `write_validated` and `validation_passed = true`
-  - all written paths stay within exact writable surfaces
-  - exact green gates passed in order
-  - closeout path remained untouched
-  - promoted write artifacts match the active successful temp run
-  - `C4` passes
+  - registry, watcher, and workflow tests are green
+  - no live scheduled or registry-driven path still depends on worker-specific transport
+  - lane returns a bounded diff for merge
 
-## WS5 - Conditional Repair Lane
+## WS5 - Parent Merge Of A, B, And C
 
 - ID: `WS5`
-- Owner: `optional worker lane` for patching, `parent` for integration and rerun decisions
-- Launch gate: failure in `WS2`, `WS4`, `WS6`, or `WS7`
-- Owned file surfaces:
-  - only the bounded failing surface assigned by parent
-  - examples:
-    - executor surfaces under `crates/xtask/src/agent_maintenance/**`
-    - closeout validation surfaces under `crates/xtask/src/agent_maintenance/closeout/**`
-    - matching regressions under `crates/xtask/tests/**`
-    - proof text under `docs/agents/lifecycle/opencode-maintenance/governance/proof/**`
-- Required commands:
-  - none required in worker lane
-  - worker may run only narrow local tests approved by parent
-  - parent reruns authoritative gates after integration
+- Owner: `parent`
+- Launch gate: `WS2`, `WS3`, and `WS4` accepted individually
+- Owned surfaces:
+  - merged `staging` head only
+- Actions:
+  1. Merge or cherry-pick lane A into `staging`.
+  2. Merge or cherry-pick lane B into `staging`.
+  3. Merge or cherry-pick lane C into `staging`.
+  4. Resolve conflicts without rewriting frozen policy.
+  5. Run the lane-level targeted tests again on merged `staging` if any conflict touched shared
+     files.
 - Stop conditions:
-  - repair scope expands beyond bounded assignment
-  - worker attempts to run live dry-run/write/closeout
-  - repair changes packet-owned truth without parent re-freeze
+  - conflict resolution changes frozen schema or blocker semantics
+  - merged head no longer cleanly reflects lane ownership boundaries
 - Acceptance:
-  - worker returns a narrow diff, concise explanation, and any relevant local test result
-  - parent integrates repair into primary worktree
-  - parent evaluates whether `C1`, `C2`, or `C3` was invalidated
-  - reruns restart from the earliest invalidated checkpoint
-  - failed run artifacts are not promoted as final proof
+  - one merged steady-state code baseline exists on `staging`
+  - `C3` passes
 
-## WS6 - Manual Closeout
+## WS6 - Phase 5 Integration Doc Refresh
 
 - ID: `WS6`
 - Owner: `parent`
-- Launch gate: `C4`
-- Owned file surfaces:
-  - `docs/agents/lifecycle/opencode-maintenance/governance/maintenance-closeout.json`
-  - `docs/agents/lifecycle/opencode-maintenance/HANDOFF.md`
-  - `docs/agents/lifecycle/opencode-maintenance/governance/remediation-log.md`
-  - `docs/agents/lifecycle/opencode-maintenance/governance/proof/closeout-summary.md`
-- Required commands:
-  ```sh
-  cargo run -p xtask -- close-agent-maintenance --request docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml --closeout docs/agents/lifecycle/opencode-maintenance/governance/maintenance-closeout.json
-  ```
+- Launch gate: `C3`
+- Owned surfaces:
+  - `docs/agents/lifecycle/codex-maintenance/**`
+  - `docs/agents/lifecycle/opencode-maintenance/**`
+  - `docs/agents/lifecycle/claude-code-cli-onboarding/**`
+  - if needed, new `docs/agents/lifecycle/claude_code-maintenance/**`
+  - `docs/specs/unified-agent-api/support-matrix.md`
+  - `docs/specs/unified-agent-api/non-tui-support-debt.md`
+  - `cli_manifests/support_matrix/current.json`
+- Actions:
+  1. Regenerate or refresh committed `codex` and `opencode` maintenance packet surfaces from the
+     merged shared renderer.
+  2. Materialize `claude_code` committed maintenance packet surfaces if transport convergence now
+     makes them a steady-state requirement and they do not already exist at the shared renderer's
+     `agent_id`-derived maintenance root, for example
+     `docs/agents/lifecycle/claude_code-maintenance/**`.
+  3. Update support publication so every remaining non-TUI caveat points to a debt row or concrete
+     blocker instead of normalizing deliberate unsupported posture.
+  4. Remove worker-transport worldview from packet-owned playbooks and workflow plans.
+  5. Preserve already-landed `opencode` proof artifacts as historical evidence while removing stale
+     explanatory carveouts around them.
 - Stop conditions:
-  - closeout JSON is untruthful or incomplete
-  - resolved findings still match live drift
-  - explicit none reason is used while drift still exists
-  - closeout command fails validation
+  - `claude_code` packet materialization path is still ambiguous after reviewing the merged code
+  - support publication still contradicts debt inventory truth
+  - lifecycle docs still describe worker flows as steady state
 - Acceptance:
-  - truthful closeout JSON exists
-  - closeout command succeeds
-  - owned closeout outputs refresh successfully
-  - proof root contains truthful `closeout-summary.md`
-  - `C5` passes
+  - lifecycle docs and support publication match the merged code and frozen contract
+  - any required `claude_code` maintenance root is present
+  - `C4` passes
 
-## WS7 - Final Proof Archive And Final Verification
+## WS7 - Regression Consolidation And Pre-Proof Green
 
 - ID: `WS7`
 - Owner: `parent`
-- Launch gate: `C5`
-- Owned file surfaces:
-  - full proof root:
-    - `request-sha256.txt`
-    - `run-id.txt`
-    - `execute-dry-run.txt`
-    - `execute-write.txt`
-    - `validation-report-dry-run.json`
-    - `validation-report-write.json`
-    - `run-status-dry-run.json`
-    - `run-status-write.json`
-    - `written-paths-write.json`
-    - `closeout-summary.md`
-    - `proof-notes.md`
-    - existing queue / PR-open evidence if still truthful
-  - final repo head across packet-declared writable surfaces
-- Required commands:
-  ```sh
-  cargo fmt --all
-  cargo run -p xtask -- codex-validate --root cli_manifests/opencode
-  cargo run -p xtask -- support-matrix --check
-  cargo run -p xtask -- capability-matrix --check
-  cargo run -p xtask -- capability-matrix-audit
-  make preflight
-  ```
+- Launch gate: `C4`
+- Owned surfaces:
+  - `crates/xtask/tests/agent_maintenance_prepare.rs`
+  - `crates/xtask/tests/agent_maintenance_execute.rs`
+  - `crates/xtask/tests/agent_maintenance_watch.rs`
+  - `crates/xtask/tests/agent_registry.rs`
+  - `crates/xtask/tests/c4_spec_ci_wiring.rs`
+  - any newly required shared regression fixture updates
+- Actions:
+  1. Land any remaining regression additions required by the merged steady state.
+  2. Run targeted xtask suites until green.
+  3. Run broader `cargo test -p xtask` if targeted suites expose cross-surface drift.
+  4. Do not start the live `codex` proof until the merged regression baseline is trustworthy.
 - Stop conditions:
-  - proof artifact mismatch with final successful run
-  - final gate failure
-  - final diff no longer reads as one bounded maintenance run
+  - missing invariant coverage remains
+  - merged behavior still depends on manual reviewer interpretation
 - Acceptance:
-  - proof archive is complete and truthful
-  - final repo gates are green
-  - final head remains bounded and reviewable
+  - targeted regressions for prepare, execute, transport, and spec wiring are green
+  - shared proof lane can start without known test debt
+  - `C5` passes
+
+## WS8 - Migrated `codex` Proof
+
+- ID: `WS8`
+- Owner: `parent`
+- Launch gate: `C5`
+- Owned surfaces:
+  - `docs/agents/lifecycle/codex-maintenance/**`
+  - `docs/agents/lifecycle/codex-maintenance/governance/proof/**`
+  - temp run state under `docs/agents/.uaa-temp/agent-maintenance/runs/<run_id>/`
+  - exact `codex` request-owned writable surfaces declared by the migrated packet
+- Actions:
+  1. Capture shared watcher evidence proving `codex` now resolves to shared `packet_pr`.
+  2. Materialize the actual proof packet through the shared opener path, not by hand-authoring a
+     fake request. Use the shared `prepare-agent-maintenance` shape with:
+     - `--agent codex`
+     - `--opened-from .github/workflows/agent-maintenance-open-pr.yml`
+     - `--detected-by .github/workflows/agent-maintenance-release-watch.yml`
+     - `--dispatch-kind packet_pr`
+     - `--write`
+     - release/version arguments taken from the actual watcher-detected release being proved
+  3. Freeze the resulting request SHA and run:
+     ```sh
+     cargo run -p xtask -- execute-agent-maintenance --request docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml --dry-run
+     ```
+  4. Reuse that exact `run_id` for:
+     ```sh
+     cargo run -p xtask -- execute-agent-maintenance --request docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml --write --run-id <run_id>
+     ```
+  5. Author truthful manual closeout and run:
+     ```sh
+     cargo run -p xtask -- close-agent-maintenance --request docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml --closeout docs/agents/lifecycle/codex-maintenance/governance/maintenance-closeout.json
+     ```
+  6. Promote only the final successful structured evidence into the canonical `codex` proof root.
+- Stop conditions:
+  - packet truth still points to worker transport
+  - dry-run or write fails
+  - write escapes the packet-declared writable envelope
+  - proof artifacts mix evidence from different proof attempts
+  - closeout is written automatically by write mode or is otherwise untruthful
+- Acceptance:
+  - one migrated `codex` packet proves shared watcher -> shared opener -> shared relay -> manual
+    closeout end to end
+  - proof artifacts are complete and replayable
   - `C6` passes
+
+## WS9 - Final Verification And Session Close
+
+- ID: `WS9`
+- Owner: `parent`
+- Launch gate: `C6`
+- Owned surfaces:
+  - final merged `staging` head
+  - final proof-bearing surfaces
+- Actions:
+  1. Run final repository gates.
+  2. Review the final diff for bounded scope and absence of shadow policy.
+  3. Confirm the final story is consistent across:
+     - specs
+     - packet rendering
+     - relay validation
+     - watcher/open-pr transport
+     - lifecycle docs
+     - support publication
+     - proof artifacts
+- Stop conditions:
+  - final repo gate failure
+  - proof-bearing head no longer reads as one bounded maintenance convergence session
+- Acceptance:
+  - final repo gates are green
+  - final diff is bounded and reviewable
+  - `C7` passes
+
+## WS10 - Conditional Repair Lane
+
+- ID: `WS10`
+- Owner: `bounded worker lane` for patching, `parent` for integration and rerun
+- Launch gate: failure in `WS2` through `WS9`
+- Owned surfaces:
+  - only the specific failing scope assigned by the parent
+- Actions:
+  1. Fix one bounded failure only.
+  2. Run only the narrow local tests approved by the parent.
+  3. Return a concise summary that states whether C1, C3, C4, or C5 may have been invalidated.
+- Stop conditions:
+  - repair scope expands beyond the assigned issue
+  - worker tries to run the authoritative live proof path
+  - repair quietly rewrites frozen policy
+- Acceptance:
+  - parent receives a bounded diff and integrates it into `staging`
+  - reruns restart from the earliest invalidated checkpoint
 
 ## Context-Control Rules
 
-1. Parent context retains:
-   - live request truth
-   - current checkpoint status
-   - active `run_id`
-   - packet invalidation rules
-   - proof archive promotion decisions
-   - final gate status
-2. Workers receive only the smallest context slice necessary for the assigned task.
-3. Workers must not receive broad “fix the repo” authority.
-4. Workers must not receive authority to decide checkpoint passage.
-5. Workers must not run:
-   - live dry-run
-   - live write
-   - live closeout
-   - final repo verification sequence
-6. Workers must return:
-   - narrow diff or read-only finding set
-   - concise explanation of what changed or what failed
-   - any relevant local test output summary
-   - explicit note if their change may invalidate `C1`, `C2`, or `C3`
-7. Parent reviews only narrow worker diffs and concise summaries before integration.
-8. Parent verifies every worker claim against local repo truth before merging or rerunning.
-9. Parent promotes only final successful structured evidence into the proof root.
-10. If a worker touches packet-owned truth, parent must treat the active packet as potentially invalid until request freeze is re-evaluated.
-11. If a worker patch touches executor or closeout contract logic, parent must treat regression baseline as potentially invalid until rerun.
+1. The parent retains:
+   - the exact C1 freeze SHA
+   - lane ownership boundaries
+   - checkpoint state
+   - final proof inputs and outputs
+   - final acceptance truth
+2. Each worker lane receives only:
+   - the exact baseline SHA
+   - its declared branch name
+   - its allowed file surfaces
+   - its target tests
+   - its stop conditions
+3. Workers must not receive "fix anything necessary" authority.
+4. Workers must not decide that Phase 1 truth is wrong. They may only report a conflict back to the
+   parent.
+5. Workers must not author or promote final proof artifacts.
+6. Workers must not run the final live watcher/open-pr/proof path.
+7. Worker outputs must include:
+   - touched files
+   - commands run
+   - pass/fail status of those commands
+   - unresolved risks or assumptions
+   - explicit statement if the work appears to invalidate C1, C3, C4, or C5
+8. The parent verifies worker claims locally before merging.
+9. The parent promotes only the final successful proof evidence. Failed or superseded proof runs
+   stay outside the canonical proof root.
+10. If a worker discovers that `claude_code` packet-surface materialization needs a different path
+    than the shared renderer's `agent_id`-derived maintenance root, the worker reports it and
+    stops. The parent resolves that naming/path question in Phase 5.
 
 ## Failure Handling And Rerun Policy
 
-### If Dry-Run Fails
+### If Phase 1 Freeze Changes After Lanes Start
 
-- fix local execution-host preflight or packet truth issue
-- rerun from `WS1` or `WS2`, depending on whether request truth changed
-- do not fabricate a `run_id`
+- stop all downstream lane work
+- record the new freeze commit
+- rebase or respawn A, B, and C from that exact commit
+- do not hand-wave the drift as a small rename
 
-### If Write Fails
+### If A, B, Or C Fails Its Lane Acceptance
 
-- preserve temp run evidence
-- determine whether failure is:
-  - packet drift
-  - boundary violation
-  - no-op rejection
-  - green gate failure
-  - executor invariant gap
-- repair only the bounded failing surface
-- rerun from earliest invalidated checkpoint
-- archive only the final successful run
+- keep the lane bounded
+- repair only the failing surface
+- rerun the lane-local targeted tests
+- merge only after the lane returns to green
 
-### If Write Succeeds But Exposes A Contract Gap
+### If Phase 5 Exposes Missing `claude_code` Maintenance Surfaces
 
-- this is not “success with follow-up”
-- fix the gap
-- add or update matching regression if invariant was missing
-- rerun dry-run and write if packet truth or write truth changed
-- only final successful rerun is archived
+- materialize them in Phase 5 from merged shared renderer truth
+- do not retroactively reopen lane C unless transport behavior itself was wrong
 
-### If Closeout Fails
+### If Regression Coverage Is Missing After Merge
 
-- fix closeout truth or underlying unresolved drift
-- rerun closeout
-- rerun write only if the closeout fix invalidates what the write proof was claiming
+- add or update the missing shared tests before starting the live proof
+- keep test additions in merged `staging`, not back in lane worktrees unless the parent decides
+  otherwise
 
-### If Final Proof Review Fails
+### If Migrated `codex` Proof Fails
 
-- correct the mismatched proof artifact
-- rerun any invalidated gate
-- do not leave mixed evidence from different runs in the proof root
+- preserve failed evidence outside the final proof root
+- classify the failure:
+  - packet generation drift
+  - relay validation gap
+  - writable-surface escape
+  - transport mismatch
+  - publication mismatch
+  - closeout truth gap
+  - missing regression invariant
+- add or tighten regression coverage first if the failure revealed a missing invariant
+- rerun from the earliest invalidated checkpoint only
+
+### If Final Gates Fail
+
+- fix only the failing surface
+- rerun the affected gates
+- keep the proof root truthful to the final successful run only
 
 ## Tests And Acceptance
 
-## Request Freeze
+## Contract Freeze
+
+Required checks:
+
+```sh
+rg -n 'support_surface_audit|non-tui-support-debt|packet_pr|workflow_dispatch|deliberately unsupported' docs/specs docs/cli-agent-*
+```
 
 Acceptance targets:
 
-- request still identifies `opencode`
-- prompt path is exactly `docs/agents/lifecycle/opencode-maintenance/governance/execute-agent-maintenance-prompt.md`
-- target version remains `1.14.47`
-- packet branch remains `automation/opencode-maintenance-1.14.47`
-- exact writable surfaces match live request
-- exact green gates match live request and handoff
-- handoff remains aligned with request
-- request SHA used for proof is explicit and singular
+- the three normative specs use identical support-audit field names and blocker semantics
+- `docs/cli-agent-maintenance-steady-state-plan.md` no longer acts as live policy
+- the debt inventory covers all currently published non-TUI caveats
 
-Failure here means no dry-run is allowed yet.
+## Lane A
 
-## Regression Baseline
+Required checks:
 
-Required commands:
+```sh
+cargo test -p xtask agent_maintenance_prepare -- --nocapture
+```
+
+Acceptance targets:
+
+- generated packet/request/prompt docs serialize the frozen support-audit schema exactly
+- `HANDOFF.md`, `pr-summary.md`, and prompt text describe support-aware bounded uplift
+- no per-agent renderer logic invents extra schema fields
+
+## Lane B
+
+Required checks:
 
 ```sh
 cargo test -p xtask agent_maintenance_execute -- --nocapture
-cargo test -p xtask agent_maintenance_closeout -- --nocapture
+```
+
+Acceptance targets:
+
+- packets missing support-audit truth fail closed
+- invalid blockers such as `deliberately_unsupported` and `not_part_of_v1` fail validation
+- debt-count ratchet and repo-owned deferral rules are enforced
+
+## Lane C
+
+Required checks:
+
+```sh
+cargo test -p xtask agent_maintenance_watch -- --nocapture
+cargo test -p xtask agent_registry -- --nocapture
+cargo test -p xtask c4_spec_ci_wiring -- --nocapture
+```
+
+Acceptance targets:
+
+- `codex` resolves to shared `packet_pr`
+- `claude_code` resolves to shared `packet_pr`
+- no active registry-driven path still points at worker-specific transport
+
+## Integration Doc Refresh
+
+Required checks:
+
+```sh
+cargo run -p xtask -- support-matrix --check
+```
+
+Acceptance targets:
+
+- lifecycle maintenance docs match the merged shared renderer and merged transport reality
+- support publication no longer normalizes deliberate unsupported non-TUI posture
+- every remaining non-TUI caveat points to debt truth or a concrete blocker
+
+## Regression Baseline
+
+Required checks:
+
+```sh
+cargo test -p xtask agent_maintenance_prepare -- --nocapture
+cargo test -p xtask agent_maintenance_execute -- --nocapture
+cargo test -p xtask agent_maintenance_watch -- --nocapture
+cargo test -p xtask agent_registry -- --nocapture
+cargo test -p xtask c4_spec_ci_wiring -- --nocapture
 ```
 
 Fallback:
@@ -696,72 +878,33 @@ cargo test -p xtask
 
 Acceptance targets:
 
-- executor regressions are green
-- closeout regressions are green
-- any newly exposed invariant gap is repaired and covered before live proof continues
+- all merged shared-lane invariants are covered and green
+- no known proof-critical gap remains untested
 
-## Dry-Run Proof
+## Migrated `codex` Proof
 
-Required command:
+Required commands:
 
 ```sh
-cargo run -p xtask -- execute-agent-maintenance --request docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml --dry-run
+cargo run -p xtask -- execute-agent-maintenance --request docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml --dry-run
+cargo run -p xtask -- execute-agent-maintenance --request docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml --write --run-id <run_id>
+cargo run -p xtask -- close-agent-maintenance --request docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml --closeout docs/agents/lifecycle/codex-maintenance/governance/maintenance-closeout.json
+```
+
+Additional required gate:
+
+```sh
+cargo run -p xtask -- codex-validate --root cli_manifests/codex
 ```
 
 Acceptance targets:
 
-- exit code `0`
-- one active `run_id`
-- one active temp run directory
-- dry-run validation passes
-- `run-status.json` records dry-run-ready state
-- proof root contains matching dry-run artifacts
-
-## Write Proof
-
-Required command:
-
-```sh
-cargo run -p xtask -- execute-agent-maintenance --request docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml --write --run-id <run_id>
-```
-
-Acceptance targets:
-
-- exit code `0`
-- exact frozen `run_id` reused
-- `run-status.json` records `status = "write_validated"`
-- `run-status.json` records `validation_passed = true`
-- write is non-empty
-- write stays inside exact writable surfaces
-- closeout path remains untouched
-- exact green gates pass in order
-- proof root contains matching write artifacts
-
-## Closeout
-
-Required command:
-
-```sh
-cargo run -p xtask -- close-agent-maintenance --request docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml --closeout docs/agents/lifecycle/opencode-maintenance/governance/maintenance-closeout.json
-```
-
-Acceptance targets:
-
-- truthful `maintenance-closeout.json`
-- closeout validation succeeds
-- refreshed handoff and remediation outputs are consistent
-- proof root contains truthful `closeout-summary.md`
-
-## Proof Archive
-
-Acceptance targets:
-
-- proof root contains required final structured files
-- `run-id.txt` points to the final successful run only
-- `request-sha256.txt` matches the final successful run’s request truth
-- `proof-notes.md` names the final request SHA, final `run_id`, rerun status, and closeout result truthfully
-- prior queue / PR-open evidence is retained only if still truthful
-- raw temp logs stay uncommitted unless explicitly needed for failure diagnosis
+- the `codex` request packet was materialized from shared opener semantics, not left on worker
+  transport truth
+- one frozen `run_id` is used for dry-run and write
+- write stays inside exact packet-declared writable surfaces
+- manual closeout remains explicit
+- the canonical proof root contains only final successful structured evidence
 
 ## Final Repo Gates
 
@@ -769,7 +912,7 @@ Required commands:
 
 ```sh
 cargo fmt --all
-cargo run -p xtask -- codex-validate --root cli_manifests/opencode
+cargo run -p xtask -- codex-validate --root cli_manifests/codex
 cargo run -p xtask -- support-matrix --check
 cargo run -p xtask -- capability-matrix --check
 cargo run -p xtask -- capability-matrix-audit
@@ -779,27 +922,37 @@ make preflight
 Acceptance targets:
 
 - all final commands pass
-- final diff remains bounded to the maintenance lane
-- final head is the proof-bearing head for the completed session
+- final diff remains bounded to the maintenance convergence lane
+- final proof-bearing head is the truthful final session head
 
 ## Assumptions
 
-1. The live request at `docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml` remains the canonical proof input.
-2. The working branch remains `staging` for the full session.
-3. The proof target remains `opencode` `1.14.47` unless legitimate request rerendering in request freeze changes the canonical truth.
-4. Existing queue / PR-open proof artifacts may remain only if still truthful relative to the final successful run.
-5. `.uaa-temp` run-state is derived evidence unless explicitly promoted into the proof root.
-6. The executor and closeout implementations are expected to be largely correct; remaining work is live proof and bounded repair, not architecture redesign.
-7. Happy-path orchestration is mostly sequential, and that is a real property of the milestone rather than a planning deficiency.
+1. The working branch remains `staging` for the entire orchestration session.
+2. The parent can create local scratch worktrees under `wt/` without committing any `wt/`
+   contents.
+3. `codex` remains the required first migrated live proof lane.
+4. `claude_code` must reach transport and contract parity in code and tests during this milestone,
+   even if its first live proof is deferred.
+5. The current `codex` maintenance packet surfaces are transitional and will be regenerated to the
+   shared packet-pr contract before the proof runs.
+6. `docs/agents/lifecycle/claude-code-cli-onboarding/**` is not yet the steady-state maintenance
+   packet root. If a new maintenance root is required, Phase 5 materializes it at the shared
+   renderer's `agent_id`-derived maintenance path, for example
+   `docs/agents/lifecycle/claude_code-maintenance/**`, and makes that root canonical there.
+7. Existing `opencode` proof artifacts remain historical evidence and should not be rewritten
+   except where surrounding explanatory docs need to stop telling a stale steady-state story.
+8. Shared watcher/open-pr transport and the local `execute-agent-maintenance` plus
+   `close-agent-maintenance` relay flow remain the intended steady-state architecture.
 
 ## Session Close Criteria
 
-The parent may close the PLAN session only after:
+The parent may close the session only after:
 
-1. `C0` through `C6` have passed in order.
-2. The final successful `run_id` is recorded in the proof root.
-3. The manual closeout command has succeeded.
-4. The proof root contains the required replayable structured artifacts.
-5. `make preflight` is green on the final proof-bearing head.
+1. `C0` through `C7` pass in order.
+2. The C1 freeze SHA is recorded and every lane is traceable back to it.
+3. A, B, and C are merged before any integration doc refresh starts.
+4. Phase 5 completes before any live proof begins.
+5. The migrated `codex` proof artifacts are committed under the canonical proof root.
+6. Final repository verification is green on the proof-bearing `staging` head.
 
-Until then, the lane is not proven landed.
+Until then, the maintenance convergence milestone is not complete.
