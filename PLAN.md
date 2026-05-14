@@ -8,6 +8,11 @@ Primary design inputs:
 - `/Users/spensermcconnell/.gstack/projects/atomize-hq-unified-agent-api/spensermcconnell-staging-design-20260513-112453.md`
 - `docs/cli-agent-maintenance-steady-state-plan.md`
 
+Disposition of draft inputs:
+- `docs/cli-agent-maintenance-steady-state-plan.md` is an input to this rewrite only. Phase 1 must
+  retire it as a live planning surface by moving any still-needed normative content into
+  `docs/specs/**` and downgrading the draft doc to an archived pointer.
+
 Ground-truth checkpoint:
 - `docs/cli-agent-onboarding-factory-workflow-atlas.md` already exists on this branch
 - `opencode` already proved the shared `packet_pr` opening path
@@ -91,8 +96,8 @@ Make the repository able to truthfully claim:
 14. Shared regression coverage proves packet generation, relay validation, watcher dispatch, and
    transport convergence for `codex`, `claude_code`, and `opencode`.
 15. At least one previously worker-backed agent, `codex`, completes a post-migration proving run on
-   the shared lane or a full repo-owned dry-run plus write-mode simulation that exercises the same
-   packet and gate contract end to end.
+   the shared lane through the real shared watcher/opener/relay path and produces a real PR-owned
+   maintenance artifact trail.
 16. `docs/cli-agent-onboarding-factory-operator-guide.md` and
     `docs/cli-agent-onboarding-factory-workflow-atlas.md` remain explanatory surfaces, not shadow
     normative stores.
@@ -117,6 +122,11 @@ Make the repository able to truthfully claim:
    to burn down, not as a permanent caveat.
 10. `opencode` does not get a special carveout. Its current v1 restrictions must be removed on the
     same policy basis as every other CLI agent.
+11. Packet-local write envelopes do not own policy. The eligible `writable_surfaces` for automated
+    maintenance must be derived from registry/spec truth and shared maintenance policy, not narrowed
+    ad hoc to justify a deferral.
+12. A deferred support gap is valid only when it points to a tracked follow-on seam with an owner
+    and milestone or to a concrete upstream/platform blocker that is external to this repo.
 
 ## Step 0 Scope Challenge
 
@@ -316,7 +326,7 @@ close-agent-maintenance
 
 | Layer | Owns | Must not own |
 | --- | --- | --- |
-| Registry | enrollment truth, upstream metadata, dispatch mode | packet policy, writable surfaces, gate lists |
+| Registry | enrollment truth, upstream metadata, dispatch mode, and write-envelope inputs | packet policy, ad hoc write-envelope narrowing, gate lists |
 | Shared watcher | stale detection and queue generation | agent-specific maintenance semantics |
 | Shared PR opener | packet generation and PR creation | artifact-refresh policy, support-audit policy, runtime gate policy |
 | Prepared packet | frozen request truth, writable surfaces, prompt digest, gates, recovery | hidden agent-specific behavior outside the request |
@@ -335,13 +345,34 @@ Automated maintenance needs one explicit ratchet rule:
 - newly discovered upstream non-TUI surface must be compared against current wrapper coverage,
   backend support, and published support posture during packet preparation
 - TUI-only surface stays excluded by contract and does not count against this ratchet
+- a successful enrolled maintenance run must not increase the committed non-TUI support debt count
+  for that agent unless the packet records a concrete upstream/platform blocker
+
+Machine-checkable ratchet requirement:
+
+- Phase 1 must create one committed baseline inventory at
+  `docs/specs/unified-agent-api/non-tui-support-debt.md`
+- each row in that inventory must identify: `agent_id`, surface family, exact unsupported surface,
+  current reason, blocker class if any, owner, and target milestone or follow-on seam
+- packet preparation must derive the current agent debt set from the same evidence model used by
+  support publication, not from prompt prose
+- relay validation and/or publication checks must compare pre-run and post-run debt counts for the
+  target agent
+- a run may only finish green when:
+  - newly discovered non-TUI surface is handled or concretely blocked
+  - all `required_uplifts_this_run[]` are handled
+  - post-run debt count is less than or equal to pre-run debt count
+- a newly onboarded agent may start partial, but its first maintenance run with either discovered
+  surface or eligible preexisting gaps must produce at least one required uplift or one concrete
+  tracked blocker
 
 Eligibility rule for preexisting gaps:
 
 - a preexisting non-TUI gap is in-scope for the current maintenance run only when at least one of
   these is true:
   - the target upstream release introduced or changed adjacent surface in the same command family
-  - the gap can be closed entirely inside the current packet `writable_surfaces`
+  - the gap can be closed entirely inside the registry/spec-derived maintenance write envelope for
+    this agent
   - the gap requires no new infra, no new transport, and no new cross-cutting abstraction
 - otherwise, the gap must not be silently pulled into the run
 - instead, it must be recorded as explicit deferred work with a concrete blocker or a separately
@@ -366,7 +397,10 @@ relay either:
 ### Required Packet Audit Shape
 
 The refined steady-state packet needs an explicit machine-readable audit block. The exact TOML
-syntax can still be chosen during implementation, but the packet must carry these concepts:
+syntax can still be chosen during implementation, but the packet must carry these concepts. The
+values in this block must be derived deterministically by shared preparation code from upstream help
+evidence, wrapper/backend coverage truth, manifest/publication truth, and the committed support-debt
+inventory. They must not be left to prompt interpretation.
 
 | Field | Purpose |
 | --- | --- |
@@ -374,6 +408,7 @@ syntax can still be chosen during implementation, but the packet must carry thes
 | `support_surface_audit.surface_kinds[]` | `commands`, `subcommands`, `flags`, `global_flags`, `positional_args` |
 | `support_surface_audit.excluded_surface_kinds[]` | explicit exclusions, initially TUI-only only |
 | `support_surface_audit.discovered_upstream_surface[]` | newly observed non-TUI surface from the target version |
+| `support_surface_audit.removed_upstream_surface[]` | upstream non-TUI surface removed or renamed in the target version so wrappers/publication can contract truthfully |
 | `support_surface_audit.preexisting_unsupported_surface[]` | already-known non-TUI gaps that remain open on the current validated baseline |
 | `support_surface_audit.eligible_preexisting_surface[]` | subset of preexisting gaps that are justified and bounded for this run |
 | `support_surface_audit.missing_wrapper_support[]` | surface present upstream but absent from wrapper support |
@@ -382,7 +417,10 @@ syntax can still be chosen during implementation, but the packet must carry thes
 | `support_surface_audit.deferred_preexisting_gaps[]` | older gaps explicitly left out of this run, each with a concrete reason |
 | `support_surface_audit.allowed_deferrals[]` | only concrete upstream/platform blockers, never vague “deliberately unsupported” posture |
 | `support_surface_audit.defer_reason` | machine-readable reason per deferred gap or uplift blocker |
+| `support_surface_audit.blocking_follow_on` | required seam/TODO reference when deferral is repo-owned rather than externally blocked |
 | `support_surface_audit.publication_impacts[]` | support-matrix or capability-publication rows/notes that must change when uplift lands |
+| `support_surface_audit.pre_run_debt_count` | machine-checkable baseline count for the target agent before execution |
+| `support_surface_audit.expected_post_run_debt_count` | declared debt target after successful execution |
 
 If this block is absent, the packet is not a valid steady-state automated maintenance packet.
 
@@ -392,13 +430,34 @@ Allowed blocker taxonomy:
 - `platform_evidence_missing`
 - `requires_new_infra`
 - `requires_new_architectural_seam`
-- `outside_current_writable_surfaces`
+- `outside_registry_maintenance_write_envelope`
 
 Not valid as blocker reasons:
 
 - `deliberately_unsupported`
 - `too_much_work_right_now`
 - `not_part_of_v1`
+
+Additional blocker rules:
+
+- `requires_new_infra`, `requires_new_architectural_seam`, and
+  `outside_registry_maintenance_write_envelope` are valid only when the packet points to a tracked
+  follow-on seam or TODO with an owner and milestone
+- deleting or rewording a support-publication caveat does not satisfy the ratchet; the underlying
+  gap must either be closed or carried as a concrete blocked inventory row
+
+### Spec Ownership Map
+
+Phase 1 must leave one explicit ownership map so the three specs stop drifting:
+
+| Concept | Owning truth |
+| --- | --- |
+| packet shape and execution contract | `docs/specs/maintenance-request-contract-v1.md` |
+| enrolled transport, agent facts, and derived write envelope inputs | `docs/specs/agent-registry-contract.md` |
+| onboarding expectations, maintenance maturity, and support posture policy | `docs/specs/cli-agent-onboarding-charter.md` |
+| published support posture and debt visibility | `docs/specs/unified-agent-api/support-matrix.md` plus `docs/specs/unified-agent-api/non-tui-support-debt.md` |
+| operator flow narrative | `docs/cli-agent-onboarding-factory-operator-guide.md` as explanatory only |
+| workflow atlas narrative | `docs/cli-agent-onboarding-factory-workflow-atlas.md` as explanatory only |
 
 ### Module Seams
 
@@ -441,7 +500,9 @@ Not valid as blocker reasons:
 | Support ratchet failure | newly discovered or preexisting non-TUI gaps remain open with no blocker and the run still claims success | execute tests, publication tests, proof review | fail closed until uplift lands or blocker is recorded | explicit packet audit failure | Yes |
 | Backlog bucket creep | packet drags unrelated historic gaps into the run without eligibility proof | prepare/execute tests, packet proof review | require packet-scoped eligibility or explicit deferral | explicit packet audit failure | Yes |
 | Docs drift | operator guide, atlas, spec, and packet docs disagree again | doc snapshot tests plus review diff | update all truth surfaces in same PR | review-time mismatch | No |
-| Proving run | migrated `codex` lane cannot open or validate from shared packet_pr flow | live proof or full end-to-end simulation | fix within blast radius, rerun proof | explicit run failure | Yes |
+| Proving run | migrated `codex` lane cannot open or validate from shared packet_pr flow | real shared watcher/opener/relay proof run | fix within blast radius, rerun proof | explicit run failure | Yes |
+| Debt baseline drift | support debt inventory and support publication disagree about open non-TUI gaps | publication checks, packet derivation tests, proof review | fail until inventory and publication truth reconcile | explicit debt mismatch | Yes |
+| Deferral laundering | packet defers repo-owned support work without a tracked seam, owner, and milestone | execute validation tests, packet proof review | reject packet until follow-on reference is present | explicit packet validation failure | Yes |
 
 ## Test Review
 
@@ -534,11 +595,18 @@ REGRESSION RULE: any migrated-lane failure becomes a required regression test be
    truth so it does not regress back to a carved-out posture.
 8. Add explicit regression coverage for blocker taxonomy:
    invalid reasons like `deliberately_unsupported` or `not_part_of_v1` fail packet validation.
-9. Keep `opencode` packet-pr coverage green while migrating the other agents. Do not regress the
-   already-proved lane.
-10. Prove one migrated `codex` path end to end, either as a real maintenance run or a full
-   repo-owned simulation that uses the actual shared packet-pr transport and relay contract.
-11. Finish with `make preflight`.
+9. Add derivation tests for the committed support-debt inventory:
+   inventory rows, support publication, and packet audit counts must agree for the target agent.
+10. Add validation tests that repo-owned deferrals fail unless they include a tracked follow-on seam
+    or TODO reference with owner and milestone.
+11. Add regression coverage for upstream surface removal or rename so publication truth can shrink,
+    not only grow.
+12. Prove one migrated `codex` path end to end as a real maintenance run through the shared watcher,
+    shared opener, and shared relay, producing the same PR-owned artifact trail maintainers will use
+    in steady state.
+13. Finish with `make preflight`.
+14. Keep `opencode` packet-pr coverage green while migrating the other agents. Do not regress the
+    already-proved lane.
 
 ## Performance Review
 
@@ -568,8 +636,10 @@ Make the specs and charter say exactly the same thing about automated maintenanc
 - `docs/specs/agent-registry-contract.md`
 - `docs/specs/cli-agent-onboarding-charter.md`
 - `docs/specs/unified-agent-api/support-matrix.md`
+- `docs/specs/unified-agent-api/non-tui-support-debt.md`
 - `docs/cli-agent-onboarding-factory-operator-guide.md`
 - `docs/cli-agent-onboarding-factory-workflow-atlas.md`
+- `docs/cli-agent-maintenance-steady-state-plan.md`
 
 **Actions**
 
@@ -587,18 +657,30 @@ Make the specs and charter say exactly the same thing about automated maintenanc
 6. Define the eligibility rule for preexisting gaps:
    only packet-bounded, justified older gaps become `required_uplifts_this_run`; everything else
    becomes explicit deferred work.
-7. Align the operator guide and atlas so they both point back to the same normative contract and
-   no longer imply artifact-refresh-only semantics.
+7. Create the initial committed non-TUI support debt inventory for every enrolled CLI agent,
+   including current `opencode` v1 restriction rows and any other deliberate unsupported rows that
+   are still published today.
+8. Add a concept ownership map so transport, packet truth, support posture, and publication each
+   have one canonical spec owner.
+9. Retire `docs/cli-agent-maintenance-steady-state-plan.md` as a live second source:
+   preserve it only as an archived pointer to the normative specs if it remains in the repo.
+10. Align the operator guide and atlas so they both point back to the same normative contract and
+    no longer imply artifact-refresh-only semantics.
+11. Freeze the field names for the support-audit packet block and the debt inventory projection
+    before parallel implementation starts.
 
 **Outputs**
 
 - one normative story
 - one operator story
 - one atlas story
+- one committed debt baseline
+- one concept ownership map
 
 **Exit criteria**
 
 - a reader can move from spec to guide to atlas without seeing contradictory success semantics
+- the draft steady-state plan no longer acts as a competing live source of truth
 
 ### Phase 2: Rewrite Packet Generation And Packet-Owned Docs Around Support Audit
 
@@ -625,16 +707,19 @@ Make generated maintenance packets describe the real job.
 3. Rewrite `HANDOFF.md` and `pr-summary.md` so the relay job is described as bounded support-aware
    maintenance, not packet refresh plus incidental edits.
 4. Make the packet carry explicit deltas:
-   discovered upstream surface, eligible preexisting surface, deferred preexisting surface,
-   missing wrapper/backend support, required uplifts for this run, and allowed blocker-based
-   deferrals.
+   discovered upstream surface, removed upstream surface, eligible preexisting surface, deferred
+   preexisting surface, missing wrapper/backend support, required uplifts for this run, and allowed
+   blocker-based deferrals.
 5. Update packet-owned playbooks so `codex`, `claude_code`, and `opencode` all read like the same
    factory with narrow per-agent value differences.
+6. Materialize one shared typed representation for the support-audit block so field names freeze in
+   code before parallel transport and relay work proceeds.
 
 **Outputs**
 
 - regenerated maintenance packet docs with truthful wording
 - support-aware prompt template semantics
+- frozen support-audit field names in shared code
 
 **Exit criteria**
 
@@ -652,7 +737,6 @@ Make `execute-agent-maintenance` fail closed when the support-aware contract is 
 - `crates/xtask/src/agent_maintenance/execute/runtime.rs`
 - `crates/xtask/src/agent_maintenance/execute/validate.rs`
 - `crates/xtask/src/agent_maintenance/execute/workflow.rs`
-- `crates/xtask/src/agent_maintenance/refresh.rs`
 
 **Actions**
 
@@ -666,7 +750,12 @@ Make `execute-agent-maintenance` fail closed when the support-aware contract is 
    concrete blocker recorded in packet truth.
 5. Fail closed when a packet marks preexisting gaps as in-scope without satisfying the eligibility
    rule for this run.
-6. Keep closeout manual and untouched by write mode.
+6. Fail closed when repo-owned deferrals do not point to a tracked follow-on seam or TODO with
+   owner and milestone.
+7. Enforce the debt ratchet:
+   a successful run cannot end with a higher debt count than it started with unless blocked by a
+   concrete external blocker class allowed by contract.
+8. Keep closeout manual and untouched by write mode.
 
 **Outputs**
 
@@ -736,6 +825,9 @@ shift.
    posture for any enrolled CLI agent.
 4. Update packet-owned playbooks and workflow plans that still talk like worker transport is the
    normal path.
+5. Do not rewrite historical `opencode` proof artifacts in a way that invalidates the already-used
+   precedent. If proof docs need to move, preserve their invariants and use sibling explanatory
+   docs for new policy framing until the new `codex` proof is green.
 
 **Outputs**
 
@@ -767,8 +859,10 @@ Prove that the new story works for a formerly worker-backed agent.
 2. Run targeted xtask suites until green.
 3. Prepare and validate one migrated `codex` maintenance lane through the shared `packet_pr`
    contract.
-4. If the proof exposes a missing invariant, add the test first, then rerun the proof.
-5. Finish with `make preflight`.
+4. Run one real proving path via the shared watcher/opener/relay stack and preserve the resulting
+   packet-owned evidence, including the real PR-owned artifact trail.
+5. If the proof exposes a missing invariant, add the test first, then rerun the proof.
+6. Finish with `make preflight`.
 
 **Outputs**
 
@@ -838,7 +932,7 @@ Sequential, shared test and proof surfaces.
 - NOT in scope: written
 - What already exists: written
 - TODOS cross-reference: one existing topology TODO is consumed by this plan
-- Failure modes: 6 critical gaps flagged
+- Failure modes: critical proof, debt, and deferral gaps explicitly flagged
 - Parallelization: 4 lanes, 3 parallel after contract freeze, 1 final sequential proof lane
 - Lake Score: choose the complete transport-and-contract convergence, not another docs-only pass
 
@@ -853,6 +947,9 @@ This plan is done only when all of the following are true:
    blocker-only deferrals.
 4. Shared relay validation enforces the same contract.
 5. `opencode` and the other enrolled CLI agents no longer publish deliberate non-TUI unsupported
-   posture as normal steady state.
+   posture as normal steady state, and the committed debt inventory shows a net reduction or a
+   concrete external blocker for every remaining row touched by this milestone.
 6. Shared regression coverage protects the migrated lane and the support ratchet rule.
-7. One migrated `codex` proof demonstrates that the post-`opencode` steady-state story is real.
+7. One migrated `codex` proof demonstrates that the post-`opencode` steady-state story is real by
+   succeeding through the real shared watcher/opener/relay path and producing a real PR-owned
+   artifact trail.
