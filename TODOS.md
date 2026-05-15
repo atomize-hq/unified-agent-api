@@ -2,17 +2,44 @@
 
 ## Pending
 
-### Decide Whether Maintenance Transport Topology Still Needs Convergence After Worker/Runbook Cleanup
+### Close Codex Completion Maintenance Gap
 
-**What:** After the `worker/runbook convergence` milestone lands, decide whether the maintenance transport model itself should change further, including worker split, replay/regeneration surface, and `packet_pr` versus worker-dispatch topology.
+**What:** Land the remaining non-TUI `codex completion` support seam so shared maintenance no longer needs to defer the command and its `SHELL` positional argument as historical support debt.
 
-**Why:** The current repo now has a stable shared maintenance packet contract, but the next plan review found that the broader transport question is larger than the worker/runbook cleanup milestone. If that decision is not recorded explicitly, it will either get smuggled into the wrong milestone or disappear into vague prose.
+**Why:** The shared maintenance contract now treats deliberate non-TUI unsupported posture as debt, not a steady-state note. `codex completion` is the live proof-backed debt row for that ratchet.
 
-**Context:** The 2026-05-10 `/autoplan` for the worker/runbook convergence follow-up recommended keeping the current milestone focused on operational convergence across generator wording, worker docs, branch naming, replay instructions, operator docs, and locking tests. Both the primary review and the independent Codex pass agreed that deciding or changing the transport topology is a separate follow-up question once the operational surface is truthful.
+**Context:** The support debt baseline records `codex completion` and `codex completion SHELL` under `requires_new_architectural_seam`. Shared maintenance now requires any repo-owned deferral to point here with an owner and milestone.
 
 **Effort:** M
-**Priority:** P2
-**Depends on:** Landing `worker/runbook convergence` so the current transport model can be judged from a truthful worker/runbook surface instead of stale docs and stale tests
+**Priority:** P1
+**Owner:** wrappers team
+**Milestone:** follow the shared packet-pr maintenance convergence proof
+
+### Close Claude Code Install Maintenance Gap
+
+**What:** Land the remaining non-TUI `claude install` seam so shared maintenance no longer defers the `install` command and `install --force` flag as historical support debt.
+
+**Why:** The support matrix currently publishes intentional non-TUI caveats for Claude Code on Windows. The new maintenance ratchet requires those caveats to burn down or stay attached to a tracked blocker.
+
+**Context:** The support debt baseline records these rows under `requires_new_architectural_seam` because installation behavior remains outside the current wrapper contract.
+
+**Effort:** M
+**Priority:** P1
+**Owner:** wrappers team
+**Milestone:** after packet-pr transport convergence for `claude_code`
+
+### Close OpenCode Non-TUI Maintenance Gaps
+
+**What:** Expand OpenCode beyond the current `run --format json` seam so shared maintenance can close the tracked `run`, `acp`, `attach`, `models`, `providers`, `serve`, and `web` gaps plus the associated `run` flags.
+
+**Why:** OpenCode proved the shared packet-pr path, but its non-TUI support posture is still far below the steady-state maintenance contract. Those v1 restrictions are now explicit debt, not an accepted plateau.
+
+**Context:** The support debt baseline records each current OpenCode non-TUI gap under `requires_new_architectural_seam` with this TODO as the follow-on reference.
+
+**Effort:** L
+**Priority:** P1
+**Owner:** wrappers team
+**Milestone:** follow the shared packet-pr maintenance convergence proof
 
 ### Make Goose The Explicit P1 End-To-End Lifecycle Validation
 
@@ -39,6 +66,19 @@
 **Depends on:** M5 landing with one canonical capability projection contract and one shared local/CI check-only gate
 
 ## Retired / Superseded
+
+### Decide Whether Maintenance Transport Topology Still Needs Convergence After Worker/Runbook Cleanup
+
+**What:** After the `worker/runbook convergence` milestone lands, decide whether the maintenance transport model itself should change further, including worker split, replay/regeneration surface, and `packet_pr` versus worker-dispatch topology.
+
+**Why:** The current repo now has a stable shared maintenance packet contract, but the next plan review found that the broader transport question is larger than the worker/runbook cleanup milestone. If that decision is not recorded explicitly, it will either get smuggled into the wrong milestone or disappear into vague prose.
+
+**Context:** This item is no longer pending. The shared packet-pr support-uplift convergence milestone absorbed it by freezing the registry, request, relay, and doc contracts around shared `packet_pr` transport plus a packet-owned support-surface audit.
+
+**Effort:** M
+**Priority:** P2
+**Depends on:** Landing `worker/runbook convergence` so the current transport model can be judged from a truthful worker/runbook surface instead of stale docs and stale tests
+**Retired:** superseded by the shared packet-pr support-uplift convergence milestone on 2026-05-14
 
 ### Enclose The Publication Refresh Follow-On After The Runtime Runner
 

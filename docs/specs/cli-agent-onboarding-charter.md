@@ -1,6 +1,6 @@
 # Charter — Onboarding new CLI agent wrapper crates + `agent_api` backends
 
-Status: Draft  
+Status: Normative  
 Date (UTC): 2026-02-20  
 Owner(s): atomize-hq wrappers team
 
@@ -20,11 +20,25 @@ Maintenance request note:
 - maintainer-authored maintenance requests remain valid under the legacy request format
 - automated release-watch maintenance requests use `artifact_version = "2"` and `trigger_kind = "upstream_release_detected"`
 - automated release-watch requests MUST carry a `[detected_release]` table and MUST freeze `requested_control_plane_actions = ["packet_doc_refresh"]`
+- automated release-watch requests for enrolled maintenance MUST also carry
+  `[support_surface_audit]`, and that block is the only valid packet-owned source of truth for:
+  - newly discovered non-TUI surface
+  - preexisting non-TUI support debt
+  - allowed deferrals
+  - `required_uplifts_this_run[]`
 
 Approval maintenance note:
 - the committed `approved-agent.toml` artifact MUST carry frozen `descriptor.maintenance` truth in exactly one mode: `release_watch_enrolled` or `explicitly_deferred`
 - `release_watch_enrolled` requires committed registry `maintenance.release_watch` truth for the same agent
 - `explicitly_deferred` forbids committed registry `maintenance.release_watch` truth for the same agent
+
+Maintenance posture note:
+- a newly onboarded agent MAY start with partial non-TUI support
+- once an agent is enrolled in automated release-watch maintenance, non-TUI support MUST ratchet
+  upward over time rather than treating deliberate unsupported posture as steady state
+- TUI-only surface remains excluded from the automated maintenance ratchet
+- published non-TUI blockers MUST live in
+  `docs/specs/unified-agent-api/non-tui-support-debt.md`, not only in support-matrix caveat prose
 
 ## Goals
 

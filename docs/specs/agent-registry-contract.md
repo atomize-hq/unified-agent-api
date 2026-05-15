@@ -10,7 +10,8 @@ This document uses RFC 2119 requirement keywords (`MUST`, `MUST NOT`, `SHOULD`).
 ## Purpose
 
 Define the committed control-plane truth used by `xtask` for onboarded agents, including the
-maintenance governance metadata consumed by `check-agent-drift`.
+maintenance governance metadata consumed by `check-agent-drift` and the transport facts used to
+derive one shared automated maintenance packet contract.
 
 ## Registry ownership
 
@@ -115,12 +116,16 @@ Required top-level fields:
 Dispatch rules:
 
 - The only live scheduled release-detection entrypoint is `.github/workflows/agent-maintenance-release-watch.yml`. Per-agent watcher workflows MUST NOT be treated as active release-watch entrypoints.
+- `dispatch_kind = "packet_pr"` is the steady-state enrolled transport for automated maintenance.
 - `dispatch_workflow` MUST be present only when `dispatch_kind = "workflow_dispatch"`.
 - `dispatch_workflow` MUST be omitted when `dispatch_kind = "packet_pr"`.
 - `dispatch_workflow`, when present, MUST be a non-empty workflow filename.
 - The registry omission for `packet_pr` is intentional. Packet generation MUST materialize
   `detected_release.dispatch_workflow = "agent-maintenance-open-pr.yml"` in the request packet so
   the frozen packet still carries one fully resolved dispatch contract.
+- `workflow_dispatch` is compatibility-only for historical or manual replay lanes. It MUST NOT
+  become a second policy store for support-audit rules, writable-surface narrowing, or gate
+  semantics.
 
 Upstream rules:
 
@@ -135,11 +140,10 @@ Upstream rules:
 - Source-specific fields from the non-selected source kind MUST NOT be present.
 
 Current committed registry truth enables release-watch metadata for `codex`, `claude_code`, and
-`opencode`. At the current checkpoint, `codex` and `claude_code` use `dispatch_kind =
-"workflow_dispatch"`, while `opencode` uses `dispatch_kind = "packet_pr"` with packet-level
-materialization of the shared `agent-maintenance-open-pr.yml` dispatch workflow. That rollout
-state lives in the committed registry content, not as a permanent schema-level allowlist for
-future agents.
+`opencode`. Enrolled automated maintenance is expected to converge on `dispatch_kind = "packet_pr"`
+for each of those agents. Any temporary or historical `workflow_dispatch` entry exists only as a
+compatibility state in the committed registry content, not as a permanent schema-level expectation
+for future agents.
 
 ## Maintenance governance checks
 

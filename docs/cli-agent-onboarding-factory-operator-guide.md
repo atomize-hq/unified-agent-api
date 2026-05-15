@@ -8,10 +8,12 @@ For the visual system map, see:
 
 `docs/cli-agent-onboarding-factory-workflow-atlas.md`
 
-For the planned maintenance steady-state rewrite that converges the repo on shared `packet_pr`
-transport plus non-TUI support uplift, see:
+For the frozen maintenance contract that governs shared `packet_pr` transport plus non-TUI support
+uplift, see:
 
-`docs/cli-agent-maintenance-steady-state-plan.md`
+`docs/specs/maintenance-request-contract-v1.md`
+`docs/specs/agent-registry-contract.md`
+`docs/specs/unified-agent-api/non-tui-support-debt.md`
 
 ## Truth boundaries
 
@@ -676,14 +678,16 @@ Use `--write` to materialize the request and packet docs. Automated requests are
 
 Dispatch notes:
 - `--dispatch-kind` must match the committed registry `maintenance.release_watch.dispatch_kind` for the same agent.
-- `workflow_dispatch` lanes use the enrolled worker workflow as both the packet `dispatch_workflow` source and the `--opened-from` workflow reference.
-- `packet_pr` lanes still use the same prepared v2 packet shape and relay contract; they resolve `detected_release.dispatch_workflow` to the shared `agent-maintenance-open-pr.yml` workflow.
-- The current proof-backed `opencode` upstream-release lane is this `packet_pr` shape: `--opened-from .github/workflows/agent-maintenance-open-pr.yml` plus `--dispatch-kind packet_pr`.
+- `packet_pr` is the steady-state enrolled transport and resolves `detected_release.dispatch_workflow` to the shared `agent-maintenance-open-pr.yml` workflow.
+- `workflow_dispatch` is compatibility-only and must not carry a second policy contract in YAML.
 
 For automated upstream-release lanes:
 - `docs/agents/lifecycle/<agent_id>-maintenance/HANDOFF.md` is canonical.
 - `docs/agents/lifecycle/<agent_id>-maintenance/governance/pr-summary.md` is derivative.
 - `docs/agents/lifecycle/<agent_id>-maintenance/governance/maintenance-request.toml` owns relay/write envelope/gates/recovery and the manual-closeout requirement.
+- `docs/agents/lifecycle/<agent_id>-maintenance/governance/maintenance-request.toml` also owns the
+  exact `support_surface_audit` truth for newly discovered surface, eligible preexisting gaps,
+  required uplifts, valid deferrals, and the pre-run versus post-run debt count.
 - packet-owned execution artifacts under the maintenance root are part of the frozen relay contract:
 - `docs/agents/lifecycle/<agent_id>-maintenance/OPS_PLAYBOOK.md`
 - `docs/agents/lifecycle/<agent_id>-maintenance/CI_WORKFLOWS_PLAN.md`

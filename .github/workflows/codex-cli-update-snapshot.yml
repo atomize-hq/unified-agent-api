@@ -1,4 +1,4 @@
-name: Codex CLI update snapshot
+name: Codex CLI update snapshot (historical manual only)
 
 on:
   workflow_dispatch:
@@ -50,6 +50,10 @@ permissions:
   pull-requests: write
 
 jobs:
+  # Historical/manual-only acquisition workflow.
+  # Shared maintenance transport is owned by:
+  # - .github/workflows/agent-maintenance-release-watch.yml
+  # - .github/workflows/agent-maintenance-open-pr.yml
   # IMPORTANT: This workflow always checks out and builds from the `staging` branch so that
   # automation branches are derived from the same base they target via create-pull-request.
   # This avoids accidentally including unrelated commits when the workflow is dispatched from `main`.
@@ -440,50 +444,3 @@ jobs:
         run: |
           set -euo pipefail
           rm -rf _download _extract
-
-      - name: Prepare maintenance packet
-        shell: bash
-        run: |
-          set -euo pipefail
-          cargo run -p xtask -- prepare-agent-maintenance \
-            --agent "${{ inputs.agent_id }}" \
-            --current-version "${{ inputs.current_version }}" \
-            --latest-stable "${{ inputs.latest_stable }}" \
-            --target-version "${{ inputs.target_version }}" \
-            --opened-from "${{ inputs.opened_from }}" \
-            --detected-by "${{ inputs.detected_by }}" \
-            --dispatch-kind "${{ inputs.dispatch_kind }}" \
-            --dispatch-workflow "codex-cli-update-snapshot.yml" \
-            --branch-name "${{ inputs.branch_name }}" \
-            --request-recorded-at "$(date -u +"%Y-%m-%dT%H:%M:%SZ")" \
-            --request-commit "${{ github.sha }}" \
-            --write
-
-      - name: Create PR (best effort)
-        id: create_pr
-        continue-on-error: true
-        uses: peter-evans/create-pull-request@v8
-        with:
-          token: ${{ secrets.AUTOMATION_TOKEN || github.token }}
-          base: staging
-          commit-message: "chore: codex cli artifacts for ${{ inputs.target_version }}"
-          title: "chore: codex cli artifacts for ${{ inputs.target_version }}"
-          body-path: docs/agents/lifecycle/codex-maintenance/governance/pr-summary.md
-          branch: "${{ inputs.branch_name }}"
-          delete-branch: true
-      - name: Print recovery guidance
-        if: ${{ steps.create_pr.outcome == 'failure' }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          REQUEST_PATH="docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml"
-          PR_SUMMARY_PATH="docs/agents/lifecycle/codex-maintenance/governance/pr-summary.md"
-          PR_TITLE="chore: codex cli artifacts for ${{ inputs.target_version }}"
-          echo "::error title=Maintenance PR creation failed::Generated packet replay required." >&2
-          cat <<EOF >&2
-          Recovery path:
-          If PR creation fails after packet generation, rerun packet regeneration from the frozen request and reopen the PR from the generated pr-summary path.
-          cargo run -p xtask -- refresh-agent --request "${REQUEST_PATH}" --write
-          gh pr create --base staging --head "${{ inputs.branch_name }}" --title "${PR_TITLE}" --body-file "${PR_SUMMARY_PATH}"
-          EOF
-          exit 1

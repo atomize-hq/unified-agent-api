@@ -32,6 +32,10 @@ pub struct SandboxCommandRequest {
     pub log_denials: bool,
     /// Allow Unix sockets on macOS (`--allow-unix-socket`).
     pub allow_unix_socket: bool,
+    /// Include Codex-managed config in the sandbox environment.
+    pub include_managed_config: bool,
+    /// Optional named permissions profile passed via `--permissions-profile`.
+    pub permissions_profile: Option<String>,
     /// Additional `--config key=value` overrides to pass through.
     pub config_overrides: Vec<ConfigOverride>,
     /// Feature toggles forwarded to `--enable`/`--disable`.
@@ -52,6 +56,8 @@ impl SandboxCommandRequest {
             full_auto: false,
             log_denials: false,
             allow_unix_socket: false,
+            include_managed_config: false,
+            permissions_profile: None,
             config_overrides: Vec::new(),
             feature_toggles: FeatureToggles::default(),
             working_dir: None,
@@ -70,6 +76,17 @@ impl SandboxCommandRequest {
 
     pub fn allow_unix_socket(mut self, enable: bool) -> Self {
         self.allow_unix_socket = enable;
+        self
+    }
+
+    pub fn include_managed_config(mut self, enable: bool) -> Self {
+        self.include_managed_config = enable;
+        self
+    }
+
+    pub fn permissions_profile(mut self, profile: impl Into<String>) -> Self {
+        let profile = profile.into();
+        self.permissions_profile = (!profile.trim().is_empty()).then_some(profile);
         self
     }
 

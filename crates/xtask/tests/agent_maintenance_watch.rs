@@ -16,6 +16,8 @@ mod agent_registry {
 mod contract_policy;
 #[path = "../src/agent_maintenance/request.rs"]
 mod request;
+#[path = "../src/agent_maintenance/support_audit.rs"]
+mod support_audit;
 #[path = "../src/workspace_mutation.rs"]
 mod workspace_mutation;
 
@@ -49,13 +51,13 @@ fn build_watch_queue_emits_frozen_fields_for_stale_agents() {
                 latest_stable: "0.99.0".to_string(),
                 target_version: "0.98.0".to_string(),
                 version_policy: "latest_stable_minus_one".to_string(),
-                dispatch_kind: "workflow_dispatch".to_string(),
-                dispatch_workflow: "codex-cli-update-snapshot.yml".to_string(),
+                dispatch_kind: "packet_pr".to_string(),
+                dispatch_workflow: "agent-maintenance-open-pr.yml".to_string(),
                 maintenance_root: "docs/agents/lifecycle/codex-maintenance".to_string(),
                 request_path:
                     "docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml"
                         .to_string(),
-                opened_from: ".github/workflows/codex-cli-update-snapshot.yml".to_string(),
+                opened_from: ".github/workflows/agent-maintenance-open-pr.yml".to_string(),
                 detected_by: ".github/workflows/agent-maintenance-release-watch.yml".to_string(),
                 branch_name: "automation/codex-maintenance-0.98.0".to_string(),
             },
@@ -66,13 +68,13 @@ fn build_watch_queue_emits_frozen_fields_for_stale_agents() {
                 latest_stable: "1.2.5".to_string(),
                 target_version: "1.2.4".to_string(),
                 version_policy: "latest_stable_minus_one".to_string(),
-                dispatch_kind: "workflow_dispatch".to_string(),
-                dispatch_workflow: "claude-code-update-snapshot.yml".to_string(),
+                dispatch_kind: "packet_pr".to_string(),
+                dispatch_workflow: "agent-maintenance-open-pr.yml".to_string(),
                 maintenance_root: "docs/agents/lifecycle/claude_code-maintenance".to_string(),
                 request_path:
                     "docs/agents/lifecycle/claude_code-maintenance/governance/maintenance-request.toml"
                         .to_string(),
-                opened_from: ".github/workflows/claude-code-update-snapshot.yml".to_string(),
+                opened_from: ".github/workflows/agent-maintenance-open-pr.yml".to_string(),
                 detected_by: ".github/workflows/agent-maintenance-release-watch.yml".to_string(),
                 branch_name: "automation/claude_code-maintenance-1.2.4".to_string(),
             },
@@ -191,25 +193,27 @@ fn malformed_upstream_history_fails_closed() {
 }
 
 #[test]
-fn packet_pr_enrollment_uses_generic_open_pr_workflow() {
-    let fixture = fixture_root("agent-maintenance-watch-packet-pr");
+fn enrolled_agents_use_generic_open_pr_workflow() {
+    let fixture = fixture_root("agent-maintenance-watch-open-pr");
     seed_registry(&fixture);
-    seed_latest_validated(&fixture, "cli_manifests/codex", "0.98.0");
-    seed_latest_validated(&fixture, "cli_manifests/claude_code", "1.2.4");
+    seed_latest_validated(&fixture, "cli_manifests/codex", "0.97.0");
+    seed_latest_validated(&fixture, "cli_manifests/claude_code", "1.2.3");
     seed_latest_validated(&fixture, "cli_manifests/opencode", "1.4.9");
 
     let queue = build_watch_queue_with_resolver(&fixture, resolver_for_queue).expect("queue");
-    let opencode = queue
-        .stale_agents
-        .iter()
-        .find(|entry| entry.agent_id == "opencode")
-        .expect("opencode stale agent");
-    assert_eq!(opencode.dispatch_kind, "packet_pr");
-    assert_eq!(opencode.dispatch_workflow, "agent-maintenance-open-pr.yml");
-    assert_eq!(
-        opencode.opened_from,
-        ".github/workflows/agent-maintenance-open-pr.yml"
-    );
+    for agent_id in ["codex", "claude_code", "opencode"] {
+        let entry = queue
+            .stale_agents
+            .iter()
+            .find(|entry| entry.agent_id == agent_id)
+            .unwrap_or_else(|| panic!("missing stale agent {agent_id}"));
+        assert_eq!(entry.dispatch_kind, "packet_pr");
+        assert_eq!(entry.dispatch_workflow, "agent-maintenance-open-pr.yml");
+        assert_eq!(
+            entry.opened_from,
+            ".github/workflows/agent-maintenance-open-pr.yml"
+        );
+    }
 }
 
 #[test]

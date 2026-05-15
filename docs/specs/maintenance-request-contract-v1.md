@@ -1,6 +1,6 @@
 # Maintenance Request Contract v1
 
-Status: Draft  
+Status: Normative  
 Scope: automated upstream-release maintenance requests under `docs/agents/lifecycle/*-maintenance/governance/maintenance-request.toml`
 
 ## Normative language
@@ -19,7 +19,13 @@ boundary between:
 - transport workflows under `.github/workflows/`
 
 This contract exists so newly enrolled agents can share one maintenance packet shape even when
-their upstream acquisition pipelines differ.
+their upstream acquisition pipelines differ, while enforcing one support-aware maintenance success
+definition:
+
+1. support-surface audit first
+2. bounded non-TUI support uplift second
+3. green gates third
+4. manual closeout last
 
 ## Current scope
 
@@ -74,6 +80,8 @@ For release-watch packets in this milestone:
 - `requested_control_plane_actions` MUST remain `["packet_doc_refresh"]`
 - the packet MUST describe implementation and relay work through `[execution_contract]`, not by
   expanding `requested_control_plane_actions` into a second command queue
+- the packet MUST carry `[support_surface_audit]` and MUST use that block, not prompt prose, to
+  describe non-TUI support uplift expectations for the run
 - `HANDOFF.md` under the maintenance root MUST remain the canonical contributor execution
   contract, while `governance/pr-summary.md` MUST remain derivative from the same packet context
 
@@ -99,6 +107,131 @@ expressed through values, not through a second per-agent schema.
 `dispatch_kind` selects PR-opening transport only; it MUST NOT imply a narrower packet schema or a
 missing relay execution contract.
 
+## Universal support-surface-audit shape
+
+Automated upstream-release requests MUST carry one shared `[support_surface_audit]` shape.
+
+```toml
+[support_surface_audit]
+required = true
+surface_kinds = ["commands", "subcommands", "flags", "global_flags", "positional_args"]
+excluded_surface_kinds = ["tui_only"]
+allowed_deferrals = [
+  "upstream_not_machine_exposed",
+  "platform_evidence_missing",
+  "requires_new_infra",
+  "requires_new_architectural_seam",
+  "outside_registry_maintenance_write_envelope",
+]
+pre_run_debt_count = 0
+expected_post_run_debt_count = 0
+
+[[support_surface_audit.discovered_upstream_surface]]
+surface_kind = "flags"
+command_path = "codex exec"
+surface_id = "--json"
+evidence_ref = "cli_manifests/codex/raw_help/..."
+
+[[support_surface_audit.removed_upstream_surface]]
+surface_kind = "flags"
+command_path = "codex exec"
+surface_id = "--legacy"
+evidence_ref = "cli_manifests/codex/raw_help/..."
+
+[[support_surface_audit.preexisting_unsupported_surface]]
+surface_kind = "global_flags"
+command_path = "claude"
+surface_id = "--output-format"
+debt_ref = "docs/specs/unified-agent-api/non-tui-support-debt.md#claude-code-output-format"
+
+[[support_surface_audit.eligible_preexisting_surface]]
+surface_kind = "global_flags"
+command_path = "claude"
+surface_id = "--output-format"
+eligibility_reason = "adjacent_surface_changed"
+
+[[support_surface_audit.missing_wrapper_support]]
+surface_kind = "flags"
+command_path = "codex exec"
+surface_id = "--json"
+
+[[support_surface_audit.missing_backend_support]]
+surface_kind = "flags"
+command_path = "codex exec"
+surface_id = "--json"
+
+[[support_surface_audit.required_uplifts_this_run]]
+surface_kind = "flags"
+command_path = "codex exec"
+surface_id = "--json"
+reason = "new_upstream_surface"
+required_writes = ["wrapper", "backend", "manifest", "publication"]
+
+[[support_surface_audit.deferred_preexisting_gaps]]
+surface_kind = "global_flags"
+command_path = "claude"
+surface_id = "--output-format"
+defer_reason = "requires_new_architectural_seam"
+blocking_follow_on = "TODOS.md#close-claude-code-install-maintenance-gap"
+
+[[support_surface_audit.publication_impacts]]
+surface_kind = "flags"
+command_path = "codex exec"
+surface_id = "--json"
+surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
+```
+
+Required record shape rules:
+
+| Record | Required keys | Notes |
+| --- | --- | --- |
+| surface row | `surface_kind`, `command_path`, `surface_id` | shared identity for every audit list |
+| evidence-backed row | surface row + `evidence_ref` | used for discovered or removed upstream surface |
+| debt-backed row | surface row + `debt_ref` | used for preexisting inventory rows |
+| eligible row | surface row + `eligibility_reason` | only `adjacent_surface_changed`, `bounded_write_envelope`, or `no_new_seam_required` |
+| uplift row | surface row + `reason`, `required_writes` | `required_writes` values limited to `wrapper`, `backend`, `manifest`, `publication`, `packet_docs` |
+| deferred row | surface row + `defer_reason`, `blocking_follow_on` when repo-owned | `blocking_follow_on` omitted only for concrete external blockers |
+| publication impact row | surface row + `surface_doc` | ties uplift to published truth |
+
+Field invariants:
+
+1. `required` MUST be `true` for every enrolled automated maintenance packet.
+2. `required_uplifts_this_run[]` MUST equal:
+   - all newly discovered non-TUI gaps with no allowed blocker, plus
+   - all eligible preexisting gaps with no allowed blocker.
+3. `deferred_preexisting_gaps[]` MAY contain only preexisting gaps, never newly discovered
+   surface.
+4. Every deferred row MUST use one `allowed_deferrals[]` value.
+5. `expected_post_run_debt_count` MUST equal:
+   `pre_run_debt_count - closed_gap_count + newly_blocked_external_gap_count`.
+   It MUST never exceed `pre_run_debt_count`.
+6. If `removed_upstream_surface[]` is non-empty, publication truth MUST contract in the same run
+   or the packet is invalid.
+7. If this block is absent, malformed, or derived partly from prompt prose instead of shared code,
+   the packet is invalid.
+
+Allowed deferral taxonomy:
+
+- `upstream_not_machine_exposed`
+- `platform_evidence_missing`
+- `requires_new_infra`
+- `requires_new_architectural_seam`
+- `outside_registry_maintenance_write_envelope`
+
+Invalid deferral reasons:
+
+- `deliberately_unsupported`
+- `too_much_work_right_now`
+- `not_part_of_v1`
+
+Additional blocker rules:
+
+- `requires_new_infra`, `requires_new_architectural_seam`, and
+  `outside_registry_maintenance_write_envelope` are valid only when the packet points to a tracked
+  follow-on seam or TODO with an owner and milestone.
+- deleting or rewording a support-publication caveat does not satisfy the ratchet. The underlying
+  gap MUST either be closed or carried as a concrete blocked inventory row.
+
 ## Universal execution-contract shape
 
 Automated upstream-release requests that are intended for relay execution MUST carry one shared
@@ -120,6 +253,8 @@ Automated upstream-release requests that are intended for relay execution MUST c
 
 The relay MUST validate packet contents against this contract and MUST NOT derive a second hidden
 write envelope or gate set from `agent_id`.
+The relay MUST also validate `[support_surface_audit]` continuity, row-shape validity, allowed
+deferrals, and debt-count invariants before write mode.
 
 Recovery notes rendered into the packet SHOULD describe execution-host repair in terms of the
 local execution host, not the maintained agent being updated.
@@ -173,6 +308,7 @@ generation.
 Worker workflows MUST NOT:
 
 - hard-code a second execution-contract schema in YAML
+- hard-code or reinterpret the support-surface-audit schema in YAML
 - redefine writable surfaces in YAML
 - redefine green gates in YAML
 - encode prompt semantics inline instead of using the packet-owned template and summary artifacts
@@ -193,6 +329,7 @@ is it.
 - `green_gates`
 - `closeout_path`
 - recovery guidance
+- `support_surface_audit`
 
 The relay MUST reject packets whose prepared-run metadata does not match the live request packet.
 The relay MUST stop before closeout. `close-agent-maintenance` remains the only closeout writer.
@@ -209,6 +346,9 @@ During the transition to full v1:
 - newly generated automated packets MUST use `execution_contract.executor = "execute-agent-maintenance"`
 - new contract work MUST treat agent-specific executor naming as a compatibility artifact, not as
   the desired steady-state schema
+- newly generated automated packets for enrolled maintenance MUST use `dispatch_kind = "packet_pr"`
+  unless a manual or historical replay lane explicitly proves that a compatibility transport is
+  still required
 
 The steady-state v1 contract is one shared relay identity with agent-specific values projected
 through the narrow override hooks above.
@@ -219,9 +359,11 @@ This contract is considered adopted when all of the following are true:
 
 - an automated packet prepared for `workflow_dispatch` and an automated packet prepared for
   `packet_pr` share the same envelope, detected-release, and execution-contract schema
+- automated packets share one exact support-surface-audit schema with no agent-local field names or
+  hidden prompt-only policy
 - `execute-agent-maintenance` can validate and execute either packet without an agent-specific
   executor special case
 - registry truth remains the only enrollment and dispatch source of truth
 - worker workflows remain transport-only surfaces
-- prompt templates and PR summaries describe relay-owned work instead of acting like hidden
-  workflow-specific contracts
+- prompt templates and PR summaries describe relay-owned support uplift instead of acting like
+  hidden workflow-specific contracts

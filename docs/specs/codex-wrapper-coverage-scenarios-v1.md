@@ -195,6 +195,7 @@ The generator MUST emit the following flags under `path=["login"]`:
 - `--mcp` (level: `explicit`, note: `capability-guarded`)
 - `--api-key` (level: `explicit`)
 - `--device-auth` (level: `explicit`)
+- `--with-access-token` (level: `explicit`)
 - `--with-api-key` (level: `explicit`)
 
 The generator MUST NOT emit any flags or args under:
@@ -278,8 +279,10 @@ Wrapper API family:
 
 ### Required command-specific flags
 
-The generator MUST emit the following sandbox-specific flag:
+The generator MUST emit the following sandbox-specific flags:
 
+- `--include-managed-config` (level: `explicit`) under `path=["sandbox","linux"]`, `path=["sandbox","macos"]`, and `path=["sandbox","windows"]`
+- `--permissions-profile` (level: `explicit`) under `path=["sandbox","linux"]`, `path=["sandbox","macos"]`, and `path=["sandbox","windows"]`
 - `--log-denials` (level: `explicit`) only under `path=["sandbox","macos"]`
 
 ### Required positional args
@@ -306,21 +309,29 @@ Wrapper API family:
 - Arg: `COMMAND` (level: `explicit`)  
   Represents the trailing command vector (passed after `--`).
 
-## Scenario 12: `codex mcp-server` and server-mode `codex app-server`
+## Scenario 12: `codex mcp-server`, server-mode `codex app-server`, and `codex exec-server`
 
 Wrapper API family:
 - `codex::mcp` server spawns (stdio JSON-RPC transports)
+- `CodexClient::start_exec_server`
 
 ### Command entries
 
 - Path: `["mcp-server"]` (level: `explicit`)
 - Path: `["app-server"]` (level: `explicit`)
+- Path: `["exec-server"]` (level: `explicit`)
 
 ### Required command-specific flags
 
 The generator MUST emit the following flag under `path=["app-server"]`:
 
 - `--analytics-default-enabled` (level: `explicit`)
+
+The generator MUST emit the following flags under `path=["exec-server"]`:
+
+- `--executor-id` (level: `explicit`)
+- `--listen` (level: `explicit`)
+- `--name` (level: `explicit`)
 
 Notes:
 - If upstream snapshots do not include these paths for a given version, reports will include them as `wrapper_only_commands`.
@@ -529,3 +540,17 @@ Wrapper API family:
 - For `path=["debug","help"]`: `COMMAND` (level: `explicit`)
 - For `path=["debug","app-server","help"]`: `COMMAND` (level: `explicit`)
 - For `path=["debug","app-server","send-message-v2"]`: `USER_MESSAGE` (level: `explicit`)
+
+## Scenario 21: `codex update`
+
+Wrapper API family:
+- `CodexClient::update`
+
+### Command entry
+
+- Path: `["update"]` (level: `explicit`)
+
+### Flags/args
+
+The generator MUST NOT emit any command-specific flags or positional args under:
+- `path=["update"]`

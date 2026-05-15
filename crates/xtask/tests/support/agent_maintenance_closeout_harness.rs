@@ -1,6 +1,7 @@
 use std::path::Path;
 
 use serde_json::json;
+use sha2::{Digest, Sha256};
 
 use crate::{closeout, harness::sha256_hex};
 
@@ -65,7 +66,21 @@ pub fn automated_maintenance_request_toml(agent_id: &str, basis_ref: &str) -> St
             "source_ref = \"anomalyco/opencode\"\n",
             "dispatch_kind = \"packet_pr\"\n",
             "dispatch_workflow = \"agent-maintenance-open-pr.yml\"\n",
-            "branch_name = \"automation/{agent_id}-maintenance-1.14.47\"\n"
+            "branch_name = \"automation/{agent_id}-maintenance-1.14.47\"\n",
+            "\n",
+            "[support_surface_audit]\n",
+            "required = true\n",
+            "surface_kinds = [\"commands\", \"subcommands\", \"flags\", \"global_flags\", \"positional_args\"]\n",
+            "excluded_surface_kinds = [\"tui_only\"]\n",
+            "allowed_deferrals = [\n",
+            "  \"upstream_not_machine_exposed\",\n",
+            "  \"platform_evidence_missing\",\n",
+            "  \"requires_new_infra\",\n",
+            "  \"requires_new_architectural_seam\",\n",
+            "  \"outside_registry_maintenance_write_envelope\",\n",
+            "]\n",
+            "pre_run_debt_count = 0\n",
+            "expected_post_run_debt_count = 0\n"
         ),
         agent_id = agent_id,
         basis_ref = basis_ref
@@ -76,7 +91,18 @@ pub fn automated_maintenance_request_with_execution_contract_toml(
     agent_id: &str,
     basis_ref: &str,
 ) -> String {
-    let prompt_sha256 = "f68f4a5c6cc09a186256fe475e311bd4881e6dfeabd7852f1ed62cf659ce9685";
+    let registry =
+        xtask::agent_registry::AgentRegistry::parse(include_str!("../../data/agent_registry.toml"))
+            .expect("parse seeded registry");
+    let entry = registry
+        .find(agent_id)
+        .unwrap_or_else(|| panic!("missing registry entry {agent_id}"));
+    let prompt = xtask::agent_maintenance::contract_policy::packet_pr_prompt_template(
+        entry,
+        &format!("docs/agents/lifecycle/{agent_id}-maintenance"),
+    )
+    .replace("{{VERSION}}", "1.14.47");
+    let prompt_sha256 = hex::encode(Sha256::digest(prompt.as_bytes()));
 
     format!(
         concat!(

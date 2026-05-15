@@ -157,6 +157,25 @@ impl CodexClient {
         spawn_with_retry(&mut command, self.command_env.binary_path())
     }
 
+    /// Spawns a `codex login --with-access-token` session.
+    ///
+    /// The returned child inherits `kill_on_drop` so abandoning the handle cleans up the login helper.
+    pub fn spawn_with_access_token_login_process(
+        &self,
+    ) -> Result<tokio::process::Child, CodexError> {
+        let mut command = Command::new(self.command_env.binary_path());
+        command
+            .arg("login")
+            .arg("--with-access-token")
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
+            .kill_on_drop(true);
+
+        self.command_env.apply(&mut command)?;
+
+        spawn_with_retry(&mut command, self.command_env.binary_path())
+    }
+
     /// Spawns `codex login --mcp` when the probed binary advertises support.
     ///
     /// Returns `Ok(None)` when the capability is unknown or unsupported so

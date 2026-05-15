@@ -44,6 +44,8 @@ mod release_doc;
 mod request;
 #[path = "../src/root_intake_layout.rs"]
 mod root_intake_layout;
+#[path = "../src/agent_maintenance/support_audit.rs"]
+mod support_audit;
 #[path = "../src/support_matrix.rs"]
 mod support_matrix;
 

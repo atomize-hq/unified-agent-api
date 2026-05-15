@@ -7,4 +7,5 @@ pub mod finding_signature;
 pub mod prepare;
 pub mod refresh;
 pub mod request;
+pub mod support_audit;
 pub mod watch;

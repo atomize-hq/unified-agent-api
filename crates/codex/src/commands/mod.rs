@@ -11,3 +11,4 @@ mod plugin;
 mod proxy;
 mod review;
 mod sandbox;
+mod update;

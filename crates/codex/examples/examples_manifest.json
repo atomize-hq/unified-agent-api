@@ -62,6 +62,7 @@
     { "path": ["sandbox", "linux"], "examples": ["run_sandbox"] },
     { "path": ["sandbox", "macos"], "examples": ["run_sandbox"] },
     { "path": ["sandbox", "windows"], "examples": ["run_sandbox"] },
-    { "path": ["stdio-to-uds"], "examples": ["stdio_to_uds_live"] }
+    { "path": ["stdio-to-uds"], "examples": ["stdio_to_uds_live"] },
+    { "path": ["update"], "examples": ["update"] }
   ]
 }

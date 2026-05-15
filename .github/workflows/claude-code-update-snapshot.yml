@@ -1,4 +1,4 @@
-name: Claude Code update snapshot
+name: Claude Code update snapshot (historical manual only)
 
 on:
   workflow_dispatch:
@@ -45,6 +45,10 @@ permissions:
   pull-requests: write
 
 jobs:
+  # Historical/manual-only acquisition workflow.
+  # Shared maintenance transport is owned by:
+  # - .github/workflows/agent-maintenance-release-watch.yml
+  # - .github/workflows/agent-maintenance-open-pr.yml
   # IMPORTANT: This workflow always checks out and builds from the `staging` branch so that
   # automation branches are derived from the same base they target via create-pull-request.
   # This avoids accidentally including unrelated commits when the workflow is dispatched from `main`.
@@ -362,50 +366,3 @@ jobs:
           cargo run -p xtask -- codex-report --root cli_manifests/claude_code --version "$VERSION"
           cargo run -p xtask -- codex-version-metadata --root cli_manifests/claude_code --version "$VERSION" --status reported
           cargo run -p xtask -- codex-validate --root cli_manifests/claude_code
-
-      - name: Prepare maintenance packet
-        shell: bash
-        run: |
-          set -euo pipefail
-          cargo run -p xtask -- prepare-agent-maintenance \
-            --agent "${{ inputs.agent_id }}" \
-            --current-version "${{ inputs.current_version }}" \
-            --latest-stable "${{ inputs.latest_stable }}" \
-            --target-version "${{ inputs.target_version }}" \
-            --opened-from "${{ inputs.opened_from }}" \
-            --detected-by "${{ inputs.detected_by }}" \
-            --dispatch-kind "${{ inputs.dispatch_kind }}" \
-            --dispatch-workflow "claude-code-update-snapshot.yml" \
-            --branch-name "${{ inputs.branch_name }}" \
-            --request-recorded-at "$(date -u +"%Y-%m-%dT%H:%M:%SZ")" \
-            --request-commit "${{ github.sha }}" \
-            --write
-
-      - name: Create update PR
-        id: create_pr
-        continue-on-error: true
-        uses: peter-evans/create-pull-request@v8
-        with:
-          token: ${{ secrets.AUTOMATION_TOKEN || secrets.GITHUB_TOKEN }}
-          base: staging
-          commit-message: "chore: snapshot claude code ${{ inputs.target_version }}"
-          title: "chore: snapshot claude code ${{ inputs.target_version }}"
-          body-path: docs/agents/lifecycle/claude_code-maintenance/governance/pr-summary.md
-          branch: "${{ inputs.branch_name }}"
-          delete-branch: true
-      - name: Print recovery guidance
-        if: ${{ steps.create_pr.outcome == 'failure' }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          REQUEST_PATH="docs/agents/lifecycle/claude_code-maintenance/governance/maintenance-request.toml"
-          PR_SUMMARY_PATH="docs/agents/lifecycle/claude_code-maintenance/governance/pr-summary.md"
-          PR_TITLE="chore: snapshot claude code ${{ inputs.target_version }}"
-          echo "::error title=Maintenance PR creation failed::Generated packet replay required." >&2
-          cat <<EOF >&2
-          Recovery path:
-          If PR creation fails after packet generation, rerun packet regeneration from the frozen request and reopen the PR from the generated pr-summary path.
-          cargo run -p xtask -- refresh-agent --request "${REQUEST_PATH}" --write
-          gh pr create --base staging --head "${{ inputs.branch_name }}" --title "${PR_TITLE}" --body-file "${PR_SUMMARY_PATH}"
-          EOF
-          exit 1

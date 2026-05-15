@@ -6,9 +6,11 @@ Use the operator guide for exact commands and ordered procedure.
 Use this atlas to understand the whole machine, the ownership boundaries, and where the current
 maintenance contract still falls short of intended product behavior.
 
-For the planned steady-state maintenance rewrite, see:
+For the frozen shared maintenance contract, see:
 
-`docs/cli-agent-maintenance-steady-state-plan.md`
+`docs/specs/maintenance-request-contract-v1.md`
+`docs/specs/agent-registry-contract.md`
+`docs/specs/unified-agent-api/non-tui-support-debt.md`
 
 It does not replace the normative contracts in `docs/specs/**` or the onboarding charter in
 `docs/specs/cli-agent-onboarding-charter.md`.
@@ -28,21 +30,14 @@ It does not replace the normative contracts in `docs/specs/**` or the onboarding
 
 The current repo already has one generic maintenance watcher.
 
-The current repo does not yet have a maintenance success contract that fully matches product
-intent.
+The maintenance success contract now lives in the normative specs above.
 
-That distinction matters:
+That distinction still matters:
 
-- generic detection and dispatch are mostly solved
-- generic bounded relay execution is mostly solved
-- maintenance-as-support-uplift is not solved yet
-
-Today the automated maintenance contract is still biased toward packet refresh and version-scoped
-manifest refresh. The intended direction is that maintenance runs should also add newly available
-non-TUI support surface over time: commands, subcommands, flags, global flags, and positional
-arguments.
-
-This atlas shows both truths.
+- workflows own transport only
+- packet truth owns the support-surface audit
+- relay truth owns validation, bounded writes, and gates
+- manual closeout remains explicit
 
 ## L0 Factory Overview
 
@@ -56,10 +51,8 @@ flowchart TD
   D --> E["Shared Maintenance Watch"]
   E --> F["stale_agents[] queue"]
   F --> G{"dispatch_kind"}
-  G -->|workflow_dispatch| H["Per-agent worker workflow"]
   G -->|packet_pr| I["agent-maintenance-open-pr.yml"]
-  H --> J["prepare-agent-maintenance"]
-  I --> J
+  I --> J["prepare-agent-maintenance"]
   J --> K["maintenance-request.toml + HANDOFF.md + PR summary"]
   K --> L["execute-agent-maintenance"]
   L --> M["manual close-agent-maintenance"]
@@ -72,7 +65,7 @@ flowchart TD
   closeout.
 - Once an agent reaches a committed maintenance-ready baseline, the shared maintenance watcher owns
   stale release detection.
-- PR opening transport can differ per agent, but packet preparation converges on one shared
+- Enrolled automated maintenance now converges on shared `packet_pr` transport and one shared
   automated maintenance request shape.
 
 ## L1 Create-Mode Lifecycle
@@ -116,10 +109,8 @@ flowchart LR
   A["agent_registry.toml"] --> B["maintenance-watch"]
   B --> C["stale_agents[]"]
   C --> D{"dispatch_kind per agent"}
-  D -->|workflow_dispatch| E["codex-cli-update-snapshot.yml / claude-code-update-snapshot.yml / future workers"]
   D -->|packet_pr| F["agent-maintenance-open-pr.yml"]
-  E --> G["prepare-agent-maintenance"]
-  F --> G
+  F --> G["prepare-agent-maintenance"]
   G --> H["shared request schema"]
 ```
 
@@ -127,9 +118,9 @@ flowchart LR
 
 | Agent | Dispatch kind | Opening workflow | Status |
 | --- | --- | --- | --- |
-| `codex` | `workflow_dispatch` | `codex-cli-update-snapshot.yml` | transitional worker flow, expected to retire |
-| `claude_code` | `workflow_dispatch` | `claude-code-update-snapshot.yml` | transitional worker flow, expected to retire |
-| `opencode` | `packet_pr` | `agent-maintenance-open-pr.yml` | proved successfully, intended default direction |
+| `codex` | `packet_pr` | `agent-maintenance-open-pr.yml` | shared enrolled transport |
+| `claude_code` | `packet_pr` | `agent-maintenance-open-pr.yml` | shared enrolled transport |
+| `opencode` | `packet_pr` | `agent-maintenance-open-pr.yml` | shared enrolled transport |
 
 ### Steady-state direction
 
@@ -268,26 +259,17 @@ flowchart TD
   D --> H
 ```
 
-### Current-state truth
+### Support-audit truth
 
-Today the automated maintenance contract still biases toward:
-
-- `requested_control_plane_actions = ["packet_doc_refresh"]`
-- prompt-driven manifest refresh
-- wrapper and backend changes only when artifact deltas happen to force them
-
-That is conservative and mechanically safe.
-
-It is also weaker than intended product behavior.
-
-### Intended-state truth
-
-Maintenance for enrolled agents should be able to:
+Maintenance for enrolled agents must now be able to:
 
 - detect newly available non-TUI surface in upstream CLI snapshots
-- compare that surface against current wrapper coverage and backend support
+- compare that surface against current wrapper coverage, backend support, published support truth,
+  and the committed debt inventory
 - land bounded support uplift in `crates/<agent>/**` and `crates/agent_api/**`
 - refresh manifests and publication surfaces so committed support truth matches what was added
+- fail closed or record one concrete allowed deferral when uplift cannot truthfully land in the
+  current run
 
 ### What is explicitly out of scope
 
@@ -302,9 +284,9 @@ This does not imply:
 The missing seam is narrower than that. It is support uplift for newly available automatable
 surface.
 
-## L3 Desired Future Maintenance Shape
+## L3 Shared Maintenance Shape
 
-This is the recommended future-state decision point the current contract does not yet encode.
+This is the current shared decision point encoded by the frozen packet contract.
 
 ```mermaid
 flowchart LR
@@ -333,7 +315,7 @@ as unrelated events.
 | `docs/agents/lifecycle/<prefix>/governance/lifecycle-state.json` | committed create-mode lifecycle truth | create-lane lifecycle commands |
 | `docs/agents/lifecycle/<prefix>/governance/publication-ready.json` | committed publication handoff | `prepare-publication --write` |
 | `docs/agents/lifecycle/<prefix>/governance/proving-run-closeout.json` | create-mode closeout artifact | `prepare-proving-run-closeout --write`, then maintainer, then `close-proving-run` |
-| `docs/agents/lifecycle/<agent_id>-maintenance/governance/maintenance-request.toml` | frozen automated or manual maintenance request | maintainer or `prepare-agent-maintenance --write` |
+| `docs/agents/lifecycle/<agent_id>-maintenance/governance/maintenance-request.toml` | frozen automated or manual maintenance request, including support-surface audit truth | maintainer or `prepare-agent-maintenance --write` |
 | `docs/agents/lifecycle/<agent_id>-maintenance/HANDOFF.md` | canonical execution contract prose for automated maintenance | maintenance packet renderer |
 | `docs/agents/lifecycle/<agent_id>-maintenance/governance/maintenance-closeout.json` | maintenance closeout artifact | maintainer, then `close-agent-maintenance` |
 | `docs/agents/.uaa-temp/runtime-follow-on/runs/<run_id>/` | scratch runtime evidence | `runtime-follow-on` |

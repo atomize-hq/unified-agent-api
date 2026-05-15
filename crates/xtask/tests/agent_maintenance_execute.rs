@@ -67,7 +67,9 @@ fn execute_agent_maintenance_dry_run_writes_frozen_packet_only_under_run_root() 
         assert!(run_dir.join(name).is_file(), "missing {name}");
     }
     let prompt = fs::read_to_string(run_dir.join("codex-prompt.md")).expect("read prompt");
-    assert!(prompt.contains("Execute maintenance target 0.98.0."));
+    assert!(
+        prompt.contains("Execute the automated maintenance packet for `codex` target `0.98.0`.")
+    );
     assert!(output.stdout.contains("closeout remains manual"));
 }
 
@@ -208,18 +210,18 @@ fn execute_agent_maintenance_write_fails_closed_on_prompt_mismatch() {
     let codex_binary = fake_execute_codex_binary(&fixture);
     let dry_run = run_execute_cli(execute_args("--dry-run", Some(&codex_binary)), &fixture);
     assert_eq!(dry_run.exit_code, 0, "stderr:\n{}", dry_run.stderr);
+    let request_path =
+        fixture.join("docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml");
+    let request = fs::read_to_string(&request_path).expect("read request");
     harness::write_text(
-        &fixture.join("cli_manifests/codex/PR_BODY_TEMPLATE.md"),
-        "@codex\n\n## Goal\n\nChanged prompt target {{VERSION}}.\n",
+        &request_path,
+        &request.replace("prompt_sha256 = \"", "prompt_sha256 = \"0000"),
     );
 
     let output = run_execute_cli(execute_args("--write", Some(&codex_binary)), &fixture);
 
     assert_eq!(output.exit_code, 2);
     assert!(output.stderr.contains("prompt_sha256"));
-    assert!(output
-        .stderr
-        .contains("must match the rendered prompt template digest"));
 }
 
 #[test]

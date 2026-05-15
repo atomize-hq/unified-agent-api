@@ -10,6 +10,7 @@ use crate::agent_registry::{
 use super::request::{
     DetectedRelease, ExecutionContract, ExecutionContractRecovery, MaintenanceRequest,
 };
+use super::support_audit::NON_TUI_SUPPORT_DEBT_PATH;
 
 pub(crate) const GENERATED_BY_WORKFLOW: &str =
     ".github/workflows/agent-maintenance-release-watch.yml";
@@ -190,10 +191,7 @@ pub(crate) fn packet_owned_prompt_template_path(maintenance_root: &str) -> Strin
     format!("{maintenance_root}/{PACKET_OWNED_PROMPT_TEMPLATE_FILE}")
 }
 
-pub(crate) fn packet_pr_prompt_template(
-    entry: &AgentRegistryEntry,
-    maintenance_root: &str,
-) -> String {
+pub fn packet_pr_prompt_template(entry: &AgentRegistryEntry, maintenance_root: &str) -> String {
     format!(
         concat!(
             "# Packet PR Maintenance Prompt (`{{{{VERSION}}}}`)\n\n",
@@ -204,6 +202,7 @@ pub(crate) fn packet_pr_prompt_template(
             "Execute the automated maintenance packet for `{agent_id}` target `{{{{VERSION}}}}`.\n\n",
             "## Frozen request contract\n\n",
             "- Read `{request_path}` before changing code or docs.\n",
+            "- Read the packet-owned `support_surface_audit` block before deciding whether the run can succeed.\n",
             "- Treat `{handoff_path}` as canonical for writable surfaces, read-only inputs, ordered commands, green gates, and recovery.\n",
             "- Treat `.github/workflows/{workflow}` as the opening workflow source.\n",
             "- Do not write outside the execution contract frozen in the request packet.\n\n",
@@ -217,11 +216,13 @@ pub(crate) fn packet_pr_prompt_template(
             "- `cli_manifests/{agent_id}/wrapper_coverage.json`\n\n",
             "## Required workflow\n\n",
             "1. Compare the current validated baseline from `cli_manifests/{agent_id}/latest_validated.txt` against the target `{{{{VERSION}}}}` artifacts.\n",
-            "2. Refresh or create version-scoped manifest artifacts under `cli_manifests/{agent_id}/snapshots/{{{{VERSION}}}}/`, `cli_manifests/{agent_id}/reports/{{{{VERSION}}}}/`, and `cli_manifests/{agent_id}/versions/{{{{VERSION}}}}.json` as required by the packet.\n",
-            "3. Update `crates/{agent_id}/**` and `crates/agent_api/**` only when the target artifact delta requires wrapper or backend changes.\n",
-            "4. Leave closeout manual; record it only with `close-agent-maintenance` after the declared green gates pass.\n\n",
+            "2. Use `support_surface_audit` to classify newly discovered non-TUI surface, preexisting non-TUI debt, required uplifts, and allowed deferrals.\n",
+            "3. Land bounded wrapper/backend/manifest/publication updates for every row in `required_uplifts_this_run`.\n",
+            "4. Refresh or create version-scoped manifest artifacts under `cli_manifests/{agent_id}/snapshots/{{{{VERSION}}}}/`, `cli_manifests/{agent_id}/reports/{{{{VERSION}}}}/`, and `cli_manifests/{agent_id}/versions/{{{{VERSION}}}}.json` as required by the packet.\n",
+            "5. Leave closeout manual; record it only with `close-agent-maintenance` after the declared green gates pass.\n\n",
             "## Done criteria\n\n",
             "- Changes stay within the writable surfaces frozen in `{request_path}`.\n",
+            "- No newly discovered non-TUI surface remains unresolved unless the packet records one allowed deferral.\n",
             "- `cargo run -p xtask -- codex-validate --root cli_manifests/{agent_id}` passes.\n",
             "- The remaining ordered commands and green gates from `{handoff_path}` pass or are captured in maintainer follow-up notes.\n"
         ),
@@ -314,12 +315,14 @@ fn read_only_inputs(
             format!("{}/CI_WORKFLOWS_PLAN.md", entry.manifest_root),
             format!("{}/PR_BODY_TEMPLATE.md", entry.manifest_root),
             opened_from.to_string(),
+            NON_TUI_SUPPORT_DEBT_PATH.to_string(),
         ],
         ReleaseWatchDispatchKind::PacketPr => vec![
             packet_owned_ops_playbook_path(maintenance_root),
             packet_owned_workflow_plan_path(maintenance_root),
             packet_owned_prompt_template_path(maintenance_root),
             opened_from.to_string(),
+            NON_TUI_SUPPORT_DEBT_PATH.to_string(),
         ],
     }
 }
@@ -354,6 +357,7 @@ fn writable_surfaces(
         format!("{}/wrapper_coverage.json", entry.manifest_root),
         "cli_manifests/support_matrix/current.json".to_string(),
         "docs/specs/unified-agent-api/support-matrix.md".to_string(),
+        NON_TUI_SUPPORT_DEBT_PATH.to_string(),
     ];
     if entry.agent_id == "codex" {
         writable_surfaces.push("docs/specs/codex-wrapper-coverage-scenarios-v1.md".to_string());

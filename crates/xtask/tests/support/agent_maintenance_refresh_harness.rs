@@ -59,12 +59,20 @@ pub fn normalize_support_matrix_fixture(root: &Path) {
 pub fn seed_publication_inputs(root: &Path) {
     seed_release_touchpoints(root);
     write_text(
+        &root.join(".github/workflows/agent-maintenance-open-pr.yml"),
+        "name: Packet PR worker\n",
+    );
+    write_text(
         &root.join("docs/integrations/opencode/governance/seam-2-closeout.md"),
         "# Closeout\n\nThis stale capability claim triggered maintenance.\n",
     );
     write_text(
         &root.join("docs/specs/unified-agent-api/support-matrix.md"),
         "# Support matrix\n\nManual contract text.\n",
+    );
+    write_text(
+        &root.join("docs/specs/unified-agent-api/non-tui-support-debt.md"),
+        "# Non-TUI Support Debt Inventory\n\n## Inventory\n",
     );
     write_text(
         &root.join("docs/specs/unified-agent-api/capability-matrix.md"),
@@ -175,7 +183,7 @@ pub fn automated_request_toml(agent_id: &str, basis_ref: &str) -> String {
             "agent_id = \"{agent_id}\"\n",
             "trigger_kind = \"upstream_release_detected\"\n",
             "basis_ref = \"{basis_ref}\"\n",
-            "opened_from = \".github/workflows/codex-cli-update-snapshot.yml\"\n",
+            "opened_from = \".github/workflows/agent-maintenance-open-pr.yml\"\n",
             "requested_control_plane_actions = [\n",
             "  \"packet_doc_refresh\",\n",
             "]\n",
@@ -194,9 +202,23 @@ pub fn automated_request_toml(agent_id: &str, basis_ref: &str) -> String {
             "version_policy = \"latest_stable_minus_one\"\n",
             "source_kind = \"github_releases\"\n",
             "source_ref = \"openai/codex\"\n",
-            "dispatch_kind = \"workflow_dispatch\"\n",
-            "dispatch_workflow = \"codex-cli-update-snapshot.yml\"\n",
-            "branch_name = \"automation/{agent_id}-maintenance-0.98.0\"\n"
+            "dispatch_kind = \"packet_pr\"\n",
+            "dispatch_workflow = \"agent-maintenance-open-pr.yml\"\n",
+            "branch_name = \"automation/{agent_id}-maintenance-0.98.0\"\n",
+            "\n",
+            "[support_surface_audit]\n",
+            "required = true\n",
+            "surface_kinds = [\"commands\", \"subcommands\", \"flags\", \"global_flags\", \"positional_args\"]\n",
+            "excluded_surface_kinds = [\"tui_only\"]\n",
+            "allowed_deferrals = [\n",
+            "  \"upstream_not_machine_exposed\",\n",
+            "  \"platform_evidence_missing\",\n",
+            "  \"requires_new_infra\",\n",
+            "  \"requires_new_architectural_seam\",\n",
+            "  \"outside_registry_maintenance_write_envelope\",\n",
+            "]\n",
+            "pre_run_debt_count = 0\n",
+            "expected_post_run_debt_count = 0\n"
         ),
         agent_id = agent_id,
         basis_ref = basis_ref
@@ -204,7 +226,17 @@ pub fn automated_request_toml(agent_id: &str, basis_ref: &str) -> String {
 }
 
 pub fn automated_request_with_execution_contract_toml(agent_id: &str, basis_ref: &str) -> String {
-    let prompt = "# Goal\n\nFollow the maintained PR template for 0.98.0.\n";
+    let registry =
+        xtask::agent_registry::AgentRegistry::parse(include_str!("../../data/agent_registry.toml"))
+            .expect("parse seeded registry");
+    let entry = registry
+        .find(agent_id)
+        .unwrap_or_else(|| panic!("missing registry entry {agent_id}"));
+    let prompt = xtask::agent_maintenance::contract_policy::packet_pr_prompt_template(
+        entry,
+        &format!("docs/agents/lifecycle/{agent_id}-maintenance"),
+    )
+    .replace("{{VERSION}}", "0.98.0");
     let prompt_sha256 = hex::encode(Sha256::digest(prompt.as_bytes()));
 
     format!(
@@ -212,7 +244,7 @@ pub fn automated_request_with_execution_contract_toml(agent_id: &str, basis_ref:
             "{}\n",
             "[execution_contract]\n",
             "executor = \"execute-agent-maintenance\"\n",
-            "prompt_template_path = \"cli_manifests/{agent_id}/PR_BODY_TEMPLATE.md\"\n",
+            "prompt_template_path = \"docs/agents/lifecycle/{agent_id}-maintenance/governance/execute-agent-maintenance-prompt.md\"\n",
             "prompt_sha256 = \"{prompt_sha256}\"\n",
             "pr_summary_path = \"docs/agents/lifecycle/{agent_id}-maintenance/governance/pr-summary.md\"\n",
             "closeout_path = \"docs/agents/lifecycle/{agent_id}-maintenance/governance/maintenance-closeout.json\"\n",
@@ -228,10 +260,10 @@ pub fn automated_request_with_execution_contract_toml(agent_id: &str, basis_ref:
             "  \"cli_manifests/{agent_id}/wrapper_coverage.json\",\n",
             "]\n",
             "read_only_inputs = [\n",
-            "  \"cli_manifests/{agent_id}/OPS_PLAYBOOK.md\",\n",
-            "  \"cli_manifests/{agent_id}/CI_WORKFLOWS_PLAN.md\",\n",
-            "  \"cli_manifests/{agent_id}/PR_BODY_TEMPLATE.md\",\n",
-            "  \".github/workflows/codex-cli-update-snapshot.yml\",\n",
+            "  \"docs/agents/lifecycle/{agent_id}-maintenance/OPS_PLAYBOOK.md\",\n",
+            "  \"docs/agents/lifecycle/{agent_id}-maintenance/CI_WORKFLOWS_PLAN.md\",\n",
+            "  \"docs/agents/lifecycle/{agent_id}-maintenance/governance/execute-agent-maintenance-prompt.md\",\n",
+            "  \".github/workflows/agent-maintenance-open-pr.yml\",\n",
             "]\n",
             "ordered_commands = [\n",
             "  \"cargo run -p xtask -- codex-validate --root cli_manifests/{agent_id}\",\n",
@@ -328,6 +360,10 @@ fn seed_cli_manifest_root(
         "# Goal\n\nFollow the maintained PR template for {{VERSION}}.\n",
     );
     write_text(
+        &root.join(manifest_root).join("latest_validated.txt"),
+        "0.97.0\n",
+    );
+    write_text(
         &root.join(manifest_root).join("OPS_PLAYBOOK.md"),
         "# Ops playbook\n",
     );
@@ -347,6 +383,26 @@ fn seed_cli_manifest_root(
             "{}\n",
             serde_json::to_string_pretty(&version).expect("serialize version metadata")
         ),
+    );
+    let target_version = serde_json::json!({
+        "semantic_version": "0.98.0",
+        "status": "reported",
+        "coverage": { "supported_targets": canonical_targets },
+    });
+    write_text(
+        &root.join(manifest_root).join("versions/0.98.0.json"),
+        &format!(
+            "{}\n",
+            serde_json::to_string_pretty(&target_version).expect("serialize version metadata")
+        ),
+    );
+    write_text(
+        &root.join(manifest_root).join("wrapper_coverage.json"),
+        "{\n  \"schema_version\": 1\n}\n",
+    );
+    write_text(
+        &root.join(manifest_root).join("artifacts.lock.json"),
+        "{\n  \"schema_version\": 1\n}\n",
     );
 
     for target in canonical_targets {
@@ -378,6 +434,15 @@ fn seed_cli_manifest_root(
             &root
                 .join(manifest_root)
                 .join(format!("reports/1.0.0/coverage.{target}.json")),
+            &format!(
+                "{}\n",
+                serde_json::to_string_pretty(&report).expect("serialize support report")
+            ),
+        );
+        write_text(
+            &root
+                .join(manifest_root)
+                .join("reports/0.98.0/coverage.any.json"),
             &format!(
                 "{}\n",
                 serde_json::to_string_pretty(&report).expect("serialize support report")

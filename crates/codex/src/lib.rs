@@ -115,7 +115,7 @@ pub use cli::{
     PluginMarketplaceAddRequest, PluginMarketplaceCommandRequest, PluginMarketplaceHelpRequest,
     PluginMarketplaceRemoveRequest, PluginMarketplaceUpgradeRequest, ResponsesApiProxyHandle,
     ResponsesApiProxyInfo, ResponsesApiProxyRequest, ResumeSessionRequest, ReviewCommandRequest,
-    SandboxCommandRequest, SandboxPlatform, SandboxRun, StdioToUdsRequest,
+    SandboxCommandRequest, SandboxPlatform, SandboxRun, StdioToUdsRequest, UpdateCommandRequest,
 };
 pub use events::{
     CommandExecutionDelta, CommandExecutionState, EventError, FileChangeDelta, FileChangeKind,

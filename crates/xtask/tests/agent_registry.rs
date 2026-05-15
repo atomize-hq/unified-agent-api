@@ -74,12 +74,9 @@ fn seeded_registry_parses_successfully() {
     );
     assert_eq!(
         codex_watch.dispatch_kind,
-        ReleaseWatchDispatchKind::WorkflowDispatch
+        ReleaseWatchDispatchKind::PacketPr
     );
-    assert_eq!(
-        codex_watch.dispatch_workflow.as_deref(),
-        Some("codex-cli-update-snapshot.yml")
-    );
+    assert_eq!(codex_watch.dispatch_workflow, None);
     assert_eq!(
         codex_watch.upstream.source_kind,
         ReleaseWatchSourceKind::GithubReleases
@@ -106,12 +103,9 @@ fn seeded_registry_parses_successfully() {
     );
     assert_eq!(
         claude_watch.dispatch_kind,
-        ReleaseWatchDispatchKind::WorkflowDispatch
+        ReleaseWatchDispatchKind::PacketPr
     );
-    assert_eq!(
-        claude_watch.dispatch_workflow.as_deref(),
-        Some("claude-code-update-snapshot.yml")
-    );
+    assert_eq!(claude_watch.dispatch_workflow, None);
     assert_eq!(
         claude_watch.upstream.source_kind,
         ReleaseWatchSourceKind::GcsObjectListing
@@ -522,8 +516,8 @@ fn malformed_release_watch_metadata_fails_closed() {
         (
             "missing workflow for workflow dispatch",
             SEEDED_REGISTRY.replacen(
-                "dispatch_workflow = \"codex-cli-update-snapshot.yml\"\n",
-                "",
+                "dispatch_kind = \"packet_pr\"",
+                "dispatch_kind = \"workflow_dispatch\"",
                 1,
             ),
             "dispatch_workflow is required when dispatch_kind = `workflow_dispatch`",
@@ -532,8 +526,8 @@ fn malformed_release_watch_metadata_fails_closed() {
             "packet pr must not keep workflow field",
             SEEDED_REGISTRY
                 .replacen(
-                    "dispatch_kind = \"workflow_dispatch\"",
                     "dispatch_kind = \"packet_pr\"",
+                    "dispatch_kind = \"packet_pr\"\ndispatch_workflow = \"codex-cli-update-snapshot.yml\"",
                     1,
                 ),
             "dispatch_workflow must be omitted when dispatch_kind = `packet_pr`",
@@ -570,13 +564,8 @@ fn malformed_release_watch_metadata_fails_closed() {
             "workflow dispatch path still requires source-specific fields",
             SEEDED_REGISTRY
                 .replacen(
-                    "dispatch_kind = \"workflow_dispatch\"",
                     "dispatch_kind = \"packet_pr\"",
-                    1,
-                )
-                .replacen(
-                    "dispatch_workflow = \"codex-cli-update-snapshot.yml\"\n",
-                    "",
+                    "dispatch_kind = \"workflow_dispatch\"\ndispatch_workflow = \"codex-cli-update-snapshot.yml\"",
                     1,
                 )
                 .replacen("repo = \"codex\"\n", "", 1),

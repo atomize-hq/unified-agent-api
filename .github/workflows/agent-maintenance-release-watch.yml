@@ -69,36 +69,23 @@ jobs:
           MAINTENANCE_ROOT: ${{ matrix.maintenance_root }}
         with:
           script: |
-            const inputs = process.env.DISPATCH_KIND === "packet_pr"
-              ? {
-                  agent_id: process.env.AGENT_ID,
-                  current_version: process.env.CURRENT_VERSION,
-                  latest_stable: process.env.LATEST_STABLE,
-                  target_version: process.env.TARGET_VERSION,
-                  opened_from: process.env.OPENED_FROM,
-                  detected_by: process.env.DETECTED_BY,
-                  dispatch_kind: process.env.DISPATCH_KIND,
-                  dispatch_workflow: process.env.DISPATCH_WORKFLOW,
-                  branch_name: process.env.BRANCH_NAME,
-                  add_paths: `${process.env.MAINTENANCE_ROOT}\n`,
-                }
-              : {
-                  agent_id: process.env.AGENT_ID,
-                  current_version: process.env.CURRENT_VERSION,
-                  latest_stable: process.env.LATEST_STABLE,
-                  target_version: process.env.TARGET_VERSION,
-                  opened_from: process.env.OPENED_FROM,
-                  detected_by: process.env.DETECTED_BY,
-                  dispatch_kind: process.env.DISPATCH_KIND,
-                  branch_name: process.env.BRANCH_NAME,
-                };
+            const inputs = {
+              agent_id: process.env.AGENT_ID,
+              current_version: process.env.CURRENT_VERSION,
+              latest_stable: process.env.LATEST_STABLE,
+              target_version: process.env.TARGET_VERSION,
+              opened_from: process.env.OPENED_FROM,
+              detected_by: process.env.DETECTED_BY,
+              dispatch_kind: process.env.DISPATCH_KIND,
+              dispatch_workflow: process.env.DISPATCH_WORKFLOW,
+              branch_name: process.env.BRANCH_NAME,
+              add_paths: `${process.env.MAINTENANCE_ROOT}\n`,
+            };
 
             await github.rest.actions.createWorkflowDispatch({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              workflow_id: process.env.DISPATCH_KIND === "packet_pr"
-                ? "agent-maintenance-open-pr.yml"
-                : process.env.DISPATCH_WORKFLOW,
+              workflow_id: "agent-maintenance-open-pr.yml",
               ref: process.env.DISPATCH_REF,
               inputs,
             });

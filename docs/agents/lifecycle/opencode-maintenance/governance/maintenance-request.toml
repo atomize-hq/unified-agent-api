@@ -6,8 +6,8 @@ opened_from = ".github/workflows/agent-maintenance-open-pr.yml"
 requested_control_plane_actions = [
   "packet_doc_refresh",
 ]
-request_recorded_at = "2026-05-11T19:47:31Z"
-request_commit = "1673a34b6eb1e2cf7d6a3bfef229f668c02746f9"
+request_recorded_at = "2026-05-14T18:37:44Z"
+request_commit = "4a6073bc7b7500441d8db170d5e5e3c9c9942366"
 
 [runtime_followup_required]
 required = false
@@ -16,19 +16,476 @@ items = []
 [detected_release]
 detected_by = ".github/workflows/agent-maintenance-release-watch.yml"
 current_validated = "1.4.11"
-target_version = "1.14.47"
-latest_stable = "1.14.48"
+target_version = "1.14.49"
+latest_stable = "1.14.50"
 version_policy = "latest_stable_minus_one"
 source_kind = "github_releases"
 source_ref = "anomalyco/opencode"
 dispatch_kind = "packet_pr"
 dispatch_workflow = "agent-maintenance-open-pr.yml"
-branch_name = "automation/opencode-maintenance-1.14.47"
+branch_name = "automation/opencode-maintenance-1.14.49"
+
+[support_surface_audit]
+required = true
+surface_kinds = [
+  "commands",
+  "subcommands",
+  "flags",
+  "global_flags",
+  "positional_args",
+]
+excluded_surface_kinds = [
+  "tui_only",
+]
+allowed_deferrals = [
+  "upstream_not_machine_exposed",
+  "platform_evidence_missing",
+  "requires_new_infra",
+  "requires_new_architectural_seam",
+  "outside_registry_maintenance_write_envelope",
+]
+pre_run_debt_count = 15
+expected_post_run_debt_count = 15
+
+[[support_surface_audit.preexisting_unsupported_surface]]
+surface_kind = "commands"
+command_path = "opencode run"
+surface_id = "run"
+debt_ref = "docs/specs/unified-agent-api/non-tui-support-debt.md#opencode-run-command"
+
+[[support_surface_audit.preexisting_unsupported_surface]]
+surface_kind = "commands"
+command_path = "opencode acp"
+surface_id = "acp"
+debt_ref = "docs/specs/unified-agent-api/non-tui-support-debt.md#opencode-acp-command"
+
+[[support_surface_audit.preexisting_unsupported_surface]]
+surface_kind = "commands"
+command_path = "opencode attach"
+surface_id = "attach"
+debt_ref = "docs/specs/unified-agent-api/non-tui-support-debt.md#opencode-attach-command"
+
+[[support_surface_audit.preexisting_unsupported_surface]]
+surface_kind = "commands"
+command_path = "opencode models"
+surface_id = "models"
+debt_ref = "docs/specs/unified-agent-api/non-tui-support-debt.md#opencode-models-command"
+
+[[support_surface_audit.preexisting_unsupported_surface]]
+surface_kind = "commands"
+command_path = "opencode providers"
+surface_id = "providers"
+debt_ref = "docs/specs/unified-agent-api/non-tui-support-debt.md#opencode-providers-command"
+
+[[support_surface_audit.preexisting_unsupported_surface]]
+surface_kind = "commands"
+command_path = "opencode serve"
+surface_id = "serve"
+debt_ref = "docs/specs/unified-agent-api/non-tui-support-debt.md#opencode-serve-command"
+
+[[support_surface_audit.preexisting_unsupported_surface]]
+surface_kind = "commands"
+command_path = "opencode web"
+surface_id = "web"
+debt_ref = "docs/specs/unified-agent-api/non-tui-support-debt.md#opencode-web-command"
+
+[[support_surface_audit.preexisting_unsupported_surface]]
+surface_kind = "flags"
+command_path = "opencode run"
+surface_id = "--format"
+debt_ref = "docs/specs/unified-agent-api/non-tui-support-debt.md#opencode-run-format-flag"
+
+[[support_surface_audit.preexisting_unsupported_surface]]
+surface_kind = "flags"
+command_path = "opencode run"
+surface_id = "--dir"
+debt_ref = "docs/specs/unified-agent-api/non-tui-support-debt.md#opencode-run-dir-flag"
+
+[[support_surface_audit.preexisting_unsupported_surface]]
+surface_kind = "flags"
+command_path = "opencode run"
+surface_id = "--attach"
+debt_ref = "docs/specs/unified-agent-api/non-tui-support-debt.md#opencode-run-attach-flag"
+
+[[support_surface_audit.preexisting_unsupported_surface]]
+surface_kind = "flags"
+command_path = "opencode run"
+surface_id = "--model"
+debt_ref = "docs/specs/unified-agent-api/non-tui-support-debt.md#opencode-run-model-flag"
+
+[[support_surface_audit.preexisting_unsupported_surface]]
+surface_kind = "flags"
+command_path = "opencode run"
+surface_id = "--continue"
+debt_ref = "docs/specs/unified-agent-api/non-tui-support-debt.md#opencode-run-continue-flag"
+
+[[support_surface_audit.preexisting_unsupported_surface]]
+surface_kind = "flags"
+command_path = "opencode run"
+surface_id = "--session"
+debt_ref = "docs/specs/unified-agent-api/non-tui-support-debt.md#opencode-run-session-flag"
+
+[[support_surface_audit.preexisting_unsupported_surface]]
+surface_kind = "flags"
+command_path = "opencode run"
+surface_id = "--fork"
+debt_ref = "docs/specs/unified-agent-api/non-tui-support-debt.md#opencode-run-fork-flag"
+
+[[support_surface_audit.preexisting_unsupported_surface]]
+surface_kind = "flags"
+command_path = "opencode run"
+surface_id = "--agent"
+debt_ref = "docs/specs/unified-agent-api/non-tui-support-debt.md#opencode-run-agent-flag"
+
+[[support_surface_audit.missing_wrapper_support]]
+surface_kind = "commands"
+command_path = "opencode run"
+surface_id = "run"
+
+[[support_surface_audit.missing_wrapper_support]]
+surface_kind = "commands"
+command_path = "opencode acp"
+surface_id = "acp"
+
+[[support_surface_audit.missing_wrapper_support]]
+surface_kind = "commands"
+command_path = "opencode attach"
+surface_id = "attach"
+
+[[support_surface_audit.missing_wrapper_support]]
+surface_kind = "commands"
+command_path = "opencode models"
+surface_id = "models"
+
+[[support_surface_audit.missing_wrapper_support]]
+surface_kind = "commands"
+command_path = "opencode providers"
+surface_id = "providers"
+
+[[support_surface_audit.missing_wrapper_support]]
+surface_kind = "commands"
+command_path = "opencode serve"
+surface_id = "serve"
+
+[[support_surface_audit.missing_wrapper_support]]
+surface_kind = "commands"
+command_path = "opencode web"
+surface_id = "web"
+
+[[support_surface_audit.missing_wrapper_support]]
+surface_kind = "flags"
+command_path = "opencode run"
+surface_id = "--format"
+
+[[support_surface_audit.missing_wrapper_support]]
+surface_kind = "flags"
+command_path = "opencode run"
+surface_id = "--dir"
+
+[[support_surface_audit.missing_wrapper_support]]
+surface_kind = "flags"
+command_path = "opencode run"
+surface_id = "--attach"
+
+[[support_surface_audit.missing_wrapper_support]]
+surface_kind = "flags"
+command_path = "opencode run"
+surface_id = "--model"
+
+[[support_surface_audit.missing_wrapper_support]]
+surface_kind = "flags"
+command_path = "opencode run"
+surface_id = "--continue"
+
+[[support_surface_audit.missing_wrapper_support]]
+surface_kind = "flags"
+command_path = "opencode run"
+surface_id = "--session"
+
+[[support_surface_audit.missing_wrapper_support]]
+surface_kind = "flags"
+command_path = "opencode run"
+surface_id = "--fork"
+
+[[support_surface_audit.missing_wrapper_support]]
+surface_kind = "flags"
+command_path = "opencode run"
+surface_id = "--agent"
+
+[[support_surface_audit.missing_backend_support]]
+surface_kind = "commands"
+command_path = "opencode run"
+surface_id = "run"
+
+[[support_surface_audit.missing_backend_support]]
+surface_kind = "commands"
+command_path = "opencode acp"
+surface_id = "acp"
+
+[[support_surface_audit.missing_backend_support]]
+surface_kind = "commands"
+command_path = "opencode attach"
+surface_id = "attach"
+
+[[support_surface_audit.missing_backend_support]]
+surface_kind = "commands"
+command_path = "opencode models"
+surface_id = "models"
+
+[[support_surface_audit.missing_backend_support]]
+surface_kind = "commands"
+command_path = "opencode providers"
+surface_id = "providers"
+
+[[support_surface_audit.missing_backend_support]]
+surface_kind = "commands"
+command_path = "opencode serve"
+surface_id = "serve"
+
+[[support_surface_audit.missing_backend_support]]
+surface_kind = "commands"
+command_path = "opencode web"
+surface_id = "web"
+
+[[support_surface_audit.missing_backend_support]]
+surface_kind = "flags"
+command_path = "opencode run"
+surface_id = "--format"
+
+[[support_surface_audit.missing_backend_support]]
+surface_kind = "flags"
+command_path = "opencode run"
+surface_id = "--dir"
+
+[[support_surface_audit.missing_backend_support]]
+surface_kind = "flags"
+command_path = "opencode run"
+surface_id = "--attach"
+
+[[support_surface_audit.missing_backend_support]]
+surface_kind = "flags"
+command_path = "opencode run"
+surface_id = "--model"
+
+[[support_surface_audit.missing_backend_support]]
+surface_kind = "flags"
+command_path = "opencode run"
+surface_id = "--continue"
+
+[[support_surface_audit.missing_backend_support]]
+surface_kind = "flags"
+command_path = "opencode run"
+surface_id = "--session"
+
+[[support_surface_audit.missing_backend_support]]
+surface_kind = "flags"
+command_path = "opencode run"
+surface_id = "--fork"
+
+[[support_surface_audit.missing_backend_support]]
+surface_kind = "flags"
+command_path = "opencode run"
+surface_id = "--agent"
+
+[[support_surface_audit.deferred_preexisting_gaps]]
+surface_kind = "commands"
+command_path = "opencode run"
+surface_id = "run"
+defer_reason = "requires_new_architectural_seam"
+blocking_follow_on = "TODOS.md#close-opencode-non-tui-maintenance-gaps"
+
+[[support_surface_audit.deferred_preexisting_gaps]]
+surface_kind = "commands"
+command_path = "opencode acp"
+surface_id = "acp"
+defer_reason = "requires_new_architectural_seam"
+blocking_follow_on = "TODOS.md#close-opencode-non-tui-maintenance-gaps"
+
+[[support_surface_audit.deferred_preexisting_gaps]]
+surface_kind = "commands"
+command_path = "opencode attach"
+surface_id = "attach"
+defer_reason = "requires_new_architectural_seam"
+blocking_follow_on = "TODOS.md#close-opencode-non-tui-maintenance-gaps"
+
+[[support_surface_audit.deferred_preexisting_gaps]]
+surface_kind = "commands"
+command_path = "opencode models"
+surface_id = "models"
+defer_reason = "requires_new_architectural_seam"
+blocking_follow_on = "TODOS.md#close-opencode-non-tui-maintenance-gaps"
+
+[[support_surface_audit.deferred_preexisting_gaps]]
+surface_kind = "commands"
+command_path = "opencode providers"
+surface_id = "providers"
+defer_reason = "requires_new_architectural_seam"
+blocking_follow_on = "TODOS.md#close-opencode-non-tui-maintenance-gaps"
+
+[[support_surface_audit.deferred_preexisting_gaps]]
+surface_kind = "commands"
+command_path = "opencode serve"
+surface_id = "serve"
+defer_reason = "requires_new_architectural_seam"
+blocking_follow_on = "TODOS.md#close-opencode-non-tui-maintenance-gaps"
+
+[[support_surface_audit.deferred_preexisting_gaps]]
+surface_kind = "commands"
+command_path = "opencode web"
+surface_id = "web"
+defer_reason = "requires_new_architectural_seam"
+blocking_follow_on = "TODOS.md#close-opencode-non-tui-maintenance-gaps"
+
+[[support_surface_audit.deferred_preexisting_gaps]]
+surface_kind = "flags"
+command_path = "opencode run"
+surface_id = "--format"
+defer_reason = "requires_new_architectural_seam"
+blocking_follow_on = "TODOS.md#close-opencode-non-tui-maintenance-gaps"
+
+[[support_surface_audit.deferred_preexisting_gaps]]
+surface_kind = "flags"
+command_path = "opencode run"
+surface_id = "--dir"
+defer_reason = "requires_new_architectural_seam"
+blocking_follow_on = "TODOS.md#close-opencode-non-tui-maintenance-gaps"
+
+[[support_surface_audit.deferred_preexisting_gaps]]
+surface_kind = "flags"
+command_path = "opencode run"
+surface_id = "--attach"
+defer_reason = "requires_new_architectural_seam"
+blocking_follow_on = "TODOS.md#close-opencode-non-tui-maintenance-gaps"
+
+[[support_surface_audit.deferred_preexisting_gaps]]
+surface_kind = "flags"
+command_path = "opencode run"
+surface_id = "--model"
+defer_reason = "requires_new_architectural_seam"
+blocking_follow_on = "TODOS.md#close-opencode-non-tui-maintenance-gaps"
+
+[[support_surface_audit.deferred_preexisting_gaps]]
+surface_kind = "flags"
+command_path = "opencode run"
+surface_id = "--continue"
+defer_reason = "requires_new_architectural_seam"
+blocking_follow_on = "TODOS.md#close-opencode-non-tui-maintenance-gaps"
+
+[[support_surface_audit.deferred_preexisting_gaps]]
+surface_kind = "flags"
+command_path = "opencode run"
+surface_id = "--session"
+defer_reason = "requires_new_architectural_seam"
+blocking_follow_on = "TODOS.md#close-opencode-non-tui-maintenance-gaps"
+
+[[support_surface_audit.deferred_preexisting_gaps]]
+surface_kind = "flags"
+command_path = "opencode run"
+surface_id = "--fork"
+defer_reason = "requires_new_architectural_seam"
+blocking_follow_on = "TODOS.md#close-opencode-non-tui-maintenance-gaps"
+
+[[support_surface_audit.deferred_preexisting_gaps]]
+surface_kind = "flags"
+command_path = "opencode run"
+surface_id = "--agent"
+defer_reason = "requires_new_architectural_seam"
+blocking_follow_on = "TODOS.md#close-opencode-non-tui-maintenance-gaps"
+
+[[support_surface_audit.publication_impacts]]
+surface_kind = "commands"
+command_path = "opencode run"
+surface_id = "run"
+surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
+
+[[support_surface_audit.publication_impacts]]
+surface_kind = "commands"
+command_path = "opencode acp"
+surface_id = "acp"
+surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
+
+[[support_surface_audit.publication_impacts]]
+surface_kind = "commands"
+command_path = "opencode attach"
+surface_id = "attach"
+surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
+
+[[support_surface_audit.publication_impacts]]
+surface_kind = "commands"
+command_path = "opencode models"
+surface_id = "models"
+surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
+
+[[support_surface_audit.publication_impacts]]
+surface_kind = "commands"
+command_path = "opencode providers"
+surface_id = "providers"
+surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
+
+[[support_surface_audit.publication_impacts]]
+surface_kind = "commands"
+command_path = "opencode serve"
+surface_id = "serve"
+surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
+
+[[support_surface_audit.publication_impacts]]
+surface_kind = "commands"
+command_path = "opencode web"
+surface_id = "web"
+surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
+
+[[support_surface_audit.publication_impacts]]
+surface_kind = "flags"
+command_path = "opencode run"
+surface_id = "--format"
+surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
+
+[[support_surface_audit.publication_impacts]]
+surface_kind = "flags"
+command_path = "opencode run"
+surface_id = "--dir"
+surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
+
+[[support_surface_audit.publication_impacts]]
+surface_kind = "flags"
+command_path = "opencode run"
+surface_id = "--attach"
+surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
+
+[[support_surface_audit.publication_impacts]]
+surface_kind = "flags"
+command_path = "opencode run"
+surface_id = "--model"
+surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
+
+[[support_surface_audit.publication_impacts]]
+surface_kind = "flags"
+command_path = "opencode run"
+surface_id = "--continue"
+surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
+
+[[support_surface_audit.publication_impacts]]
+surface_kind = "flags"
+command_path = "opencode run"
+surface_id = "--session"
+surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
+
+[[support_surface_audit.publication_impacts]]
+surface_kind = "flags"
+command_path = "opencode run"
+surface_id = "--fork"
+surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
+
+[[support_surface_audit.publication_impacts]]
+surface_kind = "flags"
+command_path = "opencode run"
+surface_id = "--agent"
+surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
 
 [execution_contract]
 executor = "execute-agent-maintenance"
 prompt_template_path = "docs/agents/lifecycle/opencode-maintenance/governance/execute-agent-maintenance-prompt.md"
-prompt_sha256 = "f68f4a5c6cc09a186256fe475e311bd4881e6dfeabd7852f1ed62cf659ce9685"
+prompt_sha256 = "63e6a34ae78b4aa8f0c6746c72f193b72eb2b530193e22cbacffd521094c82a7"
 pr_summary_path = "docs/agents/lifecycle/opencode-maintenance/governance/pr-summary.md"
 closeout_path = "docs/agents/lifecycle/opencode-maintenance/governance/maintenance-closeout.json"
 requires_manual_closeout = true
@@ -37,18 +494,20 @@ writable_surfaces = [
   "crates/opencode/**",
   "crates/agent_api/**",
   "cli_manifests/opencode/artifacts.lock.json",
-  "cli_manifests/opencode/snapshots/1.14.47/**",
-  "cli_manifests/opencode/reports/1.14.47/**",
-  "cli_manifests/opencode/versions/1.14.47.json",
+  "cli_manifests/opencode/snapshots/1.14.49/**",
+  "cli_manifests/opencode/reports/1.14.49/**",
+  "cli_manifests/opencode/versions/1.14.49.json",
   "cli_manifests/opencode/wrapper_coverage.json",
   "cli_manifests/support_matrix/current.json",
   "docs/specs/unified-agent-api/support-matrix.md",
+  "docs/specs/unified-agent-api/non-tui-support-debt.md",
 ]
 read_only_inputs = [
   "docs/agents/lifecycle/opencode-maintenance/OPS_PLAYBOOK.md",
   "docs/agents/lifecycle/opencode-maintenance/CI_WORKFLOWS_PLAN.md",
   "docs/agents/lifecycle/opencode-maintenance/governance/execute-agent-maintenance-prompt.md",
   ".github/workflows/agent-maintenance-open-pr.yml",
+  "docs/specs/unified-agent-api/non-tui-support-debt.md",
 ]
 ordered_commands = [
   "cargo fmt --all",
@@ -70,7 +529,7 @@ green_gates = [
 [execution_contract.recovery]
 recreate_packet_command = "cargo run -p xtask -- refresh-agent --request docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml --write"
 reopen_pr_body_path = "docs/agents/lifecycle/opencode-maintenance/governance/pr-summary.md"
-reopen_pr_branch = "automation/opencode-maintenance-1.14.47"
+reopen_pr_branch = "automation/opencode-maintenance-1.14.49"
 notes = [
   "If PR creation fails after packet generation, rerun packet regeneration from the frozen request and reopen the PR from the generated pr-summary path.",
   "If the local execution-host preflight (local Codex CLI host via execute-agent-maintenance) fails, fix the Codex binary/auth state and rerun `execute-agent-maintenance --dry-run` before write mode.",

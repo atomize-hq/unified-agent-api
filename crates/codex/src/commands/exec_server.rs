@@ -14,6 +14,8 @@ impl CodexClient {
     ) -> Result<tokio::process::Child, CodexError> {
         let ExecServerRequest {
             listen,
+            executor_id,
+            name,
             working_dir,
             overrides,
         } = request;
@@ -34,6 +36,14 @@ impl CodexClient {
 
         if let Some(listen) = listen {
             command.arg("--listen").arg(listen);
+        }
+
+        if let Some(executor_id) = executor_id {
+            command.arg("--executor-id").arg(executor_id);
+        }
+
+        if let Some(name) = name {
+            command.arg("--name").arg(name);
         }
 
         self.command_env.apply(&mut command)?;

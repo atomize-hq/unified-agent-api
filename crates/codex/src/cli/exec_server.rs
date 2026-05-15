@@ -7,6 +7,10 @@ use crate::{CliOverridesPatch, ConfigOverride, FlagState};
 pub struct ExecServerRequest {
     /// Optional address passed via `--listen`.
     pub listen: Option<String>,
+    /// Optional executor identifier passed via `--executor-id`.
+    pub executor_id: Option<String>,
+    /// Optional display name passed via `--name`.
+    pub name: Option<String>,
     /// Optional working directory override for the spawned process.
     pub working_dir: Option<PathBuf>,
     /// Per-call CLI overrides layered on top of the builder.
@@ -17,6 +21,8 @@ impl ExecServerRequest {
     pub fn new() -> Self {
         Self {
             listen: None,
+            executor_id: None,
+            name: None,
             working_dir: None,
             overrides: CliOverridesPatch::default(),
         }
@@ -26,6 +32,20 @@ impl ExecServerRequest {
     pub fn listen(mut self, listen: impl Into<String>) -> Self {
         let listen = listen.into();
         self.listen = (!listen.trim().is_empty()).then_some(listen);
+        self
+    }
+
+    /// Sets the optional executor identifier passed via `--executor-id`.
+    pub fn executor_id(mut self, executor_id: impl Into<String>) -> Self {
+        let executor_id = executor_id.into();
+        self.executor_id = (!executor_id.trim().is_empty()).then_some(executor_id);
+        self
+    }
+
+    /// Sets the optional display name passed via `--name`.
+    pub fn name(mut self, name: impl Into<String>) -> Self {
+        let name = name.into();
+        self.name = (!name.trim().is_empty()).then_some(name);
         self
     }
 

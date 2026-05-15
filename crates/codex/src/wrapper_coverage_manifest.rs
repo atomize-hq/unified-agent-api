@@ -275,6 +275,7 @@ pub fn wrapper_coverage_manifest() -> WrapperCoverageManifestV1 {
                     flag_note("--mcp", CoverageLevel::Explicit, "capability-guarded"),
                     flag("--api-key", CoverageLevel::Explicit),
                     flag("--device-auth", CoverageLevel::Explicit),
+                    flag("--with-access-token", CoverageLevel::Explicit),
                     flag("--with-api-key", CoverageLevel::Explicit),
                 ],
                 vec![],
@@ -346,7 +347,9 @@ pub fn wrapper_coverage_manifest() -> WrapperCoverageManifestV1 {
                 None,
                 vec![
                     flag("--allow-unix-socket", CoverageLevel::Explicit),
+                    flag("--include-managed-config", CoverageLevel::Explicit),
                     flag("--log-denials", CoverageLevel::Explicit),
+                    flag("--permissions-profile", CoverageLevel::Explicit),
                 ],
                 vec![arg("COMMAND", CoverageLevel::Explicit)],
             ),
@@ -354,14 +357,20 @@ pub fn wrapper_coverage_manifest() -> WrapperCoverageManifestV1 {
                 &["sandbox", "linux"],
                 CoverageLevel::Explicit,
                 None,
-                vec![],
+                vec![
+                    flag("--include-managed-config", CoverageLevel::Explicit),
+                    flag("--permissions-profile", CoverageLevel::Explicit),
+                ],
                 vec![arg("COMMAND", CoverageLevel::Explicit)],
             ),
             command(
                 &["sandbox", "windows"],
                 CoverageLevel::Explicit,
                 None,
-                vec![],
+                vec![
+                    flag("--include-managed-config", CoverageLevel::Explicit),
+                    flag("--permissions-profile", CoverageLevel::Explicit),
+                ],
                 vec![arg("COMMAND", CoverageLevel::Explicit)],
             ),
             // Scenario 11: `codex execpolicy check`.
@@ -412,9 +421,14 @@ pub fn wrapper_coverage_manifest() -> WrapperCoverageManifestV1 {
                 &["exec-server"],
                 CoverageLevel::Explicit,
                 None,
-                vec![flag("--listen", CoverageLevel::Explicit)],
+                vec![
+                    flag("--executor-id", CoverageLevel::Explicit),
+                    flag("--listen", CoverageLevel::Explicit),
+                    flag("--name", CoverageLevel::Explicit),
+                ],
                 vec![],
             ),
+            command(&["update"], CoverageLevel::Explicit, None, vec![], vec![]),
             command(&["mcp"], CoverageLevel::Explicit, None, vec![], vec![]),
             command(
                 &["mcp", "list"],

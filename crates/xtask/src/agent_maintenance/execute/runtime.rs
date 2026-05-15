@@ -226,9 +226,9 @@ fn spawn_codex_exec(
         .spawn()
         .map_err(|err| Error::Internal(format!("spawn codex binary `{binary}`: {err}")))?;
     {
-        let stdin = child
+        let mut stdin = child
             .stdin
-            .as_mut()
+            .take()
             .ok_or_else(|| Error::Internal("codex exec stdin was not captured".to_string()))?;
         stdin
             .write_all(prompt.as_bytes())

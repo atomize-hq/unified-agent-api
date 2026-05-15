@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-05-07T17:12:53.003778Z",
+  "generated_at": "2026-05-14T23:08:34.619942Z",
   "wrapper_version": "0.3.5",
   "coverage": [
     {
@@ -604,7 +604,15 @@
       "level": "explicit",
       "flags": [
         {
+          "key": "--executor-id",
+          "level": "explicit"
+        },
+        {
           "key": "--listen",
+          "level": "explicit"
+        },
+        {
+          "key": "--name",
           "level": "explicit"
         }
       ]
@@ -740,6 +748,10 @@
           "key": "--mcp",
           "level": "explicit",
           "note": "capability-guarded"
+        },
+        {
+          "key": "--with-access-token",
+          "level": "explicit"
         },
         {
           "key": "--with-api-key",
@@ -1107,6 +1119,16 @@
         "linux"
       ],
       "level": "explicit",
+      "flags": [
+        {
+          "key": "--include-managed-config",
+          "level": "explicit"
+        },
+        {
+          "key": "--permissions-profile",
+          "level": "explicit"
+        }
+      ],
       "args": [
         {
           "name": "COMMAND",
@@ -1126,7 +1148,15 @@
           "level": "explicit"
         },
         {
+          "key": "--include-managed-config",
+          "level": "explicit"
+        },
+        {
           "key": "--log-denials",
+          "level": "explicit"
+        },
+        {
+          "key": "--permissions-profile",
           "level": "explicit"
         }
       ],
@@ -1143,6 +1173,16 @@
         "windows"
       ],
       "level": "explicit",
+      "flags": [
+        {
+          "key": "--include-managed-config",
+          "level": "explicit"
+        },
+        {
+          "key": "--permissions-profile",
+          "level": "explicit"
+        }
+      ],
       "args": [
         {
           "name": "COMMAND",
@@ -1161,6 +1201,12 @@
           "level": "explicit"
         }
       ]
+    },
+    {
+      "path": [
+        "update"
+      ],
+      "level": "explicit"
     }
   ]
 }
