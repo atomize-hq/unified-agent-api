@@ -8,14 +8,14 @@ This file is the canonical contributor execution contract for `claude_code` main
 
 - detected_by: `.github/workflows/agent-maintenance-release-watch.yml`
 - current_validated: `2.1.29`
-- target_version: `2.1.140`
-- latest_stable: `2.1.141`
+- target_version: `2.1.141`
+- latest_stable: `2.1.142`
 - version_policy: `latest_stable_minus_one`
 - source_kind: `gcs_object_listing`
 - source_ref: `claude-code-dist-86c565f3-f756-42ad-8dfa-d59b1c096819/claude-code-releases`
 - dispatch_kind: `packet_pr`
 - dispatch_workflow: `agent-maintenance-open-pr.yml`
-- branch_name: `automation/claude_code-maintenance-2.1.140`
+- branch_name: `automation/claude_code-maintenance-2.1.141`
 
 ## Support-surface audit
 
@@ -38,11 +38,11 @@ This file is the canonical contributor execution contract for `claude_code` main
 - executor surface: `execute-agent-maintenance`
 - request artifact: `docs/agents/lifecycle/claude_code-maintenance/governance/maintenance-request.toml`
 - prompt template path: `docs/agents/lifecycle/claude_code-maintenance/governance/execute-agent-maintenance-prompt.md`
-- prompt sha256: `0e8eb3b6d0a36c0ad5844f7a5fb5e3d5a4cb7525fb7559194d85fba08c6afeac`
+- prompt sha256: `b6e89741f126318778f7cc845028511f0509bda1691603a9055f5c1f1568a5ba`
 - canonical handoff: `docs/agents/lifecycle/claude_code-maintenance/HANDOFF.md`
 - derivative pr summary: `docs/agents/lifecycle/claude_code-maintenance/governance/pr-summary.md`
 - exact closeout artifact: `docs/agents/lifecycle/claude_code-maintenance/governance/maintenance-closeout.json`
-- branch linkage: `automation/claude_code-maintenance-2.1.140`
+- branch linkage: `automation/claude_code-maintenance-2.1.141`
 - manual closeout required: `true`
 
 ## Writable surfaces
@@ -51,9 +51,9 @@ This file is the canonical contributor execution contract for `claude_code` main
 - `crates/claude_code/**`
 - `crates/agent_api/**`
 - `cli_manifests/claude_code/artifacts.lock.json`
-- `cli_manifests/claude_code/snapshots/2.1.140/**`
-- `cli_manifests/claude_code/reports/2.1.140/**`
-- `cli_manifests/claude_code/versions/2.1.140.json`
+- `cli_manifests/claude_code/snapshots/2.1.141/**`
+- `cli_manifests/claude_code/reports/2.1.141/**`
+- `cli_manifests/claude_code/versions/2.1.141.json`
 - `cli_manifests/claude_code/wrapper_coverage.json`
 - `cli_manifests/support_matrix/current.json`
 - `docs/specs/unified-agent-api/support-matrix.md`
@@ -89,7 +89,7 @@ This file is the canonical contributor execution contract for `claude_code` main
 
 - recreate packet command: `cargo run -p xtask -- refresh-agent --request docs/agents/lifecycle/claude_code-maintenance/governance/maintenance-request.toml --write`
 - reopen pr body path: `docs/agents/lifecycle/claude_code-maintenance/governance/pr-summary.md`
-- reopen pr branch: `automation/claude_code-maintenance-2.1.140`
+- reopen pr branch: `automation/claude_code-maintenance-2.1.141`
 - notes:
 - If PR creation fails after packet generation, rerun packet regeneration from the frozen request and reopen the PR from the generated pr-summary path.
 - If the local execution-host preflight (local Codex CLI host via execute-agent-maintenance) fails, fix the Codex binary/auth state and rerun `execute-agent-maintenance --dry-run` before write mode.
@@ -103,7 +103,7 @@ cargo run -p xtask -- close-agent-maintenance --request docs/agents/lifecycle/cl
 ## Exact maintained-agent prompt
 
 ```md
-# Packet PR Maintenance Prompt (`2.1.140`)
+# Packet PR Maintenance Prompt (`2.1.141`)
 
 This template renders the exact maintained-agent prompt for `claude_code` packet execution.
 `docs/agents/lifecycle/claude_code-maintenance/HANDOFF.md` remains canonical and `governance/pr-summary.md` is derivative.
@@ -112,7 +112,7 @@ This template renders the exact maintained-agent prompt for `claude_code` packet
 
 ## Goal
 
-Execute the automated maintenance packet for `claude_code` target `2.1.140`.
+Execute the automated maintenance packet for `claude_code` target `2.1.141`.
 
 ## Frozen request contract
 
@@ -134,10 +134,10 @@ Execute the automated maintenance packet for `claude_code` target `2.1.140`.
 
 ## Required workflow
 
-1. Compare the current validated baseline from `cli_manifests/claude_code/latest_validated.txt` against the target `2.1.140` artifacts.
+1. Compare the current validated baseline from `cli_manifests/claude_code/latest_validated.txt` against the target `2.1.141` artifacts.
 2. Use `support_surface_audit` to classify newly discovered non-TUI surface, preexisting non-TUI debt, required uplifts, and allowed deferrals.
 3. Land bounded wrapper/backend/manifest/publication updates for every row in `required_uplifts_this_run`.
-4. Refresh or create version-scoped manifest artifacts under `cli_manifests/claude_code/snapshots/2.1.140/`, `cli_manifests/claude_code/reports/2.1.140/`, and `cli_manifests/claude_code/versions/2.1.140.json` as required by the packet.
+4. Refresh or create version-scoped manifest artifacts under `cli_manifests/claude_code/snapshots/2.1.141/`, `cli_manifests/claude_code/reports/2.1.141/`, and `cli_manifests/claude_code/versions/2.1.141.json` as required by the packet.
 5. Leave closeout manual; record it only with `close-agent-maintenance` after the declared green gates pass.
 
 ## Done criteria
