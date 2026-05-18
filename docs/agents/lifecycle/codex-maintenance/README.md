@@ -10,8 +10,8 @@ This packet tracks automated upstream-release maintenance for `codex`.
 - trigger kind: `upstream_release_detected`
 - basis ref: `cli_manifests/codex/latest_validated.txt`
 - opened from: `.github/workflows/agent-maintenance-open-pr.yml`
-- recorded at: `2026-05-14T18:37:34Z`
-- request commit: `4a6073bc7b7500441d8db170d5e5e3c9c9942366`
+- recorded at: `2026-05-18T07:05:38Z`
+- request commit: `af8be76e63975f3ce9f593c87ad55ce9b57db144`
 
 ## Trigger context
 
@@ -31,19 +31,10 @@ This packet tracks automated upstream-release maintenance for `codex`.
 - required: `true`
 - pre-run debt count: `2`
 - expected post-run debt count: `2`
-- discovered upstream surface rows: `10`
+- discovered upstream surface rows: `0`
 - preexisting unsupported rows: `2`
 - required uplifts this run:
-- `codex update` `update` via `new_upstream_surface`
-- `codex exec-server` `--executor-id` via `new_upstream_surface`
-- `codex exec-server` `--name` via `new_upstream_surface`
-- `codex login` `--with-access-token` via `new_upstream_surface`
-- `codex sandbox linux` `--include-managed-config` via `new_upstream_surface`
-- `codex sandbox linux` `--permissions-profile` via `new_upstream_surface`
-- `codex sandbox macos` `--include-managed-config` via `new_upstream_surface`
-- `codex sandbox macos` `--permissions-profile` via `new_upstream_surface`
-- `codex sandbox windows` `--include-managed-config` via `new_upstream_surface`
-- `codex sandbox windows` `--permissions-profile` via `new_upstream_surface`
+- none
 - deferred preexisting gaps:
 - `codex completion` `completion` via `requires_new_architectural_seam` (TODOS.md#close-codex-completion-maintenance-gap)
 - `codex completion` `SHELL` via `requires_new_architectural_seam` (TODOS.md#close-codex-completion-maintenance-gap)

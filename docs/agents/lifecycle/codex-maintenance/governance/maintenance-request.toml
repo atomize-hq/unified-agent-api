@@ -6,8 +6,8 @@ opened_from = ".github/workflows/agent-maintenance-open-pr.yml"
 requested_control_plane_actions = [
   "packet_doc_refresh",
 ]
-request_recorded_at = "2026-05-14T18:37:34Z"
-request_commit = "4a6073bc7b7500441d8db170d5e5e3c9c9942366"
+request_recorded_at = "2026-05-18T07:05:38Z"
+request_commit = "af8be76e63975f3ce9f593c87ad55ce9b57db144"
 
 [runtime_followup_required]
 required = false
@@ -47,66 +47,6 @@ allowed_deferrals = [
 pre_run_debt_count = 2
 expected_post_run_debt_count = 2
 
-[[support_surface_audit.discovered_upstream_surface]]
-surface_kind = "commands"
-command_path = "codex update"
-surface_id = "update"
-evidence_ref = "cli_manifests/codex/reports/0.129.0/coverage.any.json"
-
-[[support_surface_audit.discovered_upstream_surface]]
-surface_kind = "flags"
-command_path = "codex exec-server"
-surface_id = "--executor-id"
-evidence_ref = "cli_manifests/codex/reports/0.129.0/coverage.any.json"
-
-[[support_surface_audit.discovered_upstream_surface]]
-surface_kind = "flags"
-command_path = "codex exec-server"
-surface_id = "--name"
-evidence_ref = "cli_manifests/codex/reports/0.129.0/coverage.any.json"
-
-[[support_surface_audit.discovered_upstream_surface]]
-surface_kind = "flags"
-command_path = "codex login"
-surface_id = "--with-access-token"
-evidence_ref = "cli_manifests/codex/reports/0.129.0/coverage.any.json"
-
-[[support_surface_audit.discovered_upstream_surface]]
-surface_kind = "flags"
-command_path = "codex sandbox linux"
-surface_id = "--include-managed-config"
-evidence_ref = "cli_manifests/codex/reports/0.129.0/coverage.any.json"
-
-[[support_surface_audit.discovered_upstream_surface]]
-surface_kind = "flags"
-command_path = "codex sandbox linux"
-surface_id = "--permissions-profile"
-evidence_ref = "cli_manifests/codex/reports/0.129.0/coverage.any.json"
-
-[[support_surface_audit.discovered_upstream_surface]]
-surface_kind = "flags"
-command_path = "codex sandbox macos"
-surface_id = "--include-managed-config"
-evidence_ref = "cli_manifests/codex/reports/0.129.0/coverage.any.json"
-
-[[support_surface_audit.discovered_upstream_surface]]
-surface_kind = "flags"
-command_path = "codex sandbox macos"
-surface_id = "--permissions-profile"
-evidence_ref = "cli_manifests/codex/reports/0.129.0/coverage.any.json"
-
-[[support_surface_audit.discovered_upstream_surface]]
-surface_kind = "flags"
-command_path = "codex sandbox windows"
-surface_id = "--include-managed-config"
-evidence_ref = "cli_manifests/codex/reports/0.129.0/coverage.any.json"
-
-[[support_surface_audit.discovered_upstream_surface]]
-surface_kind = "flags"
-command_path = "codex sandbox windows"
-surface_id = "--permissions-profile"
-evidence_ref = "cli_manifests/codex/reports/0.129.0/coverage.any.json"
-
 [[support_surface_audit.preexisting_unsupported_surface]]
 surface_kind = "commands"
 command_path = "codex completion"
@@ -125,56 +65,6 @@ command_path = "codex completion"
 surface_id = "completion"
 
 [[support_surface_audit.missing_wrapper_support]]
-surface_kind = "commands"
-command_path = "codex update"
-surface_id = "update"
-
-[[support_surface_audit.missing_wrapper_support]]
-surface_kind = "flags"
-command_path = "codex exec-server"
-surface_id = "--executor-id"
-
-[[support_surface_audit.missing_wrapper_support]]
-surface_kind = "flags"
-command_path = "codex exec-server"
-surface_id = "--name"
-
-[[support_surface_audit.missing_wrapper_support]]
-surface_kind = "flags"
-command_path = "codex login"
-surface_id = "--with-access-token"
-
-[[support_surface_audit.missing_wrapper_support]]
-surface_kind = "flags"
-command_path = "codex sandbox linux"
-surface_id = "--include-managed-config"
-
-[[support_surface_audit.missing_wrapper_support]]
-surface_kind = "flags"
-command_path = "codex sandbox linux"
-surface_id = "--permissions-profile"
-
-[[support_surface_audit.missing_wrapper_support]]
-surface_kind = "flags"
-command_path = "codex sandbox macos"
-surface_id = "--include-managed-config"
-
-[[support_surface_audit.missing_wrapper_support]]
-surface_kind = "flags"
-command_path = "codex sandbox macos"
-surface_id = "--permissions-profile"
-
-[[support_surface_audit.missing_wrapper_support]]
-surface_kind = "flags"
-command_path = "codex sandbox windows"
-surface_id = "--include-managed-config"
-
-[[support_surface_audit.missing_wrapper_support]]
-surface_kind = "flags"
-command_path = "codex sandbox windows"
-surface_id = "--permissions-profile"
-
-[[support_surface_audit.missing_wrapper_support]]
 surface_kind = "positional_args"
 command_path = "codex completion"
 surface_id = "SHELL"
@@ -185,189 +75,9 @@ command_path = "codex completion"
 surface_id = "completion"
 
 [[support_surface_audit.missing_backend_support]]
-surface_kind = "commands"
-command_path = "codex update"
-surface_id = "update"
-
-[[support_surface_audit.missing_backend_support]]
-surface_kind = "flags"
-command_path = "codex exec-server"
-surface_id = "--executor-id"
-
-[[support_surface_audit.missing_backend_support]]
-surface_kind = "flags"
-command_path = "codex exec-server"
-surface_id = "--name"
-
-[[support_surface_audit.missing_backend_support]]
-surface_kind = "flags"
-command_path = "codex login"
-surface_id = "--with-access-token"
-
-[[support_surface_audit.missing_backend_support]]
-surface_kind = "flags"
-command_path = "codex sandbox linux"
-surface_id = "--include-managed-config"
-
-[[support_surface_audit.missing_backend_support]]
-surface_kind = "flags"
-command_path = "codex sandbox linux"
-surface_id = "--permissions-profile"
-
-[[support_surface_audit.missing_backend_support]]
-surface_kind = "flags"
-command_path = "codex sandbox macos"
-surface_id = "--include-managed-config"
-
-[[support_surface_audit.missing_backend_support]]
-surface_kind = "flags"
-command_path = "codex sandbox macos"
-surface_id = "--permissions-profile"
-
-[[support_surface_audit.missing_backend_support]]
-surface_kind = "flags"
-command_path = "codex sandbox windows"
-surface_id = "--include-managed-config"
-
-[[support_surface_audit.missing_backend_support]]
-surface_kind = "flags"
-command_path = "codex sandbox windows"
-surface_id = "--permissions-profile"
-
-[[support_surface_audit.missing_backend_support]]
 surface_kind = "positional_args"
 command_path = "codex completion"
 surface_id = "SHELL"
-
-[[support_surface_audit.required_uplifts_this_run]]
-surface_kind = "commands"
-command_path = "codex update"
-surface_id = "update"
-reason = "new_upstream_surface"
-required_writes = [
-  "wrapper",
-  "backend",
-  "manifest",
-  "publication",
-  "packet_docs",
-]
-
-[[support_surface_audit.required_uplifts_this_run]]
-surface_kind = "flags"
-command_path = "codex exec-server"
-surface_id = "--executor-id"
-reason = "new_upstream_surface"
-required_writes = [
-  "wrapper",
-  "backend",
-  "manifest",
-  "publication",
-  "packet_docs",
-]
-
-[[support_surface_audit.required_uplifts_this_run]]
-surface_kind = "flags"
-command_path = "codex exec-server"
-surface_id = "--name"
-reason = "new_upstream_surface"
-required_writes = [
-  "wrapper",
-  "backend",
-  "manifest",
-  "publication",
-  "packet_docs",
-]
-
-[[support_surface_audit.required_uplifts_this_run]]
-surface_kind = "flags"
-command_path = "codex login"
-surface_id = "--with-access-token"
-reason = "new_upstream_surface"
-required_writes = [
-  "wrapper",
-  "backend",
-  "manifest",
-  "publication",
-  "packet_docs",
-]
-
-[[support_surface_audit.required_uplifts_this_run]]
-surface_kind = "flags"
-command_path = "codex sandbox linux"
-surface_id = "--include-managed-config"
-reason = "new_upstream_surface"
-required_writes = [
-  "wrapper",
-  "backend",
-  "manifest",
-  "publication",
-  "packet_docs",
-]
-
-[[support_surface_audit.required_uplifts_this_run]]
-surface_kind = "flags"
-command_path = "codex sandbox linux"
-surface_id = "--permissions-profile"
-reason = "new_upstream_surface"
-required_writes = [
-  "wrapper",
-  "backend",
-  "manifest",
-  "publication",
-  "packet_docs",
-]
-
-[[support_surface_audit.required_uplifts_this_run]]
-surface_kind = "flags"
-command_path = "codex sandbox macos"
-surface_id = "--include-managed-config"
-reason = "new_upstream_surface"
-required_writes = [
-  "wrapper",
-  "backend",
-  "manifest",
-  "publication",
-  "packet_docs",
-]
-
-[[support_surface_audit.required_uplifts_this_run]]
-surface_kind = "flags"
-command_path = "codex sandbox macos"
-surface_id = "--permissions-profile"
-reason = "new_upstream_surface"
-required_writes = [
-  "wrapper",
-  "backend",
-  "manifest",
-  "publication",
-  "packet_docs",
-]
-
-[[support_surface_audit.required_uplifts_this_run]]
-surface_kind = "flags"
-command_path = "codex sandbox windows"
-surface_id = "--include-managed-config"
-reason = "new_upstream_surface"
-required_writes = [
-  "wrapper",
-  "backend",
-  "manifest",
-  "publication",
-  "packet_docs",
-]
-
-[[support_surface_audit.required_uplifts_this_run]]
-surface_kind = "flags"
-command_path = "codex sandbox windows"
-surface_id = "--permissions-profile"
-reason = "new_upstream_surface"
-required_writes = [
-  "wrapper",
-  "backend",
-  "manifest",
-  "publication",
-  "packet_docs",
-]
 
 [[support_surface_audit.deferred_preexisting_gaps]]
 surface_kind = "commands"
@@ -387,66 +97,6 @@ blocking_follow_on = "TODOS.md#close-codex-completion-maintenance-gap"
 surface_kind = "commands"
 command_path = "codex completion"
 surface_id = "completion"
-surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
-
-[[support_surface_audit.publication_impacts]]
-surface_kind = "commands"
-command_path = "codex update"
-surface_id = "update"
-surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
-
-[[support_surface_audit.publication_impacts]]
-surface_kind = "flags"
-command_path = "codex exec-server"
-surface_id = "--executor-id"
-surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
-
-[[support_surface_audit.publication_impacts]]
-surface_kind = "flags"
-command_path = "codex exec-server"
-surface_id = "--name"
-surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
-
-[[support_surface_audit.publication_impacts]]
-surface_kind = "flags"
-command_path = "codex login"
-surface_id = "--with-access-token"
-surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
-
-[[support_surface_audit.publication_impacts]]
-surface_kind = "flags"
-command_path = "codex sandbox linux"
-surface_id = "--include-managed-config"
-surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
-
-[[support_surface_audit.publication_impacts]]
-surface_kind = "flags"
-command_path = "codex sandbox linux"
-surface_id = "--permissions-profile"
-surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
-
-[[support_surface_audit.publication_impacts]]
-surface_kind = "flags"
-command_path = "codex sandbox macos"
-surface_id = "--include-managed-config"
-surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
-
-[[support_surface_audit.publication_impacts]]
-surface_kind = "flags"
-command_path = "codex sandbox macos"
-surface_id = "--permissions-profile"
-surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
-
-[[support_surface_audit.publication_impacts]]
-surface_kind = "flags"
-command_path = "codex sandbox windows"
-surface_id = "--include-managed-config"
-surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
-
-[[support_surface_audit.publication_impacts]]
-surface_kind = "flags"
-command_path = "codex sandbox windows"
-surface_id = "--permissions-profile"
 surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
 
 [[support_surface_audit.publication_impacts]]

@@ -15,19 +15,10 @@ Automated maintenance packet for `codex` target `0.129.0`.
 - required: `true`
 - pre-run debt count: `2`
 - expected post-run debt count: `2`
-- discovered upstream surface rows: `10`
+- discovered upstream surface rows: `0`
 - preexisting unsupported rows: `2`
 - required uplifts this run:
-- `codex update` `update` via `new_upstream_surface`
-- `codex exec-server` `--executor-id` via `new_upstream_surface`
-- `codex exec-server` `--name` via `new_upstream_surface`
-- `codex login` `--with-access-token` via `new_upstream_surface`
-- `codex sandbox linux` `--include-managed-config` via `new_upstream_surface`
-- `codex sandbox linux` `--permissions-profile` via `new_upstream_surface`
-- `codex sandbox macos` `--include-managed-config` via `new_upstream_surface`
-- `codex sandbox macos` `--permissions-profile` via `new_upstream_surface`
-- `codex sandbox windows` `--include-managed-config` via `new_upstream_surface`
-- `codex sandbox windows` `--permissions-profile` via `new_upstream_surface`
+- none
 - deferred preexisting gaps:
 - `codex completion` `completion` via `requires_new_architectural_seam` (TODOS.md#close-codex-completion-maintenance-gap)
 - `codex completion` `SHELL` via `requires_new_architectural_seam` (TODOS.md#close-codex-completion-maintenance-gap)
