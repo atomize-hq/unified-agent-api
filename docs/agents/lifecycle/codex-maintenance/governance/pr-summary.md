@@ -2,32 +2,23 @@
 
 # PR summary
 
-Automated maintenance packet for `codex` target `0.129.0`.
+Automated maintenance packet for `codex` target `0.131.0`.
 
 - canonical execution contract: `docs/agents/lifecycle/codex-maintenance/HANDOFF.md`
 - request artifact: `docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml`
-- branch: `automation/codex-maintenance-0.129.0`
+- branch: `automation/codex-maintenance-0.131.0`
 - opened from: `.github/workflows/agent-maintenance-open-pr.yml`
-- prompt sha256: `231107d2a7bdc7ad9e75c2bb295924951e2dd001964779fe9dd186e616523031`
+- prompt sha256: `e30d963b89c9038cd874b83e1cb6b1756c9e804721b0e21359f5a49c5713102d`
 
 ## Support-surface audit
 
 - required: `true`
 - pre-run debt count: `2`
 - expected post-run debt count: `2`
-- discovered upstream surface rows: `10`
+- discovered upstream surface rows: `0`
 - preexisting unsupported rows: `2`
 - required uplifts this run:
-- `codex update` `update` via `new_upstream_surface`
-- `codex exec-server` `--executor-id` via `new_upstream_surface`
-- `codex exec-server` `--name` via `new_upstream_surface`
-- `codex login` `--with-access-token` via `new_upstream_surface`
-- `codex sandbox linux` `--include-managed-config` via `new_upstream_surface`
-- `codex sandbox linux` `--permissions-profile` via `new_upstream_surface`
-- `codex sandbox macos` `--include-managed-config` via `new_upstream_surface`
-- `codex sandbox macos` `--permissions-profile` via `new_upstream_surface`
-- `codex sandbox windows` `--include-managed-config` via `new_upstream_surface`
-- `codex sandbox windows` `--permissions-profile` via `new_upstream_surface`
+- none
 - deferred preexisting gaps:
 - `codex completion` `completion` via `requires_new_architectural_seam` (TODOS.md#close-codex-completion-maintenance-gap)
 - `codex completion` `SHELL` via `requires_new_architectural_seam` (TODOS.md#close-codex-completion-maintenance-gap)
@@ -40,7 +31,7 @@ Follow `docs/agents/lifecycle/codex-maintenance/HANDOFF.md` exactly. This PR sum
 ## Exact maintained-agent prompt
 
 ```md
-# Packet PR Maintenance Prompt (`0.129.0`)
+# Packet PR Maintenance Prompt (`0.131.0`)
 
 This template renders the exact maintained-agent prompt for `codex` packet execution.
 `docs/agents/lifecycle/codex-maintenance/HANDOFF.md` remains canonical and `governance/pr-summary.md` is derivative.
@@ -49,7 +40,7 @@ This template renders the exact maintained-agent prompt for `codex` packet execu
 
 ## Goal
 
-Execute the automated maintenance packet for `codex` target `0.129.0`.
+Execute the automated maintenance packet for `codex` target `0.131.0`.
 
 ## Frozen request contract
 
@@ -71,10 +62,10 @@ Execute the automated maintenance packet for `codex` target `0.129.0`.
 
 ## Required workflow
 
-1. Compare the current validated baseline from `cli_manifests/codex/latest_validated.txt` against the target `0.129.0` artifacts.
+1. Compare the current validated baseline from `cli_manifests/codex/latest_validated.txt` against the target `0.131.0` artifacts.
 2. Use `support_surface_audit` to classify newly discovered non-TUI surface, preexisting non-TUI debt, required uplifts, and allowed deferrals.
 3. Land bounded wrapper/backend/manifest/publication updates for every row in `required_uplifts_this_run`.
-4. Refresh or create version-scoped manifest artifacts under `cli_manifests/codex/snapshots/0.129.0/`, `cli_manifests/codex/reports/0.129.0/`, and `cli_manifests/codex/versions/0.129.0.json` as required by the packet.
+4. Refresh or create version-scoped manifest artifacts under `cli_manifests/codex/snapshots/0.131.0/`, `cli_manifests/codex/reports/0.131.0/`, and `cli_manifests/codex/versions/0.131.0.json` as required by the packet.
 5. Leave closeout manual; record it only with `close-agent-maintenance` after the declared green gates pass.
 
 ## Done criteria
