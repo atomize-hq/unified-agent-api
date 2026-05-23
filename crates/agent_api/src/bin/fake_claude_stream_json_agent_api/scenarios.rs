@@ -186,39 +186,35 @@ fn scenario_kind(scenario: &str) -> ScenarioKind {
             missing_subsequence_message: "assertion failed: missing fresh argv subsequence",
         },
         "fork_last_assert" => ScenarioKind::Assert {
-            tail: vec![
+            tail: tail_with_optional_prompt(vec![
                 "--continue".to_string(),
                 "--fork-session".to_string(),
                 "--verbose".to_string(),
-                require("FAKE_CLAUDE_EXPECT_PROMPT"),
-            ],
+            ]),
             missing_subsequence_message: "assertion failed: missing fork(last) argv subsequence",
         },
         "fork_id_assert" => ScenarioKind::Assert {
-            tail: vec![
+            tail: tail_with_optional_prompt(vec![
                 "--fork-session".to_string(),
                 "--resume".to_string(),
                 require("FAKE_CLAUDE_EXPECT_RESUME_ID"),
                 "--verbose".to_string(),
-                require("FAKE_CLAUDE_EXPECT_PROMPT"),
-            ],
+            ]),
             missing_subsequence_message: "assertion failed: missing fork(id) argv subsequence",
         },
         "resume_last_assert" => ScenarioKind::Assert {
-            tail: vec![
+            tail: tail_with_optional_prompt(vec![
                 "--continue".to_string(),
                 "--verbose".to_string(),
-                require("FAKE_CLAUDE_EXPECT_PROMPT"),
-            ],
+            ]),
             missing_subsequence_message: "assertion failed: missing resume(last) argv subsequence",
         },
         "resume_id_assert" => ScenarioKind::Assert {
-            tail: vec![
+            tail: tail_with_optional_prompt(vec![
                 "--resume".to_string(),
                 require("FAKE_CLAUDE_EXPECT_RESUME_ID"),
                 "--verbose".to_string(),
-                require("FAKE_CLAUDE_EXPECT_PROMPT"),
-            ],
+            ]),
             missing_subsequence_message: "assertion failed: missing resume(id) argv subsequence",
         },
         "add_dirs_runtime_rejection_fresh" => ScenarioKind::RuntimeRejection {
@@ -248,20 +244,18 @@ fn scenario_kind(scenario: &str) -> ScenarioKind {
             missing_subsequence_message: "assertion failed: missing fork(id) argv subsequence",
         },
         "add_dirs_runtime_rejection_resume_last" => ScenarioKind::RuntimeRejection {
-            tail: vec![
+            tail: tail_with_optional_prompt(vec![
                 "--continue".to_string(),
                 "--verbose".to_string(),
-                require("FAKE_CLAUDE_EXPECT_PROMPT"),
-            ],
+            ]),
             missing_subsequence_message: "assertion failed: missing resume(last) argv subsequence",
         },
         "add_dirs_runtime_rejection_resume_id" => ScenarioKind::RuntimeRejection {
-            tail: vec![
+            tail: tail_with_optional_prompt(vec![
                 "--resume".to_string(),
                 require("FAKE_CLAUDE_EXPECT_RESUME_ID"),
                 "--verbose".to_string(),
-                require("FAKE_CLAUDE_EXPECT_PROMPT"),
-            ],
+            ]),
             missing_subsequence_message: "assertion failed: missing resume(id) argv subsequence",
         },
         "add_dirs_runtime_rejection_nested_detail_trap" => ScenarioKind::DetailedResultError {
@@ -358,6 +352,16 @@ fn scenario_kind(scenario: &str) -> ScenarioKind {
     }
 }
 
+fn tail_with_optional_prompt(mut tail: Vec<String>) -> Vec<String> {
+    if let Ok(prompt) = env::var("FAKE_CLAUDE_EXPECT_PROMPT") {
+        if !prompt.trim().is_empty() {
+            tail.push(prompt);
+        }
+    }
+
+    tail
+}
+
 fn handle_assert(
     out: &mut dyn Write,
     args: &[String],
@@ -365,8 +369,10 @@ fn handle_assert(
     tail: &[String],
     missing_subsequence_message: &str,
 ) -> io::Result<()> {
-    let expected_prompt = require("FAKE_CLAUDE_EXPECT_PROMPT");
-    assert_prompt_and_verbose(args, out, &expected_prompt);
+    let expected_prompt = env::var("FAKE_CLAUDE_EXPECT_PROMPT")
+        .ok()
+        .filter(|value| !value.trim().is_empty());
+    assert_prompt_and_verbose(args, out, expected_prompt.as_deref());
 
     let tail_refs: Vec<_> = tail.iter().map(String::as_str).collect();
     let subseq = selector_assertion_subsequence(&tail_refs);
@@ -433,8 +439,10 @@ fn handle_terminal_error(
     missing_subsequence_message: &str,
     result_message: &'static str,
 ) -> io::Result<()> {
-    let expected_prompt = require("FAKE_CLAUDE_EXPECT_PROMPT");
-    assert_prompt_and_verbose(args, out, &expected_prompt);
+    let expected_prompt = env::var("FAKE_CLAUDE_EXPECT_PROMPT")
+        .ok()
+        .filter(|value| !value.trim().is_empty());
+    assert_prompt_and_verbose(args, out, expected_prompt.as_deref());
 
     let required_refs: Vec<_> = required_subsequence.iter().map(String::as_str).collect();
     if !contains_ordered_subsequence(args, &required_refs) {
@@ -486,11 +494,20 @@ fn handle_stream_only(out: &mut dyn Write, init: &str, user: &str, kind: &str) -
     }
 }
 
-fn assert_prompt_and_verbose(args: &[String], out: &mut dyn Write, expected_prompt: &str) {
-    if args.last().map(String::as_str) != Some(expected_prompt) {
-        fail(out, "assertion failed: prompt must be final argv token");
-    }
+fn assert_prompt_and_verbose(args: &[String], out: &mut dyn Write, expected_prompt: Option<&str>) {
     if !has_flag(args, "--verbose") {
         fail(out, "assertion failed: missing --verbose");
+    }
+    match expected_prompt {
+        Some(expected_prompt) => {
+            if args.last().map(String::as_str) != Some(expected_prompt) {
+                fail(out, "assertion failed: prompt must be final argv token");
+            }
+        }
+        None => {
+            if args.last().map(String::as_str) != Some("--verbose") {
+                fail(out, "assertion failed: --verbose must be final argv token");
+            }
+        }
     }
 }

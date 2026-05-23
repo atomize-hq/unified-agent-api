@@ -105,6 +105,10 @@ pub(crate) fn validate_resume_fork_mutual_exclusion(
     Ok(())
 }
 
+pub(crate) fn extensions_allow_empty_prompt(extensions: &BTreeMap<String, Value>) -> bool {
+    extensions.contains_key(EXT_SESSION_RESUME_V1) || extensions.contains_key(EXT_SESSION_FORK_V1)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -112,6 +112,97 @@ async fn fork_id_does_not_list_and_starts_turn_on_forked_thread() {
 }
 
 #[tokio::test]
+async fn fork_id_without_prompt_skips_turn_start_and_still_surfaces_handle() {
+    let source_thread_id = "thread-123";
+    let log = request_log_file();
+
+    let backend = CodexBackend::new(CodexBackendConfig {
+        binary: Some(fake_codex_app_server_binary()),
+        env: [
+            (
+                "FAKE_CODEX_APP_SERVER_SCENARIO".to_string(),
+                "fork_id_success".to_string(),
+            ),
+            (
+                "FAKE_CODEX_APP_SERVER_EXPECT_SOURCE_THREAD_ID".to_string(),
+                source_thread_id.to_string(),
+            ),
+            (
+                "FAKE_CODEX_APP_SERVER_REQUEST_LOG".to_string(),
+                log.path().display().to_string(),
+            ),
+        ]
+        .into_iter()
+        .collect(),
+        ..Default::default()
+    });
+
+    let handle = backend
+        .run(AgentWrapperRunRequest {
+            prompt: "".to_string(),
+            extensions: [(
+                "agent_api.session.fork.v1".to_string(),
+                json!({"selector":"id","id": source_thread_id}),
+            )]
+            .into_iter()
+            .collect(),
+            ..Default::default()
+        })
+        .await
+        .expect("run");
+
+    let mut events = handle.events;
+    let completion = handle.completion;
+
+    let seen = drain_to_none(events.as_mut(), Duration::from_secs(2)).await;
+    let handle_events: Vec<&AgentWrapperEvent> = seen
+        .iter()
+        .filter(|ev| ev.kind == AgentWrapperEventKind::Status)
+        .filter(|ev| {
+            ev.data
+                .as_ref()
+                .and_then(|data| data.get("schema"))
+                .and_then(serde_json::Value::as_str)
+                == Some("agent_api.session.handle.v1")
+        })
+        .collect();
+    assert_eq!(
+        handle_events.len(),
+        1,
+        "expected exactly one handle-bearing status for promptless fork(id)"
+    );
+    assert_eq!(
+        handle_events[0]
+            .data
+            .as_ref()
+            .and_then(|data| data.get("session"))
+            .and_then(|session| session.get("id"))
+            .and_then(serde_json::Value::as_str),
+        Some("forked-1")
+    );
+
+    let completion = tokio::time::timeout(Duration::from_secs(2), completion)
+        .await
+        .expect("completion resolves")
+        .expect("completion ok");
+    assert!(completion.status.success());
+
+    let methods = read_logged_request_methods(&log);
+    assert!(
+        methods.iter().any(|method| method == "thread/fork"),
+        "expected promptless fork(id) to still fork the selected source thread: {methods:?}"
+    );
+    assert!(
+        !methods.iter().any(|method| method == "thread/list"),
+        "fork(id) must not list threads: {methods:?}"
+    );
+    assert!(
+        !methods.iter().any(|method| method == "turn/start"),
+        "promptless fork(id) must not start a synthetic turn: {methods:?}"
+    );
+}
+
+#[tokio::test]
 async fn fork_id_oversize_forked_thread_id_is_treated_as_unknown_omits_handle_facet_and_warns_once()
 {
     let prompt = "hello world";

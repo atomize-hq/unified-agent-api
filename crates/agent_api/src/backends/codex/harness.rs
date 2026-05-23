@@ -80,6 +80,7 @@ pub(super) struct CodexHandleFacetState {
 #[derive(Debug)]
 pub(super) enum CodexBackendEvent {
     ExternalSandboxWarning,
+    SyntheticStatus,
     Thread(Box<ThreadEvent>),
     AppServerNotification(codex::mcp::AppNotification),
     NonZeroExit { status: ExitStatus },
@@ -430,6 +431,25 @@ impl BackendHarnessAdapter for CodexHarnessAdapter {
                 vec![status_event(Some(
                     PINNED_EXTERNAL_SANDBOX_WARNING.to_string(),
                 ))]
+            }
+            CodexBackendEvent::SyntheticStatus => {
+                let mut mapped = vec![status_event(None)];
+
+                let emit_handle_facet: Option<String> =
+                    self.handle_state.lock().ok().and_then(|mut state| {
+                        if state.handle_facet_emitted {
+                            return None;
+                        }
+                        let thread_id = state.thread_id.clone()?;
+                        state.handle_facet_emitted = true;
+                        Some(thread_id)
+                    });
+
+                if let Some(thread_id) = emit_handle_facet.as_deref() {
+                    mapped[0].data = Some(session_handle_facet(thread_id));
+                }
+
+                mapped
             }
             CodexBackendEvent::Thread(ev) => {
                 let mut emit_oversize_warning_len: Option<usize> = None;

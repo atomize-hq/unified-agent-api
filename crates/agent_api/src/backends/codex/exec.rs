@@ -270,19 +270,23 @@ pub(super) async fn spawn_exec_or_resume_flow(
                 .await
         }
         Some(super::SessionSelectorV1::Last) => {
+            let request = if prompt.trim().is_empty() {
+                codex::ResumeRequest::last()
+            } else {
+                codex::ResumeRequest::last().prompt(prompt)
+            };
             client
-                .stream_resume_with_env_overrides_control(
-                    codex::ResumeRequest::last().prompt(prompt),
-                    &env,
-                )
+                .stream_resume_with_env_overrides_control(request, &env)
                 .await
         }
         Some(super::SessionSelectorV1::Id { id }) => {
+            let request = if prompt.trim().is_empty() {
+                codex::ResumeRequest::with_id(id)
+            } else {
+                codex::ResumeRequest::with_id(id).prompt(prompt)
+            };
             client
-                .stream_resume_with_env_overrides_control(
-                    codex::ResumeRequest::with_id(id).prompt(prompt),
-                    &env,
-                )
+                .stream_resume_with_env_overrides_control(request, &env)
                 .await
         }
     }

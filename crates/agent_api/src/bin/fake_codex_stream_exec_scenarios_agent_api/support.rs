@@ -260,6 +260,10 @@ pub(super) fn require_env_var(out: &mut impl Write, key: &str) -> io::Result<Str
     }
 }
 
+pub(super) fn optional_env_var(key: &str) -> Option<String> {
+    env::var(key).ok().filter(|value| !value.trim().is_empty())
+}
+
 fn read_stdin_to_end_with_timeout(timeout: Duration) -> io::Result<Vec<u8>> {
     let (tx, rx) = mpsc::channel::<io::Result<Vec<u8>>>();
     std::thread::spawn(move || {
@@ -308,6 +312,32 @@ pub(super) fn assert_stdin_prompt(
         &format!(
             r#"{{"type":"error","message":"stdin prompt mismatch: expected {} bytes, got {} bytes"}}"#,
             expected.len(),
+            stdin.len()
+        ),
+    )?;
+    Ok(false)
+}
+
+pub(super) fn assert_no_stdin(out: &mut impl Write, timeout: Duration) -> io::Result<bool> {
+    let stdin = match read_stdin_to_end_with_timeout(timeout) {
+        Ok(stdin) => stdin,
+        Err(err) => {
+            emit_jsonl(
+                out,
+                &format!(r#"{{"type":"error","message":"failed to read stdin: {err}"}}"#),
+            )?;
+            return Ok(false);
+        }
+    };
+
+    if stdin.is_empty() {
+        return Ok(true);
+    }
+
+    emit_jsonl(
+        out,
+        &format!(
+            r#"{{"type":"error","message":"expected empty stdin, got {} bytes"}}"#,
             stdin.len()
         ),
     )?;

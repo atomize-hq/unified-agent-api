@@ -61,12 +61,14 @@ async fn spawn_and_drain(
 fn base_env(scenario: &str, prompt: &str, expect_model: Option<&str>) -> BTreeMap<String, String> {
     let mut env = BTreeMap::from([
         ("FAKE_CLAUDE_SCENARIO".to_string(), scenario.to_string()),
-        ("FAKE_CLAUDE_EXPECT_PROMPT".to_string(), prompt.to_string()),
         (
             "FAKE_CLAUDE_EXPECT_NO_FALLBACK_MODEL".to_string(),
             "true".to_string(),
         ),
     ]);
+    if !prompt.trim().is_empty() {
+        env.insert("FAKE_CLAUDE_EXPECT_PROMPT".to_string(), prompt.to_string());
+    }
     if let Some(model) = expect_model {
         env.insert("FAKE_CLAUDE_EXPECT_MODEL".to_string(), model.to_string());
     } else {
@@ -189,6 +191,27 @@ async fn claude_resume_id_emits_model_before_resume_flag() {
             resume: Some(SessionSelectorV1::Id {
                 id: resume_id.to_string(),
             }),
+            fork: None,
+            resolved_working_dir: None,
+            add_dirs: Vec::new(),
+        },
+        env,
+        prompt,
+    )
+    .await;
+}
+
+#[tokio::test]
+async fn claude_resume_last_omits_prompt_token_when_prompt_is_blank() {
+    let prompt = "";
+    let env = base_env("resume_last_assert", prompt, Some("request-model"));
+
+    spawn_and_drain(
+        Some("request-model".to_string()),
+        super::super::harness::ClaudeExecPolicy {
+            non_interactive: true,
+            external_sandbox: false,
+            resume: Some(SessionSelectorV1::Last),
             fork: None,
             resolved_working_dir: None,
             add_dirs: Vec::new(),

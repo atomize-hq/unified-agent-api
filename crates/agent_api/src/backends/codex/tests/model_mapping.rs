@@ -260,3 +260,44 @@ async fn codex_resume_emits_model_id_and_orders_before_add_dir() {
     )
     .await;
 }
+
+#[tokio::test]
+async fn codex_resume_without_prompt_omits_stdin_dash_and_keeps_model_ordering() {
+    let temp = tempdir().expect("tempdir");
+    let run_start_cwd = temp.path().join("run-start");
+    let expected_cwd = run_start_cwd.join("repo");
+    let expected_add_dir = expected_cwd.join("docs");
+    std::fs::create_dir_all(&expected_add_dir).expect("create add-dir target");
+
+    let env = base_env()
+        .into_iter()
+        .chain(add_dir_expectations(std::slice::from_ref(
+            &expected_add_dir,
+        )))
+        .chain([
+            (
+                "FAKE_CODEX_EXPECT_CWD".to_string(),
+                expected_cwd.display().to_string(),
+            ),
+            (
+                "FAKE_CODEX_SCENARIO".to_string(),
+                "resume_last_assert".to_string(),
+            ),
+            (
+                "FAKE_CODEX_EXPECT_MODEL".to_string(),
+                "request-model".to_string(),
+            ),
+        ])
+        .collect();
+
+    spawn_and_drain(
+        Some("request-model".to_string()),
+        None,
+        Some(SessionSelectorV1::Last),
+        vec![expected_add_dir],
+        env,
+        run_start_cwd,
+        "",
+    )
+    .await;
+}

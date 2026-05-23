@@ -145,6 +145,92 @@ async fn fork_id_maps_to_fork_session_and_resume_flag_and_prompt_is_final_token(
 }
 
 #[tokio::test]
+async fn fork_last_without_prompt_keeps_verbose_as_final_token() {
+    let backend = ClaudeCodeBackend::new(ClaudeCodeBackendConfig {
+        binary: Some(fake_claude_binary()),
+        env: [(
+            "FAKE_CLAUDE_SCENARIO".to_string(),
+            "fork_last_assert".to_string(),
+        )]
+        .into_iter()
+        .collect(),
+        ..Default::default()
+    });
+
+    let handle = backend
+        .run(AgentWrapperRunRequest {
+            prompt: "".to_string(),
+            extensions: [(
+                "agent_api.session.fork.v1".to_string(),
+                json!({"selector": "last"}),
+            )]
+            .into_iter()
+            .collect(),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+
+    let mut events = handle.events;
+    let completion = handle.completion;
+
+    let _seen = drain_to_none(events.as_mut(), Duration::from_secs(2)).await;
+
+    let completion = tokio::time::timeout(Duration::from_secs(2), completion)
+        .await
+        .expect("completion resolves")
+        .unwrap();
+    assert!(completion.status.success());
+}
+
+#[tokio::test]
+async fn fork_id_without_prompt_keeps_verbose_as_final_token() {
+    let fork_id = "sess-123";
+
+    let backend = ClaudeCodeBackend::new(ClaudeCodeBackendConfig {
+        binary: Some(fake_claude_binary()),
+        env: [
+            (
+                "FAKE_CLAUDE_SCENARIO".to_string(),
+                "fork_id_assert".to_string(),
+            ),
+            (
+                "FAKE_CLAUDE_EXPECT_RESUME_ID".to_string(),
+                fork_id.to_string(),
+            ),
+        ]
+        .into_iter()
+        .collect(),
+        ..Default::default()
+    });
+
+    let handle = backend
+        .run(AgentWrapperRunRequest {
+            prompt: "".to_string(),
+            extensions: [(
+                "agent_api.session.fork.v1".to_string(),
+                json!({"selector": "id", "id": fork_id}),
+            )]
+            .into_iter()
+            .collect(),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+
+    let mut events = handle.events;
+    let completion = handle.completion;
+
+    let _seen = drain_to_none(events.as_mut(), Duration::from_secs(2)).await;
+
+    let completion = tokio::time::timeout(Duration::from_secs(2), completion)
+        .await
+        .expect("completion resolves")
+        .unwrap();
+    assert!(completion.status.success());
+}
+
+#[tokio::test]
 async fn fork_last_preserves_add_dir_flags_in_order() {
     let prompt = "hello world";
     let temp = tempdir().expect("tempdir");

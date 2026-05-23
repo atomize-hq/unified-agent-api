@@ -9,6 +9,71 @@ mod support;
 
 use support::*;
 
+fn assert_resume_last_invocation(out: &mut impl Write, args: &[String]) -> io::Result<bool> {
+    let expected_prompt = optional_env_var("FAKE_CODEX_EXPECT_PROMPT");
+    let expected_subsequence = if expected_prompt.is_some() {
+        ["exec", "--json", "resume", "--last", "-"].as_slice()
+    } else {
+        ["exec", "--json", "resume", "--last"].as_slice()
+    };
+    if !contains_ordered_subsequence(args, expected_subsequence) {
+        let message = if expected_prompt.is_some() {
+            r#"{"type":"error","message":"missing argv subsequence: exec --json resume --last -"}"#
+        } else {
+            r#"{"type":"error","message":"missing argv subsequence: exec --json resume --last"}"#
+        };
+        emit_jsonl(out, message)?;
+        return Ok(false);
+    }
+
+    if expected_prompt.is_some() && args.last().map(String::as_str) != Some("-") {
+        emit_jsonl(
+            out,
+            r#"{"type":"error","message":"expected '-' to remain the final argv token for prompted resume"}"#,
+        )?;
+        return Ok(false);
+    }
+
+    if let Some(expected_prompt) = expected_prompt {
+        return assert_stdin_prompt(out, &expected_prompt, Duration::from_secs(1));
+    }
+
+    assert_no_stdin(out, Duration::from_secs(1))
+}
+
+fn assert_resume_id_invocation(out: &mut impl Write, args: &[String]) -> io::Result<bool> {
+    let expected_id = require_env_var(out, "FAKE_CODEX_EXPECT_RESUME_ID")?;
+    let expected_prompt = optional_env_var("FAKE_CODEX_EXPECT_PROMPT");
+    let expected_subsequence = if expected_prompt.is_some() {
+        vec!["exec", "--json", "resume", expected_id.as_str(), "-"]
+    } else {
+        vec!["exec", "--json", "resume", expected_id.as_str()]
+    };
+    if !contains_ordered_subsequence(args, &expected_subsequence) {
+        let message = if expected_prompt.is_some() {
+            r#"{"type":"error","message":"missing argv subsequence: exec --json resume <ID> -"}"#
+        } else {
+            r#"{"type":"error","message":"missing argv subsequence: exec --json resume <ID>"}"#
+        };
+        emit_jsonl(out, message)?;
+        return Ok(false);
+    }
+
+    if expected_prompt.is_some() && args.last().map(String::as_str) != Some("-") {
+        emit_jsonl(
+            out,
+            r#"{"type":"error","message":"expected '-' to remain the final argv token for prompted resume"}"#,
+        )?;
+        return Ok(false);
+    }
+
+    if let Some(expected_prompt) = expected_prompt {
+        return assert_stdin_prompt(out, &expected_prompt, Duration::from_secs(1));
+    }
+
+    assert_no_stdin(out, Duration::from_secs(1))
+}
+
 fn main() -> io::Result<()> {
     // Cross-platform test binary used by `agent_api` tests.
     //
@@ -132,19 +197,7 @@ fn main() -> io::Result<()> {
     let scenario = env::var("FAKE_CODEX_SCENARIO").unwrap_or_else(|_| "ok".to_string());
     match scenario.as_str() {
         "resume_last_assert" => {
-            let expected_prompt = require_env_var(&mut out, "FAKE_CODEX_EXPECT_PROMPT")?;
-
-            let ok =
-                contains_ordered_subsequence(&args, &["exec", "--json", "resume", "--last", "-"]);
-            if !ok {
-                emit_jsonl(
-                    &mut out,
-                    r#"{"type":"error","message":"missing argv subsequence: exec --json resume --last -"}"#,
-                )?;
-                std::process::exit(1);
-            }
-
-            if !assert_stdin_prompt(&mut out, &expected_prompt, Duration::from_secs(1))? {
+            if !assert_resume_last_invocation(&mut out, &args)? {
                 std::process::exit(1);
             }
 
@@ -154,19 +207,7 @@ fn main() -> io::Result<()> {
             )?;
         }
         "add_dirs_runtime_rejection_resume_last" => {
-            let expected_prompt = require_env_var(&mut out, "FAKE_CODEX_EXPECT_PROMPT")?;
-
-            let ok =
-                contains_ordered_subsequence(&args, &["exec", "--json", "resume", "--last", "-"]);
-            if !ok {
-                emit_jsonl(
-                    &mut out,
-                    r#"{"type":"error","message":"missing argv subsequence: exec --json resume --last -"}"#,
-                )?;
-                std::process::exit(1);
-            }
-
-            if !assert_stdin_prompt(&mut out, &expected_prompt, Duration::from_secs(1))? {
+            if !assert_resume_last_invocation(&mut out, &args)? {
                 std::process::exit(1);
             }
 
@@ -178,19 +219,7 @@ fn main() -> io::Result<()> {
             std::process::exit(1);
         }
         "add_dirs_runtime_rejection_resume_last_buffered_tail" => {
-            let expected_prompt = require_env_var(&mut out, "FAKE_CODEX_EXPECT_PROMPT")?;
-
-            let ok =
-                contains_ordered_subsequence(&args, &["exec", "--json", "resume", "--last", "-"]);
-            if !ok {
-                emit_jsonl(
-                    &mut out,
-                    r#"{"type":"error","message":"missing argv subsequence: exec --json resume --last -"}"#,
-                )?;
-                std::process::exit(1);
-            }
-
-            if !assert_stdin_prompt(&mut out, &expected_prompt, Duration::from_secs(1))? {
+            if !assert_resume_last_invocation(&mut out, &args)? {
                 std::process::exit(1);
             }
 
@@ -203,22 +232,7 @@ fn main() -> io::Result<()> {
             std::process::exit(1);
         }
         "resume_id_assert" => {
-            let expected_prompt = require_env_var(&mut out, "FAKE_CODEX_EXPECT_PROMPT")?;
-            let expected_id = require_env_var(&mut out, "FAKE_CODEX_EXPECT_RESUME_ID")?;
-
-            let ok = contains_ordered_subsequence(
-                &args,
-                &["exec", "--json", "resume", expected_id.as_str(), "-"],
-            );
-            if !ok {
-                emit_jsonl(
-                    &mut out,
-                    r#"{"type":"error","message":"missing argv subsequence: exec --json resume <ID> -"}"#,
-                )?;
-                std::process::exit(1);
-            }
-
-            if !assert_stdin_prompt(&mut out, &expected_prompt, Duration::from_secs(1))? {
+            if !assert_resume_id_invocation(&mut out, &args)? {
                 std::process::exit(1);
             }
 
@@ -228,22 +242,7 @@ fn main() -> io::Result<()> {
             )?;
         }
         "add_dirs_runtime_rejection_resume_id" => {
-            let expected_prompt = require_env_var(&mut out, "FAKE_CODEX_EXPECT_PROMPT")?;
-            let expected_id = require_env_var(&mut out, "FAKE_CODEX_EXPECT_RESUME_ID")?;
-
-            let ok = contains_ordered_subsequence(
-                &args,
-                &["exec", "--json", "resume", expected_id.as_str(), "-"],
-            );
-            if !ok {
-                emit_jsonl(
-                    &mut out,
-                    r#"{"type":"error","message":"missing argv subsequence: exec --json resume <ID> -"}"#,
-                )?;
-                std::process::exit(1);
-            }
-
-            if !assert_stdin_prompt(&mut out, &expected_prompt, Duration::from_secs(1))? {
+            if !assert_resume_id_invocation(&mut out, &args)? {
                 std::process::exit(1);
             }
 
@@ -255,22 +254,7 @@ fn main() -> io::Result<()> {
             std::process::exit(1);
         }
         "add_dirs_runtime_rejection_resume_id_buffered_tail" => {
-            let expected_prompt = require_env_var(&mut out, "FAKE_CODEX_EXPECT_PROMPT")?;
-            let expected_id = require_env_var(&mut out, "FAKE_CODEX_EXPECT_RESUME_ID")?;
-
-            let ok = contains_ordered_subsequence(
-                &args,
-                &["exec", "--json", "resume", expected_id.as_str(), "-"],
-            );
-            if !ok {
-                emit_jsonl(
-                    &mut out,
-                    r#"{"type":"error","message":"missing argv subsequence: exec --json resume <ID> -"}"#,
-                )?;
-                std::process::exit(1);
-            }
-
-            if !assert_stdin_prompt(&mut out, &expected_prompt, Duration::from_secs(1))? {
+            if !assert_resume_id_invocation(&mut out, &args)? {
                 std::process::exit(1);
             }
 

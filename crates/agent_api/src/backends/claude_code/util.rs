@@ -190,7 +190,12 @@ pub(super) fn build_fresh_run_print_request(
     allow_dangerously_skip_permissions: bool,
     add_dirs: &[PathBuf],
 ) -> ClaudePrintRequest {
-    let mut print_req = ClaudePrintRequest::new(prompt)
+    let mut print_req = if prompt.trim().is_empty() {
+        ClaudePrintRequest::new(String::new()).no_prompt()
+    } else {
+        ClaudePrintRequest::new(prompt)
+    };
+    print_req = print_req
         .output_format(ClaudeOutputFormat::StreamJson)
         .include_partial_messages(true);
     if non_interactive {

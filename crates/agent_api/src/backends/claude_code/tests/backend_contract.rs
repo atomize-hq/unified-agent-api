@@ -244,6 +244,29 @@ fn claude_fresh_run_print_request_places_allow_flag_before_variadic_add_dir_grou
 }
 
 #[test]
+fn claude_resume_print_request_omits_final_prompt_token_when_prompt_is_blank() {
+    let argv = super::super::util::build_fresh_run_print_request(
+        "   ".to_string(),
+        true,
+        false,
+        false,
+        &[],
+    )
+    .continue_session(true)
+    .argv();
+
+    assert_eq!(
+        argv.last().map(String::as_str),
+        Some("--verbose"),
+        "expected stream-json verbose mode to remain final when the wrapper omits a blank prompt"
+    );
+    assert!(
+        !argv.iter().any(|arg| arg.trim().is_empty()),
+        "expected no blank prompt token in argv"
+    );
+}
+
+#[test]
 fn claude_add_dirs_runtime_rejection_classifier_requires_exact_safe_message_match() {
     let payload = json!({
         "type": "result",

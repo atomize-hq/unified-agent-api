@@ -184,3 +184,26 @@ fn synthetic_status_is_emitted_if_id_first_seen_on_non_status_event() {
         Some("thread-1")
     );
 }
+
+#[test]
+fn synthetic_backend_status_attaches_handle_facet_when_thread_id_is_known() {
+    let adapter = test_adapter();
+
+    let _first = adapter.map_event(CodexBackendEvent::Thread(Box::new(parse_thread_event(
+        r#"{"type":"thread.started","thread_id":"thread-1"}"#,
+    ))));
+    let second = adapter.map_event(CodexBackendEvent::SyntheticStatus);
+
+    assert_eq!(second.len(), 1);
+    assert_eq!(second[0].kind, AgentWrapperEventKind::Status);
+    assert_eq!(handle_schema(&second[0]), Some(CAP_SESSION_HANDLE_V1));
+    assert_eq!(
+        second[0]
+            .data
+            .as_ref()
+            .and_then(|data| data.get("session"))
+            .and_then(|session| session.get("id"))
+            .and_then(Value::as_str),
+        Some("thread-1")
+    );
+}

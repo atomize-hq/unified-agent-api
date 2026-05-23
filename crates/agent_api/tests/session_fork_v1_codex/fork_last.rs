@@ -86,6 +86,98 @@ async fn fork_last_pages_thread_list_and_selects_max_tuple() {
 }
 
 #[tokio::test]
+async fn fork_last_without_prompt_selects_thread_and_skips_turn_start() {
+    let working_dir = make_temp_working_dir();
+    let log = request_log_file();
+
+    let backend = CodexBackend::new(CodexBackendConfig {
+        binary: Some(fake_codex_app_server_binary()),
+        env: [
+            (
+                "FAKE_CODEX_APP_SERVER_SCENARIO".to_string(),
+                "fork_last_success_paged".to_string(),
+            ),
+            (
+                "FAKE_CODEX_APP_SERVER_EXPECT_CWD".to_string(),
+                working_dir.to_string_lossy().to_string(),
+            ),
+            (
+                "FAKE_CODEX_APP_SERVER_REQUEST_LOG".to_string(),
+                log.path().display().to_string(),
+            ),
+        ]
+        .into_iter()
+        .collect(),
+        ..Default::default()
+    });
+
+    let handle = backend
+        .run(AgentWrapperRunRequest {
+            prompt: "".to_string(),
+            working_dir: Some(working_dir),
+            extensions: [(
+                "agent_api.session.fork.v1".to_string(),
+                json!({"selector":"last"}),
+            )]
+            .into_iter()
+            .collect(),
+            ..Default::default()
+        })
+        .await
+        .expect("run");
+
+    let mut events = handle.events;
+    let completion = handle.completion;
+
+    let seen = drain_to_none(events.as_mut(), Duration::from_secs(2)).await;
+    let handle_events: Vec<_> = seen
+        .iter()
+        .filter(|ev| ev.kind == AgentWrapperEventKind::Status)
+        .filter(|ev| {
+            ev.data
+                .as_ref()
+                .and_then(|data| data.get("schema"))
+                .and_then(serde_json::Value::as_str)
+                == Some("agent_api.session.handle.v1")
+        })
+        .collect();
+    assert_eq!(
+        handle_events.len(),
+        1,
+        "expected a single synthetic handle-bearing status for promptless fork"
+    );
+    assert_eq!(
+        handle_events[0]
+            .data
+            .as_ref()
+            .and_then(|data| data.get("session"))
+            .and_then(|session| session.get("id"))
+            .and_then(serde_json::Value::as_str),
+        Some("forked-1")
+    );
+
+    let completion = tokio::time::timeout(Duration::from_secs(2), completion)
+        .await
+        .expect("completion resolves")
+        .expect("completion ok");
+    assert!(completion.status.success());
+
+    let methods = read_logged_request_methods(&log);
+    assert!(
+        methods.iter().any(|method| method == "thread/list"),
+        "expected promptless fork(last) to still select the source thread: {methods:?}"
+    );
+    assert!(
+        methods.iter().any(|method| method == "thread/fork"),
+        "expected promptless fork(last) to fork the selected thread: {methods:?}"
+    );
+    assert!(
+        !methods.iter().any(|method| method == "turn/start"),
+        "promptless fork(last) must not start a synthetic turn: {methods:?}"
+    );
+}
+
+#[tokio::test]
 async fn fork_last_empty_list_translates_to_no_session_found_and_emits_terminal_error_event() {
     let prompt = "hello world";
     let working_dir = make_temp_working_dir();

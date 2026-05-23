@@ -1,5 +1,5 @@
 #[allow(dead_code)]
-mod session_selectors;
+pub(crate) mod session_selectors;
 
 #[cfg(any(feature = "codex", feature = "claude_code", test))]
 mod termination;

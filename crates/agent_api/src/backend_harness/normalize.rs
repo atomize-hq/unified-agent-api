@@ -10,6 +10,7 @@ use serde_json::Value;
 use std::path::Prefix;
 
 use super::{BackendDefaults, BackendHarnessAdapter, NormalizedRequest};
+use crate::backends::session_selectors::extensions_allow_empty_prompt;
 use crate::backends::spawn_path::resolve_relative_path_from_base;
 use crate::{AgentWrapperError, AgentWrapperRunRequest, EXT_AGENT_API_CONFIG_MODEL_V1};
 
@@ -119,7 +120,7 @@ pub(crate) fn normalize_request<A: BackendHarnessAdapter>(
     defaults: &BackendDefaults,
     request: AgentWrapperRunRequest,
 ) -> Result<NormalizedRequest<A::Policy>, AgentWrapperError> {
-    if request.prompt.trim().is_empty() {
+    if request.prompt.trim().is_empty() && !extensions_allow_empty_prompt(&request.extensions) {
         return Err(AgentWrapperError::InvalidRequest {
             message: "prompt must not be empty".to_string(),
         });

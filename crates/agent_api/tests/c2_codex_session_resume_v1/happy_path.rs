@@ -64,3 +64,28 @@ async fn resume_id_maps_to_exec_json_resume_id_dash_and_stdin_prompt() {
     let _seen = drain_to_none(events.as_mut(), STREAM_TIMEOUT).await;
     assert_completion_success(handle.completion).await;
 }
+
+#[tokio::test]
+async fn resume_last_without_prompt_omits_dash_and_stdin_follow_up() {
+    let mut env = base_env();
+    env.insert(
+        "FAKE_CODEX_SCENARIO".to_string(),
+        "resume_last_assert".to_string(),
+    );
+
+    let backend = build_backend(env, None, false);
+    let handle = backend
+        .run(run_request(
+            "",
+            [(
+                "agent_api.session.resume.v1".to_string(),
+                json!({"selector": "last"}),
+            )],
+        ))
+        .await
+        .unwrap();
+
+    let mut events = handle.events;
+    let _seen = drain_to_none(events.as_mut(), STREAM_TIMEOUT).await;
+    assert_completion_success(handle.completion).await;
+}

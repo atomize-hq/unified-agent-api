@@ -10,6 +10,7 @@ use std::{
     time::Duration,
 };
 
+use futures_util::stream;
 use serde_json::Value;
 use tokio::sync::{mpsc, oneshot};
 
@@ -380,6 +381,27 @@ pub(super) async fn spawn_fork_v1_flow(
     };
 
     install_thread_id(&handle_state, forked.thread.id.as_str());
+
+    if prompt.trim().is_empty() {
+        let events: DynBackendEventStream<CodexBackendEvent, CodexBackendError> =
+            Box::pin(stream::once(async {
+                Ok(CodexBackendEvent::SyntheticStatus)
+            }));
+        let completion: DynBackendCompletionFuture<CodexBackendCompletion, CodexBackendError> =
+            Box::pin(async move {
+                Ok(CodexBackendCompletion {
+                    status: synthetic_success_exit_status(),
+                    final_text: None,
+                    backend_error_message: None,
+                    selection_failure_message: None,
+                })
+            });
+        return Ok(BackendSpawn {
+            events,
+            completion,
+            events_observability: None,
+        });
+    }
 
     let turn = server
         .turn_start_v2(codex::mcp::TurnStartParamsV2 {
