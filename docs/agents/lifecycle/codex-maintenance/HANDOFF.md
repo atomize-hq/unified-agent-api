@@ -8,14 +8,14 @@ This file is the canonical contributor execution contract for `codex` maintenanc
 
 - detected_by: `.github/workflows/agent-maintenance-release-watch.yml`
 - current_validated: `0.125.0`
-- target_version: `0.129.0`
-- latest_stable: `0.130.0`
+- target_version: `0.133.0`
+- latest_stable: `0.134.0`
 - version_policy: `latest_stable_minus_one`
 - source_kind: `github_releases`
 - source_ref: `openai/codex`
 - dispatch_kind: `packet_pr`
 - dispatch_workflow: `agent-maintenance-open-pr.yml`
-- branch_name: `automation/codex-maintenance-0.129.0`
+- branch_name: `automation/codex-maintenance-0.133.0`
 
 ## Support-surface audit
 
@@ -38,11 +38,11 @@ This file is the canonical contributor execution contract for `codex` maintenanc
 - executor surface: `execute-agent-maintenance`
 - request artifact: `docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml`
 - prompt template path: `docs/agents/lifecycle/codex-maintenance/governance/execute-agent-maintenance-prompt.md`
-- prompt sha256: `231107d2a7bdc7ad9e75c2bb295924951e2dd001964779fe9dd186e616523031`
+- prompt sha256: `ac14dd9030047d62f41a11889aeb968486bd3cc8de10e4b128c690ff3c223050`
 - canonical handoff: `docs/agents/lifecycle/codex-maintenance/HANDOFF.md`
 - derivative pr summary: `docs/agents/lifecycle/codex-maintenance/governance/pr-summary.md`
 - exact closeout artifact: `docs/agents/lifecycle/codex-maintenance/governance/maintenance-closeout.json`
-- branch linkage: `automation/codex-maintenance-0.129.0`
+- branch linkage: `automation/codex-maintenance-0.133.0`
 - manual closeout required: `true`
 
 ## Writable surfaces
@@ -51,9 +51,9 @@ This file is the canonical contributor execution contract for `codex` maintenanc
 - `crates/codex/**`
 - `crates/agent_api/**`
 - `cli_manifests/codex/artifacts.lock.json`
-- `cli_manifests/codex/snapshots/0.129.0/**`
-- `cli_manifests/codex/reports/0.129.0/**`
-- `cli_manifests/codex/versions/0.129.0.json`
+- `cli_manifests/codex/snapshots/0.133.0/**`
+- `cli_manifests/codex/reports/0.133.0/**`
+- `cli_manifests/codex/versions/0.133.0.json`
 - `cli_manifests/codex/wrapper_coverage.json`
 - `cli_manifests/support_matrix/current.json`
 - `docs/specs/unified-agent-api/support-matrix.md`
@@ -90,7 +90,7 @@ This file is the canonical contributor execution contract for `codex` maintenanc
 
 - recreate packet command: `cargo run -p xtask -- refresh-agent --request docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml --write`
 - reopen pr body path: `docs/agents/lifecycle/codex-maintenance/governance/pr-summary.md`
-- reopen pr branch: `automation/codex-maintenance-0.129.0`
+- reopen pr branch: `automation/codex-maintenance-0.133.0`
 - notes:
 - If PR creation fails after packet generation, rerun packet regeneration from the frozen request and reopen the PR from the generated pr-summary path.
 - If the local execution-host preflight (local Codex CLI host via execute-agent-maintenance) fails, fix the Codex binary/auth state and rerun `execute-agent-maintenance --dry-run` before write mode.
@@ -104,7 +104,7 @@ cargo run -p xtask -- close-agent-maintenance --request docs/agents/lifecycle/co
 ## Exact maintained-agent prompt
 
 ```md
-# Packet PR Maintenance Prompt (`0.129.0`)
+# Packet PR Maintenance Prompt (`0.133.0`)
 
 This template renders the exact maintained-agent prompt for `codex` packet execution.
 `docs/agents/lifecycle/codex-maintenance/HANDOFF.md` remains canonical and `governance/pr-summary.md` is derivative.
@@ -113,7 +113,7 @@ This template renders the exact maintained-agent prompt for `codex` packet execu
 
 ## Goal
 
-Execute the automated maintenance packet for `codex` target `0.129.0`.
+Execute the automated maintenance packet for `codex` target `0.133.0`.
 
 ## Frozen request contract
 
@@ -135,10 +135,10 @@ Execute the automated maintenance packet for `codex` target `0.129.0`.
 
 ## Required workflow
 
-1. Compare the current validated baseline from `cli_manifests/codex/latest_validated.txt` against the target `0.129.0` artifacts.
+1. Compare the current validated baseline from `cli_manifests/codex/latest_validated.txt` against the target `0.133.0` artifacts.
 2. Use `support_surface_audit` to classify newly discovered non-TUI surface, preexisting non-TUI debt, required uplifts, and allowed deferrals.
 3. Land bounded wrapper/backend/manifest/publication updates for every row in `required_uplifts_this_run`.
-4. Refresh or create version-scoped manifest artifacts under `cli_manifests/codex/snapshots/0.129.0/`, `cli_manifests/codex/reports/0.129.0/`, and `cli_manifests/codex/versions/0.129.0.json` as required by the packet.
+4. Refresh or create version-scoped manifest artifacts under `cli_manifests/codex/snapshots/0.133.0/`, `cli_manifests/codex/reports/0.133.0/`, and `cli_manifests/codex/versions/0.133.0.json` as required by the packet.
 5. Leave closeout manual; record it only with `close-agent-maintenance` after the declared green gates pass.
 
 ## Done criteria
