@@ -23,6 +23,7 @@
   "required_publication_outputs": [
     "cli_manifests/support_matrix/current.json",
     "docs/specs/unified-agent-api/support-matrix.md",
+    "crates/agent_api/src/runtime_support_data.rs",
     "docs/specs/unified-agent-api/capability-matrix.md"
   ],
   "runtime_evidence_paths": [

@@ -59,6 +59,6 @@
     "minimal_profile_justification": null
   },
   "publication_packet_path": "docs/agents/lifecycle/aider-onboarding/governance/publication-ready.json",
-  "publication_packet_sha256": "10afd5f30669ce65257615068bb08cbdb91a97a1bb272c0668e904e06b1a5c31",
+  "publication_packet_sha256": "b6aeb89d1aaab4f99acc8224d68fd47055bde95ae8f6289cda5d160fc3ea3b8c",
   "closeout_baseline_path": "docs/agents/lifecycle/aider-onboarding/governance/proving-run-closeout.json"
 }

@@ -20,5 +20,6 @@ Newly discovered non-TUI surface must land in this run unless the frozen packet 
 - `cli_manifests/codex/wrapper_coverage.json`
 - `cli_manifests/support_matrix/current.json`
 - `docs/specs/unified-agent-api/support-matrix.md`
+- `crates/agent_api/src/runtime_support_data.rs`
 - `docs/specs/unified-agent-api/non-tui-support-debt.md`
 - `docs/specs/codex-wrapper-coverage-scenarios-v1.md`

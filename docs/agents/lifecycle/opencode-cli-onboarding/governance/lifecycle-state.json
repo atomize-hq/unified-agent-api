@@ -63,6 +63,6 @@
     "minimal_profile_justification": null
   },
   "publication_packet_path": "docs/agents/lifecycle/opencode-cli-onboarding/governance/publication-ready.json",
-  "publication_packet_sha256": "c0e4f4cf96b9b743fa53528f6e0e54abd7e23a5e427cd23dcda60a98a5d1c21d",
+  "publication_packet_sha256": "bfaa4b191a8dc832c5891c5bf4b74646b1085e06737fe1fcf37fc012018f0f95",
   "closeout_baseline_path": "docs/agents/lifecycle/opencode-cli-onboarding/governance/proving-run-closeout.json"
 }

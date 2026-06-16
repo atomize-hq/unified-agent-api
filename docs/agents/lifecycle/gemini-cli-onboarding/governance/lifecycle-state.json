@@ -59,6 +59,6 @@
     "minimal_profile_justification": null
   },
   "publication_packet_path": "docs/agents/lifecycle/gemini-cli-onboarding/governance/publication-ready.json",
-  "publication_packet_sha256": "4fe0101b5e621dae027186047bc7608555ac1ebe325265d9786a4d127b0c278b",
+  "publication_packet_sha256": "ea495f3ca1b53f51edc2f661e1997a591d430a2f98a470dfe3e2e4c4a677401e",
   "closeout_baseline_path": "docs/agents/lifecycle/gemini-cli-onboarding/governance/proving-run-closeout.json"
 }
