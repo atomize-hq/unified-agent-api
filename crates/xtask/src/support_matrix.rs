@@ -19,6 +19,9 @@ pub use consistency::{format_publication_issues, validate_publication_consistenc
 pub use derive::derive_rows;
 pub use derive::derive_rows_for_agent_root;
 pub use derive::derive_rows_for_test_roots;
+pub use derive::derive_validated_runtime_support;
+pub use derive::derive_validated_runtime_support_for_agent_root;
+pub use derive::derive_validated_runtime_support_for_test_roots;
 pub use publication::{
     render_publication_artifacts, render_publication_bundle, PublicationBundle,
     SupportMatrixArtifact,

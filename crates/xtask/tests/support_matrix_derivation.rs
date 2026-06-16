@@ -2,10 +2,12 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use agent_api::RuntimeSupportRecord;
 use serde_json::{json, Value};
 use xtask::support_matrix::{
-    derive_rows, derive_rows_for_test_roots, validate_publication_consistency, BackendSupportState,
-    ManifestSupportState, PointerPromotionState, SupportRow, UaaSupportState,
+    derive_rows, derive_rows_for_test_roots, derive_validated_runtime_support_for_agent_root,
+    derive_validated_runtime_support_for_test_roots, validate_publication_consistency,
+    BackendSupportState, ManifestSupportState, PointerPromotionState, SupportRow, UaaSupportState,
 };
 
 const SEEDED_REGISTRY: &str = include_str!("../data/agent_registry.toml");
@@ -148,6 +150,63 @@ fn materialize_aider_root(workspace: &Path) {
         &[("darwin-arm64", "0.0.0")],
         &[("darwin-arm64", "0.0.0")],
         &[],
+    );
+}
+
+#[test]
+fn derives_current_codex_validated_runtime_support_from_committed_truth() {
+    let workspace_root = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .expect("xtask crate dir parent")
+        .parent()
+        .expect("workspace root")
+        .to_path_buf();
+
+    let records = derive_validated_runtime_support_for_agent_root(
+        &workspace_root,
+        "codex",
+        "cli_manifests/codex",
+    )
+    .expect("derive codex runtime support");
+
+    assert_eq!(
+        records,
+        vec![RuntimeSupportRecord {
+            runtime_family: "codex".to_string(),
+            target_triple: "x86_64-unknown-linux-musl".to_string(),
+            version: "0.125.0".to_string(),
+        }]
+    );
+}
+
+#[test]
+fn derives_validated_runtime_support_from_latest_validated_tuples_only() {
+    let workspace = make_temp_dir("runtime-support-derivation");
+
+    materialize_root(
+        &workspace.join("cli_manifests/codex"),
+        &["linux-x64", "win32-x64"],
+        "1.0.0",
+        &["linux-x64"],
+        &[("0.9.0", &["linux-x64"]), ("1.0.0", &["linux-x64"])],
+        &[("linux-x64", "0.9.0")],
+        &[("linux-x64", "1.0.0"), ("win32-x64", "none")],
+        &[],
+    );
+
+    let records = derive_validated_runtime_support_for_test_roots(
+        &workspace,
+        &[("codex", "cli_manifests/codex")],
+    )
+    .expect("derive validated runtime support");
+
+    assert_eq!(
+        records,
+        vec![RuntimeSupportRecord {
+            runtime_family: "codex".to_string(),
+            target_triple: "linux-x64".to_string(),
+            version: "1.0.0".to_string(),
+        }]
     );
 }
 

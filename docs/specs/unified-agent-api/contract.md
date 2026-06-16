@@ -54,7 +54,8 @@ use agent_api::{
     AgentWrapperBackend, AgentWrapperCapabilities, AgentWrapperCompletion, AgentWrapperError,
     AgentWrapperEvent, AgentWrapperEventKind, AgentWrapperGateway, AgentWrapperKind,
     AgentWrapperRunControl, AgentWrapperRunHandle, AgentWrapperRunRequest, AgentWrapperRunResult,
-    AgentWrapperCancelHandle,
+    AgentWrapperCancelHandle, RuntimeSupportRecord, list_runtime_support,
+    resolve_runtime_support,
 };
 ```
 
@@ -180,6 +181,18 @@ pub struct AgentWrapperRunResult {
 pub enum AgentWrapperError {
     #[error("unknown backend: {agent_kind}")]
     UnknownBackend { agent_kind: String },
+    #[error("unknown runtime family: {runtime_family}")]
+    UnknownRuntimeFamily { runtime_family: String },
+    #[error("unsupported target triple for {runtime_family}: {target_triple}")]
+    UnsupportedTargetTriple {
+        runtime_family: String,
+        target_triple: String,
+    },
+    #[error("missing validated runtime for {runtime_family}: {target_triple}")]
+    MissingValidatedRuntime {
+        runtime_family: String,
+        target_triple: String,
+    },
     #[error("unsupported capability for {agent_kind}: {capability}")]
     UnsupportedCapability { agent_kind: String, capability: String },
     #[error("invalid agent kind: {message}")]
@@ -189,6 +202,22 @@ pub enum AgentWrapperError {
     #[error("backend error: {message}")]
     Backend { message: String },
 }
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RuntimeSupportRecord {
+    pub runtime_family: String,
+    pub target_triple: String,
+    pub version: String,
+}
+
+pub fn resolve_runtime_support(
+    runtime_family: &str,
+    target_triple: &str,
+) -> Result<RuntimeSupportRecord, AgentWrapperError>;
+
+pub fn list_runtime_support(
+    runtime_family: &str,
+) -> Result<Vec<RuntimeSupportRecord>, AgentWrapperError>;
 
 pub trait AgentWrapperBackend: Send + Sync {
     fn kind(&self) -> AgentWrapperKind;

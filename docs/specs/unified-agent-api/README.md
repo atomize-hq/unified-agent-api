@@ -14,6 +14,7 @@ Canonical specs:
 - `docs/specs/unified-agent-api/support-matrix.md`
 
 Draft specs:
+- `docs/specs/unified-agent-api/runtime-support-contract.md`
 - `docs/specs/unified-agent-api/mcp-management-spec.md`
 
 Generated artifact:
