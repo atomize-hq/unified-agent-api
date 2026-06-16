@@ -13,21 +13,7 @@ struct EmbeddedRuntimeSupportRecord {
     latest_validated: Option<&'static str>,
 }
 
-#[cfg(feature = "codex")]
-const CODEX_RUNTIME_SUPPORT: &[EmbeddedRuntimeSupportRecord] = &[
-    EmbeddedRuntimeSupportRecord {
-        target_triple: "aarch64-apple-darwin",
-        latest_validated: None,
-    },
-    EmbeddedRuntimeSupportRecord {
-        target_triple: "x86_64-pc-windows-msvc",
-        latest_validated: None,
-    },
-    EmbeddedRuntimeSupportRecord {
-        target_triple: "x86_64-unknown-linux-musl",
-        latest_validated: Some("0.125.0"),
-    },
-];
+include!("runtime_support_data.rs");
 
 fn runtime_family_records(runtime_family: &str) -> Option<&'static [EmbeddedRuntimeSupportRecord]> {
     match runtime_family {
@@ -41,11 +27,14 @@ pub fn resolve_runtime_support(
     runtime_family: &str,
     target_triple: &str,
 ) -> Result<RuntimeSupportRecord, AgentWrapperError> {
-    let records =
-        runtime_family_records(runtime_family).ok_or_else(|| AgentWrapperError::UnknownRuntimeFamily {
+    let records = runtime_family_records(runtime_family).ok_or_else(|| {
+        AgentWrapperError::UnknownRuntimeFamily {
             runtime_family: runtime_family.to_string(),
-        })?;
-    let record = records.iter().find(|record| record.target_triple == target_triple);
+        }
+    })?;
+    let record = records
+        .iter()
+        .find(|record| record.target_triple == target_triple);
     let Some(record) = record else {
         return Err(AgentWrapperError::UnsupportedTargetTriple {
             runtime_family: runtime_family.to_string(),
@@ -67,11 +56,14 @@ pub fn resolve_runtime_support(
     })
 }
 
-pub fn list_runtime_support(runtime_family: &str) -> Result<Vec<RuntimeSupportRecord>, AgentWrapperError> {
-    let records =
-        runtime_family_records(runtime_family).ok_or_else(|| AgentWrapperError::UnknownRuntimeFamily {
+pub fn list_runtime_support(
+    runtime_family: &str,
+) -> Result<Vec<RuntimeSupportRecord>, AgentWrapperError> {
+    let records = runtime_family_records(runtime_family).ok_or_else(|| {
+        AgentWrapperError::UnknownRuntimeFamily {
             runtime_family: runtime_family.to_string(),
-        })?;
+        }
+    })?;
 
     let mut resolved = records
         .iter()

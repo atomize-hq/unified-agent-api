@@ -6,7 +6,8 @@ use agent_api::RuntimeSupportRecord;
 use serde_json::{json, Value};
 use xtask::support_matrix::{
     derive_rows, derive_rows_for_test_roots, derive_validated_runtime_support_for_agent_root,
-    derive_validated_runtime_support_for_test_roots, validate_publication_consistency,
+    derive_validated_runtime_support_for_test_roots, render_agent_api_runtime_support_data,
+    render_agent_api_runtime_support_data_for_test_roots, validate_publication_consistency,
     BackendSupportState, ManifestSupportState, PointerPromotionState, SupportRow, UaaSupportState,
 };
 
@@ -180,6 +181,24 @@ fn derives_current_codex_validated_runtime_support_from_committed_truth() {
 }
 
 #[test]
+fn checked_in_agent_api_runtime_support_data_matches_committed_truth() {
+    let workspace_root = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .expect("xtask crate dir parent")
+        .parent()
+        .expect("workspace root")
+        .to_path_buf();
+
+    let rendered = render_agent_api_runtime_support_data(&workspace_root)
+        .expect("render runtime support data");
+    let checked_in =
+        fs::read_to_string(workspace_root.join("crates/agent_api/src/runtime_support_data.rs"))
+            .expect("read checked-in runtime support data");
+
+    assert_eq!(rendered, checked_in);
+}
+
+#[test]
 fn derives_validated_runtime_support_from_latest_validated_tuples_only() {
     let workspace = make_temp_dir("runtime-support-derivation");
 
@@ -207,6 +226,30 @@ fn derives_validated_runtime_support_from_latest_validated_tuples_only() {
             target_triple: "linux-x64".to_string(),
             version: "1.0.0".to_string(),
         }]
+    );
+
+    let rendered = render_agent_api_runtime_support_data_for_test_roots(
+        &workspace,
+        &[("codex", "cli_manifests/codex")],
+    )
+    .expect("render agent_api runtime support data");
+    assert_eq!(
+        rendered,
+        concat!(
+            "// This file is derived from committed repo truth.\n",
+            "// Validate it with `cargo test -p xtask --all-targets`.\n\n",
+            "#[cfg(feature = \"codex\")]\n",
+            "const CODEX_RUNTIME_SUPPORT: &[EmbeddedRuntimeSupportRecord] = &[\n",
+            "    EmbeddedRuntimeSupportRecord {\n",
+            "        target_triple: \"linux-x64\",\n",
+            "        latest_validated: Some(\"1.0.0\"),\n",
+            "    },\n",
+            "    EmbeddedRuntimeSupportRecord {\n",
+            "        target_triple: \"win32-x64\",\n",
+            "        latest_validated: None,\n",
+            "    },\n",
+            "];\n"
+        )
     );
 }
 
