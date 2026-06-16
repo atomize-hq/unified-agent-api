@@ -238,7 +238,7 @@ flowchart TD
 | Automated upstream-release lane | prepared v2 `maintenance-request.toml` | `execute-agent-maintenance` | bounded relay execution against a frozen automated request contract |
 
 `refresh-agent` is not the runtime support-uplift executor. It is the packet and publication
-refresh seam for manual maintenance lanes.
+refresh seam for manual maintenance lanes, including the library-only validated-runtime projection at `crates/agent_api/src/runtime_support_data.rs` when support publication truth is refreshed.
 
 `execute-agent-maintenance` is the intended automation relay surface for prepared automated
 upstream-release requests.

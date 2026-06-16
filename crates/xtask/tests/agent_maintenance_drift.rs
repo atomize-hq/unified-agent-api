@@ -221,6 +221,40 @@ fn check_agent_drift_reports_support_publication_mismatch() {
 }
 
 #[test]
+fn check_agent_drift_reports_runtime_support_projection_mismatch_for_codex() {
+    let fixture = fixture_root("agent-maintenance-drift-runtime-support");
+    seed_publication_inputs(&fixture);
+    seed_governance_closeouts(
+        &fixture,
+        &[
+            "agent_api.run",
+            "agent_api.events",
+            "agent_api.events.live",
+            "agent_api.config.model.v1",
+            "agent_api.session.resume.v1",
+            "agent_api.session.fork.v1",
+        ],
+        true,
+    );
+
+    write_text(
+        &fixture.join("crates/agent_api/src/runtime_support_data.rs"),
+        "// Corrupted runtime support projection\n",
+    );
+
+    let report = check_agent_drift(&fixture, "codex").expect("drift report");
+    let finding = report
+        .findings
+        .iter()
+        .find(|finding| finding.category == DriftCategory::SupportPublication)
+        .expect("support publication finding");
+    assert!(finding.summary.contains("runtime-support projection"));
+    assert!(finding
+        .surfaces
+        .contains(&"crates/agent_api/src/runtime_support_data.rs".to_string()));
+}
+
+#[test]
 fn check_agent_drift_reports_capability_truth_mismatch() {
     let fixture = fixture_root("agent-maintenance-drift-capability");
     seed_publication_inputs(&fixture);

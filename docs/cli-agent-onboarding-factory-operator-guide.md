@@ -515,6 +515,7 @@ After `prepare-publication --write` succeeds, use that single command to refresh
 
 - `cli_manifests/support_matrix/current.json`
 - `docs/specs/unified-agent-api/support-matrix.md`
+- `crates/agent_api/src/runtime_support_data.rs` (the library-only validated-runtime projection described by `docs/specs/unified-agent-api/runtime-support-contract.md`)
 - `docs/specs/unified-agent-api/capability-matrix.md`
 
 For capability publication, `refresh-publication` uses lifecycle-backed publication truth when it refreshes `capability-matrix`. Agents
@@ -655,6 +656,8 @@ This request is the control-plane input for `refresh-agent` on manual drift lane
 - `capability_matrix_refresh`
 - `release_doc_refresh`
 
+When `support_matrix_refresh` is requested, `refresh-agent` also refreshes `crates/agent_api/src/runtime_support_data.rs` from committed support truth; that runtime-support projection does not get its own control-plane action.
+
 Historical onboarding and implementation packet docs remain read-only detector inputs.
 
 Automated upstream-release lanes use the prepared v2 request contract with `artifact_version = "2"` and `trigger_kind = "upstream_release_detected"`. The shared release-watch transport generates that request and packet root before it opens the maintenance PR:
@@ -695,7 +698,7 @@ For automated upstream-release lanes:
 - the exact coding-agent prompt and PR-body tail come from those packet-owned artifacts, not from `cli_manifests/<agent_id>/PR_BODY_TEMPLATE.md`
 - promotion-only files such as `cli_manifests/<agent_id>/latest_validated.txt` and `cli_manifests/<agent_id>/min_supported.txt` remain out of scope for this packet-first follow-on
 - automated scope is the frozen shared packet + declared writable surfaces
-- support/capability/release-doc publication surfaces such as `cli_manifests/support_matrix/current.json`, `docs/specs/unified-agent-api/support-matrix.md`, `docs/specs/unified-agent-api/capability-matrix.md`, and `docs/crates-io-release.md` still exist in the broader maintenance framework, but this automated upstream-release lane does not request or rewrite them
+- support/capability/release-doc publication surfaces such as `cli_manifests/support_matrix/current.json`, `docs/specs/unified-agent-api/support-matrix.md`, `crates/agent_api/src/runtime_support_data.rs`, `docs/specs/unified-agent-api/capability-matrix.md`, and `docs/crates-io-release.md` still exist in the broader maintenance framework, but this automated upstream-release lane does not request or rewrite them
 
 ### 3. Choose the maintenance execution path
 

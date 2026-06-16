@@ -78,6 +78,7 @@ Every automated upstream-release request MUST keep one shared top-level envelope
 For release-watch packets in this milestone:
 
 - `requested_control_plane_actions` MUST remain `["packet_doc_refresh"]`
+- regeneration or validation of the library-only validated-runtime projection at `crates/agent_api/src/runtime_support_data.rs` MUST stay inside the existing publication and packet machinery; packets MUST NOT add a second control-plane action for runtime-support work
 - the packet MUST describe implementation and relay work through `[execution_contract]`, not by
   expanding `requested_control_plane_actions` into a second command queue
 - the packet MUST carry `[support_surface_audit]` and MUST use that block, not prompt prose, to

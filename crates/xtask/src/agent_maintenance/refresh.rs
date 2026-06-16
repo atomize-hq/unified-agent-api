@@ -347,6 +347,7 @@ fn ensure_allowed_write_path(
         relative_path,
         publication_refresh::SUPPORT_MATRIX_JSON_OUTPUT_PATH
             | publication_refresh::SUPPORT_MATRIX_MARKDOWN_OUTPUT_PATH
+            | publication_refresh::AGENT_API_RUNTIME_SUPPORT_DATA_OUTPUT_PATH
             | publication_refresh::CAPABILITY_MATRIX_OUTPUT_PATH
     ) || relative_path == release_doc::RELEASE_DOC_PATH;
 

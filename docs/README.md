@@ -9,6 +9,7 @@ Use that guide for create-mode onboarding, maintenance-mode refresh, artifact ow
 ## Normative docs
 
 - Unified Agent API contract index: `docs/specs/unified-agent-api/README.md`
+- Runtime support contract draft: `docs/specs/unified-agent-api/runtime-support-contract.md`
 - Normative contracts: `docs/specs/`
 - Architecture decisions: `docs/adr/`
 - Onboarding charter: `docs/specs/cli-agent-onboarding-charter.md`

@@ -281,6 +281,10 @@ fn seed_publication_output_state(fixture: &Path, flags: PublicationFlags) {
             fixture,
             publication_refresh::SUPPORT_MATRIX_MARKDOWN_OUTPUT_PATH,
         );
+        seed_stale_output(
+            fixture,
+            publication_refresh::AGENT_API_RUNTIME_SUPPORT_DATA_OUTPUT_PATH,
+        );
     }
 
     if flags.capability_enabled {
@@ -461,6 +465,9 @@ fn refresh_publication_check_reports_stale_outputs() {
     assert!(output
         .stderr
         .contains(publication_refresh::SUPPORT_MATRIX_JSON_OUTPUT_PATH));
+    assert!(output
+        .stderr
+        .contains(publication_refresh::AGENT_API_RUNTIME_SUPPORT_DATA_OUTPUT_PATH));
     assert!(output.stderr.contains(CAPABILITY_MATRIX_OUTPUT_PATH));
     assert_eq!(
         read_json(&lifecycle_state_path(&fixture))
@@ -485,6 +492,7 @@ fn refresh_publication_write_support_only_updates_only_support_outputs() {
     for path in [
         publication_refresh::SUPPORT_MATRIX_JSON_OUTPUT_PATH,
         publication_refresh::SUPPORT_MATRIX_MARKDOWN_OUTPUT_PATH,
+        publication_refresh::AGENT_API_RUNTIME_SUPPORT_DATA_OUTPUT_PATH,
     ] {
         assert!(fixture.join(path).is_file(), "missing {path}");
     }

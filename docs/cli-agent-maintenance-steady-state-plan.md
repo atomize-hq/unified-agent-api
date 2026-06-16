@@ -11,6 +11,7 @@ Use these sources instead:
 - `docs/specs/agent-registry-contract.md`
 - `docs/specs/cli-agent-onboarding-charter.md`
 - `docs/specs/unified-agent-api/support-matrix.md`
+- `docs/specs/unified-agent-api/runtime-support-contract.md`
 - `docs/specs/unified-agent-api/non-tui-support-debt.md`
 
 The implementation milestone that consumed this plan converged enrolled automated maintenance on:

@@ -200,6 +200,7 @@ Canonical lifecycle record:
    - the next command template remains `refresh-publication --approval <path> --write`
 7) `refresh-publication --approval <path> --check|--write` is the only publication consumer command; run `refresh-publication --approval docs/agents/lifecycle/<onboarding_pack_prefix>/governance/approved-agent.toml --write` to consume the committed handoff packet:
    - refresh publication outputs from the committed handoff packet
+   - regenerate the library-only validated-runtime projection at `crates/agent_api/src/runtime_support_data.rs` alongside the published support surfaces when support publication is enabled
    - own publication output writes, the required green gate, and rollback if a publication write or gate step fails
    - keep the required publication command inventory fixed to:
      - `cargo run -p xtask -- support-matrix --check`

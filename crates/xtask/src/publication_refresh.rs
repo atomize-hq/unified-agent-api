@@ -119,6 +119,8 @@ impl From<WorkspaceMutationError> for Error {
 
 pub const SUPPORT_MATRIX_JSON_OUTPUT_PATH: &str = support_matrix::JSON_OUTPUT_PATH;
 pub const SUPPORT_MATRIX_MARKDOWN_OUTPUT_PATH: &str = support_matrix::MARKDOWN_OUTPUT_PATH;
+pub const AGENT_API_RUNTIME_SUPPORT_DATA_OUTPUT_PATH: &str =
+    support_matrix::AGENT_API_RUNTIME_SUPPORT_DATA_OUTPUT_PATH;
 pub const CAPABILITY_MATRIX_OUTPUT_PATH: &str = capability_matrix::DEFAULT_OUT_PATH;
 
 pub fn expected_publication_output_paths(
@@ -129,6 +131,7 @@ pub fn expected_publication_output_paths(
     if support_enabled {
         outputs.push(SUPPORT_MATRIX_JSON_OUTPUT_PATH.to_string());
         outputs.push(SUPPORT_MATRIX_MARKDOWN_OUTPUT_PATH.to_string());
+        outputs.push(AGENT_API_RUNTIME_SUPPORT_DATA_OUTPUT_PATH.to_string());
     }
     if capability_enabled {
         outputs.push(CAPABILITY_MATRIX_OUTPUT_PATH.to_string());
@@ -151,6 +154,11 @@ pub fn build_publication_artifact_plan(
         files.push(PublicationArtifactFile {
             relative_path: SUPPORT_MATRIX_MARKDOWN_OUTPUT_PATH.to_string(),
             contents: bundle.markdown.into_bytes(),
+        });
+        files.push(PublicationArtifactFile {
+            relative_path: AGENT_API_RUNTIME_SUPPORT_DATA_OUTPUT_PATH.to_string(),
+            contents: support_matrix::render_agent_api_runtime_support_data(workspace_root)?
+                .into_bytes(),
         });
     }
     if capability_enabled {

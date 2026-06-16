@@ -119,7 +119,7 @@ fn build_manual_packet_docs(request: &MaintenanceRequest) -> Vec<RenderedPacketD
         RenderedPacketDoc {
             relative_path: format!("{root}/scope_brief.md"),
             contents: wrap_markdown(&format!(
-                "# Scope brief\n\nThis maintenance lane is limited to control-plane docs and generated publication surfaces for `{}`.\n\nAllowed write envelope:\n\n- maintenance packet docs under `{}`\n- `cli_manifests/support_matrix/current.json`\n- `docs/specs/unified-agent-api/support-matrix.md`\n- `docs/specs/unified-agent-api/capability-matrix.md`\n- `docs/crates-io-release.md`\n\nHistorical onboarding and implementation packet docs remain read-only inputs.\n",
+                "# Scope brief\n\nThis maintenance lane is limited to control-plane docs and generated publication surfaces for `{}`.\n\nAllowed write envelope:\n\n- maintenance packet docs under `{}`\n- `cli_manifests/support_matrix/current.json`\n- `docs/specs/unified-agent-api/support-matrix.md`\n- `crates/agent_api/src/runtime_support_data.rs`\n- `docs/specs/unified-agent-api/capability-matrix.md`\n- `docs/crates-io-release.md`\n\nHistorical onboarding and implementation packet docs remain read-only inputs.\n",
                 request.agent_id,
                 request.maintenance_root
             )),
@@ -137,7 +137,7 @@ fn build_manual_packet_docs(request: &MaintenanceRequest) -> Vec<RenderedPacketD
         RenderedPacketDoc {
             relative_path: format!("{root}/review_surfaces.md"),
             contents: wrap_markdown(&format!(
-                "# Review surfaces\n\n- `{}`\n- `{}`\n- `docs/specs/unified-agent-api/support-matrix.md`\n- `cli_manifests/support_matrix/current.json`\n- `docs/specs/unified-agent-api/capability-matrix.md`\n- `docs/crates-io-release.md`\n- historical packet docs are detector inputs only and remain read-only\n",
+                "# Review surfaces\n\n- `{}`\n- `{}`\n- `docs/specs/unified-agent-api/support-matrix.md`\n- `cli_manifests/support_matrix/current.json`\n- `crates/agent_api/src/runtime_support_data.rs`\n- `docs/specs/unified-agent-api/capability-matrix.md`\n- `docs/crates-io-release.md`\n- historical packet docs are detector inputs only and remain read-only\n",
                 request.basis_ref, request.opened_from
             )),
         },
