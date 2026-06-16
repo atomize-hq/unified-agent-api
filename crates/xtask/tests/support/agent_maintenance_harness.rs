@@ -101,6 +101,10 @@ pub fn seed_opencode_basis(root: &Path) {
         &support_bundle.markdown,
     );
     write_text(
+        &root.join("crates/agent_api/src/runtime_support_data.rs"),
+        &support_bundle.runtime_support_data,
+    );
+    write_text(
         &root.join("docs/specs/unified-agent-api/capability-matrix.md"),
         &default_capability_matrix_markdown(),
     );

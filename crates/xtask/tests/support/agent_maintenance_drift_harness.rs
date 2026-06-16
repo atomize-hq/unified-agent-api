@@ -77,6 +77,10 @@ pub fn seed_publication_inputs(root: &Path) {
         &root.join("docs/specs/unified-agent-api/support-matrix.md"),
         &support_bundle.markdown,
     );
+    write_text(
+        &root.join("crates/agent_api/src/runtime_support_data.rs"),
+        &support_bundle.runtime_support_data,
+    );
 
     write_text(
         &root.join("docs/specs/unified-agent-api/capability-matrix.md"),

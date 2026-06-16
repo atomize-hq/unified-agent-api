@@ -157,8 +157,7 @@ pub fn build_publication_artifact_plan(
         });
         files.push(PublicationArtifactFile {
             relative_path: AGENT_API_RUNTIME_SUPPORT_DATA_OUTPUT_PATH.to_string(),
-            contents: support_matrix::render_agent_api_runtime_support_data(workspace_root)?
-                .into_bytes(),
+            contents: bundle.runtime_support_data.into_bytes(),
         });
     }
     if capability_enabled {

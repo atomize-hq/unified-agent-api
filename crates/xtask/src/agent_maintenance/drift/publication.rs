@@ -281,7 +281,7 @@ pub(super) fn inspect_support_publication(
         Err(err) => issues.push(err),
     }
 
-    match inspect_runtime_support_projection(entry, workspace_root) {
+    match inspect_runtime_support_projection(workspace_root) {
         Ok(()) => {}
         Err(err) => issues.push(err),
     }
@@ -305,14 +305,7 @@ pub(super) fn inspect_support_publication(
     }
 }
 
-fn inspect_runtime_support_projection(
-    entry: &AgentRegistryEntry,
-    workspace_root: &Path,
-) -> Result<(), String> {
-    if entry.agent_id != "codex" {
-        return Ok(());
-    }
-
+fn inspect_runtime_support_projection(workspace_root: &Path) -> Result<(), String> {
     let expected = render_agent_api_runtime_support_data(workspace_root)?;
     let path = workspace_root.join(AGENT_API_RUNTIME_SUPPORT_DATA_OUTPUT_PATH);
     let actual =

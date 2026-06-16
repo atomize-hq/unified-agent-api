@@ -221,7 +221,8 @@ fn check_agent_drift_reports_support_publication_mismatch() {
 }
 
 #[test]
-fn check_agent_drift_reports_runtime_support_projection_mismatch_for_codex() {
+fn check_agent_drift_reports_runtime_support_projection_mismatch_as_shared_support_publication_drift(
+) {
     let fixture = fixture_root("agent-maintenance-drift-runtime-support");
     seed_publication_inputs(&fixture);
     seed_governance_closeouts(
@@ -242,7 +243,7 @@ fn check_agent_drift_reports_runtime_support_projection_mismatch_for_codex() {
         "// Corrupted runtime support projection\n",
     );
 
-    let report = check_agent_drift(&fixture, "codex").expect("drift report");
+    let report = check_agent_drift(&fixture, "opencode").expect("drift report");
     let finding = report
         .findings
         .iter()

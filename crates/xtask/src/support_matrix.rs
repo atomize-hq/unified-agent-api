@@ -165,7 +165,10 @@ pub fn generate_publication_bundle(workspace_root: &Path) -> Result<PublicationB
     if let Err(issues) = validate_publication_consistency(workspace_root, &rows) {
         return Err(format_publication_issues(&issues));
     }
-    render_publication_bundle(&rows)
+    render_publication_bundle(
+        &rows,
+        render_agent_api_runtime_support_data(workspace_root)?,
+    )
 }
 
 pub fn generate_publication_artifacts(workspace_root: &Path) -> Result<PublicationBundle, String> {
@@ -180,5 +183,9 @@ pub fn generate_publication_artifacts(workspace_root: &Path) -> Result<Publicati
                 workspace_root.join(MARKDOWN_OUTPUT_PATH).display()
             )
         })?;
-    render_publication_artifacts(&existing_markdown, &rows)
+    render_publication_artifacts(
+        &existing_markdown,
+        &rows,
+        render_agent_api_runtime_support_data(workspace_root)?,
+    )
 }
