@@ -1,15 +1,17 @@
 # Runtime Support Contract — Unified Agent API
 
-Status: Draft  
+Status: Approved  
+Approved (UTC): 2026-06-16  
+Date (UTC): 2026-06-16  
 Canonical location: `docs/specs/unified-agent-api/runtime-support-contract.md`
 
-This document defines the proposed generic runtime-support metadata contract for the Unified Agent API.
-It is a pre-implementation contract for a library-level surface that publishes UAA-owned support truth
+This document defines the generic runtime-support metadata contract for the Unified Agent API.
+It is the normative contract for the library-level surface that publishes UAA-owned support truth
 without making consumers read repo files directly.
 
-Normative language: this draft uses RFC 2119 requirement keywords (`MUST`, `MUST NOT`, `SHOULD`).
+Normative language: this contract uses RFC 2119 requirement keywords (`MUST`, `MUST NOT`, `SHOULD`).
 
-## Assumptions locked for this draft
+## Locked contract assumptions
 
 1. The public consumer is the published `unified-agent-api` library crate, not repo-local file readers.
 2. This is a **generic runtime support contract, Codex first implementation**.
@@ -54,7 +56,7 @@ Primary user stories:
 
 ## Commands
 
-Build/check the affected public and automation surfaces:
+Verify or refresh the affected public and automation surfaces:
 
 ```sh
 cargo test -p unified-agent-api --features codex
@@ -65,7 +67,7 @@ cargo run -p xtask -- capability-matrix-audit
 make preflight
 ```
 
-Expected implementation-time regeneration commands:
+Refresh commands for the committed projection:
 
 ```sh
 cargo run -p xtask -- support-matrix
@@ -84,8 +86,7 @@ crates/agent_api/                         → public umbrella crate; consumer-fa
 crates/codex/                             → Codex-first implementation details or embedded support data helpers
 crates/xtask/                             → generation, validation, onboarding/publication/maintenance automation
 cli_manifests/<agent>/                    → committed manifest truth (versions, pointers, reports, current.json)
-docs/specs/unified-agent-api/             → normative and draft UAA contracts
-docs/backlog/                             → reviewable implementation planning and tasks artifacts
+docs/specs/unified-agent-api/             → normative UAA contracts
 ```
 
 ## Code Style
@@ -159,7 +160,7 @@ Coverage expectations:
   - duplicate version-selection policy in downstream crates
   - expose backend-wrapper crate types in the umbrella public API
 
-## Proposed Contract Shape
+## Contract Shape
 
 ### Public semantics
 
@@ -242,9 +243,9 @@ machinery.
 It MUST NOT widen `requested_control_plane_actions` beyond the current normative
 `["packet_doc_refresh"]` contract.
 
-## Success Criteria
+## Conformance Criteria
 
-This spec is satisfied when all of the following are true:
+This contract is satisfied when all of the following are true:
 
 1. `unified-agent-api` exposes a library-level generic runtime-support API.
 2. The public API is generic by runtime family and target triple, with Codex as the first implemented family.
@@ -257,9 +258,9 @@ This spec is satisfied when all of the following are true:
 
 ## Open Questions
 
-None currently blocked.
+None.
 
-The remaining implementation choices are downstream design details, not open product questions:
+Implementation details remain downstream design choices, for example:
 
 - exact crate-root module path for the public API
 - exact embedded-data generation mechanism
