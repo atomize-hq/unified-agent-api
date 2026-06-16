@@ -253,6 +253,7 @@ pub fn automated_request_with_execution_contract_toml(agent_id: &str, basis_ref:
             "  \"docs/agents/lifecycle/{agent_id}-maintenance/**\",\n",
             "  \"crates/{agent_id}/**\",\n",
             "  \"crates/agent_api/**\",\n",
+            "  \"crates/agent_api/src/runtime_support_data.rs\",\n",
             "  \"cli_manifests/{agent_id}/artifacts.lock.json\",\n",
             "  \"cli_manifests/{agent_id}/snapshots/0.98.0/**\",\n",
             "  \"cli_manifests/{agent_id}/reports/0.98.0/**\",\n",

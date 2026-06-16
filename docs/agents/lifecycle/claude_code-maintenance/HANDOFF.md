@@ -57,6 +57,7 @@ This file is the canonical contributor execution contract for `claude_code` main
 - `cli_manifests/claude_code/wrapper_coverage.json`
 - `cli_manifests/support_matrix/current.json`
 - `docs/specs/unified-agent-api/support-matrix.md`
+- `crates/agent_api/src/runtime_support_data.rs`
 - `docs/specs/unified-agent-api/non-tui-support-debt.md`
 
 ## Read-only inputs

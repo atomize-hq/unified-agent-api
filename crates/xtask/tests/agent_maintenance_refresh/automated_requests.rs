@@ -192,6 +192,9 @@ fn automated_request_with_execution_contract_parses_and_validates() {
     assert!(contract
         .writable_surfaces
         .contains(&"docs/agents/lifecycle/opencode-maintenance/**".to_string()));
+    assert!(contract
+        .writable_surfaces
+        .contains(&"crates/agent_api/src/runtime_support_data.rs".to_string()));
 }
 
 #[test]

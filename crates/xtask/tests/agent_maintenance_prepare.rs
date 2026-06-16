@@ -54,6 +54,7 @@ fn prepare_agent_maintenance_builds_packet_first_plan() {
     assert!(request_text.contains(
         "prompt_template_path = \"docs/agents/lifecycle/codex-maintenance/governance/execute-agent-maintenance-prompt.md\""
     ));
+    assert!(request_text.contains("\"crates/agent_api/src/runtime_support_data.rs\""));
     assert!(request_text.contains("[support_surface_audit]"));
     assert!(request_text.contains(
         "pr_summary_path = \"docs/agents/lifecycle/codex-maintenance/governance/pr-summary.md\""
@@ -106,6 +107,7 @@ fn prepare_agent_maintenance_write_creates_packet_root() {
     assert!(handoff.contains("crates/agent_api/**"));
     assert!(handoff.contains("cli_manifests/support_matrix/current.json"));
     assert!(handoff.contains("docs/specs/unified-agent-api/support-matrix.md"));
+    assert!(handoff.contains("crates/agent_api/src/runtime_support_data.rs"));
     assert!(handoff.contains("docs/specs/codex-wrapper-coverage-scenarios-v1.md"));
     assert!(handoff.contains("docs/agents/lifecycle/codex-maintenance/OPS_PLAYBOOK.md"));
     assert!(handoff.contains("docs/agents/lifecycle/codex-maintenance/CI_WORKFLOWS_PLAN.md"));
@@ -420,6 +422,7 @@ fn automated_request_with_execution_contract_toml() -> String {
             "  \"cli_manifests/codex/wrapper_coverage.json\",\n",
             "  \"cli_manifests/support_matrix/current.json\",\n",
             "  \"docs/specs/unified-agent-api/support-matrix.md\",\n",
+            "  \"crates/agent_api/src/runtime_support_data.rs\",\n",
             "  \"docs/specs/unified-agent-api/non-tui-support-debt.md\",\n",
             "  \"docs/specs/codex-wrapper-coverage-scenarios-v1.md\",\n",
             "]\n",

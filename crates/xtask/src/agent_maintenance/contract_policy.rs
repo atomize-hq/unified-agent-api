@@ -22,6 +22,8 @@ pub(crate) const PACKET_OWNED_OPS_PLAYBOOK_FILE: &str = "OPS_PLAYBOOK.md";
 pub(crate) const PACKET_OWNED_WORKFLOW_PLAN_FILE: &str = "CI_WORKFLOWS_PLAN.md";
 pub(crate) const PACKET_OWNED_PROMPT_TEMPLATE_FILE: &str =
     "governance/execute-agent-maintenance-prompt.md";
+const AGENT_API_RUNTIME_SUPPORT_DATA_OUTPUT_PATH: &str =
+    "crates/agent_api/src/runtime_support_data.rs";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct DerivedDetectedReleaseFields {
@@ -357,6 +359,7 @@ fn writable_surfaces(
         format!("{}/wrapper_coverage.json", entry.manifest_root),
         "cli_manifests/support_matrix/current.json".to_string(),
         "docs/specs/unified-agent-api/support-matrix.md".to_string(),
+        AGENT_API_RUNTIME_SUPPORT_DATA_OUTPUT_PATH.to_string(),
         NON_TUI_SUPPORT_DEBT_PATH.to_string(),
     ];
     if entry.agent_id == "codex" {
