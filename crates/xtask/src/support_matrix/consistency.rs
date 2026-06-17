@@ -85,19 +85,6 @@ impl SupportMatrixConsistencyIssue {
         }
     }
 
-    fn omission_contradiction(row: &SupportRow, expected_notes: &[String]) -> Self {
-        Self {
-            code: "SUPPORT_MATRIX_CURRENT_SNAPSHOT_OMISSION_MISMATCH",
-            agent: row.agent.clone(),
-            version: row.version.clone(),
-            target: row.target.clone(),
-            message: format!(
-                "row claims support truth incompatible with current snapshot omission evidence; expected notes {:?}",
-                expected_notes
-            ),
-        }
-    }
-
     fn evidence_notes_mismatch(row: &SupportRow, expected_notes: &[String]) -> Self {
         Self {
             code: "SUPPORT_MATRIX_EVIDENCE_NOTES_MISMATCH",
@@ -437,25 +424,6 @@ fn validate_row_consistency(
                     status
                 ),
             });
-        }
-    }
-
-    let omitted_current_target = ctx.loaded_root.posture.current_version.as_deref()
-        == Some(row.version.as_str())
-        && !ctx
-            .loaded_root
-            .posture
-            .current_targets
-            .contains(&row.target);
-    if omitted_current_target {
-        let support_is_unsupported = row.manifest_support == ManifestSupportState::Unsupported
-            && row.uaa_support == UaaSupportState::Unsupported
-            && row.pointer_promotion == PointerPromotionState::None;
-        if !support_is_unsupported {
-            issues.push(SupportMatrixConsistencyIssue::omission_contradiction(
-                row,
-                &expected_notes,
-            ));
         }
     }
 }

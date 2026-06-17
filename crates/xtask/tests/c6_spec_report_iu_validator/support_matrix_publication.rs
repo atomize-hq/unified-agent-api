@@ -316,33 +316,54 @@ fn c6_validator_detects_support_claim_drift_for_omitted_target() {
     let temp = make_temp_dir("ccm-c6-support-matrix-omission");
     write_workspace_manifest(&temp);
     let codex_dir = temp.join("cli_manifests").join("codex");
+    let claude_dir = temp.join("cli_manifests").join("claude_code");
     let gemini_dir = temp.join("cli_manifests").join("gemini_cli");
+    let opencode_dir = temp.join("cli_manifests").join("opencode");
+    let aider_dir = temp.join("cli_manifests").join("aider");
     materialize_minimal_valid_codex_dir(&codex_dir);
+    materialize_minimal_valid_claude_dir(&claude_dir);
     materialize_committed_gemini_dir(&gemini_dir);
-    write_support_matrix_artifact(
-        &temp,
-        json!([
-            {
-                "agent": "codex",
-                "version": VERSION,
-                "target": "aarch64-apple-darwin",
-                "manifest_support": "supported",
-                "backend_support": "unsupported",
-                "uaa_support": "unsupported",
-                "pointer_promotion": "none",
-                "evidence_notes": [],
-            }
-        ]),
-    );
+    materialize_committed_opencode_dir(&opencode_dir);
+    materialize_committed_aider_dir(&aider_dir);
+    write_complete_support_matrix_artifact(&temp);
+
+    let artifact_path = temp
+        .join("cli_manifests")
+        .join("support_matrix")
+        .join("current.json");
+    let mut artifact: Value =
+        serde_json::from_str(&fs::read_to_string(&artifact_path).expect("read artifact"))
+            .expect("parse artifact");
+    let target_row = artifact["rows"]
+        .as_array_mut()
+        .expect("rows array")
+        .iter_mut()
+        .find(|row| {
+            row["agent"] == "codex"
+                && row["version"] == VERSION
+                && row["target"] == "aarch64-apple-darwin"
+        })
+        .expect("expected omitted codex row");
+    target_row["manifest_support"] = json!("supported");
+    target_row["backend_support"] = json!("supported");
+    target_row["uaa_support"] = json!("supported");
+    target_row["pointer_promotion"] = json!("latest_validated");
+    target_row["evidence_notes"] = json!([]);
+    write_json(&artifact_path, &artifact);
 
     let output = assert_validation_failure(
         &codex_dir,
-        "SUPPORT_MATRIX_CURRENT_SNAPSHOT_OMISSION_MISMATCH",
+        "SUPPORT_MATRIX_EVIDENCE_NOTES_MISMATCH",
         "cli_manifests/support_matrix/current.json",
     );
     assert_violation_surface(
         &output,
-        "SUPPORT_MATRIX_EVIDENCE_NOTES_MISMATCH",
+        "SUPPORT_MATRIX_MANIFEST_SUPPORT_MISMATCH",
+        "cli_manifests/support_matrix/current.json",
+    );
+    assert_violation_surface(
+        &output,
+        "SUPPORT_MATRIX_POINTER_PROMOTION_MISMATCH",
         "cli_manifests/support_matrix/current.json",
     );
 }

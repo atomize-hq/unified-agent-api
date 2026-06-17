@@ -11,8 +11,9 @@ const VERSION: &str = "0.61.0";
 const TS: &str = "1970-01-01T00:00:00Z";
 
 const REQUIRED_TARGET: &str = "x86_64-unknown-linux-musl";
-const TARGETS: [&str; 3] = [
+const TARGETS: [&str; 4] = [
     "x86_64-unknown-linux-musl",
+    "aarch64-unknown-linux-musl",
     "aarch64-apple-darwin",
     "x86_64-pc-windows-msvc",
 ];
@@ -160,7 +161,7 @@ fn materialize_minimal_valid_codex_dir(codex_dir: &Path) {
         "collected_at": TS,
         "expected_targets": TARGETS,
         "complete": false,
-        "missing_targets": [TARGETS[1], TARGETS[2]],
+        "missing_targets": [TARGETS[1], TARGETS[2], TARGETS[3]],
         "inputs": inputs,
         "commands": [],
     });

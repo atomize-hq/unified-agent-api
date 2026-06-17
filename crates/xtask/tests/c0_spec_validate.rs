@@ -11,8 +11,9 @@ const REPORTED_VERSION: &str = "0.60.0";
 const TS: &str = "1970-01-01T00:00:00Z";
 
 const REQUIRED_TARGET: &str = "x86_64-unknown-linux-musl";
-const TARGETS: [&str; 3] = [
+const TARGETS: [&str; 4] = [
     "x86_64-unknown-linux-musl",
+    "aarch64-unknown-linux-musl",
     "aarch64-apple-darwin",
     "x86_64-pc-windows-msvc",
 ];
@@ -128,6 +129,7 @@ fn support_rows_for_agent_from_repo(agent: &str) -> Vec<Value> {
 fn target_platform(target: &str) -> (&'static str, &'static str) {
     match target {
         "x86_64-unknown-linux-musl" => ("linux", "x86_64"),
+        "aarch64-unknown-linux-musl" => ("linux", "aarch64"),
         "aarch64-apple-darwin" => ("macos", "aarch64"),
         "x86_64-pc-windows-msvc" => ("windows", "x86_64"),
         _ => ("unknown", "unknown"),
@@ -188,7 +190,7 @@ fn write_codex_version_artifacts(
             "collected_at": TS,
             "expected_targets": TARGETS,
             "complete": false,
-            "missing_targets": [TARGETS[1], TARGETS[2]],
+            "missing_targets": [TARGETS[1], TARGETS[2], TARGETS[3]],
             "inputs": inputs,
             "commands": [],
         })
@@ -403,62 +405,53 @@ fn codex_report_exists(codex_dir: &Path, version: &str, target: &str) -> bool {
 fn write_support_matrix_artifact(workspace_root: &Path) {
     let codex_dir = workspace_root.join("cli_manifests").join("codex");
     let mut rows = support_rows_for_agent_from_repo("aider");
-    rows.extend([
-        support_row(SupportRowSpec {
-            agent: "claude_code",
-            version: VERSION,
-            target: REQUIRED_TARGET,
-            manifest_support: "supported",
-            backend_support: "supported",
-            uaa_support: "supported",
-            pointer_promotion: "latest_supported_and_validated",
-            evidence_notes: &[],
-        }),
-        support_row(SupportRowSpec {
+    let codex_non_required_order = [TARGETS[2], TARGETS[1], TARGETS[3]];
+    rows.extend([support_row(SupportRowSpec {
+        agent: "claude_code",
+        version: VERSION,
+        target: REQUIRED_TARGET,
+        manifest_support: "supported",
+        backend_support: "supported",
+        uaa_support: "supported",
+        pointer_promotion: "latest_supported_and_validated",
+        evidence_notes: &[],
+    })]);
+    for target in codex_non_required_order {
+        rows.push(support_row(SupportRowSpec {
             agent: "codex",
             version: VERSION,
-            target: TARGETS[1],
+            target,
             manifest_support: "unsupported",
             backend_support: "unsupported",
             uaa_support: "unsupported",
             pointer_promotion: "none",
             evidence_notes: &["current root snapshot omits this target"],
-        }),
-        support_row(SupportRowSpec {
-            agent: "codex",
-            version: VERSION,
-            target: TARGETS[2],
-            manifest_support: "unsupported",
-            backend_support: "unsupported",
-            uaa_support: "unsupported",
-            pointer_promotion: "none",
-            evidence_notes: &["current root snapshot omits this target"],
-        }),
-        support_row(SupportRowSpec {
-            agent: "codex",
-            version: VERSION,
-            target: REQUIRED_TARGET,
-            manifest_support: "supported",
-            backend_support: "supported",
-            uaa_support: "supported",
-            pointer_promotion: "latest_supported_and_validated",
-            evidence_notes: &[],
-        }),
-    ]);
+        }));
+    }
+    rows.push(support_row(SupportRowSpec {
+        agent: "codex",
+        version: VERSION,
+        target: REQUIRED_TARGET,
+        manifest_support: "supported",
+        backend_support: "supported",
+        uaa_support: "supported",
+        pointer_promotion: "latest_supported_and_validated",
+        evidence_notes: &[],
+    }));
 
     if codex_dir
         .join("versions")
         .join(format!("{REPORTED_VERSION}.json"))
         .exists()
     {
-        rows.insert(
-            3,
-            support_row(SupportRowSpec {
+        let mut reported_rows = Vec::new();
+        for target in codex_non_required_order {
+            reported_rows.push(support_row(SupportRowSpec {
                 agent: "codex",
                 version: REPORTED_VERSION,
-                target: TARGETS[1],
+                target,
                 manifest_support: "unsupported",
-                backend_support: if codex_report_exists(&codex_dir, REPORTED_VERSION, TARGETS[1]) {
+                backend_support: if codex_report_exists(&codex_dir, REPORTED_VERSION, target) {
                     "supported"
                 } else {
                     "unsupported"
@@ -466,48 +459,32 @@ fn write_support_matrix_artifact(workspace_root: &Path) {
                 uaa_support: "unsupported",
                 pointer_promotion: "none",
                 evidence_notes: &[],
-            }),
-        );
-        rows.insert(
-            5,
-            support_row(SupportRowSpec {
-                agent: "codex",
-                version: REPORTED_VERSION,
-                target: TARGETS[2],
-                manifest_support: "unsupported",
-                backend_support: if codex_report_exists(&codex_dir, REPORTED_VERSION, TARGETS[2]) {
-                    "supported"
-                } else {
-                    "unsupported"
-                },
-                uaa_support: "unsupported",
-                pointer_promotion: "none",
-                evidence_notes: &[],
-            }),
-        );
+            }));
+        }
         let reported_linux_backend_supported =
             codex_report_exists(&codex_dir, REPORTED_VERSION, REQUIRED_TARGET);
-        rows.insert(
-            7,
-            support_row(SupportRowSpec {
-                agent: "codex",
-                version: REPORTED_VERSION,
-                target: REQUIRED_TARGET,
-                manifest_support: "supported",
-                backend_support: if reported_linux_backend_supported {
-                    "supported"
-                } else {
-                    "unsupported"
-                },
-                uaa_support: if reported_linux_backend_supported {
-                    "supported"
-                } else {
-                    "unsupported"
-                },
-                pointer_promotion: "none",
-                evidence_notes: &[],
-            }),
-        );
+        reported_rows.push(support_row(SupportRowSpec {
+            agent: "codex",
+            version: REPORTED_VERSION,
+            target: REQUIRED_TARGET,
+            manifest_support: "supported",
+            backend_support: if reported_linux_backend_supported {
+                "supported"
+            } else {
+                "unsupported"
+            },
+            uaa_support: if reported_linux_backend_supported {
+                "supported"
+            } else {
+                "unsupported"
+            },
+            pointer_promotion: "none",
+            evidence_notes: &[],
+        }));
+        rows.insert(3, reported_rows[0].clone());
+        rows.insert(5, reported_rows[1].clone());
+        rows.insert(7, reported_rows[2].clone());
+        rows.insert(9, reported_rows[3].clone());
     }
 
     rows.extend(support_rows_for_agent_from_repo("gemini_cli"));

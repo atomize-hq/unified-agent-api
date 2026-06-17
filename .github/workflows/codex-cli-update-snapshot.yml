@@ -111,6 +111,9 @@ jobs:
           entries=()
           while IFS= read -r target; do
             case "$target" in
+              aarch64-unknown-linux-musl)
+                entries+=("{\"target_triple\":\"$target\",\"runs_on\":\"ubuntu-24.04-arm\",\"asset_name\":\"codex-$target.tar.gz\",\"binary_path\":\"./codex-$target\",\"extract\":true}")
+                ;;
               x86_64-unknown-linux-musl)
                 entries+=("{\"target_triple\":\"$target\",\"runs_on\":\"ubuntu-latest\",\"asset_name\":\"codex-$target.tar.gz\",\"binary_path\":\"./codex-$target\",\"extract\":true}")
                 ;;
@@ -189,6 +192,7 @@ jobs:
           path: |
             cli_manifests/codex/artifacts.lock.json
             _download/
+            snapshot_matrix.json
 
   snapshot:
     name: "Snapshot (${{ matrix.target_triple }})"
@@ -299,28 +303,37 @@ jobs:
           name: "codex-cli-pins-${{ inputs.target_version }}"
           path: .
 
-      - name: Download required Linux snapshot
-        uses: actions/download-artifact@v7
-        with:
-          name: "codex-cli-snapshot-${{ inputs.target_version }}-x86_64-unknown-linux-musl"
-          path: .
+      - name: Rehydrate snapshot matrix
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '%s\n' '${{ needs.prepare.outputs.snapshot_matrix }}' > snapshot_matrix.json
+          test -s snapshot_matrix.json
+          jq -e '.include | length >= 1' snapshot_matrix.json > /dev/null
 
-      - name: Download macOS snapshot (best effort)
-        continue-on-error: true
-        uses: actions/download-artifact@v7
-        with:
-          name: "codex-cli-snapshot-${{ inputs.target_version }}-aarch64-apple-darwin"
-          path: .
+      - name: Download snapshot artifacts
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.target_version }}
+        run: |
+          set -euo pipefail
 
-      - name: Download Windows snapshot (best effort)
-        continue-on-error: true
-        uses: actions/download-artifact@v7
-        with:
-          name: "codex-cli-snapshot-${{ inputs.target_version }}-x86_64-pc-windows-msvc"
-          path: .
+          while IFS= read -r target; do
+            gh run download "${{ github.run_id }}" \
+              --repo "${{ github.repository }}" \
+              --name "codex-cli-snapshot-${VERSION}-${target}" \
+              --dir . || {
+                if [ "$target" = "x86_64-unknown-linux-musl" ]; then
+                  echo "Required snapshot artifact missing for ${target}" >&2
+                  exit 1
+                fi
+                echo "Optional snapshot artifact missing for ${target}; continuing" >&2
+              }
+          done < <(jq -r '.include[].target_triple' snapshot_matrix.json)
 
-      - name: Ensure required snapshot exists
-        id: ensure-linux-snapshot
+      - name: Materialize downloaded snapshots
+        id: materialize-snapshots
         shell: bash
         env:
           VERSION: ${{ inputs.target_version }}
@@ -329,46 +342,50 @@ jobs:
           set -euo pipefail
 
           ROOT="cli_manifests/codex"
-          TARGET="x86_64-unknown-linux-musl"
-          OUT="${ROOT}/snapshots/${VERSION}/${TARGET}.json"
+          GENERATED_REQUIRED=false
 
-          if [ -f "$OUT" ]; then
-            echo "generated=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          # If the artifact was extracted under an unexpected directory layout, relocate it.
-          FOUND="$(find . -type f -path "*/${ROOT}/snapshots/${VERSION}/${TARGET}.json" | head -n 1 || true)"
-          if [ -n "$FOUND" ]; then
-            mkdir -p "$(dirname "$OUT")"
-            if [ "$(realpath "$FOUND")" != "$(realpath "$OUT")" ]; then
-              cp "$FOUND" "$OUT"
+          while IFS= read -r target; do
+            OUT="${ROOT}/snapshots/${VERSION}/${target}.json"
+            if [ -f "$OUT" ]; then
+              continue
             fi
-            echo "generated=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
 
-          # Last-resort fallback: generate the required Linux snapshot from the pinned download.
-          ASSET="codex-${TARGET}.tar.gz"
-          FILE="_download/${ASSET}"
-          test -f "$FILE"
+            FOUND="$(find . -type f -path "*/${ROOT}/snapshots/${VERSION}/${target}.json" | head -n 1 || true)"
+            if [ -n "$FOUND" ]; then
+              mkdir -p "$(dirname "$OUT")"
+              if [ "$(realpath "$FOUND")" != "$(realpath "$OUT")" ]; then
+                cp "$FOUND" "$OUT"
+              fi
+              continue
+            fi
 
-          MEMBER="$(tar -tzf "$FILE" | awk 'NF && substr($0,length($0),1) != "/" {print; exit}')"
-          test -n "$MEMBER"
-          rm -rf _extract
-          mkdir -p _extract
-          tar -xzf "$FILE" -C _extract "$MEMBER"
-          install -m 0755 "_extract/$MEMBER" "./codex-${TARGET}"
+            if [ "$target" != "x86_64-unknown-linux-musl" ]; then
+              continue
+            fi
 
-          cargo run -p xtask -- \
-            codex-snapshot \
-            --codex-binary "./codex-${TARGET}" \
-            --out-file "$OUT" \
-            --capture-raw-help \
-            --raw-help-target "$TARGET" \
-            --supplement "${ROOT}/supplement/commands.json"
+            ASSET="codex-${target}.tar.gz"
+            FILE="_download/${ASSET}"
+            test -f "$FILE"
 
-          echo "generated=true" >> "$GITHUB_OUTPUT"
+            MEMBER="$(tar -tzf "$FILE" | awk 'NF && substr($0,length($0),1) != "/" {print; exit}')"
+            test -n "$MEMBER"
+            rm -rf _extract
+            mkdir -p _extract
+            tar -xzf "$FILE" -C _extract "$MEMBER"
+            install -m 0755 "_extract/$MEMBER" "./codex-${target}"
+
+            cargo run -p xtask -- \
+              codex-snapshot \
+              --codex-binary "./codex-${target}" \
+              --out-file "$OUT" \
+              --capture-raw-help \
+              --raw-help-target "$target" \
+              --supplement "${ROOT}/supplement/commands.json"
+
+            GENERATED_REQUIRED=true
+          done < <(jq -r '.include[].target_triple' snapshot_matrix.json)
+
+          echo "generated_required=${GENERATED_REQUIRED}" >> "$GITHUB_OUTPUT"
 
       - name: Merge union snapshot
         shell: bash

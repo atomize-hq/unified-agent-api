@@ -172,11 +172,28 @@ fn derives_current_codex_validated_runtime_support_from_committed_truth() {
 
     assert_eq!(
         records,
-        vec![RuntimeSupportRecord {
-            runtime_family: "codex".to_string(),
-            target_triple: "x86_64-unknown-linux-musl".to_string(),
-            version: "0.125.0".to_string(),
-        }]
+        vec![
+            RuntimeSupportRecord {
+                runtime_family: "codex".to_string(),
+                target_triple: "aarch64-apple-darwin".to_string(),
+                version: "0.125.0".to_string(),
+            },
+            RuntimeSupportRecord {
+                runtime_family: "codex".to_string(),
+                target_triple: "aarch64-unknown-linux-musl".to_string(),
+                version: "0.125.0".to_string(),
+            },
+            RuntimeSupportRecord {
+                runtime_family: "codex".to_string(),
+                target_triple: "x86_64-pc-windows-msvc".to_string(),
+                version: "0.125.0".to_string(),
+            },
+            RuntimeSupportRecord {
+                runtime_family: "codex".to_string(),
+                target_triple: "x86_64-unknown-linux-musl".to_string(),
+                version: "0.125.0".to_string(),
+            },
+        ]
     );
 }
 

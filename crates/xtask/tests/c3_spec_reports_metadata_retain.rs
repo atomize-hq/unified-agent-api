@@ -12,9 +12,15 @@ const TS: &str = "1970-01-01T00:00:00Z";
 
 const REQUIRED_TARGET: &str = "x86_64-unknown-linux-musl";
 const TARGET_LINUX: &str = "x86_64-unknown-linux-musl";
+const TARGET_LINUX_ARM64: &str = "aarch64-unknown-linux-musl";
 const TARGET_MACOS: &str = "aarch64-apple-darwin";
 const TARGET_WINDOWS: &str = "x86_64-pc-windows-msvc";
-const TARGETS: [&str; 3] = [TARGET_LINUX, TARGET_MACOS, TARGET_WINDOWS];
+const TARGETS: [&str; 4] = [
+    TARGET_LINUX,
+    TARGET_LINUX_ARM64,
+    TARGET_MACOS,
+    TARGET_WINDOWS,
+];
 
 type CommandPath = Vec<String>;
 type MissingCommandPaths = Vec<CommandPath>;
@@ -100,6 +106,7 @@ fn assert_schema_valid(schema: &JSONSchema, instance: &Value) {
 fn minimal_binary_for_target(target: &str) -> Value {
     let (os, arch) = match target {
         TARGET_LINUX => ("linux", "x86_64"),
+        TARGET_LINUX_ARM64 => ("linux", "aarch64"),
         TARGET_MACOS => ("macos", "aarch64"),
         TARGET_WINDOWS => ("windows", "x86_64"),
         _ => ("unknown", "unknown"),
@@ -202,7 +209,7 @@ fn write_union_snapshot(codex_dir: &Path, complete: bool) {
             "collected_at": TS,
             "expected_targets": TARGETS,
             "complete": false,
-            "missing_targets": [TARGET_MACOS, TARGET_WINDOWS],
+            "missing_targets": [TARGET_LINUX_ARM64, TARGET_MACOS, TARGET_WINDOWS],
             "inputs": inputs,
             "commands": commands,
         })
@@ -278,6 +285,14 @@ fn run_xtask_codex_report(codex_dir: &Path) -> std::process::Output {
 }
 
 fn run_xtask_codex_version_metadata(codex_dir: &Path, status: &str) -> std::process::Output {
+    run_xtask_codex_version_metadata_with_args(codex_dir, status, &[])
+}
+
+fn run_xtask_codex_version_metadata_with_args(
+    codex_dir: &Path,
+    status: &str,
+    extra_args: &[&str],
+) -> std::process::Output {
     let fixture_root = codex_dir
         .parent()
         .and_then(|p| p.parent())
@@ -286,15 +301,18 @@ fn run_xtask_codex_version_metadata(codex_dir: &Path, status: &str) -> std::proc
     let root_flag = root_flag_from_help(&help_text);
 
     let xtask_bin = PathBuf::from(env!("CARGO_BIN_EXE_xtask"));
-    Command::new(xtask_bin)
-        .arg("codex-version-metadata")
+    let mut cmd = Command::new(xtask_bin);
+    cmd.arg("codex-version-metadata")
         .arg(root_flag)
         .arg(codex_dir)
         .arg("--version")
         .arg(VERSION)
         .arg("--status")
-        .arg(status)
-        .env("SOURCE_DATE_EPOCH", "0")
+        .arg(status);
+    for arg in extra_args {
+        cmd.arg(arg);
+    }
+    cmd.env("SOURCE_DATE_EPOCH", "0")
         .current_dir(fixture_root)
         .output()
         .expect("spawn xtask codex-version-metadata")

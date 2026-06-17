@@ -68,3 +68,57 @@ fn c3_version_metadata_reported_requires_union_and_any_report() {
         "expected deterministic updated_at when SOURCE_DATE_EPOCH=0"
     );
 }
+
+#[test]
+fn c3_version_metadata_accepts_explicit_validation_target_sets() {
+    let temp = make_temp_dir("ccm-c3-version-metadata-validation");
+    let codex_dir = temp.join("cli_manifests").join("codex");
+
+    materialize_codex_root_for_reports(&codex_dir, true);
+    let report_out = run_xtask_codex_report(&codex_dir);
+    assert!(
+        report_out.status.success(),
+        "expected codex-report success:\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
+        report_out.status,
+        String::from_utf8_lossy(&report_out.stdout),
+        String::from_utf8_lossy(&report_out.stderr)
+    );
+
+    let output = run_xtask_codex_version_metadata_with_args(
+        &codex_dir,
+        "reported",
+        &[
+            "--passed-target",
+            TARGET_LINUX,
+            "--passed-target",
+            TARGET_MACOS,
+            "--skipped-target",
+            TARGET_WINDOWS,
+        ],
+    );
+    assert!(
+        output.status.success(),
+        "expected success after supplying validation targets:\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
+        output.status,
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let metadata = read_json(&codex_dir.join("versions").join(format!("{VERSION}.json")));
+    assert_eq!(
+        metadata
+            .get("validation")
+            .and_then(|v| v.get("passed_targets"))
+            .and_then(|v| v.as_array())
+            .expect("validation.passed_targets array"),
+        &vec![json!(TARGET_LINUX), json!(TARGET_MACOS)]
+    );
+    assert_eq!(
+        metadata
+            .get("validation")
+            .and_then(|v| v.get("skipped_targets"))
+            .and_then(|v| v.as_array())
+            .expect("validation.skipped_targets array"),
+        &vec![json!(TARGET_WINDOWS)]
+    );
+}
