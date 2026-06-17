@@ -51,7 +51,9 @@
       "backend_support": "unsupported",
       "uaa_support": "unsupported",
       "pointer_promotion": "none",
-      "evidence_notes": []
+      "evidence_notes": [
+        "current root snapshot omits this target"
+      ]
     },
     {
       "agent": "codex",
@@ -61,9 +63,7 @@
       "backend_support": "unsupported",
       "uaa_support": "unsupported",
       "pointer_promotion": "none",
-      "evidence_notes": [
-        "current root snapshot omits this target"
-      ]
+      "evidence_notes": []
     },
     {
       "agent": "codex",
@@ -113,7 +113,9 @@
       "backend_support": "unsupported",
       "uaa_support": "unsupported",
       "pointer_promotion": "none",
-      "evidence_notes": []
+      "evidence_notes": [
+        "current root snapshot omits this target"
+      ]
     },
     {
       "agent": "codex",
@@ -123,9 +125,7 @@
       "backend_support": "unsupported",
       "uaa_support": "unsupported",
       "pointer_promotion": "none",
-      "evidence_notes": [
-        "current root snapshot omits this target"
-      ]
+      "evidence_notes": []
     },
     {
       "agent": "codex",
