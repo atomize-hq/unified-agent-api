@@ -3,7 +3,7 @@
   "rows": [
     {
       "agent": "aider",
-      "version": "0.0.0",
+      "version": "0.0.1",
       "target": "darwin-arm64",
       "manifest_support": "supported",
       "backend_support": "unsupported",
