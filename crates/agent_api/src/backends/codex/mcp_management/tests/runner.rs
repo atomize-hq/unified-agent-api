@@ -225,6 +225,7 @@ async fn run_codex_mcp_preserves_path_for_launcher_script_helpers() {
         },
         codex_mcp_list_argv(),
         AgentWrapperMcpCommandContext {
+            working_dir: Some(temp_dir.clone()),
             env: BTreeMap::from([(PATH_ENV.to_string(), effective_path.clone())]),
             ..Default::default()
         },
