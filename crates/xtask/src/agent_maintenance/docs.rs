@@ -1,14 +1,18 @@
-use std::{fs, path::Path};
+use std::path::Path;
 
 use sha2::Digest;
 
 use crate::agent_registry::{AgentRegistry, AgentRegistryEntry};
 
-use super::request::{
-    DetectedRelease, ExecutionContract, MaintenanceRequest, MaintenanceRequestEnvelope,
+use super::contract_policy::{
+    build_execution_contract_for_request, packet_owned_ops_playbook_path,
+    packet_owned_prompt_template_path, packet_owned_workflow_plan_path, packet_pr_prompt_template,
+    render_prompt_template_for_contract, EXECUTE_HOST_SURFACE, EXECUTION_HOST_LABEL,
 };
+use super::request::{ExecutionContract, MaintenanceRequest, MaintenanceRequestEnvelope};
 
-const OWNERSHIP_MARKER: &str = "<!-- generated-by: xtask refresh-agent; owner: control-plane -->";
+const OWNERSHIP_MARKER: &str =
+    "<!-- generated-by: xtask agent-maintenance renderer; source-of-truth: governance/maintenance-request.toml -->";
 const PR_SUMMARY_FILE_NAME: &str = "governance/pr-summary.md";
 const CLOSEOUT_FILE_NAME: &str = "governance/maintenance-closeout.json";
 
@@ -33,7 +37,7 @@ pub fn build_packet_docs(
     request: &MaintenanceRequest,
 ) -> Result<Vec<RenderedPacketDoc>, String> {
     if request.is_automated_watch_request() {
-        build_automated_packet_docs_legacy(workspace_root, request)
+        build_automated_packet_docs(workspace_root, request, None)
     } else {
         Ok(build_manual_packet_docs(request))
     }
@@ -44,18 +48,28 @@ pub fn build_packet_docs_from_envelope(
     envelope: &MaintenanceRequestEnvelope,
 ) -> Result<Vec<RenderedPacketDoc>, String> {
     if envelope.request.is_automated_watch_request() {
-        if let Some(execution_contract) = envelope.execution_contract.as_ref() {
-            build_automated_packet_docs_from_contract(
-                workspace_root,
-                &envelope.request,
-                execution_contract,
-            )
-        } else {
-            build_automated_packet_docs_legacy(workspace_root, &envelope.request)
-        }
+        build_automated_packet_docs(
+            workspace_root,
+            &envelope.request,
+            envelope.execution_contract.as_ref(),
+        )
     } else {
         Ok(build_manual_packet_docs(&envelope.request))
     }
+}
+
+fn build_automated_packet_docs(
+    workspace_root: &Path,
+    request: &MaintenanceRequest,
+    execution_contract: Option<&ExecutionContract>,
+) -> Result<Vec<RenderedPacketDoc>, String> {
+    let entry = load_registry_entry(workspace_root, &request.agent_id)?;
+    let derived_contract = build_execution_contract_for_request(workspace_root, &entry, request)?;
+    let execution_contract = match execution_contract {
+        Some(contract) if contract.executor == EXECUTE_HOST_SURFACE => contract,
+        _ => &derived_contract,
+    };
+    build_automated_packet_docs_from_contract(workspace_root, request, execution_contract)
 }
 
 fn build_manual_packet_docs(request: &MaintenanceRequest) -> Vec<RenderedPacketDoc> {
@@ -105,7 +119,7 @@ fn build_manual_packet_docs(request: &MaintenanceRequest) -> Vec<RenderedPacketD
         RenderedPacketDoc {
             relative_path: format!("{root}/scope_brief.md"),
             contents: wrap_markdown(&format!(
-                "# Scope brief\n\nThis maintenance lane is limited to control-plane docs and generated publication surfaces for `{}`.\n\nAllowed write envelope:\n\n- maintenance packet docs under `{}`\n- `cli_manifests/support_matrix/current.json`\n- `docs/specs/unified-agent-api/support-matrix.md`\n- `docs/specs/unified-agent-api/capability-matrix.md`\n- `docs/crates-io-release.md`\n\nHistorical onboarding and implementation packet docs remain read-only inputs.\n",
+                "# Scope brief\n\nThis maintenance lane is limited to control-plane docs and generated publication surfaces for `{}`.\n\nAllowed write envelope:\n\n- maintenance packet docs under `{}`\n- `cli_manifests/support_matrix/current.json`\n- `docs/specs/unified-agent-api/support-matrix.md`\n- `crates/agent_api/src/runtime_support_data.rs`\n- `docs/specs/unified-agent-api/capability-matrix.md`\n- `docs/crates-io-release.md`\n\nHistorical onboarding and implementation packet docs remain read-only inputs.\n",
                 request.agent_id,
                 request.maintenance_root
             )),
@@ -123,7 +137,7 @@ fn build_manual_packet_docs(request: &MaintenanceRequest) -> Vec<RenderedPacketD
         RenderedPacketDoc {
             relative_path: format!("{root}/review_surfaces.md"),
             contents: wrap_markdown(&format!(
-                "# Review surfaces\n\n- `{}`\n- `{}`\n- `docs/specs/unified-agent-api/support-matrix.md`\n- `cli_manifests/support_matrix/current.json`\n- `docs/specs/unified-agent-api/capability-matrix.md`\n- `docs/crates-io-release.md`\n- historical packet docs are detector inputs only and remain read-only\n",
+                "# Review surfaces\n\n- `{}`\n- `{}`\n- `docs/specs/unified-agent-api/support-matrix.md`\n- `cli_manifests/support_matrix/current.json`\n- `crates/agent_api/src/runtime_support_data.rs`\n- `docs/specs/unified-agent-api/capability-matrix.md`\n- `docs/crates-io-release.md`\n- historical packet docs are detector inputs only and remain read-only\n",
                 request.basis_ref, request.opened_from
             )),
         },
@@ -172,8 +186,11 @@ pub fn render_execution_packet(
             request.relative_path
         )
     })?;
-    let prompt_contents = render_prompt_template(
+    let entry = load_registry_entry(workspace_root, &request.agent_id)?;
+    let prompt_contents = render_prompt_template_for_contract(
         workspace_root,
+        &entry,
+        &request.maintenance_root,
         &execution_contract.prompt_template_path,
         &detected_release.target_version,
     )?;
@@ -221,12 +238,16 @@ pub fn render_execution_packet(
     }
 
     let trigger_context = render_trigger_context(request);
+    let support_audit = render_support_surface_audit(request);
     let handoff_contents = wrap_markdown(&format!(
-        "# Handoff\n\nThis file is the canonical contributor execution contract for `{}` maintenance.\n\n## Packet origin\n\n{}\n\n## Relay contract\n\n- request artifact: `{}`\n- executor: `{}`\n- prompt template path: `{}`\n- prompt sha256: `{}`\n- canonical handoff: `{}`\n- derivative pr summary: `{}`\n- exact closeout artifact: `{}`\n- branch linkage: `{}`\n- manual closeout required: `{}`\n\n## Writable surfaces\n\n{}\n\n## Read-only inputs\n\n{}\n\n## Ordered repo commands\n\n{}\n\n## Exact green gates\n\n{}\n\n## Recovery\n\n- recreate packet command: `{}`\n- reopen pr body path: `{}`\n- reopen pr branch: `{}`\n- notes:\n{}\n\n## Exact closeout command\n\n```sh\ncargo run -p xtask -- close-agent-maintenance --request {} --closeout {}\n```\n\n## Exact coding-agent prompt\n\n```md\n{}\n```\n",
+        "# Handoff\n\nThis file is the canonical contributor execution contract for `{}` maintenance.\n\n## Packet origin\n\n{}\n\n## Support-surface audit\n\n{}\n\n## Relay contract\n\n- maintained agent packet: `{}`\n- local execution host: `{}`\n- executor surface: `{}`\n- request artifact: `{}`\n- prompt template path: `{}`\n- prompt sha256: `{}`\n- canonical handoff: `{}`\n- derivative pr summary: `{}`\n- exact closeout artifact: `{}`\n- branch linkage: `{}`\n- manual closeout required: `{}`\n\n## Writable surfaces\n\n{}\n\n## Read-only inputs\n\n{}\n\n## Ordered repo commands\n\n{}\n\n## Exact green gates\n\n{}\n\n## Recovery\n\n- recreate packet command: `{}`\n- reopen pr body path: `{}`\n- reopen pr branch: `{}`\n- notes:\n{}\n\n## Exact closeout command\n\n```sh\ncargo run -p xtask -- close-agent-maintenance --request {} --closeout {}\n```\n\n## Exact maintained-agent prompt\n\n```md\n{}\n```\n",
         request.agent_id,
         trigger_context,
-        request.relative_path,
+        support_audit,
+        request.agent_id,
+        EXECUTION_HOST_LABEL,
         execution_contract.executor,
+        request.relative_path,
         execution_contract.prompt_template_path,
         execution_contract.prompt_sha256,
         handoff_relative_path,
@@ -252,7 +273,7 @@ pub fn render_execution_packet(
     ));
 
     let pr_summary_contents = wrap_markdown(&format!(
-        "# PR summary\n\nAutomated maintenance packet for `{}` target `{}`.\n\n- canonical execution contract: `{}`\n- request artifact: `{}`\n- branch: `{}`\n- opened from: `{}`\n- prompt sha256: `{}`\n\n## Next step\n\nFollow `{}` exactly. This PR summary is derivative from the same execution-packet renderer.\n\n## Exact coding-agent prompt\n\n```md\n{}\n```\n",
+        "# PR summary\n\nAutomated maintenance packet for `{}` target `{}`.\n\n- canonical execution contract: `{}`\n- request artifact: `{}`\n- branch: `{}`\n- opened from: `{}`\n- prompt sha256: `{}`\n\n## Support-surface audit\n\n{}\n\n## Next step\n\nFollow `{}` exactly. This PR summary is derivative from the same execution-packet renderer.\n\n## Exact maintained-agent prompt\n\n```md\n{}\n```\n",
         request.agent_id,
         detected_release.target_version,
         handoff_relative_path,
@@ -260,6 +281,7 @@ pub fn render_execution_packet(
         detected_release.branch_name,
         request.opened_from,
         execution_contract.prompt_sha256,
+        support_audit,
         handoff_relative_path,
         prompt_contents
     ));
@@ -281,14 +303,17 @@ fn build_automated_packet_docs_from_contract(
 ) -> Result<Vec<RenderedPacketDoc>, String> {
     let rendered_execution_packet =
         render_execution_packet(workspace_root, request, execution_contract)?;
+    let packet_owned_contract_inputs =
+        build_packet_owned_contract_inputs(workspace_root, request, execution_contract)?;
     let root = &request.maintenance_root;
     let trigger_context = render_trigger_context(request);
+    let support_audit = render_support_surface_audit(request);
 
-    Ok(vec![
+    let mut docs = vec![
         RenderedPacketDoc {
             relative_path: format!("{root}/README.md"),
             contents: wrap_markdown(&format!(
-                "# {} maintenance\n\nThis packet tracks automated upstream-release maintenance for `{}`.\n\n## Request\n\n- request artifact: `{}`\n- trigger kind: `{}`\n- basis ref: `{}`\n- opened from: `{}`\n- recorded at: `{}`\n- request commit: `{}`\n\n## Trigger context\n\n{}\n\n## Canonical execution contract\n\nUse `{}` as the exact contributor execution contract for this lane. The PR body summary under `{}` is derivative only.\n",
+                "# {} maintenance\n\nThis packet tracks automated upstream-release maintenance for `{}`.\n\n## Request\n\n- request artifact: `{}`\n- trigger kind: `{}`\n- basis ref: `{}`\n- opened from: `{}`\n- recorded at: `{}`\n- request commit: `{}`\n\n## Trigger context\n\n{}\n\n## Support-surface audit\n\n{}\n\n## Canonical execution contract\n\nUse `{}` as the exact contributor execution contract for this lane. The PR body summary under `{}` is derivative only.\n",
                 request.agent_id,
                 request.agent_id,
                 request.relative_path,
@@ -298,6 +323,7 @@ fn build_automated_packet_docs_from_contract(
                 request.request_recorded_at,
                 request.request_commit,
                 trigger_context,
+                support_audit,
                 rendered_execution_packet.handoff_relative_path,
                 rendered_execution_packet.pr_summary_relative_path
             )),
@@ -305,7 +331,7 @@ fn build_automated_packet_docs_from_contract(
         RenderedPacketDoc {
             relative_path: format!("{root}/scope_brief.md"),
             contents: wrap_markdown(&format!(
-                "# Scope brief\n\nThis automated maintenance lane is limited to the contributor-ready packet and the worker-owned parity surfaces for `{}`.\n\n## Writable surfaces\n\n{}\n",
+                "# Scope brief\n\nThis automated maintenance lane is limited to the frozen shared packet for `{}` and the declared writable surfaces below.\n\n## Support uplift rule\n\nNewly discovered non-TUI surface must land in this run unless the frozen packet records one allowed deferral. Preexisting non-TUI gaps remain valid only when the packet ties them to the committed debt inventory.\n\n## Writable surfaces\n\n{}\n",
                 request.agent_id,
                 markdown_repo_path_list(&execution_contract.writable_surfaces)
             )),
@@ -313,7 +339,7 @@ fn build_automated_packet_docs_from_contract(
         RenderedPacketDoc {
             relative_path: format!("{root}/seam_map.md"),
             contents: wrap_markdown(
-                "# Seam map\n\nThis maintenance packet has one bounded seam: render a contributor-ready execution contract for the detected upstream release while keeping `HANDOFF.md` canonical and `governance/pr-summary.md` derivative.\n",
+                "# Seam map\n\nThis maintenance packet has one bounded seam: render a contributor-ready execution contract for the detected upstream release while keeping `HANDOFF.md` canonical and `governance/pr-summary.md` derivative, and while freezing one exact support-surface audit for non-TUI uplift.\n",
             ),
         },
         RenderedPacketDoc {
@@ -329,18 +355,10 @@ fn build_automated_packet_docs_from_contract(
         RenderedPacketDoc {
             relative_path: format!("{root}/review_surfaces.md"),
             contents: wrap_markdown(&format!(
-                "# Review surfaces\n\n## Writable surfaces\n\n{}\n\n## Read-only inputs\n\n{}\n",
+                "# Review surfaces\n\n## Writable surfaces\n\n{}\n\n## Read-only inputs\n\n{}\n\n## Support debt baseline\n\n- `docs/specs/unified-agent-api/non-tui-support-debt.md`\n",
                 markdown_repo_path_list(&execution_contract.writable_surfaces),
                 markdown_repo_path_list(&execution_contract.read_only_inputs)
             )),
-        },
-        RenderedPacketDoc {
-            relative_path: rendered_execution_packet.handoff_relative_path.clone(),
-            contents: rendered_execution_packet.handoff_contents,
-        },
-        RenderedPacketDoc {
-            relative_path: rendered_execution_packet.pr_summary_relative_path.clone(),
-            contents: rendered_execution_packet.pr_summary_contents,
         },
         RenderedPacketDoc {
             relative_path: format!("{root}/governance/remediation-log.md"),
@@ -354,122 +372,66 @@ fn build_automated_packet_docs_from_contract(
                 rendered_execution_packet.pr_summary_relative_path
             )),
         },
-    ])
+    ];
+    docs.extend(packet_owned_contract_inputs);
+    docs.push(RenderedPacketDoc {
+        relative_path: rendered_execution_packet.handoff_relative_path.clone(),
+        contents: rendered_execution_packet.handoff_contents,
+    });
+    docs.push(RenderedPacketDoc {
+        relative_path: rendered_execution_packet.pr_summary_relative_path.clone(),
+        contents: rendered_execution_packet.pr_summary_contents,
+    });
+    Ok(docs)
 }
 
-fn build_automated_packet_docs_legacy(
+fn build_packet_owned_contract_inputs(
     workspace_root: &Path,
     request: &MaintenanceRequest,
+    execution_contract: &ExecutionContract,
 ) -> Result<Vec<RenderedPacketDoc>, String> {
+    let prompt_path = packet_owned_prompt_template_path(&request.maintenance_root);
+    if execution_contract.prompt_template_path != prompt_path {
+        return Ok(Vec::new());
+    }
+
     let entry = load_registry_entry(workspace_root, &request.agent_id)?;
     let detected_release = request.detected_release.as_ref().ok_or_else(|| {
-        "automated maintenance request missing detected_release metadata".to_string()
+        format!(
+            "packet-owned contract inputs require detected_release metadata for `{}`",
+            request.relative_path
+        )
     })?;
-    let rendered_template = render_pr_body_template(workspace_root, &entry, detected_release)?;
-    let writable_surfaces = automated_writable_surfaces(request, &entry, detected_release);
-    let read_only_inputs = automated_read_only_inputs(request, &entry);
-    let excluded_surfaces = automated_excluded_surfaces(&entry);
-    let ordered_commands = automated_ordered_commands(request, &entry, detected_release);
-    let green_gates = automated_green_gates(&entry);
-    let trigger_context = render_trigger_context(request);
-    let closeout_path = format!("{}/{}", request.maintenance_root, CLOSEOUT_FILE_NAME);
-    let root = &request.maintenance_root;
+    let handoff_path = format!("{}/HANDOFF.md", request.maintenance_root);
 
     Ok(vec![
         RenderedPacketDoc {
-            relative_path: format!("{root}/README.md"),
+            relative_path: packet_owned_ops_playbook_path(&request.maintenance_root),
             contents: wrap_markdown(&format!(
-                "# {} maintenance\n\nThis packet tracks automated upstream-release maintenance for `{}`.\n\n## Request\n\n- request artifact: `{}`\n- trigger kind: `{}`\n- basis ref: `{}`\n- opened from: `{}`\n- recorded at: `{}`\n- request commit: `{}`\n\n## Trigger context\n\n{}\n\n## Canonical execution contract\n\nUse `{}/HANDOFF.md` as the exact contributor execution contract for this lane. The PR body summary under `{}/{}` is derivative only.\n",
-                request.agent_id,
-                request.agent_id,
-                request.relative_path,
-                request.trigger_kind.as_str(),
-                request.basis_ref,
-                request.opened_from,
-                request.request_recorded_at,
-                request.request_commit,
-                trigger_context,
-                request.maintenance_root,
-                request.maintenance_root,
-                PR_SUMMARY_FILE_NAME
-            )),
-        },
-        RenderedPacketDoc {
-            relative_path: format!("{root}/scope_brief.md"),
-            contents: wrap_markdown(&format!(
-                "# Scope brief\n\nThis automated maintenance lane is limited to the contributor-ready packet and the worker-owned parity surfaces for `{}`.\n\n## Writable surfaces\n\n{}\n\n## Explicit exclusions\n\n{}\n",
-                request.agent_id,
-                markdown_list(&writable_surfaces),
-                markdown_list(&excluded_surfaces)
-            )),
-        },
-        RenderedPacketDoc {
-            relative_path: format!("{root}/seam_map.md"),
-            contents: wrap_markdown(
-                "# Seam map\n\nThis maintenance packet has one bounded seam: render a contributor-ready execution contract for the detected upstream release while keeping `HANDOFF.md` canonical and `governance/pr-summary.md` derivative.\n",
-            ),
-        },
-        RenderedPacketDoc {
-            relative_path: format!("{root}/threading.md"),
-            contents: wrap_markdown(&format!(
-                "# Threading\n\n1. Review the auto-generated request at `{}` and the canonical contract at `{}/HANDOFF.md`.\n2. Apply the exact coding-agent prompt from `HANDOFF.md` against branch `{}`.\n3. Author `{}` and run the exact closeout command from `HANDOFF.md` after the green gates pass.\n",
-                request.relative_path,
-                request.maintenance_root,
-                detected_release.branch_name,
-                closeout_path
-            )),
-        },
-        RenderedPacketDoc {
-            relative_path: format!("{root}/review_surfaces.md"),
-            contents: wrap_markdown(&format!(
-                "# Review surfaces\n\n## Writable surfaces\n\n{}\n\n## Read-only inputs\n\n{}\n\n## Explicit exclusions\n\n{}\n",
-                markdown_list(&writable_surfaces),
-                markdown_list(&read_only_inputs),
-                markdown_list(&excluded_surfaces)
-            )),
-        },
-        RenderedPacketDoc {
-            relative_path: format!("{root}/HANDOFF.md"),
-            contents: wrap_markdown(&format!(
-                "# Handoff\n\nThis file is the canonical contributor execution contract for `{}` maintenance.\n\n## Packet origin\n\n{}\n\n## Writable surfaces\n\n{}\n\n## Read-only inputs\n\n{}\n\n## Explicit exclusions\n\n{}\n\n## Ordered repo commands\n\n{}\n\n## Exact green gates\n\n{}\n\n## Exact closeout command\n\n```sh\ncargo run -p xtask -- close-agent-maintenance --request {} --closeout {}\n```\n\n## Exact coding-agent prompt\n\n```md\n{}\n```\n",
-                request.agent_id,
-                trigger_context,
-                markdown_list(&writable_surfaces),
-                markdown_list(&read_only_inputs),
-                markdown_list(&excluded_surfaces),
-                markdown_list(&ordered_commands),
-                markdown_list(&green_gates),
-                request.relative_path,
-                closeout_path,
-                rendered_template
-            )),
-        },
-        RenderedPacketDoc {
-            relative_path: format!("{root}/{PR_SUMMARY_FILE_NAME}"),
-            contents: wrap_markdown(&format!(
-                "# PR summary\n\nAutomated maintenance packet for `{}` target `{}`.\n\n- canonical execution contract: `{}/HANDOFF.md`\n- request artifact: `{}`\n- branch: `{}`\n- opened from: `{}`\n\n## Next step\n\nFollow `{}/HANDOFF.md` exactly. This PR summary is derivative from the same packet renderer context.\n\n{}\n",
+                "# Ops playbook\n\nThis packet-owned playbook freezes operator context for `{}` target `{}`.\n\n- request artifact: `{}`\n- basis ref: `{}`\n- opened from: `{}`\n- branch linkage: `{}`\n- canonical handoff: `{}`\n- recovery packet regeneration: `{}`\n",
                 request.agent_id,
                 detected_release.target_version,
-                request.maintenance_root,
                 request.relative_path,
-                detected_release.branch_name,
+                request.basis_ref,
                 request.opened_from,
-                request.maintenance_root,
-                rendered_template
+                detected_release.branch_name,
+                handoff_path,
+                execution_contract.recovery.recreate_packet_command
             )),
         },
         RenderedPacketDoc {
-            relative_path: format!("{root}/governance/remediation-log.md"),
+            relative_path: packet_owned_workflow_plan_path(&request.maintenance_root),
             contents: wrap_markdown(&format!(
-                "# Remediation log\n\nRefresh planned from `{}`.\n\n- basis ref: `{}`\n- trigger kind: `{}`\n- request sha256: `{}`\n- canonical handoff: `{}/HANDOFF.md`\n- derivative pr summary: `{}/{}`\n\nNo maintenance closeout has been recorded yet.\n",
-                request.relative_path,
-                request.basis_ref,
-                request.trigger_kind.as_str(),
-                request.sha256,
-                request.maintenance_root,
-                request.maintenance_root,
-                PR_SUMMARY_FILE_NAME
+                "# CI workflows plan\n\nThis packet is opened from `{}` and relayed through `{}`.\n\n## Ordered repo commands\n\n{}\n\n## Exact green gates\n\n{}\n",
+                request.opened_from,
+                handoff_path,
+                markdown_command_list(&execution_contract.ordered_commands),
+                markdown_command_list(&execution_contract.green_gates)
             )),
+        },
+        RenderedPacketDoc {
+            relative_path: prompt_path,
+            contents: packet_pr_prompt_template(&entry, &request.maintenance_root),
         },
     ])
 }
@@ -484,159 +446,6 @@ fn load_registry_entry(
         .find(agent_id)
         .cloned()
         .ok_or_else(|| format!("unknown agent_id `{agent_id}` in maintenance packet rendering"))
-}
-
-fn render_pr_body_template(
-    workspace_root: &Path,
-    entry: &AgentRegistryEntry,
-    detected_release: &DetectedRelease,
-) -> Result<String, String> {
-    render_prompt_template(
-        workspace_root,
-        &format!("{}/PR_BODY_TEMPLATE.md", entry.manifest_root),
-        &detected_release.target_version,
-    )
-}
-
-fn render_prompt_template(
-    workspace_root: &Path,
-    prompt_template_path: &str,
-    target_version: &str,
-) -> Result<String, String> {
-    let template_path = workspace_root.join(prompt_template_path);
-    let template = fs::read_to_string(&template_path)
-        .map_err(|err| format!("read {}: {err}", template_path.display()))?;
-    Ok(template.replace("{{VERSION}}", target_version))
-}
-
-fn automated_writable_surfaces(
-    request: &MaintenanceRequest,
-    entry: &AgentRegistryEntry,
-    detected_release: &DetectedRelease,
-) -> Vec<String> {
-    let mut writable_surfaces = vec![
-        format!(
-            "maintenance packet docs under `{}`",
-            request.maintenance_root
-        ),
-        format!("wrapper crate sources under `{}/**`", entry.crate_path),
-        format!("backend module sources under `{}/**`", entry.backend_module),
-        format!(
-            "artifact pins `{}/artifacts.lock.json`",
-            entry.manifest_root
-        ),
-        format!(
-            "versioned snapshots under `{}/snapshots/{}/**`",
-            entry.manifest_root, detected_release.target_version
-        ),
-        format!(
-            "versioned reports under `{}/reports/{}/**`",
-            entry.manifest_root, detected_release.target_version
-        ),
-        format!(
-            "version metadata `{}/versions/{}.json`",
-            entry.manifest_root, detected_release.target_version
-        ),
-        format!(
-            "generated wrapper coverage `{}/wrapper_coverage.json`",
-            entry.manifest_root
-        ),
-        "support publication `cli_manifests/support_matrix/current.json`".to_string(),
-        "support publication markdown `docs/specs/unified-agent-api/support-matrix.md`".to_string(),
-    ];
-    if entry.agent_id == "codex" {
-        writable_surfaces.push(
-            "wrapper coverage scenario catalog `docs/specs/codex-wrapper-coverage-scenarios-v1.md`"
-                .to_string(),
-        );
-    }
-    writable_surfaces
-}
-
-fn automated_read_only_inputs(
-    request: &MaintenanceRequest,
-    entry: &AgentRegistryEntry,
-) -> Vec<String> {
-    vec![
-        format!("maintenance request `{}`", request.relative_path),
-        format!("baseline pointer `{}`", request.basis_ref),
-        format!(
-            "agent-local prompt/tail template `{}/PR_BODY_TEMPLATE.md`",
-            entry.manifest_root
-        ),
-        format!(
-            "agent-local playbook `{}/OPS_PLAYBOOK.md`",
-            entry.manifest_root
-        ),
-        format!(
-            "agent-local workflow plan `{}/CI_WORKFLOWS_PLAN.md`",
-            entry.manifest_root
-        ),
-        format!("worker workflow `{}`", request.opened_from),
-    ]
-}
-
-fn automated_excluded_surfaces(entry: &AgentRegistryEntry) -> Vec<String> {
-    let mut excluded = vec![
-        format!(
-            "promotion pointer `{}/latest_validated.txt`",
-            entry.manifest_root
-        ),
-        format!(
-            "promotion policy `{}/min_supported.txt`",
-            entry.manifest_root
-        ),
-        "capability publication `docs/specs/unified-agent-api/capability-matrix.md`"
-            .to_string(),
-        "release documentation `docs/crates-io-release.md`".to_string(),
-        "note: capability-matrix and release-doc surfaces remain out of scope for this automated upstream-release lane unless a maintainer widens the request explicitly".to_string(),
-    ];
-    if entry.agent_id == "codex" {
-        excluded.push(
-            "wrapper coverage generator contract `docs/specs/codex-wrapper-coverage-generator-contract.md`"
-                .to_string(),
-        );
-    }
-    excluded
-}
-
-fn automated_ordered_commands(
-    request: &MaintenanceRequest,
-    entry: &AgentRegistryEntry,
-    detected_release: &DetectedRelease,
-) -> Vec<String> {
-    let closeout_path = format!("{}/{}", request.maintenance_root, CLOSEOUT_FILE_NAME);
-    vec![
-        format!(
-            "run the agent-specific implementation steps exactly as rendered in the prompt block for target `{}`",
-            detected_release.target_version
-        ),
-        format!(
-            "cargo run -p xtask -- codex-validate --root {}",
-            entry.manifest_root
-        ),
-        "cargo run -p xtask -- support-matrix --check".to_string(),
-        "cargo run -p xtask -- capability-matrix --check".to_string(),
-        "cargo run -p xtask -- capability-matrix-audit".to_string(),
-        "make preflight".to_string(),
-        format!(
-            "cargo run -p xtask -- close-agent-maintenance --request {} --closeout {}",
-            request.relative_path, closeout_path
-        ),
-    ]
-}
-
-fn automated_green_gates(entry: &AgentRegistryEntry) -> Vec<String> {
-    vec![
-        format!(
-            "cargo run -p xtask -- codex-validate --root {}",
-            entry.manifest_root
-        ),
-        "cargo run -p xtask -- support-matrix --check".to_string(),
-        "cargo run -p xtask -- capability-matrix --check".to_string(),
-        "cargo run -p xtask -- capability-matrix-audit".to_string(),
-        "make preflight".to_string(),
-    ]
 }
 
 fn wrap_markdown(body: &str) -> String {
@@ -685,4 +494,64 @@ fn render_trigger_context(request: &MaintenanceRequest) -> String {
     } else {
         "- no automated release detection metadata recorded".to_string()
     }
+}
+
+fn render_support_surface_audit(request: &MaintenanceRequest) -> String {
+    let Some(audit) = request.support_surface_audit.as_ref() else {
+        return "- no support-surface audit recorded".to_string();
+    };
+
+    let deferred = if audit.deferred_preexisting_gaps.is_empty() {
+        "- none".to_string()
+    } else {
+        audit
+            .deferred_preexisting_gaps
+            .iter()
+            .map(|gap| {
+                let follow_on = gap
+                    .blocking_follow_on
+                    .as_deref()
+                    .unwrap_or("external blocker");
+                format!(
+                    "- `{}` `{}` via `{}` ({follow_on})",
+                    gap.command_path, gap.surface_id, gap.defer_reason
+                )
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
+    };
+    let required = if audit.required_uplifts_this_run.is_empty() {
+        "- none".to_string()
+    } else {
+        audit
+            .required_uplifts_this_run
+            .iter()
+            .map(|gap| {
+                format!(
+                    "- `{}` `{}` via `{}`",
+                    gap.command_path, gap.surface_id, gap.reason
+                )
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
+    };
+
+    format!(
+        concat!(
+            "- required: `{}`\n",
+            "- pre-run debt count: `{}`\n",
+            "- expected post-run debt count: `{}`\n",
+            "- discovered upstream surface rows: `{}`\n",
+            "- preexisting unsupported rows: `{}`\n",
+            "- required uplifts this run:\n{}\n",
+            "- deferred preexisting gaps:\n{}\n"
+        ),
+        if audit.required { "true" } else { "false" },
+        audit.pre_run_debt_count,
+        audit.expected_post_run_debt_count,
+        audit.discovered_upstream_surface.len(),
+        audit.preexisting_unsupported_surface.len(),
+        required,
+        deferred
+    )
 }

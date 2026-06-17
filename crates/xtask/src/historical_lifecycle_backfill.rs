@@ -6,6 +6,7 @@ use std::{
 };
 
 use clap::Parser;
+use serde::Deserialize;
 use sha2::Digest;
 use xtask::{
     agent_lifecycle::{
@@ -13,15 +14,16 @@ use xtask::{
         reconstruct_publication_ready_state_from_closed_baseline, required_evidence_for_stage,
         write_lifecycle_state, write_publication_ready_packet, LifecycleStage, LifecycleState,
     },
-    agent_registry::AgentRegistry,
-    approval_artifact::ApprovalArtifact,
+    agent_registry::{AgentRegistry, AgentRegistryEntry},
+    approval_artifact::{ApprovalArtifact, ApprovalMaintenanceMode},
     prepare_publication::{
         build_publication_ready_packet, validate_runtime_evidence_run_for_approval,
         RuntimeEvidenceBundle,
     },
     proving_run_closeout::{
-        build_closeout, render_closeout_json, DurationTruth, ProvingRunCloseoutHumanFields,
-        ProvingRunCloseoutMachineFields, ProvingRunCloseoutState, ResidualFrictionTruth,
+        build_closeout, render_closeout_json, DurationTruth, MaintenanceSettlement,
+        MaintenanceSettlementMode, ProvingRunCloseoutHumanFields, ProvingRunCloseoutMachineFields,
+        ProvingRunCloseoutState, ResidualFrictionTruth,
     },
     runtime_evidence_bundle::{
         self, historical_run_id, write_runtime_evidence_bundle, RuntimeEvidenceBundleSpec,
@@ -154,12 +156,14 @@ fn backfill_agent(
             raw_state.lifecycle_stage.as_str()
         )));
     }
+    let mut normalized_state = raw_state.clone();
+    normalized_state.approval_artifact_sha256 = approval.sha256.clone();
 
-    let runtime_evidence = write_runtime_evidence(workspace_root, &approval, &raw_state)?;
+    let runtime_evidence = write_runtime_evidence(workspace_root, &approval, &normalized_state)?;
     validate_runtime_evidence_run_for_approval(workspace_root, &approval, &runtime_evidence.run_id)
         .map_err(|err| Error::Validation(err.to_string()))?;
     let historical_publication_state =
-        reconstruct_publication_ready_state_from_closed_baseline(&raw_state);
+        reconstruct_publication_ready_state_from_closed_baseline(&normalized_state);
     historical_publication_state
         .validate()
         .map_err(|err| Error::Validation(err.to_string()))?;
@@ -190,13 +194,13 @@ fn backfill_agent(
     let closeout_path = proving_run_closeout_path(&entry.scaffold.onboarding_pack_prefix);
     ensure_closeout(
         workspace_root,
+        entry,
         &approval,
-        &lifecycle_path,
         &closeout_path,
-        &raw_state,
+        &normalized_state,
     )?;
 
-    let mut repaired_state = raw_state.clone();
+    let mut repaired_state = normalized_state.clone();
     repaired_state.required_evidence =
         required_evidence_for_stage(LifecycleStage::ClosedBaseline).to_vec();
     repaired_state.satisfied_evidence =
@@ -245,36 +249,52 @@ fn write_runtime_evidence(
 
 fn ensure_closeout(
     workspace_root: &Path,
+    entry: &AgentRegistryEntry,
     approval: &ApprovalArtifact,
-    lifecycle_path: &str,
     closeout_path: &str,
     lifecycle_state: &LifecycleState,
 ) -> Result<(), Error> {
     let absolute = workspace_root.join(closeout_path);
-    if absolute.is_file() {
-        return Ok(());
-    }
-
-    let recorded_commit = git_first_add_metadata(workspace_root, lifecycle_path)
-        .map(|(commit, _)| commit)
+    let maintenance_settlement = settle_maintenance_readiness(entry, approval, closeout_path)?;
+    let existing = load_existing_closeout_seed(&absolute)
+        .map_err(|err| Error::Validation(format!("parse {}: {err}", absolute.display())))?;
+    let recorded_commit = existing
+        .as_ref()
+        .and_then(|seed| seed.commit.clone())
+        .or_else(|| git_first_add_metadata(workspace_root, closeout_path).map(|(commit, _)| commit))
         .unwrap_or_else(|| approval.sha256[..40.min(approval.sha256.len())].to_string());
+    let recorded_at = existing
+        .as_ref()
+        .and_then(|seed| seed.recorded_at.clone())
+        .unwrap_or_else(|| lifecycle_state.last_transition_at.clone());
     let closeout = build_closeout(
         ProvingRunCloseoutState::Closed,
         ProvingRunCloseoutMachineFields {
             approval_ref: approval.relative_path.clone(),
             approval_sha256: approval.sha256.clone(),
             approval_source: APPROVAL_SOURCE.to_string(),
+            maintenance_settlement: Some(maintenance_settlement),
             preflight_passed: true,
-            recorded_at: lifecycle_state.last_transition_at.clone(),
+            recorded_at,
             commit: recorded_commit,
         },
         ProvingRunCloseoutHumanFields {
-            manual_control_plane_edits: 0,
-            partial_write_incidents: 0,
-            ambiguous_ownership_incidents: 0,
-            duration: DurationTruth::MissingReason(DURATION_MISSING_REASON.to_string()),
-            residual_friction: ResidualFrictionTruth::ExplicitNone(
-                EXPLICIT_NONE_REASON.to_string(),
+            manual_control_plane_edits: existing
+                .as_ref()
+                .map_or(0, |seed| seed.manual_control_plane_edits),
+            partial_write_incidents: existing
+                .as_ref()
+                .map_or(0, |seed| seed.partial_write_incidents),
+            ambiguous_ownership_incidents: existing
+                .as_ref()
+                .map_or(0, |seed| seed.ambiguous_ownership_incidents),
+            duration: existing.as_ref().map_or_else(
+                || DurationTruth::MissingReason(DURATION_MISSING_REASON.to_string()),
+                ExistingCloseoutSeed::duration_truth,
+            ),
+            residual_friction: existing.as_ref().map_or_else(
+                || ResidualFrictionTruth::ExplicitNone(EXPLICIT_NONE_REASON.to_string()),
+                ExistingCloseoutSeed::residual_friction_truth,
             ),
         },
     )
@@ -286,6 +306,73 @@ fn ensure_closeout(
             .into_bytes(),
     )
     .map_err(|err| Error::Internal(format!("write {}: {err}", absolute.display())))
+}
+
+fn settle_maintenance_readiness(
+    entry: &AgentRegistryEntry,
+    approval: &ApprovalArtifact,
+    closeout_path: &str,
+) -> Result<MaintenanceSettlement, Error> {
+    match &approval.maintenance.mode {
+        ApprovalMaintenanceMode::ReleaseWatchEnrolled {
+            release_watch_sha256,
+            ..
+        } => {
+            let registry_release_watch = entry.maintenance.release_watch.as_ref().ok_or_else(|| {
+                Error::Validation(format!(
+                    "{closeout_path}: approval maintenance mode `release_watch_enrolled` requires registry `maintenance.release_watch` for `{}`",
+                    entry.agent_id
+                ))
+            })?;
+            let registry_release_watch_sha256 =
+                xtask::agent_registry::normalized_release_watch_sha256(registry_release_watch)
+                    .map_err(|err| {
+                        Error::Validation(format!(
+                            "{closeout_path}: registry maintenance.release_watch is invalid for `{}`: {err}",
+                            entry.agent_id
+                        ))
+                    })?;
+            if registry_release_watch_sha256 != *release_watch_sha256 {
+                return Err(Error::Validation(format!(
+                    "{closeout_path}: approval and registry maintenance.release_watch truth diverge for `{}`",
+                    entry.agent_id
+                )));
+            }
+            Ok(MaintenanceSettlement {
+                mode: MaintenanceSettlementMode::ReleaseWatchEnrolled,
+                approval_section_sha256: approval.maintenance.section_sha256.clone(),
+                release_watch_sha256: Some(registry_release_watch_sha256),
+                deferral_sha256: None,
+            })
+        }
+        ApprovalMaintenanceMode::ExplicitlyDeferred {
+            deferral_sha256, ..
+        } => {
+            if entry.maintenance.release_watch.is_some() {
+                return Err(Error::Validation(format!(
+                    "{closeout_path}: approval maintenance mode `explicitly_deferred` forbids registry `maintenance.release_watch` for `{}`",
+                    entry.agent_id
+                )));
+            }
+            Ok(MaintenanceSettlement {
+                mode: MaintenanceSettlementMode::ExplicitlyDeferred,
+                approval_section_sha256: approval.maintenance.section_sha256.clone(),
+                release_watch_sha256: None,
+                deferral_sha256: Some(deferral_sha256.clone()),
+            })
+        }
+    }
+}
+
+fn load_existing_closeout_seed(path: &Path) -> Result<Option<ExistingCloseoutSeed>, String> {
+    let bytes = match fs::read(path) {
+        Ok(bytes) => bytes,
+        Err(err) if err.kind() == io::ErrorKind::NotFound => return Ok(None),
+        Err(err) => return Err(format!("read {}: {err}", path.display())),
+    };
+    serde_json::from_slice(&bytes)
+        .map(Some)
+        .map_err(|err| err.to_string())
 }
 
 fn git_first_add_metadata(workspace_root: &Path, relative_path: &str) -> Option<(String, String)> {
@@ -369,6 +456,49 @@ fn map_closeout_error(err: xtask::proving_run_closeout::ProvingRunCloseoutError)
         }
         xtask::proving_run_closeout::ProvingRunCloseoutError::Internal(message) => {
             Error::Internal(message)
+        }
+    }
+}
+
+#[derive(Debug, Deserialize)]
+struct ExistingCloseoutSeed {
+    #[serde(default)]
+    manual_control_plane_edits: u64,
+    #[serde(default)]
+    partial_write_incidents: u64,
+    #[serde(default)]
+    ambiguous_ownership_incidents: u64,
+    recorded_at: Option<String>,
+    commit: Option<String>,
+    duration_seconds: Option<u64>,
+    duration_missing_reason: Option<String>,
+    residual_friction: Option<Vec<String>>,
+    explicit_none_reason: Option<String>,
+}
+
+impl ExistingCloseoutSeed {
+    fn duration_truth(&self) -> DurationTruth {
+        match (self.duration_seconds, self.duration_missing_reason.as_ref()) {
+            (Some(seconds), None) => DurationTruth::Seconds(seconds),
+            _ => DurationTruth::MissingReason(
+                self.duration_missing_reason
+                    .clone()
+                    .unwrap_or_else(|| DURATION_MISSING_REASON.to_string()),
+            ),
+        }
+    }
+
+    fn residual_friction_truth(&self) -> ResidualFrictionTruth {
+        match (
+            self.residual_friction.as_ref(),
+            self.explicit_none_reason.as_ref(),
+        ) {
+            (Some(items), None) => ResidualFrictionTruth::Items(items.clone()),
+            _ => ResidualFrictionTruth::ExplicitNone(
+                self.explicit_none_reason
+                    .clone()
+                    .unwrap_or_else(|| EXPLICIT_NONE_REASON.to_string()),
+            ),
         }
     }
 }

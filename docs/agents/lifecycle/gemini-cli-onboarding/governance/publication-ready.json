@@ -2,9 +2,9 @@
   "schema_version": "1",
   "agent_id": "gemini_cli",
   "approval_artifact_path": "docs/agents/lifecycle/gemini-cli-onboarding/governance/approved-agent.toml",
-  "approval_artifact_sha256": "aa3f57681d108fe28b64976a18799071f921086e57ab4fa9ce518186b710bb7a",
+  "approval_artifact_sha256": "171a77096888823d50c175b52a95d2876ddfe56fdd99271f7429e9aa01da600b",
   "lifecycle_state_path": "docs/agents/lifecycle/gemini-cli-onboarding/governance/lifecycle-state.json",
-  "lifecycle_state_sha256": "5df8caedc5770c212aabbbe15c324a743014c988d01dbbf0a462091586d82911",
+  "lifecycle_state_sha256": "c0de204f0952a08f1239b6779f7a01e469e35a927b116cde4a9e6adaf06982f3",
   "lifecycle_stage": "publication_ready",
   "support_tier_at_emit": "baseline_runtime",
   "manifest_root": "cli_manifests/gemini_cli",
@@ -23,6 +23,7 @@
   "required_publication_outputs": [
     "cli_manifests/support_matrix/current.json",
     "docs/specs/unified-agent-api/support-matrix.md",
+    "crates/agent_api/src/runtime_support_data.rs",
     "docs/specs/unified-agent-api/capability-matrix.md"
   ],
   "runtime_evidence_paths": [

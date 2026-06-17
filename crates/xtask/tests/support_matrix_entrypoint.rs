@@ -267,8 +267,12 @@ fn support_matrix_entrypoint_publishes_json_and_hybrid_markdown() {
 
     let json_path = fixture_root.join("cli_manifests/support_matrix/current.json");
     let markdown_path = fixture_root.join("docs/specs/unified-agent-api/support-matrix.md");
+    let runtime_support_data_path =
+        fixture_root.join("crates/agent_api/src/runtime_support_data.rs");
     let json_text = fs::read_to_string(&json_path).expect("read generated current.json");
     let markdown_text = fs::read_to_string(&markdown_path).expect("read generated markdown");
+    let runtime_support_data = fs::read_to_string(&runtime_support_data_path)
+        .expect("read generated runtime support data");
 
     let artifact: Value =
         serde_json::from_str(&json_text).expect("parse support-matrix current.json");
@@ -295,10 +299,14 @@ fn support_matrix_entrypoint_publishes_json_and_hybrid_markdown() {
     assert!(markdown_text.contains("| `claude_code` | `2.0.0` | `linux-x64` |"));
     assert!(markdown_text.contains("| `gemini_cli` | `0.38.2` | `darwin-arm64` |"));
     assert!(markdown_text.contains("| `opencode` | `3.0.0` | `linux-x64` |"));
+    assert!(runtime_support_data.contains("const CODEX_RUNTIME_SUPPORT"));
+    assert!(runtime_support_data.contains("latest_validated: Some(\"1.0.0\")"));
 
     let json_before_check = fs::read_to_string(&json_path).expect("read json before check");
     let markdown_before_check =
         fs::read_to_string(&markdown_path).expect("read markdown before check");
+    let runtime_support_data_before_check = fs::read_to_string(&runtime_support_data_path)
+        .expect("read runtime support data before check");
 
     let check_run = Command::new(&xtask_bin)
         .arg("support-matrix")
@@ -316,8 +324,14 @@ fn support_matrix_entrypoint_publishes_json_and_hybrid_markdown() {
     let json_after_check = fs::read_to_string(&json_path).expect("read json after check");
     let markdown_after_check =
         fs::read_to_string(&markdown_path).expect("read markdown after check");
+    let runtime_support_data_after_check = fs::read_to_string(&runtime_support_data_path)
+        .expect("read runtime support data after check");
     assert_eq!(json_before_check, json_after_check);
     assert_eq!(markdown_before_check, markdown_after_check);
+    assert_eq!(
+        runtime_support_data_before_check,
+        runtime_support_data_after_check
+    );
 
     let second_run = Command::new(&xtask_bin)
         .arg("support-matrix")

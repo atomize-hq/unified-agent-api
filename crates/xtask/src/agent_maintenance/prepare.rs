@@ -1,5 +1,4 @@
 use std::{
-    fs,
     io::{self, Write},
     path::{Path, PathBuf},
 };
@@ -10,9 +9,7 @@ use thiserror::Error;
 
 use crate::{
     agent_lifecycle::maintenance_request_path,
-    agent_registry::{
-        AgentRegistry, AgentRegistryEntry, ReleaseWatchMetadata, ReleaseWatchSourceKind,
-    },
+    agent_registry::{AgentRegistry, AgentRegistryEntry},
     workspace_mutation::{
         apply_mutations, plan_create_or_replace, ApplySummary, WorkspaceMutationError,
         WorkspacePathJail,
@@ -20,18 +17,19 @@ use crate::{
 };
 
 use super::{
+    contract_policy::{
+        build_execution_contract, derive_detected_release_fields, dispatch_kind_str,
+        dispatch_workflow_value, opened_from_path,
+    },
     docs::build_packet_docs_from_envelope,
     request::{
         self, validate_commit_value, validate_non_empty_scalar, validate_repo_relative_reference,
-        DetectedRelease, ExecutionContract, ExecutionContractRecovery, MaintenanceAction,
-        MaintenanceRequest, MaintenanceRequestEnvelope, RuntimeFollowupRequired, TriggerKind,
+        DetectedRelease, ExecutionContract, MaintenanceAction, MaintenanceRequest,
+        MaintenanceRequestEnvelope, RuntimeFollowupRequired, TriggerKind,
         AUTOMATED_ARTIFACT_VERSION,
     },
+    support_audit::{derive_support_surface_audit, SupportSurfaceAudit},
 };
-
-const GENERIC_PACKET_PR_WORKFLOW: &str = "agent-maintenance-open-pr.yml";
-const WORKFLOW_DISPATCH_KIND: &str = "workflow_dispatch";
-const PACKET_PR_KIND: &str = "packet_pr";
 
 #[derive(Debug, Parser, Clone)]
 #[command(group(
@@ -170,27 +168,41 @@ pub fn build_prepare_plan(workspace_root: &Path, args: &Args) -> Result<PrepareP
     let request_path = maintenance_request_path(&args.agent);
     let maintenance_root = format!("docs/agents/lifecycle/{}-maintenance", args.agent);
     let basis_ref = format!("{}/latest_validated.txt", entry.manifest_root);
+    let derived_detected_release =
+        derive_detected_release_fields(&args.agent, release_watch).map_err(Error::Validation)?;
     let detected_release = DetectedRelease {
         detected_by: args.detected_by.clone(),
         current_validated: args.current_version.clone(),
         target_version: args.target_version.clone(),
         latest_stable: args.latest_stable.clone(),
-        version_policy: "latest_stable_minus_one".to_string(),
-        source_kind: source_kind_str(release_watch.upstream.source_kind).to_string(),
-        source_ref: source_ref(release_watch),
-        dispatch_kind: args.dispatch_kind.clone(),
-        dispatch_workflow: dispatch_workflow_value(args),
+        version_policy: derived_detected_release.version_policy,
+        source_kind: derived_detected_release.source_kind,
+        source_ref: derived_detected_release.source_ref,
+        dispatch_kind: derived_detected_release.dispatch_kind,
+        dispatch_workflow: derived_detected_release.dispatch_workflow,
         branch_name: args.branch_name.clone(),
     };
     let execution_contract = build_execution_contract(
         workspace_root,
         entry,
-        args,
         &request_path,
         &maintenance_root,
-    )?;
-    let request_bytes =
-        render_request_toml(args, &basis_ref, &detected_release, &execution_contract).into_bytes();
+        &args.opened_from.display().to_string(),
+        &args.target_version,
+        &args.branch_name,
+    )
+    .map_err(Error::Internal)?;
+    let support_surface_audit =
+        derive_support_surface_audit(workspace_root, entry, &detected_release)
+            .map_err(Error::Internal)?;
+    let request_bytes = render_request_toml(
+        args,
+        &basis_ref,
+        &detected_release,
+        &support_surface_audit,
+        &execution_contract,
+    )
+    .into_bytes();
     let request = MaintenanceRequest {
         relative_path: request_path.clone(),
         canonical_path: workspace_root.join(&request_path),
@@ -207,6 +219,7 @@ pub fn build_prepare_plan(workspace_root: &Path, args: &Args) -> Result<PrepareP
             items: Vec::new(),
         },
         detected_release: Some(detected_release),
+        support_surface_audit: Some(support_surface_audit),
         request_recorded_at: args.request_recorded_at.clone(),
         request_commit: args.request_commit.clone(),
     };
@@ -288,29 +301,42 @@ fn validate_prepare_args(
         )));
     }
 
-    match args.dispatch_kind.as_str() {
-        WORKFLOW_DISPATCH_KIND => {
-            if args.dispatch_workflow.is_none() {
-                return Err(Error::Validation(
-                    "prepare-agent-maintenance requires --dispatch-workflow when --dispatch-kind workflow_dispatch"
-                        .to_string(),
-                ));
-            }
-        }
-        PACKET_PR_KIND => {
-            if let Some(dispatch_workflow) = args.dispatch_workflow.as_deref() {
-                if dispatch_workflow != GENERIC_PACKET_PR_WORKFLOW {
-                    return Err(Error::Validation(format!(
-                        "prepare-agent-maintenance packet_pr dispatch must use `{GENERIC_PACKET_PR_WORKFLOW}` when --dispatch-workflow is provided (got `{dispatch_workflow}`)"
-                    )));
-                }
-            }
-        }
-        other => {
+    let release_watch = entry.maintenance.release_watch.as_ref().ok_or_else(|| {
+        Error::Validation(format!(
+            "prepare-agent-maintenance requires maintenance.release_watch metadata for agent `{}`",
+            entry.agent_id
+        ))
+    })?;
+    let expected_dispatch_kind = dispatch_kind_str(release_watch.dispatch_kind);
+    if args.dispatch_kind != expected_dispatch_kind {
+        return Err(Error::Validation(format!(
+            "prepare-agent-maintenance --dispatch-kind for agent `{}` must be `{expected_dispatch_kind}` (got `{}`)",
+            entry.agent_id, args.dispatch_kind
+        )));
+    }
+    let expected_dispatch_workflow =
+        dispatch_workflow_value(&entry.agent_id, release_watch).map_err(Error::Validation)?;
+    match args.dispatch_workflow.as_deref() {
+        Some(dispatch_workflow) if dispatch_workflow != expected_dispatch_workflow => {
             return Err(Error::Validation(format!(
-                "prepare-agent-maintenance has unsupported --dispatch-kind `{other}`; expected `{WORKFLOW_DISPATCH_KIND}` or `{PACKET_PR_KIND}`"
+                "prepare-agent-maintenance --dispatch-workflow for agent `{}` must be `{expected_dispatch_workflow}` (got `{dispatch_workflow}`)",
+                entry.agent_id
             )));
         }
+        None if args.dispatch_kind == "workflow_dispatch" => {
+            return Err(Error::Validation(format!(
+                "prepare-agent-maintenance requires --dispatch-workflow `{expected_dispatch_workflow}` when --dispatch-kind workflow_dispatch"
+            )));
+        }
+        _ => {}
+    }
+    let expected_opened_from = opened_from_path(&expected_dispatch_workflow);
+    if args.opened_from.display().to_string() != expected_opened_from {
+        return Err(Error::Validation(format!(
+            "prepare-agent-maintenance --opened-from for agent `{}` must be `{expected_opened_from}` (got `{}`)",
+            entry.agent_id,
+            args.opened_from.display()
+        )));
     }
     Ok(())
 }
@@ -319,6 +345,7 @@ fn render_request_toml(
     args: &Args,
     basis_ref: &str,
     detected_release: &DetectedRelease,
+    support_surface_audit: &SupportSurfaceAudit,
     execution_contract: &ExecutionContract,
 ) -> String {
     let mut out = String::new();
@@ -363,6 +390,9 @@ fn render_request_toml(
         &detected_release.dispatch_workflow,
     );
     push_toml_line(&mut out, "branch_name", &detected_release.branch_name);
+    out.push('\n');
+
+    render_support_surface_audit(&mut out, support_surface_audit);
     out.push('\n');
 
     out.push_str("[execution_contract]\n");
@@ -418,105 +448,65 @@ fn render_request_toml(
     out
 }
 
-fn build_execution_contract(
-    workspace_root: &Path,
-    entry: &AgentRegistryEntry,
-    args: &Args,
-    request_path: &str,
-    maintenance_root: &str,
-) -> Result<ExecutionContract, Error> {
-    let prompt_template_path = format!("{}/PR_BODY_TEMPLATE.md", entry.manifest_root);
-    let prompt_contents =
-        render_execution_prompt(workspace_root, &prompt_template_path, &args.target_version)?;
-    let pr_summary_path = format!("{maintenance_root}/governance/pr-summary.md");
-    let closeout_path = format!("{maintenance_root}/governance/maintenance-closeout.json");
-    let green_gates = execution_green_gates(entry);
-
-    Ok(ExecutionContract {
-        executor: "codex".to_string(),
-        prompt_template_path,
-        prompt_sha256: hex::encode(Sha256::digest(prompt_contents.as_bytes())),
-        pr_summary_path: pr_summary_path.clone(),
-        closeout_path,
-        requires_manual_closeout: true,
-        writable_surfaces: execution_writable_surfaces(entry, maintenance_root, args),
-        read_only_inputs: vec![
-            format!("{}/OPS_PLAYBOOK.md", entry.manifest_root),
-            format!("{}/CI_WORKFLOWS_PLAN.md", entry.manifest_root),
-            format!("{}/PR_BODY_TEMPLATE.md", entry.manifest_root),
-            args.opened_from.display().to_string(),
-        ],
-        ordered_commands: green_gates.clone(),
-        green_gates,
-        recovery: ExecutionContractRecovery {
-            recreate_packet_command: format!(
-                "cargo run -p xtask -- refresh-agent --request {request_path} --write"
-            ),
-            reopen_pr_body_path: pr_summary_path,
-            reopen_pr_branch: args.branch_name.clone(),
-            notes: vec![
-                "If PR creation fails after packet generation, rerun packet creation and reopen the PR from the generated pr-summary path.".to_string(),
-                "If local Codex preflight fails, fix binary/auth and rerun execute-agent-maintenance --dry-run before write mode.".to_string(),
-            ],
-        },
-    })
-}
-
-fn render_execution_prompt(
-    workspace_root: &Path,
-    prompt_template_path: &str,
-    target_version: &str,
-) -> Result<String, Error> {
-    let template =
-        fs::read_to_string(workspace_root.join(prompt_template_path)).map_err(|err| {
-            Error::Internal(format!(
-                "read execution contract prompt template `{prompt_template_path}`: {err}"
-            ))
-        })?;
-    Ok(template.replace("{{VERSION}}", target_version))
-}
-
-fn execution_green_gates(entry: &AgentRegistryEntry) -> Vec<String> {
-    vec![
-        "cargo fmt --all".to_string(),
-        format!(
-            "cargo run -p xtask -- codex-validate --root {}",
-            entry.manifest_root
-        ),
-        "cargo run -p xtask -- support-matrix --check".to_string(),
-        "cargo run -p xtask -- capability-matrix --check".to_string(),
-        "cargo run -p xtask -- capability-matrix-audit".to_string(),
-        "make preflight".to_string(),
-    ]
-}
-
-fn execution_writable_surfaces(
-    entry: &AgentRegistryEntry,
-    maintenance_root: &str,
-    args: &Args,
-) -> Vec<String> {
-    let mut writable_surfaces = vec![
-        format!("{maintenance_root}/**"),
-        format!("{}/**", entry.crate_path),
-        "crates/agent_api/**".to_string(),
-        format!("{}/artifacts.lock.json", entry.manifest_root),
-        format!(
-            "{}/snapshots/{}/**",
-            entry.manifest_root, args.target_version
-        ),
-        format!("{}/reports/{}/**", entry.manifest_root, args.target_version),
-        format!(
-            "{}/versions/{}.json",
-            entry.manifest_root, args.target_version
-        ),
-        format!("{}/wrapper_coverage.json", entry.manifest_root),
-        "cli_manifests/support_matrix/current.json".to_string(),
-        "docs/specs/unified-agent-api/support-matrix.md".to_string(),
-    ];
-    if entry.agent_id == "codex" {
-        writable_surfaces.push("docs/specs/codex-wrapper-coverage-scenarios-v1.md".to_string());
-    }
-    writable_surfaces
+fn render_support_surface_audit(out: &mut String, audit: &SupportSurfaceAudit) {
+    out.push_str("[support_surface_audit]\n");
+    out.push_str("required = true\n");
+    push_toml_array(out, "surface_kinds", &audit.surface_kinds);
+    push_toml_array(out, "excluded_surface_kinds", &audit.excluded_surface_kinds);
+    push_toml_array(out, "allowed_deferrals", &audit.allowed_deferrals);
+    out.push_str(&format!(
+        "pre_run_debt_count = {}\n",
+        audit.pre_run_debt_count
+    ));
+    out.push_str(&format!(
+        "expected_post_run_debt_count = {}\n",
+        audit.expected_post_run_debt_count
+    ));
+    render_evidence_backed_rows(
+        out,
+        "support_surface_audit.discovered_upstream_surface",
+        &audit.discovered_upstream_surface,
+    );
+    render_evidence_backed_rows(
+        out,
+        "support_surface_audit.removed_upstream_surface",
+        &audit.removed_upstream_surface,
+    );
+    render_debt_backed_rows(
+        out,
+        "support_surface_audit.preexisting_unsupported_surface",
+        &audit.preexisting_unsupported_surface,
+    );
+    render_eligible_rows(
+        out,
+        "support_surface_audit.eligible_preexisting_surface",
+        &audit.eligible_preexisting_surface,
+    );
+    render_identity_rows(
+        out,
+        "support_surface_audit.missing_wrapper_support",
+        &audit.missing_wrapper_support,
+    );
+    render_identity_rows(
+        out,
+        "support_surface_audit.missing_backend_support",
+        &audit.missing_backend_support,
+    );
+    render_required_uplift_rows(
+        out,
+        "support_surface_audit.required_uplifts_this_run",
+        &audit.required_uplifts_this_run,
+    );
+    render_deferred_rows(
+        out,
+        "support_surface_audit.deferred_preexisting_gaps",
+        &audit.deferred_preexisting_gaps,
+    );
+    render_publication_rows(
+        out,
+        "support_surface_audit.publication_impacts",
+        &audit.publication_impacts,
+    );
 }
 
 fn push_toml_line(out: &mut String, key: &str, value: &str) {
@@ -537,31 +527,140 @@ fn push_toml_array(out: &mut String, key: &str, values: &[String]) {
     out.push_str("]\n");
 }
 
-fn dispatch_workflow_value(args: &Args) -> String {
-    args.dispatch_workflow
-        .clone()
-        .unwrap_or_else(|| GENERIC_PACKET_PR_WORKFLOW.to_string())
-}
-
-fn source_ref(release_watch: &ReleaseWatchMetadata) -> String {
-    match release_watch.upstream.source_kind {
-        ReleaseWatchSourceKind::GithubReleases => format!(
-            "{}/{}",
-            release_watch.upstream.owner.as_deref().unwrap_or(""),
-            release_watch.upstream.repo.as_deref().unwrap_or("")
-        ),
-        ReleaseWatchSourceKind::GcsObjectListing => format!(
-            "{}/{}",
-            release_watch.upstream.bucket.as_deref().unwrap_or(""),
-            release_watch.upstream.prefix.as_deref().unwrap_or("")
-        ),
+fn render_identity_rows<T>(out: &mut String, table: &str, rows: &[T])
+where
+    T: IdentityRow,
+{
+    for row in rows {
+        out.push('\n');
+        out.push_str("[[");
+        out.push_str(table);
+        out.push_str("]]\n");
+        push_toml_line(out, "surface_kind", row.surface_kind());
+        push_toml_line(out, "command_path", row.command_path());
+        push_toml_line(out, "surface_id", row.surface_id());
     }
 }
 
-fn source_kind_str(kind: ReleaseWatchSourceKind) -> &'static str {
-    match kind {
-        ReleaseWatchSourceKind::GithubReleases => "github_releases",
-        ReleaseWatchSourceKind::GcsObjectListing => "gcs_object_listing",
+fn render_evidence_backed_rows(
+    out: &mut String,
+    table: &str,
+    rows: &[super::support_audit::EvidenceBackedSurface],
+) {
+    for row in rows {
+        out.push('\n');
+        out.push_str("[[");
+        out.push_str(table);
+        out.push_str("]]\n");
+        push_toml_line(out, "surface_kind", &row.surface_kind);
+        push_toml_line(out, "command_path", &row.command_path);
+        push_toml_line(out, "surface_id", &row.surface_id);
+        push_toml_line(out, "evidence_ref", &row.evidence_ref);
+    }
+}
+
+fn render_debt_backed_rows(
+    out: &mut String,
+    table: &str,
+    rows: &[super::support_audit::DebtBackedSurface],
+) {
+    for row in rows {
+        out.push('\n');
+        out.push_str("[[");
+        out.push_str(table);
+        out.push_str("]]\n");
+        push_toml_line(out, "surface_kind", &row.surface_kind);
+        push_toml_line(out, "command_path", &row.command_path);
+        push_toml_line(out, "surface_id", &row.surface_id);
+        push_toml_line(out, "debt_ref", &row.debt_ref);
+    }
+}
+
+fn render_eligible_rows(
+    out: &mut String,
+    table: &str,
+    rows: &[super::support_audit::EligibleSurface],
+) {
+    for row in rows {
+        out.push('\n');
+        out.push_str("[[");
+        out.push_str(table);
+        out.push_str("]]\n");
+        push_toml_line(out, "surface_kind", &row.surface_kind);
+        push_toml_line(out, "command_path", &row.command_path);
+        push_toml_line(out, "surface_id", &row.surface_id);
+        push_toml_line(out, "eligibility_reason", &row.eligibility_reason);
+    }
+}
+
+fn render_required_uplift_rows(
+    out: &mut String,
+    table: &str,
+    rows: &[super::support_audit::RequiredUplift],
+) {
+    for row in rows {
+        out.push('\n');
+        out.push_str("[[");
+        out.push_str(table);
+        out.push_str("]]\n");
+        push_toml_line(out, "surface_kind", &row.surface_kind);
+        push_toml_line(out, "command_path", &row.command_path);
+        push_toml_line(out, "surface_id", &row.surface_id);
+        push_toml_line(out, "reason", &row.reason);
+        push_toml_array(out, "required_writes", &row.required_writes);
+    }
+}
+
+fn render_deferred_rows(out: &mut String, table: &str, rows: &[super::support_audit::DeferredGap]) {
+    for row in rows {
+        out.push('\n');
+        out.push_str("[[");
+        out.push_str(table);
+        out.push_str("]]\n");
+        push_toml_line(out, "surface_kind", &row.surface_kind);
+        push_toml_line(out, "command_path", &row.command_path);
+        push_toml_line(out, "surface_id", &row.surface_id);
+        push_toml_line(out, "defer_reason", &row.defer_reason);
+        if let Some(blocking_follow_on) = row.blocking_follow_on.as_ref() {
+            push_toml_line(out, "blocking_follow_on", blocking_follow_on);
+        }
+    }
+}
+
+fn render_publication_rows(
+    out: &mut String,
+    table: &str,
+    rows: &[super::support_audit::PublicationImpact],
+) {
+    for row in rows {
+        out.push('\n');
+        out.push_str("[[");
+        out.push_str(table);
+        out.push_str("]]\n");
+        push_toml_line(out, "surface_kind", &row.surface_kind);
+        push_toml_line(out, "command_path", &row.command_path);
+        push_toml_line(out, "surface_id", &row.surface_id);
+        push_toml_line(out, "surface_doc", &row.surface_doc);
+    }
+}
+
+trait IdentityRow {
+    fn surface_kind(&self) -> &str;
+    fn command_path(&self) -> &str;
+    fn surface_id(&self) -> &str;
+}
+
+impl IdentityRow for super::support_audit::SurfaceIdentity {
+    fn surface_kind(&self) -> &str {
+        &self.surface_kind
+    }
+
+    fn command_path(&self) -> &str {
+        &self.command_path
+    }
+
+    fn surface_id(&self) -> &str {
+        &self.surface_id
     }
 }
 

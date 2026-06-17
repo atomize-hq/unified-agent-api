@@ -15,6 +15,7 @@ use std::{
 use sha2::{Digest, Sha256};
 use toml_edit::de::from_str;
 
+use super::support_audit::SupportSurfaceAudit;
 use crate::{
     agent_registry::{AgentRegistry, REGISTRY_RELATIVE_PATH},
     workspace_mutation::WorkspacePathJail,
@@ -23,6 +24,7 @@ use crate::{
 use self::{
     automation::{
         validate_automated_watch_request, validate_detected_release, validate_execution_contract,
+        validate_support_surface_audit,
     },
     paths::{normalize_repo_relative_path, validate_request_path},
     raw::RawMaintenanceRequest,
@@ -47,6 +49,7 @@ pub struct MaintenanceRequest {
     pub requested_control_plane_actions: Vec<MaintenanceAction>,
     pub runtime_followup_required: RuntimeFollowupRequired,
     pub detected_release: Option<DetectedRelease>,
+    pub support_surface_audit: Option<SupportSurfaceAudit>,
     pub request_recorded_at: String,
     pub request_commit: String,
 }
@@ -295,8 +298,20 @@ pub fn load_request_envelope(
         validate_actions(&relative_path, &raw.requested_control_plane_actions)?;
     let runtime_followup_required =
         validate_runtime_followup_required(&relative_path, raw.runtime_followup_required)?;
-    let detected_release =
-        validate_detected_release(&relative_path, trigger_kind, raw.detected_release)?;
+    let detected_release = validate_detected_release(
+        registry_entry,
+        &relative_path,
+        trigger_kind,
+        raw.detected_release,
+    )?;
+    let support_surface_audit = validate_support_surface_audit(
+        &workspace_root,
+        &relative_path,
+        registry_entry,
+        trigger_kind,
+        detected_release.as_ref(),
+        raw.support_surface_audit,
+    )?;
     let execution_contract = validate_execution_contract(
         &workspace_root,
         &jail,
@@ -334,6 +349,7 @@ pub fn load_request_envelope(
             requested_control_plane_actions,
             runtime_followup_required,
             detected_release,
+            support_surface_audit,
             request_recorded_at: raw.request_recorded_at,
             request_commit: raw.request_commit,
         },

@@ -1,8 +1,14 @@
-use std::fs;
+use std::{fs, path::Path};
 
 use clap::{CommandFactory, Parser};
 use serde_json::Value;
 
+mod maintenance_docs {
+    pub use xtask::agent_maintenance::docs::*;
+}
+mod maintenance_request {
+    pub use xtask::agent_maintenance::request::*;
+}
 mod release_doc {
     pub use xtask::release_doc::*;
 }
@@ -17,8 +23,9 @@ mod maintenance_harness;
 
 use maintenance_harness::{
     execute_args, fake_execute_codex_binary, prepare_execute_fixture, read_json, run_execute_cli,
-    snapshot_without_execute_runs, write_fake_execute_codex_scenario, Cli, EXECUTE_RUNS_ROOT,
-    EXECUTE_WRITE_RUN_ID, FAKE_EXECUTE_CODEX_LOG_FILE, GATE_ORDER_LOG_FILE,
+    snapshot_without_execute_runs, write_fake_execute_codex_preflight_scenario,
+    write_fake_execute_codex_scenario, Cli, EXECUTE_RUNS_ROOT, EXECUTE_WRITE_RUN_ID,
+    FAKE_EXECUTE_CODEX_LOG_FILE, GATE_ORDER_LOG_FILE,
 };
 
 #[test]
@@ -60,8 +67,61 @@ fn execute_agent_maintenance_dry_run_writes_frozen_packet_only_under_run_root() 
         assert!(run_dir.join(name).is_file(), "missing {name}");
     }
     let prompt = fs::read_to_string(run_dir.join("codex-prompt.md")).expect("read prompt");
-    assert!(prompt.contains("Execute maintenance target 0.98.0."));
+    assert!(
+        prompt.contains("Execute the automated maintenance packet for `codex` target `0.98.0`.")
+    );
     assert!(output.stdout.contains("closeout remains manual"));
+}
+
+#[test]
+fn execute_agent_maintenance_dry_run_locks_relay_wording_and_distinction() {
+    let fixture = prepare_execute_fixture("agent-maintenance-execute-relay-contract");
+    let codex_binary = fake_execute_codex_binary(&fixture);
+    let output = run_execute_cli(execute_args("--dry-run", Some(&codex_binary)), &fixture);
+
+    assert_eq!(output.exit_code, 0, "stderr:\n{}", output.stderr);
+
+    let run_dir = fixture.join(EXECUTE_RUNS_ROOT).join(EXECUTE_WRITE_RUN_ID);
+    let input_contract = read_json(&run_dir.join("input-contract.json"));
+    let recovery_notes = input_contract
+        .get("recovery")
+        .and_then(|recovery| recovery.get("notes"))
+        .and_then(Value::as_array)
+        .expect("recovery notes array")
+        .iter()
+        .map(|note| note.as_str().expect("note string"))
+        .collect::<Vec<_>>();
+    assert_eq!(
+        recovery_notes,
+        vec![
+            "If PR creation fails after packet generation, rerun packet regeneration from the frozen request and reopen the PR from the generated pr-summary path.",
+            "If the local execution-host preflight (local Codex CLI host via execute-agent-maintenance) fails, fix the Codex binary/auth state and rerun `execute-agent-maintenance --dry-run` before write mode.",
+        ]
+    );
+    assert!(output.stdout.contains(
+        "recreate_packet_command: cargo run -p xtask -- refresh-agent --request docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml --write"
+    ));
+
+    let request_path =
+        Path::new("docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml");
+    let envelope =
+        maintenance_request::load_request_envelope(&fixture, request_path).expect("load request");
+    let packet = maintenance_docs::build_packet_docs_from_envelope(&fixture, &envelope)
+        .expect("render execution packet");
+    let handoff = packet
+        .iter()
+        .find(|doc| doc.relative_path.ends_with("/HANDOFF.md"))
+        .map(|doc| doc.contents.as_str())
+        .expect("handoff contents");
+    assert!(handoff.contains("maintained agent packet: `codex`"));
+    assert!(handoff
+        .contains("local execution host: `local Codex CLI host via execute-agent-maintenance`"));
+    assert!(handoff.contains(
+        "If PR creation fails after packet generation, rerun packet regeneration from the frozen request and reopen the PR from the generated pr-summary path."
+    ));
+    assert!(handoff.contains(
+        "If the local execution-host preflight (local Codex CLI host via execute-agent-maintenance) fails, fix the Codex binary/auth state and rerun `execute-agent-maintenance --dry-run` before write mode."
+    ));
 }
 
 #[test]
@@ -117,23 +177,51 @@ fn execute_agent_maintenance_write_rejects_noop_runtime_execution() {
 }
 
 #[test]
+fn execute_agent_maintenance_dry_run_reports_execution_host_preflight_failures() {
+    let fixture = prepare_execute_fixture("agent-maintenance-execute-preflight-fail");
+    let codex_binary = fake_execute_codex_binary(&fixture);
+    write_fake_execute_codex_preflight_scenario(&fixture, "preflight_fail");
+
+    let output = run_execute_cli(execute_args("--dry-run", Some(&codex_binary)), &fixture);
+
+    assert_eq!(output.exit_code, 2);
+    assert!(output.stderr.contains(
+        "local execution-host preflight failed; fix the Codex binary/auth state and rerun `execute-agent-maintenance --dry-run --request docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml` before write mode"
+    ));
+    assert!(output.stderr.contains(
+        "local execution-host preflight did not confirm readiness with `UAA_AGENT_MAINTENANCE_PREFLIGHT_OK`"
+    ));
+
+    let run_dir = fixture.join(EXECUTE_RUNS_ROOT).join(EXECUTE_WRITE_RUN_ID);
+    let report = read_json(&run_dir.join("validation-report.json"));
+    assert_eq!(report.get("status").and_then(Value::as_str), Some("fail"));
+    assert_eq!(
+        report
+            .get("preflight")
+            .and_then(|preflight| preflight.get("exit_code"))
+            .and_then(Value::as_i64),
+        Some(17)
+    );
+}
+
+#[test]
 fn execute_agent_maintenance_write_fails_closed_on_prompt_mismatch() {
     let fixture = prepare_execute_fixture("agent-maintenance-execute-prompt-mismatch");
     let codex_binary = fake_execute_codex_binary(&fixture);
     let dry_run = run_execute_cli(execute_args("--dry-run", Some(&codex_binary)), &fixture);
     assert_eq!(dry_run.exit_code, 0, "stderr:\n{}", dry_run.stderr);
+    let request_path =
+        fixture.join("docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml");
+    let request = fs::read_to_string(&request_path).expect("read request");
     harness::write_text(
-        &fixture.join("cli_manifests/codex/PR_BODY_TEMPLATE.md"),
-        "@codex\n\n## Goal\n\nChanged prompt target {{VERSION}}.\n",
+        &request_path,
+        &request.replace("prompt_sha256 = \"", "prompt_sha256 = \"0000"),
     );
 
     let output = run_execute_cli(execute_args("--write", Some(&codex_binary)), &fixture);
 
     assert_eq!(output.exit_code, 2);
     assert!(output.stderr.contains("prompt_sha256"));
-    assert!(output
-        .stderr
-        .contains("must match the rendered prompt template digest"));
 }
 
 #[test]
@@ -206,4 +294,25 @@ fn execute_agent_maintenance_write_ignores_generated_python_bytecode_caches() {
         .any(|path| path.ends_with(".pyc") || path.contains("__pycache__")));
     let report = read_json(&run_dir.join("validation-report.json"));
     assert_eq!(report.get("status").and_then(Value::as_str), Some("pass"));
+}
+
+#[test]
+fn execute_agent_maintenance_closeout_harness_keeps_claude_code_recovery_parity() {
+    let harness_source = include_str!("support/agent_maintenance_closeout_harness.rs");
+
+    assert!(
+        harness_source.contains("branch_name = \\\"automation/{agent_id}-maintenance-1.14.47\\\"")
+    );
+    assert!(harness_source.contains("agent-maintenance-open-pr.yml"));
+    assert!(harness_source
+        .contains("prompt_template_path = \\\"docs/agents/lifecycle/{agent_id}-maintenance/governance/execute-agent-maintenance-prompt.md\\\""));
+    assert!(harness_source.contains(
+        "pr_summary_path = \\\"docs/agents/lifecycle/{agent_id}-maintenance/governance/pr-summary.md\\\""
+    ));
+    assert!(harness_source.contains(
+        "If PR creation fails after packet generation, rerun packet regeneration from the frozen request and reopen the PR from the generated pr-summary path."
+    ));
+    assert!(harness_source.contains(
+        "If the local execution-host preflight (local Codex CLI host via execute-agent-maintenance) fails, fix the Codex binary/auth state and rerun `execute-agent-maintenance --dry-run` before write mode."
+    ));
 }

@@ -44,6 +44,10 @@ pub fn seed_opencode_basis(root: &Path) {
         &root.join("docs/specs/unified-agent-api/support-matrix.md"),
         "# Support matrix\n\nManual contract text.\n",
     );
+    write_text(
+        &root.join("docs/specs/unified-agent-api/non-tui-support-debt.md"),
+        "# Non-TUI Support Debt Inventory\n\n## Inventory\n",
+    );
     seed_publishable_workspace_member(root, "crates/gemini_cli", "unified-agent-api-gemini-cli");
     seed_cli_manifest_root(
         root,
@@ -63,6 +67,26 @@ pub fn seed_opencode_basis(root: &Path) {
         &["linux-x64", "darwin-arm64", "win32-x64"],
         &[],
     );
+    write_text(
+        &root.join("cli_manifests/opencode/latest_validated.txt"),
+        "1.4.11\n",
+    );
+    write_text(
+        &root.join("cli_manifests/opencode/artifacts.lock.json"),
+        "{\n  \"schema_version\": 1\n}\n",
+    );
+    write_text(
+        &root.join("cli_manifests/opencode/wrapper_coverage.json"),
+        "{\n  \"schema_version\": 1\n}\n",
+    );
+    write_text(
+        &root.join("cli_manifests/opencode/versions/1.14.47.json"),
+        "{\n  \"semantic_version\": \"1.14.47\"\n}\n",
+    );
+    write_text(
+        &root.join("cli_manifests/opencode/reports/1.14.47/coverage.any.json"),
+        "{\n  \"deltas\": {\n    \"missing_commands\": [],\n    \"missing_flags\": [],\n    \"missing_args\": [],\n    \"intentionally_unsupported\": []\n  }\n}\n",
+    );
     seed_cli_manifest_root(root, "cli_manifests/gemini_cli", &["darwin-arm64"], &[]);
     seed_cli_manifest_root(root, "cli_manifests/aider", &["darwin-arm64"], &[]);
 
@@ -75,6 +99,10 @@ pub fn seed_opencode_basis(root: &Path) {
     write_text(
         &root.join("docs/specs/unified-agent-api/support-matrix.md"),
         &support_bundle.markdown,
+    );
+    write_text(
+        &root.join("crates/agent_api/src/runtime_support_data.rs"),
+        &support_bundle.runtime_support_data,
     );
     write_text(
         &root.join("docs/specs/unified-agent-api/capability-matrix.md"),
@@ -296,6 +324,13 @@ pub fn write_fake_execute_codex_scenario(fixture: &Path, scenario: &str) {
     );
 }
 
+pub fn write_fake_execute_codex_preflight_scenario(fixture: &Path, scenario: &str) {
+    write_text(
+        &fixture.join(FAKE_EXECUTE_CODEX_SCENARIO_FILE),
+        &format!("{scenario}\n"),
+    );
+}
+
 pub fn read_json(path: &Path) -> Value {
     serde_json::from_slice(&fs::read(path).expect("read json")).expect("parse json")
 }
@@ -315,21 +350,28 @@ fn seed_registry(root: &Path) {
 }
 
 fn seed_execute_support_files(root: &Path) {
+    let registry =
+        xtask::agent_registry::AgentRegistry::parse(include_str!("../../data/agent_registry.toml"))
+            .expect("parse seeded registry");
+    let entry = registry.find("codex").expect("codex registry entry");
     write_text(
-        &root.join(".github/workflows/codex-cli-update-snapshot.yml"),
-        "name: Codex worker\n",
+        &root.join(".github/workflows/agent-maintenance-open-pr.yml"),
+        "name: Packet PR worker\n",
     );
     write_text(
-        &root.join("cli_manifests/codex/PR_BODY_TEMPLATE.md"),
-        "@codex\n\n## Goal\n\nExecute maintenance target {{VERSION}}.\n",
+        &root.join("docs/agents/lifecycle/codex-maintenance/governance/execute-agent-maintenance-prompt.md"),
+        &xtask::agent_maintenance::contract_policy::packet_pr_prompt_template(
+            entry,
+            "docs/agents/lifecycle/codex-maintenance",
+        ),
     );
     write_text(
-        &root.join("cli_manifests/codex/OPS_PLAYBOOK.md"),
-        "# Codex ops\n",
+        &root.join("docs/agents/lifecycle/codex-maintenance/OPS_PLAYBOOK.md"),
+        "# Packet ops\n",
     );
     write_text(
-        &root.join("cli_manifests/codex/CI_WORKFLOWS_PLAN.md"),
-        "# Codex workflow plan\n",
+        &root.join("docs/agents/lifecycle/codex-maintenance/CI_WORKFLOWS_PLAN.md"),
+        "# Packet workflow plan\n",
     );
     write_text(
         &root.join("cli_manifests/codex/latest_validated.txt"),
@@ -347,10 +389,26 @@ fn seed_execute_support_files(root: &Path) {
         &root.join("cli_manifests/codex/versions/0.98.0.json"),
         "{\n  \"semantic_version\": \"0.98.0\"\n}\n",
     );
+    write_text(
+        &root.join("cli_manifests/codex/reports/0.98.0/coverage.any.json"),
+        "{\n  \"deltas\": {\n    \"missing_commands\": [],\n    \"missing_flags\": [],\n    \"missing_args\": [],\n    \"intentionally_unsupported\": []\n  }\n}\n",
+    );
+    write_text(
+        &root.join("docs/specs/unified-agent-api/non-tui-support-debt.md"),
+        "# Non-TUI Support Debt Inventory\n\n## Inventory\n",
+    );
 }
 
 fn execution_request_toml(run_id: &str) -> String {
-    let prompt = "@codex\n\n## Goal\n\nExecute maintenance target 0.98.0.\n";
+    let registry =
+        xtask::agent_registry::AgentRegistry::parse(include_str!("../../data/agent_registry.toml"))
+            .expect("parse seeded registry");
+    let entry = registry.find("codex").expect("codex registry entry");
+    let prompt = xtask::agent_maintenance::contract_policy::packet_pr_prompt_template(
+        entry,
+        "docs/agents/lifecycle/codex-maintenance",
+    )
+    .replace("{{VERSION}}", "0.98.0");
     let prompt_sha256 = hex::encode(Sha256::digest(prompt.as_bytes()));
     let gate_one = format!(
         "sh ./gate-command.sh gate-1 docs/agents/.uaa-temp/agent-maintenance/runs/{run_id}/{GATE_ORDER_LOG_FILE}"
@@ -365,7 +423,7 @@ fn execution_request_toml(run_id: &str) -> String {
             "agent_id = \"codex\"\n",
             "trigger_kind = \"upstream_release_detected\"\n",
             "basis_ref = \"cli_manifests/codex/latest_validated.txt\"\n",
-            "opened_from = \".github/workflows/codex-cli-update-snapshot.yml\"\n",
+            "opened_from = \".github/workflows/agent-maintenance-open-pr.yml\"\n",
             "requested_control_plane_actions = [\"packet_doc_refresh\"]\n",
             "request_recorded_at = \"2026-05-05T15:00:00Z\"\n",
             "request_commit = \"abcdef1\"\n",
@@ -382,13 +440,27 @@ fn execution_request_toml(run_id: &str) -> String {
             "version_policy = \"latest_stable_minus_one\"\n",
             "source_kind = \"github_releases\"\n",
             "source_ref = \"openai/codex\"\n",
-            "dispatch_kind = \"workflow_dispatch\"\n",
-            "dispatch_workflow = \"codex-cli-update-snapshot.yml\"\n",
+            "dispatch_kind = \"packet_pr\"\n",
+            "dispatch_workflow = \"agent-maintenance-open-pr.yml\"\n",
             "branch_name = \"automation/codex-maintenance-0.98.0\"\n",
+            "\n",
+            "[support_surface_audit]\n",
+            "required = true\n",
+            "surface_kinds = [\"commands\", \"subcommands\", \"flags\", \"global_flags\", \"positional_args\"]\n",
+            "excluded_surface_kinds = [\"tui_only\"]\n",
+            "allowed_deferrals = [\n",
+            "  \"upstream_not_machine_exposed\",\n",
+            "  \"platform_evidence_missing\",\n",
+            "  \"requires_new_infra\",\n",
+            "  \"requires_new_architectural_seam\",\n",
+            "  \"outside_registry_maintenance_write_envelope\",\n",
+            "]\n",
+            "pre_run_debt_count = 0\n",
+            "expected_post_run_debt_count = 0\n",
             "\n",
             "[execution_contract]\n",
             "executor = \"codex\"\n",
-            "prompt_template_path = \"cli_manifests/codex/PR_BODY_TEMPLATE.md\"\n",
+            "prompt_template_path = \"docs/agents/lifecycle/codex-maintenance/governance/execute-agent-maintenance-prompt.md\"\n",
             "prompt_sha256 = \"{prompt_sha256}\"\n",
             "pr_summary_path = \"docs/agents/lifecycle/codex-maintenance/governance/pr-summary.md\"\n",
             "closeout_path = \"docs/agents/lifecycle/codex-maintenance/governance/maintenance-closeout.json\"\n",
@@ -398,10 +470,10 @@ fn execution_request_toml(run_id: &str) -> String {
             "  \"cli_manifests/codex/versions/0.98.0.json\",\n",
             "]\n",
             "read_only_inputs = [\n",
-            "  \"cli_manifests/codex/OPS_PLAYBOOK.md\",\n",
-            "  \"cli_manifests/codex/CI_WORKFLOWS_PLAN.md\",\n",
-            "  \"cli_manifests/codex/PR_BODY_TEMPLATE.md\",\n",
-            "  \".github/workflows/codex-cli-update-snapshot.yml\",\n",
+            "  \"docs/agents/lifecycle/codex-maintenance/OPS_PLAYBOOK.md\",\n",
+            "  \"docs/agents/lifecycle/codex-maintenance/CI_WORKFLOWS_PLAN.md\",\n",
+            "  \"docs/agents/lifecycle/codex-maintenance/governance/execute-agent-maintenance-prompt.md\",\n",
+            "  \".github/workflows/agent-maintenance-open-pr.yml\",\n",
             "]\n",
             "ordered_commands = [\n",
             "  \"{gate_one}\",\n",
@@ -413,11 +485,12 @@ fn execution_request_toml(run_id: &str) -> String {
             "]\n",
             "\n",
             "[execution_contract.recovery]\n",
-            "recreate_packet_command = \"cargo run -p xtask -- prepare-agent-maintenance --write\"\n",
+            "recreate_packet_command = \"cargo run -p xtask -- refresh-agent --request docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml --write\"\n",
             "reopen_pr_body_path = \"docs/agents/lifecycle/codex-maintenance/governance/pr-summary.md\"\n",
             "reopen_pr_branch = \"automation/codex-maintenance-0.98.0\"\n",
             "notes = [\n",
-            "  \"If local Codex preflight fails, fix binary/auth and rerun execute-agent-maintenance --dry-run before write mode.\",\n",
+            "  \"If PR creation fails after packet generation, rerun packet regeneration from the frozen request and reopen the PR from the generated pr-summary path.\",\n",
+            "  \"If the local execution-host preflight (local Codex CLI host via execute-agent-maintenance) fails, fix the Codex binary/auth state and rerun `execute-agent-maintenance --dry-run` before write mode.\",\n",
             "]\n"
         ),
         prompt_sha256 = prompt_sha256,

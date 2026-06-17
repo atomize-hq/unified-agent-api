@@ -29,3 +29,11 @@ support_matrix_enabled = true
 capability_matrix_enabled = true
 docs_release_track = "crates-io"
 onboarding_pack_prefix = "opencode-cli-onboarding"
+
+[descriptor.maintenance]
+mode = "explicitly_deferred"
+
+[descriptor.maintenance.deferral]
+reason = "Closed-baseline maintenance settlement is explicitly deferred because this historical agent is not enrolled in registry release-watch maintenance."
+follow_up = "Open a dedicated maintenance lane before any future release-watch enrollment change."
+approved_scope = "create_lane_closeout"

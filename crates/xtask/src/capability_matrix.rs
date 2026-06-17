@@ -259,8 +259,12 @@ fn resolve_workspace_root() -> Result<PathBuf, String> {
 fn runtime_backend_capabilities(
     agent_id: &str,
 ) -> Result<(String, AgentWrapperCapabilities), String> {
-    capability_publication_mod::collect_agent_capabilities(&resolve_workspace_root()?, agent_id)
-        .map(|capabilities| (agent_id.to_string(), capabilities))
+    let backends = collect_builtin_backend_capabilities()?;
+    let capabilities = backends
+        .get(agent_id)
+        .cloned()
+        .ok_or_else(|| format!("runtime backend `{agent_id}` is not present"))?;
+    Ok((agent_id.to_string(), capabilities))
 }
 
 #[cfg(test)]

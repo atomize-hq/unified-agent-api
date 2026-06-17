@@ -204,6 +204,7 @@ fn publication_refresh_actions_match_shared_publication_planner_bytes() {
                     file.relative_path.as_str(),
                     publication_refresh::SUPPORT_MATRIX_JSON_OUTPUT_PATH
                         | publication_refresh::SUPPORT_MATRIX_MARKDOWN_OUTPUT_PATH
+                        | publication_refresh::AGENT_API_RUNTIME_SUPPORT_DATA_OUTPUT_PATH
                         | publication_refresh::CAPABILITY_MATRIX_OUTPUT_PATH
                 )
             })

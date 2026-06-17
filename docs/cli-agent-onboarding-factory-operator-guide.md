@@ -4,6 +4,17 @@ This guide is the canonical operator procedure for the shipped post-M6 factory w
 
 It documents what to run, in what order, and which artifact roots each command owns. It does not replace the normative contracts in `docs/specs/**` or the onboarding charter in `docs/specs/cli-agent-onboarding-charter.md`.
 
+For the visual system map, see:
+
+`docs/cli-agent-onboarding-factory-workflow-atlas.md`
+
+For the frozen maintenance contract that governs shared `packet_pr` transport plus non-TUI support
+uplift, see:
+
+`docs/specs/maintenance-request-contract-v1.md`
+`docs/specs/agent-registry-contract.md`
+`docs/specs/unified-agent-api/non-tui-support-debt.md`
+
 ## Truth boundaries
 
 | Surface | Authority | What it owns |
@@ -504,6 +515,7 @@ After `prepare-publication --write` succeeds, use that single command to refresh
 
 - `cli_manifests/support_matrix/current.json`
 - `docs/specs/unified-agent-api/support-matrix.md`
+- `crates/agent_api/src/runtime_support_data.rs` (the library-only validated-runtime projection described by `docs/specs/unified-agent-api/runtime-support-contract.md`)
 - `docs/specs/unified-agent-api/capability-matrix.md`
 
 For capability publication, `refresh-publication` uses lifecycle-backed publication truth when it refreshes `capability-matrix`. Agents
@@ -572,6 +584,13 @@ Then refresh the generated onboarding packet to its closed state:
 - a coherent committed `publication-ready.json` packet for the same approval artifact
 - the canonical closeout artifact at `docs/agents/lifecycle/<onboarding_pack_prefix>/governance/proving-run-closeout.json`
 - closeout `state = closed` in that artifact; the only valid closeout states are `prepared` and `closed`
+- approval maintenance truth from `docs/agents/lifecycle/<onboarding_pack_prefix>/governance/approved-agent.toml` settled without inventing extra states:
+  - `descriptor.maintenance.mode = "release_watch_enrolled"` requires committed registry `maintenance.release_watch` truth for the same agent
+  - `descriptor.maintenance.mode = "explicitly_deferred"` forbids committed registry `maintenance.release_watch` truth for the same agent
+- when maintenance settlement is recorded in the closeout artifact, `maintenance_settlement.mode` must equal `release_watch_enrolled` or `explicitly_deferred`
+- every settled `maintenance_settlement` carries `approval_section_sha256`
+- `release_watch_enrolled` settlement requires `maintenance_settlement.release_watch_sha256` and forbids `maintenance_settlement.deferral_sha256`
+- `explicitly_deferred` settlement requires `maintenance_settlement.deferral_sha256` and forbids `maintenance_settlement.release_watch_sha256`
 - green published surfaces for registry/manifest continuity, support publication, capability publication, and capability-matrix audit
 - `preflight_passed = true` in the recorded proving-run closeout
 
@@ -580,12 +599,21 @@ On success it:
 - advances the committed lifecycle record to `lifecycle_stage = closed_baseline`
 - promotes `support_tier` to `publication_backed` unless the agent was already `first_class`
 - records `publication_packet_path`, `publication_packet_sha256`, and `closeout_baseline_path`
+- records `maintenance_readiness_settled` when the approval maintenance section and the closeout `maintenance_settlement` agree on the frozen normalized hashes
 - clears `blocked`, `failed_retryable`, and `drifted` while preserving `deprecated`
 - sets the next maintenance checkpoint to `check-agent-drift --agent <agent_id>`
 
 ## Maintenance mode
 
 Use maintenance mode for an already-onboarded agent when drift is detected or a control-plane refresh is needed.
+
+The procedure below documents the live committed workflow surfaces.
+
+It does not imply that all currently committed worker workflows are the intended long-term steady
+state. The successful `opencode` `packet_pr` proving run established the intended convergence
+direction: shared watcher, shared packet PR opener, shared prepared request schema, shared relay,
+and explicit manual closeout. The remaining `codex` and `claude_code` worker workflows are
+transitional transport surfaces until that migration lands.
 
 Maintenance reads the committed lifecycle baseline first. Generated packet docs and historical handoff text remain detector inputs, not the lifecycle authority.
 Maintenance accepts committed `published` records as valid baselines even before `closeout_baseline_path` exists; `closed_baseline` remains the post-closeout steady state.
@@ -628,9 +656,11 @@ This request is the control-plane input for `refresh-agent` on manual drift lane
 - `capability_matrix_refresh`
 - `release_doc_refresh`
 
+When `support_matrix_refresh` is requested, `refresh-agent` also refreshes `crates/agent_api/src/runtime_support_data.rs` from committed support truth; that runtime-support projection does not get its own control-plane action.
+
 Historical onboarding and implementation packet docs remain read-only detector inputs.
 
-Automated upstream-release lanes use the prepared v2 request contract with `artifact_version = "2"` and `trigger_kind = "upstream_release_detected"`. The shared worker workflows generate that request and packet root before they open the maintenance PR:
+Automated upstream-release lanes use the prepared v2 request contract with `artifact_version = "2"` and `trigger_kind = "upstream_release_detected"`. The shared release-watch transport generates that request and packet root before it opens the maintenance PR:
 
 ```sh
 cargo run -p xtask -- prepare-agent-maintenance \
@@ -638,9 +668,9 @@ cargo run -p xtask -- prepare-agent-maintenance \
   --current-version <current_validated> \
   --latest-stable <latest_stable> \
   --target-version <target_version> \
-  --opened-from .github/workflows/<worker-workflow>.yml \
+  --opened-from .github/workflows/<opening-workflow>.yml \
   --detected-by .github/workflows/agent-maintenance-release-watch.yml \
-  --dispatch-kind workflow_dispatch \
+  --dispatch-kind <workflow_dispatch|packet_pr> \
   --branch-name automation/<agent_id>-maintenance-<target_version> \
   --request-recorded-at <rfc3339_utc> \
   --request-commit <git_sha> \
@@ -649,13 +679,26 @@ cargo run -p xtask -- prepare-agent-maintenance \
 
 Use `--write` to materialize the request and packet docs. Automated requests are packet-first, carry the relay `[execution_contract]`, and should not be hand-edited to remove the `[detected_release]` linkage.
 
+Dispatch notes:
+- `--dispatch-kind` must match the committed registry `maintenance.release_watch.dispatch_kind` for the same agent.
+- `packet_pr` is the steady-state enrolled transport and resolves `detected_release.dispatch_workflow` to the shared `agent-maintenance-open-pr.yml` workflow.
+- `workflow_dispatch` is compatibility-only and must not carry a second policy contract in YAML.
+
 For automated upstream-release lanes:
-- `docs/agents/lifecycle/<agent_id>-maintenance/HANDOFF.md` is the canonical contributor execution contract.
-- `docs/agents/lifecycle/<agent_id>-maintenance/governance/pr-summary.md` is a derivative PR presentation surface rendered from the same packet context.
-- `docs/agents/lifecycle/<agent_id>-maintenance/governance/maintenance-request.toml` is the frozen relay input and owns `writable_surfaces`, `ordered_commands`, `green_gates`, recovery notes, and the manual-closeout requirement.
-- the exact coding-agent prompt and PR-body tail both come from `cli_manifests/<agent_id>/PR_BODY_TEMPLATE.md`
+- `docs/agents/lifecycle/<agent_id>-maintenance/HANDOFF.md` is canonical.
+- `docs/agents/lifecycle/<agent_id>-maintenance/governance/pr-summary.md` is derivative.
+- `docs/agents/lifecycle/<agent_id>-maintenance/governance/maintenance-request.toml` owns relay/write envelope/gates/recovery and the manual-closeout requirement.
+- `docs/agents/lifecycle/<agent_id>-maintenance/governance/maintenance-request.toml` also owns the
+  exact `support_surface_audit` truth for newly discovered surface, eligible preexisting gaps,
+  required uplifts, valid deferrals, and the pre-run versus post-run debt count.
+- packet-owned execution artifacts under the maintenance root are part of the frozen relay contract:
+- `docs/agents/lifecycle/<agent_id>-maintenance/OPS_PLAYBOOK.md`
+- `docs/agents/lifecycle/<agent_id>-maintenance/CI_WORKFLOWS_PLAN.md`
+- `docs/agents/lifecycle/<agent_id>-maintenance/governance/execute-agent-maintenance-prompt.md`
+- the exact coding-agent prompt and PR-body tail come from those packet-owned artifacts, not from `cli_manifests/<agent_id>/PR_BODY_TEMPLATE.md`
 - promotion-only files such as `cli_manifests/<agent_id>/latest_validated.txt` and `cli_manifests/<agent_id>/min_supported.txt` remain out of scope for this packet-first follow-on
-- support/capability/release-doc publication surfaces such as `cli_manifests/support_matrix/current.json`, `docs/specs/unified-agent-api/support-matrix.md`, `docs/specs/unified-agent-api/capability-matrix.md`, and `docs/crates-io-release.md` still exist in the broader maintenance framework, but this automated upstream-release lane is packet-only and does not request or rewrite them
+- automated scope is the frozen shared packet + declared writable surfaces
+- support/capability/release-doc publication surfaces such as `cli_manifests/support_matrix/current.json`, `docs/specs/unified-agent-api/support-matrix.md`, `crates/agent_api/src/runtime_support_data.rs`, `docs/specs/unified-agent-api/capability-matrix.md`, and `docs/crates-io-release.md` still exist in the broader maintenance framework, but this automated upstream-release lane does not request or rewrite them
 
 ### 3. Choose the maintenance execution path
 
@@ -675,9 +718,13 @@ cargo run -p xtask -- execute-agent-maintenance --request docs/agents/lifecycle/
 cargo run -p xtask -- execute-agent-maintenance --request docs/agents/lifecycle/<agent_id>-maintenance/governance/maintenance-request.toml --write --run-id <prepared_run_id>
 ```
 
-`execute-agent-maintenance` is valid only for automated upstream-release requests that already carry the generated relay contract. `--dry-run` validates the frozen request, local Codex preflight, and the exact write envelope, then writes temp evidence only under `docs/agents/.uaa-temp/agent-maintenance/runs/<run_id>/`. `--write` must reuse that prepared `run_id`, enforces the declared `writable_surfaces`, runs the exact `green_gates` from the request, and stops before closeout.
+`execute-agent-maintenance` is valid only for automated upstream-release requests that already carry the generated relay contract. `--dry-run` validates the frozen request, the local execution host, and the exact write envelope, then writes temp evidence only under `docs/agents/.uaa-temp/agent-maintenance/runs/<run_id>/`. `--write` must reuse that prepared `run_id`, enforces the declared `writable_surfaces`, runs the exact `green_gates` from the request, and stops before closeout.
 
 Packet-only agents remain explicitly deferred. If a maintenance lane does not carry the automated relay contract, do not widen it into `execute-agent-maintenance --write`; keep the packet-only PR handoff and resolve it with the existing maintainer flow.
+
+Recovery wording is frozen:
+- If PR creation fails after packet generation, rerun packet regeneration from the frozen request and reopen the PR from the generated pr-summary path.
+- If the local execution-host preflight (local Codex CLI host via execute-agent-maintenance) fails, fix the Codex binary/auth state and rerun `execute-agent-maintenance --dry-run` before write mode.
 
 ### 4. Close the maintenance run
 

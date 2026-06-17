@@ -346,6 +346,7 @@ fn prepare_publication_write_emits_packet_and_advances_lifecycle() {
         Some(vec![
             "cli_manifests/support_matrix/current.json",
             "docs/specs/unified-agent-api/support-matrix.md",
+            "crates/agent_api/src/runtime_support_data.rs",
             "docs/specs/unified-agent-api/capability-matrix.md"
         ])
     );
@@ -367,6 +368,9 @@ fn prepare_publication_write_emits_packet_and_advances_lifecycle() {
         .exists());
     assert!(!fixture
         .join("docs/specs/unified-agent-api/support-matrix.md")
+        .exists());
+    assert!(!fixture
+        .join("crates/agent_api/src/runtime_support_data.rs")
         .exists());
     assert!(!fixture
         .join("docs/specs/unified-agent-api/capability-matrix.md")

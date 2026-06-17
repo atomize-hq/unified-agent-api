@@ -1,0 +1,350 @@
+{
+  "snapshot_schema_version": 1,
+  "tool": "opencode-cli",
+  "collected_at": "2026-05-13T00:06:26.962Z",
+  "binary": {
+    "sha256": "91093dab474017c558e88f94b7cbc2adefec6badfcacff944c7c889f61f7ad3c",
+    "size_bytes": 106826914,
+    "platform": {
+      "os": "darwin",
+      "arch": "arm64"
+    },
+    "target_triple": "darwin-arm64",
+    "version_output": "1.14.47",
+    "semantic_version": "1.14.47"
+  },
+  "commands": [
+    {
+      "path": [],
+      "about": "start opencode tui                                          [default]",
+      "usage": "opencode [project]",
+      "args": [
+        {
+          "name": "project",
+          "required": false,
+          "variadic": false
+        }
+      ],
+      "flags": [
+        {
+          "takes_value": false,
+          "short": "-h",
+          "long": "--help"
+        },
+        {
+          "takes_value": false,
+          "short": "-v",
+          "long": "--version"
+        },
+        {
+          "takes_value": false,
+          "long": "--print-logs"
+        },
+        {
+          "takes_value": true,
+          "long": "--log-level"
+        },
+        {
+          "takes_value": false,
+          "long": "--pure"
+        },
+        {
+          "takes_value": true,
+          "long": "--port"
+        },
+        {
+          "takes_value": true,
+          "long": "--hostname"
+        },
+        {
+          "takes_value": false,
+          "long": "--mdns"
+        },
+        {
+          "takes_value": true,
+          "long": "--mdns-domain"
+        },
+        {
+          "takes_value": true,
+          "long": "--cors"
+        },
+        {
+          "takes_value": true,
+          "short": "-m",
+          "long": "--model"
+        },
+        {
+          "takes_value": false,
+          "short": "-c",
+          "long": "--continue"
+        },
+        {
+          "takes_value": true,
+          "short": "-s",
+          "long": "--session"
+        },
+        {
+          "takes_value": false,
+          "long": "--fork"
+        },
+        {
+          "takes_value": true,
+          "long": "--prompt"
+        },
+        {
+          "takes_value": true,
+          "long": "--agent"
+        }
+      ]
+    },
+    {
+      "path": [
+        "completion"
+      ],
+      "about": "generate shell completion script"
+    },
+    {
+      "path": [
+        "acp"
+      ],
+      "about": "start ACP (Agent Client Protocol) server"
+    },
+    {
+      "path": [
+        "mcp"
+      ],
+      "about": "manage MCP (Model Context Protocol) servers"
+    },
+    {
+      "path": [
+        "attach"
+      ],
+      "about": "attach to a running opencode server"
+    },
+    {
+      "path": [
+        "run"
+      ],
+      "about": "run opencode with a message",
+      "usage": "opencode run [message..]",
+      "args": [
+        {
+          "name": "message",
+          "required": false,
+          "variadic": true
+        }
+      ],
+      "flags": [
+        {
+          "takes_value": false,
+          "short": "-h",
+          "long": "--help"
+        },
+        {
+          "takes_value": false,
+          "short": "-v",
+          "long": "--version"
+        },
+        {
+          "takes_value": false,
+          "long": "--print-logs"
+        },
+        {
+          "takes_value": true,
+          "long": "--log-level"
+        },
+        {
+          "takes_value": false,
+          "long": "--pure"
+        },
+        {
+          "takes_value": true,
+          "long": "--command"
+        },
+        {
+          "takes_value": false,
+          "short": "-c",
+          "long": "--continue"
+        },
+        {
+          "takes_value": true,
+          "short": "-s",
+          "long": "--session"
+        },
+        {
+          "takes_value": true,
+          "long": "--fork"
+        },
+        {
+          "takes_value": false,
+          "long": "--session"
+        },
+        {
+          "takes_value": false,
+          "long": "--share"
+        },
+        {
+          "takes_value": true,
+          "short": "-m",
+          "long": "--model"
+        },
+        {
+          "takes_value": true,
+          "long": "--agent"
+        },
+        {
+          "takes_value": true,
+          "long": "--format"
+        },
+        {
+          "takes_value": true,
+          "short": "-f",
+          "long": "--file"
+        },
+        {
+          "takes_value": true,
+          "long": "--title"
+        },
+        {
+          "takes_value": true,
+          "long": "--attach"
+        },
+        {
+          "takes_value": true,
+          "short": "-p",
+          "long": "--password"
+        },
+        {
+          "takes_value": true,
+          "short": "-u",
+          "long": "--username"
+        },
+        {
+          "takes_value": true,
+          "long": "--dir"
+        },
+        {
+          "takes_value": true,
+          "long": "--port"
+        },
+        {
+          "takes_value": true,
+          "long": "--variant"
+        },
+        {
+          "takes_value": false,
+          "long": "--thinking"
+        },
+        {
+          "takes_value": false,
+          "short": "-i",
+          "long": "--interactive"
+        },
+        {
+          "takes_value": false,
+          "long": "--dangerously-skip-permissions"
+        },
+        {
+          "takes_value": false,
+          "long": "--demo"
+        }
+      ]
+    },
+    {
+      "path": [
+        "debug"
+      ],
+      "about": "debugging and troubleshooting tools"
+    },
+    {
+      "path": [
+        "providers"
+      ],
+      "about": "manage AI providers and credentials"
+    },
+    {
+      "path": [
+        "agent"
+      ],
+      "about": "manage agents"
+    },
+    {
+      "path": [
+        "upgrade"
+      ],
+      "about": "upgrade opencode to the latest or a specific version"
+    },
+    {
+      "path": [
+        "uninstall"
+      ],
+      "about": "uninstall opencode and remove all related files"
+    },
+    {
+      "path": [
+        "serve"
+      ],
+      "about": "starts a headless opencode server"
+    },
+    {
+      "path": [
+        "web"
+      ],
+      "about": "start opencode server and open web interface"
+    },
+    {
+      "path": [
+        "models"
+      ],
+      "about": "list all available models"
+    },
+    {
+      "path": [
+        "stats"
+      ],
+      "about": "show token usage and cost statistics"
+    },
+    {
+      "path": [
+        "export"
+      ],
+      "about": "export session data as JSON"
+    },
+    {
+      "path": [
+        "import"
+      ],
+      "about": "import session data from JSON file or URL"
+    },
+    {
+      "path": [
+        "github"
+      ],
+      "about": "manage GitHub agent"
+    },
+    {
+      "path": [
+        "pr"
+      ],
+      "about": "fetch and checkout a GitHub PR branch, then run opencode"
+    },
+    {
+      "path": [
+        "session"
+      ],
+      "about": "manage sessions"
+    },
+    {
+      "path": [
+        "plugin"
+      ],
+      "about": "install plugin and update config"
+    },
+    {
+      "path": [
+        "db"
+      ],
+      "about": "database tools"
+    }
+  ]
+}

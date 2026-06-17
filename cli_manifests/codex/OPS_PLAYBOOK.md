@@ -25,14 +25,14 @@ The shipped maintenance path for Codex parity is:
 
 1. `.github/workflows/agent-maintenance-release-watch.yml` detects stale `codex` parity from registry truth and dispatches `.github/workflows/codex-cli-update-snapshot.yml`.
 2. The worker refreshes the Codex parity artifacts, runs `prepare-agent-maintenance --write`, and opens branch `automation/codex-maintenance-<target_version>` with PR body `docs/agents/lifecycle/codex-maintenance/governance/pr-summary.md`.
-3. The maintainer reviews `docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml` and `docs/agents/lifecycle/codex-maintenance/HANDOFF.md`, then runs:
+3. The maintainer reviews `docs/agents/lifecycle/codex-maintenance/HANDOFF.md` as canonical, `docs/agents/lifecycle/codex-maintenance/governance/pr-summary.md` as derivative, and `docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml` as the surface that owns relay/write envelope/gates/recovery, then runs:
 
 ```bash
 cargo run -p xtask -- execute-agent-maintenance --request docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml --dry-run
 cargo run -p xtask -- execute-agent-maintenance --request docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml --write --run-id <prepared_run_id>
 ```
 
-4. `execute-agent-maintenance --dry-run` is the required trust step before write mode. It validates local Codex preflight, prints the exact writable surfaces and green gates, and prepares the frozen run packet under `docs/agents/.uaa-temp/agent-maintenance/runs/<run_id>/`.
+4. `execute-agent-maintenance --dry-run` is the required trust step before write mode. It validates the local execution host, prints the exact writable surfaces and green gates, and prepares the frozen run packet under `docs/agents/.uaa-temp/agent-maintenance/runs/<run_id>/`.
 5. `execute-agent-maintenance --write` reuses that prepared baseline, enforces the request-owned write envelope, runs the request-owned green gates, and stops before closeout.
 6. The maintainer reviews the diff and runs `close-agent-maintenance` explicitly. Closeout is never performed by the relay.
 
@@ -82,7 +82,7 @@ Notes:
 
 ## Automation PRs: Agent Instructions
 
-The Update Snapshot workflow opens a PR branch like `automation/codex-maintenance-<version>`.
+The Update Snapshot workflow opens a PR branch like `automation/codex-maintenance-<target_version>`.
 
 That PR is intentionally *not* self-closing. It is the maintainer handoff point for the local relay. The implementation work happens by:
 - reviewing the generated request and canonical `HANDOFF.md`
@@ -94,7 +94,11 @@ Use:
 - `cli_manifests/codex/PR_BODY_TEMPLATE.md` as the PR description template (starts with `@codex`).
 - `cli_manifests/codex/CI_AGENT_RUNBOOK.md` as the detailed operating instructions for the agent.
 
-If PR creation fails after packet generation, or local relay preflight fails, use the machine-derived recovery instructions rendered in:
+Recovery wording is frozen:
+- If PR creation fails after packet generation, rerun packet regeneration from the frozen request and reopen the PR from the generated pr-summary path.
+- If the local execution-host preflight (local Codex CLI host via execute-agent-maintenance) fails, fix the Codex binary/auth state and rerun `execute-agent-maintenance --dry-run` before write mode.
+
+Use the machine-derived recovery instructions rendered in:
 - `docs/agents/lifecycle/codex-maintenance/HANDOFF.md`
 - `docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml`
 

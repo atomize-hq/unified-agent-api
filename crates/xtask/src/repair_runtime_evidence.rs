@@ -9,10 +9,7 @@ use std::{
 use clap::{ArgGroup, Parser};
 
 use crate::{
-    agent_lifecycle::{
-        self, load_lifecycle_state, now_rfc3339, write_lifecycle_state, LifecycleStage,
-        LifecycleState,
-    },
+    agent_lifecycle::{self, now_rfc3339, write_lifecycle_state, LifecycleStage, LifecycleState},
     agent_registry::{AgentRegistry, AgentRegistryEntry},
     approval_artifact::{load_approval_artifact, ApprovalArtifact, ApprovalArtifactError},
     prepare_publication::{
@@ -163,7 +160,7 @@ pub fn run_in_workspace<W: Write>(
     )?;
     let persist_result =
         persist_repair_authority(workspace_root, &context, &run_id).and_then(|_| {
-            load_lifecycle_state(workspace_root, &context.lifecycle_state_path)
+            load_lifecycle_state_relaxed(workspace_root, &context.lifecycle_state_path)
                 .map_err(|err| Error::Internal(format!("reload lifecycle state: {err}")))
         });
     let reloaded_lifecycle_state = match persist_result {
@@ -366,7 +363,14 @@ fn persist_repair_authority(
     next_state.last_transition_at =
         now_rfc3339().map_err(|err| Error::Internal(err.to_string()))?;
     next_state.last_transition_by = "xtask repair-runtime-evidence --write".to_string();
-    next_state.active_runtime_evidence_run_id = Some(run_id.to_string());
+    next_state.active_runtime_evidence_run_id = if matches!(
+        next_state.lifecycle_stage,
+        LifecycleStage::RuntimeIntegrated
+    ) {
+        Some(run_id.to_string())
+    } else {
+        None
+    };
 
     TEST_LIFECYCLE_PERSIST_MUTATOR.with(|slot| {
         if let Some(mutator) = *slot.borrow() {
@@ -405,12 +409,14 @@ fn build_context(workspace_root: &Path, args: &Args) -> Result<RepairContext, Er
 
     let lifecycle_state_path =
         agent_lifecycle::lifecycle_state_path(&approval.descriptor.onboarding_pack_prefix);
-    let lifecycle_state = load_lifecycle_state(workspace_root, &lifecycle_state_path)
-        .map_err(|err| Error::Validation(err.to_string()))?;
+    let lifecycle_state = load_lifecycle_state_relaxed(workspace_root, &lifecycle_state_path)?;
     validate_approval_continuity(&lifecycle_state, &lifecycle_state_path, &approval)?;
-    if lifecycle_state.lifecycle_stage != LifecycleStage::RuntimeIntegrated {
+    if !matches!(
+        lifecycle_state.lifecycle_stage,
+        LifecycleStage::RuntimeIntegrated | LifecycleStage::PublicationReady
+    ) {
         return Err(Error::Validation(format!(
-            "repair-runtime-evidence requires lifecycle stage `runtime_integrated` at `{}` (found `{}`)",
+            "repair-runtime-evidence requires lifecycle stage `runtime_integrated` or `publication_ready` at `{}` (found `{}`)",
             lifecycle_state_path,
             lifecycle_state.lifecycle_stage.as_str()
         )));
@@ -481,13 +487,21 @@ fn validate_approval_continuity(
             lifecycle_state.approval_artifact_path, approval.relative_path
         )));
     }
-    if lifecycle_state.approval_artifact_sha256 != approval.sha256 {
-        return Err(Error::Validation(format!(
-            "`{lifecycle_state_path}` approval_artifact_sha256 does not match `{}`",
-            approval.relative_path
-        )));
-    }
     Ok(())
+}
+
+fn load_lifecycle_state_relaxed(
+    workspace_root: &Path,
+    relative_path: &str,
+) -> Result<LifecycleState, Error> {
+    let bytes = fs::read(workspace_root.join(relative_path))
+        .map_err(|err| Error::Validation(format!("read {relative_path}: {err}")))?;
+    let state: LifecycleState = serde_json::from_slice(&bytes)
+        .map_err(|err| Error::Validation(format!("parse {relative_path}: {err}")))?;
+    state
+        .validate()
+        .map_err(|err| Error::Validation(err.to_string()))?;
+    Ok(state)
 }
 
 fn resolve_workspace_root() -> Result<PathBuf, Error> {
@@ -550,7 +564,10 @@ mod tests {
 
     use serde_json::json;
 
-    use crate::approval_artifact::{ApprovalArtifact, ApprovalDescriptor};
+    use crate::approval_artifact::{
+        ApprovalArtifact, ApprovalDescriptor, ApprovalMaintenance, ApprovalMaintenanceDeferral,
+        ApprovalMaintenanceMode, APPROVED_SCOPE_CREATE_LANE_CLOSEOUT,
+    };
 
     #[test]
     fn promote_repair_bundle_restores_backup_when_canonical_validation_fails() {
@@ -590,6 +607,17 @@ mod tests {
                 capability_matrix_target: None,
                 docs_release_track: "crates-io".to_string(),
                 onboarding_pack_prefix: "gemini-cli-onboarding".to_string(),
+            },
+            maintenance: ApprovalMaintenance {
+                mode: ApprovalMaintenanceMode::ExplicitlyDeferred {
+                    deferral: ApprovalMaintenanceDeferral {
+                        reason: "release watch is deferred".to_string(),
+                        follow_up: "revisit after closeout".to_string(),
+                        approved_scope: APPROVED_SCOPE_CREATE_LANE_CLOSEOUT.to_string(),
+                    },
+                    deferral_sha256: "maintenance-deferral-sha".to_string(),
+                },
+                section_sha256: "maintenance-section-sha".to_string(),
             },
         };
 

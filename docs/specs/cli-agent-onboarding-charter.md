@@ -1,6 +1,6 @@
 # Charter — Onboarding new CLI agent wrapper crates + `agent_api` backends
 
-Status: Draft  
+Status: Normative  
 Date (UTC): 2026-02-20  
 Owner(s): atomize-hq wrappers team
 
@@ -16,9 +16,29 @@ Procedure note:
 - if the charter and an operator step summary ever diverge, the charter and `docs/specs/**` own the contract truth
 
 Maintenance request note:
+- the canonical automated maintenance packet contract lives in `docs/specs/maintenance-request-contract-v1.md`
 - maintainer-authored maintenance requests remain valid under the legacy request format
 - automated release-watch maintenance requests use `artifact_version = "2"` and `trigger_kind = "upstream_release_detected"`
 - automated release-watch requests MUST carry a `[detected_release]` table and MUST freeze `requested_control_plane_actions = ["packet_doc_refresh"]`
+- automated release-watch requests for enrolled maintenance MUST also carry
+  `[support_surface_audit]`, and that block is the only valid packet-owned source of truth for:
+  - newly discovered non-TUI surface
+  - preexisting non-TUI support debt
+  - allowed deferrals
+  - `required_uplifts_this_run[]`
+
+Approval maintenance note:
+- the committed `approved-agent.toml` artifact MUST carry frozen `descriptor.maintenance` truth in exactly one mode: `release_watch_enrolled` or `explicitly_deferred`
+- `release_watch_enrolled` requires committed registry `maintenance.release_watch` truth for the same agent
+- `explicitly_deferred` forbids committed registry `maintenance.release_watch` truth for the same agent
+
+Maintenance posture note:
+- a newly onboarded agent MAY start with partial non-TUI support
+- once an agent is enrolled in automated release-watch maintenance, non-TUI support MUST ratchet
+  upward over time rather than treating deliberate unsupported posture as steady state
+- TUI-only surface remains excluded from the automated maintenance ratchet
+- published non-TUI blockers MUST live in
+  `docs/specs/unified-agent-api/non-tui-support-debt.md`, not only in support-matrix caveat prose
 
 ## Goals
 
@@ -32,6 +52,7 @@ Maintenance request note:
 ## Normative references
 
 - `docs/specs/agent-registry-contract.md`
+- `docs/specs/maintenance-request-contract-v1.md`
 - `docs/specs/unified-agent-api/capabilities-schema-spec.md`
 - `docs/specs/unified-agent-api/extensions-spec.md`
 
@@ -179,6 +200,7 @@ Canonical lifecycle record:
    - the next command template remains `refresh-publication --approval <path> --write`
 7) `refresh-publication --approval <path> --check|--write` is the only publication consumer command; run `refresh-publication --approval docs/agents/lifecycle/<onboarding_pack_prefix>/governance/approved-agent.toml --write` to consume the committed handoff packet:
    - refresh publication outputs from the committed handoff packet
+   - regenerate the library-only validated-runtime projection at `crates/agent_api/src/runtime_support_data.rs` alongside the published support surfaces when support publication is enabled
    - own publication output writes, the required green gate, and rollback if a publication write or gate step fails
    - keep the required publication command inventory fixed to:
      - `cargo run -p xtask -- support-matrix --check`
@@ -197,6 +219,12 @@ Canonical lifecycle record:
    - the committed closeout artifact must remain on the canonical path above
    - closeout states are exactly `prepared` and `closed`
    - prepared packet surfaces must not present the proving run as closed
+   - the machine-owned closeout settlement surface is `maintenance_settlement`
+   - `maintenance_settlement.mode` MUST equal `release_watch_enrolled` or `explicitly_deferred`
+   - every `maintenance_settlement` MUST carry `approval_section_sha256`
+   - `release_watch_enrolled` requires `maintenance_settlement.release_watch_sha256` and forbids `maintenance_settlement.deferral_sha256`
+   - `explicitly_deferred` requires `maintenance_settlement.deferral_sha256` and forbids `maintenance_settlement.release_watch_sha256`
+   - successful proving-run closeout records `maintenance_readiness_settled` before the lifecycle advances to `closed_baseline`
 10) Ensure required CI workflows pass (see below).
 
 Publication handoff rule:

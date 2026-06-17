@@ -1,0 +1,29 @@
+{
+  "workflow_version": "agent_maintenance_execute_v1",
+  "generated_at": "2026-05-13T00:19:22.380096Z",
+  "run_id": "20260512T235319Z",
+  "host_surface": "execute-agent-maintenance",
+  "mode": "write",
+  "status": "write_validated",
+  "validation_passed": true,
+  "request_path": "docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml",
+  "packet_root": "docs/agents/.uaa-temp/agent-maintenance/runs/20260512T235319Z",
+  "agent_id": "opencode",
+  "target_version": "1.14.47",
+  "branch_name": "automation/opencode-maintenance-1.14.47",
+  "written_paths": [
+    "cli_manifests/opencode/artifacts.lock.json",
+    "cli_manifests/opencode/reports/1.14.47/coverage.any.json",
+    "cli_manifests/opencode/reports/1.14.47/coverage.darwin-arm64.json",
+    "cli_manifests/opencode/snapshots/1.14.47/darwin-arm64.json",
+    "cli_manifests/opencode/snapshots/1.14.47/union.json",
+    "cli_manifests/opencode/versions/1.14.47.json",
+    "cli_manifests/support_matrix/current.json",
+    "docs/agents/lifecycle/opencode-maintenance/governance/proof/execute-dry-run.txt",
+    "docs/agents/lifecycle/opencode-maintenance/governance/proof/run-id.txt",
+    "docs/agents/lifecycle/opencode-maintenance/governance/proof/run-status-dry-run.json",
+    "docs/agents/lifecycle/opencode-maintenance/governance/proof/validation-report-dry-run.json",
+    "docs/specs/unified-agent-api/support-matrix.md"
+  ],
+  "errors": []
+}

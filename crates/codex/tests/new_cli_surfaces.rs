@@ -11,7 +11,7 @@ use codex::{
     DebugAppServerSendMessageV2Request, DebugModelsRequest, DebugPromptInputRequest,
     ExecServerRequest, FeaturesDisableRequest, FeaturesEnableRequest, PluginCommandRequest,
     PluginMarketplaceAddRequest, PluginMarketplaceCommandRequest, PluginMarketplaceRemoveRequest,
-    PluginMarketplaceUpgradeRequest,
+    PluginMarketplaceUpgradeRequest, SandboxCommandRequest, SandboxPlatform, UpdateCommandRequest,
 };
 use serde::Deserialize;
 
@@ -306,6 +306,141 @@ async fn new_0125_surfaces_spawn_expected_subcommands() -> Result<(), Box<dyn st
     Ok(())
 }
 
+#[tokio::test]
+async fn new_0129_surfaces_spawn_expected_subcommands() -> Result<(), Box<dyn std::error::Error>> {
+    let temp = tempfile::tempdir()?;
+    let log_path = temp.path().join("invocations.jsonl");
+    let fake_codex = write_fake_codex(&log_path)?;
+
+    let client = CodexClient::builder()
+        .binary(&fake_codex)
+        .mirror_stdout(false)
+        .quiet(true)
+        .build();
+
+    let mut exec_server = client.start_exec_server(
+        ExecServerRequest::new()
+            .listen("stdio")
+            .executor_id("executor-1")
+            .name("background-worker"),
+    )?;
+    let exec_server_status = exec_server.wait().await?;
+    assert!(exec_server_status.success());
+
+    let access_token_login = client.spawn_with_access_token_login_process()?;
+    let access_token_login_output = access_token_login.wait_with_output().await?;
+    assert!(access_token_login_output.status.success());
+
+    let sandbox_linux = client
+        .run_sandbox(
+            SandboxCommandRequest::new(SandboxPlatform::Linux, ["echo", "linux"])
+                .include_managed_config(true)
+                .permissions_profile("linux-profile"),
+        )
+        .await?;
+    assert!(sandbox_linux.status.success());
+
+    let sandbox_macos = client
+        .run_sandbox(
+            SandboxCommandRequest::new(SandboxPlatform::Macos, ["echo", "macos"])
+                .include_managed_config(true)
+                .permissions_profile("macos-profile"),
+        )
+        .await?;
+    assert!(sandbox_macos.status.success());
+
+    let sandbox_windows = client
+        .run_sandbox(
+            SandboxCommandRequest::new(SandboxPlatform::Windows, ["echo", "windows"])
+                .include_managed_config(true)
+                .permissions_profile("windows-profile"),
+        )
+        .await?;
+    assert!(sandbox_windows.status.success());
+
+    let update = client.update(UpdateCommandRequest::new()).await?;
+    assert!(update.status.success());
+
+    let invocations = read_invocations(&log_path)?;
+    let argv_sets: Vec<_> = invocations
+        .iter()
+        .map(|inv| inv.argv.as_slice())
+        .collect::<Vec<_>>();
+
+    assert!(
+        invocations.iter().any(|inv| {
+            inv.argv.first().map(|value| value.as_str()) == Some("exec-server")
+                && inv.argv.iter().any(|value| value == "--listen")
+                && inv.argv.iter().any(|value| value == "--executor-id")
+                && inv.argv.iter().any(|value| value == "--name")
+        }),
+        "missing 0.129 exec-server invocation: {:?}",
+        argv_sets
+    );
+    assert!(
+        invocations
+            .iter()
+            .any(|inv| inv.argv == ["login", "--with-access-token"]),
+        "missing access-token login invocation: {:?}",
+        argv_sets
+    );
+    assert!(
+        invocations.iter().any(|inv| {
+            inv.argv.first().map(|value| value.as_str()) == Some("sandbox")
+                && inv.argv.get(1).map(|value| value.as_str()) == Some("linux")
+                && inv
+                    .argv
+                    .iter()
+                    .any(|value| value == "--include-managed-config")
+                && inv
+                    .argv
+                    .iter()
+                    .any(|value| value == "--permissions-profile")
+        }),
+        "missing sandbox linux 0.129 invocation: {:?}",
+        argv_sets
+    );
+    assert!(
+        invocations.iter().any(|inv| {
+            inv.argv.first().map(|value| value.as_str()) == Some("sandbox")
+                && inv.argv.get(1).map(|value| value.as_str()) == Some("macos")
+                && inv
+                    .argv
+                    .iter()
+                    .any(|value| value == "--include-managed-config")
+                && inv
+                    .argv
+                    .iter()
+                    .any(|value| value == "--permissions-profile")
+        }),
+        "missing sandbox macos 0.129 invocation: {:?}",
+        argv_sets
+    );
+    assert!(
+        invocations.iter().any(|inv| {
+            inv.argv.first().map(|value| value.as_str()) == Some("sandbox")
+                && inv.argv.get(1).map(|value| value.as_str()) == Some("windows")
+                && inv
+                    .argv
+                    .iter()
+                    .any(|value| value == "--include-managed-config")
+                && inv
+                    .argv
+                    .iter()
+                    .any(|value| value == "--permissions-profile")
+        }),
+        "missing sandbox windows 0.129 invocation: {:?}",
+        argv_sets
+    );
+    assert!(
+        invocations.iter().any(|inv| inv.argv == ["update"]),
+        "missing update invocation: {:?}",
+        argv_sets
+    );
+
+    Ok(())
+}
+
 fn write_fake_codex(log_path: &Path) -> Result<PathBuf, Box<dyn std::error::Error>> {
     let script_path = log_path
         .parent()
@@ -369,8 +504,23 @@ if [[ $# -ge 1 && $1 == "exec-server" ]]; then
   exit 0
 fi
 
+if [[ $# -ge 2 && $1 == "login" && $2 == "--with-access-token" ]]; then
+  echo "login-with-access-token-ok"
+  exit 0
+fi
+
+if [[ $# -ge 2 && $1 == "sandbox" ]]; then
+  echo "sandbox-ok"
+  exit 0
+fi
+
 if [[ $# -ge 1 && $1 == "plugin" ]]; then
   echo "plugin-ok"
+  exit 0
+fi
+
+if [[ $# -ge 1 && $1 == "update" ]]; then
+  echo "update-ok"
   exit 0
 fi
 

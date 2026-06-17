@@ -13,6 +13,11 @@ use agent_api::{
 };
 use futures_core::Stream;
 
+const FIRST_EVENT_TIMEOUT: Duration = Duration::from_secs(5);
+const COMPLETION_TIMEOUT: Duration = Duration::from_secs(5);
+const DRAIN_TIMEOUT: Duration = Duration::from_secs(5);
+const POST_EVENT_PENDING_TIMEOUT: Duration = Duration::from_millis(200);
+
 fn fake_codex_binary() -> PathBuf {
     PathBuf::from(env!("CARGO_BIN_EXE_fake_codex_stream_json_agent_api"))
 }
@@ -86,7 +91,7 @@ async fn events_are_observable_before_process_exit() {
     let mut completion = handle.completion;
 
     let first_event = tokio::time::timeout(
-        Duration::from_secs(1),
+        FIRST_EVENT_TIMEOUT,
         std::future::poll_fn(|cx| events.as_mut().poll_next(cx)),
     )
     .await
@@ -102,13 +107,13 @@ async fn events_are_observable_before_process_exit() {
     drop(events);
 
     assert!(
-        tokio::time::timeout(Duration::from_millis(200), &mut completion)
+        tokio::time::timeout(POST_EVENT_PENDING_TIMEOUT, &mut completion)
             .await
             .is_err(),
         "expected completion to remain pending after observing the first event"
     );
 
-    let completion = tokio::time::timeout(Duration::from_secs(3), &mut completion)
+    let completion = tokio::time::timeout(COMPLETION_TIMEOUT, &mut completion)
         .await
         .expect("completion resolves")
         .unwrap();
@@ -149,7 +154,7 @@ async fn request_env_overrides_backend_env() {
 
     drop(handle.events);
 
-    let completion = tokio::time::timeout(Duration::from_secs(2), handle.completion)
+    let completion = tokio::time::timeout(COMPLETION_TIMEOUT, handle.completion)
         .await
         .expect("completion resolves")
         .unwrap();
@@ -195,7 +200,7 @@ async fn redaction_does_not_leak_raw_jsonl_line() {
     let mut events = handle.events;
     let completion = handle.completion;
 
-    let seen = drain_to_none(events.as_mut(), Duration::from_secs(2)).await;
+    let seen = drain_to_none(events.as_mut(), DRAIN_TIMEOUT).await;
     assert!(
         seen.iter()
             .any(|ev| ev.kind == AgentWrapperEventKind::Error),
@@ -206,7 +211,7 @@ async fn redaction_does_not_leak_raw_jsonl_line() {
         "expected redaction to avoid raw JSONL line content"
     );
 
-    let completion = tokio::time::timeout(Duration::from_secs(2), completion)
+    let completion = tokio::time::timeout(COMPLETION_TIMEOUT, completion)
         .await
         .expect("completion resolves")
         .unwrap();

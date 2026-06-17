@@ -9,7 +9,7 @@ Key references:
 - CI agent runbook: `cli_manifests/claude_code/CI_AGENT_RUNBOOK.md`
 - PR body template: `cli_manifests/claude_code/PR_BODY_TEMPLATE.md`
 - Workflows:
-  - `.github/workflows/claude-code-release-watch.yml`
+  - `.github/workflows/agent-maintenance-release-watch.yml`
   - `.github/workflows/claude-code-update-snapshot.yml`
   - `.github/workflows/claude-code-promote.yml`
 
@@ -28,7 +28,7 @@ Key references:
 The shipped maintenance path for Claude Code parity is:
 
 1. `.github/workflows/agent-maintenance-release-watch.yml` detects stale `claude_code` parity from registry truth and dispatches `.github/workflows/claude-code-update-snapshot.yml`.
-2. The worker refreshes the Claude Code parity artifacts, runs `prepare-agent-maintenance --write`, and opens branch `automation/claude-code-<target_version>` with PR body `docs/agents/lifecycle/claude_code-maintenance/governance/pr-summary.md`.
+2. The worker refreshes the Claude Code parity artifacts, runs `prepare-agent-maintenance --write`, and opens branch `automation/claude_code-maintenance-<target_version>` with PR body `docs/agents/lifecycle/claude_code-maintenance/governance/pr-summary.md`.
 3. The maintainer reviews `docs/agents/lifecycle/claude_code-maintenance/governance/maintenance-request.toml` and `docs/agents/lifecycle/claude_code-maintenance/HANDOFF.md`, then runs:
 
 ```bash
@@ -36,7 +36,7 @@ cargo run -p xtask -- execute-agent-maintenance --request docs/agents/lifecycle/
 cargo run -p xtask -- execute-agent-maintenance --request docs/agents/lifecycle/claude_code-maintenance/governance/maintenance-request.toml --write --run-id <prepared_run_id>
 ```
 
-4. `execute-agent-maintenance --dry-run` is the required trust step before write mode. It validates local Codex preflight, prints the exact writable surfaces and green gates, and prepares the frozen run packet under `docs/agents/.uaa-temp/agent-maintenance/runs/<run_id>/`.
+4. `execute-agent-maintenance --dry-run` is the required trust step before write mode. It validates the local execution-host preflight, prints the exact writable surfaces and green gates, and prepares the frozen run packet under `docs/agents/.uaa-temp/agent-maintenance/runs/<run_id>/`.
 5. `execute-agent-maintenance --write` reuses that prepared baseline, enforces the request-owned write envelope, runs the request-owned green gates, and stops before closeout.
 6. The maintainer reviews the diff and runs `close-agent-maintenance` explicitly. Closeout is never performed by the relay.
 
@@ -67,7 +67,7 @@ Required replay inputs:
 - `opened_from`: the repo-relative worker workflow path, `.github/workflows/claude-code-update-snapshot.yml`
 - `detected_by`: `.github/workflows/agent-maintenance-release-watch.yml`
 - `dispatch_kind`: `workflow_dispatch`
-- `branch_name`: `automation/claude-code-<target_version>`
+- `branch_name`: `automation/claude_code-maintenance-<target_version>`
 
 Responsibilities (high level):
 - Download `manifest.json` and verify integrity (sha256 + size).
@@ -81,7 +81,7 @@ Responsibilities (high level):
   - `xtask codex-validate --root cli_manifests/claude_code`
 - Generate a triad scaffold under:
   - `.archived/project_management/next/claude-code-cli-parity-<version>/`
-- Open a PR branch `automation/claude-code-<version>`.
+- Open a PR branch `automation/claude_code-maintenance-<target_version>`.
 
 After the worker PR exists, complete the maintainer-owned implementation step through the relay:
 

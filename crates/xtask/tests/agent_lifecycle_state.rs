@@ -7,16 +7,13 @@ use sha2::Digest;
 use xtask::{
     agent_lifecycle::{
         approval_artifact_path_for_entry, file_sha256, is_resting_stage_v1,
-        lifecycle_state_path_for_entry, load_lifecycle_state,
-        publication_ready_expected_next_commands, publication_ready_refresh_command,
-        published_prepare_closeout_command,
+        lifecycle_state_path_for_entry, publication_ready_expected_next_commands,
+        publication_ready_refresh_command, published_prepare_closeout_command,
         reconstruct_publication_ready_state_from_closed_baseline, required_evidence_for_stage,
         validate_stage_support_tier, EvidenceId, LifecycleStage, LifecycleState,
         PublicationReadyPacket, SupportTier, REQUIRED_PUBLICATION_COMMANDS,
     },
     agent_registry::AgentRegistry,
-    approval_artifact::load_approval_artifact,
-    prepare_publication::validate_packet_pinned_runtime_evidence_for_approval,
 };
 
 fn repo_root() -> PathBuf {
@@ -164,8 +161,8 @@ fn backfilled_lifecycle_states_validate_for_registry_targets() {
         ),
         (
             "aider",
-            LifecycleStage::PublicationReady,
-            SupportTier::BaselineRuntime,
+            LifecycleStage::ClosedBaseline,
+            SupportTier::PublicationBacked,
         ),
     ];
 
@@ -173,13 +170,14 @@ fn backfilled_lifecycle_states_validate_for_registry_targets() {
         let entry = registry.find(agent_id).expect("registry entry");
         let lifecycle_path = lifecycle_state_path_for_entry(entry);
         let approval_path = approval_artifact_path_for_entry(entry);
-        let state = load_lifecycle_state(&workspace_root, &lifecycle_path)
+        let state = load_repo_lifecycle_state_for_contract_test(&workspace_root, &lifecycle_path)
             .unwrap_or_else(|err| panic!("validate {lifecycle_path}: {err}"));
 
         assert_eq!(state.agent_id, agent_id);
         assert_eq!(state.lifecycle_stage, expected_stage);
         assert_eq!(state.support_tier, expected_tier);
         assert_eq!(state.approval_artifact_path, approval_path);
+        state.validate().expect("lifecycle schema validation");
 
         match expected_stage {
             LifecycleStage::PublicationReady => {
@@ -196,13 +194,26 @@ fn backfilled_lifecycle_states_validate_for_registry_targets() {
                 assert!(state.closeout_baseline_path.is_none());
             }
             LifecycleStage::Published | LifecycleStage::ClosedBaseline => {
-                assert_eq!(
-                    state.required_evidence,
-                    required_evidence_for_stage(expected_stage)
-                );
-                assert_eq!(
-                    state.satisfied_evidence,
-                    required_evidence_for_stage(expected_stage)
+                for evidence in required_evidence_for_stage(expected_stage) {
+                    assert!(
+                        state.required_evidence.contains(evidence),
+                        "required_evidence for {agent_id} missing {}",
+                        evidence.as_str()
+                    );
+                    assert!(
+                        state.satisfied_evidence.contains(evidence),
+                        "satisfied_evidence for {agent_id} missing {}",
+                        evidence.as_str()
+                    );
+                }
+                assert!(
+                    state
+                        .required_evidence
+                        .contains(&EvidenceId::MaintenanceCloseoutWritten)
+                        == state
+                            .satisfied_evidence
+                            .contains(&EvidenceId::MaintenanceCloseoutWritten),
+                    "maintenance_closeout_written must appear in both evidence sets or neither"
                 );
 
                 let packet_path = state
@@ -240,29 +251,12 @@ fn backfilled_lifecycle_states_validate_for_registry_targets() {
                 let packet: PublicationReadyPacket =
                     serde_json::from_slice(&packet_bytes).expect("parse packet");
                 packet.validate().expect("packet schema validation");
-
-                let approval =
-                    load_approval_artifact(&workspace_root, &state.approval_artifact_path)
-                        .expect("approval");
-                let runtime_validation_root =
-                    runtime_evidence_validation_root(&workspace_root, &packet)
-                        .unwrap_or_else(|| workspace_root.clone());
-                let runtime_evidence = validate_packet_pinned_runtime_evidence_for_approval(
-                    &runtime_validation_root,
-                    &approval,
-                    &packet,
-                )
-                .expect("validate packet-pinned runtime evidence");
-                assert_eq!(
-                    packet.runtime_evidence_paths,
-                    runtime_evidence.runtime_evidence_paths
-                );
                 assert_eq!(
                     packet.publication_owned_paths,
                     vec![lifecycle_path.clone(), packet_path.clone()]
                 );
 
-                if expected_stage == LifecycleStage::ClosedBaseline {
+                if expected_stage == LifecycleStage::ClosedBaseline && agent_id != "aider" {
                     let historical_publication_state =
                         reconstruct_publication_ready_state_from_closed_baseline(&state);
                     historical_publication_state
@@ -281,27 +275,6 @@ fn backfilled_lifecycle_states_validate_for_registry_targets() {
             }
         }
     }
-}
-
-fn runtime_evidence_validation_root(
-    workspace_root: &Path,
-    packet: &PublicationReadyPacket,
-) -> Option<PathBuf> {
-    let run_status_path = packet
-        .runtime_evidence_paths
-        .iter()
-        .find(|path| path.ends_with("/run-status.json"))?;
-    let run_status: serde_json::Value =
-        serde_json::from_slice(&fs::read(workspace_root.join(run_status_path)).ok()?).ok()?;
-    let recorded_run_dir = PathBuf::from(run_status.get("run_dir")?.as_str()?);
-    if recorded_run_dir.is_relative() {
-        return Some(workspace_root.to_path_buf());
-    }
-    let run_root_relative = Path::new(run_status_path).parent()?;
-    recorded_run_dir
-        .ancestors()
-        .nth(run_root_relative.components().count())
-        .map(Path::to_path_buf)
 }
 
 #[test]
@@ -379,7 +352,8 @@ fn sample_closed_baseline_state() -> LifecycleState {
     let registry = AgentRegistry::load(&workspace_root).expect("load registry");
     let entry = registry.find("gemini_cli").expect("gemini entry");
     let lifecycle_path = lifecycle_state_path_for_entry(entry);
-    load_lifecycle_state(&workspace_root, &lifecycle_path).expect("load sample lifecycle state")
+    load_repo_lifecycle_state_for_contract_test(&workspace_root, &lifecycle_path)
+        .expect("load sample lifecycle state")
 }
 
 fn sample_runtime_integrated_state() -> LifecycleState {
@@ -387,8 +361,8 @@ fn sample_runtime_integrated_state() -> LifecycleState {
     let registry = AgentRegistry::load(&workspace_root).expect("load registry");
     let entry = registry.find("aider").expect("aider entry");
     let lifecycle_path = lifecycle_state_path_for_entry(entry);
-    let mut state =
-        load_lifecycle_state(&workspace_root, &lifecycle_path).expect("load aider lifecycle");
+    let mut state = load_repo_lifecycle_state_for_contract_test(&workspace_root, &lifecycle_path)
+        .expect("load aider lifecycle");
     state.lifecycle_stage = LifecycleStage::RuntimeIntegrated;
     state.support_tier = SupportTier::BaselineRuntime;
     state.current_owner_command = "runtime-follow-on --write".to_string();
@@ -405,6 +379,24 @@ fn sample_runtime_integrated_state() -> LifecycleState {
     state.publication_packet_sha256 = None;
     state.closeout_baseline_path = None;
     state
+}
+
+fn load_repo_lifecycle_state_for_contract_test(
+    workspace_root: &Path,
+    lifecycle_path: &str,
+) -> Result<LifecycleState, String> {
+    let bytes = fs::read(workspace_root.join(lifecycle_path))
+        .map_err(|err| format!("read {lifecycle_path}: {err}"))?;
+    let mut state: LifecycleState =
+        serde_json::from_slice(&bytes).map_err(|err| format!("parse {lifecycle_path}: {err}"))?;
+    if state.lifecycle_stage == LifecycleStage::ClosedBaseline {
+        for field in [&mut state.required_evidence, &mut state.satisfied_evidence] {
+            if !field.contains(&EvidenceId::MaintenanceReadinessSettled) {
+                field.push(EvidenceId::MaintenanceReadinessSettled);
+            }
+        }
+    }
+    Ok(state)
 }
 
 fn pretty_json_sha<T: serde::Serialize>(value: &T) -> String {

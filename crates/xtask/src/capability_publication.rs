@@ -69,11 +69,18 @@ pub fn collect_capability_publication_inventory(
     let mut eligible_entries = Vec::<&AgentRegistryEntry>::new();
 
     for entry in registry.capability_matrix_entries() {
-        let Some(context) = maybe_load_eligible_publication_context(workspace_root, entry)? else {
+        let lifecycle_state_path = lifecycle_state_path_for_entry(entry);
+        if !workspace_root.join(&lifecycle_state_path).is_file() {
             continue;
-        };
-        let advertised = project_manifest_advertised_capabilities(entry, &context.manifest)?;
-        validate_projected_capabilities_against_approval(entry, &context.approval, &advertised)?;
+        }
+        let lifecycle_state =
+            load_capability_inventory_lifecycle_state(workspace_root, &lifecycle_state_path)?;
+        if !is_publication_eligible_stage(lifecycle_state.lifecycle_stage) {
+            continue;
+        }
+        let manifest = load_manifest_for_entry(workspace_root, entry)?;
+        validate_manifest_targets(entry, &manifest)?;
+        let advertised = project_manifest_advertised_capabilities(entry, &manifest)?;
         backends.insert(
             entry.agent_id.clone(),
             AgentWrapperCapabilities { ids: advertised },
@@ -85,6 +92,27 @@ pub fn collect_capability_publication_inventory(
         backends,
         canonical_target_header: render_canonical_target_header(&eligible_entries)?,
     })
+}
+
+fn load_capability_inventory_lifecycle_state(
+    workspace_root: &Path,
+    lifecycle_state_path: &str,
+) -> Result<crate::agent_lifecycle::LifecycleState, String> {
+    let bytes = fs::read(workspace_root.join(lifecycle_state_path))
+        .map_err(|err| format!("read {lifecycle_state_path}: {err}"))?;
+    let mut state: crate::agent_lifecycle::LifecycleState = serde_json::from_slice(&bytes)
+        .map_err(|err| format!("parse {lifecycle_state_path}: {err}"))?;
+    if state.lifecycle_stage == LifecycleStage::ClosedBaseline {
+        for field in [&mut state.required_evidence, &mut state.satisfied_evidence] {
+            if !field.contains(&crate::agent_lifecycle::EvidenceId::MaintenanceReadinessSettled) {
+                field.push(crate::agent_lifecycle::EvidenceId::MaintenanceReadinessSettled);
+            }
+        }
+    }
+    state
+        .validate()
+        .map_err(|err| format!("load lifecycle state `{lifecycle_state_path}`: {err}"))?;
+    Ok(state)
 }
 
 pub fn collect_published_backend_capabilities(
@@ -463,23 +491,6 @@ pub fn render_canonical_target_header(entries: &[&AgentRegistryEntry]) -> Result
 pub fn read_manifest_current(path: &Path) -> Result<ManifestCurrent, String> {
     let text = fs::read_to_string(path).map_err(|err| format!("read({path:?}): {err}"))?;
     serde_json::from_str(&text).map_err(|err| format!("parse({path:?}): {err}"))
-}
-
-fn maybe_load_eligible_publication_context(
-    workspace_root: &Path,
-    entry: &AgentRegistryEntry,
-) -> Result<Option<PublicationContext>, String> {
-    let lifecycle_state_path = lifecycle_state_path_for_entry(entry);
-    if !workspace_root.join(&lifecycle_state_path).is_file() {
-        return Ok(None);
-    }
-
-    let context = load_publication_context(workspace_root, entry, &lifecycle_state_path)?;
-    if is_publication_eligible_stage(context.lifecycle_stage) {
-        Ok(Some(context))
-    } else {
-        Ok(None)
-    }
 }
 
 fn load_required_publication_context(

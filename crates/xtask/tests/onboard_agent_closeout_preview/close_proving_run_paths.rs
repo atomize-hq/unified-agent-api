@@ -81,14 +81,6 @@ fn seed_cli_manifest_root(root: &std::path::Path, manifest_root: &str, canonical
 
 fn seed_lifecycle_eligible_audit_peers(root: &std::path::Path) {
     write_text(
-        &root.join("cli_manifests/codex/current.json"),
-        include_str!("../../../../cli_manifests/codex/current.json"),
-    );
-    write_text(
-        &root.join("cli_manifests/claude_code/current.json"),
-        include_str!("../../../../cli_manifests/claude_code/current.json"),
-    );
-    write_text(
         &root.join("docs/agents/lifecycle/codex-cli-onboarding/governance/approved-agent.toml"),
         include_str!(
             "../../../../docs/agents/lifecycle/codex-cli-onboarding/governance/approved-agent.toml"
@@ -130,8 +122,16 @@ fn seed_green_publication_surfaces(root: &std::path::Path) {
         &root.join("docs/specs/unified-agent-api/support-matrix.md"),
         "# Support matrix\n\nManual contract text.\n",
     );
-    seed_cli_manifest_root(root, "cli_manifests/codex", &["x86_64-unknown-linux-musl"]);
-    seed_cli_manifest_root(root, "cli_manifests/claude_code", &["linux-x64"]);
+    seed_cli_manifest_root(
+        root,
+        "cli_manifests/codex",
+        &["aarch64-apple-darwin", "x86_64-unknown-linux-musl"],
+    );
+    seed_cli_manifest_root(
+        root,
+        "cli_manifests/claude_code",
+        &["linux-x64", "darwin-arm64", "win32-x64"],
+    );
     seed_cli_manifest_root(
         root,
         "cli_manifests/opencode",
@@ -149,6 +149,10 @@ fn seed_green_publication_surfaces(root: &std::path::Path) {
     write_text(
         &root.join("docs/specs/unified-agent-api/support-matrix.md"),
         &bundle.markdown,
+    );
+    write_text(
+        &root.join("crates/agent_api/src/runtime_support_data.rs"),
+        &bundle.runtime_support_data,
     );
     write_text(
         &root.join("docs/specs/unified-agent-api/capability-matrix.md"),
@@ -191,6 +195,7 @@ fn seed_published_baseline(root: &std::path::Path, approval_path: &str) {
             "required_publication_outputs": [
                 "cli_manifests/support_matrix/current.json",
                 "docs/specs/unified-agent-api/support-matrix.md",
+                "crates/agent_api/src/runtime_support_data.rs",
                 "docs/specs/unified-agent-api/capability-matrix.md"
             ],
             "runtime_evidence_paths": [

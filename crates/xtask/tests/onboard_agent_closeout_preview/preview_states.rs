@@ -29,7 +29,7 @@ fn committed_gemini_preview_renders_closed_packet_from_valid_m3_closeout() {
     ));
     assert!(output
         .stdout
-        .contains("Approval linkage: `historical-m3-backfill` via"));
+        .contains("Approval linkage: `historical-lifecycle-backfill` via"));
 }
 
 #[test]
@@ -137,6 +137,7 @@ fn prepared_closeout_draft_does_not_preview_as_closed_packet() {
             approval_ref: approval_path.clone(),
             approval_sha256: sha256_hex(&fixture.join(&approval_path)),
             approval_source: "governance-review".to_string(),
+            maintenance_settlement: None,
             preflight_passed: true,
             recorded_at: "2026-04-21T11:23:09Z".to_string(),
             commit: "6b7d5f6e9cf2bf54933659f5700bb59d1f8a95e8".to_string(),

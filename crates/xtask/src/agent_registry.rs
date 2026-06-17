@@ -1,3 +1,5 @@
+#![cfg_attr(test, allow(dead_code, unused_imports))]
+
 use std::{
     collections::{BTreeMap, BTreeSet},
     fs,
@@ -14,8 +16,10 @@ use serde::Deserialize;
 use thiserror::Error;
 
 pub use release_watch::{
-    ReleaseWatchDispatchKind, ReleaseWatchMetadata, ReleaseWatchSourceKind,
-    ReleaseWatchVersionPolicy,
+    normalize_release_watch_metadata, normalized_release_watch_sha256,
+    validate_release_watch_metadata, NormalizedReleaseWatchMetadata,
+    NormalizedReleaseWatchUpstream, ReleaseWatchDispatchKind, ReleaseWatchMetadata,
+    ReleaseWatchSourceKind, ReleaseWatchUpstream, ReleaseWatchVersionPolicy,
 };
 
 pub const REGISTRY_RELATIVE_PATH: &str = "crates/xtask/data/agent_registry.toml";

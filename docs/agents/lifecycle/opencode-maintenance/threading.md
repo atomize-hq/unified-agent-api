@@ -1,8 +1,7 @@
-<!-- generated-by: xtask refresh-agent; owner: control-plane -->
+<!-- generated-by: xtask agent-maintenance renderer; source-of-truth: governance/maintenance-request.toml -->
 
 # Threading
 
-1. Run `check-agent-drift --agent opencode`.
-2. Record the maintainer-authored request at `docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml`.
-3. Apply `refresh-agent --dry-run` and `refresh-agent --write` using that request.
-4. Close the maintenance run with `close-agent-maintenance` once findings are resolved or explicitly deferred.
+1. Review the auto-generated request at `docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml` and the canonical contract at `docs/agents/lifecycle/opencode-maintenance/HANDOFF.md`.
+2. Apply the exact coding-agent prompt from `HANDOFF.md` against branch `automation/opencode-maintenance-1.14.49`.
+3. Author `docs/agents/lifecycle/opencode-maintenance/governance/maintenance-closeout.json` and run the exact closeout command from `HANDOFF.md` after the green gates pass.

@@ -27,6 +27,7 @@ The Cargo package name is `unified-agent-api-codex`; the Rust library crate rema
 | `cargo run -p unified-agent-api-codex --example debug_cmd -- models --bundled` | `codex debug models --bundled` | Prints the bundled model inventory when the binary exposes it. |
 | `cargo run -p unified-agent-api-codex --example debug_cmd -- prompt-input --image ./diagram.png "summarize this prompt payload"` | `codex debug prompt-input --image ./diagram.png "summarize this prompt payload"` | Echoes prompt-input normalization with optional image attachments. |
 | `cargo run -p unified-agent-api-codex --example plugin_cmd -- marketplace add github.com/acme/codex-marketplace --ref main --sparse packages/demo` | `codex plugin marketplace add --ref main --sparse packages/demo github.com/acme/codex-marketplace` | Exercises the 0.125.0 plugin marketplace wrapper family. |
+| `cargo run -p unified-agent-api-codex --example update` | `codex update` | Invokes the native self-update flow through the wrapper surface. |
 
 ## Binary & CODEX_HOME
 

@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "semantic_version": "1.14.47",
+  "status": "reported",
+  "updated_at": "2026-05-13T00:07:07.539Z",
+  "notes": "Local darwin-arm64 maintenance snapshot for packet target 1.14.47; validated baseline remains 1.4.11 on linux-x64.",
+  "artifacts": {
+    "snapshots_dir": "snapshots/1.14.47",
+    "reports_dir": "reports/1.14.47",
+    "union_complete": false
+  },
+  "coverage": {
+    "supported_targets": [],
+    "supported_required_target": false
+  },
+  "promotion": {
+    "eligible_for_latest_validated": false
+  }
+}

@@ -1,0 +1,160 @@
+artifact_version = "2"
+agent_id = "claude_code"
+trigger_kind = "upstream_release_detected"
+basis_ref = "cli_manifests/claude_code/latest_validated.txt"
+opened_from = ".github/workflows/agent-maintenance-open-pr.yml"
+requested_control_plane_actions = [
+  "packet_doc_refresh",
+]
+request_recorded_at = "2026-05-14T18:37:44Z"
+request_commit = "4a6073bc7b7500441d8db170d5e5e3c9c9942366"
+
+[runtime_followup_required]
+required = false
+items = []
+
+[detected_release]
+detected_by = ".github/workflows/agent-maintenance-release-watch.yml"
+current_validated = "2.1.29"
+target_version = "2.1.140"
+latest_stable = "2.1.141"
+version_policy = "latest_stable_minus_one"
+source_kind = "gcs_object_listing"
+source_ref = "claude-code-dist-86c565f3-f756-42ad-8dfa-d59b1c096819/claude-code-releases"
+dispatch_kind = "packet_pr"
+dispatch_workflow = "agent-maintenance-open-pr.yml"
+branch_name = "automation/claude_code-maintenance-2.1.140"
+
+[support_surface_audit]
+required = true
+surface_kinds = [
+  "commands",
+  "subcommands",
+  "flags",
+  "global_flags",
+  "positional_args",
+]
+excluded_surface_kinds = [
+  "tui_only",
+]
+allowed_deferrals = [
+  "upstream_not_machine_exposed",
+  "platform_evidence_missing",
+  "requires_new_infra",
+  "requires_new_architectural_seam",
+  "outside_registry_maintenance_write_envelope",
+]
+pre_run_debt_count = 2
+expected_post_run_debt_count = 2
+
+[[support_surface_audit.preexisting_unsupported_surface]]
+surface_kind = "commands"
+command_path = "claude install"
+surface_id = "install"
+debt_ref = "docs/specs/unified-agent-api/non-tui-support-debt.md#claude-code-install-command"
+
+[[support_surface_audit.preexisting_unsupported_surface]]
+surface_kind = "flags"
+command_path = "claude install"
+surface_id = "--force"
+debt_ref = "docs/specs/unified-agent-api/non-tui-support-debt.md#claude-code-install-force-flag"
+
+[[support_surface_audit.missing_wrapper_support]]
+surface_kind = "commands"
+command_path = "claude install"
+surface_id = "install"
+
+[[support_surface_audit.missing_wrapper_support]]
+surface_kind = "flags"
+command_path = "claude install"
+surface_id = "--force"
+
+[[support_surface_audit.missing_backend_support]]
+surface_kind = "commands"
+command_path = "claude install"
+surface_id = "install"
+
+[[support_surface_audit.missing_backend_support]]
+surface_kind = "flags"
+command_path = "claude install"
+surface_id = "--force"
+
+[[support_surface_audit.deferred_preexisting_gaps]]
+surface_kind = "commands"
+command_path = "claude install"
+surface_id = "install"
+defer_reason = "requires_new_architectural_seam"
+blocking_follow_on = "TODOS.md#close-claude-code-install-maintenance-gap"
+
+[[support_surface_audit.deferred_preexisting_gaps]]
+surface_kind = "flags"
+command_path = "claude install"
+surface_id = "--force"
+defer_reason = "requires_new_architectural_seam"
+blocking_follow_on = "TODOS.md#close-claude-code-install-maintenance-gap"
+
+[[support_surface_audit.publication_impacts]]
+surface_kind = "commands"
+command_path = "claude install"
+surface_id = "install"
+surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
+
+[[support_surface_audit.publication_impacts]]
+surface_kind = "flags"
+command_path = "claude install"
+surface_id = "--force"
+surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
+
+[execution_contract]
+executor = "execute-agent-maintenance"
+prompt_template_path = "docs/agents/lifecycle/claude_code-maintenance/governance/execute-agent-maintenance-prompt.md"
+prompt_sha256 = "0e8eb3b6d0a36c0ad5844f7a5fb5e3d5a4cb7525fb7559194d85fba08c6afeac"
+pr_summary_path = "docs/agents/lifecycle/claude_code-maintenance/governance/pr-summary.md"
+closeout_path = "docs/agents/lifecycle/claude_code-maintenance/governance/maintenance-closeout.json"
+requires_manual_closeout = true
+writable_surfaces = [
+  "docs/agents/lifecycle/claude_code-maintenance/**",
+  "crates/claude_code/**",
+  "crates/agent_api/**",
+  "cli_manifests/claude_code/artifacts.lock.json",
+  "cli_manifests/claude_code/snapshots/2.1.140/**",
+  "cli_manifests/claude_code/reports/2.1.140/**",
+  "cli_manifests/claude_code/versions/2.1.140.json",
+  "cli_manifests/claude_code/wrapper_coverage.json",
+  "cli_manifests/support_matrix/current.json",
+  "docs/specs/unified-agent-api/support-matrix.md",
+  "crates/agent_api/src/runtime_support_data.rs",
+  "docs/specs/unified-agent-api/non-tui-support-debt.md",
+]
+read_only_inputs = [
+  "docs/agents/lifecycle/claude_code-maintenance/OPS_PLAYBOOK.md",
+  "docs/agents/lifecycle/claude_code-maintenance/CI_WORKFLOWS_PLAN.md",
+  "docs/agents/lifecycle/claude_code-maintenance/governance/execute-agent-maintenance-prompt.md",
+  ".github/workflows/agent-maintenance-open-pr.yml",
+  "docs/specs/unified-agent-api/non-tui-support-debt.md",
+]
+ordered_commands = [
+  "cargo fmt --all",
+  "cargo run -p xtask -- codex-validate --root cli_manifests/claude_code",
+  "cargo run -p xtask -- support-matrix --check",
+  "cargo run -p xtask -- capability-matrix --check",
+  "cargo run -p xtask -- capability-matrix-audit",
+  "make preflight",
+]
+green_gates = [
+  "cargo fmt --all",
+  "cargo run -p xtask -- codex-validate --root cli_manifests/claude_code",
+  "cargo run -p xtask -- support-matrix --check",
+  "cargo run -p xtask -- capability-matrix --check",
+  "cargo run -p xtask -- capability-matrix-audit",
+  "make preflight",
+]
+
+[execution_contract.recovery]
+recreate_packet_command = "cargo run -p xtask -- refresh-agent --request docs/agents/lifecycle/claude_code-maintenance/governance/maintenance-request.toml --write"
+reopen_pr_body_path = "docs/agents/lifecycle/claude_code-maintenance/governance/pr-summary.md"
+reopen_pr_branch = "automation/claude_code-maintenance-2.1.140"
+notes = [
+  "If PR creation fails after packet generation, rerun packet regeneration from the frozen request and reopen the PR from the generated pr-summary path.",
+  "If the local execution-host preflight (local Codex CLI host via execute-agent-maintenance) fails, fix the Codex binary/auth state and rerun `execute-agent-maintenance --dry-run` before write mode.",
+]

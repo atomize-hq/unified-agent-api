@@ -1,0 +1,22 @@
+{
+  "ambiguous_ownership_incidents": 0,
+  "approval_ref": "docs/agents/lifecycle/aider-onboarding/governance/approved-agent.toml",
+  "approval_sha256": "ad18273a921eea57f6faa6e22dbc1b9f428e0d46d266f6151038cf322e497a9f",
+  "approval_source": "governance-review",
+  "commit": "1b709b32a12b3ffa09d837f146155af0793f578f",
+  "duration_missing_reason": "Exact approval-to-closeout elapsed time was not recorded during the serialized maintenance settlement repair run.",
+  "duration_seconds": null,
+  "explicit_none_reason": "No residual proving-run friction remained once approval continuity, runtime evidence, and publication continuity were refreshed on the integrated branch.",
+  "maintenance_settlement": {
+    "approval_section_sha256": "01119021194bb1b6c99a271f52800ccf53e9b89a5a1b2909383eeb3e53fea10e",
+    "deferral_sha256": "e059b3d744b3f4ff67e13b0ef4f0827920d4a0f0be589366235be701e237f8be",
+    "mode": "explicitly_deferred",
+    "release_watch_sha256": null
+  },
+  "manual_control_plane_edits": 0,
+  "partial_write_incidents": 0,
+  "preflight_passed": true,
+  "recorded_at": "2026-05-11T16:12:03.410727Z",
+  "residual_friction": null,
+  "state": "closed"
+}

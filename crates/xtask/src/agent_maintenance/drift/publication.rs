@@ -7,7 +7,10 @@ use std::{
 use crate::{
     agent_registry::{AgentRegistry, AgentRegistryEntry, REGISTRY_RELATIVE_PATH},
     release_doc,
-    support_matrix::{validate_publication_consistency, SupportMatrixArtifact, SupportRow},
+    support_matrix::{
+        render_agent_api_runtime_support_data, validate_publication_consistency,
+        SupportMatrixArtifact, SupportRow, AGENT_API_RUNTIME_SUPPORT_DATA_OUTPUT_PATH,
+    },
 };
 
 use super::{
@@ -196,6 +199,7 @@ pub(super) fn inspect_support_publication(
                         PathBuf::from(&entry.manifest_root),
                         PathBuf::from(SUPPORT_MATRIX_JSON_PATH),
                         PathBuf::from(SUPPORT_MATRIX_MARKDOWN_PATH),
+                        PathBuf::from(AGENT_API_RUNTIME_SUPPORT_DATA_OUTPUT_PATH),
                     ],
                 ),
             ));
@@ -216,6 +220,7 @@ pub(super) fn inspect_support_publication(
                     [
                         PathBuf::from(SUPPORT_MATRIX_JSON_PATH),
                         PathBuf::from(SUPPORT_MATRIX_MARKDOWN_PATH),
+                        PathBuf::from(AGENT_API_RUNTIME_SUPPORT_DATA_OUTPUT_PATH),
                     ],
                 ),
             ));
@@ -259,6 +264,7 @@ pub(super) fn inspect_support_publication(
                     [
                         PathBuf::from(SUPPORT_MATRIX_JSON_PATH),
                         PathBuf::from(SUPPORT_MATRIX_MARKDOWN_PATH),
+                        PathBuf::from(AGENT_API_RUNTIME_SUPPORT_DATA_OUTPUT_PATH),
                     ],
                 ),
             ));
@@ -275,6 +281,11 @@ pub(super) fn inspect_support_publication(
         Err(err) => issues.push(err),
     }
 
+    match inspect_runtime_support_projection(workspace_root) {
+        Ok(()) => {}
+        Err(err) => issues.push(err),
+    }
+
     if issues.is_empty() {
         None
     } else {
@@ -287,9 +298,25 @@ pub(super) fn inspect_support_publication(
                 [
                     PathBuf::from(SUPPORT_MATRIX_JSON_PATH),
                     PathBuf::from(SUPPORT_MATRIX_MARKDOWN_PATH),
+                    PathBuf::from(AGENT_API_RUNTIME_SUPPORT_DATA_OUTPUT_PATH),
                 ],
             ),
         ))
+    }
+}
+
+fn inspect_runtime_support_projection(workspace_root: &Path) -> Result<(), String> {
+    let expected = render_agent_api_runtime_support_data(workspace_root)?;
+    let path = workspace_root.join(AGENT_API_RUNTIME_SUPPORT_DATA_OUTPUT_PATH);
+    let actual =
+        fs::read_to_string(&path).map_err(|err| format!("read({}): {err}", path.display()))?;
+    if actual == expected {
+        Ok(())
+    } else {
+        Err(
+            "published runtime-support projection does not match derived validated support truth"
+                .to_string(),
+        )
     }
 }
 

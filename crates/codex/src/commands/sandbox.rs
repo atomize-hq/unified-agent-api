@@ -61,6 +61,8 @@ impl CodexClient {
             full_auto,
             log_denials,
             allow_unix_socket,
+            include_managed_config,
+            permissions_profile,
             config_overrides,
             feature_toggles,
             working_dir,
@@ -87,6 +89,16 @@ impl CodexClient {
 
         if allow_unix_socket && matches!(platform, SandboxPlatform::Macos) {
             process.arg("--allow-unix-socket");
+        }
+
+        if include_managed_config {
+            process.arg("--include-managed-config");
+        }
+
+        if let Some(permissions_profile) = permissions_profile {
+            process
+                .arg("--permissions-profile")
+                .arg(permissions_profile);
         }
 
         for override_ in config_overrides {

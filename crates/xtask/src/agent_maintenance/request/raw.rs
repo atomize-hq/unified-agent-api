@@ -13,6 +13,8 @@ pub(super) struct RawMaintenanceRequest {
     #[serde(default)]
     pub(super) detected_release: Option<RawDetectedRelease>,
     #[serde(default)]
+    pub(super) support_surface_audit: Option<RawSupportSurfaceAudit>,
+    #[serde(default)]
     pub(super) execution_contract: Option<RawExecutionContract>,
     pub(super) request_recorded_at: String,
     pub(super) request_commit: String,
@@ -38,6 +40,100 @@ pub(super) struct RawDetectedRelease {
     pub(super) dispatch_kind: String,
     pub(super) dispatch_workflow: String,
     pub(super) branch_name: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct RawSupportSurfaceAudit {
+    pub(super) required: bool,
+    pub(super) surface_kinds: Vec<String>,
+    pub(super) excluded_surface_kinds: Vec<String>,
+    pub(super) allowed_deferrals: Vec<String>,
+    pub(super) pre_run_debt_count: usize,
+    pub(super) expected_post_run_debt_count: usize,
+    #[serde(default)]
+    pub(super) discovered_upstream_surface: Vec<RawEvidenceBackedSurface>,
+    #[serde(default)]
+    pub(super) removed_upstream_surface: Vec<RawEvidenceBackedSurface>,
+    #[serde(default)]
+    pub(super) preexisting_unsupported_surface: Vec<RawDebtBackedSurface>,
+    #[serde(default)]
+    pub(super) eligible_preexisting_surface: Vec<RawEligibleSurface>,
+    #[serde(default)]
+    pub(super) missing_wrapper_support: Vec<RawSurfaceIdentity>,
+    #[serde(default)]
+    pub(super) missing_backend_support: Vec<RawSurfaceIdentity>,
+    #[serde(default)]
+    pub(super) required_uplifts_this_run: Vec<RawRequiredUplift>,
+    #[serde(default)]
+    pub(super) deferred_preexisting_gaps: Vec<RawDeferredGap>,
+    #[serde(default)]
+    pub(super) publication_impacts: Vec<RawPublicationImpact>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct RawSurfaceIdentity {
+    pub(super) surface_kind: String,
+    pub(super) command_path: String,
+    pub(super) surface_id: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct RawEvidenceBackedSurface {
+    pub(super) surface_kind: String,
+    pub(super) command_path: String,
+    pub(super) surface_id: String,
+    pub(super) evidence_ref: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct RawDebtBackedSurface {
+    pub(super) surface_kind: String,
+    pub(super) command_path: String,
+    pub(super) surface_id: String,
+    pub(super) debt_ref: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct RawEligibleSurface {
+    pub(super) surface_kind: String,
+    pub(super) command_path: String,
+    pub(super) surface_id: String,
+    pub(super) eligibility_reason: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct RawRequiredUplift {
+    pub(super) surface_kind: String,
+    pub(super) command_path: String,
+    pub(super) surface_id: String,
+    pub(super) reason: String,
+    pub(super) required_writes: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct RawDeferredGap {
+    pub(super) surface_kind: String,
+    pub(super) command_path: String,
+    pub(super) surface_id: String,
+    pub(super) defer_reason: String,
+    #[serde(default)]
+    pub(super) blocking_follow_on: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct RawPublicationImpact {
+    pub(super) surface_kind: String,
+    pub(super) command_path: String,
+    pub(super) surface_id: String,
+    pub(super) surface_doc: String,
 }
 
 #[derive(Debug, Deserialize)]

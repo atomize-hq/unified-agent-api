@@ -1,18 +1,58 @@
-<!-- generated-by: xtask refresh-agent; owner: control-plane -->
+<!-- generated-by: xtask agent-maintenance renderer; source-of-truth: governance/maintenance-request.toml -->
 
 # opencode maintenance
 
-This packet tracks control-plane maintenance for `opencode`.
+This packet tracks automated upstream-release maintenance for `opencode`.
 
 ## Request
 
 - request artifact: `docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml`
-- trigger kind: `drift_detected`
-- basis ref: `docs/integrations/opencode/governance/seam-2-closeout.md`
-- opened from: `docs/integrations/opencode/governance/seam-2-closeout.md`
-- recorded at: `2026-04-22T00:48:19Z`
-- request commit: `8e77b59`
+- trigger kind: `upstream_release_detected`
+- basis ref: `cli_manifests/opencode/latest_validated.txt`
+- opened from: `.github/workflows/agent-maintenance-open-pr.yml`
+- recorded at: `2026-05-14T18:37:44Z`
+- request commit: `4a6073bc7b7500441d8db170d5e5e3c9c9942366`
 
-## Requested control-plane actions
+## Trigger context
 
-- `packet_doc_refresh`
+- detected_by: `.github/workflows/agent-maintenance-release-watch.yml`
+- current_validated: `1.4.11`
+- target_version: `1.14.49`
+- latest_stable: `1.14.50`
+- version_policy: `latest_stable_minus_one`
+- source_kind: `github_releases`
+- source_ref: `anomalyco/opencode`
+- dispatch_kind: `packet_pr`
+- dispatch_workflow: `agent-maintenance-open-pr.yml`
+- branch_name: `automation/opencode-maintenance-1.14.49`
+
+## Support-surface audit
+
+- required: `true`
+- pre-run debt count: `15`
+- expected post-run debt count: `15`
+- discovered upstream surface rows: `0`
+- preexisting unsupported rows: `15`
+- required uplifts this run:
+- none
+- deferred preexisting gaps:
+- `opencode run` `run` via `requires_new_architectural_seam` (TODOS.md#close-opencode-non-tui-maintenance-gaps)
+- `opencode acp` `acp` via `requires_new_architectural_seam` (TODOS.md#close-opencode-non-tui-maintenance-gaps)
+- `opencode attach` `attach` via `requires_new_architectural_seam` (TODOS.md#close-opencode-non-tui-maintenance-gaps)
+- `opencode models` `models` via `requires_new_architectural_seam` (TODOS.md#close-opencode-non-tui-maintenance-gaps)
+- `opencode providers` `providers` via `requires_new_architectural_seam` (TODOS.md#close-opencode-non-tui-maintenance-gaps)
+- `opencode serve` `serve` via `requires_new_architectural_seam` (TODOS.md#close-opencode-non-tui-maintenance-gaps)
+- `opencode web` `web` via `requires_new_architectural_seam` (TODOS.md#close-opencode-non-tui-maintenance-gaps)
+- `opencode run` `--format` via `requires_new_architectural_seam` (TODOS.md#close-opencode-non-tui-maintenance-gaps)
+- `opencode run` `--dir` via `requires_new_architectural_seam` (TODOS.md#close-opencode-non-tui-maintenance-gaps)
+- `opencode run` `--attach` via `requires_new_architectural_seam` (TODOS.md#close-opencode-non-tui-maintenance-gaps)
+- `opencode run` `--model` via `requires_new_architectural_seam` (TODOS.md#close-opencode-non-tui-maintenance-gaps)
+- `opencode run` `--continue` via `requires_new_architectural_seam` (TODOS.md#close-opencode-non-tui-maintenance-gaps)
+- `opencode run` `--session` via `requires_new_architectural_seam` (TODOS.md#close-opencode-non-tui-maintenance-gaps)
+- `opencode run` `--fork` via `requires_new_architectural_seam` (TODOS.md#close-opencode-non-tui-maintenance-gaps)
+- `opencode run` `--agent` via `requires_new_architectural_seam` (TODOS.md#close-opencode-non-tui-maintenance-gaps)
+
+
+## Canonical execution contract
+
+Use `docs/agents/lifecycle/opencode-maintenance/HANDOFF.md` as the exact contributor execution contract for this lane. The PR body summary under `docs/agents/lifecycle/opencode-maintenance/governance/pr-summary.md` is derivative only.

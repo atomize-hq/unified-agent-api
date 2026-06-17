@@ -187,6 +187,7 @@ struct DraftEntry {
     docs_release_track: String,
     onboarding_pack_prefix: String,
     approval_provenance: Option<ApprovalProvenance>,
+    approval_maintenance: Option<ApprovalMaintenanceSummary>,
 }
 
 #[derive(Debug, Clone)]
@@ -194,6 +195,44 @@ struct ApprovalProvenance {
     artifact_path: String,
     artifact_sha256: String,
     approval_recorded_at: String,
+}
+
+#[derive(Debug, Clone)]
+struct ApprovalMaintenanceSummary {
+    section_sha256: String,
+    mode: ApprovalMaintenanceModeSummary,
+}
+
+impl ApprovalMaintenanceSummary {
+    fn mode_name(&self) -> &'static str {
+        self.mode.mode_name()
+    }
+}
+
+#[derive(Debug, Clone)]
+enum ApprovalMaintenanceModeSummary {
+    ReleaseWatchEnrolled {
+        version_policy: &'static str,
+        dispatch_kind: &'static str,
+        dispatch_workflow: Option<String>,
+        upstream: String,
+        release_watch_sha256: String,
+    },
+    ExplicitlyDeferred {
+        reason: String,
+        follow_up: String,
+        approved_scope: String,
+        deferral_sha256: String,
+    },
+}
+
+impl ApprovalMaintenanceModeSummary {
+    fn mode_name(&self) -> &'static str {
+        match self {
+            Self::ReleaseWatchEnrolled { .. } => "release_watch_enrolled",
+            Self::ExplicitlyDeferred { .. } => "explicitly_deferred",
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -230,6 +269,7 @@ struct DraftDescriptorInput {
     docs_release_track: String,
     onboarding_pack_prefix: String,
     approval_provenance: Option<ApprovalProvenance>,
+    approval_maintenance: Option<ApprovalMaintenanceSummary>,
 }
 
 #[derive(Debug)]
@@ -396,6 +436,7 @@ impl DraftEntry {
             docs_release_track: input.docs_release_track,
             onboarding_pack_prefix: input.onboarding_pack_prefix,
             approval_provenance: input.approval_provenance,
+            approval_maintenance: input.approval_maintenance,
         })
     }
 

@@ -43,6 +43,21 @@ This Markdown document is the normative human-readable projection.
 Both publication targets MUST describe the same support model.
 If they disagree, the repository is in an invalid publication state.
 
+## Support debt inventory
+
+Published support truth for enrolled automated-maintenance agents MUST stay aligned with:
+
+- `docs/specs/unified-agent-api/non-tui-support-debt.md`
+
+That inventory is the machine-checkable baseline for temporary non-TUI blockers and preexisting
+unsupported surface. Publication rules:
+
+- support publication MUST NOT normalize deliberate non-TUI unsupported posture as a permanent
+  steady-state note
+- any remaining enrolled non-TUI caveat MUST point to a concrete debt-inventory row or a concrete
+  external blocker that would also qualify for the maintenance-request deferral taxonomy
+- `evidence_notes` MAY explain partial support, but MUST NOT become a shadow debt ledger
+
 ## Target-first primacy
 
 Support truth MUST be target-scoped first.
@@ -106,6 +121,8 @@ The canonical row ordering MUST be deterministic:
 - notes MUST be derived from committed evidence and MUST NOT be speculative
 - notes MAY explain intentional partial support, passthrough visibility, or other non-contradictory caveats visible in committed evidence
 - notes MUST NOT redefine `validated` or `supported`, and MUST NOT stand in for contradiction policy
+- for enrolled automated-maintenance agents, notes MUST NOT be the only place a non-TUI blocker is
+  recorded; the blocker MUST also exist in `non-tui-support-debt.md`
 - when no such caveat exists, publication MUST treat `evidence_notes` as empty rather than inventing explanatory prose
 
 ## Markdown projection boundary
@@ -233,16 +250,19 @@ Do not edit this section by hand.
 
 | agent | version | target | manifest_support | backend_support | uaa_support | pointer_promotion | evidence_notes |
 |---|---|---|---|---|---|---|---|
+| `codex` | `0.129.0` | `aarch64-apple-darwin` | `unsupported` | `unsupported` | `unsupported` | `none` | — |
 | `codex` | `0.125.0` | `aarch64-apple-darwin` | `unsupported` | `unsupported` | `unsupported` | `none` | current root snapshot omits this target |
 | `codex` | `0.97.0` | `aarch64-apple-darwin` | `unsupported` | `unsupported` | `unsupported` | `none` | — |
 | `codex` | `0.92.0` | `aarch64-apple-darwin` | `unsupported` | `unsupported` | `unsupported` | `none` | — |
 | `codex` | `0.91.0` | `aarch64-apple-darwin` | `unsupported` | `unsupported` | `unsupported` | `none` | — |
 | `codex` | `0.61.0` | `aarch64-apple-darwin` | `unsupported` | `unsupported` | `unsupported` | `none` | — |
+| `codex` | `0.129.0` | `x86_64-pc-windows-msvc` | `unsupported` | `unsupported` | `unsupported` | `none` | — |
 | `codex` | `0.125.0` | `x86_64-pc-windows-msvc` | `unsupported` | `unsupported` | `unsupported` | `none` | current root snapshot omits this target |
 | `codex` | `0.97.0` | `x86_64-pc-windows-msvc` | `unsupported` | `unsupported` | `unsupported` | `none` | — |
 | `codex` | `0.92.0` | `x86_64-pc-windows-msvc` | `unsupported` | `unsupported` | `unsupported` | `none` | — |
 | `codex` | `0.91.0` | `x86_64-pc-windows-msvc` | `unsupported` | `unsupported` | `unsupported` | `none` | — |
 | `codex` | `0.61.0` | `x86_64-pc-windows-msvc` | `unsupported` | `unsupported` | `unsupported` | `none` | — |
+| `codex` | `0.129.0` | `x86_64-unknown-linux-musl` | `supported` | `partial` | `partial` | `none` | backend report includes intentionally unsupported surface outside unified support; backend report includes backend-only surface outside unified support |
 | `codex` | `0.125.0` | `x86_64-unknown-linux-musl` | `supported` | `partial` | `partial` | `latest_validated` | backend report includes intentionally unsupported surface outside unified support; backend report includes backend-only surface outside unified support |
 | `codex` | `0.97.0` | `x86_64-unknown-linux-musl` | `supported` | `partial` | `partial` | `none` | backend report includes intentionally unsupported surface outside unified support; backend report includes backend-only surface outside unified support |
 | `codex` | `0.92.0` | `x86_64-unknown-linux-musl` | `supported` | `partial` | `partial` | `none` | backend report includes intentionally unsupported surface outside unified support; backend report includes backend-only surface outside unified support |
@@ -259,10 +279,22 @@ Do not edit this section by hand.
 
 | agent | version | target | manifest_support | backend_support | uaa_support | pointer_promotion | evidence_notes |
 |---|---|---|---|---|---|---|---|
-| `opencode` | `1.4.11` | `darwin-arm64` | `unsupported` | `unsupported` | `unsupported` | `none` | — |
+| `opencode` | `1.14.47` | `darwin-arm64` | `unsupported` | `unsupported` | `unsupported` | `none` | — |
+| `opencode` | `1.4.11` | `darwin-arm64` | `unsupported` | `unsupported` | `unsupported` | `none` | current root snapshot omits this target |
 | `opencode` | `1.4.9` | `darwin-arm64` | `unsupported` | `unsupported` | `unsupported` | `none` | — |
-| `opencode` | `1.4.11` | `linux-x64` | `supported` | `unsupported` | `unsupported` | `none` | — |
-| `opencode` | `1.4.9` | `linux-x64` | `unsupported` | `unsupported` | `unsupported` | `none` | current root snapshot omits this target |
-| `opencode` | `1.4.11` | `win32-x64` | `unsupported` | `unsupported` | `unsupported` | `none` | — |
-| `opencode` | `1.4.9` | `win32-x64` | `unsupported` | `unsupported` | `unsupported` | `none` | current root snapshot omits this target |
+| `opencode` | `1.14.47` | `darwin-x64` | `unsupported` | `unsupported` | `unsupported` | `none` | — |
+| `opencode` | `1.4.11` | `darwin-x64` | `unsupported` | `unsupported` | `unsupported` | `none` | current root snapshot omits this target |
+| `opencode` | `1.4.9` | `darwin-x64` | `unsupported` | `unsupported` | `unsupported` | `none` | — |
+| `opencode` | `1.14.47` | `linux-arm64` | `unsupported` | `unsupported` | `unsupported` | `none` | — |
+| `opencode` | `1.4.11` | `linux-arm64` | `unsupported` | `unsupported` | `unsupported` | `none` | current root snapshot omits this target |
+| `opencode` | `1.4.9` | `linux-arm64` | `unsupported` | `unsupported` | `unsupported` | `none` | — |
+| `opencode` | `1.14.47` | `linux-x64` | `unsupported` | `unsupported` | `unsupported` | `none` | — |
+| `opencode` | `1.4.11` | `linux-x64` | `supported` | `unsupported` | `unsupported` | `latest_validated` | — |
+| `opencode` | `1.4.9` | `linux-x64` | `unsupported` | `unsupported` | `unsupported` | `none` | — |
+| `opencode` | `1.14.47` | `win32-arm64` | `unsupported` | `unsupported` | `unsupported` | `none` | — |
+| `opencode` | `1.4.11` | `win32-arm64` | `unsupported` | `unsupported` | `unsupported` | `none` | current root snapshot omits this target |
+| `opencode` | `1.4.9` | `win32-arm64` | `unsupported` | `unsupported` | `unsupported` | `none` | — |
+| `opencode` | `1.14.47` | `win32-x64` | `unsupported` | `unsupported` | `unsupported` | `none` | — |
+| `opencode` | `1.4.11` | `win32-x64` | `unsupported` | `unsupported` | `unsupported` | `none` | current root snapshot omits this target |
+| `opencode` | `1.4.9` | `win32-x64` | `unsupported` | `unsupported` | `unsupported` | `none` | — |
 <!-- support-matrix-published:end -->

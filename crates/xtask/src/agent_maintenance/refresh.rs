@@ -333,7 +333,13 @@ fn ensure_allowed_write_path(
         format!("{}/seam_map.md", request.maintenance_root),
         format!("{}/threading.md", request.maintenance_root),
         format!("{}/review_surfaces.md", request.maintenance_root),
+        format!("{}/OPS_PLAYBOOK.md", request.maintenance_root),
+        format!("{}/CI_WORKFLOWS_PLAN.md", request.maintenance_root),
         format!("{}/HANDOFF.md", request.maintenance_root),
+        format!(
+            "{}/governance/execute-agent-maintenance-prompt.md",
+            request.maintenance_root
+        ),
         format!("{}/governance/pr-summary.md", request.maintenance_root),
         format!("{}/governance/remediation-log.md", request.maintenance_root),
     ];
@@ -341,6 +347,7 @@ fn ensure_allowed_write_path(
         relative_path,
         publication_refresh::SUPPORT_MATRIX_JSON_OUTPUT_PATH
             | publication_refresh::SUPPORT_MATRIX_MARKDOWN_OUTPUT_PATH
+            | publication_refresh::AGENT_API_RUNTIME_SUPPORT_DATA_OUTPUT_PATH
             | publication_refresh::CAPABILITY_MATRIX_OUTPUT_PATH
     ) || relative_path == release_doc::RELEASE_DOC_PATH;
 

@@ -1,6 +1,7 @@
 use std::{
     cmp::Ordering,
     collections::{BTreeMap, BTreeSet},
+    fmt::Write as _,
     fs,
     path::{Path, PathBuf},
 };
@@ -8,12 +9,16 @@ use std::{
 use semver::Version;
 use serde::Deserialize;
 
+use agent_api::RuntimeSupportRecord;
+
 use crate::agent_registry::AgentRegistry;
 use crate::root_intake_layout::RootIntakeLayout;
 
 use super::{
     BackendSupportState, ManifestSupportState, PointerPromotionState, SupportRow, UaaSupportState,
 };
+
+const EMBEDDED_RUNTIME_SUPPORT_FAMILIES: &[&str] = &["codex"];
 
 #[derive(Debug, Clone)]
 pub(super) struct AgentRoot {
@@ -121,6 +126,18 @@ pub fn derive_rows(workspace_root: &Path) -> Result<Vec<SupportRow>, String> {
     derive_rows_for_roots(&roots)
 }
 
+pub fn derive_validated_runtime_support(
+    workspace_root: &Path,
+) -> Result<Vec<RuntimeSupportRecord>, String> {
+    let roots = enrolled_agent_roots(workspace_root)?;
+    derive_validated_runtime_support_for_roots(&roots)
+}
+
+pub fn render_agent_api_runtime_support_data(workspace_root: &Path) -> Result<String, String> {
+    let roots = enrolled_agent_roots(workspace_root)?;
+    render_agent_api_runtime_support_data_for_roots(&roots)
+}
+
 pub fn derive_rows_for_agent_root(
     workspace_root: &Path,
     agent: &str,
@@ -131,6 +148,33 @@ pub fn derive_rows_for_agent_root(
         root: workspace_root.join(manifest_root),
     }];
     derive_rows_for_roots(&roots)
+}
+
+pub fn derive_validated_runtime_support_for_agent_root(
+    workspace_root: &Path,
+    agent: &str,
+    manifest_root: &str,
+) -> Result<Vec<RuntimeSupportRecord>, String> {
+    let roots = [AgentRoot {
+        agent: agent.to_string(),
+        root: workspace_root.join(manifest_root),
+    }];
+    derive_validated_runtime_support_for_roots(&roots)
+}
+
+#[doc(hidden)]
+pub fn render_agent_api_runtime_support_data_for_test_roots(
+    workspace_root: &Path,
+    roots: &[(&str, &str)],
+) -> Result<String, String> {
+    let roots = roots
+        .iter()
+        .map(|(agent, rel_root)| AgentRoot {
+            agent: (*agent).to_string(),
+            root: workspace_root.join(rel_root),
+        })
+        .collect::<Vec<_>>();
+    render_agent_api_runtime_support_data_for_roots(&roots)
 }
 
 #[doc(hidden)]
@@ -148,12 +192,49 @@ pub fn derive_rows_for_test_roots(
     derive_rows_for_roots(&roots)
 }
 
+#[doc(hidden)]
+pub fn derive_validated_runtime_support_for_test_roots(
+    workspace_root: &Path,
+    roots: &[(&str, &str)],
+) -> Result<Vec<RuntimeSupportRecord>, String> {
+    let roots = roots
+        .iter()
+        .map(|(agent, rel_root)| AgentRoot {
+            agent: (*agent).to_string(),
+            root: workspace_root.join(rel_root),
+        })
+        .collect::<Vec<_>>();
+    derive_validated_runtime_support_for_roots(&roots)
+}
+
 fn derive_rows_for_roots(roots: &[AgentRoot]) -> Result<Vec<SupportRow>, String> {
     let loaded_roots = roots
         .iter()
         .map(load_agent_root)
         .collect::<Result<Vec<_>, _>>()?;
     derive_rows_for_loaded_roots(&loaded_roots)
+}
+
+fn derive_validated_runtime_support_for_roots(
+    roots: &[AgentRoot],
+) -> Result<Vec<RuntimeSupportRecord>, String> {
+    let loaded_roots = roots
+        .iter()
+        .map(load_agent_root)
+        .collect::<Result<Vec<_>, _>>()?;
+    derive_validated_runtime_support_for_loaded_roots(&loaded_roots)
+}
+
+fn render_agent_api_runtime_support_data_for_roots(roots: &[AgentRoot]) -> Result<String, String> {
+    let loaded_roots = roots
+        .iter()
+        .map(load_agent_root)
+        .collect::<Result<Vec<_>, _>>()?;
+    let projections = derive_runtime_support_projection_for_loaded_roots(&loaded_roots)?;
+    Ok(render_agent_api_runtime_support_data_from_projection(
+        &projections,
+        EMBEDDED_RUNTIME_SUPPORT_FAMILIES,
+    ))
 }
 
 pub(super) fn enrolled_agent_roots(workspace_root: &Path) -> Result<Vec<AgentRoot>, String> {
@@ -179,6 +260,36 @@ pub(super) fn derive_rows_for_loaded_roots(
 
     rows.sort_by(compare_rows);
     Ok(rows)
+}
+
+fn derive_validated_runtime_support_for_loaded_roots(
+    roots: &[LoadedAgentRoot],
+) -> Result<Vec<RuntimeSupportRecord>, String> {
+    let mut records = derive_runtime_support_projection_for_loaded_roots(roots)?
+        .into_iter()
+        .filter_map(|record| {
+            record.latest_validated.map(|version| RuntimeSupportRecord {
+                runtime_family: record.runtime_family,
+                target_triple: record.target_triple,
+                version,
+            })
+        })
+        .collect::<Vec<_>>();
+
+    records.sort_by(|left, right| {
+        left.runtime_family
+            .cmp(&right.runtime_family)
+            .then(left.target_triple.cmp(&right.target_triple))
+            .then(left.version.cmp(&right.version))
+    });
+    Ok(records)
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct RuntimeSupportProjectionRecord {
+    runtime_family: String,
+    target_triple: String,
+    latest_validated: Option<String>,
 }
 
 fn derive_rows_for_loaded_root(root: &LoadedAgentRoot) -> Result<Vec<SupportRow>, String> {
@@ -226,6 +337,115 @@ fn derive_rows_for_loaded_root(root: &LoadedAgentRoot) -> Result<Vec<SupportRow>
     }
 
     Ok(rows)
+}
+
+fn derive_runtime_support_projection_for_loaded_roots(
+    roots: &[LoadedAgentRoot],
+) -> Result<Vec<RuntimeSupportProjectionRecord>, String> {
+    let mut records = Vec::new();
+    for root in roots {
+        records.extend(derive_runtime_support_projection_for_loaded_root(root)?);
+    }
+
+    records.sort_by(|left, right| {
+        left.runtime_family
+            .cmp(&right.runtime_family)
+            .then(left.target_triple.cmp(&right.target_triple))
+            .then_with(|| left.latest_validated.cmp(&right.latest_validated))
+    });
+    Ok(records)
+}
+
+fn derive_runtime_support_projection_for_loaded_root(
+    root: &LoadedAgentRoot,
+) -> Result<Vec<RuntimeSupportProjectionRecord>, String> {
+    let known_versions = root
+        .versions
+        .iter()
+        .map(|metadata| metadata.semantic_version.as_str())
+        .collect::<BTreeSet<_>>();
+    let mut records = Vec::new();
+
+    for target in &root.posture.expected_targets {
+        let latest_validated = match root
+            .pointers
+            .latest_validated
+            .get(target)
+            .and_then(|value| value.as_deref())
+        {
+            Some(version) => {
+                if !known_versions.contains(version) {
+                    return Err(format!(
+                        "agent `{}` target `{}` latest_validated pointer references unknown version `{version}`",
+                        root.agent, target
+                    ));
+                }
+                Some(version.to_string())
+            }
+            None => None,
+        };
+
+        records.push(RuntimeSupportProjectionRecord {
+            runtime_family: root.agent.clone(),
+            target_triple: target.clone(),
+            latest_validated,
+        });
+    }
+
+    Ok(records)
+}
+
+fn render_agent_api_runtime_support_data_from_projection(
+    projection: &[RuntimeSupportProjectionRecord],
+    runtime_families: &[&str],
+) -> String {
+    let mut rendered = String::from(
+        "// This file is derived from committed repo truth.\n\
+         // Validate it with `cargo test -p xtask --all-targets`.\n\n",
+    );
+
+    for runtime_family in runtime_families {
+        let symbol = runtime_family_symbol(runtime_family);
+        let _ = writeln!(
+            rendered,
+            "#[cfg(feature = \"{runtime_family}\")]\nconst {symbol}: &[EmbeddedRuntimeSupportRecord] = &["
+        );
+
+        for record in projection
+            .iter()
+            .filter(|record| record.runtime_family == *runtime_family)
+        {
+            let latest_validated = match &record.latest_validated {
+                Some(version) => format!("Some(\"{version}\")"),
+                None => "None".to_string(),
+            };
+            let _ = writeln!(
+                rendered,
+                "    EmbeddedRuntimeSupportRecord {{\n        target_triple: \"{}\",\n        latest_validated: {},\n    }},",
+                record.target_triple, latest_validated
+            );
+        }
+
+        rendered.push_str("];\n");
+    }
+
+    rendered
+}
+
+fn runtime_family_symbol(runtime_family: &str) -> String {
+    format!(
+        "{}_RUNTIME_SUPPORT",
+        runtime_family
+            .chars()
+            .map(|ch| {
+                if ch.is_ascii_alphanumeric() {
+                    ch.to_ascii_uppercase()
+                } else {
+                    '_'
+                }
+            })
+            .collect::<String>()
+    )
 }
 
 pub(super) fn load_agent_root(root: &AgentRoot) -> Result<LoadedAgentRoot, String> {

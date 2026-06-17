@@ -2,12 +2,12 @@ artifact_version = "2"
 agent_id = "codex"
 trigger_kind = "upstream_release_detected"
 basis_ref = "cli_manifests/codex/latest_validated.txt"
-opened_from = ".github/workflows/codex-cli-update-snapshot.yml"
+opened_from = ".github/workflows/agent-maintenance-open-pr.yml"
 requested_control_plane_actions = [
   "packet_doc_refresh",
 ]
-request_recorded_at = "2026-05-07T06:24:24Z"
-request_commit = "1e44a63ca3d2b0de4686725ca7a79793b90f8b57"
+request_recorded_at = "2026-05-14T18:37:34Z"
+request_commit = "4a6073bc7b7500441d8db170d5e5e3c9c9942366"
 
 [runtime_followup_required]
 required = false
@@ -15,20 +15,100 @@ items = []
 
 [detected_release]
 detected_by = ".github/workflows/agent-maintenance-release-watch.yml"
-current_validated = "0.97.0"
-target_version = "0.125.0"
-latest_stable = "0.128.0"
+current_validated = "0.125.0"
+target_version = "0.129.0"
+latest_stable = "0.130.0"
 version_policy = "latest_stable_minus_one"
 source_kind = "github_releases"
 source_ref = "openai/codex"
-dispatch_kind = "workflow_dispatch"
-dispatch_workflow = "codex-cli-update-snapshot.yml"
-branch_name = "automation/codex-maintenance-0.125.0"
+dispatch_kind = "packet_pr"
+dispatch_workflow = "agent-maintenance-open-pr.yml"
+branch_name = "automation/codex-maintenance-0.129.0"
+
+[support_surface_audit]
+required = true
+surface_kinds = [
+  "commands",
+  "subcommands",
+  "flags",
+  "global_flags",
+  "positional_args",
+]
+excluded_surface_kinds = [
+  "tui_only",
+]
+allowed_deferrals = [
+  "upstream_not_machine_exposed",
+  "platform_evidence_missing",
+  "requires_new_infra",
+  "requires_new_architectural_seam",
+  "outside_registry_maintenance_write_envelope",
+]
+pre_run_debt_count = 2
+expected_post_run_debt_count = 2
+
+[[support_surface_audit.preexisting_unsupported_surface]]
+surface_kind = "commands"
+command_path = "codex completion"
+surface_id = "completion"
+debt_ref = "docs/specs/unified-agent-api/non-tui-support-debt.md#codex-completion-command"
+
+[[support_surface_audit.preexisting_unsupported_surface]]
+surface_kind = "positional_args"
+command_path = "codex completion"
+surface_id = "SHELL"
+debt_ref = "docs/specs/unified-agent-api/non-tui-support-debt.md#codex-completion-shell-arg"
+
+[[support_surface_audit.missing_wrapper_support]]
+surface_kind = "commands"
+command_path = "codex completion"
+surface_id = "completion"
+
+[[support_surface_audit.missing_wrapper_support]]
+surface_kind = "positional_args"
+command_path = "codex completion"
+surface_id = "SHELL"
+
+[[support_surface_audit.missing_backend_support]]
+surface_kind = "commands"
+command_path = "codex completion"
+surface_id = "completion"
+
+[[support_surface_audit.missing_backend_support]]
+surface_kind = "positional_args"
+command_path = "codex completion"
+surface_id = "SHELL"
+
+[[support_surface_audit.deferred_preexisting_gaps]]
+surface_kind = "commands"
+command_path = "codex completion"
+surface_id = "completion"
+defer_reason = "requires_new_architectural_seam"
+blocking_follow_on = "TODOS.md#close-codex-completion-maintenance-gap"
+
+[[support_surface_audit.deferred_preexisting_gaps]]
+surface_kind = "positional_args"
+command_path = "codex completion"
+surface_id = "SHELL"
+defer_reason = "requires_new_architectural_seam"
+blocking_follow_on = "TODOS.md#close-codex-completion-maintenance-gap"
+
+[[support_surface_audit.publication_impacts]]
+surface_kind = "commands"
+command_path = "codex completion"
+surface_id = "completion"
+surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
+
+[[support_surface_audit.publication_impacts]]
+surface_kind = "positional_args"
+command_path = "codex completion"
+surface_id = "SHELL"
+surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
 
 [execution_contract]
-executor = "codex"
-prompt_template_path = "cli_manifests/codex/PR_BODY_TEMPLATE.md"
-prompt_sha256 = "252a9de88c1b18791e9a7805b9dfbcf2bba26686a58412db4455cd443f5f3dbc"
+executor = "execute-agent-maintenance"
+prompt_template_path = "docs/agents/lifecycle/codex-maintenance/governance/execute-agent-maintenance-prompt.md"
+prompt_sha256 = "231107d2a7bdc7ad9e75c2bb295924951e2dd001964779fe9dd186e616523031"
 pr_summary_path = "docs/agents/lifecycle/codex-maintenance/governance/pr-summary.md"
 closeout_path = "docs/agents/lifecycle/codex-maintenance/governance/maintenance-closeout.json"
 requires_manual_closeout = true
@@ -37,19 +117,22 @@ writable_surfaces = [
   "crates/codex/**",
   "crates/agent_api/**",
   "cli_manifests/codex/artifacts.lock.json",
-  "cli_manifests/codex/snapshots/0.125.0/**",
-  "cli_manifests/codex/reports/0.125.0/**",
-  "cli_manifests/codex/versions/0.125.0.json",
+  "cli_manifests/codex/snapshots/0.129.0/**",
+  "cli_manifests/codex/reports/0.129.0/**",
+  "cli_manifests/codex/versions/0.129.0.json",
   "cli_manifests/codex/wrapper_coverage.json",
   "cli_manifests/support_matrix/current.json",
   "docs/specs/unified-agent-api/support-matrix.md",
+  "crates/agent_api/src/runtime_support_data.rs",
+  "docs/specs/unified-agent-api/non-tui-support-debt.md",
   "docs/specs/codex-wrapper-coverage-scenarios-v1.md",
 ]
 read_only_inputs = [
-  "cli_manifests/codex/OPS_PLAYBOOK.md",
-  "cli_manifests/codex/CI_WORKFLOWS_PLAN.md",
-  "cli_manifests/codex/PR_BODY_TEMPLATE.md",
-  ".github/workflows/codex-cli-update-snapshot.yml",
+  "docs/agents/lifecycle/codex-maintenance/OPS_PLAYBOOK.md",
+  "docs/agents/lifecycle/codex-maintenance/CI_WORKFLOWS_PLAN.md",
+  "docs/agents/lifecycle/codex-maintenance/governance/execute-agent-maintenance-prompt.md",
+  ".github/workflows/agent-maintenance-open-pr.yml",
+  "docs/specs/unified-agent-api/non-tui-support-debt.md",
 ]
 ordered_commands = [
   "cargo fmt --all",
@@ -71,8 +154,8 @@ green_gates = [
 [execution_contract.recovery]
 recreate_packet_command = "cargo run -p xtask -- refresh-agent --request docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml --write"
 reopen_pr_body_path = "docs/agents/lifecycle/codex-maintenance/governance/pr-summary.md"
-reopen_pr_branch = "automation/codex-maintenance-0.125.0"
+reopen_pr_branch = "automation/codex-maintenance-0.129.0"
 notes = [
-  "If PR creation fails after packet generation, rerun packet creation and reopen the PR from the generated pr-summary path.",
-  "If local Codex preflight fails, fix binary/auth and rerun execute-agent-maintenance --dry-run before write mode.",
+  "If PR creation fails after packet generation, rerun packet regeneration from the frozen request and reopen the PR from the generated pr-summary path.",
+  "If the local execution-host preflight (local Codex CLI host via execute-agent-maintenance) fails, fix the Codex binary/auth state and rerun `execute-agent-maintenance --dry-run` before write mode.",
 ]

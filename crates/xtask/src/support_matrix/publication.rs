@@ -3,14 +3,16 @@ use std::{fs, path::Path};
 use serde::{Deserialize, Serialize};
 
 use super::{
-    SupportRow, GENERATED_END_MARKER, GENERATED_SECTION_NOTE, GENERATED_SECTION_TITLE,
-    GENERATED_START_MARKER, JSON_OUTPUT_PATH, MARKDOWN_OUTPUT_PATH,
+    SupportRow, AGENT_API_RUNTIME_SUPPORT_DATA_OUTPUT_PATH, GENERATED_END_MARKER,
+    GENERATED_SECTION_NOTE, GENERATED_SECTION_TITLE, GENERATED_START_MARKER, JSON_OUTPUT_PATH,
+    MARKDOWN_OUTPUT_PATH,
 };
 
 #[derive(Debug, Clone)]
 pub struct PublicationBundle {
     pub json: String,
     pub markdown: String,
+    pub runtime_support_data: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -19,7 +21,10 @@ pub struct SupportMatrixArtifact {
     pub rows: Vec<SupportRow>,
 }
 
-pub fn render_publication_bundle(rows: &[SupportRow]) -> Result<PublicationBundle, String> {
+pub fn render_publication_bundle(
+    rows: &[SupportRow],
+    runtime_support_data: String,
+) -> Result<PublicationBundle, String> {
     let json = serde_json::to_string_pretty(&SupportMatrixArtifact {
         schema_version: 1,
         rows: rows.to_vec(),
@@ -30,17 +35,20 @@ pub fn render_publication_bundle(rows: &[SupportRow]) -> Result<PublicationBundl
     Ok(PublicationBundle {
         json: format!("{json}\n"),
         markdown,
+        runtime_support_data,
     })
 }
 
 pub fn render_publication_artifacts(
     existing_markdown: &str,
     rows: &[SupportRow],
+    runtime_support_data: String,
 ) -> Result<PublicationBundle, String> {
-    let bundle = render_publication_bundle(rows)?;
+    let bundle = render_publication_bundle(rows, runtime_support_data)?;
     Ok(PublicationBundle {
         json: bundle.json,
         markdown: splice_markdown_projection(existing_markdown, &bundle.markdown),
+        runtime_support_data: bundle.runtime_support_data,
     })
 }
 
@@ -87,12 +95,14 @@ pub fn write_publication_artifacts(
 ) -> Result<(), String> {
     let json_path = workspace_root.join(JSON_OUTPUT_PATH);
     let markdown_path = workspace_root.join(MARKDOWN_OUTPUT_PATH);
+    let runtime_support_data_path = workspace_root.join(AGENT_API_RUNTIME_SUPPORT_DATA_OUTPUT_PATH);
     write_file(&json_path, &bundle.json)?;
 
     let existing_markdown = fs::read_to_string(&markdown_path)
         .map_err(|err| format!("read({}): {err}", markdown_path.display()))?;
     let updated_markdown = splice_markdown_projection(&existing_markdown, &bundle.markdown);
     write_file(&markdown_path, &updated_markdown)?;
+    write_file(&runtime_support_data_path, &bundle.runtime_support_data)?;
     Ok(())
 }
 
@@ -102,6 +112,7 @@ pub fn validate_publication_artifacts(
 ) -> Result<(), String> {
     let json_path = workspace_root.join(JSON_OUTPUT_PATH);
     let markdown_path = workspace_root.join(MARKDOWN_OUTPUT_PATH);
+    let runtime_support_data_path = workspace_root.join(AGENT_API_RUNTIME_SUPPORT_DATA_OUTPUT_PATH);
 
     let checked_in_json: serde_json::Value = serde_json::from_str(
         &fs::read_to_string(&json_path)
@@ -128,6 +139,15 @@ pub fn validate_publication_artifacts(
         return Err(format!(
             "{} generated block is stale; regenerate with `cargo run -p xtask -- support-matrix`",
             markdown_path.display()
+        ));
+    }
+
+    let checked_in_runtime_support_data = fs::read_to_string(&runtime_support_data_path)
+        .map_err(|err| format!("read({}): {err}", runtime_support_data_path.display()))?;
+    if checked_in_runtime_support_data != bundle.runtime_support_data {
+        return Err(format!(
+            "{} is stale; regenerate with `cargo run -p xtask -- support-matrix`",
+            runtime_support_data_path.display()
         ));
     }
 
@@ -232,7 +252,8 @@ mod tests {
     #[test]
     fn publication_bundle_uses_same_rows_for_json_and_markdown() {
         let rows = sample_rows();
-        let bundle = render_publication_bundle(&rows).expect("render publication bundle");
+        let bundle = render_publication_bundle(&rows, "// runtime-support\n".to_string())
+            .expect("render publication bundle");
 
         let artifact: SupportMatrixArtifact =
             serde_json::from_str(&bundle.json).expect("parse generated support-matrix json");
@@ -247,5 +268,6 @@ mod tests {
 | `codex` | `1.0.0` | `linux-x64` | `supported` | `partial` | `partial` | `latest_validated` | backend report includes backend-only surface outside unified support |\n\
 | `codex` | `0.9.0` | `darwin-arm64` | `unsupported` | `unsupported` | `unsupported` | `none` | current root snapshot omits this target |\n";
         assert_eq!(bundle.markdown, expected_markdown);
+        assert_eq!(bundle.runtime_support_data, "// runtime-support\n");
     }
 }

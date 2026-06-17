@@ -13,11 +13,13 @@ This document defines the deterministic validator contract for `cli_manifests/op
 - `VERSION_METADATA_SCHEMA.json`
 - committed files under `cli_manifests/opencode/`
 
-## Current bootstrap expectations
+## Current committed expectations
 
-- `min_supported.txt` and `latest_validated.txt` exist and may be `none`
+- `min_supported.txt` exists and may be `none`
+- `latest_validated.txt` records the committed root validated baseline `1.4.11`
 - per-target pointer files exist for `linux-x64`, `darwin-arm64`, and `win32-x64`
 - `versions/1.4.9.json` exists with `status: snapshotted`
+- `versions/1.4.11.json` exists with `status: validated`
 - `snapshots/1.4.9/union.json` and the observed per-target snapshot exist
 - `wrapper_coverage.json` exists and remains bounded to the canonical `run --format json` wrapper surface
 
@@ -29,8 +31,9 @@ This document defines the deterministic validator contract for `cli_manifests/op
 
 ## Pointer posture
 
-- Root pointers stay `none` until Linux-first validation and support evidence are committed.
-- Target pointer files must always exist even when the value is unknown.
+- The root compatibility pointer `latest_validated.txt` is promoted to `1.4.11`.
+- Per-target pointer files must always exist even when the value is unknown.
+- Per-target `latest_validated` promotion remains independent from the root compatibility pointer.
 
 ## Coverage posture
 

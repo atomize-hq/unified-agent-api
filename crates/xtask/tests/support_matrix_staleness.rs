@@ -145,6 +145,10 @@ fn reverse_generated_rows(path: &Path) {
     write_json(path, &artifact);
 }
 
+fn overwrite_runtime_support_data_with_stale_text(path: &Path) {
+    write_text(path, "// stale runtime support projection\n");
+}
+
 fn materialize_minimal_valid_opencode_root(fixture_root: &Path) {
     materialize_root(
         &fixture_root.join("cli_manifests/opencode"),
@@ -396,5 +400,106 @@ fn support_matrix_check_rejects_stale_generated_json_row_order() {
     let stderr = String::from_utf8_lossy(&check.stderr);
     assert!(stderr.contains("current.json is stale"));
     assert!(stderr.contains("cli_manifests/support_matrix/current.json"));
+    assert!(stderr.contains("regenerate with `cargo run -p xtask -- support-matrix`"));
+}
+
+#[test]
+fn support_matrix_check_rejects_stale_runtime_support_data() {
+    let xtask_bin = PathBuf::from(env!("CARGO_BIN_EXE_xtask"));
+    let fixture_root = make_temp_dir("support-matrix-runtime-support-staleness");
+
+    write_text(
+        &fixture_root.join("Cargo.toml"),
+        "[workspace]\nmembers = []\n",
+    );
+    write_seeded_agent_registry(&fixture_root);
+    write_text(
+        &fixture_root.join("docs/specs/unified-agent-api/support-matrix.md"),
+        "# Support Matrix Spec — Unified Agent API\n\n## Purpose\nManual contract text.\n\n## Change control\nManual footer.\n",
+    );
+
+    materialize_root(
+        &fixture_root.join("cli_manifests/codex"),
+        &["linux-x64"],
+        "1.0.0",
+        &["linux-x64"],
+        &[("1.0.0", &["linux-x64"])],
+        &[("linux-x64", "1.0.0")],
+        &[("linux-x64", "1.0.0")],
+        &[(
+            "1.0.0",
+            "coverage.linux-x64.json",
+            json!({
+                "deltas": {
+                    "missing_commands": [],
+                    "missing_flags": [],
+                    "missing_args": [],
+                    "intentionally_unsupported": [],
+                    "wrapper_only_commands": [],
+                    "wrapper_only_flags": [],
+                    "wrapper_only_args": [],
+                }
+            }),
+        )],
+    );
+
+    materialize_root(
+        &fixture_root.join("cli_manifests/claude_code"),
+        &["linux-x64"],
+        "2.0.0",
+        &["linux-x64"],
+        &[("2.0.0", &["linux-x64"])],
+        &[("linux-x64", "2.0.0")],
+        &[("linux-x64", "2.0.0")],
+        &[(
+            "2.0.0",
+            "coverage.linux-x64.json",
+            json!({
+                "deltas": {
+                    "missing_commands": [],
+                    "missing_flags": [],
+                    "missing_args": [],
+                    "intentionally_unsupported": [],
+                    "wrapper_only_commands": [],
+                    "wrapper_only_flags": [],
+                    "wrapper_only_args": [],
+                }
+            }),
+        )],
+    );
+    materialize_minimal_valid_opencode_root(&fixture_root);
+    materialize_minimal_gemini_root(&fixture_root);
+    materialize_minimal_aider_root(&fixture_root);
+
+    let generate = Command::new(&xtask_bin)
+        .arg("support-matrix")
+        .current_dir(&fixture_root)
+        .output()
+        .expect("spawn xtask support-matrix");
+    assert!(
+        generate.status.success(),
+        "xtask support-matrix failed\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&generate.stdout),
+        String::from_utf8_lossy(&generate.stderr)
+    );
+
+    overwrite_runtime_support_data_with_stale_text(
+        &fixture_root.join("crates/agent_api/src/runtime_support_data.rs"),
+    );
+
+    let check = Command::new(&xtask_bin)
+        .arg("support-matrix")
+        .arg("--check")
+        .current_dir(&fixture_root)
+        .output()
+        .expect("spawn xtask support-matrix --check");
+    assert!(
+        !check.status.success(),
+        "xtask support-matrix --check should fail for stale runtime support data"
+    );
+
+    let stderr = String::from_utf8_lossy(&check.stderr);
+    assert!(stderr.contains("runtime_support_data.rs is stale"));
+    assert!(stderr.contains("crates/agent_api/src/runtime_support_data.rs"));
     assert!(stderr.contains("regenerate with `cargo run -p xtask -- support-matrix`"));
 }

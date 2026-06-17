@@ -12,6 +12,7 @@ use std::time::Duration;
 use futures_core::Stream;
 
 mod agent_kind;
+mod runtime_support;
 
 use crate::mcp::{
     normalize_mcp_add_request, normalize_mcp_get_request, normalize_mcp_remove_request,
@@ -50,6 +51,7 @@ mod backend_harness;
 
 pub mod backends;
 pub mod mcp;
+pub use runtime_support::{list_runtime_support, resolve_runtime_support, RuntimeSupportRecord};
 
 const CAPABILITY_CONTROL_CANCEL_V1: &str = "agent_api.control.cancel.v1";
 #[allow(dead_code)]
@@ -219,6 +221,18 @@ pub struct AgentWrapperRunResult {
 pub enum AgentWrapperError {
     #[error("unknown backend: {agent_kind}")]
     UnknownBackend { agent_kind: String },
+    #[error("unknown runtime family: {runtime_family}")]
+    UnknownRuntimeFamily { runtime_family: String },
+    #[error("unsupported target triple for {runtime_family}: {target_triple}")]
+    UnsupportedTargetTriple {
+        runtime_family: String,
+        target_triple: String,
+    },
+    #[error("missing validated runtime for {runtime_family}: {target_triple}")]
+    MissingValidatedRuntime {
+        runtime_family: String,
+        target_triple: String,
+    },
     #[error("unsupported capability for {agent_kind}: {capability}")]
     UnsupportedCapability {
         agent_kind: String,

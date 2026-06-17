@@ -76,15 +76,17 @@ fn update_lifecycle_state_after_maintenance_closeout(
 
     let mut lifecycle_state = load_lifecycle_state(workspace_root, &lifecycle_state_path)
         .map_err(|err| MaintenanceCloseoutError::Validation(err.to_string()))?;
-    lifecycle_state.current_owner_command = "close-agent-maintenance --write".to_string();
-    lifecycle_state.expected_next_command =
-        format!("check-agent-drift --agent {}", linked.request.agent_id);
-    lifecycle_state.last_transition_at = agent_lifecycle::now_rfc3339()
-        .map_err(|err| MaintenanceCloseoutError::Internal(err.to_string()))?;
-    lifecycle_state.last_transition_by = "xtask close-agent-maintenance --write".to_string();
     lifecycle_state
         .side_states
         .retain(|state| !matches!(state, SideState::Drifted));
+    lifecycle_state
+        .required_evidence
+        .retain(|evidence| *evidence != EvidenceId::MaintenanceCloseoutWritten);
+    lifecycle_state
+        .required_evidence
+        .push(EvidenceId::MaintenanceCloseoutWritten);
+    lifecycle_state.required_evidence.sort();
+    lifecycle_state.required_evidence.dedup();
     lifecycle_state
         .satisfied_evidence
         .retain(|evidence| *evidence != EvidenceId::MaintenanceCloseoutWritten);

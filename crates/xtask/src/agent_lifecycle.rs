@@ -187,6 +187,7 @@ pub enum EvidenceId {
     CapabilityMatrixAuditGreen,
     PreflightGreen,
     ProvingRunCloseoutWritten,
+    MaintenanceReadinessSettled,
     MaintenanceCloseoutWritten,
 }
 
@@ -204,6 +205,7 @@ impl EvidenceId {
             Self::CapabilityMatrixAuditGreen => "capability_matrix_audit_green",
             Self::PreflightGreen => "preflight_green",
             Self::ProvingRunCloseoutWritten => "proving_run_closeout_written",
+            Self::MaintenanceReadinessSettled => "maintenance_readiness_settled",
             Self::MaintenanceCloseoutWritten => "maintenance_closeout_written",
         }
     }
@@ -221,6 +223,7 @@ impl EvidenceId {
             Self::CapabilityMatrixAuditGreen,
             Self::PreflightGreen,
             Self::ProvingRunCloseoutWritten,
+            Self::MaintenanceReadinessSettled,
             Self::MaintenanceCloseoutWritten,
         ]
     }
@@ -262,7 +265,7 @@ const PUBLISHED_MINIMUM_EVIDENCE: [EvidenceId; 10] = [
     EvidenceId::PreflightGreen,
 ];
 
-const CLOSED_BASELINE_MINIMUM_EVIDENCE: [EvidenceId; 11] = [
+const CLOSED_BASELINE_MINIMUM_EVIDENCE: [EvidenceId; 12] = [
     EvidenceId::RegistryEntry,
     EvidenceId::DocsPack,
     EvidenceId::ManifestRootSkeleton,
@@ -274,6 +277,7 @@ const CLOSED_BASELINE_MINIMUM_EVIDENCE: [EvidenceId; 11] = [
     EvidenceId::CapabilityMatrixAuditGreen,
     EvidenceId::PreflightGreen,
     EvidenceId::ProvingRunCloseoutWritten,
+    EvidenceId::MaintenanceReadinessSettled,
 ];
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

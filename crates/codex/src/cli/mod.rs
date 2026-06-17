@@ -12,6 +12,7 @@ mod review;
 mod sandbox;
 mod session;
 mod stdio_to_uds;
+mod update;
 
 pub use app_server::{
     AppServerCodegenOutput, AppServerCodegenRequest, AppServerCodegenTarget, AppServerProxyRequest,
@@ -47,3 +48,4 @@ pub use review::{ExecReviewCommandRequest, ReviewCommandRequest};
 pub use sandbox::{SandboxCommandRequest, SandboxPlatform, SandboxRun};
 pub use session::{ForkSessionRequest, ResumeSessionRequest};
 pub use stdio_to_uds::StdioToUdsRequest;
+pub use update::UpdateCommandRequest;

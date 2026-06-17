@@ -1,11 +1,32 @@
+#[path = "approval_artifact/fields.rs"]
+mod fields;
+#[path = "approval_artifact/maintenance.rs"]
+mod maintenance;
+#[path = "approval_artifact/pathing.rs"]
+mod pathing;
+
 use std::{
     fmt, fs,
-    path::{Component, Path, PathBuf},
+    path::{Path, PathBuf},
 };
 
+use crate::agent_registry::ReleaseWatchMetadata;
+use serde::Serialize;
 use sha2::{Digest, Sha256};
 use time::{format_description::well_known::Rfc3339, OffsetDateTime};
-use toml_edit::{DocumentMut, TableLike};
+use toml_edit::DocumentMut;
+
+use self::{
+    fields::{
+        config_gate_entries, optional_string, required_bool, required_string, required_table,
+        string_array, target_gate_entries,
+    },
+    maintenance::parse_maintenance,
+    pathing::{
+        parse_approval_path, validate_approval_path, validate_repo_relative_existing_file,
+        ApprovalPath,
+    },
+};
 
 const DOCS_NEXT_ROOT: &str = "docs/agents/lifecycle";
 const STAGING_DIR_NAME: &str = ".staging";
@@ -15,6 +36,7 @@ const COMPARISON_REF_PATH: &str = "docs/agents/selection/cli-agent-selection-pac
 const FACTORY_VALIDATION_MODE: &str = "factory_validation";
 const FRONTIER_EXPANSION_MODE: &str = "frontier_expansion";
 const APPROVAL_ARTIFACT_VERSION: &str = "1";
+pub const APPROVED_SCOPE_CREATE_LANE_CLOSEOUT: &str = "create_lane_closeout";
 
 #[derive(Debug, Clone)]
 pub struct ApprovalArtifact {
@@ -22,6 +44,7 @@ pub struct ApprovalArtifact {
     pub canonical_path: PathBuf,
     pub sha256: String,
     pub descriptor: ApprovalDescriptor,
+    pub maintenance: ApprovalMaintenance,
 }
 
 #[derive(Debug, Clone)]
@@ -44,6 +67,46 @@ pub struct ApprovalDescriptor {
     pub capability_matrix_target: Option<String>,
     pub docs_release_track: String,
     pub onboarding_pack_prefix: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct ApprovalMaintenance {
+    pub mode: ApprovalMaintenanceMode,
+    pub section_sha256: String,
+}
+
+impl ApprovalMaintenance {
+    pub fn mode_name(&self) -> &'static str {
+        self.mode.mode_name()
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum ApprovalMaintenanceMode {
+    ReleaseWatchEnrolled {
+        release_watch: ReleaseWatchMetadata,
+        release_watch_sha256: String,
+    },
+    ExplicitlyDeferred {
+        deferral: ApprovalMaintenanceDeferral,
+        deferral_sha256: String,
+    },
+}
+
+impl ApprovalMaintenanceMode {
+    pub fn mode_name(&self) -> &'static str {
+        match self {
+            Self::ReleaseWatchEnrolled { .. } => "release_watch_enrolled",
+            Self::ExplicitlyDeferred { .. } => "explicitly_deferred",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct ApprovalMaintenanceDeferral {
+    pub reason: String,
+    pub follow_up: String,
+    pub approved_scope: String,
 }
 
 #[derive(Debug, Clone)]
@@ -136,12 +199,6 @@ fn load_approval_artifact_with_options(
     )
 }
 
-#[derive(Debug, Clone)]
-struct ApprovalPath {
-    pack_prefix: String,
-    staged: bool,
-}
-
 fn parse_approval_document(
     document: DocumentMut,
     workspace_root: &Path,
@@ -172,16 +229,18 @@ fn parse_approval_document(
         "comparison_ref",
         &comparison_ref,
     )?;
+
     let selection_mode = required_string(root, "selection_mode", relative_path)?;
-    match selection_mode.as_str() {
-        FACTORY_VALIDATION_MODE | FRONTIER_EXPANSION_MODE => {}
-        _ => {
-            return Err(ApprovalArtifactError::Validation(format!(
-                "approval artifact `{}` has invalid `selection_mode` `{selection_mode}`; expected `{FACTORY_VALIDATION_MODE}` or `{FRONTIER_EXPANSION_MODE}`",
-                relative_path.display()
-            )));
-        }
+    if !matches!(
+        selection_mode.as_str(),
+        FACTORY_VALIDATION_MODE | FRONTIER_EXPANSION_MODE
+    ) {
+        return Err(ApprovalArtifactError::Validation(format!(
+            "approval artifact `{}` has invalid `selection_mode` `{selection_mode}`; expected `{FACTORY_VALIDATION_MODE}` or `{FRONTIER_EXPANSION_MODE}`",
+            relative_path.display()
+        )));
     }
+
     let recommended_agent_id = required_string(root, "recommended_agent_id", relative_path)?;
     let approved_agent_id = required_string(root, "approved_agent_id", relative_path)?;
     let approval_commit = required_string(root, "approval_commit", relative_path)?;
@@ -228,6 +287,9 @@ fn parse_approval_document(
             path_pack_prefix
         )));
     }
+
+    let maintenance = required_table(descriptor, "maintenance", relative_path)?;
+    let maintenance = parse_maintenance(maintenance, relative_path)?;
 
     Ok(ApprovalArtifact {
         relative_path: relative_path.display().to_string(),
@@ -283,91 +345,8 @@ fn parse_approval_document(
             docs_release_track: required_string(descriptor, "docs_release_track", relative_path)?,
             onboarding_pack_prefix,
         },
+        maintenance,
     })
-}
-
-fn validate_approval_path(
-    relative_path: &Path,
-    allow_staged_paths: bool,
-) -> Result<String, ApprovalArtifactError> {
-    parse_approval_path(relative_path, allow_staged_paths).map(|path| path.pack_prefix)
-}
-
-fn parse_approval_path(
-    relative_path: &Path,
-    allow_staged_paths: bool,
-) -> Result<ApprovalPath, ApprovalArtifactError> {
-    let components = relative_path.components().collect::<Vec<_>>();
-    if components.is_empty()
-        || components
-            .iter()
-            .any(|component| !matches!(component, Component::Normal(_)))
-    {
-        return Err(invalid_approval_path(relative_path, allow_staged_paths));
-    }
-
-    let rooted = relative_path
-        .strip_prefix(DOCS_NEXT_ROOT)
-        .map_err(|_| invalid_approval_path(relative_path, allow_staged_paths))?;
-    let rooted_components = rooted.components().collect::<Vec<_>>();
-    if rooted_components.len() == 3
-        && matches!(
-            rooted_components[1],
-            Component::Normal(part) if part == GOVERNANCE_DIR_NAME
-        )
-        && matches!(
-            rooted_components[2],
-            Component::Normal(part) if part == APPROVAL_FILE_NAME
-        )
-    {
-        let Component::Normal(prefix) = rooted_components[0] else {
-            return Err(invalid_approval_path(relative_path, allow_staged_paths));
-        };
-        return Ok(ApprovalPath {
-            pack_prefix: prefix.to_string_lossy().into_owned(),
-            staged: false,
-        });
-    }
-
-    if allow_staged_paths
-        && rooted_components.len() == 5
-        && matches!(
-            rooted_components[0],
-            Component::Normal(part) if part == STAGING_DIR_NAME
-        )
-        && matches!(
-            rooted_components[3],
-            Component::Normal(part) if part == GOVERNANCE_DIR_NAME
-        )
-        && matches!(
-            rooted_components[4],
-            Component::Normal(part) if part == APPROVAL_FILE_NAME
-        )
-    {
-        let Component::Normal(prefix) = rooted_components[2] else {
-            return Err(invalid_approval_path(relative_path, allow_staged_paths));
-        };
-        return Ok(ApprovalPath {
-            pack_prefix: prefix.to_string_lossy().into_owned(),
-            staged: true,
-        });
-    }
-
-    Err(invalid_approval_path(relative_path, allow_staged_paths))
-}
-
-fn invalid_approval_path(relative_path: &Path, allow_staged_paths: bool) -> ApprovalArtifactError {
-    let expected = if allow_staged_paths {
-        format!(
-            "`{DOCS_NEXT_ROOT}/<prefix>/{GOVERNANCE_DIR_NAME}/{APPROVAL_FILE_NAME}` or `{DOCS_NEXT_ROOT}/{STAGING_DIR_NAME}/<run_id>/<prefix>/{GOVERNANCE_DIR_NAME}/{APPROVAL_FILE_NAME}`"
-        )
-    } else {
-        format!("`{DOCS_NEXT_ROOT}/<prefix>/{GOVERNANCE_DIR_NAME}/{APPROVAL_FILE_NAME}`")
-    };
-    ApprovalArtifactError::Validation(format!(
-        "approval path `{}` must be repo-relative and match {expected}",
-        relative_path.display()
-    ))
 }
 
 fn validate_artifact_version(
@@ -380,53 +359,6 @@ fn validate_artifact_version(
             relative_path.display()
         )));
     }
-    Ok(())
-}
-
-fn validate_repo_relative_existing_file(
-    workspace_root: &Path,
-    relative_path: &Path,
-    field_name: &str,
-    field_value: &str,
-) -> Result<(), ApprovalArtifactError> {
-    let referenced = Path::new(field_value);
-    let components = referenced.components().collect::<Vec<_>>();
-    if components.is_empty()
-        || components
-            .iter()
-            .any(|component| !matches!(component, Component::Normal(_)))
-    {
-        return Err(ApprovalArtifactError::Validation(format!(
-            "approval artifact `{}` field `{field_name}` must be a repo-relative file path with only normal path components",
-            relative_path.display()
-        )));
-    }
-
-    let canonical_path = fs::canonicalize(workspace_root.join(referenced)).map_err(|err| {
-        ApprovalArtifactError::Validation(format!(
-            "approval artifact `{}` field `{field_name}` does not resolve: {err}",
-            relative_path.display()
-        ))
-    })?;
-    if !canonical_path.starts_with(workspace_root) {
-        return Err(ApprovalArtifactError::Validation(format!(
-            "approval artifact `{}` field `{field_name}` resolves outside workspace root",
-            relative_path.display()
-        )));
-    }
-    let metadata = fs::metadata(&canonical_path).map_err(|err| {
-        ApprovalArtifactError::Validation(format!(
-            "approval artifact `{}` field `{field_name}` cannot be inspected: {err}",
-            relative_path.display()
-        ))
-    })?;
-    if !metadata.is_file() {
-        return Err(ApprovalArtifactError::Validation(format!(
-            "approval artifact `{}` field `{field_name}` must point to an existing file",
-            relative_path.display()
-        )));
-    }
-
     Ok(())
 }
 
@@ -458,167 +390,4 @@ pub fn validate_rfc3339_value(
         ))
     })?;
     Ok(())
-}
-
-fn required_string(
-    table: &dyn TableLike,
-    key: &str,
-    relative_path: &Path,
-) -> Result<String, ApprovalArtifactError> {
-    let item = table.get(key).ok_or_else(|| {
-        ApprovalArtifactError::Validation(format!(
-            "approval artifact `{}` is missing required field `{key}`",
-            relative_path.display()
-        ))
-    })?;
-    let value = item.as_str().ok_or_else(|| {
-        ApprovalArtifactError::Validation(format!(
-            "approval artifact `{}` field `{key}` must be a string",
-            relative_path.display()
-        ))
-    })?;
-    let trimmed = value.trim();
-    if trimmed.is_empty() {
-        return Err(ApprovalArtifactError::Validation(format!(
-            "approval artifact `{}` field `{key}` must not be empty",
-            relative_path.display()
-        )));
-    }
-    Ok(trimmed.to_string())
-}
-
-fn optional_string(
-    table: &dyn TableLike,
-    key: &str,
-    relative_path: &Path,
-) -> Result<Option<String>, ApprovalArtifactError> {
-    let Some(item) = table.get(key) else {
-        return Ok(None);
-    };
-    let value = item.as_str().ok_or_else(|| {
-        ApprovalArtifactError::Validation(format!(
-            "approval artifact `{}` field `{key}` must be a string",
-            relative_path.display()
-        ))
-    })?;
-    let trimmed = value.trim();
-    if trimmed.is_empty() {
-        return Ok(None);
-    }
-    Ok(Some(trimmed.to_string()))
-}
-
-fn required_bool(
-    table: &dyn TableLike,
-    key: &str,
-    relative_path: &Path,
-) -> Result<bool, ApprovalArtifactError> {
-    let item = table.get(key).ok_or_else(|| {
-        ApprovalArtifactError::Validation(format!(
-            "approval artifact `{}` is missing required field `{key}`",
-            relative_path.display()
-        ))
-    })?;
-    item.as_bool().ok_or_else(|| {
-        ApprovalArtifactError::Validation(format!(
-            "approval artifact `{}` field `{key}` must be a bool",
-            relative_path.display()
-        ))
-    })
-}
-
-fn string_array(
-    table: &dyn TableLike,
-    key: &str,
-    relative_path: &Path,
-    required: bool,
-) -> Result<Vec<String>, ApprovalArtifactError> {
-    let Some(item) = table.get(key) else {
-        if required {
-            return Err(ApprovalArtifactError::Validation(format!(
-                "approval artifact `{}` is missing required field `{key}`",
-                relative_path.display()
-            )));
-        }
-        return Ok(Vec::new());
-    };
-    let values = item.as_array().ok_or_else(|| {
-        ApprovalArtifactError::Validation(format!(
-            "approval artifact `{}` field `{key}` must be an array of strings",
-            relative_path.display()
-        ))
-    })?;
-    values
-        .iter()
-        .map(|value| {
-            let value = value.as_str().ok_or_else(|| {
-                ApprovalArtifactError::Validation(format!(
-                    "approval artifact `{}` field `{key}` must contain only strings",
-                    relative_path.display()
-                ))
-            })?;
-            let trimmed = value.trim();
-            if trimmed.is_empty() {
-                return Err(ApprovalArtifactError::Validation(format!(
-                    "approval artifact `{}` field `{key}` must not contain empty strings",
-                    relative_path.display()
-                )));
-            }
-            Ok(trimmed.to_string())
-        })
-        .collect()
-}
-
-fn target_gate_entries(
-    table: &dyn TableLike,
-    relative_path: &Path,
-) -> Result<Vec<String>, ApprovalArtifactError> {
-    let Some(item) = table.get("target_gated_capabilities") else {
-        return Ok(Vec::new());
-    };
-    let entries = item.as_array_of_tables().ok_or_else(|| {
-        ApprovalArtifactError::Validation(format!(
-            "approval artifact `{}` field `descriptor.target_gated_capabilities` must be an array of tables",
-            relative_path.display()
-        ))
-    })?;
-    entries
-        .iter()
-        .map(|entry| {
-            let capability_id = required_string(entry, "capability_id", relative_path)?;
-            let targets = string_array(entry, "targets", relative_path, true)?;
-            Ok(format!("{capability_id}:{}", targets.join(",")))
-        })
-        .collect()
-}
-
-fn config_gate_entries(
-    table: &dyn TableLike,
-    relative_path: &Path,
-) -> Result<Vec<String>, ApprovalArtifactError> {
-    let Some(item) = table.get("config_gated_capabilities") else {
-        return Ok(Vec::new());
-    };
-    let entries = item.as_array_of_tables().ok_or_else(|| {
-        ApprovalArtifactError::Validation(format!(
-            "approval artifact `{}` field `descriptor.config_gated_capabilities` must be an array of tables",
-            relative_path.display()
-        ))
-    })?;
-    entries
-        .iter()
-        .map(|entry| {
-            let capability_id = required_string(entry, "capability_id", relative_path)?;
-            let config_key = required_string(entry, "config_key", relative_path)?;
-            let targets = string_array(entry, "targets", relative_path, false)?;
-            if targets.is_empty() {
-                Ok(format!("{capability_id}:{config_key}"))
-            } else {
-                Ok(format!(
-                    "{capability_id}:{config_key}:{}",
-                    targets.join(",")
-                ))
-            }
-        })
-        .collect()
 }

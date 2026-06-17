@@ -10,7 +10,8 @@ This document uses RFC 2119 requirement keywords (`MUST`, `MUST NOT`, `SHOULD`).
 ## Purpose
 
 Define the committed control-plane truth used by `xtask` for onboarded agents, including the
-maintenance governance metadata consumed by `check-agent-drift`.
+maintenance governance metadata consumed by `check-agent-drift` and the transport facts used to
+derive one shared automated maintenance packet contract.
 
 ## Registry ownership
 
@@ -75,6 +76,21 @@ Absence of `maintenance.release_watch` is the only “not enrolled” state. Cal
 second enrollment inventory outside the registry or represent unenrolled agents with
 `enabled = false` placeholders.
 
+Approval artifacts and create-lane closeout consumers MUST preserve exactly two maintenance
+approval modes:
+
+- `release_watch_enrolled`
+- `explicitly_deferred`
+
+These modes do not create a second enrollment contract:
+
+- `release_watch_enrolled` requires committed registry `maintenance.release_watch` truth for the
+  same agent
+- `explicitly_deferred` forbids committed registry `maintenance.release_watch` truth for the same
+  agent
+- callers MUST NOT introduce a third approval-maintenance mode or alternate release-watch
+  enrollment storage outside the registry
+
 ## Maintenance release watch
 
 `maintenance.release_watch` declares the machine-owned watch metadata for upstream release
@@ -99,9 +115,17 @@ Required top-level fields:
 
 Dispatch rules:
 
+- The only live scheduled release-detection entrypoint is `.github/workflows/agent-maintenance-release-watch.yml`. Per-agent watcher workflows MUST NOT be treated as active release-watch entrypoints.
+- `dispatch_kind = "packet_pr"` is the steady-state enrolled transport for automated maintenance.
 - `dispatch_workflow` MUST be present only when `dispatch_kind = "workflow_dispatch"`.
 - `dispatch_workflow` MUST be omitted when `dispatch_kind = "packet_pr"`.
 - `dispatch_workflow`, when present, MUST be a non-empty workflow filename.
+- The registry omission for `packet_pr` is intentional. Packet generation MUST materialize
+  `detected_release.dispatch_workflow = "agent-maintenance-open-pr.yml"` in the request packet so
+  the frozen packet still carries one fully resolved dispatch contract.
+- `workflow_dispatch` is compatibility-only for historical or manual replay lanes. It MUST NOT
+  become a second policy store for support-audit rules, writable-surface narrowing, or gate
+  semantics.
 
 Upstream rules:
 
@@ -115,9 +139,11 @@ Upstream rules:
   - `version_marker`
 - Source-specific fields from the non-selected source kind MUST NOT be present.
 
-Current milestone-1 seeded registry truth enables release-watch metadata only for `codex` and
-`claude_code`. That rollout limit lives in the committed registry content, not as a permanent
-schema-level allowlist for future agents.
+Current committed registry truth enables release-watch metadata for `codex`, `claude_code`, and
+`opencode`. Enrolled automated maintenance is expected to converge on `dispatch_kind = "packet_pr"`
+for each of those agents. Any temporary or historical `workflow_dispatch` entry exists only as a
+compatibility state in the committed registry content, not as a permanent schema-level expectation
+for future agents.
 
 ## Maintenance governance checks
 

@@ -12,6 +12,7 @@ Canonical specs:
 - `docs/specs/unified-agent-api/capabilities-schema-spec.md`
 - `docs/specs/unified-agent-api/extensions-spec.md`
 - `docs/specs/unified-agent-api/support-matrix.md`
+- `docs/specs/unified-agent-api/runtime-support-contract.md`
 
 Draft specs:
 - `docs/specs/unified-agent-api/mcp-management-spec.md`
@@ -23,8 +24,7 @@ Generated artifact:
   aligned with committed publication truth.
 
 The support publication contract lives in `docs/specs/unified-agent-api/support-matrix.md`. The
+runtime-support contract in `docs/specs/unified-agent-api/runtime-support-contract.md` owns the
+library-only validated-runtime projection that refreshes `crates/agent_api/src/runtime_support_data.rs`. The
 generated `capability-matrix.md` remains a separate lifecycle-backed publication surface and does
 not define support policy.
-
-Planning/execution artifacts remain in:
-- the Unified Agent API planning/provenance area under `.archived/project_management/next/`
