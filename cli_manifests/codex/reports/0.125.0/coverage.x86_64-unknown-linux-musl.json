@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-05-07T17:12:52.967373Z",
+  "generated_at": "2026-06-17T20:57:49.228787Z",
   "inputs": {
     "upstream": {
       "semantic_version": "0.125.0",
@@ -11,7 +11,7 @@
     },
     "wrapper": {
       "schema_version": 1,
-      "wrapper_version": "0.3.4"
+      "wrapper_version": "0.3.7"
     },
     "rules": {
       "rules_schema_version": 1
@@ -30,7 +30,10 @@
         "path": [],
         "key": "--no-alt-screen",
         "upstream_available_on": [
-          "x86_64-unknown-linux-musl"
+          "x86_64-unknown-linux-musl",
+          "aarch64-unknown-linux-musl",
+          "aarch64-apple-darwin",
+          "x86_64-pc-windows-msvc"
         ],
         "note": "Alt-screen control is a TUI-only surface and is excluded from wrapper parity."
       }
@@ -40,7 +43,10 @@
         "path": [],
         "name": "PROMPT",
         "upstream_available_on": [
-          "x86_64-unknown-linux-musl"
+          "x86_64-unknown-linux-musl",
+          "aarch64-unknown-linux-musl",
+          "aarch64-apple-darwin",
+          "x86_64-pc-windows-msvc"
         ],
         "note": "Interactive TUI default-mode prompt surface is excluded from wrapper parity."
       }
@@ -51,7 +57,10 @@
           "completion"
         ],
         "upstream_available_on": [
-          "x86_64-unknown-linux-musl"
+          "x86_64-unknown-linux-musl",
+          "aarch64-unknown-linux-musl",
+          "aarch64-apple-darwin",
+          "x86_64-pc-windows-msvc"
         ],
         "wrapper_level": "intentionally_unsupported",
         "note": "Shell completion generation is out of scope for the wrapper."
@@ -62,7 +71,10 @@
         ],
         "name": "SHELL",
         "upstream_available_on": [
-          "x86_64-unknown-linux-musl"
+          "x86_64-unknown-linux-musl",
+          "aarch64-unknown-linux-musl",
+          "aarch64-apple-darwin",
+          "x86_64-pc-windows-msvc"
         ],
         "wrapper_level": "intentionally_unsupported",
         "note": "Shell completion generation is out of scope for the wrapper."
@@ -96,6 +108,15 @@
           "x86_64-unknown-linux-musl"
         ],
         "wrapper_level": "explicit"
+      },
+      {
+        "path": [
+          "update"
+        ],
+        "upstream_available_on": [
+          "x86_64-unknown-linux-musl"
+        ],
+        "wrapper_level": "explicit"
       }
     ],
     "wrapper_only_flags": [
@@ -106,7 +127,36 @@
         ],
         "key": "--image",
         "upstream_available_on": [
-          "x86_64-unknown-linux-musl"
+          "x86_64-unknown-linux-musl",
+          "aarch64-unknown-linux-musl",
+          "aarch64-apple-darwin",
+          "x86_64-pc-windows-msvc"
+        ],
+        "wrapper_level": "explicit"
+      },
+      {
+        "path": [
+          "exec-server"
+        ],
+        "key": "--executor-id",
+        "upstream_available_on": [
+          "x86_64-unknown-linux-musl",
+          "aarch64-unknown-linux-musl",
+          "aarch64-apple-darwin",
+          "x86_64-pc-windows-msvc"
+        ],
+        "wrapper_level": "explicit"
+      },
+      {
+        "path": [
+          "exec-server"
+        ],
+        "key": "--name",
+        "upstream_available_on": [
+          "x86_64-unknown-linux-musl",
+          "aarch64-unknown-linux-musl",
+          "aarch64-apple-darwin",
+          "x86_64-pc-windows-msvc"
         ],
         "wrapper_level": "explicit"
       },
@@ -138,7 +188,10 @@
         ],
         "key": "--api-key",
         "upstream_available_on": [
-          "x86_64-unknown-linux-musl"
+          "x86_64-unknown-linux-musl",
+          "aarch64-unknown-linux-musl",
+          "aarch64-apple-darwin",
+          "x86_64-pc-windows-msvc"
         ],
         "wrapper_level": "explicit"
       },
@@ -148,10 +201,26 @@
         ],
         "key": "--mcp",
         "upstream_available_on": [
-          "x86_64-unknown-linux-musl"
+          "x86_64-unknown-linux-musl",
+          "aarch64-unknown-linux-musl",
+          "aarch64-apple-darwin",
+          "x86_64-pc-windows-msvc"
         ],
         "wrapper_level": "explicit",
         "note": "capability-guarded"
+      },
+      {
+        "path": [
+          "login"
+        ],
+        "key": "--with-access-token",
+        "upstream_available_on": [
+          "x86_64-unknown-linux-musl",
+          "aarch64-unknown-linux-musl",
+          "aarch64-apple-darwin",
+          "x86_64-pc-windows-msvc"
+        ],
+        "wrapper_level": "explicit"
       },
       {
         "path": [
@@ -190,6 +259,90 @@
         "key": "--upstream-url",
         "upstream_available_on": [
           "x86_64-unknown-linux-musl"
+        ],
+        "wrapper_level": "explicit"
+      },
+      {
+        "path": [
+          "sandbox",
+          "linux"
+        ],
+        "key": "--include-managed-config",
+        "upstream_available_on": [
+          "x86_64-unknown-linux-musl",
+          "aarch64-unknown-linux-musl",
+          "aarch64-apple-darwin",
+          "x86_64-pc-windows-msvc"
+        ],
+        "wrapper_level": "explicit"
+      },
+      {
+        "path": [
+          "sandbox",
+          "linux"
+        ],
+        "key": "--permissions-profile",
+        "upstream_available_on": [
+          "x86_64-unknown-linux-musl",
+          "aarch64-unknown-linux-musl",
+          "aarch64-apple-darwin",
+          "x86_64-pc-windows-msvc"
+        ],
+        "wrapper_level": "explicit"
+      },
+      {
+        "path": [
+          "sandbox",
+          "macos"
+        ],
+        "key": "--include-managed-config",
+        "upstream_available_on": [
+          "x86_64-unknown-linux-musl",
+          "aarch64-unknown-linux-musl",
+          "aarch64-apple-darwin",
+          "x86_64-pc-windows-msvc"
+        ],
+        "wrapper_level": "explicit"
+      },
+      {
+        "path": [
+          "sandbox",
+          "macos"
+        ],
+        "key": "--permissions-profile",
+        "upstream_available_on": [
+          "x86_64-unknown-linux-musl",
+          "aarch64-unknown-linux-musl",
+          "aarch64-apple-darwin",
+          "x86_64-pc-windows-msvc"
+        ],
+        "wrapper_level": "explicit"
+      },
+      {
+        "path": [
+          "sandbox",
+          "windows"
+        ],
+        "key": "--include-managed-config",
+        "upstream_available_on": [
+          "x86_64-unknown-linux-musl",
+          "aarch64-unknown-linux-musl",
+          "aarch64-apple-darwin",
+          "x86_64-pc-windows-msvc"
+        ],
+        "wrapper_level": "explicit"
+      },
+      {
+        "path": [
+          "sandbox",
+          "windows"
+        ],
+        "key": "--permissions-profile",
+        "upstream_available_on": [
+          "x86_64-unknown-linux-musl",
+          "aarch64-unknown-linux-musl",
+          "aarch64-apple-darwin",
+          "x86_64-pc-windows-msvc"
         ],
         "wrapper_level": "explicit"
       }

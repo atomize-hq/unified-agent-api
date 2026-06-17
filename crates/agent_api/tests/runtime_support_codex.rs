@@ -27,40 +27,52 @@ impl Drop for CurrentDirGuard {
 
 #[test]
 fn codex_runtime_support_is_validated_only_and_embedded() {
-    let resolved = resolve_runtime_support("codex", "x86_64-unknown-linux-musl")
-        .expect("resolve current codex linux tuple");
-    assert_eq!(
-        resolved,
+    let expected = vec![
+        RuntimeSupportRecord {
+            runtime_family: "codex".to_string(),
+            target_triple: "aarch64-apple-darwin".to_string(),
+            version: "0.125.0".to_string(),
+        },
+        RuntimeSupportRecord {
+            runtime_family: "codex".to_string(),
+            target_triple: "aarch64-unknown-linux-musl".to_string(),
+            version: "0.125.0".to_string(),
+        },
+        RuntimeSupportRecord {
+            runtime_family: "codex".to_string(),
+            target_triple: "x86_64-pc-windows-msvc".to_string(),
+            version: "0.125.0".to_string(),
+        },
         RuntimeSupportRecord {
             runtime_family: "codex".to_string(),
             target_triple: "x86_64-unknown-linux-musl".to_string(),
             version: "0.125.0".to_string(),
-        }
-    );
+        },
+    ];
+
+    for record in &expected {
+        let resolved = resolve_runtime_support("codex", &record.target_triple)
+            .expect("resolve current codex tuple");
+        assert_eq!(resolved, *record);
+    }
 
     let listed = list_runtime_support("codex").expect("list codex tuples");
-    assert_eq!(listed, vec![resolved.clone()]);
+    assert_eq!(listed, expected);
 
     let tmp = tempdir().expect("create temp dir");
     let _guard = CurrentDirGuard::change_to(tmp.path());
     let resolved_without_repo = resolve_runtime_support("codex", "x86_64-unknown-linux-musl")
         .expect("resolve without repo checkout");
     let listed_without_repo = list_runtime_support("codex").expect("list without repo checkout");
-    assert_eq!(resolved_without_repo, resolved);
-    assert_eq!(listed_without_repo, vec![resolved.clone()]);
-
-    let err = resolve_runtime_support("codex", "aarch64-apple-darwin")
-        .expect_err("darwin target should not publish latest_validated");
-    match err {
-        AgentWrapperError::MissingValidatedRuntime {
-            runtime_family,
-            target_triple,
-        } => {
-            assert_eq!(runtime_family, "codex");
-            assert_eq!(target_triple, "aarch64-apple-darwin");
+    assert_eq!(
+        resolved_without_repo,
+        RuntimeSupportRecord {
+            runtime_family: "codex".to_string(),
+            target_triple: "x86_64-unknown-linux-musl".to_string(),
+            version: "0.125.0".to_string(),
         }
-        other => panic!("expected MissingValidatedRuntime, got {other:?}"),
-    }
+    );
+    assert_eq!(listed_without_repo, listed);
 
     let err = resolve_runtime_support("codex", "linux-x64")
         .expect_err("non-triple alias should fail closed");

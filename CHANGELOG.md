@@ -6,6 +6,14 @@ This changelog tracks the root `VERSION` file and uses bare semantic versions (`
 
 ## [Unreleased]
 
+## [0.3.7] - 2026-06-17
+
+### Changed
+
+- Expanded committed Codex runtime-support publication truth to include `aarch64-unknown-linux-musl`, `aarch64-apple-darwin`, and `x86_64-pc-windows-msvc` alongside `x86_64-unknown-linux-musl`, and regenerated the embedded `agent_api` runtime-support projection from committed manifest pointers.
+- Promoted Codex support publication to use complete multi-target union snapshots and per-target reports for `0.125.0`, including explicit parity exclusions for the desktop-only `codex app` surface so macOS/Windows support truth matches the wrapper contract we actually ship.
+- Hardened Codex maintenance automation so snapshot refresh and promotion flows no longer silently collapse multi-target truth back to Linux x64 only, and added regression coverage for support-matrix omission handling plus explicit validation-target metadata wiring.
+
 ## [0.3.6] - 2026-06-17
 
 ## [0.3.5] - 2026-05-07
