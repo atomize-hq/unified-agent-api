@@ -6,6 +6,8 @@ This changelog tracks the root `VERSION` file and uses bare semantic versions (`
 
 ## [Unreleased]
 
+## [0.3.6] - 2026-06-17
+
 ## [0.3.5] - 2026-05-07
 
 ## [0.3.0] - 2026-04-22
