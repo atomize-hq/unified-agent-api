@@ -372,21 +372,35 @@ pub fn plan_create_or_replace(
 }
 
 fn create_temp_root(canonical_root: &Path) -> Result<PathBuf, WorkspaceMutationError> {
-    let unique = format!(
-        ".xtask-onboard-agent-{}-{}",
-        std::process::id(),
-        SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map_err(|err| {
-                WorkspaceMutationError::Internal(format!("system time before unix epoch: {err}"))
-            })?
-            .as_nanos()
-    );
-    let temp_root = canonical_root.join(unique);
-    fs::create_dir(&temp_root).map_err(|err| {
-        WorkspaceMutationError::Internal(format!("create {}: {err}", temp_root.display()))
-    })?;
-    Ok(temp_root)
+    let epoch_nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|err| {
+            WorkspaceMutationError::Internal(format!("system time before unix epoch: {err}"))
+        })?
+        .as_nanos();
+
+    for attempt in 0..1024u32 {
+        let temp_root = canonical_root.join(format!(
+            ".xtask-onboard-agent-{}-{}-{attempt}",
+            std::process::id(),
+            epoch_nanos
+        ));
+        match fs::create_dir(&temp_root) {
+            Ok(()) => return Ok(temp_root),
+            Err(err) if err.kind() == io::ErrorKind::AlreadyExists => continue,
+            Err(err) => {
+                return Err(WorkspaceMutationError::Internal(format!(
+                    "create {}: {err}",
+                    temp_root.display()
+                )))
+            }
+        }
+    }
+
+    Err(WorkspaceMutationError::Internal(format!(
+        "allocate unique temp root under {} after 1024 attempts",
+        canonical_root.display()
+    )))
 }
 
 fn cleanup_temp_root(temp_root: &Path) -> Result<(), WorkspaceMutationError> {

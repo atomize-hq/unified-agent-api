@@ -1,5 +1,5 @@
 use std::{
-    fs,
+    fs, io,
     path::Path,
     time::{SystemTime, UNIX_EPOCH},
 };
@@ -87,16 +87,7 @@ fn render_lifecycle_state_contents(
     relative_path: &str,
     state: &LifecycleState,
 ) -> Result<String, Error> {
-    let temp_root = std::env::temp_dir().join(format!(
-        "xtask-onboard-agent-lifecycle-{}-{}",
-        std::process::id(),
-        SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map_err(|err| Error::Internal(format!("system time before unix epoch: {err}")))?
-            .as_nanos()
-    ));
-    fs::create_dir(&temp_root)
-        .map_err(|err| Error::Internal(format!("create {}: {err}", temp_root.display())))?;
+    let temp_root = create_lifecycle_temp_root()?;
 
     let rendered = (|| -> Result<String, Error> {
         write_lifecycle_state(&temp_root, relative_path, state).map_err(map_lifecycle_error)?;
@@ -117,6 +108,35 @@ fn render_lifecycle_state_contents(
     let rendered = rendered?;
     cleanup_result?;
     Ok(rendered)
+}
+
+fn create_lifecycle_temp_root() -> Result<std::path::PathBuf, Error> {
+    let epoch_nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|err| Error::Internal(format!("system time before unix epoch: {err}")))?
+        .as_nanos();
+
+    for attempt in 0..1024u32 {
+        let temp_root = std::env::temp_dir().join(format!(
+            "xtask-onboard-agent-lifecycle-{}-{}-{attempt}",
+            std::process::id(),
+            epoch_nanos
+        ));
+        match fs::create_dir(&temp_root) {
+            Ok(()) => return Ok(temp_root),
+            Err(err) if err.kind() == io::ErrorKind::AlreadyExists => continue,
+            Err(err) => {
+                return Err(Error::Internal(format!(
+                    "create {}: {err}",
+                    temp_root.display()
+                )))
+            }
+        }
+    }
+
+    Err(Error::Internal(
+        "allocate unique onboard-agent lifecycle temp dir after 1024 attempts".to_string(),
+    ))
 }
 
 fn map_lifecycle_error(err: crate::agent_lifecycle::LifecycleError) -> Error {
