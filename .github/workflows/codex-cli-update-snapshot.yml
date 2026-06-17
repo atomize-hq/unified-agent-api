@@ -311,26 +311,12 @@ jobs:
           test -s snapshot_matrix.json
           jq -e '.include | length >= 1' snapshot_matrix.json > /dev/null
 
-      - name: Download snapshot artifacts
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-          VERSION: ${{ inputs.target_version }}
-        run: |
-          set -euo pipefail
-
-          while IFS= read -r target; do
-            gh run download "${{ github.run_id }}" \
-              --repo "${{ github.repository }}" \
-              --name "codex-cli-snapshot-${VERSION}-${target}" \
-              --dir . || {
-                if [ "$target" = "x86_64-unknown-linux-musl" ]; then
-                  echo "Required snapshot artifact missing for ${target}" >&2
-                  exit 1
-                fi
-                echo "Optional snapshot artifact missing for ${target}; continuing" >&2
-              }
-          done < <(jq -r '.include[].target_triple' snapshot_matrix.json)
+      - name: Download snapshot artifacts from current run
+        uses: actions/download-artifact@v7
+        with:
+          pattern: "codex-cli-snapshot-${{ inputs.target_version }}-*"
+          path: .
+          merge-multiple: true
 
       - name: Materialize downloaded snapshots
         id: materialize-snapshots

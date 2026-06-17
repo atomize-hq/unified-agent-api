@@ -198,12 +198,18 @@ fn c4_spec_update_snapshot_workflow_runs_full_pipeline_and_uploads_artifacts() {
         "Rehydrate snapshot matrix",
         "needs.prepare.outputs.snapshot_matrix",
         "--status reported",
+        "actions/download-artifact@v7",
+        "pattern: \"codex-cli-snapshot-${{ inputs.target_version }}-*\"",
     ] {
         assert!(
             yml.contains(required),
             "workflow must preserve deterministic cross-run snapshot inputs: {required}"
         );
     }
+    assert!(
+        !yml.contains("gh run download"),
+        "workflow must not use gh run download for same-run snapshot artifact hydration"
+    );
 }
 
 #[test]
