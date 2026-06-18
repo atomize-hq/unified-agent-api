@@ -8,8 +8,9 @@ use crate::{
     agent_registry::{AgentRegistry, AgentRegistryEntry, REGISTRY_RELATIVE_PATH},
     release_doc,
     support_matrix::{
-        render_agent_api_runtime_support_data, validate_publication_consistency,
-        SupportMatrixArtifact, SupportRow, AGENT_API_RUNTIME_SUPPORT_DATA_OUTPUT_PATH,
+        render_agent_api_runtime_support_data_for_agent_root, runtime_support_family_is_embedded,
+        validate_publication_consistency, SupportMatrixArtifact, SupportRow,
+        AGENT_API_RUNTIME_SUPPORT_DATA_OUTPUT_PATH,
     },
 };
 
@@ -281,7 +282,7 @@ pub(super) fn inspect_support_publication(
         Err(err) => issues.push(err),
     }
 
-    match inspect_runtime_support_projection(workspace_root) {
+    match inspect_runtime_support_projection(entry, workspace_root) {
         Ok(()) => {}
         Err(err) => issues.push(err),
     }
@@ -305,12 +306,26 @@ pub(super) fn inspect_support_publication(
     }
 }
 
-fn inspect_runtime_support_projection(workspace_root: &Path) -> Result<(), String> {
-    let expected = render_agent_api_runtime_support_data(workspace_root)?;
+fn inspect_runtime_support_projection(
+    entry: &AgentRegistryEntry,
+    workspace_root: &Path,
+) -> Result<(), String> {
+    if !runtime_support_family_is_embedded(&entry.agent_id) {
+        return Ok(());
+    }
+
+    let expected = render_agent_api_runtime_support_data_for_agent_root(
+        workspace_root,
+        &entry.agent_id,
+        &entry.manifest_root,
+    )?;
     let path = workspace_root.join(AGENT_API_RUNTIME_SUPPORT_DATA_OUTPUT_PATH);
     let actual =
         fs::read_to_string(&path).map_err(|err| format!("read({}): {err}", path.display()))?;
-    if actual == expected {
+
+    let expected_section = extract_runtime_support_projection_section(&expected, &entry.agent_id)?;
+    let actual_section = extract_runtime_support_projection_section(&actual, &entry.agent_id)?;
+    if actual_section.trim_end() == expected_section.trim_end() {
         Ok(())
     } else {
         Err(
@@ -318,6 +333,34 @@ fn inspect_runtime_support_projection(workspace_root: &Path) -> Result<(), Strin
                 .to_string(),
         )
     }
+}
+
+fn extract_runtime_support_projection_section<'a>(
+    rendered: &'a str,
+    runtime_family: &str,
+) -> Result<&'a str, String> {
+    let symbol = format!(
+        "{}_RUNTIME_SUPPORT",
+        runtime_family
+            .chars()
+            .map(|ch| {
+                if ch.is_ascii_alphanumeric() {
+                    ch.to_ascii_uppercase()
+                } else {
+                    '_'
+                }
+            })
+            .collect::<String>()
+    );
+    let start_marker = format!("const {symbol}: &[EmbeddedRuntimeSupportRecord] = &[");
+    let start = rendered.find(&start_marker).ok_or_else(|| {
+        format!("runtime-support projection is missing embedded section for `{runtime_family}`")
+    })?;
+    let remainder = &rendered[start..];
+    let end_offset = remainder.find("\n];").ok_or_else(|| {
+        format!("runtime-support projection section for `{runtime_family}` is malformed")
+    })?;
+    Ok(&remainder[..end_offset + "\n];".len()])
 }
 
 pub(super) fn inspect_release_doc(

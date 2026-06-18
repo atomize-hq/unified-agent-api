@@ -1,7 +1,6 @@
 // This file is derived from committed repo truth.
 // Validate it with `cargo test -p xtask --all-targets`.
 
-#[cfg(feature = "codex")]
 const CODEX_RUNTIME_SUPPORT: &[EmbeddedRuntimeSupportRecord] = &[
     EmbeddedRuntimeSupportRecord {
         target_triple: "aarch64-apple-darwin",

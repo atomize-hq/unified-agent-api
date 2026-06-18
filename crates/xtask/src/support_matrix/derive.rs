@@ -138,6 +138,18 @@ pub fn render_agent_api_runtime_support_data(workspace_root: &Path) -> Result<St
     render_agent_api_runtime_support_data_for_roots(&roots)
 }
 
+pub fn render_agent_api_runtime_support_data_for_agent_root(
+    workspace_root: &Path,
+    agent: &str,
+    manifest_root: &str,
+) -> Result<String, String> {
+    let roots = [AgentRoot {
+        agent: agent.to_string(),
+        root: workspace_root.join(manifest_root),
+    }];
+    render_agent_api_runtime_support_data_for_roots(&roots)
+}
+
 pub fn derive_rows_for_agent_root(
     workspace_root: &Path,
     agent: &str,
@@ -205,6 +217,10 @@ pub fn derive_validated_runtime_support_for_test_roots(
         })
         .collect::<Vec<_>>();
     derive_validated_runtime_support_for_roots(&roots)
+}
+
+pub fn runtime_support_family_is_embedded(runtime_family: &str) -> bool {
+    EMBEDDED_RUNTIME_SUPPORT_FAMILIES.contains(&runtime_family)
 }
 
 fn derive_rows_for_roots(roots: &[AgentRoot]) -> Result<Vec<SupportRow>, String> {
@@ -408,7 +424,7 @@ fn render_agent_api_runtime_support_data_from_projection(
         let symbol = runtime_family_symbol(runtime_family);
         let _ = writeln!(
             rendered,
-            "#[cfg(feature = \"{runtime_family}\")]\nconst {symbol}: &[EmbeddedRuntimeSupportRecord] = &["
+            "const {symbol}: &[EmbeddedRuntimeSupportRecord] = &["
         );
 
         for record in projection

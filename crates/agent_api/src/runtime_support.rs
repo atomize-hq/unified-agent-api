@@ -17,7 +17,6 @@ include!("runtime_support_data.rs");
 
 fn runtime_family_records(runtime_family: &str) -> Option<&'static [EmbeddedRuntimeSupportRecord]> {
     match runtime_family {
-        #[cfg(feature = "codex")]
         "codex" => Some(CODEX_RUNTIME_SUPPORT),
         _ => None,
     }

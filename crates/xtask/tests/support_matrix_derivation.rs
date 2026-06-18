@@ -255,7 +255,6 @@ fn derives_validated_runtime_support_from_latest_validated_tuples_only() {
         concat!(
             "// This file is derived from committed repo truth.\n",
             "// Validate it with `cargo test -p xtask --all-targets`.\n\n",
-            "#[cfg(feature = \"codex\")]\n",
             "const CODEX_RUNTIME_SUPPORT: &[EmbeddedRuntimeSupportRecord] = &[\n",
             "    EmbeddedRuntimeSupportRecord {\n",
             "        target_triple: \"linux-x64\",\n",
