@@ -10,9 +10,15 @@ const VERSION: &str = "0.61.0";
 const TS: &str = "1970-01-01T00:00:00Z";
 
 const TARGET_LINUX: &str = "x86_64-unknown-linux-musl";
+const TARGET_LINUX_ARM64: &str = "aarch64-unknown-linux-musl";
 const TARGET_MACOS: &str = "aarch64-apple-darwin";
 const TARGET_WINDOWS: &str = "x86_64-pc-windows-msvc";
-const TARGETS: [&str; 3] = [TARGET_LINUX, TARGET_MACOS, TARGET_WINDOWS];
+const TARGETS: [&str; 4] = [
+    TARGET_LINUX,
+    TARGET_LINUX_ARM64,
+    TARGET_MACOS,
+    TARGET_WINDOWS,
+];
 
 const IU_NOTE: &str = "waived subtree for C0 IU inheritance test";
 
@@ -95,6 +101,7 @@ fn assert_schema_valid(schema: &JSONSchema, instance: &Value) {
 fn minimal_binary_for_target(target: &str) -> Value {
     let (os, arch) = match target {
         TARGET_LINUX => ("linux", "x86_64"),
+        TARGET_LINUX_ARM64 => ("linux", "aarch64"),
         TARGET_MACOS => ("macos", "aarch64"),
         TARGET_WINDOWS => ("windows", "x86_64"),
         _ => ("unknown", "unknown"),

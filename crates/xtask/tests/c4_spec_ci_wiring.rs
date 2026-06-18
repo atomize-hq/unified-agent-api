@@ -192,6 +192,55 @@ fn c4_spec_update_snapshot_workflow_runs_full_pipeline_and_uploads_artifacts() {
             "workflow must upload committed-artifact bundle including {required_path}"
         );
     }
+
+    for required in [
+        "snapshot_matrix.json",
+        "Rehydrate snapshot matrix",
+        "needs.prepare.outputs.snapshot_matrix",
+        "--status reported",
+        "actions/download-artifact@v7",
+        "pattern: \"codex-cli-snapshot-${{ inputs.target_version }}-*\"",
+    ] {
+        assert!(
+            yml.contains(required),
+            "workflow must preserve deterministic cross-run snapshot inputs: {required}"
+        );
+    }
+    assert!(
+        !yml.contains("gh run download"),
+        "workflow must not use gh run download for same-run snapshot artifact hydration"
+    );
+}
+
+#[test]
+fn c4_spec_promote_workflow_runs_target_scoped_validation_before_pointer_promotion() {
+    let yml = read_repo_file(".github/workflows/codex-cli-promote.yml");
+
+    for required in [
+        "validation_matrix",
+        "fromJSON(needs.prepare.outputs.validation_matrix)",
+        "runs-on: ${{ matrix.runs_on }}",
+        "needs: [prepare, validate-target]",
+        "cargo test -p unified-agent-api-codex",
+        "cargo test -p unified-agent-api-codex --test cli_e2e -- --nocapture",
+        "jq -r '.inputs[].target_triple'",
+        "VALIDATION_ARGS+=(--passed-target \"$target\")",
+        "--status validated",
+        "pointers/latest_validated/${REQUIRED_TARGET}.txt",
+    ] {
+        assert!(
+            yml.contains(required),
+            "promote workflow must validate each promoted target before advancing latest_validated truth: {required}"
+        );
+    }
+
+    assert!(
+        yml.contains("x86_64-unknown-linux-musl")
+            && yml.contains("aarch64-unknown-linux-musl")
+            && yml.contains("aarch64-apple-darwin")
+            && yml.contains("x86_64-pc-windows-msvc"),
+        "promote workflow must map all committed Codex publication targets into the validation matrix"
+    );
 }
 
 #[test]

@@ -1,6 +1,9 @@
 {
   "rules_schema_version": 1,
-  "scope": "codex-cli-parity",
+  "scope": {
+    "parity_model": "help_surface_only",
+    "meaning": "This ruleset governs help-surface parity only (commands/flags/positional args from help and usage inference). Deeper runtime parsing semantics (operand forwarding, -- handling, prompt placeholder expansion) are out of scope unless a separate behavioral/probe layer is introduced."
+  },
   "identity": {
     "command": "path",
     "flag": "prefer_long_else_short",
@@ -47,10 +50,6 @@
       "reporting": "Coverage deltas for global positional args are reported only under the root path ([])."
     }
   },
-  "scope": {
-    "parity_model": "help_surface_only",
-    "meaning": "This ruleset governs help-surface parity only (commands/flags/positional args from help and usage inference). Deeper runtime parsing semantics (operand forwarding, -- handling, prompt placeholder expansion) are out of scope unless a separate behavioral/probe layer is introduced."
-  },
   "parity_exclusions": {
     "schema_version": 1,
     "meaning": "Explicit, deterministic exclusions from parity work-queue deltas. Excluded units remain visible in reports under excluded_* deltas and never appear under missing_* deltas.",
@@ -77,11 +76,37 @@
         "note": "Interactive TUI default-mode prompt surface is excluded from wrapper parity."
       },
       {
+        "unit": "arg",
+        "path": [
+          "app"
+        ],
+        "name": "PATH",
+        "category": "desktop_app",
+        "note": "Desktop app launcher workspace path is platform-specific and excluded from wrapper parity."
+      },
+      {
+        "unit": "command",
+        "path": [
+          "app"
+        ],
+        "category": "desktop_app",
+        "note": "Desktop app launcher is platform-specific and excluded from wrapper parity."
+      },
+      {
         "unit": "flag",
         "path": [],
         "key": "--no-alt-screen",
         "category": "tui",
         "note": "Alt-screen control is a TUI-only surface and is excluded from wrapper parity."
+      },
+      {
+        "unit": "flag",
+        "path": [
+          "app"
+        ],
+        "key": "--download-url",
+        "category": "desktop_app",
+        "note": "Desktop app launcher download override is platform-specific and excluded from wrapper parity."
       },
       {
         "unit": "flag",
@@ -150,11 +175,13 @@
     "required_target": "x86_64-unknown-linux-musl",
     "expected_targets": [
       "x86_64-unknown-linux-musl",
+      "aarch64-unknown-linux-musl",
       "aarch64-apple-darwin",
       "x86_64-pc-windows-msvc"
     ],
     "platform_mapping": {
       "x86_64-unknown-linux-musl": "linux",
+      "aarch64-unknown-linux-musl": "linux",
       "aarch64-apple-darwin": "macos",
       "x86_64-pc-windows-msvc": "windows"
     },

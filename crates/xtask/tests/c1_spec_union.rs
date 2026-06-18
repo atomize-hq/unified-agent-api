@@ -54,13 +54,38 @@ fn expected_targets_from_rules(codex_root: &Path) -> Vec<String> {
 }
 
 fn write_snapshot_fixture(codex_root: &Path, version: &str, target_triple: &str) {
-    let src = fixtures_dir().join(format!("{target_triple}.json"));
-    assert!(src.is_file(), "missing fixture file: {}", src.display());
-
     let dst_dir = codex_root.join("snapshots").join(version);
     fs::create_dir_all(&dst_dir).expect("create snapshots/<version> dir");
     let dst = dst_dir.join(format!("{target_triple}.json"));
-    fs::copy(src, dst).expect("copy snapshot fixture");
+
+    let src = fixtures_dir().join(format!("{target_triple}.json"));
+    if src.is_file() {
+        fs::copy(src, dst).expect("copy snapshot fixture");
+        return;
+    }
+
+    if target_triple == "aarch64-unknown-linux-musl" {
+        let template = fixtures_dir().join("x86_64-unknown-linux-musl.json");
+        assert!(
+            template.is_file(),
+            "missing template fixture file: {}",
+            template.display()
+        );
+        let mut snapshot: Value =
+            serde_json::from_str(&fs::read_to_string(&template).expect("read template fixture"))
+                .expect("parse template fixture");
+        snapshot["binary"]["target_triple"] = json!(target_triple);
+        snapshot["binary"]["platform"]["arch"] = json!("aarch64");
+        snapshot["binary"]["version_output"] = json!("codex-cli 0.77.0");
+        fs::write(
+            dst,
+            format!("{}\n", serde_json::to_string_pretty(&snapshot).unwrap()),
+        )
+        .expect("write synthesized arm64 fixture");
+        return;
+    }
+
+    panic!("missing fixture file: {}", src.display());
 }
 
 fn write_snapshot_json(codex_root: &Path, version: &str, target_triple: &str, snapshot: &Value) {
@@ -193,6 +218,7 @@ fn c1_union_emits_complete_false_and_missing_targets_for_non_required_missing() 
     assert_eq!(
         missing,
         vec![
+            "aarch64-unknown-linux-musl".to_string(),
             "aarch64-apple-darwin".to_string(),
             "x86_64-pc-windows-msvc".to_string()
         ],
@@ -222,6 +248,7 @@ fn c1_union_records_conflicts_and_is_deterministic_with_source_date_epoch() {
     let version = "0.77.0";
     for target in [
         "x86_64-unknown-linux-musl",
+        "aarch64-unknown-linux-musl",
         "aarch64-apple-darwin",
         "x86_64-pc-windows-msvc",
     ] {
@@ -277,6 +304,7 @@ fn c1_union_records_conflicts_and_is_deterministic_with_source_date_epoch() {
             .map(|a| a.iter().filter_map(Value::as_str).collect::<Vec<_>>()),
         Some(vec![
             "x86_64-unknown-linux-musl",
+            "aarch64-unknown-linux-musl",
             "aarch64-apple-darwin",
             "x86_64-pc-windows-msvc"
         ]),

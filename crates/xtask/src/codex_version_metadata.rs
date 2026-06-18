@@ -33,6 +33,18 @@ pub struct Args {
     /// Desired status to materialize.
     #[arg(long, value_enum)]
     pub status: Status,
+
+    /// Target triples that passed validation for this version.
+    #[arg(long = "passed-target")]
+    pub passed_targets: Vec<String>,
+
+    /// Target triples that failed validation for this version.
+    #[arg(long = "failed-target")]
+    pub failed_targets: Vec<String>,
+
+    /// Target triples that were intentionally skipped during validation for this version.
+    #[arg(long = "skipped-target")]
+    pub skipped_targets: Vec<String>,
 }
 
 #[derive(Debug, Clone, Copy, ValueEnum)]
@@ -235,6 +247,8 @@ pub fn run(args: Args) -> Result<(), VersionMetadataError> {
     let version_path = root.join("versions").join(format!("{}.json", args.version));
     let existing = read_existing_metadata(&version_path)?;
 
+    let validation = build_validation(args.status, &args, existing.as_ref())?;
+
     let updated_at = deterministic_rfc3339_now();
 
     let artifacts = Some(ArtifactsV1 {
@@ -256,7 +270,7 @@ pub fn run(args: Args) -> Result<(), VersionMetadataError> {
         notes: existing.as_ref().and_then(|m| m.notes.clone()),
         artifacts,
         coverage,
-        validation: existing.as_ref().and_then(|m| m.validation.clone()),
+        validation,
         promotion: None,
     };
 
@@ -269,6 +283,36 @@ pub fn run(args: Args) -> Result<(), VersionMetadataError> {
     fs::create_dir_all(root.join("versions"))?;
     write_json_pretty(&version_path, &serde_json::to_string_pretty(&out)?)?;
     Ok(())
+}
+
+fn build_validation(
+    status: Status,
+    args: &Args,
+    existing: Option<&VersionMetadataV1>,
+) -> Result<Option<ValidationV1>, VersionMetadataError> {
+    let has_cli_validation = !args.passed_targets.is_empty()
+        || !args.failed_targets.is_empty()
+        || !args.skipped_targets.is_empty();
+
+    if !has_cli_validation {
+        return Ok(existing.and_then(|m| m.validation.clone()));
+    }
+
+    if !matches!(
+        status,
+        Status::Validated | Status::Supported | Status::Reported
+    ) {
+        return Err(VersionMetadataError::Gate {
+            status: status.to_string(),
+            reason: "validation target flags are only supported for reported/validated/supported metadata".to_string(),
+        });
+    }
+
+    Ok(Some(ValidationV1 {
+        passed_targets: Some(args.passed_targets.clone()),
+        failed_targets: Some(args.failed_targets.clone()),
+        skipped_targets: Some(args.skipped_targets.clone()),
+    }))
 }
 
 fn read_existing_metadata(path: &Path) -> Result<Option<VersionMetadataV1>, VersionMetadataError> {

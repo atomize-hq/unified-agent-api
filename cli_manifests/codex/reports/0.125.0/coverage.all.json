@@ -21,24 +21,12 @@
     }
   },
   "platform_filter": {
-    "mode": "any"
+    "mode": "all"
   },
   "deltas": {
     "missing_commands": [],
     "missing_flags": [],
     "missing_args": [],
-    "excluded_commands": [
-      {
-        "path": [
-          "app"
-        ],
-        "upstream_available_on": [
-          "aarch64-apple-darwin",
-          "x86_64-pc-windows-msvc"
-        ],
-        "note": "Desktop app launcher is platform-specific and excluded from wrapper parity."
-      }
-    ],
     "excluded_flags": [
       {
         "path": [],

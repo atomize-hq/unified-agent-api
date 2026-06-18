@@ -577,7 +577,61 @@ fn publication_consistency_rejects_pointer_promotion_drift() {
 }
 
 #[test]
-fn publication_consistency_rejects_omission_claim_and_note_drift() {
+fn publication_consistency_allows_supported_omitted_current_targets_when_committed_truth_says_so() {
+    let workspace = make_temp_dir("support-matrix-consistency-omitted-supported");
+    write_seeded_agent_registry(&workspace);
+
+    materialize_root(
+        &workspace.join("cli_manifests/codex"),
+        &["linux-x64", "win32-x64"],
+        "1.0.0",
+        &["linux-x64"],
+        &[("1.0.0", &["linux-x64", "win32-x64"])],
+        &[("linux-x64", "1.0.0"), ("win32-x64", "1.0.0")],
+        &[("linux-x64", "1.0.0")],
+        &[
+            ("1.0.0", "coverage.linux-x64.json", empty_report()),
+            ("1.0.0", "coverage.win32-x64.json", empty_report()),
+        ],
+    );
+
+    materialize_root(
+        &workspace.join("cli_manifests/claude_code"),
+        &["linux-x64"],
+        "2.0.0",
+        &["linux-x64"],
+        &[("2.0.0", &["linux-x64"])],
+        &[("linux-x64", "2.0.0")],
+        &[("linux-x64", "2.0.0")],
+        &[("2.0.0", "coverage.linux-x64.json", empty_report())],
+    );
+    materialize_opencode_root(&workspace);
+    materialize_gemini_root(&workspace);
+    materialize_aider_root(&workspace);
+
+    let rows = derive_rows(&workspace).expect("derive rows");
+    let row = rows
+        .iter()
+        .find(|row| row.agent == "codex" && row.version == "1.0.0" && row.target == "win32-x64")
+        .expect("expected omitted codex row");
+    assert_eq!(row.manifest_support, ManifestSupportState::Supported);
+    assert_eq!(row.backend_support, BackendSupportState::Supported);
+    assert_eq!(row.uaa_support, UaaSupportState::Partial);
+    assert_eq!(
+        row.pointer_promotion,
+        PointerPromotionState::LatestSupported
+    );
+    assert_eq!(
+        row.evidence_notes,
+        vec!["current root snapshot omits this target".to_string()]
+    );
+
+    validate_publication_consistency(&workspace, &rows)
+        .expect("committed omitted target support should remain publishable");
+}
+
+#[test]
+fn publication_consistency_rejects_note_and_state_drift_for_omitted_targets() {
     let workspace = make_temp_dir("support-matrix-consistency-omission");
     write_seeded_agent_registry(&workspace);
 
@@ -622,14 +676,17 @@ fn publication_consistency_rejects_omission_claim_and_note_drift() {
     assert!(
         issues
             .iter()
-            .any(|issue| issue.code == "SUPPORT_MATRIX_CURRENT_SNAPSHOT_OMISSION_MISMATCH"),
-        "expected omission mismatch, got: {issues:#?}"
-    );
-    assert!(
-        issues
-            .iter()
             .any(|issue| issue.code == "SUPPORT_MATRIX_EVIDENCE_NOTES_MISMATCH"),
         "expected note mismatch, got: {issues:#?}"
+    );
+    assert!(
+        issues.iter().any(
+            |issue| issue.code == "SUPPORT_MATRIX_MANIFEST_SUPPORT_MISMATCH"
+                || issue.code == "SUPPORT_MATRIX_BACKEND_SUPPORT_MISMATCH"
+                || issue.code == "SUPPORT_MATRIX_UAA_SUPPORT_MISMATCH"
+                || issue.code == "SUPPORT_MATRIX_POINTER_PROMOTION_MISMATCH"
+        ),
+        "expected committed-state mismatch, got: {issues:#?}"
     );
 }
 
