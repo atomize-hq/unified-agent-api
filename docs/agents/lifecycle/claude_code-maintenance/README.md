@@ -10,21 +10,21 @@ This packet tracks automated upstream-release maintenance for `claude_code`.
 - trigger kind: `upstream_release_detected`
 - basis ref: `cli_manifests/claude_code/latest_validated.txt`
 - opened from: `.github/workflows/agent-maintenance-open-pr.yml`
-- recorded at: `2026-05-14T18:37:44Z`
-- request commit: `4a6073bc7b7500441d8db170d5e5e3c9c9942366`
+- recorded at: `2026-05-26T06:56:35Z`
+- request commit: `773981d81242c7353b89097baaa21e0891c191db`
 
 ## Trigger context
 
 - detected_by: `.github/workflows/agent-maintenance-release-watch.yml`
 - current_validated: `2.1.29`
-- target_version: `2.1.140`
-- latest_stable: `2.1.141`
+- target_version: `2.1.149`
+- latest_stable: `2.1.150`
 - version_policy: `latest_stable_minus_one`
 - source_kind: `gcs_object_listing`
 - source_ref: `claude-code-dist-86c565f3-f756-42ad-8dfa-d59b1c096819/claude-code-releases`
 - dispatch_kind: `packet_pr`
 - dispatch_workflow: `agent-maintenance-open-pr.yml`
-- branch_name: `automation/claude_code-maintenance-2.1.140`
+- branch_name: `automation/claude_code-maintenance-2.1.149`
 
 ## Support-surface audit
 
