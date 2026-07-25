@@ -95,22 +95,7 @@ fn non_empty_required_uplifts_reports_exit_three_and_true_flag() {
     assert_eq!(json["preexisting_unsupported_surface"], json!(0));
     assert_eq!(json["missing_wrapper_support"], json!(1));
     assert_eq!(json["missing_backend_support"], json!(1));
-    assert_eq!(
-        json["required_uplifts"],
-        json!([{
-            "surface_kind": "commands",
-            "command_path": "codex status",
-            "surface_id": "status",
-            "reason": "new_upstream_surface",
-            "required_writes": [
-                "backend",
-                "manifest",
-                "packet_docs",
-                "publication",
-                "wrapper"
-            ]
-        }])
-    );
+    assert_eq!(json["required_uplifts"], expected_required_uplifts_json());
 }
 
 #[test]
@@ -139,22 +124,7 @@ fn frozen_clean_packet_live_dirty_returns_exit_three_and_drifted_reconciliation(
     assert_eq!(json["preexisting_unsupported_surface"], json!(0));
     assert_eq!(json["missing_wrapper_support"], json!(1));
     assert_eq!(json["missing_backend_support"], json!(1));
-    assert_eq!(
-        json["required_uplifts"],
-        json!([{
-            "surface_kind": "commands",
-            "command_path": "codex status",
-            "surface_id": "status",
-            "reason": "new_upstream_surface",
-            "required_writes": [
-                "backend",
-                "manifest",
-                "packet_docs",
-                "publication",
-                "wrapper"
-            ]
-        }])
-    );
+    assert_eq!(json["required_uplifts"], expected_required_uplifts_json());
 }
 
 #[test]
@@ -265,27 +235,11 @@ fn emitted_json_is_byte_identical_across_identical_runs() {
     );
     let emit_path = fixture.join("_ci_tmp/audit/status.json");
 
-    let mut stdout = Vec::new();
-    let first = audit_status::run_in_workspace(
-        &fixture,
-        audit_args(REQUEST_PATH, Some(emit_path.clone())),
-        &mut stdout,
-    )
-    .expect("first emit");
+    let (first, first_bytes) = emit_projection(&fixture, &emit_path);
     assert_eq!(first.exit_code(), EXIT_UPLIFTS_REQUIRED);
-    assert!(stdout.is_empty(), "emit-json should not write stdout");
-    let first_bytes = fs::read(&emit_path).expect("read first emitted json");
 
-    let mut stdout = Vec::new();
-    let second = audit_status::run_in_workspace(
-        &fixture,
-        audit_args(REQUEST_PATH, Some(emit_path.clone())),
-        &mut stdout,
-    )
-    .expect("second emit");
+    let (second, second_bytes) = emit_projection(&fixture, &emit_path);
     assert_eq!(second.exit_code(), EXIT_UPLIFTS_REQUIRED);
-    assert!(stdout.is_empty(), "emit-json should not write stdout");
-    let second_bytes = fs::read(&emit_path).expect("read second emitted json");
 
     assert_eq!(first_bytes, second_bytes);
     assert!(
@@ -348,6 +302,77 @@ fn wrong_version_live_coverage_report_is_rejected() {
 }
 
 #[test]
+fn mixed_version_evidence_directory_is_rejected_even_when_selected_report_matches() {
+    let fixture = prepared_fixture(
+        "agent-maintenance-audit-status-mixed-version-evidence",
+        &clean_report(TARGET_VERSION),
+    );
+    replace_named_coverage_reports(
+        &fixture,
+        &[
+            ("coverage.darwin-arm64.json", &clean_report(TARGET_VERSION)),
+            ("coverage.linux-arm64.json", &clean_report("0.97.0")),
+            ("coverage.linux-x64.json", &clean_report("0.97.0")),
+            ("coverage.win32-x64.json", &clean_report("0.97.0")),
+        ],
+    );
+
+    let mut stdout = Vec::new();
+    let err = audit_status::run_in_workspace(&fixture, audit_args(REQUEST_PATH, None), &mut stdout)
+        .expect_err("mixed-version evidence must not report clean");
+
+    assert!(matches!(err, AuditStatusError::Validation(_)));
+    assert_eq!(err.exit_code(), 2);
+    assert!(stdout.is_empty());
+    assert!(err.to_string().contains("coverage.linux-arm64.json"));
+    assert!(err.to_string().contains(TARGET_VERSION));
+    assert!(err.to_string().contains("0.97.0"));
+}
+
+#[test]
+fn validator_and_derivation_share_selected_report_path_for_per_os_only_directories() {
+    let fixture = prepared_fixture(
+        "agent-maintenance-audit-status-shared-selector",
+        &discovery_report(TARGET_VERSION),
+    );
+    replace_named_coverage_reports(
+        &fixture,
+        &[
+            (
+                "coverage.darwin-arm64.json",
+                &discovery_report(TARGET_VERSION),
+            ),
+            ("coverage.linux-x64.json", &discovery_report(TARGET_VERSION)),
+        ],
+    );
+
+    let version_dir = coverage_report_dir(&fixture);
+    let validator_selected =
+        audit_status::selected_coverage_report_path(&version_dir).expect("validator selection");
+    let derivation_selected =
+        support_audit::select_report_path(&version_dir).expect("derivation selection");
+    assert_eq!(validator_selected, derivation_selected);
+    assert_eq!(
+        validator_selected
+            .file_name()
+            .and_then(|name| name.to_str()),
+        Some("coverage.darwin-arm64.json")
+    );
+
+    let live_audit = live_audit(&fixture);
+
+    assert_eq!(live_audit.discovered_upstream_surface.len(), 1);
+    assert_eq!(
+        live_audit.discovered_upstream_surface[0].evidence_ref,
+        validator_selected
+            .strip_prefix(&fixture)
+            .expect("repo-relative evidence path")
+            .to_string_lossy()
+            .to_string()
+    );
+}
+
+#[test]
 fn failing_emit_json_pre_derivation_preserves_existing_projection() {
     let fixture = prepared_fixture(
         "agent-maintenance-audit-status-preserve-emit-json",
@@ -385,23 +410,100 @@ fn unreadable_live_evidence_is_internal_error_not_validation() {
         "agent-maintenance-audit-status-evidence-io-failure",
         &clean_report(TARGET_VERSION),
     );
-    let report_dir = coverage_report_dir(&fixture);
-    let original_permissions = fs::metadata(&report_dir)
-        .expect("stat report dir")
-        .permissions();
-    let mut blocked_permissions = original_permissions.clone();
-    blocked_permissions.set_mode(0o000);
-    fs::set_permissions(&report_dir, blocked_permissions).expect("block coverage report dir");
-
-    let err =
-        audit_status::run_in_workspace(&fixture, audit_args(REQUEST_PATH, None), &mut Vec::new())
-            .expect_err("unreadable evidence must fail");
-
-    fs::set_permissions(&report_dir, original_permissions).expect("restore report dir perms");
-
+    let err = run_with_unreadable_evidence(&fixture);
     assert!(matches!(err, AuditStatusError::Internal(_)));
     assert_eq!(err.exit_code(), 1);
     assert_ne!(err.exit_code(), 2);
+}
+
+#[cfg(unix)]
+#[test]
+fn unreadable_live_evidence_has_same_exit_code_with_and_without_discovery_work() {
+    let clean_fixture = prepared_fixture(
+        "agent-maintenance-audit-status-unreadable-clean",
+        &clean_report(TARGET_VERSION),
+    );
+    let discovery_fixture = prepared_fixture(
+        "agent-maintenance-audit-status-unreadable-discovery",
+        &discovery_report(TARGET_VERSION),
+    );
+
+    let clean_err = run_with_unreadable_evidence(&clean_fixture);
+    let discovery_err = run_with_unreadable_evidence(&discovery_fixture);
+
+    assert!(matches!(clean_err, AuditStatusError::Internal(_)));
+    assert!(matches!(discovery_err, AuditStatusError::Internal(_)));
+    assert_eq!(clean_err.exit_code(), 1);
+    assert_eq!(discovery_err.exit_code(), clean_err.exit_code());
+    assert_ne!(discovery_err.exit_code(), 2);
+}
+
+#[cfg(unix)]
+#[test]
+fn failing_emit_json_cleanup_error_preserves_original_failure_and_exit_code() {
+    let fixture = prepared_fixture(
+        "agent-maintenance-audit-status-emit-json-cleanup-failure",
+        &clean_report(TARGET_VERSION),
+    );
+    let emit_path = fixture.join("_ci_tmp/audit/status.json");
+
+    let (first, _) = emit_projection(&fixture, &emit_path);
+    assert_eq!(first, AuditStatusOutcome::Clean);
+
+    write_text(&coverage_report_path(&fixture), &clean_report("0.97.0"));
+
+    let emit_parent = emit_path.parent().expect("emit parent");
+    let original_permissions = fs::metadata(emit_parent)
+        .expect("stat emit parent")
+        .permissions();
+    let mut blocked_permissions = original_permissions.clone();
+    blocked_permissions.set_mode(0o555);
+    fs::set_permissions(emit_parent, blocked_permissions).expect("block emit cleanup");
+
+    let err = audit_status::run_in_workspace(
+        &fixture,
+        audit_args(REQUEST_PATH, Some(emit_path.clone())),
+        &mut Vec::new(),
+    )
+    .expect_err("cleanup failure must preserve original validation error");
+
+    fs::set_permissions(emit_parent, original_permissions).expect("restore emit parent perms");
+
+    assert!(matches!(err, AuditStatusError::Validation(_)));
+    assert_eq!(err.exit_code(), 2);
+    assert!(
+        err.to_string().contains(TARGET_VERSION),
+        "original error should still name the expected version"
+    );
+    assert!(
+        err.to_string().contains("0.97.0"),
+        "original error should still name the stale declared version"
+    );
+    assert!(
+        !err.to_string()
+            .contains("remove stale maintenance audit status projection"),
+        "cleanup failures must not mask the original validation error"
+    );
+}
+
+#[test]
+fn long_emit_json_target_succeeds() {
+    let fixture = prepared_fixture(
+        "agent-maintenance-audit-status-long-emit-json",
+        &clean_report(TARGET_VERSION),
+    );
+    let emit_path = fixture
+        .join("_ci_tmp")
+        .join(format!("{}.json", "a".repeat(245)));
+
+    let (outcome, bytes) = emit_projection(&fixture, &emit_path);
+
+    assert_eq!(outcome, AuditStatusOutcome::Clean);
+    assert!(
+        emit_path.is_file(),
+        "long emit-json target should be written"
+    );
+    assert_eq!(parse_json(&bytes)["target_version"], json!(TARGET_VERSION));
 }
 
 #[test]
@@ -412,23 +514,10 @@ fn schema_version_is_first_key_and_stable_across_runs() {
     );
     let emit_path = fixture.join("_ci_tmp/audit/status.json");
 
-    let first = audit_status::run_in_workspace(
-        &fixture,
-        audit_args(REQUEST_PATH, Some(emit_path.clone())),
-        &mut Vec::new(),
-    )
-    .expect("first schema-version emit");
+    let (first, first_bytes) = emit_projection(&fixture, &emit_path);
     assert_eq!(first, AuditStatusOutcome::Clean);
-    let first_bytes = fs::read(&emit_path).expect("read first schema-version emit");
-
-    let second = audit_status::run_in_workspace(
-        &fixture,
-        audit_args(REQUEST_PATH, Some(emit_path.clone())),
-        &mut Vec::new(),
-    )
-    .expect("second schema-version emit");
+    let (second, second_bytes) = emit_projection(&fixture, &emit_path);
     assert_eq!(second, AuditStatusOutcome::Clean);
-    let second_bytes = fs::read(&emit_path).expect("read second schema-version emit");
 
     assert_eq!(parse_json(&first_bytes)["schema_version"], json!(1));
     assert_eq!(first_bytes, second_bytes);
@@ -440,8 +529,92 @@ fn schema_version_is_first_key_and_stable_across_runs() {
     );
 }
 
+#[test]
+fn request_sha256_is_present_after_schema_version_and_stable_across_runs() {
+    let fixture = prepared_fixture(
+        "agent-maintenance-audit-status-request-sha",
+        &clean_report(TARGET_VERSION),
+    );
+    let emit_path = fixture.join("_ci_tmp/audit/status.json");
+    let expected_request_sha256 = request_sha256(&fixture);
+    let (first, first_bytes) = emit_projection(&fixture, &emit_path);
+    assert_eq!(first, AuditStatusOutcome::Clean);
+    let (second, second_bytes) = emit_projection(&fixture, &emit_path);
+    assert_eq!(second, AuditStatusOutcome::Clean);
+
+    assert_eq!(
+        parse_json(&first_bytes)["request_sha256"],
+        json!(expected_request_sha256)
+    );
+    assert_eq!(first_bytes, second_bytes);
+    assert!(
+        std::str::from_utf8(&first_bytes)
+            .expect("request-sha json must be utf-8")
+            .starts_with(&format!(
+                "{{\n  \"schema_version\": 1,\n  \"request_sha256\": \"{}\",\n",
+                expected_request_sha256
+            )),
+        "request_sha256 should follow schema_version for stale-file detection"
+    );
+}
+
 fn parse_json(bytes: &[u8]) -> Value {
     serde_json::from_slice(bytes).expect("parse audit status json")
+}
+
+fn expected_required_uplifts_json() -> Value {
+    json!([{
+        "surface_kind": "commands",
+        "command_path": "codex status",
+        "surface_id": "status",
+        "reason": "new_upstream_surface",
+        "required_writes": ["backend", "manifest", "packet_docs", "publication", "wrapper"]
+    }])
+}
+
+fn emit_projection(root: &Path, emit_path: &Path) -> (AuditStatusOutcome, Vec<u8>) {
+    let mut stdout = Vec::new();
+    let outcome = audit_status::run_in_workspace(
+        root,
+        audit_args(REQUEST_PATH, Some(emit_path.to_path_buf())),
+        &mut stdout,
+    )
+    .expect("emit projection");
+    assert!(stdout.is_empty(), "emit-json should not write stdout");
+    (
+        outcome,
+        fs::read(emit_path).expect("read emitted projection"),
+    )
+}
+
+fn live_audit(root: &Path) -> support_audit::SupportSurfaceAudit {
+    let validated_request = request::load_request_envelope_validated_with_policy(
+        root,
+        Path::new(REQUEST_PATH),
+        request::AuditDriftPolicy::Tolerate,
+    )
+    .expect("load validated request");
+    let registry = agent_registry::AgentRegistry::load(root).expect("load registry");
+    let detected_release = validated_request
+        .envelope
+        .request
+        .detected_release
+        .as_ref()
+        .expect("detected release");
+    support_audit::derive_support_surface_audit(
+        root,
+        registry.find("codex").expect("codex entry"),
+        detected_release,
+    )
+    .expect("derive live audit")
+}
+
+fn request_sha256(root: &Path) -> String {
+    request::load_request_envelope_validated(root, Path::new(REQUEST_PATH))
+        .expect("load validated request")
+        .envelope
+        .request
+        .sha256
 }
 
 fn audit_args(request: &str, emit_json: Option<PathBuf>) -> AuditStatusArgs {
@@ -492,22 +665,36 @@ fn seed_support_files(root: &Path, coverage_report: &str) {
     let registry = agent_registry::AgentRegistry::parse(SEEDED_REGISTRY).expect("parse registry");
     let entry = registry.find("codex").expect("codex entry");
 
-    write_text(
-        &root.join(".github/workflows/agent-maintenance-open-pr.yml"),
-        "name: Packet PR worker\n",
-    );
-    write_text(
-        &root.join("cli_manifests/codex/PR_BODY_TEMPLATE.md"),
-        "@codex\n\n## Goal\n\nFollow the maintained PR template for {{VERSION}}.\n",
-    );
-    write_text(
-        &root.join("cli_manifests/codex/OPS_PLAYBOOK.md"),
-        "# Codex ops\n",
-    );
-    write_text(
-        &root.join("cli_manifests/codex/CI_WORKFLOWS_PLAN.md"),
-        "# Codex CI workflows\n",
-    );
+    for (path, contents) in [
+        (
+            ".github/workflows/agent-maintenance-open-pr.yml",
+            "name: Packet PR worker\n",
+        ),
+        (
+            "cli_manifests/codex/PR_BODY_TEMPLATE.md",
+            "@codex\n\n## Goal\n\nFollow the maintained PR template for {{VERSION}}.\n",
+        ),
+        ("cli_manifests/codex/OPS_PLAYBOOK.md", "# Codex ops\n"),
+        (
+            "cli_manifests/codex/CI_WORKFLOWS_PLAN.md",
+            "# Codex CI workflows\n",
+        ),
+        (
+            "docs/agents/lifecycle/codex-maintenance/OPS_PLAYBOOK.md",
+            "# Packet ops\n",
+        ),
+        (
+            "docs/agents/lifecycle/codex-maintenance/CI_WORKFLOWS_PLAN.md",
+            "# Packet workflow plan\n",
+        ),
+        ("cli_manifests/codex/latest_validated.txt", "0.97.0\n"),
+        (
+            "docs/specs/unified-agent-api/non-tui-support-debt.md",
+            "# Non-TUI Support Debt Inventory\n\n## Inventory\n",
+        ),
+    ] {
+        write_text(&root.join(path), contents);
+    }
     write_text(
         &root.join(
             "docs/agents/lifecycle/codex-maintenance/governance/execute-agent-maintenance-prompt.md",
@@ -517,23 +704,7 @@ fn seed_support_files(root: &Path, coverage_report: &str) {
             "docs/agents/lifecycle/codex-maintenance",
         ),
     );
-    write_text(
-        &root.join("docs/agents/lifecycle/codex-maintenance/OPS_PLAYBOOK.md"),
-        "# Packet ops\n",
-    );
-    write_text(
-        &root.join("docs/agents/lifecycle/codex-maintenance/CI_WORKFLOWS_PLAN.md"),
-        "# Packet workflow plan\n",
-    );
-    write_text(
-        &root.join("cli_manifests/codex/latest_validated.txt"),
-        "0.97.0\n",
-    );
     write_text(&coverage_report_path(root), coverage_report);
-    write_text(
-        &root.join("docs/specs/unified-agent-api/non-tui-support-debt.md"),
-        "# Non-TUI Support Debt Inventory\n\n## Inventory\n",
-    );
 }
 
 fn coverage_report_dir(root: &Path) -> PathBuf {
@@ -543,6 +714,34 @@ fn coverage_report_dir(root: &Path) -> PathBuf {
 
 fn coverage_report_path(root: &Path) -> PathBuf {
     coverage_report_dir(root).join("coverage.any.json")
+}
+
+fn replace_named_coverage_reports(root: &Path, reports: &[(&str, &str)]) {
+    fs::remove_file(coverage_report_path(root)).expect("remove preferred coverage report");
+    for (name, contents) in reports {
+        write_named_coverage_report(root, name, contents);
+    }
+}
+
+fn write_named_coverage_report(root: &Path, file_name: &str, contents: &str) {
+    write_text(&coverage_report_dir(root).join(file_name), contents);
+}
+
+#[cfg(unix)]
+fn run_with_unreadable_evidence(root: &Path) -> AuditStatusError {
+    let report_dir = coverage_report_dir(root);
+    let original_permissions = fs::metadata(&report_dir)
+        .expect("stat report dir")
+        .permissions();
+    let mut blocked_permissions = original_permissions.clone();
+    blocked_permissions.set_mode(0o000);
+    fs::set_permissions(&report_dir, blocked_permissions).expect("block coverage report dir");
+
+    let err = audit_status::run_in_workspace(root, audit_args(REQUEST_PATH, None), &mut Vec::new())
+        .expect_err("unreadable evidence must fail");
+
+    fs::set_permissions(&report_dir, original_permissions).expect("restore report dir perms");
+    err
 }
 
 fn replace_in_request(root: &Path, before: &str, after: &str) {
@@ -566,48 +765,32 @@ fn discovery_report(semantic_version: &str) -> String {
 
 fn coverage_report(semantic_version: &str, includes_discovery: bool) -> String {
     let missing_commands = if includes_discovery {
-        concat!(
-            "[\n",
-            "      {\n",
-            "        \"path\": [\"status\"]\n",
-            "      }\n",
-            "    ]"
-        )
+        json!([{ "path": ["status"] }])
     } else {
-        "[]"
+        json!([])
     };
-
     format!(
-        concat!(
-            "{{\n",
-            "  \"schema_version\": 1,\n",
-            "  \"generated_at\": \"2026-05-05T15:00:00Z\",\n",
-            "  \"inputs\": {{\n",
-            "    \"upstream\": {{\n",
-            "      \"semantic_version\": \"{semantic_version}\",\n",
-            "      \"mode\": \"union\",\n",
-            "      \"targets\": [\"x86_64-unknown-linux-musl\"]\n",
-            "    }},\n",
-            "    \"wrapper\": {{\n",
-            "      \"schema_version\": 1,\n",
-            "      \"wrapper_version\": \"0.1.0\"\n",
-            "    }},\n",
-            "    \"rules\": {{\n",
-            "      \"rules_schema_version\": 1\n",
-            "    }}\n",
-            "  }},\n",
-            "  \"platform_filter\": {{\n",
-            "    \"mode\": \"any\"\n",
-            "  }},\n",
-            "  \"deltas\": {{\n",
-            "    \"missing_commands\": {missing_commands},\n",
-            "    \"missing_flags\": [],\n",
-            "    \"missing_args\": [],\n",
-            "    \"intentionally_unsupported\": []\n",
-            "  }}\n",
-            "}}\n"
-        ),
-        semantic_version = semantic_version,
-        missing_commands = missing_commands,
+        "{}\n",
+        serde_json::to_string_pretty(&json!({
+            "schema_version": 1,
+            "generated_at": "2026-05-05T15:00:00Z",
+            "inputs": {
+                "upstream": {
+                    "semantic_version": semantic_version,
+                    "mode": "union",
+                    "targets": ["x86_64-unknown-linux-musl"]
+                },
+                "wrapper": { "schema_version": 1, "wrapper_version": "0.1.0" },
+                "rules": { "rules_schema_version": 1 }
+            },
+            "platform_filter": { "mode": "any" },
+            "deltas": {
+                "missing_commands": missing_commands,
+                "missing_flags": [],
+                "missing_args": [],
+                "intentionally_unsupported": []
+            }
+        }))
+        .expect("serialize coverage report")
     )
 }

@@ -73,7 +73,7 @@ pub(super) fn validate_support_surface_audit(
                     request_path.display()
                 )));
             }
-            if frozen_had_discovery_work {
+            if frozen_had_discovery_work && audit_drift_policy == AuditDriftPolicy::Reject {
                 let report_dir = format!(
                     "{}/reports/{}",
                     registry_entry.manifest_root, detected_release.target_version

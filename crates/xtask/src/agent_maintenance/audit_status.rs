@@ -1,5 +1,5 @@
 use std::{
-    fs,
+    fs::{self, OpenOptions},
     io::{self, Write},
     path::{Path, PathBuf},
     time::{SystemTime, UNIX_EPOCH},
@@ -19,7 +19,7 @@ use super::{
 const EXIT_INTERNAL: i32 = 1;
 const EXIT_VALIDATION: i32 = 2;
 const AUDIT_STATUS_SCHEMA_VERSION: u32 = 1;
-const COVERAGE_REPORT_PREFERRED_FILES: [&str; 2] = ["coverage.any.json", "coverage.all.json"];
+const AUDIT_STATUS_TEMP_BASENAME: &str = ".maintenance-audit-status.tmp";
 
 /// Exit code meaning the live support-surface audit still needs contributor relay work.
 ///
@@ -86,6 +86,7 @@ impl From<request::MaintenanceRequestError> for Error {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 struct AuditStatusProjection {
     schema_version: u32,
+    request_sha256: String,
     agent_id: String,
     target_version: String,
     uplifts_required: bool,
@@ -150,11 +151,6 @@ impl DeriveAuditStatusFailure {
     }
 }
 
-enum CoverageReportLookupError {
-    Missing,
-    Io(String),
-}
-
 pub fn run(args: Args) -> Result<AuditStatusOutcome, Error> {
     let workspace_root = match args.workspace_root.as_ref() {
         Some(root) => root.to_path_buf(),
@@ -175,7 +171,7 @@ pub fn run_in_workspace<W: Write>(
         Err(failure) => {
             if failure.live_derivation_attempted {
                 if let Some(path) = args.emit_json.as_ref() {
-                    remove_projection(path)?;
+                    let _ = remove_projection(path);
                 }
             }
             return Err(failure.error);
@@ -317,6 +313,7 @@ fn build_projection(
 
     AuditStatusProjection {
         schema_version: AUDIT_STATUS_SCHEMA_VERSION,
+        request_sha256: request.sha256.clone(),
         agent_id: request.agent_id.clone(),
         target_version: detected_release.target_version.clone(),
         uplifts_required: !required_uplifts.is_empty(),
@@ -363,17 +360,22 @@ fn require_live_acquisition_evidence(
         }
     }
 
-    let report_path = select_coverage_report_path(&report_dir).map_err(|error| match error {
-        CoverageReportLookupError::Missing => Error::Validation(format!(
-            "maintenance-audit-status requires live coverage report evidence for target version `{}` under `{}` before reporting a clean result",
-            detected_release.target_version, report_dir_display
-        )),
-        CoverageReportLookupError::Io(error) => Error::Internal(format!(
-            "maintenance-audit-status could not read live coverage report evidence for target version `{}` under `{}`: {}",
-            detected_release.target_version, report_dir_display, error
-        )),
-    })?;
-    validate_live_coverage_report_target_version(&report_path, &detected_release.target_version)
+    let selected_report_path = selected_coverage_report_path(&report_dir)?;
+    let mut report_paths = vec![selected_report_path.clone()];
+    for report_path in list_coverage_report_paths(&report_dir)? {
+        if report_path != selected_report_path {
+            report_paths.push(report_path);
+        }
+    }
+
+    for report_path in report_paths {
+        validate_live_coverage_report_target_version(
+            &report_path,
+            &detected_release.target_version,
+        )?;
+    }
+
+    Ok(())
 }
 
 fn coverage_report_version_dir(
@@ -387,55 +389,60 @@ fn coverage_report_version_dir(
         .join(target_version)
 }
 
-fn select_coverage_report_path(version_dir: &Path) -> Result<PathBuf, CoverageReportLookupError> {
-    for preferred in COVERAGE_REPORT_PREFERRED_FILES {
-        let path = version_dir.join(preferred);
-        if path.is_file() {
-            return Ok(path);
+pub(crate) fn selected_coverage_report_path(version_dir: &Path) -> Result<PathBuf, Error> {
+    support_audit::select_report_path(version_dir).map_err(|err| {
+        Error::Internal(format!(
+            "select live coverage report under {}: {err}",
+            version_dir.display()
+        ))
+    })
+}
+
+fn list_coverage_report_paths(version_dir: &Path) -> Result<Vec<PathBuf>, Error> {
+    let mut candidates = Vec::new();
+    for entry in fs::read_dir(version_dir)
+        .map_err(|err| Error::Internal(format!("read_dir({}): {err}", version_dir.display())))?
+    {
+        let entry = entry.map_err(|err| {
+            Error::Internal(format!("read_dir({}): {err}", version_dir.display()))
+        })?;
+        let path = entry.path();
+        if is_coverage_report_path(&path) {
+            candidates.push(path);
         }
     }
-
-    let mut candidates = fs::read_dir(version_dir)
-        .map_err(|err| {
-            CoverageReportLookupError::Io(format!("read_dir({}): {err}", version_dir.display()))
-        })?
-        .filter_map(Result::ok)
-        .map(|entry| entry.path())
-        .filter(|path| {
-            path.file_name()
-                .and_then(|name| name.to_str())
-                .map(|name| name.starts_with("coverage.") && name.ends_with(".json"))
-                .unwrap_or(false)
-        })
-        .collect::<Vec<_>>();
     candidates.sort();
-    candidates
-        .into_iter()
-        .next()
-        .ok_or(CoverageReportLookupError::Missing)
+    Ok(candidates)
+}
+
+fn is_coverage_report_path(path: &Path) -> bool {
+    path.file_name()
+        .and_then(|name| name.to_str())
+        .map(|name| name.starts_with("coverage.") && name.ends_with(".json"))
+        .unwrap_or(false)
+}
+
+fn read_live_coverage_report_target_version(report_path: &Path) -> Result<String, Error> {
+    let text = fs::read_to_string(report_path)
+        .map_err(|err| Error::Internal(format!("read {}: {err}", report_path.display())))?;
+    let json = serde_json::from_str::<serde_json::Value>(&text)
+        .map_err(|err| Error::Internal(format!("parse {}: {err}", report_path.display())))?;
+    json.pointer("/inputs/upstream/semantic_version")
+        .and_then(serde_json::Value::as_str)
+        .map(ToString::to_string)
+        .ok_or_else(|| {
+            Error::Validation(format!(
+                "maintenance-audit-status requires live coverage report `{}` to declare string `inputs.upstream.semantic_version`",
+                report_path.display()
+            ))
+        })
 }
 
 fn validate_live_coverage_report_target_version(
     report_path: &Path,
     target_version: &str,
 ) -> Result<(), Error> {
-    let text = fs::read_to_string(report_path)
-        .map_err(|err| Error::Internal(format!("read {}: {err}", report_path.display())))?;
-    let json = serde_json::from_str::<serde_json::Value>(&text).map_err(|err| {
-        Error::Validation(format!(
-            "maintenance-audit-status requires live coverage report `{}` to be valid JSON with `inputs.upstream.semantic_version`: {err}",
-            report_path.display()
-        ))
-    })?;
-    let actual_version = json
-        .pointer("/inputs/upstream/semantic_version")
-        .and_then(serde_json::Value::as_str)
-        .ok_or_else(|| {
-            Error::Validation(format!(
-                "maintenance-audit-status requires live coverage report `{}` to declare string `inputs.upstream.semantic_version`",
-                report_path.display()
-            ))
-        })?;
+    let actual_version = read_live_coverage_report_target_version(report_path)?;
     if actual_version != target_version {
         return Err(Error::Validation(format!(
             "maintenance-audit-status requires live coverage report `{}` to match detected release target version `{}`, but `inputs.upstream.semantic_version` is `{}`",
@@ -462,17 +469,24 @@ fn write_projection_atomically(path: &Path, rendered: &str) -> Result<(), Error>
         .duration_since(UNIX_EPOCH)
         .map_err(|err| Error::Internal(format!("read system clock: {err}")))?
         .as_nanos();
-    let file_name = path
-        .file_name()
-        .and_then(|name| name.to_str())
-        .unwrap_or("maintenance-audit-status.json");
     let temp_path = parent.join(format!(
-        ".{file_name}.tmp-{}-{unique_suffix}",
+        "{AUDIT_STATUS_TEMP_BASENAME}-{}-{unique_suffix}",
         std::process::id()
     ));
 
-    fs::write(&temp_path, rendered)
-        .map_err(|err| Error::Internal(format!("write {}: {err}", temp_path.display())))?;
+    let mut file = OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&temp_path)
+        .map_err(|err| Error::Internal(format!("create {}: {err}", temp_path.display())))?;
+    if let Err(err) = file.write_all(rendered.as_bytes()) {
+        let _ = fs::remove_file(&temp_path);
+        return Err(Error::Internal(format!(
+            "write {}: {err}",
+            temp_path.display()
+        )));
+    }
+    drop(file);
     if let Err(err) = fs::rename(&temp_path, path) {
         let _ = fs::remove_file(&temp_path);
         return Err(Error::Internal(format!(

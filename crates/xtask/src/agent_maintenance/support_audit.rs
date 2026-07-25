@@ -510,7 +510,7 @@ fn coverage_report_version_dir(
         .join(target_version)
 }
 
-fn select_report_path(version_dir: &Path) -> Result<PathBuf, String> {
+pub(crate) fn select_report_path(version_dir: &Path) -> Result<PathBuf, String> {
     for preferred in ["coverage.any.json", "coverage.all.json"] {
         let path = version_dir.join(preferred);
         if path.is_file() {
