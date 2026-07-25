@@ -127,18 +127,123 @@ fn non_empty_required_uplifts_reports_exit_three_and_true_flag() {
 }
 
 #[test]
-fn uplift_signal_is_distinct_from_validation_and_internal_error_codes() {
+fn frozen_clean_packet_live_dirty_returns_exit_three_and_drifted_reconciliation() {
+    let fixture = prepared_fixture(
+        "agent-maintenance-audit-status-clean-frozen-live-dirty",
+        CLEAN_REPORT,
+    );
+    write_text(&coverage_report_path(&fixture), DISCOVERY_REPORT);
+
+    let mut stdout = Vec::new();
+    let outcome =
+        audit_status::run_in_workspace(&fixture, audit_args(REQUEST_PATH, None), &mut stdout)
+            .expect("frozen-clean/live-dirty audit status");
+
+    assert_eq!(outcome, AuditStatusOutcome::UpliftsRequired);
+    assert_eq!(outcome.exit_code(), EXIT_UPLIFTS_REQUIRED);
+
+    let json = parse_json(&stdout);
+    assert_eq!(json["uplifts_required"], json!(true));
+    assert_eq!(json["reconciliation"], json!("drifted"));
+    assert_eq!(json["discovered_upstream_surface"], json!(1));
+    assert_eq!(json["preexisting_unsupported_surface"], json!(0));
+    assert_eq!(json["missing_wrapper_support"], json!(1));
+    assert_eq!(json["missing_backend_support"], json!(1));
     assert_eq!(
-        AuditStatusOutcome::UpliftsRequired.exit_code(),
-        EXIT_UPLIFTS_REQUIRED
+        json["required_uplifts"],
+        json!([{
+            "surface_kind": "commands",
+            "command_path": "codex status",
+            "surface_id": "status",
+            "reason": "new_upstream_surface",
+            "required_writes": [
+                "backend",
+                "manifest",
+                "packet_docs",
+                "publication",
+                "wrapper"
+            ]
+        }])
     );
-    assert_ne!(
-        EXIT_UPLIFTS_REQUIRED,
-        AuditStatusError::Validation("validation".to_string()).exit_code()
+}
+
+#[test]
+fn missing_live_coverage_report_is_validation_error_not_clean() {
+    let fixture = prepared_fixture(
+        "agent-maintenance-audit-status-missing-coverage",
+        CLEAN_REPORT,
     );
-    assert_ne!(
-        EXIT_UPLIFTS_REQUIRED,
-        AuditStatusError::Internal("internal".to_string()).exit_code()
+    fs::remove_dir_all(coverage_report_dir(&fixture)).expect("remove seeded coverage report dir");
+
+    let mut stdout = Vec::new();
+    let err = audit_status::run_in_workspace(&fixture, audit_args(REQUEST_PATH, None), &mut stdout)
+        .expect_err("missing live coverage report must fail");
+
+    assert!(matches!(err, AuditStatusError::Validation(_)));
+    assert_eq!(err.exit_code(), 2);
+    assert!(
+        stdout.is_empty(),
+        "validation failures must not emit a clean projection"
+    );
+    assert!(
+        err.to_string()
+            .contains("cli_manifests/codex/reports/0.98.0"),
+        "error should name the expected target-version report directory"
+    );
+}
+
+#[test]
+fn drifted_reconciliation_without_uplifts_is_validation_error() {
+    let fixture = prepared_fixture(
+        "agent-maintenance-audit-status-drifted-reconciliation",
+        CLEAN_REPORT,
+    );
+    replace_in_request(&fixture, "pre_run_debt_count = 0", "pre_run_debt_count = 1");
+
+    let err =
+        audit_status::run_in_workspace(&fixture, audit_args(REQUEST_PATH, None), &mut Vec::new())
+            .expect_err("drifted reconciliation without uplifts must fail");
+
+    assert!(matches!(err, AuditStatusError::Validation(_)));
+    assert_eq!(err.exit_code(), 2);
+    assert!(
+        err.to_string().contains("support_surface_audit"),
+        "drifted reconciliation should surface the packet inconsistency"
+    );
+}
+
+#[test]
+fn failing_emit_json_run_does_not_preserve_stale_projection() {
+    let fixture = prepared_fixture(
+        "agent-maintenance-audit-status-stale-emit-json",
+        CLEAN_REPORT,
+    );
+    let emit_path = fixture.join("_ci_tmp/audit/status.json");
+
+    let outcome = audit_status::run_in_workspace(
+        &fixture,
+        audit_args(REQUEST_PATH, Some(emit_path.clone())),
+        &mut Vec::new(),
+    )
+    .expect("first emit");
+    assert_eq!(outcome, AuditStatusOutcome::Clean);
+    assert!(
+        emit_path.is_file(),
+        "successful emit-json runs should materialize the projection"
+    );
+
+    replace_in_request(&fixture, "pre_run_debt_count = 0", "pre_run_debt_count = 1");
+
+    let err = audit_status::run_in_workspace(
+        &fixture,
+        audit_args(REQUEST_PATH, Some(emit_path.clone())),
+        &mut Vec::new(),
+    )
+    .expect_err("second run must fail after request drift");
+    assert!(matches!(err, AuditStatusError::Validation(_)));
+    assert!(
+        !emit_path.exists(),
+        "failing emit-json runs must delete the stale projection before deriving"
     );
 }
 
@@ -288,12 +393,28 @@ fn seed_support_files(root: &Path, coverage_report: &str) {
         &root.join("cli_manifests/codex/latest_validated.txt"),
         "0.97.0\n",
     );
-    write_text(
-        &root.join("cli_manifests/codex/reports/0.98.0/coverage.any.json"),
-        coverage_report,
-    );
+    write_text(&coverage_report_path(root), coverage_report);
     write_text(
         &root.join("docs/specs/unified-agent-api/non-tui-support-debt.md"),
         "# Non-TUI Support Debt Inventory\n\n## Inventory\n",
     );
+}
+
+fn coverage_report_dir(root: &Path) -> PathBuf {
+    root.join("cli_manifests/codex/reports/0.98.0")
+}
+
+fn coverage_report_path(root: &Path) -> PathBuf {
+    coverage_report_dir(root).join("coverage.any.json")
+}
+
+fn replace_in_request(root: &Path, before: &str, after: &str) {
+    let path = root.join(REQUEST_PATH);
+    let original = fs::read_to_string(&path).expect("read generated request");
+    let updated = original.replacen(before, after, 1);
+    assert_ne!(
+        updated, original,
+        "expected generated request to contain the replacement marker `{before}`"
+    );
+    write_text(&path, &updated);
 }
