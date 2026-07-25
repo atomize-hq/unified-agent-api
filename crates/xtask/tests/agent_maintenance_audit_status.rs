@@ -5,6 +5,9 @@ use std::{
     path::{Path, PathBuf},
 };
 
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
+
 use serde_json::{json, Value};
 
 #[path = "support/onboard_agent_harness.rs"]
@@ -40,34 +43,15 @@ use prepare::{apply_prepare_plan, build_prepare_plan, Args as PrepareArgs};
 const SEEDED_REGISTRY: &str = include_str!("../data/agent_registry.toml");
 const REQUEST_PATH: &str =
     "docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml";
-const CLEAN_REPORT: &str = concat!(
-    "{\n",
-    "  \"deltas\": {\n",
-    "    \"missing_commands\": [],\n",
-    "    \"missing_flags\": [],\n",
-    "    \"missing_args\": [],\n",
-    "    \"intentionally_unsupported\": []\n",
-    "  }\n",
-    "}\n"
-);
-const DISCOVERY_REPORT: &str = concat!(
-    "{\n",
-    "  \"deltas\": {\n",
-    "    \"missing_commands\": [\n",
-    "      {\n",
-    "        \"path\": [\"status\"]\n",
-    "      }\n",
-    "    ],\n",
-    "    \"missing_flags\": [],\n",
-    "    \"missing_args\": [],\n",
-    "    \"intentionally_unsupported\": []\n",
-    "  }\n",
-    "}\n"
-);
+const TARGET_VERSION: &str = "0.98.0";
+const REQUEST_COMMIT: &str = "abcdef1";
 
 #[test]
 fn empty_required_uplifts_reports_clean_exit_code_and_false_flag() {
-    let fixture = prepared_fixture("agent-maintenance-audit-status-clean", CLEAN_REPORT);
+    let fixture = prepared_fixture(
+        "agent-maintenance-audit-status-clean",
+        &clean_report(TARGET_VERSION),
+    );
 
     let mut stdout = Vec::new();
     let outcome =
@@ -91,7 +75,10 @@ fn empty_required_uplifts_reports_clean_exit_code_and_false_flag() {
 
 #[test]
 fn non_empty_required_uplifts_reports_exit_three_and_true_flag() {
-    let fixture = prepared_fixture("agent-maintenance-audit-status-uplifts", DISCOVERY_REPORT);
+    let fixture = prepared_fixture(
+        "agent-maintenance-audit-status-uplifts",
+        &discovery_report(TARGET_VERSION),
+    );
 
     let mut stdout = Vec::new();
     let outcome =
@@ -130,9 +117,12 @@ fn non_empty_required_uplifts_reports_exit_three_and_true_flag() {
 fn frozen_clean_packet_live_dirty_returns_exit_three_and_drifted_reconciliation() {
     let fixture = prepared_fixture(
         "agent-maintenance-audit-status-clean-frozen-live-dirty",
-        CLEAN_REPORT,
+        &clean_report(TARGET_VERSION),
     );
-    write_text(&coverage_report_path(&fixture), DISCOVERY_REPORT);
+    write_text(
+        &coverage_report_path(&fixture),
+        &discovery_report(TARGET_VERSION),
+    );
 
     let mut stdout = Vec::new();
     let outcome =
@@ -171,7 +161,7 @@ fn frozen_clean_packet_live_dirty_returns_exit_three_and_drifted_reconciliation(
 fn missing_live_coverage_report_is_validation_error_not_clean() {
     let fixture = prepared_fixture(
         "agent-maintenance-audit-status-missing-coverage",
-        CLEAN_REPORT,
+        &clean_report(TARGET_VERSION),
     );
     fs::remove_dir_all(coverage_report_dir(&fixture)).expect("remove seeded coverage report dir");
 
@@ -196,7 +186,7 @@ fn missing_live_coverage_report_is_validation_error_not_clean() {
 fn drifted_reconciliation_without_uplifts_is_validation_error() {
     let fixture = prepared_fixture(
         "agent-maintenance-audit-status-drifted-reconciliation",
-        CLEAN_REPORT,
+        &clean_report(TARGET_VERSION),
     );
     replace_in_request(&fixture, "pre_run_debt_count = 0", "pre_run_debt_count = 1");
 
@@ -216,7 +206,7 @@ fn drifted_reconciliation_without_uplifts_is_validation_error() {
 fn failing_emit_json_run_does_not_preserve_stale_projection() {
     let fixture = prepared_fixture(
         "agent-maintenance-audit-status-stale-emit-json",
-        CLEAN_REPORT,
+        &clean_report(TARGET_VERSION),
     );
     let emit_path = fixture.join("_ci_tmp/audit/status.json");
 
@@ -271,7 +261,7 @@ fn malformed_or_unresolvable_request_is_validation_error_not_exit_three() {
 fn emitted_json_is_byte_identical_across_identical_runs() {
     let fixture = prepared_fixture(
         "agent-maintenance-audit-status-byte-identical",
-        DISCOVERY_REPORT,
+        &discovery_report(TARGET_VERSION),
     );
     let emit_path = fixture.join("_ci_tmp/audit/status.json");
 
@@ -304,6 +294,152 @@ fn emitted_json_is_byte_identical_across_identical_runs() {
     );
 }
 
+#[test]
+fn drifted_packet_with_invalid_request_commit_is_validation_error_not_exit_three() {
+    let fixture = prepared_fixture(
+        "agent-maintenance-audit-status-drifted-invalid-request-commit",
+        &clean_report(TARGET_VERSION),
+    );
+    write_text(
+        &coverage_report_path(&fixture),
+        &discovery_report(TARGET_VERSION),
+    );
+    replace_in_request(
+        &fixture,
+        &format!("request_commit = \"{REQUEST_COMMIT}\""),
+        "request_commit = \"NOT A COMMIT AT ALL\"",
+    );
+
+    let err =
+        audit_status::run_in_workspace(&fixture, audit_args(REQUEST_PATH, None), &mut Vec::new())
+            .expect_err("invalid post-reconciliation fields must fail validation");
+
+    assert!(matches!(err, AuditStatusError::Validation(_)));
+    assert_eq!(err.exit_code(), 2);
+    assert_ne!(err.exit_code(), EXIT_UPLIFTS_REQUIRED);
+    assert!(
+        err.to_string().contains("request_commit"),
+        "post-reconciliation validation failures should name the invalid field"
+    );
+}
+
+#[test]
+fn wrong_version_live_coverage_report_is_rejected() {
+    let fixture = prepared_fixture(
+        "agent-maintenance-audit-status-wrong-version-report",
+        &clean_report("0.97.0"),
+    );
+
+    let err =
+        audit_status::run_in_workspace(&fixture, audit_args(REQUEST_PATH, None), &mut Vec::new())
+            .expect_err("wrong-version coverage evidence must fail");
+
+    assert!(matches!(err, AuditStatusError::Validation(_)));
+    assert_eq!(err.exit_code(), 2);
+    assert_ne!(err.exit_code(), 0);
+    assert!(
+        err.to_string().contains(TARGET_VERSION),
+        "error should name the detected release target version"
+    );
+    assert!(
+        err.to_string().contains("0.97.0"),
+        "error should name the mismatched evidence version"
+    );
+}
+
+#[test]
+fn failing_emit_json_pre_derivation_preserves_existing_projection() {
+    let fixture = prepared_fixture(
+        "agent-maintenance-audit-status-preserve-emit-json",
+        &clean_report(TARGET_VERSION),
+    );
+    let emit_path = fixture.join("_ci_tmp/audit/status.json");
+    let original = "{\n  \"stale\": true\n}\n";
+    write_text(&emit_path, original);
+
+    replace_in_request(
+        &fixture,
+        "agent_id = \"codex\"",
+        "agent_id = \"unknown_agent\"",
+    );
+
+    let err = audit_status::run_in_workspace(
+        &fixture,
+        audit_args(REQUEST_PATH, Some(emit_path.clone())),
+        &mut Vec::new(),
+    )
+    .expect_err("pre-derivation validation failures must keep the existing projection");
+
+    assert!(matches!(err, AuditStatusError::Validation(_)));
+    assert_eq!(err.exit_code(), 2);
+    assert_eq!(
+        fs::read_to_string(&emit_path).expect("read preserved emit-json target"),
+        original
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn unreadable_live_evidence_is_internal_error_not_validation() {
+    let fixture = prepared_fixture(
+        "agent-maintenance-audit-status-evidence-io-failure",
+        &clean_report(TARGET_VERSION),
+    );
+    let report_dir = coverage_report_dir(&fixture);
+    let original_permissions = fs::metadata(&report_dir)
+        .expect("stat report dir")
+        .permissions();
+    let mut blocked_permissions = original_permissions.clone();
+    blocked_permissions.set_mode(0o000);
+    fs::set_permissions(&report_dir, blocked_permissions).expect("block coverage report dir");
+
+    let err =
+        audit_status::run_in_workspace(&fixture, audit_args(REQUEST_PATH, None), &mut Vec::new())
+            .expect_err("unreadable evidence must fail");
+
+    fs::set_permissions(&report_dir, original_permissions).expect("restore report dir perms");
+
+    assert!(matches!(err, AuditStatusError::Internal(_)));
+    assert_eq!(err.exit_code(), 1);
+    assert_ne!(err.exit_code(), 2);
+}
+
+#[test]
+fn schema_version_is_first_key_and_stable_across_runs() {
+    let fixture = prepared_fixture(
+        "agent-maintenance-audit-status-schema-version",
+        &clean_report(TARGET_VERSION),
+    );
+    let emit_path = fixture.join("_ci_tmp/audit/status.json");
+
+    let first = audit_status::run_in_workspace(
+        &fixture,
+        audit_args(REQUEST_PATH, Some(emit_path.clone())),
+        &mut Vec::new(),
+    )
+    .expect("first schema-version emit");
+    assert_eq!(first, AuditStatusOutcome::Clean);
+    let first_bytes = fs::read(&emit_path).expect("read first schema-version emit");
+
+    let second = audit_status::run_in_workspace(
+        &fixture,
+        audit_args(REQUEST_PATH, Some(emit_path.clone())),
+        &mut Vec::new(),
+    )
+    .expect("second schema-version emit");
+    assert_eq!(second, AuditStatusOutcome::Clean);
+    let second_bytes = fs::read(&emit_path).expect("read second schema-version emit");
+
+    assert_eq!(parse_json(&first_bytes)["schema_version"], json!(1));
+    assert_eq!(first_bytes, second_bytes);
+    assert!(
+        std::str::from_utf8(&first_bytes)
+            .expect("schema-version json must be utf-8")
+            .starts_with("{\n  \"schema_version\": 1,\n"),
+        "schema_version should be emitted first for machine consumers"
+    );
+}
+
 fn parse_json(bytes: &[u8]) -> Value {
     serde_json::from_slice(bytes).expect("parse audit status json")
 }
@@ -332,14 +468,14 @@ fn prepare_args() -> PrepareArgs {
         agent: "codex".to_string(),
         current_version: "0.97.0".to_string(),
         latest_stable: "0.99.0".to_string(),
-        target_version: "0.98.0".to_string(),
+        target_version: TARGET_VERSION.to_string(),
         opened_from: Path::new(".github/workflows/agent-maintenance-open-pr.yml").to_path_buf(),
         detected_by: ".github/workflows/agent-maintenance-release-watch.yml".to_string(),
         dispatch_kind: "packet_pr".to_string(),
         dispatch_workflow: None,
         branch_name: "automation/codex-maintenance-0.98.0".to_string(),
         request_recorded_at: "2026-05-05T15:00:00Z".to_string(),
-        request_commit: "abcdef1".to_string(),
+        request_commit: REQUEST_COMMIT.to_string(),
         dry_run: true,
         write: false,
     }
@@ -401,7 +537,8 @@ fn seed_support_files(root: &Path, coverage_report: &str) {
 }
 
 fn coverage_report_dir(root: &Path) -> PathBuf {
-    root.join("cli_manifests/codex/reports/0.98.0")
+    root.join("cli_manifests/codex/reports")
+        .join(TARGET_VERSION)
 }
 
 fn coverage_report_path(root: &Path) -> PathBuf {
@@ -417,4 +554,60 @@ fn replace_in_request(root: &Path, before: &str, after: &str) {
         "expected generated request to contain the replacement marker `{before}`"
     );
     write_text(&path, &updated);
+}
+
+fn clean_report(semantic_version: &str) -> String {
+    coverage_report(semantic_version, false)
+}
+
+fn discovery_report(semantic_version: &str) -> String {
+    coverage_report(semantic_version, true)
+}
+
+fn coverage_report(semantic_version: &str, includes_discovery: bool) -> String {
+    let missing_commands = if includes_discovery {
+        concat!(
+            "[\n",
+            "      {\n",
+            "        \"path\": [\"status\"]\n",
+            "      }\n",
+            "    ]"
+        )
+    } else {
+        "[]"
+    };
+
+    format!(
+        concat!(
+            "{{\n",
+            "  \"schema_version\": 1,\n",
+            "  \"generated_at\": \"2026-05-05T15:00:00Z\",\n",
+            "  \"inputs\": {{\n",
+            "    \"upstream\": {{\n",
+            "      \"semantic_version\": \"{semantic_version}\",\n",
+            "      \"mode\": \"union\",\n",
+            "      \"targets\": [\"x86_64-unknown-linux-musl\"]\n",
+            "    }},\n",
+            "    \"wrapper\": {{\n",
+            "      \"schema_version\": 1,\n",
+            "      \"wrapper_version\": \"0.1.0\"\n",
+            "    }},\n",
+            "    \"rules\": {{\n",
+            "      \"rules_schema_version\": 1\n",
+            "    }}\n",
+            "  }},\n",
+            "  \"platform_filter\": {{\n",
+            "    \"mode\": \"any\"\n",
+            "  }},\n",
+            "  \"deltas\": {{\n",
+            "    \"missing_commands\": {missing_commands},\n",
+            "    \"missing_flags\": [],\n",
+            "    \"missing_args\": [],\n",
+            "    \"intentionally_unsupported\": []\n",
+            "  }}\n",
+            "}}\n"
+        ),
+        semantic_version = semantic_version,
+        missing_commands = missing_commands,
+    )
 }

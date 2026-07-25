@@ -2,23 +2,24 @@ use std::{
     fs,
     io::{self, Write},
     path::{Path, PathBuf},
+    time::{SystemTime, UNIX_EPOCH},
 };
 
 use clap::Parser;
-use serde::{de::IgnoredAny, Deserialize, Serialize};
-use sha2::{Digest, Sha256};
+use serde::Serialize;
 use thiserror::Error;
-use toml_edit::de::from_str;
 
 use crate::agent_registry::{AgentRegistry, AgentRegistryEntry};
 
 use super::{
-    request::{self, AuditReconciliation, DetectedRelease, MaintenanceRequest},
+    request::{self, AuditDriftPolicy, AuditReconciliation, DetectedRelease, MaintenanceRequest},
     support_audit::{self, SupportSurfaceAudit},
 };
 
 const EXIT_INTERNAL: i32 = 1;
 const EXIT_VALIDATION: i32 = 2;
+const AUDIT_STATUS_SCHEMA_VERSION: u32 = 1;
+const COVERAGE_REPORT_PREFERRED_FILES: [&str; 2] = ["coverage.any.json", "coverage.all.json"];
 
 /// Exit code meaning the live support-surface audit still needs contributor relay work.
 ///
@@ -84,6 +85,7 @@ impl From<request::MaintenanceRequestError> for Error {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 struct AuditStatusProjection {
+    schema_version: u32,
     agent_id: String,
     target_version: String,
     uplifts_required: bool,
@@ -117,6 +119,7 @@ impl From<AuditReconciliation> for ReconciliationProjection {
         match value {
             AuditReconciliation::Exact => Self::Exact,
             AuditReconciliation::Satisfied => Self::Satisfied,
+            AuditReconciliation::Drifted => Self::Drifted,
         }
     }
 }
@@ -126,9 +129,30 @@ struct DerivedAuditStatus {
     outcome: AuditStatusOutcome,
 }
 
-struct ReconciliationStatus {
-    projection: ReconciliationProjection,
-    drift_message: Option<String>,
+struct DeriveAuditStatusFailure {
+    error: Error,
+    live_derivation_attempted: bool,
+}
+
+impl DeriveAuditStatusFailure {
+    fn preflight(error: Error) -> Self {
+        Self {
+            error,
+            live_derivation_attempted: false,
+        }
+    }
+
+    fn attempted(error: Error) -> Self {
+        Self {
+            error,
+            live_derivation_attempted: true,
+        }
+    }
+}
+
+enum CoverageReportLookupError {
+    Missing,
+    Io(String),
 }
 
 pub fn run(args: Args) -> Result<AuditStatusOutcome, Error> {
@@ -146,11 +170,18 @@ pub fn run_in_workspace<W: Write>(
     args: Args,
     writer: &mut W,
 ) -> Result<AuditStatusOutcome, Error> {
-    if let Some(path) = args.emit_json.as_ref() {
-        remove_stale_projection(path)?;
-    }
+    let status = match derive_audit_status(workspace_root, &args.request) {
+        Ok(status) => status,
+        Err(failure) => {
+            if failure.live_derivation_attempted {
+                if let Some(path) = args.emit_json.as_ref() {
+                    remove_projection(path)?;
+                }
+            }
+            return Err(failure.error);
+        }
+    };
 
-    let status = derive_audit_status(workspace_root, &args.request)?;
     let rendered = format!(
         "{}\n",
         serde_json::to_string_pretty(&status.projection)
@@ -158,7 +189,7 @@ pub fn run_in_workspace<W: Write>(
     );
 
     match args.emit_json.as_ref() {
-        Some(path) => write_projection(path, &rendered)?,
+        Some(path) => write_projection_atomically(path, &rendered)?,
         None => writer
             .write_all(rendered.as_bytes())
             .map_err(|err| Error::Internal(format!("write stdout: {err}")))?,
@@ -170,48 +201,70 @@ pub fn run_in_workspace<W: Write>(
 fn derive_audit_status(
     workspace_root: &Path,
     request_path: &Path,
-) -> Result<DerivedAuditStatus, Error> {
-    let envelope = load_request_envelope_for_live_audit(workspace_root, request_path)?;
-    let request = &envelope.request;
-    let detected_release = require_automated_support_audit_request(request)?;
+) -> Result<DerivedAuditStatus, DeriveAuditStatusFailure> {
+    let validated = request::load_request_envelope_validated_with_policy(
+        workspace_root,
+        request_path,
+        AuditDriftPolicy::Tolerate,
+    )
+    .map_err(Error::from)
+    .map_err(DeriveAuditStatusFailure::preflight)?;
+    let reconciliation_detail = validated
+        .support_surface_audit_reconciliation_detail
+        .clone();
+    let request = &validated.envelope.request;
+    let detected_release = require_automated_support_audit_request(request)
+        .map_err(DeriveAuditStatusFailure::preflight)?;
+    let reconciliation = validated
+        .support_surface_audit_reconciliation
+        .ok_or_else(|| {
+            DeriveAuditStatusFailure::preflight(Error::Internal(format!(
+                "validated maintenance request `{}` is missing support-surface reconciliation metadata",
+                request.relative_path
+            )))
+        })?;
 
     let registry = AgentRegistry::load(workspace_root)
-        .map_err(|err| Error::Internal(format!("load agent registry: {err}")))?;
+        .map_err(|err| Error::Internal(format!("load agent registry: {err}")))
+        .map_err(DeriveAuditStatusFailure::preflight)?;
     let entry = registry.find(&request.agent_id).ok_or_else(|| {
-        Error::Internal(format!(
+        DeriveAuditStatusFailure::preflight(Error::Internal(format!(
             "validated maintenance request `{}` references agent `{}` but the committed registry no longer contains it",
             request.relative_path, request.agent_id
-        ))
+        )))
     })?;
 
     let live_audit =
         support_audit::derive_support_surface_audit(workspace_root, entry, detected_release)
             .map_err(|err| {
-                Error::Internal(format!(
+                DeriveAuditStatusFailure::attempted(Error::Internal(format!(
                     "derive live support-surface audit for `{}` target `{}`: {err}",
                     request.agent_id, detected_release.target_version
-                ))
+                )))
             })?;
     let uplifts_required = !live_audit.required_uplifts_this_run.is_empty();
     if !uplifts_required {
-        require_live_acquisition_evidence(workspace_root, entry, detected_release)?;
+        require_live_acquisition_evidence(workspace_root, entry, detected_release)
+            .map_err(DeriveAuditStatusFailure::attempted)?;
     }
 
-    let reconciliation = derive_reconciliation_status(workspace_root, request_path)?;
     let projection = build_projection(
         request,
         &live_audit,
         detected_release,
-        reconciliation.projection,
+        reconciliation.into(),
     );
     let outcome = if uplifts_required {
         AuditStatusOutcome::UpliftsRequired
-    } else if reconciliation.projection == ReconciliationProjection::Drifted {
-        return Err(Error::Validation(
-            reconciliation
-                .drift_message
-                .unwrap_or_else(|| "maintenance request reconciliation drifted".to_string()),
-        ));
+    } else if reconciliation == AuditReconciliation::Drifted {
+        return Err(DeriveAuditStatusFailure::attempted(Error::Validation(
+            reconciliation_detail.unwrap_or_else(|| {
+                format!(
+                    "maintenance request `{}` support-surface reconciliation drifted",
+                    request.relative_path
+                )
+            }),
+        )));
     } else {
         AuditStatusOutcome::Clean
     };
@@ -263,6 +316,7 @@ fn build_projection(
     required_uplifts.sort();
 
     AuditStatusProjection {
+        schema_version: AUDIT_STATUS_SCHEMA_VERSION,
         agent_id: request.agent_id.clone(),
         target_version: detected_release.target_version.clone(),
         uplifts_required: !required_uplifts.is_empty(),
@@ -275,208 +329,18 @@ fn build_projection(
     }
 }
 
-fn load_request_envelope_for_live_audit(
-    workspace_root: &Path,
-    request_path: &Path,
-) -> Result<request::MaintenanceRequestEnvelope, Error> {
-    match request::load_request_envelope(workspace_root, request_path) {
-        Ok(envelope) => Ok(envelope),
-        Err(request::MaintenanceRequestError::Validation(message))
-            if is_recoverable_reconciliation_validation(&message) =>
-        {
-            recover_request_envelope_for_live_audit(workspace_root, request_path)
-        }
-        Err(err) => Err(err.into()),
-    }
-}
-
-fn is_recoverable_reconciliation_validation(message: &str) -> bool {
-    message.contains(
-        "field `support_surface_audit` no longer matches the live derived maintenance contract",
-    ) || message.contains(
-        "field `support_surface_audit` cannot confirm reconciliation because live coverage report evidence",
-    )
-}
-
-fn recover_request_envelope_for_live_audit(
-    workspace_root: &Path,
-    request_path: &Path,
-) -> Result<request::MaintenanceRequestEnvelope, Error> {
-    let workspace_root = fs::canonicalize(workspace_root).map_err(|err| {
-        Error::Internal(format!("canonicalize {}: {err}", workspace_root.display()))
-    })?;
-    let lexical_path = if request_path.is_absolute() {
-        request_path.to_path_buf()
-    } else {
-        workspace_root.join(request_path)
-    };
-    let canonical_path = fs::canonicalize(&lexical_path).map_err(|err| {
-        Error::Validation(format!(
-            "maintenance request `{}` does not resolve: {err}",
-            request_path.display()
-        ))
-    })?;
-    if !canonical_path.starts_with(&workspace_root) {
-        return Err(Error::Validation(format!(
-            "maintenance request `{}` resolves outside workspace root",
-            request_path.display()
-        )));
-    }
-
-    let relative_path = canonical_path
-        .strip_prefix(&workspace_root)
-        .map_err(|err| {
-            Error::Internal(format!(
-                "strip request path `{}` from workspace root `{}`: {err}",
-                canonical_path.display(),
-                workspace_root.display()
-            ))
-        })?
-        .to_path_buf();
-    let bytes = fs::read(&canonical_path).map_err(|err| {
-        Error::Validation(format!(
-            "read maintenance request `{}`: {err}",
-            relative_path.display()
-        ))
-    })?;
-    let text = std::str::from_utf8(&bytes).map_err(|err| {
-        Error::Validation(format!(
-            "maintenance request `{}` must be valid utf-8: {err}",
-            relative_path.display()
-        ))
-    })?;
-    let raw: RawMaintenanceRequestForLiveAudit = from_str(text).map_err(|err| {
-        Error::Validation(format!(
-            "parse maintenance request `{}`: {err}",
-            relative_path.display()
-        ))
-    })?;
-    let maintenance_pack_prefix = maintenance_pack_prefix_from_relative_path(&relative_path)
-        .ok_or_else(|| {
-            Error::Validation(format!(
-                "maintenance request `{}` must live under `docs/agents/lifecycle/<agent>-maintenance/`",
-                relative_path.display()
-            ))
-        })?;
-
-    Ok(request::MaintenanceRequestEnvelope {
-        request: MaintenanceRequest {
-            relative_path: relative_path.display().to_string(),
-            canonical_path,
-            sha256: hex::encode(Sha256::digest(&bytes)),
-            maintenance_pack_prefix: maintenance_pack_prefix.clone(),
-            maintenance_root: Path::new("docs/agents/lifecycle")
-                .join(&maintenance_pack_prefix)
-                .display()
-                .to_string(),
-            agent_id: raw.agent_id,
-            trigger_kind: parse_trigger_kind(&raw.trigger_kind, &relative_path)?,
-            basis_ref: raw.basis_ref,
-            opened_from: raw.opened_from,
-            requested_control_plane_actions: raw
-                .requested_control_plane_actions
-                .iter()
-                .map(|value| parse_maintenance_action(value, &relative_path))
-                .collect::<Result<Vec<_>, _>>()?,
-            runtime_followup_required: request::RuntimeFollowupRequired {
-                required: raw.runtime_followup_required.required,
-                items: raw.runtime_followup_required.items,
-            },
-            detected_release: raw.detected_release.map(map_detected_release),
-            support_surface_audit: raw
-                .support_surface_audit
-                .map(|_| placeholder_support_surface_audit()),
-            request_recorded_at: raw.request_recorded_at,
-            request_commit: raw.request_commit,
-        },
-        execution_contract: None,
-    })
-}
-
-fn maintenance_pack_prefix_from_relative_path(relative_path: &Path) -> Option<String> {
-    let parts = relative_path
-        .iter()
-        .map(|segment| segment.to_string_lossy().into_owned())
-        .collect::<Vec<_>>();
-    if parts.len() < 4 || parts[0] != "docs" || parts[1] != "agents" || parts[2] != "lifecycle" {
-        return None;
-    }
-    Some(parts[3].clone())
-}
-
-fn parse_trigger_kind(value: &str, request_path: &Path) -> Result<request::TriggerKind, Error> {
-    match value {
-        "drift_detected" => Ok(request::TriggerKind::DriftDetected),
-        "manual_reopen" => Ok(request::TriggerKind::ManualReopen),
-        "post_release_audit" => Ok(request::TriggerKind::PostReleaseAudit),
-        "upstream_release_detected" => Ok(request::TriggerKind::UpstreamReleaseDetected),
-        other => Err(Error::Validation(format!(
-            "maintenance request `{}` has invalid `trigger_kind` `{other}`; expected `drift_detected`, `manual_reopen`, `post_release_audit`, or `upstream_release_detected`",
-            request_path.display()
-        ))),
-    }
-}
-
-fn parse_maintenance_action(
-    value: &str,
-    request_path: &Path,
-) -> Result<request::MaintenanceAction, Error> {
-    match value {
-        "packet_doc_refresh" => Ok(request::MaintenanceAction::PacketDocRefresh),
-        "support_matrix_refresh" => Ok(request::MaintenanceAction::SupportMatrixRefresh),
-        "capability_matrix_refresh" => Ok(request::MaintenanceAction::CapabilityMatrixRefresh),
-        "release_doc_refresh" => Ok(request::MaintenanceAction::ReleaseDocRefresh),
-        other => Err(Error::Validation(format!(
-            "maintenance request `{}` requested runtime-owned or unsupported action `{other}`; allowed actions: `packet_doc_refresh`, `support_matrix_refresh`, `capability_matrix_refresh`, `release_doc_refresh`",
-            request_path.display()
-        ))),
-    }
-}
-
-fn map_detected_release(raw: RawDetectedReleaseForLiveAudit) -> DetectedRelease {
-    DetectedRelease {
-        detected_by: raw.detected_by,
-        current_validated: raw.current_validated,
-        target_version: raw.target_version,
-        latest_stable: raw.latest_stable,
-        version_policy: raw.version_policy,
-        source_kind: raw.source_kind,
-        source_ref: raw.source_ref,
-        dispatch_kind: raw.dispatch_kind,
-        dispatch_workflow: raw.dispatch_workflow,
-        branch_name: raw.branch_name,
-    }
-}
-
-fn placeholder_support_surface_audit() -> SupportSurfaceAudit {
-    SupportSurfaceAudit {
-        required: true,
-        surface_kinds: Vec::new(),
-        excluded_surface_kinds: Vec::new(),
-        allowed_deferrals: Vec::new(),
-        pre_run_debt_count: 0,
-        expected_post_run_debt_count: 0,
-        discovered_upstream_surface: Vec::new(),
-        removed_upstream_surface: Vec::new(),
-        preexisting_unsupported_surface: Vec::new(),
-        eligible_preexisting_surface: Vec::new(),
-        missing_wrapper_support: Vec::new(),
-        missing_backend_support: Vec::new(),
-        required_uplifts_this_run: Vec::new(),
-        deferred_preexisting_gaps: Vec::new(),
-        publication_impacts: Vec::new(),
-    }
-}
-
 fn require_live_acquisition_evidence(
     workspace_root: &Path,
     entry: &AgentRegistryEntry,
     detected_release: &DetectedRelease,
 ) -> Result<(), Error> {
-    let report_dir = format!(
+    let report_dir =
+        coverage_report_version_dir(workspace_root, entry, &detected_release.target_version);
+    let report_dir_display = format!(
         "{}/reports/{}",
         entry.manifest_root, detected_release.target_version
     );
+
     // This command re-derives the audit from live artifacts, so "clean" cannot mean both
     // "acquisition found no new surface" and "acquisition produced no artifacts at all".
     match support_audit::coverage_report_present_for_target(
@@ -484,56 +348,144 @@ fn require_live_acquisition_evidence(
         entry,
         &detected_release.target_version,
     ) {
-        Ok(true) => Ok(()),
-        Ok(false) => Err(Error::Validation(format!(
-            "maintenance-audit-status requires live coverage report evidence for target version `{}` under `{}` before reporting a clean result",
-            detected_release.target_version, report_dir
-        ))),
-        Err(error) => Err(Error::Validation(format!(
-            "maintenance-audit-status could not read live coverage report evidence for target version `{}` under `{}`: {}",
-            detected_release.target_version, report_dir, error
-        ))),
-    }
-}
-
-fn derive_reconciliation_status(
-    workspace_root: &Path,
-    request_path: &Path,
-) -> Result<ReconciliationStatus, Error> {
-    match request::load_request_envelope_validated(workspace_root, request_path) {
-        Ok(validated) => Ok(ReconciliationStatus {
-            projection: validated
-                .support_surface_audit_reconciliation
-                .map(Into::into)
-                .ok_or_else(|| {
-                    Error::Internal(format!(
-                        "validated maintenance request `{}` is missing support-surface reconciliation metadata",
-                        request_path.display()
-                    ))
-                })?,
-            drift_message: None,
-        }),
-        Err(request::MaintenanceRequestError::Validation(message)) => Ok(ReconciliationStatus {
-            projection: ReconciliationProjection::Drifted,
-            drift_message: Some(message),
-        }),
-        Err(err) => Err(err.into()),
-    }
-}
-
-fn write_projection(path: &Path, rendered: &str) -> Result<(), Error> {
-    if let Some(parent) = path.parent() {
-        if !parent.as_os_str().is_empty() {
-            fs::create_dir_all(parent)
-                .map_err(|err| Error::Internal(format!("create {}: {err}", parent.display())))?;
+        Ok(true) => {}
+        Ok(false) => {
+            return Err(Error::Validation(format!(
+                "maintenance-audit-status requires live coverage report evidence for target version `{}` under `{}` before reporting a clean result",
+                detected_release.target_version, report_dir_display
+            )));
+        }
+        Err(error) => {
+            return Err(Error::Internal(format!(
+                "maintenance-audit-status could not read live coverage report evidence for target version `{}` under `{}`: {}",
+                detected_release.target_version, report_dir_display, error
+            )));
         }
     }
-    fs::write(path, rendered)
-        .map_err(|err| Error::Internal(format!("write {}: {err}", path.display())))?;
+
+    let report_path = select_coverage_report_path(&report_dir).map_err(|error| match error {
+        CoverageReportLookupError::Missing => Error::Validation(format!(
+            "maintenance-audit-status requires live coverage report evidence for target version `{}` under `{}` before reporting a clean result",
+            detected_release.target_version, report_dir_display
+        )),
+        CoverageReportLookupError::Io(error) => Error::Internal(format!(
+            "maintenance-audit-status could not read live coverage report evidence for target version `{}` under `{}`: {}",
+            detected_release.target_version, report_dir_display, error
+        )),
+    })?;
+    validate_live_coverage_report_target_version(&report_path, &detected_release.target_version)
+}
+
+fn coverage_report_version_dir(
+    workspace_root: &Path,
+    entry: &AgentRegistryEntry,
+    target_version: &str,
+) -> PathBuf {
+    workspace_root
+        .join(&entry.manifest_root)
+        .join("reports")
+        .join(target_version)
+}
+
+fn select_coverage_report_path(version_dir: &Path) -> Result<PathBuf, CoverageReportLookupError> {
+    for preferred in COVERAGE_REPORT_PREFERRED_FILES {
+        let path = version_dir.join(preferred);
+        if path.is_file() {
+            return Ok(path);
+        }
+    }
+
+    let mut candidates = fs::read_dir(version_dir)
+        .map_err(|err| {
+            CoverageReportLookupError::Io(format!("read_dir({}): {err}", version_dir.display()))
+        })?
+        .filter_map(Result::ok)
+        .map(|entry| entry.path())
+        .filter(|path| {
+            path.file_name()
+                .and_then(|name| name.to_str())
+                .map(|name| name.starts_with("coverage.") && name.ends_with(".json"))
+                .unwrap_or(false)
+        })
+        .collect::<Vec<_>>();
+    candidates.sort();
+    candidates
+        .into_iter()
+        .next()
+        .ok_or(CoverageReportLookupError::Missing)
+}
+
+fn validate_live_coverage_report_target_version(
+    report_path: &Path,
+    target_version: &str,
+) -> Result<(), Error> {
+    let text = fs::read_to_string(report_path)
+        .map_err(|err| Error::Internal(format!("read {}: {err}", report_path.display())))?;
+    let json = serde_json::from_str::<serde_json::Value>(&text).map_err(|err| {
+        Error::Validation(format!(
+            "maintenance-audit-status requires live coverage report `{}` to be valid JSON with `inputs.upstream.semantic_version`: {err}",
+            report_path.display()
+        ))
+    })?;
+    let actual_version = json
+        .pointer("/inputs/upstream/semantic_version")
+        .and_then(serde_json::Value::as_str)
+        .ok_or_else(|| {
+            Error::Validation(format!(
+                "maintenance-audit-status requires live coverage report `{}` to declare string `inputs.upstream.semantic_version`",
+                report_path.display()
+            ))
+        })?;
+    if actual_version != target_version {
+        return Err(Error::Validation(format!(
+            "maintenance-audit-status requires live coverage report `{}` to match detected release target version `{}`, but `inputs.upstream.semantic_version` is `{}`",
+            report_path.display(),
+            target_version,
+            actual_version
+        )));
+    }
+
     Ok(())
 }
 
-fn remove_stale_projection(path: &Path) -> Result<(), Error> {
+fn write_projection_atomically(path: &Path, rendered: &str) -> Result<(), Error> {
+    let parent = path
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    if parent != Path::new(".") {
+        fs::create_dir_all(parent)
+            .map_err(|err| Error::Internal(format!("create {}: {err}", parent.display())))?;
+    }
+
+    let unique_suffix = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|err| Error::Internal(format!("read system clock: {err}")))?
+        .as_nanos();
+    let file_name = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("maintenance-audit-status.json");
+    let temp_path = parent.join(format!(
+        ".{file_name}.tmp-{}-{unique_suffix}",
+        std::process::id()
+    ));
+
+    fs::write(&temp_path, rendered)
+        .map_err(|err| Error::Internal(format!("write {}: {err}", temp_path.display())))?;
+    if let Err(err) = fs::rename(&temp_path, path) {
+        let _ = fs::remove_file(&temp_path);
+        return Err(Error::Internal(format!(
+            "rename {} -> {}: {err}",
+            temp_path.display(),
+            path.display()
+        )));
+    }
+
+    Ok(())
+}
+
+fn remove_projection(path: &Path) -> Result<(), Error> {
     match fs::remove_file(path) {
         Ok(()) => Ok(()),
         Err(err) if err.kind() == io::ErrorKind::NotFound => Ok(()),
@@ -542,47 +494,4 @@ fn remove_stale_projection(path: &Path) -> Result<(), Error> {
             path.display()
         ))),
     }
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct RawMaintenanceRequestForLiveAudit {
-    #[serde(rename = "artifact_version")]
-    _artifact_version: String,
-    agent_id: String,
-    trigger_kind: String,
-    basis_ref: String,
-    opened_from: String,
-    requested_control_plane_actions: Vec<String>,
-    runtime_followup_required: RawRuntimeFollowupRequired,
-    #[serde(default)]
-    detected_release: Option<RawDetectedReleaseForLiveAudit>,
-    #[serde(default)]
-    support_surface_audit: Option<IgnoredAny>,
-    #[serde(default, rename = "execution_contract")]
-    _execution_contract: Option<IgnoredAny>,
-    request_recorded_at: String,
-    request_commit: String,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct RawRuntimeFollowupRequired {
-    required: bool,
-    items: Vec<String>,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct RawDetectedReleaseForLiveAudit {
-    detected_by: String,
-    current_validated: String,
-    target_version: String,
-    latest_stable: String,
-    version_policy: String,
-    source_kind: String,
-    source_ref: String,
-    dispatch_kind: String,
-    dispatch_workflow: String,
-    branch_name: String,
 }

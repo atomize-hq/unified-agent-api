@@ -15,12 +15,18 @@ use super::{
         RawDebtBackedSurface, RawDeferredGap, RawEligibleSurface, RawEvidenceBackedSurface,
         RawPublicationImpact, RawRequiredUplift, RawSupportSurfaceAudit, RawSurfaceIdentity,
     },
-    AuditReconciliation, DetectedRelease, MaintenanceRequestError, TriggerKind,
+    AuditDriftPolicy, AuditReconciliation, DetectedRelease, MaintenanceRequestError, TriggerKind,
 };
 
 pub(super) struct SupportSurfaceAuditValidation {
     pub audit: Option<SupportSurfaceAudit>,
     pub reconciliation: Option<AuditReconciliation>,
+    pub reconciliation_detail: Option<String>,
+}
+
+struct ReconciledSupportSurfaceAudit {
+    reconciliation: AuditReconciliation,
+    detail: Option<String>,
 }
 
 pub(super) fn validate_support_surface_audit(
@@ -30,6 +36,7 @@ pub(super) fn validate_support_surface_audit(
     trigger_kind: TriggerKind,
     detected_release: Option<&DetectedRelease>,
     raw: Option<RawSupportSurfaceAudit>,
+    audit_drift_policy: AuditDriftPolicy,
 ) -> Result<SupportSurfaceAuditValidation, MaintenanceRequestError> {
     match (trigger_kind, raw) {
         (TriggerKind::UpstreamReleaseDetected, Some(raw_audit)) => {
@@ -96,12 +103,19 @@ pub(super) fn validate_support_surface_audit(
                     }
                 }
             }
-            let expected = derive_support_surface_audit(workspace_root, registry_entry, detected_release)
-                .map_err(MaintenanceRequestError::Internal)?;
-            let reconciliation = reconcile_support_surface_audit(request_path, &actual, &expected)?;
+            let expected =
+                derive_support_surface_audit(workspace_root, registry_entry, detected_release)
+                    .map_err(MaintenanceRequestError::Internal)?;
+            let reconciliation = reconcile_support_surface_audit(
+                request_path,
+                &actual,
+                &expected,
+                audit_drift_policy,
+            )?;
             Ok(SupportSurfaceAuditValidation {
                 audit: Some(actual),
-                reconciliation: Some(reconciliation),
+                reconciliation: Some(reconciliation.reconciliation),
+                reconciliation_detail: reconciliation.detail,
             })
         }
         (TriggerKind::UpstreamReleaseDetected, None) => {
@@ -117,6 +131,7 @@ pub(super) fn validate_support_surface_audit(
         (_, None) => Ok(SupportSurfaceAuditValidation {
             audit: None,
             reconciliation: None,
+            reconciliation_detail: None,
         }),
     }
 }
@@ -125,19 +140,34 @@ fn reconcile_support_surface_audit(
     request_path: &Path,
     frozen: &SupportSurfaceAudit,
     live: &SupportSurfaceAudit,
-) -> Result<AuditReconciliation, MaintenanceRequestError> {
+    audit_drift_policy: AuditDriftPolicy,
+) -> Result<ReconciledSupportSurfaceAudit, MaintenanceRequestError> {
     if frozen == live {
-        return Ok(AuditReconciliation::Exact);
+        return Ok(ReconciledSupportSurfaceAudit {
+            reconciliation: AuditReconciliation::Exact,
+            detail: None,
+        });
     }
     if support_surface_audit_satisfied(frozen, live) {
-        return Ok(AuditReconciliation::Satisfied);
+        return Ok(ReconciledSupportSurfaceAudit {
+            reconciliation: AuditReconciliation::Satisfied,
+            detail: None,
+        });
     }
 
-    Err(MaintenanceRequestError::Validation(format!(
+    let drift_description = describe_support_surface_audit_drift(frozen, live);
+    let validation_message = format!(
         "maintenance request `{}` field `support_surface_audit` no longer matches the live derived maintenance contract: {}",
         request_path.display(),
-        describe_support_surface_audit_drift(frozen, live)
-    )))
+        drift_description
+    );
+    match audit_drift_policy {
+        AuditDriftPolicy::Reject => Err(MaintenanceRequestError::Validation(validation_message)),
+        AuditDriftPolicy::Tolerate => Ok(ReconciledSupportSurfaceAudit {
+            reconciliation: AuditReconciliation::Drifted,
+            detail: Some(validation_message),
+        }),
+    }
 }
 
 fn support_surface_audit_satisfied(
