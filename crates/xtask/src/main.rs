@@ -26,9 +26,10 @@ const CODEX_MANIFEST_ROOT: &str = "cli_manifests/codex";
 const CLAUDE_CODE_MANIFEST_ROOT: &str = "cli_manifests/claude_code";
 
 use xtask::agent_maintenance::{
-    closeout as agent_maintenance_closeout, drift as agent_maintenance_drift,
-    execute as agent_maintenance_execute, prepare as agent_maintenance_prepare,
-    refresh as agent_maintenance_refresh, watch as agent_maintenance_watch,
+    audit_status as agent_maintenance_audit_status, closeout as agent_maintenance_closeout,
+    drift as agent_maintenance_drift, execute as agent_maintenance_execute,
+    prepare as agent_maintenance_prepare, refresh as agent_maintenance_refresh,
+    watch as agent_maintenance_watch,
 };
 use xtask::capability_matrix;
 pub use xtask::manifest_acquisition;
@@ -121,6 +122,8 @@ enum Command {
     PrepareAgentMaintenance(agent_maintenance_prepare::Args),
     /// Execute the bounded contributor relay for an automated maintenance request.
     ExecuteAgentMaintenance(agent_maintenance_execute::Args),
+    /// Re-derive the live support-surface audit gate for a maintenance request.
+    MaintenanceAuditStatus(agent_maintenance_audit_status::Args),
     /// Refresh maintenance packet docs and generated publication surfaces from a maintenance request.
     RefreshAgent(agent_maintenance_refresh::Args),
     /// Validate and close an agent maintenance run.
@@ -369,6 +372,13 @@ fn main() {
         },
         Command::ExecuteAgentMaintenance(args) => match agent_maintenance_execute::run(args) {
             Ok(()) => 0,
+            Err(err) => {
+                eprintln!("{err}");
+                err.exit_code()
+            }
+        },
+        Command::MaintenanceAuditStatus(args) => match agent_maintenance_audit_status::run(args) {
+            Ok(outcome) => outcome.exit_code(),
             Err(err) => {
                 eprintln!("{err}");
                 err.exit_code()
