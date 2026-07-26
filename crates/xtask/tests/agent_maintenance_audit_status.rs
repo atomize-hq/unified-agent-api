@@ -35,7 +35,8 @@ mod support_audit;
 mod workspace_mutation;
 
 use audit_status::{
-    Args as AuditStatusArgs, AuditStatusOutcome, Error as AuditStatusError, EXIT_UPLIFTS_REQUIRED,
+    Args as AuditStatusArgs, AuditStatusOutcome, Error as AuditStatusError,
+    EXIT_INCOMPLETE_ACQUISITION, EXIT_UPLIFTS_REQUIRED,
 };
 use harness::{fixture_root, write_text};
 use prepare::{apply_prepare_plan, build_prepare_plan, Args as PrepareArgs};
@@ -84,39 +85,12 @@ fn drifted_reconciliation_without_uplifts_is_validation_error() {
     assert!(matches!(err, AuditStatusError::Validation(_)), "unexpected error: {err:?}"); assert_eq!(err.exit_code(), 2); assert!(err.to_string().contains("support_surface_audit"), "drifted reconciliation should surface the packet inconsistency");
 }
 
+#[rustfmt::skip]
 #[test]
-fn failing_emit_json_run_does_not_preserve_stale_projection() {
-    let fixture = prepared_fixture(
-        "agent-maintenance-audit-status-stale-emit-json",
-        &clean_report(TARGET_VERSION),
-    );
-    let emit_path = fixture.join("_ci_tmp/audit/status.json");
-
-    let outcome = audit_status::run_in_workspace(
-        &fixture,
-        audit_args(REQUEST_PATH, Some(emit_path.clone())),
-        &mut Vec::new(),
-    )
-    .expect("first emit");
-    assert_eq!(outcome, AuditStatusOutcome::Clean);
-    assert!(
-        emit_path.is_file(),
-        "successful emit-json runs should materialize the projection"
-    );
-
-    replace_in_request(&fixture, "pre_run_debt_count = 0", "pre_run_debt_count = 1");
-
-    let err = audit_status::run_in_workspace(
-        &fixture,
-        audit_args(REQUEST_PATH, Some(emit_path.clone())),
-        &mut Vec::new(),
-    )
-    .expect_err("second run must fail after request drift");
-    assert!(matches!(err, AuditStatusError::Validation(_)));
-    assert!(
-        !emit_path.exists(),
-        "failing emit-json runs must delete the stale projection before deriving"
-    );
+fn failing_fresh_emit_json_write_removes_stale_projection() {
+    let fixture = prepared_fixture("agent-maintenance-audit-status-stale-emit-json", &clean_report(TARGET_VERSION)); let emit_path = force_write_failure_emit_path(&fixture, "status"); write_text(&emit_path, "{\n  \"stale\": true\n}\n");
+    let (result, stderr) = run_emit_json_with_stderr(&fixture, &emit_path); let outcome = result.expect("computed clean outcome should win fresh write failures");
+    assert_eq!(outcome, AuditStatusOutcome::Clean); assert_eq!(outcome.exit_code(), 0); assert_projection_write_warning(&stderr, &emit_path, &["forced maintenance audit status projection write failure"]); assert!(!emit_path.exists(), "fresh write failures must remove stale projections so the advisory file is never stale");
 }
 
 #[rustfmt::skip]
@@ -166,6 +140,7 @@ fn wrong_version_live_coverage_report_is_rejected() {
         "wrong-version coverage evidence must fail",
     );
     assert_validation(&err, &[TARGET_VERSION, "0.97.0"]);
+    assert_ne!(err.exit_code(), EXIT_INCOMPLETE_ACQUISITION);
     assert_ne!(err.exit_code(), 0);
 }
 
@@ -197,16 +172,16 @@ fn mixed_version_evidence_directory_is_rejected_even_when_selected_report_matche
 
 #[rustfmt::skip]
 #[test]
-fn incomplete_union_snapshot_is_validation_error_and_names_missing_targets() {
+fn incomplete_union_snapshot_exits_four_and_names_missing_targets() {
     let (fixture, missing_targets) = incomplete_union_fixture("agent-maintenance-audit-status-incomplete-union-clean", &clean_report(TARGET_VERSION), 2);
-    assert_validation(&run_failure(&fixture, "incomplete union snapshot must fail validation"), &targets(&missing_targets));
+    assert_incomplete_acquisition(&run_failure(&fixture, "incomplete union snapshot must exit four"), &targets(&missing_targets));
 }
 
 #[rustfmt::skip]
 #[test]
-fn incomplete_union_snapshot_blocks_uplift_exit_three() {
+fn incomplete_union_snapshot_blocks_uplift_exit_three_with_exit_four() {
     let (fixture, missing_targets) = incomplete_union_fixture("agent-maintenance-audit-status-incomplete-union-uplifts", &discovery_report(TARGET_VERSION), 1);
-    let err = run_failure(&fixture, "incomplete union snapshot must block exit three"); assert_validation(&err, &targets(&missing_targets)); assert_ne!(err.exit_code(), EXIT_UPLIFTS_REQUIRED);
+    let err = run_failure(&fixture, "incomplete union snapshot must block exit three"); assert_incomplete_acquisition(&err, &targets(&missing_targets)); assert_ne!(err.exit_code(), EXIT_UPLIFTS_REQUIRED);
 }
 
 #[rustfmt::skip]
@@ -214,6 +189,25 @@ fn incomplete_union_snapshot_blocks_uplift_exit_three() {
 fn missing_union_snapshot_is_validation_error() {
     let fixture = prepared_fixture("agent-maintenance-audit-status-missing-union", &clean_report(TARGET_VERSION)); fs::remove_file(union_snapshot_path(&fixture)).expect("remove seeded union snapshot");
     assert_validation(&run_failure(&fixture, "missing union snapshot must fail validation"), &["cli_manifests/codex/snapshots/0.98.0/union.json"]);
+}
+
+#[rustfmt::skip]
+#[test]
+fn malformed_union_snapshot_is_validation_error() {
+    let fixture = prepared_fixture("agent-maintenance-audit-status-malformed-union", &clean_report(TARGET_VERSION)); write_text(&union_snapshot_path(&fixture), "{\"complete\": false");
+    assert_validation(&run_failure(&fixture, "malformed union snapshot must fail validation"), &["valid JSON with bool `complete`"]);
+}
+
+#[rustfmt::skip]
+#[test]
+fn union_snapshot_complete_must_be_present_and_bool_or_exit_two() {
+    let missing_fixture = prepared_fixture("agent-maintenance-audit-status-union-missing-complete", &clean_report(TARGET_VERSION));
+    rewrite_union_snapshot(&missing_fixture, |union| { union.as_object_mut().expect("union snapshot object").remove("complete"); });
+    assert_validation(&run_failure(&missing_fixture, "missing complete must fail validation"), &["declare bool `complete`"]);
+
+    let wrong_type_fixture = prepared_fixture("agent-maintenance-audit-status-union-non-bool-complete", &clean_report(TARGET_VERSION));
+    rewrite_union_snapshot(&wrong_type_fixture, |union| { union["complete"] = json!("false"); });
+    assert_validation(&run_failure(&wrong_type_fixture, "non-bool complete must fail validation"), &["valid JSON with bool `complete`"]);
 }
 
 #[rustfmt::skip]
@@ -229,7 +223,7 @@ fn complete_union_snapshot_without_missing_targets_key_is_accepted() {
 #[test]
 fn wrong_version_uplift_evidence_is_validation_error_not_exit_three() {
     let err = run_failure(&prepared_fixture("agent-maintenance-audit-status-wrong-version-uplifts", &discovery_report("0.97.0")), "wrong-version uplift evidence must fail validation");
-    assert_validation(&err, &[TARGET_VERSION, "0.97.0"]); assert_ne!(err.exit_code(), EXIT_UPLIFTS_REQUIRED);
+    assert_validation(&err, &[TARGET_VERSION, "0.97.0"]); assert_ne!(err.exit_code(), EXIT_INCOMPLETE_ACQUISITION); assert_ne!(err.exit_code(), EXIT_UPLIFTS_REQUIRED);
 }
 
 #[rustfmt::skip]
@@ -296,35 +290,22 @@ fn validator_and_derivation_share_selected_report_path_for_per_os_only_directori
     );
 }
 
+#[rustfmt::skip]
+#[test]
+fn failing_emit_json_post_derivation_failure_removes_existing_projection() {
+    let fixture = prepared_fixture("agent-maintenance-audit-status-preserve-emit-json-after-derivation", &clean_report(TARGET_VERSION)); let emit_path = fixture.join("_ci_tmp/audit/status.json"); let original = "{\n  \"stale\": true\n}\n";
+    write_text(&emit_path, original); replace_in_request(&fixture, "pre_run_debt_count = 0", "pre_run_debt_count = 1");
+    let (result, stderr) = run_emit_json_with_stderr(&fixture, &emit_path); let err = result.expect_err("post-derivation validation failures must remove the prior projection");
+    assert_validation(&err, &["support_surface_audit"]); assert!(stderr.is_empty(), "derivation failures should not emit projection-write warnings"); assert!(!emit_path.exists(), "post-derivation failures must remove stale emit-json projections");
+}
+
+#[rustfmt::skip]
 #[test]
 fn failing_emit_json_pre_derivation_preserves_existing_projection() {
-    let fixture = prepared_fixture(
-        "agent-maintenance-audit-status-preserve-emit-json",
-        &clean_report(TARGET_VERSION),
-    );
-    let emit_path = fixture.join("_ci_tmp/audit/status.json");
-    let original = "{\n  \"stale\": true\n}\n";
-    write_text(&emit_path, original);
-
-    replace_in_request(
-        &fixture,
-        "agent_id = \"codex\"",
-        "agent_id = \"unknown_agent\"",
-    );
-
-    let err = audit_status::run_in_workspace(
-        &fixture,
-        audit_args(REQUEST_PATH, Some(emit_path.clone())),
-        &mut Vec::new(),
-    )
-    .expect_err("pre-derivation validation failures must keep the existing projection");
-
-    assert!(matches!(err, AuditStatusError::Validation(_)));
-    assert_eq!(err.exit_code(), 2);
-    assert_eq!(
-        fs::read_to_string(&emit_path).expect("read preserved emit-json target"),
-        original
-    );
+    let fixture = prepared_fixture("agent-maintenance-audit-status-preserve-emit-json", &clean_report(TARGET_VERSION)); let emit_path = fixture.join("_ci_tmp/audit/status.json"); let original = "{\n  \"stale\": true\n}\n"; write_text(&emit_path, original);
+    replace_in_request(&fixture, "agent_id = \"codex\"", "agent_id = \"unknown_agent\"");
+    let err = audit_status::run_in_workspace(&fixture, audit_args(REQUEST_PATH, Some(emit_path.clone())), &mut Vec::new()).expect_err("pre-derivation validation failures must keep the existing projection");
+    assert!(matches!(err, AuditStatusError::Validation(_))); assert_eq!(err.exit_code(), 2); assert_eq!(fs::read_to_string(&emit_path).expect("read preserved emit-json target"), original);
 }
 
 #[cfg(unix)]
@@ -363,51 +344,21 @@ fn unreadable_live_evidence_has_same_exit_code_with_and_without_discovery_work()
 }
 
 #[cfg(unix)]
+#[rustfmt::skip]
 #[test]
-fn failing_emit_json_cleanup_error_preserves_original_failure_and_exit_code() {
-    let fixture = prepared_fixture(
-        "agent-maintenance-audit-status-emit-json-cleanup-failure",
-        &clean_report(TARGET_VERSION),
-    );
-    let emit_path = fixture.join("_ci_tmp/audit/status.json");
+fn uplift_outcome_survives_unwritable_emit_json_target_and_warns() {
+    let fixture = prepared_fixture("agent-maintenance-audit-status-uplifts-unwritable-emit-json", &discovery_report(TARGET_VERSION)); let emit_path = fixture.join("_ci_tmp/audit/status.json");
+    let (result, stderr) = with_unwritable_emit_parent(&emit_path, || run_emit_json_with_stderr(&fixture, &emit_path)); let outcome = result.expect("computed uplift outcome should win write failures");
+    assert_eq!(outcome, AuditStatusOutcome::UpliftsRequired); assert_eq!(outcome.exit_code(), EXIT_UPLIFTS_REQUIRED); assert_projection_write_warning(&stderr, &emit_path, &["could not write advisory projection", "Permission denied"]);
+}
 
-    let (first, _) = emit_projection(&fixture, &emit_path);
-    assert_eq!(first, AuditStatusOutcome::Clean);
-
-    write_text(&coverage_report_path(&fixture), &clean_report("0.97.0"));
-
-    let emit_parent = emit_path.parent().expect("emit parent");
-    let original_permissions = fs::metadata(emit_parent)
-        .expect("stat emit parent")
-        .permissions();
-    let mut blocked_permissions = original_permissions.clone();
-    blocked_permissions.set_mode(0o555);
-    fs::set_permissions(emit_parent, blocked_permissions).expect("block emit cleanup");
-
-    let err = audit_status::run_in_workspace(
-        &fixture,
-        audit_args(REQUEST_PATH, Some(emit_path.clone())),
-        &mut Vec::new(),
-    )
-    .expect_err("cleanup failure must preserve original validation error");
-
-    fs::set_permissions(emit_parent, original_permissions).expect("restore emit parent perms");
-
-    assert!(matches!(err, AuditStatusError::Validation(_)));
-    assert_eq!(err.exit_code(), 2);
-    assert!(
-        err.to_string().contains(TARGET_VERSION),
-        "original error should still name the expected version"
-    );
-    assert!(
-        err.to_string().contains("0.97.0"),
-        "original error should still name the stale declared version"
-    );
-    assert!(
-        !err.to_string()
-            .contains("remove stale maintenance audit status projection"),
-        "cleanup failures must not mask the original validation error"
-    );
+#[cfg(unix)]
+#[rustfmt::skip]
+#[test]
+fn clean_outcome_survives_unwritable_emit_json_target() {
+    let fixture = prepared_fixture("agent-maintenance-audit-status-clean-unwritable-emit-json", &clean_report(TARGET_VERSION)); let emit_path = fixture.join("_ci_tmp/audit/status.json");
+    let (result, stderr) = with_unwritable_emit_parent(&emit_path, || run_emit_json_with_stderr(&fixture, &emit_path)); let outcome = result.expect("computed clean outcome should win write failures");
+    assert_eq!(outcome, AuditStatusOutcome::Clean); assert_eq!(outcome.exit_code(), 0); assert_projection_write_warning(&stderr, &emit_path, &["could not write advisory projection", "Permission denied"]);
 }
 
 #[test]
@@ -535,6 +486,18 @@ fn assert_validation(err: &AuditStatusError, contains: &[&str]) {
     }
 }
 
+#[rustfmt::skip]
+fn assert_incomplete_acquisition(err: &AuditStatusError, contains: &[&str]) {
+    assert!(matches!(err, AuditStatusError::IncompleteAcquisition(_)), "unexpected error: {err:?}"); assert_eq!(err.exit_code(), EXIT_INCOMPLETE_ACQUISITION);
+    for needle in contains { assert!(err.to_string().contains(needle), "error should contain `{needle}`"); }
+}
+
+#[rustfmt::skip]
+fn assert_projection_write_warning(stderr: &str, emit_path: &Path, contains: &[&str]) {
+    assert!(stderr.contains("warning:"), "projection write failures must warn on stderr"); assert!(stderr.contains(emit_path.to_string_lossy().as_ref()), "warning should name the advisory projection path");
+    for needle in contains { assert!(stderr.contains(needle), "warning should contain `{needle}`"); }
+}
+
 fn run_success(root: &Path, context: &str) -> (AuditStatusOutcome, Value) {
     let mut stdout = Vec::new();
     let outcome = audit_status::run_in_workspace(root, audit_args(REQUEST_PATH, None), &mut stdout)
@@ -572,6 +535,13 @@ fn targets(values: &[String]) -> Vec<&str> {
 fn emit_projection(root: &Path, emit_path: &Path) -> (AuditStatusOutcome, Vec<u8>) {
     let mut stdout = Vec::new(); let outcome = audit_status::run_in_workspace(root, audit_args(REQUEST_PATH, Some(emit_path.to_path_buf())), &mut stdout).expect("emit projection");
     assert!(stdout.is_empty(), "emit-json should not write stdout"); (outcome, fs::read(emit_path).expect("read emitted projection"))
+}
+
+#[rustfmt::skip]
+fn run_emit_json_with_stderr(root: &Path, emit_path: &Path) -> (Result<AuditStatusOutcome, AuditStatusError>, String) {
+    let mut stdout = Vec::new(); let mut stderr = Vec::new();
+    let result = audit_status::run_in_workspace_with_stderr(root, audit_args(REQUEST_PATH, Some(emit_path.to_path_buf())), &mut stdout, &mut stderr);
+    assert!(stdout.is_empty(), "emit-json should not write stdout"); (result, String::from_utf8(stderr).expect("captured stderr must be utf-8"))
 }
 
 #[rustfmt::skip]
@@ -646,6 +616,10 @@ fn coverage_report_dir(root: &Path) -> PathBuf {
 fn coverage_report_path(root: &Path) -> PathBuf {
     coverage_report_dir(root).join("coverage.any.json")
 }
+fn force_write_failure_emit_path(root: &Path, stem: &str) -> PathBuf {
+    root.join("_ci_tmp/audit")
+        .join(format!("{stem}.force-write-failure.json"))
+}
 fn union_snapshot_path(root: &Path) -> PathBuf {
     root.join("cli_manifests/codex/snapshots")
         .join(TARGET_VERSION)
@@ -682,6 +656,15 @@ fn union_expected_targets(root: &Path) -> Vec<String> {
                 .to_string()
         })
         .collect()
+}
+
+#[cfg(unix)]
+#[rustfmt::skip]
+fn with_unwritable_emit_parent<T>(emit_path: &Path, action: impl FnOnce() -> T) -> T {
+    let emit_parent = emit_path.parent().expect("emit parent"); fs::create_dir_all(emit_parent).expect("create emit parent");
+    let original_permissions = fs::metadata(emit_parent).expect("stat emit parent").permissions(); let mut blocked_permissions = original_permissions.clone();
+    blocked_permissions.set_mode(0o555); fs::set_permissions(emit_parent, blocked_permissions).expect("block emit parent writes");
+    let result = action(); fs::set_permissions(emit_parent, original_permissions).expect("restore emit parent permissions"); result
 }
 
 #[cfg(unix)]
