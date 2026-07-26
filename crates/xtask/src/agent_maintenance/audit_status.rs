@@ -46,6 +46,12 @@ pub struct Args {
     #[arg(long)]
     pub request: PathBuf,
 
+    /// Require the request's detected release to match the version this acquisition run is
+    /// judging. Omit outside the acquisition workflow, where no external acquisition context
+    /// exists.
+    #[arg(long)]
+    pub expect_target_version: Option<String>,
+
     /// Write the advisory audit status JSON here instead of stdout. The exit code is authoritative;
     /// the JSON is advisory and is either current or absent.
     #[arg(long)]
@@ -199,7 +205,11 @@ fn run_in_workspace_with_stderr_impl<W: Write, E: Write>(
     writer: &mut W,
     stderr: &mut E,
 ) -> Result<AuditStatusOutcome, Error> {
-    let status = match derive_audit_status(workspace_root, &args.request) {
+    let status = match derive_audit_status(
+        workspace_root,
+        &args.request,
+        args.expect_target_version.as_deref(),
+    ) {
         Ok(status) => status,
         Err(failure) => {
             if failure.live_derivation_attempted {
@@ -249,6 +259,7 @@ pub(crate) fn run_in_workspace_with_stderr<W: Write, E: Write>(
 fn derive_audit_status(
     workspace_root: &Path,
     request_path: &Path,
+    expected_target_version: Option<&str>,
 ) -> Result<DerivedAuditStatus, DeriveAuditStatusFailure> {
     let validated = request::load_request_envelope_validated_with_policy(
         workspace_root,
@@ -262,6 +273,8 @@ fn derive_audit_status(
         .clone();
     let request = &validated.envelope.request;
     let detected_release = require_automated_support_audit_request(request)
+        .map_err(DeriveAuditStatusFailure::preflight)?;
+    validate_expected_target_version(request, detected_release, expected_target_version)
         .map_err(DeriveAuditStatusFailure::preflight)?;
     let reconciliation = validated
         .support_surface_audit_reconciliation
@@ -337,6 +350,25 @@ fn require_automated_support_audit_request(
         .detected_release
         .as_ref()
         .expect("checked detected_release presence above"))
+}
+
+fn validate_expected_target_version(
+    request: &MaintenanceRequest,
+    detected_release: &DetectedRelease,
+    expected_target_version: Option<&str>,
+) -> Result<(), Error> {
+    let Some(expected_target_version) = expected_target_version else {
+        return Ok(());
+    };
+
+    if expected_target_version == detected_release.target_version {
+        return Ok(());
+    }
+
+    Err(Error::Validation(format!(
+        "maintenance-audit-status expected target version `{expected_target_version}`, but maintenance request `{}` describes detected_release.target_version `{}`; the request does not describe the version under acquisition",
+        request.relative_path, detected_release.target_version
+    )))
 }
 
 fn build_projection(

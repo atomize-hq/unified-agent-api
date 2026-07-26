@@ -56,6 +56,40 @@ fn empty_required_uplifts_reports_clean_exit_code_and_false_flag() {
 
 #[rustfmt::skip]
 #[test]
+fn expect_target_version_match_proceeds_normally() {
+    let (outcome, json) = run_success_with_args(
+        &prepared_fixture("agent-maintenance-audit-status-expect-target-version-match", &clean_report(TARGET_VERSION)),
+        audit_args_with_expected(REQUEST_PATH, Some(TARGET_VERSION), None),
+        "matching expected target version should proceed",
+    );
+    assert_eq!(outcome, AuditStatusOutcome::Clean); assert_eq!(outcome.exit_code(), 0); assert_eq!(json["target_version"], json!(TARGET_VERSION)); assert_projection(&json, false, "exact", 0, 0, 0, 0);
+}
+
+#[rustfmt::skip]
+#[test]
+fn expect_target_version_mismatch_is_validation_error_before_evidence_work() {
+    let fixture = prepared_fixture("agent-maintenance-audit-status-expect-target-version-mismatch", &clean_report(TARGET_VERSION)); fs::remove_dir_all(coverage_report_dir(&fixture)).expect("remove seeded coverage report dir");
+    let err = audit_status::run_in_workspace(&fixture, audit_args_with_expected(REQUEST_PATH, Some("0.99.0"), None), &mut Vec::new()).expect_err("mismatched expected target version must fail");
+    assert_validation(&err, &["0.99.0", TARGET_VERSION, "does not describe the version under acquisition"]); assert!(!err.to_string().contains("requires live coverage report evidence"), "expected-target-version validation must happen before evidence validation");
+}
+
+#[rustfmt::skip]
+#[test]
+fn omitting_expect_target_version_preserves_today_behavior_exactly() {
+    let clean_fixture = prepared_fixture("agent-maintenance-audit-status-expect-target-version-clean-parity", &clean_report(TARGET_VERSION));
+    let uplift_fixture = prepared_fixture("agent-maintenance-audit-status-expect-target-version-uplift-parity", &discovery_report(TARGET_VERSION));
+
+    let (clean_without_flag_outcome, clean_without_flag_bytes) = run_success_bytes_with_args(&clean_fixture, audit_args(REQUEST_PATH, None), "clean audit status without expected target version");
+    let (clean_with_flag_outcome, clean_with_flag_bytes) = run_success_bytes_with_args(&clean_fixture, audit_args_with_expected(REQUEST_PATH, Some(TARGET_VERSION), None), "clean audit status with matching expected target version");
+    assert_eq!(clean_with_flag_outcome, clean_without_flag_outcome); assert_eq!(clean_with_flag_bytes, clean_without_flag_bytes);
+
+    let (uplift_without_flag_outcome, uplift_without_flag_bytes) = run_success_bytes_with_args(&uplift_fixture, audit_args(REQUEST_PATH, None), "uplift audit status without expected target version");
+    let (uplift_with_flag_outcome, uplift_with_flag_bytes) = run_success_bytes_with_args(&uplift_fixture, audit_args_with_expected(REQUEST_PATH, Some(TARGET_VERSION), None), "uplift audit status with matching expected target version");
+    assert_eq!(uplift_with_flag_outcome, uplift_without_flag_outcome); assert_eq!(uplift_with_flag_bytes, uplift_without_flag_bytes);
+}
+
+#[rustfmt::skip]
+#[test]
 fn non_empty_required_uplifts_reports_exit_three_and_true_flag() {
     let (outcome, json) = run_success(&prepared_fixture("agent-maintenance-audit-status-uplifts", &discovery_report(TARGET_VERSION)), "uplift audit status");
     assert_eq!(outcome, AuditStatusOutcome::UpliftsRequired); assert_eq!(outcome.exit_code(), EXIT_UPLIFTS_REQUIRED); assert_projection(&json, true, "exact", 1, 0, 1, 1); assert_eq!(json["required_uplifts"], expected_required_uplifts_json());
@@ -499,10 +533,28 @@ fn assert_projection_write_warning(stderr: &str, emit_path: &Path, contains: &[&
 }
 
 fn run_success(root: &Path, context: &str) -> (AuditStatusOutcome, Value) {
-    let mut stdout = Vec::new();
-    let outcome = audit_status::run_in_workspace(root, audit_args(REQUEST_PATH, None), &mut stdout)
-        .expect(context);
+    let (outcome, stdout) =
+        run_success_bytes_with_args(root, audit_args(REQUEST_PATH, None), context);
     (outcome, parse_json(&stdout))
+}
+
+fn run_success_with_args(
+    root: &Path,
+    args: AuditStatusArgs,
+    context: &str,
+) -> (AuditStatusOutcome, Value) {
+    let (outcome, stdout) = run_success_bytes_with_args(root, args, context);
+    (outcome, parse_json(&stdout))
+}
+
+fn run_success_bytes_with_args(
+    root: &Path,
+    args: AuditStatusArgs,
+    context: &str,
+) -> (AuditStatusOutcome, Vec<u8>) {
+    let mut stdout = Vec::new();
+    let outcome = audit_status::run_in_workspace(root, args, &mut stdout).expect(context);
+    (outcome, stdout)
 }
 
 fn run_failure(root: &Path, context: &str) -> AuditStatusError {
@@ -561,8 +613,17 @@ fn request_sha256(root: &Path) -> String {
 }
 
 fn audit_args(request: &str, emit_json: Option<PathBuf>) -> AuditStatusArgs {
+    audit_args_with_expected(request, None, emit_json)
+}
+
+fn audit_args_with_expected(
+    request: &str,
+    expect_target_version: Option<&str>,
+    emit_json: Option<PathBuf>,
+) -> AuditStatusArgs {
     AuditStatusArgs {
         request: PathBuf::from(request),
+        expect_target_version: expect_target_version.map(str::to_owned),
         emit_json,
         workspace_root: None,
     }
