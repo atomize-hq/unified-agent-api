@@ -391,7 +391,23 @@ jobs:
             ARGS+=("${EXTRA_ARGS[@]}")
           fi
 
-          cargo run -p xtask -- "${ARGS[@]}"
+          ATTEMPT=1
+          while [ "$ATTEMPT" -le 2 ]; do
+            set +e
+            cargo run -p xtask -- "${ARGS[@]}"
+            SNAPSHOT_STATUS=$?
+            set -e
+
+            if [ "$SNAPSHOT_STATUS" -eq 0 ]; then
+              break
+            fi
+            if [ "$ATTEMPT" -ge 2 ]; then
+              exit "$SNAPSHOT_STATUS"
+            fi
+
+            echo "::warning title=Snapshot capture retry::${TARGET} snapshot capture failed on attempt ${ATTEMPT}; retrying once."
+            ATTEMPT=$((ATTEMPT + 1))
+          done
 
       - name: Upload the per-target snapshot
         uses: actions/upload-artifact@v6
@@ -416,6 +432,9 @@ jobs:
     needs: [plan, snapshot]
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    outputs:
+      closeout_ready: ${{ steps.maintenance_audit.outputs.closeout_ready }}
+      uplifts_required: ${{ steps.maintenance_audit.outputs.uplifts_required }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -499,6 +518,113 @@ jobs:
           cargo run -p xtask -- manifest-version-metadata --root "$ROOT" --version "$VERSION" --status reported
           cargo run -p xtask -- support-matrix
           cargo run -p xtask -- manifest-validate --root "$ROOT"
+
+      - name: Maintenance audit gate
+        id: maintenance_audit
+        shell: bash
+        env:
+          VERSION: ${{ inputs.target_version }}
+          ROOT: ${{ needs.plan.outputs.manifest_root }}
+          AGENT_ID: ${{ inputs.agent_id }}
+        run: |
+          set -euo pipefail
+          REQUEST_PATH="docs/agents/lifecycle/${AGENT_ID}-maintenance/governance/maintenance-request.toml"
+          STATUS_JSON="_ci_tmp/audit/status.json"
+          COMMAND_STDOUT="_ci_tmp/audit/stdout.log"
+          COMMAND_STDERR="_ci_tmp/audit/stderr.log"
+          UNION="${ROOT}/snapshots/${VERSION}/union.json"
+
+          mkdir -p _ci_tmp/audit
+
+          if [ ! -f "$REQUEST_PATH" ]; then
+            echo "::notice title=Maintenance audit skipped::Skipping maintenance audit gate because ${AGENT_ID} has no maintenance packet (${REQUEST_PATH} is absent)."
+            {
+              echo "closeout_ready=false"
+              echo "uplifts_required=false"
+            } >> "$GITHUB_OUTPUT"
+            {
+              echo "## Maintenance audit gate"
+              echo
+              echo "- status: skipped"
+              echo "- closeout_ready: \`false\`"
+              echo "- uplifts_required: \`false\`"
+              echo "- reason: \`no maintenance packet at ${REQUEST_PATH}\`"
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          : > "$COMMAND_STDOUT"
+          : > "$COMMAND_STDERR"
+          set +e
+          cargo run -p xtask -- maintenance-audit-status \
+            --request "$REQUEST_PATH" \
+            --emit-json "$STATUS_JSON" \
+            >"$COMMAND_STDOUT" 2>"$COMMAND_STDERR"
+          AUDIT_STATUS=$?
+          set -e
+
+          cat "$COMMAND_STDOUT"
+          cat "$COMMAND_STDERR" >&2
+
+          case "$AUDIT_STATUS" in
+            0)
+              {
+                echo "closeout_ready=true"
+                echo "uplifts_required=false"
+              } >> "$GITHUB_OUTPUT"
+              {
+                echo "## Maintenance audit gate"
+                echo
+                echo "- status: clean"
+                echo "- closeout_ready: \`true\`"
+                echo "- uplifts_required: \`false\`"
+                echo "- packet: \`${AGENT_ID}-maintenance\` is clean for \`${VERSION}\`"
+              } >> "$GITHUB_STEP_SUMMARY"
+              ;;
+            3)
+              {
+                echo "closeout_ready=false"
+                echo "uplifts_required=true"
+              } >> "$GITHUB_OUTPUT"
+              {
+                echo "## Maintenance audit gate"
+                echo
+                echo "- status: uplifts required"
+                echo "- closeout_ready: \`false\`"
+                echo "- uplifts_required: \`true\`"
+                echo
+                echo "> Relay invocation placeholder (T3): contributor relay command renders here."
+              } >> "$GITHUB_STEP_SUMMARY"
+              ;;
+            4)
+              MISSING_TARGETS="$(jq -r '(.missing_targets // []) | join(", ") | if . == "" then "unknown" else . end' "$UNION")"
+              echo "::error title=Incomplete acquisition::maintenance-audit-status reported that acquisition is still incomplete after the in-leg retry; missing targets: ${MISSING_TARGETS}" >&2
+              exit "$AUDIT_STATUS"
+              ;;
+            *)
+              COMMAND_MESSAGE=""
+              for LOG in "$COMMAND_STDERR" "$COMMAND_STDOUT"; do
+                [ -f "$LOG" ] || continue
+                while IFS= read -r line || [ -n "$line" ]; do
+                  case "$line" in
+                    *[![:space:]]*)
+                      COMMAND_MESSAGE="$line"
+                      ;;
+                  esac
+                done < "$LOG"
+                if [ -n "$COMMAND_MESSAGE" ]; then
+                  break
+                fi
+              done
+
+              if [ -n "$COMMAND_MESSAGE" ]; then
+                echo "::error title=Maintenance audit failed::${COMMAND_MESSAGE}" >&2
+              else
+                echo "::error title=Maintenance audit failed::maintenance-audit-status exited ${AUDIT_STATUS}; see command output above." >&2
+              fi
+              exit "$AUDIT_STATUS"
+              ;;
+          esac
 
       - name: Summarize the acquired union
         shell: bash

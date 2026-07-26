@@ -2,6 +2,7 @@ use std::fs;
 use std::path::PathBuf;
 
 use regex::Regex;
+use xtask::agent_maintenance::audit_status::{EXIT_INCOMPLETE_ACQUISITION, EXIT_UPLIFTS_REQUIRED};
 
 const GENERATED_PR_SUMMARY_SUFFIX: &str = "governance/pr-summary.md";
 
@@ -202,6 +203,123 @@ fn c4_spec_reusable_acquisition_is_agent_parameterized_with_no_per_agent_branchi
             "reusable acquisition workflow must stay agent-agnostic: {forbidden}"
         );
     }
+}
+
+#[test]
+fn c4_spec_reusable_acquisition_routes_maintenance_audit_gate_by_numeric_exit_code() {
+    let workflow = ".github/workflows/parity-acquire.yml";
+    let yml = read_repo_file(workflow);
+    let gate_section = section_between(
+        &yml,
+        "- name: Maintenance audit gate",
+        "- name: Summarize the acquired union",
+        workflow,
+    );
+
+    for required in [
+        "cargo run -p xtask -- maintenance-audit-status",
+        "docs/agents/lifecycle/${AGENT_ID}-maintenance/governance/maintenance-request.toml",
+        "closeout_ready: ${{ steps.maintenance_audit.outputs.closeout_ready }}",
+        "uplifts_required: ${{ steps.maintenance_audit.outputs.uplifts_required }}",
+        "case \"$AUDIT_STATUS\" in",
+    ] {
+        assert!(
+            yml.contains(required),
+            "parity-acquire must retain maintenance audit wiring: {required}"
+        );
+    }
+
+    assert_text_order(
+        &yml,
+        "Union → wrapper coverage → report → version metadata → validate",
+        "- name: Maintenance audit gate",
+        workflow,
+    );
+    assert_text_order(
+        &yml,
+        "- name: Maintenance audit gate",
+        "Commit the acquired artifacts onto the packet branch",
+        workflow,
+    );
+
+    let uplifts_branch = section_between(
+        gate_section,
+        &format!("\n            {})", EXIT_UPLIFTS_REQUIRED),
+        &format!("\n            {})", EXIT_INCOMPLETE_ACQUISITION),
+        workflow,
+    );
+    assert!(
+        uplifts_branch.contains("closeout_ready=false")
+            && uplifts_branch.contains("uplifts_required=true"),
+        "exit {EXIT_UPLIFTS_REQUIRED} must mark the run as not closeout-ready with uplifts required"
+    );
+    assert!(
+        uplifts_branch.contains("Relay invocation placeholder (T3)"),
+        "exit {EXIT_UPLIFTS_REQUIRED} must leave a clearly marked relay placeholder for T3"
+    );
+    assert!(
+        !uplifts_branch.contains("::error") && !uplifts_branch.contains("exit \"$AUDIT_STATUS\""),
+        "exit {EXIT_UPLIFTS_REQUIRED} is an advisory result and must not fail the job"
+    );
+
+    let incomplete_branch = section_between(
+        gate_section,
+        &format!("\n            {})", EXIT_INCOMPLETE_ACQUISITION),
+        "\n            *)",
+        workflow,
+    );
+    assert!(
+        incomplete_branch.contains("::error title=Incomplete acquisition::")
+            && incomplete_branch.contains("missing targets")
+            && incomplete_branch.contains("exit \"$AUDIT_STATUS\""),
+        "exit {EXIT_INCOMPLETE_ACQUISITION} must fail the run with a missing-targets error"
+    );
+
+    let fallback_branch = section_between(
+        gate_section,
+        "\n            *)",
+        "\n          esac",
+        workflow,
+    );
+    assert!(
+        fallback_branch.contains("::error title=Maintenance audit failed::")
+            && fallback_branch.contains("exit \"$AUDIT_STATUS\""),
+        "non-zero maintenance audit exits other than {EXIT_UPLIFTS_REQUIRED} must fail the job"
+    );
+}
+
+#[test]
+fn c4_spec_reusable_acquisition_retries_snapshot_capture_once_in_place() {
+    let workflow = ".github/workflows/parity-acquire.yml";
+    let yml = read_repo_file(workflow);
+    let snapshot_section = section_between(
+        &yml,
+        "- name: Generate the per-target snapshot",
+        "- name: Upload the per-target snapshot",
+        workflow,
+    );
+
+    for required in [
+        "ATTEMPT=1",
+        "while [ \"$ATTEMPT\" -le 2 ]; do",
+        "cargo run -p xtask -- \"${ARGS[@]}\"",
+        "SNAPSHOT_STATUS=$?",
+        "if [ \"$ATTEMPT\" -ge 2 ]; then",
+        "exit \"$SNAPSHOT_STATUS\"",
+        "::warning title=Snapshot capture retry::${TARGET} snapshot capture failed on attempt ${ATTEMPT}; retrying once.",
+        "ATTEMPT=$((ATTEMPT + 1))",
+    ] {
+        assert!(
+            snapshot_section.contains(required),
+            "snapshot capture must implement a single in-place retry: {required}"
+        );
+    }
+
+    assert!(
+        !snapshot_section.contains("[ \"$ATTEMPT\" -le 3 ]")
+            && !snapshot_section.contains("[ \"$ATTEMPT\" -lt 3 ]"),
+        "snapshot capture must not retry more than once"
+    );
 }
 
 #[test]
@@ -432,6 +550,30 @@ fn assert_prepare_step_precedes(
         prepare_index < body_path_index,
         "{workflow} must render the maintenance packet before referencing {GENERATED_PR_SUMMARY_SUFFIX}"
     );
+}
+
+fn assert_text_order(workflow_text: &str, first: &str, second: &str, workflow: &str) {
+    let first_index = workflow_text
+        .find(first)
+        .unwrap_or_else(|| panic!("{workflow} must contain {first}"));
+    let second_index = workflow_text
+        .find(second)
+        .unwrap_or_else(|| panic!("{workflow} must contain {second}"));
+    assert!(
+        first_index < second_index,
+        "{workflow} must place `{first}` before `{second}`"
+    );
+}
+
+fn section_between<'a>(workflow_text: &'a str, start: &str, end: &str, workflow: &str) -> &'a str {
+    let start_index = workflow_text
+        .find(start)
+        .unwrap_or_else(|| panic!("{workflow} must contain {start}"));
+    let section = &workflow_text[start_index..];
+    let end_index = section
+        .find(end)
+        .unwrap_or_else(|| panic!("{workflow} must contain {end} after {start}"));
+    &section[..end_index]
 }
 
 #[test]
