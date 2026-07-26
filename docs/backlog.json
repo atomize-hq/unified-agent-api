@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at_utc": "2026-04-29T22:30:00Z",
+  "updated_at_utc": "2026-07-25T00:00:00Z",
   "items": [
     {
       "id": "uaa-0022",
@@ -700,6 +700,151 @@
           ]
         }
       }
+    },
+    {
+      "id": "uaa-0023",
+      "title": "Typed errors for support-audit evidence faults (remove exit-code string matching)",
+      "status": "todo",
+      "bucket": "agent_api.onboarding",
+      "type": "task",
+      "kickoff": {
+        "prompt": [
+          "Work item: uaa-0023 — Typed errors for support-audit evidence faults.",
+          "Context: `maintenance-audit-status` is a CI gate whose exit code is its product (0 clean, 3 uplifts required, 2 validation/bad evidence, 1 internal). `crates/xtask/src/agent_maintenance/support_audit.rs` returns untyped `String` errors, which reach the request layer as `MaintenanceRequestError::Internal`. To classify bad evidence as 2 rather than 1, `audit_status.rs` currently pattern-matches on error message text in `is_bad_support_audit_evidence_message` (matching `parse `, ` is missing `deltas` object`, ` is missing `deltas.`, `support-audit report row`).",
+          "Why this is debt: classification by message string is silently fragile — editing a message in `support_audit.rs` changes a gate exit code with no compile error and no failing test. An equivalent string-matching approach was already removed once as a defect during T1 (commit d41bb279 replaced it with a real `AuditDriftPolicy`).",
+          "Severity note: the failure direction is safe. A message drift makes the match fail, leaving the error `Internal` -> exit 1, which fails CI loudly. It cannot produce a false clean (0) or swallow an uplift (3). This is fragility, not a correctness hole — schedule it, do not treat it as urgent.",
+          "Goal: give `support_audit.rs` a typed error that distinguishes bad evidence data from I/O/internal faults, thread it through the request layer, and delete `is_bad_support_audit_evidence_message` entirely.",
+          "Steps:",
+          "1) Introduce a typed error enum in `support_audit.rs` separating evidence-data faults (malformed JSON, missing `deltas` object/arrays, malformed report rows) from I/O and internal faults.",
+          "2) Preserve the distinction across `request.rs` / `MaintenanceRequestError` rather than collapsing to `Internal`.",
+          "3) Delete `is_bad_support_audit_evidence_message` from `audit_status.rs` and the `From` impl branch that calls it.",
+          "4) Confirm `refresh`, `prepare`, `closeout`, and `execute` are bit-for-bit unaffected — they run under `AuditDriftPolicy::Reject` and must not change behavior.",
+          "5) Keep the existing exit-code tests green, and add one that would fail if a message were edited (i.e. assert on the typed variant, not the text).",
+          "Output: no exit-code classification anywhere in the maintenance lane depends on error message text."
+        ],
+        "files_to_read": [
+          "crates/xtask/src/agent_maintenance/audit_status.rs",
+          "crates/xtask/src/agent_maintenance/support_audit.rs",
+          "crates/xtask/src/agent_maintenance/request.rs",
+          "crates/xtask/tests/agent_maintenance_audit_status.rs",
+          "docs/agents/lifecycle/parity-generalization-plan.md"
+        ],
+        "deliverables": [
+          "Typed evidence-vs-internal error in support_audit.rs",
+          "is_bad_support_audit_evidence_message deleted",
+          "Exit-code tests that assert on typed variants rather than message text"
+        ]
+      },
+      "notes": [
+        "Introduced by T1 remediation round 5 (commit b55cef4f) as a deliberate, documented compromise: the round-5 packet scoped support_audit.rs out of the write set to avoid regression risk in shared code.",
+        "Failure direction is safe (worst case exit 1, never a false clean), which is why it was deferred rather than blocking T1."
+      ]
+    },
+    {
+      "id": "uaa-0024",
+      "title": "Define union-vs-per-target coverage coherence contract",
+      "status": "todo",
+      "bucket": "agent_api.onboarding",
+      "type": "design",
+      "kickoff": {
+        "prompt": [
+          "Work item: uaa-0024 — Define a union-vs-per-target coverage coherence contract.",
+          "Context: `maintenance-audit-status` derives the live support-surface audit from a single selected coverage report (`select_report_path` prefers `coverage.any.json`, then `coverage.all.json`, then the first `coverage.*.json` by sort order). Since T1 round 5 the gate also requires that every `coverage.*.json` in the version directory declares the correct `inputs.upstream.semantic_version`, and that `snapshots/<version>/union.json` has `complete=true`.",
+          "Gap: nothing validates that the union report's contents are actually consistent with the per-target reports it claims to summarize. A per-target report can be stale or partial in content while still carrying the right version string and sitting alongside a complete union.",
+          "Why it was deferred: closing this requires first defining what coherence means between the union and its per-target inputs — a contract that does not exist today. It is a design task, not a bug fix.",
+          "Goal: decide and document whether the union is authoritative-by-construction (per-target reports being provenance only), or whether the gate should cross-validate, and implement whichever the contract says.",
+          "Steps:",
+          "1) Determine how `crates/xtask/src/manifest_report.rs` builds `coverage.any.json` / `coverage.all.json` from per-target inputs, and whether the union is reconstructible from them.",
+          "2) Decide the contract: authoritative union (document it and close this item), or cross-validated union (specify exactly which fields must agree).",
+          "3) If cross-validating, implement it in the acquisition/report-generation lane rather than in the audit gate, so the invariant holds at write time rather than being re-checked at read time.",
+          "4) Record the decision where the maintenance lifecycle docs will surface it.",
+          "Output: a written coherence contract, and either an implementation or an explicit documented decision that the union is authoritative."
+        ],
+        "files_to_read": [
+          "crates/xtask/src/manifest_report.rs",
+          "crates/xtask/src/manifest_union.rs",
+          "crates/xtask/src/agent_maintenance/support_audit.rs",
+          "crates/xtask/src/agent_maintenance/audit_status.rs",
+          "docs/agents/lifecycle/parity-generalization-plan.md"
+        ],
+        "deliverables": [
+          "Written union-vs-per-target coherence contract",
+          "Implementation at report-generation time, or a documented authoritative-union decision"
+        ]
+      },
+      "notes": [
+        "Raised by the Codex review lane during T1 remediation round 4 review; adjudicated as a real limitation but deferred because the contract it depends on does not exist yet.",
+        "Distinct from the completeness defect fixed in b55cef4f: that one was about whether the acquisition finished, this one is about whether its outputs agree."
+      ]
+    },
+    {
+      "id": "uaa-0025",
+      "title": "maintenance-audit-status projection cannot detect same-request staleness",
+      "status": "todo",
+      "bucket": "agent_api.onboarding",
+      "type": "task",
+      "kickoff": {
+        "prompt": [
+          "Work item: uaa-0025 — `maintenance-audit-status` projection cannot detect same-request staleness.",
+          "Context: `--emit-json` writes an `AuditStatusProjection` carrying `schema_version` and `request_sha256`. `request_sha256` was added during T1 remediation round 3 specifically so a consumer could detect a stale projection file.",
+          "Defect: it cannot detect the case it was added for. Re-running the same request produces the same hash, so a projection left on disk by an earlier successful run is indistinguishable from a fresh one. Concretely: run 1 is clean and writes `status.json` with `uplifts_required: false`; evidence then goes stale; run 2 fails with exit 2 and (by design, to avoid destroying data on a pre-derivation failure) leaves the old `status.json` in place still claiming `uplifts_required: false`. A consumer reading only the file sees a clean result.",
+          "Constraint that produced this: the projection deliberately carries no timestamp, to keep byte-identical output across runs for determinism.",
+          "Goal: make projection staleness detectable by consumers without giving up run-to-run determinism.",
+          "Steps:",
+          "1) Decide the mechanism. Options include: having the consumer bind the projection to the run (e.g. CI reads the exit code as authoritative and treats the file as advisory), writing the projection only on success paths, emitting a separate liveness marker, or accepting a timestamp and dropping the byte-identity requirement.",
+          "2) Coordinate with however T2 wires `maintenance-audit-status` into `.github/workflows/parity-acquire.yml` — the right answer depends on how the workflow consumes the artifact.",
+          "3) Implement and add a regression test covering the two-run stale-file scenario described above.",
+          "Output: a projection whose staleness a consumer can detect, or an explicit documented rule that the exit code is authoritative and the file is advisory only."
+        ],
+        "files_to_read": [
+          "crates/xtask/src/agent_maintenance/audit_status.rs",
+          "crates/xtask/tests/agent_maintenance_audit_status.rs",
+          ".github/workflows/parity-acquire.yml",
+          "docs/agents/lifecycle/parity-generalization-plan.md"
+        ],
+        "deliverables": [
+          "Staleness-detection mechanism, or a documented exit-code-is-authoritative rule",
+          "Regression test for the clean-then-stale two-run scenario"
+        ]
+      },
+      "notes": [
+        "Found by the Opus adversarial review lane during T1 remediation round 4 review.",
+        "Best resolved alongside T2, which defines how the workflow actually consumes the projection."
+      ]
+    },
+    {
+      "id": "uaa-0026",
+      "title": "maintenance-audit-status loses exit 3 when --emit-json cannot be written",
+      "status": "todo",
+      "bucket": "agent_api.onboarding",
+      "type": "task",
+      "kickoff": {
+        "prompt": [
+          "Work item: uaa-0026 — `maintenance-audit-status` loses exit 3 when `--emit-json` cannot be written.",
+          "Context: exit 3 (uplifts required) is a result, not an error — CI branches on it to open a contributor relay packet. The outcome is computed before the projection is written.",
+          "Defect: if `write_projection_atomically` fails (unwritable path, full disk, permissions), the `?` propagates the write error and the already-computed `UpliftsRequired` outcome is discarded, so the command exits 1 instead of 3. A genuine uplift-required state is reported as an internal fault.",
+          "Status: pre-existing, not introduced by any T1 remediation round. Low impact in practice because a workflow that routes 'anything other than 0 or 3' to failure still stops, and the underlying write failure is itself worth failing on.",
+          "Goal: decide whether the outcome or the write failure takes precedence, and make it explicit rather than incidental.",
+          "Steps:",
+          "1) Decide precedence: report exit 3 and log the write failure to stderr, or keep failing on the write. Either is defensible — the current behavior is an accident of `?` placement, not a decision.",
+          "2) Implement it explicitly in `run_in_workspace` in `crates/xtask/src/agent_maintenance/audit_status.rs`.",
+          "3) Add a test that pins the chosen precedence (an unwritable `--emit-json` target on an uplift-producing input).",
+          "4) Make sure it agrees with however T2 routes exit codes in `.github/workflows/parity-acquire.yml`.",
+          "Output: explicit, tested precedence between a computed outcome and a projection write failure."
+        ],
+        "files_to_read": [
+          "crates/xtask/src/agent_maintenance/audit_status.rs",
+          "crates/xtask/tests/agent_maintenance_audit_status.rs",
+          ".github/workflows/parity-acquire.yml"
+        ],
+        "deliverables": [
+          "Explicit precedence between computed outcome and projection write failure",
+          "Test pinning the chosen behavior"
+        ]
+      },
+      "notes": [
+        "Observed by the Opus adversarial review lane during T1 remediation round 4 review; confirmed pre-existing rather than introduced by T1."
+      ]
     }
   ]
 }

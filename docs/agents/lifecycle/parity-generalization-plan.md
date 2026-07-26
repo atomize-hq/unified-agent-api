@@ -661,3 +661,66 @@ Three of the defects in this campaign were platform- or execution-mode-specific 
 reachable from a `commit: false` Linux run. The static guards added here cover those specific
 shapes cheaply; a paths-filtered multi-OS job on `.github/workflows/**` would cover the class.
 Left as a maintainer decision because it changes CI cost and required-check configuration.
+
+## 18. T1 complete — the audit gate, and what it cost to trust it (2026-07-25)
+
+`maintenance-audit-status` landed across five implementation rounds and four review rounds
+(`b1aec687`, `59f581ce`, `d41bb279`, `4620b531`, `b55cef4f`). Every review round found real
+defects, and the last one found the worst.
+
+### 18.1 The defect that nearly shipped
+
+Round 4 bound every `coverage.*.json` in a version directory to the target version, on the premise
+that this proved the acquisition evidence was sound. It did not. It proved only that no file came
+from a *different* version.
+
+`manifest_report` never writes a report for a target it did not acquire. So an acquisition that
+lost two of four legs emits `coverage.any.json` plus the legs that succeeded — every one carrying
+the correct `inputs.upstream.semantic_version`. All of them passed. The union's deltas were
+computed over acquired targets only, so `required_uplifts_this_run` came back empty and the gate
+returned **exit 0** for an acquisition that never inspected macOS or Windows.
+
+This was not hypothetical. Five of the seven committed codex acquisitions are that shape
+(`complete: false`, one input, two missing targets), and `parity-acquire` is deliberately built to
+continue on a partial matrix: `fail-fast: false`, only `REQUIRED_TARGET` enforced, every other
+missing leg a `::warning`. Reproduced on real 0.144.6 data by deleting the darwin and windows
+reports and flipping `union.json` — the gate returned exit 0 and `uplifts_required: false`.
+
+The fix reads the completeness the acquisition already records in
+`snapshots/<version>/union.json` and refuses anything short of `complete=true`, naming the missing
+targets. Evidence validation also ran only on the clean path, so an exit-3 relay packet could be
+derived from evidence belonging to another version; it now runs unconditionally, ahead of
+derivation.
+
+This is the same root cause as the standing gap in §17.2. Incomplete multi-OS acquisition was not
+merely unenforced in CI — it was *invisible* to the governance gate built to catch it.
+
+### 18.2 Why the parallel review lanes earned their cost
+
+The lead's own verification passed at every round, because it kept asking whether each round did
+what it intended rather than whether the intent was sufficient. The Codex lane raised a narrower
+version of the same area (stale sibling *content*) that was adjudicated as a deferred limitation.
+The adversarial lane attacked the premise instead and found that version binding never proved
+completeness at all. T1 would have been declared done before round 4 ran, and T2 and T3 would have
+been built on a gate that could not see the thing it existed to catch.
+
+### 18.3 Known debt carried out of T1
+
+Recorded in `docs/backlog.json` as the canonical follow-up register. Do not re-derive these from
+scratch; each entry carries its own context, file list and deliverables.
+
+| id | item | why deferred |
+| --- | --- | --- |
+| `uaa-0023` | Typed errors for support-audit evidence faults | Round 5 classifies some faults by matching error message text, because the packet scoped `support_audit.rs` out of the write set. Failure direction is safe — a message drift yields exit 1, never a false clean — so it is fragility, not a correctness hole. |
+| `uaa-0024` | Union-vs-per-target coverage coherence contract | Requires first defining what coherence means between the union and its inputs; that contract does not exist yet. Design task, not a bug fix. |
+| `uaa-0025` | Projection cannot detect same-request staleness | `request_sha256` cannot detect the one staleness case it was added for, since a re-run of the same request produces the same hash. Best resolved with T2, which defines how the workflow consumes the projection. |
+| `uaa-0026` | Exit 3 lost when `--emit-json` cannot be written | Pre-existing, not introduced by T1. The computed outcome is discarded by a `?` on the write path. Needs an explicit precedence decision, coordinated with T2's exit-code routing. |
+
+### 18.4 What T2 inherits
+
+The gate now has three outcomes to route, not two: clean (0), uplifts required (3), and
+insufficient evidence (2) — where 2 now includes "the matrix ran but did not finish". Because
+`parity-acquire` continues on a partial matrix by design, the common case of a flaked macOS or
+Windows leg will now land on exit 2 rather than passing silently. Whether that fails the run,
+retries the missing legs, or opens a different kind of packet is a workflow-policy decision for
+T2, not something the gate should decide on its own.
