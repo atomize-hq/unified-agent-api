@@ -894,6 +894,12 @@ row's own identity. That also means uaa-0036's claude_code rows appear as remove
 contract field invariant 6 ties to publication contraction. All three were fixed in the contract,
 uaa-0036, and this section.
 
+A final confirmation round on `1121df69..081c9a95` agreed from both lanes: the contract paragraph
+had no false statement but did not say that shared code always leaves
+`eligible_preexisting_surface` empty, and the spec §8.1 row for uaa-0036 named only the T8 pointer.
+Both were fixed in the next commit. The plan's §20.2 table keeps §8.1 out of the trigger points,
+because it is a tracking table rather than a place the decision is hit.
+
 ### 20.2 Open decisions and where they are triggered
 
 The maintainer asked that deferred decisions sit where they will be hit, not only in the backlog.

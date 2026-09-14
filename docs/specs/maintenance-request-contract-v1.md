@@ -200,8 +200,9 @@ the gap surfaces from report rows as shown below. Those identities fill `missing
 inventory row becomes a preexisting and deferred row; any other becomes a discovered row and a
 required uplift. A debt inventory row that equals no gap surface becomes a
 `removed_upstream_surface` row carrying the debt row's own identity. Without a report, every surface
-row uses the identities written in the debt inventory rows. `path` is the report row's command path
-below the agent's own command.
+row uses the identities written in the debt inventory rows. Shared code leaves
+`eligible_preexisting_surface` empty. `path` is the report row's command path below the agent's own
+command.
 
 | Report row | `surface_kind` | `command_path` | `surface_id` |
 | --- | --- | --- | --- |

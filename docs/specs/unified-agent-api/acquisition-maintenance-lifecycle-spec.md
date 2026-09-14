@@ -347,7 +347,7 @@ items (`uaa-0029`…`uaa-0032`; `uaa-0031` by reading only) and added two more (
 | `uaa-0033` | Artifact bundle does not match what the run committed | Low. The `always()` upload can succeed with only stale checkout files, and omits the support-matrix files the commit stages. |
 | `uaa-0034` | Commit step can push a rebased tree the gate never judged | Low, suspected, pre-dates T2c. |
 | `uaa-0035` | Is opencode's TUI root command excluded from parity? | **Open maintainer decision, raised 2026-09-14** by the pre-merge gate simulation. The root command is named (`commands` / `opencode` / `opencode`) since `507cf300` and is a required uplift until decided. Gates any opencode closeout or uplift work; pointers sit in T5, T8, and the non-TUI debt inventory. An exclusion would also drop the command's 20 root flags and its `project` argument from the report. |
-| `uaa-0036` | claude_code debt rows name `claude`, report-derived surfaces name `claude_code` | **Open maintainer decision, raised 2026-09-14** (Opus lane; pre-existing). The two claude_code install debt rows never match, so their surfaces show as new uplifts and the rows themselves as removed upstream surface. Gates any claude_code closeout, debt-row edit, or uplift work; pointer in T8. |
+| `uaa-0036` | claude_code debt rows name `claude`, report-derived surfaces name `claude_code` | **Open maintainer decision, raised 2026-09-14** (Opus lane; pre-existing). The two claude_code install debt rows never match, so their surfaces show as new uplifts and the rows themselves as removed upstream surface. Gates any claude_code closeout, debt-row edit, or uplift work; pointers sit in T8, the non-TUI debt inventory, and the contract's "Known conflict" note. |
 
 ### 8.2 What T1 changed about T2
 
