@@ -497,16 +497,19 @@ fn surfaces_from_report_deltas(
     deltas: &serde_json::Map<String, serde_json::Value>,
 ) -> Result<Vec<SurfaceIdentity>, String> {
     let mut surfaces = BTreeSet::new();
-    for (key, required_shape) in [
-        ("missing_commands", Some(ReportRowShape::Command)),
-        ("missing_flags", Some(ReportRowShape::Flag)),
-        ("missing_args", Some(ReportRowShape::Arg)),
-        ("intentionally_unsupported", None),
+    for (key, required_shape, list_required) in [
+        ("missing_commands", Some(ReportRowShape::Command), true),
+        ("missing_flags", Some(ReportRowShape::Flag), true),
+        ("missing_args", Some(ReportRowShape::Arg), true),
+        // The report writer omits this list when it is empty.
+        ("intentionally_unsupported", None, false),
     ] {
-        let rows = deltas
-            .get(key)
-            .and_then(serde_json::Value::as_array)
-            .ok_or_else(|| format!("{} is missing `deltas.{key}` array", report_path.display()))?;
+        let rows = match deltas.get(key) {
+            None if !list_required => continue,
+            value => value.and_then(serde_json::Value::as_array).ok_or_else(|| {
+                format!("{} is missing `deltas.{key}` array", report_path.display())
+            })?,
+        };
         for row in rows {
             let (shape, surface) = surface_from_report_value(agent_id, row)?;
             if required_shape.is_some_and(|required| required != shape) {

@@ -138,6 +138,41 @@ fn malformed_rows_are_rejected_as_bad_report_evidence() {
 }
 
 #[test]
+fn only_the_intentionally_unsupported_list_may_be_omitted() {
+    let mut report = deltas(json!([root_row()]), json!([]), json!([]));
+    report
+        .as_object_mut()
+        .expect("deltas object")
+        .remove("intentionally_unsupported");
+    assert_eq!(
+        surfaces("opencode", &report).expect("the report writer omits an empty list"),
+        vec![identity("commands", "opencode", "opencode")]
+    );
+
+    for (key, value) in [
+        ("missing_commands", None),
+        ("missing_flags", None),
+        ("missing_args", None),
+        ("missing_commands", Some(json!({}))),
+        ("intentionally_unsupported", Some(json!(null))),
+        ("intentionally_unsupported", Some(json!({}))),
+    ] {
+        let mut report = deltas(json!([]), json!([]), json!([]));
+        let object = report.as_object_mut().expect("deltas object");
+        match value {
+            Some(value) => object.insert(key.to_string(), value),
+            None => object.remove(key),
+        };
+        let error = surfaces("opencode", &report).expect_err(&format!("reject {report}"));
+        // audit_status classifies this phrase as bad evidence (exit 2).
+        assert!(
+            error.contains(&format!(" is missing `deltas.{key}` array")),
+            "unexpected error `{error}` for {report}"
+        );
+    }
+}
+
+#[test]
 fn intentionally_unsupported_accepts_every_row_shape() {
     let mut report = deltas(json!([]), json!([]), json!([]));
     report["intentionally_unsupported"] = json!([
