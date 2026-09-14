@@ -835,3 +835,62 @@ nightly `agent-maintenance-open-pr` run after T2 merges there is the proof; no m
 needed. The H3 question in `uaa-0031` did not have to wait for it: the 2026-09-13 watcher runs
 (pre-T2) already show the acquire check runs attached to `staging`'s head commit `a36a115d`, while
 packet PRs #195, #205 and #206 carry only `CI` checks.
+
+## 20. Pre-merge simulation of the gate (2026-09-14)
+
+Before asking for the T2 merge, the lead ran this branch's `maintenance-audit-status` exactly as the
+`union` job does, against each open packet branch's committed request and acquisition artifacts
+(`staging` + packet commit + acquisition commit, the tree the first post-merge nightly run judges).
+Request generation (`prepare.rs`) is unchanged since `staging`, so the packet requests match what
+merged code would write.
+
+| packet | before the fixes | after `66f7b30c` |
+| --- | --- | --- |
+| codex 0.153.4 (#206) | exit 3, 38 uplifts | exit 3, 38 uplifts, projection bytes identical |
+| claude_code 2.1.236 (#195) | exit 3, 117 uplifts | exit 3, 117 uplifts, projection bytes identical |
+| opencode 1.18.29 (#205) | exit 1, "support-audit command row must not use an empty path" | exit 3, 494 uplifts including the root command |
+
+Two pre-existing defects in the shared support-audit derivation, not in the gate, blocked opencode.
+Both would also have blocked packet opening and closeout validation for that version:
+
+1. **Root command row.** opencode's wrapper coverage declares only `run`, so its 1.18.29 report lists
+   the root command (`path: []`) as missing. The mapper assumed every command row has a last path
+   element. `507cf300` names it `commands` / `<agent_id>` / `<agent_id>` (maintainer-approved), keeps
+   it a required uplift, and checks each row's shape against its report list so a malformed flag row
+   cannot become a root command.
+2. **Omitted optional list.** The report writer omits `deltas.intentionally_unsupported` when it is
+   empty; the audit required it. codex and claude_code passed only because each report carries two
+   such rows. `66f7b30c` reads an absent list as empty (maintainer-approved relaxation); the other
+   three lists stay required.
+
+A ChatGPT Pro consult (advisory; `.codex/guidance/2026-09-14-opencode-root-command-audit.md`,
+gitignored) agreed with fixing before merge and with the tuple, and added the row-shape boundary.
+
+### 20.1 Review round
+
+Both lanes reviewed `79b305e2..66f7b30c`. The Codex lane now runs through the fixed launcher with no
+profile. The Opus lane returned CLEAN with three low observations; the Codex lane returned two
+findings. Both lanes scanned every committed coverage report reachable from `staging` and the three
+packet refs, and compared old and new derivation for every committed request (the Opus lane with
+binaries built at both revisions; the Codex lane with an in-memory replica, because its sandbox
+blocked `cargo`). No evidence is newly rejected, no identity is lost, and the only derivation or
+closeout-outcome change is opencode 1.18.29.
+
+| finding | verdict |
+| --- | --- |
+| Codex 1: uaa-0035 claimed a root-command exclusion would keep the 20 root flags; `manifest_report` `continue`s past an excluded command's flags and arguments | **accepted, fixed** in uaa-0035, spec §8.1, and the debt inventory note. The lead had repeated the same wrong claim to the maintainer |
+| Codex 2: the contract said every surface row comes from a report row; without a report it falls back to debt rows | **accepted, fixed** |
+| Codex note: malformed-row classification was asserted by substring, not through the classifier | **accepted, fixed**: tests call `is_bad_support_audit_evidence_message` |
+| Opus O1: claude_code debt rows use `claude install`, report-derived surfaces use `claude_code install`, so they never match (pre-existing) | **accepted, deferred** as `uaa-0036`, a maintainer decision; pointer in spec T8 and the debt inventory |
+| Opus O2: contract wording omitted `path` array rules and the optional list | **accepted, fixed** |
+| Lead: the new unit tests compiled into all five integration crates that include `support_audit.rs` by path, so they ran six times | **fixed**: the test module moved under `agent_maintenance/mod.rs`, which only the lib compiles |
+
+### 20.2 Open decisions and where they are triggered
+
+The maintainer asked that deferred decisions sit where they will be hit, not only in the backlog.
+Neither relies on closeout validation to force it.
+
+| id | decision | trigger points |
+| --- | --- | --- |
+| `uaa-0035` | Is opencode's TUI root command (with its root flags and `project` argument) excluded from parity? | spec T5 and T8 open-decisions list; debt inventory "Open decisions" |
+| `uaa-0036` | Is `command_path` rooted at the agent id or the binary name? | spec T8 open-decisions list; debt inventory "Open decisions" |

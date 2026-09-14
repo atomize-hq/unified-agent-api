@@ -194,8 +194,10 @@ Required record shape rules:
 | deferred row | surface row + `defer_reason`, `blocking_follow_on` when repo-owned | `blocking_follow_on` omitted only for concrete external blockers |
 | publication impact row | surface row + `surface_doc` | ties uplift to published truth |
 
-Surface identity rules. Shared code derives every surface row from a coverage report row; `path`
-is the report row's command path below the agent's own command.
+Surface identity rules. When a coverage report exists for the target version, shared code derives
+each surface row from a report row as shown below; without one, it falls back to the identities
+written in the non-TUI debt inventory rows. `path` is the report row's command path below the
+agent's own command.
 
 | Report row | `surface_kind` | `command_path` | `surface_id` |
 | --- | --- | --- | --- |
@@ -206,9 +208,18 @@ is the report row's command path below the agent's own command.
 | positional argument (`name`) | `positional_args` | `<agent_id>` or `<agent_id> <path...>` | `name` |
 
 The three fields together are the identity; a consumer MUST NOT match surfaces on `surface_id`
-alone, because the root command and a command named like the agent share one. A report row is
-invalid evidence when its shape does not match the report list it appears in, when it carries both
-`key` and `name`, or when `path`, `key`, or `name` holds a non-string value.
+alone, because the root command and a command named like the agent share one.
+
+A report's `deltas.missing_commands`, `deltas.missing_flags`, and `deltas.missing_args` MUST be
+arrays. `deltas.intentionally_unsupported` MAY be absent, which is how the report writer records an
+empty list; when present it MUST be an array. A report row is invalid evidence when `path` is
+missing or is not an array of strings, when `key` or `name` is present but not a string, when it
+carries both `key` and `name`, or when its shape does not match the list it appears in (commands
+carry neither field, flags carry `key`, arguments carry `name`).
+
+Known conflict, tracked as `uaa-0036`: the examples above and the claude_code rows in the non-TUI
+debt inventory write the binary name (`claude`) in `command_path`, while report-derived rows use the
+agent id (`claude_code`). Those debt rows therefore never match a report-derived surface.
 
 Field invariants:
 

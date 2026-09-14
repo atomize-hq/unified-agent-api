@@ -491,7 +491,7 @@ enum ReportRowShape {
     Arg,
 }
 
-fn surfaces_from_report_deltas(
+pub(crate) fn surfaces_from_report_deltas(
     agent_id: &str,
     report_path: &Path,
     deltas: &serde_json::Map<String, serde_json::Value>,
@@ -638,7 +638,3 @@ fn repo_relative(workspace_root: &Path, path: &Path) -> Result<String, String> {
         .map(|relative| relative.to_string_lossy().to_string())
         .map_err(|_| format!("{} is outside workspace root", path.display()))
 }
-
-#[cfg(test)]
-#[path = "support_audit/tests.rs"]
-mod tests;

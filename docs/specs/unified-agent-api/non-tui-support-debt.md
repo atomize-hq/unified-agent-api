@@ -43,7 +43,14 @@ opencode's root command (surface `commands` / `opencode` / `opencode`, the TUI e
 `opencode [project]`) is a newly discovered surface from opencode 1.18.29 onward. Do not add a debt
 row, a parity exclusion, or wrapper coverage for it until backlog item `uaa-0035` records the
 maintainer's decision. A newly discovered surface cannot be deferred as debt under the
-maintenance-request contract, so the choice is between an uplift and a parity exclusion.
+maintenance-request contract, so the choice is between an uplift and a parity exclusion. Under
+current report generation, excluding the command also drops its 20 root-level flags and its
+`project` argument from the report.
+
+The claude_code rows below write `command_path` with the binary name (`claude install`), but
+report-derived surfaces use the agent id (`claude_code install`), so these rows do not currently
+match. Do not add or edit claude_code rows until backlog item `uaa-0036` records which form is
+canonical.
 
 ## Inventory
 

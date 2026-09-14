@@ -312,6 +312,11 @@ stays until its backlog item records a maintainer decision.
   / `opencode` / `opencode`), or starting its uplift work, the maintainer decides whether that TUI
   entry point is excluded from parity. Closeout validation is not known to force this, so check it
   by hand.
+- `uaa-0036`: before closing **any** claude_code packet, adding a claude_code debt row, or starting
+  claude_code uplift work, the maintainer decides whether `command_path` is rooted at the agent id
+  (`claude_code`, what report-derived surfaces use) or the binary name (`claude`, what the debt
+  inventory and contract examples use). Until then claude_code's install debt is misreported as new
+  uplifts.
 
 **There is no merge dependency on this work.** The invalid `2.1.140` claude_code request exists only
 on `main`; the open claude_code packet branch carries the corrected policy, so closing claude_code
@@ -341,7 +346,8 @@ items (`uaa-0029`…`uaa-0032`; `uaa-0031` by reading only) and added two more (
 | `uaa-0032` | `--expect-target-version` mismatch fails out-of-packet runs | Medium. Dry runs and promote-prerequisite re-runs now end red. **Decided 2026-09-13: fail only when committing** — a `commit: false` mismatch emits a notice and stays green; no other exit 2 may be downgraded. Mechanism: the target version is compared before the validated request load and a mismatch gets its own exit code 5. A promote-prerequisite re-run (`commit: true`) for a version the ref's request does not name is **accepted as red-but-committed**. **Resolved in `a3c8ce53` / `916c9e9b`.** |
 | `uaa-0033` | Artifact bundle does not match what the run committed | Low. The `always()` upload can succeed with only stale checkout files, and omits the support-matrix files the commit stages. |
 | `uaa-0034` | Commit step can push a rebased tree the gate never judged | Low, suspected, pre-dates T2c. |
-| `uaa-0035` | Is opencode's TUI root command excluded from parity? | **Open maintainer decision, raised 2026-09-14** by the pre-merge gate simulation. The root command is named (`commands` / `opencode` / `opencode`) since `507cf300` and is a required uplift until decided. Gates any opencode closeout or uplift work; pointers sit in T5, T8, and the non-TUI debt inventory. |
+| `uaa-0035` | Is opencode's TUI root command excluded from parity? | **Open maintainer decision, raised 2026-09-14** by the pre-merge gate simulation. The root command is named (`commands` / `opencode` / `opencode`) since `507cf300` and is a required uplift until decided. Gates any opencode closeout or uplift work; pointers sit in T5, T8, and the non-TUI debt inventory. An exclusion would also drop the command's 20 root flags and its `project` argument from the report. |
+| `uaa-0036` | claude_code debt rows name `claude`, report-derived surfaces name `claude_code` | **Open maintainer decision, raised 2026-09-14** (Opus lane; pre-existing). The two claude_code install debt rows never match, so they show as new uplifts. Gates any claude_code closeout, debt-row edit, or uplift work; pointer in T8. |
 
 ### 8.2 What T1 changed about T2
 

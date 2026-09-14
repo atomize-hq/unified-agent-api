@@ -491,7 +491,7 @@ fn build_projection(
     }
 }
 
-fn is_bad_support_audit_evidence_message(message: &str) -> bool {
+pub(crate) fn is_bad_support_audit_evidence_message(message: &str) -> bool {
     message.starts_with("parse ")
         || message.contains(" is missing `deltas` object")
         || message.contains(" is missing `deltas.")

@@ -2,7 +2,9 @@ use std::{fs, path::Path};
 
 use serde_json::{json, Value};
 
-use super::*;
+use super::{
+    audit_status::is_bad_support_audit_evidence_message, request::DetectedRelease, support_audit::*,
+};
 use crate::agent_registry::AgentRegistry;
 
 // Verbatim from cli_manifests/opencode/reports/1.18.29/coverage.any.json (`deltas.missing_commands[0]`)
@@ -129,9 +131,9 @@ fn malformed_rows_are_rejected_as_bad_report_evidence() {
 
     for report in cases {
         let error = surfaces("opencode", &report).expect_err(&format!("reject {report}"));
-        // audit_status classifies this phrase as bad evidence (exit 2), not an internal fault.
+        // The gate must classify it as bad evidence (exit 2), not an internal fault.
         assert!(
-            error.contains("support-audit report row"),
+            is_bad_support_audit_evidence_message(&error),
             "unclassified error `{error}` for {report}"
         );
     }
@@ -164,9 +166,9 @@ fn only_the_intentionally_unsupported_list_may_be_omitted() {
             None => object.remove(key),
         };
         let error = surfaces("opencode", &report).expect_err(&format!("reject {report}"));
-        // audit_status classifies this phrase as bad evidence (exit 2).
         assert!(
-            error.contains(&format!(" is missing `deltas.{key}` array")),
+            error.contains(&format!("`deltas.{key}`"))
+                && is_bad_support_audit_evidence_message(&error),
             "unexpected error `{error}` for {report}"
         );
     }
