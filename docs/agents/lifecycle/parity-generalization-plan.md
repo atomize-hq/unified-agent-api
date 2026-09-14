@@ -753,8 +753,82 @@ spec's §8.1 carries the same table.
 | `uaa-0027` | Snapshot retry can mix two attempts in raw_help | T2 adversarial L7 | Low; raw_help is never committed. |
 | `uaa-0028` | `--emit-json` cleanup has no ownership guard | T2 adversarial L8 (suspected) | Low until T3 makes the projection path durable. |
 | `uaa-0029` | No `on.workflow_call.outputs` for the gate verdict | handoff reading (H1), unreviewed | T3 prerequisite. |
-| `uaa-0030` | One failed leg skips `union`, gate, commit and upload | handoff reading (H2); confirmed in T2c review | Docs corrected here and in the spec. Decided 2026-09-13: preserve completed legs, except a failed required target, which still hard-fails with no union. Fix after the T2c review round. |
+| `uaa-0030` | One failed leg skips `union`, gate, commit and upload | handoff reading (H2); confirmed in T2c review | Decided 2026-09-13: preserve completed legs, except a failed required target, which still hard-fails with no union. **Resolved in `a3c8ce53`** (§19). |
 | `uaa-0031` | Blocking verdict probably not visible on the packet PR | handoff reading (H3); confirmed by reading in T2c review; Opus F2 | Needs a runner observation; T3 design input. T3 also renders the exit-3 `required_uplifts` detail that `_ci_tmp` cleanup deletes today. |
-| `uaa-0032` | Version mismatch fails dry runs and promote-prerequisite re-runs | handoff reading (H5); confirmed in T2c review | Decided 2026-09-13: fail only when committing; a dry-run mismatch emits a notice. The mismatch is checked before the validated load and gets exit 5. Promote-prerequisite re-runs with `commit: true` are accepted as red-but-committed. Fix after the T2c review round. |
+| `uaa-0032` | Version mismatch fails dry runs and promote-prerequisite re-runs | handoff reading (H5); confirmed in T2c review | Decided 2026-09-13: fail only when committing; a dry-run mismatch emits a notice. The mismatch is checked before the validated load and gets exit 5. Promote-prerequisite re-runs with `commit: true` are accepted as red-but-committed. **Resolved in `a3c8ce53` / `916c9e9b`** (§19). |
 | `uaa-0033` | Artifact bundle does not match what the run committed | T2c review (Opus, suspected; Codex) | Low. |
 | `uaa-0034` | Commit step can push a rebased tree the gate never judged | T2c review (Opus, suspected) | Low; pre-dates T2c. |
+
+## 19. T2 complete — wiring the gate into `parity-acquire` (2026-09-13)
+
+T2 landed across five commits: T2a `72191bb3`, T2b `e87a9a1d`, T2c `24a95b52`, T2d `a3c8ce53`,
+T2e `916c9e9b`. The `Maintenance audit gate` step in the `union` job runs
+`maintenance-audit-status --expect-target-version "$VERSION"`, records a verdict instead of failing,
+and a terminal step fails the job only after commit and the `always()` artifact upload.
+
+Final exit routing in the gate:
+
+| exit | meaning | recorded verdict | job |
+| --- | --- | --- | --- |
+| 0 | clean | `closeout_ready=true` | green |
+| 3 | uplifts required | `uplifts_required=true`, placeholder relay line (T3 renders the real one) | green, still commits |
+| 4 | union incomplete | blocking | fails after commit and upload |
+| 5 | request describes another version | blocking only when `commit: true`; a dry run gets a `::notice` | red only when committing |
+| 2, 1, other; missing request | validation / internal | blocking | fails after commit and upload |
+
+`union` now runs whenever the run was not cancelled and `plan` succeeded, so a failed non-required
+leg yields an incomplete union that is gated, committed and uploaded before the job fails. A failed
+required target still hard-fails with no union, because `manifest-union` cannot build one.
+
+### 19.1 What the review rounds found
+
+Four review rounds ran on T2, each with a Codex lane and an Opus adversarial lane in parallel, and
+every round found real defects.
+
+- **T2b review** — two blocking premise errors: the gate checked the request's version, never the
+  version the run acquired; and a failing gate step skipped the commit, discarding an hour of matrix
+  work. T2c fixed both.
+- **T2c review (2026-09-13)** — the contract tests bound spelling, not behaviour. Recording exit 4 as
+  code `0`, writing `audit_failed=false` literally, or a `kill $$` in the uplift branch all left
+  16/16 green, and one of them turns every blocking verdict green. The version mismatch was checked
+  after the request loader's own live derivation, so malformed evidence for the request's version
+  hid it, and as a plain exit 2 it could not be downgraded on a dry run without downgrading real
+  failures. Both lanes also confirmed H1, H2, H5 and, by reading, H3, and showed the maintainer's
+  H2 rule could not cover a failed required target.
+- **T2d re-review** — the new harness still supplied the `COMMIT` env it should have been checking
+  (deleting the binding stayed green while the real step would die on an unbound variable and skip
+  the commit); the delimiter and annotation assertions each ruled out only one example; the script
+  extractor could silently truncate a step; and the pre-check missed inline-table requests.
+
+The pattern from T1 held: each defect was a check aimed at the wrong thing. The lead's own
+verification passed at every round, including one mutation check that silently tested nothing
+because a `sed` pattern did not match — caught only because the mutation count was printed.
+
+### 19.2 Operational note
+
+The Codex lane first ran on the `atomize_systems_azure` profile, whose Azure endpoint no longer
+resolves; `codex exec` retried "waiting for network" for 32 minutes without a timeout. Codex lanes
+now run as plain `codex exec` on the maintainer's ChatGPT auth, wrapped in `timeout`. The repository
+launcher `scripts/run-codex-worker.sh` and the agent definitions still require a profile overlay and
+need updating. Agent `isolation: worktree` also starts from the remote default branch, so reviews of
+local-only commits need a lead-created `git worktree add --detach`.
+
+### 19.3 Debt carried out of T2
+
+Recorded in `docs/backlog.json`; the spec's §8.1 carries the same table.
+
+| id | item | disposition |
+| --- | --- | --- |
+| `uaa-0025` | Projection can survive a failed run as a stale result | Resolve with or before T3, the first consumer. |
+| `uaa-0027` | Snapshot retry can mix two attempts in raw_help | Low. |
+| `uaa-0028` | `--emit-json` cleanup has no ownership guard | Low until T3 makes the path durable. |
+| `uaa-0029` | No `on.workflow_call.outputs` | T3 prerequisite. |
+| `uaa-0031` | Verdict not visible on the packet PR; exit-3 uplift detail deleted with `_ci_tmp` | T3 design input; needs a runner observation. |
+| `uaa-0033` | Artifact bundle does not match what the run committed | Low. |
+| `uaa-0034` | Commit step can push a rebased tree the gate never judged | Low; pre-dates T2. |
+
+Resolved during T2: `uaa-0026` (`72191bb3`), `uaa-0030` (`a3c8ce53`), `uaa-0032` (`a3c8ce53`,
+`916c9e9b`).
+
+Nothing from T2 has run on a real runner. The first real `agent-maintenance-open-pr` dispatch after
+this lands is the proof, and should be watched for the H3 question in `uaa-0031`.

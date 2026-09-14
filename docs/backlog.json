@@ -958,7 +958,7 @@
     {
       "id": "uaa-0030",
       "title": "One failed snapshot leg skips the parity-acquire union job and discards the other legs",
-      "status": "todo",
+      "status": "done",
       "bucket": "agent_api.onboarding",
       "type": "design",
       "kickoff": {
@@ -994,7 +994,8 @@
         "The T2 adversarial lane (L6) noted in passing that union is skipped; nobody corrected the docs then.",
         "Doc premise corrected in the spec §8.2 and plan §18.1 / §18.4 on 2026-09-13.",
         "Maintainer decision 2026-09-13: preserve completed legs. Implement in the fix packet that follows the T2c review round.",
-        "T2c review round (2026-09-13, both lanes) found the decided rule cannot cover a failed REQUIRED target: the materialize step exits 1 and `manifest-union` independently refuses to build without `union.required_target` (`manifest_union.rs` MissingRequiredSnapshot). Maintainer refinement 2026-09-13: a required-target failure still hard-fails with no union; only non-required leg failures preserve work (union complete=false, exit 4, commit and upload, then fail)."
+        "T2c review round (2026-09-13, both lanes) found the decided rule cannot cover a failed REQUIRED target: the materialize step exits 1 and `manifest-union` independently refuses to build without `union.required_target` (`manifest_union.rs` MissingRequiredSnapshot). Maintainer refinement 2026-09-13: a required-target failure still hard-fails with no union; only non-required leg failures preserve work (union complete=false, exit 4, commit and upload, then fail).",
+        "Implemented in a3c8ce53 (T2d): `union` has `if: ${{ !cancelled() && needs.plan.result == 'success' }}`; a failed non-required leg yields complete=false, exit 4, commit and upload, then the terminal step fails the job; a failed required target still hard-fails in the materialize step. Bound by `union_job_runs_after_snapshot_failure_but_not_plan_failure_or_cancellation`. Not yet observed on a runner."
       ]
     },
     {
@@ -1034,7 +1035,7 @@
     {
       "id": "uaa-0032",
       "title": "--expect-target-version mismatch fails out-of-packet acquisition runs",
-      "status": "todo",
+      "status": "done",
       "bucket": "agent_api.onboarding",
       "type": "design",
       "kickoff": {
@@ -1066,7 +1067,8 @@
         "Found while writing the 2026-09-13 handoff (H5). Confirmed by reading; unreviewed; impact is a maintainer decision.",
         "Maintainer decision 2026-09-13: fail only when committing. Implement in the fix packet that follows the T2c review round.",
         "T2c review round (2026-09-13, both lanes): the mismatch check runs after the request loader's live derivation, so malformed evidence for the request's own version masks the mismatch, and the `..._before_evidence_work` test does not prove its name (a removed report directory makes the loader fall back rather than fail). Mechanism chosen by the lead: compare the request's `detected_release.target_version` before the validated load, and give a mismatch its own exit code (5, `EXIT_TARGET_VERSION_MISMATCH`) so the workflow downgrades only that code on a dry run.",
-        "Maintainer decision 2026-09-13: a parity-promote prerequisite re-run (which needs `commit: true` so lockfile pins land) for a version the ref's request does not name is accepted as red-but-committed. Document it where the promote error text points operators."
+        "Maintainer decision 2026-09-13: a parity-promote prerequisite re-run (which needs `commit: true` so lockfile pins land) for a version the ref's request does not name is accepted as red-but-committed. Document it where the promote error text points operators.",
+        "Implemented in a3c8ce53 (T2d) and hardened in 916c9e9b (T2e): `EXIT_TARGET_VERSION_MISMATCH = 5`, compared before the validated request load (inline tables included); the gate records a non-blocking notice when `COMMIT` is false and a blocking verdict when true. Bound by the behavioural tests in `crates/xtask/tests/c4_spec_audit_gate_behavior.rs` and `crates/xtask/tests/agent_maintenance_audit_status_target_version.rs`. Caveat recorded in the spec: exit 5 says nothing about whether the rest of the request is valid."
       ]
     },
     {

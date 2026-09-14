@@ -117,7 +117,7 @@ incomplete acquisition (`snapshots/<version>/union.json` has `complete: false`),
 | 0 | — | clean: no uplifts, reconciliation not drifted | no |
 | 3 | `EXIT_UPLIFTS_REQUIRED` | uplifts required; contributor relay work needed | no — a result |
 | 4 | `EXIT_INCOMPLETE_ACQUISITION` | union incomplete; names `missing_targets` | yes |
-| 5 | `EXIT_TARGET_VERSION_MISMATCH` | the request's `detected_release.target_version` differs from `--expect-target-version`; checked before any evidence work, so it wins over malformed evidence or an invalid request field | yes — blocking in CI only when the run commits |
+| 5 | `EXIT_TARGET_VERSION_MISMATCH` | the request's `detected_release.target_version` differs from `--expect-target-version`; checked before any evidence work, so it wins over malformed evidence or an invalid request field — which also means exit 5 says nothing about whether the rest of the request is valid | yes — blocking in CI only when the run commits |
 | 2 | `EXIT_VALIDATION` | evidence missing, bound to another version, or malformed; invalid request; drift with no uplifts | yes |
 | 1 | `EXIT_INTERNAL` | internal fault | yes |
 
@@ -237,7 +237,7 @@ and — added in round 5 — an acquisition that never finished. `union.json`'s 
 authority for the last. See §8.1 for the debt this carried out, and plan doc §18 for why the
 completeness check exists.
 
-**T2 — Wire the gate into `parity-acquire`. CODE-COMPLETE, NOT CLOSED (`24a95b52`).** Original
+**T2 — Wire the gate into `parity-acquire`. DONE (`916c9e9b`).** Original
 sketch: run after the union job, before the commit step; branch on exit code: 0 → mark
 closeout-ready; 3 → render the relay invocation into the PR body and mark not-closeout-ready;
 other → fail. Contract test for the wiring.
@@ -251,8 +251,15 @@ verdict instead of failing, the artifact bundle upload runs `always()`, and a te
 the job on a blocking verdict after commit and upload. Exit 3 renders only a placeholder summary
 line; the real relay invocation is T3.
 
-The T2c fix round has not been reviewed. T2 closes when that review is adjudicated and its accepted
-findings are fixed. Debt recorded so far is in §8.1.
+Two more rounds closed it. The T2c review (both lanes) proved the contract tests bound spelling, not
+behaviour, and that a version mismatch was masked by the request loader and indistinguishable from
+other validation failures. T2d (`a3c8ce53`) added a behavioural harness that runs the extracted gate
+and terminal steps, a typed exit 5 checked before the validated load, terminal-code validation, a
+random output delimiter, and the maintainer-decided `union` condition that keeps non-required legs.
+The T2d re-review (both lanes) found the harness still injected the step env it should check, plus
+an inline-table hole in the pre-check; T2e (`916c9e9b`) closed both. Suite 488/0; real-repo exits
+codex 0 / opencode 2 / claude_code 2, codex `--expect-target-version 0.145.0` 5. Debt carried out is
+in §8.1; plan doc §19 has the full account.
 
 **T3 — Relay-packet rendering.** On the uplift branch, render the relay invocation (prompt path,
 dry-run→write `--run-id` handshake) into the packet PR body from the existing renderer, so the
@@ -318,9 +325,9 @@ items (`uaa-0029`…`uaa-0032`; `uaa-0031` by reading only) and added two more (
 | `uaa-0027` | Snapshot retry can mix two attempts in raw_help | Low. The retry never clears attempt 1's `raw_help/<version>/<target>/`. raw_help is never committed. |
 | `uaa-0028` | `--emit-json` cleanup deletes whatever path it names | Low, suspected. No ownership guard. Matters once T3 makes the projection path durable. |
 | `uaa-0029` | `parity-acquire` exports no `workflow_call` outputs | Medium, latent. The caller cannot see `closeout_ready` / `uplifts_required`. **T3 prerequisite.** |
-| `uaa-0030` | One failed snapshot leg skips `union`, gate, commit and upload | Medium. The "continues on a partial matrix" premise in §8.2 was wrong and is corrected there. **Decided 2026-09-13: preserve completed legs** — `union` runs unless cancelled or `plan` failed; the gate routes exit 4; commit and upload run; the job still fails. **Refined 2026-09-13:** a failed *required* target still hard-fails with no union (`manifest-union` cannot build one); only non-required leg failures preserve work. Fix after the T2c review round. |
+| `uaa-0030` | One failed snapshot leg skips `union`, gate, commit and upload | Medium. The "continues on a partial matrix" premise in §8.2 was wrong and is corrected there. **Decided 2026-09-13: preserve completed legs** — `union` runs unless cancelled or `plan` failed; the gate routes exit 4; commit and upload run; the job still fails. **Refined 2026-09-13:** a failed *required* target still hard-fails with no union (`manifest-union` cannot build one); only non-required leg failures preserve work. **Resolved in `a3c8ce53`.** |
 | `uaa-0031` | A blocking verdict is probably not visible on the packet PR | Medium; confirmed by reading, not yet observed on a runner. T3 design input. Also carries the exit-3 `required_uplifts` detail, which `_ci_tmp` cleanup deletes today — T3 renders it. |
-| `uaa-0032` | `--expect-target-version` mismatch fails out-of-packet runs | Medium. Dry runs and promote-prerequisite re-runs now end red. **Decided 2026-09-13: fail only when committing** — a `commit: false` mismatch emits a notice and stays green; no other exit 2 may be downgraded. Mechanism: the target version is compared before the validated request load and a mismatch gets its own exit code 5. A promote-prerequisite re-run (`commit: true`) for a version the ref's request does not name is **accepted as red-but-committed**. Fix after the T2c review round. |
+| `uaa-0032` | `--expect-target-version` mismatch fails out-of-packet runs | Medium. Dry runs and promote-prerequisite re-runs now end red. **Decided 2026-09-13: fail only when committing** — a `commit: false` mismatch emits a notice and stays green; no other exit 2 may be downgraded. Mechanism: the target version is compared before the validated request load and a mismatch gets its own exit code 5. A promote-prerequisite re-run (`commit: true`) for a version the ref's request does not name is **accepted as red-but-committed**. **Resolved in `a3c8ce53` / `916c9e9b`.** |
 | `uaa-0033` | Artifact bundle does not match what the run committed | Low. The `always()` upload can succeed with only stale checkout files, and omits the support-matrix files the commit stages. |
 | `uaa-0034` | Commit step can push a rebased tree the gate never judged | Low, suspected, pre-dates T2c. |
 
