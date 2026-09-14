@@ -314,9 +314,9 @@ review lane yet.
 | `uaa-0027` | Snapshot retry can mix two attempts in raw_help | Low. The retry never clears attempt 1's `raw_help/<version>/<target>/`. raw_help is never committed. |
 | `uaa-0028` | `--emit-json` cleanup deletes whatever path it names | Low, suspected. No ownership guard. Matters once T3 makes the projection path durable. |
 | `uaa-0029` | `parity-acquire` exports no `workflow_call` outputs | Medium, latent. The caller cannot see `closeout_ready` / `uplifts_required`. **T3 prerequisite.** |
-| `uaa-0030` | One failed snapshot leg skips `union`, gate, commit and upload | Medium. The "continues on a partial matrix" premise in §8.2 was wrong and is corrected there. **Maintainer decision:** accept the work loss or preserve completed legs. |
+| `uaa-0030` | One failed snapshot leg skips `union`, gate, commit and upload | Medium. The "continues on a partial matrix" premise in §8.2 was wrong and is corrected there. **Decided 2026-09-13: preserve completed legs** — `union` runs unless cancelled or `plan` failed; the gate routes exit 4; commit and upload run; the job still fails. Fix after the T2c review round. |
 | `uaa-0031` | A blocking verdict is probably not visible on the packet PR | Medium, suspected; needs a runner observation. T3 design input. |
-| `uaa-0032` | `--expect-target-version` mismatch fails out-of-packet runs | Medium. Dry runs and promote-prerequisite re-runs now end red. **Maintainer decision:** fail, skip with a notice, or fail only when committing. |
+| `uaa-0032` | `--expect-target-version` mismatch fails out-of-packet runs | Medium. Dry runs and promote-prerequisite re-runs now end red. **Decided 2026-09-13: fail only when committing** — a `commit: false` mismatch emits a notice and stays green; no other exit 2 may be downgraded. Fix after the T2c review round. |
 
 ### 8.2 What T1 changed about T2
 
@@ -339,8 +339,9 @@ fails both capture attempts skips `union` — and with it the gate, the commit a
 bundle. `union.json` is written with `complete: false` only when a leg succeeds but its snapshot
 artifact never arrives. Because the matrix and `union.expected_targets` come from the same list,
 exit 4 is close to unreachable in CI; it still matters for local runs against committed history.
-Whether one failed leg may discard the other legs' work is an open maintainer decision
-(`uaa-0030`).
+**Decided 2026-09-13:** one failed leg must not discard the other legs' work. `union` will run
+unless the run was cancelled or `plan` failed, so the gate routes exit 4 and the job fails after
+commit and upload (`uaa-0030`).
 
 ---
 

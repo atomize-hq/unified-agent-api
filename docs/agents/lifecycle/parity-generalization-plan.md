@@ -662,6 +662,9 @@ reachable from a `commit: false` Linux run. The static guards added here cover t
 shapes cheaply; a paths-filtered multi-OS job on `.github/workflows/**` would cover the class.
 Left as a maintainer decision because it changes CI cost and required-check configuration.
 
+**Decided 2026-09-13: deferred.** The static contract tests in `c4_spec_ci_wiring.rs` remain the only
+guard on workflow changes; revisit after T3.
+
 ## 18. T1 complete — the audit gate, and what it cost to trust it (2026-07-25)
 
 `maintenance-audit-status` landed across five implementation rounds and four review rounds
@@ -750,6 +753,6 @@ spec's §8.1 carries the same table.
 | `uaa-0027` | Snapshot retry can mix two attempts in raw_help | T2 adversarial L7 | Low; raw_help is never committed. |
 | `uaa-0028` | `--emit-json` cleanup has no ownership guard | T2 adversarial L8 (suspected) | Low until T3 makes the projection path durable. |
 | `uaa-0029` | No `on.workflow_call.outputs` for the gate verdict | handoff reading (H1), unreviewed | T3 prerequisite. |
-| `uaa-0030` | One failed leg skips `union`, gate, commit and upload | handoff reading (H2), unreviewed | Docs corrected here and in the spec; maintainer decision on work loss. |
+| `uaa-0030` | One failed leg skips `union`, gate, commit and upload | handoff reading (H2), unreviewed | Docs corrected here and in the spec. Decided 2026-09-13: preserve completed legs; fix after the T2c review round. |
 | `uaa-0031` | Blocking verdict probably not visible on the packet PR | handoff reading (H3), suspected | Needs a runner observation; T3 design input. |
-| `uaa-0032` | Version mismatch fails dry runs and promote-prerequisite re-runs | handoff reading (H5), unreviewed | Maintainer decision: fail, skip with a notice, or fail only when committing. |
+| `uaa-0032` | Version mismatch fails dry runs and promote-prerequisite re-runs | handoff reading (H5), unreviewed | Decided 2026-09-13: fail only when committing; a dry-run mismatch emits a notice. Fix after the T2c review round. |

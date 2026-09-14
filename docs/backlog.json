@@ -969,12 +969,13 @@
           "Doc error, corrected 2026-09-13: spec §8.2 and plan §18.1 / §18.4 said acquisition continues on a partial matrix by design. The job graph does not. The materialize step's \"union will still be written with complete=false\" comment fits only a leg that succeeds but whose snapshot artifact never arrives.",
           "Consequence: exit 4 (incomplete acquisition) is close to unreachable in CI, because the matrix `include` and `union.expected_targets` come from the same list (`crates/xtask/src/manifest_acquisition/plan.rs`). Exit 4 still matters for local runs against committed history: five of seven committed codex acquisitions are `complete: false`.",
           "Policy fit: the maintainer's matrix-flake policy (2026-07-25: retry missing legs once, then fail), implemented as a step-level retry inside each leg, matches this behaviour. But one failed leg discards every other leg's work, the same destroy-work class T2c fixed for the gate step.",
-          "Maintainer decision needed: accept the work loss, or preserve completed legs (for example `if: ${{ !cancelled() && needs.plan.result == 'success' }}` on `union`, letting the gate route exit 4 and fail after commit and upload).",
+          "Decided 2026-09-13 by the maintainer: preserve completed legs. `union` runs whenever the run was not cancelled and `plan` succeeded (for example `if: ${{ !cancelled() && needs.plan.result == 'success' }}`). The union is then written with `complete: false`, the gate routes exit 4, commit and artifact bundle upload still run, and the terminal failure step still fails the job. This is the same record-then-fail pattern T2c applied to the gate step.",
           "Steps:",
-          "1) Get the maintainer decision.",
-          "2) If preserving work: change the `union` condition, confirm the gate routes exit 4 and the terminal failure step still fails the job, and add a contract test binding the condition.",
-          "3) If accepting the loss: record it in the spec and plan as a decided property.",
-          "Output: a decided and documented rule for what a failed leg costs."
+          "1) Change the `union` job condition in `.github/workflows/parity-acquire.yml` as decided.",
+          "2) Confirm that a failed leg reaches the gate as exit 4 with `missing_targets` naming it, that commit (when `commit: true`) and upload run, and that the job still ends failed.",
+          "3) Confirm a failed or skipped `plan` job still skips `union`, and a cancelled run does not commit.",
+          "4) Add a contract test in `crates/xtask/tests/c4_spec_ci_wiring.rs` binding the condition and the ordering.",
+          "Output: one failed leg no longer discards the other legs' work, and the run still fails."
         ],
         "files_to_read": [
           ".github/workflows/parity-acquire.yml",
@@ -984,14 +985,15 @@
           "docs/specs/unified-agent-api/acquisition-maintenance-lifecycle-spec.md"
         ],
         "deliverables": [
-          "Maintainer decision on failed-leg work loss",
-          "Workflow change and contract test, or a documented accepted-loss rule"
+          "union job condition that preserves completed legs",
+          "Contract test binding the condition"
         ]
       },
       "notes": [
         "Found while writing the 2026-09-13 handoff (H2). Confirmed by reading; not observed on a runner; unreviewed.",
         "The T2 adversarial lane (L6) noted in passing that union is skipped; nobody corrected the docs then.",
-        "Doc premise corrected in the spec §8.2 and plan §18.1 / §18.4 on 2026-09-13; the decision stays open."
+        "Doc premise corrected in the spec §8.2 and plan §18.1 / §18.4 on 2026-09-13.",
+        "Maintainer decision 2026-09-13: preserve completed legs. Implement in the fix packet that follows the T2c review round."
       ]
     },
     {
@@ -1039,12 +1041,12 @@
           "Context: T2c (24a95b52) passes `--expect-target-version \"$VERSION\"` to the gate in `.github/workflows/parity-acquire.yml`. The command exits 2 when the packet request's `detected_release.target_version` differs, and T2c's terminal failure step then fails the job, including `commit: false` dry runs.",
           "Finding (found reading code while writing the 2026-09-13 handoff, H5; confirmed by reading): two documented uses acquire a version that the packet request on `ref` does not name. Plan §13 item 4 proves acquisition on a real runner via `workflow_dispatch` with `ref` defaulting to `staging`. `.github/workflows/parity-promote.yml` tells the maintainer to re-run parity-acquire for a version before promoting it. Both now end red even when acquisition succeeded; artifacts are still uploaded, and committed if `commit: true`.",
           "History: T2b's packet said the gate is informational on a dry run. The T2 adversarial lane's remediation direction allowed either refusing to run or failing; T2c chose fail without weighing these callers. Only the automated lane (open-pr to acquire) is guaranteed to match.",
-          "Maintainer decision needed. Options: fail on mismatch (current), skip the gate with a notice on mismatch, or fail only when `inputs.commit` is true.",
+          "Decided 2026-09-13 by the maintainer: fail only when committing. On a mismatch with `inputs.commit` false, the gate records a non-blocking verdict and emits a `::notice` naming both versions; the job stays green. On a mismatch with `inputs.commit` true, the verdict stays blocking and the job fails after commit and upload, as today.",
           "Steps:",
-          "1) Get the maintainer decision.",
-          "2) Implement it in the gate step, keeping exit-code capture as `set +e; cmd; s=$?; set -e`.",
-          "3) Update `c4_spec_maintenance_audit_gate_passes_expected_target_version_to_xtask` or add a contract test that binds the chosen rule.",
-          "Output: out-of-packet acquisition runs end with a verdict that matches the decided rule."
+          "1) Distinguish the version-mismatch exit 2 from other exit 2 failures without parsing message text (for example a dedicated exit code, or a pre-check in the workflow step), so no other validation failure is downgraded on a dry run.",
+          "2) Implement the decided routing in the gate step, keeping exit-code capture as `set +e; cmd; s=$?; set -e`.",
+          "3) Add or update contract tests binding both branches (commit false: notice, not failed; commit true: failed).",
+          "Output: out-of-packet dry runs stay green with a notice; a mismatched committing run still fails."
         ],
         "files_to_read": [
           ".github/workflows/parity-acquire.yml",
@@ -1054,12 +1056,13 @@
           "docs/agents/lifecycle/parity-generalization-plan.md"
         ],
         "deliverables": [
-          "Maintainer decision on version-mismatch handling",
-          "Workflow change and contract test pinning it"
+          "Mismatch routing keyed on inputs.commit",
+          "Contract tests for both branches"
         ]
       },
       "notes": [
-        "Found while writing the 2026-09-13 handoff (H5). Confirmed by reading; unreviewed; impact is a maintainer decision."
+        "Found while writing the 2026-09-13 handoff (H5). Confirmed by reading; unreviewed; impact is a maintainer decision.",
+        "Maintainer decision 2026-09-13: fail only when committing. Implement in the fix packet that follows the T2c review round."
       ]
     }
   ]
