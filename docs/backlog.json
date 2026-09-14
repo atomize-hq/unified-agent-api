@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at_utc": "2026-07-25T00:00:00Z",
+  "updated_at_utc": "2026-09-13T00:00:00Z",
   "items": [
     {
       "id": "uaa-0022",
@@ -779,43 +779,56 @@
     },
     {
       "id": "uaa-0025",
-      "title": "maintenance-audit-status projection cannot detect same-request staleness",
+      "title": "maintenance-audit-status projection can survive a failed run as a stale result",
       "status": "todo",
       "bucket": "agent_api.onboarding",
       "type": "task",
       "kickoff": {
         "prompt": [
-          "Work item: uaa-0025 — `maintenance-audit-status` projection cannot detect same-request staleness.",
-          "Context: `--emit-json` writes an `AuditStatusProjection` carrying `schema_version` and `request_sha256`. `request_sha256` was added during T1 remediation round 3 specifically so a consumer could detect a stale projection file.",
-          "Defect: it cannot detect the case it was added for. Re-running the same request produces the same hash, so a projection left on disk by an earlier successful run is indistinguishable from a fresh one. Concretely: run 1 is clean and writes `status.json` with `uplifts_required: false`; evidence then goes stale; run 2 fails with exit 2 and (by design, to avoid destroying data on a pre-derivation failure) leaves the old `status.json` in place still claiming `uplifts_required: false`. A consumer reading only the file sees a clean result.",
-          "Constraint that produced this: the projection deliberately carries no timestamp, to keep byte-identical output across runs for determinism.",
-          "Goal: make projection staleness detectable by consumers without giving up run-to-run determinism.",
+          "Work item: uaa-0025 — `maintenance-audit-status` projection can survive a failed run as a stale result.",
+          "Context: `--emit-json` writes an `AuditStatusProjection` carrying `schema_version` and `request_sha256`. `request_sha256` arrived in T1 remediation round 4 (commit 4620b531) so a consumer could detect a stale projection file. The projection carries no timestamp, to keep output byte-identical across runs.",
+          "Original defect (T1 r4 adversarial lane): the hash cannot detect same-request staleness. Re-running the same request produces the same hash, so a projection left by an earlier clean run is indistinguishable from a fresh one.",
+          "T2a (72191bb3) added three-case cleanup: a failure classified preflight preserves an existing projection; a failure classified attempted removes it; a failed fresh write removes it and warns. This was marked closed, then disproved by the T2 adversarial lane (finding M3) with a probe test.",
+          "Mechanism (probe-proven): `derive_audit_status` classifies the whole request load as `DeriveAuditStatusFailure::preflight`. But `request::load_request_envelope_validated_with_policy` calls `validate_support_surface_audit`, which runs `derive_support_surface_audit`, a full live derivation. Every check `request.rs` runs after it (`validate_execution_contract`, `validate_automated_watch_request`, `validate_rfc3339_utc`, `validate_commit_value`) therefore fails as preflight, and projection cleanup is skipped.",
+          "Probe: an invalid `request_commit` plus uplift-requiring evidence exits 2, and a pre-seeded projection claiming `uplifts_required: false` survives.",
+          "Second route: `is_bad_support_audit_evidence_message` downgrades a corrupt live coverage report to `Validation` along the same preflight path, which also preserves the stale file.",
+          "Naming (T2 Codex lane F4): evidence failures are classified attempted before `derive_support_surface_audit` runs. Adjudicated as correct behaviour, because the run read live evidence and found it bad, but the flag name `live_derivation_attempted` misdescribes it. Rename as part of this item.",
+          "Silent cleanup failure (T2 Codex lane F3): on the post-derivation failure path the removal error is discarded (`let _ = remove_projection(path)` in `run_in_workspace`, `audit_status.rs`), while the fresh-write path warns on stderr. Make the two paths consistent.",
+          "Why it is latent today (T2 adversarial lane L9): CI writes the projection to `_ci_tmp/audit/status.json` and deletes `_ci_tmp` unread before commit. T3 is the first consumer. Fix this with or before T3.",
           "Steps:",
-          "1) Decide the mechanism. Options include: having the consumer bind the projection to the run (e.g. CI reads the exit code as authoritative and treats the file as advisory), writing the projection only on success paths, emitting a separate liveness marker, or accepting a timestamp and dropping the byte-identity requirement.",
-          "2) Coordinate with however T2 wires `maintenance-audit-status` into `.github/workflows/parity-acquire.yml` — the right answer depends on how the workflow consumes the artifact.",
-          "3) Implement and add a regression test covering the two-run stale-file scenario described above.",
-          "Output: a projection whose staleness a consumer can detect, or an explicit documented rule that the exit code is authoritative and the file is advisory only."
+          "1) Decide the rule: fix the preflight/attempted classification so any failure after the request load's internal derivation removes the projection, or declare the exit code the only authority and state that the JSON is strictly advisory (and make T3 read it only after exit 0 or 3 from the same invocation).",
+          "2) Rename `live_derivation_attempted` to describe what it actually records.",
+          "3) Warn on stderr when post-derivation cleanup fails, matching the fresh-write path.",
+          "4) Add regression tests: the invalid-`request_commit` probe, the corrupt-coverage-report route, and the clean-then-stale two-run scenario.",
+          "5) Confirm `refresh`, `prepare`, `closeout`, and `execute` stay bit-for-bit unaffected under `AuditDriftPolicy::Reject`.",
+          "Output: no failed run can leave a projection that a consumer would read as a current result, or an explicit, enforced exit-code-is-authoritative rule."
         ],
         "files_to_read": [
           "crates/xtask/src/agent_maintenance/audit_status.rs",
+          "crates/xtask/src/agent_maintenance/request.rs",
+          "crates/xtask/src/agent_maintenance/support_audit.rs",
           "crates/xtask/tests/agent_maintenance_audit_status.rs",
           ".github/workflows/parity-acquire.yml",
-          "docs/agents/lifecycle/parity-generalization-plan.md"
+          "docs/specs/unified-agent-api/acquisition-maintenance-lifecycle-spec.md"
         ],
         "deliverables": [
-          "Staleness-detection mechanism, or a documented exit-code-is-authoritative rule",
-          "Regression test for the clean-then-stale two-run scenario"
+          "Correct preflight/attempted classification, or a documented and enforced exit-code-is-authoritative rule",
+          "Renamed classification flag",
+          "Stderr warning when post-derivation projection cleanup fails",
+          "Regression tests for the request-validation probe, the corrupt-report route, and the two-run stale-file scenario"
         ]
       },
       "notes": [
         "Found by the Opus adversarial review lane during T1 remediation round 4 review.",
-        "Best resolved alongside T2, which defines how the workflow actually consumes the projection."
+        "Marked closed during T2a (72191bb3) and reopened within the hour after the T2 adversarial lane disproved the fix (finding M3, probe test).",
+        "Folds in T2 Codex lane F4 (flag naming), T2 Codex lane F3 (silent cleanup failure), and T2 adversarial lane L9 (why it is latent).",
+        "Fix with or before T3, which is the first consumer of the projection."
       ]
     },
     {
       "id": "uaa-0026",
       "title": "maintenance-audit-status loses exit 3 when --emit-json cannot be written",
-      "status": "todo",
+      "status": "done",
       "bucket": "agent_api.onboarding",
       "type": "task",
       "kickoff": {
@@ -843,7 +856,210 @@
         ]
       },
       "notes": [
-        "Observed by the Opus adversarial review lane during T1 remediation round 4 review; confirmed pre-existing rather than introduced by T1."
+        "Observed by the Opus adversarial review lane during T1 remediation round 4 review; confirmed pre-existing rather than introduced by T1.",
+        "Implemented in 72191bb3 (T2a): the computed outcome takes precedence. When the fresh --emit-json write fails, the command removes any existing projection, prints a stderr warning, and still returns exit 0 or 3. Pinned by `uplift_outcome_survives_unwritable_emit_json_target_and_warns`, `clean_outcome_survives_unwritable_emit_json_target`, and `failing_fresh_emit_json_write_removes_stale_projection`."
+      ]
+    },
+    {
+      "id": "uaa-0027",
+      "title": "Snapshot capture retry can mix two attempts in the raw_help artifact",
+      "status": "todo",
+      "bucket": "agent_api.onboarding",
+      "type": "task",
+      "kickoff": {
+        "prompt": [
+          "Work item: uaa-0027 — Snapshot capture retry can mix two attempts in the raw_help artifact.",
+          "Context: T2b (e87a9a1d) made the per-target \"Generate the per-target snapshot\" step in `.github/workflows/parity-acquire.yml` retry the capture once in place (a two-attempt loop with `set +e` / `$?` / `set -e` capture).",
+          "Defect (T2 adversarial lane L7): the loop never clears attempt 1's `raw_help/<version>/<target>/` before attempt 2. The uploaded raw-help artifact can therefore contain files from both captures. Nothing compares the two attempts.",
+          "Severity: low. raw_help is evidence hygiene only; it is never committed (AGENTS.md hygiene rule), and the snapshot itself comes from the successful attempt.",
+          "Steps:",
+          "1) Clear the target's raw_help directory at the start of each attempt, keeping the loop portable to bash 3.2 and Git Bash.",
+          "2) Extend `c4_spec_reusable_acquisition_retries_snapshot_capture_once_in_place` so it binds the clear-before-retry property.",
+          "Output: a raw-help artifact that always comes from exactly one capture attempt."
+        ],
+        "files_to_read": [
+          ".github/workflows/parity-acquire.yml",
+          "crates/xtask/tests/c4_spec_ci_wiring.rs"
+        ],
+        "deliverables": [
+          "Per-attempt raw_help clear in the retry loop",
+          "Contract test binding the property"
+        ]
+      },
+      "notes": [
+        "Raised by the T2 adversarial review lane (L7); accepted and deferred during T2 adjudication."
+      ]
+    },
+    {
+      "id": "uaa-0028",
+      "title": "maintenance-audit-status deletes whatever path --emit-json names",
+      "status": "todo",
+      "bucket": "agent_api.onboarding",
+      "type": "task",
+      "kickoff": {
+        "prompt": [
+          "Work item: uaa-0028 — `maintenance-audit-status` deletes whatever path `--emit-json` names.",
+          "Context: projection cleanup (`remove_projection` in `crates/xtask/src/agent_maintenance/audit_status.rs`) removes the file at the `--emit-json` path on a post-derivation failure or a failed fresh write.",
+          "Suspected defect (T2 adversarial lane L8, not probe-proven): there is no ownership guard. The command removes any existing file at that path, whether or not an earlier `maintenance-audit-status` run wrote it.",
+          "Why it is low today: CI points `--emit-json` at `_ci_tmp/audit/status.json`, a scratch path. It matters once T3 points `--emit-json` somewhere durable.",
+          "Steps:",
+          "1) Confirm the behaviour with a test against a pre-existing unrelated file.",
+          "2) Decide a guard, for example remove only a file that parses as an `AuditStatusProjection` with a known `schema_version`, and otherwise fail without deleting.",
+          "3) Coordinate with uaa-0025, which changes when cleanup runs.",
+          "Output: cleanup that cannot delete a file the command did not write."
+        ],
+        "files_to_read": [
+          "crates/xtask/src/agent_maintenance/audit_status.rs",
+          "crates/xtask/tests/agent_maintenance_audit_status.rs"
+        ],
+        "deliverables": [
+          "Ownership guard on projection removal",
+          "Test proving an unrelated file at the --emit-json path survives"
+        ]
+      },
+      "notes": [
+        "Raised by the T2 adversarial review lane (L8), labelled suspected; accepted and deferred during T2 adjudication.",
+        "Resolve before or with T3 if T3 makes the projection path durable."
+      ]
+    },
+    {
+      "id": "uaa-0029",
+      "title": "parity-acquire does not export the audit gate outputs to callers",
+      "status": "todo",
+      "bucket": "agent_api.onboarding",
+      "type": "task",
+      "kickoff": {
+        "prompt": [
+          "Work item: uaa-0029 — `parity-acquire` does not export the audit gate outputs to callers.",
+          "Context: the `union` job in `.github/workflows/parity-acquire.yml` declares job outputs `closeout_ready` and `uplifts_required` from the `maintenance_audit` step. A reusable workflow's caller sees only outputs mapped under `on.workflow_call.outputs` (`outputs.<name>.value: ${{ jobs.union.outputs.<name> }}`).",
+          "Defect (found reading code while writing the 2026-09-13 handoff, H1; not yet through a review lane): `on.workflow_call` declares `inputs` and `secrets` but no `outputs`. The only caller, the `acquire` job in `.github/workflows/agent-maintenance-open-pr.yml`, cannot see either value. T2b's packet required them to be consumable by callers; neither review lane caught the gap.",
+          "Severity: medium, latent. Nothing consumes the outputs yet. T3 renders the verdict and relay invocation in the caller, so this blocks T3.",
+          "Steps:",
+          "1) Add `on.workflow_call.outputs` for `closeout_ready`, `uplifts_required`, and probably `audit_exit_code`.",
+          "2) Add a contract test in `crates/xtask/tests/c4_spec_ci_wiring.rs` that binds every gate output the `union` job declares to a `workflow_call` output.",
+          "3) Grant `pull-requests: write` on whichever caller job renders into the packet PR (T3).",
+          "Output: the caller can read the gate verdict without parsing logs."
+        ],
+        "files_to_read": [
+          ".github/workflows/parity-acquire.yml",
+          ".github/workflows/agent-maintenance-open-pr.yml",
+          "crates/xtask/tests/c4_spec_ci_wiring.rs"
+        ],
+        "deliverables": [
+          "on.workflow_call.outputs for the gate verdict",
+          "Contract test binding job outputs to workflow_call outputs"
+        ]
+      },
+      "notes": [
+        "Found while writing the 2026-09-13 handoff (H1). Confirmed by reading; unreviewed.",
+        "T3 prerequisite."
+      ]
+    },
+    {
+      "id": "uaa-0030",
+      "title": "One failed snapshot leg skips the parity-acquire union job and discards the other legs",
+      "status": "todo",
+      "bucket": "agent_api.onboarding",
+      "type": "design",
+      "kickoff": {
+        "prompt": [
+          "Work item: uaa-0030 — One failed snapshot leg skips the `parity-acquire` union job and discards the other legs.",
+          "Context: since 68f7fb27 the `union` job in `.github/workflows/parity-acquire.yml` has `needs: [plan, snapshot]`, no status-function `if:`, and the snapshot legs have no `continue-on-error`. `fail-fast: false` keeps the other legs running, but under GitHub's default `needs` semantics any failed leg skips `union`.",
+          "Finding (found reading code while writing the 2026-09-13 handoff, H2; confirmed by reading, not observed on a runner): a leg whose capture fails both retry attempts skips the union, the maintenance audit gate, the commit, and the artifact bundle upload. Only the successful legs' per-target artifacts survive, at `retention-days: 1`.",
+          "Doc error, corrected 2026-09-13: spec §8.2 and plan §18.1 / §18.4 said acquisition continues on a partial matrix by design. The job graph does not. The materialize step's \"union will still be written with complete=false\" comment fits only a leg that succeeds but whose snapshot artifact never arrives.",
+          "Consequence: exit 4 (incomplete acquisition) is close to unreachable in CI, because the matrix `include` and `union.expected_targets` come from the same list (`crates/xtask/src/manifest_acquisition/plan.rs`). Exit 4 still matters for local runs against committed history: five of seven committed codex acquisitions are `complete: false`.",
+          "Policy fit: the maintainer's matrix-flake policy (2026-07-25: retry missing legs once, then fail), implemented as a step-level retry inside each leg, matches this behaviour. But one failed leg discards every other leg's work, the same destroy-work class T2c fixed for the gate step.",
+          "Maintainer decision needed: accept the work loss, or preserve completed legs (for example `if: ${{ !cancelled() && needs.plan.result == 'success' }}` on `union`, letting the gate route exit 4 and fail after commit and upload).",
+          "Steps:",
+          "1) Get the maintainer decision.",
+          "2) If preserving work: change the `union` condition, confirm the gate routes exit 4 and the terminal failure step still fails the job, and add a contract test binding the condition.",
+          "3) If accepting the loss: record it in the spec and plan as a decided property.",
+          "Output: a decided and documented rule for what a failed leg costs."
+        ],
+        "files_to_read": [
+          ".github/workflows/parity-acquire.yml",
+          "crates/xtask/src/manifest_acquisition/plan.rs",
+          "crates/xtask/src/manifest_union.rs",
+          "crates/xtask/tests/c4_spec_ci_wiring.rs",
+          "docs/specs/unified-agent-api/acquisition-maintenance-lifecycle-spec.md"
+        ],
+        "deliverables": [
+          "Maintainer decision on failed-leg work loss",
+          "Workflow change and contract test, or a documented accepted-loss rule"
+        ]
+      },
+      "notes": [
+        "Found while writing the 2026-09-13 handoff (H2). Confirmed by reading; not observed on a runner; unreviewed.",
+        "The T2 adversarial lane (L6) noted in passing that union is skipped; nobody corrected the docs then.",
+        "Doc premise corrected in the spec §8.2 and plan §18.1 / §18.4 on 2026-09-13; the decision stays open."
+      ]
+    },
+    {
+      "id": "uaa-0031",
+      "title": "A blocking audit verdict is probably not visible on the packet PR",
+      "status": "todo",
+      "bucket": "agent_api.onboarding",
+      "type": "design",
+      "kickoff": {
+        "prompt": [
+          "Work item: uaa-0031 — A blocking audit verdict is probably not visible on the packet PR.",
+          "Context: T2c (24a95b52) records the gate verdict and fails the `union` job in a terminal step so that, per its rationale, the packet PR stays red. The gate runs only inside `.github/workflows/parity-acquire.yml`, called by `.github/workflows/agent-maintenance-open-pr.yml`, which the release watcher starts with `createWorkflowDispatch` on `ref: DISPATCH_REF` (`.github/workflows/agent-maintenance-release-watch.yml`).",
+          "Suspected finding (found while writing the 2026-09-13 handoff, H3; needs a runner observation): that run is not triggered by the packet branch. The packet PR's checks come from `.github/workflows/ci.yml` (`pull_request` / `push`), which never runs `maintenance-audit-status`. With `commit: true`, an exit-2 or exit-4 verdict still pushes artifacts, and the PR can show green checks while the failure is visible only in the watcher-side run. Exit 3 has the same visibility gap, which T3 exists to close.",
+          "Steps:",
+          "1) Observe on a real dispatch which commit, if any, the `acquire` job's check run attaches to.",
+          "2) Decide where the verdict and the relay invocation become visible: PR body, PR comment, check run on the packet head, or step summary only.",
+          "3) Implement in the caller after `acquire` (needs uaa-0029 outputs and `pull-requests: write`), with a contract test.",
+          "Output: a maintainer looking at the packet PR sees a blocking verdict and an uplift verdict without opening the watcher-side run."
+        ],
+        "files_to_read": [
+          ".github/workflows/parity-acquire.yml",
+          ".github/workflows/agent-maintenance-open-pr.yml",
+          ".github/workflows/agent-maintenance-release-watch.yml",
+          ".github/workflows/ci.yml"
+        ],
+        "deliverables": [
+          "Runner observation of where the acquire check run attaches",
+          "Decided visibility surface for the verdict, implemented with T3"
+        ]
+      },
+      "notes": [
+        "Found while writing the 2026-09-13 handoff (H3). Suspected; unreviewed.",
+        "T3 design input."
+      ]
+    },
+    {
+      "id": "uaa-0032",
+      "title": "--expect-target-version mismatch fails out-of-packet acquisition runs",
+      "status": "todo",
+      "bucket": "agent_api.onboarding",
+      "type": "design",
+      "kickoff": {
+        "prompt": [
+          "Work item: uaa-0032 — `--expect-target-version` mismatch fails out-of-packet acquisition runs.",
+          "Context: T2c (24a95b52) passes `--expect-target-version \"$VERSION\"` to the gate in `.github/workflows/parity-acquire.yml`. The command exits 2 when the packet request's `detected_release.target_version` differs, and T2c's terminal failure step then fails the job, including `commit: false` dry runs.",
+          "Finding (found reading code while writing the 2026-09-13 handoff, H5; confirmed by reading): two documented uses acquire a version that the packet request on `ref` does not name. Plan §13 item 4 proves acquisition on a real runner via `workflow_dispatch` with `ref` defaulting to `staging`. `.github/workflows/parity-promote.yml` tells the maintainer to re-run parity-acquire for a version before promoting it. Both now end red even when acquisition succeeded; artifacts are still uploaded, and committed if `commit: true`.",
+          "History: T2b's packet said the gate is informational on a dry run. The T2 adversarial lane's remediation direction allowed either refusing to run or failing; T2c chose fail without weighing these callers. Only the automated lane (open-pr to acquire) is guaranteed to match.",
+          "Maintainer decision needed. Options: fail on mismatch (current), skip the gate with a notice on mismatch, or fail only when `inputs.commit` is true.",
+          "Steps:",
+          "1) Get the maintainer decision.",
+          "2) Implement it in the gate step, keeping exit-code capture as `set +e; cmd; s=$?; set -e`.",
+          "3) Update `c4_spec_maintenance_audit_gate_passes_expected_target_version_to_xtask` or add a contract test that binds the chosen rule.",
+          "Output: out-of-packet acquisition runs end with a verdict that matches the decided rule."
+        ],
+        "files_to_read": [
+          ".github/workflows/parity-acquire.yml",
+          ".github/workflows/parity-promote.yml",
+          "crates/xtask/src/agent_maintenance/audit_status.rs",
+          "crates/xtask/tests/c4_spec_ci_wiring.rs",
+          "docs/agents/lifecycle/parity-generalization-plan.md"
+        ],
+        "deliverables": [
+          "Maintainer decision on version-mismatch handling",
+          "Workflow change and contract test pinning it"
+        ]
+      },
+      "notes": [
+        "Found while writing the 2026-09-13 handoff (H5). Confirmed by reading; unreviewed; impact is a maintainer decision."
       ]
     }
   ]

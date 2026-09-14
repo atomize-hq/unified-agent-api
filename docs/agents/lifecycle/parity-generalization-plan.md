@@ -681,10 +681,15 @@ computed over acquired targets only, so `required_uplifts_this_run` came back em
 returned **exit 0** for an acquisition that never inspected macOS or Windows.
 
 This was not hypothetical. Five of the seven committed codex acquisitions are that shape
-(`complete: false`, one input, two missing targets), and `parity-acquire` is deliberately built to
-continue on a partial matrix: `fail-fast: false`, only `REQUIRED_TARGET` enforced, every other
-missing leg a `::warning`. Reproduced on real 0.144.6 data by deleting the darwin and windows
-reports and flipping `union.json` — the gate returned exit 0 and `uplifts_required: false`.
+(`complete: false`, one input, two missing targets), and `parity-acquire` was believed to continue
+on a partial matrix: `fail-fast: false`, only `REQUIRED_TARGET` enforced, every other missing leg a
+`::warning`. Reproduced on real 0.144.6 data by deleting the darwin and windows reports and flipping
+`union.json` — the gate returned exit 0 and `uplifts_required: false`.
+
+*Correction (2026-09-13):* the partial-matrix belief was wrong for a leg that fails. `union` has
+`needs: [plan, snapshot]` with no status-function `if:`, so a failed leg skips `union` entirely;
+`complete: false` is written only when a leg succeeds but its snapshot artifact never arrives. The
+defect above is still real for committed history and local runs. See §18.5 and `uaa-0030`.
 
 The fix reads the completeness the acquisition already records in
 `snapshots/<version>/union.json` and refuses anything short of `complete=true`, naming the missing
@@ -716,11 +721,35 @@ scratch; each entry carries its own context, file list and deliverables.
 | `uaa-0025` | Projection cannot detect same-request staleness | `request_sha256` cannot detect the one staleness case it was added for, since a re-run of the same request produces the same hash. Best resolved with T2, which defines how the workflow consumes the projection. |
 | `uaa-0026` | Exit 3 lost when `--emit-json` cannot be written | Pre-existing, not introduced by T1. The computed outcome is discarded by a `?` on the write path. Needs an explicit precedence decision, coordinated with T2's exit-code routing. |
 
+Status as of 2026-09-13: `uaa-0026` is **done** (`72191bb3`, the computed outcome takes
+precedence). `uaa-0025` was marked closed during T2a, disproved by the T2 adversarial lane, and is
+**reopened** with a wider scope (§18.5).
+
 ### 18.4 What T2 inherits
 
 The gate now has three outcomes to route, not two: clean (0), uplifts required (3), and
-insufficient evidence (2) — where 2 now includes "the matrix ran but did not finish". Because
-`parity-acquire` continues on a partial matrix by design, the common case of a flaked macOS or
-Windows leg will now land on exit 2 rather than passing silently. Whether that fails the run,
-retries the missing legs, or opens a different kind of packet is a workflow-policy decision for
-T2, not something the gate should decide on its own.
+insufficient evidence — which includes "the matrix ran but did not finish". T2a later split that
+case out as exit **4**, so CI routes it by number; other evidence failures stay exit 2.
+
+As written on 2026-07-25, this section said a flaked macOS or Windows leg would land on the
+incomplete-acquisition exit because `parity-acquire` continues on a partial matrix by design. That
+premise was wrong (§18.1 correction): a failed leg skips `union`, so the gate never runs. The
+maintainer's policy — retry missing legs once, then fail — was implemented in T2b as a step-level
+retry-once inside each snapshot leg, because Actions cannot re-run individual matrix legs.
+
+### 18.5 Debt recorded while T2 is open (2026-09-13)
+
+T2 is code-complete at `24a95b52` (T2a `72191bb3`, T2b `e87a9a1d`, T2c `24a95b52`), but its last
+fix round has not been reviewed, so it has no section of its own yet; §19 is written when T2
+closes. These items are recorded now so they are not lost. Each is in `docs/backlog.json`, and the
+spec's §8.1 carries the same table.
+
+| id | item | source | disposition |
+| --- | --- | --- | --- |
+| `uaa-0025` | Projection can survive a failed run as a stale result | T2 adversarial M3 (probe-proven), Codex F3 and F4, adversarial L9 | Reopened. The request load derives internally, so later request-validation failures are classified preflight and leave a stale projection behind exit 2. Resolve with or before T3. |
+| `uaa-0027` | Snapshot retry can mix two attempts in raw_help | T2 adversarial L7 | Low; raw_help is never committed. |
+| `uaa-0028` | `--emit-json` cleanup has no ownership guard | T2 adversarial L8 (suspected) | Low until T3 makes the projection path durable. |
+| `uaa-0029` | No `on.workflow_call.outputs` for the gate verdict | handoff reading (H1), unreviewed | T3 prerequisite. |
+| `uaa-0030` | One failed leg skips `union`, gate, commit and upload | handoff reading (H2), unreviewed | Docs corrected here and in the spec; maintainer decision on work loss. |
+| `uaa-0031` | Blocking verdict probably not visible on the packet PR | handoff reading (H3), suspected | Needs a runner observation; T3 design input. |
+| `uaa-0032` | Version mismatch fails dry runs and promote-prerequisite re-runs | handoff reading (H5), unreviewed | Maintainer decision: fail, skip with a notice, or fail only when committing. |

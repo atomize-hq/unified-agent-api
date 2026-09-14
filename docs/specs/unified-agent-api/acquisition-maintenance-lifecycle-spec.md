@@ -83,10 +83,13 @@ New and changed surfaces. Every new command follows the existing `xtask` convent
 
 ```bash
 # NEW — emit the support-surface audit as machine-readable JSON, derived from live artifacts.
-# Piece 1's input. Read-only.
+# Piece 1's input. Read-only apart from the --emit-json projection.
+# --expect-target-version (T2c) exits 2 unless the request's detected_release.target_version
+# equals it, checked before any evidence work. Omit it outside acquisition runs.
 cargo run -p xtask -- maintenance-audit-status \
   --request <path/to/maintenance-request.toml> \
-  --emit-json _ci_tmp/audit-status.json
+  [--expect-target-version <version>] \
+  --emit-json _ci_tmp/audit/status.json
 
 # NEW — generate a closeout artifact from run evidence. Fails closed.
 cargo run -p xtask -- prepare-agent-closeout \
@@ -104,7 +107,20 @@ cargo run -p xtask -- close-agent-maintenance \
 Exit codes follow the established convention: `2` for validation failure (the artifact or the
 evidence is wrong), `1` for internal error. `maintenance-audit-status` additionally uses `3` for
 "uplifts required", so a workflow can branch on the gate without parsing stdout — mirroring
-`EXIT_NOT_ELIGIBLE` in `manifest_acquisition.rs:74`.
+`EXIT_NOT_ELIGIBLE` in `manifest_acquisition.rs:74` — and, since T2a (`72191bb3`), `4` for an
+incomplete acquisition (`snapshots/<version>/union.json` has `complete: false`).
+
+| exit | constant | meaning | error? |
+| --- | --- | --- | --- |
+| 0 | — | clean: no uplifts, reconciliation not drifted | no |
+| 3 | `EXIT_UPLIFTS_REQUIRED` | uplifts required; contributor relay work needed | no — a result |
+| 4 | `EXIT_INCOMPLETE_ACQUISITION` | union incomplete; names `missing_targets` | yes |
+| 2 | `EXIT_VALIDATION` | evidence missing, bound to another version, or malformed; invalid request; drift with no uplifts; `--expect-target-version` mismatch | yes |
+| 1 | `EXIT_INTERNAL` | internal fault | yes |
+
+A computed 0 or 3 survives a failed `--emit-json` write (the stale projection is removed and a
+warning printed). The exit code is the product; the projection is advisory until `uaa-0025` is
+resolved.
 
 ---
 
@@ -218,9 +234,22 @@ and — added in round 5 — an acquisition that never finished. `union.json`'s 
 authority for the last. See §8.1 for the debt this carried out, and plan doc §18 for why the
 completeness check exists.
 
-**T2 — Wire the gate into `parity-acquire`.** Run after the union job, before the commit step.
-Branch on exit code: 0 → mark closeout-ready; 3 → render the relay invocation into the PR body and
-mark not-closeout-ready; other → fail. Contract test for the wiring.
+**T2 — Wire the gate into `parity-acquire`. CODE-COMPLETE, NOT CLOSED (`24a95b52`).** Original
+sketch: run after the union job, before the commit step; branch on exit code: 0 → mark
+closeout-ready; 3 → render the relay invocation into the PR body and mark not-closeout-ready;
+other → fail. Contract test for the wiring.
+
+Landed in three commits. T2a (`72191bb3`): exit 4 for an incomplete acquisition; the computed
+outcome survives a projection write failure (`uaa-0026`); three-case projection cleanup; the
+`evidence.rs` split. T2b (`e87a9a1d`): the `Maintenance audit gate` step in the `union` job,
+numeric exit routing, snapshot capture retry-once, contract tests. T2c (`24a95b52`):
+`--expect-target-version`, so the gate checks the version this run acquired; the gate records its
+verdict instead of failing, the artifact bundle upload runs `always()`, and a terminal step fails
+the job on a blocking verdict after commit and upload. Exit 3 renders only a placeholder summary
+line; the real relay invocation is T3.
+
+The T2c fix round has not been reviewed. T2 closes when that review is adjudicated and its accepted
+findings are fixed. Debt recorded so far is in §8.1.
 
 **T3 — Relay-packet rendering.** On the uplift branch, render the relay invocation (prompt path,
 dry-run→write `--run-id` handshake) into the packet PR body from the existing renderer, so the
@@ -250,44 +279,68 @@ A packet must be closed **on its own branch**, so the merge carries a closed HAN
 demonstrates the failure mode: #153 merged while still open, which replaced main's closed HANDOFF
 with the open-run contributor contract. That is a regression to repair, not a pattern to repeat.
 
+Re-derived 2026-09-13 (read-only). The watcher kept opening packets after this spec was written:
+#157 (claude_code 2.1.212) and #158 (opencode 1.18.4) are **closed without merging**, superseded by
+the open packets below. Each branch request's `target_version` and `version_policy` were read from
+the packet branch; re-derive this table again (`git fetch`, `gh pr list`) when T8 starts, because
+the watcher will have moved on.
+
 | packet | closed against | why |
 |---|---|---|
-| claude_code 2.1.212 (#157) | the packet branch | its request is already valid there (`2.1.212` / `upstream_stable_pointer`) |
-| opencode 1.18.4 (#158) | the packet branch | same |
-| codex 0.144.6 | a branch off `main` | already merged open; needs a catch-up pass |
+| claude_code 2.1.236 (#195) | the packet branch | branch request reads `2.1.236` / `upstream_stable_pointer` |
+| opencode 1.18.29 (#205) | the packet branch | branch request reads `1.18.29` / `latest_stable_minus_one` |
+| codex 0.153.4 (#206) | the packet branch | branch request reads `0.153.4` / `latest_stable_minus_one` |
+| codex 0.144.6 (#153, merged) | a branch off `main` | already merged open; needs a catch-up pass |
 
 **There is no merge dependency on this work.** The invalid `2.1.140` claude_code request exists only
-on `main`; the #157 branch carries the corrected one, so closing claude_code never touches the bad
-copy. Merging #157/#158 *before* closing them would actively make things worse.
+on `main`; the open claude_code packet branch carries the corrected policy, so closing claude_code
+never touches the bad copy. Merging an open packet *before* closing it would actively make things
+worse.
 
-### 8.1 Known debt carried out of T1
+### 8.1 Known debt carried out of T1 and T2
 
-Four items were adjudicated as real but deferred. Each is a `todo` in `docs/backlog.json` with its
-own context, file list and deliverables; plan doc §18.3 carries the same table. **Two of them must
-be resolved as part of T2, not after it** — they are marked below.
+Each item is in `docs/backlog.json` with its own context, file list and deliverables; plan doc
+§18.3 and §18.5 carry the same items. T1 carried out four (`uaa-0023`…`uaa-0026`). T2 review
+adjudication, and a code reading while writing the 2026-09-13 handoff, added six more
+(`uaa-0027`…`uaa-0032`). The handoff-reading items (`uaa-0029`…`uaa-0032`) have not been through a
+review lane yet.
 
 | id | item | disposition |
 | --- | --- | --- |
 | `uaa-0023` | Typed errors for support-audit evidence faults | Independent follow-up. Round 5 classifies some faults by matching error message text, because the packet scoped `support_audit.rs` out of the write set. A message drift yields exit 1, never a false clean, so this is fragility rather than a correctness hole. |
 | `uaa-0024` | Union-vs-per-target coverage coherence contract | Independent follow-up. Needs the contract defined before it can be implemented, and it belongs at report-generation time rather than in the gate. |
-| `uaa-0025` | Projection cannot detect same-request staleness | **Resolve during T2.** `request_sha256` cannot detect the case it was added for. The right answer depends on whether T2 treats the exit code as authoritative and the JSON as advisory — decide it there. |
-| `uaa-0026` | Exit 3 lost when `--emit-json` cannot be written | **Resolve during T2.** The computed outcome is discarded by a `?` on the write path. T2's exit-code routing has to state a precedence either way, so pin it there. |
+| `uaa-0025` | Projection can survive a failed run as a stale result | **Reopened; resolve with or before T3.** T2a's cleanup fix was disproved by a probe: the request load derives the audit internally, so later request-validation failures are classified preflight and leave a stale projection behind exit 2. Also folds in the misleading `live_derivation_attempted` name and the silent post-derivation cleanup failure. Latent until T3, the first consumer. |
+| `uaa-0026` | Exit 3 lost when `--emit-json` cannot be written | **Resolved in `72191bb3`.** The computed outcome takes precedence; the stale projection is removed and a warning printed. |
+| `uaa-0027` | Snapshot retry can mix two attempts in raw_help | Low. The retry never clears attempt 1's `raw_help/<version>/<target>/`. raw_help is never committed. |
+| `uaa-0028` | `--emit-json` cleanup deletes whatever path it names | Low, suspected. No ownership guard. Matters once T3 makes the projection path durable. |
+| `uaa-0029` | `parity-acquire` exports no `workflow_call` outputs | Medium, latent. The caller cannot see `closeout_ready` / `uplifts_required`. **T3 prerequisite.** |
+| `uaa-0030` | One failed snapshot leg skips `union`, gate, commit and upload | Medium. The "continues on a partial matrix" premise in §8.2 was wrong and is corrected there. **Maintainer decision:** accept the work loss or preserve completed legs. |
+| `uaa-0031` | A blocking verdict is probably not visible on the packet PR | Medium, suspected; needs a runner observation. T3 design input. |
+| `uaa-0032` | `--expect-target-version` mismatch fails out-of-packet runs | Medium. Dry runs and promote-prerequisite re-runs now end red. **Maintainer decision:** fail, skip with a notice, or fail only when committing. |
 
 ### 8.2 What T1 changed about T2
 
 The gate now has three outcomes to route, not two: clean (0), uplifts required (3), and
-insufficient evidence (2) — where 2 now includes *the matrix ran but did not finish*. Because
-`parity-acquire` continues on a partial matrix by design (`fail-fast: false`, only
-`REQUIRED_TARGET` enforced, other missing legs are warnings), a flaked macOS or Windows leg now
-lands on exit 2 where it previously passed silently.
+insufficient evidence — where insufficient evidence includes *the matrix ran but did not finish*.
+T2a gave that case its own exit code, **4**, so CI can route it by number; every other evidence
+or validation failure stays exit 2.
 
 T2's original wiring sketch — "other → fail" — is therefore no longer adequate on its own.
 
-**Decided 2026-07-25:** on an exit 2 caused specifically by incompleteness, re-dispatch only the
-missing targets once; if the acquisition is still incomplete after that retry, fail the run. Every
-other exit 2 fails immediately. This keeps a flaked runner from blocking the lane — which is why
-`fail-fast: false` is there — without ever letting a genuinely partial acquisition through. T2 must
-therefore distinguish incompleteness from other validation failures, not just read the exit code.
+**Decided 2026-07-25:** retry missing legs once; if the acquisition is still incomplete after that
+retry, fail the run. The maintainer then clarified the mechanism: a step-level retry-once of the
+snapshot capture inside each matrix leg, because Actions cannot re-run individual matrix legs.
+T2b implemented it that way. Every other failure fails without a retry.
+
+**Correction (2026-09-13).** This section and plan doc §18.1 / §18.4 said `parity-acquire`
+continues on a partial matrix by design. The job graph does not. `fail-fast: false` keeps the other
+legs running, but `union` has `needs: [plan, snapshot]` and no status-function `if:`, so a leg that
+fails both capture attempts skips `union` — and with it the gate, the commit and the artifact
+bundle. `union.json` is written with `complete: false` only when a leg succeeds but its snapshot
+artifact never arrives. Because the matrix and `union.expected_targets` come from the same list,
+exit 4 is close to unreachable in CI; it still matters for local runs against committed history.
+Whether one failed leg may discard the other legs' work is an open maintainer decision
+(`uaa-0030`).
 
 ---
 
