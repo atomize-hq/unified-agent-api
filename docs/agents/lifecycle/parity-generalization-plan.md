@@ -808,9 +808,9 @@ because a `sed` pattern did not match — caught only because the mutation count
 
 The Codex lane first ran on the `atomize_systems_azure` profile, whose Azure endpoint no longer
 resolves; `codex exec` retried "waiting for network" for 32 minutes without a timeout. Codex lanes
-now run as plain `codex exec` on the maintainer's ChatGPT auth, wrapped in `timeout`. The repository
-launcher `scripts/run-codex-worker.sh` and the agent definitions still require a profile overlay and
-need updating. Agent `isolation: worktree` also starts from the remote default branch, so reviews of
+now run as plain `codex exec` on the maintainer's ChatGPT auth, wrapped in `timeout`. After T2 closed,
+the launchers (`scripts/run-codex-worker.sh`, `.ps1`) and agent definitions stopped requiring a
+profile and gained a default 3600-second timeout. Agent `isolation: worktree` also starts from the remote default branch, so reviews of
 local-only commits need a lead-created `git worktree add --detach`.
 
 ### 19.3 Debt carried out of T2
