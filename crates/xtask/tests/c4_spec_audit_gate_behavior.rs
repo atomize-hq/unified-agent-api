@@ -20,6 +20,7 @@ const TERMINAL_STEP: &str = "Fail the job if the maintenance audit recorded a bl
 #[derive(Debug)]
 struct GateRun {
     output: Output,
+    raw_output: String,
     outputs: BTreeMap<String, String>,
     summary: String,
 }
@@ -116,12 +117,25 @@ fn maintenance_audit_gate_routes_every_exit_by_behavior() {
             case.status,
             run.summary
         );
+        let stderr = String::from_utf8_lossy(&run.output.stderr);
         if !case.annotation.is_empty() {
             assert!(
-                String::from_utf8_lossy(&run.output.stderr).contains(case.annotation),
+                stderr.contains(case.annotation),
                 "stderr for exit {} was:\n{}",
                 case.status,
-                String::from_utf8_lossy(&run.output.stderr)
+                stderr
+            );
+        }
+        if case.status == EXIT_TARGET_VERSION_MISMATCH {
+            let forbidden = if case.commit {
+                "::notice title=Target version mismatch"
+            } else {
+                "::error title=Target version mismatch"
+            };
+            assert!(
+                !stderr.contains(forbidden),
+                "stderr for exit {} unexpectedly contained `{forbidden}`:\n{stderr}",
+                case.status
             );
         }
         if case.status == EXIT_UPLIFTS_REQUIRED {
@@ -166,11 +180,19 @@ fn maintenance_audit_gate_uses_the_last_nonblank_stderr_line_for_mismatch() {
 
 #[test]
 fn maintenance_audit_gate_heredoc_has_no_fixed_delimiter_collision() {
-    let run = run_gate(2, true, true, "__AUDIT_MESSAGE__");
-    assert!(run.output.status.success());
-    assert_eq!(run.outputs["audit_message"], "__AUDIT_MESSAGE__");
-    assert_eq!(run.outputs["audit_failed"], "true");
-    assert_eq!(run.outputs["audit_exit_code"], "2");
+    let first = run_gate(2, true, true, "__AUDIT_MESSAGE__");
+    let second = run_gate(2, true, true, "__AUDIT_MESSAGE__");
+    for run in [&first, &second] {
+        assert!(run.output.status.success());
+        assert_eq!(run.outputs["audit_message"], "__AUDIT_MESSAGE__");
+        assert_eq!(run.outputs["audit_failed"], "true");
+        assert_eq!(run.outputs["audit_exit_code"], "2");
+    }
+    let first_delimiter = audit_message_delimiter(&first.raw_output);
+    let second_delimiter = audit_message_delimiter(&second.raw_output);
+    assert_ne!(first_delimiter, second_delimiter);
+    assert_ne!(first_delimiter, "__AUDIT_MESSAGE__");
+    assert_ne!(second_delimiter, "__AUDIT_MESSAGE__");
 }
 
 #[test]
@@ -269,24 +291,33 @@ fn run_gate(status: i32, commit: bool, request_exists: bool, stderr: &str) -> Ga
     let summary_path = temp.path().join("github-summary");
     let script_path = temp.path().join("gate.sh");
     fs::write(&script_path, extract_run_block(GATE_STEP)).expect("write gate script");
-    let output = Command::new("/bin/bash")
-        .arg(&script_path)
-        .current_dir(temp.path())
+    let mut command = runner_command(&script_path, temp.path());
+    command
         .env("PATH", path_with_stub(&bin))
         .env("GITHUB_OUTPUT", &output_path)
         .env("GITHUB_STEP_SUMMARY", &summary_path)
-        .env("VERSION", "1.2.3")
-        .env("ROOT", "manifest")
-        .env("AGENT_ID", "codex")
-        .env("COMMIT", if commit { "true" } else { "false" })
         .env("STUB_STATUS", status.to_string())
-        .env("STUB_STDERR", stderr)
-        .output()
-        .expect("run gate script");
+        .env("STUB_STDERR", stderr);
+    add_step_env(
+        &mut command,
+        GATE_STEP,
+        &[
+            ("${{ inputs.target_version }}", "1.2.3"),
+            ("${{ needs.plan.outputs.manifest_root }}", "manifest"),
+            ("${{ inputs.agent_id }}", "codex"),
+            (
+                "${{ inputs.commit }}",
+                if commit { "true" } else { "false" },
+            ),
+        ],
+    );
+    let output = command.output().expect("run gate script");
+    let raw_output = fs::read_to_string(output_path).expect("read outputs");
 
     GateRun {
         output,
-        outputs: parse_github_output(&fs::read_to_string(output_path).expect("read outputs")),
+        outputs: parse_github_output(&raw_output),
+        raw_output,
         summary: fs::read_to_string(summary_path).expect("read summary"),
     }
 }
@@ -295,13 +326,56 @@ fn run_terminal(code: &str) -> Output {
     let temp = TempDir::new().expect("terminal tempdir");
     let script = temp.path().join("terminal.sh");
     fs::write(&script, extract_run_block(TERMINAL_STEP)).expect("write terminal script");
-    Command::new("/bin/bash")
+    let output_path = temp.path().join("github-output");
+    let summary_path = temp.path().join("github-summary");
+    let mut command = runner_command(&script, temp.path());
+    command
+        .env("PATH", std::env::var("PATH").expect("PATH"))
+        .env("GITHUB_OUTPUT", output_path)
+        .env("GITHUB_STEP_SUMMARY", summary_path);
+    add_step_env(
+        &mut command,
+        TERMINAL_STEP,
+        &[
+            (
+                "${{ steps.maintenance_audit.outputs.audit_exit_code }}",
+                code,
+            ),
+            (
+                "${{ steps.maintenance_audit.outputs.audit_title }}",
+                "Recorded verdict",
+            ),
+            (
+                "${{ steps.maintenance_audit.outputs.audit_message }}",
+                "recorded message",
+            ),
+        ],
+    );
+    command.output().expect("run terminal script")
+}
+
+fn runner_command(script: &Path, current_dir: &Path) -> Command {
+    let mut command = Command::new("/bin/bash");
+    command
+        .args(["--noprofile", "--norc", "-eo", "pipefail"])
         .arg(script)
-        .env("AUDIT_EXIT_CODE", code)
-        .env("AUDIT_TITLE", "Recorded verdict")
-        .env("AUDIT_MESSAGE", "recorded message")
-        .output()
-        .expect("run terminal script")
+        .current_dir(current_dir)
+        .env_clear();
+    command
+}
+
+fn add_step_env(command: &mut Command, step_name: &str, values: &[(&str, &str)]) {
+    for (key, expression) in extract_step_env(step_name) {
+        let value = values
+            .iter()
+            .find_map(|(known_expression, value)| {
+                (*known_expression == expression).then_some(*value)
+            })
+            .unwrap_or_else(|| {
+                panic!("unknown env expression `{expression}` in step `{step_name}`")
+            });
+        command.env(key, value);
+    }
 }
 
 fn write_executable(path: &Path, bytes: &[u8]) {
@@ -334,13 +408,42 @@ fn extract_run_block(step_name: &str) -> String {
         if let Some(line) = line.strip_prefix("          ") {
             script.push_str(line);
             script.push('\n');
-        } else if line.is_empty() {
+        } else if line.trim().is_empty() {
             script.push('\n');
         } else {
             break;
         }
     }
     script
+}
+
+fn extract_step_env(step_name: &str) -> Vec<(String, String)> {
+    let workflow = read_workflow();
+    let marker = format!("      - name: {step_name}\n");
+    let step = workflow
+        .split_once(&marker)
+        .unwrap_or_else(|| panic!("missing step `{step_name}`"))
+        .1;
+    let body = step
+        .split_once("        env:\n")
+        .unwrap_or_else(|| panic!("step `{step_name}` has no env block"))
+        .1;
+    body.lines()
+        .take_while(|line| line.starts_with("          "))
+        .map(|line| {
+            line.trim_start()
+                .split_once(": ")
+                .map(|(key, expression)| (key.to_string(), expression.to_string()))
+                .unwrap_or_else(|| panic!("invalid env binding `{line}` in step `{step_name}`"))
+        })
+        .collect()
+}
+
+fn audit_message_delimiter(output: &str) -> &str {
+    output
+        .lines()
+        .find_map(|line| line.strip_prefix("audit_message<<"))
+        .expect("audit_message delimiter")
 }
 
 fn parse_github_output(text: &str) -> BTreeMap<String, String> {

@@ -401,7 +401,7 @@ fn validate_expected_target_version_before_load(
     };
     let Some(target_version) = document
         .get("detected_release")
-        .and_then(toml_edit::Item::as_table)
+        .and_then(toml_edit::Item::as_table_like)
         .and_then(|table| table.get("target_version"))
         .and_then(toml_edit::Item::as_str)
     else {

@@ -30,6 +30,48 @@ fn mismatch_wins_over_an_invalid_request_commit() {
 }
 
 #[test]
+fn inline_table_mismatch_wins_over_an_invalid_request_commit() {
+    let request = fs::read_to_string(repo_root().join(REQUEST_PATH)).expect("read real request");
+    let request = request.replace(
+        "request_commit = \"118a73096ff059f0bff11a0ad82f48179189468f\"",
+        "request_commit = \"NOT A COMMIT\"",
+    );
+    let detected_release_start = request
+        .find("[detected_release]\n")
+        .expect("detected release table");
+    let support_audit_start = request
+        .find("[support_surface_audit]\n")
+        .expect("support audit table");
+    let without_detected_release = format!(
+        "{}{}",
+        &request[..detected_release_start],
+        &request[support_audit_start..],
+    );
+    let runtime_followup_start = without_detected_release
+        .find("[runtime_followup_required]\n")
+        .expect("runtime followup table");
+    let execution_contract_start = without_detected_release
+        .find("[execution_contract]\n")
+        .expect("execution contract table");
+    let request = format!(
+        "{}detected_release = {{ detected_by = \".github/workflows/agent-maintenance-release-watch.yml\", current_validated = \"0.97.0\", target_version = \"0.98.0\", latest_stable = \"0.99.0\", version_policy = \"latest_stable_minus_one\", source_kind = \"github_releases\", source_ref = \"openai/codex\", dispatch_kind = \"packet_pr\", dispatch_workflow = \"agent-maintenance-open-pr.yml\", branch_name = \"automation/codex-maintenance-0.98.0\" }}\n\n{}",
+        &without_detected_release[..runtime_followup_start],
+        &without_detected_release[runtime_followup_start..execution_contract_start],
+    );
+    let root = fixture(&request);
+    for relative_path in [
+        "crates/xtask/data/agent_registry.toml",
+        "cli_manifests/codex/latest_validated.txt",
+        ".github/workflows/agent-maintenance-open-pr.yml",
+        "docs/specs/unified-agent-api/non-tui-support-debt.md",
+    ] {
+        copy_repo_file(&root, relative_path);
+    }
+
+    assert_mismatch(run(&root, None));
+}
+
+#[test]
 fn mismatch_does_not_replace_a_preseeded_projection() {
     let root = fixture(
         r#"[detected_release]
@@ -107,6 +149,13 @@ fn repo_root() -> std::path::PathBuf {
         .and_then(Path::parent)
         .expect("repo root")
         .to_path_buf()
+}
+
+fn copy_repo_file(root: &TempDir, relative_path: &str) {
+    let destination = root.path().join(relative_path);
+    fs::create_dir_all(destination.parent().expect("fixture file parent"))
+        .expect("create fixture file parent");
+    fs::copy(repo_root().join(relative_path), destination).expect("copy fixture file");
 }
 
 fn run(
