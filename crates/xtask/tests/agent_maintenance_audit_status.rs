@@ -67,10 +67,10 @@ fn expect_target_version_match_proceeds_normally() {
 
 #[rustfmt::skip]
 #[test]
-fn expect_target_version_mismatch_is_validation_error_before_evidence_work() {
-    let fixture = prepared_fixture("agent-maintenance-audit-status-expect-target-version-mismatch", &clean_report(TARGET_VERSION)); fs::remove_dir_all(coverage_report_dir(&fixture)).expect("remove seeded coverage report dir");
+fn expect_target_version_mismatch_is_typed_before_malformed_evidence_work() {
+    let fixture = prepared_fixture("agent-maintenance-audit-status-expect-target-version-mismatch", &clean_report(TARGET_VERSION)); write_text(&coverage_report_path(&fixture), "{not valid json\n");
     let err = audit_status::run_in_workspace(&fixture, audit_args_with_expected(REQUEST_PATH, Some("0.99.0"), None), &mut Vec::new()).expect_err("mismatched expected target version must fail");
-    assert_validation(&err, &["0.99.0", TARGET_VERSION, "does not describe the version under acquisition"]); assert!(!err.to_string().contains("requires live coverage report evidence"), "expected-target-version validation must happen before evidence validation");
+    assert!(matches!(err, AuditStatusError::TargetVersionMismatch(_))); assert_eq!(err.exit_code(), 5); for needle in ["0.99.0", TARGET_VERSION, "does not describe the version under acquisition"] { assert!(err.to_string().contains(needle)); } assert!(!err.to_string().contains("parse"), "target-version mismatch must win over malformed evidence");
 }
 
 #[rustfmt::skip]

@@ -1,7 +1,7 @@
 use std::{
     fs::{self, OpenOptions},
     io::{self, Write},
-    path::{Path, PathBuf},
+    path::{Component, Path, PathBuf},
     time::{SystemTime, UNIX_EPOCH},
 };
 
@@ -39,6 +39,9 @@ pub const EXIT_UPLIFTS_REQUIRED: i32 = 3;
 /// Exit code meaning the committed acquisition evidence is incomplete and CI may retry the
 /// missing targets once; only `union.json` with `complete: false` maps here.
 pub const EXIT_INCOMPLETE_ACQUISITION: i32 = 4;
+
+/// Exit code meaning the request describes a different release than the acquisition run.
+pub const EXIT_TARGET_VERSION_MISMATCH: i32 = 5;
 
 #[derive(Debug, Parser, Clone)]
 pub struct Args {
@@ -82,6 +85,8 @@ pub enum Error {
     #[error("{0}")]
     IncompleteAcquisition(String),
     #[error("{0}")]
+    TargetVersionMismatch(String),
+    #[error("{0}")]
     Validation(String),
     #[error("{0}")]
     Internal(String),
@@ -91,6 +96,7 @@ impl Error {
     pub fn exit_code(&self) -> i32 {
         match self {
             Self::IncompleteAcquisition(_) => EXIT_INCOMPLETE_ACQUISITION,
+            Self::TargetVersionMismatch(_) => EXIT_TARGET_VERSION_MISMATCH,
             Self::Validation(_) => EXIT_VALIDATION,
             Self::Internal(_) => EXIT_INTERNAL,
         }
@@ -261,6 +267,12 @@ fn derive_audit_status(
     request_path: &Path,
     expected_target_version: Option<&str>,
 ) -> Result<DerivedAuditStatus, DeriveAuditStatusFailure> {
+    validate_expected_target_version_before_load(
+        workspace_root,
+        request_path,
+        expected_target_version,
+    )
+    .map_err(DeriveAuditStatusFailure::preflight)?;
     let validated = request::load_request_envelope_validated_with_policy(
         workspace_root,
         request_path,
@@ -335,6 +347,76 @@ fn derive_audit_status(
     })
 }
 
+fn validate_expected_target_version_before_load(
+    workspace_root: &Path,
+    request_path: &Path,
+    expected_target_version: Option<&str>,
+) -> Result<(), Error> {
+    let Some(expected_target_version) = expected_target_version else {
+        return Ok(());
+    };
+
+    let Ok(workspace_root) = fs::canonicalize(workspace_root) else {
+        return Ok(());
+    };
+    let relative_path = if request_path.is_absolute() {
+        let Ok(path) = request_path.strip_prefix(&workspace_root) else {
+            return Ok(());
+        };
+        path.to_path_buf()
+    } else {
+        request_path.to_path_buf()
+    };
+    let components = relative_path.components().collect::<Vec<_>>();
+    if components.len() != 6
+        || components
+            .iter()
+            .any(|component| !matches!(component, Component::Normal(_)))
+        || components[0] != Component::Normal("docs".as_ref())
+        || components[1] != Component::Normal("agents".as_ref())
+        || components[2] != Component::Normal("lifecycle".as_ref())
+        || components[4] != Component::Normal("governance".as_ref())
+        || components[5] != Component::Normal("maintenance-request.toml".as_ref())
+    {
+        return Ok(());
+    }
+    let Component::Normal(maintenance_root) = components[3] else {
+        return Ok(());
+    };
+    if !maintenance_root.to_string_lossy().ends_with("-maintenance") {
+        return Ok(());
+    }
+
+    let Ok(canonical_path) = fs::canonicalize(workspace_root.join(&relative_path)) else {
+        return Ok(());
+    };
+    if !canonical_path.starts_with(&workspace_root) {
+        return Ok(());
+    }
+    let Ok(text) = fs::read_to_string(canonical_path) else {
+        return Ok(());
+    };
+    let Ok(document) = text.parse::<toml_edit::DocumentMut>() else {
+        return Ok(());
+    };
+    let Some(target_version) = document
+        .get("detected_release")
+        .and_then(toml_edit::Item::as_table)
+        .and_then(|table| table.get("target_version"))
+        .and_then(toml_edit::Item::as_str)
+    else {
+        return Ok(());
+    };
+    if target_version == expected_target_version {
+        return Ok(());
+    }
+
+    Err(Error::TargetVersionMismatch(format!(
+        "maintenance-audit-status expected target version `{expected_target_version}`, but maintenance request `{}` describes detected_release.target_version `{target_version}`; the request does not describe the version under acquisition",
+        relative_path.display()
+    )))
+}
+
 fn require_automated_support_audit_request(
     request: &MaintenanceRequest,
 ) -> Result<&DetectedRelease, Error> {
@@ -365,7 +447,7 @@ fn validate_expected_target_version(
         return Ok(());
     }
 
-    Err(Error::Validation(format!(
+    Err(Error::TargetVersionMismatch(format!(
         "maintenance-audit-status expected target version `{expected_target_version}`, but maintenance request `{}` describes detected_release.target_version `{}`; the request does not describe the version under acquisition",
         request.relative_path, detected_release.target_version
     )))

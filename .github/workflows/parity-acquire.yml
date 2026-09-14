@@ -430,6 +430,7 @@ jobs:
   union:
     name: "Union → report → validate (${{ inputs.agent_id }})"
     needs: [plan, snapshot]
+    if: ${{ !cancelled() && needs.plan.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     outputs:
@@ -526,6 +527,7 @@ jobs:
           VERSION: ${{ inputs.target_version }}
           ROOT: ${{ needs.plan.outputs.manifest_root }}
           AGENT_ID: ${{ inputs.agent_id }}
+          COMMIT: ${{ inputs.commit }}
         run: |
           set -euo pipefail
           REQUEST_PATH="docs/agents/lifecycle/${AGENT_ID}-maintenance/governance/maintenance-request.toml"
@@ -543,15 +545,17 @@ jobs:
             local audit_exit_code="$4"
             local audit_title="$5"
             local audit_message="$6"
+            local audit_message_delimiter
+            audit_message_delimiter="audit_message_$(od -An -N16 -tx1 /dev/urandom | tr -d ' \n')"
             {
               echo "closeout_ready=${closeout_ready}"
               echo "uplifts_required=${uplifts_required}"
               echo "audit_failed=${audit_failed}"
               echo "audit_exit_code=${audit_exit_code}"
               echo "audit_title=${audit_title}"
-              echo "audit_message<<__AUDIT_MESSAGE__"
+              echo "audit_message<<${audit_message_delimiter}"
               printf '%s\n' "$audit_message"
-              echo "__AUDIT_MESSAGE__"
+              echo "${audit_message_delimiter}"
             } >> "$GITHUB_OUTPUT"
           }
 
@@ -591,6 +595,21 @@ jobs:
               echo "- audit_exit_code: \`${audit_exit_code}\`"
               echo "- reason: \`${audit_message}\`"
             } >> "$GITHUB_STEP_SUMMARY"
+          }
+
+          last_nonblank_line() {
+            local log="$1"
+            local result=""
+            local line
+            [ -f "$log" ] || return 0
+            while IFS= read -r line || [ -n "$line" ]; do
+              case "$line" in
+                *[![:space:]]*)
+                  result="$line"
+                  ;;
+              esac
+            done < "$log"
+            printf '%s' "$result"
           }
 
           if [ ! -f "$REQUEST_PATH" ]; then
@@ -633,6 +652,21 @@ jobs:
               echo "::error title=Incomplete acquisition::${COMMAND_MESSAGE}" >&2
               emit_gate_outputs "false" "false" "true" "$AUDIT_STATUS" "Incomplete acquisition" "$COMMAND_MESSAGE"
               summarize_failure "incomplete acquisition" "$AUDIT_STATUS" "$COMMAND_MESSAGE"
+              ;;
+            5)
+              COMMAND_MESSAGE="$(last_nonblank_line "$COMMAND_STDERR")"
+              if [ -z "$COMMAND_MESSAGE" ]; then
+                COMMAND_MESSAGE="maintenance-audit-status reported a target version mismatch; see command output above."
+              fi
+              if [ "$COMMIT" = "true" ]; then
+                echo "::error title=Target version mismatch::${COMMAND_MESSAGE}" >&2
+                emit_gate_outputs "false" "false" "true" "$AUDIT_STATUS" "Target version mismatch" "$COMMAND_MESSAGE"
+                summarize_failure "target version mismatch" "$AUDIT_STATUS" "$COMMAND_MESSAGE"
+              else
+                echo "::notice title=Target version mismatch::${COMMAND_MESSAGE}" >&2
+                emit_gate_outputs "false" "false" "false" "$AUDIT_STATUS" "Target version mismatch" "$COMMAND_MESSAGE"
+                summarize_failure "target version mismatch (dry run, not blocking)" "$AUDIT_STATUS" "$COMMAND_MESSAGE"
+              fi
               ;;
             *)
               COMMAND_MESSAGE=""
@@ -762,4 +796,14 @@ jobs:
           else
             echo "::error title=${AUDIT_TITLE}::maintenance audit gate recorded a blocking verdict." >&2
           fi
-          exit "$AUDIT_EXIT_CODE"
+          case "$AUDIT_EXIT_CODE" in
+            ''|*[!0-9]*)
+              ;;
+            *)
+              if [ "$AUDIT_EXIT_CODE" -ge 1 ] 2>/dev/null && [ "$AUDIT_EXIT_CODE" -le 255 ] 2>/dev/null; then
+                exit "$AUDIT_EXIT_CODE"
+              fi
+              ;;
+          esac
+          echo "::error title=Invalid maintenance audit exit code::The recorded audit exit code '${AUDIT_EXIT_CODE}' was invalid; expected an integer from 1 through 255." >&2
+          exit 1

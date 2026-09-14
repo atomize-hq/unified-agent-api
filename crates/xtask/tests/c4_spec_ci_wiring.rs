@@ -333,7 +333,7 @@ fn c4_spec_reusable_acquisition_routes_maintenance_audit_gate_by_numeric_exit_co
     assert!(
         fallback_branch.contains("::error title=Maintenance audit failed::")
             && fallback_branch.contains("emit_gate_outputs \"false\" \"false\" \"true\""),
-        "non-zero maintenance audit exits other than {EXIT_UPLIFTS_REQUIRED} must record a blocking verdict"
+        "fallback maintenance audit exits must record a blocking verdict"
     );
     assert!(
         nonfatal_shell_branch_violations(fallback_branch).is_empty(),
