@@ -951,3 +951,15 @@ binary builds.
 | Opus O3 / Codex note: the 20 notes said the same flag stays in parity "on `run`", but 8 flags are not on `run` (and `--help`/`--version` do not configure the TUI) | **accepted, fixed** in `RULES.json` and §20.3 |
 | Opus O2: an excluded command's children now pass through wrapper and IU resolution, which can fail report generation (for example an IU scope mismatch) where they were skipped before | **no action**: correct under the decision; noted here |
 
+The follow-up round on `7e9fc0b0..633fef64` came back CLEAN from both lanes, with three precision
+notes recorded here rather than as findings:
+
+- Lifting a command's exclusion is not enough on its own; the child also needs its own coverage entry,
+  because command coverage does not cover that command's flags or arguments.
+- An intentionally-unsupported ancestor is not a third way to close the obligation. It moves the child
+  from `missing_*` to `intentionally_unsupported`, and the support audit reads that list as obligations
+  too; a newly discovered surface still cannot be deferred.
+- A child that the wrapper really supports, under a command that stays excluded, has no accurate
+  record: its own exclusion would mislabel a supported flag, and coverage needs the exclusion lifted.
+  This is the limit that keeping validation unchanged accepts; no committed manifest reaches it.
+
