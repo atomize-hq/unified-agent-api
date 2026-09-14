@@ -195,29 +195,32 @@ fn intentionally_unsupported_accepts_every_row_shape() {
     );
 }
 
-#[test]
-fn a_missing_root_command_remains_a_required_uplift() {
-    let repo_root = Path::new(env!("CARGO_MANIFEST_DIR"))
+fn repo_root() -> &'static Path {
+    Path::new(env!("CARGO_MANIFEST_DIR"))
         .parent()
         .and_then(Path::parent)
-        .expect("repo root");
-    let registry = AgentRegistry::load(repo_root).expect("load registry");
-    let entry = registry.find("opencode").expect("opencode entry");
+        .expect("repo root")
+}
+
+/// Derives the audit for `agent_id` from the committed registry and debt inventory plus `report`.
+fn derive_with_report(agent_id: &str, version: &str, report: &Value) -> SupportSurfaceAudit {
+    let registry = AgentRegistry::load(repo_root()).expect("load registry");
+    let entry = registry.find(agent_id).expect("registry entry");
     let workspace = tempfile::TempDir::new().expect("workspace");
     let debt = workspace.path().join(NON_TUI_SUPPORT_DEBT_PATH);
     fs::create_dir_all(debt.parent().expect("debt parent")).expect("create debt parent");
-    fs::copy(repo_root.join(NON_TUI_SUPPORT_DEBT_PATH), &debt).expect("copy debt inventory");
+    fs::copy(repo_root().join(NON_TUI_SUPPORT_DEBT_PATH), &debt).expect("copy debt inventory");
     let report_dir = workspace
         .path()
         .join(&entry.manifest_root)
-        .join("reports/1.18.29");
+        .join("reports")
+        .join(version);
     fs::create_dir_all(&report_dir).expect("create report dir");
-    let report = json!({"deltas": deltas(json!([root_row()]), json!([]), json!([]))});
     fs::write(report_dir.join("coverage.any.json"), report.to_string()).expect("write report");
     let release = DetectedRelease {
         detected_by: String::new(),
         current_validated: String::new(),
-        target_version: "1.18.29".into(),
+        target_version: version.into(),
         latest_stable: String::new(),
         version_policy: String::new(),
         source_kind: String::new(),
@@ -226,9 +229,16 @@ fn a_missing_root_command_remains_a_required_uplift() {
         dispatch_workflow: String::new(),
         branch_name: String::new(),
     };
+    derive_support_surface_audit(workspace.path(), entry, &release).expect("derive audit")
+}
 
-    let audit = derive_support_surface_audit(workspace.path(), entry, &release)
-        .expect("a root command row derives");
+#[test]
+fn a_missing_root_command_remains_a_required_uplift() {
+    let audit = derive_with_report(
+        "opencode",
+        "1.18.29",
+        &json!({"deltas": deltas(json!([root_row()]), json!([]), json!([]))}),
+    );
 
     let root = identity("commands", "opencode", "opencode");
     let required = audit
@@ -242,4 +252,50 @@ fn a_missing_root_command_remains_a_required_uplift() {
         .preexisting_unsupported_surface
         .iter()
         .all(|surface| surface.identity() != root));
+}
+
+#[test]
+fn every_debt_row_is_rooted_at_its_agent_id() {
+    let registry = AgentRegistry::load(repo_root()).expect("load registry");
+    for row in load_debt_inventory(repo_root()).expect("load debt inventory") {
+        assert!(
+            registry.find(&row.agent_id).is_some(),
+            "debt row `{}` names unknown agent `{}`",
+            row.row_id,
+            row.agent_id
+        );
+        assert!(
+            row.command_path == row.agent_id
+                || row.command_path.starts_with(&format!("{} ", row.agent_id)),
+            "debt row `{}` command_path `{}` is not rooted at agent id `{}`",
+            row.row_id,
+            row.command_path,
+            row.agent_id
+        );
+    }
+}
+
+#[test]
+fn claude_code_install_debt_matches_its_report_surfaces() {
+    // Row shapes as the claude_code 2.1.236 report lists them under intentionally_unsupported.
+    let mut report = deltas(json!([]), json!([]), json!([]));
+    report["intentionally_unsupported"] = json!([
+        {"path": ["install"], "upstream_available_on": ["win32-x64"]},
+        {"path": ["install"], "key": "--force", "upstream_available_on": ["win32-x64"]},
+    ]);
+
+    let audit = derive_with_report("claude_code", "2.1.236", &json!({"deltas": report}));
+
+    let install = vec![
+        identity("commands", "claude_code install", "install"),
+        identity("flags", "claude_code install", "--force"),
+    ];
+    let preexisting = audit
+        .preexisting_unsupported_surface
+        .iter()
+        .map(DebtBackedSurface::identity)
+        .collect::<Vec<_>>();
+    assert_eq!(preexisting, install);
+    assert!(audit.required_uplifts_this_run.is_empty());
+    assert!(audit.removed_upstream_surface.is_empty());
 }

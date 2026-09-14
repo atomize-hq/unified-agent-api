@@ -37,28 +37,13 @@ Allowed `blocker_class` values are aligned to the maintenance-request contract:
 
 Row ids are the canonical `debt_ref` anchors used by `support_surface_audit`.
 
-## Open decisions
-
-opencode's root command (surface `commands` / `opencode` / `opencode`, the TUI entry point
-`opencode [project]`) is a newly discovered surface from opencode 1.18.29 onward. Do not add a debt
-row, a parity exclusion, or wrapper coverage for it until backlog item `uaa-0035` records the
-maintainer's decision. A newly discovered surface cannot be deferred as debt under the
-maintenance-request contract, so the choice is between an uplift and a parity exclusion. Under
-current report generation, excluding the command also drops its 20 root-level flags and its
-`project` argument from the report.
-
-The claude_code rows below write `command_path` with the binary name (`claude install`), but
-report-derived surfaces use the agent id (`claude_code install`), so these rows do not currently
-match. Do not add or edit claude_code rows until backlog item `uaa-0036` records which form is
-canonical.
-
 ## Inventory
 
 ### `claude-code-install-command`
 
 - `agent_id`: `claude_code`
 - `surface_kind`: `commands`
-- `command_path`: `claude install`
+- `command_path`: `claude_code install`
 - `surface_id`: `install`
 - `current_reason`: `Current wrapper contract excludes installation flows even though the upstream non-TUI surface exists on win32-x64.`
 - `blocker_class`: `requires_new_architectural_seam`
@@ -71,7 +56,7 @@ canonical.
 
 - `agent_id`: `claude_code`
 - `surface_kind`: `flags`
-- `command_path`: `claude install`
+- `command_path`: `claude_code install`
 - `surface_id`: `--force`
 - `current_reason`: `The wrapper excludes the Windows installation force path along with the install command seam.`
 - `blocker_class`: `requires_new_architectural_seam`
