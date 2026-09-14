@@ -1135,7 +1135,7 @@
     {
       "id": "uaa-0035",
       "title": "Decide whether opencode's TUI root command is excluded from parity obligations",
-      "status": "todo",
+      "status": "done",
       "bucket": "agent_api.onboarding",
       "type": "design",
       "kickoff": {
@@ -1170,13 +1170,14 @@
         ]
       },
       "notes": [
-        "Raised 2026-09-14 after the pre-merge audit-gate simulation and a ChatGPT Pro consult (advisory). The maintainer approved the root identity and deferred this policy decision, asking that it be tracked at the points where it will be hit."
+        "Raised 2026-09-14 after the pre-merge audit-gate simulation and a ChatGPT Pro consult (advisory). The maintainer approved the root identity and deferred this policy decision, asking that it be tracked at the points where it will be hit.",
+        "Decided 2026-09-14 by the maintainer: exclude the root command (option 4 of the recorded scenarios). Resolved in 3f7ad4c7: manifest-report now checks an excluded command's flags and arguments against their own exclusions instead of dropping them, and opencode RULES.json excludes the root command and its 20 root-position flags as `interactive`. Replayed post-merge nightly for opencode 1.18.29: required uplifts 494 -> 473, root command under `excluded_commands`, the 20 root flags under `excluded_flags`, `project` still under `excluded_args`, manifest-validate clean. Codex 0.153.4: `app`'s PATH arg and --download-url flag move into the excluded lists, uplifts unchanged at 38. Trigger pointers removed in fa739c7d and the following docs commit."
       ]
     },
     {
       "id": "uaa-0036",
       "title": "claude_code debt rows name the binary (`claude`) but report-derived surfaces use the agent id, so they never match",
-      "status": "todo",
+      "status": "done",
       "bucket": "agent_api.onboarding",
       "type": "design",
       "kickoff": {
@@ -1208,7 +1209,8 @@
         ]
       },
       "notes": [
-        "Raised 2026-09-14 by the Opus adversarial lane (observation O1) reviewing the root-command fix; accepted as pre-existing and deferred to a maintainer decision."
+        "Raised 2026-09-14 by the Opus adversarial lane (observation O1) reviewing the root-command fix; accepted as pre-existing and deferred to a maintainer decision.",
+        "Decided 2026-09-14 by the maintainer: `command_path` is rooted at the registry agent id (option A). Resolved in fa739c7d: the two claude_code debt rows and the contract examples read `claude_code`, the contract states the rule, and tests bind every debt row to its agent id and claude_code's install debt to preexisting. Replayed post-merge nightly for claude_code 2.1.236: required uplifts 117 -> 115, preexisting 0 -> 2, removed upstream surface 2 -> 0. The frozen claude_code request on the feature branch keeps the old form; it is generated and already invalid. Trigger pointers removed."
       ]
     }
   ]

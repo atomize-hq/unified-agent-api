@@ -900,12 +900,35 @@ had no false statement but did not say that shared code always leaves
 Both were fixed in the next commit. The plan's §20.2 table keeps §8.1 out of the trigger points,
 because it is a tracking table rather than a place the decision is hit.
 
-### 20.2 Open decisions and where they are triggered
+### 20.2 Open decisions and where they were triggered
 
 The maintainer asked that deferred decisions sit where they will be hit, not only in the backlog.
-Neither relies on closeout validation to force it.
+Both were then decided the same day, so the pointers are gone; the table records where they sat.
 
-| id | decision | trigger points |
+| id | decision | was triggered at | resolution |
+| --- | --- | --- | --- |
+| `uaa-0035` | Is opencode's TUI root command (with its root flags and `project` argument) excluded from parity? | spec T5 and T8 open-decisions list; debt inventory "Open decisions" | **Exclude**, and stop a command exclusion from hiding its children (`3f7ad4c7`) |
+| `uaa-0036` | Is `command_path` rooted at the agent id or the binary name? | spec T8 open-decisions list; debt inventory "Open decisions"; contract "Known conflict" note | **Agent id** (`fa739c7d`) |
+
+### 20.3 Implementing the two decisions
+
+`uaa-0035` (option 4). `manifest-report` used to record an excluded command and skip its flags and
+arguments without listing them, so a command exclusion also hid every child, including ones added
+upstream later. It now checks each child against its own exclusion. opencode `RULES.json` excludes
+the root command and its 20 root-position flags (`interactive`); the same flags on `run` and the
+other subcommands stay in parity. Codex's `app` already listed its children, so they move into the
+excluded lists with no obligation change; claude_code has no command exclusions.
+
+`uaa-0036` (option A). The two claude_code debt rows and the contract examples now read
+`claude_code`; tests bind every debt row to its agent id and claude_code's install debt to
+preexisting. The alternative, rooting at the binary name, needed a binary-name field that neither
+the registry nor `RULES.json` has.
+
+Post-merge nightly replay at `fa739c7d` (report, version metadata, support matrix, validate, gate,
+each on the packet's committed union):
+
+| packet | report change | gate |
 | --- | --- | --- |
-| `uaa-0035` | Is opencode's TUI root command (with its root flags and `project` argument) excluded from parity? | spec T5 and T8 open-decisions list; debt inventory "Open decisions" |
-| `uaa-0036` | Is `command_path` rooted at the agent id or the binary name? | spec T8 open-decisions list; debt inventory "Open decisions"; contract "Known conflict" note |
+| codex 0.153.4 | `excluded_args` 1 -> 2, `excluded_flags` 1 -> 2 (`app` children) | exit 3, 38 uplifts (unchanged) |
+| claude_code 2.1.236 | none | exit 3, 115 uplifts (was 117); preexisting 2 (was 0) |
+| opencode 1.18.29 | root command to `excluded_commands`, 20 root flags to `excluded_flags` | exit 3, 473 uplifts (was 494) |
