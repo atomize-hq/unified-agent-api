@@ -915,8 +915,10 @@ Both were then decided the same day, so the pointers are gone; the table records
 `uaa-0035` (option 4). `manifest-report` used to record an excluded command and skip its flags and
 arguments without listing them, so a command exclusion also hid every child, including ones added
 upstream later. It now checks each child against its own exclusion. opencode `RULES.json` excludes
-the root command and its 20 root-position flags (`interactive`); the same flags on `run` and the
-other subcommands stay in parity. Codex's `app` already listed its children, so they move into the
+the root command and its 20 root-position flags (`interactive`); wherever a subcommand accepts the
+same flag, that copy stays in parity (`run` keeps the five global flags and its own copies; `--cors`,
+`--hostname`, `--mdns`, `--mdns-domain`, `--mini`, `--no-replay`, `--replay-limit`, and `--prompt`
+appear only on other subcommands). Codex's `app` already listed its children, so they move into the
 excluded lists with no obligation change; claude_code has no command exclusions.
 
 `uaa-0036` (option A). The two claude_code debt rows and the contract examples now read
@@ -932,3 +934,20 @@ each on the packet's committed union):
 | codex 0.153.4 | `excluded_args` 1 -> 2, `excluded_flags` 1 -> 2 (`app` children) | exit 3, 38 uplifts (unchanged) |
 | claude_code 2.1.236 | none | exit 3, 115 uplifts (was 117); preexisting 2 (was 0) |
 | opencode 1.18.29 | root command to `excluded_commands`, 20 root flags to `excluded_flags` | exit 3, 473 uplifts (was 494) |
+
+### 20.4 Review round on the decisions
+
+Both lanes reviewed `dae72434..7e9fc0b0`. The Opus lane returned CLEAN with four low observations,
+after regenerating every committed report it could with both binaries (only codex 0.125.0 and
+0.144.6 changed, as intended). The Codex lane returned three findings; its sandbox again blocked
+binary builds.
+
+| finding | verdict |
+| --- | --- |
+| Codex 1 (blocking): wrapper coverage cannot declare a child of an excluded command, because the validator rejects any coverage entry at an excluded command path, so the new obligation "cannot be closed" | **accepted in part.** The coverage limit is real, but the obligation still closes validly: by the child's own parity exclusion (the path for a TUI-position flag) or by lifting the command's exclusion and covering the command. That is the intended option-4 flow, so validation is not relaxed; both routes are now documented at the decision point in `manifest-report` and here |
+| Codex 2 / Opus O4: `PLAN.md` still used `command_path = "claude"` | **accepted, fixed** |
+| Codex 3 / Opus O1: c10 did not bind wrapper-covered or intentionally-unsupported children of an excluded command; a mutation skipping IU inheritance for them passed every test | **accepted, fixed**: a second c10 case puts an intentionally-unsupported root above `app`; the mutation now fails it |
+| Codex 3: the agent-id test accepted a double-spaced `command_path` | **accepted, fixed**: tokens after the agent id must be non-empty |
+| Opus O3 / Codex note: the 20 notes said the same flag stays in parity "on `run`", but 8 flags are not on `run` (and `--help`/`--version` do not configure the TUI) | **accepted, fixed** in `RULES.json` and §20.3 |
+| Opus O2: an excluded command's children now pass through wrapper and IU resolution, which can fail report generation (for example an IU scope mismatch) where they were skipped before | **no action**: correct under the decision; noted here |
+

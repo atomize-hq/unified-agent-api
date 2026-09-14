@@ -94,7 +94,9 @@ pub(super) fn build_report(
         }
 
         // Excluding a command does not exclude its flags or args: each is checked against its own
-        // exclusion below, so a flag the rules do not name still reaches the work queue.
+        // exclusion below, so a flag the rules do not name still reaches the work queue. Wrapper
+        // coverage cannot declare a child of an excluded command (validation rejects the enclosing
+        // entry), so such a child is closed by its own exclusion or by lifting the command's.
         if let Some(ex) = parity_exclusions.and_then(|idx| idx.commands.get(path)) {
             let cmd_res = wrapper::resolve_wrapper(
                 wrapper_index

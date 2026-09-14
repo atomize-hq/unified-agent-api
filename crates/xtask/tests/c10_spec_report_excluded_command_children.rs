@@ -34,12 +34,14 @@ fn arg(name: &str) -> Value {
     json!({ "name": name, "available_on": TARGETS })
 }
 
+/// Rows of `deltas[list]` that carry `field`, as (path, value) pairs.
 fn units(deltas: &Value, list: &str, field: &str) -> Vec<(Vec<String>, String)> {
     deltas[list]
         .as_array()
         .map(Vec::as_slice)
         .unwrap_or(&[])
         .iter()
+        .filter(|row| field == "path" || row.get(field).is_some())
         .map(|row| {
             let path = serde_json::from_value(row["path"].clone()).expect("path tokens");
             (path, row[field].as_str().unwrap_or_default().to_string())
@@ -54,10 +56,10 @@ fn unit(path: &[&str], id: &str) -> (Vec<String>, String) {
     )
 }
 
-// Codex's committed RULES.json excludes the `app` command together with its `PATH` arg and
-// `--download-url` flag, plus the root `PROMPT` arg and `--no-alt-screen` flag.
-#[test]
-fn an_excluded_command_still_reports_the_flags_and_args_its_rules_do_not_name() {
+/// Runs `manifest-report` against codex's committed RULES.json, which excludes the `app` command
+/// together with its `PATH` arg and `--download-url` flag, plus the root `PROMPT` arg and
+/// `--no-alt-screen` flag. `app` also carries a flag and an arg the rules do not name.
+fn report_deltas(wrapper_coverage: Value) -> Value {
     let temp = tempfile::TempDir::new().expect("temp dir");
     let codex_dir = temp.path().join("cli_manifests/codex");
     for file in ["SCHEMA.json", "RULES.json", "VERSION_METADATA_SCHEMA.json"] {
@@ -97,11 +99,7 @@ fn an_excluded_command_still_reports_the_flags_and_args_its_rules_do_not_name() 
             ],
         }),
     );
-    write_json(
-        &codex_dir.join("wrapper_coverage.json"),
-        &json!({ "schema_version": 1, "generated_at": TS, "wrapper_version": "0.0.0-test",
-                 "coverage": [{ "path": [], "level": "explicit" }] }),
-    );
+    write_json(&codex_dir.join("wrapper_coverage.json"), &wrapper_coverage);
 
     let output = Command::new(env!("CARGO_BIN_EXE_xtask"))
         .args(["manifest-report", "--root"])
@@ -126,8 +124,10 @@ fn an_excluded_command_still_reports_the_flags_and_args_its_rules_do_not_name() 
         .expect("read report"),
     )
     .expect("parse report");
-    let deltas = &report["deltas"];
+    report["deltas"].clone()
+}
 
+fn assert_own_exclusions_apply(deltas: &Value) {
     assert_eq!(
         units(deltas, "excluded_commands", "path"),
         vec![unit(&["app"], "")]
@@ -143,13 +143,44 @@ fn an_excluded_command_still_reports_the_flags_and_args_its_rules_do_not_name() 
         units(deltas, "excluded_args", "name"),
         vec![unit(&[], "PROMPT"), unit(&["app"], "PATH")]
     );
+    assert!(units(deltas, "missing_commands", "path").is_empty());
+}
+
+#[test]
+fn an_excluded_command_still_reports_the_flags_and_args_its_rules_do_not_name() {
+    let deltas = report_deltas(json!({
+        "schema_version": 1, "generated_at": TS, "wrapper_version": "0.0.0-test",
+        "coverage": [{ "path": [], "level": "explicit" }],
+    }));
+
+    assert_own_exclusions_apply(&deltas);
     assert_eq!(
-        units(deltas, "missing_flags", "key"),
+        units(&deltas, "missing_flags", "key"),
         vec![unit(&["app"], "--new-app-flag")]
     );
     assert_eq!(
-        units(deltas, "missing_args", "name"),
+        units(&deltas, "missing_args", "name"),
         vec![unit(&["app"], "NEW_APP_ARG")]
     );
-    assert!(units(deltas, "missing_commands", "path").is_empty());
+}
+
+#[test]
+fn an_excluded_commands_unnamed_children_still_inherit_an_intentionally_unsupported_root() {
+    let deltas = report_deltas(json!({
+        "schema_version": 1, "generated_at": TS, "wrapper_version": "0.0.0-test",
+        "coverage": [{ "path": [], "level": "intentionally_unsupported",
+                       "note": "waived root subtree for the c10 exclusion test" }],
+    }));
+
+    assert_own_exclusions_apply(&deltas);
+    assert!(units(&deltas, "missing_flags", "key").is_empty());
+    assert!(units(&deltas, "missing_args", "name").is_empty());
+    assert_eq!(
+        units(&deltas, "intentionally_unsupported", "key"),
+        vec![unit(&["app"], "--new-app-flag")]
+    );
+    assert_eq!(
+        units(&deltas, "intentionally_unsupported", "name"),
+        vec![unit(&["app"], "NEW_APP_ARG")]
+    );
 }

@@ -264,10 +264,10 @@ fn every_debt_row_is_rooted_at_its_agent_id() {
             row.row_id,
             row.agent_id
         );
+        let mut tokens = row.command_path.split(' ');
         assert!(
-            row.command_path == row.agent_id
-                || row.command_path.starts_with(&format!("{} ", row.agent_id)),
-            "debt row `{}` command_path `{}` is not rooted at agent id `{}`",
+            tokens.next() == Some(row.agent_id.as_str()) && tokens.all(|token| !token.is_empty()),
+            "debt row `{}` command_path `{}` is not `<agent_id>` then single-spaced tokens (agent id `{}`)",
             row.row_id,
             row.command_path,
             row.agent_id
