@@ -302,8 +302,9 @@ worse.
 Each item is in `docs/backlog.json` with its own context, file list and deliverables; plan doc
 §18.3 and §18.5 carry the same items. T1 carried out four (`uaa-0023`…`uaa-0026`). T2 review
 adjudication, and a code reading while writing the 2026-09-13 handoff, added six more
-(`uaa-0027`…`uaa-0032`). The handoff-reading items (`uaa-0029`…`uaa-0032`) have not been through a
-review lane yet.
+(`uaa-0027`…`uaa-0032`). The T2c review round (2026-09-13, both lanes) confirmed the handoff-reading
+items (`uaa-0029`…`uaa-0032`; `uaa-0031` by reading only) and added two more (`uaa-0033`,
+`uaa-0034`).
 
 | id | item | disposition |
 | --- | --- | --- |
@@ -314,9 +315,11 @@ review lane yet.
 | `uaa-0027` | Snapshot retry can mix two attempts in raw_help | Low. The retry never clears attempt 1's `raw_help/<version>/<target>/`. raw_help is never committed. |
 | `uaa-0028` | `--emit-json` cleanup deletes whatever path it names | Low, suspected. No ownership guard. Matters once T3 makes the projection path durable. |
 | `uaa-0029` | `parity-acquire` exports no `workflow_call` outputs | Medium, latent. The caller cannot see `closeout_ready` / `uplifts_required`. **T3 prerequisite.** |
-| `uaa-0030` | One failed snapshot leg skips `union`, gate, commit and upload | Medium. The "continues on a partial matrix" premise in §8.2 was wrong and is corrected there. **Decided 2026-09-13: preserve completed legs** — `union` runs unless cancelled or `plan` failed; the gate routes exit 4; commit and upload run; the job still fails. Fix after the T2c review round. |
-| `uaa-0031` | A blocking verdict is probably not visible on the packet PR | Medium, suspected; needs a runner observation. T3 design input. |
-| `uaa-0032` | `--expect-target-version` mismatch fails out-of-packet runs | Medium. Dry runs and promote-prerequisite re-runs now end red. **Decided 2026-09-13: fail only when committing** — a `commit: false` mismatch emits a notice and stays green; no other exit 2 may be downgraded. Fix after the T2c review round. |
+| `uaa-0030` | One failed snapshot leg skips `union`, gate, commit and upload | Medium. The "continues on a partial matrix" premise in §8.2 was wrong and is corrected there. **Decided 2026-09-13: preserve completed legs** — `union` runs unless cancelled or `plan` failed; the gate routes exit 4; commit and upload run; the job still fails. **Refined 2026-09-13:** a failed *required* target still hard-fails with no union (`manifest-union` cannot build one); only non-required leg failures preserve work. Fix after the T2c review round. |
+| `uaa-0031` | A blocking verdict is probably not visible on the packet PR | Medium; confirmed by reading, not yet observed on a runner. T3 design input. Also carries the exit-3 `required_uplifts` detail, which `_ci_tmp` cleanup deletes today — T3 renders it. |
+| `uaa-0032` | `--expect-target-version` mismatch fails out-of-packet runs | Medium. Dry runs and promote-prerequisite re-runs now end red. **Decided 2026-09-13: fail only when committing** — a `commit: false` mismatch emits a notice and stays green; no other exit 2 may be downgraded. Mechanism: the target version is compared before the validated request load and a mismatch gets its own exit code 5. A promote-prerequisite re-run (`commit: true`) for a version the ref's request does not name is **accepted as red-but-committed**. Fix after the T2c review round. |
+| `uaa-0033` | Artifact bundle does not match what the run committed | Low. The `always()` upload can succeed with only stale checkout files, and omits the support-matrix files the commit stages. |
+| `uaa-0034` | Commit step can push a rebased tree the gate never judged | Low, suspected, pre-dates T2c. |
 
 ### 8.2 What T1 changed about T2
 
@@ -341,7 +344,8 @@ artifact never arrives. Because the matrix and `union.expected_targets` come fro
 exit 4 is close to unreachable in CI; it still matters for local runs against committed history.
 **Decided 2026-09-13:** one failed leg must not discard the other legs' work. `union` will run
 unless the run was cancelled or `plan` failed, so the gate routes exit 4 and the job fails after
-commit and upload (`uaa-0030`).
+commit and upload (`uaa-0030`). A failed *required* target is the exception: no union can be built
+without it, so that run still hard-fails with nothing committed.
 
 ---
 

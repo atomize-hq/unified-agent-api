@@ -753,6 +753,8 @@ spec's §8.1 carries the same table.
 | `uaa-0027` | Snapshot retry can mix two attempts in raw_help | T2 adversarial L7 | Low; raw_help is never committed. |
 | `uaa-0028` | `--emit-json` cleanup has no ownership guard | T2 adversarial L8 (suspected) | Low until T3 makes the projection path durable. |
 | `uaa-0029` | No `on.workflow_call.outputs` for the gate verdict | handoff reading (H1), unreviewed | T3 prerequisite. |
-| `uaa-0030` | One failed leg skips `union`, gate, commit and upload | handoff reading (H2), unreviewed | Docs corrected here and in the spec. Decided 2026-09-13: preserve completed legs; fix after the T2c review round. |
-| `uaa-0031` | Blocking verdict probably not visible on the packet PR | handoff reading (H3), suspected | Needs a runner observation; T3 design input. |
-| `uaa-0032` | Version mismatch fails dry runs and promote-prerequisite re-runs | handoff reading (H5), unreviewed | Decided 2026-09-13: fail only when committing; a dry-run mismatch emits a notice. Fix after the T2c review round. |
+| `uaa-0030` | One failed leg skips `union`, gate, commit and upload | handoff reading (H2); confirmed in T2c review | Docs corrected here and in the spec. Decided 2026-09-13: preserve completed legs, except a failed required target, which still hard-fails with no union. Fix after the T2c review round. |
+| `uaa-0031` | Blocking verdict probably not visible on the packet PR | handoff reading (H3); confirmed by reading in T2c review; Opus F2 | Needs a runner observation; T3 design input. T3 also renders the exit-3 `required_uplifts` detail that `_ci_tmp` cleanup deletes today. |
+| `uaa-0032` | Version mismatch fails dry runs and promote-prerequisite re-runs | handoff reading (H5); confirmed in T2c review | Decided 2026-09-13: fail only when committing; a dry-run mismatch emits a notice. The mismatch is checked before the validated load and gets exit 5. Promote-prerequisite re-runs with `commit: true` are accepted as red-but-committed. Fix after the T2c review round. |
+| `uaa-0033` | Artifact bundle does not match what the run committed | T2c review (Opus, suspected; Codex) | Low. |
+| `uaa-0034` | Commit step can push a rebased tree the gate never judged | T2c review (Opus, suspected) | Low; pre-dates T2c. |

@@ -993,7 +993,8 @@
         "Found while writing the 2026-09-13 handoff (H2). Confirmed by reading; not observed on a runner; unreviewed.",
         "The T2 adversarial lane (L6) noted in passing that union is skipped; nobody corrected the docs then.",
         "Doc premise corrected in the spec §8.2 and plan §18.1 / §18.4 on 2026-09-13.",
-        "Maintainer decision 2026-09-13: preserve completed legs. Implement in the fix packet that follows the T2c review round."
+        "Maintainer decision 2026-09-13: preserve completed legs. Implement in the fix packet that follows the T2c review round.",
+        "T2c review round (2026-09-13, both lanes) found the decided rule cannot cover a failed REQUIRED target: the materialize step exits 1 and `manifest-union` independently refuses to build without `union.required_target` (`manifest_union.rs` MissingRequiredSnapshot). Maintainer refinement 2026-09-13: a required-target failure still hard-fails with no union; only non-required leg failures preserve work (union complete=false, exit 4, commit and upload, then fail)."
       ]
     },
     {
@@ -1026,7 +1027,8 @@
       },
       "notes": [
         "Found while writing the 2026-09-13 handoff (H3). Suspected; unreviewed.",
-        "T3 design input."
+        "T3 design input.",
+        "T2c review round (Opus lane F2, 2026-09-13): on exit 3 the `required_uplifts` detail is written only to `_ci_tmp/audit/status.json`, which the cleanup step deletes before commit and upload; with `--emit-json` stdout is empty, so the log does not carry it either. Deferred to T3, which renders the verdict and relay invocation and is the projection's first consumer (resolve uaa-0025 first)."
       ]
     },
     {
@@ -1062,7 +1064,71 @@
       },
       "notes": [
         "Found while writing the 2026-09-13 handoff (H5). Confirmed by reading; unreviewed; impact is a maintainer decision.",
-        "Maintainer decision 2026-09-13: fail only when committing. Implement in the fix packet that follows the T2c review round."
+        "Maintainer decision 2026-09-13: fail only when committing. Implement in the fix packet that follows the T2c review round.",
+        "T2c review round (2026-09-13, both lanes): the mismatch check runs after the request loader's live derivation, so malformed evidence for the request's own version masks the mismatch, and the `..._before_evidence_work` test does not prove its name (a removed report directory makes the loader fall back rather than fail). Mechanism chosen by the lead: compare the request's `detected_release.target_version` before the validated load, and give a mismatch its own exit code (5, `EXIT_TARGET_VERSION_MISMATCH`) so the workflow downgrades only that code on a dry run.",
+        "Maintainer decision 2026-09-13: a parity-promote prerequisite re-run (which needs `commit: true` so lockfile pins land) for a version the ref's request does not name is accepted as red-but-committed. Document it where the promote error text points operators."
+      ]
+    },
+    {
+      "id": "uaa-0033",
+      "title": "parity-acquire artifact bundle does not match what the run committed",
+      "status": "todo",
+      "bucket": "agent_api.onboarding",
+      "type": "task",
+      "kickoff": {
+        "prompt": [
+          "Work item: uaa-0033 — `parity-acquire` artifact bundle does not match what the run committed.",
+          "Context: T2c (24a95b52) made \"Upload the committed artifact bundle\" in `.github/workflows/parity-acquire.yml` run `always()` so a failing verdict cannot discard the acquisition.",
+          "Finding 1 (T2c review, Opus lane, suspected): when an earlier union-job step fails, the upload still succeeds because `wrapper_coverage.json` and `artifacts.lock.json` already exist in the checkout, so `if-no-files-found: error` never trips. The result is an artifact named as the committed bundle that holds nothing this run produced. Preserving completed legs (uaa-0030) makes partial runs more common.",
+          "Finding 2 (T2c review, Codex lane): the bundle paths omit `cli_manifests/support_matrix/current.json` and `docs/specs/unified-agent-api/support-matrix.md`, which the commit step stages.",
+          "Steps:",
+          "1) Decide what the bundle is: exactly the staged commit set, or the run's outputs whether or not they were committed.",
+          "2) Name and populate it accordingly, and fail or label it when the run produced nothing new.",
+          "3) Bind the bundle path list to the commit step's `git add` list with a contract test.",
+          "Output: a bundle whose name and contents agree with what the run actually produced or committed."
+        ],
+        "files_to_read": [
+          ".github/workflows/parity-acquire.yml",
+          "crates/xtask/tests/c4_spec_ci_wiring.rs"
+        ],
+        "deliverables": [
+          "Defined bundle contents and naming",
+          "Contract test binding the bundle to the commit set"
+        ]
+      },
+      "notes": [
+        "Raised in the T2c review round (2026-09-13) by both lanes; accepted and deferred as low severity."
+      ]
+    },
+    {
+      "id": "uaa-0034",
+      "title": "parity-acquire commit step can push a rebased tree the audit gate never judged",
+      "status": "todo",
+      "bucket": "agent_api.onboarding",
+      "type": "task",
+      "kickoff": {
+        "prompt": [
+          "Work item: uaa-0034 — `parity-acquire` commit step can push a rebased tree the audit gate never judged.",
+          "Context: the commit step in `.github/workflows/parity-acquire.yml` retries a rejected push by fetching and rebasing onto `origin/<ref>` up to three times, because the matrix can run for most of an hour while the packet branch moves.",
+          "Finding (T2c review, Opus lane, suspected; pre-dates T2c): the maintenance audit gate ran against the checkout before the rebase. If the packet branch gained a change the gate depends on, such as a regenerated maintenance request or coverage evidence, the pushed tree carries a verdict computed against different inputs.",
+          "Steps:",
+          "1) Determine which packet-branch changes can land during an acquisition run (packet regeneration by `agent-maintenance-open-pr.yml` for the same version is the obvious one).",
+          "2) Decide: re-run the gate after a rebase that touched gate inputs, refuse to push when those inputs changed, or document that the verdict is bound to the pre-rebase inputs.",
+          "3) Add a contract test for whichever rule is chosen.",
+          "Output: a pushed acquisition commit whose gate verdict is known to match its inputs, or a documented binding."
+        ],
+        "files_to_read": [
+          ".github/workflows/parity-acquire.yml",
+          ".github/workflows/agent-maintenance-open-pr.yml",
+          "crates/xtask/tests/c4_spec_ci_wiring.rs"
+        ],
+        "deliverables": [
+          "Decided rule for gate inputs changed by a rebase",
+          "Contract test"
+        ]
+      },
+      "notes": [
+        "Raised in the T2c review round (2026-09-13) by the Opus lane; pre-existing; accepted and deferred as low severity."
       ]
     }
   ]
