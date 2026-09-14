@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at_utc": "2026-09-13T00:00:00Z",
+  "updated_at_utc": "2026-09-14T00:00:00Z",
   "items": [
     {
       "id": "uaa-0022",
@@ -1000,19 +1000,18 @@
     },
     {
       "id": "uaa-0031",
-      "title": "A blocking audit verdict is probably not visible on the packet PR",
+      "title": "A blocking audit verdict is not visible on the packet PR",
       "status": "todo",
       "bucket": "agent_api.onboarding",
       "type": "design",
       "kickoff": {
         "prompt": [
-          "Work item: uaa-0031 — A blocking audit verdict is probably not visible on the packet PR.",
+          "Work item: uaa-0031 — A blocking audit verdict is not visible on the packet PR.",
           "Context: T2c (24a95b52) records the gate verdict and fails the `union` job in a terminal step so that, per its rationale, the packet PR stays red. The gate runs only inside `.github/workflows/parity-acquire.yml`, called by `.github/workflows/agent-maintenance-open-pr.yml`, which the release watcher starts with `createWorkflowDispatch` on `ref: DISPATCH_REF` (`.github/workflows/agent-maintenance-release-watch.yml`).",
-          "Suspected finding (found while writing the 2026-09-13 handoff, H3; needs a runner observation): that run is not triggered by the packet branch. The packet PR's checks come from `.github/workflows/ci.yml` (`pull_request` / `push`), which never runs `maintenance-audit-status`. With `commit: true`, an exit-2 or exit-4 verdict still pushes artifacts, and the PR can show green checks while the failure is visible only in the watcher-side run. Exit 3 has the same visibility gap, which T3 exists to close.",
+          "Finding (H3; suspected in the 2026-09-13 handoff, confirmed by runner observation on 2026-09-14): the `acquire` run is dispatched on `staging`, not triggered by the packet branch, so its check runs attach to the `staging` head commit. The packet PR's checks come only from `.github/workflows/ci.yml` (`pull_request` / `push`), which never runs `maintenance-audit-status`. With `commit: true`, an exit-2, exit-4, or exit-5 verdict still pushes artifacts, and the PR shows green checks while the failure is visible only in the watcher-side run. Exit 3 has the same visibility gap, which T3 exists to close.",
           "Steps:",
-          "1) Observe on a real dispatch which commit, if any, the `acquire` job's check run attaches to.",
-          "2) Decide where the verdict and the relay invocation become visible: PR body, PR comment, check run on the packet head, or step summary only.",
-          "3) Implement in the caller after `acquire` (needs uaa-0029 outputs and `pull-requests: write`), with a contract test.",
+          "1) Decide where the verdict and the relay invocation become visible: PR body, PR comment, or a commit status / check run created through the API on the packet head SHA. The acquire job's own check run cannot be the surface, because it attaches to `staging`.",
+          "2) Implement in the caller after `acquire` (needs uaa-0029 outputs, plus `pull-requests: write` or `statuses: write` / `checks: write` for the chosen surface), with a contract test.",
           "Output: a maintainer looking at the packet PR sees a blocking verdict and an uplift verdict without opening the watcher-side run."
         ],
         "files_to_read": [
@@ -1022,14 +1021,14 @@
           ".github/workflows/ci.yml"
         ],
         "deliverables": [
-          "Runner observation of where the acquire check run attaches",
           "Decided visibility surface for the verdict, implemented with T3"
         ]
       },
       "notes": [
-        "Found while writing the 2026-09-13 handoff (H3). Suspected; unreviewed.",
+        "Found while writing the 2026-09-13 handoff (H3). Suspected at the time; unreviewed.",
         "T3 design input.",
-        "T2c review round (Opus lane F2, 2026-09-13): on exit 3 the `required_uplifts` detail is written only to `_ci_tmp/audit/status.json`, which the cleanup step deletes before commit and upload; with `--emit-json` stdout is empty, so the log does not carry it either. Deferred to T3, which renders the verdict and relay invocation and is the projection's first consumer (resolve uaa-0025 first)."
+        "T2c review round (Opus lane F2, 2026-09-13): on exit 3 the `required_uplifts` detail is written only to `_ci_tmp/audit/status.json`, which the cleanup step deletes before commit and upload; with `--emit-json` stdout is empty, so the log does not carry it either. Deferred to T3, which renders the verdict and relay invocation and is the projection's first consumer (resolve uaa-0025 first).",
+        "Runner observation (2026-09-14, read-only `gh`): the three watcher-dispatched `agent-maintenance-open-pr` runs of 2026-09-13 (34747321010 codex 0.153.4, 34747320844 claude_code 2.1.236, 34747320689 opencode 1.18.29) all ran on `staging` at `a36a115d`. Their `Acquire complete union / Plan + pin` and `Union → report → validate` check runs are listed on commit `a36a115d`. The packet PRs #206 (head `ab86438c`), #195 (`0f42a57b`), and #205 (`57b7a7f2`) carry only `CI` workflow checks. Those runs predate the T2 gate, but where a dispatched run's checks attach does not depend on the gate, so H3 is settled without a post-T2 dispatch."
       ]
     },
     {

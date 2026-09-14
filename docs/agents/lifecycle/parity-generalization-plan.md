@@ -754,7 +754,7 @@ spec's §8.1 carries the same table.
 | `uaa-0028` | `--emit-json` cleanup has no ownership guard | T2 adversarial L8 (suspected) | Low until T3 makes the projection path durable. |
 | `uaa-0029` | No `on.workflow_call.outputs` for the gate verdict | handoff reading (H1), unreviewed | T3 prerequisite. |
 | `uaa-0030` | One failed leg skips `union`, gate, commit and upload | handoff reading (H2); confirmed in T2c review | Decided 2026-09-13: preserve completed legs, except a failed required target, which still hard-fails with no union. **Resolved in `a3c8ce53`** (§19). |
-| `uaa-0031` | Blocking verdict probably not visible on the packet PR | handoff reading (H3); confirmed by reading in T2c review; Opus F2 | Needs a runner observation; T3 design input. T3 also renders the exit-3 `required_uplifts` detail that `_ci_tmp` cleanup deletes today. |
+| `uaa-0031` | Blocking verdict not visible on the packet PR | handoff reading (H3); confirmed by reading in T2c review; Opus F2; confirmed on a runner 2026-09-14 (see §19.3) | T3 design input. T3 also renders the exit-3 `required_uplifts` detail that `_ci_tmp` cleanup deletes today. |
 | `uaa-0032` | Version mismatch fails dry runs and promote-prerequisite re-runs | handoff reading (H5); confirmed in T2c review | Decided 2026-09-13: fail only when committing; a dry-run mismatch emits a notice. The mismatch is checked before the validated load and gets exit 5. Promote-prerequisite re-runs with `commit: true` are accepted as red-but-committed. **Resolved in `a3c8ce53` / `916c9e9b`** (§19). |
 | `uaa-0033` | Artifact bundle does not match what the run committed | T2c review (Opus, suspected; Codex) | Low. |
 | `uaa-0034` | Commit step can push a rebased tree the gate never judged | T2c review (Opus, suspected) | Low; pre-dates T2c. |
@@ -823,12 +823,15 @@ Recorded in `docs/backlog.json`; the spec's §8.1 carries the same table.
 | `uaa-0027` | Snapshot retry can mix two attempts in raw_help | Low. |
 | `uaa-0028` | `--emit-json` cleanup has no ownership guard | Low until T3 makes the path durable. |
 | `uaa-0029` | No `on.workflow_call.outputs` | T3 prerequisite. |
-| `uaa-0031` | Verdict not visible on the packet PR; exit-3 uplift detail deleted with `_ci_tmp` | T3 design input; needs a runner observation. |
+| `uaa-0031` | Verdict not visible on the packet PR; exit-3 uplift detail deleted with `_ci_tmp` | T3 design input. Confirmed on a runner 2026-09-14: acquire checks attach to the `staging` head, not the packet PR. |
 | `uaa-0033` | Artifact bundle does not match what the run committed | Low. |
 | `uaa-0034` | Commit step can push a rebased tree the gate never judged | Low; pre-dates T2. |
 
 Resolved during T2: `uaa-0026` (`72191bb3`), `uaa-0030` (`a3c8ce53`), `uaa-0032` (`a3c8ce53`,
 `916c9e9b`).
 
-Nothing from T2 has run on a real runner. The first real `agent-maintenance-open-pr` dispatch after
-this lands is the proof, and should be watched for the H3 question in `uaa-0031`.
+Nothing from T2 has run on a real runner. The watcher dispatches from `staging`, so the first
+nightly `agent-maintenance-open-pr` run after T2 merges there is the proof; no manual dispatch is
+needed. The H3 question in `uaa-0031` did not have to wait for it: the 2026-09-13 watcher runs
+(pre-T2) already show the acquire check runs attached to `staging`'s head commit `a36a115d`, while
+packet PRs #195, #205 and #206 carry only `CI` checks.
