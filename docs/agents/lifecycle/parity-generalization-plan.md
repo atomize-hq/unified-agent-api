@@ -883,7 +883,16 @@ closeout-outcome change is opencode 1.18.29.
 | Codex note: malformed-row classification was asserted by substring, not through the classifier | **accepted, fixed**: tests call `is_bad_support_audit_evidence_message` |
 | Opus O1: claude_code debt rows use `claude install`, report-derived surfaces use `claude_code install`, so they never match (pre-existing) | **accepted, deferred** as `uaa-0036`, a maintainer decision; pointer in spec T8 and the debt inventory |
 | Opus O2: contract wording omitted `path` array rules and the optional list | **accepted, fixed** |
+| Opus O3: some xtask suites failed when two test runs overlapped in its scratch copy | **no action**: environment only; they pass run alone and in the lead's `make preflight` |
 | Lead: the new unit tests compiled into all five integration crates that include `support_audit.rs` by path, so they ran six times | **fixed**: the test module moved under `agent_maintenance/mod.rs`, which only the lib compiles |
+
+A follow-up round on the remediation delta (`66f7b30c..1121df69`) came back CLEAN from the Opus
+lane, with two docs notes: the Opus observation count and a missing pointer-removal step in
+uaa-0036. The Codex lane showed the contract fix for Codex 2 was still incomplete: when a report
+exists, debt rows that match no gap surface become `removed_upstream_surface` rows with the debt
+row's own identity. That also means uaa-0036's claude_code rows appear as removed surface, which
+contract field invariant 6 ties to publication contraction. All three were fixed in the contract,
+uaa-0036, and this section.
 
 ### 20.2 Open decisions and where they are triggered
 
@@ -893,4 +902,4 @@ Neither relies on closeout validation to force it.
 | id | decision | trigger points |
 | --- | --- | --- |
 | `uaa-0035` | Is opencode's TUI root command (with its root flags and `project` argument) excluded from parity? | spec T5 and T8 open-decisions list; debt inventory "Open decisions" |
-| `uaa-0036` | Is `command_path` rooted at the agent id or the binary name? | spec T8 open-decisions list; debt inventory "Open decisions" |
+| `uaa-0036` | Is `command_path` rooted at the agent id or the binary name? | spec T8 open-decisions list; debt inventory "Open decisions"; contract "Known conflict" note |

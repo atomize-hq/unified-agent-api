@@ -1183,13 +1183,14 @@
         "prompt": [
           "Work item: uaa-0036 — claude_code debt rows name the binary (`claude`) but report-derived surfaces use the agent id, so they never match.",
           "Context: `surface_from_report_value` in `crates/xtask/src/agent_maintenance/support_audit.rs` builds `command_path` from the registry agent id (`format!(\"{agent_id} {}\", path.join(\" \"))`). The non-TUI debt inventory (`docs/specs/unified-agent-api/non-tui-support-debt.md`) writes claude_code rows with the binary name: `claude-code-install-command` is `commands` / `claude install` / `install`, and `claude-code-install-force-flag` is `flags` / `claude install` / `--force`. The contract examples in `docs/specs/maintenance-request-contract-v1.md` also use `command_path = \"claude\"`. For codex and opencode the agent id and binary name are the same, so only claude_code is affected.",
-          "Finding (Opus review lane, 2026-09-14; proven, pre-existing): on the claude_code 2.1.236 packet the audit reports `preexisting_unsupported_surface` 0 and lists `commands` / `claude_code install` / `install` and `flags` / `claude_code install` / `--force` as `new_upstream_surface` required uplifts, because the debt rows never match. The binary at `79b305e2` produces identical bytes, so the root-command fix did not cause it. Requests generated before a report exists fall back to the debt rows and freeze the binary-name form, so a frozen request and a live report-derived audit can also disagree on these rows.",
+          "Finding (Opus review lane, 2026-09-14; proven, pre-existing): on the claude_code 2.1.236 packet the audit reports `preexisting_unsupported_surface` 0 and lists `commands` / `claude_code install` / `install` and `flags` / `claude_code install` / `--force` as `new_upstream_surface` required uplifts, because the debt rows never match. The same two debt rows, matching no report row, are also emitted as `removed_upstream_surface` with their `claude install` identities (`support_audit.rs` removed-surface loop; Codex follow-up review, 2026-09-14), and contract field invariant 6 requires publication truth to contract whenever that list is non-empty. The binary at `79b305e2` produces identical bytes, so the root-command fix did not cause it. Requests generated before a report exists fall back to the debt rows and freeze the binary-name form, so a frozen request and a live report-derived audit can also disagree on these rows.",
           "Decision (maintainer, ask-first: it is contract vocabulary): is `command_path` rooted at the registry agent id or at the upstream binary name? Whichever is chosen also fixes the root-command identity from uaa-0035's fix (`commands` / `<agent_id>` / `<agent_id>` today; for claude_code that is `claude_code`, not `claude`).",
-          "Triggers — resolve this before the first of: (1) closing any claude_code maintenance packet (T8 lists claude_code 2.1.236, #195); (2) adding or editing a claude_code row in the non-TUI debt inventory; (3) starting claude_code uplift work, which would otherwise treat the install surfaces as new rather than as known debt. A pointer sits in spec T8's open-decisions list.",
+          "Triggers — resolve this before the first of: (1) closing any claude_code maintenance packet (T8 lists claude_code 2.1.236, #195); (2) adding or editing a claude_code row in the non-TUI debt inventory; (3) starting claude_code uplift work, which would otherwise treat the install surfaces as new rather than as known debt. Pointers sit in spec T8's open-decisions list, the \"Open decisions\" section of `docs/specs/unified-agent-api/non-tui-support-debt.md`, the \"Known conflict\" note in `docs/specs/maintenance-request-contract-v1.md`, and spec §8.1.",
           "Steps:",
           "1) Get the maintainer decision and record it here with the date.",
           "2) Make code, the contract examples and identity table, the debt inventory, and any committed request agree on one form.",
           "3) Add a test that a claude_code debt row matches the report-derived surface for the same command (the audit shows it under `preexisting_unsupported_surface`, not as a required uplift).",
+          "4) Remove the pointers once resolved: the spec T8 open-decisions entry, the debt inventory paragraph, and the contract's \"Known conflict\" note; mark the spec §8.1 row resolved.",
           "Output: one `command_path` root for every agent, with claude_code's install debt recognised as preexisting."
         ],
         "files_to_read": [
@@ -1202,7 +1203,8 @@
         "deliverables": [
           "Recorded maintainer decision on the command_path root",
           "Code, contract, debt inventory, and requests aligned",
-          "Test that claude_code install debt matches"
+          "Test that claude_code install debt matches",
+          "Trigger pointers removed once resolved"
         ]
       },
       "notes": [
