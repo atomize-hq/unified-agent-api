@@ -194,6 +194,22 @@ Required record shape rules:
 | deferred row | surface row + `defer_reason`, `blocking_follow_on` when repo-owned | `blocking_follow_on` omitted only for concrete external blockers |
 | publication impact row | surface row + `surface_doc` | ties uplift to published truth |
 
+Surface identity rules. Shared code derives every surface row from a coverage report row; `path`
+is the report row's command path below the agent's own command.
+
+| Report row | `surface_kind` | `command_path` | `surface_id` |
+| --- | --- | --- | --- |
+| command, empty `path` (the agent's root command) | `commands` | `<agent_id>` | `<agent_id>` |
+| command, one path element | `commands` | `<agent_id> <path>` | last path element |
+| command, two or more path elements | `subcommands` | `<agent_id> <path...>` | last path element |
+| flag (`key`) | `global_flags` when `path` is empty, else `flags` | `<agent_id>` or `<agent_id> <path...>` | `key` |
+| positional argument (`name`) | `positional_args` | `<agent_id>` or `<agent_id> <path...>` | `name` |
+
+The three fields together are the identity; a consumer MUST NOT match surfaces on `surface_id`
+alone, because the root command and a command named like the agent share one. A report row is
+invalid evidence when its shape does not match the report list it appears in, when it carries both
+`key` and `name`, or when `path`, `key`, or `name` holds a non-string value.
+
 Field invariants:
 
 1. `required` MUST be `true` for every enrolled automated maintenance packet.
