@@ -1131,6 +1131,47 @@
       "notes": [
         "Raised in the T2c review round (2026-09-13) by the Opus lane; pre-existing; accepted and deferred as low severity."
       ]
+    },
+    {
+      "id": "uaa-0035",
+      "title": "Decide whether opencode's TUI root command is excluded from parity obligations",
+      "status": "todo",
+      "bucket": "agent_api.onboarding",
+      "type": "design",
+      "kickoff": {
+        "prompt": [
+          "Work item: uaa-0035 — Decide whether opencode's TUI root command is excluded from parity obligations.",
+          "Context: the 2026-09-14 pre-merge simulation of the audit gate found that opencode 1.18.29's coverage report lists the root command (`path: []`, usage `opencode [project]`, described upstream as \"start opencode tui\") under `deltas.missing_commands`. opencode's `wrapper_coverage.json` declares only `run`, and `RULES.json` `parity_exclusions` excludes only the root positional arg `project` (category `interactive`). Commit 507cf300 names the row (`commands`, `opencode`, `opencode`) so the audit can evaluate it; the row is now a required uplift (`new_upstream_surface`, writes wrapper/backend/manifest/publication/packet_docs).",
+          "Decision (maintainer, ask-first: it changes what closeout obligates): keep the root command as an uplift obligation, or exclude it from parity.",
+          "What the contract allows: a newly discovered surface cannot be deferred (`docs/specs/maintenance-request-contract-v1.md` field invariant 3), and `deliberately_unsupported` is an invalid deferral reason, so a debt row is not an option. The non-implementation path is a `RULES.json` parity exclusion: `{\"unit\": \"command\", \"path\": [], \"category\": \"interactive\", \"note\": ...}`. `manifest_report` matches command exclusions exactly (`idx.commands.get(path)` in `crates/xtask/src/manifest_report/report.rs`), so it would exclude only the root command, not `run`, other subcommands, or the 20 root-level flags. No schema change is needed.",
+          "Also decide whether the 20 root-level flags (`global_flags`, e.g. `--port`, `--hostname`, `--mdns`) follow the same treatment; excluding the root command does not exclude them.",
+          "Triggers — resolve this before the first of: (1) closing any opencode maintenance packet whose audit lists `commands` / `opencode` / `opencode` (T8 or a manual closeout); (2) starting uplift implementation for an opencode packet; (3) editing opencode `RULES.json` `parity_exclusions` or `wrapper_coverage.json` for the root command. Pointers sit at each trigger: spec T5 and T8, and the intro of `docs/specs/unified-agent-api/non-tui-support-debt.md`.",
+          "Do not rely on closeout validation to force this decision: by reading, closeout reconciles the frozen audit against live evidence, but it was not verified to require every required uplift to be resolved.",
+          "Steps:",
+          "1) Get the maintainer decision; record it in this item's notes with the date.",
+          "2) If excluded: add the parity exclusion, regenerate the opencode report, and add a test that the root command moves to `excluded_commands` and leaves the audit while `run` and the root flags are unaffected. If kept: leave it on the uplift path.",
+          "3) Remove the trigger pointers from spec T5/T8 and the debt inventory intro.",
+          "Output: a recorded decision, and an opencode root command that is either excluded with a reason or an owned uplift."
+        ],
+        "files_to_read": [
+          "cli_manifests/opencode/RULES.json",
+          "cli_manifests/opencode/wrapper_coverage.json",
+          "crates/xtask/src/manifest_report/report.rs",
+          "crates/xtask/src/manifest_report/report/parity.rs",
+          "crates/xtask/src/agent_maintenance/support_audit.rs",
+          "docs/specs/maintenance-request-contract-v1.md",
+          "docs/specs/unified-agent-api/non-tui-support-debt.md",
+          "docs/specs/unified-agent-api/acquisition-maintenance-lifecycle-spec.md"
+        ],
+        "deliverables": [
+          "Recorded maintainer decision",
+          "Exclusion plus regenerated report and test, or confirmation that the root command stays an uplift",
+          "Trigger pointers removed once resolved"
+        ]
+      },
+      "notes": [
+        "Raised 2026-09-14 after the pre-merge audit-gate simulation and a ChatGPT Pro consult (advisory). The maintainer approved the root identity and deferred this policy decision, asking that it be tracked at the points where it will be hit."
+      ]
     }
   ]
 }

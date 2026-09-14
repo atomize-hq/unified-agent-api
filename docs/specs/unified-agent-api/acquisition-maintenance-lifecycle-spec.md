@@ -271,6 +271,9 @@ highest-risk unit; it decides whether a governance artifact can be trusted.
 **T5 — Closeout finding derivation.** Map written surfaces to `MaintenanceDriftCategory`
 (`registry_manifest_drift`, `support_publication_drift`) with real surface lists; choose
 `explicit_none_reason` vs `deferred_findings` from the live drift report.
+Open decision in its path: `uaa-0035` (whether opencode's TUI root command, surface `commands` /
+`opencode` / `opencode`, is excluded from parity). T5 must surface that row as an unresolved
+obligation, never pick a disposition for it.
 
 **T6 — `prepare-agent-closeout` command.** Compose T4 + T5, emit the artifact, and self-verify by
 running the real `validate_closeout` before writing.
@@ -302,6 +305,14 @@ the watcher will have moved on.
 | codex 0.153.4 (#206) | the packet branch | branch request reads `0.153.4` / `latest_stable_minus_one` |
 | codex 0.144.6 (#153, merged) | a branch off `main` | already merged open; needs a catch-up pass |
 
+**Open decisions that gate a closeout.** Re-deriving the table above does not clear these; each
+stays until its backlog item records a maintainer decision.
+
+- `uaa-0035`: before closing **any** opencode packet whose audit lists the root command (`commands`
+  / `opencode` / `opencode`), or starting its uplift work, the maintainer decides whether that TUI
+  entry point is excluded from parity. Closeout validation is not known to force this, so check it
+  by hand.
+
 **There is no merge dependency on this work.** The invalid `2.1.140` claude_code request exists only
 on `main`; the open claude_code packet branch carries the corrected policy, so closing claude_code
 never touches the bad copy. Merging an open packet *before* closing it would actively make things
@@ -330,6 +341,7 @@ items (`uaa-0029`…`uaa-0032`; `uaa-0031` by reading only) and added two more (
 | `uaa-0032` | `--expect-target-version` mismatch fails out-of-packet runs | Medium. Dry runs and promote-prerequisite re-runs now end red. **Decided 2026-09-13: fail only when committing** — a `commit: false` mismatch emits a notice and stays green; no other exit 2 may be downgraded. Mechanism: the target version is compared before the validated request load and a mismatch gets its own exit code 5. A promote-prerequisite re-run (`commit: true`) for a version the ref's request does not name is **accepted as red-but-committed**. **Resolved in `a3c8ce53` / `916c9e9b`.** |
 | `uaa-0033` | Artifact bundle does not match what the run committed | Low. The `always()` upload can succeed with only stale checkout files, and omits the support-matrix files the commit stages. |
 | `uaa-0034` | Commit step can push a rebased tree the gate never judged | Low, suspected, pre-dates T2c. |
+| `uaa-0035` | Is opencode's TUI root command excluded from parity? | **Open maintainer decision, raised 2026-09-14** by the pre-merge gate simulation. The root command is named (`commands` / `opencode` / `opencode`) since `507cf300` and is a required uplift until decided. Gates any opencode closeout or uplift work; pointers sit in T5, T8, and the non-TUI debt inventory. |
 
 ### 8.2 What T1 changed about T2
 
