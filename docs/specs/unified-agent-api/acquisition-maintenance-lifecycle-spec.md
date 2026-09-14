@@ -84,8 +84,9 @@ New and changed surfaces. Every new command follows the existing `xtask` convent
 ```bash
 # NEW — emit the support-surface audit as machine-readable JSON, derived from live artifacts.
 # Piece 1's input. Read-only apart from the --emit-json projection.
-# --expect-target-version (T2c) exits 2 unless the request's detected_release.target_version
-# equals it, checked before any evidence work. Omit it outside acquisition runs.
+# --expect-target-version (T2c, typed in T2d) exits 5 unless the request's
+# detected_release.target_version equals it, compared before the validated request load and any
+# evidence work. Omit it outside acquisition runs.
 cargo run -p xtask -- maintenance-audit-status \
   --request <path/to/maintenance-request.toml> \
   [--expect-target-version <version>] \
@@ -108,14 +109,16 @@ Exit codes follow the established convention: `2` for validation failure (the ar
 evidence is wrong), `1` for internal error. `maintenance-audit-status` additionally uses `3` for
 "uplifts required", so a workflow can branch on the gate without parsing stdout — mirroring
 `EXIT_NOT_ELIGIBLE` in `manifest_acquisition.rs:74` — and, since T2a (`72191bb3`), `4` for an
-incomplete acquisition (`snapshots/<version>/union.json` has `complete: false`).
+incomplete acquisition (`snapshots/<version>/union.json` has `complete: false`), and, since T2d
+(`a3c8ce53`), `5` for a target-version mismatch.
 
 | exit | constant | meaning | error? |
 | --- | --- | --- | --- |
 | 0 | — | clean: no uplifts, reconciliation not drifted | no |
 | 3 | `EXIT_UPLIFTS_REQUIRED` | uplifts required; contributor relay work needed | no — a result |
 | 4 | `EXIT_INCOMPLETE_ACQUISITION` | union incomplete; names `missing_targets` | yes |
-| 2 | `EXIT_VALIDATION` | evidence missing, bound to another version, or malformed; invalid request; drift with no uplifts; `--expect-target-version` mismatch | yes |
+| 5 | `EXIT_TARGET_VERSION_MISMATCH` | the request's `detected_release.target_version` differs from `--expect-target-version`; checked before any evidence work, so it wins over malformed evidence or an invalid request field | yes — blocking in CI only when the run commits |
+| 2 | `EXIT_VALIDATION` | evidence missing, bound to another version, or malformed; invalid request; drift with no uplifts | yes |
 | 1 | `EXIT_INTERNAL` | internal fault | yes |
 
 A computed 0 or 3 survives a failed `--emit-json` write (the stale projection is removed and a
