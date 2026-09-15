@@ -30,11 +30,11 @@
 
 ### Close OpenCode Non-TUI Maintenance Gaps
 
-**What:** Expand OpenCode beyond the current `run --format json` seam so shared maintenance can close the tracked `run`, `acp`, `attach`, `models`, `providers`, `serve`, and `web` gaps plus the associated `run` flags.
+**What:** Expand OpenCode beyond the current `run --format json` seam so shared maintenance can close the tracked `acp`, `attach`, `models`, `providers`, `serve`, and `web` gaps plus the `run` flags `--agent` and `--attach`.
 
 **Why:** OpenCode proved the shared packet-pr path, but its non-TUI support posture is still far below the steady-state maintenance contract. Those v1 restrictions are now explicit debt, not an accepted plateau.
 
-**Context:** The support debt baseline records each current OpenCode non-TUI gap under `requires_new_architectural_seam` with this TODO as the follow-on reference.
+**Context:** The support debt baseline records each current OpenCode non-TUI gap under `requires_new_architectural_seam` with this TODO as the follow-on reference. The `run` command and its `--format`, `--dir`, `--model`, `--continue`, `--session`, and `--fork` flags left the baseline on 2026-09-15: the `run --format json` seam has passed them since #92 (2026-04-18), `wrapper_coverage.json` declares them explicit, and the opencode 1.18.30 help lists them, so no coverage report counted them as gaps.
 
 **Effort:** L
 **Priority:** P1
