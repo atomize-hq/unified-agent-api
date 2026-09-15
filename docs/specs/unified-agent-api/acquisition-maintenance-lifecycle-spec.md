@@ -261,9 +261,21 @@ an inline-table hole in the pre-check; T2e (`916c9e9b`) closed both. Suite 488/0
 codex 0 / opencode 2 / claude_code 2, codex `--expect-target-version 0.145.0` 5. Debt carried out is
 in §8.1; plan doc §19 has the full account.
 
+**Support-audit classification (2026-09-15, before T3).** The first post-merge nightly showed exit 3
+hiding drift: seven opencode debt rows the wrapper already covered were reported as removed upstream
+surface. Four commits fixed it. `dce4b1fb` retired the seven rows. `ed31d54a` replaced
+`removed_upstream_surface` with `unmatched_debt_surface`, whose rows carry an `observation`
+(`covered_by_wrapper`, `excluded_by_rules`, or `not_observed`), because help output cannot prove a
+removal. `170acc68` made the gate exit 2 on unmatched debt rows or a changed debt baseline even when
+uplifts remain. `30898655` renamed the uplift reason to `unbaselined_gap`. The contract gained the
+hidden-surface policy that T8 enforces (T8 sequencing below). Backlog items `uaa-0039`…`uaa-0044`
+carry what the work exposed (§8.1).
+
 **T3 — Relay-packet rendering.** On the uplift branch, render the relay invocation (prompt path,
 dry-run→write `--run-id` handshake) into the packet PR body from the existing renderer, so the
-maintainer pastes one command. Reuses `docs.rs` rendering; no new prompt source of truth.
+maintainer pastes one command. Reuses `docs.rs` rendering; no new prompt source of truth. Exit 2
+writes no projection, so a debt-baseline failure names its unmatched rows only in the gate's error
+line; T3 must carry that line to the PR (`uaa-0031`).
 
 **T4 — Closeout evidence resolution.** Commit-pinned CI conclusion lookup, fail-closed. This is the
 highest-risk unit; it decides whether a governance artifact can be trusted.
@@ -306,6 +318,17 @@ the watcher will have moved on.
 stays until its backlog item records a maintainer decision. None is open: `uaa-0035` and `uaa-0036`
 were decided on 2026-09-14 (§8.1).
 
+**Support-audit checks that gate a closeout.** Decided 2026-09-15. Discovery reads help output, so a
+surface upstream hides is not an obligation by itself, but it stays one while the wrapper claims it
+(maintenance request contract, "Hidden upstream surfaces and wrapper-only rows"). Before a packet
+closes, every wrapper-only row in its live coverage report must be sorted into one category —
+hidden upstream but still supported, supported only on older upstream versions, obsolete, or a
+discovery bug — a surface sorted obsolete must contract publication truth in the same run, and the
+live audit must have no unmatched debt rows (contract field invariant 6). Nothing records the
+categories yet, and `close-agent-maintenance` checks none of the three; only
+`maintenance-audit-status` rejects unmatched debt rows (exit 2). Do not close a packet until
+`uaa-0039` lands.
+
 **There is no merge dependency on this work.** The invalid `2.1.140` claude_code request exists only
 on `main`; the open claude_code packet branch carries the corrected policy, so closing claude_code
 never touches the bad copy. Merging an open packet *before* closing it would actively make things
@@ -318,7 +341,7 @@ Each item is in `docs/backlog.json` with its own context, file list and delivera
 adjudication, and a code reading while writing the 2026-09-13 handoff, added six more
 (`uaa-0027`…`uaa-0032`). The T2c review round (2026-09-13, both lanes) confirmed the handoff-reading
 items (`uaa-0029`…`uaa-0032`; `uaa-0031` by reading only) and added two more (`uaa-0033`,
-`uaa-0034`).
+`uaa-0034`). The 2026-09-15 support-audit classification added six (`uaa-0039`…`uaa-0044`).
 
 | id | item | disposition |
 | --- | --- | --- |
@@ -336,6 +359,12 @@ items (`uaa-0029`…`uaa-0032`; `uaa-0031` by reading only) and added two more (
 | `uaa-0034` | Commit step can push a rebased tree the gate never judged | Low, suspected, pre-dates T2c. |
 | `uaa-0035` | Is opencode's TUI root command excluded from parity? | **Decided 2026-09-14: exclude it.** opencode `RULES.json` excludes the root command and its 20 root-position flags (`interactive`), and report generation now checks an excluded command's flags and arguments against their own exclusions instead of dropping them, so a future root flag reaches the work queue. **Resolved in `3f7ad4c7`.** |
 | `uaa-0036` | claude_code debt rows name `claude`, report-derived surfaces name `claude_code` | **Decided 2026-09-14: `command_path` is rooted at the agent id.** The two claude_code debt rows and the contract examples now read `claude_code`, and a test binds every debt row to its agent id. **Resolved in `fa739c7d`.** |
+| `uaa-0039` | Closeout does not check the support-audit baseline | **T8 prerequisite.** Wrapper-only rows need a recorded category, obsolete surfaces must contract publication, and unmatched debt rows must be empty; closeout checks none of these. Pointers: T8 sequencing above, and the contract's hidden-surface section and invariant 6. |
+| `uaa-0040` | Supplements cannot keep a hidden flag or positional argument observable | Low, latent. Supplement format v1 carries commands only. Trigger: the first `not_observed` debt row for a flag or argument upstream still ships. |
+| `uaa-0041` | Support-surface identity is name-only | Low. Accepted values, arity, and output shape are never compared; opencode `run --format` counts as covered although the wrapper passes only `json`. |
+| `uaa-0042` | A command whose wrapper coverage level is `unsupported` is never a support-audit gap | Low, latent: no wrapper coverage declares one today. Trigger: the first such declaration. |
+| `uaa-0043` | `discovered_upstream_surface` implies newness the audit never checks | Low. Deferred from the `unbaselined_gap` rename because renaming the list changes the request schema. |
+| `uaa-0044` | Release-notes mining and docs cross-check were designed but never built | Low. ADR 0001 §3 signals; codex 0.153.4 hides 11 surfaces from help and 7 appear nowhere in our artifacts. |
 
 ### 8.2 What T1 changed about T2
 
