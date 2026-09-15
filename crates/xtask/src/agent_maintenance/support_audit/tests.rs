@@ -11,6 +11,7 @@ use crate::agent_registry::AgentRegistry;
 // on the 2026-09-14 packet branch automation/opencode-maintenance-1.18.29 (`57b7a7f2`).
 const OPENCODE_1_18_29_ROOT_COMMAND_ROW: &str =
     r#"{"path": [], "upstream_available_on": ["linux-x64", "darwin-arm64", "win32-x64"]}"#;
+const TEST_TARGETS: [&str; 2] = ["linux-x64", "darwin-arm64"];
 
 fn identity(kind: &str, command_path: &str, surface_id: &str) -> SurfaceIdentity {
     SurfaceIdentity::new(kind.into(), command_path.into(), surface_id.into())
@@ -22,6 +23,24 @@ fn deltas(missing_commands: Value, missing_flags: Value, missing_args: Value) ->
         "missing_flags": missing_flags,
         "missing_args": missing_args,
         "intentionally_unsupported": [],
+    })
+}
+
+fn any_report(deltas: Value) -> Value {
+    json!({
+        "inputs": {"upstream": {"targets": TEST_TARGETS}},
+        "platform_filter": {"mode": "any"},
+        "deltas": deltas,
+    })
+}
+
+fn union(commands: Value) -> Value {
+    json!({
+        "inputs": TEST_TARGETS
+            .iter()
+            .map(|target| json!({"target_triple": target}))
+            .collect::<Vec<_>>(),
+        "commands": commands,
     })
 }
 
@@ -211,6 +230,16 @@ fn derive_audit(
     report: &Value,
     union: Option<&Value>,
 ) -> SupportSurfaceAudit {
+    try_derive_audit(agent_id, version, debt, report, union).expect("derive audit")
+}
+
+fn try_derive_audit(
+    agent_id: &str,
+    version: &str,
+    debt: Option<&str>,
+    report: &Value,
+    union: Option<&Value>,
+) -> Result<SupportSurfaceAudit, String> {
     let registry = AgentRegistry::load(repo_root()).expect("load registry");
     let entry = registry.find(agent_id).expect("registry entry");
     let workspace = tempfile::TempDir::new().expect("workspace");
@@ -243,7 +272,7 @@ fn derive_audit(
         dispatch_workflow: String::new(),
         branch_name: String::new(),
     };
-    derive_support_surface_audit(workspace.path(), entry, &release).expect("derive audit")
+    derive_support_surface_audit(workspace.path(), entry, &release)
 }
 
 #[test]
@@ -252,8 +281,8 @@ fn a_missing_root_command_remains_a_required_uplift() {
         "opencode",
         "1.18.29",
         None,
-        &json!({"deltas": deltas(json!([root_row()]), json!([]), json!([]))}),
-        Some(&json!({"commands": []})),
+        &any_report(deltas(json!([root_row()]), json!([]), json!([]))),
+        Some(&union(json!([]))),
     );
 
     let root = identity("commands", "opencode", "opencode");
@@ -301,13 +330,7 @@ fn claude_code_install_debt_matches_its_report_surfaces() {
     ]);
 
     // No union: an audit whose debt rows all match gaps never reads one.
-    let audit = derive_audit(
-        "claude_code",
-        "2.1.236",
-        None,
-        &json!({"deltas": report}),
-        None,
-    );
+    let audit = derive_audit("claude_code", "2.1.236", None, &any_report(report), None);
 
     let install = vec![
         identity("commands", "claude_code install", "install"),
@@ -347,16 +370,16 @@ fn debt_rows_that_match_no_gap_are_classified_by_what_live_evidence_shows() {
     let mut report = deltas(json!([{"path": ["acp"]}]), json!([]), json!([]));
     report["excluded_flags"] = json!([{"path": ["run"], "key": "--attach"}]);
     // `serve` is absent, as a surface upstream hides from help would be.
-    let union = json!({"commands": [
+    let union = union(json!([
         {"path": ["acp"]},
         {"path": ["run"], "flags": [{"key": "--fork"}, {"key": "--attach"}]},
-    ]});
+    ]));
 
     let audit = derive_audit(
         "opencode",
         "1.18.30",
         Some(&debt),
-        &json!({"deltas": report}),
+        &any_report(report),
         Some(&union),
     );
 
@@ -403,4 +426,62 @@ fn debt_rows_that_match_no_gap_are_classified_by_what_live_evidence_shows() {
     );
     assert_eq!(audit.pre_run_debt_count, 4);
     assert_eq!(audit.expected_post_run_debt_count, 1);
+}
+
+#[test]
+fn unmatched_debt_requires_a_coherent_any_target_report() {
+    let debt = format!(
+        "# Non-TUI Support Debt Inventory\n\n## Inventory\n\n{}",
+        debt_row("covered", "flags", "opencode run", "--fork")
+    );
+    let union = union(json!([{"path": ["run"], "flags": [{"key": "--fork"}]}]));
+    let base_report = any_report(deltas(json!([]), json!([]), json!([])));
+    let mut all_report = base_report.clone();
+    all_report["platform_filter"]["mode"] = json!("all");
+    let mut mismatched_targets = base_report.clone();
+    mismatched_targets["inputs"]["upstream"]["targets"] = json!(["win32-x64"]);
+    let mut missing_platform_filter = base_report.clone();
+    missing_platform_filter
+        .as_object_mut()
+        .expect("report object")
+        .remove("platform_filter");
+    let mut missing_targets = base_report;
+    missing_targets["inputs"]["upstream"]
+        .as_object_mut()
+        .expect("upstream inputs object")
+        .remove("targets");
+
+    for (case, report, detail) in [
+        ("all mode", all_report, "platform_filter.mode"),
+        (
+            "target mismatch",
+            mismatched_targets,
+            "differs from union input targets",
+        ),
+        (
+            "missing platform filter",
+            missing_platform_filter,
+            "missing `platform_filter.mode`",
+        ),
+        (
+            "missing report targets",
+            missing_targets,
+            "missing `inputs.upstream.targets`",
+        ),
+    ] {
+        let error = try_derive_audit("opencode", "1.18.30", Some(&debt), &report, Some(&union))
+            .expect_err(case);
+        assert!(
+            error.contains("cannot classify unmatched debt rows")
+                && error.contains("coverage.any.json")
+                && error.contains(detail)
+                && is_bad_support_audit_evidence_message(&error),
+            "unclassified error for {case}: {error}"
+        );
+        if case == "target mismatch" {
+            for target in ["win32-x64", "linux-x64", "darwin-arm64"] {
+                assert!(error.contains(target), "`{target}` missing: {error}");
+            }
+        }
+    }
 }

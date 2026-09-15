@@ -413,9 +413,15 @@ fn debt_baseline_drift(frozen: &SupportSurfaceAudit, live: &SupportSurfaceAudit)
     ] {
         if changed {
             causes.push(format!(
-                "frozen `support_surface_audit.{field}` no longer matches the live debt inventory"
+                "frozen `support_surface_audit.{field}` differs from the live audit"
             ));
         }
+    }
+    if frozen.pre_run_debt_count != live.pre_run_debt_count {
+        causes.push(format!(
+            "frozen `support_surface_audit.pre_run_debt_count` {} differs from the live audit's {}",
+            frozen.pre_run_debt_count, live.pre_run_debt_count
+        ));
     }
     (!causes.is_empty()).then(|| causes.join("; "))
 }
@@ -566,6 +572,7 @@ fn build_projection(
 
 pub(crate) fn is_bad_support_audit_evidence_message(message: &str) -> bool {
     message.starts_with("parse ")
+        || message.contains("cannot classify unmatched debt rows")
         || message.contains(" is missing `deltas` object")
         || message.contains(" is missing `deltas.")
         || message.contains("support-audit report row")

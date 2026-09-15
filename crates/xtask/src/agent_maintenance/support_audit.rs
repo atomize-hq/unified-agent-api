@@ -421,6 +421,8 @@ struct LiveReport {
     path: PathBuf,
     deltas: serde_json::Map<String, serde_json::Value>,
     gaps: Vec<SurfaceIdentity>,
+    platform_filter_mode: Option<String>,
+    upstream_targets: Option<BTreeSet<String>>,
 }
 
 fn load_live_report_if_present(
@@ -517,11 +519,26 @@ fn load_live_report(
         .ok_or_else(|| format!("{} is missing `deltas` object", report_path.display()))?
         .clone();
     let gaps = surfaces_from_report_deltas(&entry.agent_id, &report_path, &deltas)?;
+    let platform_filter_mode = json
+        .pointer("/platform_filter/mode")
+        .and_then(serde_json::Value::as_str)
+        .map(ToString::to_string);
+    let upstream_targets = json
+        .pointer("/inputs/upstream/targets")
+        .and_then(serde_json::Value::as_array)
+        .and_then(|targets| {
+            targets
+                .iter()
+                .map(|target| target.as_str().map(ToString::to_string))
+                .collect::<Option<BTreeSet<_>>>()
+        });
 
     Ok(LiveReport {
         path: report_path,
         deltas,
         gaps,
+        platform_filter_mode,
+        upstream_targets,
     })
 }
 

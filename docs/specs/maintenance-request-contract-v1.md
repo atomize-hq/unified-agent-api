@@ -205,8 +205,10 @@ required uplift. A debt inventory row that equals no gap surface becomes an
 taken from live evidence: `excluded_by_rules` when the report lists the surface under
 `deltas.excluded_commands`, `deltas.excluded_flags`, or `deltas.excluded_args`; otherwise
 `covered_by_wrapper` when the target version's `snapshots/<version>/union.json` lists it; otherwise
-`not_observed`. Shared code never derives a removal: help output cannot prove that upstream removed
-a surface, because upstream can hide one (see
+`not_observed`. Classifying unmatched rows requires `snapshots/<version>/union.json` and an
+any-target report (`platform_filter.mode = "any"`) whose `inputs.upstream.targets` equal the
+union's input targets; otherwise the evidence is invalid. Shared code never derives a removal: help
+output cannot prove that upstream removed a surface, because upstream can hide one (see
 [Hidden upstream surfaces and wrapper-only rows](#hidden-upstream-surfaces-and-wrapper-only-rows)).
 Without a report, every surface row uses the identities written in the debt inventory rows and no
 row is unmatched. Shared code leaves `eligible_preexisting_surface` empty. `path` is the report

@@ -70,22 +70,143 @@ fn uplifts_with_an_unchanged_debt_baseline_still_exit_three() {
 }
 
 #[test]
-fn a_debt_baseline_changed_since_the_freeze_fails_the_gate_even_with_uplifts() {
+fn each_debt_baseline_mutation_fails_the_gate_even_with_uplifts() {
+    let evidence_gaps = json!([{"path": ["exec"], "key": "--legacy"}]);
+    for (prefix, inventory, expected_field, absent_field) in [
+        (
+            "audit-status-debt-blocker-changed",
+            debt_inventory(
+                "codex-exec-legacy-flag",
+                "requires_new_infra",
+                "TODOS.md#close-codex-legacy-gap",
+                false,
+            ),
+            "deferred_preexisting_gaps",
+            None,
+        ),
+        (
+            "audit-status-debt-row-id-changed",
+            debt_inventory(
+                "codex-exec-renamed-legacy-flag",
+                "requires_new_architectural_seam",
+                "TODOS.md#close-codex-legacy-gap",
+                false,
+            ),
+            "preexisting_unsupported_surface",
+            Some("deferred_preexisting_gaps"),
+        ),
+        (
+            "audit-status-debt-follow-on-changed",
+            debt_inventory(
+                "codex-exec-legacy-flag",
+                "requires_new_architectural_seam",
+                "TODOS.md#replace-codex-legacy-gap",
+                false,
+            ),
+            "deferred_preexisting_gaps",
+            Some("preexisting_unsupported_surface"),
+        ),
+    ] {
+        let root = seeded_workspace(prefix, "requires_new_architectural_seam");
+        freeze(&root);
+        write_evidence(&root, evidence_gaps.clone());
+        write_text(&root.join(DEBT_PATH), &inventory);
+
+        let err = run_gate(&root).expect_err("a changed debt baseline must fail the gate");
+        assert!(matches!(err, Error::Validation(_)), "unexpected: {err:?}");
+        assert_eq!(err.exit_code(), 2);
+        let message = err.to_string();
+        assert!(
+            message.contains(expected_field) && message.contains("differs from the live audit"),
+            "unexpected: {message}"
+        );
+        if let Some(absent_field) = absent_field {
+            assert!(!message.contains(absent_field), "unexpected: {message}");
+        }
+    }
+
     let root = seeded_workspace(
-        "audit-status-debt-baseline-changed",
+        "audit-status-debt-count-changed",
         "requires_new_architectural_seam",
     );
+    write_text(
+        &root.join(DEBT_PATH),
+        &debt_inventory(
+            "codex-exec-legacy-flag",
+            "requires_new_architectural_seam",
+            "TODOS.md#close-codex-legacy-gap",
+            true,
+        ),
+    );
+    write_evidence(&root, evidence_gaps);
     freeze(&root);
-    write_evidence(&root, json!([{"path": ["exec"], "key": "--legacy"}]));
-    write_text(&root.join(DEBT_PATH), &debt_inventory("requires_new_infra"));
+    let frozen = std::fs::read_to_string(root.join(REQUEST_PATH)).expect("read request");
+    assert_eq!(
+        frozen
+            .matches("[[support_surface_audit.unmatched_debt_surface]]")
+            .count(),
+        1
+    );
+    write_text(
+        &root.join(DEBT_PATH),
+        &debt_inventory(
+            "codex-exec-legacy-flag",
+            "requires_new_architectural_seam",
+            "TODOS.md#close-codex-legacy-gap",
+            false,
+        ),
+    );
 
-    let err = run_gate(&root).expect_err("a changed debt baseline must fail the gate");
+    let err = run_gate(&root).expect_err("a changed debt count must fail the gate");
+    assert!(matches!(err, Error::Validation(_)), "unexpected: {err:?}");
     assert_eq!(err.exit_code(), 2);
     let message = err.to_string();
     assert!(
-        message.contains("`support_surface_audit.deferred_preexisting_gaps` no longer matches"),
+        message.contains(
+            "`support_surface_audit.pre_run_debt_count` 2 differs from the live audit's 1"
+        ),
         "unexpected: {message}"
     );
+    assert!(
+        !message.contains("debt rows match no live gap"),
+        "unexpected unmatched-row cause: {message}"
+    );
+}
+
+#[test]
+fn missing_or_malformed_union_for_unmatched_debt_is_bad_evidence() {
+    let root = seeded_workspace(
+        "audit-status-unmatched-debt-invalid-union",
+        "requires_new_architectural_seam",
+    );
+    freeze(&root);
+    write_evidence(&root, json!([]));
+    let union_path = root
+        .join("cli_manifests/codex/snapshots")
+        .join(TARGET_VERSION)
+        .join("union.json");
+    std::fs::remove_file(&union_path).expect("remove union");
+
+    let missing = run_gate(&root).expect_err("missing union must be bad evidence");
+    assert!(
+        matches!(missing, Error::Validation(_)),
+        "unexpected: {missing:?}"
+    );
+    assert_eq!(missing.exit_code(), 2);
+    assert!(
+        missing
+            .to_string()
+            .contains("cli_manifests/codex/snapshots/0.98.0/union.json"),
+        "unexpected: {missing}"
+    );
+
+    write_text(&union_path, "{invalid json");
+    let malformed = run_gate(&root).expect_err("malformed union must be bad evidence");
+    assert!(
+        matches!(malformed, Error::Validation(_)),
+        "unexpected: {malformed:?}"
+    );
+    assert_eq!(malformed.exit_code(), 2);
 }
 
 /// A codex workspace whose debt inventory holds one row, `codex exec --legacy`.
@@ -94,7 +215,12 @@ fn seeded_workspace(prefix: &str, blocker_class: &str) -> PathBuf {
     let root = fixture_root(prefix);
     let registry = AgentRegistry::parse(SEEDED_REGISTRY).expect("parse registry");
     let entry = registry.find("codex").expect("codex entry");
-    let debt = debt_inventory(blocker_class);
+    let debt = debt_inventory(
+        "codex-exec-legacy-flag",
+        blocker_class,
+        "TODOS.md#close-codex-legacy-gap",
+        false,
+    );
     for (path, contents) in [
         ("crates/xtask/data/agent_registry.toml", SEEDED_REGISTRY),
         (".github/workflows/agent-maintenance-open-pr.yml", "name: Packet PR worker\n"),
@@ -116,18 +242,36 @@ fn seeded_workspace(prefix: &str, blocker_class: &str) -> PathBuf {
 }
 
 #[rustfmt::skip]
-fn debt_inventory(blocker_class: &str) -> String {
-    format!(
+fn debt_inventory(
+    row_id: &str,
+    blocker_class: &str,
+    follow_on: &str,
+    include_unmatched: bool,
+) -> String {
+    let mut inventory = format!(
         concat!(
-            "# Non-TUI Support Debt Inventory\n\n## Inventory\n\n### `codex-exec-legacy-flag`\n\n",
+            "# Non-TUI Support Debt Inventory\n\n## Inventory\n\n### `{}`\n\n",
             "- `agent_id`: `codex`\n- `surface_kind`: `flags`\n- `command_path`: `codex exec`\n",
             "- `surface_id`: `--legacy`\n- `current_reason`: `The legacy flag stays outside the seam.`\n",
             "- `blocker_class`: `{}`\n- `owner`: `wrappers team`\n- `milestone`: `test`\n",
-            "- `follow_on`: `TODOS.md#close-codex-legacy-gap`\n",
+            "- `follow_on`: `{}`\n",
             "- `evidence_ref`: `cli_manifests/codex/reports/0.97.0/coverage.any.json`\n",
         ),
-        blocker_class
-    )
+        row_id, blocker_class, follow_on
+    );
+    if include_unmatched {
+        inventory.push_str(
+            concat!(
+                "\n### `codex-exec-hidden-flag`\n\n- `agent_id`: `codex`\n",
+                "- `surface_kind`: `flags`\n- `command_path`: `codex exec`\n",
+                "- `surface_id`: `--hidden`\n- `current_reason`: `The hidden flag is test debt.`\n",
+                "- `blocker_class`: `requires_new_architectural_seam`\n- `owner`: `wrappers team`\n",
+                "- `milestone`: `test`\n- `follow_on`: `TODOS.md#close-codex-hidden-gap`\n",
+                "- `evidence_ref`: `cli_manifests/codex/reports/0.97.0/coverage.any.json`\n",
+            ),
+        );
+    }
+    inventory
 }
 
 #[rustfmt::skip]

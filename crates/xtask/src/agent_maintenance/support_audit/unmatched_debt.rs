@@ -1,4 +1,4 @@
-use std::{collections::BTreeSet, fs, path::Path};
+use std::{collections::BTreeSet, fs, io, path::Path};
 
 use serde::Deserialize;
 
@@ -29,13 +29,42 @@ pub(super) fn classify_unmatched_debt_rows(
     if rows.is_empty() {
         return Ok(Vec::new());
     }
+    match report.platform_filter_mode.as_deref() {
+        Some("any") => {}
+        Some(mode) => {
+            return Err(format!(
+                "cannot classify unmatched debt rows: report {} has `platform_filter.mode` `{mode}`, expected `any`",
+                report.path.display()
+            ));
+        }
+        None => {
+            return Err(format!(
+                "cannot classify unmatched debt rows: report {} is missing `platform_filter.mode`",
+                report.path.display()
+            ));
+        }
+    }
+    let report_targets = report.upstream_targets.as_ref().ok_or_else(|| {
+        format!(
+            "cannot classify unmatched debt rows: report {} is missing `inputs.upstream.targets`",
+            report.path.display()
+        )
+    })?;
+    let union = load_union(workspace_root, entry, target_version)?;
+    if report_targets != &union.input_targets {
+        return Err(format!(
+            "cannot classify unmatched debt rows: report {} `inputs.upstream.targets` {:?} differs from union input targets {:?}",
+            report.path.display(),
+            report_targets,
+            union.input_targets
+        ));
+    }
     let excluded = surfaces_from_report_lists(
         &entry.agent_id,
         &report.path,
         &report.deltas,
         &EXCLUDED_LISTS,
     )?;
-    let observed = load_union_surfaces(workspace_root, entry, target_version)?;
     Ok(rows
         .iter()
         .map(|row| {
@@ -45,7 +74,7 @@ pub(super) fn classify_unmatched_debt_rows(
             // for. The exception is an `unsupported` command (uaa-0042).
             let observation = if excluded.contains(&identity) {
                 "excluded_by_rules"
-            } else if observed.contains(&identity) {
+            } else if union.surfaces.contains(&identity) {
                 "covered_by_wrapper"
             } else {
                 "not_observed"
@@ -63,7 +92,13 @@ pub(super) fn classify_unmatched_debt_rows(
 
 #[derive(Deserialize)]
 struct UnionSurfaces {
+    inputs: Vec<UnionInput>,
     commands: Vec<UnionCommandSurfaces>,
+}
+
+#[derive(Deserialize)]
+struct UnionInput {
+    target_triple: String,
 }
 
 #[derive(Deserialize)]
@@ -85,32 +120,45 @@ struct UnionArgSurface {
     name: String,
 }
 
-fn load_union_surfaces(
+struct UnionEvidence {
+    input_targets: BTreeSet<String>,
+    surfaces: BTreeSet<SurfaceIdentity>,
+}
+
+fn load_union(
     workspace_root: &Path,
     entry: &AgentRegistryEntry,
     target_version: &str,
-) -> Result<BTreeSet<SurfaceIdentity>, String> {
+) -> Result<UnionEvidence, String> {
     let path = workspace_root
         .join(&entry.manifest_root)
         .join("snapshots")
         .join(target_version)
         .join("union.json");
-    let text =
-        fs::read_to_string(&path).map_err(|err| format!("read {}: {err}", path.display()))?;
+    let text = match fs::read_to_string(&path) {
+        Ok(text) => text,
+        Err(err) if err.kind() == io::ErrorKind::NotFound => {
+            return Err(format!(
+                "cannot classify unmatched debt rows: union {} is missing",
+                path.display()
+            ));
+        }
+        Err(err) => return Err(format!("read {}: {err}", path.display())),
+    };
     let union = serde_json::from_str::<UnionSurfaces>(&text)
         .map_err(|err| format!("parse {}: {err}", path.display()))?;
     let agent_id = entry.agent_id.as_str();
-    let mut observed = BTreeSet::new();
+    let mut surfaces = BTreeSet::new();
     for command in &union.commands {
         let path = &command.path;
-        observed.insert(surface_identity(
+        surfaces.insert(surface_identity(
             agent_id,
             path,
             ReportRowShape::Command,
             "",
         ));
         for flag in &command.flags {
-            observed.insert(surface_identity(
+            surfaces.insert(surface_identity(
                 agent_id,
                 path,
                 ReportRowShape::Flag,
@@ -118,7 +166,7 @@ fn load_union_surfaces(
             ));
         }
         for arg in &command.args {
-            observed.insert(surface_identity(
+            surfaces.insert(surface_identity(
                 agent_id,
                 path,
                 ReportRowShape::Arg,
@@ -126,5 +174,12 @@ fn load_union_surfaces(
             ));
         }
     }
-    Ok(observed)
+    Ok(UnionEvidence {
+        input_targets: union
+            .inputs
+            .into_iter()
+            .map(|input| input.target_triple)
+            .collect(),
+        surfaces,
+    })
 }
