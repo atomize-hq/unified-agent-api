@@ -465,6 +465,8 @@ jobs:
           path: _snapshots
           merge-multiple: true
 
+      # Deferred (docs/backlog.json uaa-0038): DEST is not cleared, so when `ref` already has
+      # committed snapshots for this version, a target that failed in this run still counts as present.
       - name: Materialize snapshots and assert the required target is present
         shell: bash
         env:
