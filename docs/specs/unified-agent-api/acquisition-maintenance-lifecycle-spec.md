@@ -115,10 +115,10 @@ incomplete acquisition (`snapshots/<version>/union.json` has `complete: false`),
 | exit | constant | meaning | error? |
 | --- | --- | --- | --- |
 | 0 | — | clean: no uplifts, reconciliation not drifted | no |
-| 3 | `EXIT_UPLIFTS_REQUIRED` | uplifts required; contributor relay work needed | no — a result |
+| 3 | `EXIT_UPLIFTS_REQUIRED` | uplifts required and the debt baseline still matches; contributor relay work needed | no — a result |
 | 4 | `EXIT_INCOMPLETE_ACQUISITION` | union incomplete; names `missing_targets` | yes |
 | 5 | `EXIT_TARGET_VERSION_MISMATCH` | the request's `detected_release.target_version` differs from `--expect-target-version`; checked before any evidence work, so it wins over malformed evidence or an invalid request field — which also means exit 5 says nothing about whether the rest of the request is valid | yes — blocking in CI only when the run commits |
-| 2 | `EXIT_VALIDATION` | evidence missing, bound to another version, or malformed; invalid request; drift with no uplifts | yes |
+| 2 | `EXIT_VALIDATION` | evidence missing, bound to another version, or malformed; invalid request; drift with no uplifts; and, even when uplifts remain, a debt row that matches no live gap or frozen debt rows that no longer match the debt inventory | yes |
 | 1 | `EXIT_INTERNAL` | internal fault | yes |
 
 A computed 0 or 3 survives a failed `--emit-json` write (the stale projection is removed and a

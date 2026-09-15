@@ -1,4 +1,5 @@
 use std::{
+    collections::BTreeSet,
     fs::{self, OpenOptions},
     io::{self, Write},
     path::{Component, Path, PathBuf},
@@ -318,6 +319,18 @@ fn derive_audit_status(
                     request.agent_id, detected_release.target_version
                 )))
             })?;
+    let frozen_audit = request
+        .support_surface_audit
+        .as_ref()
+        .expect("checked support_surface_audit presence above");
+    if let Some(detail) = debt_baseline_drift(frozen_audit, &live_audit) {
+        return Err(DeriveAuditStatusFailure::attempted(Error::Validation(
+            format!(
+                "maintenance request `{}` support-surface audit drifted in a way uplifts do not explain: {detail}",
+                request.relative_path
+            ),
+        )));
+    }
     let uplifts_required = !live_audit.required_uplifts_this_run.is_empty();
 
     let projection = build_projection(
@@ -345,6 +358,66 @@ fn derive_audit_status(
         projection,
         outcome,
     })
+}
+
+/// Names drift that uplifts cannot explain, which must fail the gate even when uplifts remain. A
+/// nightly packet freezes its request before acquisition, so new uplifts always drift it; a debt
+/// row that matches no live gap, or a debt baseline that changed since the freeze, never comes
+/// from them.
+fn debt_baseline_drift(frozen: &SupportSurfaceAudit, live: &SupportSurfaceAudit) -> Option<String> {
+    let mut causes = Vec::new();
+    if !live.unmatched_debt_surface.is_empty() {
+        let rows = live
+            .unmatched_debt_surface
+            .iter()
+            .map(|row| {
+                format!(
+                    "{} [observation={}; debt_ref={}]",
+                    row.identity().describe(),
+                    row.observation,
+                    row.debt_ref
+                )
+            })
+            .collect::<Vec<_>>();
+        causes.push(format!(
+            "debt rows match no live gap (contract field invariant 6): {}",
+            rows.join(", ")
+        ));
+    }
+    let debt_rows = |audit: &SupportSurfaceAudit| {
+        audit
+            .preexisting_unsupported_surface
+            .iter()
+            .map(|row| (row.identity(), row.debt_ref.clone()))
+            .collect::<BTreeSet<_>>()
+    };
+    let deferred_rows = |audit: &SupportSurfaceAudit| {
+        audit
+            .deferred_preexisting_gaps
+            .iter()
+            .map(|row| {
+                let follow_on = row.blocking_follow_on.clone();
+                (row.identity(), row.defer_reason.clone(), follow_on)
+            })
+            .collect::<BTreeSet<_>>()
+    };
+    for (field, changed) in [
+        (
+            "preexisting_unsupported_surface",
+            debt_rows(frozen) != debt_rows(live),
+        ),
+        (
+            "deferred_preexisting_gaps",
+            deferred_rows(frozen) != deferred_rows(live),
+        ),
+    ] {
+        if changed {
+            causes.push(format!(
+                "frozen `support_surface_audit.{field}` no longer matches the live debt inventory"
+            ));
+        }
+    }
+    (!causes.is_empty()).then(|| causes.join("; "))
 }
 
 fn validate_expected_target_version_before_load(
