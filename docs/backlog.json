@@ -822,7 +822,8 @@
         "Found by the Opus adversarial review lane during T1 remediation round 4 review.",
         "Marked closed during T2a (72191bb3) and reopened within the hour after the T2 adversarial lane disproved the fix (finding M3, probe test).",
         "Folds in T2 Codex lane F4 (flag naming), T2 Codex lane F3 (silent cleanup failure), and T2 adversarial lane L9 (why it is latent).",
-        "Fix with or before T3, which is the first consumer of the projection."
+        "Fix with or before T3, which is the first consumer of the projection.",
+        "Review of 51d44a56 (Opus lane, 2026-09-14): a frozen support-surface audit row with a value the contract does not allow now fails while the request loads, before live derivation, so it exits 2 and keeps an existing --emit-json projection. Before, with no live uplifts, the same request failed as drift after derivation and removed the projection. This matches every other pre-derivation validation failure; treat it as part of this stale-projection case."
       ]
     },
     {

@@ -967,3 +967,30 @@ notes recorded here rather than as findings:
   `--no-alt-screen` one by one. A command exclusion no longer carries its children, so lifting one
   moves only the command's own row.
 
+
+### 20.5 PR #207 review: frozen audit row values
+
+The Codex connector review on PR #207 (P2) found that the gate returned exit 3 for a request whose
+frozen support-surface audit carried a value the contract does not allow. The gate's drift-tolerant
+load turns any frozen/live mismatch into drift, `audit_status.rs` returns the uplift outcome before it
+handles drift, and the loader had checked only `required` and the three header lists. The lead found
+the strict load had the same gap whenever reconciliation was satisfied, because that check never reads
+the frozen uplift or eligible rows.
+
+Fixed in `51d44a56`: `validate_support_surface_audit_row_values` runs right after the header checks and
+before reconciliation, under both policies. It rejects an `eligibility_reason` or `required_writes`
+value outside the contract's lists, and a `defer_reason` outside the request's own `allowed_deferrals`.
+The generator builds `required_writes` from the same constant. `command_path` form is deliberately not
+checked: the committed claude_code request still carries `claude install` and stays tolerated drift.
+
+Both lanes came back CLEAN at `51d44a56`. Opus ran per-check mutations on a scratch copy, and every
+case fails on its own. Its three low observations need no code change:
+
+- No committed test runs the gate end to end, because `agent_maintenance_audit_status.rs` sits at the
+  code-line cap. The loader test runs against live uplifts, and existing gate tests already bind a
+  loader validation failure to exit 2 over live uplifts. A temporary lead test showed exit 2 with the
+  check and exit 3 without it.
+- With no live uplifts, such a request now fails before live derivation and keeps an existing
+  `--emit-json` projection instead of removing it, like every other pre-derivation validation failure.
+  Recorded on `uaa-0025`.
+- The strict deferred case already failed as drift; its test binds that the row check fires first.
