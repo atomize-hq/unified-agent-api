@@ -69,6 +69,8 @@ pub enum Error {
     Io(#[from] io::Error),
     #[error("command failed: {0}")]
     CommandFailed(String),
+    #[error("codex feature(s) failed to enable: {names} (the target fails rather than snapshot a subset; see ADR 0002)\n{details}")]
+    FeatureEnable { names: String, details: String },
     #[error("failed to parse JSON: {0}")]
     Json(#[from] serde_json::Error),
     #[error("supplement file version must be 1 (got {0})")]
@@ -103,9 +105,15 @@ pub fn run(args: Args) -> Result<(), Error> {
     let (snapshot_out_path, raw_help_dir, inferred_target_triple) =
         layout::resolve_outputs(&args, &version_dir)?;
     let (features_list, features_probe_error) = probes::probe_features(&codex_binary);
+    // Removed features expose no surface and a release may reject enabling them (ADR 0002).
     let enabled_feature_names = features_list
         .as_ref()
-        .map(|f| f.iter().map(|x| x.name.clone()).collect::<Vec<_>>())
+        .map(|f| {
+            f.iter()
+                .filter(|x| !x.stage.eq_ignore_ascii_case("removed"))
+                .map(|x| x.name.clone())
+                .collect::<Vec<_>>()
+        })
         .unwrap_or_default();
     let enable_args = enabled_feature_names
         .iter()
@@ -113,7 +121,7 @@ pub fn run(args: Args) -> Result<(), Error> {
         .collect::<Vec<_>>();
 
     // Always snapshot the default surface. If we can probe features, do a second discovery pass
-    // with all known features enabled and merge results for maximum coverage.
+    // with every non-removed feature enabled and merge results for maximum coverage.
     let default_entries =
         discovery::discover_commands(&codex_binary, raw_help_dir.as_deref(), false, &[])?;
 
@@ -129,7 +137,10 @@ pub fn run(args: Args) -> Result<(), Error> {
             raw_help_dir.as_deref(),
             args.capture_raw_help,
             &enable_args,
-        )?;
+        )
+        // Fail the target rather than snapshot a subset: nothing downstream reads `features`, so
+        // a union built from a subset would look complete while feature-gated surfaces are gone.
+        .map_err(|err| probes::name_enable_failures(&codex_binary, &enabled_feature_names, err))?;
         let added = enabled_entries
             .keys()
             .filter(|k| !default_entries.contains_key(*k))

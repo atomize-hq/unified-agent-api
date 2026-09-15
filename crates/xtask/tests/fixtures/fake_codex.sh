@@ -7,6 +7,11 @@ FAKE_CODEX_SCENARIO_FILE="fake-codex-scenario.txt"
 
 enabled_features=()
 while [[ "${1:-}" == "--enable" ]]; do
+  # Model a release that rejects removed features; FAKE_CODEX_FAIL_ENABLE rejects one more.
+  if [[ "${2:-}" == "removed_feature" || ( -n "${FAKE_CODEX_FAIL_ENABLE:-}" && "${2:-}" == "$FAKE_CODEX_FAIL_ENABLE" ) ]]; then
+    echo "Error: unknown feature \`${2:-}\`" >&2
+    exit 1
+  fi
   enabled_features+=("${2:-}")
   shift 2
 done
@@ -196,6 +201,7 @@ if [[ "${1:-}" == "features" && "${2:-}" == "list" ]]; then
   cat <<'EOF'
 base_feature stable true
 extra_feature experimental false
+removed_feature removed false
 EOF
   exit 0
 fi

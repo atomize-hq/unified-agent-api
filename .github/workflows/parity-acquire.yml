@@ -418,11 +418,15 @@ jobs:
           path: |
             ${{ needs.plan.outputs.manifest_root }}/snapshots/${{ inputs.target_version }}/${{ matrix.target_triple }}.json
 
+      # Also runs when capture fails, so the partial help is evidence. The snapshot upload above
+      # stays success-only: the union must never see a `<target>.json` from a failed capture.
+      # A capture that fails on its first invocation writes no help, so only warn off the success path.
       - name: Upload the raw help capture (never committed)
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v6
         with:
           name: "parity-acquire-raw-help-${{ inputs.agent_id }}-${{ inputs.target_version }}-${{ matrix.target_triple }}"
-          if-no-files-found: error
+          if-no-files-found: ${{ job.status == 'success' && 'error' || 'warn' }}
           retention-days: 1
           path: |
             ${{ needs.plan.outputs.manifest_root }}/raw_help/${{ inputs.target_version }}/${{ matrix.target_triple }}/

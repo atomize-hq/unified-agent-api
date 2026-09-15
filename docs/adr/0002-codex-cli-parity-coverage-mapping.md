@@ -16,8 +16,9 @@ This repository wraps the upstream Codex CLI (`codex`) as a Rust library (`crate
 Note: feature stages in `codex features list` may include `deprecated` and `removed` in addition to `stable|beta|experimental`. We record the stage string to support proactive planning before surfaces disappear.
 
 Feature enable policy (for exhaustive discovery):
-- Use best-effort enabling of all features listed by `codex features list` except those with stage `removed`.
-- If enabling a feature fails, record the failure and continue discovery with the subset of features that successfully enabled.
+- Enable every feature listed by `codex features list` except those with stage `removed` (compared case-insensitively). A removed feature exposes no surface, and a release may reject enabling it. `features.listed` still records every listed row with its stage; `features.enabled_for_snapshot` names only the features actually enabled.
+- If a non-removed feature fails to enable, the target snapshot fails. `codex-snapshot` exits non-zero and writes no snapshot. Only on this failure path it probes each feature alone (`codex --enable <FEATURE> --help`) and names every feature that fails alone, with its error text. If none fails alone, the original discovery error is reported.
+- Discovery does not continue with the subset that enabled. Nothing downstream reads the `features` metadata, so a union built from a subset would look complete while feature-gated surfaces were missing. In `parity-acquire`, the failed leg uploads its raw help capture as evidence but no per-target snapshot. A failed non-required target leaves the acquisition incomplete (maintenance audit exit 4); a failed required target stops the union.
 
 Scope note (positional parsing semantics):
 - The parity/coverage mapping system is help-surface based (commands/flags/positional args as discoverable from `--help` and `Usage:` inference). It does not attempt to model deeper runtime parsing semantics (operand forwarding, `--` handling, prompt placeholder expansion) unless we add a dedicated, probeable “behavioral semantics” layer later.

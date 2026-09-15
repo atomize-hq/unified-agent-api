@@ -135,6 +135,37 @@ pub(super) fn probe_features(codex_binary: &Path) -> (Option<Vec<FeatureInfo>>, 
     (Some(features), None)
 }
 
+/// Maps a failed all-features discovery pass to the features that fail to enable on their own.
+/// Runs only on that failure path, so a passing snapshot keeps its invocation count. When no
+/// single feature fails (or a probe cannot spawn), the original error stands.
+pub(super) fn name_enable_failures(codex_binary: &Path, features: &[String], err: Error) -> Error {
+    let mut names = Vec::new();
+    let mut details = Vec::new();
+    for name in features {
+        let mut cmd = Command::new(codex_binary);
+        cmd.args(["--enable", name.as_str(), "--help"]);
+        cmd.env("NO_COLOR", "1");
+        cmd.env("CLICOLOR", "0");
+        cmd.env("TERM", "dumb");
+        let Ok(output) = cmd.output() else { continue };
+        if !output.status.success() {
+            names.push(name.as_str());
+            details.push(
+                util::command_failed_message(&cmd, &output)
+                    .trim()
+                    .to_string(),
+            );
+        }
+    }
+    if names.is_empty() {
+        return err;
+    }
+    Error::FeatureEnable {
+        names: names.join(", "),
+        details: details.join("\n"),
+    }
+}
+
 pub(super) fn build_features_metadata(
     listed: Option<Vec<FeatureInfo>>,
     probe_error: Option<String>,
