@@ -9,6 +9,7 @@ use super::super::support_audit::{
     allowed_deferrals, coverage_report_present_for_target, derive_support_surface_audit,
     excluded_surface_kinds, surface_kinds, DebtBackedSurface, DeferredGap, EligibleSurface,
     EvidenceBackedSurface, PublicationImpact, RequiredUplift, SupportSurfaceAudit, SurfaceIdentity,
+    ELIGIBILITY_REASONS, REQUIRED_WRITES,
 };
 use super::{
     raw::{
@@ -73,6 +74,7 @@ pub(super) fn validate_support_surface_audit(
                     request_path.display()
                 )));
             }
+            validate_support_surface_audit_row_values(request_path, &actual)?;
             if frozen_had_discovery_work && audit_drift_policy == AuditDriftPolicy::Reject {
                 let report_dir = format!(
                     "{}/reports/{}",
@@ -134,6 +136,55 @@ pub(super) fn validate_support_surface_audit(
             reconciliation_detail: None,
         }),
     }
+}
+
+/// Checks the row values the contract enumerates on their own, before reconciliation. Comparing
+/// against the live audit cannot stand in for this: a drift-tolerant load accepts any mismatch,
+/// and a satisfied reconciliation never reads the frozen uplift or eligible rows.
+fn validate_support_surface_audit_row_values(
+    request_path: &Path,
+    audit: &SupportSurfaceAudit,
+) -> Result<(), MaintenanceRequestError> {
+    let check = |field: String, value: &str, allowed: &[&str]| {
+        if allowed.contains(&value) {
+            return Ok(());
+        }
+        Err(MaintenanceRequestError::Validation(format!(
+            "maintenance request `{}` field `support_surface_audit.{field}` has value `{value}`, which is not one of: {}",
+            request_path.display(),
+            allowed.join(", ")
+        )))
+    };
+    for (index, row) in audit.eligible_preexisting_surface.iter().enumerate() {
+        check(
+            format!("eligible_preexisting_surface[{index}].eligibility_reason"),
+            &row.eligibility_reason,
+            &ELIGIBILITY_REASONS,
+        )?;
+    }
+    for (index, row) in audit.required_uplifts_this_run.iter().enumerate() {
+        for value in &row.required_writes {
+            check(
+                format!("required_uplifts_this_run[{index}].required_writes"),
+                value,
+                &REQUIRED_WRITES,
+            )?;
+        }
+    }
+    // The header check above has already bound this list to the shared taxonomy.
+    let allowed_deferrals = audit
+        .allowed_deferrals
+        .iter()
+        .map(String::as_str)
+        .collect::<Vec<_>>();
+    for (index, row) in audit.deferred_preexisting_gaps.iter().enumerate() {
+        check(
+            format!("deferred_preexisting_gaps[{index}].defer_reason"),
+            &row.defer_reason,
+            &allowed_deferrals,
+        )?;
+    }
+    Ok(())
 }
 
 fn reconcile_support_surface_audit(

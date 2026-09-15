@@ -26,6 +26,18 @@ const ALLOWED_DEFERRALS: [&str; 5] = [
     "requires_new_architectural_seam",
     "outside_registry_maintenance_write_envelope",
 ];
+pub(crate) const REQUIRED_WRITES: [&str; 5] = [
+    "wrapper",
+    "backend",
+    "manifest",
+    "publication",
+    "packet_docs",
+];
+pub(crate) const ELIGIBILITY_REASONS: [&str; 3] = [
+    "adjacent_surface_changed",
+    "bounded_write_envelope",
+    "no_new_seam_required",
+];
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct SurfaceIdentity {
@@ -299,13 +311,7 @@ pub(crate) fn derive_support_surface_audit(
             command_path: surface.command_path.clone(),
             surface_id: surface.surface_id.clone(),
             reason: "new_upstream_surface".to_string(),
-            required_writes: vec![
-                "wrapper".to_string(),
-                "backend".to_string(),
-                "manifest".to_string(),
-                "publication".to_string(),
-                "packet_docs".to_string(),
-            ],
+            required_writes: REQUIRED_WRITES.iter().map(ToString::to_string).collect(),
         })
         .collect::<Vec<_>>();
 
