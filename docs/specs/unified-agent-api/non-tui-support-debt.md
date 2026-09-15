@@ -43,7 +43,7 @@ Row ids are the canonical `debt_ref` anchors used by `support_surface_audit`.
 
 - `agent_id`: `claude_code`
 - `surface_kind`: `commands`
-- `command_path`: `claude install`
+- `command_path`: `claude_code install`
 - `surface_id`: `install`
 - `current_reason`: `Current wrapper contract excludes installation flows even though the upstream non-TUI surface exists on win32-x64.`
 - `blocker_class`: `requires_new_architectural_seam`
@@ -56,7 +56,7 @@ Row ids are the canonical `debt_ref` anchors used by `support_surface_audit`.
 
 - `agent_id`: `claude_code`
 - `surface_kind`: `flags`
-- `command_path`: `claude install`
+- `command_path`: `claude_code install`
 - `surface_id`: `--force`
 - `current_reason`: `The wrapper excludes the Windows installation force path along with the install command seam.`
 - `blocker_class`: `requires_new_architectural_seam`

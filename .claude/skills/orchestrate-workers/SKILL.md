@@ -15,7 +15,7 @@ normalizes review evidence, and gives the final candidate a direct once-over.
 | Role | Permitted work |
 | --- | --- |
 | Lead orchestrator | Repository investigation, plan and direction, task boundaries, integration, review adjudication, final source/diff/verification once-over. |
-| `codex-profile-worker` | All delegated documentation, implementation, and Codex review work, under an explicit profile. |
+| `codex-profile-worker` | All delegated documentation, implementation, and Codex review work, under an explicit sandbox and timeout. |
 | `opus-adversarial-reviewer` | Read-only adversarial review only, launched in parallel with a Codex review lane. Never documentation or implementation. |
 
 Do not delegate architecture ownership to either worker. Do not launch the
@@ -78,9 +78,9 @@ documentation | implementation | review
 - Commit hash, only when requested
 ```
 
-Also state `Codex profile: atomize_systems_azure` (or another explicit
-profile). Invoke the launcher with `--sandbox workspace-write` for
-documentation or implementation, and `--sandbox read-only` for review.
+Codex uses its default configuration; name a `Codex profile:` only when a task
+needs a non-default one. Invoke the launcher with `--sandbox workspace-write`
+for documentation or implementation, and `--sandbox read-only` for review.
 
 ## Documentation and implementation loop
 
@@ -99,7 +99,7 @@ against the same base/candidate revision, contract paths, changed-file set, and
 review intent:
 
 1. `codex-profile-worker` with `Work type: review`, `Allowed write set: None`,
-   an explicit Codex profile, and `--sandbox read-only`.
+   and `--sandbox read-only`.
 2. `opus-adversarial-reviewer` with a read-only packet and the same evidence.
 
 The Codex lane checks defects, edge cases, missing tests, and simpler safe

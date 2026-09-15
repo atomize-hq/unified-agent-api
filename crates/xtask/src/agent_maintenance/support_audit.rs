@@ -26,6 +26,18 @@ const ALLOWED_DEFERRALS: [&str; 5] = [
     "requires_new_architectural_seam",
     "outside_registry_maintenance_write_envelope",
 ];
+pub(crate) const REQUIRED_WRITES: [&str; 5] = [
+    "wrapper",
+    "backend",
+    "manifest",
+    "publication",
+    "packet_docs",
+];
+pub(crate) const ELIGIBILITY_REASONS: [&str; 3] = [
+    "adjacent_surface_changed",
+    "bounded_write_envelope",
+    "no_new_seam_required",
+];
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct SurfaceIdentity {
@@ -299,13 +311,7 @@ pub(crate) fn derive_support_surface_audit(
             command_path: surface.command_path.clone(),
             surface_id: surface.surface_id.clone(),
             reason: "new_upstream_surface".to_string(),
-            required_writes: vec![
-                "wrapper".to_string(),
-                "backend".to_string(),
-                "manifest".to_string(),
-                "publication".to_string(),
-                "packet_docs".to_string(),
-            ],
+            required_writes: REQUIRED_WRITES.iter().map(ToString::to_string).collect(),
         })
         .collect::<Vec<_>>();
 
@@ -479,24 +485,48 @@ fn load_current_gap_surfaces(
         .get("deltas")
         .and_then(serde_json::Value::as_object)
         .ok_or_else(|| format!("{} is missing `deltas` object", report_path.display()))?;
+    let surfaces = surfaces_from_report_deltas(&entry.agent_id, &report_path, deltas)?;
 
+    Ok((report_path, surfaces))
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ReportRowShape {
+    Command,
+    Flag,
+    Arg,
+}
+
+pub(crate) fn surfaces_from_report_deltas(
+    agent_id: &str,
+    report_path: &Path,
+    deltas: &serde_json::Map<String, serde_json::Value>,
+) -> Result<Vec<SurfaceIdentity>, String> {
     let mut surfaces = BTreeSet::new();
-    for key in [
-        "missing_commands",
-        "missing_flags",
-        "missing_args",
-        "intentionally_unsupported",
+    for (key, required_shape, list_required) in [
+        ("missing_commands", Some(ReportRowShape::Command), true),
+        ("missing_flags", Some(ReportRowShape::Flag), true),
+        ("missing_args", Some(ReportRowShape::Arg), true),
+        // The report writer omits this list when it is empty.
+        ("intentionally_unsupported", None, false),
     ] {
-        let rows = deltas
-            .get(key)
-            .and_then(serde_json::Value::as_array)
-            .ok_or_else(|| format!("{} is missing `deltas.{key}` array", report_path.display()))?;
+        let rows = match deltas.get(key) {
+            None if !list_required => continue,
+            value => value.and_then(serde_json::Value::as_array).ok_or_else(|| {
+                format!("{} is missing `deltas.{key}` array", report_path.display())
+            })?,
+        };
         for row in rows {
-            surfaces.insert(surface_from_report_value(&entry.agent_id, row)?);
+            let (shape, surface) = surface_from_report_value(agent_id, row)?;
+            if required_shape.is_some_and(|required| required != shape) {
+                return Err(format!(
+                    "support-audit report row in `deltas.{key}` has the shape of a {shape:?} row"
+                ));
+            }
+            surfaces.insert(surface);
         }
     }
-
-    Ok((report_path, surfaces.into_iter().collect()))
+    Ok(surfaces.into_iter().collect())
 }
 
 fn coverage_report_version_dir(
@@ -510,7 +540,7 @@ fn coverage_report_version_dir(
         .join(target_version)
 }
 
-fn select_report_path(version_dir: &Path) -> Result<PathBuf, String> {
+pub(crate) fn select_report_path(version_dir: &Path) -> Result<PathBuf, String> {
     for preferred in ["coverage.any.json", "coverage.all.json"] {
         let path = version_dir.join(preferred);
         if path.is_file() {
@@ -538,7 +568,7 @@ fn select_report_path(version_dir: &Path) -> Result<PathBuf, String> {
 fn surface_from_report_value(
     agent_id: &str,
     row: &serde_json::Value,
-) -> Result<SurfaceIdentity, String> {
+) -> Result<(ReportRowShape, SurfaceIdentity), String> {
     let object = row
         .as_object()
         .ok_or_else(|| "support-audit report row must be an object".to_string())?;
@@ -551,49 +581,62 @@ fn surface_from_report_value(
             value
                 .as_str()
                 .map(ToString::to_string)
-                .ok_or_else(|| "support-audit report path value must be a string".to_string())
+                .ok_or_else(|| "support-audit report row `path` values must be strings".to_string())
         })
         .collect::<Result<Vec<_>, _>>()?;
 
-    let key = object.get("key").and_then(serde_json::Value::as_str);
-    let name = object.get("name").and_then(serde_json::Value::as_str);
+    let key = optional_report_row_string(object, "key")?;
+    let name = optional_report_row_string(object, "name")?;
     let command_path = if path.is_empty() {
         agent_id.to_string()
     } else {
         format!("{agent_id} {}", path.join(" "))
     };
 
-    let (surface_kind, surface_id) = if let Some(flag) = key {
-        (
+    let (shape, surface_kind, surface_id) = match (key, name) {
+        (Some(_), Some(_)) => {
+            return Err("support-audit report row must not carry both `key` and `name`".to_string())
+        }
+        (Some(flag), None) => (
+            ReportRowShape::Flag,
             if path.is_empty() {
                 "global_flags"
             } else {
                 "flags"
             },
             flag.to_string(),
-        )
-    } else if let Some(arg_name) = name {
-        ("positional_args", arg_name.to_string())
-    } else {
-        let surface_id = path
-            .last()
-            .cloned()
-            .ok_or_else(|| "support-audit command row must not use an empty path".to_string())?;
-        (
+        ),
+        (None, Some(arg_name)) => (ReportRowShape::Arg, "positional_args", arg_name.to_string()),
+        (None, None) => (
+            ReportRowShape::Command,
             if path.len() > 1 {
                 "subcommands"
             } else {
                 "commands"
             },
-            surface_id,
-        )
+            // A command row with an empty path is the agent's own root command.
+            path.last().cloned().unwrap_or_else(|| agent_id.to_string()),
+        ),
     };
 
-    Ok(SurfaceIdentity::new(
-        surface_kind.to_string(),
-        command_path,
-        surface_id,
+    Ok((
+        shape,
+        SurfaceIdentity::new(surface_kind.to_string(), command_path, surface_id),
     ))
+}
+
+fn optional_report_row_string<'a>(
+    object: &'a serde_json::Map<String, serde_json::Value>,
+    field: &str,
+) -> Result<Option<&'a str>, String> {
+    object
+        .get(field)
+        .map(|value| {
+            value
+                .as_str()
+                .ok_or_else(|| format!("support-audit report row `{field}` must be a string"))
+        })
+        .transpose()
 }
 
 fn repo_relative(workspace_root: &Path, path: &Path) -> Result<String, String> {

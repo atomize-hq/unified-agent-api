@@ -21,6 +21,152 @@
         "name": "project",
         "category": "interactive",
         "note": "Interactive TUI project selection is outside the canonical run --format json wrapper surface."
+      },
+      {
+        "unit": "command",
+        "path": [],
+        "category": "interactive",
+        "note": "The root command starts the interactive TUI (opencode [project]), which is outside the canonical run --format json wrapper surface."
+      },
+      {
+        "unit": "flag",
+        "path": [],
+        "key": "--agent",
+        "category": "interactive",
+        "note": "Flag of the root command, which starts the interactive TUI; where a subcommand accepts the same flag, that copy stays in parity."
+      },
+      {
+        "unit": "flag",
+        "path": [],
+        "key": "--auto",
+        "category": "interactive",
+        "note": "Flag of the root command, which starts the interactive TUI; where a subcommand accepts the same flag, that copy stays in parity."
+      },
+      {
+        "unit": "flag",
+        "path": [],
+        "key": "--continue",
+        "category": "interactive",
+        "note": "Flag of the root command, which starts the interactive TUI; where a subcommand accepts the same flag, that copy stays in parity."
+      },
+      {
+        "unit": "flag",
+        "path": [],
+        "key": "--cors",
+        "category": "interactive",
+        "note": "Flag of the root command, which starts the interactive TUI; where a subcommand accepts the same flag, that copy stays in parity."
+      },
+      {
+        "unit": "flag",
+        "path": [],
+        "key": "--fork",
+        "category": "interactive",
+        "note": "Flag of the root command, which starts the interactive TUI; where a subcommand accepts the same flag, that copy stays in parity."
+      },
+      {
+        "unit": "flag",
+        "path": [],
+        "key": "--help",
+        "category": "interactive",
+        "note": "Flag of the root command, which starts the interactive TUI; where a subcommand accepts the same flag, that copy stays in parity."
+      },
+      {
+        "unit": "flag",
+        "path": [],
+        "key": "--hostname",
+        "category": "interactive",
+        "note": "Flag of the root command, which starts the interactive TUI; where a subcommand accepts the same flag, that copy stays in parity."
+      },
+      {
+        "unit": "flag",
+        "path": [],
+        "key": "--log-level",
+        "category": "interactive",
+        "note": "Flag of the root command, which starts the interactive TUI; where a subcommand accepts the same flag, that copy stays in parity."
+      },
+      {
+        "unit": "flag",
+        "path": [],
+        "key": "--mdns",
+        "category": "interactive",
+        "note": "Flag of the root command, which starts the interactive TUI; where a subcommand accepts the same flag, that copy stays in parity."
+      },
+      {
+        "unit": "flag",
+        "path": [],
+        "key": "--mdns-domain",
+        "category": "interactive",
+        "note": "Flag of the root command, which starts the interactive TUI; where a subcommand accepts the same flag, that copy stays in parity."
+      },
+      {
+        "unit": "flag",
+        "path": [],
+        "key": "--mini",
+        "category": "interactive",
+        "note": "Flag of the root command, which starts the interactive TUI; where a subcommand accepts the same flag, that copy stays in parity."
+      },
+      {
+        "unit": "flag",
+        "path": [],
+        "key": "--model",
+        "category": "interactive",
+        "note": "Flag of the root command, which starts the interactive TUI; where a subcommand accepts the same flag, that copy stays in parity."
+      },
+      {
+        "unit": "flag",
+        "path": [],
+        "key": "--no-replay",
+        "category": "interactive",
+        "note": "Flag of the root command, which starts the interactive TUI; where a subcommand accepts the same flag, that copy stays in parity."
+      },
+      {
+        "unit": "flag",
+        "path": [],
+        "key": "--port",
+        "category": "interactive",
+        "note": "Flag of the root command, which starts the interactive TUI; where a subcommand accepts the same flag, that copy stays in parity."
+      },
+      {
+        "unit": "flag",
+        "path": [],
+        "key": "--print-logs",
+        "category": "interactive",
+        "note": "Flag of the root command, which starts the interactive TUI; where a subcommand accepts the same flag, that copy stays in parity."
+      },
+      {
+        "unit": "flag",
+        "path": [],
+        "key": "--prompt",
+        "category": "interactive",
+        "note": "Flag of the root command, which starts the interactive TUI; where a subcommand accepts the same flag, that copy stays in parity."
+      },
+      {
+        "unit": "flag",
+        "path": [],
+        "key": "--pure",
+        "category": "interactive",
+        "note": "Flag of the root command, which starts the interactive TUI; where a subcommand accepts the same flag, that copy stays in parity."
+      },
+      {
+        "unit": "flag",
+        "path": [],
+        "key": "--replay-limit",
+        "category": "interactive",
+        "note": "Flag of the root command, which starts the interactive TUI; where a subcommand accepts the same flag, that copy stays in parity."
+      },
+      {
+        "unit": "flag",
+        "path": [],
+        "key": "--session",
+        "category": "interactive",
+        "note": "Flag of the root command, which starts the interactive TUI; where a subcommand accepts the same flag, that copy stays in parity."
+      },
+      {
+        "unit": "flag",
+        "path": [],
+        "key": "--version",
+        "category": "interactive",
+        "note": "Flag of the root command, which starts the interactive TUI; where a subcommand accepts the same flag, that copy stays in parity."
       }
     ]
   },

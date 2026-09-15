@@ -141,13 +141,13 @@ evidence_ref = "cli_manifests/codex/raw_help/..."
 
 [[support_surface_audit.preexisting_unsupported_surface]]
 surface_kind = "global_flags"
-command_path = "claude"
+command_path = "claude_code"
 surface_id = "--output-format"
 debt_ref = "docs/specs/unified-agent-api/non-tui-support-debt.md#claude-code-output-format"
 
 [[support_surface_audit.eligible_preexisting_surface]]
 surface_kind = "global_flags"
-command_path = "claude"
+command_path = "claude_code"
 surface_id = "--output-format"
 eligibility_reason = "adjacent_surface_changed"
 
@@ -170,7 +170,7 @@ required_writes = ["wrapper", "backend", "manifest", "publication"]
 
 [[support_surface_audit.deferred_preexisting_gaps]]
 surface_kind = "global_flags"
-command_path = "claude"
+command_path = "claude_code"
 surface_id = "--output-format"
 defer_reason = "requires_new_architectural_seam"
 blocking_follow_on = "TODOS.md#close-claude-code-install-maintenance-gap"
@@ -193,6 +193,36 @@ Required record shape rules:
 | uplift row | surface row + `reason`, `required_writes` | `required_writes` values limited to `wrapper`, `backend`, `manifest`, `publication`, `packet_docs` |
 | deferred row | surface row + `defer_reason`, `blocking_follow_on` when repo-owned | `blocking_follow_on` omitted only for concrete external blockers |
 | publication impact row | surface row + `surface_doc` | ties uplift to published truth |
+
+Surface identity rules. When a coverage report exists for the target version, shared code derives
+the gap surfaces from report rows as shown below. Those identities fill `missing_wrapper_support`,
+`missing_backend_support`, and `publication_impacts`. A gap surface that equals a non-TUI debt
+inventory row becomes a preexisting and deferred row; any other becomes a discovered row and a
+required uplift. A debt inventory row that equals no gap surface becomes a
+`removed_upstream_surface` row carrying the debt row's own identity. Without a report, every surface
+row uses the identities written in the debt inventory rows. Shared code leaves
+`eligible_preexisting_surface` empty. `path` is the report row's command path below the agent's own
+command.
+
+| Report row | `surface_kind` | `command_path` | `surface_id` |
+| --- | --- | --- | --- |
+| command, empty `path` (the agent's root command) | `commands` | `<agent_id>` | `<agent_id>` |
+| command, one path element | `commands` | `<agent_id> <path>` | last path element |
+| command, two or more path elements | `subcommands` | `<agent_id> <path...>` | last path element |
+| flag (`key`) | `global_flags` when `path` is empty, else `flags` | `<agent_id>` or `<agent_id> <path...>` | `key` |
+| positional argument (`name`) | `positional_args` | `<agent_id>` or `<agent_id> <path...>` | `name` |
+
+The three fields together are the identity; a consumer MUST NOT match surfaces on `surface_id`
+alone, because the root command and a command named like the agent share one. `command_path` is
+rooted at the registry `agent_id` (for example `claude_code install`), never at the upstream binary
+name, and debt inventory rows MUST use the same form so they match report-derived surfaces.
+
+A report's `deltas.missing_commands`, `deltas.missing_flags`, and `deltas.missing_args` MUST be
+arrays. `deltas.intentionally_unsupported` MAY be absent, which is how the report writer records an
+empty list; when present it MUST be an array. A report row is invalid evidence when `path` is
+missing or is not an array of strings, when `key` or `name` is present but not a string, when it
+carries both `key` and `name`, or when its shape does not match the list it appears in (commands
+carry neither field, flags carry `key`, arguments carry `name`).
 
 Field invariants:
 

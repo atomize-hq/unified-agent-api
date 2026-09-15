@@ -1,9 +1,10 @@
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory = $true)][ValidatePattern('^[A-Za-z0-9_-]+$')][string]$Profile,
+    [ValidatePattern('^[A-Za-z0-9_-]+$')][string]$Profile,
     [Parameter(Mandatory = $true)][string]$Worktree,
     [Parameter(Mandatory = $true)][string]$Packet,
     [ValidateSet('read-only', 'workspace-write')][string]$Sandbox = 'workspace-write',
+    [ValidateRange(1, [int]::MaxValue)][int]$TimeoutSeconds = 3600,
     [string]$OutputLastMessage,
     [switch]$DryRun
 )
@@ -19,28 +20,41 @@ if ($packetPath.StartsWith($worktreePath + [IO.Path]::DirectorySeparatorChar, [S
     throw 'Packet must be outside the target worktree.'
 }
 
-$codexHome = if ($env:CODEX_HOME) { $env:CODEX_HOME } else { Join-Path $HOME '.codex' }
-$profileFile = Join-Path $codexHome "$Profile.config.toml"
-if (-not (Test-Path -LiteralPath $profileFile -PathType Leaf)) {
-    throw "Required Codex profile overlay does not exist: $profileFile"
+# --sandbox is always passed, so the global sandbox_mode never applies.
+$codexArgs = @('exec', '--sandbox', $Sandbox, '--cd', $worktreePath)
+if ($Profile) {
+    $codexHome = if ($env:CODEX_HOME) { $env:CODEX_HOME } else { Join-Path $HOME '.codex' }
+    $profileFile = Join-Path $codexHome "$Profile.config.toml"
+    if (-not (Test-Path -LiteralPath $profileFile -PathType Leaf)) {
+        throw "Codex profile overlay does not exist: $profileFile"
+    }
+    $codexArgs += @('--profile', $Profile)
 }
-if (-not (Get-Command codex -ErrorAction SilentlyContinue)) {
-    throw 'codex is not on PATH.'
-}
-
-$codexArgs = @('exec', '--profile', $Profile, '--sandbox', $Sandbox, '--cd', $worktreePath)
 if ($OutputLastMessage) {
     $outputPath = [IO.Path]::GetFullPath($OutputLastMessage)
     $codexArgs += @('--output-last-message', $outputPath)
 }
 $codexArgs += '-'
 
+$codex = Get-Command codex -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
+if (-not $codex) {
+    throw 'codex is not on PATH.'
+}
+
 if ($DryRun) {
-    Write-Output "profile overlay: $profileFile"
+    Write-Output ('profile: ' + $(if ($Profile) { $Profile } else { '(default configuration)' }))
     Write-Output "packet: $packetPath"
+    Write-Output "timeout: $TimeoutSeconds seconds"
     Write-Output ('command: codex ' + ($codexArgs -join ' '))
     exit 0
 }
 
-Get-Content -LiteralPath $packetPath -Raw | & codex @codexArgs
-exit $LASTEXITCODE
+$quotedArgs = $codexArgs | ForEach-Object { '"' + $_ + '"' }
+$process = Start-Process -FilePath $codex.Source -ArgumentList $quotedArgs -RedirectStandardInput $packetPath -NoNewWindow -PassThru
+$null = $process.Handle  # keep the handle so ExitCode is readable after exit
+if (-not $process.WaitForExit($TimeoutSeconds * 1000)) {
+    try { $process.Kill($true) } catch { $process.Kill() }
+    Write-Error "codex did not finish within $TimeoutSeconds seconds and was stopped." -ErrorAction Continue
+    exit 124
+}
+exit $process.ExitCode

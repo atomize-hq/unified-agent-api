@@ -25,8 +25,8 @@ an imagined broader project.
 
 ## Dispatch the two lanes concurrently
 
-1. Dispatch `codex-profile-worker` with `Work type: review`, an explicit Codex
-   profile, `Allowed write set: None`, and `--sandbox read-only`. Require it to
+1. Dispatch `codex-profile-worker` with `Work type: review`,
+   `Allowed write set: None`, and `--sandbox read-only`. Require it to
    preserve Codex's final response separately from observed repository evidence.
 2. At the same time, dispatch `opus-adversarial-reviewer` with the identical
    candidate evidence and a read-only packet.

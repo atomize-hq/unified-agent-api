@@ -13,6 +13,7 @@ ownership.
 
 Use `codex-profile-worker` for documentation, implementation, and Codex review
 work. Use `opus-adversarial-reviewer` only as a read-only adversarial lane,
-dispatched in parallel with a Codex review—not as an implementation worker. A
-Codex packet must state its explicit profile; the repository launcher rejects
-omitted profiles.
+dispatched in parallel with a Codex review—not as an implementation worker.
+Codex runs on its default configuration unless a packet names a profile; the
+repository launcher always passes an explicit sandbox and stops Codex after a
+timeout.

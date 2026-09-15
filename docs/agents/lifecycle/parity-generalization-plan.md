@@ -661,3 +661,336 @@ Three of the defects in this campaign were platform- or execution-mode-specific 
 reachable from a `commit: false` Linux run. The static guards added here cover those specific
 shapes cheaply; a paths-filtered multi-OS job on `.github/workflows/**` would cover the class.
 Left as a maintainer decision because it changes CI cost and required-check configuration.
+
+**Decided 2026-09-13: deferred.** The static contract tests in `c4_spec_ci_wiring.rs` remain the only
+guard on workflow changes; revisit after T3.
+
+## 18. T1 complete — the audit gate, and what it cost to trust it (2026-07-25)
+
+`maintenance-audit-status` landed across five implementation rounds and four review rounds
+(`b1aec687`, `59f581ce`, `d41bb279`, `4620b531`, `b55cef4f`). Every review round found real
+defects, and the last one found the worst.
+
+### 18.1 The defect that nearly shipped
+
+Round 4 bound every `coverage.*.json` in a version directory to the target version, on the premise
+that this proved the acquisition evidence was sound. It did not. It proved only that no file came
+from a *different* version.
+
+`manifest_report` never writes a report for a target it did not acquire. So an acquisition that
+lost two of four legs emits `coverage.any.json` plus the legs that succeeded — every one carrying
+the correct `inputs.upstream.semantic_version`. All of them passed. The union's deltas were
+computed over acquired targets only, so `required_uplifts_this_run` came back empty and the gate
+returned **exit 0** for an acquisition that never inspected macOS or Windows.
+
+This was not hypothetical. Five of the seven committed codex acquisitions are that shape
+(`complete: false`, one input, two missing targets), and `parity-acquire` was believed to continue
+on a partial matrix: `fail-fast: false`, only `REQUIRED_TARGET` enforced, every other missing leg a
+`::warning`. Reproduced on real 0.144.6 data by deleting the darwin and windows reports and flipping
+`union.json` — the gate returned exit 0 and `uplifts_required: false`.
+
+*Correction (2026-09-13):* the partial-matrix belief was wrong for a leg that fails. `union` has
+`needs: [plan, snapshot]` with no status-function `if:`, so a failed leg skips `union` entirely;
+`complete: false` is written only when a leg succeeds but its snapshot artifact never arrives. The
+defect above is still real for committed history and local runs. See §18.5 and `uaa-0030`.
+
+The fix reads the completeness the acquisition already records in
+`snapshots/<version>/union.json` and refuses anything short of `complete=true`, naming the missing
+targets. Evidence validation also ran only on the clean path, so an exit-3 relay packet could be
+derived from evidence belonging to another version; it now runs unconditionally, ahead of
+derivation.
+
+This is the same root cause as the standing gap in §17.2. Incomplete multi-OS acquisition was not
+merely unenforced in CI — it was *invisible* to the governance gate built to catch it.
+
+### 18.2 Why the parallel review lanes earned their cost
+
+The lead's own verification passed at every round, because it kept asking whether each round did
+what it intended rather than whether the intent was sufficient. The Codex lane raised a narrower
+version of the same area (stale sibling *content*) that was adjudicated as a deferred limitation.
+The adversarial lane attacked the premise instead and found that version binding never proved
+completeness at all. T1 would have been declared done before round 4 ran, and T2 and T3 would have
+been built on a gate that could not see the thing it existed to catch.
+
+### 18.3 Known debt carried out of T1
+
+Recorded in `docs/backlog.json` as the canonical follow-up register. Do not re-derive these from
+scratch; each entry carries its own context, file list and deliverables.
+
+| id | item | why deferred |
+| --- | --- | --- |
+| `uaa-0023` | Typed errors for support-audit evidence faults | Round 5 classifies some faults by matching error message text, because the packet scoped `support_audit.rs` out of the write set. Failure direction is safe — a message drift yields exit 1, never a false clean — so it is fragility, not a correctness hole. |
+| `uaa-0024` | Union-vs-per-target coverage coherence contract | Requires first defining what coherence means between the union and its inputs; that contract does not exist yet. Design task, not a bug fix. |
+| `uaa-0025` | Projection cannot detect same-request staleness | `request_sha256` cannot detect the one staleness case it was added for, since a re-run of the same request produces the same hash. Best resolved with T2, which defines how the workflow consumes the projection. |
+| `uaa-0026` | Exit 3 lost when `--emit-json` cannot be written | Pre-existing, not introduced by T1. The computed outcome is discarded by a `?` on the write path. Needs an explicit precedence decision, coordinated with T2's exit-code routing. |
+
+Status as of 2026-09-13: `uaa-0026` is **done** (`72191bb3`, the computed outcome takes
+precedence). `uaa-0025` was marked closed during T2a, disproved by the T2 adversarial lane, and is
+**reopened** with a wider scope (§18.5).
+
+### 18.4 What T2 inherits
+
+The gate now has three outcomes to route, not two: clean (0), uplifts required (3), and
+insufficient evidence — which includes "the matrix ran but did not finish". T2a later split that
+case out as exit **4**, so CI routes it by number; other evidence failures stay exit 2.
+
+As written on 2026-07-25, this section said a flaked macOS or Windows leg would land on the
+incomplete-acquisition exit because `parity-acquire` continues on a partial matrix by design. That
+premise was wrong (§18.1 correction): a failed leg skips `union`, so the gate never runs. The
+maintainer's policy — retry missing legs once, then fail — was implemented in T2b as a step-level
+retry-once inside each snapshot leg, because Actions cannot re-run individual matrix legs.
+
+### 18.5 Debt recorded while T2 is open (2026-09-13)
+
+T2 is code-complete at `24a95b52` (T2a `72191bb3`, T2b `e87a9a1d`, T2c `24a95b52`), but its last
+fix round has not been reviewed, so it has no section of its own yet; §19 is written when T2
+closes. These items are recorded now so they are not lost. Each is in `docs/backlog.json`, and the
+spec's §8.1 carries the same table.
+
+| id | item | source | disposition |
+| --- | --- | --- | --- |
+| `uaa-0025` | Projection can survive a failed run as a stale result | T2 adversarial M3 (probe-proven), Codex F3 and F4, adversarial L9 | Reopened. The request load derives internally, so later request-validation failures are classified preflight and leave a stale projection behind exit 2. Resolve with or before T3. |
+| `uaa-0027` | Snapshot retry can mix two attempts in raw_help | T2 adversarial L7 | Low; raw_help is never committed. |
+| `uaa-0028` | `--emit-json` cleanup has no ownership guard | T2 adversarial L8 (suspected) | Low until T3 makes the projection path durable. |
+| `uaa-0029` | No `on.workflow_call.outputs` for the gate verdict | handoff reading (H1), unreviewed | T3 prerequisite. |
+| `uaa-0030` | One failed leg skips `union`, gate, commit and upload | handoff reading (H2); confirmed in T2c review | Decided 2026-09-13: preserve completed legs, except a failed required target, which still hard-fails with no union. **Resolved in `a3c8ce53`** (§19). |
+| `uaa-0031` | Blocking verdict not visible on the packet PR | handoff reading (H3); confirmed by reading in T2c review; Opus F2; confirmed on a runner 2026-09-14 (see §19.3) | T3 design input. T3 also renders the exit-3 `required_uplifts` detail that `_ci_tmp` cleanup deletes today. |
+| `uaa-0032` | Version mismatch fails dry runs and promote-prerequisite re-runs | handoff reading (H5); confirmed in T2c review | Decided 2026-09-13: fail only when committing; a dry-run mismatch emits a notice. The mismatch is checked before the validated load and gets exit 5. Promote-prerequisite re-runs with `commit: true` are accepted as red-but-committed. **Resolved in `a3c8ce53` / `916c9e9b`** (§19). |
+| `uaa-0033` | Artifact bundle does not match what the run committed | T2c review (Opus, suspected; Codex) | Low. |
+| `uaa-0034` | Commit step can push a rebased tree the gate never judged | T2c review (Opus, suspected) | Low; pre-dates T2c. |
+
+## 19. T2 complete — wiring the gate into `parity-acquire` (2026-09-13)
+
+T2 landed across five commits: T2a `72191bb3`, T2b `e87a9a1d`, T2c `24a95b52`, T2d `a3c8ce53`,
+T2e `916c9e9b`. The `Maintenance audit gate` step in the `union` job runs
+`maintenance-audit-status --expect-target-version "$VERSION"`, records a verdict instead of failing,
+and a terminal step fails the job only after commit and the `always()` artifact upload.
+
+Final exit routing in the gate:
+
+| exit | meaning | recorded verdict | job |
+| --- | --- | --- | --- |
+| 0 | clean | `closeout_ready=true` | green |
+| 3 | uplifts required | `uplifts_required=true`, placeholder relay line (T3 renders the real one) | green, still commits |
+| 4 | union incomplete | blocking | fails after commit and upload |
+| 5 | request describes another version | blocking only when `commit: true`; a dry run gets a `::notice` | red only when committing |
+| 2, 1, other; missing request | validation / internal | blocking | fails after commit and upload |
+
+`union` now runs whenever the run was not cancelled and `plan` succeeded, so a failed non-required
+leg yields an incomplete union that is gated, committed and uploaded before the job fails. A failed
+required target still hard-fails with no union, because `manifest-union` cannot build one.
+
+### 19.1 What the review rounds found
+
+Four review rounds ran on T2, each with a Codex lane and an Opus adversarial lane in parallel, and
+every round found real defects.
+
+- **T2b review** — two blocking premise errors: the gate checked the request's version, never the
+  version the run acquired; and a failing gate step skipped the commit, discarding an hour of matrix
+  work. T2c fixed both.
+- **T2c review (2026-09-13)** — the contract tests bound spelling, not behaviour. Recording exit 4 as
+  code `0`, writing `audit_failed=false` literally, or a `kill $$` in the uplift branch all left
+  16/16 green, and one of them turns every blocking verdict green. The version mismatch was checked
+  after the request loader's own live derivation, so malformed evidence for the request's version
+  hid it, and as a plain exit 2 it could not be downgraded on a dry run without downgrading real
+  failures. Both lanes also confirmed H1, H2, H5 and, by reading, H3, and showed the maintainer's
+  H2 rule could not cover a failed required target.
+- **T2d re-review** — the new harness still supplied the `COMMIT` env it should have been checking
+  (deleting the binding stayed green while the real step would die on an unbound variable and skip
+  the commit); the delimiter and annotation assertions each ruled out only one example; the script
+  extractor could silently truncate a step; and the pre-check missed inline-table requests.
+
+The pattern from T1 held: each defect was a check aimed at the wrong thing. The lead's own
+verification passed at every round, including one mutation check that silently tested nothing
+because a `sed` pattern did not match — caught only because the mutation count was printed.
+
+### 19.2 Operational note
+
+The Codex lane first ran on the `atomize_systems_azure` profile, whose Azure endpoint no longer
+resolves; `codex exec` retried "waiting for network" for 32 minutes without a timeout. Codex lanes
+now run as plain `codex exec` on the maintainer's ChatGPT auth, wrapped in `timeout`. After T2 closed,
+the launchers (`scripts/run-codex-worker.sh`, `.ps1`) and agent definitions stopped requiring a
+profile and gained a default 3600-second timeout. Agent `isolation: worktree` also starts from the remote default branch, so reviews of
+local-only commits need a lead-created `git worktree add --detach`.
+
+### 19.3 Debt carried out of T2
+
+Recorded in `docs/backlog.json`; the spec's §8.1 carries the same table.
+
+| id | item | disposition |
+| --- | --- | --- |
+| `uaa-0025` | Projection can survive a failed run as a stale result | Resolve with or before T3, the first consumer. |
+| `uaa-0027` | Snapshot retry can mix two attempts in raw_help | Low. |
+| `uaa-0028` | `--emit-json` cleanup has no ownership guard | Low until T3 makes the path durable. |
+| `uaa-0029` | No `on.workflow_call.outputs` | T3 prerequisite. |
+| `uaa-0031` | Verdict not visible on the packet PR; exit-3 uplift detail deleted with `_ci_tmp` | T3 design input. Confirmed on a runner 2026-09-14: acquire checks attach to the `staging` head, not the packet PR. |
+| `uaa-0033` | Artifact bundle does not match what the run committed | Low. |
+| `uaa-0034` | Commit step can push a rebased tree the gate never judged | Low; pre-dates T2. |
+
+Resolved during T2: `uaa-0026` (`72191bb3`), `uaa-0030` (`a3c8ce53`), `uaa-0032` (`a3c8ce53`,
+`916c9e9b`).
+
+Nothing from T2 has run on a real runner. The watcher dispatches from `staging`, so the first
+nightly `agent-maintenance-open-pr` run after T2 merges there is the proof; no manual dispatch is
+needed. The H3 question in `uaa-0031` did not have to wait for it: the 2026-09-13 watcher runs
+(pre-T2) already show the acquire check runs attached to `staging`'s head commit `a36a115d`, while
+packet PRs #195, #205 and #206 carry only `CI` checks.
+
+## 20. Pre-merge simulation of the gate (2026-09-14)
+
+Before asking for the T2 merge, the lead ran this branch's `maintenance-audit-status` exactly as the
+`union` job does, against each open packet branch's committed request and acquisition artifacts
+(`staging` + packet commit + acquisition commit, the tree the first post-merge nightly run judges).
+Request generation (`prepare.rs`) is unchanged since `staging`, so the packet requests match what
+merged code would write.
+
+| packet | before the fixes | after `66f7b30c` |
+| --- | --- | --- |
+| codex 0.153.4 (#206) | exit 3, 38 uplifts | exit 3, 38 uplifts, projection bytes identical |
+| claude_code 2.1.236 (#195) | exit 3, 117 uplifts | exit 3, 117 uplifts, projection bytes identical |
+| opencode 1.18.29 (#205) | exit 1, "support-audit command row must not use an empty path" | exit 3, 494 uplifts including the root command |
+
+Two pre-existing defects in the shared support-audit derivation, not in the gate, blocked opencode.
+Both would also have blocked packet opening and closeout validation for that version:
+
+1. **Root command row.** opencode's wrapper coverage declares only `run`, so its 1.18.29 report lists
+   the root command (`path: []`) as missing. The mapper assumed every command row has a last path
+   element. `507cf300` names it `commands` / `<agent_id>` / `<agent_id>` (maintainer-approved), keeps
+   it a required uplift, and checks each row's shape against its report list so a malformed flag row
+   cannot become a root command.
+2. **Omitted optional list.** The report writer omits `deltas.intentionally_unsupported` when it is
+   empty; the audit required it. codex and claude_code passed only because each report carries two
+   such rows. `66f7b30c` reads an absent list as empty (maintainer-approved relaxation); the other
+   three lists stay required.
+
+A ChatGPT Pro consult (advisory; `.codex/guidance/2026-09-14-opencode-root-command-audit.md`,
+gitignored) agreed with fixing before merge and with the tuple, and added the row-shape boundary.
+
+### 20.1 Review round
+
+Both lanes reviewed `79b305e2..66f7b30c`. The Codex lane now runs through the fixed launcher with no
+profile. The Opus lane returned CLEAN with three low observations; the Codex lane returned two
+findings. Both lanes scanned every committed coverage report reachable from `staging` and the three
+packet refs, and compared old and new derivation for every committed request (the Opus lane with
+binaries built at both revisions; the Codex lane with an in-memory replica, because its sandbox
+blocked `cargo`). No evidence is newly rejected, no identity is lost, and the only derivation or
+closeout-outcome change is opencode 1.18.29.
+
+| finding | verdict |
+| --- | --- |
+| Codex 1: uaa-0035 claimed a root-command exclusion would keep the 20 root flags; `manifest_report` `continue`s past an excluded command's flags and arguments | **accepted, fixed** in uaa-0035, spec §8.1, and the debt inventory note. The lead had repeated the same wrong claim to the maintainer |
+| Codex 2: the contract said every surface row comes from a report row; without a report it falls back to debt rows | **accepted, fixed** |
+| Codex note: malformed-row classification was asserted by substring, not through the classifier | **accepted, fixed**: tests call `is_bad_support_audit_evidence_message` |
+| Opus O1: claude_code debt rows use `claude install`, report-derived surfaces use `claude_code install`, so they never match (pre-existing) | **accepted, deferred** as `uaa-0036`, a maintainer decision; pointer in spec T8 and the debt inventory |
+| Opus O2: contract wording omitted `path` array rules and the optional list | **accepted, fixed** |
+| Opus O3: some xtask suites failed when two test runs overlapped in its scratch copy | **no action**: environment only; they pass run alone and in the lead's `make preflight` |
+| Lead: the new unit tests compiled into all five integration crates that include `support_audit.rs` by path, so they ran six times | **fixed**: the test module moved under `agent_maintenance/mod.rs`, which only the lib compiles |
+
+A follow-up round on the remediation delta (`66f7b30c..1121df69`) came back CLEAN from the Opus
+lane, with two docs notes: the Opus observation count and a missing pointer-removal step in
+uaa-0036. The Codex lane showed the contract fix for Codex 2 was still incomplete: when a report
+exists, debt rows that match no gap surface become `removed_upstream_surface` rows with the debt
+row's own identity. That also means uaa-0036's claude_code rows appear as removed surface, which
+contract field invariant 6 ties to publication contraction. All three were fixed in the contract,
+uaa-0036, and this section.
+
+A final confirmation round on `1121df69..081c9a95` agreed from both lanes: the contract paragraph
+had no false statement but did not say that shared code always leaves
+`eligible_preexisting_surface` empty, and the spec §8.1 row for uaa-0036 named only the T8 pointer.
+Both were fixed in the next commit. The plan's §20.2 table keeps §8.1 out of the trigger points,
+because it is a tracking table rather than a place the decision is hit.
+
+### 20.2 Open decisions and where they were triggered
+
+The maintainer asked that deferred decisions sit where they will be hit, not only in the backlog.
+Both were then decided the same day, so the pointers are gone; the table records where they sat.
+
+| id | decision | was triggered at | resolution |
+| --- | --- | --- | --- |
+| `uaa-0035` | Is opencode's TUI root command (with its root flags and `project` argument) excluded from parity? | spec T5 and T8 open-decisions list; debt inventory "Open decisions" | **Exclude**, and stop a command exclusion from hiding its children (`3f7ad4c7`) |
+| `uaa-0036` | Is `command_path` rooted at the agent id or the binary name? | spec T8 open-decisions list; debt inventory "Open decisions"; contract "Known conflict" note | **Agent id** (`fa739c7d`) |
+
+### 20.3 Implementing the two decisions
+
+`uaa-0035` (option 4). `manifest-report` used to record an excluded command and skip its flags and
+arguments without listing them, so a command exclusion also hid every child, including ones added
+upstream later. It now checks each child against its own exclusion. opencode `RULES.json` excludes
+the root command and its 20 root-position flags (`interactive`); wherever a subcommand accepts the
+same flag, that copy stays in parity (`run` keeps the five global flags and its own copies; `--cors`,
+`--hostname`, `--mdns`, `--mdns-domain`, `--mini`, `--no-replay`, `--replay-limit`, and `--prompt`
+appear only on other subcommands). Codex's `app` already listed its children, so they move into the
+excluded lists with no obligation change; claude_code has no command exclusions.
+
+`uaa-0036` (option A). The two claude_code debt rows and the contract examples now read
+`claude_code`; tests bind every debt row to its agent id and claude_code's install debt to
+preexisting. The alternative, rooting at the binary name, needed a binary-name field that neither
+the registry nor `RULES.json` has.
+
+Post-merge nightly replay at `fa739c7d` (report, version metadata, support matrix, validate, gate,
+each on the packet's committed union):
+
+| packet | report change | gate |
+| --- | --- | --- |
+| codex 0.153.4 | `excluded_args` 1 -> 2, `excluded_flags` 1 -> 2 (`app` children) | exit 3, 38 uplifts (unchanged) |
+| claude_code 2.1.236 | none | exit 3, 115 uplifts (was 117); preexisting 2 (was 0) |
+| opencode 1.18.29 | root command to `excluded_commands`, 20 root flags to `excluded_flags` | exit 3, 473 uplifts (was 494) |
+
+### 20.4 Review round on the decisions
+
+Both lanes reviewed `dae72434..7e9fc0b0`. The Opus lane returned CLEAN with four low observations,
+after regenerating every committed report it could with both binaries (only codex 0.125.0 and
+0.144.6 changed, as intended). The Codex lane returned three findings; its sandbox again blocked
+binary builds.
+
+| finding | verdict |
+| --- | --- |
+| Codex 1 (blocking): wrapper coverage cannot declare a child of an excluded command, because the validator rejects any coverage entry at an excluded command path, so the new obligation "cannot be closed" | **accepted in part.** The coverage limit is real, but the obligation still closes validly: by the child's own parity exclusion (the path for a TUI-position flag) or by lifting the command's exclusion and covering the command. That is the intended option-4 flow, so validation is not relaxed; both routes are now documented at the decision point in `manifest-report` and here |
+| Codex 2 / Opus O4: `PLAN.md` still used `command_path = "claude"` | **accepted, fixed** |
+| Codex 3 / Opus O1: c10 did not bind wrapper-covered or intentionally-unsupported children of an excluded command; a mutation skipping IU inheritance for them passed every test | **accepted, fixed**: a second c10 case puts an intentionally-unsupported root above `app`; the mutation now fails it |
+| Codex 3: the agent-id test accepted a double-spaced `command_path` | **accepted, fixed**: tokens after the agent id must be non-empty |
+| Opus O3 / Codex note: the 20 notes said the same flag stays in parity "on `run`", but 8 flags are not on `run` (and `--help`/`--version` do not configure the TUI) | **accepted, fixed** in `RULES.json` and §20.3 |
+| Opus O2: an excluded command's children now pass through wrapper and IU resolution, which can fail report generation (for example an IU scope mismatch) where they were skipped before | **no action**: correct under the decision; noted here |
+
+The follow-up round on `7e9fc0b0..633fef64` came back CLEAN from both lanes, with three precision
+notes recorded here rather than as findings:
+
+- Lifting a command's exclusion is not enough on its own; the child also needs its own coverage entry,
+  because command coverage does not cover that command's flags or arguments.
+- An intentionally-unsupported ancestor is not a third way to close the obligation. It moves the child
+  from `missing_*` to `intentionally_unsupported`, and the support audit reads that list as obligations
+  too; a newly discovered surface still cannot be deferred.
+- Validation rejects covering a child while its command stays excluded, but no accurate record needs
+  that pair: the wrapper can pass a command's flag or argument only by invoking that command, so the
+  command's exclusion no longer holds. Lift it and cover the command with the child on its entry.
+  Codex's root is the precedent: it launches the TUI, yet its coverage is `explicit` with the
+  root-position flags the wrapper passes, while `RULES.json` excludes the TUI-only root arguments and
+  `--no-alt-screen` one by one. A command exclusion no longer carries its children, so lifting one
+  moves only the command's own row.
+
+
+### 20.5 PR #207 review: frozen audit row values
+
+The Codex connector review on PR #207 (P2) found that the gate returned exit 3 for a request whose
+frozen support-surface audit carried a value the contract does not allow. The gate's drift-tolerant
+load turns any frozen/live mismatch into drift, `audit_status.rs` returns the uplift outcome before it
+handles drift, and the loader had checked only `required` and the three header lists. The lead found
+the strict load had the same gap whenever reconciliation was satisfied, because that check never reads
+the frozen uplift or eligible rows.
+
+Fixed in `51d44a56`: `validate_support_surface_audit_row_values` runs right after the header checks and
+before reconciliation, under both policies. It rejects an `eligibility_reason` or `required_writes`
+value outside the contract's lists, and a `defer_reason` outside the request's own `allowed_deferrals`.
+The generator builds `required_writes` from the same constant. `command_path` form is deliberately not
+checked: the committed claude_code request still carries `claude install` and stays tolerated drift.
+
+Both lanes came back CLEAN at `51d44a56`. Opus ran per-check mutations on a scratch copy, and every
+case fails on its own. Its three low observations need no code change:
+
+- No committed test runs the gate end to end, because `agent_maintenance_audit_status.rs` sits at the
+  code-line cap. The loader test runs against live uplifts, and existing gate tests already bind a
+  loader validation failure to exit 2 over live uplifts. A temporary lead test showed exit 2 with the
+  check and exit 3 without it.
+- With no live uplifts, such a request now fails before live derivation and keeps an existing
+  `--emit-json` projection instead of removing it, like every other pre-derivation validation failure.
+  Recorded on `uaa-0025`.
+- The strict deferred case already failed as drift; its test binds that the row check fires first.

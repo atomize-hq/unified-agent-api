@@ -391,7 +391,23 @@ jobs:
             ARGS+=("${EXTRA_ARGS[@]}")
           fi
 
-          cargo run -p xtask -- "${ARGS[@]}"
+          ATTEMPT=1
+          while [ "$ATTEMPT" -le 2 ]; do
+            set +e
+            cargo run -p xtask -- "${ARGS[@]}"
+            SNAPSHOT_STATUS=$?
+            set -e
+
+            if [ "$SNAPSHOT_STATUS" -eq 0 ]; then
+              break
+            fi
+            if [ "$ATTEMPT" -ge 2 ]; then
+              exit "$SNAPSHOT_STATUS"
+            fi
+
+            echo "::warning title=Snapshot capture retry::${TARGET} snapshot capture failed on attempt ${ATTEMPT}; retrying once."
+            ATTEMPT=$((ATTEMPT + 1))
+          done
 
       - name: Upload the per-target snapshot
         uses: actions/upload-artifact@v6
@@ -414,8 +430,12 @@ jobs:
   union:
     name: "Union → report → validate (${{ inputs.agent_id }})"
     needs: [plan, snapshot]
+    if: ${{ !cancelled() && needs.plan.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    outputs:
+      closeout_ready: ${{ steps.maintenance_audit.outputs.closeout_ready }}
+      uplifts_required: ${{ steps.maintenance_audit.outputs.uplifts_required }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -500,6 +520,181 @@ jobs:
           cargo run -p xtask -- support-matrix
           cargo run -p xtask -- manifest-validate --root "$ROOT"
 
+      - name: Maintenance audit gate
+        id: maintenance_audit
+        shell: bash
+        env:
+          VERSION: ${{ inputs.target_version }}
+          ROOT: ${{ needs.plan.outputs.manifest_root }}
+          AGENT_ID: ${{ inputs.agent_id }}
+          COMMIT: ${{ inputs.commit }}
+        run: |
+          set -euo pipefail
+          REQUEST_PATH="docs/agents/lifecycle/${AGENT_ID}-maintenance/governance/maintenance-request.toml"
+          STATUS_JSON="_ci_tmp/audit/status.json"
+          COMMAND_STDOUT="_ci_tmp/audit/stdout.log"
+          COMMAND_STDERR="_ci_tmp/audit/stderr.log"
+          UNION="${ROOT}/snapshots/${VERSION}/union.json"
+
+          mkdir -p _ci_tmp/audit
+
+          emit_gate_outputs() {
+            local closeout_ready="$1"
+            local uplifts_required="$2"
+            local audit_failed="$3"
+            local audit_exit_code="$4"
+            local audit_title="$5"
+            local audit_message="$6"
+            local audit_message_delimiter
+            audit_message_delimiter="audit_message_$(od -An -N16 -tx1 /dev/urandom | tr -d ' \n')"
+            {
+              echo "closeout_ready=${closeout_ready}"
+              echo "uplifts_required=${uplifts_required}"
+              echo "audit_failed=${audit_failed}"
+              echo "audit_exit_code=${audit_exit_code}"
+              echo "audit_title=${audit_title}"
+              echo "audit_message<<${audit_message_delimiter}"
+              printf '%s\n' "$audit_message"
+              echo "${audit_message_delimiter}"
+            } >> "$GITHUB_OUTPUT"
+          }
+
+          summarize_clean() {
+            {
+              echo "## Maintenance audit gate"
+              echo
+              echo "- status: clean"
+              echo "- closeout_ready: \`true\`"
+              echo "- uplifts_required: \`false\`"
+              echo "- packet: \`${AGENT_ID}-maintenance\` is clean for \`${VERSION}\`"
+            } >> "$GITHUB_STEP_SUMMARY"
+          }
+
+          summarize_uplifts() {
+            {
+              echo "## Maintenance audit gate"
+              echo
+              echo "- status: uplifts required"
+              echo "- closeout_ready: \`false\`"
+              echo "- uplifts_required: \`true\`"
+              echo
+              echo "> Relay invocation placeholder (T3): contributor relay command renders here."
+            } >> "$GITHUB_STEP_SUMMARY"
+          }
+
+          summarize_failure() {
+            local status_label="$1"
+            local audit_exit_code="$2"
+            local audit_message="$3"
+            {
+              echo "## Maintenance audit gate"
+              echo
+              echo "- status: ${status_label}"
+              echo "- closeout_ready: \`false\`"
+              echo "- uplifts_required: \`false\`"
+              echo "- audit_exit_code: \`${audit_exit_code}\`"
+              echo "- reason: \`${audit_message}\`"
+            } >> "$GITHUB_STEP_SUMMARY"
+          }
+
+          last_nonblank_line() {
+            local log="$1"
+            local result=""
+            local line
+            [ -f "$log" ] || return 0
+            while IFS= read -r line || [ -n "$line" ]; do
+              case "$line" in
+                *[![:space:]]*)
+                  result="$line"
+                  ;;
+              esac
+            done < "$log"
+            printf '%s' "$result"
+          }
+
+          if [ ! -f "$REQUEST_PATH" ]; then
+            # `manifest-acquisition-plan` already proves this workflow only reaches the gate for
+            # release-watch-enrolled agents that carry an acquisition descriptor. A missing request
+            # path here is therefore a broken packet path, not a docs-only skip condition.
+            COMMAND_MESSAGE="parity-acquire planned acquisition for ${AGENT_ID}, but the maintenance request path ${REQUEST_PATH} is missing; the request must exist for the version under acquisition."
+            echo "::error title=Maintenance audit failed::${COMMAND_MESSAGE}" >&2
+            emit_gate_outputs "false" "false" "true" "2" "Maintenance audit failed" "$COMMAND_MESSAGE"
+            summarize_failure "failed" "2" "$COMMAND_MESSAGE"
+            exit 0
+          fi
+
+          : > "$COMMAND_STDOUT"
+          : > "$COMMAND_STDERR"
+          set +e
+          cargo run -p xtask -- maintenance-audit-status \
+            --request "$REQUEST_PATH" \
+            --expect-target-version "$VERSION" \
+            --emit-json "$STATUS_JSON" \
+            >"$COMMAND_STDOUT" 2>"$COMMAND_STDERR"
+          AUDIT_STATUS=$?
+          set -e
+
+          cat "$COMMAND_STDOUT"
+          cat "$COMMAND_STDERR" >&2
+
+          case "$AUDIT_STATUS" in
+            0)
+              emit_gate_outputs "true" "false" "false" "0" "" ""
+              summarize_clean
+              ;;
+            3)
+              emit_gate_outputs "false" "true" "false" "3" "" ""
+              summarize_uplifts
+              ;;
+            4)
+              MISSING_TARGETS="$(jq -r '(.missing_targets // []) | join(", ") | if . == "" then "unknown" else . end' "$UNION" 2>/dev/null || printf '%s' 'unknown')"
+              COMMAND_MESSAGE="maintenance-audit-status reported that the acquisition union this run produced is incomplete; missing targets: ${MISSING_TARGETS}"
+              echo "::error title=Incomplete acquisition::${COMMAND_MESSAGE}" >&2
+              emit_gate_outputs "false" "false" "true" "$AUDIT_STATUS" "Incomplete acquisition" "$COMMAND_MESSAGE"
+              summarize_failure "incomplete acquisition" "$AUDIT_STATUS" "$COMMAND_MESSAGE"
+              ;;
+            5)
+              COMMAND_MESSAGE="$(last_nonblank_line "$COMMAND_STDERR")"
+              if [ -z "$COMMAND_MESSAGE" ]; then
+                COMMAND_MESSAGE="maintenance-audit-status reported a target version mismatch; see command output above."
+              fi
+              if [ "$COMMIT" = "true" ]; then
+                echo "::error title=Target version mismatch::${COMMAND_MESSAGE}" >&2
+                emit_gate_outputs "false" "false" "true" "$AUDIT_STATUS" "Target version mismatch" "$COMMAND_MESSAGE"
+                summarize_failure "target version mismatch" "$AUDIT_STATUS" "$COMMAND_MESSAGE"
+              else
+                echo "::notice title=Target version mismatch::${COMMAND_MESSAGE}" >&2
+                emit_gate_outputs "false" "false" "false" "$AUDIT_STATUS" "Target version mismatch" "$COMMAND_MESSAGE"
+                summarize_failure "target version mismatch (dry run, not blocking)" "$AUDIT_STATUS" "$COMMAND_MESSAGE"
+              fi
+              ;;
+            *)
+              COMMAND_MESSAGE=""
+              for LOG in "$COMMAND_STDERR" "$COMMAND_STDOUT"; do
+                [ -f "$LOG" ] || continue
+                while IFS= read -r line || [ -n "$line" ]; do
+                  case "$line" in
+                    *[![:space:]]*)
+                      COMMAND_MESSAGE="$line"
+                      ;;
+                  esac
+                done < "$LOG"
+                if [ -n "$COMMAND_MESSAGE" ]; then
+                  break
+                fi
+              done
+
+              if [ -n "$COMMAND_MESSAGE" ]; then
+                echo "::error title=Maintenance audit failed::${COMMAND_MESSAGE}" >&2
+              else
+                COMMAND_MESSAGE="maintenance-audit-status exited ${AUDIT_STATUS}; see command output above."
+                echo "::error title=Maintenance audit failed::${COMMAND_MESSAGE}" >&2
+              fi
+              emit_gate_outputs "false" "false" "true" "$AUDIT_STATUS" "Maintenance audit failed" "$COMMAND_MESSAGE"
+              summarize_failure "failed" "$AUDIT_STATUS" "$COMMAND_MESSAGE"
+              ;;
+          esac
+
       - name: Summarize the acquired union
         shell: bash
         env:
@@ -575,6 +770,7 @@ jobs:
           exit 1
 
       - name: Upload the committed artifact bundle
+        if: ${{ always() }}
         uses: actions/upload-artifact@v6
         with:
           name: "parity-acquire-artifacts-${{ inputs.agent_id }}-${{ inputs.target_version }}"
@@ -585,3 +781,29 @@ jobs:
             ${{ needs.plan.outputs.manifest_root }}/versions/${{ inputs.target_version }}.json
             ${{ needs.plan.outputs.manifest_root }}/wrapper_coverage.json
             ${{ needs.plan.outputs.manifest_root }}/artifacts.lock.json
+
+      - name: Fail the job if the maintenance audit recorded a blocking verdict
+        if: ${{ always() && steps.maintenance_audit.outputs.audit_failed == 'true' }}
+        shell: bash
+        env:
+          AUDIT_EXIT_CODE: ${{ steps.maintenance_audit.outputs.audit_exit_code }}
+          AUDIT_TITLE: ${{ steps.maintenance_audit.outputs.audit_title }}
+          AUDIT_MESSAGE: ${{ steps.maintenance_audit.outputs.audit_message }}
+        run: |
+          set -euo pipefail
+          if [ -n "$AUDIT_MESSAGE" ]; then
+            echo "::error title=${AUDIT_TITLE}::${AUDIT_MESSAGE}" >&2
+          else
+            echo "::error title=${AUDIT_TITLE}::maintenance audit gate recorded a blocking verdict." >&2
+          fi
+          case "$AUDIT_EXIT_CODE" in
+            ''|*[!0-9]*)
+              ;;
+            *)
+              if [ "$AUDIT_EXIT_CODE" -ge 1 ] 2>/dev/null && [ "$AUDIT_EXIT_CODE" -le 255 ] 2>/dev/null; then
+                exit "$AUDIT_EXIT_CODE"
+              fi
+              ;;
+          esac
+          echo "::error title=Invalid maintenance audit exit code::The recorded audit exit code '${AUDIT_EXIT_CODE}' was invalid; expected an integer from 1 through 255." >&2
+          exit 1

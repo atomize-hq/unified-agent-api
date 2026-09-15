@@ -1,3 +1,4 @@
+pub mod audit_status;
 pub mod closeout;
 pub mod contract_policy;
 pub mod docs;
@@ -8,4 +9,7 @@ pub mod prepare;
 pub mod refresh;
 pub mod request;
 pub mod support_audit;
+#[cfg(test)]
+#[path = "support_audit/tests.rs"]
+mod support_audit_tests;
 pub mod watch;

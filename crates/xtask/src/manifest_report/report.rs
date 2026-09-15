@@ -93,6 +93,11 @@ pub(super) fn build_report(
             continue;
         }
 
+        // Excluding a command does not exclude its flags or args: each is checked against its own
+        // exclusion below, so a flag the rules do not name still reaches the work queue. Wrapper
+        // coverage cannot declare a child of an excluded command (validation rejects the enclosing
+        // entry), so such a child is closed by its own exclusion, or by lifting the command's
+        // exclusion and covering the child.
         if let Some(ex) = parity_exclusions.and_then(|idx| idx.commands.get(path)) {
             let cmd_res = wrapper::resolve_wrapper(
                 wrapper_index
@@ -112,36 +117,58 @@ pub(super) fn build_report(
                 wrapper_level: cmd_res.level.clone(),
                 note: Some(ex.note.clone()),
             });
-            continue;
-        }
-
-        let cmd_res = wrapper::resolve_wrapper(
-            wrapper_index
-                .commands
-                .get(path)
-                .map(Vec::as_slice)
-                .unwrap_or(&[]),
-            &report_target_set,
-            &rules.union.expected_targets,
-            filter_mode,
-            "command",
-            &format!("path={}", util::format_path(path)),
-        )?;
-
-        if cmd_res.level.is_none() {
-            if let Some(root) = find_inherited_iu_root(
-                &iu_roots,
-                path,
-                &cmd.available_on,
+        } else {
+            let cmd_res = wrapper::resolve_wrapper(
+                wrapper_index
+                    .commands
+                    .get(path)
+                    .map(Vec::as_slice)
+                    .unwrap_or(&[]),
                 &report_target_set,
+                &rules.union.expected_targets,
+                filter_mode,
                 "command",
-            )? {
+                &format!("path={}", util::format_path(path)),
+            )?;
+
+            if cmd_res.level.is_none() {
+                if let Some(root) = find_inherited_iu_root(
+                    &iu_roots,
+                    path,
+                    &cmd.available_on,
+                    &report_target_set,
+                    "command",
+                )? {
+                    intentionally_unsupported.push(ReportIntentionallyUnsupportedDeltaV1::Command(
+                        ReportCommandDeltaV1 {
+                            path: path.clone(),
+                            upstream_available_on: cmd.available_on.clone(),
+                            wrapper_level: Some("intentionally_unsupported".to_string()),
+                            note: Some(root.note.clone()),
+                        },
+                    ));
+                } else {
+                    classify_command_delta(
+                        &mut missing_commands,
+                        &mut passthrough_candidates,
+                        &mut unsupported,
+                        path,
+                        &cmd.available_on,
+                        &cmd_res,
+                    );
+                }
+            } else if cmd_res.level.as_deref() == Some("intentionally_unsupported") {
+                let note = require_non_empty_note(
+                    cmd_res.note.as_deref(),
+                    "command",
+                    &format!("path={}", util::format_path(path)),
+                )?;
                 intentionally_unsupported.push(ReportIntentionallyUnsupportedDeltaV1::Command(
                     ReportCommandDeltaV1 {
                         path: path.clone(),
                         upstream_available_on: cmd.available_on.clone(),
                         wrapper_level: Some("intentionally_unsupported".to_string()),
-                        note: Some(root.note.clone()),
+                        note: Some(note),
                     },
                 ));
             } else {
@@ -154,29 +181,6 @@ pub(super) fn build_report(
                     &cmd_res,
                 );
             }
-        } else if cmd_res.level.as_deref() == Some("intentionally_unsupported") {
-            let note = require_non_empty_note(
-                cmd_res.note.as_deref(),
-                "command",
-                &format!("path={}", util::format_path(path)),
-            )?;
-            intentionally_unsupported.push(ReportIntentionallyUnsupportedDeltaV1::Command(
-                ReportCommandDeltaV1 {
-                    path: path.clone(),
-                    upstream_available_on: cmd.available_on.clone(),
-                    wrapper_level: Some("intentionally_unsupported".to_string()),
-                    note: Some(note),
-                },
-            ));
-        } else {
-            classify_command_delta(
-                &mut missing_commands,
-                &mut passthrough_candidates,
-                &mut unsupported,
-                path,
-                &cmd.available_on,
-                &cmd_res,
-            );
         }
 
         for flag in &cmd.flags {

@@ -9,18 +9,25 @@ use super::super::support_audit::{
     allowed_deferrals, coverage_report_present_for_target, derive_support_surface_audit,
     excluded_surface_kinds, surface_kinds, DebtBackedSurface, DeferredGap, EligibleSurface,
     EvidenceBackedSurface, PublicationImpact, RequiredUplift, SupportSurfaceAudit, SurfaceIdentity,
+    ELIGIBILITY_REASONS, REQUIRED_WRITES,
 };
 use super::{
     raw::{
         RawDebtBackedSurface, RawDeferredGap, RawEligibleSurface, RawEvidenceBackedSurface,
         RawPublicationImpact, RawRequiredUplift, RawSupportSurfaceAudit, RawSurfaceIdentity,
     },
-    AuditReconciliation, DetectedRelease, MaintenanceRequestError, TriggerKind,
+    AuditDriftPolicy, AuditReconciliation, DetectedRelease, MaintenanceRequestError, TriggerKind,
 };
 
 pub(super) struct SupportSurfaceAuditValidation {
     pub audit: Option<SupportSurfaceAudit>,
     pub reconciliation: Option<AuditReconciliation>,
+    pub reconciliation_detail: Option<String>,
+}
+
+struct ReconciledSupportSurfaceAudit {
+    reconciliation: AuditReconciliation,
+    detail: Option<String>,
 }
 
 pub(super) fn validate_support_surface_audit(
@@ -30,6 +37,7 @@ pub(super) fn validate_support_surface_audit(
     trigger_kind: TriggerKind,
     detected_release: Option<&DetectedRelease>,
     raw: Option<RawSupportSurfaceAudit>,
+    audit_drift_policy: AuditDriftPolicy,
 ) -> Result<SupportSurfaceAuditValidation, MaintenanceRequestError> {
     match (trigger_kind, raw) {
         (TriggerKind::UpstreamReleaseDetected, Some(raw_audit)) => {
@@ -66,7 +74,8 @@ pub(super) fn validate_support_surface_audit(
                     request_path.display()
                 )));
             }
-            if frozen_had_discovery_work {
+            validate_support_surface_audit_row_values(request_path, &actual)?;
+            if frozen_had_discovery_work && audit_drift_policy == AuditDriftPolicy::Reject {
                 let report_dir = format!(
                     "{}/reports/{}",
                     registry_entry.manifest_root, detected_release.target_version
@@ -96,12 +105,19 @@ pub(super) fn validate_support_surface_audit(
                     }
                 }
             }
-            let expected = derive_support_surface_audit(workspace_root, registry_entry, detected_release)
-                .map_err(MaintenanceRequestError::Internal)?;
-            let reconciliation = reconcile_support_surface_audit(request_path, &actual, &expected)?;
+            let expected =
+                derive_support_surface_audit(workspace_root, registry_entry, detected_release)
+                    .map_err(MaintenanceRequestError::Internal)?;
+            let reconciliation = reconcile_support_surface_audit(
+                request_path,
+                &actual,
+                &expected,
+                audit_drift_policy,
+            )?;
             Ok(SupportSurfaceAuditValidation {
                 audit: Some(actual),
-                reconciliation: Some(reconciliation),
+                reconciliation: Some(reconciliation.reconciliation),
+                reconciliation_detail: reconciliation.detail,
             })
         }
         (TriggerKind::UpstreamReleaseDetected, None) => {
@@ -117,27 +133,92 @@ pub(super) fn validate_support_surface_audit(
         (_, None) => Ok(SupportSurfaceAuditValidation {
             audit: None,
             reconciliation: None,
+            reconciliation_detail: None,
         }),
     }
+}
+
+/// Checks the row values the contract enumerates on their own, before reconciliation. Comparing
+/// against the live audit cannot stand in for this: a drift-tolerant load accepts any mismatch,
+/// and a satisfied reconciliation never reads the frozen uplift or eligible rows.
+fn validate_support_surface_audit_row_values(
+    request_path: &Path,
+    audit: &SupportSurfaceAudit,
+) -> Result<(), MaintenanceRequestError> {
+    let check = |field: String, value: &str, allowed: &[&str]| {
+        if allowed.contains(&value) {
+            return Ok(());
+        }
+        Err(MaintenanceRequestError::Validation(format!(
+            "maintenance request `{}` field `support_surface_audit.{field}` has value `{value}`, which is not one of: {}",
+            request_path.display(),
+            allowed.join(", ")
+        )))
+    };
+    for (index, row) in audit.eligible_preexisting_surface.iter().enumerate() {
+        check(
+            format!("eligible_preexisting_surface[{index}].eligibility_reason"),
+            &row.eligibility_reason,
+            &ELIGIBILITY_REASONS,
+        )?;
+    }
+    for (index, row) in audit.required_uplifts_this_run.iter().enumerate() {
+        for value in &row.required_writes {
+            check(
+                format!("required_uplifts_this_run[{index}].required_writes"),
+                value,
+                &REQUIRED_WRITES,
+            )?;
+        }
+    }
+    // The header check above has already bound this list to the shared taxonomy.
+    let allowed_deferrals = audit
+        .allowed_deferrals
+        .iter()
+        .map(String::as_str)
+        .collect::<Vec<_>>();
+    for (index, row) in audit.deferred_preexisting_gaps.iter().enumerate() {
+        check(
+            format!("deferred_preexisting_gaps[{index}].defer_reason"),
+            &row.defer_reason,
+            &allowed_deferrals,
+        )?;
+    }
+    Ok(())
 }
 
 fn reconcile_support_surface_audit(
     request_path: &Path,
     frozen: &SupportSurfaceAudit,
     live: &SupportSurfaceAudit,
-) -> Result<AuditReconciliation, MaintenanceRequestError> {
+    audit_drift_policy: AuditDriftPolicy,
+) -> Result<ReconciledSupportSurfaceAudit, MaintenanceRequestError> {
     if frozen == live {
-        return Ok(AuditReconciliation::Exact);
+        return Ok(ReconciledSupportSurfaceAudit {
+            reconciliation: AuditReconciliation::Exact,
+            detail: None,
+        });
     }
     if support_surface_audit_satisfied(frozen, live) {
-        return Ok(AuditReconciliation::Satisfied);
+        return Ok(ReconciledSupportSurfaceAudit {
+            reconciliation: AuditReconciliation::Satisfied,
+            detail: None,
+        });
     }
 
-    Err(MaintenanceRequestError::Validation(format!(
+    let drift_description = describe_support_surface_audit_drift(frozen, live);
+    let validation_message = format!(
         "maintenance request `{}` field `support_surface_audit` no longer matches the live derived maintenance contract: {}",
         request_path.display(),
-        describe_support_surface_audit_drift(frozen, live)
-    )))
+        drift_description
+    );
+    match audit_drift_policy {
+        AuditDriftPolicy::Reject => Err(MaintenanceRequestError::Validation(validation_message)),
+        AuditDriftPolicy::Tolerate => Ok(ReconciledSupportSurfaceAudit {
+            reconciliation: AuditReconciliation::Drifted,
+            detail: Some(validation_message),
+        }),
+    }
 }
 
 fn support_surface_audit_satisfied(

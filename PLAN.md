@@ -428,13 +428,13 @@ evidence_ref = "cli_manifests/codex/raw_help/..."
 
 [[support_surface_audit.preexisting_unsupported_surface]]
 surface_kind = "global_flags"
-command_path = "claude"
+command_path = "claude_code"
 surface_id = "--output-format"
 debt_ref = "docs/specs/unified-agent-api/non-tui-support-debt.md#claude-code-output-format"
 
 [[support_surface_audit.eligible_preexisting_surface]]
 surface_kind = "global_flags"
-command_path = "claude"
+command_path = "claude_code"
 surface_id = "--output-format"
 eligibility_reason = "adjacent_surface_changed"
 
@@ -457,7 +457,7 @@ required_writes = ["wrapper", "backend", "manifest", "publication"]
 
 [[support_surface_audit.deferred_preexisting_gaps]]
 surface_kind = "global_flags"
-command_path = "claude"
+command_path = "claude_code"
 surface_id = "--output-format"
 defer_reason = "requires_new_architectural_seam"
 blocking_follow_on = "TODOS.md#close-claude-code-global-flag-gap"

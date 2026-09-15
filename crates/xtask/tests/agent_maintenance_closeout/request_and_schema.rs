@@ -48,6 +48,18 @@ const FROZEN_DEFERRED_ROW: &str = concat!(
     "surface_doc = \"docs/specs/unified-agent-api/support-matrix.md\"\n"
 );
 
+const FROZEN_ELIGIBLE_ROW: &str = concat!(
+    "\n",
+    "[[support_surface_audit.eligible_preexisting_surface]]\n",
+    "surface_kind = \"commands\"\n",
+    "command_path = \"opencode status\"\n",
+    "surface_id = \"status\"\n",
+    "eligibility_reason = \"bounded_write_envelope\"\n"
+);
+
+const SUPPORT_AUDIT_REQUEST: &str =
+    "docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml";
+
 fn seed_live_new_discovery(fixture: &std::path::Path) {
     write_text(
         &fixture.join("cli_manifests/opencode/reports/1.14.47/coverage.any.json"),
@@ -480,4 +492,93 @@ fn close_agent_maintenance_rejects_deferred_reason_mismatch_in_linked_request() 
     assert!(message.contains("support_surface_audit.deferred_preexisting_gaps changed"));
     assert!(message.contains("requires_new_infra"));
     assert!(message.contains("requires_new_architectural_seam"));
+}
+
+/// Each case breaks one row value the contract enumerates: the field the error must name, the
+/// frozen rows with contract values, and the same rows with that value replaced by `invalid`.
+fn invalid_row_value_cases() -> [(&'static str, String, String); 3] {
+    let eligible = format!("{FROZEN_DISCOVERY_ROW}{FROZEN_ELIGIBLE_ROW}");
+    let deferred = format!("{FROZEN_DISCOVERY_ROW}{FROZEN_DEFERRED_ROW}");
+    [
+        (
+            "required_uplifts_this_run[0].required_writes",
+            FROZEN_DISCOVERY_ROW.to_string(),
+            FROZEN_DISCOVERY_ROW.replace("\"packet_docs\"]", "\"packet_docs\", \"invalid\"]"),
+        ),
+        (
+            "eligible_preexisting_surface[0].eligibility_reason",
+            eligible.clone(),
+            eligible.replace("bounded_write_envelope", "invalid"),
+        ),
+        (
+            "deferred_preexisting_gaps[0].defer_reason",
+            deferred.clone(),
+            deferred.replace("requires_new_infra", "invalid"),
+        ),
+    ]
+}
+
+fn support_audit_row_fixture(prefix: &str) -> std::path::PathBuf {
+    let fixture = fixture_root(prefix);
+    maintenance_harness::seed_opencode_basis(&fixture);
+    write_text(
+        &fixture.join(".github/workflows/agent-maintenance-open-pr.yml"),
+        "name: Packet PR worker\n",
+    );
+    fixture
+}
+
+fn load_with_frozen_rows(
+    fixture: &Path,
+    frozen_rows: &str,
+    policy: request::AuditDriftPolicy,
+) -> Result<(), String> {
+    write_text(
+        &fixture.join(SUPPORT_AUDIT_REQUEST),
+        &(automated_maintenance_request_toml(
+            "opencode",
+            "docs/integrations/opencode/governance/seam-2-closeout.md",
+        ) + frozen_rows),
+    );
+    request::load_request_envelope_validated_with_policy(
+        fixture,
+        Path::new(SUPPORT_AUDIT_REQUEST),
+        policy,
+    )
+    .map(|_| ())
+    .map_err(|err| err.to_string())
+}
+
+#[test]
+fn drift_tolerant_request_load_rejects_invalid_row_values_instead_of_reporting_drift() {
+    // The live report still lists `opencode status`, as on a gate run whose uplifts remain.
+    let fixture = support_audit_row_fixture("support-audit-row-values-tolerate");
+    seed_live_new_discovery(&fixture);
+    for (field, valid_rows, invalid_rows) in invalid_row_value_cases() {
+        load_with_frozen_rows(&fixture, &valid_rows, request::AuditDriftPolicy::Tolerate)
+            .unwrap_or_else(|err| panic!("contract values must load as drift for {field}: {err}"));
+        let err =
+            load_with_frozen_rows(&fixture, &invalid_rows, request::AuditDriftPolicy::Tolerate)
+                .expect_err("an invalid row value must not load as drift");
+        assert!(
+            err.contains(&format!("support_surface_audit.{field}")) && err.contains("`invalid`"),
+            "unexpected error for {field}: {err}"
+        );
+    }
+}
+
+#[test]
+fn strict_request_load_rejects_invalid_row_values_even_when_satisfied() {
+    // With the live report clean, the uplift and eligible cases reconcile as satisfied, which never
+    // reads those rows; the deferred case drifts, so its error must name the field instead.
+    let fixture = support_audit_row_fixture("support-audit-row-values-satisfied");
+    seed_live_clean_report(&fixture);
+    for (field, _, invalid_rows) in invalid_row_value_cases() {
+        let err = load_with_frozen_rows(&fixture, &invalid_rows, request::AuditDriftPolicy::Reject)
+            .expect_err("an invalid row value must not reconcile as satisfied");
+        assert!(
+            err.contains(&format!("support_surface_audit.{field}")),
+            "unexpected error for {field}: {err}"
+        );
+    }
 }

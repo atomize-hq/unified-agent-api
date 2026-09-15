@@ -66,12 +66,20 @@ pub struct MaintenanceRequestEnvelope {
 pub enum AuditReconciliation {
     Exact,
     Satisfied,
+    Drifted,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AuditDriftPolicy {
+    Reject,
+    Tolerate,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ValidatedMaintenanceRequestEnvelope {
     pub envelope: MaintenanceRequestEnvelope,
     pub support_surface_audit_reconciliation: Option<AuditReconciliation>,
+    pub support_surface_audit_reconciliation_detail: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -196,6 +204,7 @@ impl AuditReconciliation {
         match self {
             Self::Exact => "exact",
             Self::Satisfied => "satisfied (frozen discovery preserved)",
+            Self::Drifted => "drifted",
         }
     }
 }
@@ -250,6 +259,18 @@ pub fn load_request_envelope(
 pub fn load_request_envelope_validated(
     workspace_root: &Path,
     request_path: &Path,
+) -> Result<ValidatedMaintenanceRequestEnvelope, MaintenanceRequestError> {
+    load_request_envelope_validated_with_policy(
+        workspace_root,
+        request_path,
+        AuditDriftPolicy::Reject,
+    )
+}
+
+pub fn load_request_envelope_validated_with_policy(
+    workspace_root: &Path,
+    request_path: &Path,
+    audit_drift_policy: AuditDriftPolicy,
 ) -> Result<ValidatedMaintenanceRequestEnvelope, MaintenanceRequestError> {
     let workspace_root = fs::canonicalize(workspace_root).map_err(|err| {
         MaintenanceRequestError::Internal(format!(
@@ -345,6 +366,7 @@ pub fn load_request_envelope_validated(
         trigger_kind,
         detected_release.as_ref(),
         raw.support_surface_audit,
+        audit_drift_policy,
     )?;
     let execution_contract = validate_execution_contract(
         &workspace_root,
@@ -391,5 +413,7 @@ pub fn load_request_envelope_validated(
             execution_contract,
         },
         support_surface_audit_reconciliation: support_surface_audit_validation.reconciliation,
+        support_surface_audit_reconciliation_detail: support_surface_audit_validation
+            .reconciliation_detail,
     })
 }
