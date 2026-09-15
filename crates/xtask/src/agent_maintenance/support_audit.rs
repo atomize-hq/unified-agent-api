@@ -8,6 +8,9 @@ use crate::agent_registry::AgentRegistryEntry;
 
 use super::request::DetectedRelease;
 
+#[path = "support_audit/unmatched_debt.rs"]
+mod unmatched_debt;
+
 pub(crate) const NON_TUI_SUPPORT_DEBT_PATH: &str =
     "docs/specs/unified-agent-api/non-tui-support-debt.md";
 pub(crate) const SUPPORT_MATRIX_DOC_PATH: &str = "docs/specs/unified-agent-api/support-matrix.md";
@@ -38,6 +41,8 @@ pub(crate) const ELIGIBILITY_REASONS: [&str; 3] = [
     "bounded_write_envelope",
     "no_new_seam_required",
 ];
+pub(crate) const DEBT_OBSERVATIONS: [&str; 3] =
+    ["covered_by_wrapper", "excluded_by_rules", "not_observed"];
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct SurfaceIdentity {
@@ -60,6 +65,15 @@ pub struct DebtBackedSurface {
     pub command_path: String,
     pub surface_id: String,
     pub debt_ref: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UnmatchedDebtSurface {
+    pub surface_kind: String,
+    pub command_path: String,
+    pub surface_id: String,
+    pub debt_ref: String,
+    pub observation: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -105,7 +119,7 @@ pub struct SupportSurfaceAudit {
     pub pre_run_debt_count: usize,
     pub expected_post_run_debt_count: usize,
     pub discovered_upstream_surface: Vec<EvidenceBackedSurface>,
-    pub removed_upstream_surface: Vec<EvidenceBackedSurface>,
+    pub unmatched_debt_surface: Vec<UnmatchedDebtSurface>,
     pub preexisting_unsupported_surface: Vec<DebtBackedSurface>,
     pub eligible_preexisting_surface: Vec<EligibleSurface>,
     pub missing_wrapper_support: Vec<SurfaceIdentity>,
@@ -158,6 +172,16 @@ impl EvidenceBackedSurface {
 }
 
 impl DebtBackedSurface {
+    pub(crate) fn identity(&self) -> SurfaceIdentity {
+        SurfaceIdentity::new(
+            self.surface_kind.clone(),
+            self.command_path.clone(),
+            self.surface_id.clone(),
+        )
+    }
+}
+
+impl UnmatchedDebtSurface {
     pub(crate) fn identity(&self) -> SurfaceIdentity {
         SurfaceIdentity::new(
             self.surface_kind.clone(),
@@ -234,25 +258,21 @@ pub(crate) fn derive_support_surface_audit(
         .iter()
         .map(|row| (row.identity(), row))
         .collect::<BTreeMap<_, _>>();
-    let report = load_current_gap_surfaces_if_present(
-        workspace_root,
-        entry,
-        &detected_release.target_version,
-    )?;
+    let report =
+        load_live_report_if_present(workspace_root, entry, &detected_release.target_version)?;
     let report_ref = report
         .as_ref()
-        .map(|(path, _)| repo_relative(workspace_root, path))
+        .map(|report| repo_relative(workspace_root, &report.path))
         .transpose()?;
     let surfaces = report
         .as_ref()
-        .map(|(_, surfaces)| surfaces.clone())
+        .map(|report| report.gaps.clone())
         .unwrap_or_else(|| debt_rows.iter().map(DebtInventoryRow::identity).collect());
 
     let mut preexisting = Vec::new();
     let mut discovered = Vec::new();
     let mut deferred = Vec::new();
     let mut publication_impacts = Vec::new();
-    let mut removed = Vec::new();
     let missing_wrapper_support = surfaces.clone();
     let missing_backend_support = surfaces.clone();
 
@@ -290,19 +310,22 @@ pub(crate) fn derive_support_surface_audit(
         }
     }
 
-    if report.is_some() {
-        for row in &debt_rows {
-            let identity = row.identity();
-            if !surfaces.iter().any(|surface| surface == &identity) {
-                removed.push(EvidenceBackedSurface {
-                    surface_kind: identity.surface_kind,
-                    command_path: identity.command_path,
-                    surface_id: identity.surface_id,
-                    evidence_ref: row.evidence_ref.clone(),
-                });
-            }
+    let unmatched_debt_surface = match &report {
+        Some(report) => {
+            let unmatched = debt_rows
+                .iter()
+                .filter(|row| !surfaces.contains(&row.identity()))
+                .collect::<Vec<_>>();
+            unmatched_debt::classify_unmatched_debt_rows(
+                workspace_root,
+                entry,
+                &detected_release.target_version,
+                report,
+                &unmatched,
+            )?
         }
-    }
+        None => Vec::new(),
+    };
 
     let required_uplifts_this_run = discovered
         .iter()
@@ -326,7 +349,7 @@ pub(crate) fn derive_support_surface_audit(
         pre_run_debt_count: debt_rows.len(),
         expected_post_run_debt_count: preexisting.len(),
         discovered_upstream_surface: discovered,
-        removed_upstream_surface: removed,
+        unmatched_debt_surface,
         preexisting_unsupported_surface: preexisting,
         eligible_preexisting_surface: Vec::new(),
         missing_wrapper_support,
@@ -393,17 +416,24 @@ pub(crate) fn load_debt_inventory(workspace_root: &Path) -> Result<Vec<DebtInven
     Ok(rows)
 }
 
-fn load_current_gap_surfaces_if_present(
+/// The coverage report the audit reads: its path, its deltas, and the gap surfaces they list.
+struct LiveReport {
+    path: PathBuf,
+    deltas: serde_json::Map<String, serde_json::Value>,
+    gaps: Vec<SurfaceIdentity>,
+}
+
+fn load_live_report_if_present(
     workspace_root: &Path,
     entry: &AgentRegistryEntry,
     target_version: &str,
-) -> Result<Option<(PathBuf, Vec<SurfaceIdentity>)>, String> {
+) -> Result<Option<LiveReport>, String> {
     let version_dir = coverage_report_version_dir(workspace_root, entry, target_version);
     if !version_dir.is_dir() {
         return Ok(None);
     }
 
-    match load_current_gap_surfaces(workspace_root, entry, target_version) {
+    match load_live_report(workspace_root, entry, target_version) {
         Ok(result) => Ok(Some(result)),
         Err(error)
             if error.starts_with("no coverage report found under")
@@ -470,11 +500,11 @@ fn parse_key_value(input: &str) -> Option<(&str, &str)> {
     Some((key, value))
 }
 
-fn load_current_gap_surfaces(
+fn load_live_report(
     workspace_root: &Path,
     entry: &AgentRegistryEntry,
     target_version: &str,
-) -> Result<(PathBuf, Vec<SurfaceIdentity>), String> {
+) -> Result<LiveReport, String> {
     let version_dir = coverage_report_version_dir(workspace_root, entry, target_version);
     let report_path = select_report_path(&version_dir)?;
     let text = fs::read_to_string(&report_path)
@@ -484,10 +514,15 @@ fn load_current_gap_surfaces(
     let deltas = json
         .get("deltas")
         .and_then(serde_json::Value::as_object)
-        .ok_or_else(|| format!("{} is missing `deltas` object", report_path.display()))?;
-    let surfaces = surfaces_from_report_deltas(&entry.agent_id, &report_path, deltas)?;
+        .ok_or_else(|| format!("{} is missing `deltas` object", report_path.display()))?
+        .clone();
+    let gaps = surfaces_from_report_deltas(&entry.agent_id, &report_path, &deltas)?;
 
-    Ok((report_path, surfaces))
+    Ok(LiveReport {
+        path: report_path,
+        deltas,
+        gaps,
+    })
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -497,19 +532,36 @@ enum ReportRowShape {
     Arg,
 }
 
+/// A report delta list: its key, the row shape it must hold (any shape when `None`), and whether
+/// the report must carry it.
+type ReportList = (&'static str, Option<ReportRowShape>, bool);
+
+// `deltas.unsupported` (commands whose wrapper level is `unsupported`) is not a gap list (uaa-0042).
+const GAP_LISTS: [ReportList; 4] = [
+    ("missing_commands", Some(ReportRowShape::Command), true),
+    ("missing_flags", Some(ReportRowShape::Flag), true),
+    ("missing_args", Some(ReportRowShape::Arg), true),
+    // The report writer omits this list when it is empty.
+    ("intentionally_unsupported", None, false),
+];
+
 pub(crate) fn surfaces_from_report_deltas(
     agent_id: &str,
     report_path: &Path,
     deltas: &serde_json::Map<String, serde_json::Value>,
 ) -> Result<Vec<SurfaceIdentity>, String> {
+    surfaces_from_report_lists(agent_id, report_path, deltas, &GAP_LISTS)
+        .map(|surfaces| surfaces.into_iter().collect())
+}
+
+fn surfaces_from_report_lists(
+    agent_id: &str,
+    report_path: &Path,
+    deltas: &serde_json::Map<String, serde_json::Value>,
+    lists: &[ReportList],
+) -> Result<BTreeSet<SurfaceIdentity>, String> {
     let mut surfaces = BTreeSet::new();
-    for (key, required_shape, list_required) in [
-        ("missing_commands", Some(ReportRowShape::Command), true),
-        ("missing_flags", Some(ReportRowShape::Flag), true),
-        ("missing_args", Some(ReportRowShape::Arg), true),
-        // The report writer omits this list when it is empty.
-        ("intentionally_unsupported", None, false),
-    ] {
+    for &(key, required_shape, list_required) in lists {
         let rows = match deltas.get(key) {
             None if !list_required => continue,
             value => value.and_then(serde_json::Value::as_array).ok_or_else(|| {
@@ -526,7 +578,7 @@ pub(crate) fn surfaces_from_report_deltas(
             surfaces.insert(surface);
         }
     }
-    Ok(surfaces.into_iter().collect())
+    Ok(surfaces)
 }
 
 fn coverage_report_version_dir(
@@ -587,28 +639,35 @@ fn surface_from_report_value(
 
     let key = optional_report_row_string(object, "key")?;
     let name = optional_report_row_string(object, "name")?;
+    let (shape, leaf) = match (key, name) {
+        (Some(_), Some(_)) => {
+            return Err("support-audit report row must not carry both `key` and `name`".to_string())
+        }
+        (Some(flag), None) => (ReportRowShape::Flag, flag),
+        (None, Some(arg_name)) => (ReportRowShape::Arg, arg_name),
+        (None, None) => (ReportRowShape::Command, ""),
+    };
+
+    Ok((shape, surface_identity(agent_id, &path, shape, leaf)))
+}
+
+/// Maps a report or union row to its audit identity; `leaf` is the flag key or argument name.
+fn surface_identity(
+    agent_id: &str,
+    path: &[String],
+    shape: ReportRowShape,
+    leaf: &str,
+) -> SurfaceIdentity {
     let command_path = if path.is_empty() {
         agent_id.to_string()
     } else {
         format!("{agent_id} {}", path.join(" "))
     };
-
-    let (shape, surface_kind, surface_id) = match (key, name) {
-        (Some(_), Some(_)) => {
-            return Err("support-audit report row must not carry both `key` and `name`".to_string())
-        }
-        (Some(flag), None) => (
-            ReportRowShape::Flag,
-            if path.is_empty() {
-                "global_flags"
-            } else {
-                "flags"
-            },
-            flag.to_string(),
-        ),
-        (None, Some(arg_name)) => (ReportRowShape::Arg, "positional_args", arg_name.to_string()),
-        (None, None) => (
-            ReportRowShape::Command,
+    let (surface_kind, surface_id) = match shape {
+        ReportRowShape::Flag if path.is_empty() => ("global_flags", leaf.to_string()),
+        ReportRowShape::Flag => ("flags", leaf.to_string()),
+        ReportRowShape::Arg => ("positional_args", leaf.to_string()),
+        ReportRowShape::Command => (
             if path.len() > 1 {
                 "subcommands"
             } else {
@@ -618,11 +677,7 @@ fn surface_from_report_value(
             path.last().cloned().unwrap_or_else(|| agent_id.to_string()),
         ),
     };
-
-    Ok((
-        shape,
-        SurfaceIdentity::new(surface_kind.to_string(), command_path, surface_id),
-    ))
+    SurfaceIdentity::new(surface_kind.to_string(), command_path, surface_id)
 }
 
 fn optional_report_row_string<'a>(

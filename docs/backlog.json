@@ -1283,6 +1283,151 @@
       "notes": [
         "Noticed 2026-09-15 by the lead session while landing PR #209; pre-existing. Maintainer confirmed on 2026-09-15: track in the backlog, do not fix now."
       ]
+    },
+    {
+      "id": "uaa-0039",
+      "title": "Closeout does not check the support-audit baseline: wrapper-only rows need a recorded category and unmatched debt rows must be empty",
+      "status": "todo",
+      "bucket": "agent_api.onboarding",
+      "type": "design",
+      "kickoff": {
+        "prompt": [
+          "Work item: uaa-0039 — closeout does not check the support-audit baseline.",
+          "Context: the maintenance request contract (`docs/specs/maintenance-request-contract-v1.md`, section \"Hidden upstream surfaces and wrapper-only rows\" and field invariant 6) requires two things before a packet closes. First, every wrapper-only row in the live coverage report (`deltas.wrapper_only_commands`, `deltas.wrapper_only_flags`, `deltas.wrapper_only_args`: a surface the wrapper claims but the union does not show) must be sorted into one category: hidden upstream but still supported, supported only on older upstream versions, obsolete, or a discovery bug. A surface sorted obsolete must contract publication truth in the same run. Second, `support_surface_audit.unmatched_debt_surface` must be empty.",
+          "Today nothing records those categories and `close-agent-maintenance` checks neither rule. The only consumer of wrapper-only rows is `crates/xtask/src/support_matrix/derive.rs`, which marks backend support `partial` with one generic note (13 codex rows in `cli_manifests/support_matrix/current.json` on 2026-09-15). A frozen request that records the same unmatched debt rows as the live audit reconciles `exact`, so closeout accepts it; only `maintenance-audit-status` rejects unmatched debt rows (exit 2).",
+          "Why deferred: maintainer decision 2026-09-15. The policy landed with the support-audit classification work; the category record and the closeout check land with T8, which is held.",
+          "Trigger — resolve before the first packet closeout. Pointers: the contract section and invariant 6 named above, and `docs/specs/unified-agent-api/acquisition-maintenance-lifecycle-spec.md` §8 T8.",
+          "Steps:",
+          "1) Decide where a wrapper-only row's category lives (for example a field on the wrapper coverage entry, or a list in the closeout artifact) and what evidence each category needs.",
+          "2) Make closeout fail when a live wrapper-only row has no category, when a surface sorted obsolete still appears in publication truth, or when the live audit has unmatched debt rows.",
+          "3) Add closeout tests for each failure and for a clean pass.",
+          "4) Remove the pointers once resolved."
+        ],
+        "files_to_read": [
+          "docs/specs/maintenance-request-contract-v1.md",
+          "docs/specs/unified-agent-api/acquisition-maintenance-lifecycle-spec.md",
+          "crates/xtask/src/agent_maintenance/closeout/validate.rs",
+          "crates/xtask/src/agent_maintenance/support_audit.rs",
+          "crates/xtask/src/manifest_report/report.rs",
+          "crates/xtask/src/support_matrix/derive.rs"
+        ],
+        "deliverables": [
+          "A recorded category for every wrapper-only row",
+          "Closeout checks for uncategorized wrapper-only rows, uncontracted obsolete surfaces, and unmatched debt rows",
+          "Closeout tests for each check",
+          "Pointers removed once resolved"
+        ]
+      },
+      "notes": [
+        "Raised 2026-09-15 by a ChatGPT Pro approach review of the first post-merge nightly, reconciled against the repository by the lead session. Maintainer approved the policy and deferred the mechanism to T8 on 2026-09-15."
+      ]
+    },
+    {
+      "id": "uaa-0040",
+      "title": "Supplements cannot keep a hidden flag or positional argument observable",
+      "status": "todo",
+      "bucket": "agent_api.onboarding",
+      "type": "task",
+      "kickoff": {
+        "prompt": [
+          "Work item: uaa-0040 — supplements cannot keep a hidden flag or positional argument observable.",
+          "Context: supplement format v1 (`SupplementV1` in `crates/xtask/src/manifest_snapshot_schema.rs`) carries only command paths, platforms, and a note, and every agent's `supplement/commands.json` is empty. When upstream hides a flag or positional argument from help, no snapshot records it and the union never lists it.",
+          "A debt row for such a surface is classified `not_observed`. Field invariant 6 in `docs/specs/maintenance-request-contract-v1.md` names a supplement as the way to keep a hidden surface observable, which today works only for commands.",
+          "Why deferred: no current debt row is `not_observed` because upstream hides a flag or argument. The 2026-09-15 ChatGPT Pro approach review recommended deferring a supplement format that can carry flags; the maintainer accepted on 2026-09-15.",
+          "Trigger — resolve before the first of: (1) a `not_observed` debt row for a flag or positional argument that upstream still ships but hides; (2) a hidden flag or argument the wrapper must keep claiming across releases. Pointer: field invariant 6 in `docs/specs/maintenance-request-contract-v1.md`.",
+          "Steps:",
+          "1) Define supplement format v2 with flag and argument entries (command path, key or name, platforms, note).",
+          "2) Apply v2 in the codex, claude_code, and opencode snapshot commands and record each applied entry in `known_omissions`.",
+          "3) Validate v2 in `manifest-validate` and add a snapshot test per agent.",
+          "4) Remove the pointer once resolved."
+        ],
+        "files_to_read": [
+          "crates/xtask/src/manifest_snapshot_schema.rs",
+          "crates/xtask/src/codex_snapshot/supplements.rs",
+          "crates/xtask/src/claude_snapshot/discovery/mod.rs",
+          "crates/xtask/src/opencode_snapshot/discovery/mod.rs",
+          "docs/specs/maintenance-request-contract-v1.md"
+        ],
+        "deliverables": [
+          "Supplement format v2 with flag and argument entries",
+          "v2 applied and validated for every snapshot command",
+          "Snapshot tests per agent",
+          "Pointer removed once resolved"
+        ]
+      },
+      "notes": [
+        "Recorded 2026-09-15 with the unmatched debt classification, which made `not_observed` the only derived label for an absent surface."
+      ]
+    },
+    {
+      "id": "uaa-0041",
+      "title": "Support-surface identity is name-only, so value, arity, and output-shape changes are invisible",
+      "status": "todo",
+      "bucket": "agent_api.onboarding",
+      "type": "design",
+      "kickoff": {
+        "prompt": [
+          "Work item: uaa-0041 — support-surface identity is name-only.",
+          "Context: surface identity in `docs/specs/maintenance-request-contract-v1.md` is `surface_kind`, `command_path`, and `surface_id`. The audit never compares a flag's accepted values, arity, default, or output shape. A flag the wrapper supports for only some values therefore counts as covered: opencode `run --format` accepts more than `json` upstream, but the wrapper passes only `json` (`crates/opencode/src/run_json.rs`). An upstream change to an existing flag's values or output shape never reaches the work queue.",
+          "Why deferred: found 2026-09-15 while retiring the seven opencode debt rows the wrapper already covers. The maintainer chose a backlog item over keeping stale debt rows.",
+          "Trigger — resolve before the first of: (1) a surface whose partial value support must count as a gap; (2) an upstream release that changes the values or output shape of a flag the wrapper depends on. Pointer: the identity paragraph under \"Surface identity rules\" in `docs/specs/maintenance-request-contract-v1.md`.",
+          "Steps:",
+          "1) Decide whether snapshots capture value sets (for example clap `[possible values: ...]` or yargs `choices`) and for which surfaces.",
+          "2) Extend the union and coverage report with value-level deltas, or record partial support in wrapper coverage.",
+          "3) Decide how the audit counts partial support, and update the contract.",
+          "4) Remove the pointer once resolved."
+        ],
+        "files_to_read": [
+          "docs/specs/maintenance-request-contract-v1.md",
+          "crates/xtask/src/manifest_report/report.rs",
+          "cli_manifests/opencode/wrapper_coverage.json",
+          "crates/opencode/src/run_json.rs"
+        ],
+        "deliverables": [
+          "A decision on value-level and output-shape parity",
+          "Contract and report changes for that decision",
+          "Pointer removed once resolved"
+        ]
+      },
+      "notes": [
+        "Recorded 2026-09-15 with the retirement of the seven opencode debt rows."
+      ]
+    },
+    {
+      "id": "uaa-0042",
+      "title": "A command whose wrapper coverage level is `unsupported` is never a support-audit gap",
+      "status": "todo",
+      "bucket": "agent_api.onboarding",
+      "type": "task",
+      "kickoff": {
+        "prompt": [
+          "Work item: uaa-0042 — a command whose wrapper coverage level is `unsupported` is never a support-audit gap.",
+          "Context: `classify_command_delta` in `crates/xtask/src/manifest_report/report/filtering.rs` puts a command whose wrapper coverage level is `unsupported` into `deltas.unsupported`; flags and arguments with that level go to the `missing_*` lists instead. The support audit reads only `missing_commands`, `missing_flags`, `missing_args`, and `intentionally_unsupported` (`GAP_LISTS` in `crates/xtask/src/agent_maintenance/support_audit.rs`), so such a command never becomes an uplift and never matches a debt row. A debt row for it is classified `covered_by_wrapper`, which is wrong. The support matrix ignores the list too.",
+          "No `wrapper_coverage.json` declares a command `unsupported` today (checked 2026-09-15 for codex, claude_code, and opencode), so the gap is latent.",
+          "Why deferred: latent; found 2026-09-15 while implementing unmatched debt classification.",
+          "Trigger — resolve before any `wrapper_coverage.json` declares a command `unsupported`. Pointers: the comment above `GAP_LISTS` in `crates/xtask/src/agent_maintenance/support_audit.rs`, and the report-list paragraph under \"Surface identity rules\" in `docs/specs/maintenance-request-contract-v1.md`.",
+          "Steps:",
+          "1) Decide whether an `unsupported` command is a gap (add `deltas.unsupported` to the gap lists) or a declaration like `intentionally_unsupported` (then require a note).",
+          "2) Align the support matrix with that decision.",
+          "3) Add a report-to-audit test for an `unsupported` command.",
+          "4) Remove the pointers once resolved."
+        ],
+        "files_to_read": [
+          "crates/xtask/src/manifest_report/report/filtering.rs",
+          "crates/xtask/src/agent_maintenance/support_audit.rs",
+          "crates/xtask/src/support_matrix/derive.rs",
+          "docs/specs/maintenance-request-contract-v1.md"
+        ],
+        "deliverables": [
+          "A decision on `unsupported` commands",
+          "Audit and support matrix aligned with it",
+          "A report-to-audit test",
+          "Pointers removed once resolved"
+        ]
+      },
+      "notes": [
+        "Found 2026-09-15 by the lead session while reading report classification for the unmatched debt classifier; pre-existing."
+      ]
     }
   ]
 }

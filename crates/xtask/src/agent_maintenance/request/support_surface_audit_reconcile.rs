@@ -9,12 +9,13 @@ use super::super::support_audit::{
     allowed_deferrals, coverage_report_present_for_target, derive_support_surface_audit,
     excluded_surface_kinds, surface_kinds, DebtBackedSurface, DeferredGap, EligibleSurface,
     EvidenceBackedSurface, PublicationImpact, RequiredUplift, SupportSurfaceAudit, SurfaceIdentity,
-    ELIGIBILITY_REASONS, REQUIRED_WRITES,
+    UnmatchedDebtSurface, DEBT_OBSERVATIONS, ELIGIBILITY_REASONS, REQUIRED_WRITES,
 };
 use super::{
     raw::{
         RawDebtBackedSurface, RawDeferredGap, RawEligibleSurface, RawEvidenceBackedSurface,
         RawPublicationImpact, RawRequiredUplift, RawSupportSurfaceAudit, RawSurfaceIdentity,
+        RawUnmatchedDebtSurface,
     },
     AuditDriftPolicy, AuditReconciliation, DetectedRelease, MaintenanceRequestError, TriggerKind,
 };
@@ -155,6 +156,13 @@ fn validate_support_surface_audit_row_values(
             allowed.join(", ")
         )))
     };
+    for (index, row) in audit.unmatched_debt_surface.iter().enumerate() {
+        check(
+            format!("unmatched_debt_surface[{index}].observation"),
+            &row.observation,
+            &DEBT_OBSERVATIONS,
+        )?;
+    }
     for (index, row) in audit.eligible_preexisting_surface.iter().enumerate() {
         check(
             format!("eligible_preexisting_surface[{index}].eligibility_reason"),
@@ -239,7 +247,7 @@ fn support_surface_audit_satisfied(
     if live.pre_run_debt_count != frozen.deferred_preexisting_gaps.len() {
         return false;
     }
-    if !live.removed_upstream_surface.is_empty() {
+    if !live.unmatched_debt_surface.is_empty() {
         return false;
     }
 
@@ -283,11 +291,11 @@ fn describe_support_surface_audit_drift(
     );
     push_row_diffs(
         &mut diffs,
-        "support_surface_audit.removed_upstream_surface",
-        &frozen.removed_upstream_surface,
-        &live.removed_upstream_surface,
-        EvidenceBackedSurface::identity,
-        |row| format!("evidence_ref={}", row.evidence_ref),
+        "support_surface_audit.unmatched_debt_surface",
+        &frozen.unmatched_debt_surface,
+        &live.unmatched_debt_surface,
+        UnmatchedDebtSurface::identity,
+        |row| format!("debt_ref={}; observation={}", row.debt_ref, row.observation),
     );
     push_row_diffs(
         &mut diffs,
@@ -464,10 +472,10 @@ fn map_raw_support_surface_audit(raw: RawSupportSurfaceAudit) -> SupportSurfaceA
             .into_iter()
             .map(map_raw_evidence_backed_surface)
             .collect(),
-        removed_upstream_surface: raw
-            .removed_upstream_surface
+        unmatched_debt_surface: raw
+            .unmatched_debt_surface
             .into_iter()
-            .map(map_raw_evidence_backed_surface)
+            .map(map_raw_unmatched_debt_surface)
             .collect(),
         preexisting_unsupported_surface: raw
             .preexisting_unsupported_surface
@@ -517,6 +525,16 @@ fn map_raw_evidence_backed_surface(raw: RawEvidenceBackedSurface) -> EvidenceBac
         command_path: raw.command_path,
         surface_id: raw.surface_id,
         evidence_ref: raw.evidence_ref,
+    }
+}
+
+fn map_raw_unmatched_debt_surface(raw: RawUnmatchedDebtSurface) -> UnmatchedDebtSurface {
+    UnmatchedDebtSurface {
+        surface_kind: raw.surface_kind,
+        command_path: raw.command_path,
+        surface_id: raw.surface_id,
+        debt_ref: raw.debt_ref,
+        observation: raw.observation,
     }
 }
 
