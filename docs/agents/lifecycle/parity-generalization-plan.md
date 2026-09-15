@@ -994,3 +994,102 @@ case fails on its own. Its three low observations need no code change:
   `--emit-json` projection instead of removing it, like every other pre-derivation validation failure.
   Recorded on `uaa-0025`.
 - The strict deferred case already failed as drift; its test binds that the row check fires first.
+
+## 21. First post-merge nightly: classifying unmatched debt (2026-09-15)
+
+The audit gate that merged with PR #207 ran for the first time on 2026-09-15. All three agents exited
+3 with the counts the pre-merge simulation predicted, so the wiring held. The run also showed a defect
+the simulation could not: opencode reported seven debt rows as `removed_upstream_surface`, although
+the wrapper has passed all seven through the `run --format json` seam since PR #92 (`d8d27a41`,
+2026-04-18). Those rows made reconciliation drift every night, and because the gate returned the
+uplift outcome before it looked at drift, each run reported "uplifts required" instead of an invalid
+debt baseline.
+
+Reading the gate around that defect produced four more facts. A debt row that matches no gap surface
+was labelled a removal on the strength of help output alone, which cannot prove a removal because
+upstream can hide a surface. Contract field invariant 6 tied that list to publication contraction,
+even though a debt row names a surface the project never published. The uplift reason
+`new_upstream_surface` claimed a newness the audit never checks: it compares the report against the
+debt inventory, not against the previous version, which is why opencode 1.18.30 listed 473 uplifts.
+And nothing reads the report's wrapper-only rows, which is where a surface the wrapper claims but
+upstream no longer shows would actually appear.
+
+A ChatGPT Pro approach review was taken as advisory and reconciled against the repository before any
+decision. The maintainer decided five things on 2026-09-15: retire the seven rows; classify unmatched
+debt rows from live evidence; rank debt drift above uplifts in the gate; rename the uplift reason; and
+record the hidden-surface policy with the closeout duty it creates.
+
+### 21.1 What landed
+
+- `dce4b1fb` retires the seven opencode rows (`run` and its `--format`, `--dir`, `--model`,
+  `--continue`, `--session`, `--fork` flags). The other eight opencode rows still match live gaps.
+- `ed31d54a` replaces `removed_upstream_surface` with `unmatched_debt_surface`. Each row carries the
+  debt row's identity, its `debt_ref`, and an `observation`: `excluded_by_rules` when the report lists
+  the surface under `deltas.excluded_*`, `covered_by_wrapper` when the target version's union lists
+  it, and `not_observed` otherwise. The union is read only when a debt row is unmatched. Field
+  invariant 6 now requires the list to be empty before closeout, and publication contraction moved to
+  a new contract section on hidden upstream surfaces and wrapper-only rows.
+- `170acc68` makes the gate exit 2 when a debt row matches no live gap, or when the frozen debt rows
+  differ from the live audit, even while uplifts remain. Uplifts over an unchanged baseline still
+  exit 3.
+- `30898655` renames the uplift reason to `unbaselined_gap`. `reason` has no enumerated values, so
+  frozen requests carrying the old label still load.
+- `a8ca073f` records the closeout duty in this spec's T8 sequencing, the T3 note that an exit-2 debt
+  failure appears only in the gate's error line, and backlog items `uaa-0039`…`uaa-0044` with their
+  trigger pointers.
+- `6e031a88` carries the first review round's remediation (§21.2).
+
+### 21.2 Review rounds
+
+Round 1 at `a8ca073f`. The Opus lane returned CLEAN with one minor finding; the Codex lane returned
+two major and two minor. All were accepted and fixed in `6e031a88` through a bounded Codex
+remediation packet that the lead applied, mutation-checked and committed.
+
+| finding | lane | disposition |
+| --- | --- | --- |
+| `covered_by_wrapper` inferred from union presence without proving the report covers the union | Codex major, Opus note | Accepted. Classification now requires `platform_filter.mode = "any"` and report targets equal to the union's input targets; other evidence is invalid. A false label would tell a maintainer to retire real debt. |
+| A missing `union.json` exited 1 instead of 2 | both | Accepted. The message now says the audit cannot classify unmatched debt rows, which the gate maps to exit 2. |
+| The drift message blamed the debt inventory in the nightly case | Opus | Accepted. The causes now say "differs from the live audit". |
+| A frozen unmatched row retired later still exited 3 | Opus | Accepted. The gate also compares `pre_run_debt_count`. |
+| The drift test bound only the deferred comparison | Codex minor | Accepted. Each mutation (defer reason, row id, follow-on, count) now has its own case. |
+| `PLAN.md` was half renamed | both | Accepted by restoring it. It is a historical plan, like the review records in this document. |
+
+Round 2 at `6e031a88`: both lanes CLEAN. Five non-blocking observations were adjudicated.
+
+- A classification error can pre-empt exit 4 in the same re-run scenario `uaa-0038` already tracks,
+  where the union is rewritten with fewer inputs while the previous report stays on the ref. The
+  workflow routes both codes identically, so only the message differs; recorded on `uaa-0038`.
+- A malformed `inputs.upstream.targets` element was reported as missing. The message now says the
+  report has no usable targets, which covers both.
+- The blocker-class test case now also asserts that the preexisting comparison stays quiet.
+- The open opencode packet branch carries a frozen request with 15 debt rows, so its gate now exits 2
+  until the packet is re-prepared. The nightly opener runs `prepare-agent-maintenance --write` before
+  acquisition, so it heals on the next run; a manual re-run of acquisition alone does not. codex and
+  claude_code freeze two debt rows each and still match.
+- `PLAN.md` is deliberately stale against the current contract, as the restore intended.
+
+### 21.3 Verification
+
+`make preflight` exits 0. The checks CI runs that preflight skips also pass: default-feature workspace
+tests, the backend type leak guard, and `manifest-validate` plus `manifest-acquisition-plan` for
+codex, claude_code and opencode.
+
+The gate was replayed against the 2026-09-15 packet evidence. With the pre-retirement 15-row debt
+file, opencode 1.18.30 exits 2 and names exactly the seven retired rows as `covered_by_wrapper`. codex
+0.153.4 and claude_code 2.1.236 exit 3, unchanged. Every committed `coverage.any.json` and all three
+packet reports carry `platform_filter.mode = "any"` with targets equal to their union's inputs, so the
+new evidence checks pass on real data.
+
+Each new guard was mutation-checked: disabling the gate's debt comparison fails the two exit-2 tests
+while the exit-3 test still passes, and disabling the count comparison or the missing-union mapping
+fails its own test.
+
+### 21.4 What T3 and T8 inherit
+
+- `uaa-0039` gates every closeout: wrapper-only rows need a recorded category, a surface sorted
+  obsolete must contract publication, and unmatched debt rows must be empty. Nothing enforces this
+  yet, so no packet may close until it lands.
+- Exit 2 writes no projection, so T3 must carry the gate's error line to the PR (`uaa-0031`).
+- `uaa-0040` through `uaa-0044` hold the discovery and identity limits this work exposed: supplements
+  cannot carry hidden flags, identity is name-only, an `unsupported` command is never a gap, the
+  `discovered_upstream_surface` name implies newness, and the ADR 0001 §3 signals were never built.

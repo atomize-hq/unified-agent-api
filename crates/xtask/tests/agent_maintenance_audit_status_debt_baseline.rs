@@ -82,7 +82,8 @@ fn each_debt_baseline_mutation_fails_the_gate_even_with_uplifts() {
                 false,
             ),
             "deferred_preexisting_gaps",
-            None,
+            // The preexisting rows compare identity and debt_ref, which a defer reason never touches.
+            Some("preexisting_unsupported_surface"),
         ),
         (
             "audit-status-debt-row-id-changed",

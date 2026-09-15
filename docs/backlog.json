@@ -1282,7 +1282,8 @@
         ]
       },
       "notes": [
-        "Noticed 2026-09-15 by the lead session while landing PR #209; pre-existing. Maintainer confirmed on 2026-09-15: track in the backlog, do not fix now."
+        "Noticed 2026-09-15 by the lead session while landing PR #209; pre-existing. Maintainer confirmed on 2026-09-15: track in the backlog, do not fix now.",
+        "2026-09-15 (adversarial review of the unmatched-debt classification): in this same re-run scenario the union can be rewritten with fewer inputs while the previous run's `coverage.any.json` stays on the ref. With at least one unmatched debt row, the gate then reports `cannot classify unmatched debt rows: ... differs from union input targets` (exit 2) instead of exit 4 naming `missing_targets`. `parity-acquire.yml` routes both the same way, so only the message differs. Fix it with this item."
       ]
     },
     {

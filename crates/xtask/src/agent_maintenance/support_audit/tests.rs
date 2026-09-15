@@ -464,9 +464,9 @@ fn unmatched_debt_requires_a_coherent_any_target_report() {
             "missing `platform_filter.mode`",
         ),
         (
-            "missing report targets",
+            "unusable report targets",
             missing_targets,
-            "missing `inputs.upstream.targets`",
+            "no usable `inputs.upstream.targets`",
         ),
     ] {
         let error = try_derive_audit("opencode", "1.18.30", Some(&debt), &report, Some(&union))

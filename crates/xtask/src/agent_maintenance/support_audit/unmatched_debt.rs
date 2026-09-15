@@ -44,9 +44,10 @@ pub(super) fn classify_unmatched_debt_rows(
             ));
         }
     }
+    // Absent and malformed both arrive as `None`, so the message names the field either way.
     let report_targets = report.upstream_targets.as_ref().ok_or_else(|| {
         format!(
-            "cannot classify unmatched debt rows: report {} is missing `inputs.upstream.targets`",
+            "cannot classify unmatched debt rows: report {} has no usable `inputs.upstream.targets`",
             report.path.display()
         )
     })?;
