@@ -463,6 +463,10 @@ mod unix {
             "stderr carries the per-feature error text; stderr:\n{stderr}"
         );
         assert!(
+            stderr.contains("combined discovery pass error: "),
+            "stderr keeps the original discovery error after the named features; stderr:\n{stderr}"
+        );
+        assert!(
             !out_dir.join("current.json").exists(),
             "a failed feature pass must not write a snapshot"
         );

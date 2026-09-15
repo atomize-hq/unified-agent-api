@@ -137,7 +137,8 @@ pub(super) fn probe_features(codex_binary: &Path) -> (Option<Vec<FeatureInfo>>, 
 
 /// Maps a failed all-features discovery pass to the features that fail to enable on their own.
 /// Runs only on that failure path, so a passing snapshot keeps its invocation count. When no
-/// single feature fails (or a probe cannot spawn), the original error stands.
+/// single feature fails (or a probe cannot spawn), the original error stands; otherwise it follows
+/// the per-feature errors, since a feature can fail alone yet not be what broke the combined pass.
 pub(super) fn name_enable_failures(codex_binary: &Path, features: &[String], err: Error) -> Error {
     let mut names = Vec::new();
     let mut details = Vec::new();
@@ -160,6 +161,7 @@ pub(super) fn name_enable_failures(codex_binary: &Path, features: &[String], err
     if names.is_empty() {
         return err;
     }
+    details.push(format!("combined discovery pass error: {err}"));
     Error::FeatureEnable {
         names: names.join(", "),
         details: details.join("\n"),

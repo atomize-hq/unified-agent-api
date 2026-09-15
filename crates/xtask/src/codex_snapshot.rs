@@ -128,6 +128,8 @@ pub fn run(args: Args) -> Result<(), Error> {
     let (mut command_entries, commands_added_when_all_enabled) = if enable_args.is_empty() {
         if args.capture_raw_help {
             // If we can't enable features, capture raw help for the default surface.
+            // Deferred (docs/backlog.json uaa-0037): this discards capture errors, so a failed
+            // raw help write still yields a snapshot; now also reached when every feature is removed.
             let _ = discovery::discover_commands(&codex_binary, raw_help_dir.as_deref(), true, &[]);
         }
         (default_entries, None)
