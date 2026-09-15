@@ -959,7 +959,11 @@ notes recorded here rather than as findings:
 - An intentionally-unsupported ancestor is not a third way to close the obligation. It moves the child
   from `missing_*` to `intentionally_unsupported`, and the support audit reads that list as obligations
   too; a newly discovered surface still cannot be deferred.
-- A child that the wrapper really supports, under a command that stays excluded, has no accurate
-  record: its own exclusion would mislabel a supported flag, and coverage needs the exclusion lifted.
-  This is the limit that keeping validation unchanged accepts; no committed manifest reaches it.
+- Validation rejects covering a child while its command stays excluded, but no accurate record needs
+  that pair: the wrapper can pass a command's flag or argument only by invoking that command, so the
+  command's exclusion no longer holds. Lift it and cover the command with the child on its entry.
+  Codex's root is the precedent: it launches the TUI, yet its coverage is `explicit` with the
+  root-position flags the wrapper passes, while `RULES.json` excludes the TUI-only root arguments and
+  `--no-alt-screen` one by one. A command exclusion no longer carries its children, so lifting one
+  moves only the command's own row.
 
