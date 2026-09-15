@@ -333,7 +333,7 @@ pub(crate) fn derive_support_surface_audit(
             surface_kind: surface.surface_kind.clone(),
             command_path: surface.command_path.clone(),
             surface_id: surface.surface_id.clone(),
-            reason: "new_upstream_surface".to_string(),
+            reason: "unbaselined_gap".to_string(),
             required_writes: REQUIRED_WRITES.iter().map(ToString::to_string).collect(),
         })
         .collect::<Vec<_>>();

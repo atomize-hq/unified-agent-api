@@ -1428,6 +1428,39 @@
       "notes": [
         "Found 2026-09-15 by the lead session while reading report classification for the unmatched debt classifier; pre-existing."
       ]
+    },
+    {
+      "id": "uaa-0043",
+      "title": "`support_surface_audit.discovered_upstream_surface` implies upstream newness the audit never checks",
+      "status": "todo",
+      "bucket": "agent_api.onboarding",
+      "type": "task",
+      "kickoff": {
+        "prompt": [
+          "Work item: uaa-0043 — `support_surface_audit.discovered_upstream_surface` implies upstream newness the audit never checks.",
+          "Context: the support audit puts every gap surface that no debt row covers into `discovered_upstream_surface` and `required_uplifts_this_run`. The audit never compares against the previous version, so most of these rows are old upstream surface that was never baselined: the 2026-09-15 opencode 1.18.30 nightly listed 473 uplifts, far more than one release adds. On 2026-09-15 the uplift reason was renamed from `new_upstream_surface` to `unbaselined_gap` for this reason, but the list name kept the same implication.",
+          "Why deferred: renaming a TOML list changes the `[support_surface_audit]` schema that frozen requests on open packet branches carry, and `deny_unknown_fields` would reject the old name. The maintainer approved deferring it on 2026-09-15.",
+          "Trigger — resolve with the next schema change to `[support_surface_audit]`, or before T3 renders the list name to contributors in the packet PR body. Pointer: the evidence-backed row note in the record shape table of `docs/specs/maintenance-request-contract-v1.md`.",
+          "Steps:",
+          "1) Pick the new name (for example `unbaselined_gap_surface`) and decide whether the loader accepts the old name for one release.",
+          "2) Rename it in `support_audit.rs`, `request/raw.rs`, `request/support_surface_audit_reconcile.rs`, `prepare.rs`, `docs.rs`, the audit status projection, the contract, and tests.",
+          "3) Remove the pointer once resolved."
+        ],
+        "files_to_read": [
+          "docs/specs/maintenance-request-contract-v1.md",
+          "crates/xtask/src/agent_maintenance/support_audit.rs",
+          "crates/xtask/src/agent_maintenance/request/raw.rs",
+          "crates/xtask/src/agent_maintenance/audit_status.rs"
+        ],
+        "deliverables": [
+          "The list renamed everywhere it is written or read",
+          "A decision on accepting the old name",
+          "Pointer removed once resolved"
+        ]
+      },
+      "notes": [
+        "Recorded 2026-09-15 with the `unbaselined_gap` rename."
+      ]
     }
   ]
 }

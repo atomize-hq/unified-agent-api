@@ -166,7 +166,7 @@ surface_id = "--json"
 surface_kind = "flags"
 command_path = "codex exec"
 surface_id = "--json"
-reason = "new_upstream_surface"
+reason = "unbaselined_gap"
 required_writes = ["wrapper", "backend", "manifest", "publication"]
 
 [[support_surface_audit.deferred_preexisting_gaps]]
@@ -188,11 +188,11 @@ Required record shape rules:
 | Record | Required keys | Notes |
 | --- | --- | --- |
 | surface row | `surface_kind`, `command_path`, `surface_id` | shared identity for every audit list |
-| evidence-backed row | surface row + `evidence_ref` | used for discovered upstream surface |
+| evidence-backed row | surface row + `evidence_ref` | used for discovered upstream surface; the list name implies newness the audit never checks (`uaa-0043`) |
 | debt-backed row | surface row + `debt_ref` | used for preexisting inventory rows |
 | unmatched debt row | surface row + `debt_ref`, `observation` | `observation` only `covered_by_wrapper`, `excluded_by_rules`, or `not_observed` |
 | eligible row | surface row + `eligibility_reason` | only `adjacent_surface_changed`, `bounded_write_envelope`, or `no_new_seam_required` |
-| uplift row | surface row + `reason`, `required_writes` | `required_writes` values limited to `wrapper`, `backend`, `manifest`, `publication`, `packet_docs` |
+| uplift row | surface row + `reason`, `required_writes` | shared code writes `reason = "unbaselined_gap"`: a gap surface no debt row covers, whether upstream added it in this release or it was never baselined; `required_writes` values limited to `wrapper`, `backend`, `manifest`, `publication`, `packet_docs` |
 | deferred row | surface row + `defer_reason`, `blocking_follow_on` when repo-owned | `blocking_follow_on` omitted only for concrete external blockers |
 | publication impact row | surface row + `surface_doc` | ties uplift to published truth |
 

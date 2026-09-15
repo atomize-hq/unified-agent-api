@@ -12,7 +12,7 @@ const FROZEN_DISCOVERY_ROW: &str = concat!(
     "surface_kind = \"commands\"\n",
     "command_path = \"opencode status\"\n",
     "surface_id = \"status\"\n",
-    "reason = \"new_upstream_surface\"\n",
+    "reason = \"unbaselined_gap\"\n",
     "required_writes = [\"wrapper\", \"backend\", \"manifest\", \"publication\", \"packet_docs\"]\n"
 );
 

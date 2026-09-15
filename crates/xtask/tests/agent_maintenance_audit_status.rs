@@ -476,7 +476,7 @@ fn expected_required_uplifts_json() -> Value {
         "surface_kind": "commands",
         "command_path": "codex status",
         "surface_id": "status",
-        "reason": "new_upstream_surface",
+        "reason": "unbaselined_gap",
         "required_writes": ["backend", "manifest", "packet_docs", "publication", "wrapper"]
     }])
 }

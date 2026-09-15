@@ -452,7 +452,7 @@ surface_id = "--json"
 surface_kind = "flags"
 command_path = "codex exec"
 surface_id = "--json"
-reason = "new_upstream_surface"
+reason = "unbaselined_gap"
 required_writes = ["wrapper", "backend", "manifest", "publication"]
 
 [[support_surface_audit.deferred_preexisting_gaps]]
