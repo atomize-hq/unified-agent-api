@@ -100,8 +100,8 @@ Optional/generated:
 - `features` (object, optional): feature-probe metadata captured from `codex features list` and used to drive exhaustive help discovery:
   - `mode` (string): currently `default_plus_all_enabled`
   - `listed` (array, optional): parsed rows from `codex features list` (`name`, `stage`, `effective`). `stage` is the CLI display string and may include: `stable|beta|experimental|deprecated|removed`.
-  - `enabled_for_snapshot` (array of strings, optional): features enabled via `--enable <FEATURE>` during discovery
-  - `commands_added_when_all_enabled` (array of `path` arrays, optional): command paths that only appeared when all features were enabled
+  - `enabled_for_snapshot` (array of strings, optional): features enabled via `--enable <FEATURE>` during discovery: every listed feature except stage `removed` (case-insensitive). If any of them fails to enable, the snapshot is not written: the command exits non-zero and names each feature that fails to enable on its own (ADR 0002 feature enable policy).
+  - `commands_added_when_all_enabled` (array of `path` arrays, optional): command paths that only appeared when every feature in `enabled_for_snapshot` was enabled
 - `known_omissions` (array of strings, optional): records applied supplements for review visibility.
 
 Note: for the multi-platform “union snapshot” approach, `current.json` is specified in `SCHEMA.json` as schema v2 (`mode: "union"`), and per-target inputs are schema v1. Until implemented, the generator emits schema v1.

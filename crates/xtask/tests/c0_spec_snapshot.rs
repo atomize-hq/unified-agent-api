@@ -45,18 +45,21 @@ mod unix {
         dst
     }
 
-    fn run_xtask_snapshot(codex_bin: &Path, out_dir: &Path, supplement: &Path) -> Value {
-        let xtask_bin = PathBuf::from(env!("CARGO_BIN_EXE_xtask"));
-
-        let output = Command::new(xtask_bin)
-            .arg("codex-snapshot")
+    fn snapshot_command(codex_bin: &Path, out_dir: &Path, supplement: &Path) -> Command {
+        let mut cmd = Command::new(PathBuf::from(env!("CARGO_BIN_EXE_xtask")));
+        cmd.arg("codex-snapshot")
             .arg("--codex-binary")
             .arg(codex_bin)
             .arg("--out-dir")
             .arg(out_dir)
             .arg("--capture-raw-help")
             .arg("--supplement")
-            .arg(supplement)
+            .arg(supplement);
+        cmd
+    }
+
+    fn run_xtask_snapshot(codex_bin: &Path, out_dir: &Path, supplement: &Path) -> Value {
+        let output = snapshot_command(codex_bin, out_dir, supplement)
             .output()
             .expect("spawn xtask codex-snapshot");
 
@@ -384,6 +387,26 @@ mod unix {
             "feature list includes extra_feature and snapshot enables it for discovery"
         );
 
+        // The fake rejects `--enable removed_feature`, so this snapshot only succeeds if the
+        // enable pass skips stage `removed` while `listed` still records it.
+        let listed = features
+            .get("listed")
+            .and_then(Value::as_array)
+            .expect("features.listed is array");
+        assert!(
+            listed.iter().any(|f| {
+                f.get("name").and_then(Value::as_str) == Some("removed_feature")
+                    && f.get("stage").and_then(Value::as_str) == Some("removed")
+            }),
+            "features.listed records the removed-stage feature"
+        );
+        assert!(
+            !enabled
+                .iter()
+                .any(|v| v.as_str() == Some("removed_feature")),
+            "removed-stage features are not enabled for discovery"
+        );
+
         let added = features
             .get("commands_added_when_all_enabled")
             .and_then(Value::as_array)
@@ -407,6 +430,45 @@ mod unix {
                     .is_some_and(|p| p.iter().filter_map(Value::as_str).eq(["extra"]))
             }),
             "feature-gated command [\"extra\"] appears in merged command list"
+        );
+    }
+
+    #[test]
+    fn c0_snapshot_fails_and_names_a_feature_that_cannot_be_enabled() {
+        let temp = make_temp_dir("ccp-c0-test-feature-enable-failure");
+
+        let codex_bin = copy_executable_fixture("fake_codex.sh", &temp);
+        let supplement = copy_fixture("supplement_commands.json", &temp);
+
+        let out_dir = temp.join("out");
+        fs::create_dir_all(&out_dir).expect("create out dir");
+
+        let output = snapshot_command(&codex_bin, &out_dir, &supplement)
+            .env("FAKE_CODEX_FAIL_ENABLE", "extra_feature")
+            .output()
+            .expect("spawn xtask codex-snapshot");
+        let stderr = String::from_utf8_lossy(&output.stderr);
+
+        assert!(
+            !output.status.success(),
+            "a non-removed feature that fails to enable must fail the snapshot; stderr:\n{stderr}"
+        );
+        // The combined `--enable` command line also contains the name, so match the summary.
+        assert!(
+            stderr.contains("codex feature(s) failed to enable: extra_feature ("),
+            "stderr names exactly the failing feature; stderr:\n{stderr}"
+        );
+        assert!(
+            stderr.contains("unknown feature `extra_feature`"),
+            "stderr carries the per-feature error text; stderr:\n{stderr}"
+        );
+        assert!(
+            stderr.contains("combined discovery pass error: "),
+            "stderr keeps the original discovery error after the named features; stderr:\n{stderr}"
+        );
+        assert!(
+            !out_dir.join("current.json").exists(),
+            "a failed feature pass must not write a snapshot"
         );
     }
 }

@@ -141,11 +141,9 @@
       "excluded_stages": [
         "removed"
       ],
-      "on_enable_failure": "record_and_continue",
+      "on_enable_failure": "fail_target",
       "snapshot_metadata_fields": [
-        "requested_enable",
-        "enabled_for_snapshot",
-        "enable_failures"
+        "enabled_for_snapshot"
       ]
     }
   },

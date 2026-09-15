@@ -233,6 +233,23 @@ fn union_job_runs_after_snapshot_failure_but_not_plan_failure_or_cancellation() 
     assert!(header.contains("if: ${{ !cancelled() && needs.plan.result == 'success' }}"));
 }
 
+#[test]
+fn failed_snapshot_leg_uploads_raw_help_evidence_but_never_its_snapshot() {
+    let workflow = read_workflow();
+    let raw_help_step = "      - name: Upload the raw help capture (never committed)\n";
+    // A step-level `if:` here could let the union download a snapshot from a failed capture.
+    let snapshot_upload = section_between(
+        &workflow,
+        "      - name: Upload the per-target snapshot\n",
+        raw_help_step,
+    );
+    assert!(!snapshot_upload
+        .lines()
+        .any(|l| l.starts_with("        if:")));
+    let raw_help_upload = section_between(&workflow, raw_help_step, "  union:\n");
+    assert!(raw_help_upload.starts_with("        if: ${{ !cancelled() }}\n"));
+}
+
 fn failure_case(status: i32) -> GateCase {
     GateCase {
         status,

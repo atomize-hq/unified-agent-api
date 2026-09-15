@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at_utc": "2026-09-14T00:00:00Z",
+  "updated_at_utc": "2026-09-15T00:00:00Z",
   "items": [
     {
       "id": "uaa-0022",
@@ -1213,6 +1213,75 @@
       "notes": [
         "Raised 2026-09-14 by the Opus adversarial lane (observation O1) reviewing the root-command fix; accepted as pre-existing and deferred to a maintainer decision.",
         "Decided 2026-09-14 by the maintainer: `command_path` is rooted at the registry agent id (option A). Resolved in fa739c7d: the two claude_code debt rows and the contract examples read `claude_code`, the contract states the rule, and tests bind every debt row to its agent id and claude_code's install debt to preexisting. Replayed post-merge nightly for claude_code 2.1.236: required uplifts 117 -> 115, preexisting 0 -> 2, removed upstream surface 2 -> 0. The frozen claude_code request on the feature branch keeps the old form; it is generated and already invalid. Trigger pointers removed."
+      ]
+    },
+    {
+      "id": "uaa-0037",
+      "title": "codex-snapshot discards raw help capture errors when no feature is enabled",
+      "status": "todo",
+      "bucket": "agent_api.onboarding",
+      "type": "task",
+      "kickoff": {
+        "prompt": [
+          "Work item: uaa-0037 — codex-snapshot discards raw help capture errors when no feature is enabled.",
+          "Context: in `crates/xtask/src/codex_snapshot.rs`, when the `--enable` list is empty and `--capture-raw-help` is set, the second default crawl runs as `let _ = discovery::discover_commands(...)`, so any capture error is dropped (from 2594830e). The empty list happens when `codex features list` fails or lists nothing, and, since the removed-stage skip (patch/codex-feature-pass-removed-stage), when every listed feature is at stage `removed`. The enabled-pass branch already propagates capture errors.",
+          "Failure scenario (Codex review lane, 2026-09-15): the raw help directory cannot be written, so codex-snapshot writes a complete default-surface snapshot and exits 0. In `.github/workflows/parity-acquire.yml` the per-target snapshot uploads, then the raw help upload fails `if-no-files-found: error`, so the leg is red while the union still consumes that target's snapshot. The snapshot content is complete; the harm is a failed leg whose snapshot is treated as present, and missing evidence. Separately, any failure of a success-path step after `Upload the per-target snapshot` produces the same red-leg-but-present state.",
+          "Why deferred: pre-existing behaviour, outside the narrow removed-stage fix; the newly added trigger (every listed feature removed) is unrealistic (codex 0.154.0 lists 49 enableable features of 86). Fixing it changes deliberate best-effort behaviour and needs a maintainer decision.",
+          "Trigger — resolve before the first of: (1) any codex release whose `features list` shows every feature at stage `removed` or fails; (2) any change to the raw help capture or to the order of the snapshot job's upload steps. Pointer: the comment above the `let _ =` in `crates/xtask/src/codex_snapshot.rs`.",
+          "Steps:",
+          "1) Decide whether a raw help capture failure must fail the target (propagate with `?`) or stay best-effort.",
+          "2) If it must fail, propagate the error and add a regression with an empty enable list and a raw help write that fails without relying on file permissions (for example, pre-create `raw_help` as a regular file), in both `--out-dir` and `--out-file` modes.",
+          "3) Decide whether the snapshot job should upload the per-target snapshot only after every other success-path step has passed.",
+          "4) Remove the pointer comment once resolved."
+        ],
+        "files_to_read": [
+          "crates/xtask/src/codex_snapshot.rs",
+          "crates/xtask/src/codex_snapshot/layout.rs",
+          ".github/workflows/parity-acquire.yml",
+          "docs/adr/0002-codex-cli-parity-coverage-mapping.md"
+        ],
+        "deliverables": [
+          "Recorded decision on raw help capture failure handling",
+          "Code and regression test if capture failures become fatal",
+          "Pointer comment removed once resolved"
+        ]
+      },
+      "notes": [
+        "Raised 2026-09-15 by the Codex review lane (HIGH) reviewing the removed-stage feature pass fix (candidate eefa2a02); accepted as pre-existing and deferred."
+      ]
+    },
+    {
+      "id": "uaa-0038",
+      "title": "parity-acquire union counts a stale committed per-target snapshot as present when that target fails on a re-run",
+      "status": "todo",
+      "bucket": "agent_api.onboarding",
+      "type": "task",
+      "kickoff": {
+        "prompt": [
+          "Work item: uaa-0038 — parity-acquire union counts a stale committed per-target snapshot as present when that target fails on a re-run.",
+          "Context: in `.github/workflows/parity-acquire.yml`, the union job's \"Materialize snapshots and assert the required target is present\" step copies downloaded per-target artifacts into `${ROOT}/snapshots/${VERSION}` with `mkdir -p` and never clears it. The checkout is `inputs.ref`. When that ref already contains committed `snapshots/<version>/<target>.json` files, a target whose snapshot leg failed in this run keeps its old committed file. The required-target check and the missing-target count both treat it as present, the union omits it from `missing_targets`, and the maintenance audit reports complete (exit 0) instead of incomplete acquisition (exit 4).",
+          "When it can happen (rare): (1) acquisition runs again for a version whose artifacts are already committed on `ref`, for example a GitHub re-run after the acquisition commit landed on a packet branch, or a manual `workflow_dispatch` with the default `ref: staging` for a version already on staging; (2) at least one target fails to produce a snapshot in that run. A normal first acquisition on a fresh packet branch is not affected, because the branch has no snapshots for the new version yet.",
+          "Impact: silent false completeness, but usually with correct data. The stale file comes from the same version and the same sha256-pinned binary, so it differs from a fresh capture only when snapshot generation changed in between (for example, PR #209 changed `features.enabled_for_snapshot`).",
+          "Why deferred: rare edge case outside PR #209's scope; maintainer asked to track it without acting now (2026-09-15).",
+          "Trigger — resolve before the first of: (1) deliberately re-running acquisition for a version already committed on the target ref; (2) any change to the Materialize step or to how the union decides a target is present. Pointer: the comment above the Materialize step in `.github/workflows/parity-acquire.yml`.",
+          "Steps:",
+          "1) Before copying artifacts, remove `${DEST}/<target>.json` for every target in the plan so only this run's snapshots count (committed files for that version are regenerated or reported missing).",
+          "2) Add a behaviour test in the style of `crates/xtask/tests/c4_spec_audit_gate_behavior.rs` that runs the step with a pre-existing stale target file and no downloaded artifact for it, and expects the target to be reported missing (or the required-target check to fail).",
+          "3) Remove the pointer comment once resolved."
+        ],
+        "files_to_read": [
+          ".github/workflows/parity-acquire.yml",
+          ".github/workflows/agent-maintenance-open-pr.yml",
+          "crates/xtask/tests/c4_spec_audit_gate_behavior.rs"
+        ],
+        "deliverables": [
+          "Materialize step counts only this run's per-target snapshots",
+          "Behaviour test for a stale committed target snapshot",
+          "Pointer comment removed once resolved"
+        ]
+      },
+      "notes": [
+        "Noticed 2026-09-15 by the lead session while landing PR #209; pre-existing. Maintainer confirmed on 2026-09-15: track in the backlog, do not fix now."
       ]
     }
   ]

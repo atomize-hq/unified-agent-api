@@ -418,11 +418,16 @@ jobs:
           path: |
             ${{ needs.plan.outputs.manifest_root }}/snapshots/${{ inputs.target_version }}/${{ matrix.target_triple }}.json
 
+      # Also runs when capture fails, keeping whatever help was written before the failure. The
+      # snapshot upload above stays success-only: the union must never see a `<target>.json` from a
+      # failed capture. A capture that fails at the root (e.g. a rejected `--enable`) writes no
+      # help, so only warn off the success path.
       - name: Upload the raw help capture (never committed)
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v6
         with:
           name: "parity-acquire-raw-help-${{ inputs.agent_id }}-${{ inputs.target_version }}-${{ matrix.target_triple }}"
-          if-no-files-found: error
+          if-no-files-found: ${{ job.status == 'success' && 'error' || 'warn' }}
           retention-days: 1
           path: |
             ${{ needs.plan.outputs.manifest_root }}/raw_help/${{ inputs.target_version }}/${{ matrix.target_triple }}/
@@ -460,6 +465,8 @@ jobs:
           path: _snapshots
           merge-multiple: true
 
+      # Deferred (docs/backlog.json uaa-0038): DEST is not cleared, so when `ref` already has
+      # committed snapshots for this version, a target that failed in this run still counts as present.
       - name: Materialize snapshots and assert the required target is present
         shell: bash
         env:
