@@ -195,6 +195,8 @@ Use these signals to prompt human review; they are not the source of truth:
 - **Release notes mining:** scan upstream release notes for backticked commands and `--flag` tokens; treat as “verify in snapshot/help/binary”.
 - **Optional docs/reference cross-check:** compare to official docs as prompts for discrepancies; confirm via snapshot + real-binary behavior.
 
+Neither signal is automated yet (`uaa-0044`). A surface upstream hides from help is not a parity obligation unless the wrapper claims it; see "Hidden upstream surfaces and wrapper-only rows" in `docs/specs/maintenance-request-contract-v1.md`.
+
 ## Trial Run: 0.61.0 → 0.77.0 (Linux)
 
 This is a one-time (or occasional) checklist to validate the operational loop on Linux using the known gap described in ADR 0001.

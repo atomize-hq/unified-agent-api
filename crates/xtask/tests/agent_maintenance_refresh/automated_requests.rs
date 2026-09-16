@@ -138,7 +138,7 @@ const FROZEN_DISCOVERY_ROW: &str = concat!(
     "surface_kind = \"commands\"\n",
     "command_path = \"opencode status\"\n",
     "surface_id = \"status\"\n",
-    "reason = \"new_upstream_surface\"\n",
+    "reason = \"unbaselined_gap\"\n",
     "required_writes = [\"wrapper\", \"backend\", \"manifest\", \"publication\", \"packet_docs\"]\n"
 );
 
@@ -597,7 +597,7 @@ fn automated_request_support_surface_audit_satisfied_state_keeps_frozen_discover
         "docs/agents/lifecycle/opencode-maintenance/HANDOFF.md",
     );
     assert!(handoff.contains("- discovered upstream surface rows: `1`"));
-    assert!(handoff.contains("- `opencode status` `status` via `new_upstream_surface`"));
+    assert!(handoff.contains("- `opencode status` `status` via `unbaselined_gap`"));
 
     let mut stdout = Vec::new();
     refresh::run_in_workspace(

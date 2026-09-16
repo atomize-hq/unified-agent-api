@@ -467,10 +467,10 @@ fn render_support_surface_audit(out: &mut String, audit: &SupportSurfaceAudit) {
         "support_surface_audit.discovered_upstream_surface",
         &audit.discovered_upstream_surface,
     );
-    render_evidence_backed_rows(
+    render_unmatched_debt_rows(
         out,
-        "support_surface_audit.removed_upstream_surface",
-        &audit.removed_upstream_surface,
+        "support_surface_audit.unmatched_debt_surface",
+        &audit.unmatched_debt_surface,
     );
     render_debt_backed_rows(
         out,
@@ -573,6 +573,24 @@ fn render_debt_backed_rows(
         push_toml_line(out, "command_path", &row.command_path);
         push_toml_line(out, "surface_id", &row.surface_id);
         push_toml_line(out, "debt_ref", &row.debt_ref);
+    }
+}
+
+fn render_unmatched_debt_rows(
+    out: &mut String,
+    table: &str,
+    rows: &[super::support_audit::UnmatchedDebtSurface],
+) {
+    for row in rows {
+        out.push('\n');
+        out.push_str("[[");
+        out.push_str(table);
+        out.push_str("]]\n");
+        push_toml_line(out, "surface_kind", &row.surface_kind);
+        push_toml_line(out, "command_path", &row.command_path);
+        push_toml_line(out, "surface_id", &row.surface_id);
+        push_toml_line(out, "debt_ref", &row.debt_ref);
+        push_toml_line(out, "observation", &row.observation);
     }
 }
 

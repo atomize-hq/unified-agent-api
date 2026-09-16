@@ -133,11 +133,12 @@ command_path = "codex exec"
 surface_id = "--json"
 evidence_ref = "cli_manifests/codex/raw_help/..."
 
-[[support_surface_audit.removed_upstream_surface]]
+[[support_surface_audit.unmatched_debt_surface]]
 surface_kind = "flags"
 command_path = "codex exec"
 surface_id = "--legacy"
-evidence_ref = "cli_manifests/codex/raw_help/..."
+debt_ref = "docs/specs/unified-agent-api/non-tui-support-debt.md#codex-exec-legacy-flag"
+observation = "not_observed"
 
 [[support_surface_audit.preexisting_unsupported_surface]]
 surface_kind = "global_flags"
@@ -165,7 +166,7 @@ surface_id = "--json"
 surface_kind = "flags"
 command_path = "codex exec"
 surface_id = "--json"
-reason = "new_upstream_surface"
+reason = "unbaselined_gap"
 required_writes = ["wrapper", "backend", "manifest", "publication"]
 
 [[support_surface_audit.deferred_preexisting_gaps]]
@@ -187,10 +188,11 @@ Required record shape rules:
 | Record | Required keys | Notes |
 | --- | --- | --- |
 | surface row | `surface_kind`, `command_path`, `surface_id` | shared identity for every audit list |
-| evidence-backed row | surface row + `evidence_ref` | used for discovered or removed upstream surface |
+| evidence-backed row | surface row + `evidence_ref` | used for discovered upstream surface; the list name implies newness the audit never checks (`uaa-0043`) |
 | debt-backed row | surface row + `debt_ref` | used for preexisting inventory rows |
+| unmatched debt row | surface row + `debt_ref`, `observation` | `observation` only `covered_by_wrapper`, `excluded_by_rules`, or `not_observed` |
 | eligible row | surface row + `eligibility_reason` | only `adjacent_surface_changed`, `bounded_write_envelope`, or `no_new_seam_required` |
-| uplift row | surface row + `reason`, `required_writes` | `required_writes` values limited to `wrapper`, `backend`, `manifest`, `publication`, `packet_docs` |
+| uplift row | surface row + `reason`, `required_writes` | shared code writes `reason = "unbaselined_gap"`: a gap surface no debt row covers, whether upstream added it in this release or it was never baselined; `required_writes` values limited to `wrapper`, `backend`, `manifest`, `publication`, `packet_docs` |
 | deferred row | surface row + `defer_reason`, `blocking_follow_on` when repo-owned | `blocking_follow_on` omitted only for concrete external blockers |
 | publication impact row | surface row + `surface_doc` | ties uplift to published truth |
 
@@ -198,11 +200,19 @@ Surface identity rules. When a coverage report exists for the target version, sh
 the gap surfaces from report rows as shown below. Those identities fill `missing_wrapper_support`,
 `missing_backend_support`, and `publication_impacts`. A gap surface that equals a non-TUI debt
 inventory row becomes a preexisting and deferred row; any other becomes a discovered row and a
-required uplift. A debt inventory row that equals no gap surface becomes a
-`removed_upstream_surface` row carrying the debt row's own identity. Without a report, every surface
-row uses the identities written in the debt inventory rows. Shared code leaves
-`eligible_preexisting_surface` empty. `path` is the report row's command path below the agent's own
-command.
+required uplift. A debt inventory row that equals no gap surface becomes an
+`unmatched_debt_surface` row carrying the debt row's identity and `debt_ref`, with an `observation`
+taken from live evidence: `excluded_by_rules` when the report lists the surface under
+`deltas.excluded_commands`, `deltas.excluded_flags`, or `deltas.excluded_args`; otherwise
+`covered_by_wrapper` when the target version's `snapshots/<version>/union.json` lists it; otherwise
+`not_observed`. Classifying unmatched rows requires `snapshots/<version>/union.json` and an
+any-target report (`platform_filter.mode = "any"`) whose `inputs.upstream.targets` equal the
+union's input targets; otherwise the evidence is invalid. Shared code never derives a removal: help
+output cannot prove that upstream removed a surface, because upstream can hide one (see
+[Hidden upstream surfaces and wrapper-only rows](#hidden-upstream-surfaces-and-wrapper-only-rows)).
+Without a report, every surface row uses the identities written in the debt inventory rows and no
+row is unmatched. Shared code leaves `eligible_preexisting_surface` empty. `path` is the report
+row's command path below the agent's own command.
 
 | Report row | `surface_kind` | `command_path` | `surface_id` |
 | --- | --- | --- | --- |
@@ -216,10 +226,17 @@ The three fields together are the identity; a consumer MUST NOT match surfaces o
 alone, because the root command and a command named like the agent share one. `command_path` is
 rooted at the registry `agent_id` (for example `claude_code install`), never at the upstream binary
 name, and debt inventory rows MUST use the same form so they match report-derived surfaces.
+Identity is name-only: it does not compare accepted values, arity, or output shape, so a flag the
+wrapper supports for only some values (opencode `run --format` accepts only `json` through the
+wrapper) counts as covered (`uaa-0041`).
 
 A report's `deltas.missing_commands`, `deltas.missing_flags`, and `deltas.missing_args` MUST be
 arrays. `deltas.intentionally_unsupported` MAY be absent, which is how the report writer records an
-empty list; when present it MUST be an array. A report row is invalid evidence when `path` is
+empty list; when present it MUST be an array. `deltas.excluded_commands`, `deltas.excluded_flags`,
+and `deltas.excluded_args` follow the same rule, and shared code reads them only to classify
+unmatched debt rows. `deltas.unsupported`, which lists commands whose wrapper coverage level is
+`unsupported`, is not a gap list, so such a command never becomes an uplift or matches a debt row
+(`uaa-0042`). A report row is invalid evidence when `path` is
 missing or is not an array of strings, when `key` or `name` is present but not a string, when it
 carries both `key` and `name`, or when its shape does not match the list it appears in (commands
 carry neither field, flags carry `key`, arguments carry `name`).
@@ -236,8 +253,12 @@ Field invariants:
 5. `expected_post_run_debt_count` MUST equal:
    `pre_run_debt_count - closed_gap_count + newly_blocked_external_gap_count`.
    It MUST never exceed `pre_run_debt_count`.
-6. If `removed_upstream_surface[]` is non-empty, publication truth MUST contract in the same run
-   or the packet is invalid.
+6. `unmatched_debt_surface[]` MUST be empty before a packet closes. Retire a `covered_by_wrapper`
+   or `excluded_by_rules` row from the debt inventory, or correct the wrapper coverage or parity
+   exclusion that disagrees with it. Retire a `not_observed` row only with evidence that upstream
+   removed the surface; if upstream hides it instead, keep it observable with a supplement, which
+   today can carry only commands (`uaa-0040`). The closeout check for this invariant lands with T8
+   (`uaa-0039`).
 7. If this block is absent, malformed, or derived partly from prompt prose instead of shared code,
    the packet is invalid.
 
@@ -262,6 +283,24 @@ Additional blocker rules:
   follow-on seam or TODO with an owner and milestone.
 - deleting or rewording a support-publication caveat does not satisfy the ratchet. The underlying
   gap MUST either be closed or carried as a concrete blocked inventory row.
+
+### Hidden upstream surfaces and wrapper-only rows
+
+Acquisition discovers upstream surface from each binary's help output, plus any supplement and
+feature probe the agent's snapshot command applies. A surface that upstream hides from help is
+absent from the union, and that absence is not evidence that upstream removed it.
+
+- A hidden upstream surface is not a support-surface obligation by itself. Shared code never
+  derives a gap or an uplift for it.
+- It stays an obligation when the wrapper claims it. The coverage report lists every wrapper claim
+  that the union does not show under `deltas.wrapper_only_commands`, `deltas.wrapper_only_flags`, or
+  `deltas.wrapper_only_args`.
+- Before a packet closes, each wrapper-only row MUST be sorted into one category: hidden upstream
+  but still supported, supported only on older upstream versions, obsolete, or a discovery bug.
+- A wrapper-only surface sorted obsolete MUST contract publication truth in the same run, or the
+  packet is invalid.
+- The record for these categories and the closeout check that enforces them land with T8
+  (`uaa-0039`, `docs/specs/unified-agent-api/acquisition-maintenance-lifecycle-spec.md` §8 T8).
 
 ## Universal execution-contract shape
 

@@ -169,6 +169,8 @@ Help output is necessary but not always sufficient. We will augment change detec
 
 These signals should drive investigation and planning, but the structured snapshot + real-binary tests remain the primary source of truth.
 
+Status (2026-09-15): neither signal was built, so a surface upstream hides from help reaches maintainers only when the wrapper claims it or a supplement adds it. That is accepted policy, not an obligation gap: see "Hidden upstream surfaces and wrapper-only rows" in `docs/specs/maintenance-request-contract-v1.md`. Building the signals is tracked as `uaa-0044`.
+
 ### 3.1) Explicitly scoped to Codex CLI (non-goal: multi-CLI manifests)
 
 The audit discusses extending a manifest/diff approach to other agent CLIs (e.g., Claude/Gemini). This ADR is intentionally scoped to **Codex CLI parity maintenance** for this repo. If we later add additional CLIs, we should create a separate ADR rather than broadening this one.

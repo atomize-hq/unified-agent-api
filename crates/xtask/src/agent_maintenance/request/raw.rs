@@ -54,7 +54,7 @@ pub(super) struct RawSupportSurfaceAudit {
     #[serde(default)]
     pub(super) discovered_upstream_surface: Vec<RawEvidenceBackedSurface>,
     #[serde(default)]
-    pub(super) removed_upstream_surface: Vec<RawEvidenceBackedSurface>,
+    pub(super) unmatched_debt_surface: Vec<RawUnmatchedDebtSurface>,
     #[serde(default)]
     pub(super) preexisting_unsupported_surface: Vec<RawDebtBackedSurface>,
     #[serde(default)]
@@ -95,6 +95,16 @@ pub(super) struct RawDebtBackedSurface {
     pub(super) command_path: String,
     pub(super) surface_id: String,
     pub(super) debt_ref: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct RawUnmatchedDebtSurface {
+    pub(super) surface_kind: String,
+    pub(super) command_path: String,
+    pub(super) surface_id: String,
+    pub(super) debt_ref: String,
+    pub(super) observation: String,
 }
 
 #[derive(Debug, Deserialize)]

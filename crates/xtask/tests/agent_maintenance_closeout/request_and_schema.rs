@@ -12,7 +12,7 @@ const FROZEN_DISCOVERY_ROW: &str = concat!(
     "surface_kind = \"commands\"\n",
     "command_path = \"opencode status\"\n",
     "surface_id = \"status\"\n",
-    "reason = \"new_upstream_surface\"\n",
+    "reason = \"unbaselined_gap\"\n",
     "required_writes = [\"wrapper\", \"backend\", \"manifest\", \"publication\", \"packet_docs\"]\n"
 );
 
@@ -46,6 +46,16 @@ const FROZEN_DEFERRED_ROW: &str = concat!(
     "command_path = \"opencode status\"\n",
     "surface_id = \"status\"\n",
     "surface_doc = \"docs/specs/unified-agent-api/support-matrix.md\"\n"
+);
+
+const FROZEN_UNMATCHED_DEBT_ROW: &str = concat!(
+    "\n",
+    "[[support_surface_audit.unmatched_debt_surface]]\n",
+    "surface_kind = \"commands\"\n",
+    "command_path = \"opencode serve\"\n",
+    "surface_id = \"serve\"\n",
+    "debt_ref = \"docs/specs/unified-agent-api/non-tui-support-debt.md#opencode-serve-command\"\n",
+    "observation = \"not_observed\"\n"
 );
 
 const FROZEN_ELIGIBLE_ROW: &str = concat!(
@@ -496,10 +506,16 @@ fn close_agent_maintenance_rejects_deferred_reason_mismatch_in_linked_request() 
 
 /// Each case breaks one row value the contract enumerates: the field the error must name, the
 /// frozen rows with contract values, and the same rows with that value replaced by `invalid`.
-fn invalid_row_value_cases() -> [(&'static str, String, String); 3] {
+fn invalid_row_value_cases() -> [(&'static str, String, String); 4] {
     let eligible = format!("{FROZEN_DISCOVERY_ROW}{FROZEN_ELIGIBLE_ROW}");
     let deferred = format!("{FROZEN_DISCOVERY_ROW}{FROZEN_DEFERRED_ROW}");
+    let unmatched = format!("{FROZEN_DISCOVERY_ROW}{FROZEN_UNMATCHED_DEBT_ROW}");
     [
+        (
+            "unmatched_debt_surface[0].observation",
+            unmatched.clone(),
+            unmatched.replace("not_observed", "invalid"),
+        ),
         (
             "required_uplifts_this_run[0].required_writes",
             FROZEN_DISCOVERY_ROW.to_string(),
@@ -569,8 +585,9 @@ fn drift_tolerant_request_load_rejects_invalid_row_values_instead_of_reporting_d
 
 #[test]
 fn strict_request_load_rejects_invalid_row_values_even_when_satisfied() {
-    // With the live report clean, the uplift and eligible cases reconcile as satisfied, which never
-    // reads those rows; the deferred case drifts, so its error must name the field instead.
+    // With the live report clean, the uplift, eligible and unmatched-debt cases reconcile as
+    // satisfied, which never reads those rows; the deferred case drifts, so its error must name the
+    // field instead.
     let fixture = support_audit_row_fixture("support-audit-row-values-satisfied");
     seed_live_clean_report(&fixture);
     for (field, _, invalid_rows) in invalid_row_value_cases() {
