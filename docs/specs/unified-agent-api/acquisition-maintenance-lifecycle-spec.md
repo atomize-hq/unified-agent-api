@@ -341,7 +341,8 @@ Each item is in `docs/backlog.json` with its own context, file list and delivera
 adjudication, and a code reading while writing the 2026-09-13 handoff, added six more
 (`uaa-0027`…`uaa-0032`). The T2c review round (2026-09-13, both lanes) confirmed the handoff-reading
 items (`uaa-0029`…`uaa-0032`; `uaa-0031` by reading only) and added two more (`uaa-0033`,
-`uaa-0034`). The 2026-09-15 support-audit classification added six (`uaa-0039`…`uaa-0044`).
+`uaa-0034`). The 2026-09-15 support-audit classification added six (`uaa-0039`…`uaa-0044`). A 2026-09-16
+ChatGPT Pro review of a bounded repository bundle added three (`uaa-0045`…`uaa-0047`).
 
 | id | item | disposition |
 | --- | --- | --- |
@@ -365,6 +366,9 @@ items (`uaa-0029`…`uaa-0032`; `uaa-0031` by reading only) and added two more (
 | `uaa-0042` | A command whose wrapper coverage level is `unsupported` is never a support-audit gap | Low, latent: no wrapper coverage declares one today. Trigger: the first such declaration. |
 | `uaa-0043` | `discovered_upstream_surface` implies newness the audit never checks | Low. Deferred from the `unbaselined_gap` rename because renaming the list changes the request schema. |
 | `uaa-0044` | Release-notes mining and docs cross-check were designed but never built | Low. ADR 0001 §3 signals; codex 0.153.4 hides 11 surfaces from help and 7 appear nowhere in our artifacts. |
+| `uaa-0045` | opencode's `RULES.json` was never normalized to the union-model schema | **Resolve before the opencode packet closes.** Its `union` block omits the three identity guards codex and claude_code set, and it has no `globals`, so the union accepts a shard declaring another tool or version and skips the root-flag dedupe. Every missing key is `#[serde(default)]`, so a thin descriptor is silently permissive. Compounds `uaa-0038`. Pointer: Workstream E in the parity generalization plan §5. |
+| `uaa-0046` | Debt authorization is not scoped by target or upstream version | **Resolve before a target is added to any `union.expected_targets`, and before `uaa-0039`.** A deferral authorized on one target matches the same-named surface on a target added later. Distinct from `uaa-0041`, which is about values, arity and output shape. Pointer: the Surface identity rules in the request contract. |
+| `uaa-0047` | Permission-test fixtures restore the directory mode only on the success path | Low, test-only. `run_with_unreadable_evidence` restores after `expect_err`, so an unexpected success leaks mode `0000` to every later test in the binary. Needs a file split first: 695 of the 700-code-line cap. Pointer: the comment on both helpers. |
 
 ### 8.2 What T1 changed about T2
 

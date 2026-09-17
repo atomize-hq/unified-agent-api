@@ -719,6 +719,10 @@ fn union_expected_targets(root: &Path) -> Vec<String> {
         .collect()
 }
 
+// uaa-0047: both helpers below restore the mode only when their body returns normally, so an
+// assertion failure or a panic leaks the blocked mode to every later test in this binary. Replace
+// the restore calls with a Drop guard, and probe the fixture independently of `audit_status`
+// before asserting. The file is at the 700-code-line cap, so it needs a split first.
 #[cfg(unix)]
 #[rustfmt::skip]
 fn with_unwritable_emit_parent<T>(emit_path: &Path, action: impl FnOnce() -> T) -> T {

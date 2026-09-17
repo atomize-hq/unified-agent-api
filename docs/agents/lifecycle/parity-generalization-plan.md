@@ -221,6 +221,14 @@ capture the CLI surface, so the multi-OS matrix stays regardless of source).
   `win32-x64`) vs its committed `snapshots/1.14.47/union.json` `expected_targets` (**6**) drift;
   normalize opencode's thin `RULES.json` to the full schema (it lacks `automation`,
   `version_metadata`, `report`).
+  **Status 2026-09-16: partly done, and the remainder is `uaa-0045`.** `automation`,
+  `version_metadata` and `report` have since been added. Still absent: `comparison`,
+  `features`, `globals`, `supplements`, and the three `union` identity guards
+  (`require_same_tool`, `require_same_semantic_version`, `require_semantic_version`) that
+  codex and claude_code both set. Every one of those is `#[serde(default)]`, so the thin
+  descriptor silently takes the permissive value — opencode's union accepts a shard
+  declaring another tool or version, and skips the root-flag dedupe that codex applies.
+  Finishing this workstream is the trigger.
 - Reconcile the two stuck packets (codex `0.144.6`, opencode `1.14.47`) through the new path.
 - **Depends on:** after A/B land (rename touches workflow references).
 
