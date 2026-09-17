@@ -25,6 +25,11 @@ jobs:
       - name: Determine staging -> main labels
         id: purpose
         shell: bash
+        # A branch name is attacker-controlled on a fork pull request, so it reaches the script
+        # through the environment rather than through `${{ }}` interpolation.
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          HEAD_REF: ${{ github.head_ref }}
         run: |
           set -euo pipefail
           # Only meaningful for pull_request events (especially staging -> main).
@@ -33,7 +38,7 @@ jobs:
             exit 0
           fi
 
-          if [ "${{ github.base_ref }}" != "main" ] || [ "${{ github.head_ref }}" != "staging" ]; then
+          if [ "$BASE_REF" != "main" ] || [ "$HEAD_REF" != "staging" ]; then
             echo "purpose=non_staging_to_main" >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -425,7 +430,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          export CODEX_E2E_HOME="$(mktemp -d)"
+          CODEX_E2E_HOME="$(mktemp -d)"
+          export CODEX_E2E_HOME
           export CODEX_HOME="$CODEX_E2E_HOME"
           export CODEX_BINARY=./codex-x86_64-unknown-linux-musl
           cargo test -p unified-agent-api-codex
@@ -474,7 +480,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          export CODEX_E2E_HOME="$(mktemp -d)"
+          CODEX_E2E_HOME="$(mktemp -d)"
+          export CODEX_E2E_HOME
           export CODEX_HOME="$CODEX_E2E_HOME"
           export CODEX_BINARY=./codex-x86_64-unknown-linux-musl
           cargo test -p unified-agent-api-codex

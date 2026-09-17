@@ -203,7 +203,7 @@ jobs:
           superseded_prs=()
           for candidate in "${candidate_prs[@]}"; do
             IFS=$'\t' read -r pr_number head_ref_name <<< "$candidate"
-            candidate_version="${head_ref_name#${branch_prefix}}"
+            candidate_version="${head_ref_name#"${branch_prefix}"}"
 
             if [[ -z "$candidate_version" || "$candidate_version" == "$head_ref_name" ]]; then
               continue

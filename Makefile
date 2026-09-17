@@ -13,6 +13,19 @@ else
 TOKEI := $(TOKEI_SYSTEM)
 endif
 
+# actionlint ships as a release tarball rather than a crate, so it is pinned by version here
+# and cached under target/ like tokei. shellcheck is optional: actionlint runs it on every
+# `run:` block when it is on PATH, and silently skips those checks when it is not.
+ACTIONLINT_VERSION ?= 1.7.12
+ACTIONLINT_ROOT := $(CURDIR)/target/tools/actionlint
+ACTIONLINT_BIN := $(ACTIONLINT_ROOT)/actionlint
+ACTIONLINT_SYSTEM := $(shell command -v actionlint 2>/dev/null)
+ifeq ($(ACTIONLINT_SYSTEM),)
+ACTIONLINT := $(ACTIONLINT_BIN)
+else
+ACTIONLINT := $(ACTIONLINT_SYSTEM)
+endif
+
 CARGO_TOOLS_ROOT := $(CURDIR)/target/tools/cargo-tools
 CARGO_TOOLS_BIN := $(CARGO_TOOLS_ROOT)/bin
 
@@ -132,6 +145,32 @@ ensure-tokei:
 	  fi; \
 	fi
 
+.PHONY: ensure-actionlint
+ensure-actionlint:
+	@if [ -n "$(ACTIONLINT_SYSTEM)" ]; then \
+	  echo "ensure-actionlint: using system actionlint ($(ACTIONLINT_SYSTEM))"; \
+	elif [ -x "$(ACTIONLINT_BIN)" ]; then \
+	  echo "ensure-actionlint: using cached actionlint ($(ACTIONLINT_BIN))"; \
+	else \
+	  echo "ensure-actionlint: installing actionlint $(ACTIONLINT_VERSION) into $(ACTIONLINT_ROOT)"; \
+	  mkdir -p "$(ACTIONLINT_ROOT)"; \
+	  os="$$(uname -s | tr '[:upper:]' '[:lower:]')"; \
+	  arch="$$(uname -m)"; \
+	  case "$$arch" in \
+	    x86_64|amd64) arch=amd64 ;; \
+	    arm64|aarch64) arch=arm64 ;; \
+	    *) echo "ensure-actionlint: unsupported architecture $$arch" >&2; exit 2 ;; \
+	  esac; \
+	  curl -fsSL "https://github.com/rhysd/actionlint/releases/download/v$(ACTIONLINT_VERSION)/actionlint_$(ACTIONLINT_VERSION)_$${os}_$${arch}.tar.gz" \
+	    | tar -xz -C "$(ACTIONLINT_ROOT)" actionlint; \
+	fi
+
+.PHONY: actionlint
+actionlint: ensure-actionlint
+	@command -v shellcheck >/dev/null 2>&1 || \
+	  echo "actionlint: shellcheck is not installed, so every \`run:\` block goes unchecked"
+	@$(ACTIONLINT) -no-color
+
 .PHONY: ensure-security-tools
 ensure-security-tools:
 	@mkdir -p "$(CARGO_TOOLS_ROOT)"
@@ -181,6 +220,7 @@ flightcheck:
 	$(MAKE) capability-matrix-guard
 	$(MAKE) publish-guards
 	$(MAKE) loc-check
+	$(MAKE) actionlint
 	$(MAKE) security
 	$(MAKE) unsafe-report
 
