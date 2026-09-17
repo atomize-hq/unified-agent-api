@@ -183,6 +183,7 @@ jobs:
 
           LOCK="${ROOT}/artifacts.lock.json"
           VERSION_KEY="$(jq -r '.lockfile_version_key' _ci_tmp/acquisition-plan.json)"
+          # shellcheck disable=SC2016  # jq binds $key/$v/$t/$a through --arg, so the shell must not expand them
           SELECT='.artifacts[] | select(.[$key]==$v and .target_triple==$t and .asset_name==$a)'
           SHA="$(jq -r --arg key "$VERSION_KEY" --arg v "$VERSION" --arg t "$TARGET" --arg a "$ASSET" "${SELECT} | .sha256" "$LOCK")"
           SIZE="$(jq -r --arg key "$VERSION_KEY" --arg v "$VERSION" --arg t "$TARGET" --arg a "$ASSET" "${SELECT} | .size_bytes" "$LOCK")"

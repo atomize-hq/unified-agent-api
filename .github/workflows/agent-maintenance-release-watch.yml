@@ -148,6 +148,7 @@ jobs:
             echo
             echo "## :rotating_light: Release watch failed"
             echo
+            # shellcheck disable=SC2016  # backticks are markdown for the step summary
             echo 'The watcher job failed. Inspect the logs and the `maintenance-watch-queue` artifact if it was uploaded.'
           } >> "$GITHUB_STEP_SUMMARY"
 
