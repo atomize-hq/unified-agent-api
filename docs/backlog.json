@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at_utc": "2026-09-15T00:00:00Z",
+  "updated_at_utc": "2026-09-16T00:00:00Z",
   "items": [
     {
       "id": "uaa-0022",
@@ -1283,7 +1283,8 @@
       },
       "notes": [
         "Noticed 2026-09-15 by the lead session while landing PR #209; pre-existing. Maintainer confirmed on 2026-09-15: track in the backlog, do not fix now.",
-        "2026-09-15 (adversarial review of the unmatched-debt classification): in this same re-run scenario the union can be rewritten with fewer inputs while the previous run's `coverage.any.json` stays on the ref. With at least one unmatched debt row, the gate then reports `cannot classify unmatched debt rows: ... differs from union input targets` (exit 2) instead of exit 4 naming `missing_targets`. `parity-acquire.yml` routes both the same way, so only the message differs. Fix it with this item."
+        "2026-09-15 (adversarial review of the unmatched-debt classification): in this same re-run scenario the union can be rewritten with fewer inputs while the previous run's `coverage.any.json` stays on the ref. With at least one unmatched debt row, the gate then reports `cannot classify unmatched debt rows: ... differs from union input targets` (exit 2) instead of exit 4 naming `missing_targets`. `parity-acquire.yml` routes both the same way, so only the message differs. Fix it with this item.",
+        "2026-09-16: compounds `uaa-0045`. For codex and claude_code the union's semantic-version guard rejects a stale shard on the way in; opencode's `RULES.json` sets no such guard, so for the agent with the open packet nothing catches it. Fix the directory cleanup here and the shard identity check there together."
       ]
     },
     {
@@ -1497,6 +1498,122 @@
       },
       "notes": [
         "Recorded 2026-09-15 while investigating CLI surface discovery after the first post-merge nightly."
+      ]
+    },
+    {
+      "id": "uaa-0045",
+      "title": "opencode's RULES.json was never normalized to the union-model schema, so union identity guards and the global-flag model silently default off",
+      "status": "todo",
+      "bucket": "agent_api.onboarding",
+      "type": "task",
+      "kickoff": {
+        "prompt": [
+          "Work item: uaa-0045 — opencode's `RULES.json` was never normalized to the union-model schema. Guards that both other union-model agents enable are absent, and every absent guard defaults to the permissive value without a diagnostic.",
+          "Union identity is unguarded for opencode. `crates/xtask/src/manifest_union.rs:106-112` declares `require_same_tool`, `require_same_semantic_version` and `require_semantic_version` as `#[serde(default)]` bools. codex and claude_code set all three true; opencode's `union` block omits all three, so all three are false. A per-target snapshot declaring another tool or another version therefore enters opencode's union unchallenged.",
+          "The merger never checks the target either, for any agent. It reads `snapshots/<version>/<target>.json` by expected filename and inserts the snapshot under that filename-derived target (`manifest_union.rs:157-193`); it never compares `snapshot.binary.target_triple` to it. Completeness is then a count of present expected targets.",
+          "This compounds `uaa-0038`. That item records that the acquisition workflow overlays downloads into the checked-out snapshot directory without clearing it, so a stale committed per-target file counts as present. For codex and claude_code the version guard catches a stale file on the way into the union. For opencode nothing does — and opencode is the agent with the open packet.",
+          "The global-flag model is off for opencode too. `RulesFile.globals` is `#[serde(default)]` (`manifest_union.rs:66-71`). opencode has no `globals` block, so `effective_flags_model.enabled` and `union_normalization.dedupe_per_command_flags_against_root` are both false, while codex sets both true. opencode's union therefore repeats a global flag on every command whose help lists it, which inflates its gap count. opencode 1.18.30 reports 473 required uplifts; an unknown share of that is global-flag repetition rather than distinct implementation work.",
+          "opencode's `RULES.json` is still missing four top-level keys that codex and claude_code both have: `comparison`, `features`, `globals`, `supplements`.",
+          "Why this is probably unfinished generalization work: the parity generalization push set out to make one RULES-driven, agent-parameterized acquisition and promotion subsystem instead of per-agent workflow copies, and opencode was the agent it iterated against — `docs/agents/lifecycle/parity-generalization-plan.md` §1 records that opencode proved the generic packet-PR path and then hit the same promotion wall as codex. Workstream E in §5 of that plan already lists the exact task 'normalize opencode's thin RULES.json to the full schema (it lacks automation, version_metadata, report)'. Those three keys have since been added; the union guards, `globals`, `comparison`, `features` and `supplements` have not. Expect this item to reopen the tail of that workstream rather than to be a self-contained fix.",
+          "Trigger — resolve before the first of: (1) the opencode packet closes; (2) a new agent is enrolled on the union model; (3) `uaa-0038` is picked up, since the two share the stale-shard failure mode. Pointers: Workstream E in `docs/agents/lifecycle/parity-generalization-plan.md` §5, and the `uaa-0038` row.",
+          "Steps:",
+          "1) Decide whether the union guards stay opt-in or become required fields for a union-model agent. A safety guard that defaults off makes a thin descriptor silently permissive, which is how this arose.",
+          "2) Compare each shard's `binary.target_triple` to its filename-derived target and fail on mismatch. This applies to every agent, not only opencode.",
+          "3) Normalize opencode's `RULES.json`: add the three union guards, `globals`, `comparison`, `features`, `supplements`. Re-run the union and report, and measure how much of the 473 required uplifts was global-flag repetition.",
+          "4) Decide whether descriptor completeness for union-model agents belongs in `manifest-validate` as a schema check, so the next agent cannot be enrolled with a thin descriptor.",
+          "5) Reconcile with `uaa-0038`: the directory cleanup it prescribes and the identity check here are complementary, not alternatives."
+        ],
+        "files_to_read": [
+          "crates/xtask/src/manifest_union.rs",
+          "cli_manifests/opencode/RULES.json",
+          "cli_manifests/codex/RULES.json",
+          "docs/agents/lifecycle/parity-generalization-plan.md",
+          ".github/workflows/parity-acquire.yml"
+        ],
+        "deliverables": [
+          "A decision on whether union guards are required fields for union-model agents",
+          "Shard target identity checked against the filename-derived target",
+          "opencode's RULES.json normalized, with the re-measured uplift count recorded",
+          "A recorded decision on descriptor completeness validation"
+        ]
+      },
+      "notes": [
+        "Recorded 2026-09-16 from a ChatGPT Pro review of a bounded repository bundle at `b8e3722e`. Pro found the missing union guards and the absent shard target check; the `globals` divergence, the missing top-level keys, and the link to parity generalization Workstream E were found while verifying that finding against the repository."
+      ]
+    },
+    {
+      "id": "uaa-0046",
+      "title": "Support-surface debt authorization is not scoped by target or upstream version",
+      "status": "todo",
+      "bucket": "agent_api.onboarding",
+      "type": "task",
+      "kickoff": {
+        "prompt": [
+          "Work item: uaa-0046 — a debt row's authorization carries no target and no upstream version, so it can absorb obligations it was never granted for.",
+          "`SurfaceIdentity` is `(surface_kind, command_path, surface_id)` with `command_path` rooted at the agent id (`crates/xtask/src/agent_maintenance/support_audit.rs`). Agent, command path, item kind and surface leaf all participate. Target does not, and neither does upstream version.",
+          "Two consequences. A deferral authorized while only Linux was acquired matches a newly appearing Windows gap for the same command and flag, so the old authorization silently covers the new target. And loading a new version's report does not re-authorize an old debt decision — the upstream version selects which report is read and is validated against report metadata, but it never constrains whether a debt row still applies.",
+          "This is compounded by the audit preferring `coverage.any.json`. The reporter's `any` resolution treats coverage on any relevant target as presence (`crates/xtask/src/manifest_report/wrapper.rs`), so the obligation set the audit derives is already an aggregate that can omit a target-specific gap. Adding target fields to the debt inventory alone does not fix that, because the gaps being matched would still come from the aggregate.",
+          "Distinct from `uaa-0041`. That item is about surface *semantics* — accepted values, arity, output shape. This one is about *authorization scope*. Neither covers the other.",
+          "The any-report/union-target equality check added on 2026-09-15 does not close this: it runs only in unmatched-debt classification (`support_audit/unmatched_debt.rs`), and adds no scope to matched debt authorizations.",
+          "Trigger — resolve before the first of: (1) a target is added to any agent's `union.expected_targets`; (2) closeout begins enforcing `uaa-0039`, which reads the same authorizations. Pointers: the Surface identity rules in `docs/specs/maintenance-request-contract-v1.md`, and the `uaa-0041` row it must not be merged into.",
+          "Steps:",
+          "1) Decide where applicability lives: on the debt row, in the identity key, or both. A durable row may legitimately apply across versions, but that must be stated, not inherited from a global name match.",
+          "2) Freeze the currently authorized target set during migration. An omitted scope must not be read as 'whatever targets RULES.json later contains'.",
+          "3) Derive target-specific obligations from the per-target reports that acquisition already produces, rather than from the any-report aggregate.",
+          "4) Add a test where a new target introduces a gap that an existing single-target deferral must not absorb."
+        ],
+        "files_to_read": [
+          "crates/xtask/src/agent_maintenance/support_audit.rs",
+          "crates/xtask/src/manifest_report/wrapper.rs",
+          "docs/specs/maintenance-request-contract-v1.md",
+          "docs/specs/unified-agent-api/non-tui-support-debt.md"
+        ],
+        "deliverables": [
+          "A decision on where target and version applicability is recorded",
+          "The migration's frozen target set",
+          "Target-specific obligations derived from per-target evidence",
+          "A test binding a new target against an existing deferral"
+        ]
+      },
+      "notes": [
+        "Recorded 2026-09-16 from a ChatGPT Pro review of a bounded repository bundle at `b8e3722e`. Pro raised it and stated explicitly that `uaa-0041` does not already cover it; verified against the identity construction and the any-report resolution."
+      ]
+    },
+    {
+      "id": "uaa-0047",
+      "title": "Permission-test fixtures restore the directory mode only on the success path",
+      "status": "todo",
+      "bucket": "agent_api.onboarding",
+      "type": "task",
+      "kickoff": {
+        "prompt": [
+          "Work item: uaa-0047 — two permission fixtures in `crates/xtask/tests/agent_maintenance_audit_status.rs` leak a modified directory mode when their body does not return normally.",
+          "`run_with_unreadable_evidence` (around line 733) chmods the coverage report directory to `0000`, then calls `expect_err` on the audit, and only restores the mode after that call returns. Under an identity that bypasses permission checks the audit succeeds, `expect_err` panics, and the directory stays at `0000` for the remainder of the test binary — so later tests in the same process fail for a reason unrelated to what they assert.",
+          "`with_unwritable_emit_parent` (around line 724) has the same shape: it sets `0555` on the emit parent and restores only after `action()` returns.",
+          "Both fixtures are `#[cfg(unix)]`, not root-gated, so today they fail rather than skip under a permission-bypassing identity. That is the correct failure direction; the risk is introducing a skip that asks the code under test whether the environment enforces permissions, which would let a real regression read as an environmental skip.",
+          "Related work already in flight: the root-safe permission-test effort the 2026-09-15 ChatGPT Pro review asked for — probe the fixture independently of the code under test, restore on every exit path including the skip path, keep mandatory unprivileged coverage. This row exists so the restoration defect does not depend on that effort being picked up.",
+          "Size constraint: the file is 695 code lines against the repository's 700-line cap, so a guard type and an independent probe cannot be added in place. It needs a split first, and `make loc-check` must pass afterwards.",
+          "Trigger — resolve before the first of: (1) the root-safe permission-test work starts; (2) any new case is added to this file. Pointer: the two helpers named above.",
+          "Steps:",
+          "1) Split the file so there is room under the 700-code-line cap.",
+          "2) Replace both restore calls with a guard type whose `Drop` restores the original mode, installed immediately after the mode is changed, so returns, assertion failures and unwinding all restore.",
+          "3) Probe the fixture with a direct filesystem operation before asserting on the audit: permission denied establishes the fixture, success means this environment cannot exercise the test, any other error is a fixture failure rather than a skip.",
+          "4) Keep the unprivileged CI lane mandatory, where failing to establish denial fails the job."
+        ],
+        "files_to_read": [
+          "crates/xtask/tests/agent_maintenance_audit_status.rs",
+          "crates/xtask/src/agent_maintenance/audit_status.rs",
+          "Makefile"
+        ],
+        "deliverables": [
+          "The file split under the 700-code-line cap",
+          "A Drop-based restoration guard on both fixtures",
+          "An independent fixture probe that distinguishes denial, non-enforcement and fixture failure",
+          "Mandatory unprivileged coverage retained"
+        ]
+      },
+      "notes": [
+        "Recorded 2026-09-16 from a ChatGPT Pro review of a bounded repository bundle at `b8e3722e`. Verified by reading both helpers; the 695-of-700 measurement is from tokei."
       ]
     }
   ]

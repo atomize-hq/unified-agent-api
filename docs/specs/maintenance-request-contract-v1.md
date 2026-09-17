@@ -228,7 +228,10 @@ rooted at the registry `agent_id` (for example `claude_code install`), never at 
 name, and debt inventory rows MUST use the same form so they match report-derived surfaces.
 Identity is name-only: it does not compare accepted values, arity, or output shape, so a flag the
 wrapper supports for only some values (opencode `run --format` accepts only `json` through the
-wrapper) counts as covered (`uaa-0041`).
+wrapper) counts as covered (`uaa-0041`). Identity also carries no target and no upstream version,
+so a debt row authorized while one target was acquired matches the same-named surface on a target
+added later, and a new version's report does not re-authorize an old debt decision (`uaa-0046`).
+Resolve that before a target is added to any agent's `union.expected_targets`.
 
 A report's `deltas.missing_commands`, `deltas.missing_flags`, and `deltas.missing_args` MUST be
 arrays. `deltas.intentionally_unsupported` MAY be absent, which is how the report writer records an

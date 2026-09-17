@@ -51,15 +51,19 @@ concurrency:
   group: parity-promote-${{ inputs.agent_id }}-${{ inputs.version }}
   cancel-in-progress: false
 
+# Read-only by default: `validate-target` runs this agent's declared validation commands against a
+# downloaded upstream binary, so it may not hold a credential that can write to this repository.
+# Only `promote` opens the promotion PR.
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
 
 jobs:
   plan:
     name: "Plan validation matrix (${{ inputs.agent_id }} ${{ inputs.version }})"
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    permissions:
+      contents: read
     outputs:
       validation_matrix: ${{ steps.matrix.outputs.validation_matrix }}
       manifest_root: ${{ steps.matrix.outputs.manifest_root }}
@@ -68,6 +72,9 @@ jobs:
       - uses: actions/checkout@v5
         with:
           ref: staging
+          # This job only reads committed union inputs. It never talks to this repository's
+          # remote, so it has no use for a persisted credential.
+          persist-credentials: false
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
 
@@ -134,6 +141,8 @@ jobs:
     needs: plan
     runs-on: ${{ matrix.runs_on }}
     timeout-minutes: 60
+    permissions:
+      contents: read
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.plan.outputs.validation_matrix) }}
@@ -145,6 +154,10 @@ jobs:
       - uses: actions/checkout@v5
         with:
           ref: staging
+          # This job runs the pinned upstream binary and this agent's declared validation
+          # commands. A persisted credential would sit in .git/config, readable by that binary,
+          # until post-job cleanup. The job never talks to this repository's remote.
+          persist-credentials: false
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
 
@@ -246,6 +259,9 @@ jobs:
     needs: [plan, validate-target]
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    permissions:
+      contents: write
+      pull-requests: write
     steps:
       - uses: actions/checkout@v5
         with:
