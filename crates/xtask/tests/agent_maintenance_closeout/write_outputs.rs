@@ -3,7 +3,7 @@ use super::*;
 #[test]
 fn opencode_maintenance_closeout_writes_only_owned_outputs_after_refresh_state() {
     let fixture = fixture_root("opencode-maintenance-closeout-write");
-    maintenance_harness::seed_opencode_basis(&fixture);
+    seed_opencode_basis(&fixture);
     let request_path =
         Path::new("docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml");
     let request_absolute = fixture.join(request_path);
@@ -78,7 +78,7 @@ fn opencode_maintenance_closeout_writes_only_owned_outputs_after_refresh_state()
 #[test]
 fn closeout_write_adds_maintenance_closeout_evidence_to_required_and_satisfied_sets() {
     let fixture = fixture_root("opencode-maintenance-closeout-lifecycle");
-    maintenance_harness::seed_opencode_basis(&fixture);
+    seed_opencode_basis(&fixture);
     let request_path =
         Path::new("docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml");
     let request_absolute = fixture.join(request_path);
@@ -132,7 +132,7 @@ fn closeout_write_adds_maintenance_closeout_evidence_to_required_and_satisfied_s
 #[test]
 fn automated_request_closeout_preserves_trigger_truth_in_handoff() {
     let fixture = fixture_root("automated-request-closeout-handoff");
-    maintenance_harness::seed_opencode_basis(&fixture);
+    seed_opencode_basis(&fixture);
     write_text(
         &fixture.join(".github/workflows/agent-maintenance-open-pr.yml"),
         "name: Generic maintenance opener\n",
@@ -166,7 +166,7 @@ fn automated_request_closeout_preserves_trigger_truth_in_handoff() {
 #[test]
 fn automated_request_execution_contract_still_supports_manual_closeout() {
     let fixture = fixture_root("automated-request-closeout-execution-contract");
-    maintenance_harness::seed_opencode_basis(&fixture);
+    seed_opencode_basis(&fixture);
     let registry =
         agent_registry::AgentRegistry::parse(include_str!("../../data/agent_registry.toml"))
             .expect("parse seeded registry");

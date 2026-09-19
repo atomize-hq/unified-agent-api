@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at_utc": "2026-09-16T00:00:00Z",
+  "updated_at_utc": "2026-09-19T00:00:00Z",
   "items": [
     {
       "id": "uaa-0022",
@@ -356,7 +356,8 @@
       "notes": [
         "Avoid validating against an arbitrary local `claude` on PATH; use the binary under promotion and compare to cli_manifests pointers.",
         "If new result subtypes appear, treat it as a promotion gate: update parser contract + fixtures before bumping latest_validated/min_supported."
-      ]
+      ],
+      "priority": "P2"
     },
     {
       "id": "uaa-0020",
@@ -445,7 +446,8 @@
             "Serves as the parity reference for app-managed persistent state isolation, but Codex's native `CODEX_HOME` model is user-home scoped and does not directly solve Claude's project-root discovery model."
           ]
         }
-      }
+      },
+      "priority": "P1"
     },
     {
       "id": "uaa-0001",
@@ -489,7 +491,8 @@
           "cli": "codex --model/-m <id> exec ...",
           "impl_hint": "crates/codex: CodexClientBuilder::model(...)"
         }
-      }
+      },
+      "priority": "P4"
     },
     {
       "id": "uaa-0003",
@@ -511,7 +514,8 @@
           "cli": "codex --add-dir <DIR> exec ... (repeatable)",
           "impl_hint": "crates/codex: CodexClientBuilder::{add_dir,add_dirs}(...)"
         }
-      }
+      },
+      "priority": "P4"
     },
     {
       "id": "uaa-0004",
@@ -627,7 +631,8 @@
             "No upstream CLI flag; wrapper/agent_api would generate and attach metadata."
           ]
         }
-      }
+      },
+      "priority": "P4"
     },
     {
       "id": "uaa-0009",
@@ -738,7 +743,8 @@
       "notes": [
         "Introduced by T1 remediation round 5 (commit b55cef4f) as a deliberate, documented compromise: the round-5 packet scoped support_audit.rs out of the write set to avoid regression risk in shared code.",
         "Failure direction is safe (worst case exit 1, never a false clean), which is why it was deferred rather than blocking T1."
-      ]
+      ],
+      "priority": "P3"
     },
     {
       "id": "uaa-0024",
@@ -775,7 +781,8 @@
       "notes": [
         "Raised by the Codex review lane during T1 remediation round 4 review; adjudicated as a real limitation but deferred because the contract it depends on does not exist yet.",
         "Distinct from the completeness defect fixed in b55cef4f: that one was about whether the acquisition finished, this one is about whether its outputs agree."
-      ]
+      ],
+      "priority": "P2"
     },
     {
       "id": "uaa-0025",
@@ -824,7 +831,8 @@
         "Folds in T2 Codex lane F4 (flag naming), T2 Codex lane F3 (silent cleanup failure), and T2 adversarial lane L9 (why it is latent).",
         "Fix with or before T3, which is the first consumer of the projection.",
         "Review of 51d44a56 (Opus lane, 2026-09-14): a frozen support-surface audit row with a value the contract does not allow now fails while the request loads, before live derivation, so it exits 2 and keeps an existing --emit-json projection. Before, with no live uplifts, the same request failed as drift after derivation and removed the projection. This matches every other pre-derivation validation failure; treat it as part of this stale-projection case."
-      ]
+      ],
+      "priority": "P2"
     },
     {
       "id": "uaa-0026",
@@ -889,7 +897,8 @@
       },
       "notes": [
         "Raised by the T2 adversarial review lane (L7); accepted and deferred during T2 adjudication."
-      ]
+      ],
+      "priority": "P3"
     },
     {
       "id": "uaa-0028",
@@ -921,12 +930,13 @@
       "notes": [
         "Raised by the T2 adversarial review lane (L8), labelled suspected; accepted and deferred during T2 adjudication.",
         "Resolve before or with T3 if T3 makes the projection path durable."
-      ]
+      ],
+      "priority": "P3"
     },
     {
       "id": "uaa-0029",
       "title": "parity-acquire does not export the audit gate outputs to callers",
-      "status": "todo",
+      "status": "done",
       "bucket": "agent_api.onboarding",
       "type": "task",
       "kickoff": {
@@ -954,7 +964,8 @@
       "notes": [
         "Found while writing the 2026-09-13 handoff (H1). Confirmed by reading; unreviewed.",
         "T3 prerequisite."
-      ]
+      ],
+      "priority": "P1"
     },
     {
       "id": "uaa-0030",
@@ -1030,8 +1041,10 @@
         "T3 design input.",
         "T2c review round (Opus lane F2, 2026-09-13): on exit 3 the `required_uplifts` detail is written only to `_ci_tmp/audit/status.json`, which the cleanup step deletes before commit and upload; with `--emit-json` stdout is empty, so the log does not carry it either. Deferred to T3, which renders the verdict and relay invocation and is the projection's first consumer (resolve uaa-0025 first).",
         "Runner observation (2026-09-14, read-only `gh`): the three watcher-dispatched `agent-maintenance-open-pr` runs of 2026-09-13 (34747321010 codex 0.153.4, 34747320844 claude_code 2.1.236, 34747320689 opencode 1.18.29) all ran on `staging` at `a36a115d`. Their `Acquire complete union / Plan + pin` and `Union → report → validate` check runs are listed on commit `a36a115d`. The packet PRs #206 (head `ab86438c`), #195 (`0f42a57b`), and #205 (`57b7a7f2`) carry only `CI` workflow checks. Those runs predate the T2 gate, but where a dispatched run's checks attach does not depend on the gate, so H3 is settled without a post-T2 dispatch.",
-        "2026-09-15: exit 2 writes no status projection, so a debt-baseline failure (an unmatched debt row, or frozen debt rows that no longer match the debt inventory) names its rows only in the gate's error line. T3 must carry that line to the PR."
-      ]
+        "2026-09-15: exit 2 writes no status projection, so a debt-baseline failure (an unmatched debt row, or frozen debt rows that no longer match the debt inventory) names its rows only in the gate's error line. T3 must carry that line to the PR.",
+        "2026-09-18: `parity-acquire` reusable outputs cannot carry a blocking verdict because GitHub exposes outputs from the failed producing `union` job as empty. A caller can observe exit 0, exit 3, or non-committing exit 5; blocking exit 2, exit 4, and committing exit 5 are indistinguishable from skipped, cancelled, or infrastructure-failed runs. This item must choose a visibility mechanism rather than trying to relay those failed-job outputs."
+      ],
+      "priority": "P0"
     },
     {
       "id": "uaa-0032",
@@ -1101,7 +1114,8 @@
       },
       "notes": [
         "Raised in the T2c review round (2026-09-13) by both lanes; accepted and deferred as low severity."
-      ]
+      ],
+      "priority": "P2"
     },
     {
       "id": "uaa-0034",
@@ -1132,7 +1146,8 @@
       },
       "notes": [
         "Raised in the T2c review round (2026-09-13) by the Opus lane; pre-existing; accepted and deferred as low severity."
-      ]
+      ],
+      "priority": "P1"
     },
     {
       "id": "uaa-0035",
@@ -1249,12 +1264,13 @@
       },
       "notes": [
         "Raised 2026-09-15 by the Codex review lane (HIGH) reviewing the removed-stage feature pass fix (candidate eefa2a02); accepted as pre-existing and deferred."
-      ]
+      ],
+      "priority": "P3"
     },
     {
       "id": "uaa-0038",
       "title": "parity-acquire union counts a stale committed per-target snapshot as present when that target fails on a re-run",
-      "status": "todo",
+      "status": "done",
       "bucket": "agent_api.onboarding",
       "type": "task",
       "kickoff": {
@@ -1285,7 +1301,8 @@
         "Noticed 2026-09-15 by the lead session while landing PR #209; pre-existing. Maintainer confirmed on 2026-09-15: track in the backlog, do not fix now.",
         "2026-09-15 (adversarial review of the unmatched-debt classification): in this same re-run scenario the union can be rewritten with fewer inputs while the previous run's `coverage.any.json` stays on the ref. With at least one unmatched debt row, the gate then reports `cannot classify unmatched debt rows: ... differs from union input targets` (exit 2) instead of exit 4 naming `missing_targets`. `parity-acquire.yml` routes both the same way, so only the message differs. Fix it with this item.",
         "2026-09-16: compounds `uaa-0045`. For codex and claude_code the union's semantic-version guard rejects a stale shard on the way in; opencode's `RULES.json` sets no such guard, so for the agent with the open packet nothing catches it. Fix the directory cleanup here and the shard identity check there together."
-      ]
+      ],
+      "priority": "P1"
     },
     {
       "id": "uaa-0039",
@@ -1323,7 +1340,8 @@
       },
       "notes": [
         "Raised 2026-09-15 by a ChatGPT Pro approach review of the first post-merge nightly, reconciled against the repository by the lead session. Maintainer approved the policy and deferred the mechanism to T8 on 2026-09-15."
-      ]
+      ],
+      "priority": "P2"
     },
     {
       "id": "uaa-0040",
@@ -1360,7 +1378,8 @@
       },
       "notes": [
         "Recorded 2026-09-15 with the unmatched debt classification, which made `not_observed` the only derived label for an absent surface."
-      ]
+      ],
+      "priority": "P3"
     },
     {
       "id": "uaa-0041",
@@ -1394,7 +1413,8 @@
       },
       "notes": [
         "Recorded 2026-09-15 with the retirement of the seven opencode debt rows."
-      ]
+      ],
+      "priority": "P3"
     },
     {
       "id": "uaa-0042",
@@ -1430,12 +1450,13 @@
       },
       "notes": [
         "Found 2026-09-15 by the lead session while reading report classification for the unmatched debt classifier; pre-existing."
-      ]
+      ],
+      "priority": "P3"
     },
     {
       "id": "uaa-0043",
       "title": "`support_surface_audit.discovered_upstream_surface` implies upstream newness the audit never checks",
-      "status": "todo",
+      "status": "done",
       "bucket": "agent_api.onboarding",
       "type": "task",
       "kickoff": {
@@ -1463,7 +1484,8 @@
       },
       "notes": [
         "Recorded 2026-09-15 with the `unbaselined_gap` rename."
-      ]
+      ],
+      "priority": "P3"
     },
     {
       "id": "uaa-0044",
@@ -1498,7 +1520,8 @@
       },
       "notes": [
         "Recorded 2026-09-15 while investigating CLI surface discovery after the first post-merge nightly."
-      ]
+      ],
+      "priority": "P4"
     },
     {
       "id": "uaa-0045",
@@ -1539,12 +1562,13 @@
       },
       "notes": [
         "Recorded 2026-09-16 from a ChatGPT Pro review of a bounded repository bundle at `b8e3722e`. Pro found the missing union guards and the absent shard target check; the `globals` divergence, the missing top-level keys, and the link to parity generalization Workstream E were found while verifying that finding against the repository."
-      ]
+      ],
+      "priority": "P0"
     },
     {
       "id": "uaa-0046",
       "title": "Support-surface debt authorization is not scoped by target or upstream version",
-      "status": "todo",
+      "status": "done",
       "bucket": "agent_api.onboarding",
       "type": "task",
       "kickoff": {
@@ -1577,12 +1601,13 @@
       },
       "notes": [
         "Recorded 2026-09-16 from a ChatGPT Pro review of a bounded repository bundle at `b8e3722e`. Pro raised it and stated explicitly that `uaa-0041` does not already cover it; verified against the identity construction and the any-report resolution."
-      ]
+      ],
+      "priority": "P2"
     },
     {
       "id": "uaa-0047",
       "title": "Permission-test fixtures restore the directory mode only on the success path",
-      "status": "todo",
+      "status": "done",
       "bucket": "agent_api.onboarding",
       "type": "task",
       "kickoff": {
@@ -1614,7 +1639,8 @@
       },
       "notes": [
         "Recorded 2026-09-16 from a ChatGPT Pro review of a bounded repository bundle at `b8e3722e`. Verified by reading both helpers; the 695-of-700 measurement is from tokei."
-      ]
+      ],
+      "priority": "P2"
     }
   ]
 }

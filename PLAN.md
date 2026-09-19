@@ -414,7 +414,7 @@ allowed_deferrals = [
 pre_run_debt_count = 0
 expected_post_run_debt_count = 0
 
-[[support_surface_audit.discovered_upstream_surface]]
+[[support_surface_audit.unbaselined_gap_surface]]
 surface_kind = "flags"
 command_path = "codex exec"
 surface_id = "--json"

@@ -1,5 +1,5 @@
 use std::{
-    collections::{BTreeMap, BTreeSet},
+    collections::BTreeSet,
     fs,
     path::{Path, PathBuf},
 };
@@ -8,8 +8,13 @@ use crate::agent_registry::AgentRegistryEntry;
 
 use super::request::DetectedRelease;
 
+#[path = "support_audit/authorization.rs"]
+mod authorization;
 #[path = "support_audit/unmatched_debt.rs"]
 mod unmatched_debt;
+
+use authorization::{authorize_gap, validate_authorizations, TargetedGap};
+pub(crate) use authorization::{load_debt_inventory, load_targeted_gaps, DebtInventoryRow};
 
 pub(crate) const NON_TUI_SUPPORT_DEBT_PATH: &str =
     "docs/specs/unified-agent-api/non-tui-support-debt.md";
@@ -118,7 +123,7 @@ pub struct SupportSurfaceAudit {
     pub allowed_deferrals: Vec<String>,
     pub pre_run_debt_count: usize,
     pub expected_post_run_debt_count: usize,
-    pub discovered_upstream_surface: Vec<EvidenceBackedSurface>,
+    pub unbaselined_gap_surface: Vec<EvidenceBackedSurface>,
     pub unmatched_debt_surface: Vec<UnmatchedDebtSurface>,
     pub preexisting_unsupported_surface: Vec<DebtBackedSurface>,
     pub eligible_preexisting_surface: Vec<EligibleSurface>,
@@ -127,21 +132,6 @@ pub struct SupportSurfaceAudit {
     pub required_uplifts_this_run: Vec<RequiredUplift>,
     pub deferred_preexisting_gaps: Vec<DeferredGap>,
     pub publication_impacts: Vec<PublicationImpact>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DebtInventoryRow {
-    pub row_id: String,
-    pub agent_id: String,
-    pub surface_kind: String,
-    pub command_path: String,
-    pub surface_id: String,
-    pub current_reason: String,
-    pub blocker_class: String,
-    pub owner: String,
-    pub milestone: String,
-    pub follow_on: String,
-    pub evidence_ref: String,
 }
 
 impl SurfaceIdentity {
@@ -231,20 +221,6 @@ impl PublicationImpact {
     }
 }
 
-impl DebtInventoryRow {
-    pub fn identity(&self) -> SurfaceIdentity {
-        SurfaceIdentity::new(
-            self.surface_kind.clone(),
-            self.command_path.clone(),
-            self.surface_id.clone(),
-        )
-    }
-
-    pub fn debt_ref(&self) -> String {
-        format!("{NON_TUI_SUPPORT_DEBT_PATH}#{}", self.row_id)
-    }
-}
-
 pub(crate) fn derive_support_surface_audit(
     workspace_root: &Path,
     entry: &AgentRegistryEntry,
@@ -254,20 +230,34 @@ pub(crate) fn derive_support_surface_audit(
         .into_iter()
         .filter(|row| row.agent_id == entry.agent_id)
         .collect::<Vec<_>>();
-    let debt_by_identity = debt_rows
+    let pre_run_debt_count = debt_rows
         .iter()
-        .map(|row| (row.identity(), row))
-        .collect::<BTreeMap<_, _>>();
+        .map(DebtInventoryRow::identity)
+        .collect::<BTreeSet<_>>()
+        .len();
+    validate_authorizations(workspace_root, entry, &debt_rows)?;
     let report =
         load_live_report_if_present(workspace_root, entry, &detected_release.target_version)?;
     let report_ref = report
         .as_ref()
         .map(|report| repo_relative(workspace_root, &report.path))
         .transpose()?;
-    let surfaces = report
+    let gaps = report
         .as_ref()
         .map(|report| report.gaps.clone())
-        .unwrap_or_else(|| debt_rows.iter().map(DebtInventoryRow::identity).collect());
+        .unwrap_or_else(|| {
+            debt_rows
+                .iter()
+                .map(|row| TargetedGap {
+                    identity: row.identity(),
+                    targets: BTreeSet::new(),
+                })
+                .collect()
+        });
+    let surfaces = gaps
+        .iter()
+        .map(|gap| gap.identity.clone())
+        .collect::<Vec<_>>();
 
     let mut preexisting = Vec::new();
     let mut discovered = Vec::new();
@@ -276,14 +266,25 @@ pub(crate) fn derive_support_surface_audit(
     let missing_wrapper_support = surfaces.clone();
     let missing_backend_support = surfaces.clone();
 
-    for surface in &surfaces {
+    for gap in &gaps {
+        let surface = &gap.identity;
         publication_impacts.push(PublicationImpact {
             surface_kind: surface.surface_kind.clone(),
             command_path: surface.command_path.clone(),
             surface_id: surface.surface_id.clone(),
             surface_doc: SUPPORT_MATRIX_DOC_PATH.to_string(),
         });
-        if let Some(row) = debt_by_identity.get(surface) {
+        let authorization = authorize_gap(gap, &detected_release.target_version, &debt_rows);
+        let debt_row = debt_rows
+            .iter()
+            .filter(|row| row.identity() == *surface)
+            .min_by(|left, right| left.row_id.cmp(&right.row_id));
+        // Without per-target report evidence, an inventory identity keeps the pre-acquisition
+        // packet visible but no authorization grant is allowed to apply.
+        let fully_authorized = report.is_some()
+            && !authorization.applicable_rows.is_empty()
+            && authorization.remaining_targets.is_empty();
+        if let Some(row) = debt_row {
             preexisting.push(DebtBackedSurface {
                 surface_kind: surface.surface_kind.clone(),
                 command_path: surface.command_path.clone(),
@@ -297,7 +298,8 @@ pub(crate) fn derive_support_surface_audit(
                 defer_reason: row.blocker_class.clone(),
                 blocking_follow_on: Some(row.follow_on.clone()),
             });
-        } else {
+        }
+        if !fully_authorized {
             let evidence_ref = report_ref
                 .clone()
                 .unwrap_or_else(|| NON_TUI_SUPPORT_DEBT_PATH.to_string());
@@ -312,9 +314,11 @@ pub(crate) fn derive_support_surface_audit(
 
     let unmatched_debt_surface = match &report {
         Some(report) => {
+            let mut seen = BTreeSet::new();
             let unmatched = debt_rows
                 .iter()
                 .filter(|row| !surfaces.contains(&row.identity()))
+                .filter(|row| seen.insert(row.identity()))
                 .collect::<Vec<_>>();
             unmatched_debt::classify_unmatched_debt_rows(
                 workspace_root,
@@ -346,9 +350,9 @@ pub(crate) fn derive_support_surface_audit(
             .map(ToString::to_string)
             .collect(),
         allowed_deferrals: ALLOWED_DEFERRALS.iter().map(ToString::to_string).collect(),
-        pre_run_debt_count: debt_rows.len(),
+        pre_run_debt_count,
         expected_post_run_debt_count: preexisting.len(),
-        discovered_upstream_surface: discovered,
+        unbaselined_gap_surface: discovered,
         unmatched_debt_surface,
         preexisting_unsupported_surface: preexisting,
         eligible_preexisting_surface: Vec::new(),
@@ -379,48 +383,11 @@ pub(crate) fn coverage_report_present_for_target(
     Ok(true)
 }
 
-pub(crate) fn load_debt_inventory(workspace_root: &Path) -> Result<Vec<DebtInventoryRow>, String> {
-    let path = workspace_root.join(NON_TUI_SUPPORT_DEBT_PATH);
-    let text =
-        fs::read_to_string(&path).map_err(|err| format!("read {}: {err}", path.display()))?;
-    let mut rows = Vec::new();
-    let mut current_row_id: Option<String> = None;
-    let mut current_fields = BTreeMap::<String, String>::new();
-
-    for line in text.lines() {
-        if let Some(rest) = line.strip_prefix("### `") {
-            if let Some(row_id) = current_row_id.take() {
-                rows.push(build_debt_row(&row_id, &current_fields)?);
-                current_fields.clear();
-            }
-            let row_id = rest
-                .strip_suffix('`')
-                .ok_or_else(|| format!("invalid debt heading in {}", path.display()))?;
-            current_row_id = Some(row_id.to_string());
-            continue;
-        }
-        if current_row_id.is_some() {
-            if let Some(rest) = line.strip_prefix("- `") {
-                let (key, value) = parse_key_value(rest).ok_or_else(|| {
-                    format!("invalid debt row field `{line}` in {}", path.display())
-                })?;
-                current_fields.insert(key.to_string(), value.to_string());
-            }
-        }
-    }
-
-    if let Some(row_id) = current_row_id.take() {
-        rows.push(build_debt_row(&row_id, &current_fields)?);
-    }
-
-    Ok(rows)
-}
-
 /// The coverage report the audit reads: its path, its deltas, and the gap surfaces they list.
 struct LiveReport {
     path: PathBuf,
     deltas: serde_json::Map<String, serde_json::Value>,
-    gaps: Vec<SurfaceIdentity>,
+    gaps: Vec<TargetedGap>,
     platform_filter_mode: Option<String>,
     upstream_targets: Option<BTreeSet<String>>,
 }
@@ -462,40 +429,6 @@ pub(crate) fn excluded_surface_kinds() -> Vec<String> {
         .collect()
 }
 
-fn build_debt_row(
-    row_id: &str,
-    fields: &BTreeMap<String, String>,
-) -> Result<DebtInventoryRow, String> {
-    let get = |key: &str| {
-        fields
-            .get(key)
-            .cloned()
-            .ok_or_else(|| format!("debt row `{row_id}` is missing required field `{key}`"))
-    };
-    let blocker_class = get("blocker_class")?;
-    if !ALLOWED_DEFERRALS
-        .iter()
-        .any(|candidate| *candidate == blocker_class)
-    {
-        return Err(format!(
-            "debt row `{row_id}` has invalid blocker_class `{blocker_class}`"
-        ));
-    }
-    Ok(DebtInventoryRow {
-        row_id: row_id.to_string(),
-        agent_id: get("agent_id")?,
-        surface_kind: get("surface_kind")?,
-        command_path: get("command_path")?,
-        surface_id: get("surface_id")?,
-        current_reason: get("current_reason")?,
-        blocker_class,
-        owner: get("owner")?,
-        milestone: get("milestone")?,
-        follow_on: get("follow_on")?,
-        evidence_ref: get("evidence_ref")?,
-    })
-}
-
 fn parse_key_value(input: &str) -> Option<(&str, &str)> {
     let (key, rest) = input.split_once("`: `")?;
     let value = rest.strip_suffix('`')?;
@@ -518,7 +451,6 @@ fn load_live_report(
         .and_then(serde_json::Value::as_object)
         .ok_or_else(|| format!("{} is missing `deltas` object", report_path.display()))?
         .clone();
-    let gaps = surfaces_from_report_deltas(&entry.agent_id, &report_path, &deltas)?;
     let platform_filter_mode = json
         .pointer("/platform_filter/mode")
         .and_then(serde_json::Value::as_str)
@@ -532,6 +464,17 @@ fn load_live_report(
                 .map(|target| target.as_str().map(ToString::to_string))
                 .collect::<Option<BTreeSet<_>>>()
         });
+    let gaps = load_targeted_gaps(
+        &version_dir,
+        &entry.agent_id,
+        target_version,
+        upstream_targets.as_ref().ok_or_else(|| {
+            format!(
+                "cannot classify unmatched debt rows: report {} has no usable `inputs.upstream.targets`",
+                report_path.display()
+            )
+        })?,
+    )?;
 
     Ok(LiveReport {
         path: report_path,

@@ -464,8 +464,8 @@ fn render_support_surface_audit(out: &mut String, audit: &SupportSurfaceAudit) {
     ));
     render_evidence_backed_rows(
         out,
-        "support_surface_audit.discovered_upstream_surface",
-        &audit.discovered_upstream_surface,
+        "support_surface_audit.unbaselined_gap_surface",
+        &audit.unbaselined_gap_surface,
     );
     render_unmatched_debt_rows(
         out,

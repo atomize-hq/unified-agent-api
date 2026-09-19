@@ -1,4 +1,4 @@
-use std::{fs, path::Path};
+use std::{collections::BTreeMap, fs, path::Path};
 
 use serde_json::{json, Value};
 
@@ -27,8 +27,12 @@ fn deltas(missing_commands: Value, missing_flags: Value, missing_args: Value) ->
 }
 
 fn any_report(deltas: Value) -> Value {
+    any_report_for_targets(&TEST_TARGETS, deltas)
+}
+
+fn any_report_for_targets(targets: &[&str], deltas: Value) -> Value {
     json!({
-        "inputs": {"upstream": {"targets": TEST_TARGETS}},
+        "inputs": {"upstream": {"targets": targets}},
         "platform_filter": {"mode": "any"},
         "deltas": deltas,
     })
@@ -222,15 +226,25 @@ fn repo_root() -> &'static Path {
 }
 
 /// Derives the audit for `agent_id` from the committed registry plus `report`, the committed debt
-/// inventory unless `debt` replaces it, and `union` when one is given.
+/// inventory unless `debt` replaces it, synthetic authorization evidence with the explicitly
+/// supplied observations, and `union` when one is given.
 fn derive_audit(
     agent_id: &str,
     version: &str,
     debt: Option<&str>,
     report: &Value,
+    authorization_observed_targets: &[&str],
     union: Option<&Value>,
 ) -> SupportSurfaceAudit {
-    try_derive_audit(agent_id, version, debt, report, union).expect("derive audit")
+    try_derive_audit(
+        agent_id,
+        version,
+        debt,
+        report,
+        authorization_observed_targets,
+        union,
+    )
+    .expect("derive audit")
 }
 
 fn try_derive_audit(
@@ -238,6 +252,7 @@ fn try_derive_audit(
     version: &str,
     debt: Option<&str>,
     report: &Value,
+    authorization_observed_targets: &[&str],
     union: Option<&Value>,
 ) -> Result<SupportSurfaceAudit, String> {
     let registry = AgentRegistry::load(repo_root()).expect("load registry");
@@ -252,9 +267,113 @@ fn try_derive_audit(
             .expect("copy debt inventory"),
     }
     let manifest_root = workspace.path().join(&entry.manifest_root);
+    fs::create_dir_all(&manifest_root).expect("create manifest root");
+    fs::copy(
+        repo_root().join(&entry.manifest_root).join("RULES.json"),
+        manifest_root.join("RULES.json"),
+    )
+    .expect("copy rules");
     let report_dir = manifest_root.join("reports").join(version);
     fs::create_dir_all(&report_dir).expect("create report dir");
+    let mut report = report.clone();
+    report["inputs"]["upstream"]["semantic_version"] = json!(version);
     fs::write(report_dir.join("coverage.any.json"), report.to_string()).expect("write report");
+    let targets = report["inputs"]["upstream"]["targets"]
+        .as_array()
+        .cloned()
+        .unwrap_or_default();
+    for target in &targets {
+        let target = target.as_str().expect("string target");
+        let mut exact = report.clone();
+        exact["inputs"]["upstream"]["targets"] = json!([target]);
+        exact["platform_filter"] = json!({"mode": "exact_target", "target_triple": target});
+        for value in exact["deltas"]
+            .as_object_mut()
+            .expect("deltas object")
+            .values_mut()
+        {
+            if let Some(rows) = value.as_array_mut() {
+                rows.retain(|row| {
+                    row.get("upstream_available_on")
+                        .and_then(Value::as_array)
+                        .map_or(true, |available| {
+                            available.iter().any(|value| value == target)
+                        })
+                });
+            }
+        }
+        fs::write(
+            report_dir.join(format!("coverage.{target}.json")),
+            exact.to_string(),
+        )
+        .expect("write exact report");
+    }
+    let mut synthetic_evidence = BTreeMap::<String, (String, Vec<Value>)>::new();
+    for row in load_debt_inventory(workspace.path()).expect("parse fixture debt") {
+        if row.agent_id != agent_id {
+            continue;
+        }
+        let destination = workspace.path().join(&row.authorization_evidence_ref);
+        if destination.is_file() {
+            continue;
+        }
+        let source = repo_root().join(&row.authorization_evidence_ref);
+        if source.is_file() {
+            fs::create_dir_all(destination.parent().expect("evidence parent"))
+                .expect("create evidence parent");
+            fs::copy(source, destination).expect("copy authorization evidence");
+        } else {
+            let path = row
+                .command_path
+                .split_whitespace()
+                .skip(1)
+                .map(ToString::to_string)
+                .collect::<Vec<_>>();
+            let mut evidence_row = json!({
+                "path": path,
+                "upstream_available_on": authorization_observed_targets,
+            });
+            match row.surface_kind.as_str() {
+                "flags" | "global_flags" => evidence_row["key"] = json!(row.surface_id),
+                "positional_args" => evidence_row["name"] = json!(row.surface_id),
+                _ => {}
+            }
+            synthetic_evidence
+                .entry(row.authorization_evidence_ref)
+                .or_insert_with(|| (row.authorized_at_version, Vec::new()))
+                .1
+                .push(evidence_row);
+        }
+    }
+    for (relative, (authorized_version, rows)) in synthetic_evidence {
+        let destination = workspace.path().join(relative);
+        fs::create_dir_all(destination.parent().expect("evidence parent"))
+            .expect("create evidence parent");
+        fs::write(
+            destination,
+            json!({
+                "inputs": {"upstream": {
+                    "semantic_version": authorized_version,
+                    "targets": TEST_TARGETS,
+                }},
+                "platform_filter": {"mode": "any"},
+                "deltas": deltas(json!([]), json!([]), json!([]))
+                    .as_object()
+                    .expect("deltas")
+                    .iter()
+                    .map(|(key, value)| {
+                        if key == "intentionally_unsupported" {
+                            (key.clone(), Value::Array(rows.clone()))
+                        } else {
+                            (key.clone(), value.clone())
+                        }
+                    })
+                    .collect::<serde_json::Map<_, _>>(),
+            })
+            .to_string(),
+        )
+        .expect("write authorization evidence");
+    }
     if let Some(union) = union {
         let snapshot_dir = manifest_root.join("snapshots").join(version);
         fs::create_dir_all(&snapshot_dir).expect("create snapshot dir");
@@ -282,6 +401,7 @@ fn a_missing_root_command_remains_a_required_uplift() {
         "1.18.29",
         None,
         &any_report(deltas(json!([root_row()]), json!([]), json!([]))),
+        &TEST_TARGETS,
         Some(&union(json!([]))),
     );
 
@@ -322,7 +442,7 @@ fn every_debt_row_is_rooted_at_its_agent_id() {
 
 #[test]
 fn claude_code_install_debt_matches_its_report_surfaces() {
-    // Row shapes as the claude_code 2.1.236 report lists them under intentionally_unsupported.
+    // Row shapes as the authorized claude_code 2.1.29 report lists them.
     let mut report = deltas(json!([]), json!([]), json!([]));
     report["intentionally_unsupported"] = json!([
         {"path": ["install"], "upstream_available_on": ["win32-x64"]},
@@ -330,7 +450,14 @@ fn claude_code_install_debt_matches_its_report_surfaces() {
     ]);
 
     // No union: an audit whose debt rows all match gaps never reads one.
-    let audit = derive_audit("claude_code", "2.1.236", None, &any_report(report), None);
+    let audit = derive_audit(
+        "claude_code",
+        "2.1.29",
+        None,
+        &any_report_for_targets(&["win32-x64"], report),
+        &["win32-x64"],
+        None,
+    );
 
     let install = vec![
         identity("commands", "claude_code install", "install"),
@@ -347,21 +474,50 @@ fn claude_code_install_debt_matches_its_report_surfaces() {
 }
 
 fn debt_row(row_id: &str, surface_kind: &str, command_path: &str, surface_id: &str) -> String {
+    scoped_debt_row(
+        row_id,
+        surface_kind,
+        command_path,
+        surface_id,
+        "linux-x64, darwin-arm64",
+        "1.18.30",
+        "cli_manifests/opencode/reports/1.18.30/coverage.authorization.json",
+    )
+}
+
+fn scoped_debt_row(
+    row_id: &str,
+    surface_kind: &str,
+    command_path: &str,
+    surface_id: &str,
+    scope: &str,
+    version: &str,
+    authorization_evidence_ref: &str,
+) -> String {
     format!(
         concat!(
             "### `{}`\n\n- `agent_id`: `opencode`\n- `surface_kind`: `{}`\n",
             "- `command_path`: `{}`\n- `surface_id`: `{}`\n- `current_reason`: `test`\n",
             "- `blocker_class`: `requires_new_architectural_seam`\n- `owner`: `test`\n",
-            "- `milestone`: `test`\n- `follow_on`: `TODOS.md#test`\n- `evidence_ref`: `test`\n\n"
+            "- `milestone`: `test`\n- `follow_on`: `TODOS.md#test`\n- `evidence_ref`: `test`\n",
+            "- `scope_target_triples`: `{}`\n",
+            "- `authorized_at_version`: `{}`\n",
+            "- `authorization_evidence_ref`: `{}`\n\n"
         ),
-        row_id, surface_kind, command_path, surface_id
+        row_id, surface_kind, command_path, surface_id, scope, version, authorization_evidence_ref,
+    )
+}
+
+fn debt_inventory(rows: &str) -> String {
+    format!(
+        "# Non-TUI Support Debt Inventory\n\n### `support-debt-authorization-contract-target-version-v1`\n\n## Inventory\n\n{rows}"
     )
 }
 
 #[test]
 fn debt_rows_that_match_no_gap_are_classified_by_what_live_evidence_shows() {
     let debt = format!(
-        "# Non-TUI Support Debt Inventory\n\n## Inventory\n\n{}{}{}{}",
+        "# Non-TUI Support Debt Inventory\n\n### `support-debt-authorization-contract-target-version-v1`\n\n## Inventory\n\n{}{}{}{}",
         debt_row("gap", "commands", "opencode acp", "acp"),
         debt_row("covered", "flags", "opencode run", "--fork"),
         debt_row("excluded", "flags", "opencode run", "--attach"),
@@ -380,6 +536,7 @@ fn debt_rows_that_match_no_gap_are_classified_by_what_live_evidence_shows() {
         "1.18.30",
         Some(&debt),
         &any_report(report),
+        &TEST_TARGETS,
         Some(&union),
     );
 
@@ -431,7 +588,7 @@ fn debt_rows_that_match_no_gap_are_classified_by_what_live_evidence_shows() {
 #[test]
 fn unmatched_debt_requires_a_coherent_any_target_report() {
     let debt = format!(
-        "# Non-TUI Support Debt Inventory\n\n## Inventory\n\n{}",
+        "# Non-TUI Support Debt Inventory\n\n### `support-debt-authorization-contract-target-version-v1`\n\n## Inventory\n\n{}",
         debt_row("covered", "flags", "opencode run", "--fork")
     );
     let union = union(json!([{"path": ["run"], "flags": [{"key": "--fork"}]}]));
@@ -469,8 +626,15 @@ fn unmatched_debt_requires_a_coherent_any_target_report() {
             "no usable `inputs.upstream.targets`",
         ),
     ] {
-        let error = try_derive_audit("opencode", "1.18.30", Some(&debt), &report, Some(&union))
-            .expect_err(case);
+        let error = try_derive_audit(
+            "opencode",
+            "1.18.30",
+            Some(&debt),
+            &report,
+            &TEST_TARGETS,
+            Some(&union),
+        )
+        .expect_err(case);
         assert!(
             error.contains("cannot classify unmatched debt rows")
                 && error.contains("coverage.any.json")
@@ -485,3 +649,6 @@ fn unmatched_debt_requires_a_coherent_any_target_report() {
         }
     }
 }
+
+#[path = "tests/authorization.rs"]
+mod authorization_tests;
