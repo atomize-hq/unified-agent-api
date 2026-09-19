@@ -405,7 +405,7 @@ fn execute_agent_maintenance_write_fails_when_support_surface_audit_goes_stale_a
     assert_eq!(output.exit_code, 2);
     assert!(output
         .stderr
-        .contains("support_surface_audit.discovered_upstream_surface added"));
+        .contains("support_surface_audit.unbaselined_gap_surface added"));
     assert!(output
         .stderr
         .contains("surface_kind=commands command_path=codex status surface_id=status"));
@@ -413,16 +413,13 @@ fn execute_agent_maintenance_write_fails_when_support_surface_audit_goes_stale_a
     let run_dir = fixture.join(EXECUTE_RUNS_ROOT).join(EXECUTE_WRITE_RUN_ID);
     let report = read_json(&run_dir.join("validation-report.json"));
     assert_eq!(report.get("status").and_then(Value::as_str), Some("fail"));
-    assert!(
-        report
-            .get("errors")
-            .and_then(Value::as_array)
-            .expect("errors array")
-            .iter()
-            .filter_map(Value::as_str)
-            .any(|message| message
-                .contains("support_surface_audit.discovered_upstream_surface added"))
-    );
+    assert!(report
+        .get("errors")
+        .and_then(Value::as_array)
+        .expect("errors array")
+        .iter()
+        .filter_map(Value::as_str)
+        .any(|message| message.contains("support_surface_audit.unbaselined_gap_surface added")));
 }
 
 #[test]

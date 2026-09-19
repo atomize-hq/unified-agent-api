@@ -313,9 +313,9 @@ fn validator_and_derivation_share_selected_report_path_for_per_os_only_directori
 
     let live_audit = live_audit(&fixture);
 
-    assert_eq!(live_audit.discovered_upstream_surface.len(), 1);
+    assert_eq!(live_audit.unbaselined_gap_surface.len(), 1);
     assert_eq!(
-        live_audit.discovered_upstream_surface[0].evidence_ref,
+        live_audit.unbaselined_gap_surface[0].evidence_ref,
         validator_selected
             .strip_prefix(&fixture)
             .expect("repo-relative evidence path")
@@ -447,7 +447,7 @@ fn assert_projection(
         }
     );
     assert_eq!(json["reconciliation"], json!(reconciliation));
-    assert_eq!(json["discovered_upstream_surface"], json!(discovered));
+    assert_eq!(json["unbaselined_gap_surface"], json!(discovered));
     assert_eq!(json["preexisting_unsupported_surface"], json!(preexisting));
     assert_eq!(json["missing_wrapper_support"], json!(missing_wrapper));
     assert_eq!(json["missing_backend_support"], json!(missing_backend));

@@ -127,7 +127,7 @@ allowed_deferrals = [
 pre_run_debt_count = 0
 expected_post_run_debt_count = 0
 
-[[support_surface_audit.discovered_upstream_surface]]
+[[support_surface_audit.unbaselined_gap_surface]]
 surface_kind = "flags"
 command_path = "codex exec"
 surface_id = "--json"
@@ -188,7 +188,7 @@ Required record shape rules:
 | Record | Required keys | Notes |
 | --- | --- | --- |
 | surface row | `surface_kind`, `command_path`, `surface_id` | shared identity for every audit list |
-| evidence-backed row | surface row + `evidence_ref` | used for discovered upstream surface; the list name implies newness the audit never checks (`uaa-0043`) |
+| evidence-backed row | surface row + `evidence_ref` | used for unbaselined gap surface |
 | debt-backed row | surface row + `debt_ref` | used for preexisting inventory rows |
 | unmatched debt row | surface row + `debt_ref`, `observation` | `observation` only `covered_by_wrapper`, `excluded_by_rules`, or `not_observed` |
 | eligible row | surface row + `eligibility_reason` | only `adjacent_surface_changed`, `bounded_write_envelope`, or `no_new_seam_required` |

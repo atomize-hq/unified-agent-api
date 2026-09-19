@@ -128,7 +128,7 @@ fn opencode_automated_request_with_execution_contract_toml(
 
 const FROZEN_DISCOVERY_ROW: &str = concat!(
     "\n",
-    "[[support_surface_audit.discovered_upstream_surface]]\n",
+    "[[support_surface_audit.unbaselined_gap_surface]]\n",
     "surface_kind = \"commands\"\n",
     "command_path = \"opencode status\"\n",
     "surface_id = \"status\"\n",
@@ -694,7 +694,7 @@ fn automated_request_support_surface_audit_rejects_new_live_discovery_with_named
     let err = request::load_request_envelope_validated(&fixture, Path::new(request_path))
         .expect_err("new live discovery should invalidate the frozen request");
     let message = err.to_string();
-    assert!(message.contains("support_surface_audit.discovered_upstream_surface added"));
+    assert!(message.contains("support_surface_audit.unbaselined_gap_surface added"));
     assert!(
         message.contains("surface_kind=commands command_path=opencode status surface_id=status")
     );

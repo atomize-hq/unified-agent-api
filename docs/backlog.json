@@ -1455,7 +1455,7 @@
     {
       "id": "uaa-0043",
       "title": "`support_surface_audit.discovered_upstream_surface` implies upstream newness the audit never checks",
-      "status": "todo",
+      "status": "done",
       "bucket": "agent_api.onboarding",
       "type": "task",
       "kickoff": {

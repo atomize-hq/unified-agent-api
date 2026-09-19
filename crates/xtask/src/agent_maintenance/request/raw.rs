@@ -52,7 +52,7 @@ pub(super) struct RawSupportSurfaceAudit {
     pub(super) pre_run_debt_count: usize,
     pub(super) expected_post_run_debt_count: usize,
     #[serde(default)]
-    pub(super) discovered_upstream_surface: Vec<RawEvidenceBackedSurface>,
+    pub(super) unbaselined_gap_surface: Vec<RawEvidenceBackedSurface>,
     #[serde(default)]
     pub(super) unmatched_debt_surface: Vec<RawUnmatchedDebtSurface>,
     #[serde(default)]

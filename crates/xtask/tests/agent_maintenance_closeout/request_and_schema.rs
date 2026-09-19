@@ -2,7 +2,7 @@ use super::*;
 
 const FROZEN_DISCOVERY_ROW: &str = concat!(
     "\n",
-    "[[support_surface_audit.discovered_upstream_surface]]\n",
+    "[[support_surface_audit.unbaselined_gap_surface]]\n",
     "surface_kind = \"commands\"\n",
     "command_path = \"opencode status\"\n",
     "surface_id = \"status\"\n",
@@ -457,7 +457,7 @@ fn close_agent_maintenance_rejects_new_live_discovery_in_linked_request() {
     let err = load_linked_closeout(&fixture, request_path, closeout_path)
         .expect_err("new live discovery should invalidate closeout");
     let message = err.to_string();
-    assert!(message.contains("support_surface_audit.discovered_upstream_surface added"));
+    assert!(message.contains("support_surface_audit.unbaselined_gap_surface added"));
     assert!(
         message.contains("surface_kind=commands command_path=opencode status surface_id=status")
     );
@@ -563,6 +563,35 @@ fn load_with_frozen_rows(
     )
     .map(|_| ())
     .map_err(|err| err.to_string())
+}
+
+#[test]
+fn request_load_accepts_unbaselined_gap_key_and_rejects_legacy_key() {
+    let fixture = support_audit_row_fixture("support-audit-list-key");
+    seed_live_clean_report(&fixture);
+    // Assemble the retired key so repository searches only find historical documentation.
+    let legacy_key = ["discovered", "upstream", "surface"].join("_");
+    let legacy_rows = FROZEN_DISCOVERY_ROW.replace("unbaselined_gap_surface", &legacy_key);
+    let legacy_list = legacy_rows
+        .split("[[support_surface_audit.required_uplifts_this_run]]")
+        .next()
+        .unwrap();
+    let both_rows = format!("{FROZEN_DISCOVERY_ROW}{legacy_list}");
+    for policy in [
+        request::AuditDriftPolicy::Reject,
+        request::AuditDriftPolicy::Tolerate,
+    ] {
+        load_with_frozen_rows(&fixture, FROZEN_DISCOVERY_ROW, policy)
+            .expect("the new list key must load");
+        for rows in [&legacy_rows, &both_rows] {
+            let err = load_with_frozen_rows(&fixture, rows, policy)
+                .expect_err("the legacy list key must be rejected even alongside the new key");
+            assert!(
+                err.contains(&format!("unknown field `{legacy_key}`")),
+                "{err}"
+            );
+        }
+    }
 }
 
 #[test]
