@@ -71,64 +71,21 @@ const SUPPORT_AUDIT_REQUEST: &str =
     "docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml";
 
 fn seed_live_new_discovery(fixture: &std::path::Path) {
-    write_text(
-        &fixture.join("cli_manifests/opencode/reports/1.14.47/coverage.any.json"),
-        concat!(
-            "{\n",
-            "  \"deltas\": {\n",
-            "    \"missing_commands\": [\n",
-            "      {\n",
-            "        \"path\": [\"status\"]\n",
-            "      }\n",
-            "    ],\n",
-            "    \"missing_flags\": [],\n",
-            "    \"missing_args\": [],\n",
-            "    \"intentionally_unsupported\": []\n",
-            "  }\n",
-            "}\n"
-        ),
-    );
+    write_opencode_coverage_reports(fixture, "1.14.47", true);
 }
 
 fn seed_live_clean_report(fixture: &std::path::Path) {
-    write_text(
-        &fixture.join("cli_manifests/opencode/reports/1.14.47/coverage.any.json"),
-        concat!(
-            "{\n",
-            "  \"deltas\": {\n",
-            "    \"missing_commands\": [],\n",
-            "    \"missing_flags\": [],\n",
-            "    \"missing_args\": [],\n",
-            "    \"intentionally_unsupported\": []\n",
-            "  }\n",
-            "}\n"
-        ),
-    );
+    write_opencode_coverage_reports(fixture, "1.14.47", false);
 }
 
 fn seed_live_deferred_row(fixture: &std::path::Path, blocker_class: &str) {
-    write_text(
-        &fixture.join("cli_manifests/opencode/reports/1.14.47/coverage.any.json"),
-        concat!(
-            "{\n",
-            "  \"deltas\": {\n",
-            "    \"missing_commands\": [\n",
-            "      {\n",
-            "        \"path\": [\"status\"]\n",
-            "      }\n",
-            "    ],\n",
-            "    \"missing_flags\": [],\n",
-            "    \"missing_args\": [],\n",
-            "    \"intentionally_unsupported\": []\n",
-            "  }\n",
-            "}\n"
-        ),
-    );
+    write_opencode_coverage_reports(fixture, "1.14.47", true);
     write_text(
         &fixture.join("docs/specs/unified-agent-api/non-tui-support-debt.md"),
         &format!(
             concat!(
                 "# Non-TUI Support Debt Inventory\n\n",
+                "### `support-debt-authorization-contract-target-version-v1`\n\n",
                 "## Inventory\n\n",
                 "### `opencode-status-command`\n\n",
                 "- `agent_id`: `opencode`\n",
@@ -140,17 +97,41 @@ fn seed_live_deferred_row(fixture: &std::path::Path, blocker_class: &str) {
                 "- `owner`: `wrappers team`\n",
                 "- `milestone`: `post packet-pr convergence follow-on`\n",
                 "- `follow_on`: `TODOS.md#close-opencode-status-gap`\n",
-                "- `evidence_ref`: `cli_manifests/opencode/reports/1.14.47/coverage.any.json`\n"
+                "- `evidence_ref`: `cli_manifests/opencode/reports/1.14.47/coverage.any.json`\n",
+                "- `scope_target_triples`: `linux-x64, darwin-arm64, win32-x64`\n",
+                "- `authorized_at_version`: `1.14.47`\n",
+                "- `authorization_evidence_ref`: `cli_manifests/opencode/reports/1.14.47/authorization/coverage.any.json`\n"
             ),
             blocker_class = blocker_class
         ),
+    );
+    write_text(
+        &fixture.join("cli_manifests/opencode/reports/1.14.47/authorization/coverage.any.json"),
+        &serde_json::json!({
+            "inputs": {
+                "upstream": {
+                    "semantic_version": "1.14.47",
+                    "targets": ["linux-x64", "darwin-arm64", "win32-x64"]
+                }
+            },
+            "deltas": {
+                "missing_commands": [{
+                    "path": ["status"],
+                    "upstream_available_on": ["linux-x64", "darwin-arm64", "win32-x64"]
+                }],
+                "missing_flags": [],
+                "missing_args": [],
+                "intentionally_unsupported": []
+            }
+        })
+        .to_string(),
     );
 }
 
 #[test]
 fn close_agent_maintenance_requires_request_linkage() {
     let fixture = fixture_root("close-agent-maintenance-request-linkage");
-    maintenance_harness::seed_opencode_basis(&fixture);
+    seed_opencode_basis(&fixture);
     let request_path =
         Path::new("docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml");
     let request_absolute = fixture.join(request_path);
@@ -196,7 +177,7 @@ fn close_agent_maintenance_requires_request_linkage() {
 #[test]
 fn close_agent_maintenance_requires_resolved_and_deferred_truth() {
     let fixture = fixture_root("close-agent-maintenance-truth");
-    maintenance_harness::seed_opencode_basis(&fixture);
+    seed_opencode_basis(&fixture);
     let request_path =
         Path::new("docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml");
     let request_absolute = fixture.join(request_path);
@@ -268,7 +249,7 @@ fn close_agent_maintenance_requires_resolved_and_deferred_truth() {
 #[test]
 fn close_agent_maintenance_rejects_symlinked_output() {
     let fixture = fixture_root("close-agent-maintenance-symlink-output");
-    maintenance_harness::seed_opencode_basis(&fixture);
+    seed_opencode_basis(&fixture);
     let request_path =
         Path::new("docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml");
     let request_absolute = fixture.join(request_path);
@@ -323,7 +304,7 @@ fn close_agent_maintenance_rejects_symlinked_output() {
 #[test]
 fn close_agent_maintenance_rejects_missing_request_evidence_refs() {
     let fixture = fixture_root("close-agent-maintenance-missing-request-evidence");
-    maintenance_harness::seed_opencode_basis(&fixture);
+    seed_opencode_basis(&fixture);
     let request_path =
         Path::new("docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml");
     let request_absolute = fixture.join(request_path);
@@ -355,7 +336,7 @@ fn close_agent_maintenance_rejects_missing_request_evidence_refs() {
 #[test]
 fn close_agent_maintenance_accepts_satisfied_support_surface_audit_request() {
     let fixture = fixture_root("close-agent-maintenance-support-audit-satisfied");
-    maintenance_harness::seed_opencode_basis(&fixture);
+    seed_opencode_basis(&fixture);
     write_text(
         &fixture.join(".github/workflows/agent-maintenance-open-pr.yml"),
         "name: Packet PR worker\n",
@@ -391,14 +372,14 @@ fn close_agent_maintenance_accepts_satisfied_support_surface_audit_request() {
 #[test]
 fn close_agent_maintenance_rejects_missing_live_report_in_linked_request() {
     let fixture = fixture_root("close-agent-maintenance-support-audit-missing-report");
-    maintenance_harness::seed_opencode_basis(&fixture);
+    seed_opencode_basis(&fixture);
     write_text(
         &fixture.join(".github/workflows/agent-maintenance-open-pr.yml"),
         "name: Packet PR worker\n",
     );
     seed_live_clean_report(&fixture);
-    fs::remove_file(fixture.join("cli_manifests/opencode/reports/1.14.47/coverage.any.json"))
-        .expect("remove live report");
+    fs::remove_dir_all(fixture.join("cli_manifests/opencode/reports/1.14.47"))
+        .expect("remove live reports");
     let request_path =
         Path::new("docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml");
     let request_absolute = fixture.join(request_path);
@@ -429,7 +410,7 @@ fn close_agent_maintenance_rejects_missing_live_report_in_linked_request() {
 #[test]
 fn close_agent_maintenance_rejects_new_live_discovery_in_linked_request() {
     let fixture = fixture_root("close-agent-maintenance-support-audit-new-discovery");
-    maintenance_harness::seed_opencode_basis(&fixture);
+    seed_opencode_basis(&fixture);
     write_text(
         &fixture.join(".github/workflows/agent-maintenance-open-pr.yml"),
         "name: Packet PR worker\n",
@@ -466,7 +447,7 @@ fn close_agent_maintenance_rejects_new_live_discovery_in_linked_request() {
 #[test]
 fn close_agent_maintenance_rejects_deferred_reason_mismatch_in_linked_request() {
     let fixture = fixture_root("close-agent-maintenance-support-audit-deferred-mismatch");
-    maintenance_harness::seed_opencode_basis(&fixture);
+    seed_opencode_basis(&fixture);
     write_text(
         &fixture.join(".github/workflows/agent-maintenance-open-pr.yml"),
         "name: Packet PR worker\n",
@@ -536,7 +517,7 @@ fn invalid_row_value_cases() -> [(&'static str, String, String); 4] {
 
 fn support_audit_row_fixture(prefix: &str) -> std::path::PathBuf {
     let fixture = fixture_root(prefix);
-    maintenance_harness::seed_opencode_basis(&fixture);
+    seed_opencode_basis(&fixture);
     write_text(
         &fixture.join(".github/workflows/agent-maintenance-open-pr.yml"),
         "name: Packet PR worker\n",
