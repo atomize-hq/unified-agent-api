@@ -62,7 +62,14 @@ fn authorization_requires_the_exact_identity_version_and_every_gap_target() {
         evidence,
     ));
     let report = gap_report(&["acp"], None, &TEST_TARGETS);
-    let audit = derive_audit("opencode", "1.18.30", Some(&exact), &report, None);
+    let audit = derive_audit(
+        "opencode",
+        "1.18.30",
+        Some(&exact),
+        &report,
+        &TEST_TARGETS,
+        None,
+    );
     assert!(audit.required_uplifts_this_run.is_empty());
     assert_eq!(audit.deferred_preexisting_gaps.len(), 1);
 
@@ -80,6 +87,7 @@ fn authorization_requires_the_exact_identity_version_and_every_gap_target() {
         "1.18.30",
         Some(&wrong_identity),
         &report,
+        &TEST_TARGETS,
         Some(&union(json!([]))),
     );
     assert_eq!(audit.required_uplifts_this_run.len(), 1);
@@ -93,7 +101,14 @@ fn authorization_requires_the_exact_identity_version_and_every_gap_target() {
         "1.18.29",
         "cli_manifests/opencode/reports/1.18.29/coverage.authorization.json",
     ));
-    let audit = derive_audit("opencode", "1.18.30", Some(&old_version), &report, None);
+    let audit = derive_audit(
+        "opencode",
+        "1.18.30",
+        Some(&old_version),
+        &report,
+        &TEST_TARGETS,
+        None,
+    );
     assert_eq!(audit.required_uplifts_this_run.len(), 1);
 }
 
@@ -113,6 +128,7 @@ fn a_single_target_grant_does_not_authorize_a_new_target() {
         "1.18.30",
         Some(&debt),
         &gap_report(&["acp"], None, &TEST_TARGETS),
+        &["linux-x64"],
         None,
     );
     assert_eq!(audit.required_uplifts_this_run.len(), 1);
@@ -146,6 +162,7 @@ fn disjoint_grants_contribute_independently_and_order_does_not_change_the_verdic
             "1.18.30",
             Some(&debt_inventory(&rows)),
             &report,
+            &TEST_TARGETS,
             None,
         );
         assert!(audit.required_uplifts_this_run.is_empty());
@@ -182,6 +199,7 @@ fn overlapping_grants_are_rejected() {
         "1.18.30",
         Some(&debt_inventory(&format!("{first}{second}"))),
         &gap_report(&["acp"], None, &TEST_TARGETS),
+        &TEST_TARGETS,
         None,
     )
     .expect_err("overlap must fail validation");
@@ -197,12 +215,78 @@ fn authorization_scope_cannot_exceed_its_evidence_observations() {
         "acp",
         "linux-x64, darwin-arm64",
         "1.18.30",
-        "cli_manifests/opencode/reports/1.18.30/coverage.any.json",
+        "cli_manifests/opencode/reports/1.18.30/coverage.authorization.json",
     ));
-    let report = gap_report(&["acp"], None, &["linux-x64"]);
-    let error = try_derive_audit("opencode", "1.18.30", Some(&debt), &report, None)
-        .expect_err("scope wider than evidence must fail");
+    let report = gap_report(&["acp"], None, &TEST_TARGETS);
+    let error = try_derive_audit(
+        "opencode",
+        "1.18.30",
+        Some(&debt),
+        &report,
+        &["linux-x64"],
+        None,
+    )
+    .expect_err("scope wider than evidence must fail");
     assert!(error.contains("scope exceeds surface observations"));
+}
+
+#[test]
+fn authorization_evidence_must_be_a_direct_child_of_the_version_directory() {
+    let canonical = debt_inventory(&scoped_debt_row(
+        "canonical",
+        "commands",
+        "opencode acp",
+        "acp",
+        "linux-x64, darwin-arm64",
+        "1.18.30",
+        "cli_manifests/opencode/reports/1.18.30/coverage.authorization.json",
+    ));
+    derive_audit(
+        "opencode",
+        "1.18.30",
+        Some(&canonical),
+        &gap_report(&["acp"], None, &TEST_TARGETS),
+        &TEST_TARGETS,
+        None,
+    );
+
+    let nested = canonical.replace(
+        "reports/1.18.30/coverage.authorization.json",
+        "reports/1.18.30/authorization/coverage.authorization.json",
+    );
+    let error = try_derive_audit(
+        "opencode",
+        "1.18.30",
+        Some(&nested),
+        &gap_report(&["acp"], None, &TEST_TARGETS),
+        &TEST_TARGETS,
+        None,
+    )
+    .expect_err("nested authorization evidence path must be rejected");
+    assert!(error.contains("is not a coverage report"));
+}
+
+#[test]
+fn authorization_evidence_keeps_the_coverage_filename_guard() {
+    let debt = debt_inventory(&scoped_debt_row(
+        "bad-filename",
+        "commands",
+        "opencode acp",
+        "acp",
+        "linux-x64, darwin-arm64",
+        "1.18.30",
+        "cli_manifests/opencode/reports/1.18.30/authorization.json",
+    ));
+    let error = try_derive_audit(
+        "opencode",
+        "1.18.30",
+        Some(&debt),
+        &gap_report(&["acp"], None, &TEST_TARGETS),
+        &TEST_TARGETS,
+        None,
+    )
+    .expect_err("non-coverage authorization evidence filename must be rejected");
+    assert!(error.contains("is not a coverage report"));
 }
 
 #[test]

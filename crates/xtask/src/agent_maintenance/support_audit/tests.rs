@@ -226,15 +226,25 @@ fn repo_root() -> &'static Path {
 }
 
 /// Derives the audit for `agent_id` from the committed registry plus `report`, the committed debt
-/// inventory unless `debt` replaces it, and `union` when one is given.
+/// inventory unless `debt` replaces it, synthetic authorization evidence with the explicitly
+/// supplied observations, and `union` when one is given.
 fn derive_audit(
     agent_id: &str,
     version: &str,
     debt: Option<&str>,
     report: &Value,
+    authorization_observed_targets: &[&str],
     union: Option<&Value>,
 ) -> SupportSurfaceAudit {
-    try_derive_audit(agent_id, version, debt, report, union).expect("derive audit")
+    try_derive_audit(
+        agent_id,
+        version,
+        debt,
+        report,
+        authorization_observed_targets,
+        union,
+    )
+    .expect("derive audit")
 }
 
 fn try_derive_audit(
@@ -242,6 +252,7 @@ fn try_derive_audit(
     version: &str,
     debt: Option<&str>,
     report: &Value,
+    authorization_observed_targets: &[&str],
     union: Option<&Value>,
 ) -> Result<SupportSurfaceAudit, String> {
     let registry = AgentRegistry::load(repo_root()).expect("load registry");
@@ -320,7 +331,7 @@ fn try_derive_audit(
                 .collect::<Vec<_>>();
             let mut evidence_row = json!({
                 "path": path,
-                "upstream_available_on": row.scope_target_triples,
+                "upstream_available_on": authorization_observed_targets,
             });
             match row.surface_kind.as_str() {
                 "flags" | "global_flags" => evidence_row["key"] = json!(row.surface_id),
@@ -390,6 +401,7 @@ fn a_missing_root_command_remains_a_required_uplift() {
         "1.18.29",
         None,
         &any_report(deltas(json!([root_row()]), json!([]), json!([]))),
+        &TEST_TARGETS,
         Some(&union(json!([]))),
     );
 
@@ -443,6 +455,7 @@ fn claude_code_install_debt_matches_its_report_surfaces() {
         "2.1.29",
         None,
         &any_report_for_targets(&["win32-x64"], report),
+        &["win32-x64"],
         None,
     );
 
@@ -523,6 +536,7 @@ fn debt_rows_that_match_no_gap_are_classified_by_what_live_evidence_shows() {
         "1.18.30",
         Some(&debt),
         &any_report(report),
+        &TEST_TARGETS,
         Some(&union),
     );
 
@@ -612,8 +626,15 @@ fn unmatched_debt_requires_a_coherent_any_target_report() {
             "no usable `inputs.upstream.targets`",
         ),
     ] {
-        let error = try_derive_audit("opencode", "1.18.30", Some(&debt), &report, Some(&union))
-            .expect_err(case);
+        let error = try_derive_audit(
+            "opencode",
+            "1.18.30",
+            Some(&debt),
+            &report,
+            &TEST_TARGETS,
+            Some(&union),
+        )
+        .expect_err(case);
         assert!(
             error.contains("cannot classify unmatched debt rows")
                 && error.contains("coverage.any.json")

@@ -20,18 +20,24 @@ const TARGET_VERSION: &str = "0.98.0";
 
 #[test]
 fn a_debt_row_the_wrapper_covers_fails_the_gate_even_with_uplifts() {
-    // Frozen before acquisition, as the nightly packet is, and frozen with the evidence present,
-    // which also round-trips a rendered `unmatched_debt_surface` row through the request loader.
+    // Frozen before the live report changes, as the nightly packet is, and frozen after the
+    // change, which also round-trips a rendered `unmatched_debt_surface` row through the loader.
     for (prefix, freeze_with_evidence) in [
         ("audit-status-unmatched-debt-nightly", false),
         ("audit-status-unmatched-debt-refreshed", true),
     ] {
         let root = seeded_workspace(prefix, "requires_new_architectural_seam");
         if freeze_with_evidence {
-            write_evidence(&root, json!([]));
+            write_evidence(&root, json!([{"path": ["status"]}]), json!([]));
+        } else {
+            write_evidence(
+                &root,
+                json!([]),
+                json!([{"path": ["exec"], "key": "--legacy"}]),
+            );
         }
         freeze(&root);
-        write_evidence(&root, json!([]));
+        write_evidence(&root, json!([{"path": ["status"]}]), json!([]));
         let frozen = std::fs::read_to_string(root.join(REQUEST_PATH)).expect("read request");
         assert_eq!(
             frozen.contains("[[support_surface_audit.unmatched_debt_surface]]"),
@@ -58,8 +64,17 @@ fn uplifts_with_an_unchanged_debt_baseline_still_exit_three() {
         "audit-status-debt-baseline-unchanged",
         "requires_new_architectural_seam",
     );
+    write_evidence(
+        &root,
+        json!([]),
+        json!([{"path": ["exec"], "key": "--legacy"}]),
+    );
     freeze(&root);
-    write_evidence(&root, json!([{"path": ["exec"], "key": "--legacy"}]));
+    write_evidence(
+        &root,
+        json!([{"path": ["status"]}]),
+        json!([{"path": ["exec"], "key": "--legacy"}]),
+    );
 
     let (outcome, projection) = run_gate(&root).expect("matching debt keeps exit 3");
     assert_eq!(outcome, AuditStatusOutcome::UpliftsRequired);
@@ -114,8 +129,8 @@ fn each_debt_baseline_mutation_fails_the_gate_even_with_uplifts() {
         ),
     ] {
         let root = seeded_workspace(prefix, "requires_new_architectural_seam");
+        write_evidence(&root, json!([{"path": ["status"]}]), evidence_gaps.clone());
         freeze(&root);
-        write_evidence(&root, evidence_gaps.clone());
         write_text(&root.join(DEBT_PATH), &inventory);
 
         let err = run_gate(&root).expect_err("a changed debt baseline must fail the gate");
@@ -144,7 +159,7 @@ fn each_debt_baseline_mutation_fails_the_gate_even_with_uplifts() {
             true,
         ),
     );
-    write_evidence(&root, evidence_gaps);
+    write_evidence(&root, json!([{"path": ["status"]}]), evidence_gaps);
     freeze(&root);
     let frozen = std::fs::read_to_string(root.join(REQUEST_PATH)).expect("read request");
     assert_eq!(
@@ -185,8 +200,8 @@ fn missing_or_malformed_union_for_unmatched_debt_is_bad_evidence() {
         "audit-status-unmatched-debt-invalid-union",
         "requires_new_architectural_seam",
     );
+    write_evidence(&root, json!([{"path": ["status"]}]), json!([]));
     freeze(&root);
-    write_evidence(&root, json!([]));
     let union_path = root
         .join("cli_manifests/codex/snapshots")
         .join(TARGET_VERSION)
@@ -258,7 +273,7 @@ fn seeded_workspace(prefix: &str, blocker_class: &str) -> PathBuf {
         ]},
     });
     write_text(
-        &root.join("cli_manifests/codex/reports/0.98.0/authorization/coverage.any.json"),
+        &root.join("cli_manifests/codex/reports/0.98.0/coverage.authorization.json"),
         &authorization.to_string(),
     );
     root
@@ -281,7 +296,7 @@ fn debt_inventory(
             "- `evidence_ref`: `cli_manifests/codex/reports/0.97.0/coverage.any.json`\n",
             "- `scope_target_triples`: `x86_64-unknown-linux-musl`\n",
             "- `authorized_at_version`: `0.98.0`\n",
-            "- `authorization_evidence_ref`: `cli_manifests/codex/reports/0.98.0/authorization/coverage.any.json`\n",
+            "- `authorization_evidence_ref`: `cli_manifests/codex/reports/0.98.0/coverage.authorization.json`\n",
         ),
         row_id, blocker_class, follow_on
     );
@@ -296,7 +311,7 @@ fn debt_inventory(
                 "- `evidence_ref`: `cli_manifests/codex/reports/0.97.0/coverage.any.json`\n",
                 "- `scope_target_triples`: `x86_64-unknown-linux-musl`\n",
                 "- `authorized_at_version`: `0.98.0`\n",
-                "- `authorization_evidence_ref`: `cli_manifests/codex/reports/0.98.0/authorization/coverage.any.json`\n",
+                "- `authorization_evidence_ref`: `cli_manifests/codex/reports/0.98.0/coverage.authorization.json`\n",
             ),
         );
     }
@@ -317,9 +332,9 @@ fn freeze(root: &Path) {
 }
 
 /// Writes acquisition evidence: a complete union that lists `codex status` and `codex exec
-/// --legacy`, and a coverage report whose gaps are `codex status` plus `missing_flags`.
+/// --legacy`, and a coverage report whose gaps are `missing_commands` plus `missing_flags`.
 #[rustfmt::skip]
-fn write_evidence(root: &Path, mut missing_flags: Value) {
+fn write_evidence(root: &Path, missing_commands: Value, mut missing_flags: Value) {
     let registry = AgentRegistry::parse(SEEDED_REGISTRY).expect("parse registry");
     let targets = &registry.find("codex").expect("codex entry").canonical_targets;
     for flag in missing_flags.as_array_mut().expect("missing flag rows") {
@@ -334,7 +349,7 @@ fn write_evidence(root: &Path, mut missing_flags: Value) {
         "schema_version": 1, "generated_at": "2026-09-15T08:37:00Z",
         "inputs": {"upstream": {"semantic_version": TARGET_VERSION, "mode": "union", "targets": targets}},
         "platform_filter": {"mode": "any"},
-        "deltas": {"missing_commands": [{"path": ["status"]}], "missing_flags": missing_flags, "missing_args": []},
+        "deltas": {"missing_commands": missing_commands, "missing_flags": missing_flags, "missing_args": []},
     });
     let manifest_root = root.join("cli_manifests/codex");
     write_text(&manifest_root.join("snapshots").join(TARGET_VERSION).join("union.json"), &union.to_string());

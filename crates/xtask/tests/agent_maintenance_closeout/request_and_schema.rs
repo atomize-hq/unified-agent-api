@@ -100,13 +100,13 @@ fn seed_live_deferred_row(fixture: &std::path::Path, blocker_class: &str) {
                 "- `evidence_ref`: `cli_manifests/opencode/reports/1.14.47/coverage.any.json`\n",
                 "- `scope_target_triples`: `linux-x64, darwin-arm64, win32-x64`\n",
                 "- `authorized_at_version`: `1.14.47`\n",
-                "- `authorization_evidence_ref`: `cli_manifests/opencode/reports/1.14.47/authorization/coverage.any.json`\n"
+                "- `authorization_evidence_ref`: `cli_manifests/opencode/reports/1.14.47/coverage.authorization.json`\n"
             ),
             blocker_class = blocker_class
         ),
     );
     write_text(
-        &fixture.join("cli_manifests/opencode/reports/1.14.47/authorization/coverage.any.json"),
+        &fixture.join("cli_manifests/opencode/reports/1.14.47/coverage.authorization.json"),
         &serde_json::json!({
             "inputs": {
                 "upstream": {

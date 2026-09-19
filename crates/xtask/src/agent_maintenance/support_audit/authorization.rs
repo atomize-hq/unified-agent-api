@@ -372,7 +372,7 @@ fn validate_authorization_evidence(
     let expected_prefix = Path::new(&entry.manifest_root)
         .join("reports")
         .join(&row.authorized_at_version);
-    if !relative.starts_with(&expected_prefix)
+    if relative.parent() != Some(expected_prefix.as_path())
         || relative
             .file_name()
             .and_then(|name| name.to_str())
