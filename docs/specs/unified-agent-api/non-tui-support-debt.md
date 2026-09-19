@@ -105,8 +105,8 @@ interpret it as an incomplete debt row and reject the inventory rather than broa
 - `follow_on`: `TODOS.md#close-codex-completion-maintenance-gap`
 - `evidence_ref`: `cli_manifests/codex/reports/0.129.0/coverage.any.json`
 - `scope_target_triples`: `x86_64-unknown-linux-musl, aarch64-unknown-linux-musl, aarch64-apple-darwin, x86_64-pc-windows-msvc`
-- `authorized_at_version`: `0.125.0`
-- `authorization_evidence_ref`: `cli_manifests/codex/reports/0.125.0/coverage.any.json`
+- `authorized_at_version`: `0.144.6`
+- `authorization_evidence_ref`: `cli_manifests/codex/reports/0.144.6/coverage.any.json`
 
 ### `codex-completion-shell-arg`
 
@@ -121,8 +121,8 @@ interpret it as an incomplete debt row and reject the inventory rather than broa
 - `follow_on`: `TODOS.md#close-codex-completion-maintenance-gap`
 - `evidence_ref`: `cli_manifests/codex/reports/0.129.0/coverage.any.json`
 - `scope_target_triples`: `x86_64-unknown-linux-musl, aarch64-unknown-linux-musl, aarch64-apple-darwin, x86_64-pc-windows-msvc`
-- `authorized_at_version`: `0.125.0`
-- `authorization_evidence_ref`: `cli_manifests/codex/reports/0.125.0/coverage.any.json`
+- `authorized_at_version`: `0.144.6`
+- `authorization_evidence_ref`: `cli_manifests/codex/reports/0.144.6/coverage.any.json`
 
 ### `opencode-acp-command`
 

@@ -67,6 +67,11 @@ fn uplifts_with_an_unchanged_debt_baseline_still_exit_three() {
     // The request was frozen before acquisition, so the uplift alone drifts it.
     assert_eq!(projection["reconciliation"], json!("drifted"));
     assert_eq!(projection["preexisting_unsupported_surface"], json!(1));
+    assert_eq!(projection["required_uplifts"].as_array().unwrap().len(), 1);
+    assert_eq!(
+        projection["required_uplifts"][0]["surface_id"],
+        json!("status")
+    );
 }
 
 #[test]
@@ -239,6 +244,23 @@ fn seeded_workspace(prefix: &str, blocker_class: &str) -> PathBuf {
         &root.join("docs/agents/lifecycle/codex-maintenance/governance/execute-agent-maintenance-prompt.md"),
         &contract_policy::packet_pr_prompt_template(entry, "docs/agents/lifecycle/codex-maintenance"),
     );
+    write_text(
+        &root.join("cli_manifests/codex/RULES.json"),
+        &json!({"union": {"expected_targets": entry.canonical_targets}}).to_string(),
+    );
+    // Keep grant evidence outside live report selection so pre-acquisition freezes remain
+    // evidence-free and later live mutations still exercise debt-baseline reconciliation.
+    let authorization = json!({
+        "inputs": {"upstream": {"semantic_version": TARGET_VERSION, "targets": entry.canonical_targets}},
+        "deltas": {"missing_commands": [], "missing_args": [], "missing_flags": [
+            {"path": ["exec"], "key": "--legacy", "upstream_available_on": entry.canonical_targets},
+            {"path": ["exec"], "key": "--hidden", "upstream_available_on": entry.canonical_targets},
+        ]},
+    });
+    write_text(
+        &root.join("cli_manifests/codex/reports/0.98.0/authorization/coverage.any.json"),
+        &authorization.to_string(),
+    );
     root
 }
 
@@ -251,12 +273,15 @@ fn debt_inventory(
 ) -> String {
     let mut inventory = format!(
         concat!(
-            "# Non-TUI Support Debt Inventory\n\n## Inventory\n\n### `{}`\n\n",
+            "# Non-TUI Support Debt Inventory\n\n### `support-debt-authorization-contract-target-version-v1`\n\n## Inventory\n\n### `{}`\n\n",
             "- `agent_id`: `codex`\n- `surface_kind`: `flags`\n- `command_path`: `codex exec`\n",
             "- `surface_id`: `--legacy`\n- `current_reason`: `The legacy flag stays outside the seam.`\n",
             "- `blocker_class`: `{}`\n- `owner`: `wrappers team`\n- `milestone`: `test`\n",
             "- `follow_on`: `{}`\n",
             "- `evidence_ref`: `cli_manifests/codex/reports/0.97.0/coverage.any.json`\n",
+            "- `scope_target_triples`: `x86_64-unknown-linux-musl`\n",
+            "- `authorized_at_version`: `0.98.0`\n",
+            "- `authorization_evidence_ref`: `cli_manifests/codex/reports/0.98.0/authorization/coverage.any.json`\n",
         ),
         row_id, blocker_class, follow_on
     );
@@ -269,6 +294,9 @@ fn debt_inventory(
                 "- `blocker_class`: `requires_new_architectural_seam`\n- `owner`: `wrappers team`\n",
                 "- `milestone`: `test`\n- `follow_on`: `TODOS.md#close-codex-hidden-gap`\n",
                 "- `evidence_ref`: `cli_manifests/codex/reports/0.97.0/coverage.any.json`\n",
+                "- `scope_target_triples`: `x86_64-unknown-linux-musl`\n",
+                "- `authorized_at_version`: `0.98.0`\n",
+                "- `authorization_evidence_ref`: `cli_manifests/codex/reports/0.98.0/authorization/coverage.any.json`\n",
             ),
         );
     }
@@ -291,15 +319,18 @@ fn freeze(root: &Path) {
 /// Writes acquisition evidence: a complete union that lists `codex status` and `codex exec
 /// --legacy`, and a coverage report whose gaps are `codex status` plus `missing_flags`.
 #[rustfmt::skip]
-fn write_evidence(root: &Path, missing_flags: Value) {
+fn write_evidence(root: &Path, mut missing_flags: Value) {
     let registry = AgentRegistry::parse(SEEDED_REGISTRY).expect("parse registry");
     let targets = &registry.find("codex").expect("codex entry").canonical_targets;
+    for flag in missing_flags.as_array_mut().expect("missing flag rows") {
+        flag["upstream_available_on"] = json!(targets);
+    }
     let union = json!({
         "expected_targets": targets, "complete": true,
         "inputs": targets.iter().map(|target| json!({"target_triple": target})).collect::<Vec<_>>(),
         "commands": [{"path": ["exec"], "flags": [{"key": "--legacy"}]}, {"path": ["status"]}],
     });
-    let report = json!({
+    let mut report = json!({
         "schema_version": 1, "generated_at": "2026-09-15T08:37:00Z",
         "inputs": {"upstream": {"semantic_version": TARGET_VERSION, "mode": "union", "targets": targets}},
         "platform_filter": {"mode": "any"},
@@ -308,6 +339,10 @@ fn write_evidence(root: &Path, missing_flags: Value) {
     let manifest_root = root.join("cli_manifests/codex");
     write_text(&manifest_root.join("snapshots").join(TARGET_VERSION).join("union.json"), &union.to_string());
     write_text(&manifest_root.join("reports").join(TARGET_VERSION).join("coverage.any.json"), &report.to_string());
+    for target in targets {
+        report["platform_filter"] = json!({"mode": "exact_target", "target_triple": target});
+        write_text(&manifest_root.join("reports").join(TARGET_VERSION).join(format!("coverage.{target}.json")), &report.to_string());
+    }
 }
 
 fn run_gate(root: &Path) -> Result<(AuditStatusOutcome, Value), Error> {
