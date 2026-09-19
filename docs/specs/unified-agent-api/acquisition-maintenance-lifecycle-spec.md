@@ -295,6 +295,21 @@ both review lanes clean with findings adjudicated.
 
 Order: T1 → T2 → (T3 ∥ T4) → T5 → T6 → T7 → T8.
 
+### Backlog groups that land inside that order
+
+The open items in §8.1 are not a queue to drain after T8. Five of them gate a T item and land with
+it. Recorded 2026-09-19, after `uaa-0029`, `uaa-0038`, `uaa-0043`, `uaa-0046` and `uaa-0047` landed
+in #216.
+
+| group | items | lands |
+|---|---|---|
+| Verdict visibility | `uaa-0031`, `uaa-0025`, and `uaa-0028` only if the chosen surface makes the projection path durable | **With T3.** `uaa-0031` decides the surface T3 renders to, and its deliverable reads "implemented with T3". T3 is the projection's first consumer, so `uaa-0025` cannot follow it. |
+| Closeout prerequisites | `uaa-0045`, `uaa-0039` | **Immediately after the verdict-visibility group, before T4–T8 reach a live packet.** Neither blocks T3, and neither may wait for T8. `uaa-0045`'s trigger fired when `uaa-0038` was resolved in `a474cdbc`: the two are halves of one defense — the workflow clears a stale shard, the merger checks that a shard is what its filename claims — and only the first half exists. |
+
+`c4_spec_ci_wiring.rs` (699 code lines) and `agent_maintenance_audit_status.rs` (695) are both
+within five lines of the §5 cap and are the conventional homes for the contract and regression tests
+both groups add. Budget the file splits as the first commits of each group, not as cleanup.
+
 ### T8 sequencing — closeout happens *before* merge
 
 A packet must be closed **on its own branch**, so the merge carries a closed HANDOFF. Codex
@@ -371,7 +386,7 @@ bounded repository bundle added three (`uaa-0045`…`uaa-0047`).
 | `uaa-0043` | The gap-list name implies newness the audit never checks | **Resolved in `fb2481c0`.** The request schema now calls the list `unbaselined_gap_surface`, matching the audit's actual baseline test. |
 | `uaa-0044` | Release-notes mining and docs cross-check were designed but never built | Low. ADR 0001 §3 signals; codex 0.153.4 hides 11 surfaces from help and 7 appear nowhere in our artifacts. |
 | `uaa-0045` | opencode's `RULES.json` was never normalized to the union-model schema | **Resolve before the opencode packet closes.** Its `union` block omits the three identity guards codex and claude_code set, and it has no `globals`, so the union accepts a shard declaring another tool or version and skips the root-flag dedupe. Every missing key is `#[serde(default)]`, so a thin descriptor is silently permissive. Compounds `uaa-0038`. Pointer: Workstream E in the parity generalization plan §5. |
-| `uaa-0046` | Debt authorization does not constrain matches by target or upstream version | **Resolve before a target is added to any `union.expected_targets`, and before `uaa-0039`.** Wrapper coverage already supports target scope: `scope.target_triples` is a first-class mechanism in `crates/xtask/src/wrapper_coverage_shared.rs`, validated against the agent's expected targets, and claude_code populates it on 21 entries while codex and opencode populate it on none. The debt inventory never adopted it — its parser reads ten fixed keys and silently ignores any other, so a deferral argued for one target authorizes the same surface on a target added later. This is adoption of an existing mechanism, not invention of a new one, but the default must not be adopted with it: an omitted coverage scope means all expected targets, which on an authorization record would grant permission by omission. Debt scope is required instead. Distinct from `uaa-0041`, which is about values, arity and output shape. Pointers: `wrapper_coverage_shared.rs`, and the Surface identity rules in the request contract. |
+| `uaa-0046` | Debt authorization does not constrain matches by target or upstream version | **Resolved in `b52f1242` / `4c292da2`.** Each debt row now carries a required `scope_target_triples`, an `authorized_at_version`, and an `authorization_evidence_ref`, and a row whose scope exceeds the surface's observations is rejected. Wrapper coverage already supports target scope: `scope.target_triples` is a first-class mechanism in `crates/xtask/src/wrapper_coverage_shared.rs`, validated against the agent's expected targets, and claude_code populates it on 21 entries while codex and opencode populate it on none. The debt inventory never adopted it — its parser reads ten fixed keys and silently ignores any other, so a deferral argued for one target authorizes the same surface on a target added later. This is adoption of an existing mechanism, not invention of a new one, but the default must not be adopted with it: an omitted coverage scope means all expected targets, which on an authorization record would grant permission by omission. Debt scope is required instead. Distinct from `uaa-0041`, which is about values, arity and output shape. Pointers: `wrapper_coverage_shared.rs`, and the Surface identity rules in the request contract. |
 | `uaa-0047` | Permission-test fixtures restore the directory mode only on the success path | **Resolved in `dea84bf8`.** Both fixtures restore through a `Drop` guard whose body ignores a failed restore, since a panicking destructor during unwinding aborts the process. Each fixture is now established by a direct filesystem probe rather than by the behaviour of the code under test, so a regression cannot present itself as an environmental skip. The file was split to make room. |
 
 ### 8.2 What T1 changed about T2
