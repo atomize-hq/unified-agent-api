@@ -14,6 +14,7 @@ use xtask::agent_maintenance::audit_status::{
 };
 
 const WORKFLOW: &str = ".github/workflows/parity-acquire.yml";
+const MATERIALIZE_STEP: &str = "Materialize snapshots and assert the required target is present";
 const GATE_STEP: &str = "Maintenance audit gate";
 const TERMINAL_STEP: &str = "Fail the job if the maintenance audit recorded a blocking verdict";
 
@@ -226,6 +227,34 @@ fn terminal_step_rejects_nonblocking_or_invalid_exit_codes() {
 }
 
 #[test]
+fn c4_spec_reusable_acquisition_exports_the_single_audit_verdict_to_its_caller() {
+    let workflow = read_workflow();
+    let workflow_call = section_between(&workflow, "  workflow_call:\n", "  workflow_dispatch:\n");
+    let outputs = section_between(workflow_call, "    outputs:\n", "    secrets:\n");
+    let union_job_header = section_between(&workflow, "  union:\n", "    steps:\n");
+
+    for output in ["closeout_ready", "uplifts_required", "audit_exit_code"] {
+        let reusable_mapping = format!("value: ${{{{ jobs.union.outputs.{output} }}}}");
+        assert!(
+            outputs.contains(&format!("      {output}:\n")) && outputs.contains(&reusable_mapping),
+            "workflow_call must export `{output}` from the union job"
+        );
+
+        let audit_mapping =
+            format!("{output}: ${{{{ steps.maintenance_audit.outputs.{output} }}}}");
+        assert!(
+            union_job_header.contains(&audit_mapping),
+            "union output `{output}` must come directly from the maintenance audit step"
+        );
+    }
+
+    assert!(
+        !workflow_call.contains("|| 'true'") && !workflow_call.contains("|| \"true\""),
+        "missing reusable-workflow verdicts must not default to success"
+    );
+}
+
+#[test]
 fn union_job_runs_after_snapshot_failure_but_not_plan_failure_or_cancellation() {
     let workflow = read_workflow();
     let header = section_between(&workflow, "  union:\n", "    steps:\n");
@@ -248,6 +277,112 @@ fn failed_snapshot_leg_uploads_raw_help_evidence_but_never_its_snapshot() {
         .any(|l| l.starts_with("        if:")));
     let raw_help_upload = section_between(&workflow, raw_help_step, "  union:\n");
     assert!(raw_help_upload.starts_with("        if: ${{ !cancelled() }}\n"));
+}
+
+#[test]
+fn materialize_snapshots_removes_stale_planned_target_before_reporting_it_missing() {
+    let run = run_materialize(&["linux-x64", "linux-arm64"], &["linux-x64"], "linux-x64");
+
+    assert!(
+        run.output.status.success(),
+        "materialize step failed: {}",
+        String::from_utf8_lossy(&run.output.stderr)
+    );
+    assert!(run.destination.join("linux-x64.json").is_file());
+    assert!(
+        !run.destination.join("linux-arm64.json").exists(),
+        "a planned target with no artifact from this run must not retain its stale snapshot"
+    );
+    assert!(
+        String::from_utf8_lossy(&run.output.stdout)
+            .contains("::warning title=Missing target snapshot::linux-arm64 produced no snapshot"),
+        "missing target was not reported: {}",
+        String::from_utf8_lossy(&run.output.stdout)
+    );
+    assert!(String::from_utf8_lossy(&run.output.stdout).contains("missing target snapshots: 1"));
+}
+
+#[test]
+fn materialize_snapshots_preserves_a_complete_acquisition() {
+    let run = run_materialize(
+        &["linux-x64", "linux-arm64"],
+        &["linux-x64", "linux-arm64"],
+        "linux-x64",
+    );
+
+    assert!(
+        run.output.status.success(),
+        "materialize step failed: {}",
+        String::from_utf8_lossy(&run.output.stderr)
+    );
+    assert_eq!(
+        fs::read_to_string(run.destination.join("linux-x64.json")).expect("fresh x64 snapshot"),
+        "fresh linux-x64\n"
+    );
+    assert_eq!(
+        fs::read_to_string(run.destination.join("linux-arm64.json")).expect("fresh arm64 snapshot"),
+        "fresh linux-arm64\n"
+    );
+    assert!(String::from_utf8_lossy(&run.output.stdout).contains("missing target snapshots: 0"));
+}
+
+struct MaterializeRun {
+    _temp: TempDir,
+    destination: PathBuf,
+    output: Output,
+}
+
+fn run_materialize(planned: &[&str], fresh: &[&str], required: &str) -> MaterializeRun {
+    let temp = TempDir::new().expect("materialize tempdir");
+    let plan = temp.path().join("_ci_tmp/acquisition-plan.json");
+    fs::create_dir_all(plan.parent().expect("plan parent")).expect("create plan dir");
+    let include = planned
+        .iter()
+        .map(|target| format!(r#"{{"target_triple":"{target}"}}"#))
+        .collect::<Vec<_>>()
+        .join(",");
+    fs::write(&plan, format!(r#"{{"include":[{include}]}}"#)).expect("write plan");
+
+    let destination = temp.path().join("manifest/snapshots/1.2.3");
+    fs::create_dir_all(&destination).expect("create destination");
+    for target in planned {
+        fs::write(
+            destination.join(format!("{target}.json")),
+            format!("stale {target}\n"),
+        )
+        .expect("write stale snapshot");
+    }
+
+    let snapshots = temp.path().join("_snapshots");
+    fs::create_dir_all(&snapshots).expect("create downloaded snapshots dir");
+    for target in fresh {
+        fs::write(
+            snapshots.join(format!("{target}.json")),
+            format!("fresh {target}\n"),
+        )
+        .expect("write fresh snapshot");
+    }
+
+    let script = temp.path().join("materialize.sh");
+    fs::write(&script, extract_run_block(MATERIALIZE_STEP)).expect("write materialize script");
+    let mut command = runner_command(&script, temp.path());
+    command.env("PATH", std::env::var("PATH").expect("PATH"));
+    add_step_env(
+        &mut command,
+        MATERIALIZE_STEP,
+        &[
+            ("${{ inputs.target_version }}", "1.2.3"),
+            ("${{ needs.plan.outputs.manifest_root }}", "manifest"),
+            ("${{ needs.plan.outputs.required_target }}", required),
+        ],
+    );
+    let output = command.output().expect("run materialize script");
+
+    MaterializeRun {
+        _temp: temp,
+        destination,
+        output,
+    }
 }
 
 fn failure_case(status: i32) -> GateCase {

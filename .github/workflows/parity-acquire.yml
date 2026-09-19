@@ -31,6 +31,17 @@ on:
         required: false
         default: false
         type: boolean
+    # Blocking verdicts fail `union`, so GitHub exposes these outputs as empty; uaa-0031 owns their visible relay.
+    outputs:
+      closeout_ready:
+        description: "True only for observable exit 0; false for exit 3 or non-committing exit 5; empty if union fails"
+        value: ${{ jobs.union.outputs.closeout_ready }}
+      uplifts_required:
+        description: "True only for observable exit 3; false for exit 0 or non-committing exit 5; empty if union fails"
+        value: ${{ jobs.union.outputs.uplifts_required }}
+      audit_exit_code:
+        description: "Observable audit exit: 0, 3, or non-committing 5; empty if union fails, including blocking exit 2, 4, or 5"
+        value: ${{ jobs.union.outputs.audit_exit_code }}
     secrets:
       AUTOMATION_TOKEN:
         description: "PAT used to push acquired artifacts so the packet PR's CI re-runs"
@@ -458,6 +469,7 @@ jobs:
     outputs:
       closeout_ready: ${{ steps.maintenance_audit.outputs.closeout_ready }}
       uplifts_required: ${{ steps.maintenance_audit.outputs.uplifts_required }}
+      audit_exit_code: ${{ steps.maintenance_audit.outputs.audit_exit_code }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -482,8 +494,6 @@ jobs:
           path: _snapshots
           merge-multiple: true
 
-      # Deferred (docs/backlog.json uaa-0038): DEST is not cleared, so when `ref` already has
-      # committed snapshots for this version, a target that failed in this run still counts as present.
       - name: Materialize snapshots and assert the required target is present
         shell: bash
         env:
@@ -497,6 +507,9 @@ jobs:
           mkdir -p "$DEST"
 
           while read -r target; do
+            # The checkout may already contain this version. Clear only the planned target before
+            # looking for this run's artifact so a failed snapshot leg cannot reuse stale evidence.
+            rm -f "${DEST}/${target}.json"
             FOUND="$(find _snapshots -type f -name "${target}.json" -print -quit || true)"
             if [ -n "$FOUND" ]; then
               cp "$FOUND" "${DEST}/${target}.json"

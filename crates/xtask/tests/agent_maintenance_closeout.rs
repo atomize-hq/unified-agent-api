@@ -73,3 +73,59 @@ use closeout_harness::{
     maintenance_request_toml_with_refs, valid_closeout_json, valid_closeout_struct,
 };
 use harness::{fixture_root, sha256_hex, write_text};
+
+fn seed_opencode_basis(root: &Path) {
+    maintenance_harness::seed_opencode_basis(root);
+    let registry = agent_registry::AgentRegistry::load(root).expect("load registry");
+    let entry = registry.find("opencode").expect("opencode registry entry");
+    write_text(
+        &root.join("cli_manifests/opencode/RULES.json"),
+        &serde_json::json!({"union": {"expected_targets": entry.canonical_targets}}).to_string(),
+    );
+    write_opencode_coverage_reports(root, "1.14.47", false);
+    write_text(
+        &root.join("docs/specs/unified-agent-api/non-tui-support-debt.md"),
+        "# Non-TUI Support Debt Inventory\n\n### `support-debt-authorization-contract-target-version-v1`\n\n## Inventory\n",
+    );
+}
+
+fn write_opencode_coverage_reports(root: &Path, version: &str, missing_status: bool) {
+    let registry = agent_registry::AgentRegistry::load(root).expect("load registry");
+    let targets = &registry
+        .find("opencode")
+        .expect("opencode registry entry")
+        .canonical_targets;
+    let missing_commands = if missing_status {
+        serde_json::json!([{
+            "path": ["status"],
+            "upstream_available_on": targets
+        }])
+    } else {
+        serde_json::json!([])
+    };
+    let reports = root.join("cli_manifests/opencode/reports").join(version);
+    let mut report = serde_json::json!({
+        "inputs": {"upstream": {"semantic_version": version, "targets": targets}},
+        "platform_filter": {"mode": "any"},
+        "deltas": {
+            "missing_commands": missing_commands,
+            "missing_flags": [],
+            "missing_args": [],
+            "intentionally_unsupported": []
+        }
+    });
+    write_text(&reports.join("coverage.any.json"), &report.to_string());
+    for target in targets {
+        report["inputs"]["upstream"]["targets"] = serde_json::json!([target]);
+        report["platform_filter"] =
+            serde_json::json!({"mode": "exact_target", "target_triple": target});
+        if missing_status {
+            report["deltas"]["missing_commands"][0]["upstream_available_on"] =
+                serde_json::json!([target]);
+        }
+        write_text(
+            &reports.join(format!("coverage.{target}.json")),
+            &report.to_string(),
+        );
+    }
+}

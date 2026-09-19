@@ -49,7 +49,7 @@ pub(super) fn validate_support_surface_audit(
                 ))
             })?;
             let actual = map_raw_support_surface_audit(raw_audit);
-            let frozen_had_discovery_work = !actual.discovered_upstream_surface.is_empty()
+            let frozen_had_discovery_work = !actual.unbaselined_gap_surface.is_empty()
                 || !actual.required_uplifts_this_run.is_empty();
             if !actual.required {
                 return Err(MaintenanceRequestError::Validation(format!(
@@ -233,12 +233,12 @@ fn support_surface_audit_satisfied(
     frozen: &SupportSurfaceAudit,
     live: &SupportSurfaceAudit,
 ) -> bool {
-    let frozen_had_work = !frozen.discovered_upstream_surface.is_empty()
-        || !frozen.required_uplifts_this_run.is_empty();
+    let frozen_had_work =
+        !frozen.unbaselined_gap_surface.is_empty() || !frozen.required_uplifts_this_run.is_empty();
     if !frozen_had_work {
         return false;
     }
-    if !live.discovered_upstream_surface.is_empty() || !live.required_uplifts_this_run.is_empty() {
+    if !live.unbaselined_gap_surface.is_empty() || !live.required_uplifts_this_run.is_empty() {
         return false;
     }
     if live.deferred_preexisting_gaps != frozen.deferred_preexisting_gaps {
@@ -283,9 +283,9 @@ fn describe_support_surface_audit_drift(
     );
     push_row_diffs(
         &mut diffs,
-        "support_surface_audit.discovered_upstream_surface",
-        &frozen.discovered_upstream_surface,
-        &live.discovered_upstream_surface,
+        "support_surface_audit.unbaselined_gap_surface",
+        &frozen.unbaselined_gap_surface,
+        &live.unbaselined_gap_surface,
         EvidenceBackedSurface::identity,
         |row| format!("evidence_ref={}", row.evidence_ref),
     );
@@ -467,8 +467,8 @@ fn map_raw_support_surface_audit(raw: RawSupportSurfaceAudit) -> SupportSurfaceA
         allowed_deferrals: raw.allowed_deferrals,
         pre_run_debt_count: raw.pre_run_debt_count,
         expected_post_run_debt_count: raw.expected_post_run_debt_count,
-        discovered_upstream_surface: raw
-            .discovered_upstream_surface
+        unbaselined_gap_surface: raw
+            .unbaselined_gap_surface
             .into_iter()
             .map(map_raw_evidence_backed_surface)
             .collect(),

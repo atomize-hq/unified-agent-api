@@ -22,11 +22,53 @@ mod harness;
 mod maintenance_harness;
 
 use maintenance_harness::{
-    execute_args, fake_execute_codex_binary, prepare_execute_fixture, read_json, run_execute_cli,
+    execute_args, fake_execute_codex_binary, read_json, run_execute_cli,
     snapshot_without_execute_runs, write_fake_execute_codex_preflight_scenario,
     write_fake_execute_codex_scenario, Cli, EXECUTE_RUNS_ROOT, EXECUTE_WRITE_RUN_ID,
     FAKE_EXECUTE_CODEX_LOG_FILE, GATE_ORDER_LOG_FILE,
 };
+
+fn prepare_execute_fixture(prefix: &str) -> std::path::PathBuf {
+    let fixture = maintenance_harness::prepare_execute_fixture(prefix);
+    let registry =
+        xtask::agent_registry::AgentRegistry::parse(include_str!("../data/agent_registry.toml"))
+            .expect("parse seeded registry");
+    let entry = registry.find("codex").expect("codex registry entry");
+    harness::write_text(
+        &fixture.join("cli_manifests/codex/RULES.json"),
+        &serde_json::json!({"union": {"expected_targets": entry.canonical_targets}}).to_string(),
+    );
+    write_codex_coverage_reports(&fixture, &entry.canonical_targets);
+    harness::write_text(
+        &fixture.join("docs/specs/unified-agent-api/non-tui-support-debt.md"),
+        "# Non-TUI Support Debt Inventory\n\n### `support-debt-authorization-contract-target-version-v1`\n\n## Inventory\n",
+    );
+    fixture
+}
+
+fn write_codex_coverage_reports(root: &Path, targets: &[String]) {
+    let reports = root.join("cli_manifests/codex/reports/0.98.0");
+    let mut report = serde_json::json!({
+        "inputs": {"upstream": {"semantic_version": "0.98.0", "targets": targets}},
+        "platform_filter": {"mode": "any"},
+        "deltas": {
+            "missing_commands": [],
+            "missing_flags": [],
+            "missing_args": [],
+            "intentionally_unsupported": []
+        }
+    });
+    harness::write_text(&reports.join("coverage.any.json"), &report.to_string());
+    for target in targets {
+        report["inputs"]["upstream"]["targets"] = serde_json::json!([target]);
+        report["platform_filter"] =
+            serde_json::json!({"mode": "exact_target", "target_triple": target});
+        harness::write_text(
+            &reports.join(format!("coverage.{target}.json")),
+            &report.to_string(),
+        );
+    }
+}
 
 #[test]
 fn execute_agent_maintenance_help_text_includes_required_surface() {
@@ -393,7 +435,7 @@ fn execute_agent_maintenance_write_fails_when_support_surface_audit_goes_stale_a
     );
     harness::write_text(
         &fixture.join("gate-command.sh"),
-        "#!/usr/bin/env sh\nset -eu\nlabel=\"$1\"\nlog_path=\"$2\"\nmkdir -p \"$(dirname \"$log_path\")\"\nprintf '%s\\n' \"$label\" >> \"$log_path\"\ncat > \"cli_manifests/codex/reports/0.98.0/coverage.any.json\" <<'EOF'\n{\n  \"deltas\": {\n    \"missing_commands\": [\n      {\n        \"path\": [\"status\"]\n      }\n    ],\n    \"missing_flags\": [],\n    \"missing_args\": [],\n    \"intentionally_unsupported\": []\n  }\n}\nEOF\n",
+        "#!/usr/bin/env sh\nset -eu\nlabel=\"$1\"\nlog_path=\"$2\"\nmkdir -p \"$(dirname \"$log_path\")\"\nprintf '%s\\n' \"$label\" >> \"$log_path\"\ncat > \"cli_manifests/codex/reports/0.98.0/coverage.any.json\" <<'EOF'\n{\n  \"inputs\": {\"upstream\": {\"semantic_version\": \"0.98.0\", \"targets\": [\"x86_64-unknown-linux-musl\"]}},\n  \"platform_filter\": {\"mode\": \"any\"},\n  \"deltas\": {\n    \"missing_commands\": [{\"path\": [\"status\"], \"upstream_available_on\": [\"x86_64-unknown-linux-musl\"]}],\n    \"missing_flags\": [],\n    \"missing_args\": [],\n    \"intentionally_unsupported\": []\n  }\n}\nEOF\ncat > \"cli_manifests/codex/reports/0.98.0/coverage.x86_64-unknown-linux-musl.json\" <<'EOF'\n{\n  \"inputs\": {\"upstream\": {\"semantic_version\": \"0.98.0\", \"targets\": [\"x86_64-unknown-linux-musl\"]}},\n  \"platform_filter\": {\"mode\": \"exact_target\", \"target_triple\": \"x86_64-unknown-linux-musl\"},\n  \"deltas\": {\n    \"missing_commands\": [{\"path\": [\"status\"], \"upstream_available_on\": [\"x86_64-unknown-linux-musl\"]}],\n    \"missing_flags\": [],\n    \"missing_args\": [],\n    \"intentionally_unsupported\": []\n  }\n}\nEOF\n",
     );
 
     let codex_binary = fake_execute_codex_binary(&fixture);
@@ -405,7 +447,7 @@ fn execute_agent_maintenance_write_fails_when_support_surface_audit_goes_stale_a
     assert_eq!(output.exit_code, 2);
     assert!(output
         .stderr
-        .contains("support_surface_audit.discovered_upstream_surface added"));
+        .contains("support_surface_audit.unbaselined_gap_surface added"));
     assert!(output
         .stderr
         .contains("surface_kind=commands command_path=codex status surface_id=status"));
@@ -413,16 +455,13 @@ fn execute_agent_maintenance_write_fails_when_support_surface_audit_goes_stale_a
     let run_dir = fixture.join(EXECUTE_RUNS_ROOT).join(EXECUTE_WRITE_RUN_ID);
     let report = read_json(&run_dir.join("validation-report.json"));
     assert_eq!(report.get("status").and_then(Value::as_str), Some("fail"));
-    assert!(
-        report
-            .get("errors")
-            .and_then(Value::as_array)
-            .expect("errors array")
-            .iter()
-            .filter_map(Value::as_str)
-            .any(|message| message
-                .contains("support_surface_audit.discovered_upstream_surface added"))
-    );
+    assert!(report
+        .get("errors")
+        .and_then(Value::as_array)
+        .expect("errors array")
+        .iter()
+        .filter_map(Value::as_str)
+        .any(|message| message.contains("support_surface_audit.unbaselined_gap_surface added")));
 }
 
 #[test]

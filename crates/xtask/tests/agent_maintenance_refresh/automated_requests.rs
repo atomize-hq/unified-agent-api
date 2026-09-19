@@ -128,7 +128,7 @@ fn opencode_automated_request_with_execution_contract_toml(
 
 const FROZEN_DISCOVERY_ROW: &str = concat!(
     "\n",
-    "[[support_surface_audit.discovered_upstream_surface]]\n",
+    "[[support_surface_audit.unbaselined_gap_surface]]\n",
     "surface_kind = \"commands\"\n",
     "command_path = \"opencode status\"\n",
     "surface_id = \"status\"\n",
@@ -175,64 +175,21 @@ const FROZEN_DEFERRED_ROW: &str = concat!(
 );
 
 fn seed_live_new_discovery(fixture: &std::path::Path) {
-    write_text(
-        &fixture.join("cli_manifests/opencode/reports/0.98.0/coverage.any.json"),
-        concat!(
-            "{\n",
-            "  \"deltas\": {\n",
-            "    \"missing_commands\": [\n",
-            "      {\n",
-            "        \"path\": [\"status\"]\n",
-            "      }\n",
-            "    ],\n",
-            "    \"missing_flags\": [],\n",
-            "    \"missing_args\": [],\n",
-            "    \"intentionally_unsupported\": []\n",
-            "  }\n",
-            "}\n"
-        ),
-    );
+    write_opencode_coverage_reports(fixture, "0.98.0", true);
 }
 
 fn seed_live_clean_report(fixture: &std::path::Path) {
-    write_text(
-        &fixture.join("cli_manifests/opencode/reports/0.98.0/coverage.any.json"),
-        concat!(
-            "{\n",
-            "  \"deltas\": {\n",
-            "    \"missing_commands\": [],\n",
-            "    \"missing_flags\": [],\n",
-            "    \"missing_args\": [],\n",
-            "    \"intentionally_unsupported\": []\n",
-            "  }\n",
-            "}\n"
-        ),
-    );
+    write_opencode_coverage_reports(fixture, "0.98.0", false);
 }
 
 fn seed_live_deferred_row(fixture: &std::path::Path, blocker_class: &str) {
-    write_text(
-        &fixture.join("cli_manifests/opencode/reports/0.98.0/coverage.any.json"),
-        concat!(
-            "{\n",
-            "  \"deltas\": {\n",
-            "    \"missing_commands\": [\n",
-            "      {\n",
-            "        \"path\": [\"status\"]\n",
-            "      }\n",
-            "    ],\n",
-            "    \"missing_flags\": [],\n",
-            "    \"missing_args\": [],\n",
-            "    \"intentionally_unsupported\": []\n",
-            "  }\n",
-            "}\n"
-        ),
-    );
+    write_opencode_coverage_reports(fixture, "0.98.0", true);
     write_text(
         &fixture.join("docs/specs/unified-agent-api/non-tui-support-debt.md"),
         &format!(
             concat!(
                 "# Non-TUI Support Debt Inventory\n\n",
+                "### `support-debt-authorization-contract-target-version-v1`\n\n",
                 "## Inventory\n\n",
                 "### `opencode-status-command`\n\n",
                 "- `agent_id`: `opencode`\n",
@@ -244,10 +201,34 @@ fn seed_live_deferred_row(fixture: &std::path::Path, blocker_class: &str) {
                 "- `owner`: `wrappers team`\n",
                 "- `milestone`: `post packet-pr convergence follow-on`\n",
                 "- `follow_on`: `TODOS.md#close-opencode-status-gap`\n",
-                "- `evidence_ref`: `cli_manifests/opencode/reports/0.98.0/coverage.any.json`\n"
+                "- `evidence_ref`: `cli_manifests/opencode/reports/0.98.0/coverage.any.json`\n",
+                "- `scope_target_triples`: `linux-x64, darwin-arm64, win32-x64`\n",
+                "- `authorized_at_version`: `0.98.0`\n",
+                "- `authorization_evidence_ref`: `cli_manifests/opencode/reports/0.98.0/coverage.authorization.json`\n"
             ),
             blocker_class = blocker_class
         ),
+    );
+    write_text(
+        &fixture.join("cli_manifests/opencode/reports/0.98.0/coverage.authorization.json"),
+        &serde_json::json!({
+            "inputs": {
+                "upstream": {
+                    "semantic_version": "0.98.0",
+                    "targets": ["linux-x64", "darwin-arm64", "win32-x64"]
+                }
+            },
+            "deltas": {
+                "missing_commands": [{
+                    "path": ["status"],
+                    "upstream_available_on": ["linux-x64", "darwin-arm64", "win32-x64"]
+                }],
+                "missing_flags": [],
+                "missing_args": [],
+                "intentionally_unsupported": []
+            }
+        })
+        .to_string(),
     );
 }
 
@@ -620,8 +601,8 @@ fn automated_request_support_surface_audit_rejects_missing_live_report_after_fro
     seed_publication_inputs(&fixture);
     seed_opencode_packet_pr_workflow(&fixture);
     seed_live_clean_report(&fixture);
-    fs::remove_file(fixture.join("cli_manifests/opencode/reports/0.98.0/coverage.any.json"))
-        .expect("remove live report");
+    fs::remove_dir_all(fixture.join("cli_manifests/opencode/reports/0.98.0"))
+        .expect("remove live reports");
 
     let request_path =
         "docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml";
@@ -694,7 +675,7 @@ fn automated_request_support_surface_audit_rejects_new_live_discovery_with_named
     let err = request::load_request_envelope_validated(&fixture, Path::new(request_path))
         .expect_err("new live discovery should invalidate the frozen request");
     let message = err.to_string();
-    assert!(message.contains("support_surface_audit.discovered_upstream_surface added"));
+    assert!(message.contains("support_surface_audit.unbaselined_gap_surface added"));
     assert!(
         message.contains("surface_kind=commands command_path=opencode status surface_id=status")
     );

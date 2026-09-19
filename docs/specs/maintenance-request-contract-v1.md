@@ -127,7 +127,7 @@ allowed_deferrals = [
 pre_run_debt_count = 0
 expected_post_run_debt_count = 0
 
-[[support_surface_audit.discovered_upstream_surface]]
+[[support_surface_audit.unbaselined_gap_surface]]
 surface_kind = "flags"
 command_path = "codex exec"
 surface_id = "--json"
@@ -188,7 +188,7 @@ Required record shape rules:
 | Record | Required keys | Notes |
 | --- | --- | --- |
 | surface row | `surface_kind`, `command_path`, `surface_id` | shared identity for every audit list |
-| evidence-backed row | surface row + `evidence_ref` | used for discovered upstream surface; the list name implies newness the audit never checks (`uaa-0043`) |
+| evidence-backed row | surface row + `evidence_ref` | used for unbaselined gap surface |
 | debt-backed row | surface row + `debt_ref` | used for preexisting inventory rows |
 | unmatched debt row | surface row + `debt_ref`, `observation` | `observation` only `covered_by_wrapper`, `excluded_by_rules`, or `not_observed` |
 | eligible row | surface row + `eligibility_reason` | only `adjacent_surface_changed`, `bounded_write_envelope`, or `no_new_seam_required` |
@@ -196,11 +196,14 @@ Required record shape rules:
 | deferred row | surface row + `defer_reason`, `blocking_follow_on` when repo-owned | `blocking_follow_on` omitted only for concrete external blockers |
 | publication impact row | surface row + `surface_doc` | ties uplift to published truth |
 
-Surface identity rules. When a coverage report exists for the target version, shared code derives
-the gap surfaces from report rows as shown below. Those identities fill `missing_wrapper_support`,
-`missing_backend_support`, and `publication_impacts`. A gap surface that equals a non-TUI debt
-inventory row becomes a preexisting and deferred row; any other becomes a discovered row and a
-required uplift. A debt inventory row that equals no gap surface becomes an
+Surface identity rules. When coverage reports exist for the target version, shared code derives
+the gap surfaces and their target masks from the `coverage.<target>.json` exact-target reports,
+not from the aggregate `coverage.any.json` row's upstream-availability mask. The aggregate report
+remains the evidence reference and unmatched-debt classification source. Gap identities fill
+`missing_wrapper_support`, `missing_backend_support`, and `publication_impacts`. A gap with an
+inventory identity remains a preexisting and deferred row so debt-baseline continuity is explicit;
+if one or more target obligations remain unauthorized, that same aggregate identity also becomes a
+discovered row and a required uplift. A debt inventory row that equals no gap surface becomes an
 `unmatched_debt_surface` row carrying the debt row's identity and `debt_ref`, with an `observation`
 taken from live evidence: `excluded_by_rules` when the report lists the surface under
 `deltas.excluded_commands`, `deltas.excluded_flags`, or `deltas.excluded_args`; otherwise
@@ -210,9 +213,10 @@ any-target report (`platform_filter.mode = "any"`) whose `inputs.upstream.target
 union's input targets; otherwise the evidence is invalid. Shared code never derives a removal: help
 output cannot prove that upstream removed a surface, because upstream can hide one (see
 [Hidden upstream surfaces and wrapper-only rows](#hidden-upstream-surfaces-and-wrapper-only-rows)).
-Without a report, every surface row uses the identities written in the debt inventory rows and no
-row is unmatched. Shared code leaves `eligible_preexisting_surface` empty. `path` is the report
-row's command path below the agent's own command.
+Without per-target reports, every surface row uses the identities written in the debt inventory
+rows, no row is unmatched, and no authorization grant applies: the rows remain required work until
+target-specific gap evidence exists. Shared code leaves `eligible_preexisting_surface` empty.
+`path` is the report row's command path below the agent's own command.
 
 | Report row | `surface_kind` | `command_path` | `surface_id` |
 | --- | --- | --- | --- |
@@ -222,16 +226,34 @@ row's command path below the agent's own command.
 | flag (`key`) | `global_flags` when `path` is empty, else `flags` | `<agent_id>` or `<agent_id> <path...>` | `key` |
 | positional argument (`name`) | `positional_args` | `<agent_id>` or `<agent_id> <path...>` | `name` |
 
-The three fields together are the identity; a consumer MUST NOT match surfaces on `surface_id`
-alone, because the root command and a command named like the agent share one. `command_path` is
-rooted at the registry `agent_id` (for example `claude_code install`), never at the upstream binary
-name, and debt inventory rows MUST use the same form so they match report-derived surfaces.
-Identity is name-only: it does not compare accepted values, arity, or output shape, so a flag the
-wrapper supports for only some values (opencode `run --format` accepts only `json` through the
-wrapper) counts as covered (`uaa-0041`). Identity also carries no target and no upstream version,
-so a debt row authorized while one target was acquired matches the same-named surface on a target
-added later, and a new version's report does not re-authorize an old debt decision (`uaa-0046`).
-Resolve that before a target is added to any agent's `union.expected_targets`.
+The three fields together are the name identity; a consumer MUST NOT match surfaces on
+`surface_id` alone, because the root command and a command named like the agent share one.
+`command_path` is rooted at the registry `agent_id` (for example `claude_code install`), never at
+the upstream binary name, and debt inventory rows MUST use the same form so they match
+report-derived surfaces. Identity is name-only: it does not compare accepted values, arity, or
+output shape, so a flag the wrapper supports for only some values (opencode `run --format` accepts
+only `json` through the wrapper) counts as covered (`uaa-0041`).
+
+Authorization is narrower than identity. The normative debt inventory MUST carry the contract
+marker `support-debt-authorization-contract-target-version-v1`; a reader MUST reject an inventory
+without that exact marker and MUST reject unknown row bullet keys. Every debt row MUST provide a
+non-empty comma-separated `scope_target_triples`, exactly one canonical semver in
+`authorized_at_version`, and an `authorization_evidence_ref`. Omission, an empty or malformed
+value, a target absent from that agent's `union.expected_targets`, or a scope that exceeds the
+targets on which the referenced coverage report observed the same surface is invalid evidence.
+`evidence_ref` remains historical provenance and MUST NOT be rewritten as authorization evidence.
+
+For a gap identity `K` at version `V`, let `G` be the union of targets whose exact-target report
+lists the gap and `A` be the union of scopes from valid rows with identity `K` and
+`authorized_at_version = V`. The remaining obligation is `G - A`; the aggregate gap is deferred
+in full only when that set is empty. Version matching is exact. Targets are explicit triples:
+authorization does not expand platforms, wildcards, ranges, or omitted scope. Rows for one
+identity MAY cover
+disjoint targets at one version or the same targets at different versions. Two rows that cover the
+same `(K, V, target)` are invalid, independent of row order. A valid row at another version is
+inapplicable rather than invalid. Audit list rows and debt counts remain aggregated by the
+three-field surface identity; when multiple grant rows contribute, the lexicographically smallest
+row id supplies the rendered `debt_ref`, deferral reason, and follow-on.
 
 A report's `deltas.missing_commands`, `deltas.missing_flags`, and `deltas.missing_args` MUST be
 arrays. `deltas.intentionally_unsupported` MAY be absent, which is how the report writer records an

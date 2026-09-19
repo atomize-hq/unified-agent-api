@@ -343,12 +343,27 @@ fn seed_support_files(root: &Path) {
         "0.97.0\n",
     );
     write_text(
-        &root.join("cli_manifests/codex/reports/0.98.0/coverage.any.json"),
-        "{\n  \"deltas\": {\n    \"missing_commands\": [],\n    \"missing_flags\": [],\n    \"missing_args\": [],\n    \"intentionally_unsupported\": []\n  }\n}\n",
+        &root.join("cli_manifests/codex/RULES.json"),
+        &serde_json::json!({"union": {"expected_targets": entry.canonical_targets}}).to_string(),
     );
+    let mut report = serde_json::json!({
+        "inputs": {"upstream": {"semantic_version": "0.98.0", "targets": entry.canonical_targets}},
+        "platform_filter": {"mode": "any"},
+        "deltas": {"missing_commands": [], "missing_flags": [], "missing_args": [], "intentionally_unsupported": []},
+    });
+    let reports = root.join("cli_manifests/codex/reports/0.98.0");
+    write_text(&reports.join("coverage.any.json"), &report.to_string());
+    for target in &entry.canonical_targets {
+        report["platform_filter"] =
+            serde_json::json!({"mode": "exact_target", "target_triple": target});
+        write_text(
+            &reports.join(format!("coverage.{target}.json")),
+            &report.to_string(),
+        );
+    }
     write_text(
         &root.join("docs/specs/unified-agent-api/non-tui-support-debt.md"),
-        "# Non-TUI Support Debt Inventory\n\n## Inventory\n",
+        "# Non-TUI Support Debt Inventory\n\n### `support-debt-authorization-contract-target-version-v1`\n\n## Inventory\n",
     );
 }
 

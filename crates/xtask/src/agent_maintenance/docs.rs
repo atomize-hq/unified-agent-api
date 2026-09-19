@@ -570,7 +570,7 @@ fn render_support_surface_audit(request: &MaintenanceRequest) -> String {
         if audit.required { "true" } else { "false" },
         audit.pre_run_debt_count,
         audit.expected_post_run_debt_count,
-        audit.discovered_upstream_surface.len(),
+        audit.unbaselined_gap_surface.len(),
         audit.preexisting_unsupported_surface.len(),
         required,
         deferred

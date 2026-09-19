@@ -35,7 +35,7 @@ fn close_agent_maintenance_rejects_resolved_findings_that_still_match_live_drift
 #[test]
 fn close_agent_maintenance_rejects_explicit_none_when_live_drift_exists() {
     let fixture = fixture_root("close-agent-maintenance-live-explicit-none");
-    maintenance_harness::seed_opencode_basis(&fixture);
+    seed_opencode_basis(&fixture);
     maintenance_harness::overwrite_opencode_governance_with_stale_claim(&fixture);
     let request_path =
         Path::new("docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml");
@@ -65,7 +65,7 @@ fn close_agent_maintenance_rejects_explicit_none_when_live_drift_exists() {
 #[test]
 fn close_agent_maintenance_rejects_unaccounted_live_deferred_drift() {
     let fixture = fixture_root("close-agent-maintenance-live-deferred-missing");
-    maintenance_harness::seed_opencode_basis(&fixture);
+    seed_opencode_basis(&fixture);
     maintenance_harness::overwrite_opencode_governance_with_stale_claim(&fixture);
     let request_path =
         Path::new("docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml");
@@ -112,7 +112,7 @@ fn close_agent_maintenance_rejects_unaccounted_live_deferred_drift() {
 #[test]
 fn close_agent_maintenance_rejects_deferred_findings_when_live_report_is_clean() {
     let fixture = fixture_root("close-agent-maintenance-clean-deferred");
-    maintenance_harness::seed_opencode_basis(&fixture);
+    seed_opencode_basis(&fixture);
     let closeout_path = Path::new(
         "docs/agents/lifecycle/opencode-maintenance/governance/maintenance-closeout.json",
     );
