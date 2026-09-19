@@ -5,10 +5,10 @@ use std::{
     path::{Path, PathBuf},
 };
 
-#[cfg(unix)]
-use std::os::unix::fs::PermissionsExt;
-
 use serde_json::{json, Value};
+
+#[path = "agent_maintenance_audit_status/permission_fixtures.rs"]
+mod permission_fixtures;
 
 #[path = "support/onboard_agent_harness.rs"]
 mod harness;
@@ -342,59 +342,6 @@ fn failing_emit_json_pre_derivation_preserves_existing_projection() {
     assert!(matches!(err, AuditStatusError::Validation(_))); assert_eq!(err.exit_code(), 2); assert_eq!(fs::read_to_string(&emit_path).expect("read preserved emit-json target"), original);
 }
 
-#[cfg(unix)]
-#[test]
-fn unreadable_live_evidence_is_internal_error_not_validation() {
-    let fixture = prepared_fixture(
-        "agent-maintenance-audit-status-evidence-io-failure",
-        &clean_report(TARGET_VERSION),
-    );
-    let err = run_with_unreadable_evidence(&fixture);
-    assert!(matches!(err, AuditStatusError::Internal(_)));
-    assert_eq!(err.exit_code(), 1);
-    assert_ne!(err.exit_code(), 2);
-}
-
-#[cfg(unix)]
-#[test]
-fn unreadable_live_evidence_has_same_exit_code_with_and_without_discovery_work() {
-    let clean_fixture = prepared_fixture(
-        "agent-maintenance-audit-status-unreadable-clean",
-        &clean_report(TARGET_VERSION),
-    );
-    let discovery_fixture = prepared_fixture(
-        "agent-maintenance-audit-status-unreadable-discovery",
-        &discovery_report(TARGET_VERSION),
-    );
-
-    let clean_err = run_with_unreadable_evidence(&clean_fixture);
-    let discovery_err = run_with_unreadable_evidence(&discovery_fixture);
-
-    assert!(matches!(clean_err, AuditStatusError::Internal(_)));
-    assert!(matches!(discovery_err, AuditStatusError::Internal(_)));
-    assert_eq!(clean_err.exit_code(), 1);
-    assert_eq!(discovery_err.exit_code(), clean_err.exit_code());
-    assert_ne!(discovery_err.exit_code(), 2);
-}
-
-#[cfg(unix)]
-#[rustfmt::skip]
-#[test]
-fn uplift_outcome_survives_unwritable_emit_json_target_and_warns() {
-    let fixture = prepared_fixture("agent-maintenance-audit-status-uplifts-unwritable-emit-json", &discovery_report(TARGET_VERSION)); let emit_path = fixture.join("_ci_tmp/audit/status.json");
-    let (result, stderr) = with_unwritable_emit_parent(&emit_path, || run_emit_json_with_stderr(&fixture, &emit_path)); let outcome = result.expect("computed uplift outcome should win write failures");
-    assert_eq!(outcome, AuditStatusOutcome::UpliftsRequired); assert_eq!(outcome.exit_code(), EXIT_UPLIFTS_REQUIRED); assert_projection_write_warning(&stderr, &emit_path, &["could not write advisory projection", "Permission denied"]);
-}
-
-#[cfg(unix)]
-#[rustfmt::skip]
-#[test]
-fn clean_outcome_survives_unwritable_emit_json_target() {
-    let fixture = prepared_fixture("agent-maintenance-audit-status-clean-unwritable-emit-json", &clean_report(TARGET_VERSION)); let emit_path = fixture.join("_ci_tmp/audit/status.json");
-    let (result, stderr) = with_unwritable_emit_parent(&emit_path, || run_emit_json_with_stderr(&fixture, &emit_path)); let outcome = result.expect("computed clean outcome should win write failures");
-    assert_eq!(outcome, AuditStatusOutcome::Clean); assert_eq!(outcome.exit_code(), 0); assert_projection_write_warning(&stderr, &emit_path, &["could not write advisory projection", "Permission denied"]);
-}
-
 #[test]
 fn long_emit_json_target_succeeds() {
     let fixture = prepared_fixture(
@@ -717,28 +664,6 @@ fn union_expected_targets(root: &Path) -> Vec<String> {
                 .to_string()
         })
         .collect()
-}
-
-// uaa-0047: both helpers below restore the mode only when their body returns normally, so an
-// assertion failure or a panic leaks the blocked mode to every later test in this binary. Replace
-// the restore calls with a Drop guard, and probe the fixture independently of `audit_status`
-// before asserting. The file is at the 700-code-line cap, so it needs a split first.
-#[cfg(unix)]
-#[rustfmt::skip]
-fn with_unwritable_emit_parent<T>(emit_path: &Path, action: impl FnOnce() -> T) -> T {
-    let emit_parent = emit_path.parent().expect("emit parent"); fs::create_dir_all(emit_parent).expect("create emit parent");
-    let original_permissions = fs::metadata(emit_parent).expect("stat emit parent").permissions(); let mut blocked_permissions = original_permissions.clone();
-    blocked_permissions.set_mode(0o555); fs::set_permissions(emit_parent, blocked_permissions).expect("block emit parent writes");
-    let result = action(); fs::set_permissions(emit_parent, original_permissions).expect("restore emit parent permissions"); result
-}
-
-#[cfg(unix)]
-#[rustfmt::skip]
-fn run_with_unreadable_evidence(root: &Path) -> AuditStatusError {
-    let report_dir = coverage_report_dir(root); let original_permissions = fs::metadata(&report_dir).expect("stat report dir").permissions();
-    let mut blocked_permissions = original_permissions.clone(); blocked_permissions.set_mode(0o000); fs::set_permissions(&report_dir, blocked_permissions).expect("block coverage report dir");
-    let err = audit_status::run_in_workspace(root, audit_args(REQUEST_PATH, None), &mut Vec::new()).expect_err("unreadable evidence must fail");
-    fs::set_permissions(&report_dir, original_permissions).expect("restore report dir perms"); err
 }
 
 fn replace_in_request(root: &Path, before: &str, after: &str) {
