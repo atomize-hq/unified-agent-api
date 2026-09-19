@@ -1568,7 +1568,7 @@
     {
       "id": "uaa-0046",
       "title": "Support-surface debt authorization is not scoped by target or upstream version",
-      "status": "todo",
+      "status": "done",
       "bucket": "agent_api.onboarding",
       "type": "task",
       "kickoff": {

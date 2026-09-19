@@ -26,6 +26,20 @@ Each debt row MUST:
   - `milestone`
   - `follow_on`
   - `evidence_ref`
+  - `scope_target_triples`
+  - `authorized_at_version`
+  - `authorization_evidence_ref`
+
+`scope_target_triples` MUST be a non-empty comma-separated list of canonical target triples from
+the row agent's `union.expected_targets`; platform names, wildcards, ranges, and omission are not
+valid. `authorized_at_version` MUST be exactly one canonical upstream semantic version, never a
+range, list, or moving value. `authorization_evidence_ref` MUST name the coverage report for that
+agent and version whose same-surface `upstream_available_on` observations contain every granted
+target. `evidence_ref` remains historical provenance and is not authorization evidence.
+
+Rows with the same surface identity MAY grant disjoint targets at one version or grants at
+different versions. Rows MUST NOT overlap on one `(surface identity, authorized_at_version,
+target triple)`.
 
 Allowed `blocker_class` values are aligned to the maintenance-request contract:
 
@@ -36,6 +50,13 @@ Allowed `blocker_class` values are aligned to the maintenance-request contract:
 - `outside_registry_maintenance_write_envelope`
 
 Row ids are the canonical `debt_ref` anchors used by `support_surface_audit`.
+
+## Contract marker
+
+### `support-debt-authorization-contract-target-version-v1`
+
+This marker is required. Readers that do not understand target- and version-scoped authorization
+interpret it as an incomplete debt row and reject the inventory rather than broadening grants.
 
 ## Inventory
 
@@ -51,6 +72,9 @@ Row ids are the canonical `debt_ref` anchors used by `support_surface_audit`.
 - `milestone`: `post packet-pr convergence follow-on`
 - `follow_on`: `TODOS.md#close-claude-code-install-maintenance-gap`
 - `evidence_ref`: `cli_manifests/claude_code/reports/2.1.29/coverage.any.json`
+- `scope_target_triples`: `win32-x64`
+- `authorized_at_version`: `2.1.29`
+- `authorization_evidence_ref`: `cli_manifests/claude_code/reports/2.1.29/coverage.any.json`
 
 ### `claude-code-install-force-flag`
 
@@ -64,6 +88,9 @@ Row ids are the canonical `debt_ref` anchors used by `support_surface_audit`.
 - `milestone`: `post packet-pr convergence follow-on`
 - `follow_on`: `TODOS.md#close-claude-code-install-maintenance-gap`
 - `evidence_ref`: `cli_manifests/claude_code/reports/2.1.29/coverage.any.json`
+- `scope_target_triples`: `win32-x64`
+- `authorized_at_version`: `2.1.29`
+- `authorization_evidence_ref`: `cli_manifests/claude_code/reports/2.1.29/coverage.any.json`
 
 ### `codex-completion-command`
 
@@ -77,6 +104,9 @@ Row ids are the canonical `debt_ref` anchors used by `support_surface_audit`.
 - `milestone`: `post shared maintenance proof follow-on`
 - `follow_on`: `TODOS.md#close-codex-completion-maintenance-gap`
 - `evidence_ref`: `cli_manifests/codex/reports/0.129.0/coverage.any.json`
+- `scope_target_triples`: `x86_64-unknown-linux-musl, aarch64-unknown-linux-musl, aarch64-apple-darwin, x86_64-pc-windows-msvc`
+- `authorized_at_version`: `0.125.0`
+- `authorization_evidence_ref`: `cli_manifests/codex/reports/0.125.0/coverage.any.json`
 
 ### `codex-completion-shell-arg`
 
@@ -90,6 +120,9 @@ Row ids are the canonical `debt_ref` anchors used by `support_surface_audit`.
 - `milestone`: `post shared maintenance proof follow-on`
 - `follow_on`: `TODOS.md#close-codex-completion-maintenance-gap`
 - `evidence_ref`: `cli_manifests/codex/reports/0.129.0/coverage.any.json`
+- `scope_target_triples`: `x86_64-unknown-linux-musl, aarch64-unknown-linux-musl, aarch64-apple-darwin, x86_64-pc-windows-msvc`
+- `authorized_at_version`: `0.125.0`
+- `authorization_evidence_ref`: `cli_manifests/codex/reports/0.125.0/coverage.any.json`
 
 ### `opencode-acp-command`
 
@@ -103,6 +136,9 @@ Row ids are the canonical `debt_ref` anchors used by `support_surface_audit`.
 - `milestone`: `post shared maintenance proof follow-on`
 - `follow_on`: `TODOS.md#close-opencode-non-tui-maintenance-gaps`
 - `evidence_ref`: `cli_manifests/opencode/reports/1.14.47/coverage.any.json`
+- `scope_target_triples`: `linux-x64`
+- `authorized_at_version`: `1.4.11`
+- `authorization_evidence_ref`: `cli_manifests/opencode/reports/1.4.11/coverage.any.json`
 
 ### `opencode-attach-command`
 
@@ -116,6 +152,9 @@ Row ids are the canonical `debt_ref` anchors used by `support_surface_audit`.
 - `milestone`: `post shared maintenance proof follow-on`
 - `follow_on`: `TODOS.md#close-opencode-non-tui-maintenance-gaps`
 - `evidence_ref`: `cli_manifests/opencode/reports/1.14.47/coverage.any.json`
+- `scope_target_triples`: `linux-x64`
+- `authorized_at_version`: `1.4.11`
+- `authorization_evidence_ref`: `cli_manifests/opencode/reports/1.4.11/coverage.any.json`
 
 ### `opencode-models-command`
 
@@ -129,6 +168,9 @@ Row ids are the canonical `debt_ref` anchors used by `support_surface_audit`.
 - `milestone`: `post shared maintenance proof follow-on`
 - `follow_on`: `TODOS.md#close-opencode-non-tui-maintenance-gaps`
 - `evidence_ref`: `cli_manifests/opencode/reports/1.14.47/coverage.any.json`
+- `scope_target_triples`: `linux-x64`
+- `authorized_at_version`: `1.4.11`
+- `authorization_evidence_ref`: `cli_manifests/opencode/reports/1.4.11/coverage.any.json`
 
 ### `opencode-providers-command`
 
@@ -142,6 +184,9 @@ Row ids are the canonical `debt_ref` anchors used by `support_surface_audit`.
 - `milestone`: `post shared maintenance proof follow-on`
 - `follow_on`: `TODOS.md#close-opencode-non-tui-maintenance-gaps`
 - `evidence_ref`: `cli_manifests/opencode/reports/1.14.47/coverage.any.json`
+- `scope_target_triples`: `linux-x64`
+- `authorized_at_version`: `1.4.11`
+- `authorization_evidence_ref`: `cli_manifests/opencode/reports/1.4.11/coverage.any.json`
 
 ### `opencode-serve-command`
 
@@ -155,6 +200,9 @@ Row ids are the canonical `debt_ref` anchors used by `support_surface_audit`.
 - `milestone`: `post shared maintenance proof follow-on`
 - `follow_on`: `TODOS.md#close-opencode-non-tui-maintenance-gaps`
 - `evidence_ref`: `cli_manifests/opencode/reports/1.14.47/coverage.any.json`
+- `scope_target_triples`: `linux-x64`
+- `authorized_at_version`: `1.4.11`
+- `authorization_evidence_ref`: `cli_manifests/opencode/reports/1.4.11/coverage.any.json`
 
 ### `opencode-web-command`
 
@@ -168,6 +216,9 @@ Row ids are the canonical `debt_ref` anchors used by `support_surface_audit`.
 - `milestone`: `post shared maintenance proof follow-on`
 - `follow_on`: `TODOS.md#close-opencode-non-tui-maintenance-gaps`
 - `evidence_ref`: `cli_manifests/opencode/reports/1.14.47/coverage.any.json`
+- `scope_target_triples`: `linux-x64`
+- `authorized_at_version`: `1.4.11`
+- `authorization_evidence_ref`: `cli_manifests/opencode/reports/1.4.11/coverage.any.json`
 
 ### `opencode-run-attach-flag`
 
@@ -181,6 +232,9 @@ Row ids are the canonical `debt_ref` anchors used by `support_surface_audit`.
 - `milestone`: `post shared maintenance proof follow-on`
 - `follow_on`: `TODOS.md#close-opencode-non-tui-maintenance-gaps`
 - `evidence_ref`: `cli_manifests/opencode/reports/1.14.47/coverage.any.json`
+- `scope_target_triples`: `linux-x64`
+- `authorized_at_version`: `1.4.11`
+- `authorization_evidence_ref`: `cli_manifests/opencode/reports/1.4.11/coverage.any.json`
 
 ### `opencode-run-agent-flag`
 
@@ -194,3 +248,6 @@ Row ids are the canonical `debt_ref` anchors used by `support_surface_audit`.
 - `milestone`: `post shared maintenance proof follow-on`
 - `follow_on`: `TODOS.md#close-opencode-non-tui-maintenance-gaps`
 - `evidence_ref`: `cli_manifests/opencode/reports/1.14.47/coverage.any.json`
+- `scope_target_triples`: `linux-x64`
+- `authorized_at_version`: `1.4.11`
+- `authorization_evidence_ref`: `cli_manifests/opencode/reports/1.4.11/coverage.any.json`
