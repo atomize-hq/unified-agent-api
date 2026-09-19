@@ -354,6 +354,40 @@ fn c4_spec_reusable_acquisition_routes_maintenance_audit_gate_by_numeric_exit_co
 }
 
 #[test]
+fn c4_spec_reusable_acquisition_exports_the_single_audit_verdict_to_its_caller() {
+    let workflow = ".github/workflows/parity-acquire.yml";
+    let yml = read_repo_file(workflow);
+    let workflow_call = section_between(
+        &yml,
+        "  workflow_call:\n",
+        "  workflow_dispatch:\n",
+        workflow,
+    );
+    let union_job_header = section_between(&yml, "  union:\n", "    steps:\n", workflow);
+
+    for output in ["closeout_ready", "uplifts_required", "audit_exit_code"] {
+        let reusable_mapping = format!("value: ${{{{ jobs.union.outputs.{output} }}}}");
+        assert!(
+            workflow_call.contains(&format!("      {output}:\n"))
+                && workflow_call.contains(&reusable_mapping),
+            "workflow_call must export `{output}` from the union job"
+        );
+
+        let audit_mapping =
+            format!("{output}: ${{{{ steps.maintenance_audit.outputs.{output} }}}}");
+        assert!(
+            union_job_header.contains(&audit_mapping),
+            "union output `{output}` must come directly from the maintenance audit step"
+        );
+    }
+
+    assert!(
+        !workflow_call.contains("|| 'true'") && !workflow_call.contains("|| \"true\""),
+        "missing reusable-workflow verdicts must not default to success"
+    );
+}
+
+#[test]
 fn c4_spec_maintenance_audit_gate_passes_expected_target_version_to_xtask() {
     let workflow = ".github/workflows/parity-acquire.yml";
     let yml = read_repo_file(workflow);

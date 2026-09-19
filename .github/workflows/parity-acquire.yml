@@ -31,6 +31,16 @@ on:
         required: false
         default: false
         type: boolean
+    outputs:
+      closeout_ready:
+        description: "Whether the maintenance audit found the acquired packet ready for closeout"
+        value: ${{ jobs.union.outputs.closeout_ready }}
+      uplifts_required:
+        description: "Whether the maintenance audit found contributor uplifts are required"
+        value: ${{ jobs.union.outputs.uplifts_required }}
+      audit_exit_code:
+        description: "Numeric exit code from the maintenance audit evaluation"
+        value: ${{ jobs.union.outputs.audit_exit_code }}
     secrets:
       AUTOMATION_TOKEN:
         description: "PAT used to push acquired artifacts so the packet PR's CI re-runs"
@@ -458,6 +468,7 @@ jobs:
     outputs:
       closeout_ready: ${{ steps.maintenance_audit.outputs.closeout_ready }}
       uplifts_required: ${{ steps.maintenance_audit.outputs.uplifts_required }}
+      audit_exit_code: ${{ steps.maintenance_audit.outputs.audit_exit_code }}
     steps:
       - uses: actions/checkout@v5
         with:
