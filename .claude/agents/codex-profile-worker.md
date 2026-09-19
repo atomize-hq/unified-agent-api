@@ -44,8 +44,10 @@ and run the launcher with `--worktree "$PWD"`.
 
 Codex cannot write the git index under `workspace-write`: `git add` fails with
 "Operation not permitted". Leave the work uncommitted and report it. The lead
-commits. Never ask for a commit hash as return evidence from a write packet. Provide `--output-last-message` so Codex's final response is
-preserved separately from observed evidence. The launcher stops Codex after
+commits. Never ask for a commit hash as return evidence from a write packet.
+
+Provide `--output-last-message` so Codex's final response is preserved
+separately from observed evidence. The launcher stops Codex after
 `--timeout` seconds (default 3600) and exits 124; report that as a failed run.
 
 After Codex exits, inspect the worktree status and diff, then independently run
