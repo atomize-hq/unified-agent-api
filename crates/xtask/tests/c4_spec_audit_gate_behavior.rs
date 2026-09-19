@@ -227,6 +227,34 @@ fn terminal_step_rejects_nonblocking_or_invalid_exit_codes() {
 }
 
 #[test]
+fn c4_spec_reusable_acquisition_exports_the_single_audit_verdict_to_its_caller() {
+    let workflow = read_workflow();
+    let workflow_call = section_between(&workflow, "  workflow_call:\n", "  workflow_dispatch:\n");
+    let outputs = section_between(workflow_call, "    outputs:\n", "    secrets:\n");
+    let union_job_header = section_between(&workflow, "  union:\n", "    steps:\n");
+
+    for output in ["closeout_ready", "uplifts_required", "audit_exit_code"] {
+        let reusable_mapping = format!("value: ${{{{ jobs.union.outputs.{output} }}}}");
+        assert!(
+            outputs.contains(&format!("      {output}:\n")) && outputs.contains(&reusable_mapping),
+            "workflow_call must export `{output}` from the union job"
+        );
+
+        let audit_mapping =
+            format!("{output}: ${{{{ steps.maintenance_audit.outputs.{output} }}}}");
+        assert!(
+            union_job_header.contains(&audit_mapping),
+            "union output `{output}` must come directly from the maintenance audit step"
+        );
+    }
+
+    assert!(
+        !workflow_call.contains("|| 'true'") && !workflow_call.contains("|| \"true\""),
+        "missing reusable-workflow verdicts must not default to success"
+    );
+}
+
+#[test]
 fn union_job_runs_after_snapshot_failure_but_not_plan_failure_or_cancellation() {
     let workflow = read_workflow();
     let header = section_between(&workflow, "  union:\n", "    steps:\n");

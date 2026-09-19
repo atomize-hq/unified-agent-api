@@ -31,15 +31,16 @@ on:
         required: false
         default: false
         type: boolean
+    # Blocking verdicts fail `union`, so GitHub exposes these outputs as empty; uaa-0031 owns their visible relay.
     outputs:
       closeout_ready:
-        description: "Whether the maintenance audit found the acquired packet ready for closeout"
+        description: "True only for observable exit 0; false for exit 3 or non-committing exit 5; empty if union fails"
         value: ${{ jobs.union.outputs.closeout_ready }}
       uplifts_required:
-        description: "Whether the maintenance audit found contributor uplifts are required"
+        description: "True only for observable exit 3; false for exit 0 or non-committing exit 5; empty if union fails"
         value: ${{ jobs.union.outputs.uplifts_required }}
       audit_exit_code:
-        description: "Numeric exit code from the maintenance audit evaluation"
+        description: "Observable audit exit: 0, 3, or non-committing 5; empty if union fails, including blocking exit 2, 4, or 5"
         value: ${{ jobs.union.outputs.audit_exit_code }}
     secrets:
       AUTOMATION_TOKEN:

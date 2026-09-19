@@ -1100,4 +1100,5 @@ fails its own test.
 - Exit 2 writes no projection, so T3 must carry the gate's error line to the PR (`uaa-0031`).
 - `uaa-0040` through `uaa-0044` hold the discovery and identity limits this work exposed: supplements
   cannot carry hidden flags, identity is name-only, an `unsupported` command is never a gap, the
-  `discovered_upstream_surface` name implies newness, and the ADR 0001 §3 signals were never built.
+  gap-list name once implied newness the audit never checked (now resolved), and the ADR 0001 §3
+  signals were never built.
