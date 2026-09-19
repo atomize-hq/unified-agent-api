@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at_utc": "2026-09-18T00:00:00Z",
+  "updated_at_utc": "2026-09-19T00:00:00Z",
   "items": [
     {
       "id": "uaa-0022",
@@ -936,7 +936,7 @@
     {
       "id": "uaa-0029",
       "title": "parity-acquire does not export the audit gate outputs to callers",
-      "status": "todo",
+      "status": "done",
       "bucket": "agent_api.onboarding",
       "type": "task",
       "kickoff": {
@@ -1270,7 +1270,7 @@
     {
       "id": "uaa-0038",
       "title": "parity-acquire union counts a stale committed per-target snapshot as present when that target fails on a re-run",
-      "status": "todo",
+      "status": "done",
       "bucket": "agent_api.onboarding",
       "type": "task",
       "kickoff": {
@@ -1607,7 +1607,7 @@
     {
       "id": "uaa-0047",
       "title": "Permission-test fixtures restore the directory mode only on the success path",
-      "status": "todo",
+      "status": "done",
       "bucket": "agent_api.onboarding",
       "type": "task",
       "kickoff": {

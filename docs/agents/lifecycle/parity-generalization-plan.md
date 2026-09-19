@@ -229,6 +229,15 @@ capture the CLI surface, so the multi-OS matrix stays regardless of source).
   descriptor silently takes the permissive value — opencode's union accepts a shard
   declaring another tool or version, and skips the root-flag dedupe that codex applies.
   Finishing this workstream is the trigger.
+  **Extended 2026-09-19: the same pattern reaches `wrapper_coverage`.** opencode's
+  `wrapper_coverage` block omits the whole `resolution` object, `scope_semantics.
+  scope_set_resolution.fields`, and the `validation.error_message_requirements` that codex and
+  claude_code both declare. Separately, `scope.target_triples` is declared and honoured for
+  wrapper coverage, yet claude_code populates it on 21 entries while codex and opencode
+  populate it on none — a field the schema supports that two descriptors never adopted. The
+  authorization side of the same join never adopted it at all, which is `uaa-0046`. Treat
+  descriptor normalization and that authorization fix as siblings: both are "an available
+  field was never taken up", and both default permissively when absent.
 - Reconcile the two stuck packets (codex `0.144.6`, opencode `1.14.47`) through the new path.
 - **Depends on:** after A/B land (rename touches workflow references).
 
@@ -301,7 +310,7 @@ maintainer.
 | **B** — wire acquisition into the generic flow | **done** | `agent-maintenance-open-pr.yml` calls `parity-acquire` on the packet branch with `commit: true` |
 | **C** — `opencode-snapshot` adapter | **done** | yargs parser + 9 unit tests; verified against the real 1.18.4 binary (62 commands, no omissions) |
 | **D** — support-tier gate + onboarding | **done** | gate enforced by `manifest_acquisition::plan_for_agent`; entry rule documented in the charter and the registry contract |
-| **E** — drift + stuck packets | **done, except the maintainer-gated runs** | engine rename landed in A1; `claude_code` duplicate `scope` key removed; opencode `RULES.json` normalized to the full schema; win32→windows-x64 mapping verified live. Stuck-packet reconciliation needs CI runners — see §12 |
+| **E** — drift + stuck packets | **done, except the maintainer-gated runs** | engine rename landed in A1; `claude_code` duplicate `scope` key removed; opencode `RULES.json` **partly** normalized — `automation`, `version_metadata` and `report` added, but `comparison`, `features`, `globals`, `supplements`, the three `union` identity guards and most of `wrapper_coverage` are still absent (`uaa-0045`; see the Workstream E note in §5); win32→windows-x64 mapping verified live. Stuck-packet reconciliation needs CI runners — see §12 |
 
 ### What actually changed the shape of the system
 
