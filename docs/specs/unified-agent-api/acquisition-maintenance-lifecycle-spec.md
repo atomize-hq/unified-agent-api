@@ -272,10 +272,17 @@ hidden-surface policy that T8 enforces (T8 sequencing below). Backlog items `uaa
 carry what the work exposed (§8.1).
 
 **T3 — Relay-packet rendering.** On the uplift branch, render the relay invocation (prompt path,
-dry-run→write `--run-id` handshake) into the packet PR body from the existing renderer, so the
-maintainer pastes one command. Reuses `docs.rs` rendering; no new prompt source of truth. Exit 2
-writes no projection, so a debt-baseline failure names its unmatched rows only in the gate's error
-line; T3 must carry that line to the PR (`uaa-0031`).
+dry-run→write `--run-id` handshake) into a managed comment on the packet PR, from the existing
+renderer, so the maintainer pastes one command. Reuses `docs.rs` rendering; no new prompt source of
+truth. Exit 2 writes no projection, so a debt-baseline failure names its unmatched rows only in the
+gate's error line; T3 must carry that line to the PR (`uaa-0031`).
+
+**Decided 2026-09-19: a comment, not the PR body.** The body is set from `body-path` on
+`create-pull-request`, pointed at the generated `governance/pr-summary.md`, and the watcher
+re-dispatches `agent-maintenance-open-pr` nightly with no dedupe against an already-open packet. The
+body is therefore rewritten from that file every night, so a verdict written into it survives at
+most one day. The body also declares the frozen request as its source of truth, while the verdict is
+live post-acquisition evidence. `uaa-0048` carries the wider problem this exposed.
 
 **T4 — Closeout evidence resolution.** Commit-pinned CI conclusion lookup, fail-closed. This is the
 highest-risk unit; it decides whether a governance artifact can be trusted.
@@ -304,7 +311,7 @@ in #216.
 | group | items | lands |
 |---|---|---|
 | Verdict visibility | `uaa-0031`, `uaa-0025`, and `uaa-0028` only if the chosen surface makes the projection path durable | **With T3.** `uaa-0031` decides the surface T3 renders to, and its deliverable reads "implemented with T3". T3 is the projection's first consumer, so `uaa-0025` cannot follow it. |
-| Closeout prerequisites | `uaa-0045`, `uaa-0039` | **Immediately after the verdict-visibility group, before T4–T8 reach a live packet.** Neither blocks T3, and neither may wait for T8. `uaa-0045`'s trigger fired when `uaa-0038` was resolved in `a474cdbc`: the two are halves of one defense — the workflow clears a stale shard, the merger checks that a shard is what its filename claims — and only the first half exists. |
+| Closeout prerequisites | `uaa-0045`, `uaa-0039`, `uaa-0048` | **Immediately after the verdict-visibility group, before T4–T8 reach a live packet.** Neither blocks T3, and neither may wait for T8. `uaa-0045`'s trigger fired when `uaa-0038` was resolved in `a474cdbc`: the two are halves of one defense — the workflow clears a stale shard, the merger checks that a shard is what its filename claims — and only the first half exists. `uaa-0048` blocks T8 outright: a closeout committed to a packet branch does not survive the next nightly regeneration. |
 
 `c4_spec_ci_wiring.rs` (699 code lines) and `agent_maintenance_audit_status.rs` (695) are both
 within five lines of the §5 cap and are the conventional homes for the contract and regression tests
@@ -359,7 +366,8 @@ items (`uaa-0029`…`uaa-0032`; `uaa-0031` by reading only) and added two more (
 `uaa-0034`). Two more arrived with the codex feature pass and the pre-merge nightly simulation
 (`uaa-0037`, `uaa-0038`), and were missing from this table until 2026-09-19. The 2026-09-15
 support-audit classification added six (`uaa-0039`…`uaa-0044`). A 2026-09-16 ChatGPT Pro review of a
-bounded repository bundle added three (`uaa-0045`…`uaa-0047`).
+bounded repository bundle added three (`uaa-0045`…`uaa-0047`). Deciding T3's visibility surface
+on 2026-09-19 added one (`uaa-0048`).
 
 | id | item | disposition |
 | --- | --- | --- |
@@ -388,6 +396,7 @@ bounded repository bundle added three (`uaa-0045`…`uaa-0047`).
 | `uaa-0045` | opencode's `RULES.json` was never normalized to the union-model schema | **Resolve before the opencode packet closes.** Its `union` block omits the three identity guards codex and claude_code set, and it has no `globals`, so the union accepts a shard declaring another tool or version and skips the root-flag dedupe. Every missing key is `#[serde(default)]`, so a thin descriptor is silently permissive. Compounds `uaa-0038`. Pointer: Workstream E in the parity generalization plan §5. |
 | `uaa-0046` | Debt authorization does not constrain matches by target or upstream version | **Resolved in `b52f1242` / `4c292da2`.** Each debt row now carries a required `scope_target_triples`, an `authorized_at_version`, and an `authorization_evidence_ref`, and a row whose scope exceeds the surface's observations is rejected. Wrapper coverage already supports target scope: `scope.target_triples` is a first-class mechanism in `crates/xtask/src/wrapper_coverage_shared.rs`, validated against the agent's expected targets, and claude_code populates it on 21 entries while codex and opencode populate it on none. The debt inventory never adopted it — its parser reads ten fixed keys and silently ignores any other, so a deferral argued for one target authorizes the same surface on a target added later. This is adoption of an existing mechanism, not invention of a new one, but the default must not be adopted with it: an omitted coverage scope means all expected targets, which on an authorization record would grant permission by omission. Debt scope is required instead. Distinct from `uaa-0041`, which is about values, arity and output shape. Pointers: `wrapper_coverage_shared.rs`, and the Surface identity rules in the request contract. |
 | `uaa-0047` | Permission-test fixtures restore the directory mode only on the success path | **Resolved in `dea84bf8`.** Both fixtures restore through a `Drop` guard whose body ignores a failed restore, since a panicking destructor during unwinding aborts the process. Each fixture is now established by a direct filesystem probe rather than by the behaviour of the code under test, so a regression cannot present itself as an environmental skip. The file was split to make room. |
+| `uaa-0048` | Nightly regeneration force-pushes an open packet branch | **T8 prerequisite.** The watcher re-dispatches `agent-maintenance-open-pr` every night with no dedupe against an open packet, so `create-pull-request` resets the packet branch to `staging`, re-applies the packet and force-pushes. Proven 2026-09-19: PRs #211 and #208 had unchanged target versions for four and five days and carried only commits from the previous night. A closeout committed to a packet branch would therefore not survive until merge, regenerating HANDOFF back to the open-run contract. Needs a stand-down condition the packet itself carries. Pointer: T8 sequencing above. |
 
 ### 8.2 What T1 changed about T2
 

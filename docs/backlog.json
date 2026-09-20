@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at_utc": "2026-09-19T22:00:00Z",
+  "updated_at_utc": "2026-09-19T23:00:00Z",
   "items": [
     {
       "id": "uaa-0022",
@@ -1647,6 +1647,48 @@
         "Recorded 2026-09-16 from a ChatGPT Pro review of a bounded repository bundle at `b8e3722e`. Verified by reading both helpers; the 695-of-700 measurement is from tokei."
       ],
       "priority": "P2"
+    },
+    {
+      "id": "uaa-0048",
+      "title": "The nightly watcher regenerates and force-pushes an open packet branch, so nothing committed to it survives until merge",
+      "status": "todo",
+      "bucket": "agent_api.onboarding",
+      "type": "task",
+      "kickoff": {
+        "prompt": [
+          "Work item: uaa-0048 — the nightly watcher regenerates and force-pushes an open packet branch, so nothing committed to it survives until merge.",
+          "Context: `.github/workflows/agent-maintenance-release-watch.yml` runs on `cron: \"17 3 * * *\"` and its `queue` job compares the repository's validated pointer against upstream latest. The pointer only advances at promotion, which happens after closeout and merge, so an open packet still reads as needed every night. The queue has no dedupe against an already-open packet PR, and the dispatch step calls `createWorkflowDispatch` unconditionally for every queued row.",
+          "Each dispatch runs `agent-maintenance-open-pr.yml`, which regenerates the packet with `prepare-agent-maintenance --request-recorded-at \"$(date -u ...)\"` and calls `peter-evans/create-pull-request@v8` with `add-paths: <maintenance root>` and `body-path: docs/agents/lifecycle/<agent>-maintenance/governance/pr-summary.md`. The action resets the packet branch to `staging`, re-applies the packet as one commit, and force-pushes. The `acquire` job then re-adds its own commit.",
+          "Evidence (read-only `gh`, 2026-09-19): PR #211 was created 2026-09-16 and PR #208 on 2026-09-15; neither agent's target version changed in the interval (claude_code has been on 2.1.267 for four days, opencode on 1.18.30 for five). Both PRs carry exactly two commits, all four dated 2026-09-19 08:03-08:08. No commit from either PR's creation day still exists, so the branch history is replaced nightly on an unchanged target version. The watcher produced three `agent-maintenance-open-pr` runs per night on each of 2026-09-15 through 2026-09-19.",
+          "Why it blocks T8: the lifecycle spec requires a packet be closed on its own branch before merge, so the merge carries a closed HANDOFF. `close-agent-maintenance` writes the closeout artifact and regenerates HANDOFF inside the packet's maintenance root, which is exactly the `add-paths` tree the nightly run regenerates and force-pushes. A closeout committed during the day is therefore overwritten at the next run, with HANDOFF regenerated back to the open-run contributor contract. That is the same wrong-HANDOFF end state the spec records for the merged-open codex packet (#153), reached by a different route. Not yet observed directly: no closeout has been run against a live packet.",
+          "Steps:",
+          "1) Decide the stand-down condition: a closeout artifact present in the packet, a maintainer label, PR ready-for-review, or an explicit freeze marker. Prefer a condition the packet itself carries, so the watcher needs no external state.",
+          "2) Implement it in the `queue` job or as an early guard in `agent-maintenance-open-pr.yml`, so a stood-down packet is neither regenerated nor re-acquired.",
+          "3) Decide what the watcher should do when a stood-down packet's upstream version is superseded, since `Close superseded same-agent PRs` would otherwise close a packet a maintainer is mid-closeout on.",
+          "4) Confirm directly, before relying on either answer, whether a closeout committed to a packet branch is in fact destroyed by the next nightly run.",
+          "5) Add a contract test for the stand-down condition.",
+          "Output: a packet a maintainer has begun closing is not regenerated, re-acquired, or force-pushed out from under them."
+        ],
+        "files_to_read": [
+          ".github/workflows/agent-maintenance-release-watch.yml",
+          ".github/workflows/agent-maintenance-open-pr.yml",
+          "crates/xtask/src/agent_maintenance/closeout/validate.rs",
+          "docs/specs/unified-agent-api/acquisition-maintenance-lifecycle-spec.md"
+        ],
+        "deliverables": [
+          "A decided stand-down condition carried by the packet itself",
+          "Watcher or open-pr guard implementing it, with a contract test",
+          "A recorded decision on superseding a stood-down packet",
+          "Direct confirmation of whether a committed closeout survives a nightly run"
+        ]
+      },
+      "notes": [
+        "Found 2026-09-19 while deciding whether T3 should render the audit verdict into the packet PR body or a comment. The body is rewritten from the generated pr-summary on every nightly run, which settled that question for a comment and exposed this larger one.",
+        "T8 prerequisite. Lands with the closeout-prerequisite group alongside uaa-0045 and uaa-0039; recorded in the acquisition-maintenance-lifecycle spec §8, \"Backlog groups that land inside that order\".",
+        "The nightly refresh is not purely waste: it keeps an open packet's evidence current and continuously rebases the branch onto staging, which is why packets merge without conflict. The fix is a stand-down condition, not removing the refresh.",
+        "Related: uaa-0034 asks whether the gate's verdict still describes the tree that gets pushed after a rebase. This item is the reason those rebases happen nightly rather than occasionally."
+      ],
+      "priority": "P1"
     }
   ]
 }
