@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at_utc": "2026-09-20T00:30:00Z",
+  "updated_at_utc": "2026-09-20T17:30:00Z",
   "items": [
     {
       "id": "uaa-0022",
@@ -1324,7 +1324,10 @@
           "1) Decide where a wrapper-only row's category lives (for example a field on the wrapper coverage entry, or a list in the closeout artifact) and what evidence each category needs.",
           "2) Make closeout fail when a live wrapper-only row has no category, when a surface sorted obsolete still appears in publication truth, or when the live audit has unmatched debt rows.",
           "3) Add closeout tests for each failure and for a clean pass.",
-          "4) Remove the pointers once resolved."
+          "4) Remove the pointers once resolved.",
+          "1b) Distinguish the adjudication baseline from the final state. A row correctly sorted obsolete has its publication claim removed, so after regeneration it may no longer appear in the wrapper-only report at all; a validator comparing dispositions only against the final set would reject that entry as extraneous, or lose the evidence that a contraction was owed. Bind the report being adjudicated, then verify the resulting publication state, and keep the linkage between the two. A newly appearing live wrapper-only row must not escape categorization, and a removed baseline row must not vanish from the obligation accounting without explanation.",
+          "2b) Enforce from source state, not from the artifact's own claims. An artifact containing an empty unmatched-debt list cannot establish that the live list is empty, and the implementation must not delete legitimate debt to manufacture emptiness. Likewise verify that an obsolete sort produced a real publication change rather than accepting the word, a proposed follow-up, or a changed count; regenerate through the repository's publication authority rather than editing generated documents. The count of 36 is a snapshot, not the acceptance predicate: require exactly one applicable disposition per required row and reject missing entries, duplicates, invalid categories, and identities that do not belong to the bound evidence.",
+          "3b) Test the manual closeout validator directly with hand-authored invalid artifacts. A generator test alone does not prove this item closed the manual path, which is the path the item exists to protect."
         ],
         "files_to_read": [
           "docs/specs/maintenance-request-contract-v1.md",
@@ -1338,12 +1341,15 @@
           "A recorded category for every wrapper-only row",
           "Closeout checks for uncategorized wrapper-only rows, uncontracted obsolete surfaces, and unmatched debt rows",
           "Closeout tests for each check",
-          "Pointers removed once resolved"
+          "Pointers removed once resolved",
+          "A recorded decision on where a disposition lives, taken before T6 is implemented"
         ]
       },
       "notes": [
         "Raised 2026-09-15 by a ChatGPT Pro approach review of the first post-merge nightly, reconciled against the repository by the lead session. Maintainer approved the policy and deferred the mechanism to T8 on 2026-09-15.",
-        "2026-09-19 sequencing: lands as the closeout-prerequisite group paired with uaa-0045, immediately after the T3 verdict-visibility group and before T4-T8 reach a live packet. Neither item blocks T3; neither may wait for T8. Recorded in the acquisition-maintenance-lifecycle spec §8, \"Backlog groups that land inside that order\"."
+        "2026-09-19 sequencing: lands as the closeout-prerequisite group paired with uaa-0045, immediately after the T3 verdict-visibility group and before T4-T8 reach a live packet. Neither item blocks T3; neither may wait for T8. Recorded in the acquisition-maintenance-lifecycle spec §8, \"Backlog groups that land inside that order\".",
+        "2026-09-20 sizing: 36 wrapper-only rows need a category across the three live packets - codex 35 (8 commands, 21 flags, 6 args), claude_code 1 flag, opencode 0. opencode's zero is legitimate rather than a gap: its wrapper_coverage.json holds one entry whose note bounds coverage to the run --format json surface, against codex's 87 entries. So codex is the integration case, claude_code the small non-empty case, and opencode the empty case, and codex's evidence now sits on staging because PR #215 merged.",
+        "2026-09-20, unresolved conflict: step 2 adds checks to crates/xtask/src/agent_maintenance/closeout/validate.rs, which the acquisition-maintenance-lifecycle spec §4 lists as deliberately untouched. Adding a check is not relaxing one, so the intent is probably compatible, but the conflict needs an explicit decision rather than a reinterpretation in passing. Moving the checks into T6 would not resolve it, because that leaves the manual-closeout path unprotected, which is the defect this item exists to close. Recorded as §11 open question 1."
       ],
       "priority": "P2"
     },
@@ -1548,7 +1554,8 @@
           "2) Compare each shard's `binary.target_triple` to its filename-derived target and fail on mismatch. This applies to every agent, not only opencode.",
           "3) Normalize opencode's `RULES.json`: add the three union guards, `globals`, `comparison`, `features`, `supplements`. Re-run the union and report, and measure how much of the 473 required uplifts was global-flag repetition.",
           "4) Decide whether descriptor completeness for union-model agents belongs in `manifest-validate` as a schema check, so the next agent cannot be enrolled with a thin descriptor.",
-          "5) Reconcile with `uaa-0038`: the directory cleanup it prescribes and the identity check here are complementary, not alternatives."
+          "5) Reconcile with `uaa-0038`: the directory cleanup it prescribes and the identity check here are complementary, not alternatives.",
+          "1b) Presence and permitted value are two decisions, not one. Making a guard a required field still allows someone to supply an explicit false, and once an omitted bool has defaulted to false a consumer cannot distinguish it from a supplied false. Settle both: must each applicable guard be explicitly represented, and may it be false at all. Prefer one validation contract over divergent consumers - the descriptor-validation command and the merger should enforce the same requirements, or a descriptor can pass validation and still be unusable by the merger. Define completeness for the four missing top-level keys by named field and semantic requirement, not by 'matches codex's shape', and do not copy another agent's operational values to satisfy structural similarity."
         ],
         "files_to_read": [
           "crates/xtask/src/manifest_union.rs",
@@ -1567,7 +1574,9 @@
       "notes": [
         "Recorded 2026-09-16 from a ChatGPT Pro review of a bounded repository bundle at `b8e3722e`. Pro found the missing union guards and the absent shard target check; the `globals` divergence, the missing top-level keys, and the link to parity generalization Workstream E were found while verifying that finding against the repository.",
         "2026-09-19 sequencing: lands as the closeout-prerequisite group paired with uaa-0039, immediately after the T3 verdict-visibility group and before T4-T8 reach a live packet. Neither item blocks T3; neither may wait for T8. Recorded in the acquisition-maintenance-lifecycle spec §8, \"Backlog groups that land inside that order\".",
-        "2026-09-19: trigger condition 3 fired. uaa-0038 was picked up and resolved in a474cdbc (#216), which clears a planned target destination before materializing. That is the workflow half of the stale-shard defense; step 2 here, comparing a shard binary.target_triple to its filename-derived target, is the merger half and does not exist yet."
+        "2026-09-19: trigger condition 3 fired. uaa-0038 was picked up and resolved in a474cdbc (#216), which clears a planned target destination before materializing. That is the workflow half of the stale-shard defense; step 2 here, comparing a shard binary.target_triple to its filename-derived target, is the merger half and does not exist yet.",
+        "2026-09-20 correction: the '473 required uplifts' figure in step 3 no longer describes the packet. The live opencode request records 'required uplifts this run: none', 15 preexisting debt rows and 0 discovered upstream surface rows; the 481 missing-surface rows (394 flags, 60 commands, 27 args) are in the coverage report, not the uplift queue. Measure global-flag repetition against the coverage population and do not relabel one population as the other, in either direction: an empty uplift queue is not proof that acquisition and coverage accounting agree.",
+        "2026-09-20: the evidence for opencode 1.18.30 is not on staging. cli_manifests/opencode/reports/ holds 1.4.11 and 1.14.47 only, and the 1.18.30 reports exist solely on the automation/opencode-maintenance-1.18.30 branch. Pin that branch commit and record the descriptor, shards, union, coverage report, audit selection and upstream version used, since the default branch cannot reproduce the comparison."
       ],
       "priority": "P0"
     },
@@ -1668,7 +1677,13 @@
           "4) Confirm directly, before relying on either answer, whether a closeout committed to a packet branch is in fact destroyed by the next nightly run.",
           "5) Add a contract test for the stand-down condition.",
           "Output: a packet a maintainer has begun closing is not regenerated, re-acquired, or force-pushed out from under them.",
-          "4b) Fold in the superseded-mid-flight case: codex changes version near-daily, and a new version opens a different branch, so its `agent-maintenance-open-pr` run is in a different concurrency group and runs concurrently with an in-flight acquisition on the previous packet. That run's `Close superseded same-agent PRs` step closes the older packet PR while its acquisition is still going. The branch is not deleted, so the acquire still pushes — onto a packet PR that is now closed. Same root as this item (the watcher acting on a packet that is mid-flight) and the same fix location."
+          "4b) Fold in the superseded-mid-flight case: codex changes version near-daily, and a new version opens a different branch, so its `agent-maintenance-open-pr` run is in a different concurrency group and runs concurrently with an in-flight acquisition on the previous packet. That run's `Close superseded same-agent PRs` step closes the older packet PR while its acquisition is still going. The branch is not deleted, so the acquire still pushes — onto a packet PR that is now closed. Same root as this item (the watcher acting on a packet that is mid-flight) and the same fix location.",
+          "1b) Protection must mean that automation has lost authority to replace this packet generation, never that the packet currently holds a closeout which validates. The late reading still permits the watcher to erase categorization work, a partially authored closeout, publication corrections, or a valid closeout during an intentional edit. Bind the condition to the packet's real identity - agent, target version, and request or run identity - not to the branch name or to the fact that some PR is open.",
+          "1c) The condition must also cover a packet that has already merged. A merged packet has no open PR and no closeout artifact, so every open-PR-shaped signal misses it, and the queue still reads the version as needed because the validated pointer only advances at promotion. Observed 2026-09-20: PR #215 merged codex 0.155.0 to staging by accident without promotion, so the branch is reset to a staging that already contains the packet and the re-applied packet diffs only in regenerated timestamps. Expect a content-free packet PR each night until the pointer advances, and test the merged-but-unpromoted case explicitly.",
+          "2b) One guard is the right semantic goal, but one early watcher check is not sufficient enforcement. An invocation already queued passes an earlier check and then overwrites later maintainer work, and workflow_dispatch and re-runs bypass the queue entirely. Check immediately before mutation as well, on every destructive path: request regeneration, branch replacement, packet-body replacement, automatic supersession, and closure. Read-only acquisition into non-authoritative artifacts may continue.",
+          "2c) Consider an expected-head condition for the branch replacement, so a head that moved since inspection rejects the update. Note the feasibility constraint: the push is performed by peter-evans/create-pull-request@v8, which owns its own push, so this cannot be a --force-with-lease flag on our side and has to be a separate check before the action runs. An expected-head check proves nothing about whether overwriting the inspected content was authorized, so it supplements the ownership predicate rather than replacing it. The repository's existing concurrency group is likewise a supplement: only workflows in the same group participate.",
+          "2d) Account for executions already queued or running under the old unguarded workflow when this lands. Merging a guard does not make those safe retrospectively.",
+          "6) Do not resolve the request-hash problem by excluding request_recorded_at from the digest. That hides one mutation while leaving force-push erasure and every other request rewrite intact. The invariant is that a request generation's bytes stay stable while that generation is active, and that an intentional request change is an explicit lifecycle operation which deliberately invalidates dependent evidence. The protection check itself must not mutate the hashed request as a side effect."
         ],
         "files_to_read": [
           ".github/workflows/agent-maintenance-release-watch.yml",
@@ -1680,14 +1695,18 @@
           "A decided stand-down condition carried by the packet itself",
           "Watcher or open-pr guard implementing it, with a contract test",
           "A recorded decision on superseding a stood-down packet",
-          "Direct confirmation of whether a committed closeout survives a nightly run"
+          "Direct confirmation of whether a committed closeout survives a nightly run",
+          "A stand-down condition that survives a merged-but-unpromoted packet",
+          "Enforcement at every destructive mutation boundary, not only in the queue"
         ]
       },
       "notes": [
         "Found 2026-09-19 while deciding whether T3 should render the audit verdict into the packet PR body or a comment. The body is rewritten from the generated pr-summary on every nightly run, which settled that question for a comment and exposed this larger one.",
         "T8 prerequisite. Lands with the closeout-prerequisite group alongside uaa-0045 and uaa-0039; recorded in the acquisition-maintenance-lifecycle spec §8, \"Backlog groups that land inside that order\".",
         "The nightly refresh is not purely waste: it keeps an open packet's evidence current and continuously rebases the branch onto staging, which is why packets merge without conflict. The fix is a stand-down condition, not removing the refresh.",
-        "Related: uaa-0034 asks whether the gate's verdict still describes the tree that gets pushed after a rebase. This item is the reason those rebases happen nightly rather than occasionally."
+        "Related: uaa-0034 asks whether the gate's verdict still describes the tree that gets pushed after a rebase. This item is the reason those rebases happen nightly rather than occasionally.",
+        "2026-09-20, widened. The nightly regeneration does not only delete a committed closeout; it invalidates one that was never committed. request_recorded_at is a field inside maintenance-request.toml, request.rs:399 digests the whole file, and closeout/validate.rs:145 rejects a hash mismatch, so a generated closeout stops validating at the next nightly run while sitting untouched on disk. That makes this item a constraint on T6's output being usable, not only a T8 blocker. Recorded at the trigger point under T4 in the acquisition-maintenance-lifecycle spec.",
+        "2026-09-20 sequencing: lands first and alone, ahead of uaa-0045 and uaa-0039. The closeout-prerequisite group was first recorded as one landing; it is three merge units, because the items have independent acceptance conditions and this is the only one with a deadline."
       ],
       "priority": "P1"
     },
