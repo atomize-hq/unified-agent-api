@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at_utc": "2026-09-19T23:00:00Z",
+  "updated_at_utc": "2026-09-19T23:45:00Z",
   "items": [
     {
       "id": "uaa-0022",
@@ -1667,7 +1667,8 @@
           "3) Decide what the watcher should do when a stood-down packet's upstream version is superseded, since `Close superseded same-agent PRs` would otherwise close a packet a maintainer is mid-closeout on.",
           "4) Confirm directly, before relying on either answer, whether a closeout committed to a packet branch is in fact destroyed by the next nightly run.",
           "5) Add a contract test for the stand-down condition.",
-          "Output: a packet a maintainer has begun closing is not regenerated, re-acquired, or force-pushed out from under them."
+          "Output: a packet a maintainer has begun closing is not regenerated, re-acquired, or force-pushed out from under them.",
+          "4b) Fold in the superseded-mid-flight case: codex changes version near-daily, and a new version opens a different branch, so its `agent-maintenance-open-pr` run is in a different concurrency group and runs concurrently with an in-flight acquisition on the previous packet. That run's `Close superseded same-agent PRs` step closes the older packet PR while its acquisition is still going. The branch is not deleted, so the acquire still pushes — onto a packet PR that is now closed. Same root as this item (the watcher acting on a packet that is mid-flight) and the same fix location."
         ],
         "files_to_read": [
           ".github/workflows/agent-maintenance-release-watch.yml",
@@ -1689,6 +1690,44 @@
         "Related: uaa-0034 asks whether the gate's verdict still describes the tree that gets pushed after a rebase. This item is the reason those rebases happen nightly rather than occasionally."
       ],
       "priority": "P1"
+    },
+    {
+      "id": "uaa-0049",
+      "title": "A generic engine branches on the codex agent id to grant an extra writable surface",
+      "status": "todo",
+      "bucket": "agent_api.onboarding",
+      "type": "task",
+      "kickoff": {
+        "prompt": [
+          "Work item: uaa-0049 — a generic engine branches on the codex agent id to grant an extra writable surface.",
+          "Context: `crates/xtask/src/agent_maintenance/contract_policy.rs` builds each packet's `writable_surfaces` from registry data, then appends one path behind a hardcoded agent-id test: `if entry.agent_id == \"codex\" { writable_surfaces.push(\"docs/specs/codex-wrapper-coverage-scenarios-v1.md\") }`.",
+          "Why it matters: AGENTS.md and the lifecycle spec both require that agent-specific behaviour live in committed descriptor data, not in generic engines. The parity workflows now hold to that — `parity-acquire.yml` and `parity-promote.yml` contain no agent-specific logic, only `(e.g. codex)` in input descriptions — so this is one of the last places the rule is broken, and it is broken in the engine that decides what a packet is allowed to write.",
+          "Impact today is small: codex packets may write one extra spec file that other agents may not. The cost is the precedent. A second such branch would be easy to add and hard to find, and `writable_surfaces` is a permission boundary rather than a convenience.",
+          "Distinct from the relay-host constants in the same file (`LEGACY_EXECUTOR_ALIAS`, the `@codex` PR-body mention, the `codex-validate` command name). Those name codex as the local relay execution host, which the lifecycle spec's verified-state table records as intentional design and §4 lists as deliberately untouched. This item is about codex as a maintained agent.",
+          "Steps:",
+          "1) Decide where the surface belongs: a per-agent `writable_surfaces` extension in the registry, or in the agent's RULES.json alongside the other descriptor data.",
+          "2) Move it there and delete the branch.",
+          "3) Add a test that fails if any generic engine tests an agent id literal, or at minimum that codex's writable surfaces come entirely from descriptor data.",
+          "4) Audit the rest of `contract_policy.rs` for other agent-id tests while in there."
+        ],
+        "files_to_read": [
+          "crates/xtask/src/agent_maintenance/contract_policy.rs",
+          "crates/xtask/data/agent_registry.toml",
+          "cli_manifests/codex/RULES.json",
+          "AGENTS.md"
+        ],
+        "deliverables": [
+          "The extra writable surface declared in descriptor data",
+          "The agent-id branch removed from the engine",
+          "A test binding writable surfaces to descriptor data"
+        ]
+      },
+      "notes": [
+        "Found 2026-09-19 while checking whether anything codex-specific survives the parity generalization. The answer: the reusable lanes are clean and all three maintained agents now carry dispatch_kind = \"packet_pr\", but this branch and the per-agent jobs in ci.yml are not.",
+        "Related but out of scope here: ci.yml still hand-writes per-agent validate jobs (a codex-validate-artifacts job, a separate claude_code manifest-validate step), so enrolling an agent still means editing that workflow. Worth its own item if the generalization is meant to reach CI.",
+        "Not the relay host. codex as the local execution host for the uplift relay is intentional; see the lifecycle spec's verified-state table and §4 'Deliberately untouched'."
+      ],
+      "priority": "P3"
     }
   ]
 }
