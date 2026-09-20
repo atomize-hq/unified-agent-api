@@ -778,6 +778,7 @@ jobs:
           rm -rf "${ROOT}/raw_help"
 
       - name: Commit the acquired artifacts onto the packet branch
+        id: commit_artifacts
         if: ${{ inputs.commit }}
         shell: bash
         env:
@@ -803,8 +804,19 @@ jobs:
             cli_manifests/support_matrix/current.json \
             docs/specs/unified-agent-api/support-matrix.md
 
+          # The verdict artifact reports the audit and the delivery separately, so a blocking
+          # verdict is never mistaken for a failed push and a failed push never masquerades as a
+          # verdict. Both of this step's success paths therefore have to say which one they took.
+          emit_delivery() {
+            {
+              echo "committed=$1"
+              echo "head_sha=$(git rev-parse HEAD)"
+            } >> "$GITHUB_OUTPUT"
+          }
+
           if git diff --cached --quiet; then
             echo "no acquisition changes to commit"
+            emit_delivery "false"
             exit 0
           fi
 
@@ -815,6 +827,7 @@ jobs:
           # downloaded binary, snapshot, union and report this run produced.
           for attempt in 1 2 3; do
             if git push origin "HEAD:${BRANCH}"; then
+              emit_delivery "true"
               exit 0
             fi
             echo "push attempt ${attempt} was rejected; rebasing onto origin/${BRANCH}"
@@ -837,6 +850,104 @@ jobs:
             ${{ needs.plan.outputs.manifest_root }}/versions/${{ inputs.target_version }}.json
             ${{ needs.plan.outputs.manifest_root }}/wrapper_coverage.json
             ${{ needs.plan.outputs.manifest_root }}/artifacts.lock.json
+
+      # The one durable channel for this run's verdict. A blocking verdict fails this job by
+      # design, and GitHub empties a failed job's outputs, so a caller cannot learn exit 2, exit 4
+      # or a committing exit 5 from `jobs.union.outputs` — those arrive indistinguishable from a
+      # skipped, cancelled or infrastructure-failed run (`uaa-0031`). An artifact is not a job
+      # output and survives the failure, so the verdict and its diagnostic reach the caller either
+      # way. Both steps run before the terminal failure, and both run on `always()`.
+      - name: Record the maintenance audit verdict
+        id: record_verdict
+        if: ${{ always() }}
+        shell: bash
+        env:
+          AGENT_ID: ${{ inputs.agent_id }}
+          VERSION: ${{ inputs.target_version }}
+          BRANCH: ${{ inputs.ref }}
+          COMMIT: ${{ inputs.commit }}
+          AUDIT_EXIT_CODE: ${{ steps.maintenance_audit.outputs.audit_exit_code }}
+          AUDIT_FAILED: ${{ steps.maintenance_audit.outputs.audit_failed }}
+          AUDIT_TITLE: ${{ steps.maintenance_audit.outputs.audit_title }}
+          AUDIT_MESSAGE: ${{ steps.maintenance_audit.outputs.audit_message }}
+          CLOSEOUT_READY: ${{ steps.maintenance_audit.outputs.closeout_ready }}
+          UPLIFTS_REQUIRED: ${{ steps.maintenance_audit.outputs.uplifts_required }}
+          COMMITTED: ${{ steps.commit_artifacts.outputs.committed }}
+          HEAD_SHA: ${{ steps.commit_artifacts.outputs.head_sha }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+        run: |
+          set -euo pipefail
+          VERDICT_DIR="$(mktemp -d "${RUNNER_TEMP}/maintenance-verdict-XXXXXX")"
+          VERDICT_JSON="${VERDICT_DIR}/verdict.json"
+
+          # An empty exit code means the gate never recorded one: its step was skipped because an
+          # earlier step failed, or the run was cancelled. That is a different thing from every
+          # defined audit exit, and a consumer must never read it as a clean run — hence
+          # `observed`, which is the first thing a reader has to check.
+          jq -n \
+            --arg agent_id "$AGENT_ID" \
+            --arg target_version "$VERSION" \
+            --arg ref "$BRANCH" \
+            --arg commit_mode "$COMMIT" \
+            --arg run_id "$RUN_ID" \
+            --arg run_attempt "$RUN_ATTEMPT" \
+            --arg exit_code "$AUDIT_EXIT_CODE" \
+            --arg blocking "$AUDIT_FAILED" \
+            --arg closeout_ready "$CLOSEOUT_READY" \
+            --arg uplifts_required "$UPLIFTS_REQUIRED" \
+            --arg title "$AUDIT_TITLE" \
+            --arg message "$AUDIT_MESSAGE" \
+            --arg committed "$COMMITTED" \
+            --arg head_sha "$HEAD_SHA" \
+            '{
+              schema_version: 1,
+              packet: {
+                agent_id: $agent_id,
+                target_version: $target_version,
+                ref: $ref,
+                commit_mode: ($commit_mode == "true")
+              },
+              producer: {
+                run_id: $run_id,
+                run_attempt: ($run_attempt | tonumber)
+              },
+              audit: (
+                if $exit_code == "" then
+                  { observed: false }
+                else
+                  {
+                    observed: true,
+                    exit_code: ($exit_code | tonumber),
+                    blocking: ($blocking == "true"),
+                    closeout_ready: ($closeout_ready == "true"),
+                    uplifts_required: ($uplifts_required == "true"),
+                    title: $title,
+                    message: $message
+                  }
+                end
+              ),
+              delivery: (
+                if $commit_mode != "true" then
+                  { attempted: false }
+                elif $committed == "" then
+                  { attempted: true, committed: false, unreported: true }
+                else
+                  { attempted: true, committed: ($committed == "true"), head_sha: $head_sha }
+                end
+              )
+            }' > "$VERDICT_JSON"
+
+          echo "path=${VERDICT_JSON}" >> "$GITHUB_OUTPUT"
+          cat "$VERDICT_JSON"
+
+      - name: Upload the maintenance audit verdict
+        if: ${{ always() && steps.record_verdict.outputs.path != '' }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: "maintenance-audit-verdict-${{ inputs.agent_id }}-${{ inputs.target_version }}-${{ github.run_attempt }}"
+          if-no-files-found: error
+          path: ${{ steps.record_verdict.outputs.path }}
 
       - name: Fail the job if the maintenance audit recorded a blocking verdict
         if: ${{ always() && steps.maintenance_audit.outputs.audit_failed == 'true' }}

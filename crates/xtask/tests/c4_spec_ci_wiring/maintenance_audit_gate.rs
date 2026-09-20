@@ -252,3 +252,63 @@ fn c4_spec_maintenance_audit_blocking_verdict_fails_only_after_commit_and_upload
         "a blocking maintenance audit verdict must fail the job only in the final post-upload step"
     );
 }
+
+#[test]
+fn c4_spec_maintenance_audit_verdict_artifact_survives_the_job_it_reports_on() {
+    let workflow = ".github/workflows/parity-acquire.yml";
+    let yml = read_repo_file(workflow);
+
+    // The ordering is the whole point. A blocking verdict fails this job, and GitHub empties a
+    // failed job's outputs, so the verdict has to be written and uploaded while the job is still
+    // alive — after the commit and the bundle, before the step that fails it.
+    for (first, second) in [
+        (
+            "Upload the committed artifact bundle",
+            "Record the maintenance audit verdict",
+        ),
+        (
+            "Record the maintenance audit verdict",
+            "Upload the maintenance audit verdict",
+        ),
+        (
+            "Upload the maintenance audit verdict",
+            "Fail the job if the maintenance audit recorded a blocking verdict",
+        ),
+    ] {
+        assert_text_order(&yml, first, second, workflow);
+    }
+
+    let record = section_between(
+        &yml,
+        "- name: Record the maintenance audit verdict\n",
+        "      - name: Upload the maintenance audit verdict\n",
+        workflow,
+    );
+    assert!(
+        record.contains("if: ${{ always() }}"),
+        "the verdict must be recorded even when an earlier step failed"
+    );
+    assert!(
+        record.contains("AUDIT_MESSAGE: ${{ steps.maintenance_audit.outputs.audit_message }}"),
+        "exit 2 writes no projection, so the gate's message is the only carrier for its rows"
+    );
+    assert!(
+        record.contains("COMMITTED: ${{ steps.commit_artifacts.outputs.committed }}"),
+        "delivery has to be reported from the commit step, not inferred from the verdict"
+    );
+
+    let upload = section_from(
+        &yml,
+        "- name: Upload the maintenance audit verdict",
+        workflow,
+    );
+    assert!(
+        upload.contains("if: ${{ always() && steps.record_verdict.outputs.path != '' }}")
+            && upload.contains("if-no-files-found: error"),
+        "the verdict upload must run on always() and must fail rather than warn on a missing file"
+    );
+    assert!(
+        upload.contains("${{ github.run_attempt }}"),
+        "the artifact name must distinguish a rerun's attempt from the one that produced it"
+    );
+}

@@ -13,6 +13,9 @@ use xtask::agent_maintenance::audit_status::{
     EXIT_INCOMPLETE_ACQUISITION, EXIT_TARGET_VERSION_MISMATCH, EXIT_UPLIFTS_REQUIRED,
 };
 
+#[path = "c4_spec_audit_gate_behavior/verdict.rs"]
+mod verdict;
+
 const WORKFLOW: &str = ".github/workflows/parity-acquire.yml";
 const MATERIALIZE_STEP: &str = "Materialize snapshots and assert the required target is present";
 const GATE_STEP: &str = "Maintenance audit gate";
