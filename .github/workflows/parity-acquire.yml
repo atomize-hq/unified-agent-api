@@ -892,6 +892,15 @@ jobs:
           VERDICT_DIR="$(mktemp -d "${RUNNER_TEMP}/maintenance-verdict-XXXXXX")"
           VERDICT_JSON="${VERDICT_DIR}/verdict.json"
 
+          # T3. The relay invocation answers exit 3 and only exit 3, so it is rendered only there:
+          # a pasteable command next to a blocking verdict would be an instruction to do the wrong
+          # thing. These two lines must match `agent_maintenance::docs::relay_invocation`, which
+          # renders the same handshake into the HANDOFF; a contract test binds the two spellings so
+          # this one cannot drift into a second definition of the relay.
+          REQUEST_PATH="docs/agents/lifecycle/${AGENT_ID}-maintenance/governance/maintenance-request.toml"
+          RELAY_DRY_RUN="cargo run -p xtask -- execute-agent-maintenance --dry-run --request ${REQUEST_PATH}"
+          RELAY_WRITE="cargo run -p xtask -- execute-agent-maintenance --write --request ${REQUEST_PATH} --run-id RUN_ID_FROM_DRY_RUN"
+
           # An empty exit code means the gate never recorded one: its step was skipped because an
           # earlier step failed, or the run was cancelled. That is a different thing from every
           # defined audit exit, and a consumer must never read it as a clean run — hence
@@ -912,6 +921,8 @@ jobs:
             --arg committed "$COMMITTED" \
             --arg head_sha "$HEAD_SHA" \
             --arg not_delivered_reason "$NOT_DELIVERED_REASON" \
+            --arg relay_dry_run "$RELAY_DRY_RUN" \
+            --arg relay_write "$RELAY_WRITE" \
             '{
               schema_version: 1,
               packet: {
@@ -952,7 +963,14 @@ jobs:
                   } + (if $not_delivered_reason == "" then {} else { not_delivered_reason: $not_delivered_reason } end)
                 end
               )
-            }' > "$VERDICT_JSON"
+            }
+            + (
+              if $exit_code == "3" then
+                { relay: { dry_run: $relay_dry_run, write: $relay_write } }
+              else
+                {}
+              end
+            )' > "$VERDICT_JSON"
 
           echo "path=${VERDICT_JSON}" >> "$GITHUB_OUTPUT"
           cat "$VERDICT_JSON"

@@ -176,3 +176,37 @@ fn c4_spec_only_the_publishing_jobs_hold_write() {
         );
     }
 }
+
+#[test]
+fn c4_spec_the_verdict_publisher_holds_no_repository_write_and_no_pat() {
+    // This job exists to write one comment. It is the narrowest thing in the lifecycle and has to
+    // stay that way: `permissions` scopes a job's whole token, not the one step that calls the
+    // API, so anything else granted here is granted to everything the job runs.
+    let yml = read_repo_file(".github/workflows/agent-maintenance-open-pr.yml");
+    let block = job_block(&yml, "publish-verdict");
+
+    assert_contains(
+        &block,
+        "pull-requests: write",
+        "publish-verdict",
+        "the job must be able to write the comment it exists to write",
+    );
+    assert!(
+        !block.contains("contents: write"),
+        "publish-verdict must not hold repository write; it publishes a verdict, it does not \
+         produce one"
+    );
+    assert!(
+        !block.contains("AUTOMATION_TOKEN"),
+        "publish-verdict must use its own job-scoped GITHUB_TOKEN, never the acquisition PAT"
+    );
+    assert!(
+        !block.contains("actions/checkout"),
+        "publish-verdict must not check out the packet branch; everything it reads is data from \
+         an artifact, never code to run"
+    );
+    assert!(
+        block.contains("if: ${{ always() &&"),
+        "a blocking verdict fails the acquisition, so the publisher has to run anyway"
+    );
+}

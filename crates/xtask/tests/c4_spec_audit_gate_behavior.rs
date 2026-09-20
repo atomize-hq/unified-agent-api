@@ -16,6 +16,9 @@ use xtask::agent_maintenance::audit_status::{
 #[path = "c4_spec_audit_gate_behavior/verdict.rs"]
 mod verdict;
 
+#[path = "c4_spec_audit_gate_behavior/publisher.rs"]
+mod publisher;
+
 const WORKFLOW: &str = ".github/workflows/parity-acquire.yml";
 const MATERIALIZE_STEP: &str = "Materialize snapshots and assert the required target is present";
 const GATE_STEP: &str = "Maintenance audit gate";
@@ -557,7 +560,16 @@ fn runner_command(script: &Path, current_dir: &Path) -> Command {
 }
 
 fn add_step_env(command: &mut Command, step_name: &str, values: &[(&str, &str)]) {
-    for (key, expression) in extract_step_env(step_name) {
+    add_step_env_from(command, WORKFLOW, step_name, values);
+}
+
+fn add_step_env_from(
+    command: &mut Command,
+    workflow_path: &str,
+    step_name: &str,
+    values: &[(&str, &str)],
+) {
+    for (key, expression) in extract_step_env_from(workflow_path, step_name) {
         let value = values
             .iter()
             .find_map(|(known_expression, value)| {
@@ -581,11 +593,19 @@ fn path_with_stub(bin: &Path) -> String {
 }
 
 fn read_workflow() -> String {
-    fs::read_to_string(repo_root().join(WORKFLOW)).expect("read workflow")
+    read_workflow_file(WORKFLOW)
+}
+
+fn read_workflow_file(workflow_path: &str) -> String {
+    fs::read_to_string(repo_root().join(workflow_path)).expect("read workflow")
 }
 
 fn extract_run_block(step_name: &str) -> String {
-    let workflow = read_workflow();
+    extract_run_block_from(WORKFLOW, step_name)
+}
+
+fn extract_run_block_from(workflow_path: &str, step_name: &str) -> String {
+    let workflow = read_workflow_file(workflow_path);
     let marker = format!("      - name: {step_name}\n");
     let step = workflow
         .split_once(&marker)
@@ -609,8 +629,8 @@ fn extract_run_block(step_name: &str) -> String {
     script
 }
 
-fn extract_step_env(step_name: &str) -> Vec<(String, String)> {
-    let workflow = read_workflow();
+fn extract_step_env_from(workflow_path: &str, step_name: &str) -> Vec<(String, String)> {
+    let workflow = read_workflow_file(workflow_path);
     let marker = format!("      - name: {step_name}\n");
     let step = workflow
         .split_once(&marker)

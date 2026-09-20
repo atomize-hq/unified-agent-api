@@ -223,3 +223,43 @@ so the audit verdict describes a tree that is not its head";
     // Still the commit this run built, so the bundle in the artifacts can be matched to it.
     assert_eq!(run.verdict["delivery"]["head_sha"], "abc1234");
 }
+
+#[test]
+fn only_exit_three_renders_a_relay_invocation_and_it_matches_the_handoff_renderer() {
+    // T3. `docs::relay_invocation` is the single definition of the dry-run to write handshake; the
+    // HANDOFF renders it and so does this step. Building the strings in shell is fine as long as
+    // this test fails the moment the two spellings diverge.
+    let request = "docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml";
+    let (dry_run, write) = xtask::agent_maintenance::docs::relay_invocation(request);
+
+    let uplifts = run_verdict(&[
+        (
+            "${{ steps.maintenance_audit.outputs.audit_exit_code }}",
+            "3",
+        ),
+        (
+            "${{ steps.maintenance_audit.outputs.uplifts_required }}",
+            "true",
+        ),
+        (
+            "${{ steps.maintenance_audit.outputs.closeout_ready }}",
+            "false",
+        ),
+    ]);
+    assert_eq!(uplifts.verdict["relay"]["dry_run"], dry_run);
+    assert_eq!(uplifts.verdict["relay"]["write"], write);
+
+    // A pasteable command next to a blocking verdict would tell the maintainer to do the wrong
+    // thing, so every other exit renders none at all.
+    for exit_code in ["0", "2", "4", "5", "1", ""] {
+        let run = run_verdict(&[(
+            "${{ steps.maintenance_audit.outputs.audit_exit_code }}",
+            exit_code,
+        )]);
+        assert!(
+            run.verdict["relay"].is_null(),
+            "exit `{exit_code}` must render no relay invocation: {}",
+            run.verdict
+        );
+    }
+}

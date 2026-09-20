@@ -179,6 +179,23 @@ fn build_manual_packet_docs(request: &MaintenanceRequest) -> Vec<RenderedPacketD
     ]
 }
 
+/// The two commands that drive the contributor relay, in order.
+///
+/// The HANDOFF renders these and so does the packet PR's audit verdict comment, which is the only
+/// reason this is a function rather than two `format!` calls at the one call site: a second
+/// spelling of the handshake somewhere else is a second contract. A workflow that builds these
+/// strings in shell is bound to this function by a contract test rather than by hope.
+pub fn relay_invocation(request_relative_path: &str) -> (String, String) {
+    (
+        format!(
+            "cargo run -p xtask -- execute-agent-maintenance --dry-run --request {request_relative_path}"
+        ),
+        format!(
+            "cargo run -p xtask -- execute-agent-maintenance --write --request {request_relative_path} --run-id RUN_ID_FROM_DRY_RUN"
+        ),
+    )
+}
+
 pub fn render_execution_packet(
     workspace_root: &Path,
     request: &MaintenanceRequest,
@@ -250,14 +267,7 @@ pub fn render_execution_packet(
 
     let trigger_context = render_trigger_context(request);
     let support_audit = render_support_surface_audit(request);
-    let dry_run_command = format!(
-        "cargo run -p xtask -- execute-agent-maintenance --dry-run --request {}",
-        request.relative_path
-    );
-    let write_command = format!(
-        "cargo run -p xtask -- execute-agent-maintenance --write --request {} --run-id RUN_ID_FROM_DRY_RUN",
-        request.relative_path
-    );
+    let (dry_run_command, write_command) = relay_invocation(&request.relative_path);
     let handoff_contents = wrap_markdown(&format!(
         "# Handoff\n\nThis file is the canonical contributor execution contract for `{}` maintenance.\n\n## Packet origin\n\n{}\n\n## Support-surface audit\n\n{}\n\n## Relay contract\n\n- maintained agent packet: `{}`\n- local execution host: `{}`\n- executor surface: `{}`\n- request artifact: `{}`\n- prompt template path: `{}`\n- prompt sha256: `{}`\n- canonical handoff: `{}`\n- derivative pr summary: `{}`\n- exact closeout artifact: `{}`\n- branch linkage: `{}`\n- manual closeout required: `{}`\n\n## Writable surfaces\n\n{}\n\n## Read-only inputs\n\n{}\n\n## Ordered repo commands\n\n{}\n\n## Exact green gates\n\n{}\n\n## Recovery\n\n- recreate packet command: `{}`\n- reopen pr body path: `{}`\n- reopen pr branch: `{}`\n- notes:\n{}\n\n## Dry-run to write relay\n\nUse the `run_id` printed by the dry-run output, replacing `RUN_ID_FROM_DRY_RUN` before invoking write mode.\n\n```sh\n{}\n{}\n```\n\n## Exact closeout command\n\n```sh\ncargo run -p xtask -- close-agent-maintenance --request {} --closeout {}\n```\n\n## Exact maintained-agent prompt\n\n```md\n{}\n```\n",
         request.agent_id,
