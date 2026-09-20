@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at_utc": "2026-09-19T23:45:00Z",
+  "updated_at_utc": "2026-09-20T00:30:00Z",
   "items": [
     {
       "id": "uaa-0022",
@@ -787,7 +787,7 @@
     {
       "id": "uaa-0025",
       "title": "maintenance-audit-status projection can survive a failed run as a stale result",
-      "status": "todo",
+      "status": "done",
       "bucket": "agent_api.onboarding",
       "type": "task",
       "kickoff": {
@@ -1015,7 +1015,7 @@
     {
       "id": "uaa-0031",
       "title": "A blocking audit verdict is not visible on the packet PR",
-      "status": "todo",
+      "status": "done",
       "bucket": "agent_api.onboarding",
       "type": "design",
       "kickoff": {
@@ -1123,7 +1123,7 @@
     {
       "id": "uaa-0034",
       "title": "parity-acquire commit step can push a rebased tree the audit gate never judged",
-      "status": "todo",
+      "status": "done",
       "bucket": "agent_api.onboarding",
       "type": "task",
       "kickoff": {
