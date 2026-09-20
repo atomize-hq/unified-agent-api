@@ -39,6 +39,10 @@ fn run_verdict(overrides: &[(&str, &str)]) -> VerdictRun {
         ),
         ("${{ steps.commit_artifacts.outputs.committed }}", "true"),
         ("${{ steps.commit_artifacts.outputs.head_sha }}", "abc1234"),
+        (
+            "${{ steps.commit_artifacts.outputs.not_delivered_reason }}",
+            "",
+        ),
         ("${{ github.run_id }}", "42"),
         ("${{ github.run_attempt }}", "1"),
     ];
@@ -181,4 +185,41 @@ fn a_commit_step_that_reported_nothing_is_not_a_successful_delivery() {
     assert_eq!(run.verdict["delivery"]["committed"], false);
     assert_eq!(run.verdict["delivery"]["unreported"], true);
     assert!(run.verdict["delivery"]["head_sha"].is_null());
+}
+
+#[test]
+fn a_refused_push_keeps_the_verdict_and_says_it_was_not_delivered() {
+    // uaa-0034. The acquisition is judged, committed locally, and then refused by the remote
+    // because the branch moved. The audit verdict is still exactly what the gate found; what
+    // changed is that it never reached the branch. Reporting that as a clean commit, or as a
+    // different verdict, are both wrong in ways a maintainer cannot see from the PR.
+    let reason = "automation/codex-maintenance-1.2.3 moved under this acquisition, \
+so the audit verdict describes a tree that is not its head";
+    let run = run_verdict(&[
+        (
+            "${{ steps.maintenance_audit.outputs.audit_exit_code }}",
+            "3",
+        ),
+        (
+            "${{ steps.maintenance_audit.outputs.uplifts_required }}",
+            "true",
+        ),
+        (
+            "${{ steps.maintenance_audit.outputs.closeout_ready }}",
+            "false",
+        ),
+        ("${{ steps.commit_artifacts.outputs.committed }}", "false"),
+        (
+            "${{ steps.commit_artifacts.outputs.not_delivered_reason }}",
+            reason,
+        ),
+    ]);
+    assert_eq!(run.verdict["audit"]["observed"], true);
+    assert_eq!(run.verdict["audit"]["exit_code"], 3);
+    assert_eq!(run.verdict["audit"]["uplifts_required"], true);
+    assert_eq!(run.verdict["delivery"]["attempted"], true);
+    assert_eq!(run.verdict["delivery"]["committed"], false);
+    assert_eq!(run.verdict["delivery"]["not_delivered_reason"], reason);
+    // Still the commit this run built, so the bundle in the artifacts can be matched to it.
+    assert_eq!(run.verdict["delivery"]["head_sha"], "abc1234");
 }

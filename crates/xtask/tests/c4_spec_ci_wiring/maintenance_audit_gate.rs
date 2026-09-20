@@ -312,3 +312,26 @@ fn c4_spec_maintenance_audit_verdict_artifact_survives_the_job_it_reports_on() {
         "the artifact name must distinguish a rerun's attempt from the one that produced it"
     );
 }
+
+#[test]
+fn c4_spec_acquisition_refuses_to_push_a_tree_the_gate_did_not_judge() {
+    let workflow = ".github/workflows/parity-acquire.yml";
+    let yml = read_repo_file(workflow);
+    let commit = section_between(
+        &yml,
+        "- name: Commit the acquired artifacts onto the packet branch\n",
+        "      - name: Upload the committed artifact bundle\n",
+        workflow,
+    );
+
+    assert!(
+        !commit.contains("git rebase"),
+        "uaa-0034: an audited acquisition must not be rebased onto a branch that moved, or the \
+         gate's verdict describes a tree that was never judged"
+    );
+    assert!(
+        commit.contains("emit_delivery \"false\" \""),
+        "a refused push must be recorded as an undelivered verdict rather than left to read as a \
+         clean commit"
+    );
+}

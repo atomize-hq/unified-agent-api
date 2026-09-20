@@ -811,6 +811,9 @@ jobs:
             {
               echo "committed=$1"
               echo "head_sha=$(git rev-parse HEAD)"
+              if [ -n "${2:-}" ]; then
+                echo "not_delivered_reason=$2"
+              fi
             } >> "$GITHUB_OUTPUT"
           }
 
@@ -822,20 +825,27 @@ jobs:
 
           git commit -m "chore(${AGENT_ID}): acquire parity artifacts for ${VERSION}"
 
-          # The snapshot matrix can take the better part of an hour, so the packet branch may have
-          # moved. Rebase and retry rather than letting a non-fast-forward throw away every
-          # downloaded binary, snapshot, union and report this run produced.
-          for attempt in 1 2 3; do
-            if git push origin "HEAD:${BRANCH}"; then
-              emit_delivery "true"
-              exit 0
-            fi
-            echo "push attempt ${attempt} was rejected; rebasing onto origin/${BRANCH}"
-            git fetch origin "$BRANCH"
-            git rebase "origin/${BRANCH}"
-          done
+          # uaa-0034. The gate judged this tree. Rebasing onto a moved branch and pushing anyway
+          # would publish that verdict over a different one: the packet branch can gain a
+          # regenerated maintenance request or fresh coverage evidence, and the gate reads both.
+          #
+          # This used to rebase and retry three times, on the premise that an hour-long matrix gives
+          # the branch time to move. Concurrency already prevents that in normal operation —
+          # `agent-maintenance-open-pr` serializes on the packet branch name and this job runs
+          # inside that run — so a rejected push means something out of band happened: a direct
+          # `parity-acquire` dispatch, or a human push. That is the worst moment to guess.
+          #
+          # Failing costs a re-run, not the work: the artifact bundle and the verdict are already
+          # uploaded, and the verdict records the audit and the delivery separately, so the packet
+          # PR can say "the audit reached this verdict and it was not delivered" rather than
+          # reporting one as the other.
+          if git push origin "HEAD:${BRANCH}"; then
+            emit_delivery "true"
+            exit 0
+          fi
 
-          echo "::error title=Could not push acquired artifacts::${BRANCH} kept moving under this run." >&2
+          emit_delivery "false" "${BRANCH} moved under this acquisition, so the audit verdict describes a tree that is not its head"
+          echo "::error title=Could not push acquired artifacts::${BRANCH} moved under this run; refusing to rebase an audited acquisition onto it." >&2
           exit 1
 
       - name: Upload the committed artifact bundle
@@ -874,6 +884,7 @@ jobs:
           UPLIFTS_REQUIRED: ${{ steps.maintenance_audit.outputs.uplifts_required }}
           COMMITTED: ${{ steps.commit_artifacts.outputs.committed }}
           HEAD_SHA: ${{ steps.commit_artifacts.outputs.head_sha }}
+          NOT_DELIVERED_REASON: ${{ steps.commit_artifacts.outputs.not_delivered_reason }}
           RUN_ID: ${{ github.run_id }}
           RUN_ATTEMPT: ${{ github.run_attempt }}
         run: |
@@ -900,6 +911,7 @@ jobs:
             --arg message "$AUDIT_MESSAGE" \
             --arg committed "$COMMITTED" \
             --arg head_sha "$HEAD_SHA" \
+            --arg not_delivered_reason "$NOT_DELIVERED_REASON" \
             '{
               schema_version: 1,
               packet: {
@@ -933,7 +945,11 @@ jobs:
                 elif $committed == "" then
                   { attempted: true, committed: false, unreported: true }
                 else
-                  { attempted: true, committed: ($committed == "true"), head_sha: $head_sha }
+                  {
+                    attempted: true,
+                    committed: ($committed == "true"),
+                    head_sha: $head_sha
+                  } + (if $not_delivered_reason == "" then {} else { not_delivered_reason: $not_delivered_reason } end)
                 end
               )
             }' > "$VERDICT_JSON"
