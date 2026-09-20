@@ -82,6 +82,9 @@ jobs:
       # create-pull-request deletes the branch but still reports a pull-request-number.
       branch_created: ${{ steps.create_pr.outcome == 'success' && (steps.create_pr.outputs.pull-request-operation == 'created' || steps.create_pr.outputs.pull-request-operation == 'updated') }}
       acquire: ${{ steps.acquisition_gate.outputs.acquire }}
+      # The acquisition's verdict has to reach this PR, and the job that decides it cannot name the
+      # PR: `parity-acquire` is handed a ref, not a number. Export it here, where it is known.
+      pull_request_number: ${{ steps.create_pr.outputs.pull-request-number }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -263,3 +266,141 @@ jobs:
       commit: true
     secrets:
       AUTOMATION_TOKEN: ${{ secrets.AUTOMATION_TOKEN }}
+
+  # The acquisition's verdict is invisible on the packet PR without this job (`uaa-0031`). The
+  # watcher dispatches this workflow on its own ref, so the acquire run's check runs attach to that
+  # commit rather than to the packet head, and the PR's own checks come from `ci.yml`, which never
+  # runs the maintenance audit. A blocking verdict therefore pushes artifacts and leaves the PR
+  # looking green.
+  #
+  # This job is deliberately weak. It holds no repository write access and no PAT, runs no code
+  # from the packet branch, and does exactly two things: read one artifact and write one comment.
+  # A failed `union` job empties its outputs, so the verdict arrives as an artifact instead —
+  # artifacts are not job outputs and survive the failure that makes them worth reading.
+  publish-verdict:
+    name: Publish the audit verdict to the packet PR
+    needs: [open-pr, acquire]
+    if: ${{ always() && needs.open-pr.outputs.pull_request_number != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      pull-requests: write
+      actions: read
+    steps:
+      - name: Download the maintenance audit verdict
+        id: verdict
+        continue-on-error: true
+        uses: actions/download-artifact@v6
+        with:
+          name: "maintenance-audit-verdict-${{ inputs.agent_id }}-${{ inputs.target_version }}-${{ github.run_attempt }}"
+          path: _verdict
+
+      - name: Comment the verdict on the packet PR
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ needs.open-pr.outputs.pull_request_number }}
+          AGENT_ID: ${{ inputs.agent_id }}
+          VERSION: ${{ inputs.target_version }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}/attempts/${{ github.run_attempt }}
+          ACQUIRE_RESULT: ${{ needs.acquire.result }}
+        run: |
+          set -euo pipefail
+          # Markdown code spans are passed as arguments, never written into a single-quoted printf
+          # format: a backtick there reads as legacy command substitution to shellcheck, and the
+          # workflow linter is not worth arguing with over punctuation.
+          BT='`'
+          FENCE="${BT}${BT}${BT}"
+          VERDICT=_verdict/verdict.json
+          MARKER_PREFIX="<!-- maintenance-audit-verdict agent=${AGENT_ID} version=${VERSION} "
+          MARKER="${MARKER_PREFIX}run=${RUN_ID} attempt=${RUN_ATTEMPT} -->"
+
+          # Ordering is not generation order: a slow earlier run can finish after a later one and
+          # would otherwise replace a current verdict with its own valid but superseded relay
+          # command. Run ids increase, so a managed comment from a higher run wins and this one
+          # stands down rather than overwriting it.
+          gh api "repos/${REPO}/issues/${PR_NUMBER}/comments" --paginate > _comments.json
+          EXISTING="$(jq -r --arg prefix "$MARKER_PREFIX" \
+            '[.[] | select(.body | contains($prefix))] | last // empty' _comments.json)"
+          if [ -n "$EXISTING" ]; then
+            EXISTING_ID="$(printf '%s' "$EXISTING" | jq -r '.id')"
+            EXISTING_RUN="$(printf '%s' "$EXISTING" | jq -r '.body' | sed -n 's/.*maintenance-audit-verdict [^>]*run=\([0-9][0-9]*\).*/\1/p' | head -n 1)"
+            if [ -n "$EXISTING_RUN" ] && [ "$EXISTING_RUN" -gt "$RUN_ID" ]; then
+              echo "::notice title=Superseded audit verdict::run ${RUN_ID} will not overwrite the verdict from newer run ${EXISTING_RUN}"
+              exit 0
+            fi
+          else
+            EXISTING_ID=""
+          fi
+
+          BODY=_verdict-comment.md
+          {
+            printf '%s\n\n' "$MARKER"
+            printf '### Maintenance audit — %s%s%s %s\n\n' "$BT" "$AGENT_ID" "$BT" "$VERSION"
+          } > "$BODY"
+
+          if [ ! -f "$VERDICT" ]; then
+            # No verdict is its own state. It is not a clean audit, and saying which way the
+            # producing job went is the only honest thing available.
+            {
+              printf 'The audit verdict for this run is **unavailable**.\n\n'
+              printf -- '- acquisition job result: %s%s%s\n' "$BT" "$ACQUIRE_RESULT" "$BT"
+              printf -- '- this is not a clean audit; it means the verdict never reached this job\n'
+            } >> "$BODY"
+          else
+            OBSERVED="$(jq -r '.audit.observed' "$VERDICT")"
+            if [ "$OBSERVED" != "true" ]; then
+              {
+                printf 'The audit **did not run** for this acquisition.\n\n'
+                printf -- '- acquisition job result: %s%s%s\n' "$BT" "$ACQUIRE_RESULT" "$BT"
+              } >> "$BODY"
+            else
+              EXIT_CODE="$(jq -r '.audit.exit_code' "$VERDICT")"
+              BLOCKING="$(jq -r '.audit.blocking' "$VERDICT")"
+              MESSAGE="$(jq -r '.audit.message // ""' "$VERDICT")"
+              TITLE="$(jq -r '.audit.title // ""' "$VERDICT")"
+              case "$EXIT_CODE" in
+                0) printf 'Audit clean. No uplifts required; this packet is closeout-ready.\n' >> "$BODY" ;;
+                3)
+                  printf 'Uplifts are required. The audit completed; this packet is **not** closeout-ready.\n\n' >> "$BODY"
+                  printf 'Run the relay, then replace RUN_ID_FROM_DRY_RUN with the run_id the dry run prints:\n\n' >> "$BODY"
+                  printf '%ssh\n' "$FENCE" >> "$BODY"
+                  jq -r '.relay.dry_run, .relay.write' "$VERDICT" >> "$BODY"
+                  printf '%s\n' "$FENCE" >> "$BODY"
+                  ;;
+                *)
+                  printf '**%s** (exit %s).\n\n' "${TITLE:-Maintenance audit failed}" "$EXIT_CODE" >> "$BODY"
+                  if [ -n "$MESSAGE" ]; then
+                    # Exit 2 writes no projection, so this is the only place the offending rows are
+                    # named. It is upstream text, so it goes in a fenced block and is never eval'd.
+                    printf '%stext\n%s\n%s\n' "$FENCE" "$MESSAGE" "$FENCE" >> "$BODY"
+                  fi
+                  if [ "$BLOCKING" != "true" ]; then
+                    printf '\nThis verdict is not blocking for a non-committing run.\n' >> "$BODY"
+                  fi
+                  ;;
+              esac
+
+              ATTEMPTED="$(jq -r '.delivery.attempted' "$VERDICT")"
+              if [ "$ATTEMPTED" = "true" ]; then
+                COMMITTED="$(jq -r '.delivery.committed' "$VERDICT")"
+                REASON="$(jq -r '.delivery.not_delivered_reason // ""' "$VERDICT")"
+                if [ "$COMMITTED" = "true" ]; then
+                  printf '\n- artifacts committed: %s%s%s\n' "$BT" "$(jq -r '.delivery.head_sha' "$VERDICT")" "$BT" >> "$BODY"
+                else
+                  printf '\n- artifacts **not** delivered%s\n' "${REASON:+: $REASON}" >> "$BODY"
+                fi
+              fi
+            fi
+          fi
+
+          printf '\n[Producing run](%s)\n' "$RUN_URL" >> "$BODY"
+
+          if [ -n "$EXISTING_ID" ]; then
+            gh api --method PATCH "repos/${REPO}/issues/comments/${EXISTING_ID}" -F "body=@${BODY}"
+          else
+            gh api --method POST "repos/${REPO}/issues/${PR_NUMBER}/comments" -F "body=@${BODY}"
+          fi

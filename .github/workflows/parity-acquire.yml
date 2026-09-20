@@ -568,12 +568,29 @@ jobs:
         run: |
           set -euo pipefail
           REQUEST_PATH="docs/agents/lifecycle/${AGENT_ID}-maintenance/governance/maintenance-request.toml"
-          STATUS_JSON="_ci_tmp/audit/status.json"
           COMMAND_STDOUT="_ci_tmp/audit/stdout.log"
           COMMAND_STDERR="_ci_tmp/audit/stderr.log"
           UNION="${ROOT}/snapshots/${VERSION}/union.json"
 
           mkdir -p _ci_tmp/audit
+
+          # The projection is invocation-scoped. A fresh directory per run means a file an earlier
+          # attempt left behind can never be read as this run's result, and `$RUNNER_TEMP` puts it
+          # outside both the commit and the `_ci_tmp` sweep, so it cannot be staged by accident.
+          AUDIT_RUN_DIR="$(mktemp -d "${RUNNER_TEMP}/maintenance-audit-XXXXXX")"
+          STATUS_JSON="${AUDIT_RUN_DIR}/status.json"
+
+          # `maintenance-audit-status` documents that only exit 0 and exit 3 leave a projection a
+          # consumer may read; every other exit either writes none or can preserve an older one.
+          # Exporting the path nowhere else is what enforces that: a later step cannot read a file
+          # it was never told about.
+          emit_status_projection_path() {
+            if [ -f "$STATUS_JSON" ]; then
+              echo "status_projection=${STATUS_JSON}" >> "$GITHUB_OUTPUT"
+            else
+              echo "::warning title=Maintenance audit projection missing::the audit reported an eligible exit but left no projection at ${STATUS_JSON}" >&2
+            fi
+          }
 
           emit_gate_outputs() {
             local closeout_ready="$1"
@@ -677,10 +694,12 @@ jobs:
           case "$AUDIT_STATUS" in
             0)
               emit_gate_outputs "true" "false" "false" "0" "" ""
+              emit_status_projection_path
               summarize_clean
               ;;
             3)
               emit_gate_outputs "false" "true" "false" "3" "" ""
+              emit_status_projection_path
               summarize_uplifts
               ;;
             4)
@@ -759,6 +778,7 @@ jobs:
           rm -rf "${ROOT}/raw_help"
 
       - name: Commit the acquired artifacts onto the packet branch
+        id: commit_artifacts
         if: ${{ inputs.commit }}
         shell: bash
         env:
@@ -784,26 +804,48 @@ jobs:
             cli_manifests/support_matrix/current.json \
             docs/specs/unified-agent-api/support-matrix.md
 
+          # The verdict artifact reports the audit and the delivery separately, so a blocking
+          # verdict is never mistaken for a failed push and a failed push never masquerades as a
+          # verdict. Both of this step's success paths therefore have to say which one they took.
+          emit_delivery() {
+            {
+              echo "committed=$1"
+              echo "head_sha=$(git rev-parse HEAD)"
+              if [ -n "${2:-}" ]; then
+                echo "not_delivered_reason=$2"
+              fi
+            } >> "$GITHUB_OUTPUT"
+          }
+
           if git diff --cached --quiet; then
             echo "no acquisition changes to commit"
+            emit_delivery "false"
             exit 0
           fi
 
           git commit -m "chore(${AGENT_ID}): acquire parity artifacts for ${VERSION}"
 
-          # The snapshot matrix can take the better part of an hour, so the packet branch may have
-          # moved. Rebase and retry rather than letting a non-fast-forward throw away every
-          # downloaded binary, snapshot, union and report this run produced.
-          for attempt in 1 2 3; do
-            if git push origin "HEAD:${BRANCH}"; then
-              exit 0
-            fi
-            echo "push attempt ${attempt} was rejected; rebasing onto origin/${BRANCH}"
-            git fetch origin "$BRANCH"
-            git rebase "origin/${BRANCH}"
-          done
+          # uaa-0034. The gate judged this tree. Rebasing onto a moved branch and pushing anyway
+          # would publish that verdict over a different one: the packet branch can gain a
+          # regenerated maintenance request or fresh coverage evidence, and the gate reads both.
+          #
+          # This used to rebase and retry three times, on the premise that an hour-long matrix gives
+          # the branch time to move. Concurrency already prevents that in normal operation —
+          # `agent-maintenance-open-pr` serializes on the packet branch name and this job runs
+          # inside that run — so a rejected push means something out of band happened: a direct
+          # `parity-acquire` dispatch, or a human push. That is the worst moment to guess.
+          #
+          # Failing costs a re-run, not the work: the artifact bundle and the verdict are already
+          # uploaded, and the verdict records the audit and the delivery separately, so the packet
+          # PR can say "the audit reached this verdict and it was not delivered" rather than
+          # reporting one as the other.
+          if git push origin "HEAD:${BRANCH}"; then
+            emit_delivery "true"
+            exit 0
+          fi
 
-          echo "::error title=Could not push acquired artifacts::${BRANCH} kept moving under this run." >&2
+          emit_delivery "false" "${BRANCH} moved under this acquisition, so the audit verdict describes a tree that is not its head"
+          echo "::error title=Could not push acquired artifacts::${BRANCH} moved under this run; refusing to rebase an audited acquisition onto it." >&2
           exit 1
 
       - name: Upload the committed artifact bundle
@@ -818,6 +860,128 @@ jobs:
             ${{ needs.plan.outputs.manifest_root }}/versions/${{ inputs.target_version }}.json
             ${{ needs.plan.outputs.manifest_root }}/wrapper_coverage.json
             ${{ needs.plan.outputs.manifest_root }}/artifacts.lock.json
+
+      # The one durable channel for this run's verdict. A blocking verdict fails this job by
+      # design, and GitHub empties a failed job's outputs, so a caller cannot learn exit 2, exit 4
+      # or a committing exit 5 from `jobs.union.outputs` — those arrive indistinguishable from a
+      # skipped, cancelled or infrastructure-failed run (`uaa-0031`). An artifact is not a job
+      # output and survives the failure, so the verdict and its diagnostic reach the caller either
+      # way. Both steps run before the terminal failure, and both run on `always()`.
+      - name: Record the maintenance audit verdict
+        id: record_verdict
+        if: ${{ always() }}
+        shell: bash
+        env:
+          AGENT_ID: ${{ inputs.agent_id }}
+          VERSION: ${{ inputs.target_version }}
+          BRANCH: ${{ inputs.ref }}
+          COMMIT: ${{ inputs.commit }}
+          AUDIT_EXIT_CODE: ${{ steps.maintenance_audit.outputs.audit_exit_code }}
+          AUDIT_FAILED: ${{ steps.maintenance_audit.outputs.audit_failed }}
+          AUDIT_TITLE: ${{ steps.maintenance_audit.outputs.audit_title }}
+          AUDIT_MESSAGE: ${{ steps.maintenance_audit.outputs.audit_message }}
+          CLOSEOUT_READY: ${{ steps.maintenance_audit.outputs.closeout_ready }}
+          UPLIFTS_REQUIRED: ${{ steps.maintenance_audit.outputs.uplifts_required }}
+          COMMITTED: ${{ steps.commit_artifacts.outputs.committed }}
+          HEAD_SHA: ${{ steps.commit_artifacts.outputs.head_sha }}
+          NOT_DELIVERED_REASON: ${{ steps.commit_artifacts.outputs.not_delivered_reason }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+        run: |
+          set -euo pipefail
+          VERDICT_DIR="$(mktemp -d "${RUNNER_TEMP}/maintenance-verdict-XXXXXX")"
+          VERDICT_JSON="${VERDICT_DIR}/verdict.json"
+
+          # T3. The relay invocation answers exit 3 and only exit 3, so it is rendered only there:
+          # a pasteable command next to a blocking verdict would be an instruction to do the wrong
+          # thing. These two lines must match `agent_maintenance::docs::relay_invocation`, which
+          # renders the same handshake into the HANDOFF; a contract test binds the two spellings so
+          # this one cannot drift into a second definition of the relay.
+          REQUEST_PATH="docs/agents/lifecycle/${AGENT_ID}-maintenance/governance/maintenance-request.toml"
+          RELAY_DRY_RUN="cargo run -p xtask -- execute-agent-maintenance --dry-run --request ${REQUEST_PATH}"
+          RELAY_WRITE="cargo run -p xtask -- execute-agent-maintenance --write --request ${REQUEST_PATH} --run-id RUN_ID_FROM_DRY_RUN"
+
+          # An empty exit code means the gate never recorded one: its step was skipped because an
+          # earlier step failed, or the run was cancelled. That is a different thing from every
+          # defined audit exit, and a consumer must never read it as a clean run — hence
+          # `observed`, which is the first thing a reader has to check.
+          jq -n \
+            --arg agent_id "$AGENT_ID" \
+            --arg target_version "$VERSION" \
+            --arg ref "$BRANCH" \
+            --arg commit_mode "$COMMIT" \
+            --arg run_id "$RUN_ID" \
+            --arg run_attempt "$RUN_ATTEMPT" \
+            --arg exit_code "$AUDIT_EXIT_CODE" \
+            --arg blocking "$AUDIT_FAILED" \
+            --arg closeout_ready "$CLOSEOUT_READY" \
+            --arg uplifts_required "$UPLIFTS_REQUIRED" \
+            --arg title "$AUDIT_TITLE" \
+            --arg message "$AUDIT_MESSAGE" \
+            --arg committed "$COMMITTED" \
+            --arg head_sha "$HEAD_SHA" \
+            --arg not_delivered_reason "$NOT_DELIVERED_REASON" \
+            --arg relay_dry_run "$RELAY_DRY_RUN" \
+            --arg relay_write "$RELAY_WRITE" \
+            '{
+              schema_version: 1,
+              packet: {
+                agent_id: $agent_id,
+                target_version: $target_version,
+                ref: $ref,
+                commit_mode: ($commit_mode == "true")
+              },
+              producer: {
+                run_id: $run_id,
+                run_attempt: ($run_attempt | tonumber)
+              },
+              audit: (
+                if $exit_code == "" then
+                  { observed: false }
+                else
+                  {
+                    observed: true,
+                    exit_code: ($exit_code | tonumber),
+                    blocking: ($blocking == "true"),
+                    closeout_ready: ($closeout_ready == "true"),
+                    uplifts_required: ($uplifts_required == "true"),
+                    title: $title,
+                    message: $message
+                  }
+                end
+              ),
+              delivery: (
+                if $commit_mode != "true" then
+                  { attempted: false }
+                elif $committed == "" then
+                  { attempted: true, committed: false, unreported: true }
+                else
+                  {
+                    attempted: true,
+                    committed: ($committed == "true"),
+                    head_sha: $head_sha
+                  } + (if $not_delivered_reason == "" then {} else { not_delivered_reason: $not_delivered_reason } end)
+                end
+              )
+            }
+            + (
+              if $exit_code == "3" then
+                { relay: { dry_run: $relay_dry_run, write: $relay_write } }
+              else
+                {}
+              end
+            )' > "$VERDICT_JSON"
+
+          echo "path=${VERDICT_JSON}" >> "$GITHUB_OUTPUT"
+          cat "$VERDICT_JSON"
+
+      - name: Upload the maintenance audit verdict
+        if: ${{ always() && steps.record_verdict.outputs.path != '' }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: "maintenance-audit-verdict-${{ inputs.agent_id }}-${{ inputs.target_version }}-${{ github.run_attempt }}"
+          if-no-files-found: error
+          path: ${{ steps.record_verdict.outputs.path }}
 
       - name: Fail the job if the maintenance audit recorded a blocking verdict
         if: ${{ always() && steps.maintenance_audit.outputs.audit_failed == 'true' }}

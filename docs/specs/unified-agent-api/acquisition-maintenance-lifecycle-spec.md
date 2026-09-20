@@ -271,11 +271,25 @@ uplifts remain. `30898655` renamed the uplift reason to `unbaselined_gap`. The c
 hidden-surface policy that T8 enforces (T8 sequencing below). Backlog items `uaa-0039`…`uaa-0044`
 carry what the work exposed (§8.1).
 
-**T3 — Relay-packet rendering.** On the uplift branch, render the relay invocation (prompt path,
-dry-run→write `--run-id` handshake) into the packet PR body from the existing renderer, so the
-maintainer pastes one command. Reuses `docs.rs` rendering; no new prompt source of truth. Exit 2
-writes no projection, so a debt-baseline failure names its unmatched rows only in the gate's error
-line; T3 must carry that line to the PR (`uaa-0031`).
+**T3 — Relay-packet rendering. DONE (`c3607d6b`).** On the uplift branch, render the relay
+invocation (prompt path, dry-run→write `--run-id` handshake) into a managed comment on the packet
+PR, from the existing renderer, so the maintainer pastes one command. Reuses `docs.rs` rendering;
+no new prompt source of truth. Exit 2 writes no projection, so a debt-baseline failure names its
+unmatched rows only in the gate's error line; T3 must carry that line to the PR (`uaa-0031`).
+
+Landed across five commits. `129ea8f5` split the two test binaries that were within five lines of
+the §5 cap. `56f13a39` made the projection invocation-scoped (`uaa-0025`). `fba98f95` gave the
+verdict a channel that survives the job it reports on (`uaa-0031`). `b6498b37` stopped the commit
+step rebasing an audited acquisition onto a moved branch (`uaa-0034`). `c3607d6b` added the
+publisher job and the relay rendering. Acceptance criterion 1 is met in wiring and under test; it
+has not yet been observed on a runner, which T8 does.
+
+**Decided 2026-09-19: a comment, not the PR body.** The body is set from `body-path` on
+`create-pull-request`, pointed at the generated `governance/pr-summary.md`, and the watcher
+re-dispatches `agent-maintenance-open-pr` nightly with no dedupe against an already-open packet. The
+body is therefore rewritten from that file every night, so a verdict written into it survives at
+most one day. The body also declares the frozen request as its source of truth, while the verdict is
+live post-acquisition evidence. `uaa-0048` carries the wider problem this exposed.
 
 **T4 — Closeout evidence resolution.** Commit-pinned CI conclusion lookup, fail-closed. This is the
 highest-risk unit; it decides whether a governance artifact can be trusted.
@@ -294,6 +308,21 @@ running the real `validate_closeout` before writing.
 both review lanes clean with findings adjudicated.
 
 Order: T1 → T2 → (T3 ∥ T4) → T5 → T6 → T7 → T8.
+
+### Backlog groups that land inside that order
+
+The open items in §8.1 are not a queue to drain after T8. Five of them gate a T item and land with
+it. Recorded 2026-09-19, after `uaa-0029`, `uaa-0038`, `uaa-0043`, `uaa-0046` and `uaa-0047` landed
+in #216.
+
+| group | items | lands |
+|---|---|---|
+| ~~Verdict visibility~~ **Done** | `uaa-0031`, `uaa-0025` — `uaa-0028` stayed open, because the chosen surface did not make the projection path durable. `uaa-0034` was pulled in and resolved with them | **Landed with T3.** `uaa-0031` decides the surface T3 renders to, and its deliverable reads "implemented with T3". T3 is the projection's first consumer, so `uaa-0025` cannot follow it. |
+| Closeout prerequisites | `uaa-0045`, `uaa-0039`, `uaa-0048` | **Immediately after the verdict-visibility group, before T4–T8 reach a live packet.** Neither blocks T3, and neither may wait for T8. `uaa-0045`'s trigger fired when `uaa-0038` was resolved in `a474cdbc`: the two are halves of one defense — the workflow clears a stale shard, the merger checks that a shard is what its filename claims — and only the first half exists. `uaa-0048` blocks T8 outright: a closeout committed to a packet branch does not survive the next nightly regeneration. |
+
+`c4_spec_ci_wiring.rs` (699 code lines) and `agent_maintenance_audit_status.rs` (695) are both
+within five lines of the §5 cap and are the conventional homes for the contract and regression tests
+both groups add. Budget the file splits as the first commits of each group, not as cleanup.
 
 ### T8 sequencing — closeout happens *before* merge
 
@@ -344,22 +373,23 @@ items (`uaa-0029`…`uaa-0032`; `uaa-0031` by reading only) and added two more (
 `uaa-0034`). Two more arrived with the codex feature pass and the pre-merge nightly simulation
 (`uaa-0037`, `uaa-0038`), and were missing from this table until 2026-09-19. The 2026-09-15
 support-audit classification added six (`uaa-0039`…`uaa-0044`). A 2026-09-16 ChatGPT Pro review of a
-bounded repository bundle added three (`uaa-0045`…`uaa-0047`).
+bounded repository bundle added three (`uaa-0045`…`uaa-0047`). Deciding T3's visibility surface
+on 2026-09-19 added one (`uaa-0048`).
 
 | id | item | disposition |
 | --- | --- | --- |
 | `uaa-0023` | Typed errors for support-audit evidence faults | Independent follow-up. Round 5 classifies some faults by matching error message text, because the packet scoped `support_audit.rs` out of the write set. A message drift yields exit 1, never a false clean, so this is fragility rather than a correctness hole. |
 | `uaa-0024` | Union-vs-per-target coverage coherence contract | Independent follow-up. Needs the contract defined before it can be implemented, and it belongs at report-generation time rather than in the gate. |
-| `uaa-0025` | Projection can survive a failed run as a stale result | **Reopened; resolve with or before T3.** T2a's cleanup fix was disproved by a probe: the request load derives the audit internally, so later request-validation failures are classified preflight and leave a stale projection behind exit 2. Also folds in the misleading `live_derivation_attempted` name and the silent post-derivation cleanup failure. Latent until T3, the first consumer. |
+| `uaa-0025` | Projection can survive a failed run as a stale result | **Resolved in `56f13a39`.** Fixing the classification would improve cleanup without establishing freshness, so the rule is that the exit code is the only authority, enforced on both sides. CI allocates a fresh projection directory per invocation under the runner's scratch space and exports its path only for exit 0 and exit 3, so a later step cannot read a file it was never told about. `live_derivation_attempted` is now `live_evidence_read`, a failed post-derivation cleanup warns instead of discarding its error, and the `--emit-json` doc no longer claims the file is "either current or absent" |
 | `uaa-0026` | Exit 3 lost when `--emit-json` cannot be written | **Resolved in `72191bb3`.** The computed outcome takes precedence; the stale projection is removed and a warning printed. |
 | `uaa-0027` | Snapshot retry can mix two attempts in raw_help | Low. The retry never clears attempt 1's `raw_help/<version>/<target>/`. raw_help is never committed. |
-| `uaa-0028` | `--emit-json` cleanup deletes whatever path it names | Low, suspected. No ownership guard. Matters once T3 makes the projection path durable. |
+| `uaa-0028` | `--emit-json` cleanup deletes whatever path it names | Low, suspected. No ownership guard. Its trigger was T3 making the projection path durable; T3 did not. The projection stays in a per-invocation directory and the verdict that leaves the job is serialized separately from it, so nothing durable is handed to `--emit-json`. The defect is unchanged and the trigger now reads: a stable or shared projection location, an artifact-supplied output path, or cleanup broadened to more failure paths |
 | `uaa-0029` | `parity-acquire` exports no `workflow_call` outputs | **Resolved in `3da66250`.** `on.workflow_call.outputs` now exports `closeout_ready`, `uplifts_required` and `audit_exit_code`, all from the one gate evaluation. Read `uaa-0031` before consuming them: a blocking verdict never arrives through this channel. |
 | `uaa-0030` | One failed snapshot leg skips `union`, gate, commit and upload | Medium. The "continues on a partial matrix" premise in §8.2 was wrong and is corrected there. **Decided 2026-09-13: preserve completed legs** — `union` runs unless cancelled or `plan` failed; the gate routes exit 4; commit and upload run; the job still fails. **Refined 2026-09-13:** a failed *required* target still hard-fails with no union (`manifest-union` cannot build one); only non-required leg failures preserve work. **Resolved in `a3c8ce53`.** |
-| `uaa-0031` | A blocking verdict is not visible on the packet PR | Medium. **Confirmed on a runner 2026-09-14:** the watcher dispatches `agent-maintenance-open-pr` on `staging`, so the acquire check runs attach to the `staging` head commit (`a36a115d`), and packet PRs #195, #205 and #206 carry only `CI` checks. T3 must post the verdict to the PR itself (body, comment, or a status on the packet head SHA). Also carries the exit-3 `required_uplifts` detail, which `_ci_tmp` cleanup deletes today — T3 renders it. **Constraint found 2026-09-19:** the job outputs added by `uaa-0029` cannot carry a blocking verdict at all. The terminal step fails `union` on `audit_failed`, and GitHub empties a reusable workflow's outputs when the producing job fails, so a caller observes only exit 0, exit 3 or a non-committing exit 5; exits 2 and 4 arrive as `''`, indistinguishable from skipped or cancelled. T3 needs a channel that survives a failed producer. |
+| `uaa-0031` | A blocking verdict is not visible on the packet PR | **Resolved in `fba98f95` / `c3607d6b`.** A blocking verdict fails `union`, and GitHub empties a failed job's outputs, so the verdict leaves the job as an artifact instead — written and uploaded before the terminal failing step, both on `always()`. A new caller job reads it and maintains one marked comment on the packet PR, holding `pull-requests: write` and nothing else: no repository write, no PAT, no checkout of the packet branch. An audit that never ran is recorded as unobserved rather than clean, and a blocking verdict is kept distinct from a failed delivery. A managed comment from a higher run id wins, so a slow earlier run cannot overwrite a current verdict with a superseded one |
 | `uaa-0032` | `--expect-target-version` mismatch fails out-of-packet runs | Medium. Dry runs and promote-prerequisite re-runs now end red. **Decided 2026-09-13: fail only when committing** — a `commit: false` mismatch emits a notice and stays green; no other exit 2 may be downgraded. Mechanism: the target version is compared before the validated request load and a mismatch gets its own exit code 5. A promote-prerequisite re-run (`commit: true`) for a version the ref's request does not name is **accepted as red-but-committed**. **Resolved in `a3c8ce53` / `916c9e9b`.** |
 | `uaa-0033` | Artifact bundle does not match what the run committed | Low. The `always()` upload can succeed with only stale checkout files, and omits the support-matrix files the commit stages. |
-| `uaa-0034` | Commit step can push a rebased tree the gate never judged | Low, suspected, pre-dates T2c. |
+| `uaa-0034` | Commit step can push a rebased tree the gate never judged | **Resolved in `b6498b37`.** The commit step no longer rebases onto a moved branch and pushes anyway; it refuses. The retry's premise did not hold either — `agent-maintenance-open-pr` serializes on the packet branch name and the acquisition runs inside that run, so the nightly regeneration lands between acquisitions rather than during one, and a rejected push means something out of band. The bundle and the verdict are uploaded before this point, so the refusal costs a re-run rather than the work, and the verdict reports it as reached-but-not-delivered |
 | `uaa-0035` | Is opencode's TUI root command excluded from parity? | **Decided 2026-09-14: exclude it.** opencode `RULES.json` excludes the root command and its 20 root-position flags (`interactive`), and report generation now checks an excluded command's flags and arguments against their own exclusions instead of dropping them, so a future root flag reaches the work queue. **Resolved in `3f7ad4c7`.** |
 | `uaa-0036` | claude_code debt rows name `claude`, report-derived surfaces name `claude_code` | **Decided 2026-09-14: `command_path` is rooted at the agent id.** The two claude_code debt rows and the contract examples now read `claude_code`, and a test binds every debt row to its agent id. **Resolved in `fa739c7d`.** |
 | `uaa-0037` | codex-snapshot discards raw help capture errors when no feature is enabled | Low, latent. The default crawl runs as `let _ = discover_commands(…)`, so a capture failure is dropped and the snapshot still exits 0 while the leg goes red on the raw-help upload. Trigger: a codex release whose `features list` is empty or fails, or any change to raw help capture or the snapshot job's upload order. |
@@ -371,8 +401,10 @@ bounded repository bundle added three (`uaa-0045`…`uaa-0047`).
 | `uaa-0043` | The gap-list name implies newness the audit never checks | **Resolved in `fb2481c0`.** The request schema now calls the list `unbaselined_gap_surface`, matching the audit's actual baseline test. |
 | `uaa-0044` | Release-notes mining and docs cross-check were designed but never built | Low. ADR 0001 §3 signals; codex 0.153.4 hides 11 surfaces from help and 7 appear nowhere in our artifacts. |
 | `uaa-0045` | opencode's `RULES.json` was never normalized to the union-model schema | **Resolve before the opencode packet closes.** Its `union` block omits the three identity guards codex and claude_code set, and it has no `globals`, so the union accepts a shard declaring another tool or version and skips the root-flag dedupe. Every missing key is `#[serde(default)]`, so a thin descriptor is silently permissive. Compounds `uaa-0038`. Pointer: Workstream E in the parity generalization plan §5. |
-| `uaa-0046` | Debt authorization does not constrain matches by target or upstream version | **Resolve before a target is added to any `union.expected_targets`, and before `uaa-0039`.** Wrapper coverage already supports target scope: `scope.target_triples` is a first-class mechanism in `crates/xtask/src/wrapper_coverage_shared.rs`, validated against the agent's expected targets, and claude_code populates it on 21 entries while codex and opencode populate it on none. The debt inventory never adopted it — its parser reads ten fixed keys and silently ignores any other, so a deferral argued for one target authorizes the same surface on a target added later. This is adoption of an existing mechanism, not invention of a new one, but the default must not be adopted with it: an omitted coverage scope means all expected targets, which on an authorization record would grant permission by omission. Debt scope is required instead. Distinct from `uaa-0041`, which is about values, arity and output shape. Pointers: `wrapper_coverage_shared.rs`, and the Surface identity rules in the request contract. |
+| `uaa-0046` | Debt authorization does not constrain matches by target or upstream version | **Resolved in `b52f1242` / `4c292da2`.** Each debt row now carries a required `scope_target_triples`, an `authorized_at_version`, and an `authorization_evidence_ref`, and a row whose scope exceeds the surface's observations is rejected. Wrapper coverage already supports target scope: `scope.target_triples` is a first-class mechanism in `crates/xtask/src/wrapper_coverage_shared.rs`, validated against the agent's expected targets, and claude_code populates it on 21 entries while codex and opencode populate it on none. The debt inventory never adopted it — its parser reads ten fixed keys and silently ignores any other, so a deferral argued for one target authorizes the same surface on a target added later. This is adoption of an existing mechanism, not invention of a new one, but the default must not be adopted with it: an omitted coverage scope means all expected targets, which on an authorization record would grant permission by omission. Debt scope is required instead. Distinct from `uaa-0041`, which is about values, arity and output shape. Pointers: `wrapper_coverage_shared.rs`, and the Surface identity rules in the request contract. |
 | `uaa-0047` | Permission-test fixtures restore the directory mode only on the success path | **Resolved in `dea84bf8`.** Both fixtures restore through a `Drop` guard whose body ignores a failed restore, since a panicking destructor during unwinding aborts the process. Each fixture is now established by a direct filesystem probe rather than by the behaviour of the code under test, so a regression cannot present itself as an environmental skip. The file was split to make room. |
+| `uaa-0048` | Nightly regeneration force-pushes an open packet branch | **T8 prerequisite.** The watcher re-dispatches `agent-maintenance-open-pr` every night with no dedupe against an open packet, so `create-pull-request` resets the packet branch to `staging`, re-applies the packet and force-pushes. Proven 2026-09-19: PRs #211 and #208 had unchanged target versions for four and five days and carried only commits from the previous night. A closeout committed to a packet branch would therefore not survive until merge, regenerating HANDOFF back to the open-run contract. Needs a stand-down condition the packet itself carries. Pointer: T8 sequencing above. |
+| `uaa-0049` | A generic engine branches on the codex agent id | Low. `contract_policy.rs` appends one extra `writable_surfaces` entry behind `if entry.agent_id == "codex"`, which the repository's own rule puts in descriptor data. Impact today is one spec file; the cost is the precedent, in the engine that decides what a packet may write. Distinct from the relay-host constants in the same file, which name codex as the local execution host and are intentional (§1 verified state, §4 deliberately untouched). |
 
 ### 8.2 What T1 changed about T2
 

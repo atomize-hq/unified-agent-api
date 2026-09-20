@@ -54,3 +54,6 @@ __pycache__/
 **audit.*.json
 **audit-trio**
 .staging
+
+# macOS Finder metadata; it has reached three commits in this history already.
+.DS_Store

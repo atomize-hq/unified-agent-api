@@ -56,8 +56,11 @@ pub struct Args {
     #[arg(long)]
     pub expect_target_version: Option<String>,
 
-    /// Write the advisory audit status JSON here instead of stdout. The exit code is authoritative;
-    /// the JSON is advisory and is either current or absent.
+    /// Write the advisory audit status JSON here instead of stdout. The exit code is the only
+    /// authority on the verdict. "Current or absent" is what this used to claim and is not true: a
+    /// failure raised before live evidence is read leaves an existing file untouched, so existence
+    /// proves nothing. Read this file only after exit 0 or 3 from the invocation that named it,
+    /// and name a path that invocation owns.
     #[arg(long)]
     pub emit_json: Option<PathBuf>,
 
@@ -168,21 +171,21 @@ struct DerivedAuditStatus {
 
 struct DeriveAuditStatusFailure {
     error: Error,
-    live_derivation_attempted: bool,
+    live_evidence_read: bool,
 }
 
 impl DeriveAuditStatusFailure {
-    fn preflight(error: Error) -> Self {
+    fn before_live_evidence(error: Error) -> Self {
         Self {
             error,
-            live_derivation_attempted: false,
+            live_evidence_read: false,
         }
     }
 
-    fn attempted(error: Error) -> Self {
+    fn after_live_evidence(error: Error) -> Self {
         Self {
             error,
-            live_derivation_attempted: true,
+            live_evidence_read: true,
         }
     }
 }
@@ -219,9 +222,16 @@ fn run_in_workspace_with_stderr_impl<W: Write, E: Write>(
     ) {
         Ok(status) => status,
         Err(failure) => {
-            if failure.live_derivation_attempted {
+            // Removing the projection here is hygiene, not what makes a consumer safe. A failure
+            // raised before live evidence was read leaves an existing file alone, so the only rule
+            // a consumer may rely on is the one on `Args::emit_json`: read it after exit 0 or 3
+            // from this same invocation, never on its own existence. A cleanup failure still has
+            // to be audible, because a silent one is how a projection outlives its run.
+            if failure.live_evidence_read {
                 if let Some(path) = args.emit_json.as_ref() {
-                    let _ = remove_projection(path);
+                    if let Err(cleanup_error) = remove_projection(path) {
+                        emit_projection_cleanup_warning(stderr, path, &cleanup_error);
+                    }
                 }
             }
             return Err(failure.error);
@@ -273,26 +283,26 @@ fn derive_audit_status(
         request_path,
         expected_target_version,
     )
-    .map_err(DeriveAuditStatusFailure::preflight)?;
+    .map_err(DeriveAuditStatusFailure::before_live_evidence)?;
     let validated = request::load_request_envelope_validated_with_policy(
         workspace_root,
         request_path,
         AuditDriftPolicy::Tolerate,
     )
     .map_err(Error::from)
-    .map_err(DeriveAuditStatusFailure::preflight)?;
+    .map_err(DeriveAuditStatusFailure::before_live_evidence)?;
     let reconciliation_detail = validated
         .support_surface_audit_reconciliation_detail
         .clone();
     let request = &validated.envelope.request;
     let detected_release = require_automated_support_audit_request(request)
-        .map_err(DeriveAuditStatusFailure::preflight)?;
+        .map_err(DeriveAuditStatusFailure::before_live_evidence)?;
     validate_expected_target_version(request, detected_release, expected_target_version)
-        .map_err(DeriveAuditStatusFailure::preflight)?;
+        .map_err(DeriveAuditStatusFailure::before_live_evidence)?;
     let reconciliation = validated
         .support_surface_audit_reconciliation
         .ok_or_else(|| {
-            DeriveAuditStatusFailure::preflight(Error::Internal(format!(
+            DeriveAuditStatusFailure::before_live_evidence(Error::Internal(format!(
                 "validated maintenance request `{}` is missing support-surface reconciliation metadata",
                 request.relative_path
             )))
@@ -300,21 +310,21 @@ fn derive_audit_status(
 
     let registry = AgentRegistry::load(workspace_root)
         .map_err(|err| Error::Internal(format!("load agent registry: {err}")))
-        .map_err(DeriveAuditStatusFailure::preflight)?;
+        .map_err(DeriveAuditStatusFailure::before_live_evidence)?;
     let entry = registry.find(&request.agent_id).ok_or_else(|| {
-        DeriveAuditStatusFailure::preflight(Error::Internal(format!(
+        DeriveAuditStatusFailure::before_live_evidence(Error::Internal(format!(
             "validated maintenance request `{}` references agent `{}` but the committed registry no longer contains it",
             request.relative_path, request.agent_id
         )))
     })?;
 
     evidence::require_live_acquisition_evidence(workspace_root, entry, detected_release)
-        .map_err(DeriveAuditStatusFailure::attempted)?;
+        .map_err(DeriveAuditStatusFailure::after_live_evidence)?;
 
     let live_audit =
         support_audit::derive_support_surface_audit(workspace_root, entry, detected_release)
             .map_err(|err| {
-                DeriveAuditStatusFailure::attempted(Error::Internal(format!(
+                DeriveAuditStatusFailure::after_live_evidence(Error::Internal(format!(
                     "derive live support-surface audit for `{}` target `{}`: {err}",
                     request.agent_id, detected_release.target_version
                 )))
@@ -324,7 +334,7 @@ fn derive_audit_status(
         .as_ref()
         .expect("checked support_surface_audit presence above");
     if let Some(detail) = debt_baseline_drift(frozen_audit, &live_audit) {
-        return Err(DeriveAuditStatusFailure::attempted(Error::Validation(
+        return Err(DeriveAuditStatusFailure::after_live_evidence(Error::Validation(
             format!(
                 "maintenance request `{}` support-surface audit drifted in a way uplifts do not explain: {detail}",
                 request.relative_path
@@ -342,14 +352,14 @@ fn derive_audit_status(
     let outcome = if uplifts_required {
         AuditStatusOutcome::UpliftsRequired
     } else if reconciliation == AuditReconciliation::Drifted {
-        return Err(DeriveAuditStatusFailure::attempted(Error::Validation(
-            reconciliation_detail.unwrap_or_else(|| {
+        return Err(DeriveAuditStatusFailure::after_live_evidence(
+            Error::Validation(reconciliation_detail.unwrap_or_else(|| {
                 format!(
                     "maintenance request `{}` support-surface reconciliation drifted",
                     request.relative_path
                 )
-            }),
-        )));
+            })),
+        ));
     } else {
         AuditStatusOutcome::Clean
     };
@@ -647,6 +657,15 @@ fn remove_projection(path: &Path) -> Result<(), Error> {
             path.display()
         ))),
     }
+}
+
+fn emit_projection_cleanup_warning<W: Write>(stderr: &mut W, path: &Path, cleanup_error: &Error) {
+    let _ = writeln!(
+        stderr,
+        "warning: maintenance-audit-status could not remove stale advisory projection `{}`: {}",
+        path.display(),
+        cleanup_error
+    );
 }
 
 fn emit_projection_write_warning<W: Write>(
