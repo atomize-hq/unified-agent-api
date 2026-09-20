@@ -20,6 +20,10 @@ const TERMINAL_STEP: &str = "Fail the job if the maintenance audit recorded a bl
 
 #[derive(Debug)]
 struct GateRun {
+    // The gate writes its projection under the runner temp directory, which is this one. Holding
+    // it keeps that file readable for the duration of the assertions instead of deleting it when
+    // `run_gate` returns.
+    _temp: TempDir,
     output: Output,
     raw_output: String,
     outputs: BTreeMap<String, String>,
@@ -400,6 +404,25 @@ fn failure_case(status: i32) -> GateCase {
 }
 
 fn assert_gate_outputs(actual: &BTreeMap<String, String>, expected: &GateCase) {
+    // Only exit 0 and exit 3 may name a projection, and the name has to point at a file this
+    // invocation actually wrote. The path is a fresh mktemp directory, so it is checked by
+    // existence and then removed before the rest is compared exactly; that exact comparison is
+    // what stops a stray output slipping in unnoticed.
+    let mut actual = actual.clone();
+    let projection = actual.remove("status_projection");
+    if expected.status == 0 || expected.status == 3 {
+        let path = projection.expect("an eligible exit must export its projection path");
+        assert!(
+            Path::new(&path).is_file(),
+            "exported projection must exist: {path}"
+        );
+    } else {
+        assert!(
+            projection.is_none(),
+            "exit {} must not export a projection path",
+            expected.status
+        );
+    }
     let expected = BTreeMap::from([
         (
             "closeout_ready".to_string(),
@@ -417,7 +440,7 @@ fn assert_gate_outputs(actual: &BTreeMap<String, String>, expected: &GateCase) {
         ("audit_title".to_string(), expected.title.to_string()),
         ("audit_message".to_string(), expected.message.to_string()),
     ]);
-    assert_eq!(actual, &expected);
+    assert_eq!(actual, expected);
 }
 
 fn run_gate(status: i32, commit: bool, request_exists: bool, stderr: &str) -> GateRun {
@@ -426,7 +449,17 @@ fn run_gate(status: i32, commit: bool, request_exists: bool, stderr: &str) -> Ga
     fs::create_dir_all(&bin).expect("create stub bin");
     write_executable(
         &bin.join("cargo"),
-        b"#!/bin/bash\nprintf '%s\\n' \"$STUB_STDERR\" >&2\nexit \"$STUB_STATUS\"\n",
+        // The stub writes a projection on every exit, including the failing ones. That is the
+        // hazard `uaa-0025` records — a failed run can leave a readable file behind — and it is
+        // what makes the gate's export rule testable: the file exists either way, so only the
+        // exported path distinguishes an eligible exit from a blocking one.
+        b"#!/bin/bash\n\
+printf '%s\\n' \"$STUB_STDERR\" >&2\n\
+while [ \"$#\" -gt 0 ]; do\n\
+  if [ \"$1\" = --emit-json ]; then printf '{\"schema_version\":1}\\n' > \"$2\"; break; fi\n\
+  shift\n\
+done\n\
+exit \"$STUB_STATUS\"\n",
     );
     if request_exists {
         let request = temp
@@ -448,6 +481,9 @@ fn run_gate(status: i32, commit: bool, request_exists: bool, stderr: &str) -> Ga
         .env("PATH", path_with_stub(&bin))
         .env("GITHUB_OUTPUT", &output_path)
         .env("GITHUB_STEP_SUMMARY", &summary_path)
+        // The gate allocates its projection directory under the runner's own scratch space, so the
+        // harness has to supply it: `runner_command` clears the environment on purpose.
+        .env("RUNNER_TEMP", temp.path())
         .env("STUB_STATUS", status.to_string())
         .env("STUB_STDERR", stderr);
     add_step_env(
@@ -471,6 +507,7 @@ fn run_gate(status: i32, commit: bool, request_exists: bool, stderr: &str) -> Ga
         outputs: parse_github_output(&raw_output),
         raw_output,
         summary: fs::read_to_string(summary_path).expect("read summary"),
+        _temp: temp,
     }
 }
 

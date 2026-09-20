@@ -568,12 +568,29 @@ jobs:
         run: |
           set -euo pipefail
           REQUEST_PATH="docs/agents/lifecycle/${AGENT_ID}-maintenance/governance/maintenance-request.toml"
-          STATUS_JSON="_ci_tmp/audit/status.json"
           COMMAND_STDOUT="_ci_tmp/audit/stdout.log"
           COMMAND_STDERR="_ci_tmp/audit/stderr.log"
           UNION="${ROOT}/snapshots/${VERSION}/union.json"
 
           mkdir -p _ci_tmp/audit
+
+          # The projection is invocation-scoped. A fresh directory per run means a file an earlier
+          # attempt left behind can never be read as this run's result, and `$RUNNER_TEMP` puts it
+          # outside both the commit and the `_ci_tmp` sweep, so it cannot be staged by accident.
+          AUDIT_RUN_DIR="$(mktemp -d "${RUNNER_TEMP}/maintenance-audit-XXXXXX")"
+          STATUS_JSON="${AUDIT_RUN_DIR}/status.json"
+
+          # `maintenance-audit-status` documents that only exit 0 and exit 3 leave a projection a
+          # consumer may read; every other exit either writes none or can preserve an older one.
+          # Exporting the path nowhere else is what enforces that: a later step cannot read a file
+          # it was never told about.
+          emit_status_projection_path() {
+            if [ -f "$STATUS_JSON" ]; then
+              echo "status_projection=${STATUS_JSON}" >> "$GITHUB_OUTPUT"
+            else
+              echo "::warning title=Maintenance audit projection missing::the audit reported an eligible exit but left no projection at ${STATUS_JSON}" >&2
+            fi
+          }
 
           emit_gate_outputs() {
             local closeout_ready="$1"
@@ -677,10 +694,12 @@ jobs:
           case "$AUDIT_STATUS" in
             0)
               emit_gate_outputs "true" "false" "false" "0" "" ""
+              emit_status_projection_path
               summarize_clean
               ;;
             3)
               emit_gate_outputs "false" "true" "false" "3" "" ""
+              emit_status_projection_path
               summarize_uplifts
               ;;
             4)

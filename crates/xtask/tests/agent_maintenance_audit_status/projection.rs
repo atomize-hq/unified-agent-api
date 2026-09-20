@@ -122,3 +122,64 @@ fn request_sha256_is_present_after_schema_version_and_stable_across_runs() {
         "request_sha256 should follow schema_version for stale-file detection"
     );
 }
+
+// uaa-0025. These four pin the rule on `Args::emit_json` by demonstrating the hazard it names: a
+// projection that outlives a failed run is indistinguishable from a current one, so a consumer may
+// trust the exit code and nothing else. They are not assertions that staleness was eliminated —
+// removing an existing file the run does not own is `uaa-0028`'s question, not this one's.
+
+#[rustfmt::skip]
+#[test]
+fn a_pre_derivation_failure_leaves_a_projection_that_contradicts_the_run() {
+    let fixture = prepared_fixture("agent-maintenance-audit-status-stale-contradicts-run", &clean_report(TARGET_VERSION));
+    write_live_coverage_report(&fixture, &discovery_report(TARGET_VERSION));
+    let emit_path = fixture.join("_ci_tmp/audit/status.json");
+    write_text(&emit_path, "{\n  \"schema_version\": 1,\n  \"uplifts_required\": false\n}\n");
+    replace_in_request(&fixture, &format!("request_commit = \"{REQUEST_COMMIT}\""), "request_commit = \"NOT A COMMIT AT ALL\"");
+    let (result, _stderr) = run_emit_json_with_stderr(&fixture, &emit_path);
+    assert_eq!(result.expect_err("an invalid request_commit must fail validation").exit_code(), 2);
+    // The live evidence required uplifts and the run then failed, yet the seeded file still says
+    // the opposite. Existence is not currency, and the contents do not even have to agree.
+    let surviving = fs::read(&emit_path).expect("the pre-derivation route must preserve the file");
+    assert_eq!(parse_json(&surviving)["uplifts_required"], json!(false));
+}
+
+#[rustfmt::skip]
+#[test]
+fn a_corrupt_live_coverage_report_reaches_the_same_preserve_path() {
+    let fixture = prepared_fixture("agent-maintenance-audit-status-stale-corrupt-coverage", &clean_report(TARGET_VERSION));
+    let emit_path = fixture.join("_ci_tmp/audit/status.json");
+    write_text(&emit_path, "{\n  \"stale\": true\n}\n");
+    write_text(&coverage_report_path(&fixture), "{\"inputs\":{\"upstream\":{\"semantic_ve");
+    let (result, _stderr) = run_emit_json_with_stderr(&fixture, &emit_path);
+    assert_eq!(result.expect_err("a corrupt live coverage report must fail validation").exit_code(), 2);
+    assert!(emit_path.exists(), "a corrupt report is classified before live evidence is read, so it preserves too");
+}
+
+#[rustfmt::skip]
+#[test]
+fn a_clean_run_followed_by_a_failing_run_leaves_the_clean_projection_in_place() {
+    let fixture = prepared_fixture("agent-maintenance-audit-status-clean-then-stale", &clean_report(TARGET_VERSION));
+    let emit_path = fixture.join("_ci_tmp/audit/status.json");
+    let (first, clean_bytes) = emit_projection(&fixture, &emit_path);
+    assert_eq!(first, AuditStatusOutcome::Clean);
+    replace_in_request(&fixture, &format!("request_commit = \"{REQUEST_COMMIT}\""), "request_commit = \"NOT A COMMIT AT ALL\"");
+    let (result, _stderr) = run_emit_json_with_stderr(&fixture, &emit_path);
+    assert_eq!(result.expect_err("the second run must fail validation").exit_code(), 2);
+    // Byte-identical to the clean run, request_sha256 included, so no field in the file tells a
+    // consumer which run wrote it. This is why the rule has to be the invocation's exit code.
+    assert_eq!(fs::read(&emit_path).expect("the clean projection must still be there"), clean_bytes);
+}
+
+#[rustfmt::skip]
+#[test]
+fn a_failed_post_derivation_cleanup_warns_instead_of_passing_silently() {
+    let fixture = prepared_fixture("agent-maintenance-audit-status-cleanup-warns", &clean_report(TARGET_VERSION));
+    let emit_path = fixture.join("_ci_tmp/audit").join("status.force-remove-failure.json");
+    write_text(&emit_path, "{\n  \"stale\": true\n}\n");
+    replace_in_request(&fixture, "pre_run_debt_count = 0", "pre_run_debt_count = 1");
+    let (result, stderr) = run_emit_json_with_stderr(&fixture, &emit_path);
+    assert_eq!(result.expect_err("post-derivation validation failures must fail").exit_code(), 2);
+    assert!(stderr.contains("could not remove stale advisory projection"), "a failed cleanup must be audible: {stderr}");
+    assert!(stderr.contains(emit_path.to_string_lossy().as_ref()), "the warning must name the projection it could not remove: {stderr}");
+}
