@@ -156,14 +156,19 @@ docs/specs/agent-registry-contract.md          # if the gate becomes registry-vi
 
 - `crates/xtask/src/agent_maintenance/closeout/validate.rs` — the validation contract is correct
   as written and is what makes generation safe. Generation must satisfy it, not relax it.
-  **Unresolved against `uaa-0039` (raised 2026-09-20):** that item's step 2 adds three checks to
-  this file. Adding checks is not relaxing one, so the two are probably compatible in intent, but
-  the words here say untouched and the conflict must be decided rather than reinterpreted in
-  passing. If `uaa-0039` is the authorized exception, say so explicitly and state that the
-  resulting validator is then the fixed authority T6 must satisfy unmodified. If the freeze is
-  absolute, `uaa-0039` needs another home — and moving its checks into T6 would not resolve it,
-  because that leaves the manual-closeout path unprotected, which is the defect `uaa-0039` exists
-  to close. §11 carries this as the open question.
+  **Decided 2026-09-20: the freeze is directional, not locational, and `uaa-0039` is the
+  authorized exception.** §7's *Ask first* states the real rule — "relaxing any existing
+  validation rule to make generation easier" — and §2 Piece 2 states what it protects: the
+  validator re-derives drift truth independently, so the generator cannot fabricate it. Adding a
+  check does not touch that property; removing or weakening one does, wherever it lives. Read this
+  bullet as a direction rather than a boundary: **no change may weaken a validation rule or make
+  generation easier, and a prerequisite change that adds a check is in scope provided it lands
+  before the generator that must satisfy it.** The ordering is what carries the guarantee. A
+  validator hardened before its generator exists is written against the contract; one hardened
+  afterwards is written against whatever that generator happens to emit, and will pass because it
+  was shaped to. `uaa-0039` lands before `prepare-agent-closeout` exists, so its checks are in
+  scope here, and the validator it leaves behind is then the fixed authority T6 must satisfy
+  unmodified. `maintenance-request-contract-v1.md:327` already scheduled it this way.
 - `contract_policy.rs` relay-host constants — intentional design.
 - `execute-agent-maintenance` — the relay itself stays as-is; we only decide *when* it is needed.
 
@@ -439,13 +444,13 @@ on 2026-09-19 added one (`uaa-0048`).
 | `uaa-0036` | claude_code debt rows name `claude`, report-derived surfaces name `claude_code` | **Decided 2026-09-14: `command_path` is rooted at the agent id.** The two claude_code debt rows and the contract examples now read `claude_code`, and a test binds every debt row to its agent id. **Resolved in `fa739c7d`.** |
 | `uaa-0037` | codex-snapshot discards raw help capture errors when no feature is enabled | Low, latent. The default crawl runs as `let _ = discover_commands(…)`, so a capture failure is dropped and the snapshot still exits 0 while the leg goes red on the raw-help upload. Trigger: a codex release whose `features list` is empty or fails, or any change to raw help capture or the snapshot job's upload order. |
 | `uaa-0038` | union counts a stale committed per-target snapshot as present | **Resolved in `a474cdbc`.** The materialize step now removes each planned target's destination file before looking for this run's artifact, so a target whose leg failed is reported missing instead of inheriting its committed snapshot. The removal is unconditional and precedes the lookup; inside the copy branch it would have skipped the missing-target case it exists to catch. |
-| `uaa-0039` | Closeout does not check the support-audit baseline | **T8 prerequisite.** Wrapper-only rows need a recorded category, obsolete surfaces must contract publication, and unmatched debt rows must be empty; closeout checks none of these. Sized 2026-09-20 across the three live packets: codex 35 rows (8 commands, 21 flags, 6 args), claude_code 1 flag, opencode 0 — so this is 36 adjudications and almost all of them are codex. opencode's zero is legitimate, not a gap: its `wrapper_coverage.json` holds one entry whose own note bounds coverage to `run --format json`, against codex's 87 entries. That makes codex the integration case, claude_code the small non-empty case, and opencode the empty case. Pointers: T8 sequencing above, the contract's hidden-surface section and invariant 6, and §11 open questions 1 and 2. |
+| `uaa-0039` | Closeout does not check the support-audit baseline | **T8 prerequisite.** Wrapper-only rows need a recorded category, obsolete surfaces must contract publication, and unmatched debt rows must be empty; closeout checks none of these. Sized 2026-09-20 across the three live packets: codex 35 rows (8 commands, 21 flags, 6 args), claude_code 1 flag, opencode 0 — so this is 36 adjudications and almost all of them are codex. opencode's zero is legitimate, not a gap: its `wrapper_coverage.json` holds one entry whose own note bounds coverage to `run --format json`, against codex's 87 entries. That makes codex the integration case, claude_code the small non-empty case, and opencode the empty case. **Unblocked 2026-09-20 by decisions 1 and 2 (§11).** Its checks are in scope in `validate.rs` (§4), and a wrapper-only row's disposition is a list inside the closeout artifact — `wrapper_coverage.json` is generated from `codex::wrapper_coverage_manifest()` (`main.rs:89`), so a disposition written onto a coverage entry is destroyed by the next regeneration, which is `uaa-0048`'s defect in a second location. Bind the adjudicated report, not the regenerated one: a row sorted obsolete contracts publication and is then absent from the final report, so a validator diffing against that report would reject the entry as extraneous. One list, one authority — never a durable copy beside a per-run copy. Accepted cost: two of the four categories are durable properties of a surface, so codex's 35 rows are re-adjudicated every run; if that becomes painful the fix is to teach the coverage generator to carry those two, never to hand-edit its output. Pointers: T8 sequencing above, the contract's hidden-surface section and invariant 6, and §11 decisions 1 and 2. |
 | `uaa-0040` | Supplements cannot keep a hidden flag or positional argument observable | Low, latent. Supplement format v1 carries commands only. Trigger: the first `not_observed` debt row for a flag or argument upstream still ships. |
 | `uaa-0041` | Support-surface identity is name-only | Low. Accepted values, arity, and output shape are never compared; opencode `run --format` counts as covered although the wrapper passes only `json`. |
 | `uaa-0042` | A command whose wrapper coverage level is `unsupported` is never a support-audit gap | Low, latent: no wrapper coverage declares one today. Trigger: the first such declaration. |
 | `uaa-0043` | The gap-list name implies newness the audit never checks | **Resolved in `fb2481c0`.** The request schema now calls the list `unbaselined_gap_surface`, matching the audit's actual baseline test. |
 | `uaa-0044` | Release-notes mining and docs cross-check were designed but never built | Low. ADR 0001 §3 signals; codex 0.153.4 hides 11 surfaces from help and 7 appear nowhere in our artifacts. |
-| `uaa-0045` | opencode's `RULES.json` was never normalized to the union-model schema | **Resolve before the opencode packet closes.** Its `union` block omits the three identity guards codex and claude_code set, and it has no `globals`, so the union accepts a shard declaring another tool or version and skips the root-flag dedupe. Every missing key is `#[serde(default)]`, so a thin descriptor is silently permissive. Compounds `uaa-0038`. **Corrected 2026-09-20:** the item's "473 required uplifts" figure no longer describes the packet — the live opencode request records `required uplifts this run: none`, 15 preexisting debt rows and 0 discovered upstream surface rows, and the 481 missing-surface rows (394 flags, 60 commands, 27 args) sit in the coverage report, not the uplift queue. The two populations must not be relabelled into each other. That evidence is also not on `staging`: `cli_manifests/opencode/reports/` holds `1.4.11` and `1.14.47` only, and the 1.18.30 reports exist solely on the packet branch, so any re-measurement pins that branch. Pointers: Workstream E in the parity generalization plan §5, and §11 open question 3. |
+| `uaa-0045` | opencode's `RULES.json` was never normalized to the union-model schema | **Resolve before the opencode packet closes.** Its `union` block omits the three identity guards codex and claude_code set, and it has no `globals`, so the union accepts a shard declaring another tool or version and skips the root-flag dedupe. Every missing key is `#[serde(default)]`, so a thin descriptor is silently permissive. Compounds `uaa-0038`. **Corrected 2026-09-20:** the item's "473 required uplifts" figure no longer describes the packet — the live opencode request records `required uplifts this run: none`, 15 preexisting debt rows and 0 discovered upstream surface rows, and the 481 missing-surface rows (394 flags, 60 commands, 27 args) sit in the coverage report, not the uplift queue. The two populations must not be relabelled into each other. That evidence is also not on `staging`: `cli_manifests/opencode/reports/` holds `1.4.11` and `1.14.47` only, and the 1.18.30 reports exist solely on the packet branch, so any re-measurement pins that branch. **Decided 2026-09-20 (§11 decisions 3 and 4).** The three union identity guards are deleted rather than made required, and their checks become unconditional, so step 3's instruction to add them to opencode is withdrawn — normalization removes three keys from the other two descriptors instead. Normalization otherwise covers what a consumer reads: of the eight non-guard `union` keys opencode omits, only `promotion_policy` is read (`manifest_acquisition.rs:100`/`:179`, then `parity-promote.yml:102-110`), so opencode must declare that stance explicitly instead of inheriting `false` by omission; the other seven are recorded as unread. Pointers: Workstream E in the parity generalization plan §5, and §11 decisions 3 and 4. |
 | `uaa-0046` | Debt authorization does not constrain matches by target or upstream version | **Resolved in `b52f1242` / `4c292da2`.** Each debt row now carries a required `scope_target_triples`, an `authorized_at_version`, and an `authorization_evidence_ref`, and a row whose scope exceeds the surface's observations is rejected. Wrapper coverage already supports target scope: `scope.target_triples` is a first-class mechanism in `crates/xtask/src/wrapper_coverage_shared.rs`, validated against the agent's expected targets, and claude_code populates it on 21 entries while codex and opencode populate it on none. The debt inventory never adopted it — its parser reads ten fixed keys and silently ignores any other, so a deferral argued for one target authorizes the same surface on a target added later. This is adoption of an existing mechanism, not invention of a new one, but the default must not be adopted with it: an omitted coverage scope means all expected targets, which on an authorization record would grant permission by omission. Debt scope is required instead. Distinct from `uaa-0041`, which is about values, arity and output shape. Pointers: `wrapper_coverage_shared.rs`, and the Surface identity rules in the request contract. |
 | `uaa-0047` | Permission-test fixtures restore the directory mode only on the success path | **Resolved in `dea84bf8`.** Both fixtures restore through a `Drop` guard whose body ignores a failed restore, since a panicking destructor during unwinding aborts the process. Each fixture is now established by a direct filesystem probe rather than by the behaviour of the code under test, so a regression cannot present itself as an environmental skip. The file was split to make room. |
 | `uaa-0048` | Nightly regeneration force-pushes an open packet branch | **T8 prerequisite.** The watcher re-dispatches `agent-maintenance-open-pr` every night with no dedupe against an open packet, so `create-pull-request` resets the packet branch to `staging`, re-applies the packet and force-pushes. Proven 2026-09-19: PRs #211 and #208 had unchanged target versions for four and five days and carried only commits from the previous night. A closeout committed to a packet branch would therefore not survive until merge, regenerating HANDOFF back to the open-run contract. **Widened 2026-09-20.** The same regeneration also invalidates a closeout that was never committed, through the request-hash clock under T4 — so this gates T6's output being usable, not only T8. Protection must mean *automation has lost authority over this packet generation*, never *a valid closeout is present*: the late reading still permits erasing categorization work, a partially authored closeout, or a valid one during an intentional edit. It must also survive a merged packet, which has no open PR and no closeout, so every open-PR-shaped signal misses it — codex 0.155.0 reached that state when #215 merged without promotion. Pointer: T8 sequencing above. |
@@ -513,18 +518,67 @@ without it, so that run still hard-fails with nothing committed.
 
 ## 11. Open questions
 
-**Three opened 2026-09-20, all blocking the closeout-prerequisite group.** Each is on §7's *Ask
-first* list, so none may be settled by an implementer in passing.
+**None open.** Three were opened 2026-09-20 and decided the same day; verifying them raised a
+fourth, decided with them. Each sits on §7's *Ask first* list, so each is recorded here with its
+evidence rather than settled by an implementer in passing. The closeout-prerequisite group is
+unblocked.
 
-1. *Is `uaa-0039` the authorized exception to §4's `validate.rs` freeze?* If yes, the validator it
-   leaves behind becomes the fixed authority T6 must satisfy unmodified. Trigger point: the
-   `validate.rs` bullet in §4.
-2. *Where does a wrapper-only row's disposition live?* A field on the wrapper coverage entry, or a
-   list inside the closeout artifact. The second changes the artifact T6 emits, so T6 cannot be
-   implemented before this is answered. Trigger point: `uaa-0039` step 1.
-3. *Are the union identity guards required, and may one be explicitly `false`?* Presence and
-   permitted value are two decisions, not one: making a field required still allows an explicit
-   `false`. Trigger point: `uaa-0045` step 1.
+1. *Is `uaa-0039` the authorized exception to §4's `validate.rs` freeze?* **Yes — and §4's wording
+   was the defect.** The freeze is directional, not locational: adding a check is in scope,
+   weakening one is not, wherever it lives. The rule and its ordering rationale now live in the
+   `validate.rs` bullet in §4. The validator `uaa-0039` leaves behind is the fixed authority T6
+   must satisfy unmodified.
+2. *Where does a wrapper-only row's disposition live?* **A list inside the closeout artifact.** The
+   alternative was not available: `cli_manifests/<agent>/wrapper_coverage.json` is generated from
+   `codex::wrapper_coverage_manifest()` (`main.rs:89`), so a disposition hand-written onto a
+   coverage entry is destroyed by the next regeneration — and `generated_at` on codex's file moved
+   on 2026-09-17, so regeneration is routine rather than rare. Pushing the disposition up into the
+   Rust source avoids that but puts a governance adjudication behind a code change and the
+   wrapper's release cycle. The closeout artifact is the opposite: written once per run,
+   maintainer-approved, already digest-bound to its request, and its shape takes the addition
+   without a new mechanism — `resolved_findings` and `deferred_findings` are already
+   `Vec<MaintenanceFinding>` beside scalars (`types.rs:70-78`). Two constraints follow. Bind the
+   **adjudicated** report rather than recomputing against the final one, because a row sorted
+   obsolete contracts publication and is then gone from the regenerated report. And keep one
+   authority: one list, in the artifact, never a durable copy beside a per-run copy. T6 emits this
+   field, so its shape is settled before T6 starts. Accepted cost: two of the four categories
+   (hidden upstream but still supported, supported only on older upstream versions) are durable
+   properties of a surface, so codex's 35 rows are re-adjudicated every run. If that proves
+   painful, the fix is to teach the coverage generator to carry those two — never to hand-edit its
+   output.
+3. *Are the union identity guards required, and may one be explicitly `false`?* **Neither — all
+   three are deleted and their checks become unconditional.** The struct already answers it:
+   `tool_name`, the value compared against, is mandatory, while the decision to compare it is
+   `#[serde(default)] bool` and defaults off (`manifest_union.rs:97-113`). That is backwards, and
+   it is exactly how opencode became permissive by omission. No agent wants them off — codex and
+   claude_code set all three true and opencode's `false` is nobody's choice — and there is no
+   second acquisition model to configure for: `manifest_union.rs:245` hardcodes `mode: "union"`
+   and `union.mode` is never deserialized. The generalization plan names `union.tool_name` and
+   `union.raw_help_layout` as the only two agent-specific behaviours that belong in manifest data;
+   these three are universal safety checks and belong with the shard-target check `uaa-0045` step
+   2 already makes unconditional for every agent. Deleting them collapses presence and permitted
+   value into nothing, needs no migration beyond removing three keys from two descriptors, and
+   cannot regress the way a required field with a legal `false` can. One implementation note: made
+   unconditional, `require_semantic_version`'s check is unreachable, because a `None` semantic
+   version already fails the same-version comparison (`manifest_union.rs:175-191`) — expect two
+   checks, not three, and do not add a test for a case that cannot occur.
+4. *Does `uaa-0045`'s "normalize" cover the `union` keys opencode omits beyond the guards?* **Only
+   the one a consumer reads.** opencode's `union` block holds 5 keys against codex's and
+   claude_code's 16; beyond the three guards it omits `availability`, `canonical_keys`,
+   `conflict_handling`, `determinism`, `mode`, `partial_union_policy`, `platform_granularity` and
+   `promotion_policy`. Seven of those eight are read by nothing. `promotion_policy` is the
+   exception and is in scope: `manifest_acquisition.rs:100` deserializes it, `:179` resolves
+   `allow_promote_when_incomplete` with `.unwrap_or(false)`, and `parity-promote.yml:102-110`
+   reads the resolved value to decide whether an incomplete union may promote. Measured
+   2026-09-20: opencode's acquisition plan for `1.18.30` resolves `false`. Absent policy is absent
+   permission by design, so this is fail-closed rather than a hole — but it is still a stance held
+   by omission, which is the defect decision 3 removes, so opencode must declare it rather than
+   inherit it. Record the other seven as unread instead of adding them; `mode` in particular can
+   never be honoured. One of them is already cited as an authority it does not carry: the
+   generalization plan attributes the engine's refusal to build a union without the required
+   target to `partial_union_policy.when_required_target_missing`, but that refusal is hardcoded at
+   `manifest_union.rs:196-201` and the key is never read. Correct the citation; do not adopt the
+   key to make it true.
 
 Two settled during specification:
 

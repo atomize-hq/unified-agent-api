@@ -229,6 +229,15 @@ capture the CLI surface, so the multi-OS matrix stays regardless of source).
   descriptor silently takes the permissive value — opencode's union accepts a shard
   declaring another tool or version, and skips the root-flag dedupe that codex applies.
   Finishing this workstream is the trigger.
+  **Corrected 2026-09-20: the three guards are deleted, not added.** The maintainer decided
+  (`uaa-0045`; acquisition-maintenance-lifecycle spec §11 decision 3) that
+  `require_same_tool`, `require_same_semantic_version` and `require_semantic_version` stop
+  being descriptor knobs and become unconditional engine checks. The permissive default
+  described just above is the reason: the value compared against is mandatory while the
+  decision to compare it defaults off. Normalizing opencode therefore means removing three
+  keys from the other two descriptors, not adding three here. Of the remaining `union` keys
+  opencode omits, only `promotion_policy` is read by any consumer and in scope (that
+  spec's §11 decision 4, not this document's §11).
   **Extended 2026-09-19: the same pattern reaches `wrapper_coverage`.** opencode's
   `wrapper_coverage` block omits the whole `resolution` object, `scope_semantics.
   scope_set_resolution.fields`, and the `validation.error_message_requirements` that codex and
@@ -310,7 +319,7 @@ maintainer.
 | **B** — wire acquisition into the generic flow | **done** | `agent-maintenance-open-pr.yml` calls `parity-acquire` on the packet branch with `commit: true` |
 | **C** — `opencode-snapshot` adapter | **done** | yargs parser + 9 unit tests; verified against the real 1.18.4 binary (62 commands, no omissions) |
 | **D** — support-tier gate + onboarding | **done** | gate enforced by `manifest_acquisition::plan_for_agent`; entry rule documented in the charter and the registry contract |
-| **E** — drift + stuck packets | **done, except the maintainer-gated runs** | engine rename landed in A1; `claude_code` duplicate `scope` key removed; opencode `RULES.json` **partly** normalized — `automation`, `version_metadata` and `report` added, but `comparison`, `features`, `globals`, `supplements`, the three `union` identity guards and most of `wrapper_coverage` are still absent (`uaa-0045`; see the Workstream E note in §5); win32→windows-x64 mapping verified live. Stuck-packet reconciliation needs CI runners — see §12 |
+| **E** — drift + stuck packets | **done, except the maintainer-gated runs** | engine rename landed in A1; `claude_code` duplicate `scope` key removed; opencode `RULES.json` **partly** normalized — `automation`, `version_metadata` and `report` added, but `comparison`, `features`, `globals`, `supplements` and most of `wrapper_coverage` are still absent, and the three `union` identity guards are being deleted rather than added (`uaa-0045`; see the Workstream E note in §5); win32→windows-x64 mapping verified live. Stuck-packet reconciliation needs CI runners — see §12 |
 
 ### What actually changed the shape of the system
 
@@ -414,7 +423,9 @@ artifact exactly: 2 of 4 targets, `complete:false`, missing `aarch64-unknown-lin
 **opencode `1.14.47`** — worse than partial. Its committed `union.json` was hand-produced by the
 relay and carries `expected_targets` of **6** against the manifest's **3**, and its only input is
 `darwin-arm64` while `required_target` is `linux-x64`. The engine refuses to build that union at
-all, which is correct: `partial_union_policy.when_required_target_missing` is `fail`. There is no
+all, which is correct. **Citation corrected 2026-09-20:** that refusal is hardcoded at
+`manifest_union.rs:196-201`; `partial_union_policy.when_required_target_missing` describes it but
+no consumer deserializes the key (lifecycle spec §11 decision 4). There is no
 local fix — the required target must actually be snapshotted. Running `parity-acquire` for
 `opencode 1.14.47` regenerates the union from its own `RULES.json`, which resolves the 3-vs-6
 drift as a side effect rather than by editing a committed artifact.
