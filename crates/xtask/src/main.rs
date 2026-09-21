@@ -29,7 +29,7 @@ use xtask::agent_maintenance::{
     audit_status as agent_maintenance_audit_status, closeout as agent_maintenance_closeout,
     drift as agent_maintenance_drift, execute as agent_maintenance_execute,
     prepare as agent_maintenance_prepare, refresh as agent_maintenance_refresh,
-    watch as agent_maintenance_watch,
+    stand_down as agent_maintenance_stand_down, watch as agent_maintenance_watch,
 };
 use xtask::capability_matrix;
 pub use xtask::manifest_acquisition;
@@ -128,6 +128,8 @@ enum Command {
     RefreshAgent(agent_maintenance_refresh::Args),
     /// Validate and close an agent maintenance run.
     CloseAgentMaintenance(agent_maintenance_closeout::Args),
+    /// Ask whether automation still has authority over a packet generation.
+    MaintenanceStandDownCheck(agent_maintenance_stand_down::Args),
     /// Backfill truthful historical lifecycle maintenance artifacts for known malformed baselines.
     HistoricalLifecycleBackfill(historical_lifecycle_backfill::Args),
     /// Generate support publication JSON and Markdown outputs from committed manifest evidence.
@@ -393,6 +395,13 @@ fn main() {
         },
         Command::CloseAgentMaintenance(args) => match agent_maintenance_closeout::run(args) {
             Ok(()) => 0,
+            Err(err) => {
+                eprintln!("{err}");
+                err.exit_code()
+            }
+        },
+        Command::MaintenanceStandDownCheck(args) => match agent_maintenance_stand_down::run(args) {
+            Ok(outcome) => outcome.exit_code(),
             Err(err) => {
                 eprintln!("{err}");
                 err.exit_code()

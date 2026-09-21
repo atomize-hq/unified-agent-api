@@ -90,7 +90,47 @@ jobs:
         with:
           ref: staging
       - uses: dtolnay/rust-toolchain@stable
+      # Destructive boundary 1 of 3: request regeneration. `prepare-agent-maintenance --write`
+      # rewrites `request_recorded_at`, and `request.rs` digests the whole request file, so this
+      # step alone invalidates a closeout bound to the previous generation — committed or not.
+      - name: Check packet stand-down before regenerating the request
+        id: stand_down
+        shell: bash
+        env:
+          AGENT_ID: ${{ inputs.agent_id }}
+          TARGET_VERSION: ${{ inputs.target_version }}
+        run: |
+          set -euo pipefail
+          # Built separately, as the acquisition gate does: a compile failure and a guard answer
+          # are different things, and collapsing them would let a broken build read as "no marker".
+          cargo build -p xtask
+
+          set +e
+          ./target/debug/xtask maintenance-stand-down-check \
+            --agent "$AGENT_ID" \
+            --target-version "$TARGET_VERSION"
+          status=$?
+          set -e
+
+          # Exit 0 is the only authorization there is. Exit 3 is the declared stand-down, which is
+          # a result rather than a failure; every other exit is a guard that could not answer, and
+          # a guard that cannot answer must not authorize a force-push.
+          if [[ "$status" -eq 0 ]]; then
+            echo "stand_down=false" >> "$GITHUB_OUTPUT"
+          elif [[ "$status" -eq 3 ]]; then
+            echo "stand_down=true" >> "$GITHUB_OUTPUT"
+            echo "::notice title=Packet stood down::${AGENT_ID} ${TARGET_VERSION} is frozen by a maintainer; this run will not regenerate, replace, or supersede it."
+          else
+            # `::error` annotates but does not fail a step. A guard that cannot answer would
+            # otherwise leave the job green with no PR opened, so a flag rename or one malformed
+            # marker could stop every maintenance packet for weeks without anything going red.
+            # A declared stand-down is a healthy outcome; this is an outage, and must look like one.
+            echo "stand_down=true" >> "$GITHUB_OUTPUT"
+            echo "::error title=Stand-down check failed::Treating ${AGENT_ID} ${TARGET_VERSION} as frozen, because the guard exited ${status} instead of answering." >&2
+            exit 1
+          fi
       - name: Prepare maintenance packet
+        if: ${{ steps.stand_down.outputs.stand_down != 'true' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -155,8 +195,59 @@ jobs:
               ;;
           esac
           rm -f _ci_tmp_gate.err _ci_tmp_gate.json
+      # Destructive boundary 2 of 3: branch replacement and packet-body replacement, and the only
+      # boundary that mutates the remote. Asked again against a *freshly fetched* base rather than
+      # the checkout taken at job start: `create-pull-request` resets the packet branch to current
+      # base, so a marker a maintainer lands mid-run is live by the time the push happens, while a
+      # re-read of the job-start tree could never see it. That window is the job's whole duration,
+      # not the seconds between two steps.
+      #
+      # This step also runs when the first check already stood down, so that a skipped step cannot
+      # leave an empty output that reads as permission.
+      - name: Check packet stand-down before replacing the branch
+        id: stand_down_recheck
+        shell: bash
+        env:
+          AGENT_ID: ${{ inputs.agent_id }}
+          TARGET_VERSION: ${{ inputs.target_version }}
+        run: |
+          set -euo pipefail
+          # xtask was built by the pre-regeneration check, which has no `if:` and fails the job
+          # if the build fails, so this step never runs against a missing binary.
+          #
+          # The fetch is separate from the read: `--from-ref` treats any git failure as an internal
+          # error rather than an absent marker, so an unreachable base stands down instead of
+          # authorizing. Nothing is checked out, because the prepared packet is already in the tree.
+          git fetch --depth=1 --no-tags origin staging
+
+          set +e
+          ./target/debug/xtask maintenance-stand-down-check \
+            --agent "$AGENT_ID" \
+            --target-version "$TARGET_VERSION" \
+            --from-ref FETCH_HEAD
+          status=$?
+          set -e
+
+          # Exit 0 is the only authorization there is. Exit 3 is the declared stand-down, which is
+          # a result rather than a failure; every other exit is a guard that could not answer, and
+          # a guard that cannot answer must not authorize a force-push.
+          if [[ "$status" -eq 0 ]]; then
+            echo "stand_down=false" >> "$GITHUB_OUTPUT"
+          elif [[ "$status" -eq 3 ]]; then
+            echo "stand_down=true" >> "$GITHUB_OUTPUT"
+            echo "::notice title=Packet stood down::${AGENT_ID} ${TARGET_VERSION} is frozen by a maintainer; this run will not regenerate, replace, or supersede it."
+          else
+            # `::error` annotates but does not fail a step. A guard that cannot answer would
+            # otherwise leave the job green with no PR opened, so a flag rename or one malformed
+            # marker could stop every maintenance packet for weeks without anything going red.
+            # A declared stand-down is a healthy outcome; this is an outage, and must look like one.
+            echo "stand_down=true" >> "$GITHUB_OUTPUT"
+            echo "::error title=Stand-down check failed::Treating ${AGENT_ID} ${TARGET_VERSION} as frozen, because the guard exited ${status} instead of answering." >&2
+            exit 1
+          fi
       - name: Create PR
         id: create_pr
+        if: ${{ steps.stand_down_recheck.outputs.stand_down != 'true' }}
         continue-on-error: true
         uses: peter-evans/create-pull-request@v8
         with:
@@ -219,6 +310,21 @@ jobs:
 
             lower_version="$(printf '%s\n%s\n' "$candidate_version" "$TARGET_VERSION" | sort -V | head -n1)"
             if [[ "$candidate_version" != "$TARGET_VERSION" && "$lower_version" == "$candidate_version" ]]; then
+              # Destructive boundary 3 of 3: supersession, and the only one that asks about a
+              # packet other than this run's. A newer version opens a different branch, so its run
+              # is in a different concurrency group and can close an older packet while a
+              # maintainer is mid-closeout on it. The question is therefore asked about the
+              # candidate's version, not this run's.
+              set +e
+              ./target/debug/xtask maintenance-stand-down-check \
+                --agent "$AGENT_ID" \
+                --target-version "$candidate_version"
+              candidate_status=$?
+              set -e
+              if [[ "$candidate_status" -ne 0 ]]; then
+                echo "::notice title=Packet not superseded::Leaving #${pr_number} open: the stand-down check for ${AGENT_ID} ${candidate_version} exited ${candidate_status}."
+                continue
+              fi
               superseded_prs+=("$pr_number")
             fi
           done

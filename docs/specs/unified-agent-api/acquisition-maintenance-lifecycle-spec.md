@@ -99,6 +99,18 @@ cargo run -p xtask -- prepare-agent-closeout \
   --preflight-run <github-run-id | --preflight-from-ci> \
   --write
 
+# NEW — ask whether automation still has authority over a packet generation. Read-only, and
+# deliberately an ownership predicate rather than a validity check. Exit 3 means a maintainer
+# froze it and is a green outcome; every other non-zero exit is a guard that could not answer,
+# which also means do-not-mutate but fails the job. `--from-ref` reads the marker directory from a
+# git ref instead of the working tree, so a boundary that is about to mutate the remote can read a
+# freshly fetched base rather than a checkout taken minutes earlier. See the stand-down subsection
+# under §8's T8 sequencing.
+cargo run -p xtask -- maintenance-stand-down-check \
+  --agent <agent-id> \
+  --target-version <version> \
+  [--from-ref <git-ref>]
+
 # EXISTING — unchanged contract; now consumes a generated artifact.
 cargo run -p xtask -- close-agent-maintenance \
   --request <path/to/maintenance-request.toml> \
@@ -133,6 +145,8 @@ resolved.
 
 ```
 crates/xtask/src/agent_maintenance/audit_status.rs        # piece 1: derive + emit audit JSON
+crates/xtask/src/agent_maintenance/stand_down.rs          # uaa-0048: packet ownership predicate
+crates/xtask/src/agent_maintenance/stand_down/tests.rs
 crates/xtask/src/agent_maintenance/prepare_closeout.rs    # piece 2: closeout generation
 crates/xtask/src/agent_maintenance/prepare_closeout/
     evidence.rs                                           # CI-conclusion resolution, commit-pinned
@@ -408,6 +422,81 @@ categories yet, and `close-agent-maintenance` checks none of the three; only
 `maintenance-audit-status` rejects unmatched debt rows (exit 2). Do not close a packet until
 `uaa-0039` lands.
 
+**Declaring a stand-down (landed 2026-09-21, `uaa-0048`).** A maintainer freezes a packet
+generation by committing `<maintenance root>/governance/automation-stand-down/<version>.toml`,
+naming `agent_id`, `target_version` (which must equal the file name), a `reason`, and at least one
+of `request_recorded_at` / `request_sha256`. `maintenance-stand-down-check` reads the directory;
+`agent-maintenance-open-pr` asks before every step that can destroy a generation. Five choices are
+load-bearing:
+
+- **It is an ownership predicate, not a validity check.** Protection means *automation has lost
+  authority over this packet generation*, never *a valid closeout is present*. The second reading
+  still permits erasing half-finished categorization work, a partially authored closeout, or a
+  valid one during an intentional edit. A marker whose recorded generation no longer matches the
+  request on the branch is reported and still stands automation down, because a request that moved
+  under a maintainer is exactly when they most need automation to keep away.
+- **Markers are a sibling of the request, not a field in it.** A stand-down expressed inside
+  `maintenance-request.toml` would change the request's bytes, and `request.rs:399` digests the
+  whole file — so declaring the protection would invalidate the closeout it protects.
+- **One file per frozen generation, named for it.** Two packet PRs for one agent can be open at
+  once — supersession exists because of it — so two freezes have to coexist. A single per-agent
+  file would make freezing the newer packet silently revoke the older one's protection, with no
+  signal beyond a one-line edit. Naming the file for the generation also makes the match key
+  checkable: a name outside strict `MAJOR.MINOR.PATCH` is rejected rather than quietly never
+  matching, so `v0.155.0.toml` cannot read as protection that is not there.
+- **A directory that cannot be read in full stands automation down.** Every entry is validated,
+  not only the one that might match. A malformed, misnamed or wrong-agent entry means the freeze
+  set is unknown, and an unknown freeze set is not an authorization.
+- **Markers live on the base branch, not the packet branch.** The packet branch is inside the
+  `add-paths` tree that `create-pull-request` resets and force-pushes, so a marker carried there
+  could be destroyed by the operation it exists to block. Base is never written by the nightly run.
+  This is also what makes a merged-but-unpromoted packet protectable: codex 0.155.0 has no open PR,
+  no branch and no closeout, but base carries its packet, so base carries its markers.
+
+A freeze survives a legitimate version bump. `prepare-agent-maintenance` and `refresh-agent` write
+named files through `workspace_mutation` and never sweep the directory, so regenerating the packet
+for a newer version leaves existing markers in place; a freeze is lifted by deleting its file,
+never by the watcher moving on.
+
+Enforcement is at three boundaries, re-asked each time rather than inherited: request regeneration,
+branch and packet-body replacement, and supersession. Supersession is the one that asks about a
+packet other than the run's own — a newer version opens a different branch and therefore a
+different concurrency group, so it can close an older packet mid-closeout — so it asks per
+candidate.
+
+**The boundary that mutates the remote reads base fresh.** The job checks out base once and
+`create-pull-request` resets the packet branch to *current* base, so the exposure between reading
+the predicate and force-pushing is the job's whole duration — minutes — not the gap between two
+steps. Re-reading the job-start checkout would be theatre: it cannot produce a different answer
+than the first check did, for any reason a maintainer can cause. The pre-replacement check
+therefore fetches base and reads the committed markers through `--from-ref`, where any git failure
+is an internal error rather than an absent marker.
+
+**A guard that cannot answer stands down, and says so in red.** A false authorization is the only
+outcome this may never produce, so a compile failure, an unreachable base, a missing registry and a
+malformed marker all route to *do not mutate*. But `::error` annotates without failing a step, and
+a guard that quietly stood down every night would stop every maintenance packet while the job
+stayed green — an outage that surfaces weeks later as "packets stopped appearing". The declared
+stand-down (exit 3) keeps the job green; a guard that could not answer fails it.
+
+**Deliberately not built, with reasons.** An expected-head check before branch replacement was
+considered and dropped: `peter-evans/create-pull-request@v8` owns its own push, so the check cannot
+be `--force-with-lease` on our side and has to be a separate step, which leaves the same race it
+was meant to close. With the predicate read from a freshly fetched base immediately before that
+step, what remains is the seconds between the fetch and the action's own push. It supplements the
+ownership predicate rather than replacing it, and the predicate does the work. A queue-level dedupe
+in `agent-maintenance-release-watch` was also dropped: it would save a wasted dispatch, but it is
+not sufficient enforcement on its own (an already-queued invocation passes it, and
+`workflow_dispatch` and re-runs bypass the queue entirely), so it would be a second copy of the
+rule that must stay in step with the one that enforces. A stood-down run is cheap and its notice is
+useful evidence, at the cost of one cached `cargo build -p xtask` per frozen agent per night. And
+`close-agent-maintenance` was **not** changed to require a marker: that would change what
+`requires_manual_closeout = true` obligates the human to, which §7 puts on the *Ask first* list.
+
+**Deploy note.** Merging the guard does not protect runs already in flight. A dispatch that starts
+after the merge picks up the guarded workflow, but one already executing does not. Before beginning
+the first closeout, confirm no `agent-maintenance-open-pr` run is in progress for that agent.
+
 **There is no merge dependency on this work.** The invalid `2.1.140` claude_code request exists only
 on `main`; the open claude_code packet branch carries the corrected policy, so closing claude_code
 never touches the bad copy. Merging an open packet *before* closing it would actively make things
@@ -453,7 +542,7 @@ on 2026-09-19 added one (`uaa-0048`).
 | `uaa-0045` | opencode's `RULES.json` was never normalized to the union-model schema | **Resolve before the opencode packet closes.** Its `union` block omits the three identity guards codex and claude_code set, and it has no `globals`, so the union accepts a shard declaring another tool or version and skips the root-flag dedupe. Every missing key is `#[serde(default)]`, so a thin descriptor is silently permissive. Compounds `uaa-0038`. **Corrected 2026-09-20:** the item's "473 required uplifts" figure no longer describes the packet — the live opencode request records `required uplifts this run: none`, 15 preexisting debt rows and 0 discovered upstream surface rows, and the 481 missing-surface rows (394 flags, 60 commands, 27 args) sit in the coverage report, not the uplift queue. The two populations must not be relabelled into each other. That evidence is also not on `staging`: `cli_manifests/opencode/reports/` holds `1.4.11` and `1.14.47` only, and the 1.18.30 reports exist solely on the packet branch, so any re-measurement pins that branch. **Decided 2026-09-20 (§11 decisions 3 and 4).** The three union identity guards are deleted rather than made required, and their checks become unconditional, so step 3's instruction to add them to opencode is withdrawn — normalization removes three keys from the other two descriptors instead. Normalization otherwise covers what a consumer reads: of the eight non-guard `union` keys opencode omits, only `promotion_policy` is read (`manifest_acquisition.rs:100`/`:179`, then `parity-promote.yml:102-110`), so opencode must declare that stance explicitly instead of inheriting `false` by omission; the other seven are recorded as unread. Pointers: Workstream E in the parity generalization plan §5, and §11 decisions 3 and 4. |
 | `uaa-0046` | Debt authorization does not constrain matches by target or upstream version | **Resolved in `b52f1242` / `4c292da2`.** Each debt row now carries a required `scope_target_triples`, an `authorized_at_version`, and an `authorization_evidence_ref`, and a row whose scope exceeds the surface's observations is rejected. Wrapper coverage already supports target scope: `scope.target_triples` is a first-class mechanism in `crates/xtask/src/wrapper_coverage_shared.rs`, validated against the agent's expected targets, and claude_code populates it on 21 entries while codex and opencode populate it on none. The debt inventory never adopted it — its parser reads ten fixed keys and silently ignores any other, so a deferral argued for one target authorizes the same surface on a target added later. This is adoption of an existing mechanism, not invention of a new one, but the default must not be adopted with it: an omitted coverage scope means all expected targets, which on an authorization record would grant permission by omission. Debt scope is required instead. Distinct from `uaa-0041`, which is about values, arity and output shape. Pointers: `wrapper_coverage_shared.rs`, and the Surface identity rules in the request contract. |
 | `uaa-0047` | Permission-test fixtures restore the directory mode only on the success path | **Resolved in `dea84bf8`.** Both fixtures restore through a `Drop` guard whose body ignores a failed restore, since a panicking destructor during unwinding aborts the process. Each fixture is now established by a direct filesystem probe rather than by the behaviour of the code under test, so a regression cannot present itself as an environmental skip. The file was split to make room. |
-| `uaa-0048` | Nightly regeneration force-pushes an open packet branch | **T8 prerequisite.** The watcher re-dispatches `agent-maintenance-open-pr` every night with no dedupe against an open packet, so `create-pull-request` resets the packet branch to `staging`, re-applies the packet and force-pushes. Proven 2026-09-19: PRs #211 and #208 had unchanged target versions for four and five days and carried only commits from the previous night. A closeout committed to a packet branch would therefore not survive until merge, regenerating HANDOFF back to the open-run contract. **Widened 2026-09-20.** The same regeneration also invalidates a closeout that was never committed, through the request-hash clock under T4 — so this gates T6's output being usable, not only T8. Protection must mean *automation has lost authority over this packet generation*, never *a valid closeout is present*: the late reading still permits erasing categorization work, a partially authored closeout, or a valid one during an intentional edit. It must also survive a merged packet, which has no open PR and no closeout, so every open-PR-shaped signal misses it — codex 0.155.0 reached that state when #215 merged without promotion. Pointer: T8 sequencing above. |
+| `uaa-0048` | Nightly regeneration force-pushes an open packet branch | **Resolved 2026-09-21.** A maintainer-committed `automation-stand-down.toml` on the base branch is the ownership predicate, checked at all three destructive boundaries; see the stand-down subsection under T8 sequencing for the design and for what was deliberately left out. Original finding: the watcher re-dispatches `agent-maintenance-open-pr` every night with no dedupe against an open packet, so `create-pull-request` resets the packet branch to `staging`, re-applies the packet and force-pushes. Proven 2026-09-19: PRs #211 and #208 had unchanged target versions for four and five days and carried only commits from the previous night. A closeout committed to a packet branch would therefore not survive until merge, regenerating HANDOFF back to the open-run contract. **Widened 2026-09-20.** The same regeneration also invalidates a closeout that was never committed, through the request-hash clock under T4 — so this gates T6's output being usable, not only T8. Protection must mean *automation has lost authority over this packet generation*, never *a valid closeout is present*: the late reading still permits erasing categorization work, a partially authored closeout, or a valid one during an intentional edit. It must also survive a merged packet, which has no open PR and no closeout, so every open-PR-shaped signal misses it — codex 0.155.0 reached that state when #215 merged without promotion. Pointer: T8 sequencing above. |
 | `uaa-0049` | A generic engine branches on the codex agent id | Low. `contract_policy.rs` appends one extra `writable_surfaces` entry behind `if entry.agent_id == "codex"`, which the repository's own rule puts in descriptor data. Impact today is one spec file; the cost is the precedent, in the engine that decides what a packet may write. Distinct from the relay-host constants in the same file, which name codex as the local execution host and are intentional (§1 verified state, §4 deliberately untouched). |
 
 ### 8.2 What T1 changed about T2
