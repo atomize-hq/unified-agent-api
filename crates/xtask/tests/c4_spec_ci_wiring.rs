@@ -3,6 +3,7 @@ use std::path::PathBuf;
 
 use regex::Regex;
 use xtask::agent_maintenance::audit_status::{EXIT_INCOMPLETE_ACQUISITION, EXIT_UPLIFTS_REQUIRED};
+use xtask::agent_maintenance::stand_down::EXIT_STOOD_DOWN;
 
 #[path = "c4_spec_ci_wiring/maintenance_audit_gate.rs"]
 mod maintenance_audit_gate;
@@ -554,6 +555,187 @@ fn backend_type_leak_guard_is_centralized_in_ci_and_smoke_workflows() {
         assert!(
             !yml.contains("(?:codex|claude_code)::"),
             "{workflow} must not keep the stale inline backend regex guard"
+        );
+    }
+}
+
+/// Strip comment lines before asserting on command order.
+///
+/// These workflow steps carry their rationale inline, so a rule like "the fetch precedes the read"
+/// is otherwise an assertion about where the prose mentioning it sits — which breaks on an edit
+/// that changes nothing, and then gets deleted rather than fixed.
+fn without_comments(section: &str) -> String {
+    section
+        .lines()
+        .filter(|line| !line.trim_start().starts_with('#'))
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+/// `uaa-0048`: one early check is a semantic goal, not enforcement. An invocation already queued
+/// passes an earlier check and then overwrites later maintainer work, and `workflow_dispatch` and
+/// re-runs bypass the queue entirely — so the question is re-asked immediately before every step
+/// that can destroy a packet generation, and each destructive step is gated on its own answer.
+#[test]
+fn c4_spec_every_destructive_packet_step_is_gated_on_a_fresh_stand_down_check() {
+    let packet_pr = read_repo_file(".github/workflows/agent-maintenance-open-pr.yml");
+
+    for (boundary, guard_id, mutation, gate) in [
+        (
+            "request regeneration",
+            "id: stand_down\n",
+            "name: Prepare maintenance packet",
+            "steps.stand_down.outputs.stand_down != 'true'",
+        ),
+        (
+            "branch and packet-body replacement",
+            "id: stand_down_recheck\n",
+            "name: Create PR",
+            "steps.stand_down_recheck.outputs.stand_down != 'true'",
+        ),
+    ] {
+        assert!(
+            packet_pr.contains(guard_id),
+            "{boundary} needs its own stand-down check step ({guard_id})"
+        );
+        assert!(
+            packet_pr.contains(gate),
+            "{boundary} must be gated on that check: {gate}"
+        );
+        assert_text_order(
+            &packet_pr,
+            guard_id,
+            mutation,
+            "agent-maintenance-open-pr.yml",
+        );
+    }
+
+    let recheck = section_between(
+        &packet_pr,
+        "- name: Check packet stand-down before replacing the branch",
+        "- name: Create PR",
+        "agent-maintenance-open-pr.yml",
+    );
+
+    // The re-check must not itself be conditioned on the first one. A skipped step has an empty
+    // output, and `!= 'true'` on an empty output reads as permission — which would turn the first
+    // stand-down into an authorization for the force-push it exists to block.
+    // A line-level check, not a substring one: prose in this step mentions `if:`, and an assertion
+    // that a comment can break is an assertion that gets deleted rather than fixed.
+    assert!(
+        !recheck
+            .lines()
+            .any(|line| line.trim_start().starts_with("if:")),
+        "the pre-replacement re-check must run unconditionally, or a skipped step's empty output \
+         reads as permission"
+    );
+
+    // Both guards share one job-start checkout, so re-reading the working tree could never produce
+    // a different answer than the first check did. The boundary that actually mutates the remote
+    // has to read base fresh, or the window it claims to close stays open for the whole job.
+    let recheck_commands = without_comments(recheck);
+    assert!(
+        recheck_commands.contains("git fetch") && recheck_commands.contains("--from-ref"),
+        "the pre-replacement re-check must read a freshly fetched base, not the job-start checkout"
+    );
+    assert_text_order(
+        &recheck_commands,
+        "git fetch",
+        "--from-ref",
+        "agent-maintenance-open-pr.yml",
+    );
+
+    // Supersession is the one boundary that acts on a packet other than this run's: a newer
+    // version opens a different branch, so its run is in a different concurrency group and can
+    // close an older packet mid-closeout. It therefore asks about the candidate, not the run —
+    // and has to act on the answer, which is a separate thing to assert.
+    let supersede = section_from(
+        &packet_pr,
+        "- name: Close superseded same-agent PRs",
+        "agent-maintenance-open-pr.yml",
+    );
+    assert!(
+        supersede.contains("maintenance-stand-down-check"),
+        "supersession must ask before closing an older packet PR"
+    );
+    assert!(
+        supersede.contains("--target-version \"$candidate_version\""),
+        "supersession must ask about the candidate's version, not this run's"
+    );
+    assert!(
+        supersede.contains(r#"candidate_status" -ne 0"#),
+        "supersession must branch on the guard's exit status, not merely invoke it"
+    );
+    let refusal = section_between(
+        supersede,
+        r#"candidate_status" -ne 0"#,
+        "superseded_prs+=",
+        "agent-maintenance-open-pr.yml",
+    );
+    assert!(
+        without_comments(refusal).contains("continue"),
+        "supersession must skip a frozen candidate, not merely report it: the loop already has \
+         unrelated `continue`s, so this has to be the guard's own branch"
+    );
+}
+
+/// The guard's one forbidden outcome is a false authorization, so every way of not getting a clean
+/// answer has to land on "stand down" — and, because a stand-down skips everything downstream, a
+/// guard that could not answer has to be distinguishable from one that answered "frozen".
+#[test]
+fn c4_spec_a_stand_down_check_that_cannot_answer_does_not_authorize() {
+    let packet_pr = read_repo_file(".github/workflows/agent-maintenance-open-pr.yml");
+
+    assert_eq!(
+        EXIT_STOOD_DOWN, 3,
+        "the workflow routes the declared stand-down by literal exit code"
+    );
+    assert!(
+        packet_pr.contains("cargo build -p xtask"),
+        "the guard builds xtask separately so a compile failure cannot read as `no marker`"
+    );
+
+    for guard_id in ["id: stand_down\n", "id: stand_down_recheck\n"] {
+        let guard = section_from(&packet_pr, guard_id, "agent-maintenance-open-pr.yml");
+        let routing = guard
+            .split_once("- name: ")
+            .map(|(head, _)| head)
+            .unwrap_or(guard);
+
+        // Counting occurrences is not enough: swapping the two branch bodies leaves every count
+        // identical and inverts the guard, so bind the authorization to the exit-0 arm itself.
+        let authorized_arm = section_between(
+            routing,
+            r#"$status" -eq 0"#,
+            r#"$status" -eq 3"#,
+            "agent-maintenance-open-pr.yml",
+        );
+        assert!(
+            authorized_arm.contains("stand_down=false")
+                && !authorized_arm.contains("stand_down=true"),
+            "{guard_id} must authorize on exit 0 and only on exit 0"
+        );
+        assert_eq!(
+            routing.matches("stand_down=false").count(),
+            1,
+            "{guard_id} must have exactly one way to authorize"
+        );
+        assert!(
+            routing.matches("stand_down=true").count() >= 2,
+            "{guard_id} must stand down both for the declared marker and for a guard that could \
+             not answer, so an unanswerable guard never authorizes"
+        );
+
+        // `::error` annotates but does not fail a step. Without the explicit exit, a guard that
+        // cannot answer leaves the job green with no PR, and a total outage looks like a quiet
+        // night.
+        let unanswerable_arm = routing
+            .rsplit_once("else")
+            .map(|(_, tail)| tail)
+            .unwrap_or_default();
+        assert!(
+            unanswerable_arm.contains("exit 1"),
+            "{guard_id} must fail the job when the guard could not answer, so the outage is visible"
         );
     }
 }
