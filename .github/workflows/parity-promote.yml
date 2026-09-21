@@ -274,6 +274,7 @@ jobs:
       - name: Advance pointers and version metadata
         shell: bash
         env:
+          AGENT_ID: ${{ inputs.agent_id }}
           VERSION: ${{ inputs.version }}
           ROOT: ${{ needs.plan.outputs.manifest_root }}
           REQUIRED_TARGET: ${{ needs.plan.outputs.required_target }}
@@ -306,6 +307,27 @@ jobs:
             [ -n "$target" ] || continue
             printf '%s\n' "$VERSION" > "${ROOT}/pointers/latest_supported/${target}.txt"
           done < <(jq -r '.coverage.supported_targets[]?' "${ROOT}/versions/${VERSION}.json" | tr -d '\r')
+
+          # Retire this version's stand-down marker, if a maintainer froze the packet.
+          #
+          # This is the only place a marker is removed, and it is here rather than in the nightly
+          # for four reasons. One commit: a failed cleanup leaves an extra marker, and a failed
+          # promotion never leaves a missing one. A maintainer merge: automation proposes the
+          # unfreeze, it does not perform it. Exactly one version named: a second frozen generation
+          # for the same agent is untouched. And correct timing: the repository only reads
+          # `status: validated` once this PR lands, which is the moment the packet is finished.
+          #
+          # Tying cleanup to a *new version* instead was rejected. Upstream cadence says nothing
+          # about whether the previous packet completed — codex ships near-daily and a closeout
+          # spans days — so a newer version's first run would delete the marker of the packet being
+          # worked on, which is the supersession hazard the guard exists to prevent.
+          MARKER="docs/agents/lifecycle/${AGENT_ID}-maintenance/governance/automation-stand-down/${VERSION}.toml"
+          if [ -f "$MARKER" ]; then
+            rm -f "$MARKER"
+            echo "Retired the stand-down marker for ${AGENT_ID} ${VERSION}: ${MARKER}"
+          else
+            echo "No stand-down marker to retire for ${AGENT_ID} ${VERSION}."
+          fi
 
       - name: Refresh support publication
         shell: bash

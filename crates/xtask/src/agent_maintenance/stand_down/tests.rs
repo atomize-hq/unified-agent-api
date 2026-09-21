@@ -45,14 +45,13 @@ fn write_request(root: &Path, agent: &str, body: &str) -> Vec<u8> {
     body.as_bytes().to_vec()
 }
 
+/// Built by the renderer the generated `HANDOFF.md` hands to an agent, not written out again here.
+///
+/// A third hand-written copy of the schema would let the instruction and the parser drift apart
+/// while every test stayed green, which is the failure this routine exists to prevent. Going
+/// through it means every case below round-trips what an agent is actually told to paste.
 fn marker_for(version: &str) -> String {
-    format!(
-        "schema_version = 1\n\
-         agent_id = \"codex\"\n\
-         target_version = \"{version}\"\n\
-         reason = \"closeout in progress\"\n\
-         request_recorded_at = \"2026-09-19T08:03:11Z\"\n"
-    )
+    render_marker_toml("codex", version, "2026-09-19T08:03:11Z")
 }
 
 fn freeze(root: &Path, version: &str) {
@@ -395,4 +394,28 @@ fn an_unreadable_ref_is_an_internal_error_not_an_authorization() {
         Ok(outcome) => panic!("expected an internal error, got {outcome:?}"),
         Err(err) => assert_eq!(err.exit_code(), EXIT_INTERNAL, "{err}"),
     }
+}
+
+/// `EXPECTED_SHAPE` is the one remaining place the schema is written out by hand: the error text a
+/// maintainer reads when their marker was rejected. An example that no longer parses is worse than
+/// no example, because it is read at the moment someone is already confused about this file.
+#[test]
+fn the_shape_the_error_message_teaches_is_one_the_parser_accepts() {
+    let example: String = EXPECTED_SHAPE
+        .lines()
+        .filter_map(|line| line.strip_prefix("    "))
+        .map(|line| format!("{line}\n"))
+        .collect();
+    assert!(
+        example.contains("schema_version"),
+        "the indented example block moved, so this test is asserting on nothing"
+    );
+
+    validate_entry(
+        "codex",
+        "docs/agents/lifecycle/codex-maintenance/governance/automation-stand-down",
+        "0.155.0.toml",
+        &example,
+    )
+    .expect("the error message's own example must be a usable marker");
 }

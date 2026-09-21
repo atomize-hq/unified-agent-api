@@ -3,7 +3,7 @@ use std::path::PathBuf;
 
 use regex::Regex;
 use xtask::agent_maintenance::audit_status::{EXIT_INCOMPLETE_ACQUISITION, EXIT_UPLIFTS_REQUIRED};
-use xtask::agent_maintenance::stand_down::EXIT_STOOD_DOWN;
+use xtask::agent_maintenance::stand_down::{BASE_BRANCH, EXIT_STOOD_DOWN};
 
 #[path = "c4_spec_ci_wiring/maintenance_audit_gate.rs"]
 mod maintenance_audit_gate;
@@ -610,6 +610,12 @@ fn c4_spec_every_destructive_packet_step_is_gated_on_a_fresh_stand_down_check() 
         );
     }
 
+    let regenerate = section_between(
+        &packet_pr,
+        "- name: Check packet stand-down before regenerating the request",
+        "- name: Prepare maintenance packet",
+        "agent-maintenance-open-pr.yml",
+    );
     let recheck = section_between(
         &packet_pr,
         "- name: Check packet stand-down before replacing the branch",
@@ -628,21 +634,6 @@ fn c4_spec_every_destructive_packet_step_is_gated_on_a_fresh_stand_down_check() 
             .any(|line| line.trim_start().starts_with("if:")),
         "the pre-replacement re-check must run unconditionally, or a skipped step's empty output \
          reads as permission"
-    );
-
-    // Both guards share one job-start checkout, so re-reading the working tree could never produce
-    // a different answer than the first check did. The boundary that actually mutates the remote
-    // has to read base fresh, or the window it claims to close stays open for the whole job.
-    let recheck_commands = without_comments(recheck);
-    assert!(
-        recheck_commands.contains("git fetch") && recheck_commands.contains("--from-ref"),
-        "the pre-replacement re-check must read a freshly fetched base, not the job-start checkout"
-    );
-    assert_text_order(
-        &recheck_commands,
-        "git fetch",
-        "--from-ref",
-        "agent-maintenance-open-pr.yml",
     );
 
     // Supersession is the one boundary that acts on a packet other than this run's: a newer
@@ -676,6 +667,99 @@ fn c4_spec_every_destructive_packet_step_is_gated_on_a_fresh_stand_down_check() 
         without_comments(refusal).contains("continue"),
         "supersession must skip a frozen candidate, not merely report it: the loop already has \
          unrelated `continue`s, so this has to be the guard's own branch"
+    );
+
+    // `uaa-0050`: every boundary reads a freshly fetched base, not the job-start checkout.
+    //
+    // A checkout is a snapshot of when the job began, and all three boundaries act later than
+    // that: the first one because a re-run replays the original event's `GITHUB_SHA`, the second
+    // because `create-pull-request` resets the branch to *current* base, and the third because it
+    // runs after the PR has been pushed. The window each guard claims to close is the job's whole
+    // duration unless it fetches, so reading the working tree is the mistake this rules out.
+    for (boundary, section) in [
+        ("request regeneration", regenerate),
+        ("branch and packet-body replacement", recheck),
+        ("supersession", supersede),
+    ] {
+        let commands = without_comments(section);
+        assert!(
+            commands.contains("git fetch") && commands.contains("--from-ref"),
+            "{boundary} must read a freshly fetched base, not the job-start checkout"
+        );
+        assert_text_order(
+            &commands,
+            "git fetch",
+            "--from-ref",
+            "agent-maintenance-open-pr.yml",
+        );
+    }
+}
+
+/// The marker only protects anything if it is committed where the guard looks, so the branch named
+/// in the instruction and the branch the packet PR targets are one fact, not two.
+///
+/// A rename that moved the workflow without the constant would send every declared freeze to a
+/// branch nothing reads — a false authorization wearing the shape of a declaration, which is the
+/// one direction this guard may never fail in.
+#[test]
+fn c4_spec_the_stand_down_base_branch_is_the_branch_the_packet_pr_targets() {
+    let packet_pr = read_repo_file(".github/workflows/agent-maintenance-open-pr.yml");
+    let create_pr = section_from(
+        &packet_pr,
+        "- name: Create PR",
+        "agent-maintenance-open-pr.yml",
+    );
+    assert!(
+        create_pr.contains(&format!("base: {BASE_BRANCH}")),
+        "the packet PR must target the branch markers are committed to ({BASE_BRANCH})"
+    );
+}
+
+/// `uaa-0050`: a marker is retired by the promotion of its own version, and by nothing else.
+///
+/// Promotion is the one moment that means the packet is finished, it is maintainer-merged, and it
+/// names exactly one version. Tying cleanup to a *new version* instead would delete the marker of
+/// the packet still being worked on, because upstream cadence says nothing about whether the
+/// previous closeout completed.
+#[test]
+fn c4_spec_a_stand_down_marker_retires_with_its_own_promotion() {
+    let promote = read_repo_file(".github/workflows/parity-promote.yml");
+    let advance = section_between(
+        &promote,
+        "- name: Advance pointers and version metadata",
+        "- name: Refresh support publication",
+        "parity-promote.yml",
+    );
+    let commands = without_comments(advance);
+
+    assert!(
+        commands.contains("automation-stand-down/${VERSION}.toml"),
+        "the pointer-advance step must retire the marker for the version being promoted"
+    );
+    assert!(
+        commands.contains("rm -f"),
+        "retirement has to remove the marker, not merely name it"
+    );
+    // Same commit as the `reported -> validated` flip: a failed cleanup then leaves an extra
+    // marker, and a failed promotion never leaves a missing one.
+    assert!(
+        commands.contains("--status validated"),
+        "retirement must ride with the status flip, which is what makes it one commit"
+    );
+
+    // The removal reaches the PR only because this step has no `add-paths` to exclude it.
+    let open_pr = section_from(
+        &promote,
+        "- name: Open the promotion PR",
+        "parity-promote.yml",
+    );
+    assert!(
+        !open_pr.contains("add-paths"),
+        "an `add-paths` list on the promotion PR would silently drop the marker deletion"
+    );
+    assert!(
+        section_from(&promote, "jobs:", "parity-promote.yml").contains("contents: write"),
+        "the promote job needs write access to commit the retirement"
     );
 }
 

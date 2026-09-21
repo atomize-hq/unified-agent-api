@@ -93,6 +93,11 @@ jobs:
       # Destructive boundary 1 of 3: request regeneration. `prepare-agent-maintenance --write`
       # rewrites `request_recorded_at`, and `request.rs` digests the whole request file, so this
       # step alone invalidates a closeout bound to the previous generation — committed or not.
+      #
+      # Read from a freshly fetched base, like the other two boundaries. Being the first step after
+      # checkout does not make the checkout current: a re-run replays the original event, so
+      # `GITHUB_SHA` is the commit that triggered the dispatch and the tree can be days old by the
+      # time someone clicks the button. Step order is not freshness.
       - name: Check packet stand-down before regenerating the request
         id: stand_down
         shell: bash
@@ -105,10 +110,16 @@ jobs:
           # are different things, and collapsing them would let a broken build read as "no marker".
           cargo build -p xtask
 
+          # The fetch is separate from the read: `--from-ref` treats any git failure as an internal
+          # error rather than an absent marker, so an unreachable base stands down instead of
+          # authorizing.
+          git fetch --depth=1 --no-tags origin staging
+
           set +e
           ./target/debug/xtask maintenance-stand-down-check \
             --agent "$AGENT_ID" \
-            --target-version "$TARGET_VERSION"
+            --target-version "$TARGET_VERSION" \
+            --from-ref FETCH_HEAD
           status=$?
           set -e
 
@@ -294,6 +305,11 @@ jobs:
             exit 0
           fi
 
+          # Fetched here, not reused from the pre-replacement re-check: the PR creation and its
+          # push sit between the two, and this is the last boundary in the job. A marker landed
+          # while the packet was being pushed is live now and must be seen now.
+          git fetch --depth=1 --no-tags origin staging
+
           superseded_prs=()
           for candidate in "${candidate_prs[@]}"; do
             IFS=$'\t' read -r pr_number head_ref_name <<< "$candidate"
@@ -314,11 +330,13 @@ jobs:
               # packet other than this run's. A newer version opens a different branch, so its run
               # is in a different concurrency group and can close an older packet while a
               # maintainer is mid-closeout on it. The question is therefore asked about the
-              # candidate's version, not this run's.
+              # candidate's version, not this run's — and against the base fetched above, because
+              # this step runs at the end of a job whose checkout was taken at the start of it.
               set +e
               ./target/debug/xtask maintenance-stand-down-check \
                 --agent "$AGENT_ID" \
-                --target-version "$candidate_version"
+                --target-version "$candidate_version" \
+                --from-ref FETCH_HEAD
               candidate_status=$?
               set -e
               if [[ "$candidate_status" -ne 0 ]]; then

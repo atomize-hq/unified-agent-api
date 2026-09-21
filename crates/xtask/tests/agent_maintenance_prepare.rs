@@ -17,6 +17,12 @@ mod agent_registry {
 mod contract_policy;
 #[path = "../src/agent_maintenance/docs.rs"]
 mod docs;
+// `docs.rs` is included by path here rather than through the library, so its `use super::` imports
+// resolve against this crate root. The guard module itself is not included by path: it carries
+// `#[cfg(test)] mod tests`, which would be compiled a second time against the wrong directory.
+mod stand_down {
+    pub use xtask::agent_maintenance::stand_down::*;
+}
 #[path = "../src/agent_maintenance/prepare.rs"]
 mod prepare;
 #[path = "../src/agent_maintenance/request.rs"]
@@ -242,6 +248,81 @@ fn shared_renderer_keeps_handoff_pr_summary_and_prompt_in_lockstep() {
         .expect("pr summary doc");
     assert_eq!(handoff_doc.contents, rendered_packet.handoff_contents);
     assert_eq!(pr_summary_doc.contents, rendered_packet.pr_summary_contents);
+}
+
+/// `uaa-0050`: the acquisition step is an instruction, so the thing to test is whether following
+/// it works — not whether the text is present.
+///
+/// The instruction and the guard are written in different languages, in different files, by
+/// different people, and nothing but this test makes them agree. It pastes what the generated
+/// `HANDOFF.md` actually tells an agent to paste, at the path it actually names, and then asks the
+/// guard the question the nightly asks. A drift in either direction fails here.
+#[test]
+fn following_the_handoffs_freeze_instruction_stands_automation_down() {
+    let fixture = fixture_root("prepare-agent-maintenance-stand-down-acquisition");
+    seed_registry(&fixture);
+    seed_support_files(&fixture);
+
+    let request_path =
+        "docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml";
+    write_text(
+        &fixture.join(request_path),
+        &automated_request_with_execution_contract_toml(),
+    );
+
+    let envelope =
+        load_request_envelope(&fixture, Path::new(request_path)).expect("load request envelope");
+    let contract = envelope
+        .require_execution_contract_for_relay()
+        .expect("execution contract")
+        .clone();
+    let handoff = docs::render_execution_packet(&fixture, &envelope.request, &contract)
+        .expect("render execution packet")
+        .handoff_contents;
+
+    let target_version = "0.98.0";
+    let marker_path =
+        stand_down::marker_relative_path(&envelope.request.maintenance_root, target_version);
+    assert!(
+        handoff.contains(&marker_path),
+        "the handoff must name the exact marker path the guard reads: {marker_path}"
+    );
+
+    // Taken out of the rendered heredoc rather than rebuilt, so the bytes under test are the bytes
+    // an agent copies.
+    let marker = handoff
+        .split_once("<<'TOML'\n")
+        .and_then(|(_, tail)| tail.split_once("\nTOML\n"))
+        .map(|(body, _)| format!("{body}\n"))
+        .expect("the handoff must carry the marker in a heredoc");
+
+    let absolute = fixture.join(&marker_path);
+    fs::create_dir_all(absolute.parent().expect("marker parent")).expect("marker dir");
+    write_text(&absolute, &marker);
+
+    let outcome = stand_down::run(stand_down::Args {
+        agent: "codex".to_string(),
+        target_version: target_version.to_string(),
+        from_ref: None,
+        workspace_root: Some(fixture.clone()),
+    })
+    .expect("the guard must accept a marker written exactly as the handoff instructs");
+    assert_eq!(
+        outcome,
+        stand_down::StandDownOutcome::StoodDown,
+        "pasting the handoff's own marker has to freeze the packet it was rendered for"
+    );
+
+    // The version is part of the instruction, not decoration: a marker pasted for one generation
+    // must not silently protect the next one the nightly opens.
+    let next = stand_down::run(stand_down::Args {
+        agent: "codex".to_string(),
+        target_version: "0.99.0".to_string(),
+        from_ref: None,
+        workspace_root: Some(fixture),
+    })
+    .expect("a marker for another generation is a clean answer, not an error");
+    assert_eq!(next, stand_down::StandDownOutcome::Authorized);
 }
 
 #[test]
