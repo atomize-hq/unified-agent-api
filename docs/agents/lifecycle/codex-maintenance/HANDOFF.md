@@ -4,6 +4,47 @@
 
 This file is the canonical contributor execution contract for `codex` maintenance.
 
+## Before you start: freeze this packet
+
+The nightly watcher regenerates this packet every night for as long as this agent's
+validated pointer trails upstream. Regeneration rewrites the request and force-pushes this
+branch back to base, which destroys work committed to the branch and invalidates a closeout
+bound to the previous request even when that closeout was never committed. Declare the freeze
+**before your first adjudication**, not before the closeout command.
+
+Commit exactly one file, to `staging` and never to this packet branch: the branch is inside the
+tree the force-push replaces, so a marker carried there is destroyed by the operation it exists
+to block.
+
+```sh
+git switch staging && git pull --ff-only
+mkdir -p docs/agents/lifecycle/codex-maintenance/governance/automation-stand-down
+cat > docs/agents/lifecycle/codex-maintenance/governance/automation-stand-down/0.155.0.toml <<'TOML'
+schema_version = 1
+agent_id = "codex"
+target_version = "0.155.0"
+reason = "closeout in progress"
+request_recorded_at = "2026-09-22T08:33:08Z"
+TOML
+git add docs/agents/lifecycle/codex-maintenance/governance/automation-stand-down/0.155.0.toml
+git commit docs/agents/lifecycle/codex-maintenance/governance/automation-stand-down/0.155.0.toml -m "chore(codex): stand automation down for 0.155.0"
+git push origin staging
+git switch -
+```
+
+The `git add` is required because the marker is always a new file, and the path on `git commit` is
+what keeps everything else out of the commit. If `git switch` refuses, your tree is dirty: this
+step runs before any packet work, so commit or stash that work first.
+
+Confirm the freeze is live, from this branch:
+
+```sh
+cargo run -p xtask -- maintenance-stand-down-check --agent codex --target-version 0.155.0 --from-ref origin/staging
+```
+
+Nothing releases the freeze but retirement. Closing this PR, pushing to it, approving it and
+merging it all leave it in force; the promotion PR for `0.155.0` removes the marker.
+
 ## Packet origin
 
 - detected_by: `.github/workflows/agent-maintenance-release-watch.yml`
@@ -22,11 +63,61 @@ This file is the canonical contributor execution contract for `codex` maintenanc
 - required: `true`
 - pre-run debt count: `2`
 - expected post-run debt count: `2`
-- discovered upstream surface rows: `2`
+- discovered upstream surface rows: `52`
 - preexisting unsupported rows: `2`
 - required uplifts this run:
+- `codex agents` `agents` via `unbaselined_gap`
 - `codex completion` `completion` via `unbaselined_gap`
+- `codex migrate-rollouts` `migrate-rollouts` via `unbaselined_gap`
+- `codex queue` `queue` via `unbaselined_gap`
+- `codex app-server` `--code-mode-host` via `unbaselined_gap`
+- `codex exec` `--thread-source` via `unbaselined_gap`
+- `codex exec fork` `--ephemeral` via `unbaselined_gap`
+- `codex exec fork` `--ignore-rules` via `unbaselined_gap`
+- `codex exec fork` `--ignore-user-config` via `unbaselined_gap`
+- `codex exec fork` `--json` via `unbaselined_gap`
+- `codex exec fork` `--output-last-message` via `unbaselined_gap`
+- `codex exec fork` `--output-schema` via `unbaselined_gap`
+- `codex exec fork` `--skip-git-repo-check` via `unbaselined_gap`
+- `codex exec fork` `--thread-source` via `unbaselined_gap`
+- `codex exec resume` `--thread-source` via `unbaselined_gap`
+- `codex exec review` `--thread-source` via `unbaselined_gap`
+- `codex exec-server` `--aws-profile` via `unbaselined_gap`
+- `codex exec-server` `--aws-region` via `unbaselined_gap`
+- `codex exec-server` `--aws-service` via `unbaselined_gap`
+- `codex exec-server` `--aws-sigv4` via `unbaselined_gap`
+- `codex exec-server` `--concurrent-requests` via `unbaselined_gap`
+- `codex exec-server` `--exit-on-stdin-close` via `unbaselined_gap`
+- `codex exec-server` `--remote-transport` via `unbaselined_gap`
+- `codex exec-server forward` `--aws-profile` via `unbaselined_gap`
+- `codex exec-server forward` `--aws-region` via `unbaselined_gap`
+- `codex exec-server forward` `--aws-service` via `unbaselined_gap`
+- `codex exec-server forward` `--aws-sigv4` via `unbaselined_gap`
+- `codex exec-server forward` `--connect` via `unbaselined_gap`
+- `codex exec-server forward` `--environment-id` via `unbaselined_gap`
+- `codex exec-server forward` `--exit-on-stdin-close` via `unbaselined_gap`
+- `codex exec-server forward` `--name` via `unbaselined_gap`
+- `codex exec-server forward` `--remote-transport` via `unbaselined_gap`
+- `codex exec-server forward` `--use-agent-identity-auth` via `unbaselined_gap`
+- `codex mcp add` `--oauth-client-registration` via `unbaselined_gap`
+- `codex mcp login` `--oauth-client-registration` via `unbaselined_gap`
+- `codex migrate-rollouts` `--apply` via `unbaselined_gap`
+- `codex migrate-rollouts` `--json` via `unbaselined_gap`
+- `codex migrate-rollouts` `--max-mib-per-second` via `unbaselined_gap`
+- `codex migrate-rollouts` `--thread` via `unbaselined_gap`
+- `codex migrate-rollouts` `--verbose` via `unbaselined_gap`
+- `codex queue` `--message` via `unbaselined_gap`
+- `codex queue` `--thread` via `unbaselined_gap`
+- `codex` `--approve-for-me` via `unbaselined_gap`
+- `codex` `--worktree` via `unbaselined_gap`
 - `codex completion` `SHELL` via `unbaselined_gap`
+- `codex exec fork` `PROMPT` via `unbaselined_gap`
+- `codex exec fork` `SESSION_ID` via `unbaselined_gap`
+- `codex exec-server help` `COMMAND` via `unbaselined_gap`
+- `codex app-server daemon update` `update` via `unbaselined_gap`
+- `codex exec fork` `fork` via `unbaselined_gap`
+- `codex exec-server forward` `forward` via `unbaselined_gap`
+- `codex exec-server help` `help` via `unbaselined_gap`
 - deferred preexisting gaps:
 - `codex completion` `completion` via `requires_new_architectural_seam` (TODOS.md#close-codex-completion-maintenance-gap)
 - `codex completion` `SHELL` via `requires_new_architectural_seam` (TODOS.md#close-codex-completion-maintenance-gap)
