@@ -66,8 +66,31 @@ pub(super) struct Rules {
     pub(super) union: RulesUnion,
     pub(super) versioning: RulesVersioning,
     pub(super) wrapper_coverage: RulesWrapperCoverage,
+    /// Required, so a union-model agent cannot be enrolled with a descriptor that omits the
+    /// global-flag model. The merger reads this block through its own `#[serde(default)]` view, so
+    /// an agent that omits it gets the permissive default silently; requiring it here is where that
+    /// omission becomes visible. See `uaa-0045`.
+    pub(super) globals: RulesGlobals,
     #[serde(default)]
     pub(super) parity_exclusions: Option<RulesParityExclusions>,
+}
+
+#[derive(Debug, Deserialize)]
+pub(super) struct RulesGlobals {
+    pub(super) effective_flags_model: RulesEffectiveFlagsModel,
+}
+
+#[derive(Debug, Deserialize)]
+pub(super) struct RulesEffectiveFlagsModel {
+    pub(super) enabled: bool,
+    pub(super) union_normalization: RulesUnionNormalization,
+}
+
+#[derive(Debug, Deserialize)]
+pub(super) struct RulesUnionNormalization {
+    pub(super) dedupe_per_command_flags_against_root: bool,
+    #[serde(default)]
+    pub(super) dedupe_key: String,
 }
 
 #[derive(Debug, Deserialize)]

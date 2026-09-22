@@ -148,7 +148,8 @@ fn run_inner(args: Args, default_root: Option<&str>) -> Result<Vec<Violation>, F
         .version_schema
         .unwrap_or_else(|| root.join("VERSION_METADATA_SCHEMA.json"));
 
-    let rules: Rules = serde_json::from_slice(&fs::read(&rules_path)?)?;
+    let rules: Rules = serde_json::from_slice(&fs::read(&rules_path)?)
+        .map_err(|e| FatalError::Rules(format!("{}: {e}", rel_path(&root, &rules_path))))?;
     let stable_semver_re =
         Regex::new(&rules.versioning.pointers.stable_semver_pattern).map_err(|e| {
             FatalError::Rules(format!(
@@ -192,6 +193,23 @@ fn run_inner(args: Args, default_root: Option<&str>) -> Result<Vec<Violation>, F
             "unsupported wrapper_coverage.scope_semantics.scope_set_resolution.mode={} (expected union)",
             rules.wrapper_coverage.scope_semantics.scope_set_resolution.mode
         )));
+    }
+
+    // Keep manifest-validate in step with the merger. `manifest_union` rejects any dedupe_key
+    // other than an empty string or `flag_key`, so a descriptor that passes validation must be one
+    // the merger can actually run; otherwise a descriptor is valid and unusable at the same time.
+    let flags_model = &rules.globals.effective_flags_model;
+    if flags_model.enabled
+        && flags_model
+            .union_normalization
+            .dedupe_per_command_flags_against_root
+    {
+        let dedupe_key = flags_model.union_normalization.dedupe_key.trim();
+        if !dedupe_key.is_empty() && dedupe_key != "flag_key" {
+            return Err(FatalError::Rules(format!(
+                "unsupported globals.effective_flags_model.union_normalization.dedupe_key={dedupe_key}"
+            )));
+        }
     }
 
     let mut schema_value: Value = serde_json::from_slice(&fs::read(&schema_path)?)?;
