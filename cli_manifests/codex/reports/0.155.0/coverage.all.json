@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-09-17T23:14:43Z",
+  "generated_at": "2026-09-22T00:00:00Z",
   "inputs": {
     "upstream": {
       "semantic_version": "0.155.0",
@@ -1125,20 +1125,6 @@
       {
         "path": [],
         "key": "--full-auto",
-        "upstream_available_on": [
-          "x86_64-unknown-linux-musl",
-          "aarch64-unknown-linux-musl",
-          "aarch64-apple-darwin",
-          "x86_64-pc-windows-msvc"
-        ],
-        "wrapper_level": "explicit"
-      },
-      {
-        "path": [
-          "debug",
-          "prompt-input"
-        ],
-        "key": "--image",
         "upstream_available_on": [
           "x86_64-unknown-linux-musl",
           "aarch64-unknown-linux-musl",

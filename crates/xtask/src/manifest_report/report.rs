@@ -15,7 +15,7 @@ mod schema;
 
 use filtering::{
     classify_arg_delta, classify_command_delta, classify_flag_delta, present_on_filter,
-    upstream_arg_availability, upstream_flag_availability,
+    upstream_arg_availability, upstream_flag_availability, TargetFilter,
 };
 use iu::{build_iu_roots, cmp_iu_delta, find_inherited_iu_root, require_non_empty_note};
 pub(super) use parity::{build_parity_exclusions_index, ParityExclusionsIndex};
@@ -49,6 +49,11 @@ pub(super) fn build_report(
 ) -> Result<CoverageReportV1, ReportError> {
     let report_target_set: BTreeSet<String> = report_targets.iter().cloned().collect();
     let expected_set: BTreeSet<String> = rules.union.expected_targets.iter().cloned().collect();
+    let target_filter = TargetFilter {
+        report_targets: &report_target_set,
+        expected_targets: &rules.union.expected_targets,
+        mode: filter_mode,
+    };
     let iu_roots = build_iu_roots(
         wrapper,
         wrapper_index,
@@ -412,9 +417,8 @@ pub(super) fn build_report(
             path,
             key,
             &res,
-            &report_target_set,
-            &rules.union.expected_targets,
-            filter_mode,
+            target_filter,
+            rules.globals.effective_flags_model.enabled,
         );
         if !upstream_present {
             wrapper_only_flags.push(ReportFlagDeltaV1 {
@@ -439,15 +443,8 @@ pub(super) fn build_report(
         if !res.present {
             continue;
         }
-        let (upstream_avail, upstream_present) = upstream_arg_availability(
-            upstream,
-            path,
-            name,
-            &res,
-            &report_target_set,
-            &rules.union.expected_targets,
-            filter_mode,
-        );
+        let (upstream_avail, upstream_present) =
+            upstream_arg_availability(upstream, path, name, &res, target_filter);
         if !upstream_present {
             wrapper_only_args.push(ReportArgDeltaV1 {
                 path: path.clone(),
