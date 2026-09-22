@@ -16,7 +16,7 @@
     "root_path": [],
     "meaning": "The root command entry (path=[]) is the canonical location for opencode's global flags. opencode repeats its global flags in every subcommand's help output, so without this model the union records one copy per subcommand and the coverage report counts each copy as a distinct missing surface.",
     "effective_flags_model": {
-      "enabled": true,
+      "enabled": false,
       "definition": "A command's effective flag set is the union of root flags and that command's own flags.",
       "reporting": "Coverage deltas for global flags are reported only under the root path ([]).",
       "union_normalization": {
@@ -26,7 +26,9 @@
       }
     },
     "notes": [
-      "Measured against opencode 1.18.30 on 2026-09-21: enabling this model removes 349 repeated flag entries from the union, 305 of which are --help, --log-level, --print-logs, --pure and --version appearing on all 61 subcommands.",
+      "The model is declared and disabled, deliberately. It is incompatible with this descriptor's parity exclusions, which remove the root command and all 20 of its flags because the root command starts the interactive TUI. The model relocates a global flag's coverage reporting to the root path; those root entries are parity-excluded; so an enabled model reports the surface nowhere at all. See uaa-0052.",
+      "Measured against opencode 1.18.30 on 2026-09-21, rebuilding the pinned packet with the model on and off: missing_flags 394 -> 49, and excluded_flags stayed at 20 both ways. All 345 removed rows were subcommand copies of the 20 parity-excluded root keys, and they appeared under no delta list at all - not missing, not excluded. Each of those 20 exclusion units carries the note 'where a subcommand accepts the same flag, that copy stays in parity', which is the policy the dedupe inverts.",
+      "The 345 repeated rows are real work items, not noise, because opencode's wrapper covers one command. Suppressing them is a coverage decision that belongs in parity_exclusions, where an excluded unit keeps a visible excluded_* row with a category and a reason, and not in a structural switch that leaves no record. Doing that per unit is 345 hand-written entries today, so the enabling change is an exclusion form that can cover a path pattern. Until that exists, the honest number stands.",
       "positional_args_model is deliberately not declared. opencode's only root positional arg (project) is parity-excluded as interactive, and no consumer deserializes the key."
     ]
   },

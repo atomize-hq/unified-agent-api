@@ -138,3 +138,31 @@ fn c0_validate_rejects_a_dedupe_key_the_merger_would_refuse() {
         "stderr should name the unsupported dedupe_key; got:\n{stderr}"
     );
 }
+
+#[test]
+fn c0_validate_rejects_the_flags_model_when_the_root_command_is_parity_excluded() {
+    // `uaa-0052`: the two policies cancel. The model relocates a global flag's coverage delta to
+    // the root path; a root-command parity exclusion removes it there; and the union has already
+    // dropped the subcommand copies. opencode shipped that way and 345 surfaces were reported
+    // under no delta list at all, so the descriptor must not be able to hold both.
+    let temp = make_temp_dir("ccm-c0-validate-root-excluded-flags-model");
+    let codex_dir = materialize_minimal_valid_workspace(&temp);
+
+    let stderr = validate_stderr_for_mutated_rules(&codex_dir, |rules| {
+        rules["globals"]["effective_flags_model"]["enabled"] = json!(true);
+        rules["parity_exclusions"]["units"]
+            .as_array_mut()
+            .expect("parity_exclusions.units is an array")
+            .push(json!({
+                "unit": "command",
+                "path": [],
+                "category": "interactive",
+                "note": "Root command is the interactive TUI."
+            }));
+    });
+
+    assert!(
+        stderr.contains("root command parity-excluded"),
+        "stderr should name the conflicting pair; got:\n{stderr}"
+    );
+}
