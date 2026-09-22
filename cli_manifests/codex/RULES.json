@@ -36,7 +36,7 @@
     "effective_flags_model": {
       "enabled": true,
       "definition": "A command's effective flag set is the union of root flags and that command's own flags.",
-      "reporting": "Coverage deltas for global flags are reported only under the root path ([]) to avoid repeated noise across commands.",
+      "reporting": "Coverage deltas for global flags are reported only under the root path ([]). Enforced in two places, neither of which reads this key: manifest_union's normalize_union_commands removes a subcommand's copy of a root flag, which keeps the upstream side at root, and manifest_report credits a wrapper claim at a subcommand path against the root flag of the same key, which keeps the wrapper side there too (uaa-0051). Before uaa-0051 only the first half existed, so a wrapper claim at a subcommand scope was reported as wrapper-only against a union this model had already emptied.",
       "union_normalization": {
         "dedupe_per_command_flags_against_root": true,
         "dedupe_key": "flag_key",

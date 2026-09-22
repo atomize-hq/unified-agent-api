@@ -9,10 +9,25 @@ pub(super) struct RulesFile {
     #[serde(rename = "rules_schema_version")]
     pub(super) rules_schema_version: u32,
     pub(super) union: RulesUnion,
+    /// Required, like the merger's and the validator's views of the same key. Until `uaa-0051`
+    /// this struct did not declare it at all, so the report was the one stage of the pipeline that
+    /// could not see the flag model the union had already been normalized by — which is how a
+    /// wrapper claim at a subcommand scope came to be judged against a union the model had emptied.
+    pub(super) globals: RulesGlobals,
     pub(super) report: RulesReport,
     pub(super) sorting: RulesSorting,
     #[serde(default)]
     pub(super) parity_exclusions: Option<RulesParityExclusions>,
+}
+
+#[derive(Debug, Deserialize)]
+pub(super) struct RulesGlobals {
+    pub(super) effective_flags_model: RulesEffectiveFlagsModel,
+}
+
+#[derive(Debug, Deserialize)]
+pub(super) struct RulesEffectiveFlagsModel {
+    pub(super) enabled: bool,
 }
 
 #[derive(Debug, Deserialize)]
