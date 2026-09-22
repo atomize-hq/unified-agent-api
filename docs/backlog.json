@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at_utc": "2026-09-21T23:15:00Z",
+  "updated_at_utc": "2026-09-22T00:00:00Z",
   "items": [
     {
       "id": "uaa-0022",
@@ -1352,7 +1352,7 @@
         "2026-09-20, resolved (was recorded as an unresolved conflict the same day): step 2 adds checks to crates/xtask/src/agent_maintenance/closeout/validate.rs, which the acquisition-maintenance-lifecycle spec §4 listed as deliberately untouched. Decision 1 in §11 settles it - the freeze is directional, not locational. Adding a check is in scope; weakening one is not, wherever it lives. §4's bullet now states the rule that way, with the ordering rationale: a validator hardened before its generator exists is written against the contract, one hardened afterwards is written against whatever that generator emits. This item lands before prepare-agent-closeout exists, and the validator it leaves behind is the fixed authority T6 must satisfy unmodified. maintenance-request-contract-v1.md:327 already scheduled it so.",
         "2026-09-20 decision 2 (lifecycle spec §11): accepted cost of putting dispositions in the closeout artifact - two of the four categories (hidden upstream but still supported, supported only on older upstream versions) are durable properties of a surface, so codex's 35 rows are re-adjudicated every run. That is still the right placement, because a generated file cannot hold a hand-made decision. If re-adjudication proves painful, teach the wrapper-coverage generator to carry those two categories; do not hand-edit its output.",
         "2026-09-21 resequenced: lands as PR 4 of the closeout-prerequisite group, after uaa-0050 and uaa-0045. It also gains the stand-down admission gate - the first command to read the judgment rows must refuse to proceed unless a valid marker is visible on authoritative base, printing the ready-to-paste TOML (and the dirty-tree worktree form) on refusal. Tighten it to 'acquisition is established', not 'a marker exists': a marker only local or only on the packet branch is refused, and a predicate error is never evidence of a declaration. Reuse uaa-0050's shared marker routine rather than writing a second parser.",
-        "2026-09-21, trigger-point pointer from uaa-0045: opencode is no longer the empty case. Enabling opencode's global-flag model takes it from 0 wrapper-only rows to 4 (run --continue, --fork, --model, --session on 1.18.30), and codex has carried one of the same kind all along (['debug','prompt-input'] --image). All five are false positives from uaa-0051: manifest_report dedupes the union against root flags but does not credit a wrapper claim at a subcommand scope against a root flag, so the report contradicts itself inside a single row - it calls the surface wrapper-only while its own upstream_available_on lists every target. Resolve uaa-0051 before this item's closeout check goes live, or those five rows have to be adjudicated as 'a discovery bug' describing the reporting engine rather than the surface."
+        "2026-09-22, pointer corrected. The 2026-09-21 note claiming opencode was no longer the empty case is withdrawn: it rested on uaa-0045 enabling opencode's global-flag model, which uaa-0052 reverted. opencode is the empty case again, with 0 wrapper-only rows against 481 missing surfaces. One wrapper-only row across all three agents is a reporting defect rather than a surface - codex ['debug','prompt-input'] --image - so resolve uaa-0051 before this item's closeout check goes live. Also fix the sizing figure while implementing: 'codex 35 rows' is the coverage.all.json count and coverage.any.json holds 33, the two differing by sandbox --allow-unix-socket and --log-denials, which upstream ships on darwin only. This item has to name which report is the adjudication baseline, or two rows are adjudicable depending on which file is opened."
       ],
       "priority": "P2"
     },
@@ -1585,7 +1585,8 @@
         "2026-09-21 resequenced: lands as PR 3 of the closeout-prerequisite group, after uaa-0050. Unchanged in scope; uaa-0050 is small, touches only code that merged in PR #219, and shares no files with this item.",
         "2026-09-21, resolved. The three union identity guards are deleted from RulesUnion and from codex's and claude_code's descriptors; the tool check and the semantic-version check now run unconditionally for every agent, joined by a new shard-target check comparing binary.target_triple to the filename-derived target (manifest_union.rs). Every shard committed in the repository and all three on the pinned packet branch already satisfy both identity checks, so nothing was invalidated by making them mandatory. opencode's RULES.json gained globals and union.promotion_policy (allow_promote_when_incomplete: false, the value it already resolved). Step 4 is decided and implemented: manifest-validate now requires globals and rejects any dedupe_key manifest-union would refuse, so a descriptor cannot be valid and unusable at the same time. Step 5 needs nothing further - uaa-0038 cleared the planned destination before materializing, and the shard-target check is the merger half of the same defense.",
         "2026-09-21 measurement, step 3. Pinned automation/opencode-maintenance-1.18.30 at 962329a10646ca91759a3c2217d63c957c6d63ef; the current engine reproduces that packet's committed union.json byte-for-byte, so the comparison is faithful. Enabling the global-flag model removes 349 of 400 non-root flag entries from the union (87.2%), and drops the coverage report's missing surfaces from 481 to 136: missing_flags 394 -> 49, missing_commands 60 and missing_args 27 unchanged. 305 of the 349 are five flags repeated on all 61 subcommands - --help, --log-level, --print-logs, --pure, --version. So roughly seven of every eight opencode missing_flags rows were global-flag repetition rather than distinct implementation work. Committed historical artifacts (1.4.11, 1.14.47) were deliberately not regenerated: no CI job re-derives a committed union, and regenerating live publication truth is outside this item. The next acquisition run for a version produces the new shape.",
-        "2026-09-21 scope call on the four top-level keys. Step 3 named comparison, features, globals and supplements, which predates decision 4's rule that normalization covers what a consumer reads. Applying that rule one level up: across all ten structs that deserialize a RULES.json root, only globals is read (manifest_union.rs:70). comparison and features are read by nothing, and features would describe a feature-enable CLI surface opencode does not have. supplements is read by nothing either - parity-acquire.yml:413 finds the file by filesystem convention at <root>/supplement/commands.json, which opencode already has. Adding the three would have been the move step 1b forbids: copying another agent's operational values to satisfy structural similarity. They are recorded as unread."
+        "2026-09-21 scope call on the four top-level keys. Step 3 named comparison, features, globals and supplements, which predates decision 4's rule that normalization covers what a consumer reads. Applying that rule one level up: across all ten structs that deserialize a RULES.json root, only globals is read (manifest_union.rs:70). comparison and features are read by nothing, and features would describe a feature-enable CLI surface opencode does not have. supplements is read by nothing either - parity-acquire.yml:413 finds the file by filesystem convention at <root>/supplement/commands.json, which opencode already has. Adding the three would have been the move step 1b forbids: copying another agent's operational values to satisfy structural similarity. They are recorded as unread.",
+        "2026-09-22, partially reverted by uaa-0052. Enabling opencode's globals.effective_flags_model was wrong and is undone; the model stays declared with enabled=false. Everything else this item landed stands: the three union identity guards are still deleted and their checks unconditional, the shard-target check is unchanged, and manifest-validate still requires globals. The 481 to 136 figure recorded above describes a suppression, not a measurement of coverage, and should be read only alongside uaa-0052."
       ],
       "priority": "P0"
     },
@@ -1826,14 +1827,16 @@
           "Work item: uaa-0051 - globals.effective_flags_model is enforced on one side of the coverage comparison only.",
           "manifest_union normalizes the union by removing a per-command flag whose canonical key already appears in root flags (manifest_union.rs normalize_union_commands). The descriptor states the intent: 'A command's effective flag set is the union of root flags and that command's own flags', and 'Coverage deltas for global flags are reported only under the root path ([])'.",
           "manifest_report does not apply that model to the wrapper side. A wrapper_coverage.json entry that claims a global flag at a subcommand path finds no counterpart at that path in the deduped union, so the row is emitted as wrapper_only - a surface the wrapper claims and upstream does not have. That is false: upstream has it, at root, and the effective-flags model says the subcommand inherits it.",
-          "Measured 2026-09-21 while resolving uaa-0045. codex has had one instance all along: ['debug','prompt-input'] --image, 1 of its 19 wrapper_only_flags on 0.155.0. Enabling the model for opencode adds four more: run --continue, run --fork, run --model, run --session on 1.18.30, taking opencode from 0 wrapper-only rows to 4. Each row's own upstream_available_on lists all three targets, which is the report contradicting itself within a single entry.",
-          "This matters to uaa-0039, which makes closeout fail on any wrapper-only row without a recorded category. Under uaa-0039 these five rows must each be adjudicated, and the only honest category for them is 'a discovery bug' - a category that describes the reporting engine, not the surface.",
+          "Scope corrected 2026-09-22: one instance, not five. codex ['debug','prompt-input'] --image on 0.155.0. The union has --image as a root flag and lists ['debug','prompt-input'] with zero flags, because the dedupe removed its inherited copy; the wrapper claims --image there; upstream_flag_availability finds the command, finds no such flag on it, and emits wrapper-only. Codex's root --image is not parity-excluded, so crediting the wrapper's subcommand claim against it is correct.",
+          "The four opencode rows previously attributed to this item were not instances of it. They were the report correctly signalling that uaa-0052's descriptor defect had deleted surfaces from the union. uaa-0052 reverted that, and opencode is back to zero wrapper-only rows.",
+          "Do not reason from upstream_available_on. On a wrapper-only row that field is a fallback, not upstream truth: when upstream has the command but not the flag it reports the command's availability, and when upstream has no command at that path it reports the wrapper's own target set (manifest_report/report/filtering.rs upstream_flag_availability). All 19 of codex 0.155.0's any-scope wrapper-only flag rows take a fallback branch, so the field lists every target on rows that are genuinely hidden upstream. Read the union instead.",
+          "This matters to uaa-0039, which makes closeout fail on any wrapper-only row without a recorded category. Under uaa-0039 this row must be adjudicated, and the only honest category for it is 'a discovery bug' - a category that describes the reporting engine, not the surface.",
           "Steps:",
           "1) Credit a wrapper claim at a subcommand path against a root flag of the same canonical key, when globals.effective_flags_model.enabled is true for that agent. Apply it to wrapper-only detection; check whether missing-surface detection needs the mirror treatment or already gets it from the root-scope reporting rule.",
-          "2) Decide whether the corrected rows disappear from the report or are emitted with a distinguishing field. Disappearing is simpler; a field preserves the evidence that the wrapper claims a flag at a narrower scope than upstream offers it.",
-          "3) Regenerate codex 0.155.0's report and confirm ['debug','prompt-input'] --image resolves. Re-measure opencode 1.18.30 from the pinned packet branch and confirm the four rows resolve.",
-          "4) Reconcile opencode's parity_exclusions note with the model. Its 20 root-flag exclusions each say 'where a subcommand accepts the same flag, that copy stays in parity', which the root dedupe makes untrue as written even though the exclusions still resolve the same way.",
-          "Trigger - resolve before uaa-0039's closeout check goes live, so those five rows are not categorized as real surfaces."
+          "2) Decide whether the corrected row disappears from the report or is emitted with a distinguishing field. Disappearing is simpler; a field preserves the evidence that the wrapper claims a flag at a narrower scope than upstream offers it.",
+          "3) Regenerate codex 0.155.0's report and confirm ['debug','prompt-input'] --image resolves. opencode needs no re-measurement: its model is disabled by uaa-0052, so it has no rows of this kind.",
+          "4) While here, implement or retract the descriptor's 'reporting' clause. manifest_report never reads globals at all, so 'Coverage deltas for global flags are reported only under the root path ([])' is claimed by every descriptor and implemented by nothing. Decide which it is and make the file say so.",
+          "Trigger - resolve before uaa-0039's closeout check goes live, so that row is not categorized as a real surface."
         ],
         "files_to_read": [
           "crates/xtask/src/manifest_report.rs",
@@ -1843,16 +1846,150 @@
         ],
         "deliverables": [
           "Wrapper-only detection that honours the effective-flags model",
-          "A decision on whether corrected rows vanish or carry a distinguishing field",
-          "Regenerated codex evidence and a re-measured opencode packet confirming the five rows resolve",
-          "opencode's parity_exclusions notes reconciled with the root-dedupe behaviour"
+          "A decision on whether the corrected row vanishes or carries a distinguishing field",
+          "Regenerated codex evidence confirming ['debug','prompt-input'] --image resolves",
+          "The descriptor 'reporting' clause either implemented or retracted"
         ]
       },
       "notes": [
-        "Found 2026-09-21 while measuring uaa-0045 step 3. It is pre-existing rather than introduced: codex has carried one instance since its globals model was enabled. uaa-0045 makes it visible on opencode because enabling the model is what creates the scope mismatch.",
-        "Do not resolve this by disabling the global-flag model for opencode. The model removes 345 spurious missing_flags rows and creates 4 spurious wrapper_only rows; the trade is strongly favourable and the four rows are a reporting defect in their own right."
+        "Found 2026-09-21 while measuring uaa-0045. codex has carried this one instance since its globals model was enabled.",
+        "Rescoped 2026-09-22 from five instances to one. The four opencode rows were misattributed: they were caused by uaa-0052, not by this defect. The stated evidence was also wrong - 'the row contradicts itself because upstream_available_on lists every target' does not hold, because that field is a fallback on wrapper-only rows and carries no upstream flag data. The defect itself was re-confirmed directly against codex 0.155.0's union.",
+        "Do not resolve this by disabling the global-flag model for codex. The model is correct for codex, whose root command is in parity; see uaa-0052 for why it is wrong for opencode."
       ],
       "priority": "P2"
+    },
+    {
+      "id": "uaa-0052",
+      "title": "opencode's effective-flags model cancels its root parity exclusions, so 345 surfaces are reported nowhere",
+      "status": "done",
+      "bucket": "agent_api.onboarding",
+      "type": "task",
+      "kickoff": {
+        "prompt": [
+          "Work item: uaa-0052 - a regression introduced by uaa-0045 in PR #222 and resolved on 2026-09-22.",
+          "uaa-0045 enabled globals.effective_flags_model for opencode. That model is incompatible with opencode's parity exclusions, which remove the root command and all 20 of its flags because the root command starts the interactive TUI.",
+          "The two cancel. normalize_union_commands deletes every subcommand copy of a root flag from the union. The model's reporting clause says the surviving coverage delta is reported at the root path. That path is parity-excluded. So the surface is reported under no delta list at all - not missing_*, not excluded_*.",
+          "Measured by rebuilding the pinned packet (automation/opencode-maintenance-1.18.30 @ 962329a1) with the model on and off: missing_flags 394 to 49, excluded_flags 20 both ways, wrapper_only_flags 0 to 4. All 345 removed rows are subcommand copies of the 20 parity-excluded root keys; none appears under any delta. Each of those 20 exclusion units carries the note 'where a subcommand accepts the same flag, that copy stays in parity' - the exact policy the dedupe inverts.",
+          "Resolution: set enabled=false in cli_manifests/opencode/RULES.json, keeping the block declared so the descriptor still states its stance; add a manifest-validate guard refusing enabled=true when the root command is parity-excluded; correct the records that carried the wrong reading."
+        ],
+        "files_to_read": [
+          "cli_manifests/opencode/RULES.json",
+          "crates/xtask/src/manifest_union.rs",
+          "crates/xtask/src/manifest_validate.rs"
+        ],
+        "deliverables": [
+          "opencode's effective-flags model declared and disabled, with the reason recorded in the descriptor",
+          "A manifest-validate guard refusing the model when the root command is parity-excluded",
+          "uaa-0051 rescoped, uaa-0039's pointer corrected, uaa-0045 annotated"
+        ]
+      },
+      "notes": [
+        "Found 2026-09-22 by a read-only side session reviewing the merged PR #222, and confirmed by rebuilding the pinned packet both ways.",
+        "The root cause is not the model, which is correct for codex and claude_code. It is that a structural switch was used where the auditable mechanism is parity_exclusions, whose own contract is that an excluded unit stays visible under excluded_* with a category and a reason. The switch leaves no row.",
+        "The suppressed rows are real work items, because opencode's wrapper covers one command. Suppressing them is a coverage decision, and it belongs in parity_exclusions. Doing it per unit is 345 hand-written entries today, which is why an exclusion form covering a path pattern is the enabling change - see uaa-0055."
+      ],
+      "priority": "P1"
+    },
+    {
+      "id": "uaa-0053",
+      "title": "opencode's wrapper covers one command, so 481 upstream surfaces are unwrapped",
+      "status": "todo",
+      "bucket": "agent_api.onboarding",
+      "type": "task",
+      "kickoff": {
+        "prompt": [
+          "Work item: uaa-0053 - build out opencode's wrapper coverage.",
+          "cli_manifests/opencode/wrapper_coverage.json holds one entry: run, with six flags and one positional argument, generated 2026-04-18 at wrapper_version 0.2.3. Its note bounds coverage deliberately: 'OpenCode v1 wrapper coverage is intentionally bounded to the canonical run --format json surface.' codex declares 87 command entries and claude_code 30.",
+          "The consequence is measurable rather than theoretical. Against opencode 1.18.30 the coverage report holds 481 missing surfaces (60 commands, 394 flags, 27 args). opencode's support-matrix rows read backend_support unsupported on all 18, uaa_support unsupported on all 18, and manifest_support supported on 1 of 18. latest_validated is 1.4.11 while upstream ships 1.18.31.",
+          "So opencode is wired into the measuring half of the lifecycle - packets open, help is scraped, reports generate - and has never been built out on the wrapping half. The 481 is the accurate size of that gap, and it is this item's work list.",
+          "Sequencing decided 2026-09-22 by the maintainer: this is the destination, not the current work. The acquisition-maintenance lifecycle spec is the priority because it is what makes agent onboarding and maintenance repeatable. This item must not be pulled onto that critical path, and the lifecycle spec's T4-T8 must not wait for it.",
+          "Steps:",
+          "1) Decide the target surface. Wrapping all 61 commands is one end; wrapping the non-interactive subset that the UAA backend can actually drive is the other. The decision belongs with the backend, not with the manifest.",
+          "2) Extend the wrapper and its coverage declarations together. opencode's coverage entries populate no scope.target_triples today, unlike claude_code's 21; decide whether opencode needs target scope as it grows.",
+          "3) Advance latest_validated as coverage lands, through the normal promotion lane. Do not hand-edit pointers.",
+          "4) Retire uaa-0055's need, or use it: whatever remains deliberately unwrapped becomes parity exclusions with a category and a reason, not a suppressed number."
+        ],
+        "files_to_read": [
+          "cli_manifests/opencode/wrapper_coverage.json",
+          "cli_manifests/opencode/RULES.json",
+          "cli_manifests/support_matrix/current.json"
+        ],
+        "deliverables": [
+          "A decided target surface for the opencode wrapper",
+          "Wrapper coverage declarations matching what the backend actually supports",
+          "Remaining unwrapped surface recorded as parity exclusions rather than suppressed"
+        ]
+      },
+      "notes": [
+        "Raised 2026-09-22 while resolving uaa-0052. The 481 figure was briefly mistaken for reporting noise; it is the honest size of an unfinished agent.",
+        "Blocks nothing in the acquisition-maintenance lifecycle spec. uaa-0039 treats opencode as the empty case for wrapper-only rows, which stays true while the wrapper claims one command."
+      ],
+      "priority": "P2"
+    },
+    {
+      "id": "uaa-0054",
+      "title": "A root-flag parity exclusion under an enabled effective-flags model silently deletes subcommand copies",
+      "status": "todo",
+      "bucket": "agent_api.onboarding",
+      "type": "task",
+      "kickoff": {
+        "prompt": [
+          "Work item: uaa-0054 - the narrower half of uaa-0052, left unguarded on purpose.",
+          "uaa-0052 added a manifest-validate guard refusing globals.effective_flags_model.enabled=true when the root command is parity-excluded. A root-path *flag* exclusion is the same hazard one step narrower: the model deletes that flag's subcommand copies from the union, and the root copy that would carry the report is excluded, so those copies are reported nowhere.",
+          "codex carries one such exclusion today - a root-path --no-alt-screen exclusion, category tui - with the model enabled. It costs nothing at 0.155.0 because no subcommand repeats that flag, so the hazard is latent rather than biting. Deciding the case needs the union, which manifest-validate does not read, which is why it was filed instead of guarded.",
+          "Steps:",
+          "1) Decide where the check belongs. manifest_union has the union and could refuse precisely - model enabled, root flag excluded, and some subcommand actually carries that flag. manifest_validate can only refuse the descriptor pair, which would reject codex's harmless declaration.",
+          "2) Implement it there, with a test using a synthetic descriptor rather than a live agent's.",
+          "Trigger - resolve before any agent's subcommand repeats a parity-excluded root flag, or before a second agent adopts a root-flag exclusion under an enabled model."
+        ],
+        "files_to_read": [
+          "crates/xtask/src/manifest_union.rs",
+          "crates/xtask/src/manifest_validate.rs",
+          "cli_manifests/codex/RULES.json"
+        ],
+        "deliverables": [
+          "A check that refuses the combination where it is actually harmful",
+          "A test that does not depend on a live agent's descriptor"
+        ]
+      },
+      "notes": [
+        "Split out of uaa-0052 on 2026-09-22 rather than guarded there, because the strict descriptor-level guard would have rejected codex's current, harmless declaration."
+      ],
+      "priority": "P3"
+    },
+    {
+      "id": "uaa-0055",
+      "title": "parity_exclusions cannot cover a path pattern, so suppressing a repeated global costs one entry per subcommand",
+      "status": "todo",
+      "bucket": "agent_api.onboarding",
+      "type": "design",
+      "kickoff": {
+        "prompt": [
+          "Work item: uaa-0055 - give parity_exclusions a way to exclude one surface across many paths.",
+          "Today an exclusion unit names one exact (path, key) pair; manifest_report/report/parity.rs indexes them that way. Excluding --help on all 61 of opencode's subcommands is therefore 61 entries, and excluding the five repeated globals is 305.",
+          "That verbosity is why uaa-0045 reached for globals.effective_flags_model instead, which deletes the rows with no record at all - the defect uaa-0052 reverted. The lesson is not that suppression is wrong but that the auditable mechanism was too expensive to use.",
+          "An exclusion form that covers a path pattern - all subcommands, or a named subtree - would keep the contract opencode's RULES.json already states, that 'excluded units remain visible in reports under excluded_* deltas and never appear under missing_* deltas', while costing one entry with one category and one reason.",
+          "Steps:",
+          "1) Design the form. A wildcard path, an applies_to: all_subcommands marker, and an explicit list are the obvious candidates; prefer whichever keeps the report's excluded_* rows enumerable per concrete surface, since the adjudication under uaa-0039 works on concrete rows.",
+          "2) This changes the RULES.json schema, which the acquisition-maintenance lifecycle spec section 7 puts on the Ask first list. Get the decision before implementing.",
+          "3) Implement in the exclusions index and the report, with tests covering a pattern that matches nothing and one that matches a surface also excluded exactly."
+        ],
+        "files_to_read": [
+          "crates/xtask/src/manifest_report/report/parity.rs",
+          "cli_manifests/opencode/RULES.json",
+          "docs/specs/unified-agent-api/acquisition-maintenance-lifecycle-spec.md"
+        ],
+        "deliverables": [
+          "A decided exclusion form covering a path pattern",
+          "Implementation keeping every suppressed surface visible under excluded_*",
+          "A maintainer decision recorded, since this is a RULES.json schema change"
+        ]
+      },
+      "notes": [
+        "Raised 2026-09-22 out of uaa-0052. It is the enabling change for uaa-0053 step 4 and for any future agent whose CLI repeats its globals.",
+        "Not on the lifecycle spec's critical path. uaa-0039 needs concrete excluded rows, which this preserves either way."
+      ],
+      "priority": "P3"
     }
   ]
 }

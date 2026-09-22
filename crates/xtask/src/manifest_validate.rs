@@ -210,6 +210,32 @@ fn run_inner(args: Args, default_root: Option<&str>) -> Result<Vec<Violation>, F
                 "unsupported globals.effective_flags_model.union_normalization.dedupe_key={dedupe_key}"
             )));
         }
+
+        // The model and a root-command parity exclusion erase each other. `normalize_union_commands`
+        // deletes every subcommand copy of a root flag, and the model's `reporting` rule puts the
+        // surviving report at the root path — which this exclusion removes from parity. The surface
+        // then appears under no delta list at all: not `missing_*`, not `excluded_*`. opencode
+        // shipped in exactly that state and 345 surfaces left its report with no record (`uaa-0052`).
+        // Refuse the pair rather than let one descriptor hold two policies that cancel.
+        //
+        // Root *flag* exclusions are the same hazard one step narrower, and codex carries one
+        // (`--no-alt-screen`) that costs nothing today because no subcommand repeats it. Deciding
+        // that case needs the union, which this command does not read, so it is filed rather than
+        // guarded here (`uaa-0054`).
+        if let Some(exclusions) = rules.parity_exclusions.as_ref() {
+            if exclusions
+                .units
+                .iter()
+                .any(|u| u.unit == "command" && u.path.is_empty())
+            {
+                return Err(FatalError::Rules(
+                    "globals.effective_flags_model.enabled=true with the root command parity-excluded: \
+                     the model reports global flags at the root path, which that exclusion removes, \
+                     so deduped subcommand copies are reported nowhere"
+                        .to_string(),
+                ));
+            }
+        }
     }
 
     let mut schema_value: Value = serde_json::from_slice(&fs::read(&schema_path)?)?;
