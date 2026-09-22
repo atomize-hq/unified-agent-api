@@ -497,6 +497,72 @@ useful evidence, at the cost of one cached `cargo build -p xtask` per frozen age
 after the merge picks up the guarded workflow, but one already executing does not. Before beginning
 the first closeout, confirm no `agent-maintenance-open-pr` run is in progress for that agent.
 
+**Completing the stand-down (`uaa-0050`, resolved 2026-09-21).** `uaa-0048` landed the predicate and
+its three guards. It left three things unsettled, decided after a two-round ChatGPT Pro approach
+review reconciled against the tree, and resolved the same day.
+
+*Acquisition is an instruction, not a new capability.* The actor who performs a closeout is a
+coding agent handed the packet PR, not a maintainer at a keyboard. That agent already holds git and
+already pushes to the packet branch, so declaring a freeze needs no remote-write capability added
+to `xtask` — which has never pushed, and whose every `git` invocation is `rev-parse`, `log`,
+`ls-tree` or `show`. The declaration is delivered as an instruction instead: through the generated
+`HANDOFF.md`, which calls itself the canonical contributor execution contract and already renders
+the target version and the exact commands for its other steps, and as a standing rule in
+`AGENTS.md` beside the existing conditional obligation to run `manifest-validate` after touching
+`cli_manifests/**`. Those two obligations differ in one respect worth stating where the rule is
+written: skipping `manifest-validate` fails CI, while skipping the freeze fails nothing until a
+cron job destroys the work. The admission gate under `uaa-0039` is what converts the second kind
+into the first.
+
+Four points carry the instruction, because an agent's default behaviour is wrong on each:
+
+- **Freeze before substantive judgment work, not before the closeout command.** The request-hash
+  clock invalidates a closeout that was never committed, so local work is exposed from the first
+  adjudication, not from the first push.
+- **The marker goes to the base branch, never the packet branch.** A control file for this packet,
+  sitting in this packet's own directory, is the most natural thing in the world to commit to the
+  branch the force-push replaces.
+- **Publish only the marker.** `git add <path>` followed by a path-limited `git commit <path>` is
+  satisfiable by construction, where "keep the diff to one file" is a property to be maintained.
+  The `git add` is required because the marker is always a new file, and the path on `commit` is
+  what keeps a dirty packet tree out of the commit. An isolated worktree is recovery for the
+  already-dirty case and belongs in the admission gate's refusal output, not in the documented
+  path.
+- **Nothing releases the freeze but retirement.** Closing, pushing, approving and merging all leave
+  it in force. A closed `HANDOFF.md` should say so, since it no longer carries the acquisition
+  step.
+
+*Supersession read a stale checkout.* As shipped in `uaa-0048`, the fresh-fetch read was used at one
+boundary only. Supersession called the predicate against the job-start checkout while running at
+the *end* of the job, so it carried the same job-length window the replacement boundary was fixed
+for — and it is the boundary that acts on a packet other than the run's own. All three boundaries
+now fetch base and read through `--from-ref`, supersession per candidate. Request regeneration
+needed the same mechanism for a different reason: that boundary is first after checkout, but a
+re-run preserves the original event's `GITHUB_SHA`, so a fresh checkout is not a current one and
+step order does not imply freshness.
+
+*A marker retires with its own promotion, never with a newer version.* Cleanup belongs in
+`parity-promote`'s pointer-advance step, where removing the promoted version's marker rides into
+the promotion PR alongside the `status: reported → validated` flip. That gives four properties at
+once: one commit, so a failed cleanup leaves an extra marker and a failed promotion never leaves a
+missing one; a maintainer merge, so automation proposes the unfreeze rather than performing it;
+exactly one version named, so a second frozen generation is untouched; and correct timing, since
+the record only reads `validated` once that PR lands, not when the workflow runs. Tying cleanup to
+a *new version* was considered and rejected: upstream cadence says nothing about whether the
+previous packet completed — codex ships near-daily and a closeout spans days — so a newer version's
+first run would delete the marker of the packet being worked on, which is the supersession hazard
+this guard exists to prevent, reintroduced as housekeeping. Letting the nightly delete markers is
+also the restrained party holding the eraser: today it only reads, and base is never written by it.
+
+Accepted with that change: once a marker is removed at promotion, nothing refuses to rebuild the
+version. Neither `agent-maintenance-open-pr` nor `prepare-agent-maintenance` compares a target
+version against the pointer — `prepare.rs` reads `latest_validated.txt` only to confirm the file
+exists, and `current_validated` arrives as a caller-supplied argument. A `workflow_dispatch` or a
+re-run inside GitHub's 30-day window can therefore regenerate an already-promoted packet. The
+result is a spurious PR that regresses nothing unless it is merged, which is loud rather than
+silent, so a writer-side guard refusing a `status: validated` version is deferred until one is
+observed.
+
 **There is no merge dependency on this work.** The invalid `2.1.140` claude_code request exists only
 on `main`; the open claude_code packet branch carries the corrected policy, so closing claude_code
 never touches the bad copy. Merging an open packet *before* closing it would actively make things
@@ -542,8 +608,9 @@ on 2026-09-19 added one (`uaa-0048`).
 | `uaa-0045` | opencode's `RULES.json` was never normalized to the union-model schema | **Resolve before the opencode packet closes.** Its `union` block omits the three identity guards codex and claude_code set, and it has no `globals`, so the union accepts a shard declaring another tool or version and skips the root-flag dedupe. Every missing key is `#[serde(default)]`, so a thin descriptor is silently permissive. Compounds `uaa-0038`. **Corrected 2026-09-20:** the item's "473 required uplifts" figure no longer describes the packet — the live opencode request records `required uplifts this run: none`, 15 preexisting debt rows and 0 discovered upstream surface rows, and the 481 missing-surface rows (394 flags, 60 commands, 27 args) sit in the coverage report, not the uplift queue. The two populations must not be relabelled into each other. That evidence is also not on `staging`: `cli_manifests/opencode/reports/` holds `1.4.11` and `1.14.47` only, and the 1.18.30 reports exist solely on the packet branch, so any re-measurement pins that branch. **Decided 2026-09-20 (§11 decisions 3 and 4).** The three union identity guards are deleted rather than made required, and their checks become unconditional, so step 3's instruction to add them to opencode is withdrawn — normalization removes three keys from the other two descriptors instead. Normalization otherwise covers what a consumer reads: of the eight non-guard `union` keys opencode omits, only `promotion_policy` is read (`manifest_acquisition.rs:100`/`:179`, then `parity-promote.yml:102-110`), so opencode must declare that stance explicitly instead of inheriting `false` by omission; the other seven are recorded as unread. Pointers: Workstream E in the parity generalization plan §5, and §11 decisions 3 and 4. |
 | `uaa-0046` | Debt authorization does not constrain matches by target or upstream version | **Resolved in `b52f1242` / `4c292da2`.** Each debt row now carries a required `scope_target_triples`, an `authorized_at_version`, and an `authorization_evidence_ref`, and a row whose scope exceeds the surface's observations is rejected. Wrapper coverage already supports target scope: `scope.target_triples` is a first-class mechanism in `crates/xtask/src/wrapper_coverage_shared.rs`, validated against the agent's expected targets, and claude_code populates it on 21 entries while codex and opencode populate it on none. The debt inventory never adopted it — its parser reads ten fixed keys and silently ignores any other, so a deferral argued for one target authorizes the same surface on a target added later. This is adoption of an existing mechanism, not invention of a new one, but the default must not be adopted with it: an omitted coverage scope means all expected targets, which on an authorization record would grant permission by omission. Debt scope is required instead. Distinct from `uaa-0041`, which is about values, arity and output shape. Pointers: `wrapper_coverage_shared.rs`, and the Surface identity rules in the request contract. |
 | `uaa-0047` | Permission-test fixtures restore the directory mode only on the success path | **Resolved in `dea84bf8`.** Both fixtures restore through a `Drop` guard whose body ignores a failed restore, since a panicking destructor during unwinding aborts the process. Each fixture is now established by a direct filesystem probe rather than by the behaviour of the code under test, so a regression cannot present itself as an environmental skip. The file was split to make room. |
-| `uaa-0048` | Nightly regeneration force-pushes an open packet branch | **Resolved 2026-09-21.** A maintainer-committed `automation-stand-down.toml` on the base branch is the ownership predicate, checked at all three destructive boundaries; see the stand-down subsection under T8 sequencing for the design and for what was deliberately left out. Original finding: the watcher re-dispatches `agent-maintenance-open-pr` every night with no dedupe against an open packet, so `create-pull-request` resets the packet branch to `staging`, re-applies the packet and force-pushes. Proven 2026-09-19: PRs #211 and #208 had unchanged target versions for four and five days and carried only commits from the previous night. A closeout committed to a packet branch would therefore not survive until merge, regenerating HANDOFF back to the open-run contract. **Widened 2026-09-20.** The same regeneration also invalidates a closeout that was never committed, through the request-hash clock under T4 — so this gates T6's output being usable, not only T8. Protection must mean *automation has lost authority over this packet generation*, never *a valid closeout is present*: the late reading still permits erasing categorization work, a partially authored closeout, or a valid one during an intentional edit. It must also survive a merged packet, which has no open PR and no closeout, so every open-PR-shaped signal misses it — codex 0.155.0 reached that state when #215 merged without promotion. Pointer: T8 sequencing above. |
+| `uaa-0048` | Nightly regeneration force-pushes an open packet branch | **Resolved 2026-09-21.** A maintainer-committed `automation-stand-down.toml` on the base branch is the ownership predicate, checked at all three destructive boundaries; see the stand-down subsection under T8 sequencing for the design and for what was deliberately left out. Original finding: the watcher re-dispatches `agent-maintenance-open-pr` every night with no dedupe against an open packet, so `create-pull-request` resets the packet branch to `staging`, re-applies the packet and force-pushes. Proven 2026-09-19: PRs #211 and #208 had unchanged target versions for four and five days and carried only commits from the previous night. A closeout committed to a packet branch would therefore not survive until merge, regenerating HANDOFF back to the open-run contract. **Widened 2026-09-20.** The same regeneration also invalidates a closeout that was never committed, through the request-hash clock under T4 — so this gates T6's output being usable, not only T8. Protection must mean *automation has lost authority over this packet generation*, never *a valid closeout is present*: the late reading still permits erasing categorization work, a partially authored closeout, or a valid one during an intentional edit. It must also survive a merged packet, which has no open PR and no closeout, so every open-PR-shaped signal misses it — codex 0.155.0 reached that state when #215 merged without promotion. Pointer: T8 sequencing above. **Merged 2026-09-21 as PR #219.** Three follow-ups are split to `uaa-0050`: the acquisition path an agent actually follows, the supersession boundary's stale read, and marker retirement at promotion. |
 | `uaa-0049` | A generic engine branches on the codex agent id | Low. `contract_policy.rs` appends one extra `writable_surfaces` entry behind `if entry.agent_id == "codex"`, which the repository's own rule puts in descriptor data. Impact today is one spec file; the cost is the precedent, in the engine that decides what a packet may write. Distinct from the relay-host constants in the same file, which name codex as the local execution host and are intentional (§1 verified state, §4 deliberately untouched). |
+| `uaa-0050` | The stand-down guard has no acquisition path, one boundary reads a stale checkout, and a marker never retires | **Resolved 2026-09-21.** Completes `uaa-0048` (PR #219). Three parts. (1) Acquisition: the actor is a coding agent handed the packet PR, so the freeze is an instruction — rendered into the generated `HANDOFF.md` and stated in `AGENTS.md` — not a new remote-write capability for `xtask`, which has never pushed. Four points carry it because an agent's default is wrong on each: freeze before judgment work rather than before the closeout command, publish to base rather than the packet branch, commit only the marker (`git add <path>` then a path-limited `git commit <path>`, since the marker is always a new file), and nothing but retirement releases it. (2) Supersession fetches base and reads through `--from-ref` per candidate; request regeneration uses the same mechanism, because a re-run preserves the original event's `GITHUB_SHA` and step order does not imply freshness. (3) Retirement rides into the promotion PR from `parity-promote`'s pointer-advance step — one commit with the `status` flip, maintainer-merged, exactly one version. Cleanup triggered by a *new version* is rejected: codex ships near-daily and a closeout spans days, so it would delete the marker of the packet being worked on. Accepted residual: nothing refuses to rebuild a promoted version, so a dispatch or 30-day re-run yields a spurious PR — loud, not silent, so the writer-side guard waits until one is observed. Pointers: the stand-down subsection under T8 sequencing, and `uaa-0039` for the admission gate. |
 
 ### 8.2 What T1 changed about T2
 

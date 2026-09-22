@@ -10,6 +10,7 @@ use super::contract_policy::{
     render_prompt_template_for_contract, EXECUTE_HOST_SURFACE, EXECUTION_HOST_LABEL,
 };
 use super::request::{ExecutionContract, MaintenanceRequest, MaintenanceRequestEnvelope};
+use super::stand_down;
 
 const OWNERSHIP_MARKER: &str =
     "<!-- generated-by: xtask agent-maintenance renderer; source-of-truth: governance/maintenance-request.toml -->";
@@ -267,10 +268,13 @@ pub fn render_execution_packet(
 
     let trigger_context = render_trigger_context(request);
     let support_audit = render_support_surface_audit(request);
+    let stand_down_acquisition =
+        render_stand_down_acquisition(request, &detected_release.target_version);
     let (dry_run_command, write_command) = relay_invocation(&request.relative_path);
     let handoff_contents = wrap_markdown(&format!(
-        "# Handoff\n\nThis file is the canonical contributor execution contract for `{}` maintenance.\n\n## Packet origin\n\n{}\n\n## Support-surface audit\n\n{}\n\n## Relay contract\n\n- maintained agent packet: `{}`\n- local execution host: `{}`\n- executor surface: `{}`\n- request artifact: `{}`\n- prompt template path: `{}`\n- prompt sha256: `{}`\n- canonical handoff: `{}`\n- derivative pr summary: `{}`\n- exact closeout artifact: `{}`\n- branch linkage: `{}`\n- manual closeout required: `{}`\n\n## Writable surfaces\n\n{}\n\n## Read-only inputs\n\n{}\n\n## Ordered repo commands\n\n{}\n\n## Exact green gates\n\n{}\n\n## Recovery\n\n- recreate packet command: `{}`\n- reopen pr body path: `{}`\n- reopen pr branch: `{}`\n- notes:\n{}\n\n## Dry-run to write relay\n\nUse the `run_id` printed by the dry-run output, replacing `RUN_ID_FROM_DRY_RUN` before invoking write mode.\n\n```sh\n{}\n{}\n```\n\n## Exact closeout command\n\n```sh\ncargo run -p xtask -- close-agent-maintenance --request {} --closeout {}\n```\n\n## Exact maintained-agent prompt\n\n```md\n{}\n```\n",
+        "# Handoff\n\nThis file is the canonical contributor execution contract for `{}` maintenance.\n\n## Before you start: freeze this packet\n\n{}\n\n## Packet origin\n\n{}\n\n## Support-surface audit\n\n{}\n\n## Relay contract\n\n- maintained agent packet: `{}`\n- local execution host: `{}`\n- executor surface: `{}`\n- request artifact: `{}`\n- prompt template path: `{}`\n- prompt sha256: `{}`\n- canonical handoff: `{}`\n- derivative pr summary: `{}`\n- exact closeout artifact: `{}`\n- branch linkage: `{}`\n- manual closeout required: `{}`\n\n## Writable surfaces\n\n{}\n\n## Read-only inputs\n\n{}\n\n## Ordered repo commands\n\n{}\n\n## Exact green gates\n\n{}\n\n## Recovery\n\n- recreate packet command: `{}`\n- reopen pr body path: `{}`\n- reopen pr branch: `{}`\n- notes:\n{}\n\n## Dry-run to write relay\n\nUse the `run_id` printed by the dry-run output, replacing `RUN_ID_FROM_DRY_RUN` before invoking write mode.\n\n```sh\n{}\n{}\n```\n\n## Exact closeout command\n\n```sh\ncargo run -p xtask -- close-agent-maintenance --request {} --closeout {}\n```\n\n## Exact maintained-agent prompt\n\n```md\n{}\n```\n",
         request.agent_id,
+        stand_down_acquisition,
         trigger_context,
         support_audit,
         request.agent_id,
@@ -505,6 +509,63 @@ fn markdown_command_list(items: &[String]) -> String {
         .map(|item| format!("- `{item}`"))
         .collect::<Vec<_>>()
         .join("\n")
+}
+
+/// The freeze this packet's executor has to declare before it judges anything.
+///
+/// Rendered here rather than written down once, because everything an agent gets wrong about it is
+/// specific to this packet: which version, which file, which branch, and when. The actor is a
+/// coding agent handed the packet PR, so it already holds git and needs no capability added to
+/// `xtask` — which has never pushed. It needs an instruction, and this file already calls itself
+/// the canonical execution contract and already renders the exact commands for every other step.
+/// `AGENTS.md` carries the standing rule for anyone who arrives without a packet in hand.
+fn render_stand_down_acquisition(request: &MaintenanceRequest, target_version: &str) -> String {
+    let base = stand_down::BASE_BRANCH;
+    let agent = &request.agent_id;
+    let marker_dir = format!(
+        "{}/{}",
+        request.maintenance_root,
+        stand_down::STAND_DOWN_RELATIVE_DIR
+    );
+    let marker_path = stand_down::marker_relative_path(&request.maintenance_root, target_version);
+    let marker =
+        stand_down::render_marker_toml(agent, target_version, &request.request_recorded_at);
+
+    format!(
+        r#"The nightly watcher regenerates this packet every night for as long as this agent's
+validated pointer trails upstream. Regeneration rewrites the request and force-pushes this
+branch back to base, which destroys work committed to the branch and invalidates a closeout
+bound to the previous request even when that closeout was never committed. Declare the freeze
+**before your first adjudication**, not before the closeout command.
+
+Commit exactly one file, to `{base}` and never to this packet branch: the branch is inside the
+tree the force-push replaces, so a marker carried there is destroyed by the operation it exists
+to block.
+
+```sh
+git switch {base} && git pull --ff-only
+mkdir -p {marker_dir}
+cat > {marker_path} <<'TOML'
+{marker}TOML
+git add {marker_path}
+git commit {marker_path} -m "chore({agent}): stand automation down for {target_version}"
+git push origin {base}
+git switch -
+```
+
+The `git add` is required because the marker is always a new file, and the path on `git commit` is
+what keeps everything else out of the commit. If `git switch` refuses, your tree is dirty: this
+step runs before any packet work, so commit or stash that work first.
+
+Confirm the freeze is live, from this branch:
+
+```sh
+cargo run -p xtask -- maintenance-stand-down-check --agent {agent} --target-version {target_version} --from-ref origin/{base}
+```
+
+Nothing releases the freeze but retirement. Closing this PR, pushing to it, approving it and
+merging it all leave it in force; the promotion PR for `{target_version}` removes the marker."#
+    )
 }
 
 fn render_trigger_context(request: &MaintenanceRequest) -> String {

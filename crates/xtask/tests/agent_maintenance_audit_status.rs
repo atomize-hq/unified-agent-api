@@ -28,6 +28,12 @@ mod audit_status;
 mod contract_policy;
 #[path = "../src/agent_maintenance/docs.rs"]
 mod docs;
+// `docs.rs` is included by path here rather than through the library, so its `use super::` imports
+// resolve against this crate root. The guard module itself is not included by path: it carries
+// `#[cfg(test)] mod tests`, which would be compiled a second time against the wrong directory.
+mod stand_down {
+    pub use xtask::agent_maintenance::stand_down::*;
+}
 #[path = "../src/agent_maintenance/prepare.rs"]
 mod prepare;
 #[path = "../src/agent_maintenance/request.rs"]

@@ -62,8 +62,44 @@ pub const EXIT_STOOD_DOWN: i32 = 3;
 /// frozen generation.
 pub const STAND_DOWN_RELATIVE_DIR: &str = "governance/automation-stand-down";
 
+/// The branch a marker has to be committed to.
+///
+/// It is the branch the packet PR targets, and the only one the nightly force-push does not
+/// replace. The packet workflow hardcodes the same value as its `base:`; `c4_spec_ci_wiring` binds
+/// the two together, because a rename that moved one without the other would send every declared
+/// freeze to a branch nothing reads — a false authorization wearing the shape of a declaration.
+pub const BASE_BRANCH: &str = "staging";
+
 const REQUEST_RELATIVE_PATH: &str = "governance/maintenance-request.toml";
 const SCHEMA_VERSION: u32 = 1;
+
+/// Where a marker lives, given the packet's own maintenance root.
+///
+/// Takes the root rather than the agent id so a caller holding a request uses *that* packet's
+/// root instead of re-deriving one, and so this module keeps a single definition of the layout.
+pub fn marker_relative_path(maintenance_root: &str, target_version: &str) -> String {
+    format!("{maintenance_root}/{STAND_DOWN_RELATIVE_DIR}/{target_version}.toml")
+}
+
+/// Render a paste-ready marker for one packet generation.
+///
+/// Every producer of this text goes through here. There are two — the acquisition step in the
+/// generated `HANDOFF.md`, and the admission gate's refusal output under `uaa-0039` — and two
+/// hand-written copies of the schema is precisely how an instruction drifts away from the parser
+/// that has to accept it. One producer, one consumer (`validate_entry`), round-tripped in tests.
+///
+/// `reason` is a default, not a fact: whoever pastes this is expected to say what they are doing.
+/// Any reason is accepted as long as it is non-empty, which is the only thing the parser can
+/// meaningfully check.
+pub fn render_marker_toml(agent: &str, target_version: &str, request_recorded_at: &str) -> String {
+    format!(
+        "schema_version = {SCHEMA_VERSION}\n\
+         agent_id = \"{agent}\"\n\
+         target_version = \"{target_version}\"\n\
+         reason = \"closeout in progress\"\n\
+         request_recorded_at = \"{request_recorded_at}\"\n"
+    )
+}
 
 #[derive(Debug, Parser, Clone)]
 pub struct Args {
@@ -224,7 +260,10 @@ pub fn run(args: Args) -> Result<StandDownOutcome, Error> {
         "Automation has stood down from {} {}.",
         args.agent, args.target_version
     );
-    println!("  marker: {marker_dir}/{}.toml", args.target_version);
+    println!(
+        "  marker: {}",
+        marker_relative_path(&maintenance_root, &args.target_version)
+    );
     println!("  reason: {}", marker.reason);
     if let Some(declared_by) = marker.declared_by.as_deref() {
         println!("  declared by: {declared_by}");
