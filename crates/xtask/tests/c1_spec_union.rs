@@ -418,3 +418,84 @@ fn c1_union_dedupes_per_command_flags_against_root() {
         "expected alpha-only flag to remain; flags={keys:?}"
     );
 }
+
+/// A minimal but valid required-target shard, used by the identity tests below.
+///
+/// These tests copy the real `cli_manifests/codex/RULES.json`, which since `uaa-0045` carries no
+/// `require_*` keys at all. So they prove the checks run because the engine runs them, not because
+/// a descriptor opted in.
+fn required_target_shard(version: &str, target: &str) -> Value {
+    json!({
+      "snapshot_schema_version": 1,
+      "tool": "codex-cli",
+      "collected_at": "1970-01-01T00:00:00Z",
+      "binary": {
+        "sha256": "00",
+        "size_bytes": 1,
+        "platform": { "os": "linux", "arch": "x86_64" },
+        "target_triple": target,
+        "version_output": format!("codex {version}"),
+        "semantic_version": version,
+        "channel": "stable"
+      },
+      "commands": [{ "path": [], "usage": "codex [OPTIONS] <COMMAND>" }]
+    })
+}
+
+/// Write a shard whose identity has been tampered with, run the union, and return stderr.
+fn union_stderr_for_tampered_shard(prefix: &str, tamper: impl FnOnce(&mut Value)) -> String {
+    let temp = make_temp_dir(prefix);
+    let codex_root = temp.join("cli_manifests").join("codex");
+    write_rules_json(&codex_root);
+
+    let version = "0.77.0";
+    let target = "x86_64-unknown-linux-musl";
+    let mut snapshot = required_target_shard(version, target);
+    tamper(&mut snapshot);
+    write_snapshot_json(&codex_root, version, target, &snapshot);
+
+    let output = run_xtask_union(&codex_root, version);
+    assert!(
+        !output.status.success(),
+        "expected the union to reject the shard:\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
+        output.status,
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr),
+    );
+    String::from_utf8_lossy(&output.stderr).into_owned()
+}
+
+#[test]
+fn c1_union_rejects_a_shard_declaring_another_tool() {
+    let stderr = union_stderr_for_tampered_shard("ccm-c1-union-tool-identity", |s| {
+        s["tool"] = json!("opencode-cli");
+    });
+    assert!(
+        stderr.contains("tool mismatch") && stderr.contains("codex-cli"),
+        "stderr should name the tool mismatch and the expected tool; got:\n{stderr}"
+    );
+}
+
+#[test]
+fn c1_union_rejects_a_shard_declaring_another_version() {
+    let stderr = union_stderr_for_tampered_shard("ccm-c1-union-version-identity", |s| {
+        s["binary"]["semantic_version"] = json!("0.76.0");
+    });
+    assert!(
+        stderr.contains("semantic version mismatch") && stderr.contains("0.77.0"),
+        "stderr should name the version mismatch and the expected version; got:\n{stderr}"
+    );
+}
+
+#[test]
+fn c1_union_rejects_a_shard_whose_target_triple_is_not_its_filename() {
+    let stderr = union_stderr_for_tampered_shard("ccm-c1-union-target-identity", |s| {
+        s["binary"]["target_triple"] = json!("aarch64-apple-darwin");
+    });
+    assert!(
+        stderr.contains("target mismatch")
+            && stderr.contains("x86_64-unknown-linux-musl")
+            && stderr.contains("aarch64-apple-darwin"),
+        "stderr should name both the filename target and the declared one; got:\n{stderr}"
+    );
+}

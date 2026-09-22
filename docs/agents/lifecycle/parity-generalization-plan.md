@@ -238,6 +238,14 @@ capture the CLI surface, so the multi-OS matrix stays regardless of source).
   keys from the other two descriptors, not adding three here. Of the remaining `union` keys
   opencode omits, only `promotion_policy` is read by any consumer and in scope (that
   spec's §11 decision 4, not this document's §11).
+  **Resolved 2026-09-21.** The three guards are deleted; the tool and version checks, plus a new
+  shard-target check, run unconditionally for every agent. opencode declares `globals` and
+  `union.promotion_policy`. The remaining three top-level keys named above are **not** added and
+  are recorded as unread: nothing deserializes `comparison` or `features` from a `RULES.json` root,
+  and `supplements` is found by filesystem convention at `parity-acquire.yml:413`, not by reading
+  the descriptor. Enabling the global-flag model drops opencode's coverage-report missing surfaces
+  from 481 to 136 on the pinned `1.18.30` packet. `wrapper_coverage` normalization, extended into
+  this workstream on 2026-09-19 and described just below, is still open.
   **Extended 2026-09-19: the same pattern reaches `wrapper_coverage`.** opencode's
   `wrapper_coverage` block omits the whole `resolution` object, `scope_semantics.
   scope_set_resolution.fields`, and the `validation.error_message_requirements` that codex and
@@ -319,7 +327,7 @@ maintainer.
 | **B** — wire acquisition into the generic flow | **done** | `agent-maintenance-open-pr.yml` calls `parity-acquire` on the packet branch with `commit: true` |
 | **C** — `opencode-snapshot` adapter | **done** | yargs parser + 9 unit tests; verified against the real 1.18.4 binary (62 commands, no omissions) |
 | **D** — support-tier gate + onboarding | **done** | gate enforced by `manifest_acquisition::plan_for_agent`; entry rule documented in the charter and the registry contract |
-| **E** — drift + stuck packets | **done, except the maintainer-gated runs** | engine rename landed in A1; `claude_code` duplicate `scope` key removed; opencode `RULES.json` **partly** normalized — `automation`, `version_metadata` and `report` added, but `comparison`, `features`, `globals`, `supplements` and most of `wrapper_coverage` are still absent, and the three `union` identity guards are being deleted rather than added (`uaa-0045`; see the Workstream E note in §5); win32→windows-x64 mapping verified live. Stuck-packet reconciliation needs CI runners — see §12 |
+| **E** — drift + stuck packets | **done, except the maintainer-gated runs** | engine rename landed in A1; `claude_code` duplicate `scope` key removed; opencode `RULES.json` normalized for the union model in `uaa-0045` (resolved 2026-09-21) — `automation`, `version_metadata`, `report`, `globals` and `union.promotion_policy` present, the three `union` identity guards deleted and their checks made unconditional, and `comparison`, `features` and `supplements` recorded as unread rather than added; most of `wrapper_coverage` is still absent (see the Workstream E note in §5); win32→windows-x64 mapping verified live. Stuck-packet reconciliation needs CI runners — see §12 |
 
 ### What actually changed the shape of the system
 

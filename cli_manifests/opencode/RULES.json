@@ -12,6 +12,24 @@
       "root_pointers_allow_none": true
     }
   },
+  "globals": {
+    "root_path": [],
+    "meaning": "The root command entry (path=[]) is the canonical location for opencode's global flags. opencode repeats its global flags in every subcommand's help output, so without this model the union records one copy per subcommand and the coverage report counts each copy as a distinct missing surface.",
+    "effective_flags_model": {
+      "enabled": true,
+      "definition": "A command's effective flag set is the union of root flags and that command's own flags.",
+      "reporting": "Coverage deltas for global flags are reported only under the root path ([]).",
+      "union_normalization": {
+        "dedupe_per_command_flags_against_root": true,
+        "dedupe_key": "flag_key",
+        "meaning": "If a command help listing repeats a global flag already present in root flags (same canonical key), omit it from that command's flags in the union snapshot. The flag remains globally available via the effective_flags_model."
+      }
+    },
+    "notes": [
+      "Measured against opencode 1.18.30 on 2026-09-21: enabling this model removes 349 repeated flag entries from the union, 305 of which are --help, --log-level, --print-logs, --pure and --version appearing on all 61 subcommands.",
+      "positional_args_model is deliberately not declared. opencode's only root positional arg (project) is parity-excluded as interactive, and no consumer deserializes the key."
+    ]
+  },
   "parity_exclusions": {
     "schema_version": 1,
     "units": [
@@ -183,6 +201,13 @@
       "linux-x64": "linux",
       "darwin-arm64": "macos",
       "win32-x64": "windows"
+    },
+    "promotion_policy": {
+      "allow_promote_when_incomplete": false,
+      "notes": [
+        "This block declares the one field a consumer reads: manifest_acquisition.rs resolves allow_promote_when_incomplete and .github/workflows/parity-promote.yml gates on the resolved value. It states explicitly the stance opencode previously held by omitting the key, and changes no behaviour.",
+        "opencode does not adopt codex's mode/requirements_for_latest_validated_and_current keys: nothing deserializes them, so declaring them here would document promotion behaviour this descriptor does not control."
+      ]
     }
   },
   "acquisition": {

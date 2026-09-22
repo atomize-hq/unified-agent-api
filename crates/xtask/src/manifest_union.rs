@@ -61,6 +61,12 @@ pub enum Error {
         expected: String,
         got: Option<String>,
     },
+    #[error("snapshot target mismatch in {path} (filename declares {expected}, binary.target_triple is {got})")]
+    SnapshotTargetMismatch {
+        path: PathBuf,
+        expected: String,
+        got: String,
+    },
 }
 
 #[derive(Debug, Deserialize)]
@@ -104,12 +110,6 @@ struct RulesUnion {
     /// Layout used for `raw_help/<version>/<target>/**` references recorded in conflict evidence.
     #[serde(default)]
     raw_help_layout: RawHelpLayout,
-    #[serde(default)]
-    require_same_tool: bool,
-    #[serde(default)]
-    require_same_semantic_version: bool,
-    #[serde(default)]
-    require_semantic_version: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -164,7 +164,12 @@ pub fn run_with_default_root(args: Args, default_root: Option<&str>) -> Result<(
 
         let snapshot: SnapshotV1 = serde_json::from_slice(&fs::read(&snapshot_path)?)?;
 
-        if rules.union.require_same_tool && snapshot.tool != rules.union.tool_name {
+        // Identity is checked unconditionally for every agent. These were `#[serde(default)]`
+        // opt-ins until uaa-0045: the value compared against was mandatory while the decision to
+        // compare it defaulted off, so an agent became permissive by omitting a key rather than by
+        // choosing to. A `None` semantic_version fails the same-version comparison below, so the
+        // former `require_semantic_version` needs no separate check.
+        if snapshot.tool != rules.union.tool_name {
             return Err(Error::SnapshotToolMismatch {
                 path: snapshot_path,
                 expected: rules.union.tool_name.clone(),
@@ -172,9 +177,7 @@ pub fn run_with_default_root(args: Args, default_root: Option<&str>) -> Result<(
             });
         }
 
-        if rules.union.require_same_semantic_version
-            && snapshot.binary.semantic_version.as_deref() != Some(args.version.as_str())
-        {
+        if snapshot.binary.semantic_version.as_deref() != Some(args.version.as_str()) {
             return Err(Error::SnapshotVersionMismatch {
                 path: snapshot_path,
                 expected: args.version.clone(),
@@ -182,11 +185,14 @@ pub fn run_with_default_root(args: Args, default_root: Option<&str>) -> Result<(
             });
         }
 
-        if rules.union.require_semantic_version && snapshot.binary.semantic_version.is_none() {
-            return Err(Error::SnapshotVersionMismatch {
+        // The shard is located by filename and was, until now, inserted under that
+        // filename-derived target without ever consulting what it says it is. A stale or
+        // misfiled shard therefore entered the union as a different target.
+        if snapshot.binary.target_triple != *target {
+            return Err(Error::SnapshotTargetMismatch {
                 path: snapshot_path,
-                expected: args.version.clone(),
-                got: snapshot.binary.semantic_version,
+                expected: target.clone(),
+                got: snapshot.binary.target_triple,
             });
         }
 
