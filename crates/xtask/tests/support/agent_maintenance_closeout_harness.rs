@@ -247,3 +247,32 @@ pub fn closeout_with_deferred(
         ..closeout
     }
 }
+
+/// Make `root` a git repository with one commit, and return that commit's sha.
+///
+/// The commit is empty on purpose: the binding gate asks whether the recorded revision exists and
+/// is reachable, never what it contains.
+pub fn init_git_fixture(root: &Path) -> String {
+    git(root, &["init", "--quiet", "--initial-branch=main"]);
+    git(root, &["config", "user.email", "fixture@example.invalid"]);
+    git(root, &["config", "user.name", "fixture"]);
+    git(
+        root,
+        &["commit", "--quiet", "--allow-empty", "-m", "fixture"],
+    );
+    git(root, &["rev-parse", "HEAD"]).trim().to_string()
+}
+
+fn git(root: &Path, args: &[&str]) -> String {
+    let output = std::process::Command::new("git")
+        .current_dir(root)
+        .args(args)
+        .output()
+        .unwrap_or_else(|err| panic!("git {args:?}: {err}"));
+    assert!(
+        output.status.success(),
+        "git {args:?}: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    String::from_utf8(output.stdout).expect("git output is utf-8")
+}

@@ -1,3 +1,5 @@
+#[path = "closeout/evidence.rs"]
+mod evidence;
 #[path = "closeout/render.rs"]
 mod render;
 #[path = "closeout/support_audit_truth.rs"]
@@ -17,6 +19,10 @@ use std::{
 
 use super::stand_down;
 
+pub use self::evidence::{
+    reject_merge_commit, resolve_preflight, resolve_preflight_with_fetcher, EvidenceRun,
+    ResolvedPreflight,
+};
 pub use self::support_audit_truth::{WrapperOnlyCategory, WrapperOnlyDisposition};
 pub(super) use self::types::maintenance_pack_root;
 pub use self::types::{
@@ -46,6 +52,12 @@ pub fn run_in_workspace<W: Write>(
     writer: &mut W,
 ) -> Result<(), MaintenanceCloseoutError> {
     require_stand_down(workspace_root, &args.request)?;
+    require_commit_binding(
+        workspace_root,
+        &load_linked_closeout(workspace_root, &args.request, &args.closeout)?
+            .closeout
+            .commit,
+    )?;
     let summary = write_closeout_outputs(workspace_root, &args.request, &args.closeout)?;
     writeln!(writer, "OK: close-agent-maintenance write complete.")
         .map_err(|err| MaintenanceCloseoutError::Internal(format!("write stdout: {err}")))?;
@@ -56,6 +68,82 @@ pub fn run_in_workspace<W: Write>(
     )
     .map_err(|err| MaintenanceCloseoutError::Internal(format!("write stdout: {err}")))?;
     Ok(())
+}
+
+/// The commit binding (T4).
+///
+/// `validate_commit_shape` in the frozen validator accepts any 7-40 lowercase hex string and
+/// compares it to nothing. That is a shape check that reads as verification: the field passes, so a
+/// reviewer concludes the commit was checked, when all that was established is that it looks like a
+/// commit. Nothing binds the recorded commit to the revision T4 resolved evidence against, so a T4
+/// pointed at the wrong revision emits an artifact that validates clean.
+///
+/// This gate closes that, and it is deliberately *reachability*, not equality:
+///
+/// - Equality with `HEAD` is unsatisfiable by construction. Committing the closeout moves the head,
+///   so a closeout that named the head before the commit names the parent after it. A check that
+///   can only pass before the artifact exists is not a check.
+/// - Reachability holds everywhere the validator actually runs: before the closeout commit the
+///   recorded commit *is* `HEAD`; after it the recorded commit is an ancestor; and under a CI
+///   merge-ref checkout the packet head is a parent of the merge.
+/// - It still refuses what matters — a fabricated sha, a sha from an unrelated branch, and a sha
+///   this repository has never contained.
+///
+/// It lives here, beside `require_stand_down`, rather than inside `closeout/validate.rs`: spec §4
+/// freezes that file, and while its directional exception would permit *adding* a check, an
+/// admission gate that needs a repository does not belong in a parser whose fixtures are bare
+/// directories. `close-agent-maintenance` runs in neither CI nor `make preflight`, so this adds a
+/// git dependency to no automated gate. The cost is that a future third entry point could skip it;
+/// T6 must call this explicitly rather than assume the validator covers it.
+fn require_commit_binding(
+    workspace_root: &Path,
+    commit: &str,
+) -> Result<(), MaintenanceCloseoutError> {
+    let spec = format!("{commit}^{{commit}}");
+    let exists = run_git(workspace_root, &["rev-parse", "--verify", "--quiet", &spec])?;
+    if !exists.status.success() {
+        return Err(MaintenanceCloseoutError::Validation(format!(
+            "closeout `commit` `{commit}` is not a commit in this repository. It is shaped like \
+             one, which is all the schema checks — record the revision the CI evidence was \
+             resolved against."
+        )));
+    }
+
+    let reachable = run_git(
+        workspace_root,
+        &["merge-base", "--is-ancestor", commit, "HEAD"],
+    )?;
+    match reachable.status.code() {
+        Some(0) => Ok(()),
+        Some(1) => Err(MaintenanceCloseoutError::Validation(format!(
+            "closeout `commit` `{commit}` exists but is not reachable from `HEAD`, so it does not \
+             describe this packet. Check out the packet branch and record its head — not a merge \
+             commit, and not a revision from another branch."
+        ))),
+        _ => Err(MaintenanceCloseoutError::Internal(format!(
+            "`git merge-base --is-ancestor {commit} HEAD` failed ({}): {}",
+            reachable.status,
+            String::from_utf8_lossy(&reachable.stderr).trim()
+        ))),
+    }
+}
+
+/// Returns the raw output so a caller can read a meaningful non-zero exit — `--is-ancestor` answers
+/// "no" with exit 1, which a success-or-error helper would report as a broken repository.
+fn run_git(
+    workspace_root: &Path,
+    args: &[&str],
+) -> Result<std::process::Output, MaintenanceCloseoutError> {
+    std::process::Command::new("git")
+        .current_dir(workspace_root)
+        .args(args)
+        .output()
+        .map_err(|err| {
+            MaintenanceCloseoutError::Internal(format!(
+                "could not run `git {}`: {err}",
+                args.join(" ")
+            ))
+        })
 }
 
 /// The admission gate (`uaa-0039`).

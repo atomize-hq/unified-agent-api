@@ -645,7 +645,7 @@ pub(crate) fn build_curl_args(
     args
 }
 
-pub(crate) fn fetch_text(url: &str) -> Result<String, Error> {
+pub fn fetch_text(url: &str) -> Result<String, Error> {
     // `curl -o` follows a symlink at its output path and truncates the target, so the
     // destination is created here with O_EXCL under a random name: an attacker cannot
     // pre-plant a symlink we would later follow, and cannot guess the name.
