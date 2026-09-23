@@ -742,7 +742,8 @@
       },
       "notes": [
         "Introduced by T1 remediation round 5 (commit b55cef4f) as a deliberate, documented compromise: the round-5 packet scoped support_audit.rs out of the write set to avoid regression risk in shared code.",
-        "Failure direction is safe (worst case exit 1, never a false clean), which is why it was deferred rather than blocking T1."
+        "Failure direction is safe (worst case exit 1, never a false clean), which is why it was deferred rather than blocking T1.",
+        "2026-09-23 scope correction, measured against the tree. The kickoff understates this item in two ways. `is_bad_support_audit_evidence_message` (`crates/xtask/src/agent_maintenance/audit_status.rs:583`) now matches five patterns, not the four the kickoff lists: it gained `cannot classify unmatched debt rows`. And `uaa-0039` added two further consumers of the same untyped `String` errors, in `crates/xtask/src/agent_maintenance/closeout/support_audit_truth.rs` — `wrapper_only_baseline` at :232 and `derive_support_surface_audit` at :366 — each mapping unconditionally to `MaintenanceCloseoutError::Validation`. That is the opposite default to `audit_status.rs`, which defaults to `Internal` and string-matches its way out. One untyped error source now feeds two consumers with inverted defaults, so an I/O fault at closeout reports as a bad artifact (exit 2) rather than an internal fault (exit 1). Still fails closed, so still not urgent, but the deliverable is three call sites rather than one."
       ],
       "priority": "P3"
     },
@@ -931,7 +932,7 @@
       "notes": [
         "Raised by the T2 adversarial review lane (L8), labelled suspected; accepted and deferred during T2 adjudication.",
         "Resolve before or with T3 if T3 makes the projection path durable.",
-        "2026-09-19 sequencing: lands as the verdict-visibility group with T3, together with uaa-0031, uaa-0025, and uaa-0028 (the last only if the chosen surface makes the projection path durable). Recorded in the acquisition-maintenance-lifecycle spec §8, \"Backlog groups that land inside that order\"."
+        "2026-09-23 sequencing, superseding the 2026-09-19 note that scheduled this with T3: the trigger did not fire. T3 chose a managed PR comment, and the projection stayed in a per-invocation directory created by `mktemp -d` under `$RUNNER_TEMP` — outside the commit and outside the `_ci_tmp` sweep — so nothing durable is handed to `--emit-json`. `prepare-agent-closeout` takes `--write`, not `--emit-json`, so T6 does not extend the deletion surface either. The defect is unchanged; only its trigger moved. Resolve before the first of: a stable or shared projection location, an artifact-supplied output path, or cleanup broadened to more failure paths."
       ],
       "priority": "P3"
     },
@@ -1468,7 +1469,8 @@
         ]
       },
       "notes": [
-        "Found 2026-09-15 by the lead session while reading report classification for the unmatched debt classifier; pre-existing."
+        "Found 2026-09-15 by the lead session while reading report classification for the unmatched debt classifier; pre-existing.",
+        "2026-09-23: this is a prerequisite for `uaa-0053`, and for no T in the acquisition-maintenance lifecycle spec. Re-confirmed latent — no `wrapper_coverage.json` declares a command `unsupported` (codex 64 explicit / 22 passthrough / 1 intentionally_unsupported; claude_code 29 explicit / 1 intentionally_unsupported; opencode 1 explicit). `uaa-0053` step 1 decides opencode's target surface across 60 unwrapped commands, which is the most likely first such declaration; resolve this item before that decision lands rather than after."
       ],
       "priority": "P3"
     },
@@ -1931,7 +1933,8 @@
       },
       "notes": [
         "Raised 2026-09-22 while resolving uaa-0052. The 481 figure was briefly mistaken for reporting noise; it is the honest size of an unfinished agent.",
-        "Blocks nothing in the acquisition-maintenance lifecycle spec. uaa-0039 treats opencode as the empty case for wrapper-only rows, which stays true while the wrapper claims one command."
+        "Blocks nothing in the acquisition-maintenance lifecycle spec. uaa-0039 treats opencode as the empty case for wrapper-only rows, which stays true while the wrapper claims one command.",
+        "2026-09-23: `uaa-0042` is a prerequisite for step 1. A command whose wrapper coverage level is `unsupported` is never a support-audit gap today, and a debt row for one is misclassified `covered_by_wrapper`. Deciding that some of opencode's 60 unwrapped commands stay unwrapped is the first realistic way to declare one, so settle `uaa-0042` before that decision rather than discovering it through a wrong classification."
       ],
       "priority": "P2"
     },

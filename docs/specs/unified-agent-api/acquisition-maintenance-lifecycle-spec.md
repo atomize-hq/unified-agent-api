@@ -134,8 +134,11 @@ incomplete acquisition (`snapshots/<version>/union.json` has `complete: false`),
 | 1 | `EXIT_INTERNAL` | internal fault | yes |
 
 A computed 0 or 3 survives a failed `--emit-json` write (the stale projection is removed and a
-warning printed). The exit code is the product; the projection is advisory until `uaa-0025` is
-resolved.
+warning printed). The exit code is the product; the projection is advisory. **Corrected
+2026-09-23:** this sentence read "advisory until `uaa-0025` is resolved", which `56f13a39`
+resolved. Resolving it did not make the projection authoritative — it made the advisory status
+enforceable, by allocating a fresh projection directory per invocation and exporting its path only
+for exit 0 and exit 3, so a later step cannot read a file it was never told about.
 
 ---
 
@@ -359,6 +362,39 @@ The open items in §8.1 are not a queue to drain after T8. Five of them gate a T
 it. Recorded 2026-09-19, after `uaa-0029`, `uaa-0038`, `uaa-0043`, `uaa-0046` and `uaa-0047` landed
 in #216.
 
+**Re-derived 2026-09-23. Both groups below are now done, and no open item is a prereq for T4–T8.**
+The 2026-09-19 table was stale by construction: it was recorded before `uaa-0050` through
+`uaa-0055` were filed and before `uaa-0056` was deliberately not created. Every open item's trigger
+was re-checked against the tree rather than against its own note, and the result is one gated item,
+21 independent, and nothing retired:
+
+| class | items | note |
+|---|---|---|
+| **Prereq for a T** | *none* | The `uaa-0048` → `uaa-0045` → `uaa-0039` chain was the entire prerequisite set and is discharged. |
+| **Gated after T8** | `uaa-0019` | A *promotion* gate, not a closeout gate. It fires when a claude_code version is promoted, which T8 does not do. It will fire: `latest_validated` is 2.1.29 against a 2.1.267 packet, and the item records subtype drift observed as early as 2.1.63. |
+| **Independent** | `uaa-0023`, `uaa-0024`, `uaa-0027`, `uaa-0028`, `uaa-0033`, `uaa-0037`, `uaa-0040`, `uaa-0041`, `uaa-0042`, `uaa-0044`, `uaa-0049`, `uaa-0053`, `uaa-0054`, `uaa-0055`, plus the seven `agent_api.*` items outside this spec (`uaa-0002`, `uaa-0003`, `uaa-0008`, `uaa-0009`, `uaa-0010`, `uaa-0014`, `uaa-0021`) | None touches the T4–T8 path. The four whose adjacency was suspected are settled by construction rather than by judgement — see below. |
+| **No longer necessary** | *none* | Three retirement classes were tested and none retired an item: a trigger reading "before the first packet closeout" (now enforced by `uaa-0039`), an argument from `upstream_available_on` on a wrapper-only row (retired by `uaa-0051`), and any premise that opencode's global-flag model is enabled (reverted by `uaa-0052`). |
+
+Four verdicts rest on a structural fact rather than on severity, and are recorded here because the
+fact is what keeps them true:
+
+- `uaa-0024` (union-vs-per-target coherence) cannot gate anything here, because the audit reads
+  **exactly one** report: `select_report_path` returns a single path, preferring `coverage.any.json`.
+  Per-target reports are never cross-read, and the item's own kickoff puts its fix in the
+  report-generation lane.
+- `uaa-0033` (artifact bundle mismatch) is not adjacent to T4 despite both naming CI. T4 resolves
+  check-run conclusions pinned to a commit; the item concerns an uploaded artifact. `MaintenanceCloseout`
+  has no artifact or bundle field at all.
+- `uaa-0028` (`--emit-json` deletes what it names) had T3 as its trigger, and T3 did not fire it.
+  `prepare-agent-closeout` takes `--write`, not `--emit-json`, so T6 does not extend the surface either.
+- `uaa-0049` (codex agent-id branch) does not gate T6's output. The closeout's three write paths all
+  sit under `{maintenance_root}/**`, which `writable_surfaces` already grants every agent.
+
+One dependency outside this spec was found and is recorded on both items: **`uaa-0042` is a
+prerequisite for `uaa-0053`**, not for any T. No `wrapper_coverage.json` declares a command
+`unsupported` today, and deciding opencode's target surface across its 60 unwrapped commands is the
+most likely first such declaration.
+
 | group | items | lands |
 |---|---|---|
 | ~~Verdict visibility~~ **Done** | `uaa-0031`, `uaa-0025` — `uaa-0028` stayed open, because the chosen surface did not make the projection path durable. `uaa-0034` was pulled in and resolved with them | **Landed with T3.** `uaa-0031` decides the surface T3 renders to, and its deliverable reads "implemented with T3". T3 is the projection's first consumer, so `uaa-0025` cannot follow it. |
@@ -403,12 +439,33 @@ the open packets below. Each branch request's `target_version` and `version_poli
 the packet branch; re-derive this table again (`git fetch`, `gh pr list`) when T8 starts, because
 the watcher will have moved on.
 
-| packet | closed against | why |
-|---|---|---|
-| claude_code 2.1.236 (#195) | the packet branch | branch request reads `2.1.236` / `upstream_stable_pointer` |
-| opencode 1.18.29 (#205) | the packet branch | branch request reads `1.18.29` / `latest_stable_minus_one` |
-| codex 0.153.4 (#206) | the packet branch | branch request reads `0.153.4` / `latest_stable_minus_one` |
-| codex 0.144.6 (#153, merged) | a branch off `main` | already merged open; needs a catch-up pass |
+**Re-derived 2026-09-23.** All three rows moved, exactly as the paragraph above predicted. The
+2026-09-13 table read #195 / 2.1.236, #205 / 1.18.29 and #206 / 0.153.4; every one of those packets
+has been superseded. Current:
+
+| packet | branch | closed against | why |
+|---|---|---|---|
+| claude_code 2.1.267 (#211) | `automation/claude_code-maintenance-2.1.267` | the packet branch | branch request reads `2.1.267` / `upstream_stable_pointer` |
+| codex 0.155.0 (#220) | `automation/codex-maintenance-0.155.0` | the packet branch | branch request reads `0.155.0` / `latest_stable_minus_one` |
+| opencode 1.18.31 (#223) | `automation/opencode-maintenance-1.18.31` | the packet branch | branch request reads `1.18.31` / `latest_stable_minus_one` |
+| codex 0.144.6 (#153, merged) | — | a branch off `main` | already merged open; needs a catch-up pass |
+
+**The packet branch is not a preference — `staging` cannot close two of the three (established
+2026-09-23).** A closeout re-derives its wrapper-only baseline from the coverage report for the
+target version, and that report is committed by the acquisition run to the packet branch. On
+`staging` only codex's is present:
+
+| agent | reports on `staging` | live packet | request on `staging` |
+|---|---|---|---|
+| codex | `0.155.0` present | 0.155.0 (#220) | `0.155.0` |
+| claude_code | `2.1.29` only | 2.1.267 (#211) | `2.1.140` |
+| opencode | `1.14.47`, `1.4.11` | 1.18.31 (#223) | `1.14.49` |
+
+Run from a `staging` checkout, `wrapper_only_baseline` finds no version directory, returns `None`,
+and `uaa-0039`'s validator takes its `reject_unbound` path — whose message reads "has no coverage
+report for `<version>`". The refusal is correct and the diagnosis is wrong: the report exists, on
+the branch the maintainer is not on. T6 should make that message branch-aware, because the two
+conditions are indistinguishable from an absent directory and only one of them is a real gap.
 
 **Open decisions that gate a closeout.** Re-deriving the table above does not clear these; each
 stays until its backlog item records a maintainer decision. None is open: `uaa-0035` and `uaa-0036`
