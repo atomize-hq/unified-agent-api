@@ -1,8 +1,8 @@
 use serde::Serialize;
 
 use super::{
-    DeferredFindingsTruth, LinkedMaintenanceCloseout, MaintenanceCloseout,
-    MaintenanceCloseoutError, MaintenanceFinding,
+    support_audit_truth::WrapperOnlyDisposition, DeferredFindingsTruth, LinkedMaintenanceCloseout,
+    MaintenanceCloseout, MaintenanceCloseoutError, MaintenanceFinding,
 };
 
 #[derive(Debug, Serialize)]
@@ -14,9 +14,27 @@ struct SerializableMaintenanceCloseout<'a> {
     deferred_findings: Option<Vec<SerializableMaintenanceFinding<'a>>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     explicit_none_reason: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    wrapper_only_baseline_ref: Option<&'a str>,
+    #[serde(skip_serializing_if = "<[_]>::is_empty")]
+    wrapper_only_dispositions: Vec<SerializableWrapperOnlyDisposition<'a>>,
     preflight_passed: bool,
     recorded_at: &'a str,
     commit: &'a str,
+}
+
+#[derive(Debug, Serialize)]
+struct SerializableWrapperOnlyDisposition<'a> {
+    surface_kind: &'a str,
+    command_path: &'a str,
+    surface_id: &'a str,
+    category: &'a str,
+    evidence_ref: &'a str,
+    note: &'a str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    last_supported_version: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    follow_on: Option<&'a str>,
 }
 
 #[derive(Debug, Serialize)]
@@ -50,6 +68,12 @@ pub(crate) fn serialize_closeout_json(
             DeferredFindingsTruth::Findings(_) => None,
             DeferredFindingsTruth::ExplicitNone(reason) => Some(reason.as_str()),
         },
+        wrapper_only_baseline_ref: closeout.wrapper_only_baseline_ref.as_deref(),
+        wrapper_only_dispositions: closeout
+            .wrapper_only_dispositions
+            .iter()
+            .map(SerializableWrapperOnlyDisposition::from)
+            .collect(),
         preflight_passed: closeout.preflight_passed,
         recorded_at: &closeout.recorded_at,
         commit: &closeout.commit,
@@ -174,6 +198,21 @@ fn render_detected_release_context(linked: &LinkedMaintenanceCloseout) -> String
         )
     } else {
         "- no automated release detection metadata recorded".to_string()
+    }
+}
+
+impl<'a> From<&'a WrapperOnlyDisposition> for SerializableWrapperOnlyDisposition<'a> {
+    fn from(value: &'a WrapperOnlyDisposition) -> Self {
+        Self {
+            surface_kind: &value.surface.surface_kind,
+            command_path: &value.surface.command_path,
+            surface_id: &value.surface.surface_id,
+            category: value.category.as_id(),
+            evidence_ref: &value.evidence_ref,
+            note: &value.note,
+            last_supported_version: value.last_supported_version.as_deref(),
+            follow_on: value.follow_on.as_deref(),
+        }
     }
 }
 

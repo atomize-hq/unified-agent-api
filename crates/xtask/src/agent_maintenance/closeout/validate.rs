@@ -11,9 +11,12 @@ use crate::workspace_mutation::WorkspacePathJail;
 
 use super::super::{drift, request};
 use super::{
-    maintenance_pack_root, DeferredFindingsTruth, LinkedMaintenanceCloseout,
-    LoadedMaintenanceRequest, MaintenanceCloseout, MaintenanceCloseoutError,
-    MaintenanceDriftCategory, MaintenanceFinding,
+    maintenance_pack_root,
+    support_audit_truth::{
+        self, validate_dispositions, RawWrapperOnlyDisposition, WrapperOnlyDisposition,
+    },
+    DeferredFindingsTruth, LinkedMaintenanceCloseout, LoadedMaintenanceRequest,
+    MaintenanceCloseout, MaintenanceCloseoutError, MaintenanceDriftCategory, MaintenanceFinding,
 };
 
 #[derive(Debug, Clone, Deserialize)]
@@ -24,6 +27,8 @@ struct RawMaintenanceCloseout {
     resolved_findings: Option<Vec<RawMaintenanceFinding>>,
     deferred_findings: Option<Vec<RawMaintenanceFinding>>,
     explicit_none_reason: Option<String>,
+    wrapper_only_baseline_ref: Option<String>,
+    wrapper_only_dispositions: Option<Vec<RawWrapperOnlyDisposition>>,
     preflight_passed: bool,
     recorded_at: String,
     commit: String,
@@ -76,6 +81,7 @@ pub fn load_linked_closeout(
             ))
         })?;
     let closeout = validate_closeout(
+        workspace_root,
         &closeout_path,
         &request_path,
         &loaded_request.request_sha256,
@@ -85,6 +91,13 @@ pub fn load_linked_closeout(
         workspace_root,
         &closeout_path,
         &loaded_request.request.agent_id,
+        &closeout,
+    )?;
+    support_audit_truth::validate_live_support_audit_truth(
+        workspace_root,
+        &closeout_path,
+        &loaded_request.request.agent_id,
+        loaded_request.raw_detected_release.as_ref(),
         &closeout,
     )?;
     let maintenance_pack_root = maintenance_pack_root(&maintenance_pack_prefix);
@@ -110,6 +123,7 @@ pub fn load_request_artifact(
         .map_err(|err| map_request_error(&request_path, err))?;
     let maintenance_pack_prefix = request.maintenance_pack_prefix.clone();
     let maintenance_pack_root = PathBuf::from(&request.maintenance_root);
+    let raw_detected_release = request.detected_release.clone();
 
     Ok(LoadedMaintenanceRequest {
         request_path,
@@ -117,10 +131,12 @@ pub fn load_request_artifact(
         maintenance_pack_root,
         request_sha256: request.sha256.clone(),
         request: request.into(),
+        raw_detected_release,
     })
 }
 
 fn validate_closeout(
+    workspace_root: &Path,
     closeout_path: &Path,
     expected_request_path: &Path,
     expected_request_sha256: &str,
@@ -190,6 +206,16 @@ fn validate_closeout(
         }
     };
 
+    let wrapper_only_baseline_ref = raw
+        .wrapper_only_baseline_ref
+        .map(|value| validate_path_field(closeout_path, "wrapper_only_baseline_ref", &value))
+        .transpose()?;
+    let wrapper_only_dispositions: Vec<WrapperOnlyDisposition> = raw
+        .wrapper_only_dispositions
+        .map(|rows| validate_dispositions(workspace_root, closeout_path, rows))
+        .transpose()?
+        .unwrap_or_default();
+
     validate_rfc3339_utc(closeout_path, "recorded_at", &raw.recorded_at)?;
     validate_commit_shape(closeout_path, "commit", &raw.commit)?;
 
@@ -198,6 +224,8 @@ fn validate_closeout(
         request_sha256,
         resolved_findings,
         deferred_findings,
+        wrapper_only_baseline_ref,
+        wrapper_only_dispositions,
         preflight_passed: raw.preflight_passed,
         recorded_at: raw.recorded_at,
         commit: raw.commit,

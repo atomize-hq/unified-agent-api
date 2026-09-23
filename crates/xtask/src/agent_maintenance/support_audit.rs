@@ -514,6 +514,42 @@ pub(crate) fn surfaces_from_report_deltas(
         .map(|surfaces| surfaces.into_iter().collect())
 }
 
+// The wrapper-only lists: surfaces the wrapper claims that the union does not show. The report
+// writer omits each one when it is empty, exactly as it does for `intentionally_unsupported`, so
+// none of the three is required — claude_code's report carries no `wrapper_only_*` key at all.
+const WRAPPER_ONLY_LISTS: [ReportList; 3] = [
+    (
+        "wrapper_only_commands",
+        Some(ReportRowShape::Command),
+        false,
+    ),
+    ("wrapper_only_flags", Some(ReportRowShape::Flag), false),
+    ("wrapper_only_args", Some(ReportRowShape::Arg), false),
+];
+
+/// The wrapper-only rows a packet must adjudicate before it closes (`uaa-0039`), with the report
+/// they came from so the closeout can bind the evidence it judged. `None` when the agent has no
+/// coverage report for that version, which is the pre-acquisition case rather than a clean one.
+pub(crate) fn wrapper_only_baseline(
+    workspace_root: &Path,
+    entry: &AgentRegistryEntry,
+    target_version: &str,
+) -> Result<Option<(String, BTreeSet<SurfaceIdentity>)>, String> {
+    let Some(report) = load_live_report_if_present(workspace_root, entry, target_version)? else {
+        return Ok(None);
+    };
+    let surfaces = surfaces_from_report_lists(
+        &entry.agent_id,
+        &report.path,
+        &report.deltas,
+        &WRAPPER_ONLY_LISTS,
+    )?;
+    Ok(Some((
+        repo_relative(workspace_root, &report.path)?,
+        surfaces,
+    )))
+}
+
 fn surfaces_from_report_lists(
     agent_id: &str,
     report_path: &Path,
