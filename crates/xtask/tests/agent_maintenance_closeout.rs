@@ -13,6 +13,11 @@ mod stand_down {
     pub use xtask::agent_maintenance::stand_down::*;
 }
 
+// Likewise `evidence.rs`, whose default fetcher reuses the watcher's hardened `fetch_text`.
+mod watch {
+    pub use xtask::agent_maintenance::watch::*;
+}
+
 mod agent_lifecycle {
     pub use xtask::agent_lifecycle::*;
 }
@@ -61,6 +66,8 @@ mod harness;
 #[path = "support/agent_maintenance_harness.rs"]
 mod maintenance_harness;
 
+#[path = "agent_maintenance_closeout/evidence.rs"]
+mod evidence;
 #[path = "agent_maintenance_closeout/live_drift_validation.rs"]
 mod live_drift_validation;
 #[path = "agent_maintenance_closeout/request_and_schema.rs"]

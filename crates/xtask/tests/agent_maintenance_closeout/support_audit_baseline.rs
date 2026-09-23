@@ -468,35 +468,99 @@ fn closeout_refuses_when_the_stand_down_cannot_be_confirmed() {
     );
 }
 
-#[test]
-fn a_request_without_a_detected_release_is_not_gated() {
-    // No detected release means no packet generation for a marker to name and no cron job
-    // regenerating it, so there is nothing to freeze against.
-    let fixture = fixture_root("uaa-0039-gate-manual");
+/// Seed a manual (ungated) closeout fixture and return the repository head the closeout records.
+fn manual_closeout_fixture(prefix: &str) -> (std::path::PathBuf, String) {
+    let fixture = fixture_root(prefix);
     seed_opencode_basis(&fixture);
+    let head = crate::closeout_harness::init_git_fixture(&fixture);
     let request_absolute = fixture.join(REQUEST_PATH);
     write_text(
         &request_absolute,
         &crate::closeout_harness::maintenance_request_toml("opencode", BASIS_REF),
     );
+    (fixture, head)
+}
+
+fn write_closeout_at_commit(fixture: &Path, commit: &str) {
+    let request_absolute = fixture.join(REQUEST_PATH);
+    let mut closeout = valid_closeout(REQUEST_PATH, &sha256_hex(&request_absolute));
+    closeout["commit"] = json!(commit);
     write_text(
         &fixture.join(CLOSEOUT_PATH),
-        &serde_json::to_string_pretty(&valid_closeout(
-            REQUEST_PATH,
-            &sha256_hex(&request_absolute),
-        ))
-        .expect("serialize closeout"),
+        &serde_json::to_string_pretty(&closeout).expect("serialize closeout"),
     );
+}
 
+fn run_closeout(fixture: &Path) -> Result<Vec<u8>, String> {
     let mut stdout = Vec::new();
     crate::closeout::run_in_workspace(
-        &fixture,
+        fixture,
         crate::closeout::Args {
             request: std::path::PathBuf::from(REQUEST_PATH),
             closeout: std::path::PathBuf::from(CLOSEOUT_PATH),
         },
         &mut stdout,
     )
-    .expect("a manual closeout passes the gate");
+    .map(|()| stdout)
+    .map_err(|err| err.to_string())
+}
+
+#[test]
+fn a_request_without_a_detected_release_is_not_gated() {
+    // No detected release means no packet generation for a marker to name and no cron job
+    // regenerating it, so there is nothing to freeze against.
+    let (fixture, head) = manual_closeout_fixture("uaa-0039-gate-manual");
+    write_closeout_at_commit(&fixture, &head);
+
+    let stdout = run_closeout(&fixture).expect("a manual closeout passes the gate");
     assert!(String::from_utf8_lossy(&stdout).contains("close-agent-maintenance write complete"));
+}
+
+/// T4's companion hardening. `validate_commit_shape` accepts any 7-40 lowercase hex string and
+/// compares it to nothing, so a shaped-but-fabricated commit reads as verified. Without this, a T4
+/// resolving evidence against the wrong revision emits an artifact that validates clean.
+#[test]
+fn a_commit_this_repository_has_never_contained_blocks_closeout() {
+    let (fixture, _head) = manual_closeout_fixture("t4-binding-absent");
+    write_closeout_at_commit(&fixture, "4adefdf");
+
+    let err = run_closeout(&fixture).expect_err("a fabricated commit must not close");
+    assert!(err.contains("is not a commit in this repository"), "{err}");
+    assert!(err.contains("It is shaped like one"), "{err}");
+}
+
+/// Reachability, not equality: committing the closeout moves the head, so an equality check would
+/// be unsatisfiable by construction. A commit on an unrelated branch is still refused.
+#[test]
+fn a_commit_that_is_not_reachable_from_head_blocks_closeout() {
+    let (fixture, head) = manual_closeout_fixture("t4-binding-unreachable");
+    let git = |args: &[&str]| {
+        let out = std::process::Command::new("git")
+            .current_dir(&fixture)
+            .args(args)
+            .output()
+            .expect("git");
+        assert!(
+            out.status.success(),
+            "git {args:?}: {}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        String::from_utf8(out.stdout)
+            .expect("utf-8")
+            .trim()
+            .to_string()
+    };
+    git(&["switch", "--quiet", "-c", "elsewhere"]);
+    git(&["commit", "--quiet", "--allow-empty", "-m", "elsewhere"]);
+    let unreachable = git(&["rev-parse", "HEAD"]);
+    git(&["switch", "--quiet", "main"]);
+
+    write_closeout_at_commit(&fixture, &unreachable);
+    let err = run_closeout(&fixture).expect_err("an unreachable commit must not close");
+    assert!(err.contains("is not reachable from `HEAD`"), "{err}");
+
+    // The same fixture closes once it records a reachable commit, so the refusal is the binding
+    // and not the fixture.
+    write_closeout_at_commit(&fixture, &head);
+    run_closeout(&fixture).expect("a reachable commit closes");
 }
