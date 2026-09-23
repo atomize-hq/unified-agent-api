@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at_utc": "2026-09-22T02:00:00Z",
+  "updated_at_utc": "2026-09-23T19:56:09Z",
   "items": [
     {
       "id": "uaa-0022",
@@ -2002,6 +2002,44 @@
         "Not on the lifecycle spec's critical path. uaa-0039 needs concrete excluded rows, which this preserves either way."
       ],
       "priority": "P3"
+    },
+    {
+      "id": "uaa-0056",
+      "title": "runtime_evidence_drift has no closeout category, so an affected packet has no valid closeout",
+      "status": "todo",
+      "bucket": "agent_api.maintenance",
+      "type": "defect",
+      "kickoff": {
+        "prompt": [
+          "Work item: uaa-0056 - reconcile the two drift-category enums, or declare the asymmetry deliberate.",
+          "drift::DriftCategory has six variants; closeout::MaintenanceDriftCategory has five. runtime_evidence_drift is the one with no counterpart, and MaintenanceDriftCategory::parse rejects that id.",
+          "The two halves of the closeout validator make that unsatisfiable rather than merely awkward. validate_live_drift_report requires every live drift signature to appear in deferred_findings, and validate_finding rejects any category id parse does not accept. So a packet whose live drift includes a runtime_evidence finding has no valid closeout at all: the finding must be recorded and cannot be.",
+          "Latent today, not live. inspect_runtime_evidence returns None unless the agent's lifecycle stage is runtime_integrated. Measured 2026-09-23: codex is published, and claude_code, opencode, aider and gemini_cli are closed_baseline. The first agent to reach runtime_integrated makes this reachable.",
+          "T5 refuses on it rather than emitting a category it knows the validator rejects, so the failure is a clear refusal naming the repair rather than a rejected artifact. That refusal is the trigger point; this item is the fix.",
+          "Steps:",
+          "1) Decide which enum is wrong. Either the closeout should be able to express runtime_evidence_drift, or runtime evidence should be a repair-before-closeout precondition that never reaches the deferred set.",
+          "2) If the closeout gains the category, note that widening MaintenanceDriftCategory::parse makes the frozen validator accept more. The lifecycle spec's section 4 permits adding a check, not relaxing one; this needs the maintainer's decision, not a generator's.",
+          "3) If runtime evidence stays a precondition, say so in the contract rather than leaving it as a refusal T5 happens to emit, and check whether check-agent-drift should separate 'blocks closeout' from 'defer-able'.",
+          "4) Either way, add a test that the two enums cannot silently diverge again."
+        ],
+        "files_to_read": [
+          "crates/xtask/src/agent_maintenance/drift/mod.rs",
+          "crates/xtask/src/agent_maintenance/drift/runtime_evidence.rs",
+          "crates/xtask/src/agent_maintenance/closeout/types.rs",
+          "crates/xtask/src/agent_maintenance/closeout/validate.rs",
+          "crates/xtask/src/agent_maintenance/closeout/findings.rs"
+        ],
+        "deliverables": [
+          "A decision recorded in the lifecycle spec on whether runtime evidence is expressible or a precondition",
+          "A test that fails if DriftCategory gains a variant MaintenanceDriftCategory cannot express"
+        ]
+      },
+      "notes": [
+        "Raised 2026-09-23 while building T5. Found by reading the two enums against each other rather than by any failure: nothing reports it today because no agent is runtime_integrated.",
+        "Does not gate T4-T8. T5 refuses on it, T6 inherits that refusal, and T8's three packets are all on agents that cannot produce the finding.",
+        "The asymmetry is easy to reintroduce: DriftCategory is the richer enum and gains variants as detectors are added, while MaintenanceDriftCategory only changes when the artifact schema does."
+      ],
+      "priority": "P2"
     }
   ]
 }
