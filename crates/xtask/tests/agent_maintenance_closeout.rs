@@ -8,6 +8,11 @@ mod agent_registry {
     pub use xtask::agent_registry::*;
 }
 
+// `closeout.rs` is pulled in by path, so its `super::stand_down` needs a sibling here.
+mod stand_down {
+    pub use xtask::agent_maintenance::stand_down::*;
+}
+
 mod agent_lifecycle {
     pub use xtask::agent_lifecycle::*;
 }
@@ -60,6 +65,8 @@ mod maintenance_harness;
 mod live_drift_validation;
 #[path = "agent_maintenance_closeout/request_and_schema.rs"]
 mod request_and_schema;
+#[path = "agent_maintenance_closeout/support_audit_baseline.rs"]
+mod support_audit_baseline;
 #[path = "agent_maintenance_closeout/write_outputs.rs"]
 mod write_outputs;
 

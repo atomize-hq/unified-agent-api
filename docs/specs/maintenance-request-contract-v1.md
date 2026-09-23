@@ -282,8 +282,9 @@ Field invariants:
    or `excluded_by_rules` row from the debt inventory, or correct the wrapper coverage or parity
    exclusion that disagrees with it. Retire a `not_observed` row only with evidence that upstream
    removed the surface; if upstream hides it instead, keep it observable with a supplement, which
-   today can carry only commands (`uaa-0040`). The closeout check for this invariant lands with T8
-   (`uaa-0039`).
+   today can carry only commands (`uaa-0040`). `close-agent-maintenance` enforces this by deriving
+   the audit live rather than reading the frozen block, because a request that records the same
+   unmatched rows as the live audit reconciles `exact` and would otherwise close (`uaa-0039`).
 7. If this block is absent, malformed, or derived partly from prompt prose instead of shared code,
    the packet is invalid.
 
@@ -324,8 +325,31 @@ absent from the union, and that absence is not evidence that upstream removed it
   but still supported, supported only on older upstream versions, obsolete, or a discovery bug.
 - A wrapper-only surface sorted obsolete MUST contract publication truth in the same run, or the
   packet is invalid.
-- The record for these categories and the closeout check that enforces them land with T8
-  (`uaa-0039`, `docs/specs/unified-agent-api/acquisition-maintenance-lifecycle-spec.md` §8 T8).
+- The record is `wrapper_only_dispositions[]` in the closeout artifact, and
+  `close-agent-maintenance` enforces it (`uaa-0039`). Each entry carries the surface identity
+  (`surface_kind`, `command_path`, `surface_id`), a `category`, an `evidence_ref` that MUST resolve
+  to a file in the repository, and a non-empty `note`. `older_upstream_only` MUST also carry
+  `last_supported_version`; `discovery_bug` MUST also carry `follow_on`. Neither field is allowed on
+  any other category, so a row cannot imply tracking its category never established.
+
+| `category` | Means | Additional evidence |
+| --- | --- | --- |
+| `hidden_upstream_supported` | Upstream still ships it but hides it from help | — |
+| `older_upstream_only` | Upstream shipped it in an earlier version | `last_supported_version` |
+| `obsolete` | Upstream removed it and the wrapper claim is withdrawn | the contraction itself |
+| `discovery_bug` | The union should have shown it; acquisition is at fault | `follow_on` |
+
+- The closeout binds the report it adjudicated in `wrapper_only_baseline_ref`, which MUST be the
+  report `select_report_path` chooses — `coverage.any.json` whenever it exists. The binding is
+  required because a row correctly sorted obsolete is gone from the regenerated report by the time
+  closeout runs: judged against the final set alone, its disposition would look extraneous. Both
+  fields are omitted when the agent has no wrapper-only row and records no disposition, and MUST be
+  omitted when the request declares no detected release, because nothing then binds a version.
+- Enforcement re-derives from the repository rather than reading the artifact's claims. A
+  disposition sorted `obsolete` whose surface is still in the live wrapper-only report is rejected:
+  that is what "contract publication truth in the same run" means once the claim is withdrawn and
+  the report regenerated. A live wrapper-only row with no disposition is rejected, as is a
+  disposition for a surface that is neither live nor sorted `obsolete`.
 
 ## Universal execution-contract shape
 

@@ -6,6 +6,7 @@ use std::{
 use clap::Parser;
 
 use super::super::{finding_signature::FindingSignature, request};
+use super::support_audit_truth::WrapperOnlyDisposition;
 use crate::workspace_mutation::{ApplySummary, WorkspaceMutationError};
 
 #[derive(Debug, Parser, Clone)]
@@ -72,6 +73,12 @@ pub struct MaintenanceCloseout {
     pub request_sha256: String,
     pub resolved_findings: Vec<MaintenanceFinding>,
     pub deferred_findings: DeferredFindingsTruth,
+    /// The coverage report whose wrapper-only rows `wrapper_only_dispositions` adjudicates
+    /// (`uaa-0039`). Recorded rather than re-derived because a row correctly sorted `obsolete` is
+    /// gone from the live report by the time closeout runs, so the final set cannot identify what
+    /// was judged. Checked against the report the support audit selects today.
+    pub wrapper_only_baseline_ref: Option<String>,
+    pub wrapper_only_dispositions: Vec<WrapperOnlyDisposition>,
     pub preflight_passed: bool,
     pub recorded_at: String,
     pub commit: String,
@@ -118,6 +125,9 @@ pub struct LoadedMaintenanceRequest {
     pub maintenance_pack_root: PathBuf,
     pub request_sha256: String,
     pub request: MaintenanceRequest,
+    /// Kept in the request's own shape because the support audit derives from it directly
+    /// (`uaa-0039`); the converted `MaintenanceRequest` above is the closeout's narrower view.
+    pub(crate) raw_detected_release: Option<request::DetectedRelease>,
 }
 
 #[derive(Debug, Clone)]

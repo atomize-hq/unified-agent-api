@@ -221,6 +221,10 @@ pub fn valid_closeout_struct(
                 ],
             },
         ]),
+        // This packet's request carries no detected release, so no wrapper-only baseline is bound
+        // and no disposition is owed (`uaa-0039`).
+        wrapper_only_baseline_ref: None,
+        wrapper_only_dispositions: Vec::new(),
         preflight_passed: true,
         recorded_at: "2026-04-22T01:45:00Z".to_string(),
         commit: "4adefdf".to_string(),
