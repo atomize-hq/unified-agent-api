@@ -93,10 +93,12 @@ cargo run -p xtask -- maintenance-audit-status \
   --emit-json _ci_tmp/audit/status.json
 
 # NEW — generate a closeout artifact from run evidence. Fails closed.
+# Corrected 2026-09-24: this block previously declared `--preflight-run <github-run-id |
+# --preflight-from-ci>`. That surface is withdrawn; see the note below the fence.
 cargo run -p xtask -- prepare-agent-closeout \
   --request <path/to/maintenance-request.toml> \
   --commit <sha> \
-  --preflight-run <github-run-id | --preflight-from-ci> \
+  --recorded-at <rfc3339-utc> \
   --write
 
 # NEW — ask whether automation still has authority over a packet generation. Read-only, and
@@ -116,6 +118,32 @@ cargo run -p xtask -- close-agent-maintenance \
   --request <path/to/maintenance-request.toml> \
   --closeout <path/to/maintenance-closeout.json>
 ```
+
+**`prepare-agent-closeout` takes no run id (corrected 2026-09-24).** The withdrawn
+`--preflight-run` moved the fail-closed guarantee out of the tool and into the operator. T4 refuses
+to rank or filter candidate runs precisely so that re-running CI until it is green cannot change the
+recorded conclusion; a caller-supplied run id restores exactly that steering, because the operator
+chooses which run to hand over and nothing downstream can tell a chosen run from the only run. The
+conclusion is therefore resolved from the commit alone, under the selection policy stated in T4
+below. `--preflight-from-ci` is withdrawn with it and was never implementable: the run that prepares
+a closeout cannot supply its own conclusion, because T4 refuses any run that is not `completed`, and
+`close-agent-maintenance` runs in neither CI nor `make preflight`.
+
+**`--recorded-at` is an argument, not a clock (stated 2026-09-24).** It mirrors
+`prepare-agent-maintenance`'s `--request-recorded-at`, and it satisfies §5's determinism rule the way
+that command does: re-supplying the committed value reproduces the artifact byte for byte, while a
+caller that passes the real time records the truth. `SOURCE_DATE_EPOCH` must **not** be consulted for
+this field — `parity-acquire.yml` derives it from the upstream publish time, so honouring it would
+assert that the maintainer closed the packet on the day upstream shipped the release.
+
+**`wrapper_only_dispositions` is not an input and is not derived (stated 2026-09-24).** Each
+disposition is a judgement about why the wrapper claims a surface upstream's help does not show, and
+the four categories are indistinguishable from repository state alone. `prepare-agent-closeout`
+therefore refuses when a live wrapper-only row has no disposition, naming each unadjudicated row, and
+that refusal is the work queue. A separate durable disposition file is **not** the answer — see
+`uaa-0039`, "one list, one authority, never a durable copy beside a per-run copy". The direction of
+travel that item records is that the two durable categories migrate into the wrapper-coverage
+generator, which is an ordinary PR merge and so adds no human-in-the-loop point.
 
 Exit codes follow the established convention: `2` for validation failure (the artifact or the
 evidence is wrong), `1` for internal error. `maintenance-audit-status` additionally uses `3` for
@@ -150,12 +178,12 @@ for exit 0 and exit 3, so a later step cannot read a file it was never told abou
 crates/xtask/src/agent_maintenance/audit_status.rs        # piece 1: derive + emit audit JSON
 crates/xtask/src/agent_maintenance/stand_down.rs          # uaa-0048: packet ownership predicate
 crates/xtask/src/agent_maintenance/stand_down/tests.rs
-crates/xtask/src/agent_maintenance/prepare_closeout.rs    # piece 2: closeout generation
-crates/xtask/src/agent_maintenance/prepare_closeout/
-    evidence.rs                                           # CI-conclusion resolution, commit-pinned
-    findings.rs                                           # derive resolved_findings from written surfaces
+crates/xtask/src/agent_maintenance/prepare_closeout.rs    # piece 2: closeout generation (T6)
+crates/xtask/src/agent_maintenance/closeout/evidence.rs   # T4: CI-conclusion resolution, commit-pinned
+crates/xtask/src/agent_maintenance/closeout/findings.rs   # T5: derive resolved_findings from written surfaces
 crates/xtask/tests/agent_maintenance_uplift_gate.rs
-crates/xtask/tests/agent_maintenance_closeout_generation.rs
+crates/xtask/tests/agent_maintenance_closeout/evidence.rs
+crates/xtask/tests/agent_maintenance_closeout/findings.rs
 ```
 
 ### Changed files
@@ -345,8 +373,28 @@ its invariant is that a request generation's bytes are stable while that generat
 (`registry_manifest_drift`, `support_publication_drift`) with real surface lists; choose
 `explicit_none_reason` vs `deferred_findings` from the live drift report.
 
-**T6 — `prepare-agent-closeout` command.** Compose T4 + T5, emit the artifact, and self-verify by
-running the real `validate_closeout` before writing.
+**T6 — `prepare-agent-closeout` command.** Compose T4 + T5, emit the artifact, and self-verify
+through the validator's real input path.
+
+**Self-verification writes first and validates second (corrected 2026-09-24).** The earlier wording,
+"self-verify by running the real `validate_closeout` before writing", is not satisfiable.
+`load_linked_closeout` is the only public validating entry and it is path-addressed:
+`maintenance_pack_prefix_from_closeout_path` requires exactly six path components ending in the
+literal `maintenance-closeout.json`, so a candidate written under a temporary name or into a
+temporary directory is refused on its path before its bytes are read. T6 therefore writes the
+canonical path, validates it through `load_linked_closeout`, and on refusal restores the previous
+bytes — or, where no closeout existed, names the invalid file it has left behind. Widening the
+validator to accept a candidate path is not an alternative: §4 makes it the fixed authority T6 must
+satisfy unmodified, and the guarantee here is that the bytes validated are the bytes on disk.
+
+T6 also owes the branch-aware `reject_unbound` message described under T8 sequencing, and must call
+the commit binding explicitly rather than assume the validator covers it.
+
+**T6 does not author `wrapper_only_dispositions`.** It carries forward the dispositions already
+recorded for surfaces that are still live, and refuses when a live wrapper-only row has none, naming
+each unadjudicated row. See the note under §3. This means a packet whose rows have never been
+adjudicated cannot be closed by T6 alone — which is the mechanism reporting a missing human
+judgement, not a gap in T6.
 
 **T7 — Docs.** Plan doc §18; operator guide gains closeout as an explicit lifecycle step; the
 §13 maintainer checklist gains the step it currently omits.
@@ -716,7 +764,12 @@ without it, so that run still hard-fails with nothing committed.
 1. An acquisition run whose release adds no surface emits a closeout-ready marker; one that adds
    surface emits a relay invocation and does not mark closeout-ready.
 2. `prepare-agent-closeout` produces an artifact that `close-agent-maintenance` accepts with **no
-   hand editing**, for all three live packets.
+   hand editing**, for all three live packets. Qualified 2026-09-24: "no hand editing" is a property
+   of the *artifact*, not a claim that no judgement was required to reach it. Every live wrapper-only
+   row must already carry a disposition, because those are adjudications and §3 records that T6
+   neither derives nor invents them. Measured that day, claude_code and opencode have zero such rows
+   and satisfy this criterion outright; codex has 32 and satisfies it once they are adjudicated. T6
+   refusing on an unadjudicated row is this criterion being enforced, not missed.
 3. The generator refuses to emit when CI evidence for the recorded SHA is missing or not green,
    and says why.
 4. No existing validation rule was relaxed.
