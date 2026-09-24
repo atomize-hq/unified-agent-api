@@ -48,6 +48,8 @@ mod closeout;
 mod contract_policy;
 #[path = "../src/agent_maintenance/drift/mod.rs"]
 mod drift;
+#[path = "../src/agent_maintenance/prepare_closeout.rs"]
+mod prepare_closeout;
 #[path = "../src/release_doc.rs"]
 mod release_doc;
 #[path = "../src/agent_maintenance/request.rs"]
@@ -72,6 +74,8 @@ mod evidence;
 mod findings;
 #[path = "agent_maintenance_closeout/live_drift_validation.rs"]
 mod live_drift_validation;
+#[path = "agent_maintenance_closeout/prepare_closeout.rs"]
+mod prepare_closeout_tests;
 #[path = "agent_maintenance_closeout/request_and_schema.rs"]
 mod request_and_schema;
 #[path = "agent_maintenance_closeout/support_audit_baseline.rs"]

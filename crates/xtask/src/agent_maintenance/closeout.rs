@@ -26,7 +26,10 @@ pub use self::evidence::{
     ResolvedPreflight,
 };
 pub use self::findings::{derive_findings, derive_findings_from_report, DerivedFindings};
-pub use self::support_audit_truth::{WrapperOnlyCategory, WrapperOnlyDisposition};
+pub(crate) use self::render::serialize_closeout_json;
+pub use self::support_audit_truth::{
+    read_recorded_dispositions, WrapperOnlyCategory, WrapperOnlyDisposition,
+};
 pub(super) use self::types::maintenance_pack_root;
 pub use self::types::{
     Args, CloseoutWriteSummary, DeferredFindingsTruth, LinkedMaintenanceCloseout,
@@ -98,7 +101,7 @@ pub fn run_in_workspace<W: Write>(
 /// directories. `close-agent-maintenance` runs in neither CI nor `make preflight`, so this adds a
 /// git dependency to no automated gate. The cost is that a future third entry point could skip it;
 /// T6 must call this explicitly rather than assume the validator covers it.
-fn require_commit_binding(
+pub fn require_commit_binding(
     workspace_root: &Path,
     commit: &str,
 ) -> Result<(), MaintenanceCloseoutError> {
@@ -237,7 +240,7 @@ fn require_stand_down(
     )))
 }
 
-fn resolve_workspace_root() -> Result<PathBuf, MaintenanceCloseoutError> {
+pub(crate) fn resolve_workspace_root() -> Result<PathBuf, MaintenanceCloseoutError> {
     let current_dir = std::env::current_dir()
         .map_err(|err| MaintenanceCloseoutError::Internal(format!("current_dir: {err}")))?;
     for candidate in current_dir.ancestors() {
