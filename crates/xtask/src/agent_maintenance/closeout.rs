@@ -1,5 +1,7 @@
 #[path = "closeout/evidence.rs"]
 mod evidence;
+#[path = "closeout/findings.rs"]
+mod findings;
 #[path = "closeout/render.rs"]
 mod render;
 #[path = "closeout/support_audit_truth.rs"]
@@ -23,6 +25,7 @@ pub use self::evidence::{
     reject_merge_commit, resolve_preflight, resolve_preflight_with_fetcher, EvidenceRun,
     ResolvedPreflight,
 };
+pub use self::findings::{derive_findings, derive_findings_from_report, DerivedFindings};
 pub use self::support_audit_truth::{WrapperOnlyCategory, WrapperOnlyDisposition};
 pub(super) use self::types::maintenance_pack_root;
 pub use self::types::{

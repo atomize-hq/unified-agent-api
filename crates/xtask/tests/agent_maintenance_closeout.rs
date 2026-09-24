@@ -68,6 +68,8 @@ mod maintenance_harness;
 
 #[path = "agent_maintenance_closeout/evidence.rs"]
 mod evidence;
+#[path = "agent_maintenance_closeout/findings.rs"]
+mod findings;
 #[path = "agent_maintenance_closeout/live_drift_validation.rs"]
 mod live_drift_validation;
 #[path = "agent_maintenance_closeout/request_and_schema.rs"]
