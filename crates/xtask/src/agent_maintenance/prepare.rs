@@ -31,6 +31,10 @@ use super::{
     support_audit::{derive_support_surface_audit, SupportSurfaceAudit},
 };
 
+#[path = "prepare/from_request.rs"]
+mod from_request;
+pub use from_request::{args_from_request, args_from_request_in_workspace};
+
 #[derive(Debug, Parser, Clone)]
 #[command(group(
     ArgGroup::new("mode")

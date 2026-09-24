@@ -90,7 +90,7 @@ jobs:
         with:
           ref: staging
       - uses: dtolnay/rust-toolchain@stable
-      # Destructive boundary 1 of 3: request regeneration. `prepare-agent-maintenance --write`
+      # Destructive boundary 1 of 4: request regeneration. `prepare-agent-maintenance --write`
       # rewrites `request_recorded_at`, and `request.rs` digests the whole request file, so this
       # step alone invalidates a closeout bound to the previous generation — committed or not.
       #
@@ -206,7 +206,7 @@ jobs:
               ;;
           esac
           rm -f _ci_tmp_gate.err _ci_tmp_gate.json
-      # Destructive boundary 2 of 3: branch replacement and packet-body replacement, and the only
+      # Destructive boundary 2 of 4: branch replacement and packet-body replacement, and the only
       # boundary that mutates the remote. Asked again against a *freshly fetched* base rather than
       # the checkout taken at job start: `create-pull-request` resets the packet branch to current
       # base, so a marker a maintainer lands mid-run is live by the time the push happens, while a
@@ -326,7 +326,7 @@ jobs:
 
             lower_version="$(printf '%s\n%s\n' "$candidate_version" "$TARGET_VERSION" | sort -V | head -n1)"
             if [[ "$candidate_version" != "$TARGET_VERSION" && "$lower_version" == "$candidate_version" ]]; then
-              # Destructive boundary 3 of 3: supersession, and the only one that asks about a
+              # Destructive boundary 3 of 4: supersession, and the only one that asks about a
               # packet other than this run's. A newer version opens a different branch, so its run
               # is in a different concurrency group and can close an older packet while a
               # maintainer is mid-closeout on it. The question is therefore asked about the

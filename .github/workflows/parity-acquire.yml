@@ -557,6 +557,58 @@ jobs:
           cargo run -p xtask -- support-matrix
           cargo run -p xtask -- manifest-validate --root "$ROOT"
 
+      # Destructive boundary 4 of 4: request re-freeze. The packet was frozen before its target
+      # artifacts existed, so its frozen audit is a placeholder that no strict loader accepts
+      # (`uaa-0058`). This completes the same generation: `request_recorded_at` and
+      # `request_commit` are preserved.
+      #
+      # Like the other three boundaries, ask the stand-down question again against a freshly
+      # fetched base through `--from-ref`: a re-run replays the original event's `GITHUB_SHA`.
+      - name: Re-freeze the maintenance request against the acquired artifacts
+        id: refreeze
+        if: ${{ inputs.commit }}
+        shell: bash
+        env:
+          AGENT_ID: ${{ inputs.agent_id }}
+          VERSION: ${{ inputs.target_version }}
+        run: |
+          set -euo pipefail
+          REQUEST_PATH="docs/agents/lifecycle/${AGENT_ID}-maintenance/governance/maintenance-request.toml"
+
+          if [ ! -f "$REQUEST_PATH" ]; then
+            echo "::notice title=Maintenance request missing::${REQUEST_PATH} does not exist; leaving the maintenance audit gate to report the packet state."
+            echo "refrozen=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          cargo build -p xtask
+          git fetch --depth=1 --no-tags origin staging
+
+          set +e
+          ./target/debug/xtask maintenance-stand-down-check \
+            --agent "$AGENT_ID" \
+            --target-version "$VERSION" \
+            --from-ref FETCH_HEAD
+          status=$?
+          set -e
+
+          case "$status" in
+            0)
+              ;;
+            3)
+              echo "::notice title=Packet stood down::${AGENT_ID} ${VERSION} has a valid stand-down marker on staging; skipping request re-freeze."
+              echo "refrozen=false" >> "$GITHUB_OUTPUT"
+              exit 0
+              ;;
+            *)
+              echo "::error title=Stand-down check failed::could not determine authority to re-freeze ${AGENT_ID} ${VERSION} (exit ${status})." >&2
+              exit 1
+              ;;
+          esac
+
+          ./target/debug/xtask prepare-agent-maintenance --from-request "$REQUEST_PATH" --write
+          echo "refrozen=true" >> "$GITHUB_OUTPUT"
+
       - name: Maintenance audit gate
         id: maintenance_audit
         shell: bash
@@ -802,7 +854,8 @@ jobs:
             "${ROOT}/wrapper_coverage.json" \
             "${ROOT}/artifacts.lock.json" \
             cli_manifests/support_matrix/current.json \
-            docs/specs/unified-agent-api/support-matrix.md
+            docs/specs/unified-agent-api/support-matrix.md \
+            "docs/agents/lifecycle/${AGENT_ID}-maintenance"
 
           # The verdict artifact reports the audit and the delivery separately, so a blocking
           # verdict is never mistaken for a failed push and a failed push never masquerades as a
@@ -860,6 +913,9 @@ jobs:
             ${{ needs.plan.outputs.manifest_root }}/versions/${{ inputs.target_version }}.json
             ${{ needs.plan.outputs.manifest_root }}/wrapper_coverage.json
             ${{ needs.plan.outputs.manifest_root }}/artifacts.lock.json
+            cli_manifests/support_matrix/current.json
+            docs/specs/unified-agent-api/support-matrix.md
+            docs/agents/lifecycle/${{ inputs.agent_id }}-maintenance/
 
       # The one durable channel for this run's verdict. A blocking verdict fails this job by
       # design, and GitHub empties a failed job's outputs, so a caller cannot learn exit 2, exit 4
