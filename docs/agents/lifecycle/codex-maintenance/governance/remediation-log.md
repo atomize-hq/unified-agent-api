@@ -6,7 +6,7 @@ Refresh planned from `docs/agents/lifecycle/codex-maintenance/governance/mainten
 
 - basis ref: `cli_manifests/codex/latest_validated.txt`
 - trigger kind: `upstream_release_detected`
-- request sha256: `a62759aebefb15f03ef2aa0114e98ac07fa9abf12054ebe01bfb9e50b7caf037`
+- request sha256: `1f63d1746ea184aaaa9604b294b318ebb43aaf2bca48c179ea819a1f0ece9f12`
 - canonical handoff: `docs/agents/lifecycle/codex-maintenance/HANDOFF.md`
 - derivative pr summary: `docs/agents/lifecycle/codex-maintenance/governance/pr-summary.md`
 
