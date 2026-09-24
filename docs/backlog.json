@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at_utc": "2026-09-24T23:27:02Z",
+  "updated_at_utc": "2026-09-24T23:35:00Z",
   "items": [
     {
       "id": "uaa-0022",
@@ -2311,6 +2311,39 @@
         "Under the current derivation, the 481 report gaps are the uplift queue: every gap is an uplift unless a debt row authorizes it at the target version. That is why the queue is 481: 473 new surfaces plus 8 debt rows not yet re-authorized. This supersedes the `uaa-0045` caution written when the queue was empty."
       ],
       "priority": "P2"
+    },
+    {
+      "id": "uaa-0067",
+      "title": "run_json_timeout_after_stdout_eof_reaps_child flakes under load on its one-second event timeouts",
+      "status": "todo",
+      "bucket": "agent_api.exec",
+      "type": "defect",
+      "kickoff": {
+        "prompt": [
+          "Work item: uaa-0067 — capture why run_json_timeout_after_stdout_eof_reaps_child loses its second event under load before changing the test.",
+          "Observed once, 2026-09-24, in a local make preflight run on a docs-only commit that touched no Rust. unix::run_json_timeout_after_stdout_eof_reaps_child in crates/opencode/tests/run_json_timeout_reaps_child.rs panicked at line 94 with 'stream open': the event stream ended before the second event arrived.",
+          "The machine's load average was about 23 at the time because a parallel cargo test was running. Re-run alone, cargo test -p unified-agent-api-opencode --all-features --test run_json_timeout_reaps_child passed 5 of 5, and the next preflight passed.",
+          "The likely mechanism is not established. At lines 84-96 the test wraps events.next() for each of the first two events in tokio::time::timeout(Duration::from_secs(1), ...). Under heavy load the stub may not emit, or the reader may not observe, the second event in time. The interesting part is that the stream closed rather than timing out: the expect that fired was 'stream open', not 'second event timeout'.",
+          "This is the same class as uaa-0057 and the load-sensitive codex timeout test recorded in project memory. It is not a CI failure; CI has not reproduced it.",
+          "Steps:",
+          "1) On a second occurrence, capture the child's stdout and stderr, and whether the stream ended by EOF or by error.",
+          "2) Decide whether the stub's output or the one-second windows are the fragile part.",
+          "3) Make the assertion say which one fired."
+        ],
+        "files_to_read": [
+          "crates/opencode/tests/run_json_timeout_reaps_child.rs"
+        ],
+        "deliverables": [
+          "A second-occurrence record that captures the child's stdout and stderr and distinguishes EOF from stream error",
+          "A determination of whether the stub output or the one-second event windows are fragile",
+          "An assertion that identifies the event and termination condition that fired"
+        ]
+      },
+      "notes": [
+        "Raised 2026-09-24 during the post-acquisition freeze work. P4 until it reproduces.",
+        "Does not gate the maintenance lifecycle work."
+      ],
+      "priority": "P4"
     }
   ]
 }
