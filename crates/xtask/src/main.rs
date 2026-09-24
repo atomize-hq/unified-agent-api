@@ -44,9 +44,7 @@ pub use xtask::runtime_follow_on;
 pub use xtask::support_matrix;
 pub use xtask::wrapper_scaffold;
 
-use std::path::PathBuf;
-
-use clap::{ArgGroup, Parser, Subcommand};
+use clap::{Parser, Subcommand};
 
 #[derive(Debug, Parser)]
 #[command(name = "xtask")]
@@ -54,44 +52,6 @@ use clap::{ArgGroup, Parser, Subcommand};
 struct Cli {
     #[command(subcommand)]
     command: Command,
-}
-
-#[derive(Debug, Parser)]
-#[command(group(
-    ArgGroup::new("mode")
-        .required(true)
-        .args(["dry_run", "write"])
-        .multiple(false)
-))]
-struct PrepareAgentMaintenanceArgs {
-    #[arg(long, conflicts_with_all = ["agent", "current_version", "latest_stable", "target_version", "opened_from", "detected_by", "dispatch_kind", "dispatch_workflow", "branch_name", "request_recorded_at", "request_commit"])]
-    from_request: Option<PathBuf>,
-    #[arg(long, required_unless_present = "from_request")]
-    agent: Option<String>,
-    #[arg(long, required_unless_present = "from_request")]
-    current_version: Option<String>,
-    #[arg(long, required_unless_present = "from_request")]
-    latest_stable: Option<String>,
-    #[arg(long, required_unless_present = "from_request")]
-    target_version: Option<String>,
-    #[arg(long, required_unless_present = "from_request")]
-    opened_from: Option<PathBuf>,
-    #[arg(long, required_unless_present = "from_request")]
-    detected_by: Option<String>,
-    #[arg(long, required_unless_present = "from_request")]
-    dispatch_kind: Option<String>,
-    #[arg(long)]
-    dispatch_workflow: Option<String>,
-    #[arg(long, required_unless_present = "from_request")]
-    branch_name: Option<String>,
-    #[arg(long, required_unless_present = "from_request")]
-    request_recorded_at: Option<String>,
-    #[arg(long, required_unless_present = "from_request")]
-    request_commit: Option<String>,
-    #[arg(long)]
-    dry_run: bool,
-    #[arg(long)]
-    write: bool,
 }
 
 #[derive(Debug, Subcommand)]
@@ -160,7 +120,7 @@ enum Command {
     /// Detect stale enrolled agents from registry truth and emit the maintenance queue.
     MaintenanceWatch(agent_maintenance_watch::Args),
     /// Prepare an automated maintenance request and packet docs from release-watch inputs.
-    PrepareAgentMaintenance(PrepareAgentMaintenanceArgs),
+    PrepareAgentMaintenance(agent_maintenance_prepare::Cli),
     /// Execute the bounded contributor relay for an automated maintenance request.
     ExecuteAgentMaintenance(agent_maintenance_execute::Args),
     /// Re-derive the live support-surface audit gate for a maintenance request.
@@ -408,43 +368,7 @@ fn main() {
             }
         },
         Command::PrepareAgentMaintenance(cli_args) => match cli_args
-            .from_request
-            .map(|path| {
-                agent_maintenance_prepare::args_from_request(
-                    &path,
-                    cli_args.dry_run,
-                    cli_args.write,
-                )
-            })
-            .unwrap_or_else(|| {
-                Ok(agent_maintenance_prepare::Args {
-                    agent: cli_args.agent.expect("clap requires --agent"),
-                    current_version: cli_args
-                        .current_version
-                        .expect("clap requires --current-version"),
-                    latest_stable: cli_args
-                        .latest_stable
-                        .expect("clap requires --latest-stable"),
-                    target_version: cli_args
-                        .target_version
-                        .expect("clap requires --target-version"),
-                    opened_from: cli_args.opened_from.expect("clap requires --opened-from"),
-                    detected_by: cli_args.detected_by.expect("clap requires --detected-by"),
-                    dispatch_kind: cli_args
-                        .dispatch_kind
-                        .expect("clap requires --dispatch-kind"),
-                    dispatch_workflow: cli_args.dispatch_workflow,
-                    branch_name: cli_args.branch_name.expect("clap requires --branch-name"),
-                    request_recorded_at: cli_args
-                        .request_recorded_at
-                        .expect("clap requires --request-recorded-at"),
-                    request_commit: cli_args
-                        .request_commit
-                        .expect("clap requires --request-commit"),
-                    dry_run: cli_args.dry_run,
-                    write: cli_args.write,
-                })
-            })
+            .into_args()
             .and_then(agent_maintenance_prepare::run)
         {
             Ok(()) => 0,

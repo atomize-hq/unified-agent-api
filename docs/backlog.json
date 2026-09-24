@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at_utc": "2026-09-24T22:50:06Z",
+  "updated_at_utc": "2026-09-24T23:27:02Z",
   "items": [
     {
       "id": "uaa-0022",
@@ -1117,7 +1117,8 @@
         ]
       },
       "notes": [
-        "Raised in the T2c review round (2026-09-13) by both lanes; accepted and deferred as low severity."
+        "Raised in the T2c review round (2026-09-13) by both lanes; accepted and deferred as low severity.",
+        "Finding 2 is resolved by the code PR: the bundle now names the support-matrix outputs and the packet docs, and `c4_spec_acquisition_commit_and_bundle_name_the_same_paths` binds it to the commit set. Finding 1 (a stale upload after an earlier union-step failure) remains open."
       ],
       "priority": "P2"
     },
@@ -2082,7 +2083,7 @@
     {
       "id": "uaa-0058",
       "title": "The nightly freezes the maintenance request before acquisition, so no relay, refresh or closeout can load a packet",
-      "status": "todo",
+      "status": "done",
       "bucket": "agent_api.maintenance",
       "type": "defect",
       "kickoff": {
@@ -2105,7 +2106,8 @@
         "Validated the same day by a two-lane cross-review (Codex and Opus). Both confirmed the root cause.",
         "Opus found the contract-order violation and the b52f1242 history.",
         "The decision is implemented by PR B (`uaa-0058`), which lands after this documentation PR.",
-        "Pointer history: no promotion has advanced a pointer since `80271c02` (codex 0.125.0, 2026-05-07); `2af2890d` (2026-05-11) set opencode's enrollment baseline, which is not a promotion."
+        "Pointer history: no promotion has advanced a pointer since `80271c02` (codex 0.125.0, 2026-05-07); `2af2890d` (2026-05-11) set opencode's enrollment baseline, which is not a promotion.",
+        "Resolved 2026-09-24 by the code PR that follows the docs PR: the `--from-request` mode, the re-freeze step with the fresh-fetch stand-down check and the ref guard, and the acquisition commit set landed; `from_request_refreezes_against_live_reports_and_is_idempotent`, `c4_spec_acquisition_refreezes_between_union_and_audit`, and `c4_spec_acquisition_commit_and_bundle_name_the_same_paths` bind them."
       ],
       "priority": "P1"
     },
@@ -2138,7 +2140,7 @@
     {
       "id": "uaa-0060",
       "title": "The pre-acquisition audit placeholder is neither ordered nor aggregated by surface identity",
-      "status": "todo",
+      "status": "done",
       "bucket": "agent_api.maintenance",
       "type": "defect",
       "kickoff": {
@@ -2155,14 +2157,15 @@
       },
       "notes": [
         "The resolution is generator-side canonicalization; no validator or reconciliation rule is relaxed.",
-        "PR B resolves this item."
+        "PR B resolves this item.",
+        "Resolved 2026-09-24 by the code PR that follows the docs PR: the identity-set placeholder landed; `placeholder_is_identity_ordered_distinct_and_can_reconcile_satisfied` binds its ordering, aggregation, and reconciliation behavior."
       ],
       "priority": "P3"
     },
     {
       "id": "uaa-0061",
       "title": "The relay prompt never says how to carry preexisting debt to a new version, and labels the debt file read-only",
-      "status": "todo",
+      "status": "done",
       "bucket": "agent_api.maintenance",
       "type": "defect",
       "kickoff": {
@@ -2181,7 +2184,8 @@
       "notes": [
         "The resolution is in-place re-authorization only for continuing blockers; newly discovered surface remains non-deferrable.",
         "PR B resolves this item.",
-        "Changing the prompt changes every request's prompt_sha256 and derived contract; nightly packet regeneration repairs the committed staging copies."
+        "Changing the prompt changes every request's prompt_sha256 and derived contract; nightly packet regeneration repairs the committed staging copies.",
+        "Resolved 2026-09-24 by the code PR that follows the docs PR: the debt re-authorization prompt and packet-PR `read_only_inputs` landed; `packet_prompt_and_contract_pin_debt_reauthorization_semantics` binds their load-bearing semantics."
       ],
       "priority": "P1"
     },
@@ -2230,7 +2234,8 @@
       "notes": [
         "The ordinary instruction should read as two conditions together: freeze before first adjudication, and only after the acquisition commit.",
         "The direct parity-acquire commit behavior is older than uaa-0058 and remains a separate concern.",
-        "When a stand-down skips the re-freeze, the audit gate still judges the placeholder and still publishes a relay invocation that exits 2 (`parity-acquire.yml:895-969` at `7c640b73`). The nightly acquisition (`commit: true`) can also commit onto a packet whose marker landed mid-matrix; this is not limited to a direct dispatch."
+        "When a stand-down skips the re-freeze, the audit gate still judges the placeholder and still publishes a relay invocation that exits 2 (`parity-acquire.yml:895-969` at `7c640b73`). The nightly acquisition (`commit: true`) can also commit onto a packet whose marker landed mid-matrix; this is not limited to a direct dispatch.",
+        "The re-freeze now also skips when `inputs.ref` is not this version's packet branch, so a mismatched direct dispatch leaves the request untouched."
       ],
       "priority": "P3"
     },

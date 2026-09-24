@@ -37,6 +37,36 @@ fn c4_spec_acquisition_refreezes_between_union_and_audit() {
         step.contains("--from-ref FETCH_HEAD"),
         "stand-down must read the freshly fetched staging base"
     );
+    assert!(
+        step.contains("REF: ${{ inputs.ref }}")
+            && step.contains("EXPECTED_REF=\"automation/${AGENT_ID}-maintenance-${VERSION}\""),
+        "the re-freeze must bind the dispatch ref to this packet generation"
+    );
+
+    for command in [
+        "maintenance-stand-down-check",
+        "prepare-agent-maintenance --from-request",
+    ] {
+        assert_text_order(
+            step,
+            "if [ \"$REF\" != \"$EXPECTED_REF\" ]",
+            command,
+            WORKFLOW,
+        );
+    }
+    let ref_mismatch = section_between(
+        step,
+        "if [ \"$REF\" != \"$EXPECTED_REF\" ]; then",
+        "\n          fi",
+        WORKFLOW,
+    );
+    assert!(
+        ref_mismatch.contains("::notice title=Re-freeze skipped::")
+            && ref_mismatch.contains("refrozen=false")
+            && ref_mismatch.contains("exit 0")
+            && !ref_mismatch.contains("prepare-agent-maintenance"),
+        "a dispatch for another packet branch must exit cleanly without re-freezing"
+    );
 
     let stood_down = section_between(step, "\n            3)", "\n            *)", WORKFLOW);
     assert!(
@@ -79,25 +109,34 @@ fn c4_spec_acquisition_commit_and_bundle_name_the_same_paths() {
 }
 
 fn git_add_paths(step: &str) -> BTreeSet<String> {
-    let mut lines = step
-        .lines()
-        .skip_while(|line| !line.trim().starts_with("git add \\"));
-    let first = lines.next().expect("git add command");
     let mut paths = Vec::new();
-    let first_value = first.trim().trim_start_matches("git add").trim();
-    if first_value != "\\" {
-        paths.push(first_value);
-    }
-    for line in lines {
+    let mut in_paths = false;
+    for line in step.lines() {
         let trimmed = line.trim();
-        if trimmed.is_empty() || trimmed.starts_with('#') {
-            break;
+        if trimmed == "PATHS=(" {
+            in_paths = true;
+            continue;
         }
-        paths.push(trimmed);
-        if !trimmed.ends_with('\\') {
-            break;
+        if in_paths {
+            if trimmed == ")" {
+                in_paths = false;
+            } else {
+                paths.push(trimmed);
+            }
+            continue;
+        }
+        if let Some(path) = trimmed
+            .strip_prefix("PATHS+=(")
+            .and_then(|value| value.strip_suffix(')'))
+        {
+            paths.push(path);
         }
     }
+    assert!(
+        step.contains("git add \"${PATHS[@]}\""),
+        "git add must stage PATHS"
+    );
+    assert!(!paths.is_empty(), "PATHS array");
     paths.into_iter().map(normalize_path).collect()
 }
 

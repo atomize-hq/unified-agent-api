@@ -34,8 +34,11 @@ use super::{
 #[path = "prepare/from_request.rs"]
 mod from_request;
 pub use from_request::{args_from_request, args_from_request_in_workspace};
+#[path = "prepare/cli.rs"]
+mod cli;
+pub use cli::Cli;
 
-#[derive(Debug, Parser, Clone)]
+#[derive(Debug, Parser, Clone, PartialEq, Eq)]
 #[command(group(
     ArgGroup::new("mode")
         .required(true)

@@ -1,5 +1,6 @@
 use std::{collections::BTreeMap, process::Command};
 
+use clap::Parser;
 use serde_json::json;
 
 use super::*;
@@ -131,7 +132,59 @@ fn from_request_refuses_wrong_trigger_missing_field_and_wrong_path() {
 }
 
 #[test]
-fn explicit_cli_matches_the_existing_plan_and_mixed_mode_is_rejected() {
+fn explicit_cli_conversion_preserves_every_field() {
+    let parsed = prepare::Cli::try_parse_from([
+        "prepare-agent-maintenance",
+        "--agent",
+        "agent-value",
+        "--current-version",
+        "current-version-value",
+        "--latest-stable",
+        "latest-stable-value",
+        "--target-version",
+        "target-version-value",
+        "--opened-from",
+        "opened/from/value.yml",
+        "--detected-by",
+        "detected-by-value",
+        "--dispatch-kind",
+        "dispatch-kind-value",
+        "--dispatch-workflow",
+        "dispatch-workflow-value",
+        "--branch-name",
+        "branch-name-value",
+        "--request-recorded-at",
+        "request-recorded-at-value",
+        "--request-commit",
+        "request-commit-value",
+        "--dry-run",
+    ])
+    .expect("parse explicit CLI")
+    .into_args()
+    .expect("convert explicit CLI");
+
+    assert_eq!(
+        parsed,
+        Args {
+            agent: "agent-value".to_string(),
+            current_version: "current-version-value".to_string(),
+            latest_stable: "latest-stable-value".to_string(),
+            target_version: "target-version-value".to_string(),
+            opened_from: Path::new("opened/from/value.yml").to_path_buf(),
+            detected_by: "detected-by-value".to_string(),
+            dispatch_kind: "dispatch-kind-value".to_string(),
+            dispatch_workflow: Some("dispatch-workflow-value".to_string()),
+            branch_name: "branch-name-value".to_string(),
+            request_recorded_at: "request-recorded-at-value".to_string(),
+            request_commit: "request-commit-value".to_string(),
+            dry_run: true,
+            write: false,
+        }
+    );
+}
+
+#[test]
+fn explicit_cli_matches_the_existing_plan_and_invalid_modes_are_rejected() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"))
         .parent()
         .and_then(Path::parent)
@@ -175,6 +228,60 @@ fn explicit_cli_matches_the_existing_plan_and_mixed_mode_is_rejected() {
         .expect("run mixed CLI");
     assert_eq!(mixed.status.code(), Some(2));
     assert!(String::from_utf8_lossy(&mixed.stderr).contains("cannot be used with"));
+
+    let missing_mode = Command::new(env!("CARGO_BIN_EXE_xtask"))
+        .args(["prepare-agent-maintenance", "--from-request", REQUEST_PATH])
+        .output()
+        .expect("run from-request without mode");
+    assert_eq!(missing_mode.status.code(), Some(2));
+    assert!(String::from_utf8_lossy(&missing_mode.stderr).contains("<--dry-run|--write>"));
+}
+
+#[test]
+fn packet_prompt_and_contract_pin_debt_reauthorization_semantics() {
+    let fixture = fixture_root("prepare-agent-maintenance-prompt-semantics");
+    seed_registry(&fixture);
+    seed_support_files(&fixture);
+    let registry = agent_registry::AgentRegistry::parse(SEEDED_REGISTRY).expect("registry");
+    let entry = registry.find("codex").expect("codex");
+    let maintenance_root = "docs/agents/lifecycle/codex-maintenance";
+    let request_path =
+        "docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml";
+    let prompt = contract_policy::packet_pr_prompt_template(entry, maintenance_root)
+        .replace("{{VERSION}}", "0.98.0");
+
+    for clause in [
+        "re-authorize",
+        "in place",
+        "authorized_at_version",
+        "no target in two rows",
+        "authorization_evidence_ref` to `cli_manifests/codex/reports/0.98.0/coverage.any.json",
+        "add no row",
+        "Newly discovered surface is never deferred",
+        "maintenance-audit-status --request docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml` exits 0",
+    ] {
+        assert!(prompt.contains(clause), "prompt must contain `{clause}`");
+    }
+
+    let contract = contract_policy::build_execution_contract(
+        &fixture,
+        entry,
+        request_path,
+        maintenance_root,
+        ".github/workflows/agent-maintenance-open-pr.yml",
+        "0.98.0",
+        "automation/codex-maintenance-0.98.0",
+    )
+    .expect("build packet-PR execution contract");
+    let debt_path = support_audit::NON_TUI_SUPPORT_DEBT_PATH;
+    assert!(!contract
+        .read_only_inputs
+        .iter()
+        .any(|path| path == debt_path));
+    assert!(contract
+        .writable_surfaces
+        .iter()
+        .any(|path| path == debt_path));
 }
 
 #[test]

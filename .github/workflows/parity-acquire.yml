@@ -571,8 +571,22 @@ jobs:
         env:
           AGENT_ID: ${{ inputs.agent_id }}
           VERSION: ${{ inputs.target_version }}
+          REF: ${{ inputs.ref }}
         run: |
           set -euo pipefail
+          EXPECTED_REF="automation/${AGENT_ID}-maintenance-${VERSION}"
+
+          # The packet branch name is the only thing binding this dispatch to a packet generation.
+          # The same prefix is how supersession finds packets (agent-maintenance-open-pr.yml:283)
+          # and how the watcher names them (crates/xtask/src/agent_maintenance/watch.rs:307).
+          # A mismatched dispatch (a staging acquisition, or a different version onto an existing
+          # packet branch) therefore never rewrites a request.
+          if [ "$REF" != "$EXPECTED_REF" ]; then
+            echo "::notice title=Re-freeze skipped::${REF} does not name this version's packet branch ${EXPECTED_REF}, so the request is left as the audit gate will find it."
+            echo "refrozen=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
           REQUEST_PATH="docs/agents/lifecycle/${AGENT_ID}-maintenance/governance/maintenance-request.toml"
 
           if [ ! -f "$REQUEST_PATH" ]; then
@@ -843,19 +857,23 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          # These are the two paths `xtask support-matrix` actually publishes
+          # These include the two paths `xtask support-matrix` actually publishes
           # (support_matrix::JSON_OUTPUT_PATH and MARKDOWN_OUTPUT_PATH). `git add` fails the whole
-          # commit on a pathspec that matches nothing, so a wrong path here does not degrade
-          # gracefully — it discards an entire acquisition run at the last step.
-          git add \
-            "${ROOT}/snapshots/${VERSION}" \
-            "${ROOT}/reports/${VERSION}" \
-            "${ROOT}/versions/${VERSION}.json" \
-            "${ROOT}/wrapper_coverage.json" \
-            "${ROOT}/artifacts.lock.json" \
-            cli_manifests/support_matrix/current.json \
-            docs/specs/unified-agent-api/support-matrix.md \
-            "docs/agents/lifecycle/${AGENT_ID}-maintenance"
+          # commit on a pathspec that matches nothing, so append the optional maintenance directory
+          # only when a packet exists instead of discarding an otherwise complete acquisition.
+          PATHS=(
+            "${ROOT}/snapshots/${VERSION}"
+            "${ROOT}/reports/${VERSION}"
+            "${ROOT}/versions/${VERSION}.json"
+            "${ROOT}/wrapper_coverage.json"
+            "${ROOT}/artifacts.lock.json"
+            cli_manifests/support_matrix/current.json
+            docs/specs/unified-agent-api/support-matrix.md
+          )
+          if [ -d "docs/agents/lifecycle/${AGENT_ID}-maintenance" ]; then
+            PATHS+=("docs/agents/lifecycle/${AGENT_ID}-maintenance")
+          fi
+          git add "${PATHS[@]}"
 
           # The verdict artifact reports the audit and the delivery separately, so a blocking
           # verdict is never mistaken for a failed push and a failed push never masquerades as a
