@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at_utc": "2026-09-23T19:56:09Z",
+  "updated_at_utc": "2026-09-24T14:44:05Z",
   "items": [
     {
       "id": "uaa-0022",
@@ -2040,6 +2040,44 @@
         "The asymmetry is easy to reintroduce: DriftCategory is the richer enum and gains variants as detectors are added, while MaintenanceDriftCategory only changes when the artifact schema does."
       ],
       "priority": "P2"
+    },
+    {
+      "id": "uaa-0057",
+      "title": "run_codex_mcp_preserves_path_for_launcher_script_helpers flakes in CI and its assertion cannot report why",
+      "status": "todo",
+      "bucket": "agent_api.exec",
+      "type": "defect",
+      "kickoff": {
+        "prompt": [
+          "Work item: uaa-0057 - make the launcher-PATH test able to explain its own failure, then find the cause if it recurs.",
+          "Observed once. The 'Rust tests (workspace)' job on PR #229 reported 'test result: FAILED. 400 passed; 1 failed', the one failure being run_codex_mcp_preserves_path_for_launcher_script_helpers at crates/agent_api/src/backends/codex/mcp_management/tests/runner.rs:236 with the message 'launcher helper should resolve via PATH'. Re-running the same job passed. The change under review touched only xtask and docs, added no dependencies, and did not touch crates/agent_api at all.",
+          "The assertion is the blocking defect, independent of the cause. It asserts result.status.success() with a message naming one hypothesis, and discards both the exit status and result.stderr. The stderr is captured and is asserted empty two lines later, but the status assertion fires first, so the CI log never shows it. A failure therefore cannot be distinguished between 'helper-bin was not found on PATH', 'helper-bin ran and exited non-zero', and 'the exec was refused'. Fix this first: without it, the next occurrence is as uninformative as this one.",
+          "Two mechanisms were ruled out by reading, not by re-running. Temp directory collision between the two twin tests is impossible: temp_test_dir embeds the backend name, the process id and a nanosecond timestamp, so the codex and claude_code directories cannot coincide. A process-global environment or working-directory race from a sibling test is also ruled out: every env::set_var, env::remove_var, env::set_current_dir, EnvGuard::set and CurrentDirGuard::set site under crates/agent_api sits beneath test_env_lock, including both CurrentDirGuard::set sites in backends/spawn_path.rs, and that lock is a single process-wide lockfile that spin-waits rather than giving up.",
+          "The remaining candidates are all distinguishable from the output the assertion throws away: a transient ETXTBSY when the freshly written helper is exec'd on the runner's filesystem; a shell difference, since the codex scripts are '#!/bin/sh' (dash on Ubuntu) while the claude_code twin uses '#!/usr/bin/env bash'; and fork or resource exhaustion on the runner. This is why the diagnostic comes before the fix.",
+          "The most useful single datum was free: the claude_code twin run_claude_mcp_preserves_path_for_launcher_script_helpers passed in the same run. Same pattern, same binary, same runner. That is a race or an environment transient, not a standing environment fact. The twins differ in exactly two ways worth noting: codex passes working_dir: Some(temp_dir) and claude_code passes none, and the interpreters differ as above.",
+          "Steps:",
+          "1) Make the status assertion report the exit status and stderr on failure, in both twins and in any sibling that asserts status.success() with a message naming a single cause. This is the whole of the work that is justified today.",
+          "2) Do not chase a cause until a second occurrence exists. One unreproduced failure with no diagnostic output cannot discriminate between the candidates above, and 12 local stress iterations of the lib suite produced none.",
+          "3) On a second occurrence, read the new diagnostic output first and only then pick a candidate. If it is ETXTBSY, the repair belongs in the shared write_test_executable helper, not in one test."
+        ],
+        "files_to_read": [
+          "crates/agent_api/src/backends/codex/mcp_management/tests/runner.rs",
+          "crates/agent_api/src/backends/claude_code/mcp_management/tests/runner.rs",
+          "crates/agent_api/src/backends/test_support.rs",
+          "crates/agent_api/src/backends/codex/mcp_management/tests/support.rs"
+        ],
+        "deliverables": [
+          "The status assertion reports the child's exit status and stderr on failure, in both twin tests",
+          "Either a named root cause, or a recorded second occurrence carrying that new diagnostic output"
+        ]
+      },
+      "notes": [
+        "Raised 2026-09-24 from a single CI failure on PR #229. P4 is deliberate: one occurrence, not reproduced, and a green re-run confirms flakiness rather than fixing it.",
+        "Raise the priority on a second occurrence. Until then the only justified work is the diagnostic in step 1.",
+        "Does not gate the T4-T8 lifecycle work. Different crate, and preflight does not run this job; 'cargo test --workspace --all-targets' does, which is the same preflight-versus-CI gap recorded elsewhere.",
+        "The assertion defect stands on its own even if the flake never returns, because the same shape appears wherever a test asserts status.success() with a message that names one of several possible causes."
+      ],
+      "priority": "P4"
     }
   ]
 }

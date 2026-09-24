@@ -6,6 +6,7 @@ pub mod drift;
 pub mod execute;
 pub mod finding_signature;
 pub mod prepare;
+pub mod prepare_closeout;
 pub mod refresh;
 pub mod request;
 pub mod stand_down;

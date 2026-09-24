@@ -91,6 +91,55 @@ pub(super) struct RawWrapperOnlyDisposition {
     follow_on: Option<String>,
 }
 
+/// Read the dispositions a previous closeout recorded, without validating the rest of that file.
+///
+/// T6 carries adjudications forward rather than re-asking for them, so it needs the prior
+/// `wrapper_only_dispositions` from an artifact that is otherwise stale: its `request_sha256`
+/// belongs to an older request generation and its `commit` to an older packet, both of which
+/// `load_linked_closeout` would rightly reject. Only this one array survives a version change,
+/// because a disposition is a judgement about a *surface*, not about a release.
+///
+/// The dispositions themselves are held to the full bar — `validate_dispositions` is the same
+/// function the validator calls — so a carried row that no longer resolves its `evidence_ref`
+/// fails here rather than being copied forward on trust. A missing file and a file with no
+/// dispositions are both an empty list: neither is an error, because the first closeout for an
+/// agent has no predecessor and a packet with no wrapper-only rows records none.
+pub fn read_recorded_dispositions(
+    workspace_root: &Path,
+    closeout_path: &Path,
+) -> Result<Vec<WrapperOnlyDisposition>, MaintenanceCloseoutError> {
+    let resolved = workspace_root.join(closeout_path);
+    let text = match std::fs::read_to_string(&resolved) {
+        Ok(text) => text,
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
+        Err(err) => {
+            return Err(MaintenanceCloseoutError::Internal(format!(
+                "read {}: {err}",
+                closeout_path.display()
+            )))
+        }
+    };
+
+    let document = serde_json::from_str::<serde_json::Value>(&text).map_err(|err| {
+        MaintenanceCloseoutError::Validation(format!(
+            "parse {}: {err}. The recorded closeout must be readable before its dispositions can \
+             be carried forward; repair or remove it.",
+            closeout_path.display()
+        ))
+    })?;
+    let Some(rows) = document.get("wrapper_only_dispositions") else {
+        return Ok(Vec::new());
+    };
+    let raw =
+        serde_json::from_value::<Vec<RawWrapperOnlyDisposition>>(rows.clone()).map_err(|err| {
+            MaintenanceCloseoutError::Validation(format!(
+                "{}: `wrapper_only_dispositions` is not readable: {err}",
+                closeout_path.display()
+            ))
+        })?;
+    validate_dispositions(workspace_root, closeout_path, raw)
+}
+
 pub(super) fn validate_dispositions(
     workspace_root: &Path,
     closeout_path: &Path,

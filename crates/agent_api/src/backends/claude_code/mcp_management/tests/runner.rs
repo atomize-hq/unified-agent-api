@@ -187,6 +187,8 @@ async fn run_claude_mcp_preserves_path_for_launcher_script_helpers() {
     .await
     .expect("runner should succeed");
 
+    // uaa-0057: this assertion discards the exit status and stderr, so a CI failure here
+    // cannot say which cause fired. Observed flaking once, on PR #229, 2026-09-24.
     assert!(
         result.status.success(),
         "launcher helper should resolve via PATH"
