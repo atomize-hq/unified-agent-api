@@ -102,9 +102,11 @@ New and changed surfaces. Every new command follows the existing `xtask` convent
 # gate. The acquisition commit then carries the regenerated request, packet docs, and artifacts
 # together. Reads only the request's recorded agent_id, opened_from, request_recorded_at,
 # request_commit and every detected_release field accepted by prepare; it does not reconcile the
-# audit it replaces. request_commit remains the base commit from which the generation was opened,
-# not the tree from which the completed audit was derived; the acquisition commit records that
-# tree. Regenerates the request and packet docs against the current tree exactly as prepare does,
+# audit it replaces. request_commit remains the commit of the event that opened the generation:
+# the opening workflow's github.sha. It is not guaranteed to equal the checked-out base. A
+# post-acquisition --from-request re-freeze preserves it, so it identifies neither the base nor the
+# tree from which the completed audit was derived; the acquisition commit records that tree.
+# Regenerates the request and packet docs against the current tree exactly as prepare does,
 # while preserving request_recorded_at and request_commit. An unchanged rerun writes identical bytes.
 cargo run -p xtask -- prepare-agent-maintenance \
   --from-request <path/to/maintenance-request.toml> \
@@ -406,8 +408,12 @@ regression row records this as a hand-authoring hazard, and with the nightly cad
 deadline. Do not resolve it by excluding the timestamp from the digest: that hides one mutation and
 leaves force-push erasure and every other request rewrite intact. `uaa-0048` carries the fix, and
 its invariant is that a request generation's bytes are stable while that generation is active.
-A generation becomes active, and therefore byte-stable, once its post-acquisition freeze is
-committed. Before that point no closeout can exist because strict loaders refuse the placeholder.
+On the acquisition lane with no target report at open, the request first becomes strictly loadable
+when its post-acquisition freeze is committed. Before that, strict loaders refuse the placeholder,
+so no closeout can exist. On the docs-only lane, or when the target reports already existed on base
+at open, the first freeze is already strictly loadable. Loadable is not protected. A generation is
+protected against regeneration and force-push only once a stand-down marker names it (`uaa-0048`).
+Declare that marker after the acquisition commit (`uaa-0063`).
 
 **T5 — Closeout finding derivation.** Map written surfaces to `MaintenanceDriftCategory`
 (`registry_manifest_drift`, `support_publication_drift`) with real surface lists; choose
@@ -865,8 +871,9 @@ not wait for wrapper expansion. The maintainer must choose one of three paths be
 opencode: amend criterion 5 to close codex and claude_code now and opencode after `uaa-0053`; pull
 `uaa-0055` forward so deliberate non-support becomes parity exclusions; or baseline the unwrapped
 surface as debt before the freeze. Under the current derivation, the 481 report gaps are the uplift
-queue: every gap outside the debt inventory is an uplift. This supersedes the `uaa-0045` caution,
-which was written when the queue was empty. The four decisions below remain settled.
+queue: every gap is an uplift unless a debt row authorizes it at the target version. That is why the
+queue is 481: 473 new surfaces plus 8 debt rows not yet re-authorized. This supersedes the `uaa-0045`
+caution, which was written when the queue was empty. The four decisions below remain settled.
 
 1. *Is `uaa-0039` the authorized exception to §4's `validate.rs` freeze?* **Yes — and §4's wording
    was the defect.** The freeze is directional, not locational: adding a check is in scope,

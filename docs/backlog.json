@@ -2303,7 +2303,7 @@
       "notes": [
         "This is the maintainer's §7 Ask first decision, not an implementation choice.",
         "The contradiction is between criterion 5 and opencode's current 473 newly discovered, non-debt uplifts; uaa-0053 remains off the T4-T8 critical path unless the maintainer changes that decision.",
-        "Under the current derivation, the 481 report gaps are the uplift queue: every gap outside the debt inventory is an uplift. This supersedes the `uaa-0045` caution written when the queue was empty."
+        "Under the current derivation, the 481 report gaps are the uplift queue: every gap is an uplift unless a debt row authorizes it at the target version. That is why the queue is 481: 473 new surfaces plus 8 debt rows not yet re-authorized. This supersedes the `uaa-0045` caution written when the queue was empty."
       ],
       "priority": "P2"
     }

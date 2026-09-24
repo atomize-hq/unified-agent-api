@@ -80,7 +80,7 @@ Every automated upstream-release request MUST keep one shared top-level envelope
 | `opened_from` | MUST be a repo-relative reference to the workflow or source that opened the packet. |
 | `requested_control_plane_actions` | MUST remain a control-plane action list, not a runtime implementation plan. |
 | `request_recorded_at` | MUST be an RFC 3339 UTC timestamp. A post-acquisition `--from-request` re-freeze MUST preserve it because that re-freeze completes the same generation. |
-| `request_commit` | MUST be the base commit from which the generation was opened. A post-acquisition `--from-request` re-freeze MUST preserve it, so it does not identify the tree from which the completed audit was derived; the acquisition commit records that tree. |
+| `request_commit` | MUST be the commit of the event that opened the generation: the opening workflow's `github.sha`. It is not guaranteed to equal the checked-out base. A post-acquisition `--from-request` re-freeze MUST preserve it, so it identifies neither the base nor the tree from which the completed audit was derived; the acquisition commit records that tree. |
 | `[runtime_followup_required]` | MUST remain present, even when `required = false`. |
 
 For release-watch packets in this milestone:
