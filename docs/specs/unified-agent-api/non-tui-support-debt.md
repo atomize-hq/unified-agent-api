@@ -54,8 +54,11 @@ Row ids are the canonical `debt_ref` anchors used by `support_surface_audit`.
 A maintenance run carries a preexisting row to its target version by updating that row in place:
 `scope_target_triples`, `authorized_at_version`, and `authorization_evidence_ref`. It does so only
 while the row's `blocker_class` still holds; otherwise the surface is uplifted. Adding a second row
-for the same identity remains valid, but until `uaa-0059` is resolved the gates disagree on how a
-second row is rendered, so maintenance runs update in place.
+for the same identity remains valid. Both gates render the lexicographically smallest row id, but
+they compare it differently: `maintenance-audit-status` compares `debt_ref` (the row id), while
+strict reconciliation compares only the deferral reason and follow-on. Until `uaa-0059` is resolved,
+an added row whose id sorts first therefore makes the gates disagree, so maintenance runs update in
+place.
 
 ## Contract marker
 

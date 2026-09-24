@@ -2091,7 +2091,7 @@
           "The nightly runs prepare-agent-maintenance --write on staging before parity-acquire (.github/workflows/agent-maintenance-open-pr.yml:143-164,381-392). When cli_manifests/<agent>/reports/<target>/ is absent, derive_support_surface_audit falls back to debt-inventory rows (crates/xtask/src/agent_maintenance/support_audit.rs:224-360), producing a placeholder whose evidence_ref is docs/specs/unified-agent-api/non-tui-support-debt.md.",
           "After parity-acquire commits the target reports, every strict loader re-derives a different live audit and refuses the request: execute-agent-maintenance at execute/workflow.rs:19-20, refresh-agent at refresh.rs:141, close-agent-maintenance through closeout/validate.rs:117-122, and prepare-agent-closeout at prepare_closeout.rs:149. request/support_surface_audit_reconcile.rs:79-107 also refuses a placeholder with work before acquisition. Only maintenance-audit-status tolerates the drift at audit_status.rs:287-290.",
           "Measured 2026-09-24 on packet heads #223 (opencode 1.18.31, 104e91ff), #227 (codex 0.156.0, 62f090aa), and #230 (claude_code 2.1.273, 0fbe4756): frozen/live uplift counts were 8/481, 2/56, and 2/185. Both execute-agent-maintenance --dry-run and refresh-agent --dry-run exited 2 on all three, and the generated HANDOFF and relay prompt carried the placeholder scope.",
-          "The contract already orders acquisition before preparation (docs/specs/maintenance-request-contract-v1.md:59,435). The gap has been structural since 68f7fb27 moved acquisition into the packet PR on 2026-07-24, and became universal when b52f1242 gave version-scoped debt rows placeholder work on 2026-09-19. The last closeout, #144 at 93e771d7, used a manual re-freeze after the work; no latest_validated.txt has moved since 80271c02.",
+          "The contract already orders acquisition before preparation (docs/specs/maintenance-request-contract-v1.md:59,435). The gap has been structural since 68f7fb27 moved acquisition into the packet PR on 2026-07-24, and became universal when b52f1242 gave version-scoped debt rows placeholder work on 2026-09-19. The last closeout, #144 at 93e771d7, used a manual re-freeze after the work; no promotion has advanced a pointer since `80271c02` (codex 0.125.0, 2026-05-07); `2af2890d` (2026-05-11) set opencode's enrollment baseline, which is not a promotion.",
           "Steps:",
           "1) Add prepare-agent-maintenance --from-request <request>. Read only agent_id, opened_from, request_recorded_at, request_commit, and every detected_release field used by prepare; replace rather than reconcile the old audit; regenerate the request and packet docs against the current tree; preserve request_recorded_at and request_commit; and make an unchanged rerun byte-identical.",
           "2) In parity-acquire.yml, run that re-freeze after union and before the audit gate, so the acquisition commit carries the request and packet docs with the reports.",
@@ -2104,7 +2104,8 @@
         "Found 2026-09-24 while tracing the rehearsal path.",
         "Validated the same day by a two-lane cross-review (Codex and Opus). Both confirmed the root cause.",
         "Opus found the contract-order violation and the b52f1242 history.",
-        "Resolved by PR B, which lands after this documentation PR."
+        "The decision is implemented by PR B (`uaa-0058`), which lands after this documentation PR.",
+        "Pointer history: no promotion has advanced a pointer since `80271c02` (codex 0.125.0, 2026-05-07); `2af2890d` (2026-05-11) set opencode's enrollment baseline, which is not a promotion."
       ],
       "priority": "P1"
     },
@@ -2168,7 +2169,7 @@
         "prompt": [
           "Work item: uaa-0061 — make the relay contract explain version-scoped debt re-authorization.",
           "contract_policy.rs packet_pr_prompt_template tells the worker in Required workflow step 3 to land every required uplift, but authorization matches the target version exactly (support_audit/authorization.rs:182-200; docs/specs/unified-agent-api/non-tui-support-debt.md:33-42). Every preexisting debt row therefore becomes an uplift at a new version unless the same row is re-authorized for that version.",
-          "The prompt contradicts itself: contract_policy.rs:315-335 lists non-tui-support-debt.md in read_only_inputs and writable_surfaces, although only writable_surfaces is enforced (execute/validate.rs:110-150). Its done criterion permits one allowed deferral even though field invariant 3 forbids deferring newly discovered surface. RULES.json is not writable, so the relay cannot use parity exclusions instead.",
+          "The prompt contradicts itself: contract_policy.rs:315-335 lists non-tui-support-debt.md in read_only_inputs, while contract_policy.rs:353-375 lists writable_surfaces and names the debt path at contract_policy.rs:370; only writable_surfaces is enforced (execute/validate.rs:110-150). Its done criterion permits one allowed deferral even though field invariant 3 forbids deferring newly discovered surface. RULES.json is not writable, so the relay cannot use parity exclusions instead.",
           "Steps:",
           "1) State that a worker may update a preexisting debt row in place for the target version only while its blocker still holds.",
           "2) State that newly discovered surface must be uplifted, and remove the contradictory allowed-deferral done criterion.",
@@ -2228,7 +2229,8 @@
       },
       "notes": [
         "The ordinary instruction should read as two conditions together: freeze before first adjudication, and only after the acquisition commit.",
-        "The direct parity-acquire commit behavior is older than uaa-0058 and remains a separate concern."
+        "The direct parity-acquire commit behavior is older than uaa-0058 and remains a separate concern.",
+        "When a stand-down skips the re-freeze, the audit gate still judges the placeholder and still publishes a relay invocation that exits 2 (`parity-acquire.yml:895-969` at `7c640b73`). The nightly acquisition (`commit: true`) can also commit onto a packet whose marker landed mid-matrix; this is not limited to a direct dispatch."
       ],
       "priority": "P3"
     },
@@ -2300,7 +2302,8 @@
       },
       "notes": [
         "This is the maintainer's §7 Ask first decision, not an implementation choice.",
-        "The contradiction is between criterion 5 and opencode's current 473 newly discovered, non-debt uplifts; uaa-0053 remains off the T4-T8 critical path unless the maintainer changes that decision."
+        "The contradiction is between criterion 5 and opencode's current 473 newly discovered, non-debt uplifts; uaa-0053 remains off the T4-T8 critical path unless the maintainer changes that decision.",
+        "Under the current derivation, the 481 report gaps are the uplift queue: every gap outside the debt inventory is an uplift. This supersedes the `uaa-0045` caution written when the queue was empty."
       ],
       "priority": "P2"
     }
