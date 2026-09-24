@@ -51,6 +51,12 @@ Allowed `blocker_class` values are aligned to the maintenance-request contract:
 
 Row ids are the canonical `debt_ref` anchors used by `support_surface_audit`.
 
+A maintenance run carries a preexisting row to its target version by updating that row in place:
+`scope_target_triples`, `authorized_at_version`, and `authorization_evidence_ref`. It does so only
+while the row's `blocker_class` still holds; otherwise the surface is uplifted. Adding a second row
+for the same identity remains valid, but until `uaa-0059` is resolved the gates disagree on how a
+second row is rendered, so maintenance runs update in place.
+
 ## Contract marker
 
 ### `support-debt-authorization-contract-target-version-v1`

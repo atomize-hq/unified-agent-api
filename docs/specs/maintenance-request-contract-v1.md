@@ -57,7 +57,11 @@ The system MUST continue to separate responsibilities this way:
   execution.
 - `close-agent-maintenance` owns explicit post-write closeout only.
 - workflow YAML owns transport only: acquire upstream artifacts, invoke `prepare-agent-maintenance`,
-  and open or refresh the PR. Workflow YAML MUST NOT become a second source of maintenance policy.
+  and open or refresh the PR. Because a packet opens before its target artifacts exist, one
+  generation freezes the request twice: once at open, then with
+  `prepare-agent-maintenance --from-request` after acquisition commits the target artifacts. Only
+  the second freeze is a relay contract. The first is a placeholder that no strict loader accepts.
+  Workflow YAML MUST NOT become a second source of maintenance policy.
 
 ## Universal packet fields
 
@@ -71,8 +75,8 @@ Every automated upstream-release request MUST keep one shared top-level envelope
 | `basis_ref` | MUST be a repo-relative baseline pointer owned by the agent manifest root. |
 | `opened_from` | MUST be a repo-relative reference to the workflow or source that opened the packet. |
 | `requested_control_plane_actions` | MUST remain a control-plane action list, not a runtime implementation plan. |
-| `request_recorded_at` | MUST be an RFC 3339 UTC timestamp. |
-| `request_commit` | MUST be the repo commit used when the packet was generated. |
+| `request_recorded_at` | MUST be an RFC 3339 UTC timestamp. A post-acquisition `--from-request` re-freeze MUST preserve it because that re-freeze completes the same generation. |
+| `request_commit` | MUST be the repo commit used when the packet was generated. A post-acquisition `--from-request` re-freeze MUST preserve it for the same reason. |
 | `[runtime_followup_required]` | MUST remain present, even when `required = false`. |
 
 For release-watch packets in this milestone:
