@@ -2,6 +2,8 @@
 
 # Review surfaces
 
+Some paths below contain guarded lifecycle command names. An agent executing this packet inside a relay session must not invoke those commands.
+
 ## Writable surfaces
 
 - `docs/agents/lifecycle/codex-maintenance/**`

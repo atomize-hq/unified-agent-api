@@ -15,6 +15,7 @@ Execute the automated maintenance packet for `codex` target `{{VERSION}}`.
 - Read the packet-owned `support_surface_audit` block before deciding whether the run can succeed.
 - Treat `docs/agents/lifecycle/codex-maintenance/HANDOFF.md` as canonical for writable surfaces, read-only inputs, ordered commands, green gates, and recovery.
 - Treat `.github/workflows/agent-maintenance-open-pr.yml` as the opening workflow source.
+- Never invoke `execute-agent-maintenance`, `prepare-agent-maintenance`, or `refresh-agent`. If this prompt was delivered by `execute-agent-maintenance`, that process is the executor and is already running; lifecycle queries remain available. `HANDOFF.md` is the agent's contract for writable surfaces, read-only inputs, ordered commands, green gates, and the freeze step; its relay and recovery sections describe maintainer actions that start or recreate a run, and its closeout section identifies the closeout actor.
 - Do not write outside the execution contract frozen in the request packet.
 
 ## Manifest inputs
@@ -39,7 +40,7 @@ Execute the automated maintenance packet for `codex` target `{{VERSION}}`.
    Change no other field and add no row. If the blocker no longer holds, treat the row as an uplift.
 4. Land bounded wrapper/backend/manifest/publication updates for every remaining row in `required_uplifts_this_run`. Newly discovered surface is never deferred (maintenance-request contract field invariant 3), and no debt row may be added.
 5. Refresh or create version-scoped manifest artifacts under `cli_manifests/codex/snapshots/{{VERSION}}/`, `cli_manifests/codex/reports/{{VERSION}}/`, and `cli_manifests/codex/versions/{{VERSION}}.json` as required by the packet.
-6. Leave closeout manual; record it only with `close-agent-maintenance` after the declared green gates pass.
+6. An agent executing this packet inside a relay session does not run `close-agent-maintenance` or `prepare-agent-closeout`; after the declared green gates pass, the actor handed the packet PR records the closeout.
 
 ## Done criteria
 

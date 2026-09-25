@@ -8,7 +8,7 @@ Automated maintenance packet for `codex` target `0.156.1`.
 - request artifact: `docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml`
 - branch: `automation/codex-maintenance-0.156.1`
 - opened from: `.github/workflows/agent-maintenance-open-pr.yml`
-- prompt sha256: `2498dea39ad568795819b81b7fee2f728f91904d2a79720bbadc88b3a4a3e963`
+- prompt sha256: `b215b743126c352c23e57fd45c3c32468abf0574a1f9a48b20a76ab56588c0f8`
 
 ## Support-surface audit
 
@@ -103,6 +103,7 @@ Execute the automated maintenance packet for `codex` target `0.156.1`.
 - Read the packet-owned `support_surface_audit` block before deciding whether the run can succeed.
 - Treat `docs/agents/lifecycle/codex-maintenance/HANDOFF.md` as canonical for writable surfaces, read-only inputs, ordered commands, green gates, and recovery.
 - Treat `.github/workflows/agent-maintenance-open-pr.yml` as the opening workflow source.
+- Never invoke `execute-agent-maintenance`, `prepare-agent-maintenance`, or `refresh-agent`. If this prompt was delivered by `execute-agent-maintenance`, that process is the executor and is already running; lifecycle queries remain available. `HANDOFF.md` is the agent's contract for writable surfaces, read-only inputs, ordered commands, green gates, and the freeze step; its relay and recovery sections describe maintainer actions that start or recreate a run, and its closeout section identifies the closeout actor.
 - Do not write outside the execution contract frozen in the request packet.
 
 ## Manifest inputs
@@ -127,7 +128,7 @@ Execute the automated maintenance packet for `codex` target `0.156.1`.
    Change no other field and add no row. If the blocker no longer holds, treat the row as an uplift.
 4. Land bounded wrapper/backend/manifest/publication updates for every remaining row in `required_uplifts_this_run`. Newly discovered surface is never deferred (maintenance-request contract field invariant 3), and no debt row may be added.
 5. Refresh or create version-scoped manifest artifacts under `cli_manifests/codex/snapshots/0.156.1/`, `cli_manifests/codex/reports/0.156.1/`, and `cli_manifests/codex/versions/0.156.1.json` as required by the packet.
-6. Leave closeout manual; record it only with `close-agent-maintenance` after the declared green gates pass.
+6. An agent executing this packet inside a relay session does not run `close-agent-maintenance` or `prepare-agent-closeout`; after the declared green gates pass, the actor handed the packet PR records the closeout.
 
 ## Done criteria
 

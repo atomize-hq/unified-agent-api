@@ -4,6 +4,8 @@
 
 This packet-owned playbook freezes operator context for `codex` target `0.156.1`.
 
+The recovery packet-regeneration command is a maintainer action run from outside a relay session. An agent executing this packet inside a relay session must not run it.
+
 - request artifact: `docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml`
 - basis ref: `cli_manifests/codex/latest_validated.txt`
 - opened from: `.github/workflows/agent-maintenance-open-pr.yml`

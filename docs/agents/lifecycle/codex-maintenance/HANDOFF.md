@@ -129,12 +129,14 @@ merging it all leave it in force; the promotion PR for `0.156.1` removes the mar
 
 ## Relay contract
 
+Guarded lifecycle command names appear below as contract metadata or as instructions for an actor outside the relay. An agent executing this packet inside a relay session must not invoke them.
+
 - maintained agent packet: `codex`
 - local execution host: `local Codex CLI host via execute-agent-maintenance`
 - executor surface: `execute-agent-maintenance`
 - request artifact: `docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml`
 - prompt template path: `docs/agents/lifecycle/codex-maintenance/governance/execute-agent-maintenance-prompt.md`
-- prompt sha256: `2498dea39ad568795819b81b7fee2f728f91904d2a79720bbadc88b3a4a3e963`
+- prompt sha256: `b215b743126c352c23e57fd45c3c32468abf0574a1f9a48b20a76ab56588c0f8`
 - canonical handoff: `docs/agents/lifecycle/codex-maintenance/HANDOFF.md`
 - derivative pr summary: `docs/agents/lifecycle/codex-maintenance/governance/pr-summary.md`
 - exact closeout artifact: `docs/agents/lifecycle/codex-maintenance/governance/maintenance-closeout.json`
@@ -184,6 +186,8 @@ merging it all leave it in force; the promotion PR for `0.156.1` removes the mar
 
 ## Recovery
 
+Packet recovery is a maintainer action run from outside a relay session. An agent executing this packet inside a relay session must not run any command named in this Recovery section, including its notes.
+
 - recreate packet command: `cargo run -p xtask -- refresh-agent --request docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml --write`
 - reopen pr body path: `docs/agents/lifecycle/codex-maintenance/governance/pr-summary.md`
 - reopen pr branch: `automation/codex-maintenance-0.156.1`
@@ -193,7 +197,7 @@ merging it all leave it in force; the promotion PR for `0.156.1` removes the mar
 
 ## Dry-run to write relay
 
-Use the `run_id` printed by the dry-run output, replacing `RUN_ID_FROM_DRY_RUN` before invoking write mode.
+Starting the relay is a maintainer action run from outside a relay session. An agent executing this packet inside a relay session must not run either command. The maintainer uses the `run_id` printed by the dry-run output, replacing `RUN_ID_FROM_DRY_RUN` before invoking write mode.
 
 ```sh
 cargo run -p xtask -- execute-agent-maintenance --dry-run --request docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml
@@ -201,6 +205,8 @@ cargo run -p xtask -- execute-agent-maintenance --write --request docs/agents/li
 ```
 
 ## Exact closeout command
+
+After the declared green gates pass, the actor handed the packet PR records the closeout. An agent executing this packet inside a relay session must not run this command.
 
 ```sh
 cargo run -p xtask -- close-agent-maintenance --request docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml --closeout docs/agents/lifecycle/codex-maintenance/governance/maintenance-closeout.json
@@ -226,6 +232,7 @@ Execute the automated maintenance packet for `codex` target `0.156.1`.
 - Read the packet-owned `support_surface_audit` block before deciding whether the run can succeed.
 - Treat `docs/agents/lifecycle/codex-maintenance/HANDOFF.md` as canonical for writable surfaces, read-only inputs, ordered commands, green gates, and recovery.
 - Treat `.github/workflows/agent-maintenance-open-pr.yml` as the opening workflow source.
+- Never invoke `execute-agent-maintenance`, `prepare-agent-maintenance`, or `refresh-agent`. If this prompt was delivered by `execute-agent-maintenance`, that process is the executor and is already running; lifecycle queries remain available. `HANDOFF.md` is the agent's contract for writable surfaces, read-only inputs, ordered commands, green gates, and the freeze step; its relay and recovery sections describe maintainer actions that start or recreate a run, and its closeout section identifies the closeout actor.
 - Do not write outside the execution contract frozen in the request packet.
 
 ## Manifest inputs
@@ -250,7 +257,7 @@ Execute the automated maintenance packet for `codex` target `0.156.1`.
    Change no other field and add no row. If the blocker no longer holds, treat the row as an uplift.
 4. Land bounded wrapper/backend/manifest/publication updates for every remaining row in `required_uplifts_this_run`. Newly discovered surface is never deferred (maintenance-request contract field invariant 3), and no debt row may be added.
 5. Refresh or create version-scoped manifest artifacts under `cli_manifests/codex/snapshots/0.156.1/`, `cli_manifests/codex/reports/0.156.1/`, and `cli_manifests/codex/versions/0.156.1.json` as required by the packet.
-6. Leave closeout manual; record it only with `close-agent-maintenance` after the declared green gates pass.
+6. An agent executing this packet inside a relay session does not run `close-agent-maintenance` or `prepare-agent-closeout`; after the declared green gates pass, the actor handed the packet PR records the closeout.
 
 ## Done criteria
 

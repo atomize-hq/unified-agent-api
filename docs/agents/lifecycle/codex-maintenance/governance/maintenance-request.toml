@@ -2036,7 +2036,7 @@ surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
 [execution_contract]
 executor = "execute-agent-maintenance"
 prompt_template_path = "docs/agents/lifecycle/codex-maintenance/governance/execute-agent-maintenance-prompt.md"
-prompt_sha256 = "2498dea39ad568795819b81b7fee2f728f91904d2a79720bbadc88b3a4a3e963"
+prompt_sha256 = "b215b743126c352c23e57fd45c3c32468abf0574a1f9a48b20a76ab56588c0f8"
 pr_summary_path = "docs/agents/lifecycle/codex-maintenance/governance/pr-summary.md"
 closeout_path = "docs/agents/lifecycle/codex-maintenance/governance/maintenance-closeout.json"
 requires_manual_closeout = true
