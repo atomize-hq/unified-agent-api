@@ -27,6 +27,8 @@ pub(super) fn run_codex_preflight(
         "Repository preflight for execute-agent-maintenance.\nReply with exactly {PREFLIGHT_SENTINEL}.\nDo not write, edit, or delete any files.\nDo not run any commands.\n"
     );
     // The run id alone marks descendants as inside the relay; preflight needs no write surfaces.
+    // uaa-0068: before changing either host environment or the fake host harness, add behavioral
+    // assertions for the inherited run id in both host phases; current coverage does not pin it.
     let envs = vec![(
         "XTASK_AGENT_MAINTENANCE_RUN_ID".to_string(),
         context.run_id.clone(),

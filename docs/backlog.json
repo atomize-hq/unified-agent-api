@@ -2362,7 +2362,8 @@
       "notes": [
         "Resolved 2026-09-25 by the nested lifecycle environment guard, preflight marker propagation, subprocess regression coverage for all five guarded CLI names, and packet-prompt clauses. The marker can be cleared by a descendant that chooses to, so the guard's strength rests on no rendered instruction telling one to; that weight is carried by the refusal text, rendered HANDOFF.md, OPS_PLAYBOOK.md, threading.md, review_surfaces.md, and governance/pr-summary.md, plus the standalone packet prompt and its embedded copies.",
         "Accepted residual: `maintenance-audit-status --emit-json` and `maintenance-watch --emit-json` both write a JSON projection to any caller-named path and are deliberately left unguarded because the packet prompt's done criteria require `maintenance-audit-status`. The unguarded lifecycle-query set therefore includes two arbitrary-path writers.",
-        "`spawn_codex_exec` remains unbounded. This guard closes the observed recursion path, but the separate timeout question remains open."
+        "`spawn_codex_exec` remains unbounded. This guard closes the observed recursion path, but the separate timeout question remains open.",
+        "Codex review on 2026-09-25: marker propagation to both host phases is present, but the fake host does not assert the inherited run ID. Deferred P3 test hardening: make the fake host reject a missing or mismatched XTASK_AGENT_MAINTENANCE_RUN_ID in both preflight and write execution. Trigger: before changing either host environment assignment or the fake host harness; see execute/runtime.rs at the preflight marker assignment."
       ],
       "priority": "P1"
     },
@@ -2426,7 +2427,8 @@
       },
       "notes": [
         "Raised 2026-09-25 while auditing a hung background process from a review lane. Not a product defect; it makes `make preflight` and full-suite runs unreliable, which is what has made preflight evidence hard to trust in this work.",
-        "Deliberately not the deletion hazard the same lane reported: that scratch checkout was removed by the lead's own cleanup `rm -rf` while the lane was still live, not by any test."
+        "Deliberately not the deletion hazard the same lane reported: that scratch checkout was removed by the lead's own cleanup `rm -rf` while the lane was still live, not by any test.",
+        "Codex verification on 2026-09-25 demonstrated a more specific mechanism for the empty-success symptom: refresh_publication_entrypoint writes a fixture xtask with fn main() {} and invokes nested cargo commands. An inherited absolute CARGO_TARGET_DIR makes that fixture replace the real shared debug/xtask binary. In one isolated probe its size changed from 38,795,664 to 404,352 bytes and --help changed from 4,673 output bytes to zero, both exit 0. Running without the override keeps each fixture target separate; the complete xtask suite then passed. The earlier claim that outer cargo relinks while running tests is not established by those symptoms alone, and the historical dyld hang has not been independently attributed. Use a worktree-local default target directory for verification; any harness-level isolation change remains separate work."
       ],
       "priority": "P2"
     }
