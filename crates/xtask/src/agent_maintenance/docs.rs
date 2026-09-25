@@ -272,7 +272,7 @@ pub fn render_execution_packet(
         render_stand_down_acquisition(request, &detected_release.target_version);
     let (dry_run_command, write_command) = relay_invocation(&request.relative_path);
     let handoff_contents = wrap_markdown(&format!(
-        "# Handoff\n\nThis file is the canonical contributor execution contract for `{}` maintenance.\n\n## Before you start: freeze this packet\n\n{}\n\n## Packet origin\n\n{}\n\n## Support-surface audit\n\n{}\n\n## Relay contract\n\n- maintained agent packet: `{}`\n- local execution host: `{}`\n- executor surface: `{}`\n- request artifact: `{}`\n- prompt template path: `{}`\n- prompt sha256: `{}`\n- canonical handoff: `{}`\n- derivative pr summary: `{}`\n- exact closeout artifact: `{}`\n- branch linkage: `{}`\n- manual closeout required: `{}`\n\n## Writable surfaces\n\n{}\n\n## Read-only inputs\n\n{}\n\n## Ordered repo commands\n\n{}\n\n## Exact green gates\n\n{}\n\n## Recovery\n\n- recreate packet command: `{}`\n- reopen pr body path: `{}`\n- reopen pr branch: `{}`\n- notes:\n{}\n\n## Dry-run to write relay\n\nUse the `run_id` printed by the dry-run output, replacing `RUN_ID_FROM_DRY_RUN` before invoking write mode.\n\n```sh\n{}\n{}\n```\n\n## Exact closeout command\n\n```sh\ncargo run -p xtask -- close-agent-maintenance --request {} --closeout {}\n```\n\n## Exact maintained-agent prompt\n\n```md\n{}\n```\n",
+        "# Handoff\n\nThis file is the canonical contributor execution contract for `{}` maintenance.\n\n## Before you start: freeze this packet\n\n{}\n\n## Packet origin\n\n{}\n\n## Support-surface audit\n\n{}\n\n## Relay contract\n\nGuarded lifecycle command names appear below as contract metadata or as instructions for an actor outside the relay. An agent executing this packet inside a relay session must not invoke them.\n\n- maintained agent packet: `{}`\n- local execution host: `{}`\n- executor surface: `{}`\n- request artifact: `{}`\n- prompt template path: `{}`\n- prompt sha256: `{}`\n- canonical handoff: `{}`\n- derivative pr summary: `{}`\n- exact closeout artifact: `{}`\n- branch linkage: `{}`\n- manual closeout required: `{}`\n\n## Writable surfaces\n\n{}\n\n## Read-only inputs\n\n{}\n\n## Ordered repo commands\n\n{}\n\n## Exact green gates\n\n{}\n\n## Recovery\n\nPacket recovery is a maintainer action run from outside a relay session. An agent executing this packet inside a relay session must not run any command named in this Recovery section, including its notes.\n\n- recreate packet command: `{}`\n- reopen pr body path: `{}`\n- reopen pr branch: `{}`\n- notes:\n{}\n\n## Dry-run to write relay\n\nStarting the relay is a maintainer action run from outside a relay session. An agent executing this packet inside a relay session must not run either command. The maintainer uses the `run_id` printed by the dry-run output, replacing `RUN_ID_FROM_DRY_RUN` before invoking write mode.\n\n```sh\n{}\n{}\n```\n\n## Exact closeout command\n\nAfter the declared green gates pass, the actor handed the packet PR records the closeout. An agent executing this packet inside a relay session must not run this command.\n\n```sh\ncargo run -p xtask -- close-agent-maintenance --request {} --closeout {}\n```\n\n## Exact maintained-agent prompt\n\n```md\n{}\n```\n",
         request.agent_id,
         stand_down_acquisition,
         trigger_context,
@@ -380,7 +380,7 @@ fn build_automated_packet_docs_from_contract(
         RenderedPacketDoc {
             relative_path: format!("{root}/threading.md"),
             contents: wrap_markdown(&format!(
-                "# Threading\n\n1. Review the auto-generated request at `{}` and the canonical contract at `{}`.\n2. Apply the exact coding-agent prompt from `HANDOFF.md` against branch `{}`.\n3. Author `{}` and run the exact closeout command from `HANDOFF.md` after the green gates pass.\n",
+                "# Threading\n\n1. Review the auto-generated request at `{}` and the canonical contract at `{}`.\n2. Apply the exact coding-agent prompt from `HANDOFF.md` against branch `{}`.\n3. After the green gates pass, the actor handed the packet PR authors `{}` and runs the exact `close-agent-maintenance` command from `HANDOFF.md`. An agent executing this packet inside a relay session must not run that command.\n",
                 request.relative_path,
                 rendered_execution_packet.handoff_relative_path,
                 execution_contract.recovery.reopen_pr_branch,
@@ -390,7 +390,7 @@ fn build_automated_packet_docs_from_contract(
         RenderedPacketDoc {
             relative_path: format!("{root}/review_surfaces.md"),
             contents: wrap_markdown(&format!(
-                "# Review surfaces\n\n## Writable surfaces\n\n{}\n\n## Read-only inputs\n\n{}\n\n## Support debt baseline\n\n- `docs/specs/unified-agent-api/non-tui-support-debt.md`\n",
+                "# Review surfaces\n\nSome paths below contain guarded lifecycle command names. An agent executing this packet inside a relay session must not invoke those commands.\n\n## Writable surfaces\n\n{}\n\n## Read-only inputs\n\n{}\n\n## Support debt baseline\n\n- `docs/specs/unified-agent-api/non-tui-support-debt.md`\n",
                 markdown_repo_path_list(&execution_contract.writable_surfaces),
                 markdown_repo_path_list(&execution_contract.read_only_inputs)
             )),
@@ -443,7 +443,7 @@ fn build_packet_owned_contract_inputs(
         RenderedPacketDoc {
             relative_path: packet_owned_ops_playbook_path(&request.maintenance_root),
             contents: wrap_markdown(&format!(
-                "# Ops playbook\n\nThis packet-owned playbook freezes operator context for `{}` target `{}`.\n\n- request artifact: `{}`\n- basis ref: `{}`\n- opened from: `{}`\n- branch linkage: `{}`\n- canonical handoff: `{}`\n- recovery packet regeneration: `{}`\n",
+                "# Ops playbook\n\nThis packet-owned playbook freezes operator context for `{}` target `{}`.\n\nThe recovery packet-regeneration command is a maintainer action run from outside a relay session. An agent executing this packet inside a relay session must not run it.\n\n- request artifact: `{}`\n- basis ref: `{}`\n- opened from: `{}`\n- branch linkage: `{}`\n- canonical handoff: `{}`\n- recovery packet regeneration: `{}`\n",
                 request.agent_id,
                 detected_release.target_version,
                 request.relative_path,
