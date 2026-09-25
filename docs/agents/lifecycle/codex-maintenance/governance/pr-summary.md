@@ -2,13 +2,13 @@
 
 # PR summary
 
-Automated maintenance packet for `codex` target `0.155.0`.
+Automated maintenance packet for `codex` target `0.156.1`.
 
 - canonical execution contract: `docs/agents/lifecycle/codex-maintenance/HANDOFF.md`
 - request artifact: `docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml`
-- branch: `automation/codex-maintenance-0.155.0`
+- branch: `automation/codex-maintenance-0.156.1`
 - opened from: `.github/workflows/agent-maintenance-open-pr.yml`
-- prompt sha256: `6848635390da7e6783b8171535dc63e432518fc9cc6359d6ef50ab37be5044e1`
+- prompt sha256: `2498dea39ad568795819b81b7fee2f728f91904d2a79720bbadc88b3a4a3e963`
 
 ## Support-surface audit
 
@@ -32,7 +32,7 @@ Follow `docs/agents/lifecycle/codex-maintenance/HANDOFF.md` exactly. This PR sum
 ## Exact maintained-agent prompt
 
 ```md
-# Packet PR Maintenance Prompt (`0.155.0`)
+# Packet PR Maintenance Prompt (`0.156.1`)
 
 This template renders the exact maintained-agent prompt for `codex` packet execution.
 `docs/agents/lifecycle/codex-maintenance/HANDOFF.md` remains canonical and `governance/pr-summary.md` is derivative.
@@ -41,7 +41,7 @@ This template renders the exact maintained-agent prompt for `codex` packet execu
 
 ## Goal
 
-Execute the automated maintenance packet for `codex` target `0.155.0`.
+Execute the automated maintenance packet for `codex` target `0.156.1`.
 
 ## Frozen request contract
 
@@ -63,17 +63,24 @@ Execute the automated maintenance packet for `codex` target `0.155.0`.
 
 ## Required workflow
 
-1. Compare the current validated baseline from `cli_manifests/codex/latest_validated.txt` against the target `0.155.0` artifacts.
+1. Compare the current validated baseline from `cli_manifests/codex/latest_validated.txt` against the target `0.156.1` artifacts.
 2. Use `support_surface_audit` to classify newly discovered non-TUI surface, preexisting non-TUI debt, required uplifts, and allowed deferrals.
-3. Land bounded wrapper/backend/manifest/publication updates for every row in `required_uplifts_this_run`.
-4. Refresh or create version-scoped manifest artifacts under `cli_manifests/codex/snapshots/0.155.0/`, `cli_manifests/codex/reports/0.155.0/`, and `cli_manifests/codex/versions/0.155.0.json` as required by the packet.
-5. Leave closeout manual; record it only with `close-agent-maintenance` after the declared green gates pass.
+3. For each `deferred_preexisting_gaps` row that also appears in `required_uplifts_this_run`, decide whether its `defer_reason` still holds at `0.156.1`. If it does, re-authorize that identity's existing debt row or rows in `docs/specs/unified-agent-api/non-tui-support-debt.md` in place:
+   - set `authorized_at_version` to `0.156.1`;
+   - set `scope_target_triples` so the rows together cover exactly the targets whose `cli_manifests/codex/reports/0.156.1/coverage.<target>.json` lists the surface, with no target in two rows;
+   - set `authorization_evidence_ref` to `cli_manifests/codex/reports/0.156.1/coverage.any.json`.
+
+   Change no other field and add no row. If the blocker no longer holds, treat the row as an uplift.
+4. Land bounded wrapper/backend/manifest/publication updates for every remaining row in `required_uplifts_this_run`. Newly discovered surface is never deferred (maintenance-request contract field invariant 3), and no debt row may be added.
+5. Refresh or create version-scoped manifest artifacts under `cli_manifests/codex/snapshots/0.156.1/`, `cli_manifests/codex/reports/0.156.1/`, and `cli_manifests/codex/versions/0.156.1.json` as required by the packet.
+6. Leave closeout manual; record it only with `close-agent-maintenance` after the declared green gates pass.
 
 ## Done criteria
 
 - Changes stay within the writable surfaces frozen in `docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml`.
-- No newly discovered non-TUI surface remains unresolved unless the packet records one allowed deferral.
+- Every row in `required_uplifts_this_run` is uplifted, or is a preexisting debt row re-authorized at `0.156.1`; newly discovered surface is never deferred.
 - `cargo run -p xtask -- codex-validate --root cli_manifests/codex` passes.
+- `cargo run -p xtask -- maintenance-audit-status --request docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml` exits 0.
 - The remaining ordered commands and green gates from `docs/agents/lifecycle/codex-maintenance/HANDOFF.md` pass or are captured in maintainer follow-up notes.
 
 ```
