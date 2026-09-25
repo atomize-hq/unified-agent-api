@@ -1,0 +1,5 @@
+schema_version = 1
+agent_id = "codex"
+target_version = "0.156.1"
+reason = "closeout rehearsal in progress on the 0.156.1 packet PR"
+request_recorded_at = "2026-09-25T08:49:50Z"
