@@ -248,8 +248,11 @@ pub(crate) fn derive_support_surface_audit(
         .unwrap_or_else(|| {
             debt_rows
                 .iter()
-                .map(|row| TargetedGap {
-                    identity: row.identity(),
+                .map(DebtInventoryRow::identity)
+                .collect::<BTreeSet<_>>()
+                .into_iter()
+                .map(|identity| TargetedGap {
+                    identity,
                     targets: BTreeSet::new(),
                 })
                 .collect()
@@ -275,6 +278,10 @@ pub(crate) fn derive_support_surface_audit(
             surface_doc: SUPPORT_MATRIX_DOC_PATH.to_string(),
         });
         let authorization = authorize_gap(gap, &detected_release.target_version, &debt_rows);
+        // The contract (maintenance-request-contract-v1.md) says the smallest contributing grant
+        // supplies debt_ref, reason, and follow-on; this selects over every row of the identity.
+        // Aligning them changes debt_ref across re-authorization, which debt_baseline_drift compares.
+        // Tracked as uaa-0059; the relay prompt re-authorizes in place until it is resolved.
         let debt_row = debt_rows
             .iter()
             .filter(|row| row.identity() == *surface)

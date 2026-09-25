@@ -120,7 +120,7 @@ enum Command {
     /// Detect stale enrolled agents from registry truth and emit the maintenance queue.
     MaintenanceWatch(agent_maintenance_watch::Args),
     /// Prepare an automated maintenance request and packet docs from release-watch inputs.
-    PrepareAgentMaintenance(agent_maintenance_prepare::Args),
+    PrepareAgentMaintenance(agent_maintenance_prepare::Cli),
     /// Execute the bounded contributor relay for an automated maintenance request.
     ExecuteAgentMaintenance(agent_maintenance_execute::Args),
     /// Re-derive the live support-surface audit gate for a maintenance request.
@@ -367,7 +367,10 @@ fn main() {
                 err.exit_code()
             }
         },
-        Command::PrepareAgentMaintenance(args) => match agent_maintenance_prepare::run(args) {
+        Command::PrepareAgentMaintenance(cli_args) => match cli_args
+            .into_args()
+            .and_then(agent_maintenance_prepare::run)
+        {
             Ok(()) => 0,
             Err(err) => {
                 eprintln!("{err}");

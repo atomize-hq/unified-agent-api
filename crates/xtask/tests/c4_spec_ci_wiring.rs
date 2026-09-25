@@ -5,6 +5,8 @@ use regex::Regex;
 use xtask::agent_maintenance::audit_status::{EXIT_INCOMPLETE_ACQUISITION, EXIT_UPLIFTS_REQUIRED};
 use xtask::agent_maintenance::stand_down::{BASE_BRANCH, EXIT_STOOD_DOWN};
 
+#[path = "c4_spec_ci_wiring/acquisition_refreeze.rs"]
+mod acquisition_refreeze;
 #[path = "c4_spec_ci_wiring/maintenance_audit_gate.rs"]
 mod maintenance_audit_gate;
 

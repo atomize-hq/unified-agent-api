@@ -38,6 +38,9 @@ use request::load_request_envelope;
 
 const SEEDED_REGISTRY: &str = include_str!("../data/agent_registry.toml");
 
+#[path = "agent_maintenance_prepare/from_request.rs"]
+mod from_request_tests;
+
 #[test]
 fn prepare_agent_maintenance_builds_packet_first_plan() {
     let fixture = fixture_root("prepare-agent-maintenance-plan");
@@ -536,7 +539,6 @@ fn automated_request_with_execution_contract_toml() -> String {
             "  \"docs/agents/lifecycle/codex-maintenance/CI_WORKFLOWS_PLAN.md\",\n",
             "  \"docs/agents/lifecycle/codex-maintenance/governance/execute-agent-maintenance-prompt.md\",\n",
             "  \".github/workflows/agent-maintenance-open-pr.yml\",\n",
-            "  \"docs/specs/unified-agent-api/non-tui-support-debt.md\",\n",
             "]\n",
             "ordered_commands = [\n",
             "  \"cargo fmt --all\",\n",
