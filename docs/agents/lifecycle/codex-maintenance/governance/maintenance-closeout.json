@@ -1,33 +1,325 @@
 {
   "request_ref": "docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml",
-  "request_sha256": "27f3c0797b0ae6af9d8297d0d816d6c8e3cc730b72fbe84a6674f1aa0d9cad6a",
+  "request_sha256": "92961ae8c983df38f1d6dce287bf0761088e517d3567b133070a6c1f4e3aea6b",
   "resolved_findings": [
     {
       "category_id": "registry_manifest_drift",
-      "summary": "The codex 0.144.6 packet materialized the version-scoped snapshots, coverage reports, union, version metadata, wrapper coverage, and lockfile provenance required by the live maintenance request (baseline 0.125.0 -> target 0.144.6).",
+      "summary": "The codex 0.156.1 packet materialized the version-scoped manifest artifacts required by the live maintenance request.",
       "surfaces": [
-        "cli_manifests/codex/snapshots/0.144.6/aarch64-apple-darwin.json",
-        "cli_manifests/codex/snapshots/0.144.6/x86_64-unknown-linux-musl.json",
-        "cli_manifests/codex/snapshots/0.144.6/union.json",
-        "cli_manifests/codex/reports/0.144.6/coverage.aarch64-apple-darwin.json",
-        "cli_manifests/codex/reports/0.144.6/coverage.x86_64-unknown-linux-musl.json",
-        "cli_manifests/codex/reports/0.144.6/coverage.any.json",
-        "cli_manifests/codex/versions/0.144.6.json",
+        "cli_manifests/codex/snapshots/0.156.1/aarch64-apple-darwin.json",
+        "cli_manifests/codex/snapshots/0.156.1/aarch64-unknown-linux-musl.json",
+        "cli_manifests/codex/snapshots/0.156.1/union.json",
+        "cli_manifests/codex/snapshots/0.156.1/x86_64-pc-windows-msvc.json",
+        "cli_manifests/codex/snapshots/0.156.1/x86_64-unknown-linux-musl.json",
+        "cli_manifests/codex/reports/0.156.1/coverage.aarch64-apple-darwin.json",
+        "cli_manifests/codex/reports/0.156.1/coverage.aarch64-unknown-linux-musl.json",
+        "cli_manifests/codex/reports/0.156.1/coverage.all.json",
+        "cli_manifests/codex/reports/0.156.1/coverage.any.json",
+        "cli_manifests/codex/reports/0.156.1/coverage.x86_64-pc-windows-msvc.json",
+        "cli_manifests/codex/reports/0.156.1/coverage.x86_64-unknown-linux-musl.json",
+        "cli_manifests/codex/versions/0.156.1.json",
         "cli_manifests/codex/wrapper_coverage.json",
         "cli_manifests/codex/artifacts.lock.json"
       ]
     },
     {
       "category_id": "support_publication_drift",
-      "summary": "Support-matrix publication was regenerated to match the landed codex 0.144.6 manifest truth, including the deterministic passthrough evidence note derived from the committed 0.144.6 coverage passthrough_candidates.",
+      "summary": "Support-matrix publication was regenerated to match the landed codex 0.156.1 manifest truth.",
       "surfaces": [
         "cli_manifests/support_matrix/current.json",
         "docs/specs/unified-agent-api/support-matrix.md"
       ]
     }
   ],
-  "explicit_none_reason": "Live drift for codex is clean (check-agent-drift --agent codex -> status: clean) after the 0.144.6 packet write, the bounded non-TUI passthrough surface, and green-gate validation (fmt, codex-validate, support-matrix --check, capability-matrix --check, capability-matrix-audit, make preflight). No maintenance drift findings remain deferred. The frozen support_surface_audit was reconciled via prepare-agent-maintenance/refresh-agent to the post-passthrough coverage: the 68 discovered upstream surfaces are now covered by the bounded passthrough surface, so required_uplifts_this_run is 0; only the two preexisting `codex completion` non-TUI rows stay deferred by the request (requires_new_architectural_seam; TODOS.md#close-codex-completion-maintenance-gap) as support-surface debt, not drift. Two out-of-envelope xtask follow-ups (snapshot-discovery parser fix; support-matrix passthrough-note tooling) are recorded in governance/maintainer-follow-up.md and governance/orchestration-friction-log.md.",
+  "explicit_none_reason": "`check-agent-drift --agent codex` reports status: clean, so no maintenance drift finding remains deferred. Derived from the live report at closeout time, not carried forward from the request.",
+  "wrapper_only_baseline_ref": "cli_manifests/codex/reports/0.156.1/coverage.any.json",
+  "wrapper_only_dispositions": [
+    {
+      "surface_kind": "subcommands",
+      "command_path": "codex execpolicy check",
+      "surface_id": "check",
+      "category": "hidden_upstream_supported",
+      "evidence_ref": "docs/agents/lifecycle/codex-maintenance/governance/wrapper-only-evidence-0.156.1.md",
+      "note": "The 0.156.1 source registers this hidden command and implements the named surface; see the version-pinned source evidence."
+    },
+    {
+      "surface_kind": "commands",
+      "command_path": "codex mcp-server",
+      "surface_id": "mcp-server",
+      "category": "older_upstream_only",
+      "evidence_ref": "docs/agents/lifecycle/codex-maintenance/governance/wrapper-only-evidence-0.156.1.md",
+      "note": "Upstream 0.153.4 implements this surface; 0.156.1 does not implement the same invocation. Retained for wrapper compatibility with older upstream versions. See the version-pinned source evidence and following release boundary.",
+      "last_supported_version": "0.153.4"
+    },
+    {
+      "surface_kind": "commands",
+      "command_path": "codex responses-api-proxy",
+      "surface_id": "responses-api-proxy",
+      "category": "hidden_upstream_supported",
+      "evidence_ref": "docs/agents/lifecycle/codex-maintenance/governance/wrapper-only-evidence-0.156.1.md",
+      "note": "The 0.156.1 source registers this hidden command and implements the named surface; see the version-pinned source evidence."
+    },
+    {
+      "surface_kind": "subcommands",
+      "command_path": "codex sandbox help",
+      "surface_id": "help",
+      "category": "older_upstream_only",
+      "evidence_ref": "docs/agents/lifecycle/codex-maintenance/governance/wrapper-only-evidence-0.156.1.md",
+      "note": "Upstream 0.133.0 implements this surface; 0.156.1 does not implement the same invocation. Retained for wrapper compatibility with older upstream versions. See the version-pinned source evidence and following release boundary.",
+      "last_supported_version": "0.133.0"
+    },
+    {
+      "surface_kind": "subcommands",
+      "command_path": "codex sandbox linux",
+      "surface_id": "linux",
+      "category": "older_upstream_only",
+      "evidence_ref": "docs/agents/lifecycle/codex-maintenance/governance/wrapper-only-evidence-0.156.1.md",
+      "note": "Upstream 0.133.0 implements this surface; 0.156.1 does not implement the same invocation. Retained for wrapper compatibility with older upstream versions. See the version-pinned source evidence and following release boundary.",
+      "last_supported_version": "0.133.0"
+    },
+    {
+      "surface_kind": "subcommands",
+      "command_path": "codex sandbox macos",
+      "surface_id": "macos",
+      "category": "older_upstream_only",
+      "evidence_ref": "docs/agents/lifecycle/codex-maintenance/governance/wrapper-only-evidence-0.156.1.md",
+      "note": "Upstream 0.133.0 implements this surface; 0.156.1 does not implement the same invocation. Retained for wrapper compatibility with older upstream versions. See the version-pinned source evidence and following release boundary.",
+      "last_supported_version": "0.133.0"
+    },
+    {
+      "surface_kind": "subcommands",
+      "command_path": "codex sandbox windows",
+      "surface_id": "windows",
+      "category": "older_upstream_only",
+      "evidence_ref": "docs/agents/lifecycle/codex-maintenance/governance/wrapper-only-evidence-0.156.1.md",
+      "note": "Upstream 0.133.0 implements this surface; 0.156.1 does not implement the same invocation. Retained for wrapper compatibility with older upstream versions. See the version-pinned source evidence and following release boundary.",
+      "last_supported_version": "0.133.0"
+    },
+    {
+      "surface_kind": "commands",
+      "command_path": "codex stdio-to-uds",
+      "surface_id": "stdio-to-uds",
+      "category": "hidden_upstream_supported",
+      "evidence_ref": "docs/agents/lifecycle/codex-maintenance/governance/wrapper-only-evidence-0.156.1.md",
+      "note": "The 0.156.1 source registers this hidden command and implements the named surface; see the version-pinned source evidence."
+    },
+    {
+      "surface_kind": "global_flags",
+      "command_path": "codex",
+      "surface_id": "--full-auto",
+      "category": "older_upstream_only",
+      "evidence_ref": "docs/agents/lifecycle/codex-maintenance/governance/wrapper-only-evidence-0.156.1.md",
+      "note": "Upstream 0.125.0 implements this surface; 0.156.1 does not implement the same invocation. Retained for wrapper compatibility with older upstream versions. See the version-pinned source evidence and following release boundary.",
+      "last_supported_version": "0.125.0"
+    },
+    {
+      "surface_kind": "flags",
+      "command_path": "codex exec-server",
+      "surface_id": "--executor-id",
+      "category": "older_upstream_only",
+      "evidence_ref": "docs/agents/lifecycle/codex-maintenance/governance/wrapper-only-evidence-0.156.1.md",
+      "note": "Upstream 0.132.0 implements this surface; 0.156.1 does not implement the same invocation. Retained for wrapper compatibility with older upstream versions. See the version-pinned source evidence and following release boundary.",
+      "last_supported_version": "0.132.0"
+    },
+    {
+      "surface_kind": "flags",
+      "command_path": "codex execpolicy check",
+      "surface_id": "--policy",
+      "category": "obsolete",
+      "evidence_ref": "docs/agents/lifecycle/codex-maintenance/governance/wrapper-only-evidence-0.156.1.md",
+      "note": "The 0.156.1 parser requires --rules and does not accept --policy. The source emission and publication claim have been corrected in this packet; historical support for --policy is not asserted."
+    },
+    {
+      "surface_kind": "flags",
+      "command_path": "codex execpolicy check",
+      "surface_id": "--pretty",
+      "category": "hidden_upstream_supported",
+      "evidence_ref": "docs/agents/lifecycle/codex-maintenance/governance/wrapper-only-evidence-0.156.1.md",
+      "note": "The 0.156.1 source registers this hidden command and implements the named surface; see the version-pinned source evidence."
+    },
+    {
+      "surface_kind": "flags",
+      "command_path": "codex login",
+      "surface_id": "--api-key",
+      "category": "older_upstream_only",
+      "evidence_ref": "docs/agents/lifecycle/codex-maintenance/governance/wrapper-only-evidence-0.156.1.md",
+      "note": "Upstream 0.44.0 implements this surface; 0.156.1 does not implement the same invocation. Retained for wrapper compatibility with older upstream versions. See the version-pinned source evidence and following release boundary.",
+      "last_supported_version": "0.44.0"
+    },
+    {
+      "surface_kind": "flags",
+      "command_path": "codex login",
+      "surface_id": "--mcp",
+      "category": "obsolete",
+      "evidence_ref": "docs/agents/lifecycle/codex-maintenance/governance/wrapper-only-evidence-0.156.1.md",
+      "note": "The 0.156.1 LoginCommand does not implement --mcp. Historical upstream support was not established. The obsolete publication claim is withdrawn from the source declaration, normative catalog and regenerated reports in this packet; the conditional wrapper method remains for API compatibility. This does not assert a historical removal version."
+    },
+    {
+      "surface_kind": "flags",
+      "command_path": "codex responses-api-proxy",
+      "surface_id": "--http-shutdown",
+      "category": "hidden_upstream_supported",
+      "evidence_ref": "docs/agents/lifecycle/codex-maintenance/governance/wrapper-only-evidence-0.156.1.md",
+      "note": "The 0.156.1 source registers this hidden command and implements the named surface; see the version-pinned source evidence."
+    },
+    {
+      "surface_kind": "flags",
+      "command_path": "codex responses-api-proxy",
+      "surface_id": "--port",
+      "category": "hidden_upstream_supported",
+      "evidence_ref": "docs/agents/lifecycle/codex-maintenance/governance/wrapper-only-evidence-0.156.1.md",
+      "note": "The 0.156.1 source registers this hidden command and implements the named surface; see the version-pinned source evidence."
+    },
+    {
+      "surface_kind": "flags",
+      "command_path": "codex responses-api-proxy",
+      "surface_id": "--server-info",
+      "category": "hidden_upstream_supported",
+      "evidence_ref": "docs/agents/lifecycle/codex-maintenance/governance/wrapper-only-evidence-0.156.1.md",
+      "note": "The 0.156.1 source registers this hidden command and implements the named surface; see the version-pinned source evidence."
+    },
+    {
+      "surface_kind": "flags",
+      "command_path": "codex responses-api-proxy",
+      "surface_id": "--upstream-url",
+      "category": "hidden_upstream_supported",
+      "evidence_ref": "docs/agents/lifecycle/codex-maintenance/governance/wrapper-only-evidence-0.156.1.md",
+      "note": "The 0.156.1 source registers this hidden command and implements the named surface; see the version-pinned source evidence."
+    },
+    {
+      "surface_kind": "flags",
+      "command_path": "codex sandbox linux",
+      "surface_id": "--include-managed-config",
+      "category": "older_upstream_only",
+      "evidence_ref": "docs/agents/lifecycle/codex-maintenance/governance/wrapper-only-evidence-0.156.1.md",
+      "note": "Upstream 0.133.0 implements this surface; 0.156.1 does not implement the same invocation. Retained for wrapper compatibility with older upstream versions. See the version-pinned source evidence and following release boundary.",
+      "last_supported_version": "0.133.0"
+    },
+    {
+      "surface_kind": "flags",
+      "command_path": "codex sandbox linux",
+      "surface_id": "--permissions-profile",
+      "category": "older_upstream_only",
+      "evidence_ref": "docs/agents/lifecycle/codex-maintenance/governance/wrapper-only-evidence-0.156.1.md",
+      "note": "Upstream 0.133.0 implements this surface; 0.156.1 does not implement the same invocation. Retained for wrapper compatibility with older upstream versions. See the version-pinned source evidence and following release boundary.",
+      "last_supported_version": "0.133.0"
+    },
+    {
+      "surface_kind": "flags",
+      "command_path": "codex sandbox macos",
+      "surface_id": "--allow-unix-socket",
+      "category": "older_upstream_only",
+      "evidence_ref": "docs/agents/lifecycle/codex-maintenance/governance/wrapper-only-evidence-0.156.1.md",
+      "note": "Upstream 0.133.0 implements this surface; 0.156.1 does not implement the same invocation. Retained for wrapper compatibility with older upstream versions. See the version-pinned source evidence and following release boundary.",
+      "last_supported_version": "0.133.0"
+    },
+    {
+      "surface_kind": "flags",
+      "command_path": "codex sandbox macos",
+      "surface_id": "--include-managed-config",
+      "category": "older_upstream_only",
+      "evidence_ref": "docs/agents/lifecycle/codex-maintenance/governance/wrapper-only-evidence-0.156.1.md",
+      "note": "Upstream 0.133.0 implements this surface; 0.156.1 does not implement the same invocation. Retained for wrapper compatibility with older upstream versions. See the version-pinned source evidence and following release boundary.",
+      "last_supported_version": "0.133.0"
+    },
+    {
+      "surface_kind": "flags",
+      "command_path": "codex sandbox macos",
+      "surface_id": "--log-denials",
+      "category": "older_upstream_only",
+      "evidence_ref": "docs/agents/lifecycle/codex-maintenance/governance/wrapper-only-evidence-0.156.1.md",
+      "note": "Upstream 0.133.0 implements this surface; 0.156.1 does not implement the same invocation. Retained for wrapper compatibility with older upstream versions. See the version-pinned source evidence and following release boundary.",
+      "last_supported_version": "0.133.0"
+    },
+    {
+      "surface_kind": "flags",
+      "command_path": "codex sandbox macos",
+      "surface_id": "--permissions-profile",
+      "category": "older_upstream_only",
+      "evidence_ref": "docs/agents/lifecycle/codex-maintenance/governance/wrapper-only-evidence-0.156.1.md",
+      "note": "Upstream 0.133.0 implements this surface; 0.156.1 does not implement the same invocation. Retained for wrapper compatibility with older upstream versions. See the version-pinned source evidence and following release boundary.",
+      "last_supported_version": "0.133.0"
+    },
+    {
+      "surface_kind": "flags",
+      "command_path": "codex sandbox windows",
+      "surface_id": "--include-managed-config",
+      "category": "older_upstream_only",
+      "evidence_ref": "docs/agents/lifecycle/codex-maintenance/governance/wrapper-only-evidence-0.156.1.md",
+      "note": "Upstream 0.133.0 implements this surface; 0.156.1 does not implement the same invocation. Retained for wrapper compatibility with older upstream versions. See the version-pinned source evidence and following release boundary.",
+      "last_supported_version": "0.133.0"
+    },
+    {
+      "surface_kind": "flags",
+      "command_path": "codex sandbox windows",
+      "surface_id": "--permissions-profile",
+      "category": "older_upstream_only",
+      "evidence_ref": "docs/agents/lifecycle/codex-maintenance/governance/wrapper-only-evidence-0.156.1.md",
+      "note": "Upstream 0.133.0 implements this surface; 0.156.1 does not implement the same invocation. Retained for wrapper compatibility with older upstream versions. See the version-pinned source evidence and following release boundary.",
+      "last_supported_version": "0.133.0"
+    },
+    {
+      "surface_kind": "positional_args",
+      "command_path": "codex execpolicy check",
+      "surface_id": "COMMAND",
+      "category": "hidden_upstream_supported",
+      "evidence_ref": "docs/agents/lifecycle/codex-maintenance/governance/wrapper-only-evidence-0.156.1.md",
+      "note": "The 0.156.1 source registers this hidden command and implements the named surface; see the version-pinned source evidence."
+    },
+    {
+      "surface_kind": "positional_args",
+      "command_path": "codex sandbox help",
+      "surface_id": "COMMAND",
+      "category": "older_upstream_only",
+      "evidence_ref": "docs/agents/lifecycle/codex-maintenance/governance/wrapper-only-evidence-0.156.1.md",
+      "note": "Upstream 0.133.0 implements this surface; 0.156.1 does not implement the same invocation. Retained for wrapper compatibility with older upstream versions. See the version-pinned source evidence and following release boundary.",
+      "last_supported_version": "0.133.0"
+    },
+    {
+      "surface_kind": "positional_args",
+      "command_path": "codex sandbox linux",
+      "surface_id": "COMMAND",
+      "category": "older_upstream_only",
+      "evidence_ref": "docs/agents/lifecycle/codex-maintenance/governance/wrapper-only-evidence-0.156.1.md",
+      "note": "Upstream 0.133.0 implements this surface; 0.156.1 does not implement the same invocation. Retained for wrapper compatibility with older upstream versions. See the version-pinned source evidence and following release boundary.",
+      "last_supported_version": "0.133.0"
+    },
+    {
+      "surface_kind": "positional_args",
+      "command_path": "codex sandbox macos",
+      "surface_id": "COMMAND",
+      "category": "older_upstream_only",
+      "evidence_ref": "docs/agents/lifecycle/codex-maintenance/governance/wrapper-only-evidence-0.156.1.md",
+      "note": "Upstream 0.133.0 implements this surface; 0.156.1 does not implement the same invocation. Retained for wrapper compatibility with older upstream versions. See the version-pinned source evidence and following release boundary.",
+      "last_supported_version": "0.133.0"
+    },
+    {
+      "surface_kind": "positional_args",
+      "command_path": "codex sandbox windows",
+      "surface_id": "COMMAND",
+      "category": "older_upstream_only",
+      "evidence_ref": "docs/agents/lifecycle/codex-maintenance/governance/wrapper-only-evidence-0.156.1.md",
+      "note": "Upstream 0.133.0 implements this surface; 0.156.1 does not implement the same invocation. Retained for wrapper compatibility with older upstream versions. See the version-pinned source evidence and following release boundary.",
+      "last_supported_version": "0.133.0"
+    },
+    {
+      "surface_kind": "positional_args",
+      "command_path": "codex stdio-to-uds",
+      "surface_id": "SOCKET_PATH",
+      "category": "hidden_upstream_supported",
+      "evidence_ref": "docs/agents/lifecycle/codex-maintenance/governance/wrapper-only-evidence-0.156.1.md",
+      "note": "The 0.156.1 source registers this hidden command and implements the named surface; see the version-pinned source evidence."
+    },
+    {
+      "surface_kind": "flags",
+      "command_path": "codex execpolicy check",
+      "surface_id": "--rules",
+      "category": "hidden_upstream_supported",
+      "evidence_ref": "docs/agents/lifecycle/codex-maintenance/governance/wrapper-only-evidence-0.156.1.md",
+      "note": "The pinned 0.156.1 hidden execpolicy check command requires repeatable --rules paths. The wrapper now emits that exact option through the preserved Rust policy()/policies() API."
+    }
+  ],
   "preflight_passed": true,
-  "recorded_at": "2026-07-22T02:42:12Z",
-  "commit": "9234efca"
+  "recorded_at": "2026-09-25T21:25:15Z",
+  "commit": "aacd785fe6a3920ab016b6ce7986a4c7c5831f18"
 }

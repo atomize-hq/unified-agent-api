@@ -177,7 +177,7 @@ Notes:
 
 Wrapper API family:
 - `CodexClient::spawn_login_process` (login interactive)
-- `CodexClient::spawn_mcp_login_process` (login with MCP integration)
+- `CodexClient::spawn_mcp_login_process` (conditional compatibility helper; no upstream coverage claim)
 - `CodexClient::login_with_api_key`
 - `CodexClient::login_status`
 - `CodexClient::logout`
@@ -192,11 +192,12 @@ Wrapper API family:
 
 The generator MUST emit the following flags under `path=["login"]`:
 
-- `--mcp` (level: `explicit`, note: `capability-guarded`)
 - `--api-key` (level: `explicit`)
 - `--device-auth` (level: `explicit`)
 - `--with-access-token` (level: `explicit`)
 - `--with-api-key` (level: `explicit`)
+
+The generator MUST NOT claim `login --mcp`: Codex 0.156.1 does not implement that invocation. The conditional compatibility helper remains available without a published upstream-support claim. MCP OAuth login is the separate `mcp login` surface in Scenario 18.
 
 The generator MUST NOT emit any flags or args under:
 - `path=["login","status"]`
@@ -301,7 +302,7 @@ Wrapper API family:
 
 ### Required command-specific flags
 
-- `--policy` (level: `explicit`)
+- `--rules` (level: `explicit`)
 - `--pretty` (level: `explicit`)
 
 ### Required positional args

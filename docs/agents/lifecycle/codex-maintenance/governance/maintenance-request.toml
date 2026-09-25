@@ -6,8 +6,8 @@ opened_from = ".github/workflows/agent-maintenance-open-pr.yml"
 requested_control_plane_actions = [
   "packet_doc_refresh",
 ]
-request_recorded_at = "2026-09-20T08:34:28Z"
-request_commit = "35678c6ee381d32902611ae81208078bb2eedb31"
+request_recorded_at = "2026-09-25T08:49:50Z"
+request_commit = "9e4a06ad0a9494fcc8d3fbb10ef57f35b55c42aa"
 
 [runtime_followup_required]
 required = false
@@ -16,14 +16,14 @@ items = []
 [detected_release]
 detected_by = ".github/workflows/agent-maintenance-release-watch.yml"
 current_validated = "0.125.0"
-target_version = "0.155.0"
-latest_stable = "0.155.1"
+target_version = "0.156.1"
+latest_stable = "0.157.0"
 version_policy = "latest_stable_minus_one"
 source_kind = "github_releases"
 source_ref = "openai/codex"
 dispatch_kind = "packet_pr"
 dispatch_workflow = "agent-maintenance-open-pr.yml"
-branch_name = "automation/codex-maintenance-0.155.0"
+branch_name = "automation/codex-maintenance-0.156.1"
 
 [support_surface_audit]
 required = true
@@ -49,15 +49,339 @@ expected_post_run_debt_count = 2
 
 [[support_surface_audit.unbaselined_gap_surface]]
 surface_kind = "commands"
+command_path = "codex agents"
+surface_id = "agents"
+evidence_ref = "cli_manifests/codex/reports/0.156.1/coverage.any.json"
+
+[[support_surface_audit.unbaselined_gap_surface]]
+surface_kind = "commands"
 command_path = "codex completion"
 surface_id = "completion"
-evidence_ref = "docs/specs/unified-agent-api/non-tui-support-debt.md"
+evidence_ref = "cli_manifests/codex/reports/0.156.1/coverage.any.json"
+
+[[support_surface_audit.unbaselined_gap_surface]]
+surface_kind = "commands"
+command_path = "codex migrate-rollouts"
+surface_id = "migrate-rollouts"
+evidence_ref = "cli_manifests/codex/reports/0.156.1/coverage.any.json"
+
+[[support_surface_audit.unbaselined_gap_surface]]
+surface_kind = "commands"
+command_path = "codex queue"
+surface_id = "queue"
+evidence_ref = "cli_manifests/codex/reports/0.156.1/coverage.any.json"
+
+[[support_surface_audit.unbaselined_gap_surface]]
+surface_kind = "flags"
+command_path = "codex app-server"
+surface_id = "--code-mode-host"
+evidence_ref = "cli_manifests/codex/reports/0.156.1/coverage.any.json"
+
+[[support_surface_audit.unbaselined_gap_surface]]
+surface_kind = "flags"
+command_path = "codex app-server daemon update"
+surface_id = "--from-cli"
+evidence_ref = "cli_manifests/codex/reports/0.156.1/coverage.any.json"
+
+[[support_surface_audit.unbaselined_gap_surface]]
+surface_kind = "flags"
+command_path = "codex app-server daemon update"
+surface_id = "--yes"
+evidence_ref = "cli_manifests/codex/reports/0.156.1/coverage.any.json"
+
+[[support_surface_audit.unbaselined_gap_surface]]
+surface_kind = "flags"
+command_path = "codex exec"
+surface_id = "--thread-source"
+evidence_ref = "cli_manifests/codex/reports/0.156.1/coverage.any.json"
+
+[[support_surface_audit.unbaselined_gap_surface]]
+surface_kind = "flags"
+command_path = "codex exec fork"
+surface_id = "--ephemeral"
+evidence_ref = "cli_manifests/codex/reports/0.156.1/coverage.any.json"
+
+[[support_surface_audit.unbaselined_gap_surface]]
+surface_kind = "flags"
+command_path = "codex exec fork"
+surface_id = "--ignore-rules"
+evidence_ref = "cli_manifests/codex/reports/0.156.1/coverage.any.json"
+
+[[support_surface_audit.unbaselined_gap_surface]]
+surface_kind = "flags"
+command_path = "codex exec fork"
+surface_id = "--ignore-user-config"
+evidence_ref = "cli_manifests/codex/reports/0.156.1/coverage.any.json"
+
+[[support_surface_audit.unbaselined_gap_surface]]
+surface_kind = "flags"
+command_path = "codex exec fork"
+surface_id = "--json"
+evidence_ref = "cli_manifests/codex/reports/0.156.1/coverage.any.json"
+
+[[support_surface_audit.unbaselined_gap_surface]]
+surface_kind = "flags"
+command_path = "codex exec fork"
+surface_id = "--output-last-message"
+evidence_ref = "cli_manifests/codex/reports/0.156.1/coverage.any.json"
+
+[[support_surface_audit.unbaselined_gap_surface]]
+surface_kind = "flags"
+command_path = "codex exec fork"
+surface_id = "--output-schema"
+evidence_ref = "cli_manifests/codex/reports/0.156.1/coverage.any.json"
+
+[[support_surface_audit.unbaselined_gap_surface]]
+surface_kind = "flags"
+command_path = "codex exec fork"
+surface_id = "--skip-git-repo-check"
+evidence_ref = "cli_manifests/codex/reports/0.156.1/coverage.any.json"
+
+[[support_surface_audit.unbaselined_gap_surface]]
+surface_kind = "flags"
+command_path = "codex exec fork"
+surface_id = "--thread-source"
+evidence_ref = "cli_manifests/codex/reports/0.156.1/coverage.any.json"
+
+[[support_surface_audit.unbaselined_gap_surface]]
+surface_kind = "flags"
+command_path = "codex exec resume"
+surface_id = "--thread-source"
+evidence_ref = "cli_manifests/codex/reports/0.156.1/coverage.any.json"
+
+[[support_surface_audit.unbaselined_gap_surface]]
+surface_kind = "flags"
+command_path = "codex exec review"
+surface_id = "--thread-source"
+evidence_ref = "cli_manifests/codex/reports/0.156.1/coverage.any.json"
+
+[[support_surface_audit.unbaselined_gap_surface]]
+surface_kind = "flags"
+command_path = "codex exec-server"
+surface_id = "--aws-profile"
+evidence_ref = "cli_manifests/codex/reports/0.156.1/coverage.any.json"
+
+[[support_surface_audit.unbaselined_gap_surface]]
+surface_kind = "flags"
+command_path = "codex exec-server"
+surface_id = "--aws-region"
+evidence_ref = "cli_manifests/codex/reports/0.156.1/coverage.any.json"
+
+[[support_surface_audit.unbaselined_gap_surface]]
+surface_kind = "flags"
+command_path = "codex exec-server"
+surface_id = "--aws-service"
+evidence_ref = "cli_manifests/codex/reports/0.156.1/coverage.any.json"
+
+[[support_surface_audit.unbaselined_gap_surface]]
+surface_kind = "flags"
+command_path = "codex exec-server"
+surface_id = "--aws-sigv4"
+evidence_ref = "cli_manifests/codex/reports/0.156.1/coverage.any.json"
+
+[[support_surface_audit.unbaselined_gap_surface]]
+surface_kind = "flags"
+command_path = "codex exec-server"
+surface_id = "--concurrent-requests"
+evidence_ref = "cli_manifests/codex/reports/0.156.1/coverage.any.json"
+
+[[support_surface_audit.unbaselined_gap_surface]]
+surface_kind = "flags"
+command_path = "codex exec-server"
+surface_id = "--exit-on-stdin-close"
+evidence_ref = "cli_manifests/codex/reports/0.156.1/coverage.any.json"
+
+[[support_surface_audit.unbaselined_gap_surface]]
+surface_kind = "flags"
+command_path = "codex exec-server"
+surface_id = "--remote-transport"
+evidence_ref = "cli_manifests/codex/reports/0.156.1/coverage.any.json"
+
+[[support_surface_audit.unbaselined_gap_surface]]
+surface_kind = "flags"
+command_path = "codex exec-server forward"
+surface_id = "--aws-profile"
+evidence_ref = "cli_manifests/codex/reports/0.156.1/coverage.any.json"
+
+[[support_surface_audit.unbaselined_gap_surface]]
+surface_kind = "flags"
+command_path = "codex exec-server forward"
+surface_id = "--aws-region"
+evidence_ref = "cli_manifests/codex/reports/0.156.1/coverage.any.json"
+
+[[support_surface_audit.unbaselined_gap_surface]]
+surface_kind = "flags"
+command_path = "codex exec-server forward"
+surface_id = "--aws-service"
+evidence_ref = "cli_manifests/codex/reports/0.156.1/coverage.any.json"
+
+[[support_surface_audit.unbaselined_gap_surface]]
+surface_kind = "flags"
+command_path = "codex exec-server forward"
+surface_id = "--aws-sigv4"
+evidence_ref = "cli_manifests/codex/reports/0.156.1/coverage.any.json"
+
+[[support_surface_audit.unbaselined_gap_surface]]
+surface_kind = "flags"
+command_path = "codex exec-server forward"
+surface_id = "--connect"
+evidence_ref = "cli_manifests/codex/reports/0.156.1/coverage.any.json"
+
+[[support_surface_audit.unbaselined_gap_surface]]
+surface_kind = "flags"
+command_path = "codex exec-server forward"
+surface_id = "--environment-id"
+evidence_ref = "cli_manifests/codex/reports/0.156.1/coverage.any.json"
+
+[[support_surface_audit.unbaselined_gap_surface]]
+surface_kind = "flags"
+command_path = "codex exec-server forward"
+surface_id = "--exit-on-stdin-close"
+evidence_ref = "cli_manifests/codex/reports/0.156.1/coverage.any.json"
+
+[[support_surface_audit.unbaselined_gap_surface]]
+surface_kind = "flags"
+command_path = "codex exec-server forward"
+surface_id = "--name"
+evidence_ref = "cli_manifests/codex/reports/0.156.1/coverage.any.json"
+
+[[support_surface_audit.unbaselined_gap_surface]]
+surface_kind = "flags"
+command_path = "codex exec-server forward"
+surface_id = "--remote-transport"
+evidence_ref = "cli_manifests/codex/reports/0.156.1/coverage.any.json"
+
+[[support_surface_audit.unbaselined_gap_surface]]
+surface_kind = "flags"
+command_path = "codex exec-server forward"
+surface_id = "--use-agent-identity-auth"
+evidence_ref = "cli_manifests/codex/reports/0.156.1/coverage.any.json"
+
+[[support_surface_audit.unbaselined_gap_surface]]
+surface_kind = "flags"
+command_path = "codex mcp add"
+surface_id = "--oauth-client-registration"
+evidence_ref = "cli_manifests/codex/reports/0.156.1/coverage.any.json"
+
+[[support_surface_audit.unbaselined_gap_surface]]
+surface_kind = "flags"
+command_path = "codex mcp login"
+surface_id = "--no-browser"
+evidence_ref = "cli_manifests/codex/reports/0.156.1/coverage.any.json"
+
+[[support_surface_audit.unbaselined_gap_surface]]
+surface_kind = "flags"
+command_path = "codex mcp login"
+surface_id = "--oauth-client-registration"
+evidence_ref = "cli_manifests/codex/reports/0.156.1/coverage.any.json"
+
+[[support_surface_audit.unbaselined_gap_surface]]
+surface_kind = "flags"
+command_path = "codex migrate-rollouts"
+surface_id = "--apply"
+evidence_ref = "cli_manifests/codex/reports/0.156.1/coverage.any.json"
+
+[[support_surface_audit.unbaselined_gap_surface]]
+surface_kind = "flags"
+command_path = "codex migrate-rollouts"
+surface_id = "--json"
+evidence_ref = "cli_manifests/codex/reports/0.156.1/coverage.any.json"
+
+[[support_surface_audit.unbaselined_gap_surface]]
+surface_kind = "flags"
+command_path = "codex migrate-rollouts"
+surface_id = "--max-mib-per-second"
+evidence_ref = "cli_manifests/codex/reports/0.156.1/coverage.any.json"
+
+[[support_surface_audit.unbaselined_gap_surface]]
+surface_kind = "flags"
+command_path = "codex migrate-rollouts"
+surface_id = "--thread"
+evidence_ref = "cli_manifests/codex/reports/0.156.1/coverage.any.json"
+
+[[support_surface_audit.unbaselined_gap_surface]]
+surface_kind = "flags"
+command_path = "codex migrate-rollouts"
+surface_id = "--verbose"
+evidence_ref = "cli_manifests/codex/reports/0.156.1/coverage.any.json"
+
+[[support_surface_audit.unbaselined_gap_surface]]
+surface_kind = "flags"
+command_path = "codex queue"
+surface_id = "--message"
+evidence_ref = "cli_manifests/codex/reports/0.156.1/coverage.any.json"
+
+[[support_surface_audit.unbaselined_gap_surface]]
+surface_kind = "flags"
+command_path = "codex queue"
+surface_id = "--thread"
+evidence_ref = "cli_manifests/codex/reports/0.156.1/coverage.any.json"
+
+[[support_surface_audit.unbaselined_gap_surface]]
+surface_kind = "global_flags"
+command_path = "codex"
+surface_id = "--approve-for-me"
+evidence_ref = "cli_manifests/codex/reports/0.156.1/coverage.any.json"
+
+[[support_surface_audit.unbaselined_gap_surface]]
+surface_kind = "global_flags"
+command_path = "codex"
+surface_id = "--no-daemon"
+evidence_ref = "cli_manifests/codex/reports/0.156.1/coverage.any.json"
+
+[[support_surface_audit.unbaselined_gap_surface]]
+surface_kind = "global_flags"
+command_path = "codex"
+surface_id = "--worktree"
+evidence_ref = "cli_manifests/codex/reports/0.156.1/coverage.any.json"
 
 [[support_surface_audit.unbaselined_gap_surface]]
 surface_kind = "positional_args"
 command_path = "codex completion"
 surface_id = "SHELL"
-evidence_ref = "docs/specs/unified-agent-api/non-tui-support-debt.md"
+evidence_ref = "cli_manifests/codex/reports/0.156.1/coverage.any.json"
+
+[[support_surface_audit.unbaselined_gap_surface]]
+surface_kind = "positional_args"
+command_path = "codex exec fork"
+surface_id = "PROMPT"
+evidence_ref = "cli_manifests/codex/reports/0.156.1/coverage.any.json"
+
+[[support_surface_audit.unbaselined_gap_surface]]
+surface_kind = "positional_args"
+command_path = "codex exec fork"
+surface_id = "SESSION_ID"
+evidence_ref = "cli_manifests/codex/reports/0.156.1/coverage.any.json"
+
+[[support_surface_audit.unbaselined_gap_surface]]
+surface_kind = "positional_args"
+command_path = "codex exec-server help"
+surface_id = "COMMAND"
+evidence_ref = "cli_manifests/codex/reports/0.156.1/coverage.any.json"
+
+[[support_surface_audit.unbaselined_gap_surface]]
+surface_kind = "subcommands"
+command_path = "codex app-server daemon update"
+surface_id = "update"
+evidence_ref = "cli_manifests/codex/reports/0.156.1/coverage.any.json"
+
+[[support_surface_audit.unbaselined_gap_surface]]
+surface_kind = "subcommands"
+command_path = "codex exec fork"
+surface_id = "fork"
+evidence_ref = "cli_manifests/codex/reports/0.156.1/coverage.any.json"
+
+[[support_surface_audit.unbaselined_gap_surface]]
+surface_kind = "subcommands"
+command_path = "codex exec-server forward"
+surface_id = "forward"
+evidence_ref = "cli_manifests/codex/reports/0.156.1/coverage.any.json"
+
+[[support_surface_audit.unbaselined_gap_surface]]
+surface_kind = "subcommands"
+command_path = "codex exec-server help"
+surface_id = "help"
+evidence_ref = "cli_manifests/codex/reports/0.156.1/coverage.any.json"
 
 [[support_surface_audit.preexisting_unsupported_surface]]
 surface_kind = "commands"
@@ -73,28 +397,1179 @@ debt_ref = "docs/specs/unified-agent-api/non-tui-support-debt.md#codex-completio
 
 [[support_surface_audit.missing_wrapper_support]]
 surface_kind = "commands"
+command_path = "codex agents"
+surface_id = "agents"
+
+[[support_surface_audit.missing_wrapper_support]]
+surface_kind = "commands"
 command_path = "codex completion"
 surface_id = "completion"
+
+[[support_surface_audit.missing_wrapper_support]]
+surface_kind = "commands"
+command_path = "codex migrate-rollouts"
+surface_id = "migrate-rollouts"
+
+[[support_surface_audit.missing_wrapper_support]]
+surface_kind = "commands"
+command_path = "codex queue"
+surface_id = "queue"
+
+[[support_surface_audit.missing_wrapper_support]]
+surface_kind = "flags"
+command_path = "codex app-server"
+surface_id = "--code-mode-host"
+
+[[support_surface_audit.missing_wrapper_support]]
+surface_kind = "flags"
+command_path = "codex app-server daemon update"
+surface_id = "--from-cli"
+
+[[support_surface_audit.missing_wrapper_support]]
+surface_kind = "flags"
+command_path = "codex app-server daemon update"
+surface_id = "--yes"
+
+[[support_surface_audit.missing_wrapper_support]]
+surface_kind = "flags"
+command_path = "codex exec"
+surface_id = "--thread-source"
+
+[[support_surface_audit.missing_wrapper_support]]
+surface_kind = "flags"
+command_path = "codex exec fork"
+surface_id = "--ephemeral"
+
+[[support_surface_audit.missing_wrapper_support]]
+surface_kind = "flags"
+command_path = "codex exec fork"
+surface_id = "--ignore-rules"
+
+[[support_surface_audit.missing_wrapper_support]]
+surface_kind = "flags"
+command_path = "codex exec fork"
+surface_id = "--ignore-user-config"
+
+[[support_surface_audit.missing_wrapper_support]]
+surface_kind = "flags"
+command_path = "codex exec fork"
+surface_id = "--json"
+
+[[support_surface_audit.missing_wrapper_support]]
+surface_kind = "flags"
+command_path = "codex exec fork"
+surface_id = "--output-last-message"
+
+[[support_surface_audit.missing_wrapper_support]]
+surface_kind = "flags"
+command_path = "codex exec fork"
+surface_id = "--output-schema"
+
+[[support_surface_audit.missing_wrapper_support]]
+surface_kind = "flags"
+command_path = "codex exec fork"
+surface_id = "--skip-git-repo-check"
+
+[[support_surface_audit.missing_wrapper_support]]
+surface_kind = "flags"
+command_path = "codex exec fork"
+surface_id = "--thread-source"
+
+[[support_surface_audit.missing_wrapper_support]]
+surface_kind = "flags"
+command_path = "codex exec resume"
+surface_id = "--thread-source"
+
+[[support_surface_audit.missing_wrapper_support]]
+surface_kind = "flags"
+command_path = "codex exec review"
+surface_id = "--thread-source"
+
+[[support_surface_audit.missing_wrapper_support]]
+surface_kind = "flags"
+command_path = "codex exec-server"
+surface_id = "--aws-profile"
+
+[[support_surface_audit.missing_wrapper_support]]
+surface_kind = "flags"
+command_path = "codex exec-server"
+surface_id = "--aws-region"
+
+[[support_surface_audit.missing_wrapper_support]]
+surface_kind = "flags"
+command_path = "codex exec-server"
+surface_id = "--aws-service"
+
+[[support_surface_audit.missing_wrapper_support]]
+surface_kind = "flags"
+command_path = "codex exec-server"
+surface_id = "--aws-sigv4"
+
+[[support_surface_audit.missing_wrapper_support]]
+surface_kind = "flags"
+command_path = "codex exec-server"
+surface_id = "--concurrent-requests"
+
+[[support_surface_audit.missing_wrapper_support]]
+surface_kind = "flags"
+command_path = "codex exec-server"
+surface_id = "--exit-on-stdin-close"
+
+[[support_surface_audit.missing_wrapper_support]]
+surface_kind = "flags"
+command_path = "codex exec-server"
+surface_id = "--remote-transport"
+
+[[support_surface_audit.missing_wrapper_support]]
+surface_kind = "flags"
+command_path = "codex exec-server forward"
+surface_id = "--aws-profile"
+
+[[support_surface_audit.missing_wrapper_support]]
+surface_kind = "flags"
+command_path = "codex exec-server forward"
+surface_id = "--aws-region"
+
+[[support_surface_audit.missing_wrapper_support]]
+surface_kind = "flags"
+command_path = "codex exec-server forward"
+surface_id = "--aws-service"
+
+[[support_surface_audit.missing_wrapper_support]]
+surface_kind = "flags"
+command_path = "codex exec-server forward"
+surface_id = "--aws-sigv4"
+
+[[support_surface_audit.missing_wrapper_support]]
+surface_kind = "flags"
+command_path = "codex exec-server forward"
+surface_id = "--connect"
+
+[[support_surface_audit.missing_wrapper_support]]
+surface_kind = "flags"
+command_path = "codex exec-server forward"
+surface_id = "--environment-id"
+
+[[support_surface_audit.missing_wrapper_support]]
+surface_kind = "flags"
+command_path = "codex exec-server forward"
+surface_id = "--exit-on-stdin-close"
+
+[[support_surface_audit.missing_wrapper_support]]
+surface_kind = "flags"
+command_path = "codex exec-server forward"
+surface_id = "--name"
+
+[[support_surface_audit.missing_wrapper_support]]
+surface_kind = "flags"
+command_path = "codex exec-server forward"
+surface_id = "--remote-transport"
+
+[[support_surface_audit.missing_wrapper_support]]
+surface_kind = "flags"
+command_path = "codex exec-server forward"
+surface_id = "--use-agent-identity-auth"
+
+[[support_surface_audit.missing_wrapper_support]]
+surface_kind = "flags"
+command_path = "codex mcp add"
+surface_id = "--oauth-client-registration"
+
+[[support_surface_audit.missing_wrapper_support]]
+surface_kind = "flags"
+command_path = "codex mcp login"
+surface_id = "--no-browser"
+
+[[support_surface_audit.missing_wrapper_support]]
+surface_kind = "flags"
+command_path = "codex mcp login"
+surface_id = "--oauth-client-registration"
+
+[[support_surface_audit.missing_wrapper_support]]
+surface_kind = "flags"
+command_path = "codex migrate-rollouts"
+surface_id = "--apply"
+
+[[support_surface_audit.missing_wrapper_support]]
+surface_kind = "flags"
+command_path = "codex migrate-rollouts"
+surface_id = "--json"
+
+[[support_surface_audit.missing_wrapper_support]]
+surface_kind = "flags"
+command_path = "codex migrate-rollouts"
+surface_id = "--max-mib-per-second"
+
+[[support_surface_audit.missing_wrapper_support]]
+surface_kind = "flags"
+command_path = "codex migrate-rollouts"
+surface_id = "--thread"
+
+[[support_surface_audit.missing_wrapper_support]]
+surface_kind = "flags"
+command_path = "codex migrate-rollouts"
+surface_id = "--verbose"
+
+[[support_surface_audit.missing_wrapper_support]]
+surface_kind = "flags"
+command_path = "codex queue"
+surface_id = "--message"
+
+[[support_surface_audit.missing_wrapper_support]]
+surface_kind = "flags"
+command_path = "codex queue"
+surface_id = "--thread"
+
+[[support_surface_audit.missing_wrapper_support]]
+surface_kind = "global_flags"
+command_path = "codex"
+surface_id = "--approve-for-me"
+
+[[support_surface_audit.missing_wrapper_support]]
+surface_kind = "global_flags"
+command_path = "codex"
+surface_id = "--no-daemon"
+
+[[support_surface_audit.missing_wrapper_support]]
+surface_kind = "global_flags"
+command_path = "codex"
+surface_id = "--worktree"
 
 [[support_surface_audit.missing_wrapper_support]]
 surface_kind = "positional_args"
 command_path = "codex completion"
 surface_id = "SHELL"
 
+[[support_surface_audit.missing_wrapper_support]]
+surface_kind = "positional_args"
+command_path = "codex exec fork"
+surface_id = "PROMPT"
+
+[[support_surface_audit.missing_wrapper_support]]
+surface_kind = "positional_args"
+command_path = "codex exec fork"
+surface_id = "SESSION_ID"
+
+[[support_surface_audit.missing_wrapper_support]]
+surface_kind = "positional_args"
+command_path = "codex exec-server help"
+surface_id = "COMMAND"
+
+[[support_surface_audit.missing_wrapper_support]]
+surface_kind = "subcommands"
+command_path = "codex app-server daemon update"
+surface_id = "update"
+
+[[support_surface_audit.missing_wrapper_support]]
+surface_kind = "subcommands"
+command_path = "codex exec fork"
+surface_id = "fork"
+
+[[support_surface_audit.missing_wrapper_support]]
+surface_kind = "subcommands"
+command_path = "codex exec-server forward"
+surface_id = "forward"
+
+[[support_surface_audit.missing_wrapper_support]]
+surface_kind = "subcommands"
+command_path = "codex exec-server help"
+surface_id = "help"
+
+[[support_surface_audit.missing_backend_support]]
+surface_kind = "commands"
+command_path = "codex agents"
+surface_id = "agents"
+
 [[support_surface_audit.missing_backend_support]]
 surface_kind = "commands"
 command_path = "codex completion"
 surface_id = "completion"
+
+[[support_surface_audit.missing_backend_support]]
+surface_kind = "commands"
+command_path = "codex migrate-rollouts"
+surface_id = "migrate-rollouts"
+
+[[support_surface_audit.missing_backend_support]]
+surface_kind = "commands"
+command_path = "codex queue"
+surface_id = "queue"
+
+[[support_surface_audit.missing_backend_support]]
+surface_kind = "flags"
+command_path = "codex app-server"
+surface_id = "--code-mode-host"
+
+[[support_surface_audit.missing_backend_support]]
+surface_kind = "flags"
+command_path = "codex app-server daemon update"
+surface_id = "--from-cli"
+
+[[support_surface_audit.missing_backend_support]]
+surface_kind = "flags"
+command_path = "codex app-server daemon update"
+surface_id = "--yes"
+
+[[support_surface_audit.missing_backend_support]]
+surface_kind = "flags"
+command_path = "codex exec"
+surface_id = "--thread-source"
+
+[[support_surface_audit.missing_backend_support]]
+surface_kind = "flags"
+command_path = "codex exec fork"
+surface_id = "--ephemeral"
+
+[[support_surface_audit.missing_backend_support]]
+surface_kind = "flags"
+command_path = "codex exec fork"
+surface_id = "--ignore-rules"
+
+[[support_surface_audit.missing_backend_support]]
+surface_kind = "flags"
+command_path = "codex exec fork"
+surface_id = "--ignore-user-config"
+
+[[support_surface_audit.missing_backend_support]]
+surface_kind = "flags"
+command_path = "codex exec fork"
+surface_id = "--json"
+
+[[support_surface_audit.missing_backend_support]]
+surface_kind = "flags"
+command_path = "codex exec fork"
+surface_id = "--output-last-message"
+
+[[support_surface_audit.missing_backend_support]]
+surface_kind = "flags"
+command_path = "codex exec fork"
+surface_id = "--output-schema"
+
+[[support_surface_audit.missing_backend_support]]
+surface_kind = "flags"
+command_path = "codex exec fork"
+surface_id = "--skip-git-repo-check"
+
+[[support_surface_audit.missing_backend_support]]
+surface_kind = "flags"
+command_path = "codex exec fork"
+surface_id = "--thread-source"
+
+[[support_surface_audit.missing_backend_support]]
+surface_kind = "flags"
+command_path = "codex exec resume"
+surface_id = "--thread-source"
+
+[[support_surface_audit.missing_backend_support]]
+surface_kind = "flags"
+command_path = "codex exec review"
+surface_id = "--thread-source"
+
+[[support_surface_audit.missing_backend_support]]
+surface_kind = "flags"
+command_path = "codex exec-server"
+surface_id = "--aws-profile"
+
+[[support_surface_audit.missing_backend_support]]
+surface_kind = "flags"
+command_path = "codex exec-server"
+surface_id = "--aws-region"
+
+[[support_surface_audit.missing_backend_support]]
+surface_kind = "flags"
+command_path = "codex exec-server"
+surface_id = "--aws-service"
+
+[[support_surface_audit.missing_backend_support]]
+surface_kind = "flags"
+command_path = "codex exec-server"
+surface_id = "--aws-sigv4"
+
+[[support_surface_audit.missing_backend_support]]
+surface_kind = "flags"
+command_path = "codex exec-server"
+surface_id = "--concurrent-requests"
+
+[[support_surface_audit.missing_backend_support]]
+surface_kind = "flags"
+command_path = "codex exec-server"
+surface_id = "--exit-on-stdin-close"
+
+[[support_surface_audit.missing_backend_support]]
+surface_kind = "flags"
+command_path = "codex exec-server"
+surface_id = "--remote-transport"
+
+[[support_surface_audit.missing_backend_support]]
+surface_kind = "flags"
+command_path = "codex exec-server forward"
+surface_id = "--aws-profile"
+
+[[support_surface_audit.missing_backend_support]]
+surface_kind = "flags"
+command_path = "codex exec-server forward"
+surface_id = "--aws-region"
+
+[[support_surface_audit.missing_backend_support]]
+surface_kind = "flags"
+command_path = "codex exec-server forward"
+surface_id = "--aws-service"
+
+[[support_surface_audit.missing_backend_support]]
+surface_kind = "flags"
+command_path = "codex exec-server forward"
+surface_id = "--aws-sigv4"
+
+[[support_surface_audit.missing_backend_support]]
+surface_kind = "flags"
+command_path = "codex exec-server forward"
+surface_id = "--connect"
+
+[[support_surface_audit.missing_backend_support]]
+surface_kind = "flags"
+command_path = "codex exec-server forward"
+surface_id = "--environment-id"
+
+[[support_surface_audit.missing_backend_support]]
+surface_kind = "flags"
+command_path = "codex exec-server forward"
+surface_id = "--exit-on-stdin-close"
+
+[[support_surface_audit.missing_backend_support]]
+surface_kind = "flags"
+command_path = "codex exec-server forward"
+surface_id = "--name"
+
+[[support_surface_audit.missing_backend_support]]
+surface_kind = "flags"
+command_path = "codex exec-server forward"
+surface_id = "--remote-transport"
+
+[[support_surface_audit.missing_backend_support]]
+surface_kind = "flags"
+command_path = "codex exec-server forward"
+surface_id = "--use-agent-identity-auth"
+
+[[support_surface_audit.missing_backend_support]]
+surface_kind = "flags"
+command_path = "codex mcp add"
+surface_id = "--oauth-client-registration"
+
+[[support_surface_audit.missing_backend_support]]
+surface_kind = "flags"
+command_path = "codex mcp login"
+surface_id = "--no-browser"
+
+[[support_surface_audit.missing_backend_support]]
+surface_kind = "flags"
+command_path = "codex mcp login"
+surface_id = "--oauth-client-registration"
+
+[[support_surface_audit.missing_backend_support]]
+surface_kind = "flags"
+command_path = "codex migrate-rollouts"
+surface_id = "--apply"
+
+[[support_surface_audit.missing_backend_support]]
+surface_kind = "flags"
+command_path = "codex migrate-rollouts"
+surface_id = "--json"
+
+[[support_surface_audit.missing_backend_support]]
+surface_kind = "flags"
+command_path = "codex migrate-rollouts"
+surface_id = "--max-mib-per-second"
+
+[[support_surface_audit.missing_backend_support]]
+surface_kind = "flags"
+command_path = "codex migrate-rollouts"
+surface_id = "--thread"
+
+[[support_surface_audit.missing_backend_support]]
+surface_kind = "flags"
+command_path = "codex migrate-rollouts"
+surface_id = "--verbose"
+
+[[support_surface_audit.missing_backend_support]]
+surface_kind = "flags"
+command_path = "codex queue"
+surface_id = "--message"
+
+[[support_surface_audit.missing_backend_support]]
+surface_kind = "flags"
+command_path = "codex queue"
+surface_id = "--thread"
+
+[[support_surface_audit.missing_backend_support]]
+surface_kind = "global_flags"
+command_path = "codex"
+surface_id = "--approve-for-me"
+
+[[support_surface_audit.missing_backend_support]]
+surface_kind = "global_flags"
+command_path = "codex"
+surface_id = "--no-daemon"
+
+[[support_surface_audit.missing_backend_support]]
+surface_kind = "global_flags"
+command_path = "codex"
+surface_id = "--worktree"
 
 [[support_surface_audit.missing_backend_support]]
 surface_kind = "positional_args"
 command_path = "codex completion"
 surface_id = "SHELL"
 
+[[support_surface_audit.missing_backend_support]]
+surface_kind = "positional_args"
+command_path = "codex exec fork"
+surface_id = "PROMPT"
+
+[[support_surface_audit.missing_backend_support]]
+surface_kind = "positional_args"
+command_path = "codex exec fork"
+surface_id = "SESSION_ID"
+
+[[support_surface_audit.missing_backend_support]]
+surface_kind = "positional_args"
+command_path = "codex exec-server help"
+surface_id = "COMMAND"
+
+[[support_surface_audit.missing_backend_support]]
+surface_kind = "subcommands"
+command_path = "codex app-server daemon update"
+surface_id = "update"
+
+[[support_surface_audit.missing_backend_support]]
+surface_kind = "subcommands"
+command_path = "codex exec fork"
+surface_id = "fork"
+
+[[support_surface_audit.missing_backend_support]]
+surface_kind = "subcommands"
+command_path = "codex exec-server forward"
+surface_id = "forward"
+
+[[support_surface_audit.missing_backend_support]]
+surface_kind = "subcommands"
+command_path = "codex exec-server help"
+surface_id = "help"
+
+[[support_surface_audit.required_uplifts_this_run]]
+surface_kind = "commands"
+command_path = "codex agents"
+surface_id = "agents"
+reason = "unbaselined_gap"
+required_writes = [
+  "wrapper",
+  "backend",
+  "manifest",
+  "publication",
+  "packet_docs",
+]
+
 [[support_surface_audit.required_uplifts_this_run]]
 surface_kind = "commands"
 command_path = "codex completion"
 surface_id = "completion"
+reason = "unbaselined_gap"
+required_writes = [
+  "wrapper",
+  "backend",
+  "manifest",
+  "publication",
+  "packet_docs",
+]
+
+[[support_surface_audit.required_uplifts_this_run]]
+surface_kind = "commands"
+command_path = "codex migrate-rollouts"
+surface_id = "migrate-rollouts"
+reason = "unbaselined_gap"
+required_writes = [
+  "wrapper",
+  "backend",
+  "manifest",
+  "publication",
+  "packet_docs",
+]
+
+[[support_surface_audit.required_uplifts_this_run]]
+surface_kind = "commands"
+command_path = "codex queue"
+surface_id = "queue"
+reason = "unbaselined_gap"
+required_writes = [
+  "wrapper",
+  "backend",
+  "manifest",
+  "publication",
+  "packet_docs",
+]
+
+[[support_surface_audit.required_uplifts_this_run]]
+surface_kind = "flags"
+command_path = "codex app-server"
+surface_id = "--code-mode-host"
+reason = "unbaselined_gap"
+required_writes = [
+  "wrapper",
+  "backend",
+  "manifest",
+  "publication",
+  "packet_docs",
+]
+
+[[support_surface_audit.required_uplifts_this_run]]
+surface_kind = "flags"
+command_path = "codex app-server daemon update"
+surface_id = "--from-cli"
+reason = "unbaselined_gap"
+required_writes = [
+  "wrapper",
+  "backend",
+  "manifest",
+  "publication",
+  "packet_docs",
+]
+
+[[support_surface_audit.required_uplifts_this_run]]
+surface_kind = "flags"
+command_path = "codex app-server daemon update"
+surface_id = "--yes"
+reason = "unbaselined_gap"
+required_writes = [
+  "wrapper",
+  "backend",
+  "manifest",
+  "publication",
+  "packet_docs",
+]
+
+[[support_surface_audit.required_uplifts_this_run]]
+surface_kind = "flags"
+command_path = "codex exec"
+surface_id = "--thread-source"
+reason = "unbaselined_gap"
+required_writes = [
+  "wrapper",
+  "backend",
+  "manifest",
+  "publication",
+  "packet_docs",
+]
+
+[[support_surface_audit.required_uplifts_this_run]]
+surface_kind = "flags"
+command_path = "codex exec fork"
+surface_id = "--ephemeral"
+reason = "unbaselined_gap"
+required_writes = [
+  "wrapper",
+  "backend",
+  "manifest",
+  "publication",
+  "packet_docs",
+]
+
+[[support_surface_audit.required_uplifts_this_run]]
+surface_kind = "flags"
+command_path = "codex exec fork"
+surface_id = "--ignore-rules"
+reason = "unbaselined_gap"
+required_writes = [
+  "wrapper",
+  "backend",
+  "manifest",
+  "publication",
+  "packet_docs",
+]
+
+[[support_surface_audit.required_uplifts_this_run]]
+surface_kind = "flags"
+command_path = "codex exec fork"
+surface_id = "--ignore-user-config"
+reason = "unbaselined_gap"
+required_writes = [
+  "wrapper",
+  "backend",
+  "manifest",
+  "publication",
+  "packet_docs",
+]
+
+[[support_surface_audit.required_uplifts_this_run]]
+surface_kind = "flags"
+command_path = "codex exec fork"
+surface_id = "--json"
+reason = "unbaselined_gap"
+required_writes = [
+  "wrapper",
+  "backend",
+  "manifest",
+  "publication",
+  "packet_docs",
+]
+
+[[support_surface_audit.required_uplifts_this_run]]
+surface_kind = "flags"
+command_path = "codex exec fork"
+surface_id = "--output-last-message"
+reason = "unbaselined_gap"
+required_writes = [
+  "wrapper",
+  "backend",
+  "manifest",
+  "publication",
+  "packet_docs",
+]
+
+[[support_surface_audit.required_uplifts_this_run]]
+surface_kind = "flags"
+command_path = "codex exec fork"
+surface_id = "--output-schema"
+reason = "unbaselined_gap"
+required_writes = [
+  "wrapper",
+  "backend",
+  "manifest",
+  "publication",
+  "packet_docs",
+]
+
+[[support_surface_audit.required_uplifts_this_run]]
+surface_kind = "flags"
+command_path = "codex exec fork"
+surface_id = "--skip-git-repo-check"
+reason = "unbaselined_gap"
+required_writes = [
+  "wrapper",
+  "backend",
+  "manifest",
+  "publication",
+  "packet_docs",
+]
+
+[[support_surface_audit.required_uplifts_this_run]]
+surface_kind = "flags"
+command_path = "codex exec fork"
+surface_id = "--thread-source"
+reason = "unbaselined_gap"
+required_writes = [
+  "wrapper",
+  "backend",
+  "manifest",
+  "publication",
+  "packet_docs",
+]
+
+[[support_surface_audit.required_uplifts_this_run]]
+surface_kind = "flags"
+command_path = "codex exec resume"
+surface_id = "--thread-source"
+reason = "unbaselined_gap"
+required_writes = [
+  "wrapper",
+  "backend",
+  "manifest",
+  "publication",
+  "packet_docs",
+]
+
+[[support_surface_audit.required_uplifts_this_run]]
+surface_kind = "flags"
+command_path = "codex exec review"
+surface_id = "--thread-source"
+reason = "unbaselined_gap"
+required_writes = [
+  "wrapper",
+  "backend",
+  "manifest",
+  "publication",
+  "packet_docs",
+]
+
+[[support_surface_audit.required_uplifts_this_run]]
+surface_kind = "flags"
+command_path = "codex exec-server"
+surface_id = "--aws-profile"
+reason = "unbaselined_gap"
+required_writes = [
+  "wrapper",
+  "backend",
+  "manifest",
+  "publication",
+  "packet_docs",
+]
+
+[[support_surface_audit.required_uplifts_this_run]]
+surface_kind = "flags"
+command_path = "codex exec-server"
+surface_id = "--aws-region"
+reason = "unbaselined_gap"
+required_writes = [
+  "wrapper",
+  "backend",
+  "manifest",
+  "publication",
+  "packet_docs",
+]
+
+[[support_surface_audit.required_uplifts_this_run]]
+surface_kind = "flags"
+command_path = "codex exec-server"
+surface_id = "--aws-service"
+reason = "unbaselined_gap"
+required_writes = [
+  "wrapper",
+  "backend",
+  "manifest",
+  "publication",
+  "packet_docs",
+]
+
+[[support_surface_audit.required_uplifts_this_run]]
+surface_kind = "flags"
+command_path = "codex exec-server"
+surface_id = "--aws-sigv4"
+reason = "unbaselined_gap"
+required_writes = [
+  "wrapper",
+  "backend",
+  "manifest",
+  "publication",
+  "packet_docs",
+]
+
+[[support_surface_audit.required_uplifts_this_run]]
+surface_kind = "flags"
+command_path = "codex exec-server"
+surface_id = "--concurrent-requests"
+reason = "unbaselined_gap"
+required_writes = [
+  "wrapper",
+  "backend",
+  "manifest",
+  "publication",
+  "packet_docs",
+]
+
+[[support_surface_audit.required_uplifts_this_run]]
+surface_kind = "flags"
+command_path = "codex exec-server"
+surface_id = "--exit-on-stdin-close"
+reason = "unbaselined_gap"
+required_writes = [
+  "wrapper",
+  "backend",
+  "manifest",
+  "publication",
+  "packet_docs",
+]
+
+[[support_surface_audit.required_uplifts_this_run]]
+surface_kind = "flags"
+command_path = "codex exec-server"
+surface_id = "--remote-transport"
+reason = "unbaselined_gap"
+required_writes = [
+  "wrapper",
+  "backend",
+  "manifest",
+  "publication",
+  "packet_docs",
+]
+
+[[support_surface_audit.required_uplifts_this_run]]
+surface_kind = "flags"
+command_path = "codex exec-server forward"
+surface_id = "--aws-profile"
+reason = "unbaselined_gap"
+required_writes = [
+  "wrapper",
+  "backend",
+  "manifest",
+  "publication",
+  "packet_docs",
+]
+
+[[support_surface_audit.required_uplifts_this_run]]
+surface_kind = "flags"
+command_path = "codex exec-server forward"
+surface_id = "--aws-region"
+reason = "unbaselined_gap"
+required_writes = [
+  "wrapper",
+  "backend",
+  "manifest",
+  "publication",
+  "packet_docs",
+]
+
+[[support_surface_audit.required_uplifts_this_run]]
+surface_kind = "flags"
+command_path = "codex exec-server forward"
+surface_id = "--aws-service"
+reason = "unbaselined_gap"
+required_writes = [
+  "wrapper",
+  "backend",
+  "manifest",
+  "publication",
+  "packet_docs",
+]
+
+[[support_surface_audit.required_uplifts_this_run]]
+surface_kind = "flags"
+command_path = "codex exec-server forward"
+surface_id = "--aws-sigv4"
+reason = "unbaselined_gap"
+required_writes = [
+  "wrapper",
+  "backend",
+  "manifest",
+  "publication",
+  "packet_docs",
+]
+
+[[support_surface_audit.required_uplifts_this_run]]
+surface_kind = "flags"
+command_path = "codex exec-server forward"
+surface_id = "--connect"
+reason = "unbaselined_gap"
+required_writes = [
+  "wrapper",
+  "backend",
+  "manifest",
+  "publication",
+  "packet_docs",
+]
+
+[[support_surface_audit.required_uplifts_this_run]]
+surface_kind = "flags"
+command_path = "codex exec-server forward"
+surface_id = "--environment-id"
+reason = "unbaselined_gap"
+required_writes = [
+  "wrapper",
+  "backend",
+  "manifest",
+  "publication",
+  "packet_docs",
+]
+
+[[support_surface_audit.required_uplifts_this_run]]
+surface_kind = "flags"
+command_path = "codex exec-server forward"
+surface_id = "--exit-on-stdin-close"
+reason = "unbaselined_gap"
+required_writes = [
+  "wrapper",
+  "backend",
+  "manifest",
+  "publication",
+  "packet_docs",
+]
+
+[[support_surface_audit.required_uplifts_this_run]]
+surface_kind = "flags"
+command_path = "codex exec-server forward"
+surface_id = "--name"
+reason = "unbaselined_gap"
+required_writes = [
+  "wrapper",
+  "backend",
+  "manifest",
+  "publication",
+  "packet_docs",
+]
+
+[[support_surface_audit.required_uplifts_this_run]]
+surface_kind = "flags"
+command_path = "codex exec-server forward"
+surface_id = "--remote-transport"
+reason = "unbaselined_gap"
+required_writes = [
+  "wrapper",
+  "backend",
+  "manifest",
+  "publication",
+  "packet_docs",
+]
+
+[[support_surface_audit.required_uplifts_this_run]]
+surface_kind = "flags"
+command_path = "codex exec-server forward"
+surface_id = "--use-agent-identity-auth"
+reason = "unbaselined_gap"
+required_writes = [
+  "wrapper",
+  "backend",
+  "manifest",
+  "publication",
+  "packet_docs",
+]
+
+[[support_surface_audit.required_uplifts_this_run]]
+surface_kind = "flags"
+command_path = "codex mcp add"
+surface_id = "--oauth-client-registration"
+reason = "unbaselined_gap"
+required_writes = [
+  "wrapper",
+  "backend",
+  "manifest",
+  "publication",
+  "packet_docs",
+]
+
+[[support_surface_audit.required_uplifts_this_run]]
+surface_kind = "flags"
+command_path = "codex mcp login"
+surface_id = "--no-browser"
+reason = "unbaselined_gap"
+required_writes = [
+  "wrapper",
+  "backend",
+  "manifest",
+  "publication",
+  "packet_docs",
+]
+
+[[support_surface_audit.required_uplifts_this_run]]
+surface_kind = "flags"
+command_path = "codex mcp login"
+surface_id = "--oauth-client-registration"
+reason = "unbaselined_gap"
+required_writes = [
+  "wrapper",
+  "backend",
+  "manifest",
+  "publication",
+  "packet_docs",
+]
+
+[[support_surface_audit.required_uplifts_this_run]]
+surface_kind = "flags"
+command_path = "codex migrate-rollouts"
+surface_id = "--apply"
+reason = "unbaselined_gap"
+required_writes = [
+  "wrapper",
+  "backend",
+  "manifest",
+  "publication",
+  "packet_docs",
+]
+
+[[support_surface_audit.required_uplifts_this_run]]
+surface_kind = "flags"
+command_path = "codex migrate-rollouts"
+surface_id = "--json"
+reason = "unbaselined_gap"
+required_writes = [
+  "wrapper",
+  "backend",
+  "manifest",
+  "publication",
+  "packet_docs",
+]
+
+[[support_surface_audit.required_uplifts_this_run]]
+surface_kind = "flags"
+command_path = "codex migrate-rollouts"
+surface_id = "--max-mib-per-second"
+reason = "unbaselined_gap"
+required_writes = [
+  "wrapper",
+  "backend",
+  "manifest",
+  "publication",
+  "packet_docs",
+]
+
+[[support_surface_audit.required_uplifts_this_run]]
+surface_kind = "flags"
+command_path = "codex migrate-rollouts"
+surface_id = "--thread"
+reason = "unbaselined_gap"
+required_writes = [
+  "wrapper",
+  "backend",
+  "manifest",
+  "publication",
+  "packet_docs",
+]
+
+[[support_surface_audit.required_uplifts_this_run]]
+surface_kind = "flags"
+command_path = "codex migrate-rollouts"
+surface_id = "--verbose"
+reason = "unbaselined_gap"
+required_writes = [
+  "wrapper",
+  "backend",
+  "manifest",
+  "publication",
+  "packet_docs",
+]
+
+[[support_surface_audit.required_uplifts_this_run]]
+surface_kind = "flags"
+command_path = "codex queue"
+surface_id = "--message"
+reason = "unbaselined_gap"
+required_writes = [
+  "wrapper",
+  "backend",
+  "manifest",
+  "publication",
+  "packet_docs",
+]
+
+[[support_surface_audit.required_uplifts_this_run]]
+surface_kind = "flags"
+command_path = "codex queue"
+surface_id = "--thread"
+reason = "unbaselined_gap"
+required_writes = [
+  "wrapper",
+  "backend",
+  "manifest",
+  "publication",
+  "packet_docs",
+]
+
+[[support_surface_audit.required_uplifts_this_run]]
+surface_kind = "global_flags"
+command_path = "codex"
+surface_id = "--approve-for-me"
+reason = "unbaselined_gap"
+required_writes = [
+  "wrapper",
+  "backend",
+  "manifest",
+  "publication",
+  "packet_docs",
+]
+
+[[support_surface_audit.required_uplifts_this_run]]
+surface_kind = "global_flags"
+command_path = "codex"
+surface_id = "--no-daemon"
+reason = "unbaselined_gap"
+required_writes = [
+  "wrapper",
+  "backend",
+  "manifest",
+  "publication",
+  "packet_docs",
+]
+
+[[support_surface_audit.required_uplifts_this_run]]
+surface_kind = "global_flags"
+command_path = "codex"
+surface_id = "--worktree"
 reason = "unbaselined_gap"
 required_writes = [
   "wrapper",
@@ -117,6 +1592,97 @@ required_writes = [
   "packet_docs",
 ]
 
+[[support_surface_audit.required_uplifts_this_run]]
+surface_kind = "positional_args"
+command_path = "codex exec fork"
+surface_id = "PROMPT"
+reason = "unbaselined_gap"
+required_writes = [
+  "wrapper",
+  "backend",
+  "manifest",
+  "publication",
+  "packet_docs",
+]
+
+[[support_surface_audit.required_uplifts_this_run]]
+surface_kind = "positional_args"
+command_path = "codex exec fork"
+surface_id = "SESSION_ID"
+reason = "unbaselined_gap"
+required_writes = [
+  "wrapper",
+  "backend",
+  "manifest",
+  "publication",
+  "packet_docs",
+]
+
+[[support_surface_audit.required_uplifts_this_run]]
+surface_kind = "positional_args"
+command_path = "codex exec-server help"
+surface_id = "COMMAND"
+reason = "unbaselined_gap"
+required_writes = [
+  "wrapper",
+  "backend",
+  "manifest",
+  "publication",
+  "packet_docs",
+]
+
+[[support_surface_audit.required_uplifts_this_run]]
+surface_kind = "subcommands"
+command_path = "codex app-server daemon update"
+surface_id = "update"
+reason = "unbaselined_gap"
+required_writes = [
+  "wrapper",
+  "backend",
+  "manifest",
+  "publication",
+  "packet_docs",
+]
+
+[[support_surface_audit.required_uplifts_this_run]]
+surface_kind = "subcommands"
+command_path = "codex exec fork"
+surface_id = "fork"
+reason = "unbaselined_gap"
+required_writes = [
+  "wrapper",
+  "backend",
+  "manifest",
+  "publication",
+  "packet_docs",
+]
+
+[[support_surface_audit.required_uplifts_this_run]]
+surface_kind = "subcommands"
+command_path = "codex exec-server forward"
+surface_id = "forward"
+reason = "unbaselined_gap"
+required_writes = [
+  "wrapper",
+  "backend",
+  "manifest",
+  "publication",
+  "packet_docs",
+]
+
+[[support_surface_audit.required_uplifts_this_run]]
+surface_kind = "subcommands"
+command_path = "codex exec-server help"
+surface_id = "help"
+reason = "unbaselined_gap"
+required_writes = [
+  "wrapper",
+  "backend",
+  "manifest",
+  "publication",
+  "packet_docs",
+]
+
 [[support_surface_audit.deferred_preexisting_gaps]]
 surface_kind = "commands"
 command_path = "codex completion"
@@ -130,6 +1696,12 @@ command_path = "codex completion"
 surface_id = "SHELL"
 defer_reason = "requires_new_architectural_seam"
 blocking_follow_on = "TODOS.md#close-codex-completion-maintenance-gap"
+
+[[support_surface_audit.publication_impacts]]
+surface_kind = "commands"
+command_path = "codex agents"
+surface_id = "agents"
+surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
 
 [[support_surface_audit.publication_impacts]]
 surface_kind = "commands"
@@ -138,15 +1710,333 @@ surface_id = "completion"
 surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
 
 [[support_surface_audit.publication_impacts]]
+surface_kind = "commands"
+command_path = "codex migrate-rollouts"
+surface_id = "migrate-rollouts"
+surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
+
+[[support_surface_audit.publication_impacts]]
+surface_kind = "commands"
+command_path = "codex queue"
+surface_id = "queue"
+surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
+
+[[support_surface_audit.publication_impacts]]
+surface_kind = "flags"
+command_path = "codex app-server"
+surface_id = "--code-mode-host"
+surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
+
+[[support_surface_audit.publication_impacts]]
+surface_kind = "flags"
+command_path = "codex app-server daemon update"
+surface_id = "--from-cli"
+surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
+
+[[support_surface_audit.publication_impacts]]
+surface_kind = "flags"
+command_path = "codex app-server daemon update"
+surface_id = "--yes"
+surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
+
+[[support_surface_audit.publication_impacts]]
+surface_kind = "flags"
+command_path = "codex exec"
+surface_id = "--thread-source"
+surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
+
+[[support_surface_audit.publication_impacts]]
+surface_kind = "flags"
+command_path = "codex exec fork"
+surface_id = "--ephemeral"
+surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
+
+[[support_surface_audit.publication_impacts]]
+surface_kind = "flags"
+command_path = "codex exec fork"
+surface_id = "--ignore-rules"
+surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
+
+[[support_surface_audit.publication_impacts]]
+surface_kind = "flags"
+command_path = "codex exec fork"
+surface_id = "--ignore-user-config"
+surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
+
+[[support_surface_audit.publication_impacts]]
+surface_kind = "flags"
+command_path = "codex exec fork"
+surface_id = "--json"
+surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
+
+[[support_surface_audit.publication_impacts]]
+surface_kind = "flags"
+command_path = "codex exec fork"
+surface_id = "--output-last-message"
+surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
+
+[[support_surface_audit.publication_impacts]]
+surface_kind = "flags"
+command_path = "codex exec fork"
+surface_id = "--output-schema"
+surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
+
+[[support_surface_audit.publication_impacts]]
+surface_kind = "flags"
+command_path = "codex exec fork"
+surface_id = "--skip-git-repo-check"
+surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
+
+[[support_surface_audit.publication_impacts]]
+surface_kind = "flags"
+command_path = "codex exec fork"
+surface_id = "--thread-source"
+surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
+
+[[support_surface_audit.publication_impacts]]
+surface_kind = "flags"
+command_path = "codex exec resume"
+surface_id = "--thread-source"
+surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
+
+[[support_surface_audit.publication_impacts]]
+surface_kind = "flags"
+command_path = "codex exec review"
+surface_id = "--thread-source"
+surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
+
+[[support_surface_audit.publication_impacts]]
+surface_kind = "flags"
+command_path = "codex exec-server"
+surface_id = "--aws-profile"
+surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
+
+[[support_surface_audit.publication_impacts]]
+surface_kind = "flags"
+command_path = "codex exec-server"
+surface_id = "--aws-region"
+surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
+
+[[support_surface_audit.publication_impacts]]
+surface_kind = "flags"
+command_path = "codex exec-server"
+surface_id = "--aws-service"
+surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
+
+[[support_surface_audit.publication_impacts]]
+surface_kind = "flags"
+command_path = "codex exec-server"
+surface_id = "--aws-sigv4"
+surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
+
+[[support_surface_audit.publication_impacts]]
+surface_kind = "flags"
+command_path = "codex exec-server"
+surface_id = "--concurrent-requests"
+surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
+
+[[support_surface_audit.publication_impacts]]
+surface_kind = "flags"
+command_path = "codex exec-server"
+surface_id = "--exit-on-stdin-close"
+surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
+
+[[support_surface_audit.publication_impacts]]
+surface_kind = "flags"
+command_path = "codex exec-server"
+surface_id = "--remote-transport"
+surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
+
+[[support_surface_audit.publication_impacts]]
+surface_kind = "flags"
+command_path = "codex exec-server forward"
+surface_id = "--aws-profile"
+surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
+
+[[support_surface_audit.publication_impacts]]
+surface_kind = "flags"
+command_path = "codex exec-server forward"
+surface_id = "--aws-region"
+surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
+
+[[support_surface_audit.publication_impacts]]
+surface_kind = "flags"
+command_path = "codex exec-server forward"
+surface_id = "--aws-service"
+surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
+
+[[support_surface_audit.publication_impacts]]
+surface_kind = "flags"
+command_path = "codex exec-server forward"
+surface_id = "--aws-sigv4"
+surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
+
+[[support_surface_audit.publication_impacts]]
+surface_kind = "flags"
+command_path = "codex exec-server forward"
+surface_id = "--connect"
+surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
+
+[[support_surface_audit.publication_impacts]]
+surface_kind = "flags"
+command_path = "codex exec-server forward"
+surface_id = "--environment-id"
+surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
+
+[[support_surface_audit.publication_impacts]]
+surface_kind = "flags"
+command_path = "codex exec-server forward"
+surface_id = "--exit-on-stdin-close"
+surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
+
+[[support_surface_audit.publication_impacts]]
+surface_kind = "flags"
+command_path = "codex exec-server forward"
+surface_id = "--name"
+surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
+
+[[support_surface_audit.publication_impacts]]
+surface_kind = "flags"
+command_path = "codex exec-server forward"
+surface_id = "--remote-transport"
+surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
+
+[[support_surface_audit.publication_impacts]]
+surface_kind = "flags"
+command_path = "codex exec-server forward"
+surface_id = "--use-agent-identity-auth"
+surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
+
+[[support_surface_audit.publication_impacts]]
+surface_kind = "flags"
+command_path = "codex mcp add"
+surface_id = "--oauth-client-registration"
+surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
+
+[[support_surface_audit.publication_impacts]]
+surface_kind = "flags"
+command_path = "codex mcp login"
+surface_id = "--no-browser"
+surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
+
+[[support_surface_audit.publication_impacts]]
+surface_kind = "flags"
+command_path = "codex mcp login"
+surface_id = "--oauth-client-registration"
+surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
+
+[[support_surface_audit.publication_impacts]]
+surface_kind = "flags"
+command_path = "codex migrate-rollouts"
+surface_id = "--apply"
+surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
+
+[[support_surface_audit.publication_impacts]]
+surface_kind = "flags"
+command_path = "codex migrate-rollouts"
+surface_id = "--json"
+surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
+
+[[support_surface_audit.publication_impacts]]
+surface_kind = "flags"
+command_path = "codex migrate-rollouts"
+surface_id = "--max-mib-per-second"
+surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
+
+[[support_surface_audit.publication_impacts]]
+surface_kind = "flags"
+command_path = "codex migrate-rollouts"
+surface_id = "--thread"
+surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
+
+[[support_surface_audit.publication_impacts]]
+surface_kind = "flags"
+command_path = "codex migrate-rollouts"
+surface_id = "--verbose"
+surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
+
+[[support_surface_audit.publication_impacts]]
+surface_kind = "flags"
+command_path = "codex queue"
+surface_id = "--message"
+surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
+
+[[support_surface_audit.publication_impacts]]
+surface_kind = "flags"
+command_path = "codex queue"
+surface_id = "--thread"
+surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
+
+[[support_surface_audit.publication_impacts]]
+surface_kind = "global_flags"
+command_path = "codex"
+surface_id = "--approve-for-me"
+surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
+
+[[support_surface_audit.publication_impacts]]
+surface_kind = "global_flags"
+command_path = "codex"
+surface_id = "--no-daemon"
+surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
+
+[[support_surface_audit.publication_impacts]]
+surface_kind = "global_flags"
+command_path = "codex"
+surface_id = "--worktree"
+surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
+
+[[support_surface_audit.publication_impacts]]
 surface_kind = "positional_args"
 command_path = "codex completion"
 surface_id = "SHELL"
+surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
+
+[[support_surface_audit.publication_impacts]]
+surface_kind = "positional_args"
+command_path = "codex exec fork"
+surface_id = "PROMPT"
+surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
+
+[[support_surface_audit.publication_impacts]]
+surface_kind = "positional_args"
+command_path = "codex exec fork"
+surface_id = "SESSION_ID"
+surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
+
+[[support_surface_audit.publication_impacts]]
+surface_kind = "positional_args"
+command_path = "codex exec-server help"
+surface_id = "COMMAND"
+surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
+
+[[support_surface_audit.publication_impacts]]
+surface_kind = "subcommands"
+command_path = "codex app-server daemon update"
+surface_id = "update"
+surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
+
+[[support_surface_audit.publication_impacts]]
+surface_kind = "subcommands"
+command_path = "codex exec fork"
+surface_id = "fork"
+surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
+
+[[support_surface_audit.publication_impacts]]
+surface_kind = "subcommands"
+command_path = "codex exec-server forward"
+surface_id = "forward"
+surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
+
+[[support_surface_audit.publication_impacts]]
+surface_kind = "subcommands"
+command_path = "codex exec-server help"
+surface_id = "help"
 surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
 
 [execution_contract]
 executor = "execute-agent-maintenance"
 prompt_template_path = "docs/agents/lifecycle/codex-maintenance/governance/execute-agent-maintenance-prompt.md"
-prompt_sha256 = "6848635390da7e6783b8171535dc63e432518fc9cc6359d6ef50ab37be5044e1"
+prompt_sha256 = "b215b743126c352c23e57fd45c3c32468abf0574a1f9a48b20a76ab56588c0f8"
 pr_summary_path = "docs/agents/lifecycle/codex-maintenance/governance/pr-summary.md"
 closeout_path = "docs/agents/lifecycle/codex-maintenance/governance/maintenance-closeout.json"
 requires_manual_closeout = true
@@ -155,9 +2045,9 @@ writable_surfaces = [
   "crates/codex/**",
   "crates/agent_api/**",
   "cli_manifests/codex/artifacts.lock.json",
-  "cli_manifests/codex/snapshots/0.155.0/**",
-  "cli_manifests/codex/reports/0.155.0/**",
-  "cli_manifests/codex/versions/0.155.0.json",
+  "cli_manifests/codex/snapshots/0.156.1/**",
+  "cli_manifests/codex/reports/0.156.1/**",
+  "cli_manifests/codex/versions/0.156.1.json",
   "cli_manifests/codex/wrapper_coverage.json",
   "cli_manifests/support_matrix/current.json",
   "docs/specs/unified-agent-api/support-matrix.md",
@@ -170,7 +2060,6 @@ read_only_inputs = [
   "docs/agents/lifecycle/codex-maintenance/CI_WORKFLOWS_PLAN.md",
   "docs/agents/lifecycle/codex-maintenance/governance/execute-agent-maintenance-prompt.md",
   ".github/workflows/agent-maintenance-open-pr.yml",
-  "docs/specs/unified-agent-api/non-tui-support-debt.md",
 ]
 ordered_commands = [
   "cargo fmt --all",
@@ -192,7 +2081,7 @@ green_gates = [
 [execution_contract.recovery]
 recreate_packet_command = "cargo run -p xtask -- refresh-agent --request docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml --write"
 reopen_pr_body_path = "docs/agents/lifecycle/codex-maintenance/governance/pr-summary.md"
-reopen_pr_branch = "automation/codex-maintenance-0.155.0"
+reopen_pr_branch = "automation/codex-maintenance-0.156.1"
 notes = [
   "If PR creation fails after packet generation, rerun packet regeneration from the frozen request and reopen the PR from the generated pr-summary path.",
   "If the local execution-host preflight (local Codex CLI host via execute-agent-maintenance) fails, fix the Codex binary/auth state and rerun `execute-agent-maintenance --dry-run` before write mode.",
