@@ -6,8 +6,8 @@ opened_from = ".github/workflows/agent-maintenance-open-pr.yml"
 requested_control_plane_actions = [
   "packet_doc_refresh",
 ]
-request_recorded_at = "2026-05-14T18:37:44Z"
-request_commit = "4a6073bc7b7500441d8db170d5e5e3c9c9942366"
+request_recorded_at = "2026-09-25T08:49:43Z"
+request_commit = "9e4a06ad0a9494fcc8d3fbb10ef57f35b55c42aa"
 
 [runtime_followup_required]
 required = false
@@ -16,14 +16,14 @@ items = []
 [detected_release]
 detected_by = ".github/workflows/agent-maintenance-release-watch.yml"
 current_validated = "2.1.29"
-target_version = "2.1.140"
-latest_stable = "2.1.141"
-version_policy = "latest_stable_minus_one"
-source_kind = "gcs_object_listing"
-source_ref = "claude-code-dist-86c565f3-f756-42ad-8dfa-d59b1c096819/claude-code-releases"
+target_version = "2.1.274"
+latest_stable = "2.1.274"
+version_policy = "upstream_stable_pointer"
+source_kind = "npm_dist_tag"
+source_ref = "@anthropic-ai/claude-code#stable"
 dispatch_kind = "packet_pr"
 dispatch_workflow = "agent-maintenance-open-pr.yml"
-branch_name = "automation/claude_code-maintenance-2.1.140"
+branch_name = "automation/claude_code-maintenance-2.1.274"
 
 [support_surface_audit]
 required = true
@@ -47,68 +47,106 @@ allowed_deferrals = [
 pre_run_debt_count = 2
 expected_post_run_debt_count = 2
 
+[[support_surface_audit.unbaselined_gap_surface]]
+surface_kind = "commands"
+command_path = "claude_code install"
+surface_id = "install"
+evidence_ref = "docs/specs/unified-agent-api/non-tui-support-debt.md"
+
+[[support_surface_audit.unbaselined_gap_surface]]
+surface_kind = "flags"
+command_path = "claude_code install"
+surface_id = "--force"
+evidence_ref = "docs/specs/unified-agent-api/non-tui-support-debt.md"
+
 [[support_surface_audit.preexisting_unsupported_surface]]
 surface_kind = "commands"
-command_path = "claude install"
+command_path = "claude_code install"
 surface_id = "install"
 debt_ref = "docs/specs/unified-agent-api/non-tui-support-debt.md#claude-code-install-command"
 
 [[support_surface_audit.preexisting_unsupported_surface]]
 surface_kind = "flags"
-command_path = "claude install"
+command_path = "claude_code install"
 surface_id = "--force"
 debt_ref = "docs/specs/unified-agent-api/non-tui-support-debt.md#claude-code-install-force-flag"
 
 [[support_surface_audit.missing_wrapper_support]]
 surface_kind = "commands"
-command_path = "claude install"
+command_path = "claude_code install"
 surface_id = "install"
 
 [[support_surface_audit.missing_wrapper_support]]
 surface_kind = "flags"
-command_path = "claude install"
+command_path = "claude_code install"
 surface_id = "--force"
 
 [[support_surface_audit.missing_backend_support]]
 surface_kind = "commands"
-command_path = "claude install"
+command_path = "claude_code install"
 surface_id = "install"
 
 [[support_surface_audit.missing_backend_support]]
 surface_kind = "flags"
-command_path = "claude install"
+command_path = "claude_code install"
 surface_id = "--force"
+
+[[support_surface_audit.required_uplifts_this_run]]
+surface_kind = "commands"
+command_path = "claude_code install"
+surface_id = "install"
+reason = "unbaselined_gap"
+required_writes = [
+  "wrapper",
+  "backend",
+  "manifest",
+  "publication",
+  "packet_docs",
+]
+
+[[support_surface_audit.required_uplifts_this_run]]
+surface_kind = "flags"
+command_path = "claude_code install"
+surface_id = "--force"
+reason = "unbaselined_gap"
+required_writes = [
+  "wrapper",
+  "backend",
+  "manifest",
+  "publication",
+  "packet_docs",
+]
 
 [[support_surface_audit.deferred_preexisting_gaps]]
 surface_kind = "commands"
-command_path = "claude install"
+command_path = "claude_code install"
 surface_id = "install"
 defer_reason = "requires_new_architectural_seam"
 blocking_follow_on = "TODOS.md#close-claude-code-install-maintenance-gap"
 
 [[support_surface_audit.deferred_preexisting_gaps]]
 surface_kind = "flags"
-command_path = "claude install"
+command_path = "claude_code install"
 surface_id = "--force"
 defer_reason = "requires_new_architectural_seam"
 blocking_follow_on = "TODOS.md#close-claude-code-install-maintenance-gap"
 
 [[support_surface_audit.publication_impacts]]
 surface_kind = "commands"
-command_path = "claude install"
+command_path = "claude_code install"
 surface_id = "install"
 surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
 
 [[support_surface_audit.publication_impacts]]
 surface_kind = "flags"
-command_path = "claude install"
+command_path = "claude_code install"
 surface_id = "--force"
 surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
 
 [execution_contract]
 executor = "execute-agent-maintenance"
 prompt_template_path = "docs/agents/lifecycle/claude_code-maintenance/governance/execute-agent-maintenance-prompt.md"
-prompt_sha256 = "0e8eb3b6d0a36c0ad5844f7a5fb5e3d5a4cb7525fb7559194d85fba08c6afeac"
+prompt_sha256 = "fb77405ce0eeab22c16d6777b82fa1f8390cacb6e96bce403cf270979634b3fe"
 pr_summary_path = "docs/agents/lifecycle/claude_code-maintenance/governance/pr-summary.md"
 closeout_path = "docs/agents/lifecycle/claude_code-maintenance/governance/maintenance-closeout.json"
 requires_manual_closeout = true
@@ -117,9 +155,9 @@ writable_surfaces = [
   "crates/claude_code/**",
   "crates/agent_api/**",
   "cli_manifests/claude_code/artifacts.lock.json",
-  "cli_manifests/claude_code/snapshots/2.1.140/**",
-  "cli_manifests/claude_code/reports/2.1.140/**",
-  "cli_manifests/claude_code/versions/2.1.140.json",
+  "cli_manifests/claude_code/snapshots/2.1.274/**",
+  "cli_manifests/claude_code/reports/2.1.274/**",
+  "cli_manifests/claude_code/versions/2.1.274.json",
   "cli_manifests/claude_code/wrapper_coverage.json",
   "cli_manifests/support_matrix/current.json",
   "docs/specs/unified-agent-api/support-matrix.md",
@@ -131,7 +169,6 @@ read_only_inputs = [
   "docs/agents/lifecycle/claude_code-maintenance/CI_WORKFLOWS_PLAN.md",
   "docs/agents/lifecycle/claude_code-maintenance/governance/execute-agent-maintenance-prompt.md",
   ".github/workflows/agent-maintenance-open-pr.yml",
-  "docs/specs/unified-agent-api/non-tui-support-debt.md",
 ]
 ordered_commands = [
   "cargo fmt --all",
@@ -153,7 +190,7 @@ green_gates = [
 [execution_contract.recovery]
 recreate_packet_command = "cargo run -p xtask -- refresh-agent --request docs/agents/lifecycle/claude_code-maintenance/governance/maintenance-request.toml --write"
 reopen_pr_body_path = "docs/agents/lifecycle/claude_code-maintenance/governance/pr-summary.md"
-reopen_pr_branch = "automation/claude_code-maintenance-2.1.140"
+reopen_pr_branch = "automation/claude_code-maintenance-2.1.274"
 notes = [
   "If PR creation fails after packet generation, rerun packet regeneration from the frozen request and reopen the PR from the generated pr-summary path.",
   "If the local execution-host preflight (local Codex CLI host via execute-agent-maintenance) fails, fix the Codex binary/auth state and rerun `execute-agent-maintenance --dry-run` before write mode.",

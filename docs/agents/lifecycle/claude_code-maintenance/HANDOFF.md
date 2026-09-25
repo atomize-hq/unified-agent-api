@@ -4,31 +4,73 @@
 
 This file is the canonical contributor execution contract for `claude_code` maintenance.
 
+## Before you start: freeze this packet
+
+The nightly watcher regenerates this packet every night for as long as this agent's
+validated pointer trails upstream. Regeneration rewrites the request and force-pushes this
+branch back to base, which destroys work committed to the branch and invalidates a closeout
+bound to the previous request even when that closeout was never committed. Declare the freeze
+**before your first adjudication**, not before the closeout command.
+
+Commit exactly one file, to `staging` and never to this packet branch: the branch is inside the
+tree the force-push replaces, so a marker carried there is destroyed by the operation it exists
+to block.
+
+```sh
+git switch staging && git pull --ff-only
+mkdir -p docs/agents/lifecycle/claude_code-maintenance/governance/automation-stand-down
+cat > docs/agents/lifecycle/claude_code-maintenance/governance/automation-stand-down/2.1.274.toml <<'TOML'
+schema_version = 1
+agent_id = "claude_code"
+target_version = "2.1.274"
+reason = "closeout in progress"
+request_recorded_at = "2026-09-25T08:49:43Z"
+TOML
+git add docs/agents/lifecycle/claude_code-maintenance/governance/automation-stand-down/2.1.274.toml
+git commit docs/agents/lifecycle/claude_code-maintenance/governance/automation-stand-down/2.1.274.toml -m "chore(claude_code): stand automation down for 2.1.274"
+git push origin staging
+git switch -
+```
+
+The `git add` is required because the marker is always a new file, and the path on `git commit` is
+what keeps everything else out of the commit. If `git switch` refuses, your tree is dirty: this
+step runs before any packet work, so commit or stash that work first.
+
+Confirm the freeze is live, from this branch:
+
+```sh
+cargo run -p xtask -- maintenance-stand-down-check --agent claude_code --target-version 2.1.274 --from-ref origin/staging
+```
+
+Nothing releases the freeze but retirement. Closing this PR, pushing to it, approving it and
+merging it all leave it in force; the promotion PR for `2.1.274` removes the marker.
+
 ## Packet origin
 
 - detected_by: `.github/workflows/agent-maintenance-release-watch.yml`
 - current_validated: `2.1.29`
-- target_version: `2.1.140`
-- latest_stable: `2.1.141`
-- version_policy: `latest_stable_minus_one`
-- source_kind: `gcs_object_listing`
-- source_ref: `claude-code-dist-86c565f3-f756-42ad-8dfa-d59b1c096819/claude-code-releases`
+- target_version: `2.1.274`
+- latest_stable: `2.1.274`
+- version_policy: `upstream_stable_pointer`
+- source_kind: `npm_dist_tag`
+- source_ref: `@anthropic-ai/claude-code#stable`
 - dispatch_kind: `packet_pr`
 - dispatch_workflow: `agent-maintenance-open-pr.yml`
-- branch_name: `automation/claude_code-maintenance-2.1.140`
+- branch_name: `automation/claude_code-maintenance-2.1.274`
 
 ## Support-surface audit
 
 - required: `true`
 - pre-run debt count: `2`
 - expected post-run debt count: `2`
-- discovered upstream surface rows: `0`
+- discovered upstream surface rows: `2`
 - preexisting unsupported rows: `2`
 - required uplifts this run:
-- none
+- `claude_code install` `install` via `unbaselined_gap`
+- `claude_code install` `--force` via `unbaselined_gap`
 - deferred preexisting gaps:
-- `claude install` `install` via `requires_new_architectural_seam` (TODOS.md#close-claude-code-install-maintenance-gap)
-- `claude install` `--force` via `requires_new_architectural_seam` (TODOS.md#close-claude-code-install-maintenance-gap)
+- `claude_code install` `install` via `requires_new_architectural_seam` (TODOS.md#close-claude-code-install-maintenance-gap)
+- `claude_code install` `--force` via `requires_new_architectural_seam` (TODOS.md#close-claude-code-install-maintenance-gap)
 
 
 ## Relay contract
@@ -38,11 +80,11 @@ This file is the canonical contributor execution contract for `claude_code` main
 - executor surface: `execute-agent-maintenance`
 - request artifact: `docs/agents/lifecycle/claude_code-maintenance/governance/maintenance-request.toml`
 - prompt template path: `docs/agents/lifecycle/claude_code-maintenance/governance/execute-agent-maintenance-prompt.md`
-- prompt sha256: `0e8eb3b6d0a36c0ad5844f7a5fb5e3d5a4cb7525fb7559194d85fba08c6afeac`
+- prompt sha256: `fb77405ce0eeab22c16d6777b82fa1f8390cacb6e96bce403cf270979634b3fe`
 - canonical handoff: `docs/agents/lifecycle/claude_code-maintenance/HANDOFF.md`
 - derivative pr summary: `docs/agents/lifecycle/claude_code-maintenance/governance/pr-summary.md`
 - exact closeout artifact: `docs/agents/lifecycle/claude_code-maintenance/governance/maintenance-closeout.json`
-- branch linkage: `automation/claude_code-maintenance-2.1.140`
+- branch linkage: `automation/claude_code-maintenance-2.1.274`
 - manual closeout required: `true`
 
 ## Writable surfaces
@@ -51,9 +93,9 @@ This file is the canonical contributor execution contract for `claude_code` main
 - `crates/claude_code/**`
 - `crates/agent_api/**`
 - `cli_manifests/claude_code/artifacts.lock.json`
-- `cli_manifests/claude_code/snapshots/2.1.140/**`
-- `cli_manifests/claude_code/reports/2.1.140/**`
-- `cli_manifests/claude_code/versions/2.1.140.json`
+- `cli_manifests/claude_code/snapshots/2.1.274/**`
+- `cli_manifests/claude_code/reports/2.1.274/**`
+- `cli_manifests/claude_code/versions/2.1.274.json`
 - `cli_manifests/claude_code/wrapper_coverage.json`
 - `cli_manifests/support_matrix/current.json`
 - `docs/specs/unified-agent-api/support-matrix.md`
@@ -66,7 +108,6 @@ This file is the canonical contributor execution contract for `claude_code` main
 - `docs/agents/lifecycle/claude_code-maintenance/CI_WORKFLOWS_PLAN.md`
 - `docs/agents/lifecycle/claude_code-maintenance/governance/execute-agent-maintenance-prompt.md`
 - `.github/workflows/agent-maintenance-open-pr.yml`
-- `docs/specs/unified-agent-api/non-tui-support-debt.md`
 
 ## Ordered repo commands
 
@@ -90,10 +131,19 @@ This file is the canonical contributor execution contract for `claude_code` main
 
 - recreate packet command: `cargo run -p xtask -- refresh-agent --request docs/agents/lifecycle/claude_code-maintenance/governance/maintenance-request.toml --write`
 - reopen pr body path: `docs/agents/lifecycle/claude_code-maintenance/governance/pr-summary.md`
-- reopen pr branch: `automation/claude_code-maintenance-2.1.140`
+- reopen pr branch: `automation/claude_code-maintenance-2.1.274`
 - notes:
 - If PR creation fails after packet generation, rerun packet regeneration from the frozen request and reopen the PR from the generated pr-summary path.
 - If the local execution-host preflight (local Codex CLI host via execute-agent-maintenance) fails, fix the Codex binary/auth state and rerun `execute-agent-maintenance --dry-run` before write mode.
+
+## Dry-run to write relay
+
+Use the `run_id` printed by the dry-run output, replacing `RUN_ID_FROM_DRY_RUN` before invoking write mode.
+
+```sh
+cargo run -p xtask -- execute-agent-maintenance --dry-run --request docs/agents/lifecycle/claude_code-maintenance/governance/maintenance-request.toml
+cargo run -p xtask -- execute-agent-maintenance --write --request docs/agents/lifecycle/claude_code-maintenance/governance/maintenance-request.toml --run-id RUN_ID_FROM_DRY_RUN
+```
 
 ## Exact closeout command
 
@@ -104,7 +154,7 @@ cargo run -p xtask -- close-agent-maintenance --request docs/agents/lifecycle/cl
 ## Exact maintained-agent prompt
 
 ```md
-# Packet PR Maintenance Prompt (`2.1.140`)
+# Packet PR Maintenance Prompt (`2.1.274`)
 
 This template renders the exact maintained-agent prompt for `claude_code` packet execution.
 `docs/agents/lifecycle/claude_code-maintenance/HANDOFF.md` remains canonical and `governance/pr-summary.md` is derivative.
@@ -113,7 +163,7 @@ This template renders the exact maintained-agent prompt for `claude_code` packet
 
 ## Goal
 
-Execute the automated maintenance packet for `claude_code` target `2.1.140`.
+Execute the automated maintenance packet for `claude_code` target `2.1.274`.
 
 ## Frozen request contract
 
@@ -135,17 +185,24 @@ Execute the automated maintenance packet for `claude_code` target `2.1.140`.
 
 ## Required workflow
 
-1. Compare the current validated baseline from `cli_manifests/claude_code/latest_validated.txt` against the target `2.1.140` artifacts.
+1. Compare the current validated baseline from `cli_manifests/claude_code/latest_validated.txt` against the target `2.1.274` artifacts.
 2. Use `support_surface_audit` to classify newly discovered non-TUI surface, preexisting non-TUI debt, required uplifts, and allowed deferrals.
-3. Land bounded wrapper/backend/manifest/publication updates for every row in `required_uplifts_this_run`.
-4. Refresh or create version-scoped manifest artifacts under `cli_manifests/claude_code/snapshots/2.1.140/`, `cli_manifests/claude_code/reports/2.1.140/`, and `cli_manifests/claude_code/versions/2.1.140.json` as required by the packet.
-5. Leave closeout manual; record it only with `close-agent-maintenance` after the declared green gates pass.
+3. For each `deferred_preexisting_gaps` row that also appears in `required_uplifts_this_run`, decide whether its `defer_reason` still holds at `2.1.274`. If it does, re-authorize that identity's existing debt row or rows in `docs/specs/unified-agent-api/non-tui-support-debt.md` in place:
+   - set `authorized_at_version` to `2.1.274`;
+   - set `scope_target_triples` so the rows together cover exactly the targets whose `cli_manifests/claude_code/reports/2.1.274/coverage.<target>.json` lists the surface, with no target in two rows;
+   - set `authorization_evidence_ref` to `cli_manifests/claude_code/reports/2.1.274/coverage.any.json`.
+
+   Change no other field and add no row. If the blocker no longer holds, treat the row as an uplift.
+4. Land bounded wrapper/backend/manifest/publication updates for every remaining row in `required_uplifts_this_run`. Newly discovered surface is never deferred (maintenance-request contract field invariant 3), and no debt row may be added.
+5. Refresh or create version-scoped manifest artifacts under `cli_manifests/claude_code/snapshots/2.1.274/`, `cli_manifests/claude_code/reports/2.1.274/`, and `cli_manifests/claude_code/versions/2.1.274.json` as required by the packet.
+6. Leave closeout manual; record it only with `close-agent-maintenance` after the declared green gates pass.
 
 ## Done criteria
 
 - Changes stay within the writable surfaces frozen in `docs/agents/lifecycle/claude_code-maintenance/governance/maintenance-request.toml`.
-- No newly discovered non-TUI surface remains unresolved unless the packet records one allowed deferral.
+- Every row in `required_uplifts_this_run` is uplifted, or is a preexisting debt row re-authorized at `2.1.274`; newly discovered surface is never deferred.
 - `cargo run -p xtask -- codex-validate --root cli_manifests/claude_code` passes.
+- `cargo run -p xtask -- maintenance-audit-status --request docs/agents/lifecycle/claude_code-maintenance/governance/maintenance-request.toml` exits 0.
 - The remaining ordered commands and green gates from `docs/agents/lifecycle/claude_code-maintenance/HANDOFF.md` pass or are captured in maintainer follow-up notes.
 
 ```
