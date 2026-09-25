@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at_utc": "2026-09-24T14:44:05Z",
+  "updated_at_utc": "2026-09-24T22:50:06Z",
   "items": [
     {
       "id": "uaa-0022",
@@ -2078,6 +2078,234 @@
         "The assertion defect stands on its own even if the flake never returns, because the same shape appears wherever a test asserts status.success() with a message that names one of several possible causes."
       ],
       "priority": "P4"
+    },
+    {
+      "id": "uaa-0058",
+      "title": "The nightly freezes the maintenance request before acquisition, so no relay, refresh or closeout can load a packet",
+      "status": "todo",
+      "bucket": "agent_api.maintenance",
+      "type": "defect",
+      "kickoff": {
+        "prompt": [
+          "Work item: uaa-0058 — move the authoritative maintenance-request freeze after acquisition.",
+          "The nightly runs prepare-agent-maintenance --write on staging before parity-acquire (.github/workflows/agent-maintenance-open-pr.yml:143-164,381-392). When cli_manifests/<agent>/reports/<target>/ is absent, derive_support_surface_audit falls back to debt-inventory rows (crates/xtask/src/agent_maintenance/support_audit.rs:224-360), producing a placeholder whose evidence_ref is docs/specs/unified-agent-api/non-tui-support-debt.md.",
+          "After parity-acquire commits the target reports, every strict loader re-derives a different live audit and refuses the request: execute-agent-maintenance at execute/workflow.rs:19-20, refresh-agent at refresh.rs:141, close-agent-maintenance through closeout/validate.rs:117-122, and prepare-agent-closeout at prepare_closeout.rs:149. request/support_surface_audit_reconcile.rs:79-107 also refuses a placeholder with work before acquisition. Only maintenance-audit-status tolerates the drift at audit_status.rs:287-290.",
+          "Measured 2026-09-24 on packet heads #223 (opencode 1.18.31, 104e91ff), #227 (codex 0.156.0, 62f090aa), and #230 (claude_code 2.1.273, 0fbe4756): frozen/live uplift counts were 8/481, 2/56, and 2/185. Both execute-agent-maintenance --dry-run and refresh-agent --dry-run exited 2 on all three, and the generated HANDOFF and relay prompt carried the placeholder scope.",
+          "The contract already orders acquisition before preparation (docs/specs/maintenance-request-contract-v1.md:59,435). The gap has been structural since 68f7fb27 moved acquisition into the packet PR on 2026-07-24, and became universal when b52f1242 gave version-scoped debt rows placeholder work on 2026-09-19. The last closeout, #144 at 93e771d7, used a manual re-freeze after the work; no promotion has advanced a pointer since `80271c02` (codex 0.125.0, 2026-05-07); `2af2890d` (2026-05-11) set opencode's enrollment baseline, which is not a promotion.",
+          "Steps:",
+          "1) Add prepare-agent-maintenance --from-request <request>. Read only agent_id, opened_from, request_recorded_at, request_commit, and every detected_release field used by prepare; replace rather than reconcile the old audit; regenerate the request and packet docs against the current tree; preserve request_recorded_at and request_commit; and make an unchanged rerun byte-identical.",
+          "2) In parity-acquire.yml, run that re-freeze after union and before the audit gate, so the acquisition commit carries the request and packet docs with the reports.",
+          "3) Treat the re-freeze as a fourth destructive boundary: fetch the base and re-run maintenance-stand-down-check with --from-ref. Exit 3 skips the re-freeze and continues; every other non-zero exit fails the step.",
+          "4) Prove the relay dry-run passes both strict codex loads, and that simulated perfect opencode and claude_code relays reach satisfied.",
+          "Trigger: resolve before another packet is presented as relay-ready, refreshable, or closeout-ready from a pre-acquisition request."
+        ]
+      },
+      "notes": [
+        "Found 2026-09-24 while tracing the rehearsal path.",
+        "Validated the same day by a two-lane cross-review (Codex and Opus). Both confirmed the root cause.",
+        "Opus found the contract-order violation and the b52f1242 history.",
+        "The decision is implemented by PR B (`uaa-0058`), which lands after this documentation PR.",
+        "Pointer history: no promotion has advanced a pointer since `80271c02` (codex 0.125.0, 2026-05-07); `2af2890d` (2026-05-11) set opencode's enrollment baseline, which is not a promotion."
+      ],
+      "priority": "P1"
+    },
+    {
+      "id": "uaa-0059",
+      "title": "Debt-row metadata is chosen from every row of an identity, not from the rows that grant the target version",
+      "status": "todo",
+      "bucket": "agent_api.maintenance",
+      "type": "defect",
+      "kickoff": {
+        "prompt": [
+          "Work item: uaa-0059 — define a stable debt baseline across re-authorization.",
+          "crates/xtask/src/agent_maintenance/support_audit.rs:278-281 selects the lexicographically smallest row id from every debt row with the surface identity. The contract instead assigns debt_ref, deferral reason, and follow-on from the smallest contributing grant row (docs/specs/maintenance-request-contract-v1.md:254-256), and authorize_gap already computes those applicable_rows at support_audit/authorization.rs:182-200.",
+          "This is not a one-line selection fix. audit_status.rs:377-437 compares (identity, debt_ref) sets in debt_baseline_drift, while support_surface_audit_satisfied compares (defer_reason, blocking_follow_on) per identity. Selecting only applicable_rows can therefore change debt_ref whenever re-authorization adds a lower-sorting row relative to an older frozen request, making a legitimate gate exit 2.",
+          "The Opus review lane reproduced this on 2026-09-24. A lower-sorting re-authorization row leaves strict refresh-agent satisfied but makes maintenance-audit-status exit 2; changing follow_on makes both rendered metadata fields drift. Separately, Satisfied never directly compares frozen pre_run_debt_count or expected_post_run_debt_count (support_surface_audit_reconcile.rs:232-265), so a hand-edited scalar is ignored once the other predicates pass.",
+          "Steps:",
+          "1) Decide what identifies a debt baseline across a re-authorization.",
+          "2) Make row selection, debt_baseline_drift, and support_surface_audit_satisfied agree through one shared comparison.",
+          "3) Test both gates against the same re-authorization fixtures, including changed debt_ref, defer_reason, and blocking_follow_on.",
+          "Trigger: resolve before either one debt identity carries two rows or debt_baseline_drift or support_surface_audit_satisfied changes. The uaa-0061 relay instruction keeps the defect latent by re-authorizing in place; PR B adds this trigger-point comment at the min_by."
+        ]
+      },
+      "notes": [
+        "Reproduced 2026-09-24 by the Opus review lane with a lower-sorting re-authorization row.",
+        "Related scalar gap: Satisfied does not directly compare pre_run_debt_count or expected_post_run_debt_count once its other predicates pass.",
+        "PR B does not resolve the baseline decision; it records the trigger beside the current min_by selection."
+      ],
+      "priority": "P2"
+    },
+    {
+      "id": "uaa-0060",
+      "title": "The pre-acquisition audit placeholder is neither ordered nor aggregated by surface identity",
+      "status": "todo",
+      "bucket": "agent_api.maintenance",
+      "type": "defect",
+      "kickoff": {
+        "prompt": [
+          "Work item: uaa-0060 — canonicalize the pre-acquisition support-audit placeholder by surface identity.",
+          "The no-report fallback emits one gap per debt row in inventory-file order (crates/xtask/src/agent_maintenance/support_audit.rs:245-256), while the report path emits gaps in BTreeMap<SurfaceIdentity> order (support_audit/authorization.rs:203-255). support_surface_audit_satisfied compares deferred_preexisting_gaps as an ordered Vec, but audit_status.rs debt_baseline_drift compares sets.",
+          "On opencode, the inventory lists run --attach before run --agent. A simulated perfect relay therefore exits 2; swapping only those two frozen rows reaches satisfied. Two contract-legal rows for one identity also make the placeholder emit duplicates: pre_run_debt_count deduplicates while expected_post_run_debt_count does not, violating field invariant 5 and making Satisfied impossible at support_surface_audit_reconcile.rs:247.",
+          "Steps:",
+          "1) Aggregate the placeholder by surface identity rather than debt row.",
+          "2) Emit the aggregate in the same SurfaceIdentity order as the report-backed path.",
+          "3) Cover reversed inventory order and multiple contract-legal grants for one identity without relaxing any validation rule.",
+          "Trigger: resolve while pre-acquisition placeholders remain constructible. uaa-0058 makes this latent for the normal acquisition lane because it re-freezes through the report path, but any request frozen from the placeholder can still reach it."
+        ]
+      },
+      "notes": [
+        "The resolution is generator-side canonicalization; no validator or reconciliation rule is relaxed.",
+        "PR B resolves this item."
+      ],
+      "priority": "P3"
+    },
+    {
+      "id": "uaa-0061",
+      "title": "The relay prompt never says how to carry preexisting debt to a new version, and labels the debt file read-only",
+      "status": "todo",
+      "bucket": "agent_api.maintenance",
+      "type": "defect",
+      "kickoff": {
+        "prompt": [
+          "Work item: uaa-0061 — make the relay contract explain version-scoped debt re-authorization.",
+          "contract_policy.rs packet_pr_prompt_template tells the worker in Required workflow step 3 to land every required uplift, but authorization matches the target version exactly (support_audit/authorization.rs:182-200; docs/specs/unified-agent-api/non-tui-support-debt.md:33-42). Every preexisting debt row therefore becomes an uplift at a new version unless the same row is re-authorized for that version.",
+          "The prompt contradicts itself: contract_policy.rs:315-335 lists non-tui-support-debt.md in read_only_inputs, while contract_policy.rs:353-375 lists writable_surfaces and names the debt path at contract_policy.rs:370; only writable_surfaces is enforced (execute/validate.rs:110-150). Its done criterion permits one allowed deferral even though field invariant 3 forbids deferring newly discovered surface. RULES.json is not writable, so the relay cannot use parity exclusions instead.",
+          "Steps:",
+          "1) State that a worker may update a preexisting debt row in place for the target version only while its blocker still holds.",
+          "2) State that newly discovered surface must be uplifted, and remove the contradictory allowed-deferral done criterion.",
+          "3) Remove non-tui-support-debt.md from read_only_inputs while retaining its enforced writable surface.",
+          "4) Update request-hash fixtures and account for every request prompt_sha256 and derived contract changing through request/automation.rs:94-101,171-173. Committed staging requests may stay stale until the nightly regenerates them because CI does not load them.",
+          "Trigger: resolve before the post-acquisition relay is treated as executable contributor guidance."
+        ]
+      },
+      "notes": [
+        "The resolution is in-place re-authorization only for continuing blockers; newly discovered surface remains non-deferrable.",
+        "PR B resolves this item.",
+        "Changing the prompt changes every request's prompt_sha256 and derived contract; nightly packet regeneration repairs the committed staging copies."
+      ],
+      "priority": "P1"
+    },
+    {
+      "id": "uaa-0062",
+      "title": "Every documented packet recovery command is `refresh-agent`, which cannot load a pre-relay request",
+      "status": "todo",
+      "bucket": "agent_api.maintenance",
+      "type": "defect",
+      "kickoff": {
+        "prompt": [
+          "Work item: uaa-0062 — make packet recovery capable of replacing a pre-acquisition placeholder.",
+          "The workflow recovery guidance at .github/workflows/agent-maintenance-open-pr.yml:358-372 and every request's recovery.recreate_packet_command use refresh-agent --write. refresh-agent strict-loads the request at crates/xtask/src/agent_maintenance/refresh.rs:141 and never re-derives its support-surface audit.",
+          "After uaa-0058 that command works for a request already re-frozen after acquisition, but it still fails in the case the guidance exists for: PR creation fails before acquisition and leaves only the placeholder.",
+          "Steps:",
+          "1) Choose one recovery authority: point recovery at prepare-agent-maintenance --from-request, or make refresh-agent re-derive the audit.",
+          "2) Render the chosen command consistently in workflow failure guidance and recovery.recreate_packet_command.",
+          "3) Test recovery from a request whose audit still cites non-tui-support-debt.md as evidence_ref.",
+          "Trigger: resolve before anyone relies on the documented recovery path."
+        ]
+      },
+      "notes": [
+        "uaa-0058 fixes the normal acquisition lane, not this recovery case.",
+        "refresh-agent remains strict and cannot itself transition a placeholder under the current contract."
+      ],
+      "priority": "P2"
+    },
+    {
+      "id": "uaa-0063",
+      "title": "A stand-down declared before the post-acquisition re-freeze locks a packet on its placeholder request",
+      "status": "todo",
+      "bucket": "agent_api.maintenance",
+      "type": "defect",
+      "kickoff": {
+        "prompt": [
+          "Work item: uaa-0063 — close the ordering gap between acquisition and a maintainer stand-down.",
+          "After uaa-0058, a declared stand-down skips the post-acquisition re-freeze. A marker committed between packet open and that re-freeze therefore leaves the branch on a placeholder request no strict loader accepts; the window lasts for the acquisition matrix. Packets frozen before uaa-0058 lands have the same shape.",
+          "HANDOFF is right to require the freeze before first adjudication, but it must also say after the acquisition commit. A direct parity-acquire dispatch with commit: true can still commit artifacts onto a stood-down packet branch; that behavior predates uaa-0058 and is unchanged by the new re-freeze.",
+          "Steps:",
+          "1) Choose either to render the acquisition-before-freeze ordering into HANDOFF or to add a sanctioned local re-freeze that refuses after relay writes exist.",
+          "2) Cover a marker appearing during the acquisition matrix and a packet that predates uaa-0058.",
+          "3) Keep the direct parity-acquire commit behavior explicit rather than attributing it to the re-freeze.",
+          "Trigger: resolve on the first stand-down declared for a packet whose frozen audit still cites docs/specs/unified-agent-api/non-tui-support-debt.md as evidence_ref."
+        ]
+      },
+      "notes": [
+        "The ordinary instruction should read as two conditions together: freeze before first adjudication, and only after the acquisition commit.",
+        "The direct parity-acquire commit behavior is older than uaa-0058 and remains a separate concern.",
+        "When a stand-down skips the re-freeze, the audit gate still judges the placeholder and still publishes a relay invocation that exits 2 (`parity-acquire.yml:895-969` at `7c640b73`). The nightly acquisition (`commit: true`) can also commit onto a packet whose marker landed mid-matrix; this is not limited to a direct dispatch."
+      ],
+      "priority": "P3"
+    },
+    {
+      "id": "uaa-0064",
+      "title": "`parity-promote` never checks that the packet it promotes has a valid closeout",
+      "status": "todo",
+      "bucket": "agent_api.maintenance",
+      "type": "defect",
+      "kickoff": {
+        "prompt": [
+          "Work item: uaa-0064 — bind promotion to a valid maintenance closeout.",
+          "The acquisition-maintenance lifecycle spec §11 decides that closeout precedes promotion, and acceptance criterion 5 depends on that order. .github/workflows/parity-promote.yml:258-375 validates acquisition artifacts, advances latest_validated and pointers, removes the stand-down marker, and opens the promotion PR, but reads neither maintenance-request.toml nor maintenance-closeout.json.",
+          "The current mitigation is procedural: promotion is maintainer-dispatched, and a maintainer merges the promotion PR.",
+          "Steps:",
+          "1) Define which request and closeout generation a promotion must validate.",
+          "2) Fail promotion before pointer or marker changes when that closeout is absent, stale, or invalid.",
+          "3) Test the closed packet, missing closeout, mismatched request digest, and stale packet cases.",
+          "Trigger: resolve before promotion is dispatched by anything other than the maintainer, or before lifecycle T8 is called done."
+        ]
+      },
+      "notes": [
+        "The lifecycle ordering is documented but not enforced by parity-promote.",
+        "Maintainer dispatch and maintainer merge reduce exposure; they do not prove the closeout."
+      ],
+      "priority": "P2"
+    },
+    {
+      "id": "uaa-0065",
+      "title": "`prepare-agent-maintenance` and `maintenance-watch` resolve the workspace from the build checkout, not the working directory",
+      "status": "todo",
+      "bucket": "agent_api.maintenance",
+      "type": "defect",
+      "kickoff": {
+        "prompt": [
+          "Work item: uaa-0065 — make local maintenance commands resolve the invoked checkout.",
+          "prepare.rs:126-127,699-704 and watch.rs:116-117,711-716 derive the workspace from env!(\"CARGO_MANIFEST_DIR\"). execute, refresh, closeout, drift, audit-status, and stand-down instead use the working directory. A binary built in checkout A and invoked in checkout B therefore writes prepare output into A.",
+          "This occurred during the 2026-09-24 investigation: nine codex packet documents were written into the lead checkout and then reverted. CI is unaffected because it builds and runs within one checkout.",
+          "Steps:",
+          "1) Align prepare-agent-maintenance and maintenance-watch with the working-directory rule used by the other maintenance commands.",
+          "2) Add a two-checkout test or equivalent fixture proving that build location cannot redirect writes.",
+          "3) Audit documented local invocations for assumptions about the binary's build checkout.",
+          "Trigger: resolve before any documented local procedure runs prepare-agent-maintenance from a binary built in another checkout."
+        ]
+      },
+      "notes": [
+        "Observed directly on 2026-09-24; nine unintended packet-doc writes were reverted from the lead checkout.",
+        "CI remains unaffected because its build checkout and working checkout are the same."
+      ],
+      "priority": "P3"
+    },
+    {
+      "id": "uaa-0066",
+      "title": "Acceptance criterion 5 requires closing opencode, which cannot close without `uaa-0053` or `uaa-0055`",
+      "status": "todo",
+      "bucket": "agent_api.maintenance",
+      "type": "task",
+      "kickoff": {
+        "prompt": [
+          "Work item: uaa-0066 — decide how lifecycle acceptance criterion 5 applies to opencode.",
+          "The acquisition-maintenance lifecycle spec §9 criterion 5 requires all three packets closed. opencode 1.18.31 has 481 live uplifts, 473 of which are absent from the debt inventory. Field invariant 3 forbids deferring newly discovered surface, RULES.json is outside the maintenance writable_surfaces, and uaa-0053 explicitly says lifecycle T4-T8 must not wait for opencode wrapper expansion.",
+          "As written, T8 cannot close opencode and satisfy criterion 5 without contradicting one of those contracts.",
+          "Steps:",
+          "1) As a §7 Ask first decision, choose one path: amend criterion 5 to close codex and claude_code now and opencode after uaa-0053; pull uaa-0055 forward so deliberate non-support can be expressed as parity exclusions; or baseline the unwrapped surface as debt before the freeze.",
+          "2) Record the decision in the lifecycle spec and update the T8 proof scope without weakening field invariant 3 by accident.",
+          "3) If exclusions or debt are chosen, make the resulting 473 dispositions auditable rather than suppressing the count.",
+          "Trigger: resolve before T8 starts on opencode."
+        ]
+      },
+      "notes": [
+        "This is the maintainer's §7 Ask first decision, not an implementation choice.",
+        "The contradiction is between criterion 5 and opencode's current 473 newly discovered, non-debt uplifts; uaa-0053 remains off the T4-T8 critical path unless the maintainer changes that decision.",
+        "Under the current derivation, the 481 report gaps are the uplift queue: every gap is an uplift unless a debt row authorizes it at the target version. That is why the queue is 481: 473 new surfaces plus 8 debt rows not yet re-authorized. This supersedes the `uaa-0045` caution written when the queue was empty."
+      ],
+      "priority": "P2"
     }
   ]
 }

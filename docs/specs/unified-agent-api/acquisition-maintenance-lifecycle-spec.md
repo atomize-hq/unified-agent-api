@@ -38,6 +38,12 @@ Established by direct inspection at `origin/main`, not assumed:
 | Promotion is outside the maintenance contract **by design** | `writable_surfaces` excludes `latest_validated.txt` and `pointers/` |
 | Codex-as-relay-host is intentional, not leakage | HANDOFF models `maintained agent packet` ≠ `local execution host` |
 
+**Corrected 2026-09-24 (`uaa-0058`).** The row stating that all three audits reconcile `exact`
+stopped holding on 2026-09-19, when `b52f1242` made authorization require a report
+(`fully_authorized = report.is_some() && …`). The pre-acquisition placeholder therefore turns every
+debt row into an uplift; the live packet requests now differ from their acquired reports and strict
+request loaders refuse them.
+
 The last row matters: an earlier reading of this as a defect was **wrong** and is not in scope.
 
 ---
@@ -53,6 +59,15 @@ those *fresh* artifacts and branch on `required_uplifts_this_run`:
 - **non-empty** → the packet needs the Codex relay. Acquisition still succeeds and still commits
   (the artifacts are valid and worth keeping), but the job renders the relay invocation into the
   PR body and marks the packet not-closeout-ready.
+
+The gate judges a request re-frozen against the fresh artifacts, not the request first written when
+the packet opens. That first request is a placeholder because its target reports do not yet exist,
+and no strict loader accepts it after acquisition changes the live audit. Inside `parity-acquire`,
+after the union/report/validate step has produced the target artifacts and before the maintenance
+audit gate, acquisition therefore runs `prepare-agent-maintenance --from-request`. The acquisition
+commit then carries the regenerated request, packet docs, and artifacts together. Only that
+completed generation lets the uplift-branch relay invocation start (implemented by PR B,
+`uaa-0058`).
 
 This converts today's *accidental* safety — the relay is skippable only because these particular
 releases added no surface — into a decided property.
@@ -82,6 +97,21 @@ New and changed surfaces. Every new command follows the existing `xtask` convent
 (clap `Args` struct, `run()` returning a typed error with `exit_code()`).
 
 ```bash
+# NEW — complete an existing packet generation inside parity-acquire, after the
+# union/report/validate step has produced the target artifacts and before the maintenance audit
+# gate. The acquisition commit then carries the regenerated request, packet docs, and artifacts
+# together. Reads only the request's recorded agent_id, opened_from, request_recorded_at,
+# request_commit and every detected_release field accepted by prepare; it does not reconcile the
+# audit it replaces. request_commit remains the commit of the event that opened the generation:
+# the opening workflow's github.sha. It is not guaranteed to equal the checked-out base. A
+# post-acquisition --from-request re-freeze preserves it, so it identifies neither the base nor the
+# tree from which the completed audit was derived; the acquisition commit records that tree.
+# Regenerates the request and packet docs against the current tree exactly as prepare does,
+# while preserving request_recorded_at and request_commit. An unchanged rerun writes identical bytes.
+cargo run -p xtask -- prepare-agent-maintenance \
+  --from-request <path/to/maintenance-request.toml> \
+  [--write]
+
 # NEW — emit the support-surface audit as machine-readable JSON, derived from live artifacts.
 # Piece 1's input. Read-only apart from the --emit-json projection.
 # --expect-target-version (T2c, typed in T2d) exits 5 unless the request's
@@ -248,6 +278,10 @@ Follow `AGENTS.md` and the surrounding code, specifically:
 | Regression | a closeout whose `request_sha256` is stale is rejected (the failure mode observed on codex 0.144.6) |
 | End-to-end | dry-run the full chain against the three live packets; all three currently reconcile `exact`, so all three must come out closeout-ready |
 
+**Corrected 2026-09-24 (`uaa-0058`, `uaa-0066`).** The end-to-end row's premise no longer holds:
+the post-acquisition reports produce non-empty uplift queues, so the three packets do not all come
+out closeout-ready.
+
 `make preflight` is the authoritative gate; nothing is done until it is green.
 
 **Explicit non-goal:** do not add a test that asserts the *current* audit is `exact`. That is a
@@ -342,6 +376,12 @@ step rebasing an audited acquisition onto a moved branch (`uaa-0034`). `c3607d6b
 publisher job and the relay rendering. Acceptance criterion 1 is met in wiring and under test; it
 has not yet been observed on a runner, which T8 does.
 
+**Corrected 2026-09-24 from runner evidence.** The relay invocations published on packet PRs #223
+(opencode), #227 (codex), and #230 (claude_code) exit 2 at request load. Each request was frozen
+before acquisition and does not match the acquired reports (`uaa-0058`). The repair is the
+post-acquisition re-freeze described in Piece 1. The generated relay prompt also omitted the debt
+re-authorization step required at every new version (`uaa-0061`).
+
 **Decided 2026-09-19: a comment, not the PR body.** The body is set from `body-path` on
 `create-pull-request`, pointed at the generated `governance/pr-summary.md`, and the watcher
 re-dispatches `agent-maintenance-open-pr` nightly with no dedupe against an already-open packet. The
@@ -368,6 +408,12 @@ regression row records this as a hand-authoring hazard, and with the nightly cad
 deadline. Do not resolve it by excluding the timestamp from the digest: that hides one mutation and
 leaves force-push erasure and every other request rewrite intact. `uaa-0048` carries the fix, and
 its invariant is that a request generation's bytes are stable while that generation is active.
+On the acquisition lane with no target report at open, the request first becomes strictly loadable
+when its post-acquisition freeze is committed. Before that, strict loaders refuse the placeholder,
+so no closeout can exist. On the docs-only lane, or when the target reports already existed on base
+at open, the first freeze is already strictly loadable. Loadable is not protected. A generation is
+protected against regeneration and force-push only once a stand-down marker names it (`uaa-0048`).
+Declare that marker after the acquisition commit (`uaa-0063`).
 
 **T5 — Closeout finding derivation.** Map written surfaces to `MaintenanceDriftCategory`
 (`registry_manifest_drift`, `support_publication_drift`) with real surface lists; choose
@@ -576,6 +622,11 @@ packet other than the run's own — a newer version opens a different branch and
 different concurrency group, so it can close an older packet mid-closeout — so it asks per
 candidate.
 
+**Corrected 2026-09-24.** The decision is to enforce stand-down at four boundaries. PR B
+(`uaa-0058`) implements the fourth at the post-acquisition re-freeze: it fetches base fresh and asks
+through `--from-ref`. A declared stand-down (exit 3) skips only the re-freeze and the job continues
+as before; any other non-zero exit means the guard could not answer and fails the step.
+
 **The boundary that mutates the remote reads base fresh.** The job checks out base once and
 `create-pull-request` resets the packet branch to *current* base, so the exposure between reading
 the predicate and force-pushing is the job's whole duration — minutes — not the gap between two
@@ -652,6 +703,10 @@ now fetch base and read through `--from-ref`, supersession per candidate. Reques
 needed the same mechanism for a different reason: that boundary is first after checkout, but a
 re-run preserves the original event's `GITHUB_SHA`, so a fresh checkout is not a current one and
 step order does not imply freshness.
+
+**Corrected 2026-09-24.** The decision makes the acquisition re-freeze the fourth boundary. PR B
+(`uaa-0058`) implements it with the same fresh-fetch and `--from-ref` rule: exit 3 skips that
+re-freeze without failing the job, and any guard failure fails the step.
 
 *A marker retires with its own promotion, never with a newer version.* Cleanup belongs in
 `parity-promote`'s pointer-advance step, where removing the promoted version's marker rides into
@@ -770,12 +825,18 @@ without it, so that run still hard-fails with nothing committed.
    neither derives nor invents them. Measured that day, claude_code and opencode have zero such rows
    and satisfy this criterion outright; codex has 32 and satisfies it once they are adjudicated. T6
    refusing on an unadjudicated row is this criterion being enforced, not missed.
+   **Corrected 2026-09-24.** The preceding claude_code zero was measured from trunk's 2.1.29
+   report, not the live 2.1.273 packet. At 2.1.273 claude_code has four wrapper-only rows: three
+   commands and one flag. opencode has zero at 1.18.31. codex has 32 at 0.156.0: eight commands,
+   18 flags and six arguments. claude_code therefore satisfies this criterion, like codex, once
+   its rows are adjudicated.
 3. The generator refuses to emit when CI evidence for the recorded SHA is missing or not green,
    and says why.
 4. No existing validation rule was relaxed.
 5. All three packets are closed, with HANDOFF regenerated by `close-agent-maintenance` — each
    closed **on its own branch before merge** (codex excepted, as a catch-up against `main`; see
-   T8 sequencing). No packet is merged in the open state.
+   T8 sequencing). No packet is merged in the open state. **Not satisfiable for opencode as
+   written; see `uaa-0066`.**
 6. The lifecycle has exactly two human-in-the-loop points plus PR merges, and the docs say so.
 7. `make preflight` green; new code has tests; both review lanes clean.
 
@@ -802,6 +863,17 @@ without it, so that run still hard-fails with nothing committed.
 fourth, decided with them. Each sits on §7's *Ask first* list, so each is recorded here with its
 evidence rather than settled by an implementer in passing. The closeout-prerequisite group is
 unblocked.
+
+**Corrected 2026-09-24 (`uaa-0066`).** One §7 *Ask first* question is now open for the maintainer:
+acceptance criterion 5 requires closing opencode, but 473 of opencode 1.18.31's 481 live uplifts are
+newly discovered surface that field invariant 3 forbids deferring, while `uaa-0053` says T4–T8 must
+not wait for wrapper expansion. The maintainer must choose one of three paths before T8 starts on
+opencode: amend criterion 5 to close codex and claude_code now and opencode after `uaa-0053`; pull
+`uaa-0055` forward so deliberate non-support becomes parity exclusions; or baseline the unwrapped
+surface as debt before the freeze. Under the current derivation, the 481 report gaps are the uplift
+queue: every gap is an uplift unless a debt row authorizes it at the target version. That is why the
+queue is 481: 473 new surfaces plus 8 debt rows not yet re-authorized. This supersedes the `uaa-0045`
+caution, which was written when the queue was empty. The four decisions below remain settled.
 
 1. *Is `uaa-0039` the authorized exception to §4's `validate.rs` freeze?* **Yes — and §4's wording
    was the defect.** The freeze is directional, not locational: adding a check is in scope,
@@ -891,3 +963,10 @@ Two settled during specification:
 - *Should the lane run `refresh-agent`?* **No** — `refresh-agent` is the recovery command; packet
   docs are owned by `prepare-agent-maintenance` at open time, and all three packets already
   reconcile `exact`.
+
+  **Corrected 2026-09-24 (`uaa-0058`, `uaa-0062`).** The premise that all three packets reconcile
+  `exact` no longer holds. The decision is for the acquisition lane to complete the generation with
+  `prepare-agent-maintenance --from-request` after the target artifacts exist; PR B (`uaa-0058`)
+  implements it. The lane does not use `refresh-agent`, which strict-loads the stale request and
+  cannot perform that transition. `refresh-agent` remains the documented recovery command pending
+  `uaa-0062`.

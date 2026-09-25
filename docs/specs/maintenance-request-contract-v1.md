@@ -57,7 +57,15 @@ The system MUST continue to separate responsibilities this way:
   execution.
 - `close-agent-maintenance` owns explicit post-write closeout only.
 - workflow YAML owns transport only: acquire upstream artifacts, invoke `prepare-agent-maintenance`,
-  and open or refresh the PR. Workflow YAML MUST NOT become a second source of maintenance policy.
+  and open or refresh the PR. On the acquisition lane, when no target report exists at open, one
+  generation freezes the request twice: once at open, then inside `parity-acquire` with
+  `prepare-agent-maintenance --from-request` after the union/report/validate step has produced the
+  target artifacts and before the maintenance audit gate. The acquisition commit then carries the
+  regenerated request, packet docs, and artifacts together. Only the second freeze is a relay
+  contract; the first is a placeholder that no strict loader accepts. The docs-only lane
+  (`acquire=false`) has no acquisition and no second freeze. If the target reports already exist on
+  base at open, the first freeze is not a placeholder. A declared stand-down skips the second freeze
+  (`uaa-0063`). Workflow YAML MUST NOT become a second source of maintenance policy.
 
 ## Universal packet fields
 
@@ -71,8 +79,8 @@ Every automated upstream-release request MUST keep one shared top-level envelope
 | `basis_ref` | MUST be a repo-relative baseline pointer owned by the agent manifest root. |
 | `opened_from` | MUST be a repo-relative reference to the workflow or source that opened the packet. |
 | `requested_control_plane_actions` | MUST remain a control-plane action list, not a runtime implementation plan. |
-| `request_recorded_at` | MUST be an RFC 3339 UTC timestamp. |
-| `request_commit` | MUST be the repo commit used when the packet was generated. |
+| `request_recorded_at` | MUST be an RFC 3339 UTC timestamp. A post-acquisition `--from-request` re-freeze MUST preserve it because that re-freeze completes the same generation. |
+| `request_commit` | MUST be the commit of the event that opened the generation: the opening workflow's `github.sha`. It is not guaranteed to equal the checked-out base. A post-acquisition `--from-request` re-freeze MUST preserve it, so it identifies neither the base nor the tree from which the completed audit was derived; the acquisition commit records that tree. |
 | `[runtime_followup_required]` | MUST remain present, even when `required = false`. |
 
 For release-watch packets in this milestone:
