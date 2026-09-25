@@ -31,11 +31,194 @@ This packet tracks automated upstream-release maintenance for `claude_code`.
 - required: `true`
 - pre-run debt count: `2`
 - expected post-run debt count: `2`
-- discovered upstream surface rows: `2`
+- discovered upstream surface rows: `185`
 - preexisting unsupported rows: `2`
 - required uplifts this run:
+- `claude_code agents` `agents` via `unbaselined_gap`
+- `claude_code attach` `attach` via `unbaselined_gap`
+- `claude_code auth` `auth` via `unbaselined_gap`
+- `claude_code auto-mode` `auto-mode` via `unbaselined_gap`
+- `claude_code gateway` `gateway` via `unbaselined_gap`
+- `claude_code import` `import` via `unbaselined_gap`
 - `claude_code install` `install` via `unbaselined_gap`
+- `claude_code logs` `logs` via `unbaselined_gap`
+- `claude_code project` `project` via `unbaselined_gap`
+- `claude_code respawn` `respawn` via `unbaselined_gap`
+- `claude_code rm` `rm` via `unbaselined_gap`
+- `claude_code stop` `stop` via `unbaselined_gap`
+- `claude_code ultrareview` `ultrareview` via `unbaselined_gap`
+- `claude_code agents` `--all` via `unbaselined_gap`
+- `claude_code agents` `--cwd` via `unbaselined_gap`
+- `claude_code agents` `--json` via `unbaselined_gap`
+- `claude_code auth login` `--claudeai` via `unbaselined_gap`
+- `claude_code auth login` `--console` via `unbaselined_gap`
+- `claude_code auth login` `--email` via `unbaselined_gap`
+- `claude_code auth login` `--sso` via `unbaselined_gap`
+- `claude_code auth status` `--json` via `unbaselined_gap`
+- `claude_code auth status` `--text` via `unbaselined_gap`
+- `claude_code auto-mode defaults` `--label` via `unbaselined_gap`
+- `claude_code auto-mode reset` `--yes` via `unbaselined_gap`
+- `claude_code gateway` `--config` via `unbaselined_gap`
+- `claude_code import` `--dry-run` via `unbaselined_gap`
+- `claude_code import` `--yes` via `unbaselined_gap`
 - `claude_code install` `--force` via `unbaselined_gap`
+- `claude_code mcp add` `--callback-port` via `unbaselined_gap`
+- `claude_code mcp add` `--client-id` via `unbaselined_gap`
+- `claude_code mcp add` `--client-secret` via `unbaselined_gap`
+- `claude_code mcp add` `--env` via `unbaselined_gap`
+- `claude_code mcp add` `--header` via `unbaselined_gap`
+- `claude_code mcp add` `--scope` via `unbaselined_gap`
+- `claude_code mcp add` `--transport` via `unbaselined_gap`
+- `claude_code mcp add-from-claude-desktop` `--scope` via `unbaselined_gap`
+- `claude_code mcp add-json` `--client-secret` via `unbaselined_gap`
+- `claude_code mcp add-json` `--scope` via `unbaselined_gap`
+- `claude_code mcp login` `--no-browser` via `unbaselined_gap`
+- `claude_code mcp remove` `--scope` via `unbaselined_gap`
+- `claude_code plugin disable` `--all` via `unbaselined_gap`
+- `claude_code plugin disable` `--json` via `unbaselined_gap`
+- `claude_code plugin disable` `--scope` via `unbaselined_gap`
+- `claude_code plugin enable` `--json` via `unbaselined_gap`
+- `claude_code plugin enable` `--scope` via `unbaselined_gap`
+- `claude_code plugin eval` `--ablation` via `unbaselined_gap`
+- `claude_code plugin eval` `--allow-real-servers` via `unbaselined_gap`
+- `claude_code plugin eval` `--allow-tools` via `unbaselined_gap`
+- `claude_code plugin eval` `--case` via `unbaselined_gap`
+- `claude_code plugin eval` `--concurrency` via `unbaselined_gap`
+- `claude_code plugin eval` `--eval-dir` via `unbaselined_gap`
+- `claude_code plugin eval` `--json` via `unbaselined_gap`
+- `claude_code plugin eval` `--judge-model` via `unbaselined_gap`
+- `claude_code plugin eval` `--keep-temp` via `unbaselined_gap`
+- `claude_code plugin eval` `--max-cost-usd` via `unbaselined_gap`
+- `claude_code plugin eval` `--mocks` via `unbaselined_gap`
+- `claude_code plugin eval` `--no-publish` via `unbaselined_gap`
+- `claude_code plugin eval` `--no-scaffold` via `unbaselined_gap`
+- `claude_code plugin eval` `--output-dir` via `unbaselined_gap`
+- `claude_code plugin eval` `--publish-report` via `unbaselined_gap`
+- `claude_code plugin eval` `--report` via `unbaselined_gap`
+- `claude_code plugin eval` `--runs` via `unbaselined_gap`
+- `claude_code plugin eval` `--scaffold` via `unbaselined_gap`
+- `claude_code plugin eval` `--tag` via `unbaselined_gap`
+- `claude_code plugin eval` `--threshold` via `unbaselined_gap`
+- `claude_code plugin eval` `--trust-plugin` via `unbaselined_gap`
+- `claude_code plugin eval init` `--eval-dir` via `unbaselined_gap`
+- `claude_code plugin eval init` `--interactive` via `unbaselined_gap`
+- `claude_code plugin init` `--author` via `unbaselined_gap`
+- `claude_code plugin init` `--author-email` via `unbaselined_gap`
+- `claude_code plugin init` `--description` via `unbaselined_gap`
+- `claude_code plugin init` `--force` via `unbaselined_gap`
+- `claude_code plugin init` `--with` via `unbaselined_gap`
+- `claude_code plugin install` `--accept-command` via `unbaselined_gap`
+- `claude_code plugin install` `--config` via `unbaselined_gap`
+- `claude_code plugin install` `--json` via `unbaselined_gap`
+- `claude_code plugin install` `--scope` via `unbaselined_gap`
+- `claude_code plugin install` `--yes` via `unbaselined_gap`
+- `claude_code plugin list` `--available` via `unbaselined_gap`
+- `claude_code plugin list` `--json` via `unbaselined_gap`
+- `claude_code plugin marketplace add` `--claudeai` via `unbaselined_gap`
+- `claude_code plugin marketplace add` `--scope` via `unbaselined_gap`
+- `claude_code plugin marketplace add` `--sparse` via `unbaselined_gap`
+- `claude_code plugin marketplace list` `--json` via `unbaselined_gap`
+- `claude_code plugin marketplace remove` `--scope` via `unbaselined_gap`
+- `claude_code plugin prune` `--dry-run` via `unbaselined_gap`
+- `claude_code plugin prune` `--scope` via `unbaselined_gap`
+- `claude_code plugin prune` `--yes` via `unbaselined_gap`
+- `claude_code plugin tag` `--dry-run` via `unbaselined_gap`
+- `claude_code plugin tag` `--force` via `unbaselined_gap`
+- `claude_code plugin tag` `--message` via `unbaselined_gap`
+- `claude_code plugin tag` `--push` via `unbaselined_gap`
+- `claude_code plugin tag` `--remote` via `unbaselined_gap`
+- `claude_code plugin uninstall` `--json` via `unbaselined_gap`
+- `claude_code plugin uninstall` `--keep-data` via `unbaselined_gap`
+- `claude_code plugin uninstall` `--prune` via `unbaselined_gap`
+- `claude_code plugin uninstall` `--scope` via `unbaselined_gap`
+- `claude_code plugin uninstall` `--yes` via `unbaselined_gap`
+- `claude_code plugin update` `--accept-command` via `unbaselined_gap`
+- `claude_code plugin update` `--json` via `unbaselined_gap`
+- `claude_code plugin update` `--scope` via `unbaselined_gap`
+- `claude_code plugin update` `--yes` via `unbaselined_gap`
+- `claude_code plugin validate` `--json` via `unbaselined_gap`
+- `claude_code plugin validate` `--strict` via `unbaselined_gap`
+- `claude_code project purge` `--all` via `unbaselined_gap`
+- `claude_code project purge` `--dry-run` via `unbaselined_gap`
+- `claude_code project purge` `--interactive` via `unbaselined_gap`
+- `claude_code project purge` `--yes` via `unbaselined_gap`
+- `claude_code ultrareview` `--json` via `unbaselined_gap`
+- `claude_code ultrareview` `--no-post` via `unbaselined_gap`
+- `claude_code ultrareview` `--post` via `unbaselined_gap`
+- `claude_code ultrareview` `--timeout` via `unbaselined_gap`
+- `claude_code` `--autocompact` via `unbaselined_gap`
+- `claude_code` `--ax-screen-reader` via `unbaselined_gap`
+- `claude_code` `--bare` via `unbaselined_gap`
+- `claude_code` `--bg` via `unbaselined_gap`
+- `claude_code` `--brief` via `unbaselined_gap`
+- `claude_code` `--cloud` via `unbaselined_gap`
+- `claude_code` `--effort` via `unbaselined_gap`
+- `claude_code` `--environment` via `unbaselined_gap`
+- `claude_code` `--exclude-dynamic-system-prompt-sections` via `unbaselined_gap`
+- `claude_code` `--forward-subagent-text` via `unbaselined_gap`
+- `claude_code` `--include-hook-events` via `unbaselined_gap`
+- `claude_code` `--name` via `unbaselined_gap`
+- `claude_code` `--permission-prompts` via `unbaselined_gap`
+- `claude_code` `--plugin-url` via `unbaselined_gap`
+- `claude_code` `--prompt-suggestions` via `unbaselined_gap`
+- `claude_code` `--remote-control` via `unbaselined_gap`
+- `claude_code` `--remote-control-session-name-prefix` via `unbaselined_gap`
+- `claude_code` `--restricted` via `unbaselined_gap`
+- `claude_code` `--safe-mode` via `unbaselined_gap`
+- `claude_code` `--system-prompt-snapshot` via `unbaselined_gap`
+- `claude_code` `--teleport` via `unbaselined_gap`
+- `claude_code` `--tmux` via `unbaselined_gap`
+- `claude_code` `--worktree` via `unbaselined_gap`
+- `claude_code attach` `id` via `unbaselined_gap`
+- `claude_code logs` `id` via `unbaselined_gap`
+- `claude_code mcp add` `commandOrUrl` via `unbaselined_gap`
+- `claude_code mcp add` `name` via `unbaselined_gap`
+- `claude_code mcp add-json` `json` via `unbaselined_gap`
+- `claude_code mcp add-json` `name` via `unbaselined_gap`
+- `claude_code mcp get` `name` via `unbaselined_gap`
+- `claude_code mcp login` `name` via `unbaselined_gap`
+- `claude_code mcp logout` `name` via `unbaselined_gap`
+- `claude_code mcp remove` `name` via `unbaselined_gap`
+- `claude_code plugin details` `name` via `unbaselined_gap`
+- `claude_code plugin enable` `plugin` via `unbaselined_gap`
+- `claude_code plugin marketplace add` `source` via `unbaselined_gap`
+- `claude_code plugin update` `plugin` via `unbaselined_gap`
+- `claude_code plugin validate` `path` via `unbaselined_gap`
+- `claude_code rm` `id` via `unbaselined_gap`
+- `claude_code stop` `id` via `unbaselined_gap`
+- `claude_code auth login` `login` via `unbaselined_gap`
+- `claude_code auth logout` `logout` via `unbaselined_gap`
+- `claude_code auth status` `status` via `unbaselined_gap`
+- `claude_code auto-mode config` `config` via `unbaselined_gap`
+- `claude_code auto-mode critique` `critique` via `unbaselined_gap`
+- `claude_code auto-mode defaults` `defaults` via `unbaselined_gap`
+- `claude_code auto-mode reset` `reset` via `unbaselined_gap`
+- `claude_code mcp add` `add` via `unbaselined_gap`
+- `claude_code mcp add-from-claude-desktop` `add-from-claude-desktop` via `unbaselined_gap`
+- `claude_code mcp add-json` `add-json` via `unbaselined_gap`
+- `claude_code mcp get` `get` via `unbaselined_gap`
+- `claude_code mcp login` `login` via `unbaselined_gap`
+- `claude_code mcp logout` `logout` via `unbaselined_gap`
+- `claude_code mcp remove` `remove` via `unbaselined_gap`
+- `claude_code mcp serve` `serve` via `unbaselined_gap`
+- `claude_code plugin details` `details` via `unbaselined_gap`
+- `claude_code plugin disable` `disable` via `unbaselined_gap`
+- `claude_code plugin enable` `enable` via `unbaselined_gap`
+- `claude_code plugin eval` `eval` via `unbaselined_gap`
+- `claude_code plugin eval init` `init` via `unbaselined_gap`
+- `claude_code plugin init` `init` via `unbaselined_gap`
+- `claude_code plugin install` `install` via `unbaselined_gap`
+- `claude_code plugin list` `list` via `unbaselined_gap`
+- `claude_code plugin marketplace add` `add` via `unbaselined_gap`
+- `claude_code plugin marketplace list` `list` via `unbaselined_gap`
+- `claude_code plugin marketplace remove` `remove` via `unbaselined_gap`
+- `claude_code plugin marketplace update` `update` via `unbaselined_gap`
+- `claude_code plugin prune` `prune` via `unbaselined_gap`
+- `claude_code plugin tag` `tag` via `unbaselined_gap`
+- `claude_code plugin uninstall` `uninstall` via `unbaselined_gap`
+- `claude_code plugin update` `update` via `unbaselined_gap`
+- `claude_code plugin validate` `validate` via `unbaselined_gap`
+- `claude_code project purge` `purge` via `unbaselined_gap`
 - deferred preexisting gaps:
 - `claude_code install` `install` via `requires_new_architectural_seam` (TODOS.md#close-claude-code-install-maintenance-gap)
 - `claude_code install` `--force` via `requires_new_architectural_seam` (TODOS.md#close-claude-code-install-maintenance-gap)
