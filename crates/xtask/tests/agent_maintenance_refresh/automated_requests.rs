@@ -491,10 +491,10 @@ fn automated_packet_refresh_renders_canonical_handoff_and_pr_summary() {
     assert!(handoff.contains("## Exact green gates"));
     assert!(handoff.contains("## Dry-run to write relay"));
     assert!(handoff.contains(
-        "Packet regeneration is a maintainer action run from outside a relay session. An agent executing this packet is already inside one and must not run the recreate command."
+        "Packet recovery is a maintainer action run from outside a relay session. An agent executing this packet inside a relay session must not run any command named in this Recovery section, including its notes."
     ));
     assert!(handoff.contains(
-        "Starting the relay is a maintainer action run from outside a relay session. An agent executing this packet is already inside one and must not run either command."
+        "Starting the relay is a maintainer action run from outside a relay session. An agent executing this packet inside a relay session must not run either command."
     ));
     assert!(handoff.contains(
         "cargo run -p xtask -- execute-agent-maintenance --dry-run --request docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml"
@@ -504,7 +504,7 @@ fn automated_packet_refresh_renders_canonical_handoff_and_pr_summary() {
     ));
     assert!(handoff.contains("## Exact closeout command"));
     assert!(handoff.contains(
-        "Closeout is a maintainer action run from outside a relay session. An agent executing this packet is already inside one and must not run this command."
+        "After the declared green gates pass, the actor handed the packet PR records the closeout. An agent executing this packet inside a relay session must not run this command."
     ));
     assert!(handoff.contains("## Exact maintained-agent prompt"));
     assert!(handoff
@@ -518,7 +518,7 @@ fn automated_packet_refresh_renders_canonical_handoff_and_pr_summary() {
         "docs/agents/lifecycle/opencode-maintenance/OPS_PLAYBOOK.md",
     );
     assert!(ops_playbook.contains(
-        "The recovery packet-regeneration command is a maintainer action run from outside a relay session. An agent executing this packet is already inside one and must not run it."
+        "The recovery packet-regeneration command is a maintainer action run from outside a relay session. An agent executing this packet inside a relay session must not run it."
     ));
 
     let pr_summary = planned_utf8(

@@ -177,6 +177,12 @@ pub(crate) fn build_execution_contract(
             ),
             reopen_pr_body_path: pr_summary_path,
             reopen_pr_branch: branch_name.to_string(),
+            // `uaa-0070` triggers here. Both notes are imperatives naming a guarded command, and
+            // `docs.rs` frames them only where it renders the `## Recovery` section — not in
+            // `governance/maintenance-request.toml`, which repeats them as frozen data and which the
+            // packet prompt orders the agent to read first. Reattributing them here is the fix that
+            // reaches every surface; it was deferred because `c4_spec_ci_wiring.rs` binds the second
+            // sentence to `agent-maintenance-open-pr.yml`, so the change also edits the nightly.
             notes: vec![
                 "If PR creation fails after packet generation, rerun packet regeneration from the frozen request and reopen the PR from the generated pr-summary path.".to_string(),
                 format!(
@@ -213,7 +219,7 @@ pub fn packet_pr_prompt_template(entry: &AgentRegistryEntry, maintenance_root: &
             "- Read the packet-owned `support_surface_audit` block before deciding whether the run can succeed.\n",
             "- Treat `{handoff_path}` as canonical for writable surfaces, read-only inputs, ordered commands, green gates, and recovery.\n",
             "- Treat `.github/workflows/{workflow}` as the opening workflow source.\n",
-            "- The hosted agent is the executor: this prompt is delivered by `execute-agent-maintenance`, which is already running. It must never invoke `execute-agent-maintenance`, `prepare-agent-maintenance`, or `refresh-agent`; lifecycle queries are expected. `HANDOFF.md` is the agent's contract for writable surfaces, read-only inputs, ordered commands, green gates, and the freeze step; its relay, recovery, and closeout sections describe maintainer actions that start or close a run.\n",
+            "- Never invoke `execute-agent-maintenance`, `prepare-agent-maintenance`, or `refresh-agent`. If this prompt was delivered by `execute-agent-maintenance`, that process is the executor and is already running; lifecycle queries remain available. `HANDOFF.md` is the agent's contract for writable surfaces, read-only inputs, ordered commands, green gates, and the freeze step; its relay and recovery sections describe maintainer actions that start or recreate a run, and its closeout section identifies the closeout actor.\n",
             "- Do not write outside the execution contract frozen in the request packet.\n\n",
             "## Manifest inputs\n\n",
             "- `cli_manifests/{agent_id}/README.md`\n",
@@ -233,7 +239,7 @@ pub fn packet_pr_prompt_template(entry: &AgentRegistryEntry, maintenance_root: &
             "   Change no other field and add no row. If the blocker no longer holds, treat the row as an uplift.\n",
             "4. Land bounded wrapper/backend/manifest/publication updates for every remaining row in `required_uplifts_this_run`. Newly discovered surface is never deferred (maintenance-request contract field invariant 3), and no debt row may be added.\n",
             "5. Refresh or create version-scoped manifest artifacts under `cli_manifests/{agent_id}/snapshots/{{{{VERSION}}}}/`, `cli_manifests/{agent_id}/reports/{{{{VERSION}}}}/`, and `cli_manifests/{agent_id}/versions/{{{{VERSION}}}}.json` as required by the packet.\n",
-            "6. The agent does not run `close-agent-maintenance` or `prepare-agent-closeout`; the maintainer records the closeout after the declared green gates pass.\n\n",
+            "6. An agent executing this packet inside a relay session does not run `close-agent-maintenance` or `prepare-agent-closeout`; after the declared green gates pass, the actor handed the packet PR records the closeout.\n\n",
             "## Done criteria\n\n",
             "- Changes stay within the writable surfaces frozen in `{request_path}`.\n",
             "- Every row in `required_uplifts_this_run` is uplifted, or is a preexisting debt row re-authorized at `{{{{VERSION}}}}`; newly discovered surface is never deferred.\n",

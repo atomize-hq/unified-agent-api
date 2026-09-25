@@ -166,10 +166,10 @@ fn execute_agent_maintenance_dry_run_locks_relay_wording_and_distinction() {
     ));
     assert!(handoff.contains("## Dry-run to write relay"));
     assert!(handoff.contains(
-        "Packet regeneration is a maintainer action run from outside a relay session. An agent executing this packet is already inside one and must not run the recreate command."
+        "Packet recovery is a maintainer action run from outside a relay session. An agent executing this packet inside a relay session must not run any command named in this Recovery section, including its notes."
     ));
     assert!(handoff.contains(
-        "Starting the relay is a maintainer action run from outside a relay session. An agent executing this packet is already inside one and must not run either command."
+        "Starting the relay is a maintainer action run from outside a relay session. An agent executing this packet inside a relay session must not run either command."
     ));
     assert!(handoff.contains(
         "cargo run -p xtask -- execute-agent-maintenance --dry-run --request docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml"
@@ -178,7 +178,7 @@ fn execute_agent_maintenance_dry_run_locks_relay_wording_and_distinction() {
         "cargo run -p xtask -- execute-agent-maintenance --write --request docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml --run-id RUN_ID_FROM_DRY_RUN"
     ));
     assert!(handoff.contains(
-        "Closeout is a maintainer action run from outside a relay session. An agent executing this packet is already inside one and must not run this command."
+        "After the declared green gates pass, the actor handed the packet PR records the closeout. An agent executing this packet inside a relay session must not run this command."
     ));
 
     let ops_playbook = packet
@@ -187,7 +187,7 @@ fn execute_agent_maintenance_dry_run_locks_relay_wording_and_distinction() {
         .map(|doc| doc.contents.as_str())
         .expect("ops playbook contents");
     assert!(ops_playbook.contains(
-        "The recovery packet-regeneration command is a maintainer action run from outside a relay session. An agent executing this packet is already inside one and must not run it."
+        "The recovery packet-regeneration command is a maintainer action run from outside a relay session. An agent executing this packet inside a relay session must not run it."
     ));
 }
 
@@ -213,11 +213,11 @@ fn execute_agent_maintenance_write_requires_run_id() {
 }
 
 #[test]
-fn execute_agent_maintenance_rejects_blank_run_id_in_both_modes() {
+fn execute_agent_maintenance_rejects_invalid_run_id_in_both_modes() {
     let fixture = prepare_execute_fixture("agent-maintenance-execute-blank-run-id");
 
     for mode in ["--dry-run", "--write"] {
-        for run_id in ["", " \t\n"] {
+        for run_id in ["", " \t\n", ".", "..", "a/b", "a\\b"] {
             let output = run_execute_cli(
                 [
                     "xtask",
@@ -237,6 +237,13 @@ fn execute_agent_maintenance_rejects_blank_run_id_in_both_modes() {
                 "mode={mode:?}, run_id={run_id:?}, stderr={}",
                 output.stderr
             );
+            if !run_id.trim().is_empty() {
+                assert!(
+                    output.stderr.contains("one path segment"),
+                    "mode={mode:?}, run_id={run_id:?}, stderr={}",
+                    output.stderr
+                );
+            }
         }
     }
 }

@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at_utc": "2026-09-25T16:48:04Z",
+  "updated_at_utc": "2026-09-25T17:59:18Z",
   "items": [
     {
       "id": "uaa-0022",
@@ -2356,11 +2356,12 @@
           "Work item: uaa-0068 — refuse nested write-side lifecycle invocation from inside the relay.",
           "Observed 2026-09-25 against the codex 0.156.1 packet. The hosted session ran `cargo run -p xtask -- execute-agent-maintenance --dry-run --request <the same request>` and then `cargo run -p xtask -- execute-agent-maintenance --write --request <the same request> --run-id <its own new run>`. The nested relay repeated the sequence, reaching three levels of nesting, 11 `codex exec` sessions, and 2,523,345 tokens before the lead stopped it. Nothing was written to the repository, so this was a cost and control defect rather than repository corruption.",
           "The prompt made `HANDOFF.md` canonical without telling the hosted agent that `execute-agent-maintenance` had already made it the executor. `spawn_codex_exec` uses `wait_with_output` with no timeout, so nothing bounded the fan-out. The path had been unreachable until uaa-0058 was fixed because write mode had never loaded a request successfully.",
-          "Resolved by refusing all modes of `prepare-agent-maintenance`, `execute-agent-maintenance`, `refresh-agent`, `close-agent-maintenance`, and `prepare-agent-closeout` when `XTASK_AGENT_MAINTENANCE_RUN_ID` identifies an enclosing relay; passing the same marker to the preflight child; and making the executor and manual-closeout boundaries explicit in the packet prompt. Read-only lifecycle queries remain available inside the relay."
+          "Resolved by refusing all modes of `prepare-agent-maintenance`, `execute-agent-maintenance`, `refresh-agent`, `close-agent-maintenance`, and `prepare-agent-closeout` when `XTASK_AGENT_MAINTENANCE_RUN_ID` identifies an enclosing relay; passing the same marker to the preflight child; and making the executor and manual-closeout boundaries explicit in the packet prompt. Lifecycle queries remain available inside the relay."
         ]
       },
       "notes": [
-        "Resolved 2026-09-25 by the nested lifecycle environment guard, preflight marker propagation, subprocess regression coverage for all five guarded CLI names, and packet-prompt clauses. The marker can be cleared by a descendant that chooses to, so the guard's strength rests on nothing instructing it to; the refusal, rendered HANDOFF sections, and packet prompt close that instructional gap.",
+        "Resolved 2026-09-25 by the nested lifecycle environment guard, preflight marker propagation, subprocess regression coverage for all five guarded CLI names, and packet-prompt clauses. The marker can be cleared by a descendant that chooses to, so the guard's strength rests on no rendered instruction telling one to; that weight is carried by the refusal text, rendered HANDOFF.md, OPS_PLAYBOOK.md, threading.md, review_surfaces.md, and governance/pr-summary.md, plus the standalone packet prompt and its embedded copies.",
+        "Accepted residual: `maintenance-audit-status --emit-json` and `maintenance-watch --emit-json` both write a JSON projection to any caller-named path and are deliberately left unguarded because the packet prompt's done criteria require `maintenance-audit-status`. The unguarded lifecycle-query set therefore includes two arbitrary-path writers.",
         "`spawn_codex_exec` remains unbounded. This guard closes the observed recursion path, but the separate timeout question remains open."
       ],
       "priority": "P1"
@@ -2384,6 +2385,28 @@
         "Raised 2026-09-25 from remediation review of uaa-0068; timeout design and cleanup semantics remain to be specified."
       ],
       "priority": "P2"
+    },
+    {
+      "id": "uaa-0070",
+      "title": "the frozen request repeats recovery instructions naming guarded commands, with no relay framing",
+      "status": "todo",
+      "bucket": "agent_api.maintenance",
+      "type": "defect",
+      "kickoff": {
+        "prompt": [
+          "Work item: uaa-0070 — frame or reattribute the recovery notes at their source, so no rendered surface hands a relay-hosted agent an imperative naming a guarded command.",
+          "`crates/xtask/src/agent_maintenance/contract_policy.rs:181-184` authors two `execution_contract.recovery.notes`. Note 2 is an imperative: \"fix the Codex binary/auth state and rerun `execute-agent-maintenance --dry-run` before write mode\".",
+          "uaa-0068 framed the rendered docs: `docs.rs` prefixes the HANDOFF `## Recovery` section with a sentence covering every command it names, its notes included. That framing does not reach `governance/maintenance-request.toml`, which repeats both notes as frozen data and which the packet prompt orders the agent to read first.",
+          "Two controls already cover that surface: the packet prompt prohibits invoking the relay family unconditionally, and the environment guard refuses the command. This row closes the remaining contradiction between two documents the agent reads, which is the defect class uaa-0068 was about.",
+          "The fix is to reattribute the note text to the actor outside the relay, at its source, which reaches every surface including the TOML. Blast radius, measured 2026-09-25: about sixteen pinned strings across eight test files (`c4_spec_ci_wiring.rs`, `agent_maintenance_prepare.rs`, `agent_maintenance_execute.rs`, and four harnesses) plus `.github/workflows/agent-maintenance-open-pr.yml`, because `c4_spec_ci_wiring.rs:84` binds the workflow's copy of the sentence to the contract's.",
+          "`docs/specs/maintenance-request-contract-v1.md:426` is permissive about this field's content, so the text is not spec-pinned; the workflow coupling is what makes the change wide."
+        ]
+      },
+      "notes": [
+        "Raised 2026-09-25 during uaa-0068's second remediation review, and deferred by the lead the same day: the change would touch the nightly's own workflow days before the first closeout rehearsal, for a surface two other controls already cover.",
+        "The regression test added with uaa-0068 (`crates/xtask/tests/agent_maintenance_prepare.rs`) enforces the set of rendered docs that name guarded tooling, but checks the framing only at document level, so it would not catch a single section that frames one command and orders another. Section-level proof needs a heading parser and a per-doc exception table; fold that into this row rather than adding it separately."
+      ],
+      "priority": "P3"
     }
   ]
 }

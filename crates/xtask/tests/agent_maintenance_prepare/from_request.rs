@@ -254,13 +254,14 @@ fn packet_prompt_and_contract_pin_debt_reauthorization_semantics() {
         .replace("{{VERSION}}", "0.98.0");
 
     for clause in [
-        "this prompt is delivered by `execute-agent-maintenance`, which is already running",
-        "The hosted agent is the executor",
-        "It must never invoke `execute-agent-maintenance`, `prepare-agent-maintenance`, or `refresh-agent`",
+        "Never invoke `execute-agent-maintenance`, `prepare-agent-maintenance`, or `refresh-agent`",
+        "If this prompt was delivered by `execute-agent-maintenance`, that process is the executor and is already running",
         "`HANDOFF.md` is the agent's contract for writable surfaces, read-only inputs, ordered commands, green gates, and the freeze step",
-        "its relay, recovery, and closeout sections describe maintainer actions that start or close a run",
-        "lifecycle queries are expected",
-        "The agent does not run `close-agent-maintenance` or `prepare-agent-closeout`",
+        "its relay and recovery sections describe maintainer actions that start or recreate a run",
+        "its closeout section identifies the closeout actor",
+        "lifecycle queries remain available",
+        "An agent executing this packet inside a relay session does not run `close-agent-maintenance` or `prepare-agent-closeout`",
+        "the actor handed the packet PR records the closeout",
         "re-authorize",
         "in place",
         "authorized_at_version",

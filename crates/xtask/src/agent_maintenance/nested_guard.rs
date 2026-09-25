@@ -64,5 +64,9 @@ mod tests {
             !message.contains("unset"),
             "refusal must not instruct a nested process to bypass the guard: {message}"
         );
+        assert!(
+            !message.contains("read-only"),
+            "refusal must not misdescribe lifecycle queries that can write projections: {message}"
+        );
     }
 }
