@@ -37,8 +37,11 @@ pub(crate) struct ResolvedCliOverrides {
     pub(crate) remote: Option<String>,
     pub(crate) remote_auth_token_env: Option<String>,
     pub(crate) local_provider: Option<LocalProvider>,
+    pub(crate) approve_for_me: bool,
+    pub(crate) no_daemon: bool,
     pub(crate) oss: bool,
     pub(crate) search: FlagState,
+    pub(crate) worktree: bool,
 }
 
 impl ResolvedCliOverrides {
@@ -111,6 +114,18 @@ pub(super) fn resolve_cli_overrides(
         FlagState::Inherit => builder.oss,
         other => other,
     };
+    let approve_for_me = match patch.approve_for_me {
+        FlagState::Inherit => builder.approve_for_me,
+        other => other,
+    };
+    let no_daemon = match patch.no_daemon {
+        FlagState::Inherit => builder.no_daemon,
+        other => other,
+    };
+    let worktree = match patch.worktree {
+        FlagState::Inherit => builder.worktree,
+        other => other,
+    };
     let mut feature_toggles = builder.feature_toggles.clone();
     feature_toggles
         .enable
@@ -130,8 +145,11 @@ pub(super) fn resolve_cli_overrides(
         remote,
         remote_auth_token_env,
         local_provider,
+        approve_for_me: matches!(approve_for_me, FlagState::Enable),
+        no_daemon: matches!(no_daemon, FlagState::Enable),
         oss: matches!(oss, FlagState::Enable),
         search,
+        worktree: matches!(worktree, FlagState::Enable),
     }
 }
 
@@ -201,12 +219,24 @@ pub(super) fn cli_override_args(
         args.push(OsString::from(provider.as_str()));
     }
 
+    if resolved.approve_for_me {
+        args.push(OsString::from("--approve-for-me"));
+    }
+
+    if resolved.no_daemon {
+        args.push(OsString::from("--no-daemon"));
+    }
+
     if resolved.oss {
         args.push(OsString::from("--oss"));
     }
 
     if include_search && resolved.search_enabled() {
         args.push(OsString::from("--search"));
+    }
+
+    if resolved.worktree {
+        args.push(OsString::from("--worktree"));
     }
 
     args

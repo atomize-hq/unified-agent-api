@@ -2,15 +2,20 @@
   "schema_version": 1,
   "semantic_version": "0.156.1",
   "status": "reported",
-  "updated_at": "2026-09-23T02:41:36Z",
+  "updated_at": "2026-09-25T20:07:12.731285Z",
   "artifacts": {
     "snapshots_dir": "snapshots/0.156.1",
     "reports_dir": "reports/0.156.1",
     "union_complete": true
   },
   "coverage": {
-    "supported_targets": [],
-    "supported_required_target": false
+    "supported_targets": [
+      "x86_64-unknown-linux-musl",
+      "aarch64-unknown-linux-musl",
+      "aarch64-apple-darwin",
+      "x86_64-pc-windows-msvc"
+    ],
+    "supported_required_target": true
   },
   "promotion": {
     "eligible_for_latest_validated": false
