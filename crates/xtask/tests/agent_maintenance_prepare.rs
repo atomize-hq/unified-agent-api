@@ -107,7 +107,16 @@ fn prepare_agent_maintenance_write_creates_packet_root() {
     assert!(handoff.contains("## Ordered repo commands"));
     assert!(handoff.contains("## Exact green gates"));
     assert!(handoff.contains("## Recovery"));
+    assert!(handoff.contains(
+        "Packet regeneration is a maintainer action run from outside a relay session. An agent executing this packet is already inside one and must not run the recreate command."
+    ));
+    assert!(handoff.contains(
+        "Starting the relay is a maintainer action run from outside a relay session. An agent executing this packet is already inside one and must not run either command."
+    ));
     assert!(handoff.contains("## Exact closeout command"));
+    assert!(handoff.contains(
+        "Closeout is a maintainer action run from outside a relay session. An agent executing this packet is already inside one and must not run this command."
+    ));
     assert!(handoff.contains("## Exact maintained-agent prompt"));
     assert!(
         handoff.contains("Execute the automated maintenance packet for `codex` target `0.98.0`.")
@@ -134,6 +143,13 @@ fn prepare_agent_maintenance_write_creates_packet_root() {
         "If the local execution-host preflight (local Codex CLI host via execute-agent-maintenance) fails, fix the Codex binary/auth state and rerun `execute-agent-maintenance --dry-run` before write mode."
     ));
     assert!(!handoff.contains("## Explicit exclusions"));
+
+    let ops_playbook =
+        fs::read_to_string(fixture.join("docs/agents/lifecycle/codex-maintenance/OPS_PLAYBOOK.md"))
+            .expect("read ops playbook");
+    assert!(ops_playbook.contains(
+        "The recovery packet-regeneration command is a maintainer action run from outside a relay session. An agent executing this packet is already inside one and must not run it."
+    ));
 
     let pr_summary = fs::read_to_string(
         fixture.join("docs/agents/lifecycle/codex-maintenance/governance/pr-summary.md"),

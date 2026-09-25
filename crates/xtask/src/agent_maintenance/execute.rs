@@ -130,6 +130,15 @@ pub fn run_in_workspace<W: Write>(
 }
 
 fn validate_args(args: &Args) -> Result<(), Error> {
+    if args
+        .run_id
+        .as_deref()
+        .is_some_and(|run_id| run_id.trim().is_empty())
+    {
+        return Err(Error::Validation(
+            "--run-id must not be empty or whitespace-only".to_string(),
+        ));
+    }
     if args.write && args.run_id.is_none() {
         return Err(Error::Validation(
             "--run-id is required with --write so the relay can validate against one prepared dry-run baseline".to_string(),

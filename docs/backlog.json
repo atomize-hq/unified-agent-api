@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at_utc": "2026-09-24T23:35:00Z",
+  "updated_at_utc": "2026-09-25T16:48:04Z",
   "items": [
     {
       "id": "uaa-0022",
@@ -2344,6 +2344,46 @@
         "Does not gate the maintenance lifecycle work."
       ],
       "priority": "P4"
+    },
+    {
+      "id": "uaa-0068",
+      "title": "the relay prompt lets the hosted agent re-invoke execute-agent-maintenance, recursing without bound",
+      "status": "done",
+      "bucket": "agent_api.maintenance",
+      "type": "defect",
+      "kickoff": {
+        "prompt": [
+          "Work item: uaa-0068 — refuse nested write-side lifecycle invocation from inside the relay.",
+          "Observed 2026-09-25 against the codex 0.156.1 packet. The hosted session ran `cargo run -p xtask -- execute-agent-maintenance --dry-run --request <the same request>` and then `cargo run -p xtask -- execute-agent-maintenance --write --request <the same request> --run-id <its own new run>`. The nested relay repeated the sequence, reaching three levels of nesting, 11 `codex exec` sessions, and 2,523,345 tokens before the lead stopped it. Nothing was written to the repository, so this was a cost and control defect rather than repository corruption.",
+          "The prompt made `HANDOFF.md` canonical without telling the hosted agent that `execute-agent-maintenance` had already made it the executor. `spawn_codex_exec` uses `wait_with_output` with no timeout, so nothing bounded the fan-out. The path had been unreachable until uaa-0058 was fixed because write mode had never loaded a request successfully.",
+          "Resolved by refusing all modes of `prepare-agent-maintenance`, `execute-agent-maintenance`, `refresh-agent`, `close-agent-maintenance`, and `prepare-agent-closeout` when `XTASK_AGENT_MAINTENANCE_RUN_ID` identifies an enclosing relay; passing the same marker to the preflight child; and making the executor and manual-closeout boundaries explicit in the packet prompt. Read-only lifecycle queries remain available inside the relay."
+        ]
+      },
+      "notes": [
+        "Resolved 2026-09-25 by the nested lifecycle environment guard, preflight marker propagation, subprocess regression coverage for all five guarded CLI names, and packet-prompt clauses. The marker can be cleared by a descendant that chooses to, so the guard's strength rests on nothing instructing it to; the refusal, rendered HANDOFF sections, and packet prompt close that instructional gap.",
+        "`spawn_codex_exec` remains unbounded. This guard closes the observed recursion path, but the separate timeout question remains open."
+      ],
+      "priority": "P1"
+    },
+    {
+      "id": "uaa-0069",
+      "title": "spawn_codex_exec has no timeout, so a relay session is bounded by nothing the child cannot remove",
+      "status": "todo",
+      "bucket": "agent_api.maintenance",
+      "type": "defect",
+      "kickoff": {
+        "prompt": [
+          "Work item: uaa-0069 — add a deadline that bounds the relay child independently of child-controlled environment state.",
+          "`crates/xtask/src/agent_maintenance/execute/runtime.rs` uses `wait_with_output()` with no deadline. The 2026-09-25 incident ran unbounded until it was killed by hand.",
+          "An adversarial review lane judged that because `XTASK_AGENT_MAINTENANCE_RUN_ID` can be unset by a descendant, a deadline is the only bound a child cannot delete.",
+          "The repository's own Codex worker launcher already stops Codex after a timeout, so the maintenance relay is the outlier.",
+          "Cross-reference uaa-0068, which closes the observed nested-invocation path but does not bound an uncooperative child."
+        ]
+      },
+      "notes": [
+        "Raised 2026-09-25 from remediation review of uaa-0068; timeout design and cleanup semantics remain to be specified."
+      ],
+      "priority": "P2"
     }
   ]
 }

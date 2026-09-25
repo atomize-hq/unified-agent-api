@@ -166,10 +166,28 @@ fn execute_agent_maintenance_dry_run_locks_relay_wording_and_distinction() {
     ));
     assert!(handoff.contains("## Dry-run to write relay"));
     assert!(handoff.contains(
+        "Packet regeneration is a maintainer action run from outside a relay session. An agent executing this packet is already inside one and must not run the recreate command."
+    ));
+    assert!(handoff.contains(
+        "Starting the relay is a maintainer action run from outside a relay session. An agent executing this packet is already inside one and must not run either command."
+    ));
+    assert!(handoff.contains(
         "cargo run -p xtask -- execute-agent-maintenance --dry-run --request docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml"
     ));
     assert!(handoff.contains(
         "cargo run -p xtask -- execute-agent-maintenance --write --request docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml --run-id RUN_ID_FROM_DRY_RUN"
+    ));
+    assert!(handoff.contains(
+        "Closeout is a maintainer action run from outside a relay session. An agent executing this packet is already inside one and must not run this command."
+    ));
+
+    let ops_playbook = packet
+        .iter()
+        .find(|doc| doc.relative_path.ends_with("/OPS_PLAYBOOK.md"))
+        .map(|doc| doc.contents.as_str())
+        .expect("ops playbook contents");
+    assert!(ops_playbook.contains(
+        "The recovery packet-regeneration command is a maintainer action run from outside a relay session. An agent executing this packet is already inside one and must not run it."
     ));
 }
 
@@ -192,6 +210,35 @@ fn execute_agent_maintenance_write_requires_run_id() {
 
     assert_eq!(output.exit_code, 2);
     assert!(output.stderr.contains("--run-id is required"));
+}
+
+#[test]
+fn execute_agent_maintenance_rejects_blank_run_id_in_both_modes() {
+    let fixture = prepare_execute_fixture("agent-maintenance-execute-blank-run-id");
+
+    for mode in ["--dry-run", "--write"] {
+        for run_id in ["", " \t\n"] {
+            let output = run_execute_cli(
+                [
+                    "xtask",
+                    "execute-agent-maintenance",
+                    mode,
+                    "--request",
+                    "docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml",
+                    "--run-id",
+                    run_id,
+                ],
+                &fixture,
+            );
+
+            assert_eq!(output.exit_code, 2, "mode={mode:?}, run_id={run_id:?}");
+            assert!(
+                output.stderr.contains("--run-id"),
+                "mode={mode:?}, run_id={run_id:?}, stderr={}",
+                output.stderr
+            );
+        }
+    }
 }
 
 #[test]

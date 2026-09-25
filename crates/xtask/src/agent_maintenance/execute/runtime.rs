@@ -26,8 +26,13 @@ pub(super) fn run_codex_preflight(
     let prompt = format!(
         "Repository preflight for execute-agent-maintenance.\nReply with exactly {PREFLIGHT_SENTINEL}.\nDo not write, edit, or delete any files.\nDo not run any commands.\n"
     );
+    // The run id alone marks descendants as inside the relay; preflight needs no write surfaces.
+    let envs = vec![(
+        "XTASK_AGENT_MAINTENANCE_RUN_ID".to_string(),
+        context.run_id.clone(),
+    )];
     let (argv, output) =
-        spawn_codex_exec(&context.codex_binary, workspace_root, &prompt, &[], true)?;
+        spawn_codex_exec(&context.codex_binary, workspace_root, &prompt, &envs, true)?;
     let after = snapshot_workspace(workspace_root, &[Path::new(EXECUTION_RUNS_ROOT)])?;
     let changed_paths = diff_snapshots(&before, &after);
     let stdout = String::from_utf8_lossy(&output.stdout).into_owned();

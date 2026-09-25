@@ -203,6 +203,7 @@ fn explicit_cli_matches_the_existing_plan_and_invalid_modes_are_rejected() {
     );
     let output = Command::new(env!("CARGO_BIN_EXE_xtask"))
         .args(explicit_cli_args())
+        .env_remove("XTASK_AGENT_MAINTENANCE_RUN_ID")
         .output()
         .expect("run xtask");
     assert!(
@@ -224,6 +225,7 @@ fn explicit_cli_matches_the_existing_plan_and_invalid_modes_are_rejected() {
             "codex",
             "--dry-run",
         ])
+        .env_remove("XTASK_AGENT_MAINTENANCE_RUN_ID")
         .output()
         .expect("run mixed CLI");
     assert_eq!(mixed.status.code(), Some(2));
@@ -231,6 +233,7 @@ fn explicit_cli_matches_the_existing_plan_and_invalid_modes_are_rejected() {
 
     let missing_mode = Command::new(env!("CARGO_BIN_EXE_xtask"))
         .args(["prepare-agent-maintenance", "--from-request", REQUEST_PATH])
+        .env_remove("XTASK_AGENT_MAINTENANCE_RUN_ID")
         .output()
         .expect("run from-request without mode");
     assert_eq!(missing_mode.status.code(), Some(2));
@@ -251,6 +254,13 @@ fn packet_prompt_and_contract_pin_debt_reauthorization_semantics() {
         .replace("{{VERSION}}", "0.98.0");
 
     for clause in [
+        "this prompt is delivered by `execute-agent-maintenance`, which is already running",
+        "The hosted agent is the executor",
+        "It must never invoke `execute-agent-maintenance`, `prepare-agent-maintenance`, or `refresh-agent`",
+        "`HANDOFF.md` is the agent's contract for writable surfaces, read-only inputs, ordered commands, green gates, and the freeze step",
+        "its relay, recovery, and closeout sections describe maintainer actions that start or close a run",
+        "lifecycle queries are expected",
+        "The agent does not run `close-agent-maintenance` or `prepare-agent-closeout`",
         "re-authorize",
         "in place",
         "authorized_at_version",
@@ -262,6 +272,9 @@ fn packet_prompt_and_contract_pin_debt_reauthorization_semantics() {
     ] {
         assert!(prompt.contains(clause), "prompt must contain `{clause}`");
     }
+    assert!(!prompt.contains(
+        "Leave closeout manual; record it only with `close-agent-maintenance` after the declared green gates pass."
+    ));
 
     let contract = contract_policy::build_execution_contract(
         &fixture,
