@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at_utc": "2026-09-25T17:59:18Z",
+  "updated_at_utc": "2026-09-25T18:31:13Z",
   "items": [
     {
       "id": "uaa-0022",
@@ -2407,6 +2407,28 @@
         "The regression test added with uaa-0068 (`crates/xtask/tests/agent_maintenance_prepare.rs`) enforces the set of rendered docs that name guarded tooling, but checks the framing only at document level, so it would not catch a single section that frames one command and orders another. Section-level proof needs a heading parser and a per-doc exception table; fold that into this row rather than adding it separately."
       ],
       "priority": "P3"
+    },
+    {
+      "id": "uaa-0071",
+      "title": "xtask test targets exec the shared debug/xtask binary while cargo relinks it, so execs wedge or no-op",
+      "status": "todo",
+      "bucket": "agent_api.exec",
+      "type": "defect",
+      "kickoff": {
+        "prompt": [
+          "Work item: uaa-0071 — stop xtask test targets from racing cargo over the one `debug/xtask` binary they all exec.",
+          "Roughly twenty test files spawn `env!(\"CARGO_BIN_EXE_xtask\")` as a subprocess. `cargo test` builds and relinks that single bin target while already-built test binaries are running, so a concurrent exec can observe it mid-write.",
+          "Two independent measurements on 2026-09-25, from different processes, describe one mechanism. First: a `cargo test -p xtask` run hung for 1h12m inside `refresh_publication_entrypoint`, whose five live children (three `support-matrix --check`, two `capability-matrix --check`) were each sampled entirely in `_dyld_start` — blocked in the dynamic loader, never reaching `main`. Second: a review lane running the suite from a non-git extract with a cold target dir got 28 failures whose common shape was `debug/xtask` exiting 0 with empty stderr, i.e. a binary that loaded but did nothing.",
+          "The same lane proved the failures are unrelated to the relay marker: with `XTASK_AGENT_MAINTENANCE_RUN_ID` set and unset, the sorted failing-test name sets were identical.",
+          "This has been misread three times in one day as a pre-existing load-sensitive flake, because every affected test passes when its target runs alone. `uaa-0057` and `uaa-0067` were both filed under that reading and should be re-examined against this mechanism before being chased separately.",
+          "Candidate directions, none chosen: give the spawning tests their own copy of the binary; serialize the targets that exec it; or have them resolve a binary built once, outside the test run."
+        ]
+      },
+      "notes": [
+        "Raised 2026-09-25 while auditing a hung background process from a review lane. Not a product defect; it makes `make preflight` and full-suite runs unreliable, which is what has made preflight evidence hard to trust in this work.",
+        "Deliberately not the deletion hazard the same lane reported: that scratch checkout was removed by the lead's own cleanup `rm -rf` while the lane was still live, not by any test."
+      ],
+      "priority": "P2"
     }
   ]
 }
