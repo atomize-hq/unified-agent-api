@@ -442,11 +442,10 @@ each unadjudicated row. See the note under §3. This means a packet whose rows h
 adjudicated cannot be closed by T6 alone — which is the mechanism reporting a missing human
 judgement, not a gap in T6.
 
-**T7 — Docs.** Plan doc §18; operator guide gains closeout as an explicit lifecycle step; the
-§13 maintainer checklist gains the step it currently omits.
+**T7 — Docs. DONE (2026-09-25).** The [operator guide](../../cli-agent-onboarding-factory-operator-guide.md#maintenance-mode) now records the freeze, relay, closeout, and separate-promotion procedure; the [plan's current lifecycle checklist](../../agents/lifecycle/parity-generalization-plan.md#current-lifecycle-checklist-2026-09-25) records the maintainer sequence; and the [Codex 0.156.1 proof receipt](../../agents/lifecycle/codex-maintenance/governance/proof/2026-09-25-closeout-rehearsal.md) records the supervised rehearsal and its limits.
 
-**T8 — Prove it.** Run the chain against all three live packets; confirm `make preflight` green;
-both review lanes clean with findings adjudicated.
+**T8 — Prove it. INCOMPLETE.** Run the chain against all three live packets; confirm `make preflight` green;
+both review lanes clean with findings adjudicated. The Codex rehearsal is evidence for the lifecycle, not completion of the remaining packet proofs.
 
 Order: T1 → T2 → (T3 ∥ T4) → T5 → T6 → T7 → T8.
 

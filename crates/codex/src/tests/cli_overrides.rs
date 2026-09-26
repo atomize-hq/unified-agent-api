@@ -107,6 +107,45 @@ fn request_search_override_can_disable_builder_flag() {
 }
 
 #[test]
+fn packet_global_flags_respect_request_precedence() {
+    use FlagState::{Disable, Enable, Inherit};
+
+    let flags = ["--approve-for-me", "--no-daemon", "--worktree"];
+    for flag in flags {
+        for (builder_state, patch_state, expected) in [
+            (Inherit, Inherit, false),
+            (Enable, Inherit, true),
+            (Disable, Inherit, false),
+            (Enable, Disable, false),
+            (Disable, Enable, true),
+            (Inherit, Enable, true),
+            (Inherit, Disable, false),
+        ] {
+            let mut builder = CliOverrides::default();
+            let mut patch = CliOverridesPatch::default();
+            let (builder_flag, patch_flag) = match flag {
+                "--approve-for-me" => (&mut builder.approve_for_me, &mut patch.approve_for_me),
+                "--no-daemon" => (&mut builder.no_daemon, &mut patch.no_daemon),
+                "--worktree" => (&mut builder.worktree, &mut patch.worktree),
+                _ => unreachable!(),
+            };
+            *builder_flag = builder_state;
+            *patch_flag = patch_state;
+
+            let resolved = resolve_cli_overrides(&builder, &patch, None);
+            let args = cli_override_args(&resolved, true);
+            for observed in flags {
+                assert_eq!(
+                    args.iter().any(|arg| arg == observed),
+                    observed == flag && expected,
+                    "{flag}: builder={builder_state:?}, patch={patch_state:?}, observed={observed}"
+                );
+            }
+        }
+    }
+}
+
+#[test]
 fn request_profile_override_replaces_builder_value() {
     let builder_overrides = CliOverrides {
         profile: Some("builder".to_string()),
@@ -215,8 +254,11 @@ fn cli_override_args_apply_safety_precedence() {
         remote: None,
         remote_auth_token_env: None,
         local_provider: None,
+        approve_for_me: false,
+        no_daemon: false,
         oss: false,
         search: FlagState::Enable,
+        worktree: false,
     };
     let args = cli_override_args(&resolved, true);
     let args: Vec<_> = args
@@ -247,8 +289,11 @@ fn cli_override_args_apply_safety_precedence() {
         remote: Some("staging".to_string()),
         remote_auth_token_env: Some("CODEX_REMOTE_TOKEN".to_string()),
         local_provider: Some(LocalProvider::Ollama),
+        approve_for_me: true,
+        no_daemon: true,
         oss: false,
         search: FlagState::Enable,
+        worktree: true,
     };
     let args = cli_override_args(&resolved, true);
     let args: Vec<_> = args
@@ -268,7 +313,10 @@ fn cli_override_args_apply_safety_precedence() {
     assert!(args.contains(&"CODEX_REMOTE_TOKEN".to_string()));
     assert!(args.contains(&"--local-provider".to_string()));
     assert!(args.contains(&"ollama".to_string()));
+    assert!(args.contains(&"--approve-for-me".to_string()));
+    assert!(args.contains(&"--no-daemon".to_string()));
     assert!(args.contains(&"--search".to_string()));
+    assert!(args.contains(&"--worktree".to_string()));
     assert!(!args.contains(&"--ask-for-approval".to_string()));
     assert!(!args.contains(&"--sandbox".to_string()));
 

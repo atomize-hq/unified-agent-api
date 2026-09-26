@@ -5,6 +5,7 @@ pub mod docs;
 pub mod drift;
 pub mod execute;
 pub mod finding_signature;
+pub mod nested_guard;
 pub mod prepare;
 pub mod prepare_closeout;
 pub mod refresh;

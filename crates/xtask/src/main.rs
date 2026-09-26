@@ -28,9 +28,9 @@ const CLAUDE_CODE_MANIFEST_ROOT: &str = "cli_manifests/claude_code";
 use xtask::agent_maintenance::{
     audit_status as agent_maintenance_audit_status, closeout as agent_maintenance_closeout,
     drift as agent_maintenance_drift, execute as agent_maintenance_execute,
-    prepare as agent_maintenance_prepare, prepare_closeout as agent_maintenance_prepare_closeout,
-    refresh as agent_maintenance_refresh, stand_down as agent_maintenance_stand_down,
-    watch as agent_maintenance_watch,
+    nested_guard as agent_maintenance_nested_guard, prepare as agent_maintenance_prepare,
+    prepare_closeout as agent_maintenance_prepare_closeout, refresh as agent_maintenance_refresh,
+    stand_down as agent_maintenance_stand_down, watch as agent_maintenance_watch,
 };
 use xtask::capability_matrix;
 pub use xtask::manifest_acquisition;
@@ -138,6 +138,29 @@ enum Command {
     SupportMatrix(support_matrix::Args),
     /// Bump the workspace release version and exact inter-crate publish pins.
     VersionBump(version_bump::Args),
+}
+
+fn run_write_side_lifecycle<E: std::fmt::Display>(
+    command: &str,
+    run: impl FnOnce() -> Result<(), E>,
+    error_exit_code: impl FnOnce(&E) -> i32,
+) -> i32 {
+    let host_run_id = std::env::var_os("XTASK_AGENT_MAINTENANCE_RUN_ID")
+        .map(|value| value.to_string_lossy().into_owned());
+    match agent_maintenance_nested_guard::refuse_nested_invocation(command, host_run_id.as_deref())
+    {
+        Ok(()) => match run() {
+            Ok(()) => 0,
+            Err(err) => {
+                eprintln!("{err}");
+                error_exit_code(&err)
+            }
+        },
+        Err(message) => {
+            eprintln!("{message}");
+            2
+        }
+    }
 }
 
 fn main() {
@@ -367,23 +390,20 @@ fn main() {
                 err.exit_code()
             }
         },
-        Command::PrepareAgentMaintenance(cli_args) => match cli_args
-            .into_args()
-            .and_then(agent_maintenance_prepare::run)
-        {
-            Ok(()) => 0,
-            Err(err) => {
-                eprintln!("{err}");
-                err.exit_code()
-            }
-        },
-        Command::ExecuteAgentMaintenance(args) => match agent_maintenance_execute::run(args) {
-            Ok(()) => 0,
-            Err(err) => {
-                eprintln!("{err}");
-                err.exit_code()
-            }
-        },
+        Command::PrepareAgentMaintenance(cli_args) => run_write_side_lifecycle(
+            "prepare-agent-maintenance",
+            || {
+                cli_args
+                    .into_args()
+                    .and_then(agent_maintenance_prepare::run)
+            },
+            |err| err.exit_code(),
+        ),
+        Command::ExecuteAgentMaintenance(args) => run_write_side_lifecycle(
+            "execute-agent-maintenance",
+            || agent_maintenance_execute::run(args),
+            |err| err.exit_code(),
+        ),
         Command::MaintenanceAuditStatus(args) => match agent_maintenance_audit_status::run(args) {
             Ok(outcome) => outcome.exit_code(),
             Err(err) => {
@@ -391,29 +411,21 @@ fn main() {
                 err.exit_code()
             }
         },
-        Command::RefreshAgent(args) => match agent_maintenance_refresh::run(args) {
-            Ok(()) => 0,
-            Err(err) => {
-                eprintln!("{err}");
-                err.exit_code()
-            }
-        },
-        Command::CloseAgentMaintenance(args) => match agent_maintenance_closeout::run(args) {
-            Ok(()) => 0,
-            Err(err) => {
-                eprintln!("{err}");
-                err.exit_code()
-            }
-        },
-        Command::PrepareAgentCloseout(args) => {
-            match agent_maintenance_prepare_closeout::run(args) {
-                Ok(()) => 0,
-                Err(err) => {
-                    eprintln!("{err}");
-                    err.exit_code()
-                }
-            }
-        }
+        Command::RefreshAgent(args) => run_write_side_lifecycle(
+            "refresh-agent",
+            || agent_maintenance_refresh::run(args),
+            |err| err.exit_code(),
+        ),
+        Command::CloseAgentMaintenance(args) => run_write_side_lifecycle(
+            "close-agent-maintenance",
+            || agent_maintenance_closeout::run(args),
+            |err| err.exit_code(),
+        ),
+        Command::PrepareAgentCloseout(args) => run_write_side_lifecycle(
+            "prepare-agent-closeout",
+            || agent_maintenance_prepare_closeout::run(args),
+            |err| err.exit_code(),
+        ),
         Command::MaintenanceStandDownCheck(args) => match agent_maintenance_stand_down::run(args) {
             Ok(outcome) => outcome.exit_code(),
             Err(err) => {

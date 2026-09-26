@@ -60,13 +60,53 @@ pub struct ExecPolicyNoMatch {
 }
 
 /// Parsed output from `codex execpolicy check`.
+///
+/// Current flat `decision`/`matchedRules` output is normalized into the existing public
+/// match/no-match representation; legacy nested output remains accepted.
 #[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", from = "ExecPolicyEvaluationWire")]
 pub struct ExecPolicyEvaluation {
     #[serde(rename = "match", default, skip_serializing_if = "Option::is_none")]
     pub match_result: Option<ExecPolicyMatch>,
     #[serde(rename = "noMatch", default, skip_serializing_if = "Option::is_none")]
     pub no_match: Option<ExecPolicyNoMatch>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ExecPolicyEvaluationWire {
+    #[serde(rename = "match")]
+    match_result: Option<ExecPolicyMatch>,
+    no_match: Option<ExecPolicyNoMatch>,
+    matched_rules: Option<Vec<ExecPolicyRuleMatch>>,
+    decision: Option<ExecPolicyDecision>,
+}
+
+impl From<ExecPolicyEvaluationWire> for ExecPolicyEvaluation {
+    fn from(wire: ExecPolicyEvaluationWire) -> Self {
+        match wire.matched_rules {
+            Some(rules) => match wire.decision {
+                Some(decision) => Self {
+                    match_result: Some(ExecPolicyMatch {
+                        decision,
+                        rules,
+                        extra: BTreeMap::new(),
+                    }),
+                    no_match: None,
+                },
+                None => Self {
+                    match_result: None,
+                    no_match: Some(ExecPolicyNoMatch {
+                        extra: BTreeMap::new(),
+                    }),
+                },
+            },
+            None => Self {
+                match_result: wire.match_result,
+                no_match: wire.no_match,
+            },
+        }
+    }
 }
 
 impl ExecPolicyEvaluation {
@@ -99,7 +139,7 @@ impl ExecPolicyCheckResult {
 /// Request to evaluate a command against Starlark execpolicy files.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ExecPolicyCheckRequest {
-    /// One or more `.codexpolicy` files to merge with repeatable `--policy` flags.
+    /// One or more `.codexpolicy` files to merge with repeatable `--rules` flags.
     pub policies: Vec<PathBuf>,
     /// Pretty-print JSON output (`--pretty`).
     pub pretty: bool,
@@ -123,13 +163,13 @@ impl ExecPolicyCheckRequest {
         }
     }
 
-    /// Adds a single `--policy` path.
+    /// Adds a single `--rules` path.
     pub fn policy(mut self, policy: impl Into<PathBuf>) -> Self {
         self.policies.push(policy.into());
         self
     }
 
-    /// Adds multiple `--policy` paths.
+    /// Adds multiple `--rules` paths.
     pub fn policies<I, P>(mut self, policies: I) -> Self
     where
         I: IntoIterator<Item = P>,
@@ -211,7 +251,7 @@ impl ExecPolicyCheckRequest {
 impl CodexClient {
     /// Evaluates a command against Starlark execpolicy files via `codex execpolicy check`.
     ///
-    /// Forwards repeatable `--policy` paths, optional `--pretty`, and builder/request CLI overrides
+    /// Forwards repeatable `--rules` paths, optional `--pretty`, and builder/request CLI overrides
     /// (config/profile/approval/sandbox/local-provider/cd/search). Captures stdout/stderr according to the
     /// builder, returns parsed JSON, and surfaces non-zero exits as [`CodexError::NonZeroExit`].
     /// Empty command argv returns [`CodexError::EmptyExecPolicyCommand`].
@@ -245,7 +285,7 @@ impl CodexClient {
         process.arg("execpolicy").arg("check");
 
         for policy in policies {
-            process.arg("--policy").arg(policy);
+            process.arg("--rules").arg(policy);
         }
 
         if pretty {

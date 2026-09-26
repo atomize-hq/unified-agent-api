@@ -12,6 +12,32 @@ use xtask::support_matrix::{
 };
 
 const SEEDED_REGISTRY: &str = include_str!("../data/agent_registry.toml");
+const CODEX_TARGET_TRIPLES: &[&str] = &[
+    "aarch64-apple-darwin",
+    "aarch64-unknown-linux-musl",
+    "x86_64-pc-windows-msvc",
+    "x86_64-unknown-linux-musl",
+];
+
+fn expected_codex_records_from_latest_validated(
+    workspace_root: &Path,
+) -> Vec<RuntimeSupportRecord> {
+    CODEX_TARGET_TRIPLES
+        .iter()
+        .map(|target_triple| RuntimeSupportRecord {
+            runtime_family: "codex".to_string(),
+            target_triple: (*target_triple).to_string(),
+            version: fs::read_to_string(
+                workspace_root
+                    .join("cli_manifests/codex/pointers/latest_validated")
+                    .join(format!("{target_triple}.txt")),
+            )
+            .expect("read committed latest_validated pointer")
+            .trim()
+            .to_string(),
+        })
+        .collect()
+}
 
 fn make_temp_dir(prefix: &str) -> PathBuf {
     let now = SystemTime::now()
@@ -172,28 +198,7 @@ fn derives_current_codex_validated_runtime_support_from_committed_truth() {
 
     assert_eq!(
         records,
-        vec![
-            RuntimeSupportRecord {
-                runtime_family: "codex".to_string(),
-                target_triple: "aarch64-apple-darwin".to_string(),
-                version: "0.125.0".to_string(),
-            },
-            RuntimeSupportRecord {
-                runtime_family: "codex".to_string(),
-                target_triple: "aarch64-unknown-linux-musl".to_string(),
-                version: "0.125.0".to_string(),
-            },
-            RuntimeSupportRecord {
-                runtime_family: "codex".to_string(),
-                target_triple: "x86_64-pc-windows-msvc".to_string(),
-                version: "0.125.0".to_string(),
-            },
-            RuntimeSupportRecord {
-                runtime_family: "codex".to_string(),
-                target_triple: "x86_64-unknown-linux-musl".to_string(),
-                version: "0.125.0".to_string(),
-            },
-        ]
+        expected_codex_records_from_latest_validated(&workspace_root)
     );
 }
 

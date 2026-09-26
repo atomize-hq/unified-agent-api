@@ -9,6 +9,7 @@ use crate::CliOverridesPatch;
 /// escape hatch.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum NonTuiCommand {
+    Agents,
     AppServer,
     AppServerDaemon,
     AppServerDaemonBootstrap,
@@ -18,14 +19,21 @@ pub enum NonTuiCommand {
     AppServerDaemonRestart,
     AppServerDaemonStart,
     AppServerDaemonStop,
+    AppServerDaemonUpdate,
     AppServerDaemonVersion,
     Archive,
     Delete,
     Doctor,
+    Exec,
+    ExecFork,
     ExecResume,
     ExecReview,
     ExecServer,
+    ExecServerForward,
+    ExecServerHelp,
     McpAdd,
+    McpLogin,
+    MigrateRollouts,
     PluginAdd,
     PluginList,
     PluginMarketplaceAdd,
@@ -39,6 +47,7 @@ pub enum NonTuiCommand {
     RemoteControlStart,
     RemoteControlStop,
     Sandbox,
+    Queue,
     Unarchive,
 }
 
@@ -47,6 +56,7 @@ impl NonTuiCommand {
     /// compatibility tests and intentionally excludes deferred surfaces.
     pub const fn all() -> &'static [Self] {
         &[
+            Self::Agents,
             Self::AppServer,
             Self::AppServerDaemon,
             Self::AppServerDaemonBootstrap,
@@ -56,14 +66,21 @@ impl NonTuiCommand {
             Self::AppServerDaemonRestart,
             Self::AppServerDaemonStart,
             Self::AppServerDaemonStop,
+            Self::AppServerDaemonUpdate,
             Self::AppServerDaemonVersion,
             Self::Archive,
             Self::Delete,
             Self::Doctor,
+            Self::Exec,
+            Self::ExecFork,
             Self::ExecResume,
             Self::ExecReview,
             Self::ExecServer,
+            Self::ExecServerForward,
+            Self::ExecServerHelp,
             Self::McpAdd,
+            Self::McpLogin,
+            Self::MigrateRollouts,
             Self::PluginAdd,
             Self::PluginList,
             Self::PluginMarketplaceAdd,
@@ -77,12 +94,14 @@ impl NonTuiCommand {
             Self::RemoteControlStart,
             Self::RemoteControlStop,
             Self::Sandbox,
+            Self::Queue,
             Self::Unarchive,
         ]
     }
 
     pub const fn path(self) -> &'static [&'static str] {
         match self {
+            Self::Agents => &["agents"],
             Self::AppServer => &["app-server"],
             Self::AppServerDaemon => &["app-server", "daemon"],
             Self::AppServerDaemonBootstrap => &["app-server", "daemon", "bootstrap"],
@@ -96,14 +115,21 @@ impl NonTuiCommand {
             Self::AppServerDaemonRestart => &["app-server", "daemon", "restart"],
             Self::AppServerDaemonStart => &["app-server", "daemon", "start"],
             Self::AppServerDaemonStop => &["app-server", "daemon", "stop"],
+            Self::AppServerDaemonUpdate => &["app-server", "daemon", "update"],
             Self::AppServerDaemonVersion => &["app-server", "daemon", "version"],
             Self::Archive => &["archive"],
             Self::Delete => &["delete"],
             Self::Doctor => &["doctor"],
+            Self::Exec => &["exec"],
+            Self::ExecFork => &["exec", "fork"],
             Self::ExecResume => &["exec", "resume"],
             Self::ExecReview => &["exec", "review"],
             Self::ExecServer => &["exec-server"],
+            Self::ExecServerForward => &["exec-server", "forward"],
+            Self::ExecServerHelp => &["exec-server", "help"],
             Self::McpAdd => &["mcp", "add"],
+            Self::McpLogin => &["mcp", "login"],
+            Self::MigrateRollouts => &["migrate-rollouts"],
             Self::PluginAdd => &["plugin", "add"],
             Self::PluginList => &["plugin", "list"],
             Self::PluginMarketplaceAdd => &["plugin", "marketplace", "add"],
@@ -117,6 +143,7 @@ impl NonTuiCommand {
             Self::RemoteControlStart => &["remote-control", "start"],
             Self::RemoteControlStop => &["remote-control", "stop"],
             Self::Sandbox => &["sandbox"],
+            Self::Queue => &["queue"],
             Self::Unarchive => &["unarchive"],
         }
     }

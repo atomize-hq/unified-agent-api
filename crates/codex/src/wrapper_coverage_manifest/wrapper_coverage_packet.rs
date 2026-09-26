@@ -51,6 +51,12 @@ pub(super) fn packet_non_tui_coverage() -> Vec<WrapperCommandCoverageV1> {
         command(&["app-server", "daemon", "start"], &[], &[]),
         command(&["app-server", "daemon", "stop"], &[], &[]),
         command(&["app-server", "daemon", "version"], &[], &[]),
+        command(
+            &["app-server", "daemon", "update"],
+            &["--from-cli", "--yes"],
+            &[],
+        ),
+        command(&["agents"], &[], &[]),
         command(&["archive"], &[], &["SESSION"]),
         command(&["delete"], &["--force"], &["SESSION"]),
         command(
@@ -58,6 +64,49 @@ pub(super) fn packet_non_tui_coverage() -> Vec<WrapperCommandCoverageV1> {
             &["--all", "--ascii", "--json", "--no-color", "--summary"],
             &[],
         ),
+        command(
+            &["exec", "fork"],
+            &[
+                "--ephemeral",
+                "--ignore-rules",
+                "--ignore-user-config",
+                "--json",
+                "--output-last-message",
+                "--output-schema",
+                "--skip-git-repo-check",
+                "--thread-source",
+            ],
+            &["PROMPT", "SESSION_ID"],
+        ),
+        command(
+            &["exec-server", "forward"],
+            &[
+                "--aws-profile",
+                "--aws-region",
+                "--aws-service",
+                "--aws-sigv4",
+                "--connect",
+                "--environment-id",
+                "--exit-on-stdin-close",
+                "--name",
+                "--remote-transport",
+                "--use-agent-identity-auth",
+            ],
+            &[],
+        ),
+        command(&["exec-server", "help"], &[], &["COMMAND"]),
+        command(
+            &["migrate-rollouts"],
+            &[
+                "--apply",
+                "--json",
+                "--max-mib-per-second",
+                "--thread",
+                "--verbose",
+            ],
+            &[],
+        ),
+        command(&["queue"], &["--message", "--thread"], &[]),
         command(
             &["plugin", "add"],
             &["--json", "--marketplace"],
@@ -81,6 +130,51 @@ pub(super) fn packet_non_tui_coverage() -> Vec<WrapperCommandCoverageV1> {
         command(&["remote-control", "stop"], &["--json"], &[]),
         command(&["unarchive"], &[], &["SESSION"]),
     ]
+}
+
+/// Extends already-modeled commands with packet-owned pass-through flags.
+pub(super) fn extend_existing_command_coverage(coverage: &mut [WrapperCommandCoverageV1]) {
+    let extensions: &[(&[&str], &[&str])] = &[
+        (&[], &["--approve-for-me", "--no-daemon", "--worktree"]),
+        (&["app-server"], &["--code-mode-host"]),
+        (&["exec"], &["--thread-source"]),
+        (&["exec", "resume"], &["--thread-source"]),
+        (&["exec", "review"], &["--thread-source"]),
+        (
+            &["exec-server"],
+            &[
+                "--aws-profile",
+                "--aws-region",
+                "--aws-service",
+                "--aws-sigv4",
+                "--concurrent-requests",
+                "--exit-on-stdin-close",
+                "--remote-transport",
+            ],
+        ),
+        (&["mcp", "add"], &["--oauth-client-registration"]),
+        (
+            &["mcp", "login"],
+            &["--no-browser", "--oauth-client-registration"],
+        ),
+    ];
+
+    for (path, flags) in extensions {
+        let command = coverage
+            .iter_mut()
+            .find(|command| {
+                command
+                    .path
+                    .iter()
+                    .map(String::as_str)
+                    .eq(path.iter().copied())
+            })
+            .expect("packet extension path must already be declared");
+        command
+            .flags
+            .get_or_insert_with(Vec::new)
+            .extend(flags.iter().map(|key| flag(key)));
+    }
 }
 
 fn explicit_entry(

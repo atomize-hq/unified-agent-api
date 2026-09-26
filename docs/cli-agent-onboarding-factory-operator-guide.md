@@ -664,7 +664,7 @@ Manual drift lanes still start from the maintainer-authored request:
 
 `docs/agents/lifecycle/<agent_id>-maintenance/governance/maintenance-request.toml`
 
-This request is the control-plane input for `refresh-agent` on manual drift lanes. It can request only maintenance-owned control-plane actions such as:
+This request is the control-plane input for `refresh-agent` on manual drift lanes. Manual lanes can have no `[detected_release]`; keep that path manual and do not send such a request through `prepare-agent-maintenance`, which requires an automated upstream-release generation. It can request only maintenance-owned control-plane actions such as:
 
 - `packet_doc_refresh`
 - `support_matrix_refresh`
@@ -694,6 +694,19 @@ cargo run -p xtask -- prepare-agent-maintenance \
 
 Use `--write` to materialize the request and packet docs. Automated requests are packet-first, carry the relay `[execution_contract]`, and should not be hand-edited to remove the `[detected_release]` linkage.
 
+After acquisition changes the packet tree, refresh that same frozen automated generation from its request instead of reconstructing release inputs:
+
+```sh
+cargo run -p xtask -- prepare-agent-maintenance \
+  --from-request docs/agents/lifecycle/<agent_id>-maintenance/governance/maintenance-request.toml \
+  --dry-run
+cargo run -p xtask -- prepare-agent-maintenance \
+  --from-request docs/agents/lifecycle/<agent_id>-maintenance/governance/maintenance-request.toml \
+  --write
+```
+
+The from-request form preserves the recorded release identity; it is for an automated request only. A manual drift request stays on the `refresh-agent` path above.
+
 Dispatch notes:
 - `--dispatch-kind` must match the committed registry `maintenance.release_watch.dispatch_kind` for the same agent.
 - `packet_pr` is the steady-state enrolled transport and resolves `detected_release.dispatch_workflow` to the shared `agent-maintenance-open-pr.yml` workflow.
@@ -713,7 +726,7 @@ For automated upstream-release lanes:
 - the exact coding-agent prompt and PR-body tail come from those packet-owned artifacts, not from `cli_manifests/<agent_id>/PR_BODY_TEMPLATE.md`
 - promotion-only files such as `cli_manifests/<agent_id>/latest_validated.txt` and `cli_manifests/<agent_id>/min_supported.txt` remain out of scope for this packet-first follow-on
 - automated scope is the frozen shared packet + declared writable surfaces
-- support/capability/release-doc publication surfaces such as `cli_manifests/support_matrix/current.json`, `docs/specs/unified-agent-api/support-matrix.md`, `crates/agent_api/src/runtime_support_data.rs`, `docs/specs/unified-agent-api/capability-matrix.md`, and `docs/crates-io-release.md` still exist in the broader maintenance framework, but this automated upstream-release lane does not request or rewrite them
+- publication surfaces are writable only when the frozen `writable_surfaces` list declares them. Do not infer a blanket exclusion: the Codex `0.156.1` packet declared and refreshed its support-matrix publication surfaces. The relay may write no other surface.
 
 ### 3. Choose the maintenance execution path
 
@@ -728,6 +741,18 @@ cargo run -p xtask -- refresh-agent --request docs/agents/lifecycle/<agent_id>-m
 
 Automated upstream-release lanes use the bounded local relay instead of `refresh-agent`:
 
+Before the first relay ownership work or adjudication, freeze the automated generation. Commit the exact version-named stand-down marker rendered by `HANDOFF.md` to `origin/staging`, then confirm the frozen base through a fresh ref:
+
+```sh
+git fetch origin staging
+cargo run -p xtask -- maintenance-stand-down-check \
+  --agent <agent_id> \
+  --target-version <target_version> \
+  --from-ref origin/staging
+```
+
+Exit 3 is the expected protected outcome. The marker stops regeneration; it does not grant or add a new closeout permission.
+
 ```sh
 cargo run -p xtask -- execute-agent-maintenance --request docs/agents/lifecycle/<agent_id>-maintenance/governance/maintenance-request.toml --dry-run
 cargo run -p xtask -- execute-agent-maintenance --request docs/agents/lifecycle/<agent_id>-maintenance/governance/maintenance-request.toml --write --run-id <prepared_run_id>
@@ -735,13 +760,46 @@ cargo run -p xtask -- execute-agent-maintenance --request docs/agents/lifecycle/
 
 `execute-agent-maintenance` is valid only for automated upstream-release requests that already carry the generated relay contract. `--dry-run` validates the frozen request, the local execution host, and the exact write envelope, then writes temp evidence only under `docs/agents/.uaa-temp/agent-maintenance/runs/<run_id>/`. `--write` must reuse that prepared `run_id`, enforces the declared `writable_surfaces`, runs the exact `green_gates` from the request, and stops before closeout.
 
+The relay is deliberately non-recursive: it refuses a guarded lifecycle invocation nested inside an existing relay. Invoke the relay once from its generated command and retain the enclosing run marker. Supervise the local coding-agent process externally when a bounded host runtime is required; that supervision is operational evidence, not an intrinsic relay timeout.
+
 Packet-only agents remain explicitly deferred. If a maintenance lane does not carry the automated relay contract, do not widen it into `execute-agent-maintenance --write`; keep the packet-only PR handoff and resolve it with the existing maintainer flow.
 
 Recovery wording is frozen:
 - If PR creation fails after packet generation, rerun packet regeneration from the frozen request and reopen the PR from the generated pr-summary path.
 - If the local execution-host preflight (local Codex CLI host via execute-agent-maintenance) fails, fix the Codex binary/auth state and rerun `execute-agent-maintenance --dry-run` before write mode.
 
-### 4. Close the maintenance run
+### 4. Run required gates, adjudicate, and prepare closeout
+
+Before closeout preparation, manual drift lanes run the shared gate:
+
+```sh
+cargo run -p xtask -- support-matrix --check
+cargo run -p xtask -- capability-matrix --check
+cargo run -p xtask -- capability-matrix-audit
+make preflight
+```
+
+Automated upstream-release lanes run the exact `green_gates` rendered into the frozen `HANDOFF.md` and maintenance request. Review the relay diff and resolve current-head CI conclusions for the non-merge implementation SHA selected for closeout. That SHA must be reachable from `HEAD`; do not substitute a PR merge commit.
+
+For an automated release with wrapper-only rows, record every adjudication in the canonical `wrapper_only_dispositions[]` with repository-backed evidence before prepare, as the [maintenance request contract](specs/maintenance-request-contract-v1.md#hidden-upstream-surfaces-and-wrapper-only-rows) requires. `prepare-agent-closeout` carries live rows only; if reviewed obsolete rows must remain in the historical record, restore them before `close-agent-maintenance` and let that validator check the canonical artifact. The user-directed coding-agent actor may perform this existing manual closeout work outside the relay.
+
+Preview first, then write the canonical closeout with the actual UTC evidence-recording time:
+
+```sh
+cargo run -p xtask -- prepare-agent-closeout \
+  --request docs/agents/lifecycle/<agent_id>-maintenance/governance/maintenance-request.toml \
+  --commit <non_merge_implementation_sha> \
+  --recorded-at <rfc3339_utc>
+cargo run -p xtask -- prepare-agent-closeout \
+  --request docs/agents/lifecycle/<agent_id>-maintenance/governance/maintenance-request.toml \
+  --commit <non_merge_implementation_sha> \
+  --recorded-at <rfc3339_utc> \
+  --write
+```
+
+Without `--write`, `prepare-agent-closeout` previews and does not mutate. The write form validates its canonical artifact before it returns. A manual drift request with no `[detected_release]` skips `prepare-agent-closeout`; after the required gates pass, manually author the canonical `maintenance-closeout.json`, then run `close-agent-maintenance` as the next step. It has no version-bound wrapper-only baseline or dispositions.
+
+### 5. Close the maintenance run
 
 Once the requested maintenance work is resolved or explicitly deferred, record the maintenance closeout in:
 
@@ -755,20 +813,100 @@ cargo run -p xtask -- close-agent-maintenance --request docs/agents/lifecycle/<a
 
 `close-agent-maintenance` refreshes the maintenance closeout surfaces from the request and closeout evidence, then clears lifecycle `drifted` state when the committed lifecycle baseline exists. It records `maintenance_closeout_written` without rewriting approval truth.
 
-For automated upstream-release relay lanes, this closeout step remains manual even after `execute-agent-maintenance --write` succeeds. Review the diff, keep the generated closeout command from `HANDOFF.md`, and run `close-agent-maintenance` explicitly.
+For automated upstream-release relay lanes, this closeout step remains manual even after `execute-agent-maintenance --write` succeeds. Run it explicitly outside the relay after the prepared artifact is reviewed.
 
-### 5. Run the same green gate
+### 6. Keep promotion separate
 
-Manual maintenance-mode closeout still uses the same exact green gate:
+Closing the packet does not promote it. Promotion is a separate maintainer-owned lane after the closed packet is merged, and the version's stand-down marker retires only in that version's promotion change alongside the pointer advance. Do not retire it on close, merge, or a newer packet generation.
+
+#### Prepare the promotion
+
+Use the shared [Parity promote workflow](../.github/workflows/parity-promote.yml). The maintainer chooses the agent and version after the closed maintenance packet has landed on `staging`. The existing canonical `governance/maintenance-closeout.json` is the closeout record; no second closeout document is needed for promotion.
+
+Before dispatch, confirm that the closed packet on staging belongs to the intended version and request generation. This remains an operator check: `parity-promote` validates acquisition and promotion artifacts but does not read or validate the maintenance closeout (`uaa-0064` in [the backlog](backlog.json)). Keep the version's stand-down marker in place until the promotion PR merges.
+
+#### Dispatch once to validate and open a PR
+
+From an authenticated checkout of this repository, substitute the registered agent ID and bare version:
 
 ```sh
-cargo run -p xtask -- support-matrix --check
-cargo run -p xtask -- capability-matrix --check
-cargo run -p xtask -- capability-matrix-audit
-make preflight
+gh workflow run parity-promote.yml --ref staging \
+  -f agent_id=<agent_id> \
+  -f version=<version> \
+  -f dry_run=false
 ```
 
-Automated upstream-release relay lanes must use the exact `green_gates` rendered into `HANDOFF.md` and `maintenance-request.toml`. Do not substitute a hand-written command list for those lanes.
+For example, the Codex packet closed in the 2026-09-25 rehearsal uses `agent_id=codex` and `version=0.156.1`. The workflow's jobs explicitly check out `staging`; the local branch is not the source of promotion artifacts.
+
+`dry_run=false` still performs the full promotion validation before opening a PR. A separate `dry_run=true` dispatch is an optional rehearsal that performs validation and stages the changes on the runner but skips PR creation; it does not publish a branch or advance staging. If the input is omitted, the workflow defaults to `true`. A later real dispatch repeats validation rather than reusing the rehearsal's result.
+
+The workflow derives its target matrix from the committed union and the agent's `RULES.json`, requires the declared required target, and enforces the declared incomplete-union policy. It downloads each target's pinned binary, verifies its lockfile digest and size, and runs the agent's declared validation commands. After those jobs succeed, it stages:
+
+- `latest_validated.txt`, `current.json`, and the applicable per-target validated/supported pointers;
+- `versions/<version>.json` with status `validated` and validation results;
+- refreshed support publication;
+- deletion of only the promoted version's stand-down marker, when present.
+
+`manifest-version-metadata`, `support-matrix`, and `manifest-validate` provide the xtask work inside this workflow. There is no single local xtask command that dispatches promotion, waits, and merges it. The workflow opens `automation/<agent_id>-promote-<version>` as a PR targeting `staging` only after its validation gates pass; it does not merge the PR.
+
+#### Follow the run and review its PR
+
+Dispatch returns before the workflow finishes. Retain the run URL/ID reported by GitHub CLI. If it is not printed, list candidate dispatches and identify yours by its start time and inputs in Actions; do not select a concurrent run merely because it is newest:
+
+```sh
+gh run list --workflow parity-promote.yml --branch staging \
+  --event workflow_dispatch --limit 10
+gh run watch <run_id> --exit-status
+gh run view <run_id> --json status,conclusion,jobs,url
+```
+
+If a job fails, inspect that run's failed logs with `gh run view <run_id> --log-failed`. A failed promotion validation is not a promoted version. Resolve the demonstrated failure before retrying. If the workflow reports a missing usable lockfile pin, follow its acquisition prerequisite and review the resulting committed artifacts before redispatching; do not bypass digest validation or hand-edit the pointers.
+
+After a successful non-dry run, locate the PR by its exact branch and inspect the diff, checks, and review state:
+
+```sh
+gh pr list --state all --base staging \
+  --head automation/<agent_id>-promote-<version>
+gh pr diff <pr_number>
+gh pr checks <pr_number>
+gh pr view <pr_number> \
+  --json url,state,headRefOid,reviewDecision,mergedAt,mergeCommit
+```
+
+Check that the diff promotes the intended version, retains other versions' stand-down markers, and contains only intended promotion changes.
+
+There are two validation stages. `parity-promote` runs the agent's declared validation commands against pinned upstream binaries, then validates the staged promotion artifacts. The resulting PR's CI runs the repository-wide checks against the promoted state, including generated runtime-support data. The first stage can succeed while the second fails; both must pass before merge. Missing or pending PR checks do not establish success. If PR CI fails, inspect that failure and validate any correction on the updated PR head; the earlier workflow's green result does not replace those checks.
+
+If PR checks never start, inspect the PR-creation credential and event wiring: the workflow uses `AUTOMATION_TOKEN` when available and otherwise `github.token`, whose generated PR events may not trigger CI.
+
+The maintainer reviews and merges the promotion PR. An approval is not a merge, and a green promotion run does not advance staging by itself.
+
+#### Verify the merge, then handle main separately
+
+After the PR reports `MERGED`, fetch staging and verify the committed outcome (substitute the agent and version):
+
+```sh
+git fetch origin staging
+git show origin/staging:cli_manifests/<agent_id>/latest_validated.txt
+git show origin/staging:cli_manifests/<agent_id>/versions/<version>.json
+git ls-tree --name-only origin/staging -- \
+  docs/agents/lifecycle/<agent_id>-maintenance/governance/automation-stand-down/<version>.toml
+```
+
+The validated pointer must name the promoted version, its metadata must read `validated`, and the last command must produce no marker path. Review the applicable per-target pointers and support publication in the merged diff as well. If the fetch or another verification command fails, resolve that failure before claiming promotion complete.
+
+Promotion is now effective on staging. Bringing it to `main` requires a separate reviewed `staging` → `main` PR and its normal CI/merge process. That PR includes all staging changes not yet in main, so review its full scope; promotion does not automatically open or merge it.
+
+For that staging → main PR, [CI's purpose guard](../.github/workflows/ci.yml) requires exactly one of these purpose labels: `repo_release`, `ops`, `codex_release`, or `claude_code_release`. Choose the label for the full PR scope, not just the presence of a Codex promotion; unrelated non-purpose labels may remain. Missing or conflicting purpose labels fail the guard. Apply the selected label, then check the resulting CI run:
+
+```sh
+gh pr edit <main_pr_number> --add-label <purpose_label>
+gh pr checks <main_pr_number>
+```
+
+If another purpose label is already present, remove it when selecting its replacement so exactly one remains. The maintainer reviews the full staging → main diff and merges only after the required checks pass.
+
+
 
 ## Generated packet roots
 

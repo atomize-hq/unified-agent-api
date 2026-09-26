@@ -259,9 +259,9 @@ JSON
             "on-request",
             "execpolicy",
             "check",
-            "--policy",
+            "--rules",
             policy_one.to_string_lossy().as_ref(),
-            "--policy",
+            "--rules",
             policy_two.to_string_lossy().as_ref(),
             "--pretty",
             "--",
@@ -325,4 +325,41 @@ async fn sandbox_rejects_empty_command() {
     let request = SandboxCommandRequest::new(SandboxPlatform::Linux, Vec::<OsString>::new());
     let err = client.run_sandbox(request).await.unwrap_err();
     assert!(matches!(err, CodexError::EmptySandboxCommand));
+}
+
+#[test]
+fn execpolicy_current_output_preserves_decisions_and_rules() {
+    for (decision, expected) in [
+        ("allow", ExecPolicyDecision::Allow),
+        ("prompt", ExecPolicyDecision::Prompt),
+        ("forbidden", ExecPolicyDecision::Forbidden),
+    ] {
+        let output = serde_json::json!({
+            "matchedRules": [{"prefixRuleMatch": {
+                "matchedPrefix": ["echo"], "decision": decision
+            }}],
+            "decision": decision
+        });
+        let evaluation: ExecPolicyEvaluation = serde_json::from_value(output).unwrap();
+        assert_eq!(evaluation.decision(), Some(expected));
+        let matched = evaluation.match_result.unwrap();
+        assert_eq!(matched.rules.len(), 1);
+        assert_eq!(
+            matched.rules[0].extra["prefixRuleMatch"]["decision"],
+            decision
+        );
+        assert!(evaluation.no_match.is_none());
+    }
+}
+
+#[test]
+fn execpolicy_current_output_distinguishes_no_match_and_invalid_decision() {
+    let evaluation: ExecPolicyEvaluation = serde_json::from_str(r#"{"matchedRules":[]}"#).unwrap();
+    assert_eq!(evaluation.decision(), None);
+    assert!(evaluation.match_result.is_none());
+    assert!(evaluation.no_match.is_some());
+    assert!(serde_json::from_str::<ExecPolicyEvaluation>(
+        r#"{"matchedRules":[],"decision":"unknown"}"#
+    )
+    .is_err());
 }

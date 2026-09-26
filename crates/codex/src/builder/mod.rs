@@ -344,6 +344,26 @@ impl CodexClientBuilder {
         self
     }
 
+    /// Requests Codex's `--approve-for-me` global flag.
+    pub fn approve_for_me(mut self, enable: bool) -> Self {
+        self.cli_overrides.approve_for_me = if enable {
+            FlagState::Enable
+        } else {
+            FlagState::Disable
+        };
+        self
+    }
+
+    /// Requests Codex's `--no-daemon` global flag.
+    pub fn no_daemon(mut self, enable: bool) -> Self {
+        self.cli_overrides.no_daemon = if enable {
+            FlagState::Enable
+        } else {
+            FlagState::Disable
+        };
+        self
+    }
+
     /// Requests the CLI `--oss` flag to favor OSS/local backends when available.
     pub fn oss(mut self, enable: bool) -> Self {
         self.cli_overrides.oss = if enable {
@@ -369,6 +389,16 @@ impl CodexClientBuilder {
     /// Controls whether `--search` is passed through to Codex.
     pub fn search(mut self, enable: bool) -> Self {
         self.cli_overrides.search = if enable {
+            FlagState::Enable
+        } else {
+            FlagState::Disable
+        };
+        self
+    }
+
+    /// Requests Codex's `--worktree` global flag.
+    pub fn worktree(mut self, enable: bool) -> Self {
+        self.cli_overrides.worktree = if enable {
             FlagState::Enable
         } else {
             FlagState::Disable

@@ -285,7 +285,6 @@ pub fn wrapper_coverage_manifest() -> WrapperCoverageManifestV1 {
                 CoverageLevel::Explicit,
                 None,
                 vec![
-                    flag_note("--mcp", CoverageLevel::Explicit, "capability-guarded"),
                     flag("--api-key", CoverageLevel::Explicit),
                     flag("--device-auth", CoverageLevel::Explicit),
                     flag("--with-access-token", CoverageLevel::Explicit),
@@ -406,7 +405,7 @@ pub fn wrapper_coverage_manifest() -> WrapperCoverageManifestV1 {
                 CoverageLevel::Explicit,
                 None,
                 vec![
-                    flag("--policy", CoverageLevel::Explicit),
+                    flag("--rules", CoverageLevel::Explicit),
                     flag("--pretty", CoverageLevel::Explicit),
                 ],
                 vec![arg("COMMAND", CoverageLevel::Explicit)],
@@ -715,6 +714,7 @@ pub fn wrapper_coverage_manifest() -> WrapperCoverageManifestV1 {
             ),
     ];
     coverage.extend(wrapper_coverage_packet::packet_non_tui_coverage());
+    wrapper_coverage_packet::extend_existing_command_coverage(&mut coverage);
     coverage.extend(wrapper_coverage_packet::plugin_and_debt_coverage());
     WrapperCoverageManifestV1 {
         schema_version: 1,

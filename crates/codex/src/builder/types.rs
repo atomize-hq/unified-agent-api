@@ -277,8 +277,11 @@ pub struct CliOverrides {
     pub remote: Option<String>,
     pub remote_auth_token_env: Option<String>,
     pub local_provider: Option<LocalProvider>,
+    pub approve_for_me: FlagState,
+    pub no_daemon: FlagState,
     pub oss: FlagState,
     pub search: FlagState,
+    pub worktree: FlagState,
     pub auto_reasoning_defaults: bool,
 }
 
@@ -296,8 +299,11 @@ impl Default for CliOverrides {
             remote: None,
             remote_auth_token_env: None,
             local_provider: None,
+            approve_for_me: FlagState::Inherit,
+            no_daemon: FlagState::Inherit,
             oss: FlagState::Inherit,
             search: FlagState::Inherit,
+            worktree: FlagState::Inherit,
             auto_reasoning_defaults: true,
         }
     }
@@ -317,7 +323,10 @@ pub struct CliOverridesPatch {
     pub remote: Option<String>,
     pub remote_auth_token_env: Option<String>,
     pub local_provider: Option<LocalProvider>,
+    pub approve_for_me: FlagState,
+    pub no_daemon: FlagState,
     pub oss: FlagState,
     pub search: FlagState,
+    pub worktree: FlagState,
     pub auto_reasoning_defaults: Option<bool>,
 }
