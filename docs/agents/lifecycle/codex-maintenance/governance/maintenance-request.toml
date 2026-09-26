@@ -51,13 +51,13 @@ expected_post_run_debt_count = 2
 surface_kind = "commands"
 command_path = "codex completion"
 surface_id = "completion"
-evidence_ref = "docs/specs/unified-agent-api/non-tui-support-debt.md"
+evidence_ref = "cli_manifests/codex/reports/0.157.0/coverage.any.json"
 
 [[support_surface_audit.unbaselined_gap_surface]]
 surface_kind = "positional_args"
 command_path = "codex completion"
 surface_id = "SHELL"
-evidence_ref = "docs/specs/unified-agent-api/non-tui-support-debt.md"
+evidence_ref = "cli_manifests/codex/reports/0.157.0/coverage.any.json"
 
 [[support_surface_audit.preexisting_unsupported_surface]]
 surface_kind = "commands"
