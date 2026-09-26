@@ -1,0 +1,5 @@
+schema_version = 1
+agent_id = "claude_code"
+target_version = "2.1.274"
+reason = "supervised T8 maintenance proof in progress on PR #235"
+request_recorded_at = "2026-09-25T08:49:43Z"
