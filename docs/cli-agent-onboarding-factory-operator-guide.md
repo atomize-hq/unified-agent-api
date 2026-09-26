@@ -664,7 +664,7 @@ Manual drift lanes still start from the maintainer-authored request:
 
 `docs/agents/lifecycle/<agent_id>-maintenance/governance/maintenance-request.toml`
 
-This request is the control-plane input for `refresh-agent` on manual drift lanes. It can request only maintenance-owned control-plane actions such as:
+This request is the control-plane input for `refresh-agent` on manual drift lanes. Manual lanes can have no `[detected_release]`; keep that path manual and do not send such a request through `prepare-agent-maintenance`, which requires an automated upstream-release generation. It can request only maintenance-owned control-plane actions such as:
 
 - `packet_doc_refresh`
 - `support_matrix_refresh`
@@ -694,6 +694,19 @@ cargo run -p xtask -- prepare-agent-maintenance \
 
 Use `--write` to materialize the request and packet docs. Automated requests are packet-first, carry the relay `[execution_contract]`, and should not be hand-edited to remove the `[detected_release]` linkage.
 
+After acquisition changes the packet tree, refresh that same frozen automated generation from its request instead of reconstructing release inputs:
+
+```sh
+cargo run -p xtask -- prepare-agent-maintenance \
+  --from-request docs/agents/lifecycle/<agent_id>-maintenance/governance/maintenance-request.toml \
+  --dry-run
+cargo run -p xtask -- prepare-agent-maintenance \
+  --from-request docs/agents/lifecycle/<agent_id>-maintenance/governance/maintenance-request.toml \
+  --write
+```
+
+The from-request form preserves the recorded release identity; it is for an automated request only. A manual drift request stays on the `refresh-agent` path above.
+
 Dispatch notes:
 - `--dispatch-kind` must match the committed registry `maintenance.release_watch.dispatch_kind` for the same agent.
 - `packet_pr` is the steady-state enrolled transport and resolves `detected_release.dispatch_workflow` to the shared `agent-maintenance-open-pr.yml` workflow.
@@ -713,7 +726,7 @@ For automated upstream-release lanes:
 - the exact coding-agent prompt and PR-body tail come from those packet-owned artifacts, not from `cli_manifests/<agent_id>/PR_BODY_TEMPLATE.md`
 - promotion-only files such as `cli_manifests/<agent_id>/latest_validated.txt` and `cli_manifests/<agent_id>/min_supported.txt` remain out of scope for this packet-first follow-on
 - automated scope is the frozen shared packet + declared writable surfaces
-- support/capability/release-doc publication surfaces such as `cli_manifests/support_matrix/current.json`, `docs/specs/unified-agent-api/support-matrix.md`, `crates/agent_api/src/runtime_support_data.rs`, `docs/specs/unified-agent-api/capability-matrix.md`, and `docs/crates-io-release.md` still exist in the broader maintenance framework, but this automated upstream-release lane does not request or rewrite them
+- publication surfaces are writable only when the frozen `writable_surfaces` list declares them. Do not infer a blanket exclusion: the Codex `0.156.1` packet declared and refreshed its support-matrix publication surfaces. The relay may write no other surface.
 
 ### 3. Choose the maintenance execution path
 
@@ -728,6 +741,18 @@ cargo run -p xtask -- refresh-agent --request docs/agents/lifecycle/<agent_id>-m
 
 Automated upstream-release lanes use the bounded local relay instead of `refresh-agent`:
 
+Before the first relay ownership work or adjudication, freeze the automated generation. Commit the exact version-named stand-down marker rendered by `HANDOFF.md` to `origin/staging`, then confirm the frozen base through a fresh ref:
+
+```sh
+git fetch origin staging
+cargo run -p xtask -- maintenance-stand-down-check \
+  --agent <agent_id> \
+  --target-version <target_version> \
+  --from-ref origin/staging
+```
+
+Exit 3 is the expected protected outcome. The marker stops regeneration; it does not grant or add a new closeout permission.
+
 ```sh
 cargo run -p xtask -- execute-agent-maintenance --request docs/agents/lifecycle/<agent_id>-maintenance/governance/maintenance-request.toml --dry-run
 cargo run -p xtask -- execute-agent-maintenance --request docs/agents/lifecycle/<agent_id>-maintenance/governance/maintenance-request.toml --write --run-id <prepared_run_id>
@@ -735,13 +760,46 @@ cargo run -p xtask -- execute-agent-maintenance --request docs/agents/lifecycle/
 
 `execute-agent-maintenance` is valid only for automated upstream-release requests that already carry the generated relay contract. `--dry-run` validates the frozen request, the local execution host, and the exact write envelope, then writes temp evidence only under `docs/agents/.uaa-temp/agent-maintenance/runs/<run_id>/`. `--write` must reuse that prepared `run_id`, enforces the declared `writable_surfaces`, runs the exact `green_gates` from the request, and stops before closeout.
 
+The relay is deliberately non-recursive: it refuses a guarded lifecycle invocation nested inside an existing relay. Invoke the relay once from its generated command and retain the enclosing run marker. Supervise the local coding-agent process externally when a bounded host runtime is required; that supervision is operational evidence, not an intrinsic relay timeout.
+
 Packet-only agents remain explicitly deferred. If a maintenance lane does not carry the automated relay contract, do not widen it into `execute-agent-maintenance --write`; keep the packet-only PR handoff and resolve it with the existing maintainer flow.
 
 Recovery wording is frozen:
 - If PR creation fails after packet generation, rerun packet regeneration from the frozen request and reopen the PR from the generated pr-summary path.
 - If the local execution-host preflight (local Codex CLI host via execute-agent-maintenance) fails, fix the Codex binary/auth state and rerun `execute-agent-maintenance --dry-run` before write mode.
 
-### 4. Close the maintenance run
+### 4. Run required gates, adjudicate, and prepare closeout
+
+Before closeout preparation, manual drift lanes run the shared gate:
+
+```sh
+cargo run -p xtask -- support-matrix --check
+cargo run -p xtask -- capability-matrix --check
+cargo run -p xtask -- capability-matrix-audit
+make preflight
+```
+
+Automated upstream-release lanes run the exact `green_gates` rendered into the frozen `HANDOFF.md` and maintenance request. Review the relay diff and resolve current-head CI conclusions for the non-merge implementation SHA selected for closeout. That SHA must be reachable from `HEAD`; do not substitute a PR merge commit.
+
+For an automated release with wrapper-only rows, record every adjudication in the canonical `wrapper_only_dispositions[]` with repository-backed evidence before prepare, as the [maintenance request contract](specs/maintenance-request-contract-v1.md#hidden-upstream-surfaces-and-wrapper-only-rows) requires. `prepare-agent-closeout` carries live rows only; if reviewed obsolete rows must remain in the historical record, restore them before `close-agent-maintenance` and let that validator check the canonical artifact. The user-directed coding-agent actor may perform this existing manual closeout work outside the relay.
+
+Preview first, then write the canonical closeout with the actual UTC evidence-recording time:
+
+```sh
+cargo run -p xtask -- prepare-agent-closeout \
+  --request docs/agents/lifecycle/<agent_id>-maintenance/governance/maintenance-request.toml \
+  --commit <non_merge_implementation_sha> \
+  --recorded-at <rfc3339_utc>
+cargo run -p xtask -- prepare-agent-closeout \
+  --request docs/agents/lifecycle/<agent_id>-maintenance/governance/maintenance-request.toml \
+  --commit <non_merge_implementation_sha> \
+  --recorded-at <rfc3339_utc> \
+  --write
+```
+
+Without `--write`, `prepare-agent-closeout` previews and does not mutate. The write form validates its canonical artifact before it returns. A manual drift request with no `[detected_release]` skips `prepare-agent-closeout`; after the required gates pass, manually author the canonical `maintenance-closeout.json`, then run `close-agent-maintenance` as the next step. It has no version-bound wrapper-only baseline or dispositions.
+
+### 5. Close the maintenance run
 
 Once the requested maintenance work is resolved or explicitly deferred, record the maintenance closeout in:
 
@@ -755,20 +813,11 @@ cargo run -p xtask -- close-agent-maintenance --request docs/agents/lifecycle/<a
 
 `close-agent-maintenance` refreshes the maintenance closeout surfaces from the request and closeout evidence, then clears lifecycle `drifted` state when the committed lifecycle baseline exists. It records `maintenance_closeout_written` without rewriting approval truth.
 
-For automated upstream-release relay lanes, this closeout step remains manual even after `execute-agent-maintenance --write` succeeds. Review the diff, keep the generated closeout command from `HANDOFF.md`, and run `close-agent-maintenance` explicitly.
+For automated upstream-release relay lanes, this closeout step remains manual even after `execute-agent-maintenance --write` succeeds. Run it explicitly outside the relay after the prepared artifact is reviewed.
 
-### 5. Run the same green gate
+### 6. Keep promotion separate
 
-Manual maintenance-mode closeout still uses the same exact green gate:
-
-```sh
-cargo run -p xtask -- support-matrix --check
-cargo run -p xtask -- capability-matrix --check
-cargo run -p xtask -- capability-matrix-audit
-make preflight
-```
-
-Automated upstream-release relay lanes must use the exact `green_gates` rendered into `HANDOFF.md` and `maintenance-request.toml`. Do not substitute a hand-written command list for those lanes.
+Closing the packet does not promote it. Promotion is a separate maintainer-owned lane after the closed packet is merged, and the version's stand-down marker retires only in that version's promotion change alongside the pointer advance. Do not retire it on close, merge, or a newer packet generation.
 
 ## Generated packet roots
 
