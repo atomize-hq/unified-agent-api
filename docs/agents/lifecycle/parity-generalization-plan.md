@@ -452,9 +452,9 @@ Deliberately **not** done: adding a validator gate asserting that a committed un
 would gate the repo on an action only the maintainer can take. It belongs in the follow-up that
 lands after opencode `1.14.47` is reconciled.
 
-## 13. Maintainer checklist (everything gated on a human)
+## 13. Historical maintainer checklist (2026-07-24)
 
-Nothing below was performed by this session.
+This initial checklist is retained as historical planning context. The current lifecycle checklist below supersedes it for a packet that reaches closeout.
 
 1. **Review and push the branch.** `feat/parity-acquisition-generalization`, branched from
    `origin/staging` @ `9400ee8e`. Nothing has been pushed.
@@ -473,6 +473,15 @@ Nothing below was performed by this session.
    `dry_run: false` until the dry run is green and the union has been reviewed.
 7. **Then, and only then, promote.** Promotion advances `latest_validated` and publishes support
    claims; it stays a human decision at every tier.
+
+### Current lifecycle checklist (2026-09-25)
+
+1. Freeze the automated packet generation on `origin/staging` before adjudication, then verify the stand-down predicate from a freshly fetched base.
+2. Run the packet's rendered green gates, resolve CI for the non-merge implementation commit, and prepare the canonical closeout with the actual UTC record time.
+3. Run `close-agent-maintenance` outside the relay and merge only the closed packet.
+4. Treat promotion as a separate maintainer decision; retire only that version's stand-down marker in its promotion change with the pointer advance.
+
+The exact commands and manual-drift exception are in the [maintenance operator procedure](../../cli-agent-onboarding-factory-operator-guide.md#maintenance-mode).
 
 ## 14. Review adjudication (Codex lane, candidate `68f7fb27`)
 
@@ -802,6 +811,10 @@ spec's §8.1 carries the same table.
 | `uaa-0032` | Version mismatch fails dry runs and promote-prerequisite re-runs | handoff reading (H5); confirmed in T2c review | Decided 2026-09-13: fail only when committing; a dry-run mismatch emits a notice. The mismatch is checked before the validated load and gets exit 5. Promote-prerequisite re-runs with `commit: true` are accepted as red-but-committed. **Resolved in `a3c8ce53` / `916c9e9b`** (§19). |
 | `uaa-0033` | Artifact bundle does not match what the run committed | T2c review (Opus, suspected; Codex) | Low. |
 | `uaa-0034` | Commit step can push a rebased tree the gate never judged | T2c review (Opus, suspected) | Low; pre-dates T2c. |
+
+### 18.6 Current lifecycle integration (2026-09-25)
+
+The Codex `0.156.1` rehearsal completed the documented closeout sequence: stand down on `origin/staging` before adjudication, re-freeze the automated request after acquisition, run the guarded relay under external supervision, prepare and close outside that relay, then merge the closed packet. The [operator procedure](../../cli-agent-onboarding-factory-operator-guide.md#maintenance-mode) is current operator guidance; the frozen request and canonical `HANDOFF.md` remain the packet command authority, and the [durable rehearsal receipt](codex-maintenance/governance/proof/2026-09-25-closeout-rehearsal.md) records the commit, CI, and reproducibility limits. Promotion and marker retirement remain separate.
 
 ## 19. T2 complete — wiring the gate into `parity-acquire` (2026-09-13)
 
