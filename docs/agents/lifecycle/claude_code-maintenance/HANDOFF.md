@@ -4,31 +4,256 @@
 
 This file is the canonical contributor execution contract for `claude_code` maintenance.
 
+## Before you start: freeze this packet
+
+The nightly watcher regenerates this packet every night for as long as this agent's
+validated pointer trails upstream. Regeneration rewrites the request and force-pushes this
+branch back to base, which destroys work committed to the branch and invalidates a closeout
+bound to the previous request even when that closeout was never committed. Declare the freeze
+**before your first adjudication**, not before the closeout command.
+
+Commit exactly one file, to `staging` and never to this packet branch: the branch is inside the
+tree the force-push replaces, so a marker carried there is destroyed by the operation it exists
+to block.
+
+```sh
+git switch staging && git pull --ff-only
+mkdir -p docs/agents/lifecycle/claude_code-maintenance/governance/automation-stand-down
+cat > docs/agents/lifecycle/claude_code-maintenance/governance/automation-stand-down/2.1.274.toml <<'TOML'
+schema_version = 1
+agent_id = "claude_code"
+target_version = "2.1.274"
+reason = "closeout in progress"
+request_recorded_at = "2026-09-25T08:49:43Z"
+TOML
+git add docs/agents/lifecycle/claude_code-maintenance/governance/automation-stand-down/2.1.274.toml
+git commit docs/agents/lifecycle/claude_code-maintenance/governance/automation-stand-down/2.1.274.toml -m "chore(claude_code): stand automation down for 2.1.274"
+git push origin staging
+git switch -
+```
+
+The `git add` is required because the marker is always a new file, and the path on `git commit` is
+what keeps everything else out of the commit. If `git switch` refuses, your tree is dirty: this
+step runs before any packet work, so commit or stash that work first.
+
+Confirm the freeze is live, from this branch:
+
+```sh
+cargo run -p xtask -- maintenance-stand-down-check --agent claude_code --target-version 2.1.274 --from-ref origin/staging
+```
+
+Nothing releases the freeze but retirement. Closing this PR, pushing to it, approving it and
+merging it all leave it in force; the promotion PR for `2.1.274` removes the marker.
+
 ## Packet origin
 
 - detected_by: `.github/workflows/agent-maintenance-release-watch.yml`
 - current_validated: `2.1.29`
-- target_version: `2.1.140`
-- latest_stable: `2.1.141`
-- version_policy: `latest_stable_minus_one`
-- source_kind: `gcs_object_listing`
-- source_ref: `claude-code-dist-86c565f3-f756-42ad-8dfa-d59b1c096819/claude-code-releases`
+- target_version: `2.1.274`
+- latest_stable: `2.1.274`
+- version_policy: `upstream_stable_pointer`
+- source_kind: `npm_dist_tag`
+- source_ref: `@anthropic-ai/claude-code#stable`
 - dispatch_kind: `packet_pr`
 - dispatch_workflow: `agent-maintenance-open-pr.yml`
-- branch_name: `automation/claude_code-maintenance-2.1.140`
+- branch_name: `automation/claude_code-maintenance-2.1.274`
 
 ## Support-surface audit
 
 - required: `true`
 - pre-run debt count: `2`
 - expected post-run debt count: `2`
-- discovered upstream surface rows: `0`
+- discovered upstream surface rows: `185`
 - preexisting unsupported rows: `2`
 - required uplifts this run:
-- none
+- `claude_code agents` `agents` via `unbaselined_gap`
+- `claude_code attach` `attach` via `unbaselined_gap`
+- `claude_code auth` `auth` via `unbaselined_gap`
+- `claude_code auto-mode` `auto-mode` via `unbaselined_gap`
+- `claude_code gateway` `gateway` via `unbaselined_gap`
+- `claude_code import` `import` via `unbaselined_gap`
+- `claude_code install` `install` via `unbaselined_gap`
+- `claude_code logs` `logs` via `unbaselined_gap`
+- `claude_code project` `project` via `unbaselined_gap`
+- `claude_code respawn` `respawn` via `unbaselined_gap`
+- `claude_code rm` `rm` via `unbaselined_gap`
+- `claude_code stop` `stop` via `unbaselined_gap`
+- `claude_code ultrareview` `ultrareview` via `unbaselined_gap`
+- `claude_code agents` `--all` via `unbaselined_gap`
+- `claude_code agents` `--cwd` via `unbaselined_gap`
+- `claude_code agents` `--json` via `unbaselined_gap`
+- `claude_code auth login` `--claudeai` via `unbaselined_gap`
+- `claude_code auth login` `--console` via `unbaselined_gap`
+- `claude_code auth login` `--email` via `unbaselined_gap`
+- `claude_code auth login` `--sso` via `unbaselined_gap`
+- `claude_code auth status` `--json` via `unbaselined_gap`
+- `claude_code auth status` `--text` via `unbaselined_gap`
+- `claude_code auto-mode defaults` `--label` via `unbaselined_gap`
+- `claude_code auto-mode reset` `--yes` via `unbaselined_gap`
+- `claude_code gateway` `--config` via `unbaselined_gap`
+- `claude_code import` `--dry-run` via `unbaselined_gap`
+- `claude_code import` `--yes` via `unbaselined_gap`
+- `claude_code install` `--force` via `unbaselined_gap`
+- `claude_code mcp add` `--callback-port` via `unbaselined_gap`
+- `claude_code mcp add` `--client-id` via `unbaselined_gap`
+- `claude_code mcp add` `--client-secret` via `unbaselined_gap`
+- `claude_code mcp add` `--env` via `unbaselined_gap`
+- `claude_code mcp add` `--header` via `unbaselined_gap`
+- `claude_code mcp add` `--scope` via `unbaselined_gap`
+- `claude_code mcp add` `--transport` via `unbaselined_gap`
+- `claude_code mcp add-from-claude-desktop` `--scope` via `unbaselined_gap`
+- `claude_code mcp add-json` `--client-secret` via `unbaselined_gap`
+- `claude_code mcp add-json` `--scope` via `unbaselined_gap`
+- `claude_code mcp login` `--no-browser` via `unbaselined_gap`
+- `claude_code mcp remove` `--scope` via `unbaselined_gap`
+- `claude_code plugin disable` `--all` via `unbaselined_gap`
+- `claude_code plugin disable` `--json` via `unbaselined_gap`
+- `claude_code plugin disable` `--scope` via `unbaselined_gap`
+- `claude_code plugin enable` `--json` via `unbaselined_gap`
+- `claude_code plugin enable` `--scope` via `unbaselined_gap`
+- `claude_code plugin eval` `--ablation` via `unbaselined_gap`
+- `claude_code plugin eval` `--allow-real-servers` via `unbaselined_gap`
+- `claude_code plugin eval` `--allow-tools` via `unbaselined_gap`
+- `claude_code plugin eval` `--case` via `unbaselined_gap`
+- `claude_code plugin eval` `--concurrency` via `unbaselined_gap`
+- `claude_code plugin eval` `--eval-dir` via `unbaselined_gap`
+- `claude_code plugin eval` `--json` via `unbaselined_gap`
+- `claude_code plugin eval` `--judge-model` via `unbaselined_gap`
+- `claude_code plugin eval` `--keep-temp` via `unbaselined_gap`
+- `claude_code plugin eval` `--max-cost-usd` via `unbaselined_gap`
+- `claude_code plugin eval` `--mocks` via `unbaselined_gap`
+- `claude_code plugin eval` `--no-publish` via `unbaselined_gap`
+- `claude_code plugin eval` `--no-scaffold` via `unbaselined_gap`
+- `claude_code plugin eval` `--output-dir` via `unbaselined_gap`
+- `claude_code plugin eval` `--publish-report` via `unbaselined_gap`
+- `claude_code plugin eval` `--report` via `unbaselined_gap`
+- `claude_code plugin eval` `--runs` via `unbaselined_gap`
+- `claude_code plugin eval` `--scaffold` via `unbaselined_gap`
+- `claude_code plugin eval` `--tag` via `unbaselined_gap`
+- `claude_code plugin eval` `--threshold` via `unbaselined_gap`
+- `claude_code plugin eval` `--trust-plugin` via `unbaselined_gap`
+- `claude_code plugin eval init` `--eval-dir` via `unbaselined_gap`
+- `claude_code plugin eval init` `--interactive` via `unbaselined_gap`
+- `claude_code plugin init` `--author` via `unbaselined_gap`
+- `claude_code plugin init` `--author-email` via `unbaselined_gap`
+- `claude_code plugin init` `--description` via `unbaselined_gap`
+- `claude_code plugin init` `--force` via `unbaselined_gap`
+- `claude_code plugin init` `--with` via `unbaselined_gap`
+- `claude_code plugin install` `--accept-command` via `unbaselined_gap`
+- `claude_code plugin install` `--config` via `unbaselined_gap`
+- `claude_code plugin install` `--json` via `unbaselined_gap`
+- `claude_code plugin install` `--scope` via `unbaselined_gap`
+- `claude_code plugin install` `--yes` via `unbaselined_gap`
+- `claude_code plugin list` `--available` via `unbaselined_gap`
+- `claude_code plugin list` `--json` via `unbaselined_gap`
+- `claude_code plugin marketplace add` `--claudeai` via `unbaselined_gap`
+- `claude_code plugin marketplace add` `--scope` via `unbaselined_gap`
+- `claude_code plugin marketplace add` `--sparse` via `unbaselined_gap`
+- `claude_code plugin marketplace list` `--json` via `unbaselined_gap`
+- `claude_code plugin marketplace remove` `--scope` via `unbaselined_gap`
+- `claude_code plugin prune` `--dry-run` via `unbaselined_gap`
+- `claude_code plugin prune` `--scope` via `unbaselined_gap`
+- `claude_code plugin prune` `--yes` via `unbaselined_gap`
+- `claude_code plugin tag` `--dry-run` via `unbaselined_gap`
+- `claude_code plugin tag` `--force` via `unbaselined_gap`
+- `claude_code plugin tag` `--message` via `unbaselined_gap`
+- `claude_code plugin tag` `--push` via `unbaselined_gap`
+- `claude_code plugin tag` `--remote` via `unbaselined_gap`
+- `claude_code plugin uninstall` `--json` via `unbaselined_gap`
+- `claude_code plugin uninstall` `--keep-data` via `unbaselined_gap`
+- `claude_code plugin uninstall` `--prune` via `unbaselined_gap`
+- `claude_code plugin uninstall` `--scope` via `unbaselined_gap`
+- `claude_code plugin uninstall` `--yes` via `unbaselined_gap`
+- `claude_code plugin update` `--accept-command` via `unbaselined_gap`
+- `claude_code plugin update` `--json` via `unbaselined_gap`
+- `claude_code plugin update` `--scope` via `unbaselined_gap`
+- `claude_code plugin update` `--yes` via `unbaselined_gap`
+- `claude_code plugin validate` `--json` via `unbaselined_gap`
+- `claude_code plugin validate` `--strict` via `unbaselined_gap`
+- `claude_code project purge` `--all` via `unbaselined_gap`
+- `claude_code project purge` `--dry-run` via `unbaselined_gap`
+- `claude_code project purge` `--interactive` via `unbaselined_gap`
+- `claude_code project purge` `--yes` via `unbaselined_gap`
+- `claude_code ultrareview` `--json` via `unbaselined_gap`
+- `claude_code ultrareview` `--no-post` via `unbaselined_gap`
+- `claude_code ultrareview` `--post` via `unbaselined_gap`
+- `claude_code ultrareview` `--timeout` via `unbaselined_gap`
+- `claude_code` `--autocompact` via `unbaselined_gap`
+- `claude_code` `--ax-screen-reader` via `unbaselined_gap`
+- `claude_code` `--bare` via `unbaselined_gap`
+- `claude_code` `--bg` via `unbaselined_gap`
+- `claude_code` `--brief` via `unbaselined_gap`
+- `claude_code` `--cloud` via `unbaselined_gap`
+- `claude_code` `--effort` via `unbaselined_gap`
+- `claude_code` `--environment` via `unbaselined_gap`
+- `claude_code` `--exclude-dynamic-system-prompt-sections` via `unbaselined_gap`
+- `claude_code` `--forward-subagent-text` via `unbaselined_gap`
+- `claude_code` `--include-hook-events` via `unbaselined_gap`
+- `claude_code` `--name` via `unbaselined_gap`
+- `claude_code` `--permission-prompts` via `unbaselined_gap`
+- `claude_code` `--plugin-url` via `unbaselined_gap`
+- `claude_code` `--prompt-suggestions` via `unbaselined_gap`
+- `claude_code` `--remote-control` via `unbaselined_gap`
+- `claude_code` `--remote-control-session-name-prefix` via `unbaselined_gap`
+- `claude_code` `--restricted` via `unbaselined_gap`
+- `claude_code` `--safe-mode` via `unbaselined_gap`
+- `claude_code` `--system-prompt-snapshot` via `unbaselined_gap`
+- `claude_code` `--teleport` via `unbaselined_gap`
+- `claude_code` `--tmux` via `unbaselined_gap`
+- `claude_code` `--worktree` via `unbaselined_gap`
+- `claude_code attach` `id` via `unbaselined_gap`
+- `claude_code logs` `id` via `unbaselined_gap`
+- `claude_code mcp add` `commandOrUrl` via `unbaselined_gap`
+- `claude_code mcp add` `name` via `unbaselined_gap`
+- `claude_code mcp add-json` `json` via `unbaselined_gap`
+- `claude_code mcp add-json` `name` via `unbaselined_gap`
+- `claude_code mcp get` `name` via `unbaselined_gap`
+- `claude_code mcp login` `name` via `unbaselined_gap`
+- `claude_code mcp logout` `name` via `unbaselined_gap`
+- `claude_code mcp remove` `name` via `unbaselined_gap`
+- `claude_code plugin details` `name` via `unbaselined_gap`
+- `claude_code plugin enable` `plugin` via `unbaselined_gap`
+- `claude_code plugin marketplace add` `source` via `unbaselined_gap`
+- `claude_code plugin update` `plugin` via `unbaselined_gap`
+- `claude_code plugin validate` `path` via `unbaselined_gap`
+- `claude_code rm` `id` via `unbaselined_gap`
+- `claude_code stop` `id` via `unbaselined_gap`
+- `claude_code auth login` `login` via `unbaselined_gap`
+- `claude_code auth logout` `logout` via `unbaselined_gap`
+- `claude_code auth status` `status` via `unbaselined_gap`
+- `claude_code auto-mode config` `config` via `unbaselined_gap`
+- `claude_code auto-mode critique` `critique` via `unbaselined_gap`
+- `claude_code auto-mode defaults` `defaults` via `unbaselined_gap`
+- `claude_code auto-mode reset` `reset` via `unbaselined_gap`
+- `claude_code mcp add` `add` via `unbaselined_gap`
+- `claude_code mcp add-from-claude-desktop` `add-from-claude-desktop` via `unbaselined_gap`
+- `claude_code mcp add-json` `add-json` via `unbaselined_gap`
+- `claude_code mcp get` `get` via `unbaselined_gap`
+- `claude_code mcp login` `login` via `unbaselined_gap`
+- `claude_code mcp logout` `logout` via `unbaselined_gap`
+- `claude_code mcp remove` `remove` via `unbaselined_gap`
+- `claude_code mcp serve` `serve` via `unbaselined_gap`
+- `claude_code plugin details` `details` via `unbaselined_gap`
+- `claude_code plugin disable` `disable` via `unbaselined_gap`
+- `claude_code plugin enable` `enable` via `unbaselined_gap`
+- `claude_code plugin eval` `eval` via `unbaselined_gap`
+- `claude_code plugin eval init` `init` via `unbaselined_gap`
+- `claude_code plugin init` `init` via `unbaselined_gap`
+- `claude_code plugin install` `install` via `unbaselined_gap`
+- `claude_code plugin list` `list` via `unbaselined_gap`
+- `claude_code plugin marketplace add` `add` via `unbaselined_gap`
+- `claude_code plugin marketplace list` `list` via `unbaselined_gap`
+- `claude_code plugin marketplace remove` `remove` via `unbaselined_gap`
+- `claude_code plugin marketplace update` `update` via `unbaselined_gap`
+- `claude_code plugin prune` `prune` via `unbaselined_gap`
+- `claude_code plugin tag` `tag` via `unbaselined_gap`
+- `claude_code plugin uninstall` `uninstall` via `unbaselined_gap`
+- `claude_code plugin update` `update` via `unbaselined_gap`
+- `claude_code plugin validate` `validate` via `unbaselined_gap`
+- `claude_code project purge` `purge` via `unbaselined_gap`
 - deferred preexisting gaps:
-- `claude install` `install` via `requires_new_architectural_seam` (TODOS.md#close-claude-code-install-maintenance-gap)
-- `claude install` `--force` via `requires_new_architectural_seam` (TODOS.md#close-claude-code-install-maintenance-gap)
+- `claude_code install` `install` via `requires_new_architectural_seam` (TODOS.md#close-claude-code-install-maintenance-gap)
+- `claude_code install` `--force` via `requires_new_architectural_seam` (TODOS.md#close-claude-code-install-maintenance-gap)
 
 
 ## Relay contract
@@ -38,11 +263,11 @@ This file is the canonical contributor execution contract for `claude_code` main
 - executor surface: `execute-agent-maintenance`
 - request artifact: `docs/agents/lifecycle/claude_code-maintenance/governance/maintenance-request.toml`
 - prompt template path: `docs/agents/lifecycle/claude_code-maintenance/governance/execute-agent-maintenance-prompt.md`
-- prompt sha256: `0e8eb3b6d0a36c0ad5844f7a5fb5e3d5a4cb7525fb7559194d85fba08c6afeac`
+- prompt sha256: `fb77405ce0eeab22c16d6777b82fa1f8390cacb6e96bce403cf270979634b3fe`
 - canonical handoff: `docs/agents/lifecycle/claude_code-maintenance/HANDOFF.md`
 - derivative pr summary: `docs/agents/lifecycle/claude_code-maintenance/governance/pr-summary.md`
 - exact closeout artifact: `docs/agents/lifecycle/claude_code-maintenance/governance/maintenance-closeout.json`
-- branch linkage: `automation/claude_code-maintenance-2.1.140`
+- branch linkage: `automation/claude_code-maintenance-2.1.274`
 - manual closeout required: `true`
 
 ## Writable surfaces
@@ -51,9 +276,9 @@ This file is the canonical contributor execution contract for `claude_code` main
 - `crates/claude_code/**`
 - `crates/agent_api/**`
 - `cli_manifests/claude_code/artifacts.lock.json`
-- `cli_manifests/claude_code/snapshots/2.1.140/**`
-- `cli_manifests/claude_code/reports/2.1.140/**`
-- `cli_manifests/claude_code/versions/2.1.140.json`
+- `cli_manifests/claude_code/snapshots/2.1.274/**`
+- `cli_manifests/claude_code/reports/2.1.274/**`
+- `cli_manifests/claude_code/versions/2.1.274.json`
 - `cli_manifests/claude_code/wrapper_coverage.json`
 - `cli_manifests/support_matrix/current.json`
 - `docs/specs/unified-agent-api/support-matrix.md`
@@ -66,7 +291,6 @@ This file is the canonical contributor execution contract for `claude_code` main
 - `docs/agents/lifecycle/claude_code-maintenance/CI_WORKFLOWS_PLAN.md`
 - `docs/agents/lifecycle/claude_code-maintenance/governance/execute-agent-maintenance-prompt.md`
 - `.github/workflows/agent-maintenance-open-pr.yml`
-- `docs/specs/unified-agent-api/non-tui-support-debt.md`
 
 ## Ordered repo commands
 
@@ -90,10 +314,19 @@ This file is the canonical contributor execution contract for `claude_code` main
 
 - recreate packet command: `cargo run -p xtask -- refresh-agent --request docs/agents/lifecycle/claude_code-maintenance/governance/maintenance-request.toml --write`
 - reopen pr body path: `docs/agents/lifecycle/claude_code-maintenance/governance/pr-summary.md`
-- reopen pr branch: `automation/claude_code-maintenance-2.1.140`
+- reopen pr branch: `automation/claude_code-maintenance-2.1.274`
 - notes:
 - If PR creation fails after packet generation, rerun packet regeneration from the frozen request and reopen the PR from the generated pr-summary path.
 - If the local execution-host preflight (local Codex CLI host via execute-agent-maintenance) fails, fix the Codex binary/auth state and rerun `execute-agent-maintenance --dry-run` before write mode.
+
+## Dry-run to write relay
+
+Use the `run_id` printed by the dry-run output, replacing `RUN_ID_FROM_DRY_RUN` before invoking write mode.
+
+```sh
+cargo run -p xtask -- execute-agent-maintenance --dry-run --request docs/agents/lifecycle/claude_code-maintenance/governance/maintenance-request.toml
+cargo run -p xtask -- execute-agent-maintenance --write --request docs/agents/lifecycle/claude_code-maintenance/governance/maintenance-request.toml --run-id RUN_ID_FROM_DRY_RUN
+```
 
 ## Exact closeout command
 
@@ -104,7 +337,7 @@ cargo run -p xtask -- close-agent-maintenance --request docs/agents/lifecycle/cl
 ## Exact maintained-agent prompt
 
 ```md
-# Packet PR Maintenance Prompt (`2.1.140`)
+# Packet PR Maintenance Prompt (`2.1.274`)
 
 This template renders the exact maintained-agent prompt for `claude_code` packet execution.
 `docs/agents/lifecycle/claude_code-maintenance/HANDOFF.md` remains canonical and `governance/pr-summary.md` is derivative.
@@ -113,7 +346,7 @@ This template renders the exact maintained-agent prompt for `claude_code` packet
 
 ## Goal
 
-Execute the automated maintenance packet for `claude_code` target `2.1.140`.
+Execute the automated maintenance packet for `claude_code` target `2.1.274`.
 
 ## Frozen request contract
 
@@ -135,17 +368,24 @@ Execute the automated maintenance packet for `claude_code` target `2.1.140`.
 
 ## Required workflow
 
-1. Compare the current validated baseline from `cli_manifests/claude_code/latest_validated.txt` against the target `2.1.140` artifacts.
+1. Compare the current validated baseline from `cli_manifests/claude_code/latest_validated.txt` against the target `2.1.274` artifacts.
 2. Use `support_surface_audit` to classify newly discovered non-TUI surface, preexisting non-TUI debt, required uplifts, and allowed deferrals.
-3. Land bounded wrapper/backend/manifest/publication updates for every row in `required_uplifts_this_run`.
-4. Refresh or create version-scoped manifest artifacts under `cli_manifests/claude_code/snapshots/2.1.140/`, `cli_manifests/claude_code/reports/2.1.140/`, and `cli_manifests/claude_code/versions/2.1.140.json` as required by the packet.
-5. Leave closeout manual; record it only with `close-agent-maintenance` after the declared green gates pass.
+3. For each `deferred_preexisting_gaps` row that also appears in `required_uplifts_this_run`, decide whether its `defer_reason` still holds at `2.1.274`. If it does, re-authorize that identity's existing debt row or rows in `docs/specs/unified-agent-api/non-tui-support-debt.md` in place:
+   - set `authorized_at_version` to `2.1.274`;
+   - set `scope_target_triples` so the rows together cover exactly the targets whose `cli_manifests/claude_code/reports/2.1.274/coverage.<target>.json` lists the surface, with no target in two rows;
+   - set `authorization_evidence_ref` to `cli_manifests/claude_code/reports/2.1.274/coverage.any.json`.
+
+   Change no other field and add no row. If the blocker no longer holds, treat the row as an uplift.
+4. Land bounded wrapper/backend/manifest/publication updates for every remaining row in `required_uplifts_this_run`. Newly discovered surface is never deferred (maintenance-request contract field invariant 3), and no debt row may be added.
+5. Refresh or create version-scoped manifest artifacts under `cli_manifests/claude_code/snapshots/2.1.274/`, `cli_manifests/claude_code/reports/2.1.274/`, and `cli_manifests/claude_code/versions/2.1.274.json` as required by the packet.
+6. Leave closeout manual; record it only with `close-agent-maintenance` after the declared green gates pass.
 
 ## Done criteria
 
 - Changes stay within the writable surfaces frozen in `docs/agents/lifecycle/claude_code-maintenance/governance/maintenance-request.toml`.
-- No newly discovered non-TUI surface remains unresolved unless the packet records one allowed deferral.
+- Every row in `required_uplifts_this_run` is uplifted, or is a preexisting debt row re-authorized at `2.1.274`; newly discovered surface is never deferred.
 - `cargo run -p xtask -- codex-validate --root cli_manifests/claude_code` passes.
+- `cargo run -p xtask -- maintenance-audit-status --request docs/agents/lifecycle/claude_code-maintenance/governance/maintenance-request.toml` exits 0.
 - The remaining ordered commands and green gates from `docs/agents/lifecycle/claude_code-maintenance/HANDOFF.md` pass or are captured in maintainer follow-up notes.
 
 ```
