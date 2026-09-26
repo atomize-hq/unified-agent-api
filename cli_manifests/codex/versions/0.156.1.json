@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "semantic_version": "0.156.1",
-  "status": "reported",
-  "updated_at": "2026-09-25T20:07:12.731285Z",
+  "status": "validated",
+  "updated_at": "2026-09-26T01:02:15.239187196Z",
   "artifacts": {
     "snapshots_dir": "snapshots/0.156.1",
     "reports_dir": "reports/0.156.1",
@@ -17,7 +17,17 @@
     ],
     "supported_required_target": true
   },
+  "validation": {
+    "passed_targets": [
+      "x86_64-unknown-linux-musl",
+      "aarch64-unknown-linux-musl",
+      "aarch64-apple-darwin",
+      "x86_64-pc-windows-msvc"
+    ],
+    "failed_targets": [],
+    "skipped_targets": []
+  },
   "promotion": {
-    "eligible_for_latest_validated": false
+    "eligible_for_latest_validated": true
   }
 }

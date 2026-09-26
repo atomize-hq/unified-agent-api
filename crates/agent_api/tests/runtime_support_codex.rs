@@ -1,11 +1,48 @@
 #![cfg(feature = "codex")]
 
-use std::path::PathBuf;
+use std::fs;
+use std::path::{Path, PathBuf};
 
 use agent_api::{
     list_runtime_support, resolve_runtime_support, AgentWrapperError, RuntimeSupportRecord,
 };
 use tempfile::tempdir;
+
+const CODEX_TARGET_TRIPLES: &[&str] = &[
+    "aarch64-apple-darwin",
+    "aarch64-unknown-linux-musl",
+    "x86_64-pc-windows-msvc",
+    "x86_64-unknown-linux-musl",
+];
+
+fn workspace_root() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .expect("agent_api crate directory parent")
+        .parent()
+        .expect("workspace root")
+        .to_path_buf()
+}
+
+fn expected_codex_records() -> Vec<RuntimeSupportRecord> {
+    let workspace_root = workspace_root();
+
+    CODEX_TARGET_TRIPLES
+        .iter()
+        .map(|target_triple| RuntimeSupportRecord {
+            runtime_family: "codex".to_string(),
+            target_triple: (*target_triple).to_string(),
+            version: fs::read_to_string(
+                workspace_root
+                    .join("cli_manifests/codex/pointers/latest_validated")
+                    .join(format!("{target_triple}.txt")),
+            )
+            .expect("read committed latest_validated pointer")
+            .trim()
+            .to_string(),
+        })
+        .collect()
+}
 
 struct CurrentDirGuard {
     original: PathBuf,
@@ -27,28 +64,12 @@ impl Drop for CurrentDirGuard {
 
 #[test]
 fn codex_runtime_support_is_validated_only_and_embedded() {
-    let expected = vec![
-        RuntimeSupportRecord {
-            runtime_family: "codex".to_string(),
-            target_triple: "aarch64-apple-darwin".to_string(),
-            version: "0.125.0".to_string(),
-        },
-        RuntimeSupportRecord {
-            runtime_family: "codex".to_string(),
-            target_triple: "aarch64-unknown-linux-musl".to_string(),
-            version: "0.125.0".to_string(),
-        },
-        RuntimeSupportRecord {
-            runtime_family: "codex".to_string(),
-            target_triple: "x86_64-pc-windows-msvc".to_string(),
-            version: "0.125.0".to_string(),
-        },
-        RuntimeSupportRecord {
-            runtime_family: "codex".to_string(),
-            target_triple: "x86_64-unknown-linux-musl".to_string(),
-            version: "0.125.0".to_string(),
-        },
-    ];
+    let expected = expected_codex_records();
+    let expected_linux_record = expected
+        .iter()
+        .find(|record| record.target_triple == "x86_64-unknown-linux-musl")
+        .cloned()
+        .expect("expected linux target");
 
     for record in &expected {
         let resolved = resolve_runtime_support("codex", &record.target_triple)
@@ -64,14 +85,7 @@ fn codex_runtime_support_is_validated_only_and_embedded() {
     let resolved_without_repo = resolve_runtime_support("codex", "x86_64-unknown-linux-musl")
         .expect("resolve without repo checkout");
     let listed_without_repo = list_runtime_support("codex").expect("list without repo checkout");
-    assert_eq!(
-        resolved_without_repo,
-        RuntimeSupportRecord {
-            runtime_family: "codex".to_string(),
-            target_triple: "x86_64-unknown-linux-musl".to_string(),
-            version: "0.125.0".to_string(),
-        }
-    );
+    assert_eq!(resolved_without_repo, expected_linux_record);
     assert_eq!(listed_without_repo, listed);
 
     let err = resolve_runtime_support("codex", "linux-x64")
