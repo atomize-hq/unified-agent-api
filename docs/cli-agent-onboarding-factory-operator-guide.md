@@ -819,6 +819,81 @@ For automated upstream-release relay lanes, this closeout step remains manual ev
 
 Closing the packet does not promote it. Promotion is a separate maintainer-owned lane after the closed packet is merged, and the version's stand-down marker retires only in that version's promotion change alongside the pointer advance. Do not retire it on close, merge, or a newer packet generation.
 
+#### Prepare the promotion
+
+Use the shared [Parity promote workflow](../.github/workflows/parity-promote.yml). The maintainer chooses the agent and version after the closed maintenance packet has landed on `staging`. The existing canonical `governance/maintenance-closeout.json` is the closeout record; no second closeout document is needed for promotion.
+
+Before dispatch, confirm that the closed packet on staging belongs to the intended version and request generation. This remains an operator check: `parity-promote` validates acquisition and promotion artifacts but does not read or validate the maintenance closeout (`uaa-0064` in [the backlog](backlog.json)). Keep the version's stand-down marker in place until the promotion PR merges.
+
+#### Dispatch once to validate and open a PR
+
+From an authenticated checkout of this repository, substitute the registered agent ID and bare version:
+
+```sh
+gh workflow run parity-promote.yml --ref staging \
+  -f agent_id=<agent_id> \
+  -f version=<version> \
+  -f dry_run=false
+```
+
+For example, the Codex packet closed in the 2026-09-25 rehearsal uses `agent_id=codex` and `version=0.156.1`. The workflow's jobs explicitly check out `staging`; the local branch is not the source of promotion artifacts.
+
+`dry_run=false` still performs the full promotion validation before opening a PR. A separate `dry_run=true` dispatch is an optional rehearsal that performs validation and stages the changes on the runner but skips PR creation; it does not publish a branch or advance staging. If the input is omitted, the workflow defaults to `true`. A later real dispatch repeats validation rather than reusing the rehearsal's result.
+
+The workflow derives its target matrix from the committed union and the agent's `RULES.json`, requires the declared required target, and enforces the declared incomplete-union policy. It downloads each target's pinned binary, verifies its lockfile digest and size, and runs the agent's declared validation commands. After those jobs succeed, it stages:
+
+- `latest_validated.txt`, `current.json`, and the applicable per-target validated/supported pointers;
+- `versions/<version>.json` with status `validated` and validation results;
+- refreshed support publication;
+- deletion of only the promoted version's stand-down marker, when present.
+
+`manifest-version-metadata`, `support-matrix`, and `manifest-validate` provide the xtask work inside this workflow. There is no single local xtask command that dispatches promotion, waits, and merges it. The workflow opens `automation/<agent_id>-promote-<version>` as a PR targeting `staging` only after its validation gates pass; it does not merge the PR.
+
+#### Follow the run and review its PR
+
+Dispatch returns before the workflow finishes. Retain the run URL/ID reported by GitHub CLI. If it is not printed, list candidate dispatches and identify yours by its start time and inputs in Actions; do not select a concurrent run merely because it is newest:
+
+```sh
+gh run list --workflow parity-promote.yml --branch staging \
+  --event workflow_dispatch --limit 10
+gh run watch <run_id> --exit-status
+gh run view <run_id> --json status,conclusion,jobs,url
+```
+
+If a job fails, inspect that run's failed logs with `gh run view <run_id> --log-failed`. A failed promotion validation is not a promoted version. Resolve the demonstrated failure before retrying. If the workflow reports a missing usable lockfile pin, follow its acquisition prerequisite and review the resulting committed artifacts before redispatching; do not bypass digest validation or hand-edit the pointers.
+
+After a successful non-dry run, locate the PR by its exact branch and inspect the diff, checks, and review state:
+
+```sh
+gh pr list --state all --base staging \
+  --head automation/<agent_id>-promote-<version>
+gh pr diff <pr_number>
+gh pr checks <pr_number>
+gh pr view <pr_number> \
+  --json url,state,headRefOid,reviewDecision,mergedAt,mergeCommit
+```
+
+Check that the diff promotes the intended version, retains other versions' stand-down markers, and contains only intended promotion changes. The workflow result and PR checks are separate evidence; missing or pending PR checks do not establish success. Review CI against the current PR head. If PR checks never start, inspect the PR-creation credential and event wiring: the workflow uses `AUTOMATION_TOKEN` when available and otherwise `github.token`, whose generated PR events may not trigger CI.
+
+The maintainer reviews and merges the promotion PR. An approval is not a merge, and a green promotion run does not advance staging by itself.
+
+#### Verify the merge, then handle main separately
+
+After the PR reports `MERGED`, fetch staging and verify the committed outcome (substitute the agent and version):
+
+```sh
+git fetch origin staging
+git show origin/staging:cli_manifests/<agent_id>/latest_validated.txt
+git show origin/staging:cli_manifests/<agent_id>/versions/<version>.json
+git ls-tree --name-only origin/staging -- \
+  docs/agents/lifecycle/<agent_id>-maintenance/governance/automation-stand-down/<version>.toml
+```
+
+The validated pointer must name the promoted version, its metadata must read `validated`, and the last command must produce no marker path. Review the applicable per-target pointers and support publication in the merged diff as well. If the fetch or another verification command fails, resolve that failure before claiming promotion complete.
+
+Promotion is now effective on staging. Bringing it to `main` requires a separate reviewed `staging` → `main` PR and its normal CI/merge process. That PR includes all staging changes not yet in main, so review its full scope; promotion does not automatically open or merge it.
+
+
 ## Generated packet roots
 
 The current repo contains two important generated examples:

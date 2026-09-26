@@ -479,7 +479,8 @@ This initial checklist is retained as historical planning context. The current l
 1. Freeze the automated packet generation on `origin/staging` before adjudication, then verify the stand-down predicate from a freshly fetched base.
 2. Run the packet's rendered green gates, resolve CI for the non-merge implementation commit, and prepare the canonical closeout with the actual UTC record time.
 3. Run `close-agent-maintenance` outside the relay and merge only the closed packet.
-4. Treat promotion as a separate maintainer decision; retire only that version's stand-down marker in its promotion change with the pointer advance.
+4. Follow the [promotion runbook](../../cli-agent-onboarding-factory-operator-guide.md#6-keep-promotion-separate): dispatch `parity-promote` with `dry_run=false` to validate and open the staging promotion PR (a separate dry run is optional), review its diff and CI, then have the maintainer merge it. Only that version's stand-down marker retires with the pointer advance.
+5. Verify the promoted state on staging. Bring staging to main through a separate reviewed PR; neither promotion dispatch nor approval performs that merge.
 
 The exact commands and manual-drift exception are in the [maintenance operator procedure](../../cli-agent-onboarding-factory-operator-guide.md#maintenance-mode).
 
