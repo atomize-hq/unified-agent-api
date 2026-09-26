@@ -8,7 +8,7 @@ Automated maintenance packet for `claude_code` target `2.1.274`.
 - request artifact: `docs/agents/lifecycle/claude_code-maintenance/governance/maintenance-request.toml`
 - branch: `automation/claude_code-maintenance-2.1.274`
 - opened from: `.github/workflows/agent-maintenance-open-pr.yml`
-- prompt sha256: `fb77405ce0eeab22c16d6777b82fa1f8390cacb6e96bce403cf270979634b3fe`
+- prompt sha256: `42c5eb17f83d36c1e68ffdbe8eee43a81a7d9b53fc94ba63e18704cefc6bf9cc`
 
 ## Support-surface audit
 
@@ -232,6 +232,7 @@ Execute the automated maintenance packet for `claude_code` target `2.1.274`.
 - Read the packet-owned `support_surface_audit` block before deciding whether the run can succeed.
 - Treat `docs/agents/lifecycle/claude_code-maintenance/HANDOFF.md` as canonical for writable surfaces, read-only inputs, ordered commands, green gates, and recovery.
 - Treat `.github/workflows/agent-maintenance-open-pr.yml` as the opening workflow source.
+- Never invoke `execute-agent-maintenance`, `prepare-agent-maintenance`, or `refresh-agent`. If this prompt was delivered by `execute-agent-maintenance`, that process is the executor and is already running; lifecycle queries remain available. `HANDOFF.md` is the agent's contract for writable surfaces, read-only inputs, ordered commands, green gates, and the freeze step; its relay and recovery sections describe maintainer actions that start or recreate a run, and its closeout section identifies the closeout actor.
 - Do not write outside the execution contract frozen in the request packet.
 
 ## Manifest inputs
@@ -256,7 +257,7 @@ Execute the automated maintenance packet for `claude_code` target `2.1.274`.
    Change no other field and add no row. If the blocker no longer holds, treat the row as an uplift.
 4. Land bounded wrapper/backend/manifest/publication updates for every remaining row in `required_uplifts_this_run`. Newly discovered surface is never deferred (maintenance-request contract field invariant 3), and no debt row may be added.
 5. Refresh or create version-scoped manifest artifacts under `cli_manifests/claude_code/snapshots/2.1.274/`, `cli_manifests/claude_code/reports/2.1.274/`, and `cli_manifests/claude_code/versions/2.1.274.json` as required by the packet.
-6. Leave closeout manual; record it only with `close-agent-maintenance` after the declared green gates pass.
+6. An agent executing this packet inside a relay session does not run `close-agent-maintenance` or `prepare-agent-closeout`; after the declared green gates pass, the actor handed the packet PR records the closeout.
 
 ## Done criteria
 

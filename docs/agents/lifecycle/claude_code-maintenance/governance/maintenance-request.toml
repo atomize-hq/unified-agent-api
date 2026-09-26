@@ -6551,7 +6551,7 @@ surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
 [execution_contract]
 executor = "execute-agent-maintenance"
 prompt_template_path = "docs/agents/lifecycle/claude_code-maintenance/governance/execute-agent-maintenance-prompt.md"
-prompt_sha256 = "fb77405ce0eeab22c16d6777b82fa1f8390cacb6e96bce403cf270979634b3fe"
+prompt_sha256 = "42c5eb17f83d36c1e68ffdbe8eee43a81a7d9b53fc94ba63e18704cefc6bf9cc"
 pr_summary_path = "docs/agents/lifecycle/claude_code-maintenance/governance/pr-summary.md"
 closeout_path = "docs/agents/lifecycle/claude_code-maintenance/governance/maintenance-closeout.json"
 requires_manual_closeout = true
