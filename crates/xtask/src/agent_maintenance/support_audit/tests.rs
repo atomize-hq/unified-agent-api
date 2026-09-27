@@ -449,11 +449,35 @@ fn claude_code_install_debt_matches_its_report_surfaces() {
         {"path": ["install"], "key": "--force", "upstream_available_on": ["win32-x64"]},
     ]);
 
+    // Keep this historical row-shape fixture independent of live reauthorizations.
+    let rows = [("commands", "install"), ("flags", "--force")]
+        .into_iter()
+        .map(|(kind, surface)| {
+            format!(
+                "### `claude-install-{kind}`\n\n\
+                 - `agent_id`: `claude_code`\n\
+                 - `surface_kind`: `{kind}`\n\
+                 - `command_path`: `claude_code install`\n\
+                 - `surface_id`: `{surface}`\n\
+                 - `current_reason`: `historical test fixture`\n\
+                 - `blocker_class`: `requires_new_architectural_seam`\n\
+                 - `owner`: `test`\n\
+                 - `milestone`: `test`\n\
+                 - `follow_on`: `TODOS.md#test`\n\
+                 - `evidence_ref`: `test`\n\
+                 - `scope_target_triples`: `win32-x64`\n\
+                 - `authorized_at_version`: `2.1.29`\n\
+                 - `authorization_evidence_ref`: `cli_manifests/claude_code/reports/2.1.29/coverage.any.json`\n\n"
+            )
+        })
+        .collect::<String>();
+    let debt = debt_inventory(&rows);
+
     // No union: an audit whose debt rows all match gaps never reads one.
     let audit = derive_audit(
         "claude_code",
         "2.1.29",
-        None,
+        Some(&debt),
         &any_report_for_targets(&["win32-x64"], report),
         &["win32-x64"],
         None,

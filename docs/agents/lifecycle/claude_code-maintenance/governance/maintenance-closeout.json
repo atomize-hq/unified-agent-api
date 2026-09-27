@@ -1,0 +1,38 @@
+{
+  "wrapper_only_baseline_ref": "cli_manifests/claude_code/reports/2.1.274/coverage.any.json",
+  "wrapper_only_dispositions": [
+    {
+      "surface_kind": "global_flags",
+      "command_path": "claude_code",
+      "surface_id": "--mcp-debug",
+      "category": "older_upstream_only",
+      "evidence_ref": "docs/agents/lifecycle/claude_code-maintenance/governance/wrapper-only-evidence-2.1.274.md",
+      "note": "The retained 2.1.29 union lists the root flag on all targets; the target union does not. No intervening removal version or current hidden support is asserted.",
+      "last_supported_version": "2.1.29"
+    },
+    {
+      "surface_kind": "subcommands",
+      "command_path": "claude_code plugin manifest",
+      "surface_id": "manifest",
+      "category": "unsubstantiated_wrapper_claim",
+      "evidence_ref": "docs/agents/lifecycle/claude_code-maintenance/governance/wrapper-only-evidence-2.1.274.md",
+      "note": "The pinned help and registration evidence did not establish this upstream command. Its wrapper publication claim was withdrawn while the public request API remains for compatibility."
+    },
+    {
+      "surface_kind": "subcommands",
+      "command_path": "claude_code plugin manifest marketplace",
+      "surface_id": "marketplace",
+      "category": "unsubstantiated_wrapper_claim",
+      "evidence_ref": "docs/agents/lifecycle/claude_code-maintenance/governance/wrapper-only-evidence-2.1.274.md",
+      "note": "The pinned help and registration evidence did not establish this upstream command. Its wrapper publication claim was withdrawn while the public request API remains for compatibility."
+    },
+    {
+      "surface_kind": "subcommands",
+      "command_path": "claude_code plugin marketplace repo",
+      "surface_id": "repo",
+      "category": "unsubstantiated_wrapper_claim",
+      "evidence_ref": "docs/agents/lifecycle/claude_code-maintenance/governance/wrapper-only-evidence-2.1.274.md",
+      "note": "The pinned help and registration evidence did not establish this upstream command. Its wrapper publication claim was withdrawn while the public request API remains for compatibility."
+    }
+  ]
+}

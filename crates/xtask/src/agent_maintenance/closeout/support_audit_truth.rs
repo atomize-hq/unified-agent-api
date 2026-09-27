@@ -2,7 +2,7 @@
 //!
 //! Two rules in `docs/specs/maintenance-request-contract-v1.md` gate a packet close and neither had
 //! an enforcer. Under "Hidden upstream surfaces and wrapper-only rows", every wrapper-only row — a
-//! surface the wrapper claims that the union does not show — must be sorted into one of four
+//! surface the wrapper claims that the union does not show — must be sorted into one of five
 //! categories, and a row sorted obsolete must contract publication truth in the same run. Under
 //! field invariant 6, `unmatched_debt_surface` must be empty.
 //!
@@ -28,12 +28,13 @@ use super::super::{
 };
 use super::{MaintenanceCloseout, MaintenanceCloseoutError};
 
-/// The four categories the contract names, in its own order.
+/// The five categories the contract names, in its own order.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum WrapperOnlyCategory {
     HiddenUpstreamSupported,
     OlderUpstreamOnly,
     Obsolete,
+    UnsubstantiatedWrapperClaim,
     DiscoveryBug,
 }
 
@@ -43,6 +44,7 @@ impl WrapperOnlyCategory {
             "hidden_upstream_supported" => Some(Self::HiddenUpstreamSupported),
             "older_upstream_only" => Some(Self::OlderUpstreamOnly),
             "obsolete" => Some(Self::Obsolete),
+            "unsubstantiated_wrapper_claim" => Some(Self::UnsubstantiatedWrapperClaim),
             "discovery_bug" => Some(Self::DiscoveryBug),
             _ => None,
         }
@@ -53,21 +55,27 @@ impl WrapperOnlyCategory {
             Self::HiddenUpstreamSupported => "hidden_upstream_supported",
             Self::OlderUpstreamOnly => "older_upstream_only",
             Self::Obsolete => "obsolete",
+            Self::UnsubstantiatedWrapperClaim => "unsubstantiated_wrapper_claim",
             Self::DiscoveryBug => "discovery_bug",
         }
+    }
+
+    fn requires_publication_withdrawal(self) -> bool {
+        matches!(self, Self::Obsolete | Self::UnsubstantiatedWrapperClaim)
     }
 }
 
 /// One adjudicated wrapper-only row.
 ///
 /// The evidence each category owes differs, because the categories assert different things. All
-/// four owe an `evidence_ref` that resolves to a file in the repository and a non-empty `note`.
+/// five owe an `evidence_ref` that resolves to a file in the repository and a non-empty `note`.
 /// `older_upstream_only` additionally owes `last_supported_version`, which is the whole content of
 /// the claim. `discovery_bug` owes `follow_on`, because a discovery bug is work the packet is
 /// deferring and an untracked deferral is the failure this repository already guards elsewhere.
-/// `obsolete` owes no extra field and instead owes a fact: the surface must be gone from the live
-/// report, which is what "contract publication truth in the same run" means once the wrapper claim
-/// is withdrawn and the report regenerated.
+/// `obsolete` and `unsubstantiated_wrapper_claim` owe no extra field and instead owe a fact: the
+/// surface must be gone from the live report, which is what "contract publication truth in the same
+/// run" means once the wrapper claim is withdrawn and the report regenerated. The latter records
+/// no historical or upstream-removal claim.
 #[derive(Debug, Clone)]
 pub struct WrapperOnlyDisposition {
     pub surface: SurfaceIdentity,
@@ -163,7 +171,7 @@ fn validate_disposition(
             closeout_path,
             &field("category"),
             &format!(
-                "`{}` is not one of hidden_upstream_supported, older_upstream_only, obsolete, discovery_bug",
+                "`{}` is not one of hidden_upstream_supported, older_upstream_only, obsolete, unsubstantiated_wrapper_claim, discovery_bug",
                 raw.category
             ),
         )
@@ -192,8 +200,8 @@ fn validate_disposition(
     }
 
     // Each optional field belongs to exactly one category. Requiring it where it is owed keeps the
-    // claim honest; refusing it elsewhere stops an obsolete row from carrying a `follow_on` that
-    // implies tracking the category never established.
+    // claim honest; refusing it elsewhere stops a withdrawal row from carrying a `follow_on` that
+    // implies tracking a category it never established.
     let last_supported_version = require_for(
         closeout_path,
         &field("last_supported_version"),
@@ -378,18 +386,20 @@ fn check_dispositions_cover_live(
     for (surface, disposition) in &by_surface {
         let still_claimed = live_surfaces.contains(*surface);
         match (disposition.category, still_claimed) {
-            // Sorted obsolete and still claimed: the contraction this category owes did not happen.
-            (WrapperOnlyCategory::Obsolete, true) => {
+            // A withdrawal category that is still claimed did not complete its required
+            // publication contraction.
+            (category, true) if category.requires_publication_withdrawal() => {
                 return Err(MaintenanceCloseoutError::Validation(format!(
-                    "{}: {} is sorted `obsolete` but still appears in the live wrapper-only report; \
+                    "{}: {} is sorted `{}` but still appears in the live wrapper-only report; \
                      the publication claim must be contracted in the same run",
                     closeout_path.display(),
-                    surface.describe()
+                    surface.describe(),
+                    category.as_id(),
                 )));
             }
             // Any other category naming a surface the report no longer lists is adjudicating
-            // something that is not there. Only `obsolete` explains a row's absence.
-            (category, false) if category != WrapperOnlyCategory::Obsolete => {
+            // something that is not there. Only a withdrawal category explains a row's absence.
+            (category, false) if !category.requires_publication_withdrawal() => {
                 return Err(MaintenanceCloseoutError::Validation(format!(
                     "{}: {} is sorted `{}` but is not a live wrapper-only row",
                     closeout_path.display(),

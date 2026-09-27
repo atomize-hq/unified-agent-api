@@ -2,15 +2,19 @@
   "schema_version": 1,
   "semantic_version": "2.1.274",
   "status": "reported",
-  "updated_at": "2026-09-16T22:36:09Z",
+  "updated_at": "2026-09-26T03:41:28.224753Z",
   "artifacts": {
     "snapshots_dir": "snapshots/2.1.274",
     "reports_dir": "reports/2.1.274",
     "union_complete": true
   },
   "coverage": {
-    "supported_targets": [],
-    "supported_required_target": false
+    "supported_targets": [
+      "linux-x64",
+      "darwin-arm64",
+      "win32-x64"
+    ],
+    "supported_required_target": true
   },
   "promotion": {
     "eligible_for_latest_validated": false

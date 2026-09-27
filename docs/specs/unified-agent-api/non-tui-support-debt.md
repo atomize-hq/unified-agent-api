@@ -81,9 +81,9 @@ interpret it as an incomplete debt row and reject the inventory rather than broa
 - `milestone`: `post packet-pr convergence follow-on`
 - `follow_on`: `TODOS.md#close-claude-code-install-maintenance-gap`
 - `evidence_ref`: `cli_manifests/claude_code/reports/2.1.29/coverage.any.json`
-- `scope_target_triples`: `win32-x64`
-- `authorized_at_version`: `2.1.29`
-- `authorization_evidence_ref`: `cli_manifests/claude_code/reports/2.1.29/coverage.any.json`
+- `scope_target_triples`: `linux-x64, darwin-arm64, win32-x64`
+- `authorized_at_version`: `2.1.274`
+- `authorization_evidence_ref`: `cli_manifests/claude_code/reports/2.1.274/coverage.any.json`
 
 ### `claude-code-install-force-flag`
 
@@ -97,9 +97,9 @@ interpret it as an incomplete debt row and reject the inventory rather than broa
 - `milestone`: `post packet-pr convergence follow-on`
 - `follow_on`: `TODOS.md#close-claude-code-install-maintenance-gap`
 - `evidence_ref`: `cli_manifests/claude_code/reports/2.1.29/coverage.any.json`
-- `scope_target_triples`: `win32-x64`
-- `authorized_at_version`: `2.1.29`
-- `authorization_evidence_ref`: `cli_manifests/claude_code/reports/2.1.29/coverage.any.json`
+- `scope_target_triples`: `linux-x64, darwin-arm64, win32-x64`
+- `authorized_at_version`: `2.1.274`
+- `authorization_evidence_ref`: `cli_manifests/claude_code/reports/2.1.274/coverage.any.json`
 
 ### `codex-completion-command`
 

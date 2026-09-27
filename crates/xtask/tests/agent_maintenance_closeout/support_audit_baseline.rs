@@ -162,6 +162,57 @@ fn an_obsolete_row_that_was_contracted_closes() {
 }
 
 #[test]
+fn an_unsubstantiated_wrapper_claim_that_was_withdrawn_closes_and_serializes() {
+    let fixture = fixture_root("uaa-0039-unsubstantiated-withdrawn");
+    seed_opencode_basis(&fixture);
+    write_text(
+        &fixture.join(".github/workflows/agent-maintenance-open-pr.yml"),
+        "name: Packet PR worker\n",
+    );
+    set_wrapper_only_flags(&fixture, &[]);
+
+    let request_absolute = fixture.join(REQUEST_PATH);
+    write_text(
+        &request_absolute,
+        &automated_maintenance_request_toml("opencode", BASIS_REF),
+    );
+    let mut closeout = valid_closeout(REQUEST_PATH, &sha256_hex(&request_absolute));
+    adjudicated(json!([disposition(
+        "unsubstantiated_wrapper_claim",
+        json!({}),
+    )]))(&mut closeout);
+    write_text(
+        &fixture.join(CLOSEOUT_PATH),
+        &serde_json::to_string_pretty(&closeout).expect("serialize closeout"),
+    );
+
+    let linked = load_linked_closeout(&fixture, Path::new(REQUEST_PATH), Path::new(CLOSEOUT_PATH))
+        .expect("a withdrawn unsubstantiated claim closes");
+    let rendered = crate::closeout::serialize_closeout_json(&linked.closeout)
+        .expect("serialize the parsed category");
+    assert!(String::from_utf8(rendered)
+        .expect("rendered closeout is utf8")
+        .contains("\"unsubstantiated_wrapper_claim\""),);
+}
+
+#[test]
+fn an_unsubstantiated_wrapper_claim_that_is_still_published_blocks_closeout() {
+    let err = close(
+        "uaa-0039-unsubstantiated-published",
+        &[status_json_flag()],
+        adjudicated(json!([disposition(
+            "unsubstantiated_wrapper_claim",
+            json!({}),
+        )])),
+    )
+    .expect_err("an unsubstantiated claim must be withdrawn from publication");
+    assert!(
+        err.contains("sorted `unsubstantiated_wrapper_claim` but still appears"),
+        "{err}"
+    );
+}
+
+#[test]
 fn a_disposition_for_a_surface_that_was_never_claimed_blocks_closeout() {
     let err = close(
         "uaa-0039-extraneous",

@@ -16,7 +16,7 @@
 //!   that into a refusal. The `bool` in the schema stays meaningful because a hand-authored closeout
 //!   may still carry `false` — the generator is simply stricter than the validator.
 //! - **An unadjudicated wrapper-only row refuses.** A disposition answers why the wrapper claims a
-//!   surface upstream's help does not show, and the four categories are indistinguishable from
+//!   surface upstream's help does not show, and the categories are indistinguishable from
 //!   repository state alone: a surface upstream hides and a surface upstream removed produce an
 //!   identical observation. Nothing here can tell them apart, so nothing here writes one. The
 //!   refusal names each row and is the work queue.
@@ -226,9 +226,10 @@ where
 ///
 /// A disposition is a judgement about a surface, so it survives a version change; that is what
 /// makes carrying forward correct rather than merely convenient. Rows whose surface is no longer
-/// live are dropped, because `check_dispositions_cover_live` rejects an entry for a surface the
-/// report no longer carries — a row sorted `obsolete` contracts publication and then vanishes, and
-/// keeping its disposition would make the next closeout invalid.
+/// live are dropped, except `unsubstantiated_wrapper_claim`: that category records a withdrawn
+/// publication claim whose evidence never established an upstream surface, so preserving it keeps
+/// the next closeout from erasing the adjudication. `obsolete` remains historical-only because its
+/// upstream-removal assertion is already fully established.
 fn carry_dispositions(
     workspace_root: &Path,
     closeout_path: &Path,
@@ -237,7 +238,10 @@ fn carry_dispositions(
     let recorded = read_recorded_dispositions(workspace_root, closeout_path)?;
     let carried: Vec<WrapperOnlyDisposition> = recorded
         .into_iter()
-        .filter(|row| live_surfaces.contains(&row.surface))
+        .filter(|row| {
+            live_surfaces.contains(&row.surface)
+                || row.category == super::closeout::WrapperOnlyCategory::UnsubstantiatedWrapperClaim
+        })
         .collect();
 
     let missing: Vec<&SurfaceIdentity> = live_surfaces
