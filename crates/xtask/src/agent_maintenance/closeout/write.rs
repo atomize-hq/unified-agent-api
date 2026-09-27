@@ -4,7 +4,7 @@ use crate::workspace_mutation::{
     apply_mutations, plan_create_or_replace, PlannedMutation, WorkspacePathJail,
 };
 use crate::{
-    agent_lifecycle::{self, load_lifecycle_state, write_lifecycle_state, EvidenceId, SideState},
+    agent_lifecycle::{self, load_lifecycle_state, EvidenceId, SideState},
     agent_registry::AgentRegistry,
 };
 
@@ -44,9 +44,13 @@ pub fn write_closeout_outputs(
     closeout_path: &Path,
 ) -> Result<CloseoutWriteSummary, MaintenanceCloseoutError> {
     let linked = super::load_linked_closeout(workspace_root, request_path, closeout_path)?;
-    let mutations = plan_closeout_mutations(workspace_root, &linked)?;
+    let mut mutations = plan_closeout_mutations(workspace_root, &linked)?;
+    if let Some(lifecycle_mutation) =
+        plan_lifecycle_state_after_maintenance_closeout(workspace_root, &linked)?
+    {
+        mutations.push(lifecycle_mutation);
+    }
     let apply = apply_mutations(workspace_root, &mutations)?;
-    update_lifecycle_state_after_maintenance_closeout(workspace_root, &linked)?;
     Ok(CloseoutWriteSummary {
         agent_id: linked.request.agent_id.clone(),
         maintenance_pack_prefix: linked.maintenance_pack_prefix.clone(),
@@ -56,22 +60,22 @@ pub fn write_closeout_outputs(
     })
 }
 
-fn update_lifecycle_state_after_maintenance_closeout(
+fn plan_lifecycle_state_after_maintenance_closeout(
     workspace_root: &Path,
     linked: &LinkedMaintenanceCloseout,
-) -> Result<(), MaintenanceCloseoutError> {
+) -> Result<Option<PlannedMutation>, MaintenanceCloseoutError> {
     let registry = AgentRegistry::load(workspace_root).map_err(|err| {
         MaintenanceCloseoutError::Validation(format!("load agent registry: {err}"))
     })?;
     let Some(entry) = registry.find(&linked.request.agent_id) else {
-        return Ok(());
+        return Ok(None);
     };
 
     let lifecycle_state_path =
         agent_lifecycle::lifecycle_state_path(&entry.scaffold.onboarding_pack_prefix);
     let lifecycle_state_absolute = workspace_root.join(&lifecycle_state_path);
     if !lifecycle_state_absolute.is_file() {
-        return Ok(());
+        return Ok(None);
     }
 
     let mut lifecycle_state = load_lifecycle_state(workspace_root, &lifecycle_state_path)
@@ -96,6 +100,17 @@ fn update_lifecycle_state_after_maintenance_closeout(
     lifecycle_state.satisfied_evidence.sort();
     lifecycle_state.satisfied_evidence.dedup();
 
-    write_lifecycle_state(workspace_root, &lifecycle_state_path, &lifecycle_state)
-        .map_err(|err| MaintenanceCloseoutError::Internal(format!("write lifecycle state: {err}")))
+    lifecycle_state
+        .validate_in_workspace(workspace_root)
+        .map_err(|err| MaintenanceCloseoutError::Validation(err.to_string()))?;
+    let mut bytes = serde_json::to_vec_pretty(&lifecycle_state).map_err(|err| {
+        MaintenanceCloseoutError::Internal(format!("serialize lifecycle state: {err}"))
+    })?;
+    bytes.push(b'\n');
+    let jail = WorkspacePathJail::new(workspace_root)?;
+    Ok(Some(plan_create_or_replace(
+        &jail,
+        lifecycle_state_path,
+        bytes,
+    )?))
 }

@@ -320,6 +320,23 @@ fn refresh_publication_continuity(
         lifecycle["approval_artifact_sha256"] = json!(approval_sha256);
         lifecycle["publication_packet_sha256"] = json!(packet_sha256);
         if lifecycle
+            .get("maintenance_readiness_adoption_path")
+            .is_some()
+        {
+            // This fixture replaces the historical Claude approval with a synthetic
+            // maintenance-aware approval, so its real adoption link cannot apply.
+            lifecycle
+                .as_object_mut()
+                .expect("lifecycle object")
+                .remove("maintenance_readiness_adoption_path");
+            lifecycle
+                .as_object_mut()
+                .expect("lifecycle object")
+                .remove("maintenance_readiness_adoption_sha256");
+            lifecycle["last_transition_at"] = json!("2026-02-12T09:34:04-05:00");
+            lifecycle["last_transition_by"] = json!("historical-lifecycle-backfill");
+        }
+        if lifecycle
             .get("lifecycle_stage")
             .and_then(serde_json::Value::as_str)
             == Some("closed_baseline")

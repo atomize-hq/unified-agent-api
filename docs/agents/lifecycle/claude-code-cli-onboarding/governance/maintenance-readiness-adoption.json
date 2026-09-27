@@ -1,0 +1,15 @@
+{
+  "schema_version": "1",
+  "agent_id": "claude_code",
+  "onboarding_pack_prefix": "claude-code-cli-onboarding",
+  "mode": "release_watch_enrolled",
+  "approval_ref": "docs/agents/lifecycle/claude-code-cli-onboarding/governance/approved-agent.toml",
+  "approval_sha256": "9bd2dc39909499598791fcdd84a2c0960f68d70f167e05fc98264b5099397fc3",
+  "proving_run_closeout_ref": "docs/agents/lifecycle/claude-code-cli-onboarding/governance/proving-run-closeout.json",
+  "proving_run_closeout_sha256": "f11ea2a8dea65b4266135536ab30efac63614e3c4caadcb6a73e3730f97026b8",
+  "registry_release_watch_sha256": "a51309dfb579d7f755accf241954a3f31c81d29cad2bd39b54f74a20824a400d",
+  "recorded_at": "2026-09-27T02:46:03Z",
+  "source_commit": "beb777b6c4715fb8dae880c58cc9a77c988101ba",
+  "publication_packet_ref": "docs/agents/lifecycle/claude-code-cli-onboarding/governance/publication-ready.json",
+  "publication_packet_sha256": "bfbf90819b93c58eef1e44c3c2430c5525c1f3ffa2a0df847a48cde348cbea3c"
+}

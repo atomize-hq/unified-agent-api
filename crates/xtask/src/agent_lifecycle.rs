@@ -1,3 +1,4 @@
+mod maintenance_adoption;
 mod storage;
 mod validation;
 
@@ -320,6 +321,10 @@ pub struct LifecycleState {
     pub publication_packet_path: Option<String>,
     pub publication_packet_sha256: Option<String>,
     pub closeout_baseline_path: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub maintenance_readiness_adoption_path: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub maintenance_readiness_adoption_sha256: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -368,15 +373,18 @@ impl LifecycleState {
             &self.satisfied_evidence,
             EvidenceId::as_str,
         )?;
+        let pre_settlement_claude_baseline = maintenance_adoption::is_historical_baseline(self);
         validate_stage_minimum_evidence(
             self.lifecycle_stage,
             "required_evidence",
             &self.required_evidence,
+            pre_settlement_claude_baseline,
         )?;
         validate_stage_minimum_evidence(
             self.lifecycle_stage,
             "satisfied_evidence",
             &self.satisfied_evidence,
+            pre_settlement_claude_baseline,
         )?;
         validate_subset(
             "satisfied_evidence",
@@ -402,6 +410,7 @@ impl LifecycleState {
             "closeout_baseline_path",
             &self.closeout_baseline_path,
         )?;
+        maintenance_adoption::validate_state_fields(self)?;
         validate_stage_field_presence(
             self.lifecycle_stage,
             "publication_packet_path",
@@ -473,6 +482,7 @@ impl LifecycleState {
         if let Some(path) = &self.closeout_baseline_path {
             ensure_repo_relative_file_exists(workspace_root, "closeout_baseline_path", path)?;
         }
+        maintenance_adoption::validate_workspace_link(workspace_root, self)?;
         Ok(())
     }
 }
@@ -675,6 +685,7 @@ pub fn reconstruct_publication_ready_state_from_closed_baseline(
     state: &LifecycleState,
 ) -> LifecycleState {
     let mut historical = state.clone();
+    maintenance_adoption::restore_historical_publication_transition(&mut historical);
     historical.lifecycle_stage = LifecycleStage::PublicationReady;
     historical.support_tier = SupportTier::BaselineRuntime;
     historical.current_owner_command = "refresh-publication --write".to_string();
@@ -698,6 +709,8 @@ pub fn reconstruct_publication_ready_state_from_closed_baseline(
     historical.publication_packet_path = None;
     historical.publication_packet_sha256 = None;
     historical.closeout_baseline_path = None;
+    historical.maintenance_readiness_adoption_path = None;
+    historical.maintenance_readiness_adoption_sha256 = None;
     historical
 }
 

@@ -54,6 +54,8 @@ fn seeded_lifecycle_state(
         publication_packet_path: None,
         publication_packet_sha256: None,
         closeout_baseline_path: None,
+        maintenance_readiness_adoption_path: None,
+        maintenance_readiness_adoption_sha256: None,
     })
 }
 

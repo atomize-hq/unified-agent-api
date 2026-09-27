@@ -600,6 +600,7 @@ On success it:
 - promotes `support_tier` to `publication_backed` unless the agent was already `first_class`
 - records `publication_packet_path`, `publication_packet_sha256`, and `closeout_baseline_path`
 - records `maintenance_readiness_settled` when the approval maintenance section and the closeout `maintenance_settlement` agree on the frozen normalized hashes
+- Claude Code's February 2026 historical baseline predates that settlement. Its September 2026 `maintenance-readiness-adoption.json` binds the unchanged historical approval and proving-run closeout to the currently enrolled registry release watch. This is a present-day adoption, not a revision of the February decision. The lifecycle record carries its path and hash; maintenance closeout validates that link before writing any generated output.
 - clears `blocked`, `failed_retryable`, and `drifted` while preserving `deprecated`
 - sets the next maintenance checkpoint to `check-agent-drift --agent <agent_id>`
 
