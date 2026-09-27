@@ -23,7 +23,8 @@
     "capability_matrix_audit_green",
     "preflight_green",
     "proving_run_closeout_written",
-    "maintenance_readiness_settled"
+    "maintenance_readiness_settled",
+    "maintenance_closeout_written"
   ],
   "satisfied_evidence": [
     "registry_entry",
@@ -37,7 +38,8 @@
     "capability_matrix_audit_green",
     "preflight_green",
     "proving_run_closeout_written",
-    "maintenance_readiness_settled"
+    "maintenance_readiness_settled",
+    "maintenance_closeout_written"
   ],
   "blocking_issues": [],
   "retryable_failures": [],

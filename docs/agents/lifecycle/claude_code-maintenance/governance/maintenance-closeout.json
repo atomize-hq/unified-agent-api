@@ -1,4 +1,35 @@
 {
+  "request_ref": "docs/agents/lifecycle/claude_code-maintenance/governance/maintenance-request.toml",
+  "request_sha256": "c2a50ed7a20fb815f32d0d86d20d9deea8d962b5f6b8724d571c9dee100a6f66",
+  "resolved_findings": [
+    {
+      "category_id": "registry_manifest_drift",
+      "summary": "The claude_code 2.1.274 packet materialized the version-scoped manifest artifacts required by the live maintenance request.",
+      "surfaces": [
+        "cli_manifests/claude_code/snapshots/2.1.274/darwin-arm64.json",
+        "cli_manifests/claude_code/snapshots/2.1.274/linux-x64.json",
+        "cli_manifests/claude_code/snapshots/2.1.274/union.json",
+        "cli_manifests/claude_code/snapshots/2.1.274/win32-x64.json",
+        "cli_manifests/claude_code/reports/2.1.274/coverage.all.json",
+        "cli_manifests/claude_code/reports/2.1.274/coverage.any.json",
+        "cli_manifests/claude_code/reports/2.1.274/coverage.darwin-arm64.json",
+        "cli_manifests/claude_code/reports/2.1.274/coverage.linux-x64.json",
+        "cli_manifests/claude_code/reports/2.1.274/coverage.win32-x64.json",
+        "cli_manifests/claude_code/versions/2.1.274.json",
+        "cli_manifests/claude_code/wrapper_coverage.json",
+        "cli_manifests/claude_code/artifacts.lock.json"
+      ]
+    },
+    {
+      "category_id": "support_publication_drift",
+      "summary": "Support-matrix publication was regenerated to match the landed claude_code 2.1.274 manifest truth.",
+      "surfaces": [
+        "cli_manifests/support_matrix/current.json",
+        "docs/specs/unified-agent-api/support-matrix.md"
+      ]
+    }
+  ],
+  "explicit_none_reason": "`check-agent-drift --agent claude_code` reports status: clean, so no maintenance drift finding remains deferred. Derived from the live report at closeout time, not carried forward from the request.",
   "wrapper_only_baseline_ref": "cli_manifests/claude_code/reports/2.1.274/coverage.any.json",
   "wrapper_only_dispositions": [
     {
@@ -34,5 +65,8 @@
       "evidence_ref": "docs/agents/lifecycle/claude_code-maintenance/governance/wrapper-only-evidence-2.1.274.md",
       "note": "The pinned help and registration evidence did not establish this upstream command. Its wrapper publication claim was withdrawn while the public request API remains for compatibility."
     }
-  ]
+  ],
+  "preflight_passed": true,
+  "recorded_at": "2026-09-27T03:28:00Z",
+  "commit": "603534154a236d477a130902901a41231af44c8d"
 }
