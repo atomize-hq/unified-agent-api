@@ -1,6 +1,6 @@
-## Parity promotion — `codex` 0.156.1
+## Parity promotion — `claude_code` 2.1.274
 
-- required target: `x86_64-unknown-linux-musl`
-- promoted targets: `x86_64-unknown-linux-musl, aarch64-unknown-linux-musl, aarch64-apple-darwin, x86_64-pc-windows-msvc`
+- required target: `linux-x64`
+- promoted targets: `linux-x64, darwin-arm64, win32-x64`
 - union complete: `true`
 - dry run: `false`
