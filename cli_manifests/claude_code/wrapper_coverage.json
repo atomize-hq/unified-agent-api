@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-02-14T12:38:28.919868Z",
-  "wrapper_version": "0.2.0",
+  "generated_at": "2026-09-26T03:50:45.60275Z",
+  "wrapper_version": "0.3.7",
   "coverage": [
     {
       "path": [],
@@ -32,12 +32,42 @@
           "level": "explicit"
         },
         {
+          "key": "--autocompact",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeCommandRequest and ClaudeClient::run_command."
+        },
+        {
+          "key": "--ax-screen-reader",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeCommandRequest and ClaudeClient::run_command."
+        },
+        {
+          "key": "--bare",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeCommandRequest and ClaudeClient::run_command."
+        },
+        {
           "key": "--betas",
           "level": "explicit"
         },
         {
+          "key": "--bg",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeCommandRequest and ClaudeClient::run_command."
+        },
+        {
+          "key": "--brief",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeCommandRequest and ClaudeClient::run_command."
+        },
+        {
           "key": "--chrome",
           "level": "explicit"
+        },
+        {
+          "key": "--cloud",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeCommandRequest and ClaudeClient::run_command."
         },
         {
           "key": "--continue",
@@ -64,6 +94,21 @@
           "level": "explicit"
         },
         {
+          "key": "--effort",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeCommandRequest and ClaudeClient::run_command."
+        },
+        {
+          "key": "--environment",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeCommandRequest and ClaudeClient::run_command."
+        },
+        {
+          "key": "--exclude-dynamic-system-prompt-sections",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeCommandRequest and ClaudeClient::run_command."
+        },
+        {
           "key": "--fallback-model",
           "level": "explicit"
         },
@@ -76,6 +121,11 @@
           "level": "explicit"
         },
         {
+          "key": "--forward-subagent-text",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeCommandRequest and ClaudeClient::run_command."
+        },
+        {
           "key": "--from-pr",
           "level": "explicit"
         },
@@ -86,6 +136,11 @@
         {
           "key": "--ide",
           "level": "explicit"
+        },
+        {
+          "key": "--include-hook-events",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeCommandRequest and ClaudeClient::run_command."
         },
         {
           "key": "--include-partial-messages",
@@ -116,6 +171,11 @@
           "level": "explicit"
         },
         {
+          "key": "--name",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeCommandRequest and ClaudeClient::run_command."
+        },
+        {
           "key": "--no-chrome",
           "level": "explicit"
         },
@@ -132,20 +192,55 @@
           "level": "explicit"
         },
         {
+          "key": "--permission-prompts",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeCommandRequest and ClaudeClient::run_command."
+        },
+        {
           "key": "--plugin-dir",
           "level": "explicit"
+        },
+        {
+          "key": "--plugin-url",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeCommandRequest and ClaudeClient::run_command."
         },
         {
           "key": "--print",
           "level": "explicit"
         },
         {
+          "key": "--prompt-suggestions",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeCommandRequest and ClaudeClient::run_command."
+        },
+        {
+          "key": "--remote-control",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeCommandRequest and ClaudeClient::run_command."
+        },
+        {
+          "key": "--remote-control-session-name-prefix",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeCommandRequest and ClaudeClient::run_command."
+        },
+        {
           "key": "--replay-user-messages",
           "level": "explicit"
         },
         {
+          "key": "--restricted",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeCommandRequest and ClaudeClient::run_command."
+        },
+        {
           "key": "--resume",
           "level": "explicit"
+        },
+        {
+          "key": "--safe-mode",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeCommandRequest and ClaudeClient::run_command."
         },
         {
           "key": "--session-id",
@@ -168,6 +263,21 @@
           "level": "explicit"
         },
         {
+          "key": "--system-prompt-snapshot",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeCommandRequest and ClaudeClient::run_command."
+        },
+        {
+          "key": "--teleport",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeCommandRequest and ClaudeClient::run_command."
+        },
+        {
+          "key": "--tmux",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeCommandRequest and ClaudeClient::run_command."
+        },
+        {
           "key": "--tools",
           "level": "explicit"
         },
@@ -178,6 +288,167 @@
         {
           "key": "--version",
           "level": "explicit"
+        },
+        {
+          "key": "--worktree",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeCommandRequest and ClaudeClient::run_command."
+        }
+      ]
+    },
+    {
+      "path": [
+        "agents"
+      ],
+      "level": "passthrough",
+      "note": "Forwarded verbatim by ClaudeNonTuiCommandRequest.",
+      "flags": [
+        {
+          "key": "--all",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeNonTuiCommandRequest."
+        },
+        {
+          "key": "--cwd",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeNonTuiCommandRequest."
+        },
+        {
+          "key": "--json",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeNonTuiCommandRequest."
+        }
+      ]
+    },
+    {
+      "path": [
+        "attach"
+      ],
+      "level": "passthrough",
+      "note": "Forwarded verbatim by ClaudeNonTuiCommandRequest.",
+      "args": [
+        {
+          "name": "id",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeNonTuiCommandRequest."
+        }
+      ]
+    },
+    {
+      "path": [
+        "auth"
+      ],
+      "level": "passthrough",
+      "note": "Forwarded verbatim by ClaudeNonTuiCommandRequest."
+    },
+    {
+      "path": [
+        "auth",
+        "login"
+      ],
+      "level": "passthrough",
+      "note": "Forwarded verbatim by ClaudeNonTuiCommandRequest.",
+      "flags": [
+        {
+          "key": "--claudeai",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeNonTuiCommandRequest."
+        },
+        {
+          "key": "--console",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeNonTuiCommandRequest."
+        },
+        {
+          "key": "--email",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeNonTuiCommandRequest."
+        },
+        {
+          "key": "--sso",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeNonTuiCommandRequest."
+        }
+      ]
+    },
+    {
+      "path": [
+        "auth",
+        "logout"
+      ],
+      "level": "passthrough",
+      "note": "Forwarded verbatim by ClaudeNonTuiCommandRequest."
+    },
+    {
+      "path": [
+        "auth",
+        "status"
+      ],
+      "level": "passthrough",
+      "note": "Forwarded verbatim by ClaudeNonTuiCommandRequest.",
+      "flags": [
+        {
+          "key": "--json",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeNonTuiCommandRequest."
+        },
+        {
+          "key": "--text",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeNonTuiCommandRequest."
+        }
+      ]
+    },
+    {
+      "path": [
+        "auto-mode"
+      ],
+      "level": "passthrough",
+      "note": "Forwarded verbatim by ClaudeNonTuiCommandRequest."
+    },
+    {
+      "path": [
+        "auto-mode",
+        "config"
+      ],
+      "level": "passthrough",
+      "note": "Forwarded verbatim by ClaudeNonTuiCommandRequest."
+    },
+    {
+      "path": [
+        "auto-mode",
+        "critique"
+      ],
+      "level": "passthrough",
+      "note": "Forwarded verbatim by ClaudeNonTuiCommandRequest."
+    },
+    {
+      "path": [
+        "auto-mode",
+        "defaults"
+      ],
+      "level": "passthrough",
+      "note": "Forwarded verbatim by ClaudeNonTuiCommandRequest.",
+      "flags": [
+        {
+          "key": "--label",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeNonTuiCommandRequest."
+        }
+      ]
+    },
+    {
+      "path": [
+        "auto-mode",
+        "reset"
+      ],
+      "level": "passthrough",
+      "note": "Forwarded verbatim by ClaudeNonTuiCommandRequest.",
+      "flags": [
+        {
+          "key": "--yes",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeNonTuiCommandRequest."
         }
       ]
     },
@@ -189,20 +460,62 @@
     },
     {
       "path": [
+        "gateway"
+      ],
+      "level": "passthrough",
+      "note": "Forwarded verbatim by ClaudeNonTuiCommandRequest.",
+      "flags": [
+        {
+          "key": "--config",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeNonTuiCommandRequest."
+        }
+      ]
+    },
+    {
+      "path": [
+        "import"
+      ],
+      "level": "passthrough",
+      "note": "Forwarded verbatim by ClaudeNonTuiCommandRequest.",
+      "flags": [
+        {
+          "key": "--dry-run",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeNonTuiCommandRequest."
+        },
+        {
+          "key": "--yes",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeNonTuiCommandRequest."
+        }
+      ]
+    },
+    {
+      "path": [
         "install"
       ],
       "level": "intentionally_unsupported",
       "note": "Claude Code installation is out of scope for this wrapper.",
-      "scope": {
-        "target_triples": [
-          "win32-x64"
-        ]
-      },
       "flags": [
         {
           "key": "--force",
           "level": "intentionally_unsupported",
           "note": "Claude Code installation is out of scope for this wrapper."
+        }
+      ]
+    },
+    {
+      "path": [
+        "logs"
+      ],
+      "level": "passthrough",
+      "note": "Forwarded verbatim by ClaudeNonTuiCommandRequest.",
+      "args": [
+        {
+          "name": "id",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeNonTuiCommandRequest."
         }
       ]
     },
@@ -218,12 +531,22 @@
         "add"
       ],
       "level": "explicit",
-      "scope": {
-        "target_triples": [
-          "win32-x64"
-        ]
-      },
       "flags": [
+        {
+          "key": "--callback-port",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeCommandRequest and ClaudeClient::run_command."
+        },
+        {
+          "key": "--client-id",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeCommandRequest and ClaudeClient::run_command."
+        },
+        {
+          "key": "--client-secret",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeCommandRequest and ClaudeClient::run_command."
+        },
         {
           "key": "--env",
           "level": "explicit"
@@ -258,11 +581,6 @@
         "add-from-claude-desktop"
       ],
       "level": "explicit",
-      "scope": {
-        "target_triples": [
-          "win32-x64"
-        ]
-      },
       "flags": [
         {
           "key": "--scope",
@@ -276,12 +594,12 @@
         "add-json"
       ],
       "level": "explicit",
-      "scope": {
-        "target_triples": [
-          "win32-x64"
-        ]
-      },
       "flags": [
+        {
+          "key": "--client-secret",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeCommandRequest and ClaudeClient::run_command."
+        },
         {
           "key": "--scope",
           "level": "explicit"
@@ -304,11 +622,6 @@
         "get"
       ],
       "level": "explicit",
-      "scope": {
-        "target_triples": [
-          "win32-x64"
-        ]
-      },
       "args": [
         {
           "name": "name",
@@ -326,14 +639,46 @@
     {
       "path": [
         "mcp",
+        "login"
+      ],
+      "level": "passthrough",
+      "note": "Forwarded verbatim by ClaudeNonTuiCommandRequest.",
+      "flags": [
+        {
+          "key": "--no-browser",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeNonTuiCommandRequest."
+        }
+      ],
+      "args": [
+        {
+          "name": "name",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeNonTuiCommandRequest."
+        }
+      ]
+    },
+    {
+      "path": [
+        "mcp",
+        "logout"
+      ],
+      "level": "passthrough",
+      "note": "Forwarded verbatim by ClaudeNonTuiCommandRequest.",
+      "args": [
+        {
+          "name": "name",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeNonTuiCommandRequest."
+        }
+      ]
+    },
+    {
+      "path": [
+        "mcp",
         "remove"
       ],
       "level": "explicit",
-      "scope": {
-        "target_triples": [
-          "win32-x64"
-        ]
-      },
       "flags": [
         {
           "key": "--scope",
@@ -359,12 +704,7 @@
         "mcp",
         "serve"
       ],
-      "level": "explicit",
-      "scope": {
-        "target_triples": [
-          "win32-x64"
-        ]
-      }
+      "level": "explicit"
     },
     {
       "path": [
@@ -375,18 +715,33 @@
     {
       "path": [
         "plugin",
+        "details"
+      ],
+      "level": "passthrough",
+      "note": "Forwarded verbatim by ClaudeNonTuiCommandRequest.",
+      "args": [
+        {
+          "name": "name",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeNonTuiCommandRequest."
+        }
+      ]
+    },
+    {
+      "path": [
+        "plugin",
         "disable"
       ],
       "level": "explicit",
-      "scope": {
-        "target_triples": [
-          "win32-x64"
-        ]
-      },
       "flags": [
         {
           "key": "--all",
           "level": "explicit"
+        },
+        {
+          "key": "--json",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeCommandRequest and ClaudeClient::run_command."
         },
         {
           "key": "--scope",
@@ -400,12 +755,12 @@
         "enable"
       ],
       "level": "explicit",
-      "scope": {
-        "target_triples": [
-          "win32-x64"
-        ]
-      },
       "flags": [
+        {
+          "key": "--json",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeCommandRequest and ClaudeClient::run_command."
+        },
         {
           "key": "--scope",
           "level": "explicit"
@@ -421,18 +776,204 @@
     {
       "path": [
         "plugin",
+        "eval"
+      ],
+      "level": "passthrough",
+      "note": "Forwarded verbatim by ClaudeNonTuiCommandRequest.",
+      "flags": [
+        {
+          "key": "--ablation",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeNonTuiCommandRequest."
+        },
+        {
+          "key": "--allow-real-servers",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeNonTuiCommandRequest."
+        },
+        {
+          "key": "--allow-tools",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeNonTuiCommandRequest."
+        },
+        {
+          "key": "--case",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeNonTuiCommandRequest."
+        },
+        {
+          "key": "--concurrency",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeNonTuiCommandRequest."
+        },
+        {
+          "key": "--eval-dir",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeNonTuiCommandRequest."
+        },
+        {
+          "key": "--json",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeNonTuiCommandRequest."
+        },
+        {
+          "key": "--judge-model",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeNonTuiCommandRequest."
+        },
+        {
+          "key": "--keep-temp",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeNonTuiCommandRequest."
+        },
+        {
+          "key": "--max-cost-usd",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeNonTuiCommandRequest."
+        },
+        {
+          "key": "--mocks",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeNonTuiCommandRequest."
+        },
+        {
+          "key": "--no-publish",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeNonTuiCommandRequest."
+        },
+        {
+          "key": "--no-scaffold",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeNonTuiCommandRequest."
+        },
+        {
+          "key": "--output-dir",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeNonTuiCommandRequest."
+        },
+        {
+          "key": "--publish-report",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeNonTuiCommandRequest."
+        },
+        {
+          "key": "--report",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeNonTuiCommandRequest."
+        },
+        {
+          "key": "--runs",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeNonTuiCommandRequest."
+        },
+        {
+          "key": "--scaffold",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeNonTuiCommandRequest."
+        },
+        {
+          "key": "--tag",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeNonTuiCommandRequest."
+        },
+        {
+          "key": "--threshold",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeNonTuiCommandRequest."
+        },
+        {
+          "key": "--trust-plugin",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeNonTuiCommandRequest."
+        }
+      ]
+    },
+    {
+      "path": [
+        "plugin",
+        "eval",
+        "init"
+      ],
+      "level": "passthrough",
+      "note": "Forwarded verbatim by ClaudeNonTuiCommandRequest.",
+      "flags": [
+        {
+          "key": "--eval-dir",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeNonTuiCommandRequest."
+        },
+        {
+          "key": "--interactive",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeNonTuiCommandRequest."
+        }
+      ]
+    },
+    {
+      "path": [
+        "plugin",
+        "init"
+      ],
+      "level": "passthrough",
+      "note": "Forwarded verbatim by ClaudeNonTuiCommandRequest.",
+      "flags": [
+        {
+          "key": "--author",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeNonTuiCommandRequest."
+        },
+        {
+          "key": "--author-email",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeNonTuiCommandRequest."
+        },
+        {
+          "key": "--description",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeNonTuiCommandRequest."
+        },
+        {
+          "key": "--force",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeNonTuiCommandRequest."
+        },
+        {
+          "key": "--with",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeNonTuiCommandRequest."
+        }
+      ]
+    },
+    {
+      "path": [
+        "plugin",
         "install"
       ],
       "level": "explicit",
-      "scope": {
-        "target_triples": [
-          "win32-x64"
-        ]
-      },
       "flags": [
+        {
+          "key": "--accept-command",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeCommandRequest and ClaudeClient::run_command."
+        },
+        {
+          "key": "--config",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeCommandRequest and ClaudeClient::run_command."
+        },
+        {
+          "key": "--json",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeCommandRequest and ClaudeClient::run_command."
+        },
         {
           "key": "--scope",
           "level": "explicit"
+        },
+        {
+          "key": "--yes",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeCommandRequest and ClaudeClient::run_command."
         }
       ]
     },
@@ -442,11 +983,6 @@
         "list"
       ],
       "level": "explicit",
-      "scope": {
-        "target_triples": [
-          "win32-x64"
-        ]
-      },
       "flags": [
         {
           "key": "--available",
@@ -457,33 +993,6 @@
           "level": "explicit"
         }
       ]
-    },
-    {
-      "path": [
-        "plugin",
-        "manifest"
-      ],
-      "level": "explicit",
-      "scope": {
-        "target_triples": [
-          "linux-x64",
-          "darwin-arm64"
-        ]
-      }
-    },
-    {
-      "path": [
-        "plugin",
-        "manifest",
-        "marketplace"
-      ],
-      "level": "explicit",
-      "scope": {
-        "target_triples": [
-          "linux-x64",
-          "darwin-arm64"
-        ]
-      }
     },
     {
       "path": [
@@ -499,11 +1008,23 @@
         "add"
       ],
       "level": "explicit",
-      "scope": {
-        "target_triples": [
-          "win32-x64"
-        ]
-      },
+      "flags": [
+        {
+          "key": "--claudeai",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeCommandRequest and ClaudeClient::run_command."
+        },
+        {
+          "key": "--scope",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeCommandRequest and ClaudeClient::run_command."
+        },
+        {
+          "key": "--sparse",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeCommandRequest and ClaudeClient::run_command."
+        }
+      ],
       "args": [
         {
           "name": "source",
@@ -518,11 +1039,6 @@
         "list"
       ],
       "level": "explicit",
-      "scope": {
-        "target_triples": [
-          "win32-x64"
-        ]
-      },
       "flags": [
         {
           "key": "--json",
@@ -537,25 +1053,13 @@
         "remove"
       ],
       "level": "explicit",
-      "scope": {
-        "target_triples": [
-          "win32-x64"
-        ]
-      }
-    },
-    {
-      "path": [
-        "plugin",
-        "marketplace",
-        "repo"
-      ],
-      "level": "explicit",
-      "scope": {
-        "target_triples": [
-          "linux-x64",
-          "darwin-arm64"
-        ]
-      }
+      "flags": [
+        {
+          "key": "--scope",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeCommandRequest and ClaudeClient::run_command."
+        }
+      ]
     },
     {
       "path": [
@@ -563,12 +1067,67 @@
         "marketplace",
         "update"
       ],
-      "level": "explicit",
-      "scope": {
-        "target_triples": [
-          "win32-x64"
-        ]
-      }
+      "level": "explicit"
+    },
+    {
+      "path": [
+        "plugin",
+        "prune"
+      ],
+      "level": "passthrough",
+      "note": "Forwarded verbatim by ClaudeNonTuiCommandRequest.",
+      "flags": [
+        {
+          "key": "--dry-run",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeNonTuiCommandRequest."
+        },
+        {
+          "key": "--scope",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeNonTuiCommandRequest."
+        },
+        {
+          "key": "--yes",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeNonTuiCommandRequest."
+        }
+      ]
+    },
+    {
+      "path": [
+        "plugin",
+        "tag"
+      ],
+      "level": "passthrough",
+      "note": "Forwarded verbatim by ClaudeNonTuiCommandRequest.",
+      "flags": [
+        {
+          "key": "--dry-run",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeNonTuiCommandRequest."
+        },
+        {
+          "key": "--force",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeNonTuiCommandRequest."
+        },
+        {
+          "key": "--message",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeNonTuiCommandRequest."
+        },
+        {
+          "key": "--push",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeNonTuiCommandRequest."
+        },
+        {
+          "key": "--remote",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeNonTuiCommandRequest."
+        }
+      ]
     },
     {
       "path": [
@@ -576,15 +1135,30 @@
         "uninstall"
       ],
       "level": "explicit",
-      "scope": {
-        "target_triples": [
-          "win32-x64"
-        ]
-      },
       "flags": [
+        {
+          "key": "--json",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeCommandRequest and ClaudeClient::run_command."
+        },
+        {
+          "key": "--keep-data",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeCommandRequest and ClaudeClient::run_command."
+        },
+        {
+          "key": "--prune",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeCommandRequest and ClaudeClient::run_command."
+        },
         {
           "key": "--scope",
           "level": "explicit"
+        },
+        {
+          "key": "--yes",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeCommandRequest and ClaudeClient::run_command."
         }
       ]
     },
@@ -594,15 +1168,25 @@
         "update"
       ],
       "level": "explicit",
-      "scope": {
-        "target_triples": [
-          "win32-x64"
-        ]
-      },
       "flags": [
+        {
+          "key": "--accept-command",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeCommandRequest and ClaudeClient::run_command."
+        },
+        {
+          "key": "--json",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeCommandRequest and ClaudeClient::run_command."
+        },
         {
           "key": "--scope",
           "level": "explicit"
+        },
+        {
+          "key": "--yes",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeCommandRequest and ClaudeClient::run_command."
         }
       ],
       "args": [
@@ -618,11 +1202,18 @@
         "validate"
       ],
       "level": "explicit",
-      "scope": {
-        "target_triples": [
-          "win32-x64"
-        ]
-      },
+      "flags": [
+        {
+          "key": "--json",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeCommandRequest and ClaudeClient::run_command."
+        },
+        {
+          "key": "--strict",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeCommandRequest and ClaudeClient::run_command."
+        }
+      ],
       "args": [
         {
           "name": "path",
@@ -632,9 +1223,110 @@
     },
     {
       "path": [
+        "project"
+      ],
+      "level": "passthrough",
+      "note": "Forwarded verbatim by ClaudeNonTuiCommandRequest."
+    },
+    {
+      "path": [
+        "project",
+        "purge"
+      ],
+      "level": "passthrough",
+      "note": "Forwarded verbatim by ClaudeNonTuiCommandRequest.",
+      "flags": [
+        {
+          "key": "--all",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeNonTuiCommandRequest."
+        },
+        {
+          "key": "--dry-run",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeNonTuiCommandRequest."
+        },
+        {
+          "key": "--interactive",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeNonTuiCommandRequest."
+        },
+        {
+          "key": "--yes",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeNonTuiCommandRequest."
+        }
+      ]
+    },
+    {
+      "path": [
+        "respawn"
+      ],
+      "level": "passthrough",
+      "note": "Forwarded verbatim by ClaudeNonTuiCommandRequest."
+    },
+    {
+      "path": [
+        "rm"
+      ],
+      "level": "passthrough",
+      "note": "Forwarded verbatim by ClaudeNonTuiCommandRequest.",
+      "args": [
+        {
+          "name": "id",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeNonTuiCommandRequest."
+        }
+      ]
+    },
+    {
+      "path": [
         "setup-token"
       ],
       "level": "explicit"
+    },
+    {
+      "path": [
+        "stop"
+      ],
+      "level": "passthrough",
+      "note": "Forwarded verbatim by ClaudeNonTuiCommandRequest.",
+      "args": [
+        {
+          "name": "id",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeNonTuiCommandRequest."
+        }
+      ]
+    },
+    {
+      "path": [
+        "ultrareview"
+      ],
+      "level": "passthrough",
+      "note": "Forwarded verbatim by ClaudeNonTuiCommandRequest.",
+      "flags": [
+        {
+          "key": "--json",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeNonTuiCommandRequest."
+        },
+        {
+          "key": "--no-post",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeNonTuiCommandRequest."
+        },
+        {
+          "key": "--post",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeNonTuiCommandRequest."
+        },
+        {
+          "key": "--timeout",
+          "level": "passthrough",
+          "note": "Forwarded verbatim by ClaudeNonTuiCommandRequest."
+        }
+      ]
     },
     {
       "path": [

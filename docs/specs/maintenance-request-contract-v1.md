@@ -330,9 +330,13 @@ absent from the union, and that absence is not evidence that upstream removed it
   that the union does not show under `deltas.wrapper_only_commands`, `deltas.wrapper_only_flags`, or
   `deltas.wrapper_only_args`.
 - Before a packet closes, each wrapper-only row MUST be sorted into one category: hidden upstream
-  but still supported, supported only on older upstream versions, obsolete, or a discovery bug.
+  but still supported, supported only on older upstream versions, obsolete, an unsubstantiated
+  wrapper claim, or a discovery bug.
 - A wrapper-only surface sorted obsolete MUST contract publication truth in the same run, or the
   packet is invalid.
+- An unsubstantiated wrapper claim MUST also contract publication truth in the same run. This
+  category records that the repository did not establish the claimed upstream surface; it makes no
+  assertion that upstream ever supported or later removed it.
 - The record is `wrapper_only_dispositions[]` in the closeout artifact, and
   `close-agent-maintenance` enforces it (`uaa-0039`). Each entry carries the surface identity
   (`surface_kind`, `command_path`, `surface_id`), a `category`, an `evidence_ref` that MUST resolve
@@ -345,19 +349,22 @@ absent from the union, and that absence is not evidence that upstream removed it
 | `hidden_upstream_supported` | Upstream still ships it but hides it from help | — |
 | `older_upstream_only` | Upstream shipped it in an earlier version | `last_supported_version` |
 | `obsolete` | Upstream removed it and the wrapper claim is withdrawn | the contraction itself |
+| `unsubstantiated_wrapper_claim` | The wrapper claim did not establish an upstream surface and is withdrawn | the contraction itself |
 | `discovery_bug` | The union should have shown it; acquisition is at fault | `follow_on` |
 
 - The closeout binds the report it adjudicated in `wrapper_only_baseline_ref`, which MUST be the
   report `select_report_path` chooses — `coverage.any.json` whenever it exists. The binding is
-  required because a row correctly sorted obsolete is gone from the regenerated report by the time
-  closeout runs: judged against the final set alone, its disposition would look extraneous. Both
-  fields are omitted when the agent has no wrapper-only row and records no disposition, and MUST be
-  omitted when the request declares no detected release, because nothing then binds a version.
+  required because a row correctly sorted obsolete or `unsubstantiated_wrapper_claim` is gone from
+  the regenerated report by the time closeout runs: judged against the final set alone, its
+  disposition would look extraneous. Both fields are omitted when the agent has no wrapper-only row
+  and records no disposition, and MUST be omitted when the request declares no detected release,
+  because nothing then binds a version.
 - Enforcement re-derives from the repository rather than reading the artifact's claims. A
-  disposition sorted `obsolete` whose surface is still in the live wrapper-only report is rejected:
-  that is what "contract publication truth in the same run" means once the claim is withdrawn and
-  the report regenerated. A live wrapper-only row with no disposition is rejected, as is a
-  disposition for a surface that is neither live nor sorted `obsolete`.
+  disposition sorted `obsolete` or `unsubstantiated_wrapper_claim` whose surface is still in the
+  live wrapper-only report is rejected: that is what "contract publication truth in the same run"
+  means once the claim is withdrawn and the report regenerated. A live wrapper-only row with no
+  disposition is rejected, as is a disposition for a surface that is neither live nor one of those
+  two withdrawal categories.
 
 ## Universal execution-contract shape
 

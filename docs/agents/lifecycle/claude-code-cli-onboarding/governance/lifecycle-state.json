@@ -9,8 +9,8 @@
   "side_states": [],
   "current_owner_command": "close-proving-run --write",
   "expected_next_command": "check-agent-drift --agent claude_code",
-  "last_transition_at": "2026-02-12T09:34:04-05:00",
-  "last_transition_by": "historical-lifecycle-backfill",
+  "last_transition_at": "2026-09-27T02:46:03Z",
+  "last_transition_by": "maintenance-readiness-adoption",
   "required_evidence": [
     "registry_entry",
     "docs_pack",
@@ -22,7 +22,9 @@
     "capability_matrix_check_green",
     "capability_matrix_audit_green",
     "preflight_green",
-    "proving_run_closeout_written"
+    "proving_run_closeout_written",
+    "maintenance_readiness_settled",
+    "maintenance_closeout_written"
   ],
   "satisfied_evidence": [
     "registry_entry",
@@ -35,7 +37,9 @@
     "capability_matrix_check_green",
     "capability_matrix_audit_green",
     "preflight_green",
-    "proving_run_closeout_written"
+    "proving_run_closeout_written",
+    "maintenance_readiness_settled",
+    "maintenance_closeout_written"
   ],
   "blocking_issues": [],
   "retryable_failures": [],
@@ -65,5 +69,7 @@
   },
   "publication_packet_path": "docs/agents/lifecycle/claude-code-cli-onboarding/governance/publication-ready.json",
   "publication_packet_sha256": "bfbf90819b93c58eef1e44c3c2430c5525c1f3ffa2a0df847a48cde348cbea3c",
-  "closeout_baseline_path": "docs/agents/lifecycle/claude-code-cli-onboarding/governance/proving-run-closeout.json"
+  "closeout_baseline_path": "docs/agents/lifecycle/claude-code-cli-onboarding/governance/proving-run-closeout.json",
+  "maintenance_readiness_adoption_path": "docs/agents/lifecycle/claude-code-cli-onboarding/governance/maintenance-readiness-adoption.json",
+  "maintenance_readiness_adoption_sha256": "4d79d8779822d7f0bc0a76e6b6e820fe8852ca333568dc14490d3254428760b4"
 }

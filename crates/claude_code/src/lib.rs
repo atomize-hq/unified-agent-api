@@ -35,6 +35,7 @@ pub use commands::mcp::{
     McpAddFromClaudeDesktopRequest, McpAddJsonRequest, McpAddRequest, McpGetRequest,
     McpRemoveRequest, McpScope, McpServeRequest, McpTransport,
 };
+pub use commands::non_tui::{ClaudeNonTuiCommand, ClaudeNonTuiCommandRequest};
 pub use commands::plugin::{
     PluginDisableRequest, PluginEnableRequest, PluginInstallRequest, PluginListRequest,
     PluginManifestMarketplaceRequest, PluginManifestRequest, PluginMarketplaceAddRequest,

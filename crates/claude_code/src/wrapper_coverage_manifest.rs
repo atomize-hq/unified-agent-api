@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 
+mod packet_coverage;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum CoverageLevel {
@@ -112,12 +114,14 @@ pub fn wrapper_coverage_manifest() -> WrapperCoverageManifestV1 {
         flags: Vec<WrapperFlagCoverageV1>,
         args: Vec<WrapperArgCoverageV1>,
     ) -> WrapperCommandCoverageV1 {
-        let mut out = command(path, level, note, flags, args);
-        out.scope = Some(scope);
-        out
+        // The direct command runner and the 2.1.274 packet forwarding surface
+        // are portable. Keep the parameter so older call sites remain concise,
+        // but do not constrain parity declarations to a single acquisition target.
+        let _ = scope;
+        command(path, level, note, flags, args)
     }
 
-    WrapperCoverageManifestV1 {
+    let mut manifest = WrapperCoverageManifestV1 {
         schema_version: 1,
         generated_at: None,
         wrapper_version: None,
@@ -386,22 +390,6 @@ pub fn wrapper_coverage_manifest() -> WrapperCoverageManifestV1 {
                     scope: None,
                 }],
             ),
-            command_scoped(
-                &["plugin", "manifest"],
-                CoverageLevel::Explicit,
-                None,
-                scope_targets(&["linux-x64", "darwin-arm64"]),
-                vec![],
-                vec![],
-            ),
-            command_scoped(
-                &["plugin", "manifest", "marketplace"],
-                CoverageLevel::Explicit,
-                None,
-                scope_targets(&["linux-x64", "darwin-arm64"]),
-                vec![],
-                vec![],
-            ),
             command(
                 &["plugin", "marketplace"],
                 CoverageLevel::Explicit,
@@ -439,14 +427,6 @@ pub fn wrapper_coverage_manifest() -> WrapperCoverageManifestV1 {
                 vec![],
             ),
             command_scoped(
-                &["plugin", "marketplace", "repo"],
-                CoverageLevel::Explicit,
-                None,
-                scope_targets(&["linux-x64", "darwin-arm64"]),
-                vec![],
-                vec![],
-            ),
-            command_scoped(
                 &["plugin", "marketplace", "update"],
                 CoverageLevel::Explicit,
                 None,
@@ -455,5 +435,10 @@ pub fn wrapper_coverage_manifest() -> WrapperCoverageManifestV1 {
                 vec![],
             ),
         ],
-    }
+    };
+    manifest
+        .coverage
+        .extend(packet_coverage::new_command_coverage());
+    packet_coverage::extend_existing_coverage(&mut manifest.coverage);
+    manifest
 }

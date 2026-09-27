@@ -31,6 +31,7 @@ Approval maintenance note:
 - the committed `approved-agent.toml` artifact MUST carry frozen `descriptor.maintenance` truth in exactly one mode: `release_watch_enrolled` or `explicitly_deferred`
 - `release_watch_enrolled` requires committed registry `maintenance.release_watch` truth for the same agent
 - `explicitly_deferred` forbids committed registry `maintenance.release_watch` truth for the same agent
+- the Claude Code approval with SHA-256 `9bd2dc39909499598791fcdd84a2c0960f68d70f167e05fc98264b5099397fc3` predates this requirement. Its 2026-02-12 approval and proving-run closeout MUST remain historical evidence, without a backdated maintenance settlement. The sole compatibility path for its closed baseline is the current-dated `maintenance-readiness-adoption.json` in the same governance directory. The adoption MUST bind that exact approval, the original proving-run closeout with SHA-256 `f11ea2a8dea65b4266135536ab30efac63614e3c4caadcb6a73e3730f97026b8`, the original publication packet with SHA-256 `bfbf90819b93c58eef1e44c3c2430c5525c1f3ffa2a0df847a48cde348cbea3c`, the current normalized registry release-watch hash, and a later `recorded_at`. Lifecycle `maintenance_readiness_settled` requires the adoption path and SHA-256, both validated against the current registry. No other missing-settlement baseline receives this exception.
 
 Maintenance posture note:
 - a newly onboarded agent MAY start with partial non-TUI support
@@ -225,6 +226,7 @@ Canonical lifecycle record:
    - `release_watch_enrolled` requires `maintenance_settlement.release_watch_sha256` and forbids `maintenance_settlement.deferral_sha256`
    - `explicitly_deferred` requires `maintenance_settlement.deferral_sha256` and forbids `maintenance_settlement.release_watch_sha256`
    - successful proving-run closeout records `maintenance_readiness_settled` before the lifecycle advances to `closed_baseline`
+   - the pre-settlement Claude Code baseline described above may retain its original evidence list only while it keeps its exact historical identity. A current-dated adoption adds `maintenance_readiness_settled` without changing the old approval, proving-run closeout, or publication packet. The lifecycle record points to the adoption artifact and retains the original publication packet hash.
 10) Ensure required CI workflows pass (see below).
 
 Publication handoff rule:

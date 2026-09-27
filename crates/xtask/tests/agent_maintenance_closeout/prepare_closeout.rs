@@ -208,6 +208,41 @@ fn a_recorded_disposition_is_carried_forward_into_the_new_artifact() {
     );
 }
 
+#[test]
+fn a_withdrawn_unsubstantiated_claim_is_carried_forward_after_regeneration() {
+    let (fixture, head) = seed_packet("t6-carry-unsubstantiated", &[]);
+    write_text(
+        &fixture.join(CLOSEOUT_PATH),
+        &json!({
+            "wrapper_only_dispositions": [{
+                "surface_kind": "flags",
+                "command_path": "opencode status",
+                "surface_id": "--json",
+                "category": "unsubstantiated_wrapper_claim",
+                "evidence_ref": BASIS_REF,
+                "note": "The wrapper claim was withdrawn because the evidence did not establish an upstream surface.",
+            }]
+        })
+        .to_string(),
+    );
+
+    prepare(&fixture, &head, "success", true).expect("the withdrawal disposition is retained");
+
+    let linked = load_linked_closeout(&fixture, Path::new(REQUEST_PATH), Path::new(CLOSEOUT_PATH))
+        .expect("the carried artifact validates");
+    assert_eq!(linked.closeout.wrapper_only_dispositions.len(), 1);
+    assert_eq!(
+        linked.closeout.wrapper_only_dispositions[0]
+            .category
+            .as_id(),
+        "unsubstantiated_wrapper_claim"
+    );
+    assert_eq!(
+        linked.closeout.wrapper_only_baseline_ref.as_deref(),
+        Some(BASELINE_REF)
+    );
+}
+
 /// A disposition whose evidence no longer resolves is not carried on trust — the same bar the
 /// validator applies is applied at carry time, so the refusal names the field rather than
 /// surfacing later as a rejected artifact.

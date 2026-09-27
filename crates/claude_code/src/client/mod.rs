@@ -24,6 +24,7 @@ use crate::{
         McpAddFromClaudeDesktopRequest, McpAddJsonRequest, McpAddRequest, McpGetRequest,
         McpRemoveRequest, McpServeRequest,
     },
+    commands::non_tui::ClaudeNonTuiCommandRequest,
     commands::plugin::{
         PluginDisableRequest, PluginEnableRequest, PluginInstallRequest, PluginListRequest,
         PluginManifestMarketplaceRequest, PluginManifestRequest, PluginMarketplaceAddRequest,
@@ -99,6 +100,14 @@ impl ClaudeClient {
             self.mirror_stderr,
         )
         .await
+    }
+
+    /// Runs a packet-maintained non-TUI command through its bounded forwarding surface.
+    pub async fn run_non_tui_command(
+        &self,
+        request: ClaudeNonTuiCommandRequest,
+    ) -> Result<CommandOutput, ClaudeCodeError> {
+        self.run_command(request.into_command()).await
     }
 
     pub async fn print(

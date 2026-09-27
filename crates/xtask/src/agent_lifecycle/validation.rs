@@ -253,8 +253,14 @@ pub(super) fn validate_stage_minimum_evidence(
     stage: LifecycleStage,
     field: &str,
     values: &[super::EvidenceId],
+    pre_settlement_claude_baseline: bool,
 ) -> Result<(), LifecycleError> {
     for required in super::required_evidence_for_stage(stage) {
+        if pre_settlement_claude_baseline
+            && *required == super::EvidenceId::MaintenanceReadinessSettled
+        {
+            continue;
+        }
         if !values.contains(required) {
             return Err(LifecycleError::Validation(format!(
                 "{field} is missing required evidence `{}` for lifecycle_stage `{}`",

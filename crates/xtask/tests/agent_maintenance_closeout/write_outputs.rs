@@ -1,4 +1,5 @@
 use super::*;
+use crate::harness::repo_root;
 
 #[test]
 fn opencode_maintenance_closeout_writes_only_owned_outputs_after_refresh_state() {
@@ -127,6 +128,75 @@ fn closeout_write_adds_maintenance_closeout_evidence_to_required_and_satisfied_s
     assert!(state
         .satisfied_evidence
         .contains(&agent_lifecycle::EvidenceId::MaintenanceCloseoutWritten));
+}
+
+#[test]
+fn invalid_lifecycle_never_partially_writes_closeout_outputs() {
+    let fixture = fixture_root("maintenance-closeout-invalid-lifecycle-transaction");
+    seed_opencode_basis(&fixture);
+    let request_path =
+        Path::new("docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml");
+    let request_absolute = fixture.join(request_path);
+    write_text(
+        &request_absolute,
+        &maintenance_request_toml(
+            "opencode",
+            "docs/integrations/opencode/governance/seam-2-closeout.md",
+        ),
+    );
+    let closeout_path = Path::new(
+        "docs/agents/lifecycle/opencode-maintenance/governance/maintenance-closeout.json",
+    );
+    let original_closeout = valid_closeout_json(&request_absolute, request_path);
+    write_text(&fixture.join(closeout_path), &original_closeout);
+    let handoff_path = fixture.join("docs/agents/lifecycle/opencode-maintenance/HANDOFF.md");
+    write_text(&handoff_path, "open handoff\n");
+
+    let onboarding_root = "docs/agents/lifecycle/opencode-cli-onboarding/governance";
+    for name in [
+        "approved-agent.toml",
+        "publication-ready.json",
+        "proving-run-closeout.json",
+    ] {
+        let source = repo_root().join(onboarding_root).join(name);
+        write_text(
+            &fixture.join(onboarding_root).join(name),
+            &fs::read_to_string(source).expect("source"),
+        );
+    }
+    let state_source = repo_root()
+        .join(onboarding_root)
+        .join("lifecycle-state.json");
+    let mut state: serde_json::Value =
+        serde_json::from_slice(&fs::read(state_source).expect("state source")).expect("state json");
+    for field in ["required_evidence", "satisfied_evidence"] {
+        state[field]
+            .as_array_mut()
+            .expect("evidence array")
+            .retain(|value| value.as_str() != Some("maintenance_readiness_settled"));
+    }
+    write_text(
+        &fixture.join(onboarding_root).join("lifecycle-state.json"),
+        &format!(
+            "{}\n",
+            serde_json::to_string_pretty(&state).expect("serialize state")
+        ),
+    );
+
+    let err = write_closeout_outputs(&fixture, request_path, closeout_path)
+        .expect_err("invalid lifecycle must prevent all writes");
+    assert!(err.to_string().contains("maintenance_readiness_settled"));
+    assert_eq!(
+        fs::read_to_string(fixture.join(closeout_path)).expect("closeout"),
+        original_closeout
+    );
+    assert_eq!(
+        fs::read_to_string(handoff_path).expect("handoff"),
+        "open handoff\n"
+    );
+    assert!(!fixture
+        .join("docs/agents/lifecycle/opencode-maintenance/governance/remediation-log.md")
+        .exists());
 }
 
 #[test]
