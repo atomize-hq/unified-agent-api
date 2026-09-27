@@ -10,9 +10,9 @@ Some paths below contain guarded lifecycle command names. An agent executing thi
 - `crates/codex/**`
 - `crates/agent_api/**`
 - `cli_manifests/codex/artifacts.lock.json`
-- `cli_manifests/codex/snapshots/0.156.1/**`
-- `cli_manifests/codex/reports/0.156.1/**`
-- `cli_manifests/codex/versions/0.156.1.json`
+- `cli_manifests/codex/snapshots/0.157.0/**`
+- `cli_manifests/codex/reports/0.157.0/**`
+- `cli_manifests/codex/versions/0.157.0.json`
 - `cli_manifests/codex/wrapper_coverage.json`
 - `cli_manifests/support_matrix/current.json`
 - `docs/specs/unified-agent-api/support-matrix.md`
