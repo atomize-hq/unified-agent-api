@@ -63,11 +63,12 @@ merging it all leave it in force; the promotion PR for `2.1.277` removes the mar
 - required: `true`
 - pre-run debt count: `2`
 - expected post-run debt count: `2`
-- discovered upstream surface rows: `2`
+- discovered upstream surface rows: `3`
 - preexisting unsupported rows: `2`
 - required uplifts this run:
 - `claude_code install` `install` via `unbaselined_gap`
 - `claude_code install` `--force` via `unbaselined_gap`
+- `claude_code plugin install` `--registry` via `unbaselined_gap`
 - deferred preexisting gaps:
 - `claude_code install` `install` via `requires_new_architectural_seam` (TODOS.md#close-claude-code-install-maintenance-gap)
 - `claude_code install` `--force` via `requires_new_architectural_seam` (TODOS.md#close-claude-code-install-maintenance-gap)

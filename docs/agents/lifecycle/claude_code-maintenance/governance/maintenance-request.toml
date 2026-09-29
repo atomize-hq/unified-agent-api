@@ -51,13 +51,19 @@ expected_post_run_debt_count = 2
 surface_kind = "commands"
 command_path = "claude_code install"
 surface_id = "install"
-evidence_ref = "docs/specs/unified-agent-api/non-tui-support-debt.md"
+evidence_ref = "cli_manifests/claude_code/reports/2.1.277/coverage.any.json"
 
 [[support_surface_audit.unbaselined_gap_surface]]
 surface_kind = "flags"
 command_path = "claude_code install"
 surface_id = "--force"
-evidence_ref = "docs/specs/unified-agent-api/non-tui-support-debt.md"
+evidence_ref = "cli_manifests/claude_code/reports/2.1.277/coverage.any.json"
+
+[[support_surface_audit.unbaselined_gap_surface]]
+surface_kind = "flags"
+command_path = "claude_code plugin install"
+surface_id = "--registry"
+evidence_ref = "cli_manifests/claude_code/reports/2.1.277/coverage.any.json"
 
 [[support_surface_audit.preexisting_unsupported_surface]]
 surface_kind = "commands"
@@ -81,6 +87,11 @@ surface_kind = "flags"
 command_path = "claude_code install"
 surface_id = "--force"
 
+[[support_surface_audit.missing_wrapper_support]]
+surface_kind = "flags"
+command_path = "claude_code plugin install"
+surface_id = "--registry"
+
 [[support_surface_audit.missing_backend_support]]
 surface_kind = "commands"
 command_path = "claude_code install"
@@ -90,6 +101,11 @@ surface_id = "install"
 surface_kind = "flags"
 command_path = "claude_code install"
 surface_id = "--force"
+
+[[support_surface_audit.missing_backend_support]]
+surface_kind = "flags"
+command_path = "claude_code plugin install"
+surface_id = "--registry"
 
 [[support_surface_audit.required_uplifts_this_run]]
 surface_kind = "commands"
@@ -108,6 +124,19 @@ required_writes = [
 surface_kind = "flags"
 command_path = "claude_code install"
 surface_id = "--force"
+reason = "unbaselined_gap"
+required_writes = [
+  "wrapper",
+  "backend",
+  "manifest",
+  "publication",
+  "packet_docs",
+]
+
+[[support_surface_audit.required_uplifts_this_run]]
+surface_kind = "flags"
+command_path = "claude_code plugin install"
+surface_id = "--registry"
 reason = "unbaselined_gap"
 required_writes = [
   "wrapper",
@@ -141,6 +170,12 @@ surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
 surface_kind = "flags"
 command_path = "claude_code install"
 surface_id = "--force"
+surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
+
+[[support_surface_audit.publication_impacts]]
+surface_kind = "flags"
+command_path = "claude_code plugin install"
+surface_id = "--registry"
 surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
 
 [execution_contract]

@@ -59,6 +59,36 @@
       "download_url": "https://registry.npmjs.org/@anthropic-ai/claude-code-win32-x64/-/claude-code-win32-x64-2.1.274.tgz",
       "sha256": "c09fdf0d2d143c03824fbf531c25ce0904e939494c93711ac186cb7aa99f45e8",
       "size_bytes": 105492042
+    },
+    {
+      "claude_code_version": "2.1.277",
+      "target_triple": "darwin-arm64",
+      "package_name": "@anthropic-ai/claude-code-darwin-arm64",
+      "package_version": "2.1.277",
+      "asset_name": "claude-code-darwin-arm64-2.1.277.tgz",
+      "download_url": "https://registry.npmjs.org/@anthropic-ai/claude-code-darwin-arm64/-/claude-code-darwin-arm64-2.1.277.tgz",
+      "sha256": "1975d918669869480b19d7753f92a94c84165a2347ba74bab6b7801472bfc26d",
+      "size_bytes": 94310885
+    },
+    {
+      "claude_code_version": "2.1.277",
+      "target_triple": "linux-x64",
+      "package_name": "@anthropic-ai/claude-code-linux-x64",
+      "package_version": "2.1.277",
+      "asset_name": "claude-code-linux-x64-2.1.277.tgz",
+      "download_url": "https://registry.npmjs.org/@anthropic-ai/claude-code-linux-x64/-/claude-code-linux-x64-2.1.277.tgz",
+      "sha256": "0ac0d7e24e12fedd6de2507dd5ed8b1d16b686ef8e58839d976e72a09b380b2e",
+      "size_bytes": 104046180
+    },
+    {
+      "claude_code_version": "2.1.277",
+      "target_triple": "win32-x64",
+      "package_name": "@anthropic-ai/claude-code-win32-x64",
+      "package_version": "2.1.277",
+      "asset_name": "claude-code-win32-x64-2.1.277.tgz",
+      "download_url": "https://registry.npmjs.org/@anthropic-ai/claude-code-win32-x64/-/claude-code-win32-x64-2.1.277.tgz",
+      "sha256": "b844ad9729aa27f7b455db9b318dd453abbd4529ce137ca263f6cd5a97567b7d",
+      "size_bytes": 106942860
     }
   ]
 }
