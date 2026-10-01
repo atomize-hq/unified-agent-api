@@ -51,13 +51,85 @@ expected_post_run_debt_count = 2
 surface_kind = "commands"
 command_path = "codex completion"
 surface_id = "completion"
-evidence_ref = "docs/specs/unified-agent-api/non-tui-support-debt.md"
+evidence_ref = "cli_manifests/codex/reports/0.159.2/coverage.any.json"
+
+[[support_surface_audit.unbaselined_gap_surface]]
+surface_kind = "flags"
+command_path = "codex exec-server"
+surface_id = "--linux-sandbox-pid-namespace"
+evidence_ref = "cli_manifests/codex/reports/0.159.2/coverage.any.json"
+
+[[support_surface_audit.unbaselined_gap_surface]]
+surface_kind = "flags"
+command_path = "codex exec-server"
+surface_id = "--proxy-private-ips-via-upstream"
+evidence_ref = "cli_manifests/codex/reports/0.159.2/coverage.any.json"
+
+[[support_surface_audit.unbaselined_gap_surface]]
+surface_kind = "flags"
+command_path = "codex exec-server"
+surface_id = "--ws-audience"
+evidence_ref = "cli_manifests/codex/reports/0.159.2/coverage.any.json"
+
+[[support_surface_audit.unbaselined_gap_surface]]
+surface_kind = "flags"
+command_path = "codex exec-server"
+surface_id = "--ws-auth"
+evidence_ref = "cli_manifests/codex/reports/0.159.2/coverage.any.json"
+
+[[support_surface_audit.unbaselined_gap_surface]]
+surface_kind = "flags"
+command_path = "codex exec-server"
+surface_id = "--ws-issuer"
+evidence_ref = "cli_manifests/codex/reports/0.159.2/coverage.any.json"
+
+[[support_surface_audit.unbaselined_gap_surface]]
+surface_kind = "flags"
+command_path = "codex exec-server"
+surface_id = "--ws-max-clock-skew-seconds"
+evidence_ref = "cli_manifests/codex/reports/0.159.2/coverage.any.json"
+
+[[support_surface_audit.unbaselined_gap_surface]]
+surface_kind = "flags"
+command_path = "codex exec-server"
+surface_id = "--ws-shared-secret-file"
+evidence_ref = "cli_manifests/codex/reports/0.159.2/coverage.any.json"
+
+[[support_surface_audit.unbaselined_gap_surface]]
+surface_kind = "flags"
+command_path = "codex exec-server"
+surface_id = "--ws-token-file"
+evidence_ref = "cli_manifests/codex/reports/0.159.2/coverage.any.json"
+
+[[support_surface_audit.unbaselined_gap_surface]]
+surface_kind = "flags"
+command_path = "codex exec-server"
+surface_id = "--ws-token-sha256"
+evidence_ref = "cli_manifests/codex/reports/0.159.2/coverage.any.json"
+
+[[support_surface_audit.unbaselined_gap_surface]]
+surface_kind = "flags"
+command_path = "codex exec-server forward"
+surface_id = "--linux-sandbox-pid-namespace"
+evidence_ref = "cli_manifests/codex/reports/0.159.2/coverage.any.json"
+
+[[support_surface_audit.unbaselined_gap_surface]]
+surface_kind = "flags"
+command_path = "codex exec-server forward"
+surface_id = "--proxy-private-ips-via-upstream"
+evidence_ref = "cli_manifests/codex/reports/0.159.2/coverage.any.json"
+
+[[support_surface_audit.unbaselined_gap_surface]]
+surface_kind = "flags"
+command_path = "codex mcp add"
+surface_id = "--oauth-client-secret"
+evidence_ref = "cli_manifests/codex/reports/0.159.2/coverage.any.json"
 
 [[support_surface_audit.unbaselined_gap_surface]]
 surface_kind = "positional_args"
 command_path = "codex completion"
 surface_id = "SHELL"
-evidence_ref = "docs/specs/unified-agent-api/non-tui-support-debt.md"
+evidence_ref = "cli_manifests/codex/reports/0.159.2/coverage.any.json"
 
 [[support_surface_audit.preexisting_unsupported_surface]]
 surface_kind = "commands"
@@ -77,6 +149,66 @@ command_path = "codex completion"
 surface_id = "completion"
 
 [[support_surface_audit.missing_wrapper_support]]
+surface_kind = "flags"
+command_path = "codex exec-server"
+surface_id = "--linux-sandbox-pid-namespace"
+
+[[support_surface_audit.missing_wrapper_support]]
+surface_kind = "flags"
+command_path = "codex exec-server"
+surface_id = "--proxy-private-ips-via-upstream"
+
+[[support_surface_audit.missing_wrapper_support]]
+surface_kind = "flags"
+command_path = "codex exec-server"
+surface_id = "--ws-audience"
+
+[[support_surface_audit.missing_wrapper_support]]
+surface_kind = "flags"
+command_path = "codex exec-server"
+surface_id = "--ws-auth"
+
+[[support_surface_audit.missing_wrapper_support]]
+surface_kind = "flags"
+command_path = "codex exec-server"
+surface_id = "--ws-issuer"
+
+[[support_surface_audit.missing_wrapper_support]]
+surface_kind = "flags"
+command_path = "codex exec-server"
+surface_id = "--ws-max-clock-skew-seconds"
+
+[[support_surface_audit.missing_wrapper_support]]
+surface_kind = "flags"
+command_path = "codex exec-server"
+surface_id = "--ws-shared-secret-file"
+
+[[support_surface_audit.missing_wrapper_support]]
+surface_kind = "flags"
+command_path = "codex exec-server"
+surface_id = "--ws-token-file"
+
+[[support_surface_audit.missing_wrapper_support]]
+surface_kind = "flags"
+command_path = "codex exec-server"
+surface_id = "--ws-token-sha256"
+
+[[support_surface_audit.missing_wrapper_support]]
+surface_kind = "flags"
+command_path = "codex exec-server forward"
+surface_id = "--linux-sandbox-pid-namespace"
+
+[[support_surface_audit.missing_wrapper_support]]
+surface_kind = "flags"
+command_path = "codex exec-server forward"
+surface_id = "--proxy-private-ips-via-upstream"
+
+[[support_surface_audit.missing_wrapper_support]]
+surface_kind = "flags"
+command_path = "codex mcp add"
+surface_id = "--oauth-client-secret"
+
+[[support_surface_audit.missing_wrapper_support]]
 surface_kind = "positional_args"
 command_path = "codex completion"
 surface_id = "SHELL"
@@ -85,6 +217,66 @@ surface_id = "SHELL"
 surface_kind = "commands"
 command_path = "codex completion"
 surface_id = "completion"
+
+[[support_surface_audit.missing_backend_support]]
+surface_kind = "flags"
+command_path = "codex exec-server"
+surface_id = "--linux-sandbox-pid-namespace"
+
+[[support_surface_audit.missing_backend_support]]
+surface_kind = "flags"
+command_path = "codex exec-server"
+surface_id = "--proxy-private-ips-via-upstream"
+
+[[support_surface_audit.missing_backend_support]]
+surface_kind = "flags"
+command_path = "codex exec-server"
+surface_id = "--ws-audience"
+
+[[support_surface_audit.missing_backend_support]]
+surface_kind = "flags"
+command_path = "codex exec-server"
+surface_id = "--ws-auth"
+
+[[support_surface_audit.missing_backend_support]]
+surface_kind = "flags"
+command_path = "codex exec-server"
+surface_id = "--ws-issuer"
+
+[[support_surface_audit.missing_backend_support]]
+surface_kind = "flags"
+command_path = "codex exec-server"
+surface_id = "--ws-max-clock-skew-seconds"
+
+[[support_surface_audit.missing_backend_support]]
+surface_kind = "flags"
+command_path = "codex exec-server"
+surface_id = "--ws-shared-secret-file"
+
+[[support_surface_audit.missing_backend_support]]
+surface_kind = "flags"
+command_path = "codex exec-server"
+surface_id = "--ws-token-file"
+
+[[support_surface_audit.missing_backend_support]]
+surface_kind = "flags"
+command_path = "codex exec-server"
+surface_id = "--ws-token-sha256"
+
+[[support_surface_audit.missing_backend_support]]
+surface_kind = "flags"
+command_path = "codex exec-server forward"
+surface_id = "--linux-sandbox-pid-namespace"
+
+[[support_surface_audit.missing_backend_support]]
+surface_kind = "flags"
+command_path = "codex exec-server forward"
+surface_id = "--proxy-private-ips-via-upstream"
+
+[[support_surface_audit.missing_backend_support]]
+surface_kind = "flags"
+command_path = "codex mcp add"
+surface_id = "--oauth-client-secret"
 
 [[support_surface_audit.missing_backend_support]]
 surface_kind = "positional_args"
@@ -95,6 +287,162 @@ surface_id = "SHELL"
 surface_kind = "commands"
 command_path = "codex completion"
 surface_id = "completion"
+reason = "unbaselined_gap"
+required_writes = [
+  "wrapper",
+  "backend",
+  "manifest",
+  "publication",
+  "packet_docs",
+]
+
+[[support_surface_audit.required_uplifts_this_run]]
+surface_kind = "flags"
+command_path = "codex exec-server"
+surface_id = "--linux-sandbox-pid-namespace"
+reason = "unbaselined_gap"
+required_writes = [
+  "wrapper",
+  "backend",
+  "manifest",
+  "publication",
+  "packet_docs",
+]
+
+[[support_surface_audit.required_uplifts_this_run]]
+surface_kind = "flags"
+command_path = "codex exec-server"
+surface_id = "--proxy-private-ips-via-upstream"
+reason = "unbaselined_gap"
+required_writes = [
+  "wrapper",
+  "backend",
+  "manifest",
+  "publication",
+  "packet_docs",
+]
+
+[[support_surface_audit.required_uplifts_this_run]]
+surface_kind = "flags"
+command_path = "codex exec-server"
+surface_id = "--ws-audience"
+reason = "unbaselined_gap"
+required_writes = [
+  "wrapper",
+  "backend",
+  "manifest",
+  "publication",
+  "packet_docs",
+]
+
+[[support_surface_audit.required_uplifts_this_run]]
+surface_kind = "flags"
+command_path = "codex exec-server"
+surface_id = "--ws-auth"
+reason = "unbaselined_gap"
+required_writes = [
+  "wrapper",
+  "backend",
+  "manifest",
+  "publication",
+  "packet_docs",
+]
+
+[[support_surface_audit.required_uplifts_this_run]]
+surface_kind = "flags"
+command_path = "codex exec-server"
+surface_id = "--ws-issuer"
+reason = "unbaselined_gap"
+required_writes = [
+  "wrapper",
+  "backend",
+  "manifest",
+  "publication",
+  "packet_docs",
+]
+
+[[support_surface_audit.required_uplifts_this_run]]
+surface_kind = "flags"
+command_path = "codex exec-server"
+surface_id = "--ws-max-clock-skew-seconds"
+reason = "unbaselined_gap"
+required_writes = [
+  "wrapper",
+  "backend",
+  "manifest",
+  "publication",
+  "packet_docs",
+]
+
+[[support_surface_audit.required_uplifts_this_run]]
+surface_kind = "flags"
+command_path = "codex exec-server"
+surface_id = "--ws-shared-secret-file"
+reason = "unbaselined_gap"
+required_writes = [
+  "wrapper",
+  "backend",
+  "manifest",
+  "publication",
+  "packet_docs",
+]
+
+[[support_surface_audit.required_uplifts_this_run]]
+surface_kind = "flags"
+command_path = "codex exec-server"
+surface_id = "--ws-token-file"
+reason = "unbaselined_gap"
+required_writes = [
+  "wrapper",
+  "backend",
+  "manifest",
+  "publication",
+  "packet_docs",
+]
+
+[[support_surface_audit.required_uplifts_this_run]]
+surface_kind = "flags"
+command_path = "codex exec-server"
+surface_id = "--ws-token-sha256"
+reason = "unbaselined_gap"
+required_writes = [
+  "wrapper",
+  "backend",
+  "manifest",
+  "publication",
+  "packet_docs",
+]
+
+[[support_surface_audit.required_uplifts_this_run]]
+surface_kind = "flags"
+command_path = "codex exec-server forward"
+surface_id = "--linux-sandbox-pid-namespace"
+reason = "unbaselined_gap"
+required_writes = [
+  "wrapper",
+  "backend",
+  "manifest",
+  "publication",
+  "packet_docs",
+]
+
+[[support_surface_audit.required_uplifts_this_run]]
+surface_kind = "flags"
+command_path = "codex exec-server forward"
+surface_id = "--proxy-private-ips-via-upstream"
+reason = "unbaselined_gap"
+required_writes = [
+  "wrapper",
+  "backend",
+  "manifest",
+  "publication",
+  "packet_docs",
+]
+
+[[support_surface_audit.required_uplifts_this_run]]
+surface_kind = "flags"
+command_path = "codex mcp add"
+surface_id = "--oauth-client-secret"
 reason = "unbaselined_gap"
 required_writes = [
   "wrapper",
@@ -135,6 +483,78 @@ blocking_follow_on = "TODOS.md#close-codex-completion-maintenance-gap"
 surface_kind = "commands"
 command_path = "codex completion"
 surface_id = "completion"
+surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
+
+[[support_surface_audit.publication_impacts]]
+surface_kind = "flags"
+command_path = "codex exec-server"
+surface_id = "--linux-sandbox-pid-namespace"
+surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
+
+[[support_surface_audit.publication_impacts]]
+surface_kind = "flags"
+command_path = "codex exec-server"
+surface_id = "--proxy-private-ips-via-upstream"
+surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
+
+[[support_surface_audit.publication_impacts]]
+surface_kind = "flags"
+command_path = "codex exec-server"
+surface_id = "--ws-audience"
+surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
+
+[[support_surface_audit.publication_impacts]]
+surface_kind = "flags"
+command_path = "codex exec-server"
+surface_id = "--ws-auth"
+surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
+
+[[support_surface_audit.publication_impacts]]
+surface_kind = "flags"
+command_path = "codex exec-server"
+surface_id = "--ws-issuer"
+surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
+
+[[support_surface_audit.publication_impacts]]
+surface_kind = "flags"
+command_path = "codex exec-server"
+surface_id = "--ws-max-clock-skew-seconds"
+surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
+
+[[support_surface_audit.publication_impacts]]
+surface_kind = "flags"
+command_path = "codex exec-server"
+surface_id = "--ws-shared-secret-file"
+surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
+
+[[support_surface_audit.publication_impacts]]
+surface_kind = "flags"
+command_path = "codex exec-server"
+surface_id = "--ws-token-file"
+surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
+
+[[support_surface_audit.publication_impacts]]
+surface_kind = "flags"
+command_path = "codex exec-server"
+surface_id = "--ws-token-sha256"
+surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
+
+[[support_surface_audit.publication_impacts]]
+surface_kind = "flags"
+command_path = "codex exec-server forward"
+surface_id = "--linux-sandbox-pid-namespace"
+surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
+
+[[support_surface_audit.publication_impacts]]
+surface_kind = "flags"
+command_path = "codex exec-server forward"
+surface_id = "--proxy-private-ips-via-upstream"
+surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
+
+[[support_surface_audit.publication_impacts]]
+surface_kind = "flags"
+command_path = "codex mcp add"
+surface_id = "--oauth-client-secret"
 surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
 
 [[support_surface_audit.publication_impacts]]
