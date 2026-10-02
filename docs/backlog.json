@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at_utc": "2026-09-25T18:31:13Z",
+  "updated_at_utc": "2026-09-28T15:08:16Z",
   "items": [
     {
       "id": "uaa-0022",
@@ -2429,6 +2429,39 @@
         "Raised 2026-09-25 while auditing a hung background process from a review lane. Not a product defect; it makes `make preflight` and full-suite runs unreliable, which is what has made preflight evidence hard to trust in this work.",
         "Deliberately not the deletion hazard the same lane reported: that scratch checkout was removed by the lead's own cleanup `rm -rf` while the lane was still live, not by any test.",
         "Codex verification on 2026-09-25 demonstrated a more specific mechanism for the empty-success symptom: refresh_publication_entrypoint writes a fixture xtask with fn main() {} and invokes nested cargo commands. An inherited absolute CARGO_TARGET_DIR makes that fixture replace the real shared debug/xtask binary. In one isolated probe its size changed from 38,795,664 to 404,352 bytes and --help changed from 4,673 output bytes to zero, both exit 0. Running without the override keeps each fixture target separate; the complete xtask suite then passed. The earlier claim that outer cargo relinks while running tests is not established by those symptoms alone, and the historical dyld hang has not been independently attributed. Use a worktree-local default target directory for verification; any harness-level isolation change remains separate work."
+      ],
+      "priority": "P2"
+    },
+    {
+      "id": "uaa-0072",
+      "title": "Implement delegated debt transitions and separate support-depth policy, obligation and evidence bindings",
+      "status": "todo",
+      "bucket": "agent_api.maintenance",
+      "type": "task",
+      "kickoff": {
+        "prompt": [
+          "Work item: uaa-0072 — implement the 2026-09-28 decisions recorded in docs/agents/lifecycle/support-depth-policy-proposal.md sections 1 and 4. This backlog entry schedules future work; it does not authorize execution or adopt the remainder of that proposal.",
+          "First prepare the bounded normative-contract changes, obtain required maintainer approval, then implement shared xtask derivation, strict schemas, renderers and affected onboarding/maintenance/publication consumers. Coordinate with uaa-0041 rather than duplicate its broader semantic model work.",
+          "Preserve constrained executor renewal of existing frozen debt identities: same blocker, only version/observed-target/evidence fields, no new rows or changed reasons/owners/follow-ons/semantic obligation coverage, and no target outside the frozen delegation envelope. Permit row retirement only when all scoped obligations/targets have live coverage or proved upstream removal; preserve transition provenance. Partial satisfaction must not retire unresolved debt.",
+          "Freeze normative rules, delegation and initial authorization baseline separately from the acquisition-derived concrete obligation set and evolving materialized-grant/test state. Ordinary discovery under approved rules finalizes the obligation binding at acquisition completion without changing policy identity; a post-freeze acquisition change requires explicit acquisition re-freeze and downstream invalidation.",
+          "Validate delegated grant transitions against frozen authority and content-bound proof; update execution-state digests/audit and invalidate dependent closeout/publication receipts without a policy re-freeze. New debt or authority expansion requires maintainer approval and explicit policy re-freeze/supersession; executing packets still cannot defer newly discovered non-TUI gaps.",
+          "Reuse existing inventory/report/receipt machinery, keep policy logic out of YAML, and preserve manual closeout and separate promotion. Implement fail-closed checks in every affected consumer so an unchanged policy digest cannot conceal changed grants or stale tested inputs.",
+          "Acceptance: unchanged-policy acquisition discovering a new flag; valid renewal; fully evidenced retirement; refusal of partial/unproved retirement, new rows, expanded targets/obligation coverage and altered reasons; explicit re-freeze after authority changes; stale grant/acquisition/test-state refusal before closeout or pointer/marker mutation. Keep name coverage separate from semantic depth and legacy migration separate from debt authorization.",
+          "Keep OpenCode queue accounting explicit where rendered or documented: the pinned example is 481 total = 473 new + 8 existing unrenewed debt identities, not 489. Use synthetic fixture counts in regression tests, not a test tied to the current upstream inventory.",
+          "Non-goals: broad wrapper retrofits, OpenCode API expansion, changing runtime-support public payload, automatic closeout/promotion, or implementing the entire support-depth proposal in this one item."
+        ],
+        "files_to_read": [
+          "docs/agents/lifecycle/support-depth-policy-proposal.md",
+          "docs/specs/maintenance-request-contract-v1.md",
+          "docs/specs/unified-agent-api/non-tui-support-debt.md",
+          "crates/xtask/src/agent_maintenance/contract_policy.rs",
+          "crates/xtask/src/agent_maintenance/prepare/from_request.rs",
+          "crates/xtask/src/agent_maintenance/request/support_surface_audit_reconcile.rs"
+        ]
+      },
+      "notes": [
+        "Raised 2026-09-28 after Pro found no P1/P2 in the proposal and identified debt ownership, policy/obligation identity and overlapping OpenCode accounting as non-blocking clarifications. Maintainer authorized recording these decisions and scheduling implementation, not runtime implementation now.",
+        "Broader policy implementation remains staged by the proposal; uaa-0041 and uaa-0042 own related semantic/accounting work, uaa-0053 owns subsequent OpenCode expansion, and uaa-0066 owns staged lifecycle acceptance."
       ],
       "priority": "P2"
     }
