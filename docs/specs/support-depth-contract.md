@@ -85,17 +85,20 @@ Other contracts reference this one for depth rules and MUST NOT restate them.
 - **Depth scope tuple.** One `(agent, lifecycle path, exact upstream version, operation and
   promise, modes and required values, target)` inside a depth enrollment.
 - **Event, P, O and E.** The four bindings defined in [Bindings](#bindings).
-- **Depth record.** For one depth-enrolled version and target: the resolved depth enrollment
-  selection for its tuples, the content identities of the P and O it was produced under, the
-  identity of its E, its depth results, the capability mappings they serve and, once accepted, the
-  identities of the closeout and promotion that accepted them. It is written no later than the
-  freeze of O, kept under the agent's manifest root, and outlives the generation's working files.
-  It records what a generation froze and proved. It is neither an enrollment inventory nor a
-  status ledger.
+- **Depth record.** The durable record of one depth-enrolled version of one agent: one committed
+  file in that version's `reports/<version>/` directory under the agent's manifest root. For the
+  version's latest generation it states the Event, the resolved depth enrollment selection, the
+  content identities of P and O, the identity of E, each obligation's result for each target and,
+  for a `verified` result, the content identity of the evidence it rests on, and the capability
+  mappings those results serve. It also lists every acceptance granted for the version: the
+  closeout, publication or promotion that granted it and the P, O and E identities it accepted.
+  The record is first written when the version's first generation freezes P. It is extended as O
+  is frozen, as E changes and as acceptances are granted. A later generation of the same version
+  continues the same record: what the record states becomes that generation's, and the listed
+  acceptances stay. It is neither an enrollment inventory nor a status ledger.
 - **Working files.** The per-agent maintenance packet files of the current generation under
   `docs/agents/lifecycle/`, such as `maintenance-request.toml` and `maintenance-closeout.json`. A
-  later generation replaces them. Replacing a working file whose content a depth record has
-  captured is not a deleted binding.
+  later generation replaces them.
 - **Remainder.** Everything outside every depth enrollment.
 - **Depth admission.** The check defined in [Depth admission](#depth-admission). It is distinct
   from the stand-down admission gate of `close-agent-maintenance`, which this contract leaves
@@ -152,7 +155,7 @@ Each obligation in an operation's set produces exactly one result: `verified`, `
 - An unknown output contract is `unverified`. A known counterexample is `failed`.
 - A result whose bindings are no longer current is `unverified` until it is verified again.
 - An obligation with no admissible evidence is `unverified`. While contradictory qualifying runs
-  are under investigation the result is `unverified`.
+  are unresolved the result is `unverified`.
 - A constrained value subset, such as JSON-only output, is an applicable promise about that
   subset. It MUST NOT be reported as a promise about every upstream value.
 - No score, percentage or highest-template label substitutes for per-obligation results.
@@ -331,10 +334,11 @@ standing reviewer role. An unchanged, admissible mapping is not reviewed again.
   version and target are identical or covered by an approved compatibility rule, and that every
   input in the obligation's dependency set is unchanged. The evidence keeps its original P and O,
   and newly due or changed cases run fresh.
-- Evidence is admissible only if it was produced under the P and O of some depth enrollment.
-  Evidence produced under one version's P and O serves another version only through a reuse
-  binding under an approved compatibility rule. Evidence produced outside any depth enrollment, a
-  successful closeout included, is not admissible.
+- Evidence verifies an obligation of a production depth enrollment only if it was produced under
+  the P and O of a production depth enrollment. Evidence produced under one version's P and O
+  serves another version only through a reuse binding under an approved compatibility rule.
+  Evidence produced outside every production depth enrollment, a successful closeout included, is
+  not admissible.
 - Evidence is repository verification inside the existing repository and CI trust boundary. It is
   not remote attestation.
 
@@ -390,17 +394,19 @@ Rules:
    governing rule does.
 6. A binding's identity MUST NOT depend on its own digest, on a future output or on the commit that
    will contain it.
-7. The freeze points of the maintenance request contract are unchanged. On the acquisition lane
-   that opens without target reports, O is frozen at the existing second freeze and the opening
-   placeholder stays non-executable. A lane whose reports exist at open keeps its existing
-   treatment. A generation in which O is never frozen from target reports, on the docs-only lane
-   or on an acquisition lane stood down before its second freeze, cannot reach acceptance for
-   depth-enrolled scope. That scope is reported as insufficient depth and never as not
-   depth-enrolled. The onboarding charter does not yet define where O is frozen on the create
-   lane; it MUST be amended to define it before the onboarding path is enabled.
+7. The freeze points of the maintenance request contract are unchanged. P is frozen when the
+   generation opens, at the request's first freeze. On the acquisition lane that opens without
+   target reports, O is frozen at the existing second freeze and the opening placeholder stays
+   non-executable. A lane whose reports exist at open keeps its existing treatment. A generation
+   in which O is never frozen from target reports, on the docs-only lane or on an acquisition lane
+   stood down before its second freeze, cannot reach acceptance for depth-enrolled scope. That
+   scope is reported as insufficient depth and never as not depth-enrolled. Where P and O are
+   frozen on the onboarding create lane is for the onboarding charter to define; see
+   [Path enablement](#path-enablement).
 8. A consumer acting on depth-enrolled scope MUST require the current executable schema revision
-   and all four bindings. A missing field or an unsupported revision is an error. It is never read
-   as "not depth-enrolled".
+   and every binding the generation has established so far. A binding the depth record shows as
+   not yet established is read as such, and its scope as insufficient depth. A missing field or an
+   unsupported revision is an error. None of these is read as "not depth-enrolled".
 9. Artifacts completed under an earlier contract keep their original meaning. They are not
    translated, backfilled or presented as depth evidence. An unfinished generation that an adopted
    revision makes incompatible MUST stop. Work continues only in a new generation prepared through
@@ -445,13 +451,16 @@ work.
    applies to it.
 6. Depth enrollment adds obligations. It MUST NOT remove or narrow required uplifts, target
    acquisition completeness, existing shared promises or the release-watch ratchet.
-7. Resolution MUST be deterministic. Until a version has a depth record it comes from registry-owned
-   authority together with the frozen request or the approval for the current generation; once a
-   depth record exists it comes from the depth record. An executor's assertion, an optional field
-   and a caller-supplied argument are not authority.
+7. Resolution MUST be deterministic. A version's depth enrollment resolves from its depth record.
+   The record is first written from registry-owned authority and the frozen request or approval
+   of the version's first generation, and that authority and that request or approval resolve the
+   depth enrollment until the record is written. An executor's assertion, an optional field and a
+   caller-supplied argument are not authority.
 8. Missing policy for selected scope, an unsupported schema revision, unresolved or overlapping
    depth enrollment selectors, contradictory generation references and deleted bindings are errors.
-   None of them resolves to "not depth-enrolled".
+   None of them resolves to "not depth-enrolled". A removed depth record is a deleted binding. A
+   replaced working file is not, because the depth record identifies the bindings that file
+   carried.
 9. A flag, value or default discovered on a depth-enrolled operation stays attached to that
    operation. It MUST NOT fall into the remainder because a depth enrollment selector matched
    the earlier values.
@@ -469,7 +478,7 @@ depth-gated output that changes a value belonging to at least one depth scope tu
 
 | Depth-gated output | Values that belong to a depth scope tuple |
 | --- | --- |
-| Depth records and the version- and target-scoped evidence they derive from, coverage reports included, under the agent's manifest root | Every entry in the tuple's depth record, and the presence and content identity of each evidence entry that belongs to the tuple |
+| Depth records | Everything the depth record of the tuple's version states for the tuple, and every acceptance it lists |
 | Support publication rows and their Markdown projection | The row for the tuple's agent, version and target |
 | Capability publication | The entry for each capability a depth enrollment claims, for the tuple's agent |
 | Version metadata | The tuple's version file: its status and its per-target outcomes |
@@ -478,13 +487,30 @@ depth-gated output that changes a value belonging to at least one depth scope tu
 | The embedded runtime-support projection | The record for the tuple's runtime family and target while it names the tuple's version, and any change that would make it name that version |
 | Stand-down markers | Removal of a marker for the tuple's version. Declaring a marker is not a depth-gated effect. |
 | Maintenance requests and maintenance and proving-run closeout records | The current file while it belongs to a generation of the tuple's version |
-| The lifecycle record | Its stage, side states and evidence entries, for the tuples of the generation the writing route acts for |
+| The lifecycle record | Its `published` and `closed_baseline` stages, its closeout evidence ids and its drift side state. Each belongs to the tuples of the generation whose record it reports, as that record stands in the same revision |
 
-An evidence entry that a depth record's recorded acceptance derives from MUST NOT be removed or
-changed while a published value derives from that acceptance. Regenerating a file that leaves those
-entries unchanged is permitted. Version-agnostic inputs under the manifest root, such as
-`wrapper_coverage.json`, are dependencies of evidence rather than evidence; changing them
-invalidates dependent results under [Reuse and invalidation](#reuse-and-invalidation).
+The lifecycle record names no version, so its values are attributed through the records they
+report and never through the route that writes them. A `published` stage reports the publication
+packet the lifecycle record names. A `closed_baseline` stage and the proving-run closeout evidence
+id report the proving-run closeout it names. The maintenance closeout evidence id and the absence
+of a drift side state report the agent's maintenance closeout record. No other lifecycle value
+belongs to a tuple.
+
+A depth record binds each `verified` result to its evidence by content identity, and that binding
+alone decides what the result's evidence is. Coverage reports and `wrapper_coverage.json` are
+name-coverage artifacts and are not depth-gated outputs. A result that depends on their content is
+invalidated by a change to that content under [Reuse and invalidation](#reuse-and-invalidation),
+and this contract does not otherwise restrict regenerating them. Changing or removing bound
+evidence is not prohibited either. The record is not rewritten for it: the result has no current
+evidence and is published as `unverified` until it is verified again.
+
+A depth record MUST NOT be removed, whether by retention pruning or otherwise, and an acceptance it
+lists MUST NOT be removed or altered. What a record states changes only when a later generation of
+the same version continues the record, or through a change that [Bindings](#bindings) permits to
+the binding concerned: the selection and the capability mappings belong to P, the obligations to
+O, and the results and their bound evidence to E. Every such change is reflected in the P, O or E
+identity the record states. An acceptance supports a published value only while the record states
+the P, O and E identities that acceptance accepted.
 
 A depth-gated effect is an **acceptance effect** for a tuple when it does any of the following:
 
@@ -494,8 +520,8 @@ A depth-gated effect is an **acceptance effect** for a tuple when it does any of
 - retires a stand-down marker
 - creates or changes a maintenance closeout record, or records a proving-run closeout as `closed`
 - advances the lifecycle record's stage to `published` or `closed_baseline`, adds a closeout
-  evidence entry or clears a drift side state
-- records acceptance in a depth record, or publishes a promise as qualified or a capability as
+  evidence id or clears a drift side state
+- lists an acceptance in a depth record, or publishes a promise as qualified or a capability as
   depth-qualified
 - adds capability advertising
 
@@ -509,8 +535,8 @@ For every depth scope tuple a depth-gated effect touches, the route MUST establi
 2. that what it writes states the tuple's results as they are. A result whose bindings are not
    current is written as `unverified`. Nothing is written as better than its current bound
    evidence supports; and
-3. that it removes or changes no evidence entry that a depth record's recorded acceptance derives
-   from while a published value derives from that acceptance.
+3. that it removes no depth record, removes or alters no acceptance a depth record lists, and
+   changes what a depth record states only as [Depth-gated effects](#depth-gated-effects) permits.
 
 For an acceptance effect the route MUST also establish:
 
@@ -545,14 +571,29 @@ effect touches or refuse the effect.
    one.
 6. A route MUST NOT narrow the touched set because a caller omitted an optional scope or
    depth enrollment argument.
-7. Repository validation MUST compare the depth-gated state of every depth enrollment, on the
-   integration branch and on every branch proposed for merge into it, with that depth
-   enrollment's depth records. A contradiction is a published value a depth record does not
-   support, an acceptance effect a depth record does not record, an evidence entry whose presence
-   or content identity differs from what a depth record's recorded acceptance binds while a
-   published value derives from that acceptance, or a version whose O has been frozen without a
-   depth record. Validation MUST fail on any contradiction, whatever produced the change: a
-   supported route, unsupported tooling or a hand edit.
+7. Repository validation MUST check, on the integration branch and on every branch proposed for
+   merge into it, every depth record, every generation whose P is frozen for depth-enrolled scope
+   and the depth-gated outputs of the agents concerned. Each of the following is a contradiction:
+   - a generation whose P is frozen for depth-enrolled scope while its version has no depth
+     record;
+   - a proposed branch that removes a depth record the integration branch holds, or removes or
+     alters an acceptance that record lists;
+   - a proposed branch that changes what a depth record states, other than by listing a further
+     acceptance, while the record states the same P, O and E identities as the integration
+     branch's copy;
+   - a value published as better than the depth record states;
+   - a result published as `verified`, or a promise or capability published as qualified or
+     depth-qualified on it, whose depth record binds no evidence for the result or binds
+     repository content that is absent or has another content identity;
+   - a promise published as qualified, or a capability published as depth-qualified, whose depth
+     record lists no acceptance of the P, O and E identities the record states;
+   - any other acceptance effect for a tuple whose depth record lists no acceptance that granted
+     it; and
+   - a `published` or `closed_baseline` stage or a closeout evidence id, in the lifecycle record
+     of an agent that has a depth record, that reports a record the same revision does not hold.
+
+   Validation MUST fail on any contradiction, whatever produced the change: a supported route,
+   unsupported tooling or a hand edit.
 
 ### Later versions
 
@@ -581,9 +622,11 @@ For a route whose writes reach the integration branch by merge, the writes on it
 candidate. Its gated sequence is the integration step alone: reading the integration branch tip,
 forming the merge result, establishing depth admission against that result and merging. Depth
 admission established while the candidate was prepared was established earlier and MUST be
-established again at the integration step. A ref update of the integration branch that is refused
-when its tip moved after depth admission was established, such as a fast-forward-only push or a
-merge that re-checks the exact merge result, is the integration step's serialization.
+established again at the integration step. The integration step MUST change the integration branch
+only through a ref update that is refused when the tip moved after depth admission was
+established, such as a fast-forward-only push or a merge that re-checks the exact merge result.
+That ref update is the integration step's serialization: with it, depth admission established
+against the exact merge result satisfies items 1 to 3 for that step.
 
 Serialization:
 
@@ -647,10 +690,10 @@ Enabling the maintenance path does not require the onboarding path to be proven.
 that fails item 3 blocks it.
 
 The onboarding path MAY be enabled when items 1, 3, 4 and 5 hold for it, the onboarding charter
-defines where O is frozen on the create lane, and an independent new-entry run in an isolated
-workspace proves approval, the onboarding checklist's implementation
-and evidence steps, runtime evidence selection, publication and proving-run closeout. Maintenance
-evidence does not substitute. Enabling it MUST establish item 3 again for the maintenance path.
+defines where P and O are frozen on the create lane, and an independent new-entry run in an
+isolated workspace proves approval, the onboarding checklist's implementation and evidence steps,
+runtime evidence selection, publication and proving-run closeout. Maintenance evidence does not
+substitute. Enabling it MUST establish item 3 again for the maintenance path.
 
 A synthetic agent in an isolated workspace MAY prove the onboarding machinery. It qualifies no
 real agent. A real agent's promised scope is qualified by its own upstream evidence before any
@@ -694,9 +737,9 @@ and defines no command for it.
 
 ## Publication
 
-- Depth records MUST be published as committed evidence under the agent's manifest root, in an
-  evidence category the support matrix's neutral root intake already reads. A second evidence
-  store MUST NOT be introduced.
+- Depth facts MUST be published from depth records. A depth record is committed evidence under
+  the agent's manifest root in `reports/**`, an evidence category the support matrix's neutral
+  root intake already reads. A second evidence store MUST NOT be introduced.
 - Aggregates MUST keep per-target results. One target's evidence never qualifies another.
 - Machine-readable and Markdown depth facts MUST agree.
 - The runtime-support payload stays version-only. Keeping depth facts out of that payload does not
