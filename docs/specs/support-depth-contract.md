@@ -2,7 +2,7 @@
 
 Status: Draft, awaiting maintainer approval
 Date (UTC): 2026-10-02
-Scope: semantic support obligations, their evidence and bindings, depth enrollment, depth admission of writes to acceptance outputs, path enablement and additive shared integration, for the maintenance and onboarding lifecycles
+Scope: semantic support obligations, their evidence and bindings, depth enrollment, depth admission of writes to depth-gated outputs, path enablement and additive shared integration, for the maintenance and onboarding lifecycles
 
 ## Normative language
 
@@ -25,7 +25,7 @@ It defines:
 - what evidence verifies an obligation, how evidence is bound to its inputs, and when it may be
   reused
 - how a bounded scope is selected for these rules, and what stays outside it
-- the depth admission rules every write to an acceptance output must satisfy
+- the depth admission rules every write to a depth-gated output must satisfy
 - the prerequisites for enabling these rules on a lifecycle path
 - how depth results are published, and the rules for later additive shared integration
 
@@ -48,8 +48,8 @@ documents are not normative.
 | Capability ids and their minimum semantics | [Capabilities spec](unified-agent-api/capabilities-schema-spec.md) and each capability's owner document | Unchanged. |
 | The capability promotion rule and its allowlist | [Onboarding charter](cli-agent-onboarding-charter.md) | Unchanged. Depth admission is added for the capabilities a depth enrollment claims. |
 | Lifecycle stages and support tiers | The committed lifecycle record, as the onboarding charter designates | Unchanged. Neither is a depth result. |
-| Runtime profiles `minimal`, `default` and `feature-rich` | The lifecycle implementation in `crates/xtask/src/agent_lifecycle.rs`; no normative owner | Unchanged. A runtime profile is not a depth result. |
-| Surface exclusions in `parity_exclusions` | Each manifest root's `RULES.json` and validator spec | Unchanged. See classification rule 7 for mode exclusions. |
+| Runtime profiles `minimal`, `default` and `feature_rich` | The lifecycle implementation in `crates/xtask/src/agent_lifecycle.rs`; no normative owner | Unchanged. A runtime profile is not a depth result. |
+| Surface exclusions in `parity_exclusions` | Each manifest root's `RULES.json` and validator spec, where the root has them | Unchanged. See classification rule 7 for mode exclusions. |
 | The version-only runtime-support payload | [Runtime-support contract](unified-agent-api/runtime-support-contract.md) | Unchanged. Depth facts never enter it. |
 | Manual maintenance closeout | Maintenance request contract | Kept. Depth admission is added to it. |
 | Manual proving-run closeout and maintainer-gated promotion | Onboarding charter | Kept. Depth admission is added to them. |
@@ -74,8 +74,9 @@ Other contracts reference this one for depth rules and MUST NOT restate them.
   runtime-support contract gives it. In this contract "template" always means an obligation
   template.
 - **Generation.** One packet generation for one agent and one exact upstream version, opened by
-  one Event. A maintenance regeneration of the same version, the nightly re-dispatch included,
-  opens a new generation. One onboarding create-lane run is one generation.
+  one Event. A maintenance regeneration that records a new Event, the nightly re-dispatch
+  included, opens a new generation; the `--from-request` re-freeze completes the same generation.
+  One onboarding create-lane run under one approval artifact is one generation.
 - **Depth enrollment.** A maintainer-approved positive selection of scope for this contract, for
   one agent, one lifecycle path and one exact upstream version. It covers every generation of that
   version. It is always written with the qualifier. Unqualified "enrolled" in other documents keeps
@@ -83,6 +84,13 @@ Other contracts reference this one for depth rules and MUST NOT restate them.
   and the `enrolled` lifecycle stage.
 - **Depth scope tuple.** One `(agent, lifecycle path, exact upstream version, operation and
   promise, modes and required values, target)` inside a depth enrollment.
+- **Event, P, O and E.** The four bindings defined in [Bindings](#bindings).
+- **Depth record.** For one depth-enrolled version and target: its depth results, the P, O and E
+  references they were produced under, the capability mappings they serve and, once accepted, the
+  identities of the closeout and promotion that accepted them. It is stored with the depth results
+  under the agent's manifest root and outlives the generation's working files.
+- **Working files.** The per-root packet files of the current generation, such as
+  `maintenance-request.toml` and `maintenance-closeout.json`. A later generation replaces them.
 - **Remainder.** Everything outside every depth enrollment.
 - **Depth admission.** The check defined in [Depth admission](#depth-admission). It is distinct
   from the stand-down admission gate of `close-agent-maintenance`, which this contract leaves
@@ -159,7 +167,7 @@ Obligations that templates add to BASE:
 | `FX1` | Mutation: explicit scope and destructive intent, denied-write no-effect, before and after state, retry and idempotency only as promised, and partial effects on failure. |
 | `S1` | Session: explicit id, last-session and fork selectors, conflict rules, no-match behavior and returned or continued identity, with no interactive picker or silent new session where the promise forbids one. |
 | `N1` | Remote: endpoint and credential intent, local versus remote path intent, and client disconnect and cancel semantics. Ownership of the remote server is excluded unless separately promised. |
-| `B1` | Reviewed boundary: a named, constrained route whose effects have been reviewed. |
+| `B1` | Reviewed boundary: a named, constrained invocation path whose effects have been reviewed. |
 | `MCP1` | The [MCP management spec](unified-agent-api/mcp-management-spec.md)'s rules for effective home, target and configuration checks, write opt-in, output and errors, its pinned caveats included. |
 | `EX1` | Mode exclusion: classification evidence under `R1`, `G1` and `A1`, and rejection tests at the headless boundary. |
 
@@ -177,8 +185,8 @@ Obligations that templates add to BASE:
 | `REMOTE` | `N1` | Never from accepting a URL alone. |
 | `EXCLUDED` | None. An excluded mode has `EX1` instead of BASE. | Not applicable. No support claim is made. |
 
-An executable operation's obligation set is BASE plus the obligations of every template its
-promise selects. An excluded mode's set is `EX1` alone.
+An executable operation's obligation set is BASE, `M` for a mapped operation, and the obligations
+of every template its promise selects. An excluded mode's set is `EX1` alone.
 
 Classification rules:
 
@@ -199,11 +207,13 @@ Classification rules:
    stays inside an approved boundary is decided by the independent adequacy review. The executor
    decides neither.
 7. `EXCLUDED` applies to one mode. It MUST NOT extend to a headless mode of the same command or to
-   the command as a whole. A mode exclusion MUST NOT create a second exclusion list beside
-   `parity_exclusions`, and it never removes a unit from name-level accounting.
+   the command as a whole. A mode exclusion is a classification entry in P. It MUST NOT create a
+   second exclusion list beside `parity_exclusions`, and it never removes a unit from name-level
+   accounting.
 8. An override names the exact scope, the replacement obligations, the rationale, the versions and
    targets, a maintainer approval reference and an expiry or review condition. It MUST NOT erase
-   an existing promise, replace `M` obligations or evade the debt contract. An executor MUST NOT
+   an existing promise, replace `M` obligations or evade the debt contract. When its condition is
+   reached the override lapses and the replaced obligations apply again. An executor MUST NOT
    author an override, relax a requirement or broaden an exclusion to close a packet.
 9. Evaluation covers every observed or claimed unit of a depth-enrolled operation, whatever its
    coverage level. A unit at `passthrough` or `unsupported` is evaluated, not skipped. The
@@ -228,7 +238,7 @@ Rules:
    Advertising stays governed by the capability documents and the charter's promotion rule.
 5. For each capability a depth enrollment claims, the approved policy MUST name the complete set
    of operations through which that agent's adapter honors the capability, covering every flow
-   the adapter exposes for it. That mapping is published with the depth results. The capability is
+   the adapter exposes for it. That mapping is part of the depth record. The capability is
    **depth-qualified** for one `(agent, version, target)` only when every operation in that set is
    depth-enrolled and qualified, `M` included.
 6. A capability that no depth enrollment claims is **not assessed**. It is neither qualified nor
@@ -314,8 +324,8 @@ standing reviewer role. An unchanged, admissible mapping is not reviewed again.
   version and target are identical or covered by an approved compatibility rule, and that every
   input in the obligation's dependency set is unchanged. The evidence keeps its original P and O,
   and newly due or changed cases run fresh.
-- Evidence produced before a generation's depth enrollment, a successful closeout included, is
-  admissible for that generation only through a reuse binding.
+- Evidence produced before the depth enrollment it would serve, a successful closeout included, is
+  not admissible.
 - Evidence is repository verification inside the existing repository and CI trust boundary. It is
   not remote attestation.
 
@@ -340,8 +350,8 @@ Rules:
 3. An empty due list is not qualification. A qualified subset MUST be named by its exact promise
    and scope.
 4. The remainder carries no depth claim. It MUST NOT be counted as `verified` or `not_applicable`.
-5. Publishing a truthful pending, partial or failed assessment MUST remain possible. It MUST NOT
-   require qualification, and it MUST NOT produce an acceptance effect.
+5. Publishing a truthful assessment with pending, `unverified` or `failed` results MUST remain
+   possible. It MUST NOT require qualification, and it MUST NOT produce an acceptance effect.
 
 ## Bindings
 
@@ -352,7 +362,7 @@ Shared storage MUST NOT merge their authority or their invalidation.
 | Binding | Content | Who may change it | A change invalidates |
 | --- | --- | --- | --- |
 | **Event** | Maintenance: `request_commit`, `request_recorded_at`, trigger and source. Onboarding: the approval artifact's `approval_commit` and `approval_recorded_at`. | Nobody inside a generation. A later generation has its own Event. | Nothing. It is attribution, not tested code. |
-| **P**, policy | Resolved rules, templates and classifications, promises and subsets, overrides and exclusions, depth enrollment selectors, path enablement, the debt delegation and the initial authorization baseline, for the affected acceptance scope | The maintainer, through explicit re-freeze or supersession | O, E and every dependent closeout and publication result |
+| **P**, policy | Resolved rules, templates and classifications, promises and subsets, overrides and exclusions, depth enrollment selectors, path enablement, the debt delegation and the initial authorization baseline, for the depth scope tuples it governs | The maintainer, through explicit re-freeze or supersession | O, E and every dependent closeout and publication result |
 | **O**, obligations | The P reference, exact version and targets, acquired input identities, operation-to-surface edges and the concrete obligation set, independently required acceptance work included | Only the existing acquisition and preparation path, at its freeze and at any later re-freeze. A re-freeze MUST NOT change the agent, version, targets or depth enrollment. The executor never changes O. | E and every dependent closeout and publication result |
 | **E**, execution | The P and O references, implementation and evidence identities, reuse bindings, materialized debt grants, validated transitions from P's baseline and derived results | Execution, evidence refresh and delegated debt transitions | Dependent closeout and publication results |
 
@@ -365,7 +375,7 @@ Rules:
 3. A policy amendment is prospective. It MUST NOT relabel evidence produced under an earlier P as
    meeting the amended rules.
 4. A debt transition is not a policy waiver. See [Debt operations](#debt-operations).
-5. P is resolved for the affected acceptance scope. A change to another agent's or path's
+5. P is resolved for the depth scope tuples it governs. A change to another agent's or path's
    selection, or the enablement of another path, does not change it. A change to a shared
    governing rule does.
 6. A binding's identity MUST NOT depend on its own digest, on a future output or on the commit that
@@ -375,28 +385,30 @@ Rules:
    placeholder stays non-executable. A lane whose reports exist at open keeps its existing
    treatment. A generation in which O is never frozen from target reports, on the docs-only lane
    or on an acquisition lane stood down before its second freeze, cannot reach acceptance for
-   depth-enrolled scope. That scope is reported as outstanding and never as not depth-enrolled.
+   depth-enrolled scope. That scope is reported as insufficient depth and never as not
+   depth-enrolled. On the onboarding path, the onboarding charter defines where O is frozen.
 8. A consumer acting on depth-enrolled scope MUST require the current executable schema revision
    and all four bindings. A missing field or an unsupported revision is an error. It is never read
    as "not depth-enrolled".
 9. Artifacts completed under an earlier contract keep their original meaning. They are not
    translated, backfilled or presented as depth evidence. An unfinished generation that an adopted
    revision makes incompatible MUST stop. Work continues only in a new generation prepared through
-   existing preparation, with fresh bindings.
+   existing preparation, with fresh bindings; on the onboarding path that means a new approval
+   artifact.
 
 ### Debt operations
 
-Debt rows are name-level. A row dispositions the name-level required work it covers. It
-dispositions no depth obligation unless the debt contract is amended to identify depth obligations
-explicitly. The **frozen delegation** is the set of debt rows and renewal permissions in force when
+Debt rows are name-level. A row dispositions the name-level required work it covers. No row
+dispositions a depth obligation: until the debt contract is amended to identify depth obligations
+explicitly, a due depth obligation is dispositioned only by being satisfied. The **frozen delegation** is the set of debt rows and renewal permissions in force when
 P was frozen, and the **initial authorization baseline** is the content of those rows at that time.
 
 | Operation | Who | Limits | Binding treatment |
 | --- | --- | --- | --- |
 | Renew an existing grant | Executor | Only a row inside the frozen delegation, and only while its `blocker_class` still holds. Only `scope_target_triples`, `authorized_at_version` and `authorization_evidence_ref` change. Targets stay inside the delegation and match current target reports. | P unchanged. E changes, and dependent closeout and publication results become stale. |
-| Retire debt | Executor | Only under the retirement conditions of the maintenance request contract. Partial satisfaction keeps the row for its unresolved scope. Absence from help output is not proof of removal. | As above. |
+| Retire debt | Executor | Only under the retirement conditions of the maintenance request contract. Absence from help output is not proof of removal. | As above. |
 | Refresh evidence | Executor | Inside the selected contract. | P and grants unchanged. |
-| Add debt or widen authority | Maintainer | A new identity or reason, a target outside the delegation, or any deferral of a depth obligation. The executing packet MUST NOT defer a newly discovered non-TUI gap. | P re-freeze or supersession, with downstream invalidation. |
+| Add debt or widen authority | Maintainer | A new identity, `blocker_class` or `current_reason`, or a target outside the delegation. The executing packet MUST NOT defer a newly discovered non-TUI gap. | P re-freeze or supersession, with downstream invalidation. |
 
 An unsupported or unproved transition MUST fail closed. Execution never closes or promotes its own
 work.
@@ -410,7 +422,7 @@ work.
    later version.
 2. A later version inherits nothing from an earlier depth enrollment: no depth enrollment, no
    qualification and no publication authority. How a later version may move a depth-enrolled version's
-   pointer is set out in [Supersession](#supersession).
+   pointer or replace its working files is set out in [Later versions](#later-versions).
 3. A production depth enrollment MUST name an enabled lifecycle path. A selection made inside an
    isolated proof workspace is not a production depth enrollment and MUST NOT produce a depth-gated
    effect on production outputs.
@@ -421,15 +433,16 @@ work.
    applies to it.
 6. Depth enrollment adds obligations. It MUST NOT remove or narrow required uplifts, target
    acquisition completeness, existing shared promises or the release-watch ratchet.
-7. Resolution MUST be deterministic and MUST come from registry-owned authority together with the
-   frozen request or the approval for that generation. An executor's assertion, an optional field
-   and a caller-supplied argument are not authority.
+7. Resolution MUST be deterministic. While a generation's working files are current it comes from
+   registry-owned authority together with the frozen request or the approval for that
+   generation; afterwards it comes from the depth record. An executor's assertion, an optional
+   field and a caller-supplied argument are not authority.
 8. Missing policy for selected scope, an unsupported schema revision, unresolved or overlapping
-   enrollment selectors, contradictory generation references and deleted bindings are errors. None
+   depth enrollment selectors, contradictory generation references and deleted bindings are errors. None
    of them resolves to "not depth-enrolled".
 9. A flag, value or default discovered on a depth-enrolled operation stays attached to that
-   operation. It MUST NOT fall into the remainder because an enrollment selector matched the
-   earlier values.
+   operation. It MUST NOT fall into the remainder because a depth enrollment selector matched
+   the earlier values.
 10. Work that is due in a frozen generation stays due until it is satisfied or validly
     dispositioned. Moving it to another packet, ending the selection, pausing, removing
     advertising or deleting a declaration does not discharge it.
@@ -444,28 +457,31 @@ depth-gated output that changes a value belonging to at least one depth scope tu
 
 | Depth-gated output | Values that belong to a depth scope tuple |
 | --- | --- |
-| Depth results and the evidence they derive from, under the agent's manifest root | Every result, mapping and dependency identity recorded for the tuple, and the presence of the evidence itself |
+| Depth records and the evidence they derive from, coverage reports included, under the agent's manifest root | Every result, mapping, binding reference and acceptance entry in the tuple's depth record, and the presence and content identity of the evidence it derives from |
 | Support publication rows and their Markdown projection | The row for the tuple's agent, version and target |
 | Capability publication | The entry for each capability a depth enrollment claims, for the tuple's agent |
 | Version metadata | The tuple's version file: its status and its per-target outcomes |
-| The `latest_validated` and `latest_supported` pointers | The pointer for the tuple's target while it names the tuple's version, and any change that would make it name that version |
+| The manifest root's `current.json` | Whether it lists the tuple's target as expected |
+| The `latest_validated` and `latest_supported` pointers, the root `latest_validated.txt` included | Each pointer for the tuple's target, and the root pointer, while it names the tuple's version, and any change that would make it name that version |
 | The embedded runtime-support projection | The record for the tuple's runtime family and target while it names the tuple's version, and any change that would make it name that version |
 | Stand-down markers | Removal of a marker for the tuple's version. Declaring a marker is not a depth-gated effect. |
-| Maintenance and proving-run closeout records | The record of any generation of the tuple's version |
-| The lifecycle record | Its stage and evidence fields while the tuple's depth enrollment is on the onboarding path |
+| Maintenance requests and maintenance and proving-run closeout records | The current file while it belongs to a generation of the tuple's version |
+| The lifecycle record | Its stage, side states and evidence entries for the tuple's agent |
 
-Evidence for a tuple whose acceptance is recorded MUST NOT be removed while any published output
-relies on it.
+Evidence that a depth record's recorded acceptance derives from MUST NOT be removed or replaced
+while a published value derives from that acceptance.
 
 A depth-gated effect is an **acceptance effect** for a tuple when it does any of the following:
 
-- sets or advances a pointer to the tuple's version
+- sets or advances a pointer, or the runtime-support projection, to the tuple's version
 - sets the tuple's version status to `validated` or `supported`, or records a passed per-target
   outcome
 - retires a stand-down marker
-- records a closeout as closed
-- advances the lifecycle record to `published` or `closed_baseline`
-- publishes a promise as qualified or a capability as depth-qualified
+- creates or changes a maintenance closeout record, or records a proving-run closeout as `closed`
+- advances the lifecycle record's stage, adds a closeout evidence entry or clears a drift side
+  state
+- records acceptance in a depth record, or publishes a promise as qualified or a capability as
+  depth-qualified
 - adds capability advertising
 
 Every other depth-gated effect is a **reporting effect**.
@@ -499,9 +515,9 @@ effect touches or refuse the effect.
    version or scope the request names. A regeneration requested for one agent that would change
    another agent's depth-enrolled row touches that row's tuple. A request for a version outside
    every depth enrollment that would move a depth-enrolled pointer touches that pointer's tuple;
-   see [Supersession](#supersession).
-2. Not matching a depth enrollment is never permission to change a depth-enrolled tuple's results,
-   acceptance records or closeout records.
+   see [Later versions](#later-versions).
+2. Not matching a depth enrollment is never permission to change a depth-enrolled tuple's depth
+   record.
 3. For an acceptance effect, authority is established per touched tuple under the lifecycle path
    that owns that tuple's depth enrollment. Reaching a shared writer from another path confers
    none. A gate that admits on the wrong path's authority does not satisfy this section.
@@ -512,46 +528,54 @@ effect touches or refuse the effect.
 6. A route MUST NOT narrow the touched set because a caller omitted an optional scope or
    depth enrollment argument.
 7. Repository validation MUST compare the depth-gated state of every depth enrollment, on the
-   integration branch and on every candidate for it, with that depth enrollment's admission and
-   acceptance records. It MUST fail on any contradiction, whatever produced the change: a
-   supported route, unsupported tooling or a hand edit.
+   integration branch and on every branch proposed for merge into it, with that enrollment's depth
+   record. A contradiction is a published value the depth record does not support, an acceptance
+   effect the depth record does not record, or a depth-enrolled version without a depth record.
+   Validation MUST fail on any contradiction, whatever produced the change: a supported route,
+   unsupported tooling or a hand edit.
 
-### Supersession
+### Later versions
 
-An effect for another version that moves a depth-enrolled tuple's pointer, or changes its row or
-runtime-support record because a pointer moved, supersedes that tuple.
+An effect for a later version that moves a depth-enrolled tuple's pointer or runtime-support
+record, changes its row because a pointer moved, or replaces the working files of the tuple's
+generation, displaces that tuple.
 
-1. For the superseded tuple, a supersession is a reporting effect. Its row continues to state its
-   own results, and its results, acceptance records and closeout records are not rewritten.
-2. The new version's state is admitted under the rules that apply to the new version: its own depth
+1. For the displaced tuple the effect is a reporting effect. Its row continues to state its own
+   results, and its depth record is not rewritten.
+2. The later version's state is admitted under the rules that apply to it: its own depth
    enrollment where it has one, and otherwise the existing lifecycle rules, which this contract
    leaves unchanged.
 
 ### Final depth admission
 
-The gated operation is the whole sequence that reads current state, plans, writes and, on failure,
-restores. A route MUST:
+The gated sequence is the part of a route that reads the current state of the outputs it will
+change, establishes depth admission and writes them, together with any restoration on failure. A
+route MUST:
 
-1. hold serialization ownership of the gated operation before its first write;
+1. hold serialization ownership of the gated sequence before its first write;
 2. establish depth admission while holding that ownership, against the frozen bindings, current
    authority, the relevant inputs and the expected state of the outputs it will change; and
 3. keep that depth admission valid through its last write and through any failure handling.
 
+For a route whose writes reach the integration branch by merge, the writes on its branch prepare a
+candidate. Its gated sequence is the integration step alone: reading the integration branch tip,
+forming the merge result, establishing depth admission against that result and merging. Results
+obtained while the candidate was prepared are results obtained earlier. An integration step that
+refuses when the integration branch moved after depth admission was established, such as a
+fast-forward-only push or a merge that re-checks the exact merge result, satisfies this rule.
+
 Serialization:
 
-- Routes whose depth-gated outputs, touched tuples or depth admission inputs overlap share one
-  serialization domain. Ownership excludes every other member of the domain from changing those
-  outputs or inputs until the gated operation ends. Serialization within one route's own lane does
-  not satisfy this rule.
+- Two routes share a serialization domain when one can change a depth-gated output or a depth
+  admission input that the other writes or relies on. Routes that only read the same inputs do not
+  share a domain for that reason. Ownership excludes every other member of the domain from those
+  changes until the gated sequence ends. Serialization within one route's own lane does not
+  satisfy this rule.
 - An invalidating change is any change, by any writer, to the bindings, authority, relevant inputs
   or expected output state that depth admission relied on. A check made inside ownership, with
-  every invalidating change excluded until the operation ends, is the final check and need not be
-  repeated. A result obtained earlier MUST be established again.
-- When a route's writes reach the integration branch by merge, the gated operation ends at the
-  merge. Depth admission, currency included, MUST hold for the merge result, and the merge MUST be
-  refused when it does not. A check made against an earlier state of the integration branch does
-  not satisfy this rule.
-- This revision requires serialization of gated operations. Per-writer compare-and-refuse MAY
+  every invalidating change excluded until the gated sequence ends, is the final check and need
+  not be repeated. A result obtained earlier MUST be established again.
+- This revision requires serialization of gated sequences. Per-writer compare-and-refuse MAY
   replace it later by amendment.
 - No cross-process lock or atomic multi-file transaction is assumed to exist. A route demonstrates
   its serialization by an Annex A entry that names every writer in its domain, together with a
@@ -561,8 +585,8 @@ Restoration and interruption:
 
 - Restoring outputs from a snapshot is a depth-gated effect. A restoration that would overwrite
   state the route no longer owns MUST NOT run; the route reports the conflict and stops.
-- An interrupted operation MUST NOT leave in place any acceptance effect that its depth admission
-  did not cover.
+- An interrupted sequence MUST NOT leave in place any acceptance effect for which depth admission
+  was not established.
 
 ### Route inventory
 
@@ -647,10 +671,9 @@ and defines no command for it.
 
 ## Publication
 
-- Depth results MUST be published as committed evidence under the agent's manifest root, in an
-  evidence category the support matrix's neutral root intake already reads, together with the
-  capability mappings of [Shared mapping and capabilities](#shared-mapping-and-capabilities) rule 5.
-  A second evidence store MUST NOT be introduced.
+- Depth records MUST be published as committed evidence under the agent's manifest root, in an
+  evidence category the support matrix's neutral root intake already reads. A second evidence
+  store MUST NOT be introduced.
 - Aggregates MUST keep per-target results. One target's evidence never qualifies another.
 - Machine-readable and Markdown depth facts MUST agree.
 - The runtime-support payload stays version-only. Keeping depth facts out of that payload does not
@@ -667,7 +690,8 @@ Reports MUST keep these outcomes distinguishable:
 | Authorized debt | Unavailable behavior covered by a valid target- and version-scoped name-level grant. Never `verified`. |
 | Mode exclusion | One TUI mode excluded with a rationale, without a second exclusion list. |
 | Not depth-enrolled | The remainder. No depth claim. |
-| Unresolved | Depth enrollment, classification or evidence could not be resolved. Validation reports it as an error, and depth-gated effects for the tuple are refused until it is resolved. It is never reported as not depth-enrolled. |
+| Classification required | A unit of a depth-enrolled operation has no resolved template. It is recorded and published, and it blocks execution readiness and acceptance effects for that operation. |
+| Unresolved | Depth enrollment could not be resolved. Validation reports it as an error, and depth-gated effects for the tuple are refused until it is resolved. It is never reported as not depth-enrolled. |
 
 ## Conformance
 
