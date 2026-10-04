@@ -23,12 +23,13 @@ integration branch tip it would replace.
 | 2 | Merge | A depth record is removed, or an acceptance entry is removed or altered | 1 |
 | 3 | Any revision | The revision holds a frozen request or approval for a record's version, and the record's Event, P or O is not that generation's | 2 |
 | 4 | Merge | What a depth record states changes while the merge result holds no frozen request or approval for the record's version | 2 |
-| 5 | Any revision | A published result is not the result the record states. Publishing `unverified` for a stated `verified` is the one exception | 3 |
+| 5 | Any revision | A published result is neither the result the record states nor `unverified`, or is not `unverified` although the record does not yet state it or its bindings are not current | 3 |
 | 6 | Any revision | A tuple the record selects is published as not depth-enrolled | 3 |
 | 7 | Any revision | A result is published as `verified`, or a promise or capability as qualified or depth-qualified on it, and the record binds no evidence for the result, or binds evidence that is absent or has another content identity | 3 |
 | 8 | Any revision | A promise is published as qualified, or a capability as depth-qualified, and no acceptance entry identifies what the record states | 4 |
 | 9 | Merge | The merge result makes an acceptance effect for a tuple and no acceptance entry identifies what the tuple's depth record states in the merge result | 4 |
 | 10 | Any revision | The lifecycle record of an agent that has a depth record holds a `published` or `closed_baseline` stage, or a closeout evidence id, that reports a packet or closeout the revision does not hold | 4 |
+| 11 | Merge | The selection, mappings, results or bound evidence a depth record states change while the Event, P, O and E identities it states do not | 2 |
 
 Checks 8 and 9 need the acceptance entry to identify what the record stated in a form the
 validator can recompute from the record alone, so the check survives replaced working files. The
@@ -42,11 +43,13 @@ Each scenario is a test case. "Pass" means validation must not fail; "fail" mean
 ### Must pass
 
 - **Nightly re-dispatch of an unchanged version.** The record on the integration branch states
-  only P. A new generation of the same version opens with a new Event, the same P and no O yet,
+  an Event and P and nothing else. A new generation of the same version opens with a new Event,
+  the same P and no O yet,
   and the record restates the Event. Backlog item `uaa-0048` records that this re-dispatch
   happens. An earlier draft failed it.
 - **Later generation of an accepted version.** The record states the new generation's Event and
-  P, shows O, E and results as not yet produced, and keeps its acceptance entries.
+  P, shows O, E and results as not yet produced, and keeps its acceptance entries. The published
+  rows are rewritten to `unverified` in the same merge.
 - **Truthful downgrade.** Bound evidence changes or is removed, the record is not rewritten, and
   the result is published as `unverified`.
 - **Evidence refresh after promotion.** E changes after a pointer moved. The pointer, the version
@@ -56,7 +59,8 @@ Each scenario is a test case. "Pass" means validation must not fail; "fail" mean
   parity exclusion is added. They are not depth-gated outputs.
 - **Separate merges of prepare and refresh.** `prepare-publication` and `refresh-publication`
   reach the integration branch in different merges, and `refresh-publication` sets `published`
-  without rewriting the publication packet.
+  without changing the publication packet's content. The refresh merge lists the acceptance
+  entry.
 - **Displacement.** A later version's packet replaces the working files of a depth-enrolled
   version. The displaced version still resolves from its record.
 - **Multi-agent backfill.** `historical-lifecycle-backfill` writes several agents' lifecycle
@@ -69,6 +73,8 @@ Each scenario is a test case. "Pass" means validation must not fail; "fail" mean
   still bound and republishes qualified under the original acceptance entry.
 - **Selection narrowing.** A tuple is dropped from the record's selection and P is restated, so
   the tuple would read as remainder.
+- **Edit under unchanged identities.** A hand edit changes a stated result, mapping or evidence
+  binding and leaves the Event, P, O and E identities as they were.
 - **Unbinding accepted evidence.** A reporting effect removes a result's evidence binding while a
   row still says `verified` or qualified.
 - **Record removed by retention.** `manifest-retain` deletes `reports/<version>/` for a version
@@ -85,8 +91,16 @@ Each scenario is a test case. "Pass" means validation must not fail; "fail" mean
 
 ## Open questions for the validator design
 
-- A hand-listed acceptance entry that nothing granted passes every check above. Today it is
+- A hand-listed acceptance entry that no closeout, publication or promotion made passes every
+  check above. Today it is
   caught only by review, and listing one is an acceptance effect at the integration step.
+- An entry is not scoped to an effect or a tuple, so any entry that matches the record's state
+  backs any later acceptance effect, such as a hand pointer advance after a genuine closeout.
+- Invariant 2 is defined by who may change a binding. History does not show the actor, so for E
+  it is checkable only structurally.
+- `cli_manifests/aider` and `cli_manifests/gemini_cli` have no validator spec, and the existing
+  specs read one manifest root only. The checks also need lifecycle records, working files and
+  the integration branch tip.
 - Retargeting the lifecycle record's `publication_packet_path` re-attributes a `published` stage.
   Decide whether the reference itself is checked.
 - The absence of a drift side state is attributed to the previous maintenance closeout while a
