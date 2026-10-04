@@ -510,26 +510,30 @@ regenerating them. Changing or removing bound evidence is not prohibited either.
 rewritten for it: the result has no current evidence and is published as `unverified` until it is
 verified again.
 
-The following **record invariants** hold for every depth record and every depth-gated output:
+The following **record invariants** hold for every depth-gated output:
 
 1. A depth-enrolled version has a depth record from the time a generation first freezes P for it.
    A depth record MUST NOT be removed, whether by retention pruning or otherwise, and an
-   acceptance entry MUST NOT be removed or altered.
+   acceptance entry MUST NOT be removed or altered. A manifest root without a validator spec MUST
+   NOT hold a depth record.
 2. What a record states changes only when a later generation of the same version continues the
    record, or through a change that [Bindings](#bindings) permits to the binding concerned: the
    selection and the capability mappings belong to P, the obligations to O, and the results and
    their bound evidence to E.
 3. A published result is the result the record states, or `unverified`. It MUST be `unverified`
-   when the record does not yet state the result, when the result's bindings are not current, or
-   when the evidence the record binds for it is absent or has another content identity. No promise
-   is published as qualified, and no capability as depth-qualified, on such a result. A tuple the
-   record selects MUST NOT be published as not depth-enrolled.
+   in three cases: the record does not yet state the result; the result was produced under a P, O
+   or E other than the one the record states; or the record states it as `verified` and binds no
+   evidence for it, or binds evidence that is absent from the revision or has another content
+   identity. A change to a dependency outside the bound evidence is not within this invariant. A
+   promise is published as qualified, or a capability as depth-qualified, only when every result
+   the claim rests on is published as `verified`, or as `not_applicable` where P permits it. A
+   tuple the record selects MUST NOT be published as not depth-enrolled.
 4. Every acceptance effect other than listing an acceptance entry MUST have an acceptance entry
-   made for what the record stated when the effect was made. A promise published as qualified, or
-   a capability published as depth-qualified, is supported only while an acceptance entry exists
-   that was made for what the record states now. In the lifecycle record of an agent that has a
-   depth record, a `published` or `closed_baseline` stage and a closeout evidence id MUST report
-   a packet or closeout that the same revision holds.
+   made for what the record stated when the effect was made. A promise is published as qualified,
+   or a capability as depth-qualified, only while an acceptance entry exists that was made for
+   what the record states now. In the lifecycle record of an agent that has a depth record, a
+   `published` or `closed_baseline` stage and a closeout evidence id MUST report a packet or
+   closeout that the same revision holds.
 
 A depth-gated effect is an **acceptance effect** for a tuple when it does any of the following:
 
@@ -596,8 +600,7 @@ effect touches or refuse the effect.
    supported route, unsupported tooling or a hand edit. This contract does not enumerate the
    checks that enforce the invariants. They are defined beside the depth record's schema in the
    manifest root's validator spec, and they are part of the enforcement that
-   [Path enablement](#path-enablement) item 4 requires. A manifest root without a validator spec
-   MUST NOT hold a depth record.
+   [Path enablement](#path-enablement) item 4 requires.
 
 ### Later versions
 
@@ -694,11 +697,11 @@ Enabling the maintenance path does not require the onboarding path to be proven.
 that fails item 3 blocks it.
 
 The onboarding path MAY be enabled when items 1, 3, 4 and 5 hold for it, the onboarding charter
-defines where P and O are frozen on the create lane, at a point where the agent's manifest root and
-its exact upstream version exist, and an independent new-entry run in an isolated workspace proves
-approval, the onboarding checklist's implementation and evidence steps, runtime evidence
-selection, publication and proving-run closeout. Maintenance evidence does not substitute.
-Enabling it MUST establish item 3 again for the maintenance path.
+defines where P and O are frozen on the create lane, at a point where the agent's manifest root,
+its validator spec and its exact upstream version exist, and an independent new-entry run in an
+isolated workspace proves approval, the onboarding checklist's implementation and evidence steps,
+runtime evidence selection, publication and proving-run closeout. Maintenance evidence does not
+substitute. Enabling it MUST establish item 3 again for the maintenance path.
 
 A synthetic agent in an isolated workspace MAY prove the onboarding machinery. It qualifies no
 real agent. A real agent's promised scope is qualified by its own upstream evidence before any
