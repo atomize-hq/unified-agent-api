@@ -45,6 +45,9 @@ This document does not redefine:
 - packet-only maintainer handoff flows that omit the relay `[execution_contract]`, regardless of
   how the PR was opened
 - onboarding or publication contracts outside the maintenance packet
+- support-depth rules, which the [support-depth contract](support-depth-contract.md) owns.
+  [Depth-enrolled generations](#depth-enrolled-generations) states what this contract adds for
+  them
 
 ## Canonical ownership split
 
@@ -467,6 +470,128 @@ is it.
 
 The relay MUST reject packets whose prepared-run metadata does not match the live request packet.
 The relay MUST stop before closeout. `close-agent-maintenance` remains the only closeout writer.
+
+## Depth-enrolled generations
+
+The [support-depth contract](support-depth-contract.md) owns the rules for support depth: depth
+enrollment, depth scope tuples, the depth record, the bindings Event, P, O and E, depth admission,
+and which changes are acceptance effects and which are reporting effects. This section states only
+what this contract owns for them: how a request carries the bindings, what each freeze does, what
+relay execution may change and what closeout establishes. Where it applies one of those rules it
+does not redefine it, and a term it does not define has the meaning the support-depth contract
+gives it.
+
+A **depth-enrolled generation** is a generation whose `agent_id` and
+`detected_release.target_version` a depth enrollment selects on the maintenance path. This section
+applies to depth-enrolled generations and adds nothing for any other generation. Where another
+generation's writes touch a depth scope tuple, as when a later version's request replaces an
+earlier one, the support-depth contract's own rules reach those writes. While the support-depth
+contract is a Draft this section binds nothing.
+
+### Request fields
+
+A depth-enrolled generation's request carries one table beyond the shared shape above:
+
+```toml
+[support_depth]
+policy_identity = "<sha256 of P>"
+obligations_identity = "<sha256 of O>"
+```
+
+| Field | Rule |
+| --- | --- |
+| `policy_identity` | MUST be the content identity of the P this generation froze at its first freeze. A `--from-request` re-freeze MUST preserve it because that re-freeze completes the same generation. |
+| `obligations_identity` | MUST be the content identity of the O this generation last froze. It MUST be absent while no freeze of this generation has frozen O. |
+
+Rules:
+
+1. The table MUST be present in a depth-enrolled generation's request and absent from every other
+   request. Whether a generation is depth-enrolled is resolved under the support-depth contract's
+   depth enrollment rules, and a freeze MUST refuse when that resolution fails. A strict loader
+   MUST reject a request that breaks this rule, and MUST NOT read a missing table as "not
+   depth-enrolled".
+2. Event needs no field of its own. It is the request's `request_commit` and
+   `request_recorded_at`, with `trigger_kind` and `opened_from` as its trigger and source.
+3. Each identity is a SHA-256 digest written as 64 lowercase hex characters, the form
+   `prompt_sha256` uses. What each digest is taken over is defined with the depth record's schema.
+   The table carries the two identities and nothing else, and `[support_surface_audit]` is
+   unchanged.
+4. A strict loader MUST reject the request unless the target version's depth record states the
+   request's Event and the same two identities, with O shown as not yet produced while
+   `obligations_identity` is absent.
+5. `artifact_version` stays `"2"`. Strict loaders reject unknown keys today, so one that predates
+   this section rejects the table, and rule 1 rejects a request that lacks it.
+
+The two fields are the only addition to the request. The support-depth contract's minimum
+machinery rule requires the failure they prevent to be named. Without them, nothing that a run
+is barred from changing says which P and O a generation froze. The depth record states both, and
+execution writes to that record. The debt rows that P's baseline is taken from, and the target
+version's snapshots and reports that O is derived from, are inside the write envelope as well, so
+neither identity can be recomputed from the tree after a run. The request is the one packet
+artifact that the relay and the closeout already bind by content.
+
+### Freezes
+
+The freeze points are unchanged. For a depth-enrolled generation:
+
+1. The first freeze freezes P. `prepare-agent-maintenance` writes `policy_identity`, and in the
+   same invocation writes the target version's depth record, or continues it when an earlier
+   generation of that version wrote it. This holds on every lane, the docs-only lane included.
+2. Every freeze at which the target version's target reports exist freezes O: the first freeze
+   when they exist on base at open, and every `--from-request` re-freeze after acquisition has
+   produced them. Such a freeze writes `obligations_identity` and in the same invocation extends
+   the depth record with O.
+3. A `--from-request` re-freeze MUST derive O under the frozen P, and MUST refuse when P has
+   changed since the first freeze. On this path P changes only when a new generation opens. No
+   re-freeze changes it.
+4. Within a generation, O is frozen again only by another `--from-request` re-freeze.
+5. `HANDOFF.md` MUST present the depth obligations due for the run from the O the depth record
+   states, and MUST NOT state them from prompt prose.
+
+### Relay execution
+
+For a depth-enrolled generation:
+
+1. `[support_depth]` is part of the request's authority for the run. The relay MUST refuse to
+   execute a request that carries no `obligations_identity`.
+2. Whatever `writable_surfaces` lists, the relay MUST treat the request as outside the write
+   envelope, as it treats the closeout.
+3. Relay execution makes reporting effects only. The relay MUST treat a run as failed when its
+   changes include an acceptance effect for a depth scope tuple, removal of a stand-down marker
+   included, or a depth-gated effect for which the relay cannot establish depth admission.
+4. When a run fails under rule 2 or 3, the relay MUST restore the depth-gated outputs the run
+   changed, the request included, before it reports the failure. The support-depth contract
+   requires every depth-gated output to be left unchanged when depth admission fails, and its
+   restoration rules govern the restore.
+
+Rules 2 to 4 are shared policy for every agent. They narrow what a run may change inside
+`writable_surfaces`, and they are not a second envelope derived from `agent_id`.
+
+### Closeout
+
+For a depth-enrolled generation, writing the closeout artifact is an acceptance effect, and so are
+the lifecycle-record changes `close-agent-maintenance` makes with it. `prepare-agent-closeout`,
+which generates the closeout artifact, and `close-agent-maintenance`:
+
+1. MUST establish depth admission, for every depth scope tuple their writes touch, before their
+   first write. Validating the artifact a command is about to write is part of that and comes
+   before the write. When depth admission fails they MUST leave every file unchanged.
+2. MUST ensure, in the same invocation, that the target version's depth record lists an
+   acceptance entry naming the closeout they write.
+
+The closeout artifact gains no field. It already binds the request it closes by content
+(`request_sha256`), and through the request the two identities. Closeout's other checks are
+unchanged.
+
+### Present behavior
+
+None of this section is implemented, and it has no effect until a depth enrollment exists. Today
+no request carries `[support_depth]`, and `--from-request` reads a fixed list of recorded fields
+and regenerates the rest. `writable_surfaces` covers the request and the stand-down markers
+through `{maintenance_root}/**`. The relay checks the write envelope after the executor has
+written, and leaves a failed run's changes in place. `prepare-agent-closeout` writes the closeout
+artifact before it validates it. The support-depth contract's path enablement requires this
+enforcement to land, with tests, before the maintenance path is enabled.
 
 ## Transitional compatibility
 

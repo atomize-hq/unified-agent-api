@@ -8,9 +8,10 @@ does not enumerate the checks. This note carries the checks and the attack scena
 review rounds produced, so they become tests of the validator instead of contract prose.
 
 The checks belong beside the depth record's schema in the manifest root's validator spec, which
-`manifest-validate` implements. They cannot be written as code before that schema and the request
-contract's P and O bindings exist. Until then this list is the record of what the validator must
-decide.
+`manifest-validate` implements. They cannot be written as code before that schema exists. The
+[maintenance request contract](../../specs/maintenance-request-contract-v1.md#depth-enrolled-generations)
+states how a maintenance request carries P and O; the onboarding charter does not yet state it
+for an approval. Until then this list is the record of what the validator must decide.
 
 ## Checks
 
@@ -122,3 +123,10 @@ Each scenario is a test case. "Pass" means validation must not fail; "fail" mean
   identities to check against. Annex A's promotion entry decides whether that suffices.
 - On the onboarding create lane, P must be frozen where the manifest root and the exact upstream
   version both exist, or check 1 cannot be satisfied.
+- A hand edit that restates the request's `[support_depth]` identities and the record together
+  passes check 3. Recomputing P needs its debt baseline, and recomputing O needs the acquired
+  inputs, which the same edit can change.
+- Comparing a changed debt row with the baseline P froze needs that baseline's content. The
+  request and the record hold P's identity only. The request's frozen `[support_surface_audit]`
+  rows hold part of it today: each row's identity, `debt_ref`, deferral reason and follow-on. The
+  schema decides where the rest is stated.

@@ -378,7 +378,7 @@ Shared storage MUST NOT merge their authority or their invalidation.
 
 | Binding | Content | Who may change it | A change invalidates |
 | --- | --- | --- | --- |
-| **Event** | Maintenance: `request_commit`, `request_recorded_at`, trigger and source. Onboarding: the approval artifact's `approval_commit` and `approval_recorded_at`. | Nobody inside a generation. A later generation has its own Event. | Nothing. It is attribution, not tested code. |
+| **Event** | Maintenance: `request_commit`, `request_recorded_at`, `trigger_kind` and `opened_from`. Onboarding: the approval artifact's `approval_commit` and `approval_recorded_at`. | Nobody inside a generation. A later generation has its own Event. | Nothing. It is attribution, not tested code. |
 | **P**, policy | Resolved rules, templates and classifications, promises and subsets, overrides and exclusions, depth enrollment selectors, path enablement, the debt delegation and the initial authorization baseline, for the depth scope tuples it governs | The maintainer, through explicit re-freeze or supersession | O, E and every dependent closeout and publication result |
 | **O**, obligations | The P reference, exact version and targets, acquired input identities, operation-to-surface edges and the concrete obligation set, independently required acceptance work included | Only the existing acquisition and preparation path, at its freeze and at any later re-freeze. A re-freeze MUST NOT change the agent, version, targets or depth enrollment. The executor never changes O. | E and every dependent closeout and publication result |
 | **E**, execution | The P and O references, implementation and evidence identities, reuse bindings, materialized debt grants, validated transitions from P's baseline and derived results | Execution, evidence refresh and delegated debt transitions | Dependent closeout and publication results |
@@ -403,8 +403,10 @@ Rules:
    non-executable. A lane whose reports exist at open keeps its existing treatment. A generation
    in which O is never frozen from target reports, on the docs-only lane or on an acquisition lane
    stood down before its second freeze, cannot reach acceptance for depth-enrolled scope. That
-   scope is reported as insufficient depth and never as not depth-enrolled. Where P and O are
-   frozen on the onboarding create lane is for the onboarding charter to define; see
+   scope is reported as insufficient depth and never as not depth-enrolled. The
+   [maintenance request contract](maintenance-request-contract-v1.md#depth-enrolled-generations)
+   states how a request carries P and O and what each freeze writes. Where P and O are frozen on
+   the onboarding create lane is for the onboarding charter to define; see
    [Path enablement](#path-enablement).
 8. A consumer acting on depth-enrolled scope MUST require the current executable schema revision
    and every binding the depth record states. A binding that the record shows its generation has
@@ -930,10 +932,12 @@ Present behavior that the required behavior changes:
    depth admission, or MA6 refuses for a depth-enrolled version.
 4. **The executor's envelope covers most depth-gated outputs.** MA4 runs unsandboxed, can call
    the neutral generators, and is checked only after it has written.
-   [Debt operations](#debt-operations) says execution never closes or promotes its own work. The
-   maintenance request contract amendment narrows the envelope for depth-enrolled scope, or MA4
-   reverts and refuses when its diff touches a depth-gated output other than through an admitted
-   reporting effect.
+   [Debt operations](#debt-operations) says execution never closes or promotes its own work. For
+   a depth-enrolled generation the
+   [maintenance request contract](maintenance-request-contract-v1.md#depth-enrolled-generations)
+   puts the request outside the envelope, and requires the relay to fail a run that makes an
+   acceptance effect or a reporting effect it cannot admit and to restore the depth-gated outputs
+   that run changed.
 5. **Aggregate generators rewrite every agent's rows.** MA2, MA3, MA4, MA6 and ON4 each
    regenerate publication for all agents under one path's authority. Each must determine the
    touched tuples from the values that change, as Complete mediation rule 1 requires.
