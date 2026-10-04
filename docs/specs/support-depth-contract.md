@@ -557,9 +557,10 @@ Every other depth-gated effect is a **reporting effect**.
 For every depth scope tuple a depth-gated effect touches, the route MUST establish:
 
 1. that depth enrollment resolves for the tuple under [Depth enrollment](#depth-enrollment);
-2. that what it writes states the tuple's results as they are. A result whose bindings are not
-   current is written as `unverified`. Nothing is written as better than its current bound
-   evidence supports; and
+2. that what it writes states the tuple's results as they are. A result is written as
+   `unverified` in each case record invariant 3 names, and when
+   [Reuse and invalidation](#reuse-and-invalidation) has invalidated it. Nothing is written as
+   better than the evidence the record binds for it supports; and
 3. that it removes no depth record, removes or alters no acceptance entry, and changes what a
    depth record states only as record invariant 2 permits.
 
