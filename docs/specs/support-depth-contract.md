@@ -778,4 +778,135 @@ guidance for the tests of the record invariants.
 
 ## Annex A: route inventory
 
-Not yet written. This contract MUST NOT be approved without it.
+Source revision: `staging` at `f61534be`. The inventory is final for that revision and MUST be
+established again against the revision that carries enforcement, as
+[Route inventory](#route-inventory) requires. Paths are relative to the repository root; `xtask/`
+abbreviates `crates/xtask/src/` and `wf/` abbreviates `.github/workflows/`.
+
+No route establishes depth admission today, and no conformance test exists for any route. Every
+"Required" cell below is enforcement and test work under [Path enablement](#path-enablement)
+item 4. Until that work lands for a route, the route's required behavior is to refuse a
+depth-gated effect.
+
+### A.1 Routes
+
+Each route is listed once, from its entrypoint forward. "Path" is the lifecycle path whose
+authority the route acts under; a neutral route has none of its own and takes it from its caller.
+
+| Id | Route | Entrypoint and callers | Path | Depth-gated outputs it can change | Reaches the integration branch by |
+| --- | --- | --- | --- | --- | --- |
+| M1 | `prepare-agent-maintenance` | `wf/agent-maintenance-open-pr.yml:148`; a maintainer | Maintenance | Maintenance request (`xtask/agent_maintenance/prepare.rs:270`) | Packet branch, then merge |
+| M2 | Acquisition | `wf/parity-acquire.yml:546-558`, called from the open-PR workflow or dispatched | Maintenance | Version metadata with `--status reported`; support publication; runtime-support projection; the request's second freeze (`:623`) | Push to the packet branch (`:897-913`), then merge |
+| M3 | `refresh-agent --write` | `wf/agent-maintenance-open-pr.yml:370`; a maintainer | Maintenance | Support publication, runtime-support projection, capability publication (`xtask/agent_maintenance/refresh.rs:137-228`) | Packet branch, then merge |
+| M4 | `execute-agent-maintenance --write` | A maintainer or contributor | Maintenance | None directly. It changes wrapper code and evidence, which E binds | Packet branch, then merge |
+| M5 | `close-agent-maintenance`, `prepare-agent-closeout` | A maintainer. No workflow calls either | Maintenance | Maintenance closeout; lifecycle record (`maintenance_closeout_written`, cleared drift) (`xtask/agent_maintenance/closeout/write.rs:41-113`) | Packet branch, then merge |
+| M6 | Promotion | `wf/parity-promote.yml:273-344`, dispatched by a maintainer | Maintenance | Root and per-target pointers and `current.json` (shell, `:285-308`); version metadata with `--status validated`; stand-down marker removal (shell, `:324-326`); support publication; runtime-support projection | Promotion PR against `staging` (`:367-376`), then merge |
+| O1 | `onboard-agent --write` | A maintainer | Onboarding | Scaffolds the manifest root: `current.json`, empty pointer and report directories (`xtask/onboard_agent/preview.rs:282-314`); lifecycle record (`xtask/onboard_agent/lifecycle.rs:95`) | Branch, then merge |
+| O2 | `runtime-follow-on`, `repair-runtime-evidence` | A maintainer | Onboarding | Lifecycle record, stages before `published` only (`xtask/runtime_follow_on/lifecycle.rs:133,176`; `xtask/repair_runtime_evidence.rs:380`) | Branch, then merge |
+| O3 | `prepare-publication` | A maintainer | Onboarding | Publication packet; lifecycle record to `publication_ready` (`xtask/prepare_publication.rs:431`) | Branch, then merge |
+| O4 | `refresh-publication` | A maintainer | Onboarding | Support publication, runtime-support projection, capability publication; lifecycle record to `published` (`xtask/publication_refresh.rs:187-266,433-472`) | Branch, then merge |
+| O5 | `close-proving-run`, `prepare-proving-run-closeout` | A maintainer | Onboarding | Proving-run closeout; lifecycle record to `closed_baseline`, cleared drift (`xtask/close_proving_run.rs:410-476`) | Branch, then merge |
+| N1 | `support-matrix` | M2, M6, a maintainer | Neutral | Support publication JSON and Markdown and the runtime-support projection, for every agent (`xtask/support_matrix/publication.rs:92`) | Its caller |
+| N2 | `capability-matrix` | A maintainer | Neutral | Capability publication, for every agent (`xtask/capability_matrix.rs:29`) | Its caller |
+| N3 | `manifest-version-metadata`, `codex-version-metadata` | M2, M6, a maintainer | Neutral | One version file; the status is a caller-supplied argument (`xtask/manifest_version_metadata.rs:184`) | Its caller |
+| N4 | `manifest-validate` in fix mode | A maintainer. CI runs check mode only | Neutral | Creates missing per-target pointers as `none`; rewrites `current.json` from the union that `latest_validated.txt` names (`xtask/manifest_validate/fix_mode.rs:5-46`) | Its caller |
+| N5 | `manifest-retain`, `codex-retain` | A maintainer. No workflow calls either | Neutral | Removes `reports/<version>/` for versions outside the keep set, the depth record with it (`xtask/manifest_retain.rs:97-126`) | Its caller |
+| N6 | Snapshot commands in legacy output mode | A maintainer | Neutral | `current.json` when the output directory is a manifest root (`xtask/*_snapshot/layout.rs:38`) | Its caller |
+| N7 | `historical-lifecycle-backfill` | A maintainer | Neutral | Publication packet, proving-run closeout and lifecycle record to `closed_baseline`, for several agents (`xtask/historical_lifecycle_backfill.rs:191-215`) | Its caller |
+| G1 | Merge into the integration branch | A pull request, or a direct push | Whatever the merged change carries | Every depth-gated output | The ref update itself |
+| G2 | Hand edit or unsupported tooling | Anyone with write access to a branch | None | Every depth-gated output | G1 |
+
+Every route other than G1 changes a branch, and its writes reach the integration branch only
+through G1. Under [Final depth admission](#final-depth-admission) those writes prepare a candidate
+and the gated sequence is G1's integration step.
+
+### A.2 Outputs
+
+Each depth-gated output is listed with every route that can change it, from the output backward.
+
+| Depth-gated output | Routes | Scope a route's change can reach | Present gate | Required |
+| --- | --- | --- | --- | --- |
+| Depth records | None writes one. N5 removes one. G2 | One version of one agent | None | The record is written at the P freeze (M1; the charter-defined point on the onboarding path), extended at O's freeze (M2), as E changes (M4) and with an acceptance entry (M5, M6, O4, O5). N5 MUST skip a depth record |
+| Support publication rows and Markdown | N1 through M2 and M6; M3; O4; G2 | Aggregate: every agent's rows are regenerated, whichever agent triggered the route | `make preflight` runs `support-matrix --check` on pull requests (`wf/ci.yml:190-201`, `Makefile:219`), which proves freshness against committed evidence and nothing about depth | Admission for every tuple whose row changes, not only the requesting agent's. A row that would change for another path's tuple is a reporting effect or the route refuses |
+| Capability publication | N2; M3; O4; a merge of adapter code that changes advertising; G2 | Aggregate, every agent | `capability-matrix --check` and the audit in `make preflight` | As above. Added advertising is an acceptance effect under the path that owns the tuple |
+| Version metadata | N3 through M2 (`reported`) and M6 (`validated`); G2 | One version file | None. The status is whatever the caller passes | `validated`, `supported` and passed per-target outcomes are acceptance effects under the maintenance path. `reported` is a reporting effect |
+| `current.json` | M6 (shell); N4; N6; O1 at scaffold; G2 | One manifest root | `manifest-validate` in CI for three roots | A change that makes it list a depth-enrolled tuple's target follows the pointer it mirrors. N4 and N6 refuse when the root holds a depth record, unless called by a route that established admission |
+| Pointers | M6 (shell); N4 (creates `none`, normalizes formatting); G2 | One root, per target; a later version's promotion displaces the earlier version's tuples | `manifest-validate` checks pointer shape and consistency | Setting or advancing a pointer to a depth-enrolled version is an acceptance effect under the maintenance path. Moving it off one is displacement under [Later versions](#later-versions) |
+| Embedded runtime-support projection | N1 through M2 and M6; M3; O4; G2 | Aggregate, every agent and target | `support-matrix --check` | Follows the pointers it is derived from: the same admission as the pointer change that causes it |
+| Stand-down markers | Removal by M6 (shell); G2. Declared by a maintainer's commit | One version of one agent | None beyond the merge of the promotion PR | Removal is an acceptance effect under the maintenance path |
+| Maintenance request | M1; M2 at the second freeze; G2 | One agent. The file is replaced when a later version's generation opens | The request contract's own validation | Reporting effect. Replacing it displaces the earlier version's tuples, which then resolve from their depth record |
+| Maintenance closeout | M5; G2 | One agent, one file replaced across versions | The stand-down check and the commit binding (`xtask/agent_maintenance/closeout.rs:55-66`) | Acceptance effect under the maintenance path, with an acceptance entry listed in the same change |
+| Proving-run closeout | O5; N7; G2 | One agent | The approval and lifecycle continuity checks in O5 | Recording `closed` is an acceptance effect under the onboarding path, with an entry in the same change. N7 refuses for an agent that has a depth record |
+| Lifecycle record | O1, O2, O3 (stages before `published`); O4 (`published`); O5 and N7 (`closed_baseline`); M5 (`maintenance_closeout_written`, cleared drift); G2 | One agent. It names no version | Stage and evidence validation when the record is loaded (`xtask/agent_lifecycle.rs:354-484`) | `published`, `closed_baseline`, the two closeout evidence ids and a cleared drift state are acceptance effects, attributed through the packet or closeout they report. Earlier stages are not depth-gated |
+
+### A.3 Serialization domains
+
+No cross-process lock exists. Every xtask route writes a working tree, and several write through
+`workspace_mutation::apply_mutations` (`xtask/workspace_mutation.rs:246`), which is not atomic
+across files and holds nothing between processes.
+
+| Domain | Members | Present serialization | Required |
+| --- | --- | --- | --- |
+| The integration branch | G1, and through it every other route | None. `staging` has no branch protection and no ruleset: no required status check, no required pull request and no requirement that a branch be up to date. Only `main` is protected, and its one required check is the source-branch guard | The tip-conditional ref update that [Final depth admission](#final-depth-admission) requires, with depth admission established against the exact merge result. This is the serialization for every route above |
+| One packet branch | M1, M2, M3, M4, M5 for one agent and version | Workflow concurrency on the packet branch name; acquisition fails instead of rebasing when its push is rejected (`wf/parity-acquire.yml:897-913`) | Sufficient for preparing a candidate. It is not depth admission |
+| Promotion of one version | M6 | Workflow concurrency per agent and version (`wf/parity-promote.yml:50-52`) | Sufficient for preparing a candidate |
+| Aggregate publication | N1, N2, M3, O4 from different branches | None. Two branches that each regenerate the aggregate conflict textually at merge or are merged in sequence | Covered by the integration branch domain: the second merge is re-checked against the tip that contains the first |
+
+Restorations, each a depth-gated effect when it rewrites a depth-gated output:
+
+- `refresh-publication` captures snapshots, applies its mutations, runs its gate and restores on
+  failure (`xtask/publication_refresh.rs:255-266,508-534`).
+- `prepare-agent-closeout` restores on failure (`xtask/agent_maintenance/prepare_closeout.rs:307`).
+- `repair-runtime-evidence` restores a backup (`xtask/repair_runtime_evidence.rs:312`).
+
+Each runs inside one process on one working tree before anything is committed, so no other route
+can have changed the files it restores. A restoration that could overwrite another writer's state
+would arise only if two routes shared a working tree, which no workflow does.
+
+### A.4 Reconciliation
+
+The output view and the entrypoint view agree: every writer found from an output in A.2 is a
+route in A.1, and every route in A.1 appears under each output it can change. Three writers were
+found only from one direction and are included above: the promotion workflow's shell copy of the
+union to `current.json`, fix mode's pointer creation, and the snapshot commands' legacy mode.
+
+Entrypoints checked and found to produce no depth-gated effect: `manifest-union`,
+`manifest-report`, the wrapper-coverage generators, `manifest-acquisition-plan`,
+`maintenance-watch`, `maintenance-audit-status`, `maintenance-stand-down-check`,
+`check-agent-drift`, `scaffold-wrapper-crate`, `recommend-next-agent-research`,
+`capability-matrix-audit`, `version-bump`, and every `--check` or dry-run mode. Coverage reports
+and `wrapper_coverage.json` are not depth-gated outputs.
+
+Present behavior that the required behavior changes:
+
+1. **The integration step is ungated.** A direct push to `staging` reaches every depth-gated
+   output with no check at all, and a pull request can merge while its checks are failing or were
+   run against an older tip. Enabling any path requires a tip-conditional, check-enforced ref
+   update on the integration branch.
+2. **Pointers, `current.json` and stand-down markers are written by workflow shell.** No shared
+   command mediates them, so [Complete mediation](#complete-mediation) rule 5 cannot hold for M6
+   as it stands. The writes move behind a command that establishes depth admission, or M6 refuses
+   for a depth-enrolled version.
+3. **Aggregate generators rewrite every agent's rows.** M2, M3, M6 and O4 each regenerate
+   publication for all agents under one path's authority. Each must determine the touched tuples
+   from the values that change, as Complete mediation rule 1 requires.
+4. **`manifest-retain` deletes depth records.** It removes `reports/<version>/` wholesale. It
+   MUST leave a depth record in place.
+5. **Version status is a caller-supplied argument.** Complete mediation rule 6 and
+   [Depth enrollment](#depth-enrollment) rule 7 exclude a caller-supplied argument as authority.
+6. **Two manifest roots have no validator spec.** `cli_manifests/aider` and
+   `cli_manifests/gemini_cli` hold none, and CI validates three roots. Neither may hold a depth
+   record until it has one.
+
+### A.5 Promotion after the working files were replaced
+
+A later version's generation can open between a version's closeout (M5) and its promotion (M6),
+and it replaces the maintenance request and closeout files. Promotion then has the depth record
+and nothing else for the earlier version.
+
+Promotion is admitted from the record in that case. M6 establishes depth admission when the record
+lists the closeout's acceptance entry and still states what that entry was made for, and it lists
+its own entry in the same change. When the record's state has changed since the closeout, M6
+refuses and the version is closed out again. The P and O content the predicate requires to be
+present is the content whose identities the record states; the replaced working files are not
+required.
