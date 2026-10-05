@@ -44,7 +44,7 @@ documents are not normative.
 | Wrapper coverage levels `explicit`, `passthrough`, `unsupported`, `intentionally_unsupported` and `unknown` | [Coverage generator contract](codex-wrapper-coverage-generator-contract.md) | Unchanged. A coverage level never states depth. |
 | Name identity `(surface_kind, command_path, surface_id)`, the support-surface audit, required uplifts and allowed deferrals | [Maintenance request contract](maintenance-request-contract-v1.md) | Unchanged. Depth obligations are additional. |
 | Debt rows and their target- and version-scoped authorization | [Debt inventory](unified-agent-api/non-tui-support-debt.md) | Unchanged. A debt row stays name-level; see [Debt operations](#debt-operations). |
-| Release-watch enrollment | [Registry contract](agent-registry-contract.md) | Unchanged. Depth enrollment is a separate selection. |
+| Release-watch enrollment | [Registry contract](agent-registry-contract.md) | Unchanged. Depth enrollment is a separate selection, declared in the same registry entry. |
 | Capability ids and their minimum semantics | [Capabilities spec](unified-agent-api/capabilities-schema-spec.md) and each capability's owner document | Unchanged. |
 | The capability promotion rule and its allowlist | [Onboarding charter](cli-agent-onboarding-charter.md) | Unchanged. Depth admission is added for the capabilities a depth enrollment claims. |
 | Lifecycle stages and support tiers | The committed lifecycle record, as the onboarding charter designates | Unchanged. Neither is a depth result. |
@@ -463,8 +463,9 @@ work.
    acquisition completeness, existing shared promises or the release-watch ratchet.
 7. Resolution MUST be deterministic. A version's depth enrollment resolves from its depth record.
    Until the record is written, registry-owned authority and the frozen request or approval
-   resolve it. An executor's assertion, an optional field and a caller-supplied argument are not
-   authority.
+   resolve it. The [registry contract](agent-registry-contract.md#support-depth) states where a
+   depth enrollment is declared. An executor's assertion, an optional field and a caller-supplied
+   argument are not authority.
 8. Missing policy for selected scope, an unsupported schema revision, unresolved or overlapping
    depth enrollment selectors, contradictory generation references and deleted bindings are errors.
    None of them resolves to "not depth-enrolled". A removed depth record is a deleted binding. A
@@ -706,6 +707,9 @@ The maintenance path MAY be enabled when all of the following hold:
 Enabling the maintenance path does not require the onboarding path to be proven. A single route
 that fails item 3 blocks it.
 
+The maintainer's authorization under item 5 is recorded in the registry, agent by agent, as the
+[registry contract](agent-registry-contract.md#support-depth) states.
+
 The onboarding path MAY be enabled when items 1, 3, 4 and 5 hold for it, the onboarding charter
 defines where P and O are frozen on the create lane, at a point where the agent's manifest root,
 its validator spec and its exact upstream version exist, and an independent new-entry run in an
@@ -720,8 +724,10 @@ acceptance effect.
 A cross-agent workflow that adds shared mappings MUST NOT be enabled until the maintenance and
 onboarding chains are both proven and landed.
 
-When a prerequisite stops holding, new acceptance effects for depth-enrolled tuples on that path
-MUST be refused. The path MUST NOT fall back to rules that predate this contract.
+When a prerequisite stops holding, or the maintainer withdraws the authorization, new acceptance
+effects for depth-enrolled tuples on that path MUST be refused. The path MUST NOT fall back to
+rules that predate this contract. A depth enrollment declared for a path that is not enabled is
+treated the same way: its tuples stay depth-enrolled and receive no acceptance effect.
 
 ## Additive shared integration
 

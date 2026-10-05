@@ -23,6 +23,7 @@ derive one shared automated maintenance packet contract.
 - onboarding packet ownership
 - maintenance governance checks for already-onboarded agents
 - maintenance release-watch enrollment and upstream-watch metadata
+- support-depth path enablement and depth enrollment declarations
 
 Generated docs and maintenance packets MAY reference this registry, but they MUST NOT redefine its
 schema.
@@ -76,6 +77,17 @@ Absence of `maintenance.release_watch` is the only “not enrolled” state. Cal
 second enrollment inventory outside the registry or represent unenrolled agents with
 `enabled = false` placeholders.
 
+Support depth, when it is configured for an agent, lives under:
+
+```toml
+[agents.support_depth]
+[[agents.support_depth.enrollments]]
+```
+
+[Support depth](#support-depth) defines that table and states when it takes effect. In this
+document “enrolled” without a qualifier keeps its existing meanings, and depth enrollment is
+always written with the qualifier.
+
 Approval artifacts and create-lane closeout consumers MUST preserve exactly two maintenance
 approval modes:
 
@@ -90,6 +102,8 @@ These modes do not create a second enrollment contract:
   agent
 - callers MUST NOT introduce a third approval-maintenance mode or alternate release-watch
   enrollment storage outside the registry
+
+Depth enrollment adds no approval-maintenance mode; see [Support depth](#support-depth).
 
 ## Maintenance release watch
 
@@ -177,6 +191,126 @@ docs-only maintenance path with no behavior change.
 Watch and acquire are independent. `maintenance.release_watch.upstream.source_kind` governs
 release *detection*; `acquisition.source_kind` in the manifest governs where *binaries* come from.
 An agent may legitimately watch one source and acquire from another.
+
+## Support depth
+
+The [support-depth contract](support-depth-contract.md) owns the rules for support depth: what a
+depth enrollment selects, how one resolves, what the remainder is, what a lifecycle path is and
+what enabling one requires. This section states only what the registry owns for them: where a
+depth enrollment is declared, where the enablement of a lifecycle path is recorded, what absence
+means and who may change either. Where it applies one of those rules it does not redefine it, and
+a term it does not define has the meaning the support-depth contract gives it.
+
+While the support-depth contract is a Draft this section binds nothing.
+
+`support_depth` records, for one agent, the lifecycle paths the maintainer has enabled and the
+depth enrollments the maintainer has approved. The schema is:
+
+```toml
+[agents.support_depth]
+enabled_paths = ["maintenance"]
+
+[[agents.support_depth.enrollments]]
+lifecycle_path = "maintenance"
+version = "1.2.3"
+targets = ["linux-x64"]
+```
+
+| Field | Rule |
+| --- | --- |
+| `enabled_paths` | The lifecycle paths enabled for this agent: `maintenance`, `onboarding` or both. It records the maintainer's authorization under the support-depth contract's path enablement, with this agent as the bounded production scope. It MUST be omitted when no path is enabled, and it MUST NOT repeat a path. |
+| `enrollments` | One entry for each depth enrollment the maintainer has approved for this agent. It MUST be omitted when there is none. |
+| `lifecycle_path` | MUST be `maintenance` or `onboarding`. |
+| `version` | MUST be one exact upstream version, in the form the agent's manifest root uses to name `versions/<version>.json`. A range, a wildcard and a moving name such as `latest` are invalid. |
+| `targets` | MUST list at least one target without repeats. Each MUST be a target the agent's manifest root expects. |
+
+The table MUST be omitted when it would hold neither key.
+
+Rules:
+
+1. The registry entry is the only place a depth enrollment is declared, and the only place the
+   enablement of a lifecycle path is recorded. A workflow input, a command-line argument, a
+   request field and a file under the manifest root MUST NOT declare either, and MUST NOT stand
+   in for a missing one. They carry what is derived from this table, as the `[support_depth]`
+   table of a maintenance request does.
+2. Once a generation has written a version's depth record, the support-depth contract resolves
+   that version's depth enrollment from the record. The record states what was resolved from this
+   table. It is not a second place to declare a depth enrollment.
+3. An entry with no `enrollments` entry for a version declares no depth enrollment of that
+   version. Unless the version already has a depth record (rule 11), that absence is what places
+   it in the support-depth contract's remainder, and nothing else declares the remainder. Callers
+   MUST NOT model a version or an operation that is not depth-enrolled as a disabled, empty or
+   placeholder entry, and MUST NOT enumerate the remainder.
+4. A declaration states the whole positive selection the support-depth contract requires. Beyond
+   the fields above, that is the operations and their promises, their modes and required values
+   and, for each capability the declaration claims, the complete set of operations through which
+   the agent's adapter honors it. The other policy entries the maintainer approves for the
+   agent's depth scope tuples, such as classification entries, mode exclusions and overrides, are
+   stated in the same `support_depth` table and nowhere else.
+5. This revision does not define the fields that carry what rule 4 lists. They are an executable
+   schema revision of this contract, which the support-depth contract requires to be adopted
+   before a path is enabled. Until that revision is adopted `enabled_paths` MUST be absent from
+   every entry, and a declaration that lacks its operations is missing policy for its selected
+   scope.
+6. A declaration selects one exact upstream version of one agent on one lifecycle path. An entry
+   MUST NOT carry two declarations with the same `version`, whether they name the same lifecycle
+   path or different ones.
+7. A declaration whose `lifecycle_path` is `maintenance` MUST sit in an entry that carries
+   `maintenance.release_watch`, because the maintenance request contract opens its generations
+   for release-watch agents only. Depth enrollment is otherwise independent of release-watch
+   enrollment. It adds no way to enroll an agent for release watch and creates no second
+   release-watch inventory.
+8. A declaration whose `lifecycle_path` is not listed in `enabled_paths` is still a declaration,
+   and its version is depth-enrolled. The support-depth contract decides what a path that is not
+   enabled may do. Removing a path from `enabled_paths` withdraws the maintainer's authorization
+   and removes no declaration.
+9. `support_depth` is maintainer-owned. A path is enabled, and a declaration is added, changed or
+   removed, only by a maintainer's change to the registry. `onboard-agent` is the one exception.
+   When it writes a new agent's entry from a committed approval artifact, what it writes under
+   `support_depth` MUST be what that approval states. When it is given descriptor flags instead
+   of an approval artifact it MUST NOT write the table. No other command or workflow, and no
+   executor run, writes it.
+10. An approval artifact states the depth enrollment it approves on the onboarding path so that
+    `onboard-agent` can write it. It is not a second depth enrollment inventory: resolution reads
+    the registry, and the approval requires the committed declaration in the same agent's entry,
+    as `release_watch_enrolled` requires committed `maintenance.release_watch` truth. How an
+    approval states and binds that declaration is for the onboarding charter to define.
+11. A change to this table changes no binding that a generation has frozen. The support-depth
+    contract defines when a generation freezes what it resolves from the table, and what a frozen
+    binding that no longer agrees with the table may still do. Removing a declaration does not
+    make its version "not depth-enrolled" once that version has a depth record. It leaves the
+    version without the policy its selection needs.
+12. A registry that breaks a rule of this section that the registry alone decides is invalid, as
+    it is for any other schema rule of this contract. A declaration that cannot be resolved for
+    another reason, such as a target the manifest root does not expect or missing operations, is
+    an error for that agent and version under the support-depth contract. A reader MUST NOT
+    treat either case as "not depth-enrolled".
+
+The support-depth contract's minimum machinery rule requires the failure a new field prevents to
+be named. Without `enrollments`, nothing the maintainer owns would state which version, operations
+and targets were approved, and depth enrollment would rest on a caller-supplied argument or on
+what a run asserts, neither of which the support-depth contract accepts as authority. Without
+`enabled_paths`, the only way to withdraw the authorization for a path would be to delete the
+declarations made on it. A version that has no depth record yet would then read as never selected,
+and its work would fall back to the rules that predate the support-depth contract, which that
+contract forbids.
+
+### Present behavior
+
+None of this section is implemented, and it has no effect until a depth enrollment is declared.
+Today:
+
+- The registry loader rejects unknown fields at the top level, in an agent entry and under
+  `maintenance`. A registry that carried `support_depth` would fail to load, and the onboarding,
+  maintenance and publication commands all load the registry.
+- No entry carries the table, and no command reads a depth enrollment from anywhere.
+- `onboard-agent --write` is the only command that writes the registry. It appends the new
+  agent's entry, from an approval artifact or from descriptor flags.
+- `.github/CODEOWNERS` assigns the registry to the maintainer. The integration branch has no
+  branch protection, so nothing enforces that ownership there.
+- The relay's `writable_surfaces` do not include the registry.
+- `manifest-validate`, `manifest-version-metadata` and `manifest-retain` take a manifest root and
+  do not read the registry.
 
 ## Maintenance governance checks
 
