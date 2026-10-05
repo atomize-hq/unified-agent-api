@@ -455,9 +455,10 @@ work.
    it, or one that rule 7 keeps. The [registry contract](agent-registry-contract.md#support-depth)
    states how one is declared. A declaration MUST NOT be added, or moved to another lifecycle path,
    unless the same commit leaves that lifecycle path enabled for its agent. Restoring the
-   declaration of a version whose depth record the integration branch holds is not an addition. A
-   selection made inside an isolated proof workspace is not a production depth enrollment and MUST
-   NOT produce a depth-gated effect on production outputs.
+   declaration of a version whose depth record the integration branch holds, on the lifecycle path
+   that record's selection names, is not an addition. A selection made inside an isolated proof
+   workspace is not a production depth enrollment and MUST NOT produce a depth-gated effect on
+   production outputs.
 4. The remainder is declared once, by rule. It MUST NOT be enumerated per historical operation,
    modeled as disabled placeholders or compared against an adoption baseline.
 5. The remainder carries no depth claim. It is not an exclusion, a waiver or debt, and every
@@ -467,15 +468,17 @@ work.
    acquisition completeness, existing shared promises or the release-watch ratchet.
 7. Resolution MUST be deterministic. Registry-owned authority and the frozen request or approval
    resolve a version's depth enrollment. Each generation freezes its P from registry-owned
-   authority, and where the version already has a depth record that P MUST cover every
-   invocation mode the record's selection covers, on each target the mode is covered on, and
-   MUST claim every capability id the record claims. Once the integration branch holds the
-   record, everything its selection covers stays depth-enrolled under a production depth
-   enrollment, whatever the registry declares afterwards. A record that the integration branch
-   does not hold is part of a candidate and is discarded with it. Whether the integration branch
-   holds a record is established at the integration step, against the tip. An executor's
-   assertion, an optional field of a request or approval and a caller-supplied argument are not
-   authority.
+   authority, and where the tree it freezes in already holds the version's depth record, that P
+   MUST cover every invocation mode the record's selection covers, on each target the mode is
+   covered on, and MUST claim every capability id the record claims. Once the integration branch
+   holds the record, everything the record's selection covers as that branch holds it stays
+   depth-enrolled under a production depth enrollment, whatever the registry declares afterwards.
+   So far as the integration branch does not hold what a record states, the record is part of a
+   candidate and is discarded with it. Whether the integration branch holds a record, and what it
+   holds of it, is established at the integration step, against the tip. A route that runs before
+   that step reads the record its own tree holds as the one the integration branch holds. An
+   executor's assertion, an optional field of a request or approval and a caller-supplied argument
+   are not authority.
 8. Missing policy for selected scope, an unsupported schema revision, unresolved or overlapping
    depth enrollment selectors, contradictory generation references and deleted bindings are errors.
    None of them resolves to "not depth-enrolled". A removed depth record is a deleted binding. A
@@ -487,8 +490,8 @@ work.
 10. Work that is due in a frozen generation stays due until it is satisfied or validly
     dispositioned. Moving it to another packet, ending the selection, pausing, removing
     advertising or deleting a declaration does not discharge it. The version's depth record
-    carries that work. A generation whose record the integration branch never held leaves no due
-    work once its candidate is discarded.
+    carries that work. Work that the record carries only as part of a candidate is no longer due
+    once that candidate is discarded.
 11. Depth enrollment MUST NOT create a second release-watch enrollment inventory.
 
 ## Depth admission
