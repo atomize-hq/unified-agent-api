@@ -538,8 +538,8 @@ Rules:
 2. Event needs no field of its own. It is the request's `request_commit` and
    `request_recorded_at`, with `trigger_kind` and `opened_from` as its trigger and source.
 3. Each identity is a SHA-256 digest written as 64 lowercase hex characters, the form
-   `prompt_sha256` uses. What each digest is taken over is defined with the depth record's schema.
-   The table carries the two identities and nothing else, and `[support_surface_audit]` is
+   `prompt_sha256` uses. Annex B of the support-depth contract defines what each digest is taken
+   over. The table carries the two identities and nothing else, and `[support_surface_audit]` is
    unchanged.
 4. A validating loader MUST reject the request unless the target version's depth record states
    the request's Event and the same two identities, with O shown as not yet produced while
@@ -575,9 +575,10 @@ The freeze points are unchanged. For a depth-enrolled generation:
    unchanged. For P's debt baseline the comparison is between the debt rows as the tree now holds
    them and the baseline as the first freeze froze it. A difference that the support-depth
    contract's debt operations assign to execution changes E and is not a change to P. Any other
-   difference from that baseline is a change to P. Where the content of that baseline is stated
-   is for the depth record's schema to define. The request's `[support_surface_audit]` rows
-   cannot serve, because every re-freeze takes them again from the tree.
+   difference from that baseline is a change to P. The depth record states that baseline in its
+   policy part, as Annex B of the support-depth contract defines. The request's
+   `[support_surface_audit]` rows cannot serve, because every re-freeze takes them again from
+   the tree.
 4. On this path P changes only when a new generation opens, and within a generation O is frozen
    again only by a re-freeze.
 5. A freeze that records the standing request's Event for another target version is not a

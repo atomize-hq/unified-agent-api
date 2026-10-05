@@ -241,15 +241,15 @@ Rules:
    request field and a file under the manifest root MUST NOT declare either. None of them stands
    in for a missing declaration, except the depth record as rule 2 states. They carry what is
    derived from this table, as a maintenance request's own `[support_depth]` table does.
-2. Once a generation has written a version's depth record, the support-depth contract keeps
+2. Once the integration branch holds a version's depth record, the support-depth contract keeps
    everything the record selects depth-enrolled, whatever this table declares afterwards. The
    record states what was resolved from this table. It is not a second place to declare a depth
    enrollment, and each later generation still resolves its policy from this table.
 3. An entry with no declaration for a version declares no depth enrollment of that version. That
    absence is how the registry states the support-depth contract's remainder. That contract says
-   what the remainder is and how it may be represented, and rule 2 covers a version that already
-   has a depth record. The registry MUST NOT carry a disabled, empty or placeholder entry for a
-   version or an operation that is not depth-enrolled.
+   what the remainder is and how it may be represented, and rule 2 covers a version whose depth
+   record the integration branch holds. The registry MUST NOT carry a disabled, empty or
+   placeholder entry for a version or an operation that is not depth-enrolled.
 4. A declaration states the whole positive selection the support-depth contract requires. Beyond
    the fields above, that is the operations and their promises, their modes and required values
    and, for each capability the declaration claims, the complete set of operations through which
@@ -269,11 +269,11 @@ Rules:
    the maintenance request contract opens generations for release-watch agents only.
 8. The support-depth contract's depth enrollment rule 3 says when a declaration may be added:
    only in a commit that leaves its lifecycle path in `enabled_paths`. Restoring the declaration
-   of a version that has a depth record is not an addition. Removing a path from `enabled_paths`
-   withdraws the maintainer's authorization and removes no declaration. A declaration whose
-   lifecycle path `enabled_paths` does not list, however that came about, is still a declaration
-   and its version is depth-enrolled. The support-depth contract's path enablement says what its
-   tuples may receive.
+   of a version whose depth record the integration branch holds is not an addition. Removing a
+   path from `enabled_paths` withdraws the maintainer's authorization and removes no
+   declaration. A declaration whose lifecycle path `enabled_paths` does not list, however that
+   came about, is still a declaration and its version is depth-enrolled. The support-depth
+   contract's path enablement says what its tuples may receive.
 9. `support_depth` is maintainer-owned. A path is enabled, and a declaration is added, changed or
    removed, only by a maintainer's change to the registry. No command or workflow, and no
    executor run, writes this table. `onboard-agent` MUST NOT write it into the entry it appends
@@ -285,12 +285,13 @@ Rules:
     charter to define.
 11. A change to this table changes no binding that a generation has frozen. The support-depth
     contract's Bindings rules say when a generation freezes P, and its depth admission predicate
-    requires a frozen P to be current. Once a version has a depth record, removing its
-    declaration, or changing it so that it covers less than the record's selection covers,
-    un-enrolls nothing. Coverage is measured by invocation mode and target, as the support-depth
-    contract's depth enrollment rule 7 states. Such a change leaves what the record covers
-    without the policy it needs, which rule 12 treats as missing policy. A declaration changed to
-    cover more takes effect for the generation that next freezes P.
+    requires a frozen P to be current. Once the integration branch holds a version's depth
+    record, removing its declaration, or changing it so that it covers less than the record's
+    selection covers, un-enrolls nothing. Coverage is measured by invocation mode and target, as
+    the support-depth contract's depth enrollment rule 7 and its Annex B state. Such a change
+    leaves what the record covers without the policy it needs, which rule 12 treats as missing
+    policy. A declaration changed to cover more takes effect for the generation that next
+    freezes P.
 12. The registry alone decides the field rules above, apart from whether a target is one that
     `union.expected_targets` lists or a depth record covers, and it alone decides rules 5 and 6. A
     registry that breaks one of these is invalid, as it is for any other schema rule of this
@@ -327,8 +328,10 @@ None of this section is implemented. Today:
 - `.github/CODEOWNERS` assigns the registry to the maintainer. As read on 2026-10-05, the
   integration branch has no branch protection, so nothing enforces that ownership there.
 - The relay's `writable_surfaces` do not include the registry.
-- `manifest-validate`, `manifest-version-metadata` and `manifest-retain` take a manifest root and
-  do not read the registry.
+- `manifest-version-metadata` and `manifest-retain` take a manifest root and do not read the
+  registry. `manifest-validate` loads it only when it runs inside a workspace, to find the
+  manifest roots whose support publication it checks, so it too fails on a registry it cannot
+  load.
 
 ## Maintenance governance checks
 
