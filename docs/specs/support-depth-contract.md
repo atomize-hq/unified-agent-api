@@ -156,7 +156,9 @@ Each obligation in an operation's set produces exactly one result: `verified`, `
 - `not_applicable` MUST carry a rationale and is valid only where the resolved policy permits it
   for the stated promise. An unavailable target or an unknown effect is not `not_applicable`.
 - An unknown output contract is `unverified`. A known counterexample is `failed`.
-- A result whose bindings are no longer current is `unverified` until it is verified again.
+- A result produced under a P, O or E other than the one its depth record states, or invalidated
+  under [Reuse and invalidation](#reuse-and-invalidation), is `unverified` until it is verified
+  again.
 - An obligation with no admissible evidence is `unverified`. While qualifying runs for an
   obligation contradict each other, its result is `unverified`.
 - A constrained value subset, such as JSON-only output, is an applicable promise about that
@@ -557,7 +559,7 @@ Every other depth-gated effect is a **reporting effect**.
 For every depth scope tuple a depth-gated effect touches, the route MUST establish:
 
 1. that depth enrollment resolves for the tuple under [Depth enrollment](#depth-enrollment);
-2. that what it writes states the tuple's results as they are. A result is written as
+2. that what it writes states the tuple's results as they are. A published result is written as
    `unverified` in each case record invariant 3 names, and when
    [Reuse and invalidation](#reuse-and-invalidation) has invalidated it. Nothing is written as
    better than the evidence the record binds for it supports; and
