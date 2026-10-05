@@ -15,10 +15,22 @@ Automated maintenance packet for `codex` target `0.159.3`.
 - required: `true`
 - pre-run debt count: `2`
 - expected post-run debt count: `2`
-- discovered upstream surface rows: `2`
+- discovered upstream surface rows: `14`
 - preexisting unsupported rows: `2`
 - required uplifts this run:
 - `codex completion` `completion` via `unbaselined_gap`
+- `codex exec-server` `--linux-sandbox-pid-namespace` via `unbaselined_gap`
+- `codex exec-server` `--proxy-private-ips-via-upstream` via `unbaselined_gap`
+- `codex exec-server` `--ws-audience` via `unbaselined_gap`
+- `codex exec-server` `--ws-auth` via `unbaselined_gap`
+- `codex exec-server` `--ws-issuer` via `unbaselined_gap`
+- `codex exec-server` `--ws-max-clock-skew-seconds` via `unbaselined_gap`
+- `codex exec-server` `--ws-shared-secret-file` via `unbaselined_gap`
+- `codex exec-server` `--ws-token-file` via `unbaselined_gap`
+- `codex exec-server` `--ws-token-sha256` via `unbaselined_gap`
+- `codex exec-server forward` `--linux-sandbox-pid-namespace` via `unbaselined_gap`
+- `codex exec-server forward` `--proxy-private-ips-via-upstream` via `unbaselined_gap`
+- `codex mcp add` `--oauth-client-secret` via `unbaselined_gap`
 - `codex completion` `SHELL` via `unbaselined_gap`
 - deferred preexisting gaps:
 - `codex completion` `completion` via `requires_new_architectural_seam` (TODOS.md#close-codex-completion-maintenance-gap)
