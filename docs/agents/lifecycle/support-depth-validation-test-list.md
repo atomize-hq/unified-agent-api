@@ -22,10 +22,10 @@ integration branch tip it would replace.
 | # | Decided on | Fails when | Invariant |
 | --- | --- | --- | --- |
 | 1 | Any revision | A generation has P frozen for depth-enrolled scope and its version has no depth record | 1 |
-| 2 | Merge | A depth record is removed, an acceptance entry is removed or altered, or a record's selection comes to cover less: an invocation mode or target it covered is no longer selected | 1 |
+| 2 | Merge | A depth record is removed, an acceptance entry is removed or altered, or a record's selection comes to cover less: an invocation mode or target it covered is no longer covered, or a capability it claimed is no longer claimed | 1 |
 | 3 | Any revision | The revision holds a frozen request or approval for a record's version, and the record's Event, P or O is not that generation's | 2 |
 | 4 | Merge | What a depth record states changes while the merge result holds no frozen request or approval for the record's version | 2 |
-| 5 | Any revision | A published result is neither the result the record states nor `unverified`, or is not `unverified` although the record does not yet state it or the record does not state the P and O that its E references | 3 |
+| 5 | Any revision | A published result is neither the result the record states nor `unverified`, or is not `unverified` although the record does not yet state it or the P or the O that its E references is not the one the record states | 3 |
 | 12 | Any revision | A promise is published as qualified, or a capability as depth-qualified, while a result the claim rests on is published as anything other than `verified` or a permitted `not_applicable` | 3 |
 | 6 | Any revision | A tuple the record selects is published as not depth-enrolled | 3 |
 | 7 | Any revision | A result is published as `verified`, or a promise or capability as qualified or depth-qualified on it, and the record states it as `verified` and binds no evidence for it, or binds evidence that is absent or has another content identity | 3 |
@@ -126,6 +126,11 @@ Each scenario is a test case. "Pass" means validation must not fail; "fail" mean
   branch cut before the declaration landed. Only depth admission at the integration step does.
 - A declared version that has no depth record yet has no publication rule, because depth facts
   are published from depth records.
+- Check 2 needs a record to state what its selection covers in a form that can still be compared
+  after operations are split, renamed or reclassified. The schema decides that form.
+- "Once the record is written" can mean the first freeze or the first merge into the integration
+  branch. A declaration narrowed before a record reaches the integration branch yields a smaller
+  first record there, and check 2 has no earlier record to compare it with.
 - Retargeting the lifecycle record's `publication_packet_path` re-attributes a `published` stage.
   Decide whether the reference itself is checked.
 - The absence of a drift side state is attributed to the previous maintenance closeout while a

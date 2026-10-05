@@ -160,8 +160,8 @@ Each obligation in an operation's set produces exactly one result: `verified`, `
 - `not_applicable` MUST carry a rationale and is valid only where the resolved policy permits it
   for the stated promise. An unavailable target or an unknown effect is not `not_applicable`.
 - An unknown output contract is `unverified`. A known counterexample is `failed`.
-- A result is `unverified` until it is verified again when its depth record does not state the P
-  and O that the record's E references, or when it is invalidated under
+- A result is `unverified` until it is verified again when the P or the O that its depth record's
+  E references is not the one the record states, or when it is invalidated under
   [Reuse and invalidation](#reuse-and-invalidation).
 - An obligation with no admissible evidence is `unverified`. While qualifying runs for an
   obligation contradict each other, its result is `unverified`.
@@ -452,11 +452,11 @@ work.
 2. A later version inherits nothing from an earlier depth enrollment: no depth enrollment, no
    qualification and no publication authority. How a later version may move a depth-enrolled
    version's pointer or replace its working files is set out in [Later versions](#later-versions).
-3. A production depth enrollment is one declared in the registry, as the
-   [registry contract](agent-registry-contract.md#support-depth) states. It MUST NOT be declared
-   for a lifecycle path that is not enabled for its agent at the time. A selection made inside an
-   isolated proof workspace is not a production depth enrollment and MUST NOT produce a
-   depth-gated effect on production outputs.
+3. A production depth enrollment is one declared in the registry as the integration branch holds
+   it; the [registry contract](agent-registry-contract.md#support-depth) states how. A
+   declaration MUST NOT be added unless the same commit leaves its lifecycle path enabled for its
+   agent. A selection made inside an isolated proof workspace is not a production depth
+   enrollment and MUST NOT produce a depth-gated effect on production outputs.
 4. The remainder is declared once, by rule. It MUST NOT be enumerated per historical operation,
    modeled as disabled placeholders or compared against an adoption baseline.
 5. The remainder carries no depth claim. It is not an exclusion, a waiver or debt, and every
@@ -466,10 +466,11 @@ work.
    acquisition completeness, existing shared promises or the release-watch ratchet.
 7. Resolution MUST be deterministic. Until a version's depth record is written, registry-owned
    authority and the frozen request or approval resolve its depth enrollment. Once the record is
-   written, everything the record selects is depth-enrolled, whatever the registry declares
-   afterwards. Each generation still freezes its P from registry-owned authority, and that P MUST
-   select every invocation mode and target the version's depth record selects. An executor's
-   assertion, an optional field of a request and a caller-supplied argument are not authority.
+   written, everything its selection covers stays depth-enrolled under a production depth
+   enrollment, whatever the registry declares afterwards. Each generation still freezes its P
+   from registry-owned authority, and that P MUST cover every invocation mode and target the
+   record's selection covers. An executor's assertion, an optional field of a request or approval
+   and a caller-supplied argument are not authority.
 8. Missing policy for selected scope, an unsupported schema revision, unresolved or overlapping
    depth enrollment selectors, contradictory generation references and deleted bindings are errors.
    None of them resolves to "not depth-enrolled". A removed depth record is a deleted binding. A
@@ -527,8 +528,10 @@ The following **record invariants** hold for every depth-gated output:
 1. A depth-enrolled version has a depth record from the time a generation first freezes P for it.
    A depth record MUST NOT be removed, whether by retention pruning or otherwise, and an
    acceptance entry MUST NOT be removed or altered. A record's selection MUST NOT shrink: every
-   invocation mode and target it covers stays covered, whichever operations then name them. A
-   manifest root without a validator spec MUST NOT hold a depth record.
+   invocation mode and target it covers stays covered, whichever operations then name them, a
+   mode that P comes to exclude under classification rule 7 stays covered, and a capability its
+   mappings claim stays claimed. A manifest root without a validator spec MUST NOT hold a depth
+   record.
 2. What a record states changes only when a later generation of the same version continues the
    record, or through a change that [Bindings](#bindings) permits to the binding concerned: the
    selection and the capability mappings belong to P, the obligations to O, and the results,
@@ -536,8 +539,8 @@ The following **record invariants** hold for every depth-gated output:
    identities a record states each cover what it states under that binding: nothing stated under
    a binding changes while that binding's identity stays the same.
 3. A published result is the result the record states, or `unverified`. It MUST be `unverified`
-   in three cases: the record does not yet state the result; the record does not state the P and
-   O that its E references; or the record states the result as `verified` and binds no
+   in three cases: the record does not yet state the result; the P or the O that its E references
+   is not the one the record states; or the record states the result as `verified` and binds no
    evidence for it, or binds evidence that is absent from the revision or has another content
    identity. A change to a dependency outside the bound evidence is not within this invariant. A
    promise is published as qualified, or a capability as depth-qualified, only when every result
@@ -574,8 +577,8 @@ For every depth scope tuple a depth-gated effect touches, the route MUST establi
    `unverified` in each case record invariant 3 names, and when
    [Reuse and invalidation](#reuse-and-invalidation) has invalidated it. Nothing is written as
    better than the evidence the record binds for it supports; and
-3. that it removes no depth record, removes or alters no acceptance entry, and changes what a
-   depth record states only as record invariant 2 permits.
+3. that it removes no depth record, removes or alters no acceptance entry, shrinks no record's
+   selection, and changes what a depth record states only as record invariant 2 permits.
 
 For an acceptance effect the route MUST also establish:
 
@@ -991,7 +994,8 @@ including:
   with its bound evidence present in the merge result under the content identity the record
   names, and no result has been invalidated under
   [Reuse and invalidation](#reuse-and-invalidation), as predicate items 2 and 5 require;
-- the debt grants E materializes still hold, and the path is still enabled; and
+- the debt grants E materializes still hold, and the path is still enabled for the tuple's
+  agent; and
 - predicate items 4 and 6 hold.
 
 MA6 lists its own acceptance entry in the same change. When any of these fails, MA6 refuses and

@@ -216,21 +216,21 @@ version = "1.2.3"
 targets = ["linux-x64"]
 ```
 
-The example shows the shape of the table. Rule 5 keeps the table out of every entry until a later
-revision of this contract.
+The example shows the shape of the table. Under rule 5 no entry carries it until a later revision
+of this contract defines the rest of a declaration.
 
 Two terms are used below. A lifecycle path is **enabled for an agent** when the agent's
 `enabled_paths` lists it. The key records the maintainer's authorization, which is item 5 of the
 support-depth contract's path enablement. The other items of path enablement are not registry
-facts. A **depth enrollment declaration**, below a declaration, is one entry of `enrollments`.
+facts. A **depth enrollment declaration** (below, a declaration) is one entry of `enrollments`.
 
 | Field | Rule |
 | --- | --- |
 | `enabled_paths` | The lifecycle paths enabled for this agent: `maintenance`, `onboarding` or both, with this agent as the bounded production scope that the support-depth contract's path enablement asks for. It MUST be omitted when no path is enabled, and it MUST NOT repeat a path. |
 | `enrollments` | One declaration for each depth enrollment the maintainer has approved for this agent. It MUST be omitted when there is none. |
 | `lifecycle_path` | MUST be `maintenance` or `onboarding`. |
-| `version` | MUST be one exact upstream version, written as the version string itself. A range, a wildcard and a moving name such as `latest` are invalid. |
-| `targets` | MUST list at least one target, without repeats. Each names a target in `union.expected_targets` of the manifest root's `RULES.json`. Rule 12 covers a target that is not there. |
+| `version` | MUST be one exact semantic version: the string that `detected_release.target_version` and the manifest root's `versions/<version>.json` use for that version. A range, a wildcard, a prefix such as `v` and a moving name such as `latest` are invalid. |
+| `targets` | MUST list at least one target, without repeats. Each names a target in `union.expected_targets` of the manifest root's `RULES.json`, or a target the version's depth record already covers. Rule 12 covers any other target. |
 
 The table MUST be omitted when it would hold neither key.
 
@@ -267,15 +267,17 @@ Rules:
    for release watch and creates no second release-watch inventory. A declaration on the
    maintenance path in an entry without `maintenance.release_watch` opens no generation, because
    the maintenance request contract opens generations for release-watch agents only.
-8. A declaration MUST NOT be added unless `enabled_paths` lists its lifecycle path in the same
-   revision of the registry. Removing a path from `enabled_paths` withdraws the maintainer's
-   authorization and removes no declaration. A declaration whose lifecycle path `enabled_paths`
-   does not list, however that came about, is still a declaration and its version is
-   depth-enrolled. The support-depth contract's path enablement says what its tuples may receive.
+8. The support-depth contract's depth enrollment rule 3 says when a declaration may be added:
+   only in a commit that leaves its lifecycle path in `enabled_paths`. Restoring the declaration
+   of a version that has a depth record is not an addition. Removing a path from `enabled_paths`
+   withdraws the maintainer's authorization and removes no declaration. A declaration whose
+   lifecycle path `enabled_paths` does not list, however that came about, is still a declaration
+   and its version is depth-enrolled. The support-depth contract's path enablement says what its
+   tuples may receive.
 9. `support_depth` is maintainer-owned. A path is enabled, and a declaration is added, changed or
    removed, only by a maintainer's change to the registry. No command or workflow, and no
    executor run, writes this table. `onboard-agent` MUST NOT write it into the entry it appends
-   for a new agent, as it writes no `maintenance` table there today.
+   for a new agent.
 10. An approval artifact that approves depth enrollment for a new agent is not a second depth
     enrollment inventory. It requires the committed table in the same agent's entry, as
     `release_watch_enrolled` requires committed `maintenance.release_watch` truth. What an
@@ -285,16 +287,20 @@ Rules:
     contract's Bindings rules say when a generation freezes P, and its depth admission predicate
     requires a frozen P to be current. Once a version has a depth record, removing its
     declaration, or changing it so that it covers less than the record's selection covers,
-    un-enrolls nothing. It leaves what the record selects without the policy it needs, which
-    rule 12 treats as an error. A declaration changed to select more takes effect for the
-    generation that next freezes P.
+    un-enrolls nothing. Coverage is measured by invocation mode and target, as the support-depth
+    contract's depth enrollment rule 7 states. Such a change leaves what the record covers
+    without the policy it needs, which rule 12 treats as missing policy. A declaration changed to
+    cover more takes effect for the generation that next freezes P.
 12. The registry alone decides the field rules above, apart from whether a target is one that
-    `union.expected_targets` lists, and it alone decides rules 5 and 6. A registry that breaks
-    one of these is invalid, as it is for any other schema rule of this contract. Any other
-    failure to resolve a declaration is an error for that agent and version under the
-    support-depth contract: a target that `union.expected_targets` does not list, missing
-    operations, or a declaration that covers less than a depth record selects. A reader MUST NOT
-    treat either case as "not depth-enrolled".
+    `union.expected_targets` lists or a depth record covers, and it alone decides rules 5 and 6. A
+    registry that breaks one of these is invalid, as it is for any other schema rule of this
+    contract. Rules 1, 3, 8 and 9 bind who may write the table and what a change to it may do, and
+    breaking one makes no registry invalid. Anything else that keeps a version's policy from being
+    resolved is missing policy for that agent and version, which the support-depth contract treats
+    as an error: a target that is neither in `union.expected_targets` nor covered by the version's
+    depth record, missing operations, or a depth record that covers more than the version's
+    declaration does, a removed declaration included. Rule 2 holds in each of these cases. A reader
+    MUST NOT treat an invalid registry or missing policy as "not depth-enrolled".
 
 The support-depth contract's minimum machinery rule requires the failure a new field prevents to
 be named. Without `enrollments`, nothing the maintainer owns would state which version, operations
@@ -303,13 +309,12 @@ what a run asserts, neither of which the support-depth contract accepts as autho
 `enabled_paths`, the only way to withdraw the authorization for a path would be to delete the
 declarations made on it. A version that has no depth record yet would then read as never selected,
 and its work would fall back to the rules that predate the support-depth contract, which that
-contract forbids. Neither failure can occur while rule 5 keeps the table out of every entry. They
-are what the two keys prevent once the table is in use.
+contract forbids. Neither failure can occur before the table is in use. They are what the two
+keys prevent from then on.
 
 ### Present behavior
 
-None of this section is implemented, and rule 5 keeps the table out of every entry at this
-revision. Today:
+None of this section is implemented. Today:
 
 - The registry loader rejects unknown fields at the top level, in an agent entry and under
   `maintenance`. A registry that carried `support_depth` would fail to load, and the onboarding,
