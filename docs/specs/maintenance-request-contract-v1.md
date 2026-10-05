@@ -469,9 +469,9 @@ is it.
 - `support_surface_audit`
 
 The relay MUST reject packets whose prepared-run metadata does not match the live request packet.
-The relay MUST stop before closeout. `close-agent-maintenance` remains the only closeout writer.
-`prepare-agent-closeout` generates the closeout artifact that `close-agent-maintenance` records;
-see [Closeout](#closeout).
+The relay MUST stop before closeout. `close-agent-maintenance` remains the only closeout writer:
+the relay never writes the closeout. `prepare-agent-closeout` generates the closeout artifact that
+`close-agent-maintenance` records; see [Closeout](#closeout).
 
 ## Depth-enrolled generations
 
@@ -487,22 +487,29 @@ A **depth-enrolled generation** is a generation whose `agent_id` and
 `detected_release.target_version` a depth enrollment selects on the maintenance path. The rules
 below are of two kinds:
 
-- Rules about what a request carries, what a freeze writes, what a closeout lists and how a run
-  treats its own request apply to depth-enrolled generations. Every other request stays as the
-  sections above describe it.
+- Rules about what a request carries, what a freeze writes, what a closeout adds to the depth
+  record and how a run treats its own request apply to depth-enrolled generations. Every other
+  request stays as the sections above describe it.
 - Rules about what a relay run or a closeout command may change apply to every run and command
   whose writes touch a depth scope tuple, whichever generation it belongs to. The support-depth
   contract determines the tuples a write touches from the values it changes, not from the
   request's agent or version. A later version's run reaches an earlier version's tuples, because
   its `writable_surfaces` cover the same maintenance root and the same aggregate publication.
 
+A freeze can touch another version's tuples as well, as when a later version's request replaces
+an earlier one. This section adds no rule for that write, and the support-depth contract's own
+rules reach it.
+
 While the support-depth contract is a Draft this section binds nothing.
 
-Two terms are used below. A **validating loader** is any command that validates the request
-against this contract when it loads it, whether or not it tolerates audit drift. The reader behind
-`--from-request` is not one. A **re-freeze** is a freeze that records the Event the standing
-request already states, whether `--from-request` supplies the recorded values or they are passed
-explicitly. A freeze that is not a re-freeze opens a new generation and is that generation's
+Three terms are used below. A **validating loader** is any command that validates the request
+against this contract when it loads it, whether or not it tolerates audit drift. The strict loader
+that the Canonical ownership split mentions is a validating loader that also rejects audit drift.
+The reader behind `--from-request` is not a validating loader. The **standing request** is the
+request at the agent's maintenance request path when a freeze runs. A **re-freeze** is a freeze
+that records, for the same target version, the Event the standing request already states, whether
+`--from-request` supplies the recorded values or they are passed explicitly. Any other freeze,
+one that finds no standing request included, opens a new generation and is that generation's
 first freeze.
 
 ### Request fields
@@ -540,17 +547,17 @@ Rules:
 5. `artifact_version` stays `"2"`. Validating loaders reject unknown keys today, so one that
    predates this section rejects the table, and rule 1 rejects a request that lacks it.
 
-The two fields are the only addition to the request. The support-depth contract's minimum
-machinery rule requires the failure they prevent to be named. The depth record is otherwise the
-only place that states which P and O a generation froze. Execution writes to that record, and
+The two fields are the only addition to the request. The support-depth contract's minimum machinery
+rule requires the failure they prevent to be named. The depth record is otherwise the only place
+that states which P and O a generation froze. Execution writes to that record, and
 `writable_surfaces` also cover the debt rows that P's baseline is taken from and the target
-version's snapshots and reports that O is derived from, so neither identity can be recomputed
-from the tree. A record whose P or O has been restated, by a hand edit or by a run that was
-interrupted before the relay checked it, then reads as truthful in any single tree, and a single
-tree is what repository validation reads. A second statement in the request, the packet artifact
-that both the relay and the closeout already bind by content, lets one tree be checked: the
-record must state what the request states. Two fields are needed because a generation can freeze
-P and never freeze O.
+version's snapshots and reports that O is derived from, so neither identity can be recomputed from
+the tree after a run. A record whose P or O has been restated, by a hand edit or by a run that was
+interrupted before the relay checked it, then reads as truthful in any single tree, and the checks
+repository validation makes on one revision read only that tree. A second statement in the request,
+the packet artifact that both the relay and the closeout already bind by content, lets one tree be
+checked: the record must state what the request states. Two fields are needed because a generation
+can freeze P and never freeze O.
 
 ### Freezes
 
@@ -565,14 +572,16 @@ The freeze points are unchanged. For a depth-enrolled generation:
    invocation, MUST extend the depth record with O.
 3. A re-freeze MUST preserve `policy_identity` and MUST derive O under the frozen P. It MUST
    refuse when P has changed since the first freeze, and when it cannot establish that P is
-   unchanged. A debt transition that the support-depth contract's debt operations assign to
-   execution changes E and is not a change to P, so the comparison is with P's baseline as the
-   first freeze froze it, not with the debt rows as the tree now holds them. Where the content of
-   that baseline is stated is for the depth record's schema to define. The request's
-   `[support_surface_audit]` rows cannot serve, because every re-freeze takes them again from the
-   tree.
+   unchanged. For P's debt baseline the comparison is between the debt rows as the tree now holds
+   them and the baseline as the first freeze froze it. A difference that the support-depth
+   contract's debt operations assign to execution changes E and is not a change to P. Any other
+   difference from that baseline is a change to P. Where the content of that baseline is stated
+   is for the depth record's schema to define. The request's `[support_surface_audit]` rows
+   cannot serve, because every re-freeze takes them again from the tree.
 4. On this path P changes only when a new generation opens, and within a generation O is frozen
    again only by a re-freeze.
+5. A freeze that records the standing request's Event for another target version is not a
+   re-freeze of this generation, and it MUST refuse.
 
 ### Relay execution
 
@@ -583,6 +592,10 @@ For a depth-enrolled generation:
    and the support-depth contract reports its depth-enrolled scope as insufficient depth.
 2. A run MUST NOT change the request, whatever `writable_surfaces` lists. The relay MUST treat a
    change to the request as it treats a write to the closeout path.
+
+A run's changes, in the rules below, are the changes made since the executor started. The dry-run
+baseline is taken earlier and holds digests only, so it cannot serve as that reference: the relay
+keeps its own record of the state at executor start, with the content it needs to restore.
 
 For every relay run whose changes touch a depth scope tuple, whichever generation the run belongs
 to:
@@ -595,38 +608,37 @@ to:
    failure. Restoring the depth-gated outputs alone is not enough: the run may also have changed
    the evidence and dependencies those outputs rest on, and a restored result would then claim
    more than the tree supports. The support-depth contract's restoration rules govern the
-   restore. The relay MAY keep a copy of the changes it reverts in the run directory.
+   restore. The relay SHOULD keep a copy of the changes it reverts in the run directory.
 5. Rules 2 and 3 are evaluated on every write-mode run in which the executor ran, whatever else
    failed.
 
-Rules 2 to 5 are shared policy for every agent. `writable_surfaces` stays the declared list, and
-these rules limit what a run may change inside it, as the exclusion of the closeout path already
-does. They are not a second envelope derived from `agent_id`.
+Rules 2 to 5 are shared policy for every agent. `writable_surfaces` is unchanged, and these rules
+limit what a run may change inside it, as the exclusion of the closeout path already does. They
+are not a second envelope derived from `agent_id`.
 
 ### Closeout
 
 `prepare-agent-closeout` generates the closeout artifact that `close-agent-maintenance` records,
-and both write the closeout path. The Relay boundary's statement that `close-agent-maintenance`
-remains the only closeout writer is about the relay, which never writes the closeout. It does not
-put `prepare-agent-closeout` outside the rules below.
+and both write the closeout path. Both are bound by the rules below.
 
 For each of the two commands, when its writes touch a depth scope tuple, whichever generation it
 closes:
 
 1. The command MUST establish depth admission for every such tuple, as the support-depth contract
    requires of every route.
-2. Unless depth admission is established and the artifact the command wrote validates, the
-   command MUST leave every file as it was before the invocation. An artifact the command wrote
-   and then rejected MUST NOT stay at the closeout path, whether or not a closeout existed
-   before. The command MAY report it or keep it elsewhere.
+2. Unless depth admission is established, the artifact the command wrote validates and, where
+   rule 3 applies, the acceptance entry is listed, the command MUST leave every file as it was
+   before the invocation, within the support-depth contract's restoration rules. An artifact the
+   command wrote and then rejected MUST NOT stay at the closeout path, whether or not a closeout
+   existed before. The command MAY report it or keep it elsewhere.
 
 For a depth-enrolled generation, writing the closeout artifact is an acceptance effect, and so are
 the lifecycle-record changes `close-agent-maintenance` makes with it:
 
 3. Each command MUST ensure, in the same invocation, that the target version's depth record lists
    the acceptance entry for the closeout it writes, as record invariant 4 of the support-depth
-   contract requires. It lists the entry only once the artifact has validated, so that a refusal
-   never has an entry to take back.
+   contract requires. It lists the entry only once depth admission is established and the
+   artifact has validated, so that a refusal never has an entry to take back.
 
 The closeout artifact gains no field. It already binds the request it closes by content
 (`request_sha256`), and through the request the two identities. Closeout's other checks are
@@ -639,12 +651,14 @@ None of this section is implemented, and it has no effect until a depth enrollme
 - No request carries `[support_depth]`, and `--from-request` reads a fixed list of recorded
   fields and regenerates the rest.
 - The workflows that open a packet commit the maintenance root only. A depth record written under
-  the manifest root at the first freeze would not be in the opening commit. On the acquisition
-  lane the acquisition commit carries `reports/<version>/`; on the docs-only lane nothing does.
+  the manifest root at the first freeze would not be in the opening commit, so the re-freeze
+  inside `parity-acquire`, which runs on a fresh checkout of the packet branch, would not find
+  it. The acquisition commit carries `reports/<version>/`; on the docs-only lane nothing does.
 - `writable_surfaces` cover the request and the stand-down markers through
   `{maintenance_root}/**`.
-- The relay checks the declared list after the executor has written. It takes its baseline at
-  the dry run, as digests without content, and it leaves a failed run's changes in place.
+- The relay checks the executor's writes against `writable_surfaces` after the executor has
+  written. It takes its baseline at the dry run, as digests without content, and it leaves a
+  failed run's changes in place.
 - `prepare-agent-closeout` writes the closeout artifact, then validates it through the
   validator's own input path, and leaves a rejected artifact in place when no closeout existed
   before.

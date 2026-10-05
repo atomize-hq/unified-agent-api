@@ -129,6 +129,13 @@ Each scenario is a test case. "Pass" means validation must not fail; "fail" mean
   inputs, which the same edit can change. The same state is reachable without a hand edit: after
   an interrupted relay run, or a restore the relay had to refuse, the next dry run takes the tree
   as its baseline.
+- A relay restore returns the tree to what it held when the executor started, and that can
+  already be stale. A run that failed only a green gate is left in place; if it changed bound
+  evidence, a later failed run's restore puts back a `verified` row that is no longer true.
+  Repository validation still fails that tree.
+- A freeze that records an Event the target version's depth record already states, with no
+  standing request that states it, is a first freeze under an unchanged Event: P is frozen again
+  and the record's Event does not change. Decide whether it refuses.
 - Comparing a changed debt row with the baseline P froze needs that baseline's content, and so
   does a re-freeze that must refuse when P has changed. The request and the record hold P's
   identity only. The request's `[support_surface_audit]` rows cannot serve: every re-freeze takes
