@@ -101,7 +101,8 @@ Other contracts reference this one for depth rules and MUST NOT restate them.
   record's file name and schema are defined in the manifest root's validator spec. The schema
   MUST define the P, O and E identities, and the form in which an entry identifies what the
   record stated, so that validation can decide, from the record alone, whether each of them
-  agrees with what the record states.
+  agrees with what the record states. An identity MAY cover more than the record states, and the
+  schema then has the record state what that decision needs.
 - **Working files.** The per-agent maintenance packet files of the current generation under
   `docs/agents/lifecycle/`, such as `maintenance-request.toml` and `maintenance-closeout.json`. A
   later generation replaces them.
@@ -159,8 +160,8 @@ Each obligation in an operation's set produces exactly one result: `verified`, `
 - `not_applicable` MUST carry a rationale and is valid only where the resolved policy permits it
   for the stated promise. An unavailable target or an unknown effect is not `not_applicable`.
 - An unknown output contract is `unverified`. A known counterexample is `failed`.
-- A result is derived in one E. It is `unverified` until it is verified again when its depth
-  record states a P or O other than the one that E references, or when it is invalidated under
+- A result is `unverified` until it is verified again when its depth record does not state the P
+  and O that the record's E references, or when it is invalidated under
   [Reuse and invalidation](#reuse-and-invalidation).
 - An obligation with no admissible evidence is `unverified`. While qualifying runs for an
   obligation contradict each other, its result is `unverified`.
@@ -398,8 +399,8 @@ Rules:
    meeting the amended rules.
 4. A debt transition is not a policy waiver. See [Debt operations](#debt-operations).
 5. P is resolved for the depth scope tuples it governs. A change to another agent's or path's
-   selection, or the enablement of another path, does not change it. A change to a shared
-   governing rule does.
+   selection, or the enablement of another path or of the same path for another agent, does not
+   change it. A change to a shared governing rule does.
 6. A binding's identity MUST NOT depend on its own digest, on a future output or on the commit that
    will contain it.
 7. The freeze points of the maintenance request contract are unchanged. P is frozen when the
@@ -451,9 +452,11 @@ work.
 2. A later version inherits nothing from an earlier depth enrollment: no depth enrollment, no
    qualification and no publication authority. How a later version may move a depth-enrolled
    version's pointer or replace its working files is set out in [Later versions](#later-versions).
-3. A production depth enrollment MUST name an enabled lifecycle path. A selection made inside an
-   isolated proof workspace is not a production depth enrollment and MUST NOT produce a depth-gated
-   effect on production outputs.
+3. A production depth enrollment is one declared in the registry, as the
+   [registry contract](agent-registry-contract.md#support-depth) states. It MUST NOT be declared
+   for a lifecycle path that is not enabled for its agent at the time. A selection made inside an
+   isolated proof workspace is not a production depth enrollment and MUST NOT produce a
+   depth-gated effect on production outputs.
 4. The remainder is declared once, by rule. It MUST NOT be enumerated per historical operation,
    modeled as disabled placeholders or compared against an adoption baseline.
 5. The remainder carries no depth claim. It is not an exclusion, a waiver or debt, and every
@@ -461,11 +464,12 @@ work.
    applies to it.
 6. Depth enrollment adds obligations. It MUST NOT remove or narrow required uplifts, target
    acquisition completeness, existing shared promises or the release-watch ratchet.
-7. Resolution MUST be deterministic. A version's depth enrollment resolves from its depth record.
-   Until the record is written, registry-owned authority and the frozen request or approval
-   resolve it. The [registry contract](agent-registry-contract.md#support-depth) states where a
-   depth enrollment is declared. An executor's assertion, an optional field and a caller-supplied
-   argument are not authority.
+7. Resolution MUST be deterministic. Until a version's depth record is written, registry-owned
+   authority and the frozen request or approval resolve its depth enrollment. Once the record is
+   written, everything the record selects is depth-enrolled, whatever the registry declares
+   afterwards. Each generation still freezes its P from registry-owned authority, and that P MUST
+   select every invocation mode and target the version's depth record selects. An executor's
+   assertion, an optional field of a request and a caller-supplied argument are not authority.
 8. Missing policy for selected scope, an unsupported schema revision, unresolved or overlapping
    depth enrollment selectors, contradictory generation references and deleted bindings are errors.
    None of them resolves to "not depth-enrolled". A removed depth record is a deleted binding. A
@@ -522,17 +526,18 @@ The following **record invariants** hold for every depth-gated output:
 
 1. A depth-enrolled version has a depth record from the time a generation first freezes P for it.
    A depth record MUST NOT be removed, whether by retention pruning or otherwise, and an
-   acceptance entry MUST NOT be removed or altered. A manifest root without a validator spec MUST
-   NOT hold a depth record.
+   acceptance entry MUST NOT be removed or altered. A record's selection MUST NOT shrink: every
+   invocation mode and target it covers stays covered, whichever operations then name them. A
+   manifest root without a validator spec MUST NOT hold a depth record.
 2. What a record states changes only when a later generation of the same version continues the
    record, or through a change that [Bindings](#bindings) permits to the binding concerned: the
-   selection and the capability mappings belong to P, the obligations to O, and the results and
-   their bound evidence to E. The P, O and E identities a record states each cover what it states
-   under that binding: nothing stated under a binding changes while that binding's identity stays
-   the same.
+   selection and the capability mappings belong to P, the obligations to O, and the results,
+   their bound evidence and the P and O identities that E references to E. The P, O and E
+   identities a record states each cover what it states under that binding: nothing stated under
+   a binding changes while that binding's identity stays the same.
 3. A published result is the result the record states, or `unverified`. It MUST be `unverified`
-   in three cases: the record does not yet state the result; the record states a P or O other
-   than the one its E references; or the record states the result as `verified` and binds no
+   in three cases: the record does not yet state the result; the record does not state the P and
+   O that its E references; or the record states the result as `verified` and binds no
    evidence for it, or binds evidence that is absent from the revision or has another content
    identity. A change to a dependency outside the bound evidence is not within this invariant. A
    promise is published as qualified, or a capability as depth-qualified, only when every result
@@ -708,7 +713,9 @@ Enabling the maintenance path does not require the onboarding path to be proven.
 that fails item 3 blocks it.
 
 The maintainer's authorization under item 5 is recorded in the registry, agent by agent, as the
-[registry contract](agent-registry-contract.md#support-depth) states.
+[registry contract](agent-registry-contract.md#support-depth) states. Each authorization enables
+the path for one agent, and the conditions for enabling that path MUST hold when it is given.
+Items 1 to 4 concern the path as a whole.
 
 The onboarding path MAY be enabled when items 1, 3, 4 and 5 hold for it, the onboarding charter
 defines where P and O are frozen on the create lane, at a point where the agent's manifest root,
@@ -724,10 +731,12 @@ acceptance effect.
 A cross-agent workflow that adds shared mappings MUST NOT be enabled until the maintenance and
 onboarding chains are both proven and landed.
 
-When a prerequisite stops holding, or the maintainer withdraws the authorization, new acceptance
-effects for depth-enrolled tuples on that path MUST be refused. The path MUST NOT fall back to
-rules that predate this contract. A depth enrollment declared for a path that is not enabled is
-treated the same way: its tuples stay depth-enrolled and receive no acceptance effect.
+When a prerequisite stops holding, new acceptance effects for depth-enrolled tuples on that path
+MUST be refused. When the maintainer withdraws the authorization for an agent, new acceptance
+effects for that agent's depth-enrolled tuples on the path MUST be refused. The path MUST NOT
+fall back to rules that predate this contract. A production depth enrollment whose path is not
+enabled for its agent, however that came about, stays a production depth enrollment: its tuples
+stay depth-enrolled, reporting effects for them continue, and they receive no acceptance effect.
 
 ## Additive shared integration
 

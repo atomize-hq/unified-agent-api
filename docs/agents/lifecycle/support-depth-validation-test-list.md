@@ -22,18 +22,18 @@ integration branch tip it would replace.
 | # | Decided on | Fails when | Invariant |
 | --- | --- | --- | --- |
 | 1 | Any revision | A generation has P frozen for depth-enrolled scope and its version has no depth record | 1 |
-| 2 | Merge | A depth record is removed, or an acceptance entry is removed or altered | 1 |
+| 2 | Merge | A depth record is removed, an acceptance entry is removed or altered, or a record's selection comes to cover less: an invocation mode or target it covered is no longer selected | 1 |
 | 3 | Any revision | The revision holds a frozen request or approval for a record's version, and the record's Event, P or O is not that generation's | 2 |
 | 4 | Merge | What a depth record states changes while the merge result holds no frozen request or approval for the record's version | 2 |
-| 5 | Any revision | A published result is neither the result the record states nor `unverified`, or is not `unverified` although the record does not yet state it or the record states a P or O other than the one its E references | 3 |
+| 5 | Any revision | A published result is neither the result the record states nor `unverified`, or is not `unverified` although the record does not yet state it or the record does not state the P and O that its E references | 3 |
 | 12 | Any revision | A promise is published as qualified, or a capability as depth-qualified, while a result the claim rests on is published as anything other than `verified` or a permitted `not_applicable` | 3 |
 | 6 | Any revision | A tuple the record selects is published as not depth-enrolled | 3 |
 | 7 | Any revision | A result is published as `verified`, or a promise or capability as qualified or depth-qualified on it, and the record states it as `verified` and binds no evidence for it, or binds evidence that is absent or has another content identity | 3 |
 | 8 | Any revision | A promise is published as qualified, or a capability as depth-qualified, and no acceptance entry identifies what the record states | 4 |
 | 9 | Merge | The merge result makes an acceptance effect for a tuple and no acceptance entry identifies what the tuple's depth record states in the merge result | 4 |
 | 10 | Any revision | The lifecycle record of an agent that has a depth record holds a `published` or `closed_baseline` stage, or a closeout evidence id, that reports a packet or closeout the revision does not hold | 4 |
-| 11 | Merge | The selection, mappings, obligations, results or bound evidence a depth record states change while none of the Event, P, O and E identities it states changes | 2 |
-| 13 | Any revision | A P, O or E identity a record states does not agree with what the record states under that binding: the selection and the capability mappings for P, the obligations for O, the results and their bound evidence for E | 2 |
+| 11 | Merge | The selection, mappings, obligations, results, bound evidence or E's P and O references a depth record states change while the identity of the binding they are stated under does not | 2 |
+| 13 | Any revision | A P, O or E identity a record states does not agree with what the record states under that binding: the selection and the capability mappings for P, the obligations for O, the results, their bound evidence and E's P and O references for E | 2 |
 
 Check 13 is check 11 decided from one tree. The contract requires the schema to define the three
 identities so that validation can decide it from the record alone.
@@ -79,8 +79,9 @@ Each scenario is a test case. "Pass" means validation must not fail; "fail" mean
 - **Two-merge laundering.** Merge one rebinds a `verified` result to other evidence, restates E
   and drops the row from qualified. Merge two restores the old E identity with the new evidence
   still bound and republishes qualified under the original acceptance entry.
-- **Selection narrowing.** A tuple is dropped from the record's selection and P is restated, so
-  the tuple would read as remainder.
+- **Selection narrowing.** An invocation mode or target is dropped from the record's selection
+  and P is restated, so it would read as remainder. This includes a registry declaration that was
+  narrowed and a later generation that continues the record from it.
 - **Edit under unchanged identities.** A hand edit changes a stated selection, mapping,
   obligation, result or evidence binding and leaves the Event, P, O and E identities as they were.
 - **Qualified over a failed result.** The record states a promise as all `verified` on one
@@ -119,8 +120,12 @@ Each scenario is a test case. "Pass" means validation must not fail; "fail" mean
   rewritten together, passes checks 11 and 13. For P and O the frozen request or approval is a
   second statement, so check 3 fails it while that request or approval stands. For E there is no
   second statement. Acceptance entries stop matching, so qualified and depth-qualified claims
-  lapse, but `verified` rows follow the restated record. Once a later version has replaced the
-  working files, a selection narrowed this way is caught only by check 4.
+  lapse, but `verified` rows follow the restated record. A selection that shrinks is the
+  exception: check 2 fails it whatever else is restated.
+- No record invariant reaches a declared version whose generation never froze P, such as a packet
+  branch cut before the declaration landed. Only depth admission at the integration step does.
+- A declared version that has no depth record yet has no publication rule, because depth facts
+  are published from depth records.
 - Retargeting the lifecycle record's `publication_packet_path` re-attributes a `published` stage.
   Decide whether the reference itself is checked.
 - The absence of a drift side state is attributed to the previous maintenance closeout while a
