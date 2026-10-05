@@ -452,10 +452,12 @@ work.
    qualification and no publication authority. How a later version may move a depth-enrolled
    version's pointer or replace its working files is set out in [Later versions](#later-versions).
 3. A production depth enrollment is one declared in the registry as the integration branch holds
-   it; the [registry contract](agent-registry-contract.md#support-depth) states how. A
-   declaration MUST NOT be added unless the same commit leaves its lifecycle path enabled for its
-   agent. A selection made inside an isolated proof workspace is not a production depth
-   enrollment and MUST NOT produce a depth-gated effect on production outputs.
+   it, or one that rule 7 keeps. The [registry contract](agent-registry-contract.md#support-depth)
+   states how one is declared. A declaration MUST NOT be added, or moved to another lifecycle path,
+   unless the same commit leaves that lifecycle path enabled for its agent. Restoring the
+   declaration of a version whose depth record the integration branch holds is not an addition. A
+   selection made inside an isolated proof workspace is not a production depth enrollment and MUST
+   NOT produce a depth-gated effect on production outputs.
 4. The remainder is declared once, by rule. It MUST NOT be enumerated per historical operation,
    modeled as disabled placeholders or compared against an adoption baseline.
 5. The remainder carries no depth claim. It is not an exclusion, a waiver or debt, and every
@@ -463,15 +465,17 @@ work.
    applies to it.
 6. Depth enrollment adds obligations. It MUST NOT remove or narrow required uplifts, target
    acquisition completeness, existing shared promises or the release-watch ratchet.
-7. Resolution MUST be deterministic. Until the integration branch holds a depth record for a
-   version, registry-owned authority and the frozen request or approval resolve the version's
-   depth enrollment. A record that the integration branch does not yet hold is part of a
-   candidate. Once the integration branch holds a record, everything that record's selection
-   covers stays depth-enrolled under a production depth enrollment, whatever the registry
-   declares afterwards. Each generation still freezes its P from registry-owned authority, and
-   that P MUST cover every invocation mode the record's selection covers, on each target the
-   mode is covered on. An executor's assertion, an optional field of a request or approval and a
-   caller-supplied argument are not authority.
+7. Resolution MUST be deterministic. Registry-owned authority and the frozen request or approval
+   resolve a version's depth enrollment. Each generation freezes its P from registry-owned
+   authority, and where the version already has a depth record that P MUST cover every
+   invocation mode the record's selection covers, on each target the mode is covered on, and
+   MUST claim every capability id the record claims. Once the integration branch holds the
+   record, everything its selection covers stays depth-enrolled under a production depth
+   enrollment, whatever the registry declares afterwards. A record that the integration branch
+   does not hold is part of a candidate and is discarded with it. Whether the integration branch
+   holds a record is established at the integration step, against the tip. An executor's
+   assertion, an optional field of a request or approval and a caller-supplied argument are not
+   authority.
 8. Missing policy for selected scope, an unsupported schema revision, unresolved or overlapping
    depth enrollment selectors, contradictory generation references and deleted bindings are errors.
    None of them resolves to "not depth-enrolled". A removed depth record is a deleted binding. A
@@ -482,7 +486,9 @@ work.
    the earlier values.
 10. Work that is due in a frozen generation stays due until it is satisfied or validly
     dispositioned. Moving it to another packet, ending the selection, pausing, removing
-    advertising or deleting a declaration does not discharge it.
+    advertising or deleting a declaration does not discharge it. The version's depth record
+    carries that work. A generation whose record the integration branch never held leaves no due
+    work once its candidate is discarded.
 11. Depth enrollment MUST NOT create a second release-watch enrollment inventory.
 
 ## Depth admission
@@ -536,11 +542,12 @@ The following **record invariants** hold for every depth-gated output:
    record.
 2. What a record states changes only when a later generation of the same version continues the
    record, or through a change that [Bindings](#bindings) permits to the binding concerned.
-   Annex B assigns everything a record states, its Event and its acceptance entries aside, to
-   P, O or E: the selection and the capability mappings belong to P, the obligations to O, and
-   the results, their bound evidence and the P and O identities that E references to E. The P,
-   O and E identities a record states each cover what it states under that binding: nothing
-   stated under a binding changes while that binding's identity stays the same.
+   Annex B assigns everything a record states, its Event aside, to P, O or E: the selection and
+   the capability mappings belong to P, the obligations to O, and the results, their bound
+   evidence and the P and O identities that E references to E. Listing an acceptance entry is
+   not a change to what a record states. The P, O and E identities a record states each cover
+   what it states under that binding: nothing stated under a binding changes while that
+   binding's identity stays the same.
 3. A published result is the result the record states, or `unverified`. It MUST be `unverified`
    in three cases: the record does not yet state the result; the P or the O that its E references
    is not the one the record states; or the record states the result as `verified` and binds no
@@ -1018,7 +1025,7 @@ This annex defines the depth record that [Terms](#terms) introduces: where it is
 states, the identities it carries and the form of an acceptance entry. The record invariants in
 [Depth-gated effects](#depth-gated-effects) say what must hold of a record, and the checks that
 enforce them are not part of this annex. This annex is the one definition for every manifest
-root, and a root's validator spec adopts it.
+root. A root's validator spec adopts it by a section that says so.
 
 This revision of the annex is not executable. It leaves three things to an executable schema
 revision, which amends this annex and is among the revisions that
@@ -1037,16 +1044,17 @@ Until that revision is adopted a manifest root MUST NOT hold a depth record.
 1. A version's depth record is the file `reports/<version>/depth-record.json` under the agent's
    manifest root. `<version>` is the exact upstream version, written as the root's
    `versions/<version>.json` writes it. A version has one record.
-2. The record is a JSON document. Its `schema_version` states the revision of this annex that
-   the record follows. A consumer MUST reject a record whose revision it does not support, as
-   [Bindings](#bindings) rule 8 requires. It MUST NOT read such a record, or a record it cannot
-   parse, as "not depth-enrolled".
+2. The record is a JSON document. Its `schema_version` is an integer that states the executable
+   revision of this annex that the record follows, and the first executable revision is 1. A
+   consumer MUST require the current executable revision and reject any other, as
+   [Bindings](#bindings) rule 8 requires. It MUST NOT read a record of another revision, or a
+   record it cannot parse, as "not depth-enrolled".
 3. In this annex the content identity of a committed file is the SHA-256 digest of the file's
    bytes, written as 64 lowercase hexadecimal characters.
 
 ### B.2 What a record states
 
-A record states an Event, three parts and a list of acceptance entries. Each part states one
+A record states an Event and three parts, and it lists acceptance entries. Each part states one
 binding of the version's latest generation.
 
 - **Event.** The fields that [Bindings](#bindings) lists for the lifecycle path that owns the
@@ -1056,8 +1064,8 @@ binding of the version's latest generation.
     operations with their promises, the modes and required values of each, and the targets;
   - for each promise, where it permits a `not_applicable` result;
   - what the selection covers, as B.4 defines it;
-  - for each capability the selection claims, the complete set of operations through which the
-    agent's adapter honors it;
+  - the capability mappings: for each capability the selection claims, the complete set of
+    operations through which the agent's adapter honors it;
   - the classification entries, mode exclusions and overrides that apply to those operations;
     and
   - the frozen delegation and the initial authorization baseline that
@@ -1067,16 +1075,18 @@ binding of the version's latest generation.
   - the policy identity that O was frozen under;
   - the targets that O is frozen for;
   - the acquired inputs that O was derived from;
-  - for each operation, its concrete obligation set; and
-  - every unit of a selected operation that is `classification_required`.
+  - for each operation, the name identities it owns and its concrete obligation set;
+  - every unit of a selected operation that is `classification_required`; and
+  - the independently required acceptance work.
 - **Execution part**, for E:
   - the policy identity and the obligations identity that E references;
   - for each obligation and each target, its result, with the rationale of a `not_applicable`
     result and, for a `verified` result, the committed evidence it rests on;
   - every reuse binding; and
-  - the debt grants that E materializes, each as the granted row with its content.
-- **Acceptance entries.** One entry for each closeout, publication or promotion that made an
-  acceptance effect for the version, as B.5 defines it.
+  - the debt grants that E materializes for the version, each as the granted row with its
+    content.
+- **Acceptance entries.** Listed, not stated: one entry for each closeout, publication or
+  promotion that made an acceptance effect for the version, as B.5 defines it.
 
 Rules:
 
@@ -1085,8 +1095,8 @@ Rules:
    revision decides. A part therefore states its whole binding.
 2. A committed file is stated by its path and its content identity. It is not copied into the
    record.
-3. Everything a part states belongs to that part's binding for record invariant 2. The Event and
-   the acceptance entries belong to no part.
+3. Everything a part states belongs to that part's binding for record invariant 2. The Event
+   belongs to no part, and neither do the acceptance entries.
 4. A part that the latest generation has not yet produced is stated as not yet produced. An
    absent part is an error and MUST NOT be read as not yet produced. The policy part is never
    stated as not yet produced, because the record is first written when P is frozen.
@@ -1095,9 +1105,10 @@ Rules:
 
 ### B.3 Identities
 
-1. A record states three identities: the policy identity in its policy part, the obligations
-   identity in its obligations part and the execution identity in its execution part. They are
-   the content identities of P, O and E that this contract and the
+1. A record states one identity for each part that has been produced: the policy identity in
+   its policy part, the obligations identity in its obligations part and the execution identity
+   in its execution part. A part stated as not yet produced has none. They are the content
+   identities of P, O and E that this contract and the
    [maintenance request contract](maintenance-request-contract-v1.md#depth-enrolled-generations)
    refer to.
 2. Each identity is the SHA-256 digest of its own part with the identity itself left out,
@@ -1108,20 +1119,25 @@ Rules:
    obligations part states nothing of E. With rule 2 this keeps every identity independent of
    its own digest and of a later output, as [Bindings](#bindings) rule 6 requires.
 
-### B.4 Coverage
+### B.4 Covered modes
 
-1. The policy part states what the selection covers in two lists: the covered invocation modes,
-   each with the targets it is covered on, and the capability ids the selection claims.
-2. A covered mode is named apart from the operations that serve it. Its name is the selector
-   under which the selection first covered it, in the form the executable revision defines, and
-   the mode keeps that name once the integration branch holds the record. Each operation states
-   which covered modes it serves.
+1. The policy part states what the selection covers as a list of covered invocation modes, each
+   with the targets it is covered on. The capabilities the selection claims are the ones its
+   capability mappings state, and they need no second list.
+2. A covered mode is named apart from the operations that serve it. Its name is the depth
+   enrollment selector under which the selection first covered it, in the form the executable
+   revision defines, and the mode keeps that name once the integration branch holds the record.
+   Each operation states which covered modes it serves.
 3. A P that renames, divides, merges or reclassifies operations changes which operations serve a
    covered mode. It neither renames nor drops the mode. A mode that P comes to exclude under
    classification rule 7 stays in the list and names the classification entry that excludes it.
-4. Record invariant 1 is decided on these lists. A selection has shrunk when the record that
-   would replace the one the integration branch holds lacks a covered mode, a target that the
-   mode is covered on, or a claimed capability id that the held record states.
+4. A listed mode counts as covered on a target only where an operation of the resolved selection
+   serves it on that target, or where the mode names the classification entry that excludes it.
+   A mode or a target listed with neither is lacking for rule 5.
+5. Record invariant 1 is decided on this list and on the capability mappings. A selection has
+   shrunk when the record that would replace the one the integration branch holds lacks a
+   covered mode, a target that the mode is covered on, or the mapping of a capability that the
+   record it replaces claims.
 
 ### B.5 Acceptance entries
 
@@ -1132,8 +1148,8 @@ Rules:
      packet, each by path and content identity; for a promotion, the targets whose pointers the
      promotion set; and
    - what the record stated when the entry was made: one digest over the Event and the three
-     parts as they then stood, taken as B.3 takes an identity. The list of acceptance entries
-     is left out of it.
+     parts as they then stood, their identities included, in the serialization that B.3 uses.
+     The list of acceptance entries is left out of it.
 2. An entry identifies what the record states now when that digest equals the digest of the
    record's present Event and parts. Record invariant 4 speaks of an acceptance entry made for
    what the record states in this sense.
@@ -1163,6 +1179,11 @@ abbreviations of Annex A. Today:
   (`xtask/agent_maintenance/support_audit.rs:598-620`,
   `xtask/agent_maintenance/audit_status/evidence.rs:174-204`). None of them would open
   `depth-record.json`.
+- `prepare-agent-closeout` lists every regular file directly under `reports/<version>/` as a
+  version-scoped manifest artifact of the packet. It refuses when it finds no such artifact: no
+  file there, none under `snapshots/<version>/` and no `versions/<version>.json`
+  (`xtask/agent_maintenance/closeout/findings.rs:158-197,243-255`). A depth record written at the
+  first freeze would satisfy that guard by itself.
 - `manifest-retain` removes `reports/<version>/` for a version outside its keep set, and a depth
   record with it, as Annex A records.
 - `manifest-validate` reads one manifest root (`xtask/manifest_validate.rs:140-149`). Inside a
@@ -1175,5 +1196,5 @@ abbreviations of Annex A. Today:
   coverage reports and `SCHEMA.json` defines no shape for a depth record. This revision changes
   neither file.
 - The repository's existing content identities are SHA-256 digests of a file's bytes, such as
-  `request_sha256` and `prompt_sha256`, or of a typed value's serialization, such as a
-  proving-run closeout's `release_watch_sha256`.
+  `request_sha256`, of a rendered text, such as `prompt_sha256`, or of a typed value's
+  serialization, such as a proving-run closeout's `release_watch_sha256`.

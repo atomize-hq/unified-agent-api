@@ -51,5 +51,5 @@ states the invariants a record must satisfy. This spec restates neither.
 While the support-depth contract is a Draft this section binds nothing.
 
 Present behavior: `xtask codex-validate` does not read a depth record, and this spec states no
-check for one. The support-depth contract requires the checks that enforce its record invariants
-to be stated for this root before a lifecycle path is enabled.
+check for one. Complete mediation rule 7 and path enablement item 4 of the support-depth contract
+say when the checks that enforce its record invariants are stated here.

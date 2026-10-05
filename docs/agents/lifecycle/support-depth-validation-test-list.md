@@ -9,15 +9,15 @@ review rounds produced, so they become tests of the validator instead of contrac
 
 Annex B of the contract defines the depth record: its file, what it states, its three identities
 and its acceptance entries. That definition is not executable yet. The key names, the form of an
-operation and the serialization the digests are taken over are left to an executable revision.
-The checks below stay non-normative until they are implemented. Each one then becomes normative
-in the manifest root's validator spec in the same change as its code and its tests, which is how
-the existing validator checks landed. Until then the checks and scenarios are the acceptance test
-of the record's definition: every check has to be decidable from a record as Annex B defines it,
-together with the inputs named below, and every scenario has to come out as listed. The
+operation and the serialization the digests are taken over are left to an executable revision. The
+checks below stay non-normative until they are implemented. Each one then becomes normative in the
+manifest root's validator spec together with its code and its tests, as the existing validator
+checks did: in one change, or a day apart. Until then the checks and scenarios are the acceptance
+test of the record's definition: every check has to be decidable from a record as Annex B defines
+it, together with the inputs named below, and every scenario has to come out as listed. The
 [maintenance request contract](../../specs/maintenance-request-contract-v1.md#depth-enrolled-generations)
-states how a maintenance request carries P and O; the onboarding charter does not yet state it
-for an approval.
+states how a maintenance request carries P and O; the onboarding charter does not yet state it for
+an approval.
 
 ## Checks
 
@@ -27,9 +27,9 @@ integration branch tip it would replace.
 | # | Decided on | Fails when | Invariant |
 | --- | --- | --- | --- |
 | 1 | Any revision | A generation has P frozen for depth-enrolled scope and its version has no depth record | 1 |
-| 2 | Merge | A depth record is removed, an acceptance entry is removed or altered, or a record's selection comes to cover less: a covered mode, a target that mode was covered on, or a claimed capability id is missing from the record | 1 |
+| 2 | Merge | A depth record is removed, an acceptance entry is removed or altered, or a record's selection comes to cover less: a covered mode, a target that mode was covered on, or the mapping of a claimed capability is missing from the record, or a mode is listed with no operation that serves it and no exclusion that names it | 1 |
 | 3 | Any revision | The revision holds a frozen request or approval for a record's version, and the record's Event, P or O is not that generation's | 2 |
-| 4 | Merge | What a depth record states changes while the merge result holds no frozen request or approval for the record's version | 2 |
+| 4 | Merge | What a depth record states, its Event or a part, changes while the merge result holds no frozen request or approval for the record's version | 2 |
 | 5 | Any revision | A published result is neither the result the record states nor `unverified`, or is not `unverified` although the record does not yet state it or the P or the O that its E references is not the one the record states | 3 |
 | 12 | Any revision | A promise is published as qualified, or a capability as depth-qualified, while a result the claim rests on is published as anything other than `verified` or a permitted `not_applicable` | 3 |
 | 6 | Any revision | A tuple the record selects is published as not depth-enrolled | 3 |
@@ -48,11 +48,17 @@ validator can recompute from the record alone, so the check survives replaced wo
 Annex B defines that form: one digest over the Event and the three parts, with the entries left
 out.
 
+Listing an acceptance entry is not a change to what a record states. A promotion that lists its
+entry after the working files were replaced therefore does not fail check 4.
+
 Besides the record, the checks read the registry's declarations, the frozen request or approval
-among the working files, the lifecycle record, the published support and capability rows and the
-committed evidence a result is bound to. A merge check also reads the integration branch tip.
-Inside a workspace `manifest-validate` already reads two of these, the published support rows
-and, to check them, the registry. It reads none of the others.
+among the working files, the committed evidence a result is bound to, and the other depth-gated
+outputs: the published support and capability rows, the pointers and the runtime-support
+projection, the version file, the stand-down markers, the closeout records, and the lifecycle
+record with the publication packet it names. A merge check also reads the integration branch
+tip. Inside a workspace `manifest-validate` already reads the published support rows and, to
+check them, the registry, the pointers and the version files of every published root. It reads
+none of the others.
 
 ## Scenarios
 
@@ -92,7 +98,8 @@ Each scenario is a test case. "Pass" means validation must not fail; "fail" mean
   still bound and republishes qualified under the original acceptance entry.
 - **Selection narrowing.** An invocation mode or target is dropped from the record's selection
   and P is restated, so it would read as remainder. This includes a registry declaration that was
-  narrowed and a later generation that continues the record from it.
+  narrowed and a later generation that continues the record from it, and a record that keeps a
+  covered mode's name while no operation serves it any more.
 - **Edit under unchanged identities.** A hand edit changes a stated selection, mapping,
   obligation, result or evidence binding and leaves the Event, P, O and E identities as they were.
 - **Qualified over a failed result.** The record states a promise as all `verified` on one
@@ -121,10 +128,9 @@ Each scenario is a test case. "Pass" means validation must not fail; "fail" mean
   backs any later acceptance effect, such as a hand pointer advance after a genuine closeout.
 - Invariant 2 is defined by who may change a binding. History does not show the actor, so for E
   it is checkable only structurally.
-- `cli_manifests/aider` and `cli_manifests/gemini_cli` have no validator spec, and the existing
-  specs describe a validator that reads one manifest root. The checks also need the registry,
-  lifecycle records, working files and the integration branch tip. The spec change that makes a
-  check normative has to state those inputs.
+- The existing validator specs describe a validator that reads one manifest root. The checks also
+  need the registry, lifecycle records, working files and the integration branch tip. The spec
+  change that makes a check normative has to state those inputs.
 - Clearing a drift side state with no maintenance closeout in the revision is reached by no
   invariant. It cannot be a state rule, because agents with no maintenance closeout have no drift
   state either.
@@ -138,15 +144,22 @@ Each scenario is a test case. "Pass" means validation must not fail; "fail" mean
   branch cut before the declaration landed. Only depth admission at the integration step does.
 - A declared version that has no depth record yet has no publication rule, because depth facts
   are published from depth records.
-- Annex B names a covered mode apart from the operations that serve it, so check 2 compares
-  names. Whether the operations a P lists for a mode still cover all of it after an operation is
-  divided is decided when P is resolved. No check reaches it.
+- Annex B names a covered mode apart from the operations that serve it and counts it as covered
+  only where an operation serves it or an exclusion names it, so check 2 compares names and that
+  reference. Whether the operations a P lists for a mode still cover all of it after an operation
+  is divided is decided when P is resolved. No check reaches it.
 - A covered mode is named by a selector whose form comes with the registry contract's schema
   revision. Annex B fixes that the name is kept, not what it looks like.
-- The contract treats a record as irrevocable once the integration branch holds it. A declaration
-  narrowed before the first record reaches the integration branch therefore yields a smaller
-  first record there, through a new generation, and check 2 has no earlier record to compare it
-  with. Until then a packet branch can also be reset and its candidate record lost.
+- The contract treats a record as irrevocable once the integration branch holds it. Until then
+  the record is part of a candidate: it binds a freeze in the tree that holds it, and a packet
+  branch reset discards it. A declaration narrowed before the first record reaches the
+  integration branch therefore yields a smaller first record there, through a new generation on a
+  reset branch, and check 2 has no earlier record to compare it with. Depth enrollment rule 10
+  says so: a generation whose record the integration branch never held leaves no due work once
+  its candidate is discarded.
+- A covered target that the manifest root stops listing stays covered, and no later generation
+  can acquire it. Its tuples stay insufficient depth, and acceptance values that hold for the
+  whole version are blocked until a later version displaces it.
 - Retargeting the lifecycle record's `publication_packet_path` re-attributes a `published` stage.
   Decide whether the reference itself is checked.
 - The absence of a drift side state is attributed to the previous maintenance closeout while a
@@ -171,19 +184,25 @@ Each scenario is a test case. "Pass" means validation must not fail; "fail" mean
   standing request that states it, is a first freeze under an unchanged Event: P is frozen again
   and the record's Event does not change. Decide whether it refuses.
 - The digests are taken over a serialization that the executable revision fixes. Until it does,
-  no identity can be computed, and checks 3, 8, 9, 11 and 13 have nothing to compare. The
-  repository's existing identities serialize a typed value with serde, and test vectors are
-  needed before two implementations can be said to agree.
+  no identity can be computed, and checks 3, 8, 9, 11 and 13 have nothing to compare. Where the
+  repository already takes an identity over a structured value it serializes a typed value with
+  serde, and test vectors are needed before two implementations can be said to agree.
 - How a policy identity comes to differ after a change to a shared governing rule, such as an
   obligation template in the contract. Annex B has the policy part state the whole binding and
   leaves the form in which it states the governing rules to the executable revision.
 - `prepare-agent-closeout` and `close-agent-maintenance` each list an entry for the closeout they
-  write. Annex B names a closeout by content identity, so one closeout leaves two entries, the
-  first naming the prepared artifact. Decide whether the first is wanted.
+  write. Annex B names a closeout by content identity, so one closeout can leave two entries when
+  the prepared artifact is edited before it is recorded, the first naming the prepared artifact.
+  Decide whether the first is wanted.
 - Whether the record's shape needs an entry in each root's `SCHEMA.json`, or a typed loader that
   rejects unknown fields suffices, as it does for the registry and the request. `RULES.json`
   describes `reports/<version>/` as holding coverage reports only, and the record's path is added
-  there with the code that reads it.
+  there with the code that reads it. Read literally, the validator specs' `schemas` check and the
+  `ci_validation` note in `RULES.json` cover every committed artifact, while the code validates
+  named files only.
+- When a declaration renames or divides an operation whose mode a record already covers,
+  something has to say which covered mode the new operations serve. The registry contract's
+  schema revision has to let a declaration state it.
 - A re-freeze after a relay run derives O from snapshots and reports the run may have rewritten.
   A re-freeze refuses when P has changed and has no such refusal for O, and the tree does not
   show which actor changed the acquired inputs.
