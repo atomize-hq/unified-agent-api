@@ -88,17 +88,20 @@ Other contracts reference this one for depth rules and MUST NOT restate them.
 - **Depth record.** The durable record of one depth-enrolled version of one agent: one committed
   file in that version's `reports/<version>/` directory under the agent's manifest root. For the
   version's latest generation it states the Event, the resolved depth enrollment selection, the
-  content identities of P and O, the identity of E, each obligation's result for each target and,
-  for a `verified` result, the committed evidence it rests on, named by path and content identity,
-  and the capability mappings those results serve. It also lists an acceptance entry for every
-  closeout, publication or promotion that made an acceptance effect for the version. An entry
-  names that closeout, publication or promotion and identifies what the record stated when the
-  entry was made. The record is first written when a generation of the version first freezes P,
-  and it is extended as O is frozen and as E changes. A later generation of the same version
-  continues the same record: the record then states that generation's Event and P, shows O, E and
-  results as not yet produced until that generation produces them, and keeps its acceptance
-  entries. The record's file name and schema, including the form in which an entry identifies what
-  the record stated, are defined in the manifest root's validator spec.
+  content identities of P and O, the identity of E with the P and O identities that E references,
+  each obligation's result for each target and, for a `verified` result, the committed evidence
+  it rests on, named by path and content identity, and the capability mappings those results
+  serve. It also lists an acceptance entry for every closeout, publication or promotion that made
+  an acceptance effect for the version. An entry names that closeout, publication or promotion
+  and identifies everything the record stated when the entry was made, acceptance entries aside.
+  The record is first written when a generation of the version first freezes P, and it is
+  extended as O is frozen and as E changes. A later generation of the same version continues the
+  same record: the record then states that generation's Event and P, shows O, E and results as
+  not yet produced until that generation produces them, and keeps its acceptance entries. The
+  record's file name and schema are defined in the manifest root's validator spec. The schema
+  MUST define the P, O and E identities, and the form in which an entry identifies what the
+  record stated, so that validation can decide, from the record alone, whether each of them
+  agrees with what the record states.
 - **Working files.** The per-agent maintenance packet files of the current generation under
   `docs/agents/lifecycle/`, such as `maintenance-request.toml` and `maintenance-closeout.json`. A
   later generation replaces them.
@@ -156,9 +159,9 @@ Each obligation in an operation's set produces exactly one result: `verified`, `
 - `not_applicable` MUST carry a rationale and is valid only where the resolved policy permits it
   for the stated promise. An unavailable target or an unknown effect is not `not_applicable`.
 - An unknown output contract is `unverified`. A known counterexample is `failed`.
-- A result produced under a P, O or E other than the one its depth record states, or invalidated
-  under [Reuse and invalidation](#reuse-and-invalidation), is `unverified` until it is verified
-  again.
+- A result is derived in one E. It is `unverified` until it is verified again when its depth
+  record states a P or O other than the one that E references, or when it is invalidated under
+  [Reuse and invalidation](#reuse-and-invalidation).
 - An obligation with no admissible evidence is `unverified`. While qualifying runs for an
   obligation contradict each other, its result is `unverified`.
 - A constrained value subset, such as JSON-only output, is an applicable promise about that
@@ -523,10 +526,12 @@ The following **record invariants** hold for every depth-gated output:
 2. What a record states changes only when a later generation of the same version continues the
    record, or through a change that [Bindings](#bindings) permits to the binding concerned: the
    selection and the capability mappings belong to P, the obligations to O, and the results and
-   their bound evidence to E.
+   their bound evidence to E. The P, O and E identities a record states each cover what it states
+   under that binding: nothing stated under a binding changes while that binding's identity stays
+   the same.
 3. A published result is the result the record states, or `unverified`. It MUST be `unverified`
-   in three cases: the record does not yet state the result; the result was produced under a P, O
-   or E other than the one the record states; or the record states it as `verified` and binds no
+   in three cases: the record does not yet state the result; the record states a P or O other
+   than the one its E references; or the record states the result as `verified` and binds no
    evidence for it, or binds evidence that is absent from the revision or has another content
    identity. A change to a dependency outside the bound evidence is not within this invariant. A
    promise is published as qualified, or a capability as depth-qualified, only when every result

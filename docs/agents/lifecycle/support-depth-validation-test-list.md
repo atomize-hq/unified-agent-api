@@ -25,7 +25,7 @@ integration branch tip it would replace.
 | 2 | Merge | A depth record is removed, or an acceptance entry is removed or altered | 1 |
 | 3 | Any revision | The revision holds a frozen request or approval for a record's version, and the record's Event, P or O is not that generation's | 2 |
 | 4 | Merge | What a depth record states changes while the merge result holds no frozen request or approval for the record's version | 2 |
-| 5 | Any revision | A published result is neither the result the record states nor `unverified`, or is not `unverified` although the record does not yet state it or it was produced under a P, O or E other than the one the record states | 3 |
+| 5 | Any revision | A published result is neither the result the record states nor `unverified`, or is not `unverified` although the record does not yet state it or the record states a P or O other than the one its E references | 3 |
 | 12 | Any revision | A promise is published as qualified, or a capability as depth-qualified, while a result the claim rests on is published as anything other than `verified` or a permitted `not_applicable` | 3 |
 | 6 | Any revision | A tuple the record selects is published as not depth-enrolled | 3 |
 | 7 | Any revision | A result is published as `verified`, or a promise or capability as qualified or depth-qualified on it, and the record states it as `verified` and binds no evidence for it, or binds evidence that is absent or has another content identity | 3 |
@@ -33,11 +33,15 @@ integration branch tip it would replace.
 | 9 | Merge | The merge result makes an acceptance effect for a tuple and no acceptance entry identifies what the tuple's depth record states in the merge result | 4 |
 | 10 | Any revision | The lifecycle record of an agent that has a depth record holds a `published` or `closed_baseline` stage, or a closeout evidence id, that reports a packet or closeout the revision does not hold | 4 |
 | 11 | Merge | The selection, mappings, obligations, results or bound evidence a depth record states change while none of the Event, P, O and E identities it states changes | 2 |
+| 13 | Any revision | A P, O or E identity a record states does not agree with what the record states under that binding: the selection and the capability mappings for P, the obligations for O, the results and their bound evidence for E | 2 |
+
+Check 13 is check 11 decided from one tree. The contract requires the schema to define the three
+identities so that validation can decide it from the record alone.
 
 Checks 8 and 9 need the acceptance entry to identify what the record stated in a form the
 validator can recompute from the record alone, so the check survives replaced working files. The
-last reviewed proposal used the content identity of everything the record states, acceptance
-entries aside. The schema decides the form.
+contract requires that: an entry identifies everything the record stated when it was made,
+acceptance entries aside. The schema decides the encoding.
 
 ## Scenarios
 
@@ -111,8 +115,12 @@ Each scenario is a test case. "Pass" means validation must not fail; "fail" mean
 - Clearing a drift side state with no maintenance closeout in the revision is reached by no
   invariant. It cannot be a state rule, because agents with no maintenance closeout have no drift
   state either.
-- Check 11 maps to invariant 2 only if the E identity the record states changes whenever a result
-  or an evidence binding changes. The schema decides that.
+- A record restated consistently, with what it states under a binding and that binding's identity
+  rewritten together, passes checks 11 and 13. For P and O the frozen request or approval is a
+  second statement, so check 3 fails it while that request or approval stands. For E there is no
+  second statement. Acceptance entries stop matching, so qualified and depth-qualified claims
+  lapse, but `verified` rows follow the restated record. Once a later version has replaced the
+  working files, a selection narrowed this way is caught only by check 4.
 - Retargeting the lifecycle record's `publication_packet_path` re-attributes a `published` stage.
   Decide whether the reference itself is checked.
 - The absence of a drift side state is attributed to the previous maintenance closeout while a
