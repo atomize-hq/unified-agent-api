@@ -933,12 +933,12 @@ Present behavior that the required behavior changes:
    depth admission, or MA6 refuses for a depth-enrolled version.
 4. **The executor's envelope covers most depth-gated outputs.** MA4 runs unsandboxed, can call
    the neutral generators, and is checked only after it has written.
-   [Debt operations](#debt-operations) says execution never closes or promotes its own work. For
-   a depth-enrolled generation the
-   [maintenance request contract](maintenance-request-contract-v1.md#depth-enrolled-generations)
-   puts the request outside the envelope, and requires the relay to fail a run that makes an
-   acceptance effect or a reporting effect it cannot admit and to restore the depth-gated outputs
-   that run changed.
+   [Debt operations](#debt-operations) says execution never closes or promotes its own work. The
+   [maintenance request contract](maintenance-request-contract-v1.md#relay-execution) requires
+   the relay to fail any run whose changes include an acceptance effect for a depth scope tuple,
+   or a depth-gated effect it cannot admit, whichever generation the run belongs to, and to
+   restore what the run changed. For a depth-enrolled generation it also bars the run from
+   changing the request.
 5. **Aggregate generators rewrite every agent's rows.** MA2, MA3, MA4, MA6 and ON4 each
    regenerate publication for all agents under one path's authority. Each must determine the
    touched tuples from the values that change, as Complete mediation rule 1 requires.

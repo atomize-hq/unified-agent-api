@@ -11,7 +11,8 @@ The checks belong beside the depth record's schema in the manifest root's valida
 `manifest-validate` implements. They cannot be written as code before that schema exists. The
 [maintenance request contract](../../specs/maintenance-request-contract-v1.md#depth-enrolled-generations)
 states how a maintenance request carries P and O; the onboarding charter does not yet state it
-for an approval. Until then this list is the record of what the validator must decide.
+for an approval. Until that schema exists this list is the record of what the validator must
+decide.
 
 ## Checks
 
@@ -125,8 +126,14 @@ Each scenario is a test case. "Pass" means validation must not fail; "fail" mean
   version both exist, or check 1 cannot be satisfied.
 - A hand edit that restates the request's `[support_depth]` identities and the record together
   passes check 3. Recomputing P needs its debt baseline, and recomputing O needs the acquired
-  inputs, which the same edit can change.
-- Comparing a changed debt row with the baseline P froze needs that baseline's content. The
-  request and the record hold P's identity only. The request's frozen `[support_surface_audit]`
-  rows hold part of it today: each row's identity, `debt_ref`, deferral reason and follow-on. The
-  schema decides where the rest is stated.
+  inputs, which the same edit can change. The same state is reachable without a hand edit: after
+  an interrupted relay run, or a restore the relay had to refuse, the next dry run takes the tree
+  as its baseline.
+- Comparing a changed debt row with the baseline P froze needs that baseline's content, and so
+  does a re-freeze that must refuse when P has changed. The request and the record hold P's
+  identity only. The request's `[support_surface_audit]` rows cannot serve: every re-freeze takes
+  them again from the tree, so they state the last freeze's rows and not the first's. The schema
+  decides where the baseline is stated.
+- A re-freeze after a relay run derives O from snapshots and reports the run may have rewritten.
+  A re-freeze refuses when P has changed and has no such refusal for O, and the tree does not
+  show which actor changed the acquired inputs.
