@@ -290,9 +290,9 @@ Rules:
     version's declaration, or changing it so that it covers or claims less than that generation's
     selection does, un-enrolls nothing. The support-depth contract's Annex B states what a
     selection covers and claims, and how a later selection is compared with it. Such a change
-    leaves what the selection covers or claims without the policy it needs, which rule 12 treats as
-    missing policy. A declaration changed to cover more takes effect for the generation that next
-    freezes P.
+    leaves what the selection covers or claims without the policy it needs. In a tree that holds
+    the version's depth record, rule 12 treats that as missing policy. A declaration changed to
+    cover more takes effect for the generation that next freezes P.
 12. The registry alone decides the field rules above, apart from whether a target is one that
     `union.expected_targets` lists or that the version's depth record, as the integration branch
     holds it, covers, and it alone decides rules 5 and 6. A registry that breaks one of these is
@@ -306,13 +306,13 @@ Rules:
     holds in each of these cases. A reader MUST NOT treat an invalid registry or missing policy as
     "not depth-enrolled".
 
-The support-depth contract's minimum machinery rule requires the failure a new field prevents to
-be named. Without `enrollments`, nothing the maintainer owns would state which version, operations
-and targets were approved, and depth enrollment would rest on a caller-supplied argument or on
-what a run asserts, neither of which the support-depth contract accepts as authority. Without
+The support-depth contract's minimum machinery rule requires the failure a new field prevents to be
+named. Without `enrollments`, nothing the maintainer owns would state which version, operations and
+targets were approved, and depth enrollment would rest on a caller-supplied argument or on what a
+run asserts, neither of which the support-depth contract accepts as authority. Without
 `enabled_paths`, the only way to withdraw the authorization for a path would be to delete the
-declarations made on it. A version that has no depth record yet would then read as never selected,
-so withdrawing the authorization would send its work back to the rules that predate the
+declarations made on it. A version that has no committed generation would then read as never
+selected, so withdrawing the authorization would send its work back to the rules that predate the
 support-depth contract, which that contract's path enablement forbids. Neither failure can occur
 before the table is in use. They are what the two keys prevent from then on.
 

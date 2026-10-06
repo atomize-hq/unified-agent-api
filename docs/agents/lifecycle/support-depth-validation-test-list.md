@@ -133,17 +133,20 @@ marker names, and nothing is checked at the integration step.
 
 Must be admitted:
 
-- **Frozen generation merges.** The tip holds a marker for the version whose `request_recorded_at`
+- **Named generation merges.** The tip holds a marker for the version whose `request_recorded_at`
   is the one the merge result's request and record state, and the merge result carries the closeout
   with its acceptance entry.
-- **Re-freeze after the packet freeze.** A maintainer-run re-freeze froze O after the marker was
-  declared. The Event is unchanged, so the marker still names the generation.
+- **Re-freeze after the packet freeze.** The marker states `request_recorded_at`, and a
+  maintainer-run re-freeze froze O after it was declared. The Event is unchanged, so the marker
+  still names the generation.
 - **Replaced before any packet freeze.** No marker names the version and the integration branch
   holds no record of it. Each dispatch resets the packet branch and writes a first record. A
   declaration narrowed between two dispatches yields a smaller first record, and nothing of the
   earlier generation is due.
-- **Marker corrected.** The marker was declared for a generation that a dispatch had just replaced.
-  A maintainer changes it to name the generation on the packet branch, whose selection is the same.
+- **Marker corrected.** The marker was declared for a generation that a dispatch had just replaced,
+  so it named none and committed nothing. A maintainer changes it to name the generation on the
+  packet branch. This holds whether or not a declaration narrowed between the two dispatches left
+  that generation a smaller selection.
 
 Must be refused:
 
@@ -152,15 +155,20 @@ Must be refused:
 - **Another generation closed.** The tip's marker names one generation, and the request, record and
   closeout in the merge result belong to another generation of the same version.
 - **Narrowed after the packet freeze.** The declaration is narrowed after the marker was declared,
-  and the frozen generation arrives unchanged. Its record covers more than the declaration does,
-  which the registry contract treats as missing policy.
+  and the generation the marker names arrives unchanged. Its record covers more than the
+  declaration does, which the registry contract treats as missing policy.
+- **Digest-only marker after a re-freeze.** The marker states only `request_sha256`, and a
+  re-freeze after it was declared changed the request file. The generation stays committed and the
+  marker no longer names it. The merge result carries its closeout before a maintainer has restated
+  the marker.
 
 Not decidable from the trees involved:
 
 - **Marker changed to a narrower generation.** After a packet freeze the declaration is narrowed,
-  the packet branch is reset by hand, a new generation is frozen and closed, and the marker is
-  changed to name it. Packet freeze rule 4 forbids it. Nothing on the integration branch states
-  what the first generation covered, so the trees do not tell this case from a corrected marker.
+  the packet branch is reset by hand, a new generation opens with a narrower P and is closed, and
+  the marker is changed to name it. Depth enrollment rule 7 forbids it. Nothing on the integration
+  branch states what the first generation covered, so the trees do not tell this case from a
+  corrected marker.
 
 ## Open questions for the validator design
 
@@ -187,10 +195,10 @@ Not decidable from the trees involved:
   branch cut before the declaration landed. Only depth admission at the integration step does.
 - Before the integration step a route reads the record in its own tree as the one the integration
   branch holds. A record the integration branch does not hold can therefore keep a target that its
-  manifest root has stopped listing, because a freeze on that branch finds the target covered. At
-  the integration step the declaration is missing policy for that target, and only depth admission
-  refuses it there. No check above does. After a packet freeze the same root change leaves the
-  committed generation unable to merge until the target is listed again.
+  manifest root has stopped listing, because a freeze of the request on that branch finds the
+  target covered. At the integration step the declaration is missing policy for that target, and
+  only depth admission refuses it there. No check above does. After a packet freeze the same root
+  change leaves the committed generation unable to merge until the target is listed again.
 - A declared version that has no depth record yet has no publication rule, because depth facts
   are published from depth records.
 - Annex B names a covered mode apart from the operations that serve it and counts it as covered on
@@ -200,9 +208,10 @@ Not decidable from the trees involved:
   reaches it.
 - Check 2 compares which capabilities have a mapping, not what a mapping names. A mapping kept with
   fewer operations, or with none, is therefore not a shrink. Shared mapping rule 5 requires P to
-  name the complete set, and with an empty set "depth-qualified" would hold of nothing. Decide
-  whether the executable revision refuses an empty mapping, and whether anything checks that a
-  mapping is complete.
+  name the complete set. With an empty set its condition and record invariant 3's hold vacuously,
+  so nothing in them keeps the capability from being published as depth-qualified on no result.
+  Decide whether the executable revision refuses an empty mapping, and whether anything checks that
+  a mapping is complete.
 - A covered mode is named by a selector whose form comes with the registry contract's schema
   revision. Annex B fixes that the name is kept, not what it looks like.
 - A generation is committed from its packet freeze, or from the time the integration branch holds
@@ -217,9 +226,10 @@ Not decidable from the trees involved:
   down for that agent and version, and a later generation of the version still has to cover what
   the abandoned one committed. Decide whether a superseded version's marker is ever retired another
   way.
-- `prepare-agent-maintenance` reads no marker, so a maintainer who runs it under a packet freeze
-  opens a generation that the marker does not name, and its closeout is refused until the marker is
-  changed. Decide whether the command should ask before it writes.
+- `prepare-agent-maintenance` reads no marker, so a maintainer's run under a packet freeze that is
+  not a re-freeze opens a generation that the marker does not name, and its closeout is refused
+  until the marker is changed. Decide whether the command should ask before it writes. A check
+  there has to let through the re-freeze that freezes O after a packet freeze.
 - A marker that states only `request_sha256` cannot be matched to a record once a later version's
   packet has replaced the working files, because the record states the Event and not the request's
   digest.

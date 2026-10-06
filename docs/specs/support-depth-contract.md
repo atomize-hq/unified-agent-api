@@ -115,9 +115,10 @@ Other contracts reference this one for depth rules and MUST NOT restate them.
 - **Integration branch.** The branch that holds committed publication truth, currently `staging`.
 - **Packet freeze.** On the maintenance path, a stand-down marker that the integration branch holds
   for one agent and one exact upstream version. A maintainer declares it to stand automation down
-  from that version's packet, and it names one generation of the version. The
-  [maintenance request contract](maintenance-request-contract-v1.md#packet-freeze) states its form
-  and what it requires of a depth-enrolled generation. It is not a freeze of the request.
+  from that version's packet. The
+  [maintenance request contract](maintenance-request-contract-v1.md#packet-freeze) states its form,
+  which generation of the version it names and what it requires of a depth-enrolled generation. It
+  is not a freeze of the request.
 - **Committed generation.** A generation whose selection can no longer be given up.
   [Depth enrollment](#depth-enrollment) rule 7 says when a generation is committed and what follows
   from it.
@@ -521,7 +522,7 @@ depth-gated output that changes a value belonging to at least one depth scope tu
 | The manifest root's `current.json` | Whether it lists the tuple's target as expected |
 | The `latest_validated` and `latest_supported` pointers, the root `latest_validated.txt` included | Each pointer for the tuple's target, and the root pointer, while it names the tuple's version, and any change that would make it name that version |
 | The embedded runtime-support projection | The record for the tuple's runtime family and target while it names the tuple's version, and any change that would make it name that version |
-| Stand-down markers | Removal of a marker for the tuple's version. Declaring a marker is not a depth-gated effect. |
+| Stand-down markers | Removal of a marker for the tuple's version. Declaring or changing a marker is not a depth-gated effect. |
 | Maintenance requests and maintenance and proving-run closeout records | The current file while it belongs to a generation of the tuple's version |
 | The lifecycle record | Its `published` and `closed_baseline` stages, its `proving_run_closeout_written` and `maintenance_closeout_written` evidence ids, its drift side state, and the publication packet and proving-run closeout references it holds. Each belongs to the tuples of the generation whose packet or closeout it reports, as that packet or closeout stands in the same revision |
 
@@ -615,6 +616,11 @@ For an acceptance effect the route MUST also establish:
 
 A reporting effect needs no lifecycle-path authority. If depth admission fails, every depth-gated
 output MUST be left unchanged.
+
+On the maintenance path, the authority that item 4 requires for the closeout of a depth-enrolled
+generation includes a packet freeze that names the generation. The
+[maintenance request contract](maintenance-request-contract-v1.md#packet-freeze) states that
+requirement.
 
 ### Complete mediation
 
@@ -897,7 +903,7 @@ enrollment. A route that holds another path's authority refuses it, as
 | `current.json` | MA6 (shell); NE4; NE6; ON1 at scaffold | One manifest root | `manifest-validate` in CI for three roots | A change to whether it lists a tuple's target is a reporting effect. NE4 and NE6 run on their own establish admission for it or refuse |
 | Pointers | MA6 (shell); NE4 (creates `none`, normalizes formatting) | One root, per target. A promotion moves the pointers off the version they named | `manifest-validate` checks pointer shape and consistency | Setting or advancing a pointer to a depth-enrolled version is an acceptance effect. Moving it off one, to a later or an earlier version, is a reporting effect for the version it leaves |
 | Embedded runtime-support projection | NE1 through MA4 and MA6; MA3; ON4 | Aggregate, every agent and target | `support-matrix --check` | Setting or advancing it to a depth-enrolled version is an acceptance effect, admitted with the pointer change that causes it |
-| Stand-down markers | Removal by MA6 (shell) and within MA4's envelope. Declared, and changed to name a later generation, by a maintainer's commit | One version of one agent | None beyond the merge of the promotion PR. `maintenance-stand-down-check` validates every marker it reads and reports, without deciding on it, whether a marker names the request in the tree (`xtask/agent_maintenance/stand_down.rs:227-233,443-481`) | Removal is an acceptance effect. A marker on the integration branch is a packet freeze: it commits the generation it names, as the maintenance request contract's packet freeze states. MA4 MUST NOT add, change or remove one |
+| Stand-down markers | Removal by MA6 (shell) and within MA4's envelope. Declared and changed by a maintainer's commit | One version of one agent | None beyond the merge of the promotion PR. `maintenance-stand-down-check` validates every marker it reads and reports, without deciding on it, whether a marker names the request in the tree (`xtask/agent_maintenance/stand_down.rs:227-233,443-481`) | Removal is an acceptance effect. A marker on the integration branch is a packet freeze: it commits the generation it names, as the maintenance request contract's packet freeze states. MA4 MUST NOT add, change or remove one |
 | Maintenance request | MA1; MA2 at the second freeze; MA4's envelope | One agent. The file is replaced when a later version's generation opens | The request contract's own validation | Reporting effect. Replacing it displaces the earlier version's tuples, which then resolve from their depth record. MA4 MUST NOT change it |
 | Maintenance closeout | MA5 | One agent, one file replaced across versions | `close-agent-maintenance`: the stand-down check and the commit binding (`xtask/agent_maintenance/closeout.rs:55-66`). `prepare-agent-closeout`: the commit binding only | Acceptance effect, with an acceptance entry listed in the same change. For a depth-enrolled generation, only under a packet freeze that names it |
 | Proving-run closeout | ON5; NE7 | One agent | The approval and lifecycle continuity checks in ON5 | Recording `closed` is an acceptance effect, with an entry in the same change. NE7 refuses for an agent that has a depth record |
@@ -980,14 +986,15 @@ Present behavior that the required behavior changes:
    establish depth admission before the effect, and [Publication](#publication) forbids workflow
    YAML from carrying depth admission policy. The writes move behind a command that establishes
    depth admission, or MA6 refuses for a depth-enrolled version.
-4. **The executor's envelope covers most depth-gated outputs.** MA4 runs unsandboxed, can call
-   the neutral generators, and is checked only after it has written.
+4. **The executor's envelope covers most depth-gated outputs.** MA4 runs unsandboxed, can call the
+   neutral generators, and is checked only after it has written.
    [Debt operations](#debt-operations) says execution never closes or promotes its own work. The
-   [maintenance request contract](maintenance-request-contract-v1.md#relay-execution) requires
-   the relay to fail any run whose changes include an acceptance effect for a depth scope tuple,
-   or a depth-gated effect it cannot admit, whichever generation the run belongs to, and to
-   restore what the run changed. For a depth-enrolled generation it also bars the run from
-   changing the request.
+   [maintenance request contract](maintenance-request-contract-v1.md#relay-execution) requires the
+   relay to fail any run whose changes include an acceptance effect for a depth scope tuple, or a
+   depth-gated effect it cannot admit, whichever generation the run belongs to, and to restore what
+   the run changed. It treats a run that adds or changes a stand-down marker for a depth-enrolled
+   version in the same way. For a depth-enrolled generation it also bars the run from changing the
+   request.
 5. **Aggregate generators rewrite every agent's rows.** MA2, MA3, MA4, MA6 and ON4 each
    regenerate publication for all agents under one path's authority. Each must determine the
    touched tuples from the values that change, as Complete mediation rule 1 requires.
