@@ -241,16 +241,16 @@ Rules:
    request field and a file under the manifest root MUST NOT declare either. None of them stands
    in for a missing declaration, except the depth record as rule 2 states. They carry what is
    derived from this table, as a maintenance request's own `[support_depth]` table does.
-2. Once the integration branch holds a version's depth record, the support-depth contract's
-   depth enrollment rule 7 keeps everything the record's selection covers depth-enrolled,
-   whatever this table declares afterwards. The record states what was resolved from this table.
-   It is not a second place to declare a depth enrollment, and each later generation still
-   resolves its policy from this table.
+2. Once a generation of a version is committed, the support-depth contract's depth enrollment rule
+   7 keeps everything that generation's selection covers depth-enrolled, whatever this table
+   declares afterwards. That rule also says when a generation is committed. The depth record states
+   what was resolved from this table. It is not a second place to declare a depth enrollment, and
+   each later generation still resolves its policy from this table.
 3. An entry with no declaration for a version declares no depth enrollment of that version. That
    absence is how the registry states the support-depth contract's remainder. That contract says
-   what the remainder is and how it may be represented, and rule 2 covers a version whose depth
-   record the integration branch holds. The registry MUST NOT carry a disabled, empty or
-   placeholder entry for a version or an operation that is not depth-enrolled.
+   what the remainder is and how it may be represented, and rule 2 covers a version that has a
+   committed generation. The registry MUST NOT carry a disabled, empty or placeholder entry for a
+   version or an operation that is not depth-enrolled.
 4. A declaration states the whole positive selection the support-depth contract requires. Beyond
    the fields above, that is the operations and their promises, their modes and required values
    and, for each capability the declaration claims, the complete set of operations through which
@@ -286,11 +286,11 @@ Rules:
     charter to define.
 11. A change to this table changes no binding that a generation has frozen. The support-depth
     contract's Bindings rules say when a generation freezes P, and its depth admission predicate
-    requires a frozen P to be current. Once the integration branch holds a version's depth record,
-    removing its declaration, or changing it so that it covers or claims less than the record's
+    requires a frozen P to be current. Once a generation of a version is committed, removing the
+    version's declaration, or changing it so that it covers or claims less than that generation's
     selection does, un-enrolls nothing. The support-depth contract's Annex B states what a
     selection covers and claims, and how a later selection is compared with it. Such a change
-    leaves what the record covers or claims without the policy it needs, which rule 12 treats as
+    leaves what the selection covers or claims without the policy it needs, which rule 12 treats as
     missing policy. A declaration changed to cover more takes effect for the generation that next
     freezes P.
 12. The registry alone decides the field rules above, apart from whether a target is one that

@@ -107,12 +107,20 @@ Other contracts reference this one for depth rules and MUST NOT restate them.
   later generation replaces them.
 - **Remainder.** Everything outside every depth enrollment.
 - **Depth admission.** The check defined in [Depth admission](#depth-admission). It is distinct
-  from the stand-down admission gate of `close-agent-maintenance`, which this contract leaves
-  unchanged.
+  from the stand-down admission gate of `close-agent-maintenance`. That gate asks whether a packet
+  freeze exists, and this contract leaves it unchanged.
 - **Depth-gated output** and **depth-gated effect.** An output listed in
   [Depth-gated effects](#depth-gated-effects), and a change to such an output that touches a depth
   scope tuple.
 - **Integration branch.** The branch that holds committed publication truth, currently `staging`.
+- **Packet freeze.** On the maintenance path, a stand-down marker that the integration branch holds
+  for one agent and one exact upstream version. A maintainer declares it to stand automation down
+  from that version's packet, and it names one generation of the version. The
+  [maintenance request contract](maintenance-request-contract-v1.md#packet-freeze) states its form
+  and what it requires of a depth-enrolled generation. It is not a freeze of the request.
+- **Committed generation.** A generation whose selection can no longer be given up.
+  [Depth enrollment](#depth-enrollment) rule 7 says when a generation is committed and what follows
+  from it.
 - **Route.** A supported command, workflow, script or lower-level interface, or a merge into the
   integration branch, that can produce a depth-gated effect.
 
@@ -455,8 +463,8 @@ work.
    it, or one that rule 7 keeps. The [registry contract](agent-registry-contract.md#support-depth)
    states how one is declared. A declaration MUST NOT be added, or moved to another lifecycle path,
    unless the same commit leaves that lifecycle path enabled for its agent. Restoring the
-   declaration of a version whose depth record the integration branch holds, on the lifecycle path
-   that record's selection names, is not an addition. A selection made inside an isolated proof
+   declaration of a version that has a committed generation, on the lifecycle path that
+   generation's selection names, is not an addition. A selection made inside an isolated proof
    workspace is not a production depth enrollment and MUST NOT produce a depth-gated effect on
    production outputs.
 4. The remainder is declared once, by rule. It MUST NOT be enumerated per historical operation,
@@ -470,15 +478,17 @@ work.
    resolve a version's depth enrollment. Each generation freezes its P from registry-owned
    authority, and where the tree it freezes in already holds the version's depth record, that P
    MUST cover every invocation mode the record's selection covers, on each target the mode is
-   covered on, and MUST claim every capability id the record claims. Once the integration branch
-   holds the record, everything the record's selection covers as that branch holds it stays
-   depth-enrolled under a production depth enrollment, whatever the registry declares afterwards.
-   So far as the integration branch does not hold what a record states, the record is part of a
-   candidate and is discarded with it. Whether the integration branch holds a record, and what it
-   holds of it, is established at the integration step, against the tip. A route that runs before
-   that step reads the record its own tree holds as the one the integration branch holds. An
-   executor's assertion, an optional field of a request or approval and a caller-supplied argument
-   are not authority.
+   covered on, and MUST claim every capability id the record claims. A generation is committed from
+   its packet freeze, or from the time the integration branch holds the depth record as the
+   generation wrote or continued it, whichever comes first. Everything a committed generation's
+   selection covers stays depth-enrolled under a production depth enrollment, whatever the registry
+   declares afterwards, and every later generation of the version MUST cover what that selection
+   covers and claim what it claims. A generation that is not committed may be replaced or abandoned
+   together with its record, and nothing of it carries over. Whether a generation is committed is
+   established at the integration step, against the tip. Before that step a route reads the packet
+   freeze from the integration branch, and it reads the record its own tree holds as the one the
+   integration branch holds. An executor's assertion, an optional field of a request or approval
+   and a caller-supplied argument are not authority.
 8. Missing policy for selected scope, an unsupported schema revision, unresolved or overlapping
    depth enrollment selectors, contradictory generation references and deleted bindings are errors.
    None of them resolves to "not depth-enrolled". A removed depth record is a deleted binding. A
@@ -487,11 +497,12 @@ work.
 9. A flag, value or default discovered on a depth-enrolled operation stays attached to that
    operation. It MUST NOT fall into the remainder because a depth enrollment selector matched
    the earlier values.
-10. Work that is due in a frozen generation stays due until it is satisfied or validly
+10. Work that is due in a committed generation stays due until it is satisfied or validly
     dispositioned. Moving it to another packet, ending the selection, pausing, removing
-    advertising or deleting a declaration does not discharge it. The version's depth record
-    carries that work. Work that the record carries only as part of a candidate is no longer due
-    once that candidate is discarded.
+    advertising, deleting a declaration, or replacing or abandoning the generation does not
+    discharge it. The version's depth record carries that work, and a later generation of the
+    version carries it in turn. A generation that was never committed leaves no due work when it is
+    replaced or abandoned.
 11. Depth enrollment MUST NOT create a second release-watch enrollment inventory.
 
 ## Depth admission
@@ -886,9 +897,9 @@ enrollment. A route that holds another path's authority refuses it, as
 | `current.json` | MA6 (shell); NE4; NE6; ON1 at scaffold | One manifest root | `manifest-validate` in CI for three roots | A change to whether it lists a tuple's target is a reporting effect. NE4 and NE6 run on their own establish admission for it or refuse |
 | Pointers | MA6 (shell); NE4 (creates `none`, normalizes formatting) | One root, per target. A promotion moves the pointers off the version they named | `manifest-validate` checks pointer shape and consistency | Setting or advancing a pointer to a depth-enrolled version is an acceptance effect. Moving it off one, to a later or an earlier version, is a reporting effect for the version it leaves |
 | Embedded runtime-support projection | NE1 through MA4 and MA6; MA3; ON4 | Aggregate, every agent and target | `support-matrix --check` | Setting or advancing it to a depth-enrolled version is an acceptance effect, admitted with the pointer change that causes it |
-| Stand-down markers | Removal by MA6 (shell) and within MA4's envelope. Declared by a maintainer's commit | One version of one agent | None beyond the merge of the promotion PR | Removal is an acceptance effect. MA4 MUST NOT remove one |
+| Stand-down markers | Removal by MA6 (shell) and within MA4's envelope. Declared, and changed to name a later generation, by a maintainer's commit | One version of one agent | None beyond the merge of the promotion PR. `maintenance-stand-down-check` validates every marker it reads and reports, without deciding on it, whether a marker names the request in the tree (`xtask/agent_maintenance/stand_down.rs:227-233,443-481`) | Removal is an acceptance effect. A marker on the integration branch is a packet freeze: it commits the generation it names, as the maintenance request contract's packet freeze states. MA4 MUST NOT add, change or remove one |
 | Maintenance request | MA1; MA2 at the second freeze; MA4's envelope | One agent. The file is replaced when a later version's generation opens | The request contract's own validation | Reporting effect. Replacing it displaces the earlier version's tuples, which then resolve from their depth record. MA4 MUST NOT change it |
-| Maintenance closeout | MA5 | One agent, one file replaced across versions | `close-agent-maintenance`: the stand-down check and the commit binding (`xtask/agent_maintenance/closeout.rs:55-66`). `prepare-agent-closeout`: the commit binding only | Acceptance effect, with an acceptance entry listed in the same change |
+| Maintenance closeout | MA5 | One agent, one file replaced across versions | `close-agent-maintenance`: the stand-down check and the commit binding (`xtask/agent_maintenance/closeout.rs:55-66`). `prepare-agent-closeout`: the commit binding only | Acceptance effect, with an acceptance entry listed in the same change. For a depth-enrolled generation, only under a packet freeze that names it |
 | Proving-run closeout | ON5; NE7 | One agent | The approval and lifecycle continuity checks in ON5 | Recording `closed` is an acceptance effect, with an entry in the same change. NE7 refuses for an agent that has a depth record |
 | Lifecycle record | ON1, ON2, ON3 (stages before `published`); ON4 (`published`); ON5 (`closed_baseline`, cleared drift); NE7 (evidence and references); MA5 (`maintenance_closeout_written`, cleared drift) | One agent. It names no version | Stage and evidence validation when the record is loaded (`xtask/agent_lifecycle.rs:354-487`) | `published`, `closed_baseline`, the two closeout evidence ids and a cleared drift state are acceptance effects, attributed through the packet or closeout they report. A cleared drift state reports the maintenance closeout. ON5 clears it and resets the evidence lists, which drops `maintenance_closeout_written` (`xtask/close_proving_run.rs:460-469`); where the maintenance closeout that stands belongs to a depth-enrolled generation, that acts on another path's tuple and ON5 refuses or leaves both in place. Earlier stages are not depth-gated |
 
@@ -989,6 +1000,16 @@ Present behavior that the required behavior changes:
 9. **Two manifest roots have no validator spec.** `cli_manifests/aider` and
    `cli_manifests/gemini_cli` hold none, and CI validates three roots. Neither may hold a depth
    record until it has one that adopts Annex B.
+10. **No route decides which generation a stand-down marker names.** `close-agent-maintenance` asks
+    whether a marker for the agent and version is on `origin/staging`
+    (`xtask/agent_maintenance/closeout.rs:174-241`). The check it calls reports whether the
+    marker's `request_recorded_at` or `request_sha256` matches the request and answers the same
+    either way (`xtask/agent_maintenance/stand_down.rs:443-481`). `prepare-agent-closeout` does not
+    ask at all, and `prepare-agent-maintenance` reads no marker: only the workflows ask before they
+    call it (`wf/agent-maintenance-open-pr.yml:101-142`, `wf/parity-acquire.yml:560-624`). The
+    [maintenance request contract](maintenance-request-contract-v1.md#packet-freeze) requires the
+    closeout commands and the integration step to establish that the marker names the generation
+    they accept.
 
 ### A.5 Promotion after the working files were replaced
 
@@ -1129,8 +1150,8 @@ Rules:
    capability mappings state, and they need no second list.
 2. A covered mode is named apart from the operations that serve it. Its name is the depth
    enrollment selector under which the selection first covered it, in the form the executable
-   revision defines, and the mode keeps that name once the integration branch holds the record.
-   Each operation states which covered modes it serves.
+   revision defines, and the mode keeps that name from the time a generation that covers it is
+   committed. Each operation states which covered modes it serves.
 3. A P that renames, divides, merges or reclassifies operations changes which operations serve a
    covered mode. It neither renames nor drops the mode. A mode that P comes to exclude under
    classification rule 7 stays in the list and names the classification entry that excludes it.

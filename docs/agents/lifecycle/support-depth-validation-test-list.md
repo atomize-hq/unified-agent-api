@@ -66,10 +66,11 @@ Each scenario is a test case. "Pass" means validation must not fail; "fail" mean
 
 ### Must pass
 
-- **Nightly re-dispatch of an unchanged version.** The record on the integration branch states
-  an Event and P and nothing else. A new generation of the same version opens with a new Event,
-  the same P and no O yet, and the record restates the Event. Backlog item `uaa-0048` records
-  that this re-dispatch happens. An earlier draft failed it.
+- **Nightly re-dispatch of an unchanged version.** The record on the integration branch states an
+  Event and P and nothing else, and no stand-down marker names the version. A new generation of the
+  same version opens with a new Event, the same P and no O yet, and the record restates the Event.
+  Backlog item `uaa-0048` records that this re-dispatch happens until a stand-down marker stops it.
+  An earlier draft failed it.
 - **Later generation of an accepted version.** The record states the new generation's Event and
   P, shows O, E and results as not yet produced, and keeps its acceptance entries. The published
   rows are rewritten to `unverified`, and qualified and depth-qualified claims are dropped, in
@@ -121,6 +122,46 @@ Each scenario is a test case. "Pass" means validation must not fail; "fail" mean
 - **Dangling lifecycle stage.** A hand edit sets `published` or `closed_baseline` while the
   packet or closeout it reports is absent.
 
+## Packet freeze cases
+
+The [maintenance request contract](../../specs/maintenance-request-contract-v1.md#packet-freeze)
+makes the packet freeze the point from which a maintenance generation is committed. The cases below
+are decided by depth admission, not by a check above. Its inputs are the stand-down markers on the
+integration branch tip, and the request and the depth record in the merge result. Today
+`close-agent-maintenance` refuses when the version has no marker. Nothing checks which generation a
+marker names, and nothing is checked at the integration step.
+
+Must be admitted:
+
+- **Frozen generation merges.** The tip holds a marker for the version whose `request_recorded_at`
+  is the one the merge result's request and record state, and the merge result carries the closeout
+  with its acceptance entry.
+- **Re-freeze after the packet freeze.** A maintainer-run re-freeze froze O after the marker was
+  declared. The Event is unchanged, so the marker still names the generation.
+- **Replaced before any packet freeze.** No marker names the version and the integration branch
+  holds no record of it. Each dispatch resets the packet branch and writes a first record. A
+  declaration narrowed between two dispatches yields a smaller first record, and nothing of the
+  earlier generation is due.
+- **Marker corrected.** The marker was declared for a generation that a dispatch had just replaced.
+  A maintainer changes it to name the generation on the packet branch, whose selection is the same.
+
+Must be refused:
+
+- **Closed without a packet freeze.** The merge result carries a depth-enrolled generation's
+  closeout and the tip holds no marker for the version.
+- **Another generation closed.** The tip's marker names one generation, and the request, record and
+  closeout in the merge result belong to another generation of the same version.
+- **Narrowed after the packet freeze.** The declaration is narrowed after the marker was declared,
+  and the frozen generation arrives unchanged. Its record covers more than the declaration does,
+  which the registry contract treats as missing policy.
+
+Not decidable from the trees involved:
+
+- **Marker changed to a narrower generation.** After a packet freeze the declaration is narrowed,
+  the packet branch is reset by hand, a new generation is frozen and closed, and the marker is
+  changed to name it. Packet freeze rule 4 forbids it. Nothing on the integration branch states
+  what the first generation covered, so the trees do not tell this case from a corrected marker.
+
 ## Open questions for the validator design
 
 - A hand-listed acceptance entry that no closeout, publication or promotion made passes every check
@@ -145,10 +186,11 @@ Each scenario is a test case. "Pass" means validation must not fail; "fail" mean
 - No record invariant reaches a declared version whose generation never froze P, such as a packet
   branch cut before the declaration landed. Only depth admission at the integration step does.
 - Before the integration step a route reads the record in its own tree as the one the integration
-  branch holds. A candidate record can therefore keep a target that its manifest root has stopped
-  listing, because a freeze on that branch finds the target covered. At the integration step the
-  declaration is missing policy for that target, and only depth admission refuses it there. No
-  check above does.
+  branch holds. A record the integration branch does not hold can therefore keep a target that its
+  manifest root has stopped listing, because a freeze on that branch finds the target covered. At
+  the integration step the declaration is missing policy for that target, and only depth admission
+  refuses it there. No check above does. After a packet freeze the same root change leaves the
+  committed generation unable to merge until the target is listed again.
 - A declared version that has no depth record yet has no publication rule, because depth facts
   are published from depth records.
 - Annex B names a covered mode apart from the operations that serve it and counts it as covered on
@@ -163,17 +205,27 @@ Each scenario is a test case. "Pass" means validation must not fail; "fail" mean
   mapping is complete.
 - A covered mode is named by a selector whose form comes with the registry contract's schema
   revision. Annex B fixes that the name is kept, not what it looks like.
-- The contract treats a record as irrevocable once the integration branch holds it, and only as
-  that branch holds it. So far as the branch does not hold what a record states, the record is part
-  of a candidate: it binds a freeze in the tree that holds it, and a packet branch reset discards
-  it. A declaration narrowed before the first record reaches the integration branch therefore
-  yields a smaller first record there, through a new generation on a reset branch, and check 2 has
-  no earlier record to compare it with. A later generation's widening that never reaches the
-  integration branch lapses the same way. Depth enrollment rule 10 says so: work that the record
-  carries only as part of a candidate is no longer due once that candidate is discarded. Restating
-  the request and a record the integration branch never held together, in one tree, reaches the
-  same result without a reset, and no check sees it. A candidate that is neither merged nor reset
-  keeps its record and its due work in its own tree and changes nothing on the integration branch.
+- A generation is committed from its packet freeze, or from the time the integration branch holds
+  the record it wrote or continued. Until then the next dispatch replaces it, and check 2 has no
+  earlier record to compare a smaller first record with. Depth enrollment rule 10 says so: a
+  generation that was never committed leaves no due work. Between the packet freeze and the merge
+  the marker names the generation, and nothing on the integration branch states what its selection
+  covers. A marker that also stated `request_sha256` would fix the request's bytes and through them
+  both identities, but a re-freeze after the packet freeze changes those bytes, and `uaa-0063` may
+  sanction one. Decide whether a depth-enrolled packet's marker has to state more than it does.
+- An abandoned packet keeps its marker, because only promotion removes one. Automation stays stood
+  down for that agent and version, and a later generation of the version still has to cover what
+  the abandoned one committed. Decide whether a superseded version's marker is ever retired another
+  way.
+- `prepare-agent-maintenance` reads no marker, so a maintainer who runs it under a packet freeze
+  opens a generation that the marker does not name, and its closeout is refused until the marker is
+  changed. Decide whether the command should ask before it writes.
+- A marker that states only `request_sha256` cannot be matched to a record once a later version's
+  packet has replaced the working files, because the record states the Event and not the request's
+  digest.
+- A marker names a generation by `request_recorded_at`, and the Event has three more fields. Two
+  generations of one version that stated the same `request_recorded_at`, which takes a caller who
+  passes it by hand, would both be named.
 - A covered target that the manifest root stops listing stays covered, and no later generation
   can acquire it. Its tuples stay insufficient depth, and acceptance values that hold for the
   whole version are blocked until a later version displaces it.
@@ -184,8 +236,11 @@ Each scenario is a test case. "Pass" means validation must not fail; "fail" mean
 - Coverage reports, wrapper code and `wrapper_coverage.json` are dependencies whose change no
   check detects. Results that depend on them are invalidated lazily.
 - The admission checker runs from the candidate's own tree.
-- Promotion of a version whose working files were replaced has only the record's P and O
-  identities to check against. Annex A's promotion entry decides whether that suffices.
+- Promotion of a version whose working files were replaced has only the record's P and O identities
+  to check against. Annex A's promotion entry decides whether that suffices. The marker is still on
+  the tip then and names the generation by `request_recorded_at`, which the record states as its
+  Event, so promotion could compare the two without the working files. `parity-promote` reads
+  neither the request nor the closeout today (`uaa-0064`).
 - On the onboarding create lane, P must be frozen where the manifest root and the exact upstream
   version both exist, or check 1 cannot be satisfied.
 - A hand edit that restates the request's `[support_depth]` identities and the record together
