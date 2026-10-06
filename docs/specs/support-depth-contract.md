@@ -620,7 +620,8 @@ output MUST be left unchanged.
 On the maintenance path, the authority that item 4 requires for the closeout of a depth-enrolled
 generation includes a packet freeze that names the generation. The
 [maintenance request contract](maintenance-request-contract-v1.md#packet-freeze) states that
-requirement.
+requirement. The stand-down admission gate asks only whether a marker exists for the version, not
+which generation it names.
 
 ### Complete mediation
 

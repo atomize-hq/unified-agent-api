@@ -135,7 +135,8 @@ Must be admitted:
 
 - **Named generation merges.** The tip holds a marker for the version whose `request_recorded_at`
   is the one the merge result's request and record state, and the merge result carries the closeout
-  with its acceptance entry.
+  with its acceptance entry. It makes no difference whether that generation had been replaced when
+  the marker was declared and was pushed back afterwards.
 - **Re-freeze after the packet freeze.** The marker states `request_recorded_at`, and a
   maintainer-run re-freeze froze O after it was declared. The Event is unchanged, so the marker
   still names the generation.
@@ -144,7 +145,7 @@ Must be admitted:
   declaration narrowed between two dispatches yields a smaller first record, and nothing of the
   earlier generation is due.
 - **Marker corrected.** The marker was declared for a generation that a dispatch had just replaced,
-  so it named none and committed nothing. A maintainer changes it to name the generation on the
+  so it committed nothing of that generation. A maintainer changes it to name the generation on the
   packet branch. This holds whether or not a declaration narrowed between the two dispatches left
   that generation a smaller selection.
 
@@ -208,10 +209,10 @@ Not decidable from the trees involved:
   reaches it.
 - Check 2 compares which capabilities have a mapping, not what a mapping names. A mapping kept with
   fewer operations, or with none, is therefore not a shrink. Shared mapping rule 5 requires P to
-  name the complete set. With an empty set its condition and record invariant 3's hold vacuously,
-  so nothing in them keeps the capability from being published as depth-qualified on no result.
-  Decide whether the executable revision refuses an empty mapping, and whether anything checks that
-  a mapping is complete.
+  name the complete set. With an empty set that rule's condition and record invariant 3's hold
+  vacuously, so nothing in them keeps the capability from being published as depth-qualified on no
+  result. Decide whether the executable revision refuses an empty mapping, and whether anything
+  checks that a mapping is complete.
 - A covered mode is named by a selector whose form comes with the registry contract's schema
   revision. Annex B fixes that the name is kept, not what it looks like.
 - A generation is committed from its packet freeze, or from the time the integration branch holds
@@ -225,7 +226,9 @@ Not decidable from the trees involved:
 - An abandoned packet keeps its marker, because only promotion removes one. Automation stays stood
   down for that agent and version, and a later generation of the version still has to cover what
   the abandoned one committed. Decide whether a superseded version's marker is ever retired another
-  way.
+  way. A marker declared only after its packet was abandoned, or after a later version's packet
+  replaced the working files, names and commits its generation all the same. Decide whether it
+  should.
 - `prepare-agent-maintenance` reads no marker, so a maintainer's run under a packet freeze that is
   not a re-freeze opens a generation that the marker does not name, and its closeout is refused
   until the marker is changed. Decide whether the command should ask before it writes. A check

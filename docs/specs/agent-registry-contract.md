@@ -290,9 +290,10 @@ Rules:
     version's declaration, or changing it so that it covers or claims less than that generation's
     selection does, un-enrolls nothing. The support-depth contract's Annex B states what a
     selection covers and claims, and how a later selection is compared with it. Such a change
-    leaves what the selection covers or claims without the policy it needs. In a tree that holds
-    the version's depth record, rule 12 treats that as missing policy. A declaration changed to
-    cover more takes effect for the generation that next freezes P.
+    leaves what the selection covers or claims without the policy it needs. Where the same tree
+    holds a depth record of the version that covers or claims more than the declaration does, rule
+    12 treats that as missing policy. A declaration changed to cover more takes effect for the
+    generation that next freezes P.
 12. The registry alone decides the field rules above, apart from whether a target is one that
     `union.expected_targets` lists or that the version's depth record, as the integration branch
     holds it, covers, and it alone decides rules 5 and 6. A registry that breaks one of these is

@@ -599,18 +599,18 @@ a freeze of the request. A packet freeze exists whether or not support depth is 
 For a depth-enrolled generation:
 
 1. The packet freeze is the point from which the generation it names is committed under the
-   support-depth contract's depth enrollment rule 7. While the target version has no packet freeze,
-   automation keeps authority over its packet: the next dispatch for the version opens a new
-   generation and replaces the request and the packet. Where the integration branch holds no depth
-   record of the version, the record the earlier generation wrote is replaced with them.
+   support-depth contract's depth enrollment rule 7, with one exception. A marker commits nothing
+   of a generation that a later generation of the version had already replaced when the marker was
+   declared, or changed, to state that generation's `request_recorded_at` or digest, for as long as
+   the generation stays replaced. Depth enrollment rule 7 decides, as for any generation that has
+   no packet freeze, whether anything of it carries over. While the target version has no packet
+   freeze, automation keeps authority over its packet: the next dispatch for the version opens a
+   new generation and replaces the request and the packet. Where the integration branch holds no
+   depth record of the version, the record the earlier generation wrote is replaced with them.
 2. A marker names the generation whose request states the `request_recorded_at` that the marker
    states. A marker that states only `request_sha256` names the generation whose request file has
    that digest, and stops naming it when a re-freeze changes the file. That generation stays
-   committed, and rule 3 refuses its closeout until a maintainer restates the marker. A marker does
-   not name a generation that a later generation of the version had already replaced when the
-   marker came to state it. Such a marker commits nothing, and depth enrollment rule 7 decides, as
-   for any generation that has no packet freeze, whether anything of the replaced generation
-   carries over.
+   committed, and rule 3 refuses its closeout until a maintainer restates the marker.
 3. Writing the closeout for the generation requires its packet freeze. As part of depth admission,
    `prepare-agent-closeout` and `close-agent-maintenance` MUST establish that the integration
    branch holds a marker for the target version and that the marker names the generation, and MUST
@@ -622,10 +622,10 @@ For a depth-enrolled generation:
    in still holds the earlier record.
 5. Only a maintainer's commit to the integration branch declares a marker or changes one. A change
    may name a later generation of the same target version, or restate the marker for a generation
-   it has stopped naming. No command or workflow, and no executor run, does either. Changing a
-   marker releases nothing: a generation that was committed stays committed, and depth enrollment
-   rule 7 binds the generation the marker then names. A marker is removed only by the version's
-   promotion, which the support-depth contract makes an acceptance effect.
+   that the marker has stopped naming. No command or workflow, and no executor run, does either.
+   Changing a marker releases nothing: a generation that was committed stays committed, and depth
+   enrollment rule 7 binds the generation the marker then names. A marker is removed only by the
+   version's promotion, which the support-depth contract makes an acceptance effect.
 6. A packet freeze declared before any freeze of the request has frozen O commits a generation that
    has no frozen obligations. It reaches acceptance only after a re-freeze has frozen O.
 
@@ -724,7 +724,7 @@ None of this section is implemented, and it has no effect until a depth enrollme
   closes an older packet's pull request, and `parity-acquire` asks before its re-freeze.
   `close-agent-maintenance` refuses unless a marker for the agent and target version is on
   `origin/staging` as the local clone last fetched it, and it does not ask when the request has no
-  detected release. The only step that removes a marker is in the promotion workflow.
+  detected release. The only workflow or command that removes a marker is the promotion workflow.
 - No command decides on the generation a marker names. `maintenance-stand-down-check` reports
   whether the marker's `request_recorded_at` or `request_sha256` matches the request in the tree
   and gives the same answer either way. `prepare-agent-closeout` does not read the marker.
