@@ -50,6 +50,8 @@ documents are not normative.
 | Lifecycle stages and support tiers | The committed lifecycle record, as the onboarding charter designates | Unchanged. Neither is a depth result. |
 | Runtime profiles `minimal`, `default` and `feature_rich` | The lifecycle implementation in `crates/xtask/src/agent_lifecycle.rs`; no normative owner | Unchanged. A runtime profile is not a depth result. |
 | Surface exclusions in `parity_exclusions` | Each manifest root's `RULES.json` and validator spec, where the root has them | Unchanged. See classification rule 7 for mode exclusions. |
+| The four support layers, and the row model and derivation of every support publication row outside a depth enrollment | [Support matrix spec](unified-agent-api/support-matrix.md) | Unchanged. That spec states what a depth-enrolled row adds and how its `uaa_support` is derived. |
+| The capability matrix as a publication of advertising | [Capabilities spec](unified-agent-api/capabilities-schema-spec.md) | Unchanged. It publishes no depth fact. |
 | The version-only runtime-support payload | [Runtime-support contract](unified-agent-api/runtime-support-contract.md) | Unchanged. Depth facts never enter it. |
 | Manual maintenance closeout | Maintenance request contract | Kept. Depth admission is added to it. |
 | Manual proving-run closeout and maintainer-gated promotion | Onboarding charter | Kept. Depth admission is added to them. |
@@ -278,7 +280,10 @@ Rules:
 9. Maintenance MUST preserve or repair mappings that already exist. Adding a mapping is not
    maintenance work and never becomes due through discovery.
 
-The support matrix contract owns how capability-level results are published.
+The [support matrix spec](unified-agent-api/support-matrix.md#support-depth) owns how
+capability-level results are published, and the
+[capabilities spec](unified-agent-api/capabilities-schema-spec.md#support-depth) states how the
+capability matrix relates to them.
 
 ## Evidence
 
@@ -806,9 +811,11 @@ and defines no command for it.
 
 ## Publication
 
-- Depth facts MUST be published from depth records. A depth record is committed evidence under
-  the agent's manifest root in `reports/**`, an evidence category the support matrix's neutral
-  root intake already reads. A second evidence store MUST NOT be introduced.
+- Depth facts MUST be published from depth records. A depth record is committed evidence under the
+  agent's manifest root in `reports/**`, an evidence category the support matrix's neutral root
+  intake already reads. A second evidence store MUST NOT be introduced. The
+  [support matrix spec](unified-agent-api/support-matrix.md#support-depth) states what a
+  depth-enrolled row publishes.
 - Aggregates MUST keep per-target results. One target's evidence never qualifies another.
 - Machine-readable and Markdown depth facts MUST agree.
 - The runtime-support payload stays version-only. Keeping depth facts out of that payload does not

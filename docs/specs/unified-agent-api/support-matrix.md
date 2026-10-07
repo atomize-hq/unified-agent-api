@@ -208,6 +208,112 @@ The support matrix MUST remain separate from `docs/specs/unified-agent-api/capab
 If a reader needs backend capability coverage, they SHOULD use the capability matrix.
 If a reader needs published support truth, they MUST use the support matrix.
 
+## Support depth
+
+The [support-depth contract](../support-depth-contract.md) owns the rules for support depth: what a
+depth record states, when a result is published as `verified` or as `unverified`, when a promise is
+qualified and a capability depth-qualified, and which changes to a published row need depth
+admission. This section states only what this spec owns: which rows carry depth facts, where those
+facts are read from, what such a row states, how its `uaa_support` is derived, and the revision of
+the JSON artifact that carries them. It uses that contract's terms and redefines none of them.
+
+While the support-depth contract is a Draft this section binds nothing.
+
+Rules:
+
+1. A row is **depth-enrolled** when the depth record of the row's agent and version, in the tree
+   being published, covers an invocation mode on the row's target. Every other row belongs to the
+   support-depth contract's remainder. A remainder row keeps the fields, the meanings and the
+   derivation that the sections above give it. It states no depth fact and carries no marker: the
+   absence of depth facts is how publication states the remainder.
+2. Depth facts are read from depth records and from nowhere else. A depth record is committed
+   evidence under `reports/**`, which [Neutral root intake](#neutral-root-intake) already lists,
+   and this section adds no evidence category. Publication MUST NOT decide a depth fact from the
+   generated capability inventory, from a backend's advertised capability set, from a registry
+   declaration, from a working file or from the lifecycle record. A capability id reaches a row
+   only through the capability mappings of the row's depth record. Where the support-depth
+   contract has a published result depend on evidence the record binds, publication reads that
+   evidence to establish its content identity and for nothing else.
+3. A depth record that cannot be read, that states a schema revision other than the current one or
+   that does not follow Annex B of the support-depth contract is invalid publication state.
+   Publication MUST fail. It MUST NOT publish that version's rows as remainder rows.
+4. A target that a version's depth record covers implies a row for that agent, version and target,
+   whether or not `current.json.expected_targets` still lists the target. That row is part of the
+   exact row set that [Shared support row model](#shared-support-row-model) requires.
+5. Beyond the fields of the shared support row model, a depth-enrolled row states for its target:
+   - each promise of the record's selection that serves a covered mode on the target, with every
+     obligation of that promise and the obligation's published result;
+   - for each such promise, the outcome it has among those the support-depth contract's
+     Publication section requires reports to keep distinguishable, and each covered mode that the
+     record's policy excludes, as a mode exclusion; and
+   - each capability that the record's mappings claim, and whether it is published as
+     depth-qualified for the target.
+
+   The support-depth contract's record invariants and depth admission predicate decide each of
+   these values, and this spec adds no case to them. The JSON artifact states every obligation's
+   result. No count, score, percentage or single label stands in for those results, in the JSON
+   artifact or in the Markdown projection.
+6. For a depth-enrolled row whose record claims at least one capability, `uaa_support` is derived
+   from the row's capability-level depth facts and from nothing else:
+   - `supported`: every capability the record claims is published as depth-qualified for the row's
+     target;
+   - `partial`: at least one is and at least one is not;
+   - `unsupported`: none is.
+
+   The state is a statement about the capabilities the row names. A capability the record does
+   not claim is not assessed, and the state says nothing about it. `manifest_support`,
+   `backend_support`, `pointer_promotion` and `evidence_notes` keep their derivation, and the
+   `uaa_support` of such a row no longer follows from them. A depth-enrolled row whose record
+   claims no capability derives `uaa_support` as a remainder row does.
+7. A change that raises the `uaa_support` of a depth-enrolled row under rule 6 publishes at least
+   one capability as depth-qualified. The support-depth contract makes that an acceptance effect
+   and governs it. This spec adds no condition of its own.
+8. `evidence_notes` MUST NOT carry a depth fact, and authorized debt stays where
+   [Support debt inventory](#support-debt-inventory) puts it. Neither is a second place for the
+   facts of rule 5.
+9. `schema_version` 1 of the JSON artifact is the row model of the sections above. The facts of
+   rule 5 and the derivation of rule 6 belong to the next revision of the artifact. That revision
+   is an executable schema revision of this spec, among those the support-depth contract's path
+   enablement requires to be adopted, and this revision of the spec does not define its fields.
+   In it, a remainder row has exactly the fields and the values it has in revision 1. A reader of
+   the artifact MUST require the revision it supports, and it MUST NOT read an artifact of another
+   revision as one that holds no depth-enrolled row.
+10. [Separation from the capability matrix](#separation-from-the-capability-matrix) holds for
+    depth-enrolled rows as well. A row's capability-level fact says whether a capability is
+    depth-qualified. It never says that a backend advertises the capability, and the capability
+    matrix never says that a capability is depth-qualified. A change to one artifact is still not
+    assumed to update the other.
+
+The support-depth contract's minimum machinery rule requires the failure a new requirement prevents
+to be named. Without rule 5, a `supported` state that rule 6 derives from two claimed capabilities
+would read as a claim about everything the agent advertises, and that contract requires a qualified
+subset to be named by its exact scope. Without rule 4, removing a target from `expected_targets`
+would remove a depth-enrolled row, and with it the published results of that target. Without the
+revision of rule 9, a reader written for revision 1 would take a `uaa_support` derived from depth
+facts for one derived from manifest and backend support.
+
+### Present behavior
+
+None of this section is implemented. Source references are to `staging` at `f61534be`. Today:
+
+- No manifest root holds a depth record, so no row is depth-enrolled.
+- `uaa_support` is derived from `manifest_support`, `backend_support` and whether the row has
+  evidence notes (`crates/xtask/src/support_matrix/derive.rs:704-723`). The derivation reads no
+  capability.
+- Root intake opens a version's coverage reports by exact file name
+  (`crates/xtask/src/support_matrix/derive.rs:575-600`). It would not open `depth-record.json`.
+- The generator loads the agent registry to find the manifest roots it publishes
+  (`crates/xtask/src/support_matrix/derive.rs:258-269`) and reads nothing else from it.
+- The JSON artifact is written with `schema_version` 1
+  (`crates/xtask/src/support_matrix/publication.rs:20-31`).
+- `uaa_support` has three readers besides the Markdown projection: the consistency check behind
+  `support-matrix --check` and `manifest-validate`
+  (`crates/xtask/src/support_matrix/consistency.rs:362-366`), the `markdown_support_claim`
+  governance check, which compares a claimed `uaa_support` with the currently derived rows
+  (`crates/xtask/src/agent_maintenance/drift/governance.rs:436-520`), and the drift report's own
+  rendering of those rows (`crates/xtask/src/agent_maintenance/drift/shared.rs:141-156`). For a
+  depth-enrolled row each of them would read the state that rule 6 derives.
+
 ## Verification checklist
 
 Before downstream work consumes this contract, reviewers MUST confirm:

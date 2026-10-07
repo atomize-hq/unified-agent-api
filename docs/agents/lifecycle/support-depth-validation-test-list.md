@@ -173,6 +173,41 @@ Not decidable from the trees involved:
   branch states what the first generation covered, so the trees do not tell this case from a
   corrected marker.
 
+## Support publication cases
+
+The [support matrix spec](../../specs/unified-agent-api/support-matrix.md#support-depth) states
+which rows are depth-enrolled, what such a row publishes and how its `uaa_support` is derived. The
+fields that carry those facts are left to the next revision of the JSON artifact. Until then the
+cases below are the acceptance test of that section.
+
+Must be published as listed:
+
+- **Remainder row.** The version has no depth record. The row has the fields and the values that
+  revision 1 of the artifact gives it.
+- **One target qualifies, another does not.** The record claims two capabilities and covers two
+  targets. Both capabilities are published as depth-qualified on the first target and one of them
+  on the second. The first row is `supported` and the second is `partial`.
+- **Evidence changed after acceptance.** A bound evidence file has another content identity than
+  the record names. The result is published as `unverified`, the capability is no longer published
+  as depth-qualified, and the row's `uaa_support` falls. No authority is needed for that.
+- **No capability claimed.** The record's selection is wrapper-only. The row states each promise
+  and its results, and `uaa_support` is derived as for a remainder row.
+- **Target no longer expected.** `current.json.expected_targets` drops a target the record covers.
+  The row for that target is still published, with its depth facts.
+
+Must fail:
+
+- **Unreadable record.** The version's depth record cannot be parsed, or states another schema
+  revision. Publication fails and does not publish the version's rows as remainder rows.
+- **Capability from the inventory.** A row names a capability that the capability matrix lists for
+  the agent and the record does not claim.
+- **Raised by regeneration alone.** A regeneration would publish a capability as depth-qualified,
+  and with it raise `uaa_support`, while no acceptance entry was made for what the record states.
+- **Depth fact in a note.** `evidence_notes` states a result, a qualification or a capability's
+  depth qualification.
+- **Reader of another revision.** A reader written for revision 1 is given an artifact of the next
+  revision and reports that no row is depth-enrolled.
+
 ## Open questions for the validator design
 
 - A hand-listed acceptance entry that no closeout, publication or promotion made passes every check
@@ -306,3 +341,24 @@ Not decidable from the trees involved:
 - A re-freeze after a relay run derives O from snapshots and reports the run may have rewritten.
   A re-freeze refuses when P has changed and has no such refusal for O, and the tree does not
   show which actor changed the acquired inputs.
+- The support matrix reads depth facts from depth records alone, so a version that the registry
+  declares and that has no record yet is published with remainder rows until its first freeze.
+  Decide whether publication should show such a version, and from what.
+- A depth record outlives its version's `versions/<version>.json` when the metadata is removed and
+  `reports/<version>/` is kept. The row set is derived from the metadata, so the depth-enrolled
+  rows would vanish. Decide whether a record implies its rows in that case as it does for a target
+  that is no longer expected.
+- A depth-enrolled row states every obligation's result, and one promise can have more than a dozen
+  obligations. Decide how the Markdown projection renders them so that it still agrees with the
+  JSON artifact.
+- A `markdown_support_claim` line claims one `uaa_support` value with no capability scope. For a
+  depth-enrolled row the value is a statement about the capabilities the record claims. Decide
+  whether a claim about such a row has to name them.
+- `uaa_support` is `supported` when every claimed capability is depth-qualified, even where the
+  record claims one capability and the agent advertises many. The row names the capabilities, and a
+  reader of the one column does not see them. Decide whether the executable revision shows the
+  claimed set beside the state.
+- `support-matrix` regenerates every agent's rows. A run made for one agent can find that another
+  agent's row would rise because that agent's record now supports it. The support-depth contract
+  refuses the acceptance effect for a route without authority. Decide whether the run fails or
+  writes the other agent's row at its earlier state.
