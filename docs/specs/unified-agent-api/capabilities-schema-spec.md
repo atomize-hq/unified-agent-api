@@ -130,9 +130,9 @@ Rules:
    An advertised capability that no depth enrollment claims is not assessed.
 3. The capability matrix publishes no depth fact. Capability-level depth results are published by
    the [support matrix](support-matrix.md#support-depth), for each agent, version and target. The
-   capability matrix is generated for one publication target per agent, so a cell has no target to
-   state a per-target result for. Whether a cell later shows a depth result is left to a later
-   revision of this spec.
+   capability matrix is generated for one publication target per agent and names no version, so a
+   cell cannot state a result for each version and target. Whether a cell later shows a depth
+   result is left to a later revision of this spec.
 4. The support-depth contract lists capability publication among its depth-gated outputs, for the
    capabilities a depth enrollment claims, and makes added advertising an acceptance effect. Its
    Annex A lists the routes: regenerating the matrix, and a merge of adapter code that changes an

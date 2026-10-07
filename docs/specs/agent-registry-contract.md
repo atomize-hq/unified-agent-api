@@ -291,9 +291,9 @@ Rules:
     selection does, un-enrolls nothing. The support-depth contract's Annex B states what a
     selection covers and claims, and how a later selection is compared with it. Such a change
     leaves what the selection covers or claims without the policy it needs. Where the tree that
-    holds the declaration also holds a depth record of the version that covers or claims more than
-    the declaration does, rule 12 treats that as missing policy. A declaration changed to cover
-    more takes effect for the generation that next freezes P.
+    holds the registry also holds a depth record of the version that covers or claims more than the
+    declaration does, rule 12 treats that as missing policy. A declaration changed to cover more
+    takes effect for the generation that next freezes P.
 12. The registry alone decides the field rules above, apart from whether a target is one that
     `union.expected_targets` lists or that the version's depth record, as the integration branch
     holds it, covers, and it alone decides rules 5 and 6. A registry that breaks one of these is
