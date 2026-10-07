@@ -479,9 +479,9 @@ The [support-depth contract](support-depth-contract.md) owns the rules for suppo
 enrollment, depth scope tuples, the depth record, the bindings Event, P, O and E, depth admission,
 and which changes are acceptance effects and which are reporting effects. This section states only
 what this contract owns for them: how a request carries the bindings, what each freeze does, which
-generation a packet freeze names, what relay execution may change and what closeout establishes.
-Where it applies one of those rules it does not redefine it, and a term it does not define has the
-meaning the support-depth contract gives it.
+generation a packet freeze names and commits, what relay execution may change and what closeout
+establishes. Where it applies one of those rules it does not redefine it, and a term it does not
+define has the meaning the support-depth contract gives it.
 
 A **depth-enrolled generation** is a generation whose `agent_id` and
 `detected_release.target_version` a depth enrollment selects on the maintenance path. The rules
@@ -600,13 +600,14 @@ For a depth-enrolled generation:
 
 1. The packet freeze is the point from which the generation it names is committed under the
    support-depth contract's depth enrollment rule 7, with one exception. A marker commits nothing
-   of a generation that a later generation of the version had already replaced when the marker was
-   declared, or changed, to state that generation's `request_recorded_at` or digest, for as long as
-   the generation stays replaced. Depth enrollment rule 7 decides, as for any generation that has
-   no packet freeze, whether anything of it carries over. While the target version has no packet
-   freeze, automation keeps authority over its packet: the next dispatch for the version opens a
-   new generation and replaces the request and the packet. Where the integration branch holds no
-   depth record of the version, the record the earlier generation wrote is replaced with them.
+   of a generation that a later generation of the version had already replaced on the version's
+   packet branch when the marker was declared, or changed, to state the replaced generation's
+   `request_recorded_at` or digest, for as long as it stays replaced there. Depth enrollment rule 7
+   decides, as for any generation that has no packet freeze, whether anything of it carries over.
+   While the target version has no packet freeze, automation keeps authority over its packet: the
+   next dispatch for the version opens a new generation and replaces the request and the packet.
+   Where the integration branch holds no depth record of the version, the record the earlier
+   generation wrote is replaced with them.
 2. A marker names the generation whose request states the `request_recorded_at` that the marker
    states. A marker that states only `request_sha256` names the generation whose request file has
    that digest, and stops naming it when a re-freeze changes the file. That generation stays
@@ -620,19 +621,22 @@ For a depth-enrolled generation:
 4. Depth enrollment rule 7 applies from the packet freeze. What it requires of every later
    generation of the same target version holds whether or not the tree the later generation freezes
    in still holds the earlier record.
-5. A marker is declared, and changed, only by a commit made directly to the integration branch.
-   Whoever works the packet with the maintainer's authority makes that commit: a maintainer, or the
-   coding agent that is handed the packet, a relay executor included. The
+5. A marker is declared, and changed, only by a change to the integration branch that the packet
+   branch does not carry. No command or workflow declares or changes a marker, and a marker carried
+   on a packet branch is no packet freeze until the integration branch holds it. Whoever works the
+   packet with the maintainer's authority makes the change: for example a maintainer, a
+   contributor, or the coding agent that is handed the packet pull request, whether or not
+   `execute-agent-maintenance` runs that agent. The
    [lifecycle spec](unified-agent-api/acquisition-maintenance-lifecycle-spec.md) has that agent
-   declare the marker as its first step. No command or workflow declares or changes a marker, and a
-   marker on a packet branch declares nothing. A generation is therefore committed from the first
-   step of the work on its packet, with no separate decision by a maintainer. What is committed is
-   the selection that was frozen from the maintainer's registry declaration. A change may name a
-   later generation of the same target version, or restate the marker for a generation that the
-   marker has stopped naming. Changing a marker releases nothing: a generation that was committed
-   stays committed, and depth enrollment rule 7 binds the generation the marker then names. A
-   marker is removed only by the version's promotion, which the support-depth contract makes an
-   acceptance effect.
+   declare the marker before its first adjudication, so a generation is ordinarily committed when
+   that step is taken, with no separate decision by a maintainer. Rule 1 and depth enrollment rule
+   7 alone say when a generation is committed. Declaring a marker selects nothing: what is
+   committed is the selection that was frozen from the maintainer's registry declaration. A change
+   may name a later generation of the same target version, or restate the marker for a generation
+   that the marker has stopped naming. Changing a marker releases nothing: a generation that was
+   committed stays committed, and depth enrollment rule 7 binds the generation the marker then
+   names. A marker is removed only by the version's promotion, which the support-depth contract
+   makes an acceptance effect.
 6. A packet freeze declared before any freeze of the request has frozen O commits a generation that
    has no frozen obligations. It reaches acceptance only after a re-freeze has frozen O.
 
@@ -652,9 +656,10 @@ For a depth-enrolled generation:
 2. A run MUST NOT change the request, whatever `writable_surfaces` lists. The relay MUST treat a
    change to the request as it treats a write to the closeout path.
 
-A run's changes, in the rules below, are the changes made since the executor started. The dry-run
-baseline is taken earlier and holds digests only, so it cannot serve as that reference: the relay
-keeps its own record of the state at executor start, with the content it needs to restore.
+A run's changes, in the rules below, are the changes made, since the executor started, to the tree
+the run works in. The dry-run baseline is taken earlier and holds digests only, so it cannot serve
+as that reference: the relay keeps its own record of the state at executor start, with the content
+it needs to restore.
 
 For every relay run whose changes touch a depth scope tuple, or add or change a stand-down marker
 for a depth-enrolled version, whichever generation the run belongs to:
@@ -664,9 +669,10 @@ for a depth-enrolled version, whichever generation the run belongs to:
    included, or a depth-gated effect for which the relay cannot establish depth admission. It MUST
    also treat the run as failed when its changes add or change a stand-down marker for a
    depth-enrolled version. Adding or changing one is not a depth-gated effect, but
-   [Packet freeze](#packet-freeze) rule 5 leaves both to a commit made directly to the integration
-   branch. A marker that the executor commits there under that rule is not a change to the packet
-   and is not among the run's changes.
+   [Packet freeze](#packet-freeze) rule 5 leaves both to a change to the integration branch that
+   the packet branch does not carry. A marker that the agent commits to the integration branch
+   under that rule is not a change to the tree the run works in, and is not among the run's
+   changes.
 4. When a run fails under rule 2 or 3, the relay MUST restore every change it attributes to the
    run, so that those paths are as they were when the executor started, before it reports the
    failure. Restoring the depth-gated outputs alone is not enough: the run may also have changed
@@ -735,11 +741,12 @@ None of this section is implemented, and it has no effect until a depth enrollme
   `origin/staging` as the local clone last fetched it, and it does not ask when the request has no
   detected release. The only workflow or command that removes a marker is the promotion workflow.
 - A marker is declared by following an instruction, not by running a command. The generated
-  `HANDOFF.md` opens with the step and its exact commands, which commit the marker to `staging` and
-  push it. The packet prompt makes that step the executor's, also when `execute-agent-maintenance`
-  delivers the prompt, and `AGENTS.md` carries the standing rule. The lifecycle spec names the
-  actor as a coding agent handed the packet pull request. A marker's `declared_by` field is
-  optional, the marker that `HANDOFF.md` renders omits it, and nothing checks it.
+  `HANDOFF.md` opens with the freeze step and its exact commands, which commit the marker to
+  `staging` and push it. The packet prompt makes that step the agent's, also when
+  `execute-agent-maintenance` delivers the prompt, and `AGENTS.md` carries the standing rule. The
+  lifecycle spec names the actor as a coding agent handed the packet pull request. A marker's
+  `declared_by` field is optional, the marker that `HANDOFF.md` renders omits it, and nothing
+  checks it.
 - No command decides on the generation a marker names. `maintenance-stand-down-check` reports
   whether the marker's `request_recorded_at` or `request_sha256` matches the request in the tree
   and gives the same answer either way. `prepare-agent-closeout` does not read the marker.

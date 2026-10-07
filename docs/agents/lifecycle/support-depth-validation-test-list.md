@@ -136,7 +136,8 @@ Must be admitted:
 - **Named generation merges.** The tip holds a marker for the version whose `request_recorded_at`
   is the one the merge result's request and record state, and the merge result carries the closeout
   with its acceptance entry. It makes no difference whether that generation had been replaced when
-  the marker was declared and was pushed back afterwards.
+  the marker was declared and stopped being replaced when it was pushed back to the packet branch
+  afterwards.
 - **Re-freeze after the packet freeze.** The marker states `request_recorded_at`, and a
   maintainer-run re-freeze froze O after it was declared. The Event is unchanged, so the marker
   still names the generation.
@@ -223,7 +224,11 @@ Not decidable from the trees involved:
   the marker names the generation, and nothing on the integration branch states what its selection
   covers. A marker that also stated `request_sha256` would fix the request's bytes and through them
   both identities, but a re-freeze after the packet freeze changes those bytes, and `uaa-0063` may
-  sanction one. Decide whether a depth-enrolled packet's marker has to state more than it does.
+  sanction one. Decide whether a depth-enrolled packet's marker has to state more than it does. A
+  generation that was replaced before its marker landed becomes committed when it is pushed back to
+  the packet branch, with nothing changing on the integration branch. A correction to a narrower
+  generation after such a push-back is forbidden, and the trees cannot tell it from the admitted
+  case "Marker corrected".
 - An abandoned packet keeps its marker, because only promotion removes one. Automation stays stood
   down for that agent and version, and a later generation of the version still has to cover what
   the abandoned one committed. Decide whether a superseded version's marker is ever retired another
