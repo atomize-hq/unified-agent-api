@@ -145,14 +145,15 @@ Must be admitted:
   declaration narrowed between two dispatches yields a smaller first record, and nothing of the
   earlier generation is due.
 - **Marker corrected.** The marker was declared for a generation that a dispatch had just replaced,
-  so it committed nothing of that generation. A maintainer changes it to name the generation on the
+  so it committed nothing of that generation. It is then changed to name the generation on the
   packet branch. This holds whether or not a declaration narrowed between the two dispatches left
   that generation a smaller selection.
 
 Must be refused:
 
 - **Closed without a packet freeze.** The merge result carries a depth-enrolled generation's
-  closeout and the tip holds no marker for the version.
+  closeout and the tip holds no marker for the version. It makes no difference that the merge
+  result itself carries a marker.
 - **Another generation closed.** The tip's marker names one generation, and the request, record and
   closeout in the merge result belong to another generation of the same version.
 - **Narrowed after the packet freeze.** The declaration is narrowed after the marker was declared,
@@ -160,8 +161,8 @@ Must be refused:
   declaration does, which the registry contract treats as missing policy.
 - **Digest-only marker after a re-freeze.** The marker states only `request_sha256`, and a
   re-freeze after it was declared changed the request file. The generation stays committed and the
-  marker no longer names it. The merge result carries its closeout before a maintainer has restated
-  the marker.
+  marker no longer names it. The merge result carries its closeout before the marker has been
+  restated.
 
 Not decidable from the trees involved:
 
