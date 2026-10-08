@@ -281,9 +281,9 @@ Rules:
    for a new agent.
 10. An approval artifact that approves depth enrollment for a new agent is not a second depth
     enrollment inventory. It requires the committed table in the same agent's entry, as
-    `release_watch_enrolled` requires committed `maintenance.release_watch` truth. What an
-    approval states for this table, and how it binds the committed table, is for the onboarding
-    charter to define.
+    `release_watch_enrolled` requires committed `maintenance.release_watch` truth. The
+    [onboarding charter](cli-agent-onboarding-charter.md#support-depth) states what an approval
+    states for this table and how it binds the committed table.
 11. A change to this table changes no binding that a generation has frozen. The support-depth
     contract's Bindings rules say when a generation freezes P, and its depth admission predicate
     requires a frozen P to be current. Once a generation of a version is committed, removing the

@@ -16,8 +16,10 @@ checks did: in one change, or a day apart. Until then the checks and scenarios a
 test of the record's definition: every check has to be decidable from a record as Annex B defines
 it, together with the inputs named below, and every scenario has to come out as listed. The
 [maintenance request contract](../../specs/maintenance-request-contract-v1.md#depth-enrolled-generations)
-states how a maintenance request carries P and O; the onboarding charter does not yet state it for
-an approval.
+states how a maintenance request carries P and O, and the
+[onboarding charter](../../specs/cli-agent-onboarding-charter.md#support-depth) states that on the
+create lane the run's input contract carries them. Where a check below reads "the frozen request
+or approval", the create lane's statement is that input contract.
 
 ## Checks
 
@@ -309,8 +311,11 @@ Must fail:
   the tip then and names the generation by `request_recorded_at`, which the record states as its
   Event, so promotion could compare the two without the working files. `parity-promote` reads
   neither the request nor the closeout today (`uaa-0064`).
-- On the onboarding create lane, P must be frozen where the manifest root and the exact upstream
-  version both exist, or check 1 cannot be satisfied.
+- On the onboarding create lane the charter freezes P at a `runtime-follow-on` dry run, once the
+  manifest root holds version metadata for the approved version and a validator spec. No
+  create-lane command writes either today, and a write run is rejected when it changes anything
+  under the manifest root outside `snapshots/` and `supplement/`. Decide which command writes the
+  version metadata, the validator spec and the depth record for a new root.
 - A hand edit that restates the request's `[support_depth]` identities and the record together
   passes check 3. Recomputing P needs its debt baseline, and recomputing O needs the acquired
   inputs, which the same edit can change. The same state is reachable without a hand edit: after
@@ -390,3 +395,19 @@ Must fail:
   bound evidence cannot be seen from the record and that evidence. Decide what the generator reads
   to publish such a result as `unverified`, and whether the executable revision confines bound
   evidence to `reports/**`.
+- On the create lane O is frozen from the acquired surface under the manifest root, because the
+  lane writes no coverage report. Onboarding acquires from a single host, so that surface can be a
+  partial union. Decide what the acquired inputs of an onboarding O are, and whether a partial
+  union can freeze O for the targets it covers.
+- The create lane's frozen statement of P and O is a run's input contract under
+  `docs/agents/.uaa-temp/`, and the publication packet lists that file among its runtime evidence
+  paths. A later run has its own input contract. Decide which input contract checks 3 and 4 read
+  once several runs exist, and whether it stays in the tree after the proving-run closeout.
+- The charter gives the create lane no route for pointers or version status. A version whose depth
+  enrollment the onboarding path owns reaches them only after its declaration is moved to the
+  maintenance path and a maintenance generation is promoted. Decide whether that move needs
+  anything beyond the registry change, such as release-watch enrollment of the agent.
+- An approval artifact is committed before `onboard-agent` appends the registry entry, and the
+  charter has it state only the exact upstream version. Decide whether an approval written before
+  the version is known can be amended, or whether a new approval artifact, and so a new generation,
+  is always required.

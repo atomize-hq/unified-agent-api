@@ -54,6 +54,7 @@ Maintenance posture note:
 
 - `docs/specs/agent-registry-contract.md`
 - `docs/specs/maintenance-request-contract-v1.md`
+- `docs/specs/support-depth-contract.md`
 - `docs/specs/unified-agent-api/capabilities-schema-spec.md`
 - `docs/specs/unified-agent-api/extensions-spec.md`
 
@@ -121,6 +122,17 @@ Allowlist (may be supported by fewer than 2 backends):
 - `agent_api.events`
 - `agent_api.events.live`
 - `agent_api.exec.non_interactive`
+- `agent_api.tools.mcp.list.v1`
+- `agent_api.tools.mcp.get.v1`
+- `agent_api.tools.mcp.add.v1`
+- `agent_api.tools.mcp.remove.v1`
+
+The first four are the core ids for running, events and non-interactive execution. The four MCP
+management ids are standard ids that `docs/specs/unified-agent-api/capabilities-schema-spec.md`
+defines, and a backend advertises each only where its target supports it and, for `add` and
+`remove`, where `allow_mcp_write` is set. Under default settings they can therefore be advertised
+by fewer than two backends, or by none. The list above is the one `capability-matrix-audit`
+enforces.
 
 ### Extension keys
 
@@ -243,6 +255,97 @@ Runtime evidence repair rule:
 - `repair-runtime-evidence --write` may repoint `active_runtime_evidence_run_id` while leaving lifecycle stage unchanged
 - that selector change is a lifecycle mutation and must update lifecycle provenance fields (`current_owner_command`, `last_transition_at`, `last_transition_by`)
 - repair must be transactional across the canonical repair bundle and lifecycle state: on failure, neither authoritative surface may change
+
+## Support depth
+
+The [support-depth contract](support-depth-contract.md) owns the rules for support depth: depth
+enrollment, the bindings Event, P, O and E, the depth record, depth admission, and which changes
+are acceptance effects. This section states only what this charter owns for the create lane: what
+an approval states for a depth enrollment and how it binds the registry, which generation a
+create-lane run belongs to, where P and O are frozen, which create-lane commands make acceptance
+effects, and what the lane has no route for. It uses that contract's terms and redefines none of
+them.
+
+While the support-depth contract is a Draft this section binds nothing.
+
+Rules:
+
+1. One create-lane run under one approval artifact is one generation. Its Event is the approval
+   artifact's `approval_commit` and `approval_recorded_at`. Work under a new approval artifact is
+   a new generation.
+2. A depth enrollment of a new agent on the onboarding path is declared in the registry's
+   `support_depth` table with `lifecycle_path = "onboarding"`, as the
+   [registry contract](agent-registry-contract.md#support-depth) states. `onboard-agent` appends
+   the agent's entry without that table. A maintainer adds the table afterwards, as release-watch
+   enrollment is added, in a change that leaves `onboarding` in `enabled_paths`.
+3. An approval artifact that approves a depth enrollment states the one exact upstream version it
+   approves it for. It states nothing else of the selection, and it declares nothing: the registry
+   table is the declaration. The two bind by that version. Where the registry declares a depth
+   enrollment on the onboarding path for an agent whose approval states no version or another
+   version, or the approval states a version the registry does not declare, depth enrollment is
+   unresolved, which the support-depth contract treats as an error. This revision does not define
+   the field that carries the version. It belongs to the executable schema revision that the
+   support-depth contract's path enablement requires.
+4. Before P is frozen, the agent's manifest root MUST hold version metadata for the approved exact
+   upstream version and a validator spec that adopts Annex B of the support-depth contract. A
+   placeholder version is not an exact upstream version.
+5. `runtime-follow-on --dry-run` is the create lane's freeze. The first dry run under the approval
+   at which rules 2 to 4 hold freezes P from the registry declaration and writes the version's
+   depth record. A dry run at which the acquired surface of the approved version exists under the
+   manifest root freezes O from it. A dry run before that surface exists leaves O not yet produced,
+   and the generation cannot reach acceptance for depth-enrolled scope until a later dry run has
+   frozen O. The support-depth contract's Bindings say what a later freeze may change.
+6. The run's input contract states the policy identity and, once O is frozen, the obligations
+   identity, as a maintenance request's `[support_depth]` table does. It is the create lane's
+   frozen statement of P and O beside the depth record. This revision does not define those fields.
+7. `runtime-follow-on --write` and `repair-runtime-evidence` make reporting effects only. A write
+   run MUST NOT change the depth identities its input contract states, and the command MUST treat
+   a run as failed when its changes include an acceptance effect.
+8. `refresh-publication --write` and `close-proving-run` are the create-lane commands that make
+   acceptance effects: the lifecycle stages `published` and `closed_baseline`, and a proving-run
+   closeout recorded as `closed`. The support-depth contract requires each to establish depth
+   admission and to list an acceptance entry in the same change.
+9. The create lane has no packet freeze, because no automation replaces a create-lane branch. An
+   onboarding generation is committed from the time the integration branch holds its depth
+   record, as the support-depth contract's depth enrollment rule 7 states.
+10. The create lane sets no pointer and no version status, and this charter adds no route for
+    either. For a version whose depth enrollment the onboarding path owns, those acceptance effects
+    are not available on the create lane. They become available when a maintainer moves the
+    version's declaration to the maintenance path, as the registry contract allows, and a
+    maintenance generation of the version reaches promotion.
+11. The allowlist of the [capability promotion rule](#capability-promotion-rule) is an exception to
+    the two-backend threshold and to nothing else, as the support-depth contract's shared mapping
+    rules state.
+
+The support-depth contract's minimum machinery rule requires the failure a new field or mechanism
+prevents to be named. Without the version in the approval, a declaration added to the registry
+after onboarding began would attach a depth enrollment to a run whose approval never covered it,
+and the depth record's Event would name an approval that says nothing of depth. Without the
+identities in the input contract, nothing on the create lane would state P and O beside the depth
+record, and a record rewritten together with its identities could not be told from the one that
+was frozen.
+
+### Present behavior
+
+None of this section is implemented. Source references are to `staging` at `f61534be`. Today:
+
+- An approval artifact carries `approval_commit` and `approval_recorded_at`
+  (`crates/xtask/src/approval_artifact.rs:246-249`) and no upstream version.
+- `onboard-agent --write` scaffolds the manifest root with a `current.json` and placeholder
+  directories (`crates/xtask/src/onboard_agent/preview.rs:282-320`). It writes no version metadata
+  and no validator spec. The `aider` and `gemini_cli` roots have no `VALIDATOR_SPEC.md`, and the
+  `aider` root's only version is the placeholder `0.0.0`.
+- `runtime-follow-on --dry-run` writes a frozen prompt and input contract under
+  `docs/agents/.uaa-temp/runtime-follow-on/runs/<run_id>/`, and `--write` requires the run id of a
+  prepared dry run (`crates/xtask/src/runtime_follow_on.rs:165-169,235-238`). The input contract
+  carries the approval artifact's path and SHA-256 and no depth identity
+  (`crates/xtask/src/runtime_follow_on/models.rs:8-30`).
+- A write run may change `snapshots/` and `supplement/` under the manifest root and is rejected
+  when it changes anything else there, `reports/` and version metadata included
+  (`crates/xtask/src/runtime_follow_on/codex_exec.rs:150-163`,
+  `crates/xtask/src/runtime_follow_on.rs:455-482`). The check runs after the executor has written.
+- No create-lane command writes `reports/<version>/`, version metadata or a pointer, and none
+  reads a depth enrollment.
 
 ## Multi-target parity acquisition (when a new agent joins it)
 

@@ -420,14 +420,14 @@ Rules:
 7. The freeze points of the maintenance request contract are unchanged. P is frozen when the
    generation opens, at the request's first freeze. On the acquisition lane that opens without
    target reports, O is frozen at the existing second freeze and the opening placeholder stays
-   non-executable. A lane whose reports exist at open keeps its existing treatment. A generation
-   in which O is never frozen from target reports, on the docs-only lane or on an acquisition lane
+   non-executable. A lane whose reports exist at open keeps its existing treatment. A generation in
+   which O is never frozen from target reports, on the docs-only lane or on an acquisition lane
    stood down before its second freeze, cannot reach acceptance for depth-enrolled scope. That
    scope is reported as insufficient depth and never as not depth-enrolled. The
    [maintenance request contract](maintenance-request-contract-v1.md#depth-enrolled-generations)
-   states how a request carries P and O and what each freeze writes. Where P and O are frozen on
-   the onboarding create lane is for the onboarding charter to define; see
-   [Path enablement](#path-enablement).
+   states how a request carries P and O and what each freeze writes. The
+   [onboarding charter](cli-agent-onboarding-charter.md#support-depth) states where P and O are
+   frozen on the create lane and what carries them; see [Path enablement](#path-enablement).
 8. A consumer acting on depth-enrolled scope MUST require the current executable schema revision
    and every binding the depth record states. A binding that the record shows its generation has
    not yet produced is read as such, and its scope as insufficient depth. A missing field or an
@@ -906,7 +906,7 @@ enrollment. A route that holds another path's authority refuses it, as
 
 | Depth-gated output | Routes | Scope a route's change can reach | Present gate | Required |
 | --- | --- | --- | --- | --- |
-| Depth records | None writes one. MA4 can write its directory. NE5 removes it | One version of one agent | None | The record is written at the P freeze (MA1; the charter-defined point on the onboarding path). It is extended at O's freeze (MA1 where reports exist at open, otherwise MA2), as E changes (MA4) and with an acceptance entry (MA5, MA6, ON4, ON5). MA4 MUST NOT list an acceptance entry. NE5 MUST leave a depth record in place |
+| Depth records | None writes one. MA4 can write its directory. NE5 removes it | One version of one agent | None | The record is written at the P freeze (MA1; ON2's dry run on the onboarding path). It is extended at O's freeze (MA1 where reports exist at open, otherwise MA2; ON2's dry run on the onboarding path), as E changes (MA4, ON2) and with an acceptance entry (MA5, MA6, ON4, ON5). MA4 MUST NOT list an acceptance entry. NE5 MUST leave a depth record in place |
 | Support publication rows and Markdown | NE1 through MA2, MA4 and MA6; MA3; ON4 | Aggregate: every agent's rows are regenerated, whichever agent triggered the route, including rows that change because a pointer moved | `make preflight` runs `support-matrix --check` on pull requests (`wf/ci.yml:190-201`, `Makefile:219`), which proves freshness against committed evidence and nothing about depth | Admission for every tuple whose row changes, not only the requesting agent's. Publishing a promise as qualified or a capability as depth-qualified is an acceptance effect; every other row change is a reporting effect |
 | Capability publication | NE2; MA3; ON4; MA4 and any merge of adapter code that changes advertising | Aggregate, every agent | `capability-matrix --check` and the audit in `make preflight` | As above. Added advertising is an acceptance effect. The capability matrix publishes no depth fact |
 | Version metadata | NE3 through MA2 (`reported`) and MA6 (`validated`); MA4 can pass it any status | One version file | The command's own gates (`xtask/manifest_version_metadata.rs:345-421`) and `manifest-validate` in CI. None concerns depth, and the status is whatever the caller passes | `validated`, `supported` and passed per-target outcomes are acceptance effects. `reported` and `snapshotted` are reporting effects. MA2 overwrites a `validated` status with `reported` today; whether it may is for the maintenance lifecycle rules, which this contract leaves unchanged |
@@ -922,8 +922,10 @@ enrollment. A route that holds another path's authority refuses it, as
 No onboarding route writes pointers or version status today: `runtime-follow-on` rejects a run that
 changed either (`xtask/runtime_follow_on/codex_exec.rs:159-163`,
 `xtask/runtime_follow_on.rs:455-482`), by a check after an unsandboxed run, as for MA4. A tuple
-whose depth enrollment the onboarding path owns therefore has no admitting route for either output
-until the onboarding charter amendment provides one, and MA6 refuses for it.
+whose depth enrollment the onboarding path owns therefore has no admitting route for either output,
+and MA6 refuses for it. The [onboarding charter](cli-agent-onboarding-charter.md#support-depth)
+adds none: those effects become available when the version's declaration is moved to the
+maintenance path.
 
 ### A.3 Serialization domains
 
