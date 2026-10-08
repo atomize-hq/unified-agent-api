@@ -427,7 +427,7 @@ Rules:
    [maintenance request contract](maintenance-request-contract-v1.md#depth-enrolled-generations)
    states how a request carries P and O and what each freeze writes. The
    [onboarding charter](cli-agent-onboarding-charter.md#support-depth) states where P and O are
-   frozen on the create lane and what carries them; see [Path enablement](#path-enablement).
+   frozen on the create lane; see [Path enablement](#path-enablement).
 8. A consumer acting on depth-enrolled scope MUST require the current executable schema revision
    and every binding the depth record states. A binding that the record shows its generation has
    not yet produced is read as such, and its scope as insufficient depth. A missing field or an
@@ -925,7 +925,7 @@ changed either (`xtask/runtime_follow_on/codex_exec.rs:159-163`,
 whose depth enrollment the onboarding path owns therefore has no admitting route for either output,
 and MA6 refuses for it. The [onboarding charter](cli-agent-onboarding-charter.md#support-depth)
 adds none: those effects become available when the version's declaration is moved to the
-maintenance path.
+maintenance path and a maintenance generation of the version reaches promotion.
 
 ### A.3 Serialization domains
 

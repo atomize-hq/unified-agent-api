@@ -221,22 +221,23 @@ While the support-depth contract is a Draft this section binds nothing.
 
 Rules:
 
-1. A row is **depth-enrolled** when, in the tree being published, either of these holds: the
-   depth record of the row's agent and version covers an invocation mode on the row's target, or
-   the agent's registry entry declares a depth enrollment of the row's version that lists the
-   row's target. Every other row is a **row without depth facts**. It keeps the fields, the
-   meanings and the derivation that the sections above give it, and it carries no marker.
-2. Whether a row is depth-enrolled is read as rule 1 states. Every other depth fact is read from
-   depth records. A depth record is committed evidence under `reports/**`, which
-   [Neutral root intake](#neutral-root-intake) already lists, and this section adds no evidence
-   category. Publication MUST NOT decide a result, a qualification or a capability's depth
-   qualification from the generated capability inventory, from a backend's advertised capability
-   set, from a registry declaration, from a working file or from the lifecycle record. A
-   capability id reaches a row only through the capability mappings of the row's depth record.
-   Where the support-depth contract has a published result depend on evidence the record binds,
-   publication reads that evidence to establish its content identity and for nothing else. Such a
-   file may lie outside the intake categories. Reading it for its content identity loads no
-   support evidence, and it is the one read this section makes outside those categories.
+1. A row is **depth-enrolled** when, in the tree being published, either of these holds: the depth
+   record of the row's agent and version covers an invocation mode on the row's target, or the
+   agent's registry entry declares a depth enrollment of the row's version that lists the row's
+   target. Every other row is a **row without depth facts**. It keeps the fields, the meanings and
+   the derivation it has under revision 1 of the JSON artifact, and it carries no marker.
+2. Whether a row is depth-enrolled is a matter of scope and is read as rule 1 states. The depth
+   facts a row states are read from depth records. A depth record is committed evidence under
+   `reports/**`, which [Neutral root intake](#neutral-root-intake) already lists, and this section
+   adds no evidence category. Publication MUST NOT decide a result, a qualification or a
+   capability's depth qualification from the generated capability inventory, from a backend's
+   advertised capability set, from a registry declaration, from a working file or from the
+   lifecycle record. A capability id reaches a row only through the capability mappings of the
+   row's depth record. Where the support-depth contract has a published result depend on evidence
+   the record binds, publication reads that evidence to establish its content identity and for
+   nothing else. Such a file may lie outside the intake categories. Reading it for its content
+   identity loads no support evidence, and it is the one evidence read this section makes outside
+   those categories.
 3. A depth record of a version that has committed version metadata is invalid publication state
    when it cannot be read, states a schema revision other than the current one or does not follow
    Annex B of the support-depth contract. Publication MUST fail. It MUST NOT publish that
@@ -264,10 +265,10 @@ Rules:
    its policy for the row's target, states that it is depth-enrolled and that its obligations are
    not yet frozen, which that contract reports as insufficient depth.
 6. For a depth-enrolled row whose record claims at least one capability, `uaa_support` is derived
-   as the sections above derive it, with one further condition: the row is `supported` only when,
-   in addition, every capability the record claims is published as depth-qualified for the row's
-   target. Where that derivation yields `supported` and the condition does not hold, the row is
-   `partial`. Depth facts never raise `uaa_support` above what that derivation yields, and they
+   as it is for a row without depth facts, with one further condition: the row is `supported` only
+   when, in addition, every capability the record claims is published as depth-qualified for the
+   row's target. Where that derivation yields `supported` and the condition does not hold, the row
+   is `partial`. Depth facts never raise `uaa_support` above what that derivation yields, and they
    lower no state other than `supported`. A capability the record does not claim is not assessed,
    and the state says nothing about it. Every other depth-enrolled row derives `uaa_support` as a
    row without depth facts does, and every other field of every row keeps its derivation.
@@ -305,7 +306,8 @@ support alone.
 
 None of this section is implemented. Source references are to `staging` at `f61534be`. Today:
 
-- No manifest root holds a depth record, so no row is depth-enrolled.
+- No manifest root holds a depth record and the registry declares no depth enrollment, so no row is
+  depth-enrolled.
 - `uaa_support` is derived from `manifest_support`, `backend_support` and whether the row has
   evidence notes (`crates/xtask/src/support_matrix/derive.rs:704-723`). The derivation reads no
   capability.

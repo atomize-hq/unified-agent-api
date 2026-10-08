@@ -16,10 +16,10 @@ checks did: in one change, or a day apart. Until then the checks and scenarios a
 test of the record's definition: every check has to be decidable from a record as Annex B defines
 it, together with the inputs named below, and every scenario has to come out as listed. The
 [maintenance request contract](../../specs/maintenance-request-contract-v1.md#depth-enrolled-generations)
-states how a maintenance request carries P and O, and the
-[onboarding charter](../../specs/cli-agent-onboarding-charter.md#support-depth) states that on the
-create lane the run's input contract carries them. Where a check below reads "the frozen request
-or approval", the create lane's statement is that input contract.
+states how a maintenance request carries P and O. The
+[onboarding charter](../../specs/cli-agent-onboarding-charter.md#support-depth) names no second
+committed statement of them on the create lane yet. Where a check below reads "the frozen request
+or approval", an onboarding generation has only its approval's Event fields beside the record.
 
 ## Checks
 
@@ -184,8 +184,8 @@ cases below are the acceptance test of that section.
 
 Must be published as listed:
 
-- **Row without depth facts.** The version has no depth record. The row has the fields and the
-  values that revision 1 of the artifact gives it.
+- **Row without depth facts.** The version has no depth record and no registry declaration lists
+  the target. The row has the fields and the values that revision 1 of the artifact gives it.
 - **One target qualifies, another does not.** The record claims two capabilities and covers two
   targets, and the derivation of revision 1 yields `supported` on both. Both capabilities are
   published as depth-qualified on the first target and one of them on the second. The first row is
@@ -312,10 +312,12 @@ Must fail:
   Event, so promotion could compare the two without the working files. `parity-promote` reads
   neither the request nor the closeout today (`uaa-0064`).
 - On the onboarding create lane the charter freezes P at a `runtime-follow-on` dry run, once the
-  manifest root holds version metadata for the approved version and a validator spec. No
-  create-lane command writes either today, and a write run is rejected when it changes anything
-  under the manifest root outside `snapshots/` and `supplement/`. Decide which command writes the
-  version metadata, the validator spec and the depth record for a new root.
+  manifest root holds version metadata for the approved version, a `RULES.json` and a validator
+  spec. No create-lane command writes any of them today, and a write run is rejected when it
+  changes anything under the manifest root outside `snapshots/` and `supplement/`. The baseline of
+  a write run is taken before the dry run writes its own files, so a depth record written by the
+  dry run would count as a change of the write run. Decide which command writes those three files
+  for a new root, and how the dry run's record stays out of the write run's comparison.
 - A hand edit that restates the request's `[support_depth]` identities and the record together
   passes check 3. Recomputing P needs its debt baseline, and recomputing O needs the acquired
   inputs, which the same edit can change. The same state is reachable without a hand edit: after
@@ -395,19 +397,38 @@ Must fail:
   bound evidence cannot be seen from the record and that evidence. Decide what the generator reads
   to publish such a result as `unverified`, and whether the executable revision confines bound
   evidence to `reports/**`.
-- On the create lane O is frozen from the acquired surface under the manifest root, because the
-  lane writes no coverage report. Onboarding acquires from a single host, so that surface can be a
-  partial union. Decide what the acquired inputs of an onboarding O are, and whether a partial
-  union can freeze O for the targets it covers.
-- The create lane's frozen statement of P and O is a run's input contract under
-  `docs/agents/.uaa-temp/`, and the publication packet lists that file among its runtime evidence
-  paths. A later run has its own input contract. Decide which input contract checks 3 and 4 read
-  once several runs exist, and whether it stays in the tree after the proving-run closeout.
-- The charter gives the create lane no route for pointers or version status. A version whose depth
-  enrollment the onboarding path owns reaches them only after its declaration is moved to the
-  maintenance path and a maintenance generation is promoted. Decide whether that move needs
-  anything beyond the registry change, such as release-watch enrollment of the agent.
+- On the create lane a dry run freezes O from an acquired surface that is already in the manifest
+  root and is not a write run's output. Today the write run's executor is the only create-lane
+  writer of `snapshots/`, both modes of `runtime-follow-on` require the lifecycle stage `enrolled`,
+  and a write run that passes moves the stage on, so no dry run can follow it. Onboarding also
+  acquires from a single host, so the surface can be a partial union. Decide which command acquires
+  the surface ahead of the dry run, whether a dry run is admitted after `runtime_integrated`, what
+  the acquired inputs of an onboarding O are, and whether a partial union can freeze O for the
+  targets it covers.
+- The charter names no committed create-lane artifact that states the P and O identities beside the
+  depth record, so checks 3 and 4 have no second statement for an onboarding generation, and a
+  record rewritten together with its identities cannot be told from the one that was frozen. A
+  run's input contract cannot serve: run directories are ignored by git, an executor can rewrite
+  the file unnoticed, and `repair-runtime-evidence` writes a different one without a dry run. The
+  publication packet is committed and is consumed with its SHA-256 checked, and it is written only
+  after execution. Decide which artifact states the identities, from which point, and how it
+  reaches the integration branch with the record.
+- The charter gives the create lane no route for pointers or for a `validated` or `supported`
+  version status. A version whose depth enrollment the onboarding path owns reaches them only after
+  its proving-run closeout, once its declaration is moved to the maintenance path and a maintenance
+  generation is promoted. The registry contract and the charter's multi-target entry rule already
+  say what the agent needs for that path. Decide whether the move needs anything else, and what
+  owns the version's depth enrollment between the move and the first maintenance freeze.
 - An approval artifact is committed before `onboard-agent` appends the registry entry, and the
-  charter has it state only the exact upstream version. Decide whether an approval written before
-  the version is known can be amended, or whether a new approval artifact, and so a new generation,
-  is always required.
+  charter has it state only the exact upstream version. An approval has been amended in place
+  before, with its `approval_commit` and `approval_recorded_at` unchanged. Decide whether an
+  approval written before the version is known can be amended, whether an amended approval is a new
+  approval artifact, and so a new generation, and what a second approval for the same version
+  continues.
+- The support matrix makes a row depth-enrolled from a registry declaration. A declaration that the
+  registry contract makes missing policy, such as one that lists a target outside
+  `union.expected_targets`, or one removed after a generation was committed, leaves the version
+  unresolved, which the support-depth contract keeps apart from insufficient depth. Decide how a
+  row states unresolved, and whether publication fails as it does for a record it cannot read. A
+  declared target that an existing record does not cover is a third state: decide whether its row
+  states obligations not yet frozen.
