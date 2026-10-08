@@ -402,11 +402,13 @@ Must fail:
   writer of `snapshots/`, both modes of `runtime-follow-on` require the lifecycle stage `enrolled`,
   and a write run that passes moves the stage on, so no dry run can follow it. A write run that
   fails leaves the stage `enrolled` and its output in place, so a retried dry run finds an
-  executor-written surface that nothing in the tree or the record tells from an acquired one.
-  Onboarding also acquires from a single host, so the surface can be a partial union. Decide which
-  command acquires the surface ahead of the dry run, what marks a surface as acquired, whether a
-  dry run is admitted after `runtime_integrated`, what the acquired inputs of an onboarding O are,
-  and whether a partial union can freeze O for the targets it covers.
+  executor-written surface. The failed run's `written-paths.json` lists the paths it changed, but
+  no dry run reads it, it is ignored by git, an executor can rewrite it and an interrupted run
+  writes none, so nothing a dry run reads tells that surface from an acquired one. Onboarding also
+  acquires from a single host, so the surface can be a partial union. Decide which command acquires
+  the surface ahead of the dry run, what marks a surface as acquired, whether a dry run is admitted
+  after `runtime_integrated`, what the acquired inputs of an onboarding O are, and whether a
+  partial union can freeze O for the targets it covers.
 - The charter names no committed create-lane artifact that states the P and O identities beside the
   depth record, so checks 3 and 4 have no second statement for an onboarding generation, and a
   record rewritten together with its identities cannot be told from the one that was frozen. A
@@ -420,8 +422,8 @@ Must fail:
   its proving-run closeout, once its declaration is moved to the maintenance path and a maintenance
   generation is promoted. The registry contract and the charter's multi-target entry rule already
   say what the agent needs for that path. Decide whether the move needs anything else. The question
-  above on a declaration moved to another lifecycle path covers what owns the enrollment in
-  between.
+  above on a declaration moved to another lifecycle path covers what owns the enrollment between
+  the move and the first maintenance freeze.
 - An approval artifact is committed before `onboard-agent` appends the registry entry, and the
   charter has it state only the exact upstream version. An approval has been amended in place
   before, with its `approval_commit` and `approval_recorded_at` unchanged. Decide whether an
@@ -436,4 +438,5 @@ Must fail:
   declared target that an existing record does not cover is a third state: decide whether its row
   states obligations not yet frozen. A fourth is a declaration on the onboarding path of a version
   the agent's approval does not state: the charter keeps its version depth-enrolled with nothing
-  frozen, and no dry run signals it. Decide whether validation reports it and what its rows state.
+  frozen, and no dry run signals it. Its rows are those of the case "Declared, no record yet".
+  Decide whether validation reports it.

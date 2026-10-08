@@ -291,9 +291,9 @@ Rules:
    is under the registry contract's rule 8 for a declaration whose path is not enabled: nothing of
    it is frozen on the create lane, and no create-lane command makes an acceptance effect for its
    depth scope tuples. A declaration that a maintainer moves to the maintenance path after the
-   generation's proving-run closeout is outside this rule. This revision does not define the field
-   that carries the version. It belongs to an executable schema revision of this charter, adopted
-   before the onboarding path is enabled.
+   generation's proving-run closeout is recorded as `closed` is outside this rule. This revision
+   does not define the field that carries the version. It belongs to an executable schema revision
+   of this charter, adopted before the onboarding path is enabled.
 4. Before P is frozen, the agent's manifest root MUST hold version metadata for the approved exact
    upstream version, a `RULES.json` under which the declared targets meet the registry contract's
    `targets` rule, and a validator spec that adopts Annex B of the support-depth contract. A
@@ -334,11 +334,11 @@ Rules:
     onboarding generation is committed from the time the integration branch holds its depth
     record, as the support-depth contract's depth enrollment rule 7 states.
 11. The create lane sets no pointer and records no `validated` or `supported` version status, and
-    this charter adds no route for either. For a version whose depth enrollment the onboarding
-    path owns, those acceptance effects are not available on the create lane. They become
-    available after the proving-run closeout, when a maintainer moves the version's declaration to
-    the maintenance path under the registry contract's rules and a maintenance generation of the
-    version reaches promotion.
+    this charter adds no route for either. For a version whose depth enrollment the onboarding path
+    owns, those acceptance effects are not available on the create lane. They become available
+    after the proving-run closeout is recorded as `closed`, when a maintainer moves the version's
+    declaration to the maintenance path under the registry contract's rules and a maintenance
+    generation of the version reaches promotion.
     [Multi-target parity acquisition](#multi-target-parity-acquisition-when-a-new-agent-joins-it)
     says what the agent needs in order to be on that path.
 
@@ -362,18 +362,22 @@ None of this section is implemented. Source references are to `staging` at `f615
   prepared dry run (`crates/xtask/src/runtime_follow_on.rs:165-169,235-238`). Both modes require
   the lifecycle stage `enrolled`, and a write run that passes sets `runtime_integrated`
   (`crates/xtask/src/runtime_follow_on/lifecycle.rs:86-106`), so no dry run is admitted after a
-  write run has succeeded. A write run that fails records a side state and leaves the stage
-  `enrolled` (`crates/xtask/src/runtime_follow_on/lifecycle.rs:140-181`), and the command restores
-  nothing, so a later dry run is admitted with the failed run's output in place.
+  write run has succeeded. A write run that fails leaves the stage `enrolled`, recording a side
+  state where its validation fails (`crates/xtask/src/runtime_follow_on/lifecycle.rs:141-182`), and
+  the command restores nothing, so a later dry run is admitted with the failed run's output in
+  place.
 - A write run may change `snapshots/` and `supplement/` under the manifest root and is rejected
   when it changes anything else there, `reports/` and version metadata included
   (`crates/xtask/src/runtime_follow_on/codex_exec.rs:150-163`,
   `crates/xtask/src/runtime_follow_on.rs:455-482`). The check runs after the executor has written.
-  The write run is the only create-lane command that writes `snapshots/`, so no surface that rule 6
-  admits exists on the lane today, and nothing in the tree says which command wrote a surface. The
-  baseline a write run is compared with is taken before the dry run writes its own files
-  (`crates/xtask/src/runtime_follow_on.rs:314-318`), so a depth record written by the dry run would
-  count as a change of the write run.
+  The write run is the only create-lane command that writes `snapshots/`, so no create-lane command
+  yields a surface that rule 6 admits. A write run lists the paths it changed in its run
+  directory's `written-paths.json` (`crates/xtask/src/runtime_follow_on.rs:196-221`). No dry run
+  reads that file, it is ignored by git unless added as runtime evidence, an executor can rewrite
+  it, and an interrupted run writes none, so nothing a dry run reads says which command wrote a
+  surface. The baseline a write run is compared with is taken before the dry run writes its own
+  files (`crates/xtask/src/runtime_follow_on.rs:314-318`), so a depth record written by the dry run
+  would count as a change of the write run.
 - A run's input contract carries the approval artifact's path and SHA-256 and no depth identity
   (`crates/xtask/src/runtime_follow_on/models.rs:8-30`). Run directories are ignored by git, apart
   from four historical ones, and reach a commit only when added as runtime evidence. The runs
