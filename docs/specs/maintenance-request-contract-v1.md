@@ -622,11 +622,12 @@ For a depth-enrolled generation:
    generation of the same target version holds whether or not the tree the later generation freezes
    in still holds the earlier record.
 5. Whoever declares or changes a marker does so by a change to the integration branch that the
-   packet branch does not carry. No command or workflow declares or changes a marker. A marker
-   carried on a packet branch is no packet freeze until the integration branch holds it, and it is
-   one from the merge that brings it there. Whoever works the packet with the maintainer's
-   authority makes the change: for example a maintainer, a contributor, or the coding agent that is
-   handed the packet pull request, whether or not `execute-agent-maintenance` runs that agent. The
+   packet branch does not carry. No command or workflow declares or changes a marker. A marker that
+   nonetheless reaches the integration branch with a packet branch's merge is no packet freeze
+   before that merge and is one from it, and for rule 1 that merge is when it is declared. Whoever
+   works the packet with the maintainer's authority makes the change: for example a maintainer, a
+   contributor, or the coding agent that is handed the packet pull request, whether or not
+   `execute-agent-maintenance` runs that agent. The
    [lifecycle spec](unified-agent-api/acquisition-maintenance-lifecycle-spec.md) has that agent
    declare the marker before its judgment work, so a generation is ordinarily committed when that
    step is taken, with no separate decision by a maintainer. Rule 1 and depth enrollment rule 7
@@ -641,7 +642,7 @@ For a depth-enrolled generation:
    has no frozen obligations. It reaches acceptance only after a re-freeze has frozen O.
 
 The packet freeze adds no file and no field. The support-depth contract's minimum machinery rule
-requires the failure a new requirement prevents to be named. Without rule 3, a packet whose marker
+requires the failure a new mechanism prevents to be named. Without rule 3, a packet whose marker
 names a generation with one selection could be closed and merged as another generation, whose P was
 frozen from a declaration narrowed in between, and the work the first generation made due would be
 gone with nothing on the integration branch to show it.

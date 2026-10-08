@@ -50,7 +50,7 @@ documents are not normative.
 | Lifecycle stages and support tiers | The committed lifecycle record, as the onboarding charter designates | Unchanged. Neither is a depth result. |
 | Runtime profiles `minimal`, `default` and `feature_rich` | The lifecycle implementation in `crates/xtask/src/agent_lifecycle.rs`; no normative owner | Unchanged. A runtime profile is not a depth result. |
 | Surface exclusions in `parity_exclusions` | Each manifest root's `RULES.json` and validator spec, where the root has them | Unchanged. See classification rule 7 for mode exclusions. |
-| The four support layers, and the row model and derivation of every support publication row that states no depth fact | [Support matrix spec](unified-agent-api/support-matrix.md) | Unchanged. That spec states what a depth-enrolled row adds and how its `uaa_support` is derived. |
+| The four support layers, and the row model and derivation of every support publication row without depth facts | [Support matrix spec](unified-agent-api/support-matrix.md) | Unchanged. That spec states what a depth-enrolled row adds and how its `uaa_support` is derived. |
 | The capability matrix as a publication of advertising | [Capabilities spec](unified-agent-api/capabilities-schema-spec.md) | Unchanged. It publishes no depth fact. |
 | The version-only runtime-support payload | [Runtime-support contract](unified-agent-api/runtime-support-contract.md) | Unchanged. Depth facts never enter it. |
 | Manual maintenance closeout | Maintenance request contract | Kept. Depth admission is added to it. |

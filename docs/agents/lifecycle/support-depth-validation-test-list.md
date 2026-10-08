@@ -185,26 +185,30 @@ Must be published as listed:
 - **Row without depth facts.** The version has no depth record. The row has the fields and the
   values that revision 1 of the artifact gives it.
 - **One target qualifies, another does not.** The record claims two capabilities and covers two
-  targets. Both capabilities are published as depth-qualified on the first target and one of them
-  on the second. The first row is `supported` and the second is `partial`.
+  targets, and the derivation of revision 1 yields `supported` on both. Both capabilities are
+  published as depth-qualified on the first target and one of them on the second. The first row is
+  `supported` and the second is `partial`.
 - **Evidence changed after acceptance.** A bound evidence file has another content identity than
   the record names. The result is published as `unverified`, the capability is no longer published
-  as depth-qualified, and the row's `uaa_support` falls or stays and never rises. That is a
-  reporting effect: it needs no lifecycle-path authority and no acceptance entry, and depth
-  admission still applies.
+  as depth-qualified, and the row's `uaa_support` falls from `supported` to `partial` or stays, and
+  never rises. That is a reporting effect: it needs no lifecycle-path authority and no acceptance
+  entry, and depth admission still applies.
 - **No capability claimed.** The record's selection is wrapper-only. The row states each promise
   and its results, and `uaa_support` is derived as for a row without depth facts.
 - **Target no longer expected.** `current.json.expected_targets` drops a target the record covers.
   The row for that target is still published, with its depth facts.
 - **Enrolled before qualification.** A version whose row is `partial` under revision 1 is
-  depth-enrolled with one claimed capability that is not yet depth-qualified. The row is
-  `unsupported`.
+  depth-enrolled with one claimed capability that is not yet depth-qualified. The row stays
+  `partial`. A row that was `supported` becomes `partial`.
 - **Qualified over an unsupported backend.** The row's `backend_support` is `unsupported` and the
-  one capability its record claims is published as depth-qualified for the target. The row is
-  `supported`.
-- **Capability not served on the target.** The record claims a capability whose mapped operations
-  cover no mode on the row's target. The capability is not published as depth-qualified for that
-  target and does not count toward `supported`.
+  one capability its record claims is published as depth-qualified for the target. The row stays
+  `unsupported`: depth facts raise no state.
+- **Capability not served on the target.** The record claims a capability, and none of its mapped
+  operations serves a mode on the row's target. The capability is not published as depth-qualified
+  for that target, so the row is not `supported`.
+- **Declared, no record yet.** The registry declares the row's version and target, and no
+  generation has frozen its policy. The row is depth-enrolled, states that its obligations are not
+  yet frozen, and derives `uaa_support` as a row without depth facts does.
 
 Must fail:
 
@@ -248,10 +252,6 @@ Must fail:
   target covered. At the integration step the declaration is missing policy for that target, and
   only depth admission refuses it there. No check above does. After a packet freeze the same root
   change leaves the committed generation unable to merge until the target is listed again.
-- The support matrix reads depth facts from depth records, so a version that the registry declares
-  and that has no record yet is published with rows without depth facts until its first freeze. The
-  support-depth contract counts such a version as depth-enrolled and its scope as insufficient
-  depth. Decide whether publication should show that, and from what.
 - Annex B names a covered mode apart from the operations that serve it and counts it as covered on
   a target only where an operation serves it there or the mode names the classification entry that
   excludes it, so check 2 compares names and that reference. Whether the operations a P lists for a
@@ -262,8 +262,8 @@ Must fail:
   name the complete set. With an empty set that rule's condition and record invariant 3's hold
   vacuously, so nothing in them keeps the capability from being published as depth-qualified on no
   result. Decide whether the executable revision refuses an empty mapping, and whether anything
-  checks that a mapping is complete. The support matrix spec's rule 6 would count such a capability
-  toward `supported`.
+  checks that a mapping is complete. The support matrix spec's rule 6 would not withhold
+  `supported` for such a capability.
 - A covered mode is named by a selector whose form comes with the registry contract's schema
   revision. Annex B fixes that the name is kept, not what it looks like.
 - A generation is committed from its packet freeze, or from the time the integration branch holds
@@ -358,20 +358,22 @@ Must fail:
 - A depth record can exist without its version's `versions/<version>.json`: it is written at the
   first freeze, before acquisition writes the metadata, the docs-only lane writes none, and the
   metadata can be removed while `reports/<version>/` is kept. The row set is derived from the
-  metadata, so such a version has no rows and its record is never opened. Decide whether a record
-  implies its rows in those cases. For a target that is no longer expected the row is kept, and its
-  `pointer_promotion` has no defined source, because pointer files are read only for expected
-  targets.
+  metadata, so such a version has no rows, and the support matrix spec's rule 3 does not reach its
+  record. Bindings rule 7 of the support-depth contract has that scope reported as insufficient
+  depth, and the support matrix is where depth facts are published. Decide whether a record implies
+  its rows in those cases, or where else that scope is reported. For a target that is no longer
+  expected the row is kept, and its `pointer_promotion` has no defined source, because pointer
+  files are read only for expected targets.
 - A depth-enrolled row states every obligation's result, and one promise can have more than a dozen
   obligations. Decide how the Markdown projection renders them so that it still agrees with the
   JSON artifact.
 - A `markdown_support_claim` line states one `uaa_support` value with no capability scope. For a
   depth-enrolled row the value is a statement about the capabilities the record claims. Decide
   whether a line about such a row has to name them.
-- `uaa_support` is `supported` when every claimed capability is depth-qualified, even where the
-  record claims one capability and the agent advertises many. The row names the capabilities, and a
-  reader of the one column does not see them. Decide whether the executable revision shows the
-  claimed set beside the state.
+- On a depth-enrolled row `supported` means that the name-level derivation yields it and that every
+  claimed capability is depth-qualified, even where the record claims one capability and the agent
+  advertises many. The row names the capabilities, and a reader of the one column does not see
+  them. Decide whether the executable revision shows the claimed set beside the state.
 - `support-matrix` regenerates every agent's rows. A run made for one agent can find that another
   agent's row would rise because that agent's record now supports it. The support-depth contract
   refuses that acceptance effect for a route without authority and leaves every output unchanged.
