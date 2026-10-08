@@ -63,11 +63,19 @@ merging it all leave it in force; the promotion PR for `2.1.285` removes the mar
 - required: `true`
 - pre-run debt count: `2`
 - expected post-run debt count: `2`
-- discovered upstream surface rows: `2`
+- discovered upstream surface rows: `10`
 - preexisting unsupported rows: `2`
 - required uplifts this run:
 - `claude_code install` `install` via `unbaselined_gap`
 - `claude_code install` `--force` via `unbaselined_gap`
+- `claude_code plugin configure` `--json` via `unbaselined_gap`
+- `claude_code plugin configure` `--values-stdin` via `unbaselined_gap`
+- `claude_code plugin install` `--registry` via `unbaselined_gap`
+- `claude_code plugin list` `--data-size` via `unbaselined_gap`
+- `claude_code` `--client-data-url` via `unbaselined_gap`
+- `claude_code` `--desktop` via `unbaselined_gap`
+- `claude_code plugin configure` `plugin` via `unbaselined_gap`
+- `claude_code plugin configure` `configure` via `unbaselined_gap`
 - deferred preexisting gaps:
 - `claude_code install` `install` via `requires_new_architectural_seam` (TODOS.md#close-claude-code-install-maintenance-gap)
 - `claude_code install` `--force` via `requires_new_architectural_seam` (TODOS.md#close-claude-code-install-maintenance-gap)
