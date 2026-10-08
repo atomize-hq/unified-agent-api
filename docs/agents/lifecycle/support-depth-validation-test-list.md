@@ -241,11 +241,11 @@ Must fail:
   invariant. It cannot be a state rule, because agents with no maintenance closeout have no drift
   state either.
 - A record restated consistently, with what it states under a binding and that binding's identity
-  rewritten together, passes checks 11 and 13. For P and O the frozen request or approval is a
-  second statement, so check 3 fails it while that request or approval stands. For E there is no
-  second statement. Acceptance entries stop matching, so qualified and depth-qualified claims
-  lapse, but `verified` rows follow the restated record. A selection that shrinks is the
-  exception: check 2 fails it whatever else is restated.
+  rewritten together, passes checks 11 and 13. On the maintenance path the frozen request is a
+  second statement of P and O, so check 3 fails it while that request stands. On the create lane
+  the charter names none. For E there is no second statement. Acceptance entries stop matching, so
+  qualified and depth-qualified claims lapse, but `verified` rows follow the restated record. A
+  selection that shrinks is the exception: check 2 fails it whatever else is restated.
 - No record invariant reaches a declared version whose generation never froze P, such as a packet
   branch cut before the declaration landed. Only depth admission at the integration step does.
 - Before the integration step a route reads the record in its own tree as the one the integration
@@ -400,11 +400,13 @@ Must fail:
 - On the create lane a dry run freezes O from an acquired surface that is already in the manifest
   root and is not a write run's output. Today the write run's executor is the only create-lane
   writer of `snapshots/`, both modes of `runtime-follow-on` require the lifecycle stage `enrolled`,
-  and a write run that passes moves the stage on, so no dry run can follow it. Onboarding also
-  acquires from a single host, so the surface can be a partial union. Decide which command acquires
-  the surface ahead of the dry run, whether a dry run is admitted after `runtime_integrated`, what
-  the acquired inputs of an onboarding O are, and whether a partial union can freeze O for the
-  targets it covers.
+  and a write run that passes moves the stage on, so no dry run can follow it. A write run that
+  fails leaves the stage `enrolled` and its output in place, so a retried dry run finds an
+  executor-written surface that nothing in the tree or the record tells from an acquired one.
+  Onboarding also acquires from a single host, so the surface can be a partial union. Decide which
+  command acquires the surface ahead of the dry run, what marks a surface as acquired, whether a
+  dry run is admitted after `runtime_integrated`, what the acquired inputs of an onboarding O are,
+  and whether a partial union can freeze O for the targets it covers.
 - The charter names no committed create-lane artifact that states the P and O identities beside the
   depth record, so checks 3 and 4 have no second statement for an onboarding generation, and a
   record rewritten together with its identities cannot be told from the one that was frozen. A
@@ -417,8 +419,9 @@ Must fail:
   version status. A version whose depth enrollment the onboarding path owns reaches them only after
   its proving-run closeout, once its declaration is moved to the maintenance path and a maintenance
   generation is promoted. The registry contract and the charter's multi-target entry rule already
-  say what the agent needs for that path. Decide whether the move needs anything else, and what
-  owns the version's depth enrollment between the move and the first maintenance freeze.
+  say what the agent needs for that path. Decide whether the move needs anything else. The question
+  above on a declaration moved to another lifecycle path covers what owns the enrollment in
+  between.
 - An approval artifact is committed before `onboard-agent` appends the registry entry, and the
   charter has it state only the exact upstream version. An approval has been amended in place
   before, with its `approval_commit` and `approval_recorded_at` unchanged. Decide whether an
@@ -431,4 +434,6 @@ Must fail:
   unresolved, which the support-depth contract keeps apart from insufficient depth. Decide how a
   row states unresolved, and whether publication fails as it does for a record it cannot read. A
   declared target that an existing record does not cover is a third state: decide whether its row
-  states obligations not yet frozen.
+  states obligations not yet frozen. A fourth is a declaration on the onboarding path of a version
+  the agent's approval does not state: the charter keeps its version depth-enrolled with nothing
+  frozen, and no dry run signals it. Decide whether validation reports it and what its rows state.

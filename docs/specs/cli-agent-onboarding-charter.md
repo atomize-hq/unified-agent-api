@@ -269,8 +269,10 @@ While the support-depth contract is a Draft this section binds nothing.
 
 Rules:
 
-1. The support-depth contract defines a create-lane generation and its Event. The approval
-   artifact it names is the committed `approved-agent.toml` of the agent's onboarding pack.
+1. The support-depth contract defines a create-lane generation and its Event. The approval artifact
+   of that Event is the committed `approved-agent.toml` of the agent's onboarding pack. In this
+   section a generation is on the create lane from its approval until its proving-run closeout is
+   recorded as `closed`.
 2. A depth enrollment of a new agent on the onboarding path is declared in the registry's
    `support_depth` table with `lifecycle_path = "onboarding"`, as the
    [registry contract](agent-registry-contract.md#support-depth) states. `onboard-agent` appends
@@ -278,40 +280,49 @@ Rules:
    enrollment is added, in a change that leaves `onboarding` in `enabled_paths`.
 3. An approval artifact that approves a depth enrollment states the one exact upstream version it
    approves it for. It states nothing else of the selection, and it declares nothing: the registry
-   table is the declaration. While a generation is on the create lane the two bind by that
-   version. A create-lane command resolves the generation's depth enrollment only where the
-   registry declares, on the onboarding path, a depth enrollment of the version the approval
-   states. Where the approval states a version and the registry declares none for it on the
-   onboarding path, the generation's depth enrollment is unresolved, which the support-depth
-   contract treats as an error. An approval that states no version approves no depth enrollment,
-   and a declaration on the onboarding path of a version the agent's approval does not state opens
-   no create-lane generation. A declaration that a maintainer has moved to the maintenance path is
-   outside this rule. This revision does not define the field that carries the version. It belongs
-   to an executable schema revision of this charter, adopted before the onboarding path is enabled.
+   table is the declaration. While a generation is on the create lane the two bind by that version.
+   A create-lane command resolves the generation's depth enrollment only where the registry
+   declares, on the onboarding path, a depth enrollment of the version the approval states. Where
+   the approval states a version and the registry declares none for it on the onboarding path, the
+   generation's depth enrollment is unresolved, which the support-depth contract treats as an
+   error. An approval that states no version approves no depth enrollment, and a declaration on the
+   onboarding path of a version the agent's approval does not state opens no create-lane
+   generation. Such a declaration is still a declaration and its version is depth-enrolled, as it
+   is under the registry contract's rule 8 for a declaration whose path is not enabled: nothing of
+   it is frozen on the create lane, and no create-lane command makes an acceptance effect for its
+   depth scope tuples. A declaration that a maintainer moves to the maintenance path after the
+   generation's proving-run closeout is outside this rule. This revision does not define the field
+   that carries the version. It belongs to an executable schema revision of this charter, adopted
+   before the onboarding path is enabled.
 4. Before P is frozen, the agent's manifest root MUST hold version metadata for the approved exact
-   upstream version, a `RULES.json` whose `union.expected_targets` lists the declared targets, and
-   a validator spec that adopts Annex B of the support-depth contract. A placeholder version is
-   not an exact upstream version.
+   upstream version, a `RULES.json` under which the declared targets meet the registry contract's
+   `targets` rule, and a validator spec that adopts Annex B of the support-depth contract. A
+   placeholder version is not an exact upstream version. This revision does not name the command
+   that writes these files.
 5. `runtime-follow-on --dry-run` is the create lane's freeze. The first dry run of a generation at
-   which rules 2 to 4 hold freezes P from the registry declaration and writes the version's depth
-   record, or continues it where one exists. A dry run of a generation whose approval states a
-   version MUST refuse where rule 3 does not resolve or rule 4 does not hold. It MUST NOT prepare
-   the run as though the generation were not depth-enrolled. A later dry run of the same
-   generation is a re-freeze, and the support-depth contract's Bindings say what it may change.
+   which rule 3 resolves and rule 4 holds freezes P from the registry declaration and writes the
+   version's depth record, or continues it where one exists. A dry run of a generation whose
+   approval states a version MUST refuse where rule 3 does not resolve or rule 4 does not hold. It
+   MUST NOT prepare the run as though the generation were not depth-enrolled. A later dry run of
+   the same generation is a re-freeze, and the support-depth contract's Bindings say what it may
+   change.
 6. A dry run freezes O where the acquired surface of the approved version is already in the
-   manifest root. That surface MUST be acquired before the dry run, and it MUST NOT be the output
-   of a write run of the same generation, because the support-depth contract lets the executor
-   change no part of O. Where the surface is absent the dry run leaves O not yet produced, and the
-   generation cannot reach acceptance for depth-enrolled scope until a dry run has frozen O. This
-   revision does not name the command that acquires the surface ahead of the dry run.
+   manifest root. It MUST freeze O only from a surface that was acquired before the dry run, and
+   MUST NOT freeze it from the output of a write run, of this generation or of an earlier one,
+   because the support-depth contract lets the executor change no part of O. Where the surface is
+   absent the dry run leaves O not yet produced, and the generation cannot reach acceptance for
+   depth-enrolled scope until a dry run has frozen O. This revision does not name the command that
+   acquires the surface ahead of the dry run, nor what marks a surface in the manifest root as
+   acquired.
 7. The depth record states P and O of a create-lane generation. This revision names no second
    committed artifact that states their identities, as a maintenance request's `[support_depth]`
    table does on the maintenance path. A run's input contract is not one:
    [Present behavior](#present-behavior) says why.
-8. `runtime-follow-on --write` and `repair-runtime-evidence` make reporting effects only. A write
-   run MUST NOT list an acceptance entry, and it MUST NOT change what the depth record states
-   under P or O. Adapter code that a write run lands can advertise a capability. On its branch
-   that code is a candidate, and the advertising it adds is admitted where rule 9 says.
+8. `runtime-follow-on --write` and `repair-runtime-evidence` make reporting effects only. Each MUST
+   NOT list an acceptance entry and MUST NOT change what the depth record states under P or O.
+   Adapter code that a write run lands can advertise a capability. On its branch that code is a
+   candidate, and the advertising it adds is admitted only with the acceptance entry that
+   publication lists under rule 9.
 9. `refresh-publication --write` and `close-proving-run` are the create-lane commands that make
    acceptance effects. The support-depth contract's list of acceptance effects and its Annex A.2
    say which effects those are. They include the capability advertising and the qualified or
@@ -333,8 +344,8 @@ Rules:
 
 The support-depth contract's minimum machinery rule requires the failure a new field or mechanism
 prevents to be named. Without the version in the approval, a declaration added to the registry
-after onboarding began would attach a depth enrollment to a run whose approval never covered it,
-and the depth record's Event would name an approval that says nothing of depth.
+after onboarding began would attach a depth enrollment to a generation whose approval never covered
+it, and the depth record's Event would name an approval that says nothing of depth.
 
 ### Present behavior
 
@@ -351,15 +362,18 @@ None of this section is implemented. Source references are to `staging` at `f615
   prepared dry run (`crates/xtask/src/runtime_follow_on.rs:165-169,235-238`). Both modes require
   the lifecycle stage `enrolled`, and a write run that passes sets `runtime_integrated`
   (`crates/xtask/src/runtime_follow_on/lifecycle.rs:86-106`), so no dry run is admitted after a
-  write run has succeeded.
+  write run has succeeded. A write run that fails records a side state and leaves the stage
+  `enrolled` (`crates/xtask/src/runtime_follow_on/lifecycle.rs:140-181`), and the command restores
+  nothing, so a later dry run is admitted with the failed run's output in place.
 - A write run may change `snapshots/` and `supplement/` under the manifest root and is rejected
   when it changes anything else there, `reports/` and version metadata included
   (`crates/xtask/src/runtime_follow_on/codex_exec.rs:150-163`,
   `crates/xtask/src/runtime_follow_on.rs:455-482`). The check runs after the executor has written.
-  The write run is the only create-lane command that writes `snapshots/`, so the surface rule 6
-  needs is executor output today. The baseline a write run is compared with is taken before the
-  dry run writes its own files (`crates/xtask/src/runtime_follow_on.rs:314-318`), so a depth
-  record written by the dry run would count as a change of the write run.
+  The write run is the only create-lane command that writes `snapshots/`, so no surface that rule 6
+  admits exists on the lane today, and nothing in the tree says which command wrote a surface. The
+  baseline a write run is compared with is taken before the dry run writes its own files
+  (`crates/xtask/src/runtime_follow_on.rs:314-318`), so a depth record written by the dry run would
+  count as a change of the write run.
 - A run's input contract carries the approval artifact's path and SHA-256 and no depth identity
   (`crates/xtask/src/runtime_follow_on/models.rs:8-30`). Run directories are ignored by git, apart
   from four historical ones, and reach a commit only when added as runtime evidence. The runs
