@@ -20,6 +20,9 @@ states how a maintenance request carries P and O. The
 [onboarding charter](../../specs/cli-agent-onboarding-charter.md#support-depth) names no second
 committed statement of them on the create lane yet. Where a check below reads "the frozen request
 or approval", an onboarding generation has only its approval's Event fields beside the record.
+Checks 1 and 3 are therefore decided for P and O on the maintenance path only. The contract's Path
+enablement requires the charter to name that statement before the onboarding path is enabled, and
+the two checks cover the create lane from then.
 
 ## Checks
 

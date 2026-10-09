@@ -766,7 +766,9 @@ Items 1 to 4 concern the path as a whole.
 
 The onboarding path MAY be enabled when items 1, 3, 4 and 5 hold for it, the onboarding charter
 defines where P and O are frozen on the create lane, at a point where the agent's manifest root,
-its validator spec and its exact upstream version exist, and an independent new-entry run in an
+its validator spec and its exact upstream version exist, the charter names the committed artifact
+that states, beside the depth record, the P and O identities a create-lane freeze froze, and an
+independent new-entry run in an
 isolated workspace proves approval, the onboarding checklist's implementation and evidence steps,
 runtime evidence selection, publication and proving-run closeout. Maintenance evidence does not
 substitute. Enabling it MUST establish item 3 again for the maintenance path.
