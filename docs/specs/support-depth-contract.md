@@ -271,7 +271,9 @@ Rules:
    of operations through which that agent's adapter honors the capability, covering every flow
    the adapter exposes for it. That mapping is part of the depth record. The capability is
    **depth-qualified** for one `(agent, version, target)` only when every operation in that set is
-   depth-enrolled and qualified, `M` included.
+   depth-enrolled and qualified, `M` included. The mapping of a claimed capability MUST name at
+   least one operation, and policy resolution MUST refuse one that names none. On a target where
+   no operation of the mapping serves a covered mode, the capability is not depth-qualified.
 6. A capability that no depth enrollment claims is **not assessed**. It is neither qualified nor
    failed.
 7. The charter's promotion allowlist is an exception to the two-backend threshold only. It is not
@@ -497,8 +499,9 @@ work.
    with its record, and nothing of it carries over. Whether a generation is committed is
    established at the integration step, against the tip. Before that step a route reads the packet
    freeze from the integration branch, its marker and the record that came with it. For every
-   other purpose it reads the record its own tree holds as the one the integration branch holds. An executor's assertion, an optional field of a request or approval
-   and a caller-supplied argument are not authority.
+   other purpose it reads the record its own tree holds as the one the integration branch holds.
+   An executor's assertion, an optional field of a request or approval and a caller-supplied
+   argument are not authority.
 8. Missing policy for selected scope, an unsupported schema revision, unresolved or overlapping
    depth enrollment selectors, contradictory generation references and deleted bindings are errors.
    None of them resolves to "not depth-enrolled". A removed depth record is a deleted binding. A

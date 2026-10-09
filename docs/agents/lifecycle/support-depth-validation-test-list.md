@@ -33,7 +33,7 @@ integration branch tip it would replace.
 | 3 | Any revision | The revision holds a frozen request or approval for a record's version, and the record's Event, P or O is not that generation's | 2 |
 | 4 | Merge | What a depth record states, its Event or a part, changes while the merge result holds no frozen request or approval for the record's version, unless the same change declares or changes the version's stand-down marker | 2 |
 | 5 | Any revision | A published result is neither the result the record states nor `unverified`, or is not `unverified` although the record does not yet state it or the P or the O that its E references is not the one the record states | 3 |
-| 12 | Any revision | A promise is published as qualified, or a capability as depth-qualified, while a result the claim rests on is published as anything other than `verified` or a permitted `not_applicable` | 3 |
+| 12 | Any revision | A promise is published as qualified, or a capability as depth-qualified, while a result the claim rests on is published as anything other than `verified` or a permitted `not_applicable`, or a capability is published as depth-qualified for a target on which no operation of its mapping serves a covered mode | 3 |
 | 6 | Any revision | A tuple the record selects is published as not depth-enrolled | 3 |
 | 7 | Any revision | A result is published as `verified`, or a promise or capability as qualified or depth-qualified on it, and the record states it as `verified` and binds no evidence for it, or binds evidence that is absent or has another content identity | 3 |
 | 8 | Any revision | A promise is published as qualified, or a capability as depth-qualified, and no acceptance entry identifies what the record states | 4 |
@@ -265,12 +265,10 @@ Must fail:
   mode still cover all of it after an operation is divided is decided when P is resolved. No check
   reaches it.
 - Check 2 compares which capabilities have a mapping, not what a mapping names. A mapping kept with
-  fewer operations, or with none, is therefore not a shrink. Shared mapping rule 5 requires P to
-  name the complete set. With an empty set that rule's condition and record invariant 3's hold
-  vacuously, so nothing in them keeps the capability from being published as depth-qualified on no
-  result. Decide whether the executable revision refuses an empty mapping, and whether anything
-  checks that a mapping is complete. The support matrix spec's rule 6 would not withhold
-  `supported` for such a capability.
+  fewer operations is therefore not a shrink. Shared mapping rule 5 requires P to name the
+  complete set, refuses a mapping that names no operation, and withholds depth-qualified on a
+  target that no mapped operation serves, so the support matrix spec's rule 6 withholds
+  `supported` there. Decide whether anything checks that a mapping is complete.
 - A covered mode is named by a selector whose form comes with the registry contract's schema
   revision. Annex B fixes that the name is kept, not what it looks like.
 - A generation is committed from the time the integration branch holds the record it wrote or
