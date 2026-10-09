@@ -598,26 +598,30 @@ mean a freeze of the request. A packet freeze exists whether or not support dept
 
 For a depth-enrolled generation:
 
-1. The packet freeze is the point from which the generation it names is committed under the
-   support-depth contract's depth enrollment rule 7, with one exception. A marker commits nothing
-   of a generation that a later generation of the version had already replaced on the version's
-   packet branch, as the remote holds that branch, when the marker was declared, or changed, to
-   state the replaced generation's `request_recorded_at` or digest, for as long as it stays
-   replaced there. Depth enrollment rule 7 decides, as for any generation that has no packet
-   freeze, whether anything of it carries over. While the target version has no packet freeze,
-   automation keeps authority over its packet: the next dispatch for the version opens a new
-   generation and replaces the request and the packet. Where the integration branch holds no depth
-   record of the version, the record the earlier generation wrote is replaced with them.
+1. The change that declares a marker, or changes one to name another generation, MUST carry to
+   the integration branch the target version's depth record as the generation the marker names
+   wrote or continued it. The support-depth contract's depth enrollment rule 7 commits a generation
+   from the time the integration branch holds its record, so the packet freeze is the point from
+   which the generation is committed, and the record on the integration branch states the
+   selection that is committed. A marker whose change carried no record commits nothing, and so
+   does a marker that names a generation other than the one whose Event that record states. What
+   a packet branch holds or held, on the remote or anywhere else, decides nothing. While the
+   target version has no packet freeze, automation keeps authority over its packet: the next
+   dispatch for the version opens a new generation and replaces the request and the packet. Where
+   the integration branch holds no depth record of the version, the record the earlier generation
+   wrote is replaced with them.
 2. A marker names the generation whose request states the `request_recorded_at` that the marker
    states. A marker that states only `request_sha256` names the generation whose request file has
    that digest, and stops naming it when a re-freeze changes the file. That generation stays
    committed, and rule 3 refuses its closeout until the marker is restated under rule 5.
 3. Writing the closeout for the generation requires its packet freeze. As part of depth admission,
    `prepare-agent-closeout` and `close-agent-maintenance` MUST establish that the integration
-   branch holds a marker for the target version and that the marker names the generation, and MUST
-   refuse otherwise. The integration step for a change that carries the closeout MUST establish the
-   same against the tip. The marker is read from the integration branch, never from the packet
-   branch, and a marker directory that cannot be read is not an absent marker.
+   branch holds a marker for the target version, that the marker names the generation, and that
+   the integration branch holds the version's depth record stating that generation's Event, and
+   MUST refuse otherwise. The integration step for a change that carries the closeout MUST
+   establish the same against the tip. The marker and that record are read from the integration
+   branch, never from the packet branch, and a marker directory that cannot be read is not an
+   absent marker.
 4. Depth enrollment rule 7 applies from the packet freeze. What it requires of every later
    generation of the same target version holds whether or not the tree the later generation freezes
    in still holds the earlier record.
@@ -631,21 +635,26 @@ For a depth-enrolled generation:
    [lifecycle spec](unified-agent-api/acquisition-maintenance-lifecycle-spec.md) has that agent
    declare the marker before its judgment work, so a generation is ordinarily committed when that
    step is taken, with no separate decision by a maintainer. Rule 1 and depth enrollment rule 7
-   alone say when a generation is committed. A marker states no selection: what is committed is the
-   selection that was frozen from the maintainer's registry declaration. A change may name a later
-   generation of the same target version, or restate the marker for a generation that the marker
-   has stopped naming. Changing a marker releases nothing: a generation that was committed stays
-   committed, and depth enrollment rule 7 binds the generation the marker then names. A marker is
+   alone say when a generation is committed. A marker states no selection: the depth record that its
+   change carries states it. A change may name a later generation of the same target version, or
+   restate the marker for a generation that the marker has stopped naming. Changing a marker
+   releases nothing. The record that the integration branch already holds keeps what it covers,
+   and a change that would leave it covering less is refused, as the support-depth contract's
+   record invariant 1 requires. A marker that was declared for the wrong generation can therefore
+   be corrected only to a generation whose record covers at least as much, or after a debt
+   operation that the support-depth contract permits has dispositioned the difference. A marker is
    removed only by the version's promotion, which the support-depth contract makes an acceptance
    effect.
 6. A packet freeze declared before any freeze of the request has frozen O commits a generation that
    has no frozen obligations. It reaches acceptance only after a re-freeze has frozen O.
 
-The packet freeze adds no file and no field. The support-depth contract's minimum machinery rule
-requires the failure a new mechanism prevents to be named. Without rule 3, a packet whose marker
-names a generation with one selection could be closed and merged as another generation, whose P was
-frozen from a declaration narrowed in between, and the work the first generation made due would be
-gone with nothing on the integration branch to show it.
+The packet freeze adds no file and no field. It brings the depth record to the integration branch
+earlier than the packet's merge would. The support-depth contract's minimum machinery rule
+requires the failure a new mechanism prevents to be named. Without the record in the marker's
+change, nothing on the integration branch would state what the named generation covers, and a
+marker changed to name a narrower generation could not be told from a corrected one. Without
+rule 3, a packet whose marker names a generation with one selection could be closed and merged as
+another generation, whose P was frozen from a declaration narrowed in between.
 
 ### Relay execution
 
@@ -748,6 +757,8 @@ None of this section is implemented, and it has no effect until a depth enrollme
   lifecycle spec names the actor as a coding agent handed the packet pull request. A marker's
   `declared_by` field is optional, the marker that `HANDOFF.md` renders omits it, and nothing
   checks it.
+- Nothing carries a depth record with a marker. The packet freeze step in `HANDOFF.md` commits
+  the marker alone.
 - No command decides on the generation a marker names. `maintenance-stand-down-check` reports
   whether the marker's `request_recorded_at` or `request_sha256` matches the request in the tree
   and gives the same answer either way. `prepare-agent-closeout` does not read the marker.
