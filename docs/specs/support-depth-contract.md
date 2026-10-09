@@ -279,7 +279,9 @@ Rules:
 7. The charter's promotion allowlist is an exception to the two-backend threshold only. It is not
    qualification, lifecycle eligibility or permission to advertise.
 8. A capability absent from the capability matrix because safe defaults leave it off is neither
-   qualified nor free of obligations.
+   qualified nor free of obligations. Its absence establishes neither: it is not evidence of
+   qualification, it removes no obligation, and it does not keep a claimed capability from being
+   depth-qualified on its own evidence.
 9. Maintenance MUST preserve or repair mappings that already exist. Adding a mapping is not
    maintenance work and never becomes due through discovery.
 
@@ -402,7 +404,7 @@ Shared storage MUST NOT merge their authority or their invalidation.
 | Binding | Content | Who may change it | A change invalidates |
 | --- | --- | --- | --- |
 | **Event** | Maintenance: `request_commit`, `request_recorded_at`, `trigger_kind` and `opened_from`. Onboarding: the approval artifact's `approval_commit` and `approval_recorded_at`. | Nobody inside a generation. A later generation has its own Event. | Nothing. It is attribution, not tested code. |
-| **P**, policy | Resolved rules, templates and classifications, promises and subsets, overrides and exclusions, depth enrollment selectors, path enablement, the debt delegation and the initial authorization baseline, for the depth scope tuples it governs | The maintainer, through explicit re-freeze or supersession | O, E and every dependent closeout and publication result |
+| **P**, policy | Resolved rules, templates and classifications, promises and subsets, overrides and exclusions, depth enrollment selectors, path enablement, the debt delegation and the initial authorization baseline, for the depth scope tuples it governs | The maintainer, through explicit re-freeze or supersession, as the owning path's freeze rules allow. On the maintenance path P changes only when a new generation opens | O, E and every dependent closeout and publication result |
 | **O**, obligations | The P reference, exact version and targets, acquired input identities, operation-to-surface edges and the concrete obligation set, independently required acceptance work included | Only the existing acquisition and preparation path, at its freeze and at any later re-freeze. A re-freeze MUST NOT change the agent, version, targets or depth enrollment. The executor never changes O. | E and every dependent closeout and publication result |
 | **E**, execution | The P and O references, implementation and evidence identities, reuse bindings, materialized debt grants, validated transitions from P's baseline and derived results | Execution, evidence refresh and delegated debt transitions | Dependent closeout and publication results |
 
@@ -746,7 +748,9 @@ operation's qualification.
 The maintenance path MAY be enabled when all of the following hold:
 
 1. this contract and the executable schema revisions it requires are adopted, with explicit
-   maintenance path and selection authority;
+   maintenance path and selection authority. Those revisions are the registry contract's
+   `support_depth` table, the depth record of Annex B and the support matrix's next revision, and
+   for the onboarding path the field of the approval artifact that states the version;
 2. the complete maintenance chain of acquisition, frozen obligations, execution, audit, manual
    closeout and separate promotion is proven end to end in an isolated workspace that cannot
    change production pointers or closeouts;
@@ -920,7 +924,7 @@ enrollment. A route that holds another path's authority refuses it, as
 | Version metadata | NE3 through MA2 (`reported`) and MA6 (`validated`); MA4 can pass it any status | One version file | The command's own gates (`xtask/manifest_version_metadata.rs:345-421`) and `manifest-validate` in CI. None concerns depth, and the status is whatever the caller passes | `validated`, `supported` and passed per-target outcomes are acceptance effects. `reported` and `snapshotted` are reporting effects. MA2 overwrites a `validated` status with `reported` today; whether it may is for the maintenance lifecycle rules, which this contract leaves unchanged |
 | `current.json` | MA6 (shell); NE4; NE6; ON1 at scaffold | One manifest root | `manifest-validate` in CI for three roots | A change to whether it lists a tuple's target is a reporting effect. NE4 and NE6 run on their own establish admission for it or refuse |
 | Pointers | MA6 (shell); NE4 (creates `none`, normalizes formatting) | One root, per target. A promotion moves the pointers off the version they named | `manifest-validate` checks pointer shape and consistency | Setting or advancing a pointer to a depth-enrolled version is an acceptance effect. Moving it off one, to a later or an earlier version, is a reporting effect for the version it leaves |
-| Embedded runtime-support projection | NE1 through MA4 and MA6; MA3; ON4 | Aggregate, every agent and target | `support-matrix --check` | Setting or advancing it to a depth-enrolled version is an acceptance effect, admitted with the pointer change that causes it |
+| Embedded runtime-support projection | NE1 through MA2, MA4 and MA6; MA3; ON4. MA2 regenerates it and does not commit it | Aggregate, every agent and target | `support-matrix --check` | Setting or advancing it to a depth-enrolled version is an acceptance effect, admitted with the pointer change that causes it |
 | Stand-down markers | Removal by MA6 (shell) and within MA4's envelope. Declared and changed by whoever works the packet, in a change to the integration branch that the packet branch does not carry, as the maintenance request contract's packet freeze rule 5 states | One version of one agent | None beyond the merge of the promotion PR. `maintenance-stand-down-check` validates every marker it reads and reports, without deciding on it, whether a marker names the request in the tree (`xtask/agent_maintenance/stand_down.rs:227-233,443-481`) | Removal is an acceptance effect. A marker on the integration branch is a packet freeze. For a depth-enrolled version its change carries the depth record of the generation it names, and that record on the integration branch is what commits the generation, as the maintenance request contract's packet freeze states. The changes of an MA4 run MUST NOT add, change or remove one, as that contract's relay execution rule 3 states them |
 | Maintenance request | MA1; MA2 at the second freeze; MA4's envelope | One agent. The file is replaced when a later version's generation opens | The request contract's own validation | Reporting effect. Replacing it displaces the earlier version's tuples, which then resolve from their depth record. MA4 MUST NOT change it |
 | Maintenance closeout | MA5 | One agent, one file replaced across versions | `close-agent-maintenance`: the stand-down check and the commit binding (`xtask/agent_maintenance/closeout.rs:55-66`). `prepare-agent-closeout`: the commit binding only | Acceptance effect, with an acceptance entry listed in the same change. For a depth-enrolled generation, only under a packet freeze that names it |
