@@ -117,12 +117,10 @@ Other contracts reference this one for depth rules and MUST NOT restate them.
 - **Integration branch.** The branch that holds committed publication truth, currently `staging`.
 - **Packet freeze.** On the maintenance path, a stand-down marker that the integration branch holds
   for one agent and one exact upstream version. Whoever works that version's packet declares it, to
-  stand automation down from the packet. A marker states no selection. For a depth-enrolled
-  version the change that declares it carries the generation's depth record to the integration
-  branch, and that record states the selection that is committed. The
+  stand automation down from the packet. A marker states no selection and commits none. The
   [maintenance request contract](maintenance-request-contract-v1.md#packet-freeze) states its form,
-  who declares it, which generation of the version it names and commits, and what it requires of a
-  depth-enrolled generation. It is not a freeze of the request.
+  who declares it, which generation of the version it names, and what it requires of a
+  depth-enrolled generation's closeout. It is not a freeze of the request.
 - **Committed generation.** A generation whose selection can no longer be given up.
   [Depth enrollment](#depth-enrollment) rule 7 says when a generation is committed and what follows
   from it.
@@ -271,17 +269,17 @@ Rules:
    of operations through which that agent's adapter honors the capability, covering every flow
    the adapter exposes for it. That mapping is part of the depth record. The capability is
    **depth-qualified** for one `(agent, version, target)` only when every operation in that set is
-   depth-enrolled and qualified, `M` included. The mapping of a claimed capability MUST name at
-   least one operation, and policy resolution MUST refuse one that names none. On a target where
-   no operation of the mapping serves a covered mode, the capability is not depth-qualified.
+   depth-enrolled on that target and qualified there, and at least one `M` obligation of the
+   mapping has the result `verified` on that target. The mapping of a claimed capability MUST name
+   at least one operation, and policy resolution MUST refuse one that names none.
 6. A capability that no depth enrollment claims is **not assessed**. It is neither qualified nor
    failed.
 7. The charter's promotion allowlist is an exception to the two-backend threshold only. It is not
    qualification, lifecycle eligibility or permission to advertise.
-8. A capability absent from the capability matrix because safe defaults leave it off is neither
-   qualified nor free of obligations. Its absence establishes neither: it is not evidence of
-   qualification, it removes no obligation, and it does not keep a claimed capability from being
-   depth-qualified on its own evidence.
+8. That a capability is absent from the capability matrix because safe defaults leave it off
+   establishes nothing about it. The absence is not evidence of qualification, it removes no
+   obligation, and it does not keep a claimed capability from being depth-qualified on its own
+   evidence.
 9. Maintenance MUST preserve or repair mappings that already exist. Adding a mapping is not
    maintenance work and never becomes due through discovery.
 
@@ -404,7 +402,7 @@ Shared storage MUST NOT merge their authority or their invalidation.
 | Binding | Content | Who may change it | A change invalidates |
 | --- | --- | --- | --- |
 | **Event** | Maintenance: `request_commit`, `request_recorded_at`, `trigger_kind` and `opened_from`. Onboarding: the approval artifact's `approval_commit` and `approval_recorded_at`. | Nobody inside a generation. A later generation has its own Event. | Nothing. It is attribution, not tested code. |
-| **P**, policy | Resolved rules, templates and classifications, promises and subsets, overrides and exclusions, depth enrollment selectors, path enablement, the debt delegation and the initial authorization baseline, for the depth scope tuples it governs | The maintainer, through explicit re-freeze or supersession, as the owning path's freeze rules allow. On the maintenance path P changes only when a new generation opens | O, E and every dependent closeout and publication result |
+| **P**, policy | Resolved rules, templates and classifications, promises and subsets, overrides and exclusions, depth enrollment selectors, path enablement, the debt delegation and the initial authorization baseline, for the depth scope tuples it governs | The maintainer, through explicit re-freeze or supersession. On the maintenance path P changes only when a new generation opens, as the maintenance request contract's freeze rules state | O, E and every dependent closeout and publication result |
 | **O**, obligations | The P reference, exact version and targets, acquired input identities, operation-to-surface edges and the concrete obligation set, independently required acceptance work included | Only the existing acquisition and preparation path, at its freeze and at any later re-freeze. A re-freeze MUST NOT change the agent, version, targets or depth enrollment. The executor never changes O. | E and every dependent closeout and publication result |
 | **E**, execution | The P and O references, implementation and evidence identities, reuse bindings, materialized debt grants, validated transitions from P's baseline and derived results | Execution, evidence refresh and delegated debt transitions | Dependent closeout and publication results |
 
@@ -492,18 +490,15 @@ work.
    MUST cover every invocation mode the record's selection covers, on each target the mode is
    covered on, and MUST claim every capability id the record claims. A generation is committed from
    the time the integration branch holds the depth record as the generation wrote or continued it.
-   On the maintenance path a packet freeze brings that about ahead of the packet's merge: the
-   change that declares it carries the record, as the maintenance request contract states.
-   Everything a committed generation's selection covers
+   On the maintenance path the merge of its packet brings that about, and a packet freeze commits
+   nothing. Everything a committed generation's selection covers
    stays depth-enrolled under a production depth enrollment, whatever the registry declares
    afterwards, and every later generation of the version MUST cover what that selection covers and
    claim what it claims. A generation that is not committed may be replaced or abandoned together
    with its record, and nothing of it carries over. Whether a generation is committed is
-   established at the integration step, against the tip. Before that step a route reads the packet
-   freeze from the integration branch, its marker and the record that came with it. For every
-   other purpose it reads the record its own tree holds as the one the integration branch holds.
-   An executor's assertion, an optional field of a request or approval and a caller-supplied
-   argument are not authority.
+   established at the integration step, against the tip. Before that step a route reads the record
+   its own tree holds as the one the integration branch holds. An executor's assertion, an
+   optional field of a request or approval and a caller-supplied argument are not authority.
 8. Missing policy for selected scope, an unsupported schema revision, unresolved or overlapping
    depth enrollment selectors, contradictory generation references and deleted bindings are errors.
    None of them resolves to "not depth-enrolled". A removed depth record is a deleted binding. A
@@ -632,8 +627,7 @@ A reporting effect needs no lifecycle-path authority. If depth admission fails, 
 output MUST be left unchanged.
 
 On the maintenance path, the authority that item 4 requires for the closeout of a depth-enrolled
-generation includes a packet freeze that names the generation, with the version's depth record on
-the integration branch. The
+generation includes a packet freeze that names the generation. The
 [maintenance request contract](maintenance-request-contract-v1.md#packet-freeze) states that
 requirement. The stand-down admission gate asks only whether a marker exists for the version, not
 which generation it names.
@@ -771,8 +765,8 @@ Items 1 to 4 concern the path as a whole.
 The onboarding path MAY be enabled when items 1, 3, 4 and 5 hold for it, the onboarding charter
 defines where P and O are frozen on the create lane, at a point where the agent's manifest root,
 its validator spec and its exact upstream version exist, the charter names the committed artifact
-that states, beside the depth record, the P and O identities a create-lane freeze froze, and an
-independent new-entry run in an
+that states, beside the depth record, the P and O identities a create-lane freeze froze, with who
+writes it and who may replace it, and an independent new-entry run in an
 isolated workspace proves approval, the onboarding checklist's implementation and evidence steps,
 runtime evidence selection, publication and proving-run closeout. Maintenance evidence does not
 substitute. Enabling it MUST establish item 3 again for the maintenance path.
@@ -925,7 +919,7 @@ enrollment. A route that holds another path's authority refuses it, as
 | `current.json` | MA6 (shell); NE4; NE6; ON1 at scaffold | One manifest root | `manifest-validate` in CI for three roots | A change to whether it lists a tuple's target is a reporting effect. NE4 and NE6 run on their own establish admission for it or refuse |
 | Pointers | MA6 (shell); NE4 (creates `none`, normalizes formatting) | One root, per target. A promotion moves the pointers off the version they named | `manifest-validate` checks pointer shape and consistency | Setting or advancing a pointer to a depth-enrolled version is an acceptance effect. Moving it off one, to a later or an earlier version, is a reporting effect for the version it leaves |
 | Embedded runtime-support projection | NE1 through MA2, MA4 and MA6; MA3; ON4. MA2 regenerates it and does not commit it | Aggregate, every agent and target | `support-matrix --check` | Setting or advancing it to a depth-enrolled version is an acceptance effect, admitted with the pointer change that causes it |
-| Stand-down markers | Removal by MA6 (shell) and within MA4's envelope. Declared and changed by whoever works the packet, in a change to the integration branch that the packet branch does not carry, as the maintenance request contract's packet freeze rule 5 states | One version of one agent | None beyond the merge of the promotion PR. `maintenance-stand-down-check` validates every marker it reads and reports, without deciding on it, whether a marker names the request in the tree (`xtask/agent_maintenance/stand_down.rs:227-233,443-481`) | Removal is an acceptance effect. A marker on the integration branch is a packet freeze. For a depth-enrolled version its change carries the depth record of the generation it names, and that record on the integration branch is what commits the generation, as the maintenance request contract's packet freeze states. The changes of an MA4 run MUST NOT add, change or remove one, as that contract's relay execution rule 3 states them |
+| Stand-down markers | Removal by MA6 (shell) and within MA4's envelope. Declared and changed by whoever works the packet, in a change to the integration branch that the packet branch does not carry, as the maintenance request contract's packet freeze rule 5 states | One version of one agent | None beyond the merge of the promotion PR. `maintenance-stand-down-check` validates every marker it reads and reports, without deciding on it, whether a marker names the request in the tree (`xtask/agent_maintenance/stand_down.rs:227-233,443-481`) | Removal is an acceptance effect. A marker on the integration branch is a packet freeze. It commits nothing, and the closeout of a depth-enrolled generation requires one that names the generation, as the maintenance request contract's packet freeze states. The changes of an MA4 run MUST NOT add, change or remove one, as that contract's relay execution rule 3 states them |
 | Maintenance request | MA1; MA2 at the second freeze; MA4's envelope | One agent. The file is replaced when a later version's generation opens | The request contract's own validation | Reporting effect. Replacing it displaces the earlier version's tuples, which then resolve from their depth record. MA4 MUST NOT change it |
 | Maintenance closeout | MA5 | One agent, one file replaced across versions | `close-agent-maintenance`: the stand-down check and the commit binding (`xtask/agent_maintenance/closeout.rs:55-66`). `prepare-agent-closeout`: the commit binding only | Acceptance effect, with an acceptance entry listed in the same change. For a depth-enrolled generation, only under a packet freeze that names it |
 | Proving-run closeout | ON5; NE7 | One agent | The approval and lifecycle continuity checks in ON5 | Recording `closed` is an acceptance effect, with an entry in the same change. NE7 refuses for an agent that has a depth record |

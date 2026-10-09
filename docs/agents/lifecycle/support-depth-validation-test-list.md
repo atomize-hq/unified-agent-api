@@ -34,9 +34,9 @@ integration branch tip it would replace.
 | 1 | Any revision | A generation has P frozen for depth-enrolled scope and its version has no depth record | 1 |
 | 2 | Merge | A depth record is removed, an acceptance entry is removed or altered, or a record's selection comes to cover less than the record it replaces: it lacks a covered mode of that record, a target the mode was covered on, or the mapping of a capability that record claims. A mode or target of that record is lacking too when it is still listed but no operation of the resolved selection serves the mode on that target and the mode names no classification entry that excludes it | 1 |
 | 3 | Any revision | The revision holds a frozen request or approval for a record's version, and the record's Event, P or O is not that generation's | 2 |
-| 4 | Merge | What a depth record states, its Event or a part, changes while the merge result holds no frozen request or approval for the record's version, unless the same change declares or changes the version's stand-down marker | 2 |
+| 4 | Merge | What a depth record states, its Event or a part, changes while the merge result holds no frozen request or approval for the record's version | 2 |
 | 5 | Any revision | A published result is neither the result the record states nor `unverified`, or is not `unverified` although the record does not yet state it or the P or the O that its E references is not the one the record states | 3 |
-| 12 | Any revision | A promise is published as qualified, or a capability as depth-qualified, while a result the claim rests on is published as anything other than `verified` or a permitted `not_applicable`, or a capability is published as depth-qualified for a target on which no operation of its mapping serves a covered mode | 3 |
+| 12 | Any revision | A promise is published as qualified, or a capability as depth-qualified, while a result the claim rests on is published as anything other than `verified` or a permitted `not_applicable`, or a capability is published as depth-qualified for a target on which an operation of its mapping is not depth-enrolled or no `M` obligation of the mapping is published as `verified` | 3 |
 | 6 | Any revision | A tuple the record selects is published as not depth-enrolled | 3 |
 | 7 | Any revision | A result is published as `verified`, or a promise or capability as qualified or depth-qualified on it, and the record states it as `verified` and binds no evidence for it, or binds evidence that is absent or has another content identity | 3 |
 | 8 | Any revision | A promise is published as qualified, or a capability as depth-qualified, and no acceptance entry identifies what the record states | 4 |
@@ -130,19 +130,19 @@ Each scenario is a test case. "Pass" means validation must not fail; "fail" mean
 ## Packet freeze cases
 
 The [maintenance request contract](../../specs/maintenance-request-contract-v1.md#packet-freeze)
-makes the packet freeze the point from which a maintenance generation is committed. The cases below
+requires a packet freeze that names the generation before a depth-enrolled generation's closeout.
+A packet freeze commits nothing: a generation is committed when its packet merges. The cases below
 are decided by depth admission, not by a check above. Its inputs are the stand-down markers on the
-integration branch tip, the depth record on that tip, and the request and the depth record in the
-merge result. Today
+integration branch tip, and the request and the depth record in the merge result. Today
 `close-agent-maintenance` refuses when the version has no marker. Nothing checks which generation a
 marker names, and nothing is checked at the integration step.
 
 Must be admitted:
 
-- **Named generation merges.** The tip holds a marker for the version and the version's record.
-  The marker's `request_recorded_at` is the one that the tip's record, the merge result's request
-  and the merge result's record all state, and the merge result carries the closeout with its
-  acceptance entry. What the packet branch held when the marker was declared makes no difference.
+- **Named generation merges.** The tip holds a marker for the version whose `request_recorded_at`
+  is the one the merge result's request and record state, and the merge result carries the closeout
+  with its acceptance entry. What the packet branch held when the marker was declared makes
+  no difference.
 - **Re-freeze after the packet freeze.** The marker states `request_recorded_at`, and a
   maintainer-run re-freeze froze O after it was declared. The Event is unchanged, so the marker
   still names the generation.
@@ -150,15 +150,13 @@ Must be admitted:
   holds no record of it. Each dispatch resets the packet branch and writes a first record. A
   declaration narrowed between two dispatches yields a smaller first record, and nothing of the
   earlier generation is due.
-- **Marker corrected.** The marker was declared for a generation that a dispatch had just replaced,
-  and its change carried no record, or carried the record of the generation then on the packet
-  branch. It committed nothing of the replaced generation. It is then changed to name the
-  generation on the packet branch, in a change that carries that generation's record where the tip
-  holds none. This holds whether or not a declaration narrowed between the two dispatches left that
-  generation a smaller selection, because the tip never held the replaced generation's record.
-- **Marker changed to a wider generation.** Under a packet freeze a maintainer widens the
-  declaration and opens a new generation, and the marker is changed to name it in a change that
-  carries its record. The record covers everything the tip's record covers.
+- **Marker corrected.** The marker was declared for a generation that a dispatch had just replaced.
+  It is then changed to name the generation on the packet branch. This holds whether or not a
+  declaration narrowed between the two dispatches left that generation a smaller selection.
+- **Narrowed before the merge.** Under a packet freeze a maintainer narrows the declaration on the
+  integration branch, the packet branch is reset, a new generation opens with the narrower P, the
+  marker is changed to name it, and it is closed and merged. The tip holds no record of the
+  version, so no generation of it was committed and nothing of the first one is due.
 
 Must be refused:
 
@@ -170,17 +168,9 @@ Must be refused:
 - **Narrowed after the packet freeze.** The declaration is narrowed after the marker was declared,
   and the generation the marker names arrives unchanged. Its record covers more than the
   declaration does, which the registry contract treats as missing policy.
-- **Marker without a record.** The tip holds a marker that names the generation and no record of
-  the version, and the merge result carries the generation's closeout.
-- **Marker changed to a narrower generation.** After a packet freeze the declaration is narrowed,
-  the packet branch is reset by hand, a new generation opens with a narrower P, and the marker is
-  changed to name it in a change that carries its record. The tip holds the first generation's
-  record, so check 2 refuses the change. The same holds when the first marker was declared for a
-  replaced generation and its change carried that generation's record: the correction has to cover
-  as much, or follow a debt operation that dispositions the difference.
 - **Digest-only marker after a re-freeze.** The marker states only `request_sha256`, and a
-  re-freeze after it was declared changed the request file. The generation stays committed and the
-  marker no longer names it. The merge result carries its closeout before the marker has been
+  re-freeze after it was declared changed the request file. The marker no longer names the
+  generation. The merge result carries its closeout before the marker has been
   restated.
 
 ## Support publication cases
@@ -213,9 +203,9 @@ Must be published as listed:
 - **Qualified over an unsupported backend.** The row's `backend_support` is `unsupported` and the
   one capability its record claims is published as depth-qualified for the target. The row stays
   `unsupported`: depth facts raise no state.
-- **Capability not served on the target.** The record claims a capability, and none of its mapped
-  operations serves a mode on the row's target. The capability is not published as depth-qualified
-  for that target, so the row is not `supported`.
+- **Capability not served on the target.** The record claims a capability, and one of its mapped
+  operations is not depth-enrolled on the row's target, or none of them is. The capability is not
+  published as depth-qualified for that target, so the row is not `supported`.
 - **Declared, no record yet.** The registry declares the row's version and target, and no
   generation has frozen its policy. The row is depth-enrolled, states that its obligations are not
   yet frozen, and derives `uaa_support` as a row without depth facts does.
@@ -260,8 +250,9 @@ Must fail:
   branch holds. A record the integration branch does not hold can therefore keep a target that its
   manifest root has stopped listing, because a freeze of the request on that branch finds the
   target covered. At the integration step the declaration is missing policy for that target, and
-  only depth admission refuses it there. No check above does. After a packet freeze the same root
-  change leaves the committed generation unable to merge until the target is listed again.
+  only depth admission refuses it there. No check above does. The generation cannot merge until
+  the target is listed again or a generation frozen from a declaration without the target
+  replaces it.
 - Annex B names a covered mode apart from the operations that serve it and counts it as covered on
   a target only where an operation serves it there or the mode names the classification entry that
   excludes it, so check 2 compares names and that reference. Whether the operations a P lists for a
@@ -270,34 +261,26 @@ Must fail:
 - Check 2 compares which capabilities have a mapping, not what a mapping names. A mapping kept with
   fewer operations is therefore not a shrink. Shared mapping rule 5 requires P to name the
   complete set, refuses a mapping that names no operation, and withholds depth-qualified on a
-  target that no mapped operation serves, so the support matrix spec's rule 6 withholds
-  `supported` there. Decide whether anything checks that a mapping is complete.
+  target where a mapped operation is not depth-enrolled or no `M` obligation of the mapping is
+  `verified`, so the support matrix spec's rule 6 withholds `supported` there. Decide whether
+  anything checks that a mapping is complete, and how a mapping states an operation that the
+  upstream CLI does not offer on one target, since rule 5 leaves the capability not
+  depth-qualified there.
 - A covered mode is named by a selector whose form comes with the registry contract's schema
   revision. Annex B fixes that the name is kept, not what it looks like.
 - A generation is committed from the time the integration branch holds the record it wrote or
-  continued, and a packet freeze's change carries that record. Until then the next dispatch
-  replaces the generation, and check 2 has no earlier record to compare a smaller first record
-  with. Depth enrollment rule 10 says so: a generation that was never committed leaves no due
-  work. Four things about that change are left to the implementation:
-  - Check 4 lets a record change through when the same change declares or changes the version's
-    marker, because that change carries no request. Nothing then compares the record with the
-    request the packet branch holds. Checks 2, 11 and 13 still apply to it, and check 3 applies
-    when the packet merges. Decide whether the change may state results or list an acceptance
-    entry, or must carry the record as the last freeze of the request left it.
-  - The packet branch and the integration branch then each add the record's file, and the packet
-    branch goes on to extend it. Decide how the packet branch takes up the integration branch's
-    copy so that its merge does not conflict.
-  - `reports/<version>/` holds the record on the integration branch before the version has
-    metadata or target reports there. Decide what `manifest-validate` and the freeze of O, which
-    asks whether the target reports exist, make of a directory that holds the record alone.
-  - `HANDOFF.md` renders the packet freeze step. Decide how its commands take the record from
-    the packet branch.
+  continued, which the merge of its packet brings about. Until then the next dispatch replaces it,
+  or a maintainer narrows the declaration and reopens it, and check 2 has no earlier record to
+  compare a smaller first record with. Depth enrollment rule 10 says so: a generation that was
+  never committed leaves no due work. A packet that is merged while still open commits its
+  generation at that merge. Nothing refuses a declaration narrowed while a packet is open. Decide
+  whether anything should report it.
 - An abandoned packet keeps its marker, because only promotion removes one. Automation stays stood
-  down for that agent and version, and a later generation of the version still has to cover what
-  the abandoned one committed. Decide whether a superseded version's marker is ever retired another
-  way. A marker declared only after its packet was abandoned, or after a later version's packet
-  replaced the working files, names and commits its generation all the same. Decide whether it
-  should.
+  down for that agent and version. A later generation of the version has to cover what the
+  abandoned one covered only where the abandoned packet had merged. Decide whether a superseded
+  version's marker is ever retired another way. A marker declared only after its packet was
+  abandoned, or after a later version's packet replaced the working files, names its generation
+  all the same. Decide whether it should.
 - `prepare-agent-maintenance` reads no marker, so a maintainer's run under a packet freeze that is
   not a re-freeze opens a generation that the marker does not name, and its closeout is refused
   until the marker is changed. Decide whether the command should ask before it writes. A check
@@ -422,7 +405,7 @@ Must fail:
   after `runtime_integrated`, what the acquired inputs of an onboarding O are, and whether a
   partial union can freeze O for the targets it covers.
 - The charter names no committed create-lane artifact that states the P and O identities beside the
-  depth record, so checks 3 and 4 have no second statement for an onboarding generation, and a
+  depth record, so checks 1 and 3 have no second statement for an onboarding generation, and a
   record rewritten together with its identities cannot be told from the one that was frozen. A
   run's input contract cannot serve: run directories are ignored by git, an executor can rewrite
   the file unnoticed, and `repair-runtime-evidence` writes a different one without a dry run. The
