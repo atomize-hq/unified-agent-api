@@ -45,6 +45,9 @@ This document does not redefine:
 - packet-only maintainer handoff flows that omit the relay `[execution_contract]`, regardless of
   how the PR was opened
 - onboarding or publication contracts outside the maintenance packet
+- support-depth rules, which the [support-depth contract](support-depth-contract.md) owns.
+  [Depth-enrolled generations](#depth-enrolled-generations) states what this contract adds for
+  them
 
 ## Canonical ownership split
 
@@ -466,7 +469,301 @@ is it.
 - `support_surface_audit`
 
 The relay MUST reject packets whose prepared-run metadata does not match the live request packet.
-The relay MUST stop before closeout. `close-agent-maintenance` remains the only closeout writer.
+The relay MUST stop before closeout. `close-agent-maintenance` remains the only closeout writer:
+the relay never writes the closeout. `prepare-agent-closeout` generates the closeout artifact that
+`close-agent-maintenance` records; see [Closeout](#closeout).
+
+## Depth-enrolled generations
+
+The [support-depth contract](support-depth-contract.md) owns the rules for support depth: depth
+enrollment, depth scope tuples, the depth record, the bindings Event, P, O and E, depth admission,
+and which changes are acceptance effects and which are reporting effects. This section states only
+what this contract owns for them: how a request carries the bindings, what each freeze does, who
+declares a packet freeze and which generation it names, what relay execution may change
+and what closeout establishes. Where it applies one of those rules it does not redefine it, and a
+term it does not define has the meaning the support-depth contract gives it.
+
+A **depth-enrolled generation** is a generation whose `agent_id` and
+`detected_release.target_version` a depth enrollment selects on the maintenance path. The rules
+below are of two kinds:
+
+- Rules about what a request carries, what a freeze writes, what a closeout adds to the depth
+  record and how a run treats its own request apply to depth-enrolled generations. Every other
+  request stays as the sections above describe it.
+- Rules about what a relay run or a closeout command may change apply to every run and command
+  whose writes touch a depth scope tuple, whichever generation it belongs to. The support-depth
+  contract determines the tuples a write touches from the values it changes, not from the request's
+  agent or version. A later version's run reaches an earlier version's tuples, because its
+  `writable_surfaces` cover the same maintenance root and the same aggregate publication. The
+  relay's rule on a stand-down marker that a run adds or changes applies in the same way, although
+  that write touches no tuple.
+
+A freeze can touch another version's tuples as well, as when a later version's request replaces
+an earlier one. This section adds no rule for that write, and the support-depth contract's own
+rules reach it.
+
+While the support-depth contract is a Draft this section binds nothing.
+
+Three terms are used below. A **validating loader** is any command that validates the request
+against this contract when it loads it, whether or not it tolerates audit drift. The strict loader
+that the Canonical ownership split mentions is a validating loader that also rejects audit drift.
+The reader behind `--from-request` is not a validating loader. The **standing request** is the
+request at the agent's maintenance request path when a freeze runs. A **re-freeze** is a freeze
+that records, for the same target version, the Event the standing request already states, whether
+`--from-request` supplies the recorded values or they are passed explicitly. Any other freeze,
+one that finds no standing request included, opens a new generation and is that generation's
+first freeze.
+
+### Request fields
+
+A depth-enrolled generation's request carries one table beyond the fields above:
+
+```toml
+[support_depth]
+policy_identity = "<sha256 of P>"
+obligations_identity = "<sha256 of O>"
+```
+
+| Field | Rule |
+| --- | --- |
+| `policy_identity` | MUST be the content identity of the P this generation froze at its first freeze. A re-freeze MUST preserve it because a re-freeze completes the same generation. |
+| `obligations_identity` | MUST be the content identity of the O this generation last froze. It MUST be absent while no freeze of this generation has frozen O. |
+
+Rules:
+
+1. The table MUST be present in a depth-enrolled generation's request and absent from every other
+   request. It is part of the shared shape: its presence follows depth enrollment and never
+   `agent_id`. Whether a generation is depth-enrolled is resolved under the support-depth
+   contract's depth enrollment rules, and a freeze MUST refuse when that resolution fails. A
+   validating loader MUST reject a request that breaks this rule, and MUST NOT read a missing
+   table as "not depth-enrolled".
+2. Event needs no field of its own. It is the request's `request_commit` and
+   `request_recorded_at`, with `trigger_kind` and `opened_from` as its trigger and source.
+3. Each identity is a SHA-256 digest written as 64 lowercase hex characters, the form
+   `prompt_sha256` uses. Annex B of the support-depth contract defines what each digest is taken
+   over. The table carries the two identities and nothing else, and `[support_surface_audit]` is
+   unchanged.
+4. A validating loader MUST reject the request unless the target version's depth record states
+   the request's Event and the same two identities, with O shown as not yet produced while
+   `obligations_identity` is absent.
+5. `artifact_version` stays `"2"`. Validating loaders reject unknown keys today, so one that
+   predates this section rejects the table, and rule 1 rejects a request that lacks it.
+
+The two fields are the only addition to the request. The support-depth contract's minimum machinery
+rule requires the failure they prevent to be named. The depth record is otherwise the only place
+that states which P and O a generation froze. Execution writes to that record, and
+`writable_surfaces` also cover the debt rows that P's baseline is taken from and the target
+version's snapshots and reports that O is derived from, so neither identity can be recomputed from
+the tree after a run. A record whose P or O has been restated, by a hand edit or by a run that was
+interrupted before the relay checked it, then reads as truthful in any single tree, and the checks
+repository validation makes on one revision read only that tree. A second statement in the request,
+the packet artifact that both the relay and the closeout already bind by content, lets one tree be
+checked: the record must state what the request states. Two fields are needed because a generation
+can freeze P and never freeze O.
+
+### Freezes
+
+The freeze points are unchanged. For a depth-enrolled generation:
+
+1. The first freeze freezes P. `prepare-agent-maintenance` MUST write `policy_identity` and, in
+   the same invocation, MUST write the target version's depth record, or continue it when an
+   earlier generation of that version wrote it. This holds on every lane, the docs-only lane
+   included.
+2. Every freeze at which the target version's target reports exist freezes O, whether it is the
+   first freeze or a re-freeze. Such a freeze MUST write `obligations_identity` and, in the same
+   invocation, MUST extend the depth record with O.
+3. A re-freeze MUST preserve `policy_identity` and MUST derive O under the frozen P. It MUST
+   refuse when P has changed since the first freeze, and when it cannot establish that P is
+   unchanged. For P's debt baseline the comparison is between the debt rows as the tree now holds
+   them and the baseline as the first freeze froze it. A difference that the support-depth
+   contract's debt operations assign to execution changes E and is not a change to P. Any other
+   difference from that baseline is a change to P. The depth record states that baseline in its
+   policy part, as Annex B of the support-depth contract defines. The request's
+   `[support_surface_audit]` rows cannot serve, because every re-freeze takes them again from
+   the tree.
+4. On this path P changes only when a new generation opens, and within a generation O is frozen
+   again only by a re-freeze.
+5. A freeze that records the standing request's Event for another target version is not a
+   re-freeze of this generation, and it MUST refuse.
+
+### Packet freeze
+
+Whoever works one version's packet stands automation down from it by committing a stand-down marker
+to the integration branch: `governance/automation-stand-down/<target_version>.toml` under the
+agent's maintenance root. The marker names the agent and the target version, and rule 2 below says
+which generation of that version it names. This contract calls that a **packet freeze**. It is not
+a freeze of the request: "first freeze", "second freeze" and "re-freeze" in this contract always
+mean a freeze of the request. A packet freeze exists whether or not support depth is involved, and
+[Present behavior](#present-behavior) records what reads it today.
+
+For a depth-enrolled generation:
+
+1. A packet freeze commits nothing under the support-depth contract. Depth enrollment rule 7
+   commits a generation from the time the integration branch holds its depth record, which on this
+   path is the merge of its packet. Until then the generation may be replaced or abandoned together
+   with its record, whether or not a marker names it, and a generation that replaces it freezes P
+   from the registry declaration as it then stands. While the target version has no packet freeze,
+   automation keeps authority over its packet: the next dispatch for the version opens a new
+   generation and replaces the request and the packet. Where the integration branch holds no depth
+   record of the version, the record the earlier generation wrote is replaced with them.
+2. A marker names the generation whose request states the `request_recorded_at` that the marker
+   states. A marker that states only `request_sha256` names the generation whose request file has
+   that digest, and stops naming it when a re-freeze changes the file. Rule 3 then refuses that
+   generation's closeout until the marker is restated under rule 5.
+3. Writing the closeout for the generation requires its packet freeze. As part of depth admission,
+   `prepare-agent-closeout` and `close-agent-maintenance` MUST establish that the integration
+   branch holds a marker for the target version and that the marker names the generation, and MUST
+   refuse otherwise. The integration step for a change that carries the closeout MUST establish the
+   same against the tip. The marker is read from the integration branch, never from the packet
+   branch, and a marker directory that cannot be read is not an absent marker.
+4. Depth enrollment rule 7 applies from the time the integration branch holds the version's depth
+   record. What it requires of every later generation of the same target version holds whether or
+   not the tree the later generation freezes in still holds that record.
+5. Whoever declares or changes a marker does so by a change to the integration branch that the
+   packet branch does not carry. No command or workflow declares or changes a marker. A marker that
+   nonetheless reaches the integration branch with a packet branch's merge is no packet freeze
+   before that merge and is one from it, so automation stands down from that merge. Whoever
+   works the packet with the maintainer's authority makes the change: for example a maintainer, a
+   contributor, or the coding agent that is handed the packet pull request, whether or not
+   `execute-agent-maintenance` runs that agent. The
+   [lifecycle spec](unified-agent-api/acquisition-maintenance-lifecycle-spec.md) has that agent
+   declare the marker before its judgment work, with no separate decision by a maintainer. A
+   marker states no selection and commits none. A change may name a later generation of the same
+   target version, or restate the marker for a generation that the marker has stopped naming.
+   Changing a marker releases nothing that depth enrollment rule 7 has committed. A marker is
+   removed only by the version's promotion, which the support-depth contract makes an acceptance
+   effect.
+6. A packet freeze declared before any freeze of the request has frozen O names a generation that
+   has no frozen obligations. It reaches acceptance only after a re-freeze has frozen O.
+
+The packet freeze adds no file and no field. The support-depth contract's minimum machinery rule
+requires the failure a new mechanism prevents to be named. Without rule 3, a packet could be
+closed and merged as a generation other than the one its worker stood automation down for, such as
+one that a dispatch or a maintainer's run opened in between, and the closeout would accept work
+that nobody working the packet had seen.
+
+A generation is not committed before its packet merges. While the integration branch holds no
+depth record of the version, a maintainer can therefore narrow the registry declaration while a
+packet is open, and a generation that replaces the open one, on a packet branch that no longer
+holds the earlier record, then has less due. That narrowing is a change to the registry on the
+integration branch. Nothing refuses it, and the registry's history shows it. Where the integration
+branch holds a record of the version, or the tree the new generation freezes in still holds the
+earlier one, depth enrollment rule 7 requires the new P to cover it.
+
+### Relay execution
+
+For a depth-enrolled generation:
+
+1. `[support_depth]` is part of the request's authority for the run. While the request carries no
+   `obligations_identity` the generation has no frozen depth obligations for a run to work to,
+   and the support-depth contract reports its depth-enrolled scope as insufficient depth.
+2. A run MUST NOT change the request, whatever `writable_surfaces` lists. The relay MUST treat a
+   change to the request as it treats a write to the closeout path.
+
+A run's changes, in the rules below, are the differences between the tree the run works in as it
+was when the executor started and as it is when the relay checks it. The dry-run baseline is taken
+earlier and holds digests only, so it cannot serve as that reference: the relay keeps its own
+record of the state at executor start, with the content it needs to restore.
+
+For every relay run whose changes touch a depth scope tuple, or add or change a stand-down marker
+for a depth-enrolled version, whichever generation the run belongs to:
+
+3. Relay execution makes reporting effects only. The relay MUST treat the run as failed when its
+   changes include an acceptance effect for a depth scope tuple, removal of a stand-down marker
+   included, or a depth-gated effect for which the relay cannot establish depth admission. It MUST
+   also treat the run as failed when its changes add or change a stand-down marker for a
+   depth-enrolled version. Adding or changing one is not a depth-gated effect, but
+   [Packet freeze](#packet-freeze) rule 5 leaves both to a change to the integration branch that
+   the packet branch does not carry. A marker that the coding agent commits to the integration
+   branch under that rule is among the run's changes only where the tree the run works in comes to
+   hold it.
+4. When a run fails under rule 2 or 3, the relay MUST restore every change it attributes to the
+   run, so that those paths are as they were when the executor started, before it reports the
+   failure. Restoring the depth-gated outputs alone is not enough: the run may also have changed
+   the evidence and dependencies those outputs rest on, and a restored result would then claim
+   more than the tree supports. The support-depth contract's restoration rules govern the
+   restore. The relay SHOULD keep a copy of the changes it reverts in the run directory.
+5. Rules 2 and 3 are evaluated on every write-mode run in which the executor ran, whatever else
+   failed.
+
+Rules 2 to 5 are shared policy for every agent. `writable_surfaces` is unchanged, and these rules
+limit what a run may change inside it, as the exclusion of the closeout path already does. They
+are not a second envelope derived from `agent_id`.
+
+### Closeout
+
+`prepare-agent-closeout` generates the closeout artifact that `close-agent-maintenance` records,
+and both write the closeout path. Both are bound by the rules below.
+
+For each of the two commands, when its writes touch a depth scope tuple, whichever generation it
+closes:
+
+1. The command MUST establish depth admission for every such tuple, as the support-depth contract
+   requires of every route.
+2. Unless depth admission is established, the artifact the command wrote validates and, where
+   rule 3 applies, the acceptance entry is listed, the command MUST leave every file as it was
+   before the invocation, within the support-depth contract's restoration rules. An artifact the
+   command wrote and then rejected MUST NOT stay at the closeout path, whether or not a closeout
+   existed before. The command MAY report it or keep it elsewhere.
+
+For a depth-enrolled generation, writing the closeout artifact is an acceptance effect, and so are
+the lifecycle-record changes `close-agent-maintenance` makes with it:
+
+3. Each command MUST ensure, in the same invocation, that the target version's depth record lists
+   the acceptance entry for the closeout it writes, as record invariant 4 of the support-depth
+   contract requires. It lists the entry only once depth admission is established and the
+   artifact has validated, so that a refusal never has an entry to take back.
+
+The closeout artifact gains no field. It already binds the request it closes by content
+(`request_sha256`), and through the request the two identities. Closeout's other checks are
+unchanged, and [Packet freeze](#packet-freeze) rule 3 says what the stand-down marker has to name.
+
+### Present behavior
+
+None of this section is implemented, and it has no effect until a depth enrollment exists. Today:
+
+- No request carries `[support_depth]`, and `--from-request` reads a fixed list of recorded
+  fields and regenerates the rest.
+- The workflows that open a packet commit the maintenance root only. A depth record written under
+  the manifest root at the first freeze would not be in the opening commit, so the re-freeze
+  inside `parity-acquire`, which runs on a fresh checkout of the packet branch, would not find
+  it. The acquisition commit carries `reports/<version>/`; on the docs-only lane nothing does.
+- `writable_surfaces` cover the request and the stand-down markers through
+  `{maintenance_root}/**`.
+- The relay checks the executor's writes against `writable_surfaces` after the executor has
+  written. It takes its baseline at the dry run, as digests without content, and it leaves a
+  failed run's changes in place.
+- `prepare-agent-closeout` writes the closeout artifact, then validates it through the
+  validator's own input path, and leaves a rejected artifact in place when no closeout existed
+  before.
+- The stand-down check runs for every automated packet, whether or not depth is involved.
+  `maintenance-stand-down-check` reads the marker directory from the working tree, or from a git
+  ref when it is given one. The open-PR workflow asks it, against a freshly fetched integration
+  branch, before it regenerates the request, before it replaces the packet branch and before it
+  closes an older packet's pull request, and `parity-acquire` asks before its re-freeze.
+  `close-agent-maintenance` refuses unless a marker for the agent and target version is on
+  `origin/staging` as the local clone last fetched it, and it does not ask when the request has no
+  detected release. The only workflow or command that removes a marker is the promotion workflow.
+- A marker is declared by following an instruction, not by running a command. The generated
+  `HANDOFF.md` opens with the packet freeze step and its exact commands, which commit the marker to
+  `staging` and push it. The packet prompt makes that step the coding agent's, also when
+  `execute-agent-maintenance` delivers the prompt, and `AGENTS.md` carries the standing rule. The
+  lifecycle spec names the actor as a coding agent handed the packet pull request. A marker's
+  `declared_by` field is optional, the marker that `HANDOFF.md` renders omits it, and nothing
+  checks it.
+- No command decides on the generation a marker names. `maintenance-stand-down-check` reports
+  whether the marker's `request_recorded_at` or `request_sha256` matches the request in the tree
+  and gives the same answer either way. `prepare-agent-closeout` does not read the marker.
+  `prepare-agent-maintenance` does not read it either: only the workflows ask before they call it,
+  so a maintainer who runs it under a packet freeze, other than as a re-freeze, opens a new
+  generation.
+- The [lifecycle spec](unified-agent-api/acquisition-maintenance-lifecycle-spec.md) has a packet
+  closed on its own branch before it is merged, and promoted after the merge. In that order the
+  depth record would first reach the integration branch with the closeout already written. Nothing
+  enforces the order, and the spec records a packet that was merged while still open.
+
+The support-depth contract's path enablement requires this enforcement to land, with tests,
+before the maintenance path is enabled.
 
 ## Transitional compatibility
 
