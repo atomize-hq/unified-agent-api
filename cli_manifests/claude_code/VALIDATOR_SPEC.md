@@ -291,3 +291,16 @@ Violations:
 - delete arbitrary files (retention pruning is a separate mechanical command)
 - modify snapshots, reports, or version metadata (except `current.json` per above)
 - invent values other than `none`
+
+## Depth records
+
+This root adopts the depth record that Annex B of `docs/specs/support-depth-contract.md` defines.
+A depth-enrolled version's record is `reports/<version>/depth-record.json`. Annex B defines what
+the record states, its identities and its acceptance entries, and the support-depth contract
+states the invariants a record must satisfy. This spec restates neither.
+
+While the support-depth contract is a Draft this section binds nothing.
+
+Present behavior: `xtask codex-validate` does not read a depth record, and this spec states no
+check for one. Complete mediation rule 7 and path enablement item 4 of the support-depth contract
+say when the checks that enforce its record invariants are stated here.

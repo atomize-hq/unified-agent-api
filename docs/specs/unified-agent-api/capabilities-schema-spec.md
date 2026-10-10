@@ -109,6 +109,46 @@ Semantics (pinned):
 - Runtime availability checks MUST use `AgentWrapperCapabilities.ids` from the selected backend; the matrix is a
   maintenance/overview artifact, not a runtime truth source.
 
+## Support depth
+
+The [support-depth contract](../support-depth-contract.md) owns the rules for support depth,
+including when a capability is depth-qualified and which changes to capability publication need
+depth admission. This section states only what this spec owns: how a capability id's semantics and
+the capability matrix relate to those rules. It redefines none of that contract's terms.
+
+While the support-depth contract is a Draft this section binds nothing.
+
+Rules:
+
+1. A capability id and its minimum semantics are defined by this spec and by the capability's owner
+   document, as before. They are what the support-depth contract's `M` obligations require of a
+   depth enrollment that claims the capability. A change to a capability's minimum semantics is a
+   change to a requirement those obligations cover, and that contract's reuse and invalidation
+   rules say what it invalidates.
+2. A cell of the capability matrix states advertising and nothing else. It MUST NOT be read as
+   depth qualification, and generation MUST NOT set, clear or annotate a cell from a depth record.
+   An advertised capability that no depth enrollment claims is not assessed.
+3. The capability matrix publishes no depth fact. Capability-level depth results are published by
+   the [support matrix](support-matrix.md#support-depth), for each agent, version and target. The
+   capability matrix is generated for one publication target per agent and names no version, so a
+   cell cannot state a result for each version and target. Whether a cell later shows a depth
+   result is left to a later revision of this spec.
+4. The support-depth contract lists capability publication among its depth-gated outputs, for the
+   capabilities a depth enrollment claims, and makes added advertising an acceptance effect. Its
+   Annex A lists the routes: regenerating the matrix, and a merge of adapter code that changes an
+   advertised set. This spec adds no condition of its own.
+5. Runtime availability checks still use `AgentWrapperCapabilities.ids`, as
+   [Capability matrix](#capability-matrix-generated-artifact) says. A depth result is not a runtime
+   truth source.
+
+### Present behavior
+
+None of this section is implemented, and it changes neither the generator nor the generated file.
+Today `capability-matrix` derives the matrix from lifecycle-backed publication truth and reads no
+depth record (`crates/xtask/src/capability_matrix.rs`,
+`crates/xtask/src/capability_publication.rs`), and the generated header says that the inventory
+"documents backend capability advertising, not support or promotion status".
+
 ## Change control and verification (normative)
 
 This spec is the canonical registry for standard `agent_api.*` capability ids. When a new universal
