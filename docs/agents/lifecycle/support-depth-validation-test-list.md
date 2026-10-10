@@ -8,8 +8,9 @@ does not enumerate the checks. This note carries the checks and the attack scena
 review rounds produced, so they become tests of the validator instead of contract prose.
 
 Annex B of the contract defines the depth record: its file, what it states, its three identities
-and its acceptance entries. That definition is not executable yet. The key names, the form of an
-operation and the serialization the digests are taken over are left to an executable revision. The
+and its acceptance entries. Its sections B.6 and B.7 are revision 1 of the record's encoding and of the serialization the
+digests are taken over, and `crates/xtask/src/depth_record.rs` reads a record by them. No command
+calls that reader yet. The
 checks below stay non-normative until they are implemented. Each one then becomes normative in the
 manifest root's validator spec together with its code and its tests, as the existing validator
 checks did: in one change, or a day apart. Until then the checks and scenarios are the acceptance
@@ -334,17 +335,23 @@ Must fail:
 - A freeze that records an Event the target version's depth record already states, with no
   standing request that states it, is a first freeze under an unchanged Event: P is frozen again
   and the record's Event does not change. Decide whether it refuses.
-- The digests are taken over a serialization that the executable revision fixes. Until it does,
-  no identity can be computed, and checks 3, 8, 9, 11 and 13 have nothing to compare. Where the
-  repository already takes an identity over a structured value it serializes a typed value with
-  serde, and test vectors are needed before two implementations can be said to agree.
+- The digests are taken over the serialization Annex B.7 fixes, with one test vector. The
+  reader refuses a record whose part does not have the identity it states, which is the
+  single-record half of check 11. Checks 3, 8, 9 and 13 compare a record with a request, an
+  entry or a second tree and still have no caller.
+- Revision 1 reads a covered mode as kept only when its selector, command path, mode and
+  predicates are all unchanged, so a selector cannot be widened in place. Decide whether a
+  later revision needs to tell a widened selector from a narrowed one.
+- Revision 1 states the independently required acceptance work as surfaces with targets, taken
+  from the request. The contract does not define that work further. Decide whether the
+  evaluator needs more than the name identity and the targets.
 - A consumer requires the current executable revision of the record and rejects any other, and what
   a record states changes only through a generation of its own version. A second executable
   revision would therefore leave unreadable every held record whose version gets no new generation.
   The revision that follows revision 1 has to say how such a record is read.
-- How a policy identity comes to differ after a change to a shared governing rule, such as an
-  obligation template in the contract. Annex B has the policy part state the whole binding and
-  leaves the form in which it states the governing rules to the executable revision.
+- A policy identity differs after a change to an obligation template because the policy part
+  states BASE and each selected template's obligations as P resolved them. A governing rule
+  that is neither, such as a classification rule, changes no identity by itself.
 - `prepare-agent-closeout` and `close-agent-maintenance` each list an entry for the closeout they
   write. Annex B names a closeout by content identity, so one closeout can leave two entries when
   the prepared artifact is edited before it is recorded, the first naming the prepared artifact.

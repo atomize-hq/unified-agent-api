@@ -49,7 +49,8 @@ pub(crate) const ELIGIBILITY_REASONS: [&str; 3] = [
 pub(crate) const DEBT_OBSERVATIONS: [&str; 3] =
     ["covered_by_wrapper", "excluded_by_rules", "not_observed"];
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, serde::Deserialize, serde::Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct SurfaceIdentity {
     pub surface_kind: String,
     pub command_path: String,

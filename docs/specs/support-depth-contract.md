@@ -1080,17 +1080,11 @@ states, the identities it carries and the form of an acceptance entry. The recor
 enforce them are not part of this annex. This annex is the one definition for every manifest
 root. A root's validator spec adopts it by a section that says so.
 
-This revision of the annex is not executable. It leaves three things to an executable schema
-revision, which amends this annex and is among the revisions that
-[Path enablement](#path-enablement) item 1 requires:
-
-- the key names and value encodings of the record, `schema_version` aside;
-- the form in which an operation, its promise and an invocation mode are stated, which follows
-  the schema revision that the [registry contract](agent-registry-contract.md#support-depth)
-  requires for a declaration; and
-- the serialization that the digests in B.3 and B.5 are taken over.
-
-Until that revision is adopted a manifest root MUST NOT hold a depth record.
+B.6 and B.7 are the first executable revision of this annex, revision 1: the key names and value
+encodings of the record, the form in which an operation, its promise and an invocation mode are
+stated, and the serialization the digests in B.3 and B.5 are taken over. It is among the
+revisions that [Path enablement](#path-enablement) item 1 requires. No validator spec adopts this
+annex yet, so under record invariant 1 no manifest root may hold a depth record.
 
 ### B.1 File and revision
 
@@ -1144,8 +1138,7 @@ binding of the version's latest generation.
 Rules:
 
 1. The items listed for a part are stated in full. Whatever else [Bindings](#bindings) gives the
-   binding as content, the part states as well, in full or by content identity as the executable
-   revision decides. A part therefore states its whole binding.
+   binding as content, the part states as well, in full or by content identity as B.6 decides. A part therefore states its whole binding.
 2. A committed file is stated by its path and its content identity. It is not copied into the
    record.
 3. Everything a part states belongs to that part's binding for record invariant 2. The Event
@@ -1166,8 +1159,8 @@ Rules:
    refer to.
 2. Each identity is the SHA-256 digest of its own part with the identity itself left out,
    written as 64 lowercase hexadecimal characters. The digest is taken over the serialization
-   that the executable revision defines. That revision MUST make the serialization
-   deterministic, so that one part has one digest whoever computes it.
+   that B.7 defines, which is deterministic, so that one part has one digest whoever computes
+   it.
 3. No part states anything of a later binding: the policy part states nothing of O or E, and the
    obligations part states nothing of E. With rule 2 this keeps every identity independent of
    its own digest and of a later output, as [Bindings](#bindings) rule 6 requires.
@@ -1178,8 +1171,7 @@ Rules:
    with the targets it is covered on. The capabilities the selection claims are the ones its
    capability mappings state, and they need no second list.
 2. A covered mode is named apart from the operations that serve it. Its name is the depth
-   enrollment selector under which the selection first covered it, in the form the executable
-   revision defines, and the mode keeps that name from the time a generation that covers it is
+   enrollment selector under which the selection first covered it, in the form rule 6 gives, and the mode keeps that name from the time a generation that covers it is
    committed. Each operation states which covered modes it serves.
 3. A P that renames, divides, merges or reclassifies operations changes which operations serve a
    covered mode. It neither renames nor drops the mode. A mode that P comes to exclude under
@@ -1191,6 +1183,16 @@ Rules:
    shrunk when the record that would replace the one the integration branch holds lacks a
    covered mode, a target that the mode is covered on, or the mapping of a capability that the
    record it replaces claims.
+
+6. In revision 1 the list of covered modes is the `modes` list of the selection, and no second
+   list exists. A mode's `selector` is the covered mode's name, the targets it is selected on are
+   the targets it is covered on, an operation's `serves` states the covered modes it serves, and
+   a mode that an `EXCLUDED` operation serves names that operation as the classification entry
+   that excludes it. The registry contract already requires every mode of a declaration to be
+   served, so every listed mode counts as covered under rule 4.
+7. A record lacks a covered mode of the record it replaces unless it lists a mode with the same
+   `selector`, `command_path`, `mode` and `predicates`. A kept name that selects anything else is
+   another mode. A selection covers more by adding a selector, never by changing one.
 
 ### B.5 Acceptance entries
 
@@ -1218,11 +1220,117 @@ named. Two choices in this annex add structure:
   run's `writable_surfaces`, and every re-freeze takes the request's audit rows from the tree
   again. Nothing else would state what a debt transition is compared with.
 
-### B.6 Present behavior
+### B.6 Encoding
 
-None of this annex is implemented. Source references are to `staging` at `f61534be` and use the
-abbreviations of Annex A. Today:
+This section and B.7 are revision 1. Every object below takes exactly the members listed. A
+consumer MUST reject a member that is not listed and a listed member that is missing.
 
+1. One content has one written form. A member marked optional is left out when it states
+   nothing and is never `null`. Every other member is written, an empty list as `[]`. The only
+   `null` values are the `obligations` and `execution` members of a part not yet produced.
+2. Apart from `schema_version` a record holds no number. Every digest is 64 lowercase
+   hexadecimal characters.
+3. A **file reference** is `{ "path", "sha256" }`: a repository-relative path with `/`
+   separators and no `.` or `..` segment, and the content identity of the file.
+4. A **surface** is a name identity as the
+   [maintenance request contract](maintenance-request-contract-v1.md) defines it:
+   `{ "surface_kind", "command_path", "surface_id" }`.
+5. A **debt row** is one row of the debt inventory, with a member for the row id and one for
+   each key of the row: `row_id`, `agent_id`, `surface_kind`, `command_path`, `surface_id`,
+   `current_reason`, `blocker_class`, `owner`, `milestone`, `follow_on`, `evidence_ref`,
+   `scope_target_triples`, `authorized_at_version` and `authorization_evidence_ref`. Each is a
+   string, except `scope_target_triples`, which is the list of targets in ascending byte order.
+6. An **obligation reference** is `{ "operation", "id", "target" }`, where `id` is an obligation
+   id. For the `M` obligation of a capability it is `{ "operation", "capability", "target" }`
+   and has no `id`. It states exactly one of the two.
+
+The record:
+
+| Member | Value |
+| --- | --- |
+| `schema_version` | `1`. |
+| `event` | The Event. `lifecycle_path` is `"maintenance"` or `"onboarding"` and MUST be the selection's. With it, the maintenance Event states `request_commit`, `request_recorded_at`, `trigger_kind` and `opened_from`, and the onboarding Event `approval_commit` and `approval_recorded_at`, each a non-empty string written as its request or approval artifact writes it. |
+| `policy` | The policy part. |
+| `obligations` | The obligations part, or `null` while not yet produced. |
+| `execution` | The execution part, or `null` while not yet produced. |
+| `acceptance_entries` | The list of acceptance entries, in the order they were made. |
+
+The policy part:
+
+| Member | Value |
+| --- | --- |
+| `identity` | The policy identity. |
+| `selection` | `{ "agent_id", "enrollment" }`. `enrollment` is the declaration in the form the [registry contract](agent-registry-contract.md#support-depth) gives one, with the same member names and the same rules: `lifecycle_path`, `version`, `targets`, `modes`, `operations` and `capabilities`. Rule 1 applies to it, so `predicates`, `not_applicable_permitted` and `capabilities` are always written. It states the operations with their promises, the modes and required values of each, the targets, where a promise permits `not_applicable`, the capability mappings, the classification entries and the mode exclusions. Revision 1 has no override. |
+| `base` | The BASE obligation ids as P resolved them. |
+| `templates` | One `{ "template", "obligations" }` for each obligation template an operation of the selection selects, stating the obligations the template added when P was frozen. |
+| `path_enabled` | Whether the selection's lifecycle path was enabled for the agent when P was frozen. |
+| `debt_baseline` | The frozen delegation and the initial authorization baseline: a debt row for every row in force for the agent when P was frozen. Row ids do not repeat. |
+
+`base` and `templates` state the governing rules. Without them a change to an obligation template
+would leave a frozen P with the same identity and another meaning.
+
+The obligations part:
+
+| Member | Value |
+| --- | --- |
+| `identity` | The obligations identity. |
+| `policy_identity` | The policy identity that O was frozen under. |
+| `targets` | The targets that O is frozen for, without repeats. |
+| `acquired_inputs` | A file reference for each acquired input that O was derived from. |
+| `operations` | One `{ "id", "surfaces", "obligations" }` for each operation: the surfaces it owns and its obligation ids. An `M` obligation is not listed. An operation has one for each capability mapping that names it. Operation ids do not repeat. |
+| `classification_required` | One `{ "operation", "surface" }` for each unit that is `classification_required`, named by the surface that carries it. |
+| `acceptance_work` | The independently required acceptance work: one `{ "surface", "targets" }` for each name-level item the generation's request holds as required, with the targets it is required on. |
+
+The execution part:
+
+| Member | Value |
+| --- | --- |
+| `identity` | The execution identity. |
+| `policy_identity`, `obligations_identity` | The P and O identities that E references. |
+| `results` | One `{ "obligation", "result", "rationale", "evidence" }` for each result. `obligation` is an obligation reference and does not repeat. `result` is `"verified"`, `"unverified"`, `"failed"` or `"not_applicable"`. `rationale` is optional: a `not_applicable` result MUST state it and no other result may. `evidence` is a list of file references, and only a `verified` result may bind any. The implementation identities that [Bindings](#bindings) gives E are stated by that evidence. |
+| `reuse_bindings` | One `{ "obligation", "policy_identity", "obligations_identity" }` for each reused obligation: the P and O that its evidence was produced under. `obligation` does not repeat. |
+| `debt_grants` | A debt row for each grant that E materializes for the version. Row ids do not repeat. |
+| `debt_retired` | The row ids of the baseline rows that E retires. A transition from P's baseline is a grant or a retirement stated here. |
+
+An acceptance entry states `backs`, `record_sha256` and one further member:
+
+| `backs` | Further member |
+| --- | --- |
+| `"maintenance_closeout"`, `"proving_run_closeout"` | `closeout`, a file reference to the closeout record. |
+| `"publication"` | `packet`, a file reference to the publication packet. |
+| `"promotion"` | `targets`, the targets whose pointers the promotion set: at least one, without repeats. |
+
+`record_sha256` is the digest that B.5 rule 1 defines.
+
+What this section requires is what a record decides by itself, and a consumer MUST reject a
+record that breaks it. Whether the parts agree with one another, with the registry and with a
+request is [Depth admission](#depth-admission): a `policy_identity` that E references and the
+record does not state, for example, is not a malformed record. Record invariant 3 says how its
+results are published.
+
+### B.7 Serialization and digests
+
+1. A digest is the SHA-256 digest of a JSON value serialized as RFC 8785 requires: no
+   insignificant whitespace, the members of an object sorted by name, and each string escaped as
+   that RFC states. B.6 rule 2 leaves no number to serialize, and every member name is ASCII.
+2. An identity is taken over its part's object with the `identity` member left out.
+3. The digest of an acceptance entry is taken over the object
+   `{ "event", "policy", "obligations", "execution" }` whose members are those of the record as
+   they then stood, a part not yet produced as `null`.
+4. Rule 1 of B.6 makes the serialization deterministic: a content has one written form, so one
+   part has one digest.
+
+Test vector for rule 2. The part `{"identity":"left out","z":"a","a":["é\n",true,null]}` is
+serialized as the 32 bytes of `{"a":["é\n",true,null],"z":"a"}`, in which `é` is the two bytes
+`c3 a9` and `\n` is the two-character escape. Its identity is
+`1019655b4e277dabfe0cb08487ef861e99531f65f058a980e76a1927afe4c441`.
+
+### B.8 Present behavior
+
+Source references are to `staging` at `f61534be` and use the abbreviations of Annex A. Today:
+
+- `xtask/depth_record.rs` reads a record and decides what B.6 and B.7 require, the digest of
+  B.5 and the comparison of B.4. It is not at `f61534be`. No command calls it.
 - No manifest root holds a depth record, and no command reads or writes one.
 - The commands that parse a version's coverage reports open them by exact name or scan
   `reports/<version>/` for names that begin with `coverage.` and end with `.json`.

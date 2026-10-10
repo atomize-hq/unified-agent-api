@@ -6,16 +6,16 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use super::{validate_non_empty_scalar, AgentRegistryError};
 
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct SupportDepth {
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub enabled_paths: Option<Vec<LifecyclePath>>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub enrollments: Option<Vec<DepthEnrollmentDeclaration>>,
 }
 
@@ -69,14 +69,14 @@ impl SupportDepth {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum LifecyclePath {
     Maintenance,
     Onboarding,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct DepthEnrollmentDeclaration {
     pub lifecycle_path: LifecyclePath,
@@ -89,7 +89,7 @@ pub struct DepthEnrollmentDeclaration {
 }
 
 impl DepthEnrollmentDeclaration {
-    fn validate(&self, agent_id: &str) -> Result<(), AgentRegistryError> {
+    pub(crate) fn validate(&self, agent_id: &str) -> Result<(), AgentRegistryError> {
         let at = format!("support_depth.enrollments[version={}]", self.version);
 
         let bare = semver::Version::parse(&self.version)
@@ -227,7 +227,7 @@ impl DepthEnrollmentDeclaration {
 }
 
 /// A depth enrollment selector. Its `selector` is the name a covered mode keeps.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct ModeSelector {
     pub selector: String,
@@ -235,7 +235,7 @@ pub struct ModeSelector {
     pub mode: String,
     #[serde(default)]
     pub predicates: Vec<FlagPredicate>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub targets: Option<Vec<String>>,
 }
 
@@ -285,27 +285,27 @@ impl ModeSelector {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct FlagPredicate {
     pub flag: String,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub value: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct OperationDeclaration {
     pub id: String,
     pub serves: Vec<String>,
     pub templates: Vec<ObligationTemplate>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub shared_mapping: Option<SharedMapping>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub promise: Option<BasePromise>,
     #[serde(default)]
     pub not_applicable_permitted: Vec<ObligationId>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rationale: Option<String>,
 }
 
@@ -393,7 +393,7 @@ impl OperationDeclaration {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum SharedMapping {
     WrapperOnly,
@@ -402,7 +402,7 @@ pub enum SharedMapping {
 }
 
 /// What the promise states for each BASE dimension of the support-depth contract.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct BasePromise {
     pub r1: String,
@@ -435,14 +435,14 @@ impl BasePromise {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct CapabilityMapping {
     pub id: String,
     pub operations: Vec<String>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Deserialize, Serialize)]
 #[serde(rename_all = "UPPERCASE")]
 pub enum ObligationTemplate {
     Core,
@@ -479,7 +479,7 @@ impl ObligationTemplate {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Deserialize, Serialize)]
 #[serde(rename_all = "UPPERCASE")]
 pub enum ObligationId {
     R1,
