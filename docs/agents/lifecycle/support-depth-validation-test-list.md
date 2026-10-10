@@ -268,8 +268,15 @@ Must fail:
   anything checks that a mapping is complete, and how a mapping states an operation that the
   upstream CLI does not offer on one target, since rule 5 leaves the capability not
   depth-qualified there.
-- A covered mode is named by a selector whose form comes with the registry contract's schema
-  revision. Annex B fixes that the name is kept, not what it looks like.
+  The registry contract's rule 5 answers the second part: the operation is declared with modes
+  whose `targets` leave that target out, and the capability is not depth-qualified there.
+- A covered mode is named by the `selector` of the registry declaration's `modes` entry that
+  first covered it. The registry loader refuses two selectors with one `command_path` and `mode`.
+  It does not decide whether two selectors with different `mode` names overlap, which
+  classification rule 2 makes an error where their effects or requirements differ. Nor does it
+  decide whether a kept `selector` name still selects what it selected in the record the
+  integration branch holds, so check 2 passes a mode narrowed under its old name. Decide where
+  policy resolution checks that, and against which acquired input.
 - A generation is committed from the time the integration branch holds the record it wrote or
   continued, which the merge of its packet brings about. Until then the next dispatch replaces it,
   or a maintainer narrows the declaration and reopens it, and check 2 has no earlier record to
@@ -349,8 +356,8 @@ Must fail:
   `ci_validation` note in `RULES.json` cover every committed artifact, while the code validates
   named files only.
 - When a declaration renames or divides an operation whose mode a record already covers,
-  something has to say which covered mode the new operations serve. The registry contract's
-  schema revision has to let a declaration state it.
+  something has to say which covered mode the new operations serve. The registry declaration's
+  `serves` states it.
 - A declaration moved to another lifecycle path changes no frozen binding. The record keeps the
   selection its last generation froze, which names the old path, until a generation on the new path
   freezes P and continues the record. Until then predicate item 5 blocks acceptance, because the

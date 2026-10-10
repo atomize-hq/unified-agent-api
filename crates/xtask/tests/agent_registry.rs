@@ -739,3 +739,6 @@ fn invalid_governance_comparison_kind_fails_closed() {
     let text = err.to_string();
     assert!(text.contains("unknown variant"), "{text}");
 }
+
+#[path = "agent_registry/support_depth.rs"]
+mod support_depth;
