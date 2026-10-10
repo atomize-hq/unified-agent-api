@@ -532,6 +532,16 @@
     },
     {
       "agent": "opencode",
+      "version": "1.18.34",
+      "target": "darwin-arm64",
+      "manifest_support": "unsupported",
+      "backend_support": "unsupported",
+      "uaa_support": "unsupported",
+      "pointer_promotion": "none",
+      "evidence_notes": []
+    },
+    {
+      "agent": "opencode",
       "version": "1.14.47",
       "target": "darwin-arm64",
       "manifest_support": "unsupported",
@@ -556,6 +566,16 @@
       "agent": "opencode",
       "version": "1.4.9",
       "target": "darwin-arm64",
+      "manifest_support": "unsupported",
+      "backend_support": "unsupported",
+      "uaa_support": "unsupported",
+      "pointer_promotion": "none",
+      "evidence_notes": []
+    },
+    {
+      "agent": "opencode",
+      "version": "1.18.34",
+      "target": "darwin-x64",
       "manifest_support": "unsupported",
       "backend_support": "unsupported",
       "uaa_support": "unsupported",
@@ -596,6 +616,16 @@
     },
     {
       "agent": "opencode",
+      "version": "1.18.34",
+      "target": "linux-arm64",
+      "manifest_support": "unsupported",
+      "backend_support": "unsupported",
+      "uaa_support": "unsupported",
+      "pointer_promotion": "none",
+      "evidence_notes": []
+    },
+    {
+      "agent": "opencode",
       "version": "1.14.47",
       "target": "linux-arm64",
       "manifest_support": "unsupported",
@@ -620,6 +650,16 @@
       "agent": "opencode",
       "version": "1.4.9",
       "target": "linux-arm64",
+      "manifest_support": "unsupported",
+      "backend_support": "unsupported",
+      "uaa_support": "unsupported",
+      "pointer_promotion": "none",
+      "evidence_notes": []
+    },
+    {
+      "agent": "opencode",
+      "version": "1.18.34",
+      "target": "linux-x64",
       "manifest_support": "unsupported",
       "backend_support": "unsupported",
       "uaa_support": "unsupported",
@@ -658,6 +698,16 @@
     },
     {
       "agent": "opencode",
+      "version": "1.18.34",
+      "target": "win32-arm64",
+      "manifest_support": "unsupported",
+      "backend_support": "unsupported",
+      "uaa_support": "unsupported",
+      "pointer_promotion": "none",
+      "evidence_notes": []
+    },
+    {
+      "agent": "opencode",
       "version": "1.14.47",
       "target": "win32-arm64",
       "manifest_support": "unsupported",
@@ -682,6 +732,16 @@
       "agent": "opencode",
       "version": "1.4.9",
       "target": "win32-arm64",
+      "manifest_support": "unsupported",
+      "backend_support": "unsupported",
+      "uaa_support": "unsupported",
+      "pointer_promotion": "none",
+      "evidence_notes": []
+    },
+    {
+      "agent": "opencode",
+      "version": "1.18.34",
+      "target": "win32-x64",
       "manifest_support": "unsupported",
       "backend_support": "unsupported",
       "uaa_support": "unsupported",
