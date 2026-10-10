@@ -142,15 +142,6 @@ impl DepthEnrollmentDeclaration {
         }
 
         // Operations: each serves declared modes, and an excluded mode has no other operation.
-        if self
-            .operations
-            .iter()
-            .all(OperationDeclaration::is_excluded)
-        {
-            return Err(invalid(format!(
-                "{at}.operations must list at least one operation that is not a mode exclusion"
-            )));
-        }
         let mut operations = BTreeMap::new();
         let mut served: BTreeMap<&str, Vec<&OperationDeclaration>> = BTreeMap::new();
         for operation in &self.operations {
@@ -170,6 +161,15 @@ impl DepthEnrollmentDeclaration {
                 }
                 served.entry(selector).or_default().push(operation);
             }
+        }
+        if self
+            .operations
+            .iter()
+            .all(OperationDeclaration::is_excluded)
+        {
+            return Err(invalid(format!(
+                "{at}.operations must list at least one operation that is not a mode exclusion"
+            )));
         }
         for selector in &selectors {
             let serving = served.get(selector).map(Vec::as_slice).unwrap_or_default();

@@ -275,8 +275,8 @@ Must fail:
   It does not decide whether two selectors with different `mode` names overlap, which
   classification rule 2 makes an error where their effects or requirements differ. Nor does it
   decide whether a kept `selector` name still selects what it selected in the record the
-  integration branch holds, so check 2 passes a mode narrowed under its old name. Decide where policy resolution checks that, and against
-  which acquired input.
+  integration branch holds, so check 2 passes a mode narrowed under its old name. Decide where
+  policy resolution checks that, and against which acquired input.
 - A generation is committed from the time the integration branch holds the record it wrote or
   continued, which the merge of its packet brings about. Until then the next dispatch replaces it,
   or a maintainer narrows the declaration and reopens it, and check 2 has no earlier record to

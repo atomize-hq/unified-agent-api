@@ -277,7 +277,7 @@ The table MUST be omitted when it would hold neither key.
 
 A declaration states its selection in three lists. In the tables below a **name** is a string of
 lowercase ASCII letters, digits, `.`, `_` and `-` that starts with a letter or a digit. No entry
-of a list is empty or holds whitespace. For `predicates`, `not_applicable_permitted` and
+of a list is empty or holds whitespace, and a value that holds only whitespace is empty. For `predicates`, `not_applicable_permitted` and
 `capabilities`, an empty list states what an omitted one states.
 
 `modes` lists the depth enrollment selectors of the declaration. Each selects one invocation mode.
@@ -285,7 +285,7 @@ of a list is empty or holds whitespace. For `predicates`, `not_applicable_permit
 | Field | Rule |
 | --- | --- |
 | `selector` | A name, unique in the declaration. It is the name the support-depth contract's Annex B says a covered mode keeps. |
-| `command_path` | The form the maintenance request contract's `command_path` uses: the entry's `agent_id`, then the command tokens, separated by single spaces, such as `codex exec`. No token is a flag. |
+| `command_path` | The form the maintenance request contract's `command_path` uses: the entry's `agent_id`, then the command tokens, separated by single spaces, such as `codex exec`. No token after the first is a flag. |
 | `mode` | A name for the mode of that command, such as `headless` or `interactive`. A declaration MUST NOT carry two selectors with the same `command_path` and `mode`. |
 | `predicates` | Optional. The flags and values that select the mode. Each entry states a `flag`, which starts with `-`, names a flag and holds no whitespace and no `=`, and MAY state a `value`, which is not empty. A selector MUST NOT name a flag twice. A mode that the command's defaults select states none. |
 | `targets` | Optional. The targets the mode is selected on: at least one, without repeats, each listed in the declaration's `targets`. When it is omitted the mode is selected on every target of the declaration. |
@@ -398,8 +398,8 @@ Rules:
     selection does, un-enrolls nothing. A `selector` names what its `command_path`, `mode` and
     `predicates` select. Keeping the name while changing any of the three so that it selects
     less covers less under that name, although the name itself is kept. The support-depth
-    contract's Annex B states what a
-    selection covers and claims, and how a later selection is compared with it. Such a change
+    contract's Annex B states what a selection covers and claims, and how a later selection is
+    compared with it. Such a change
     leaves what the selection covers or claims without the policy it needs. Where the tree that
     holds the registry also holds a depth record of the version that covers or claims more than the
     declaration does, rule 12 treats that as missing policy. A declaration changed to cover more
@@ -435,9 +435,9 @@ Only the loader is implemented. Today:
   rule 5 or 6 (`crates/xtask/src/agent_registry/support_depth.rs`). It rejects unknown fields in
   the table as it does elsewhere. It decides nothing that rule 12 leaves to a second input, so
   it does not check a target against `union.expected_targets` or a depth record.
-- No route enforces the support-depth contract yet. Until one does, every command refuses a
-  registry in which an entry carries the table, so that a declared version is never handled as
-  if it were not depth-enrolled (`AgentRegistry::parse`). The onboarding, maintenance and
+- No route enforces the support-depth contract yet. Until one does, every command that loads
+  the registry refuses one in which an entry carries the table, so that none of them handles a
+  declared version as if it were not depth-enrolled (`AgentRegistry::parse`). The onboarding, maintenance and
   publication commands all load the registry. The change that lands enforcement removes the
   refusal.
 - `mode` is a free name, so the loader cannot tell a headless mode from another. That a mode
