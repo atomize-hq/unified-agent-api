@@ -213,11 +213,50 @@ enabled_paths = ["maintenance"]
 [[agents.support_depth.enrollments]]
 lifecycle_path = "maintenance"
 version = "1.2.3"
-targets = ["linux-x64"]
+targets = ["x86_64-unknown-linux-musl", "aarch64-apple-darwin"]
+
+[[agents.support_depth.enrollments.modes]]
+selector = "exec-json"
+command_path = "codex exec"
+mode = "headless"
+predicates = [{ flag = "--json" }]
+
+[[agents.support_depth.enrollments.modes]]
+selector = "tui"
+command_path = "codex"
+mode = "interactive"
+targets = ["x86_64-unknown-linux-musl"]
+
+[[agents.support_depth.enrollments.operations]]
+id = "exec-json-run"
+serves = ["exec-json"]
+templates = ["CORE", "SESSION"]
+shared_mapping = "mapped"
+not_applicable_permitted = ["X1"]
+
+[agents.support_depth.enrollments.operations.promise]
+r1 = "..."
+v1 = "..."
+g1 = "..."
+e1 = "..."
+a1 = "..."
+x1 = "..."
+x2 = "..."
+x3 = "..."
+x4 = "..."
+
+[[agents.support_depth.enrollments.operations]]
+id = "tui-excluded"
+serves = ["tui"]
+templates = ["EXCLUDED"]
+
+[[agents.support_depth.enrollments.capabilities]]
+id = "agent_api.run"
+operations = ["exec-json-run"]
 ```
 
-The example shows the shape of the table. Under rule 5 no entry carries it until a later revision
-of this contract defines the rest of a declaration.
+The example shows the shape of the table and declares nothing. This is the first executable
+revision of the table, and rule 5 states what it leaves out.
 
 Two terms are used below. A lifecycle path is **enabled for an agent** when the agent's
 `enabled_paths` lists it. The key records the maintainer's authorization, which is item 5 of the
@@ -233,6 +272,39 @@ facts. A **depth enrollment declaration** (below, a declaration) is one entry of
 | `targets` | MUST list at least one target, without repeats. Each names a target in `union.expected_targets` of the manifest root's `RULES.json`, or a target that the version's depth record, as the integration branch holds it, already covers. Rule 12 covers any other target. |
 
 The table MUST be omitted when it would hold neither key.
+
+A declaration states its selection in three lists. In the tables below a **name** is a string of
+lowercase ASCII letters, digits, `.`, `_` and `-` that starts with a letter or a digit.
+
+`modes` lists the depth enrollment selectors of the declaration. Each selects one invocation mode.
+
+| Field | Rule |
+| --- | --- |
+| `selector` | A name, unique in the declaration. It is the name the support-depth contract's Annex B says a covered mode keeps. |
+| `command_path` | The command tokens separated by single spaces, the form the maintenance request contract's `command_path` uses, such as `codex exec`. |
+| `mode` | A name for the mode of that command, such as `headless` or `interactive`. A declaration MUST NOT carry two selectors with the same `command_path` and `mode`. |
+| `predicates` | Optional. The flags and values that select the mode. Each entry states a `flag`, which starts with `-` and holds no whitespace, and MAY state a `value`, which is not empty. A selector MUST NOT name a flag twice. A mode that the command's defaults select states none. |
+| `targets` | Optional. The targets the mode is selected on, where they are fewer than the declaration's: at least one, without repeats, each listed in the declaration's `targets`. When it is omitted the mode is selected on every target of the declaration. |
+
+`operations` lists the operations of the declaration. An entry is also the classification entry
+for the modes it serves: it assigns their obligation templates.
+
+| Field | Rule |
+| --- | --- |
+| `id` | A name, unique in the declaration. |
+| `serves` | The `selector` of each mode the operation serves: at least one, without repeats, each declared in `modes`. |
+| `templates` | The obligation templates the promise selects, by the names the support-depth contract gives them: at least one, without repeats. An entry whose only template is `EXCLUDED` is a mode exclusion. `EXCLUDED` MUST NOT be listed with another template. |
+| `shared_mapping` | `wrapper_only`, `mapped` or `proposed_extension`. Required, except in a mode exclusion, which MUST NOT carry it. |
+| `promise` | What the promise states for each BASE dimension, under the keys `r1`, `v1`, `g1`, `e1`, `a1`, `x1`, `x2`, `x3` and `x4`. Every key is required and none is empty. Required, except in a mode exclusion, which MUST NOT carry it. |
+| `not_applicable_permitted` | Optional. The ids of the obligations for which the promise permits a `not_applicable` result, without repeats. Each MUST be a BASE obligation or one that the entry's templates select. A mode exclusion MUST NOT carry it. |
+
+`capabilities` lists the capability mappings of the declaration. It is omitted when the
+declaration claims no capability.
+
+| Field | Rule |
+| --- | --- |
+| `id` | A capability id, unique in the declaration. The declaration claims the capability. |
+| `operations` | The `id` of each operation through which the agent's adapter honors the capability: at least one, without repeats, each an operation of the declaration whose `shared_mapping` is `mapped`. |
 
 Rules:
 
@@ -257,10 +329,29 @@ Rules:
    the agent's adapter honors it. The other policy entries the maintainer approves for the
    agent's depth scope tuples, such as classification entries, mode exclusions and overrides, are
    stated in the same `support_depth` table.
-5. This revision does not define the fields that carry what rule 4 lists. They are an executable
-   schema revision of this contract, which the support-depth contract requires to be adopted
-   before a path is enabled. Until that revision is adopted an entry MUST NOT carry
-   `support_depth`.
+5. The three lists above carry what rule 4 lists, and they are the executable schema revision
+   that the support-depth contract's path enablement requires of this contract. A declaration
+   MUST satisfy all of the following:
+   - It lists at least one mode and at least one operation.
+   - Every target in its `targets` has at least one mode selected on it.
+   - Every mode is served by at least one operation. A mode that a mode exclusion serves is
+     served by no other operation.
+   - The templates of an operation that is not a mode exclusion select at least one output
+     obligation, `OUT1` to `OUT4`, and at least one lifecycle obligation, `LC1` to `LC4`. That
+     is how the declaration states the promise's output and lifecycle dimensions, and its
+     `shared_mapping` states the shared mapping dimension.
+   - Every operation whose `shared_mapping` is `mapped` is named by at least one capability
+     mapping.
+
+   A mapping names operations of its own declaration only. A capability that the adapter also
+   honors through an operation the declaration does not select therefore cannot be claimed,
+   because its mapping could not be complete. An operation that the upstream CLI does not offer
+   on a target is declared with modes whose `targets` leave that target out.
+
+   This revision defines no field for an override, and none for an `M` obligation in
+   `not_applicable_permitted`. Under it no override can be approved, and no promise permits
+   `not_applicable` for an `M` obligation. A later revision of this contract adds either.
+   Adopting this revision enables no path and adds no declaration.
 6. A declaration selects one exact upstream version of one agent on one lifecycle path. An entry
    MUST NOT carry two declarations with the same `version`, whether they name the same lifecycle
    path or different ones.
@@ -319,12 +410,17 @@ before the table is in use. They are what the two keys prevent from then on.
 
 ### Present behavior
 
-None of this section is implemented. Today:
+Only the loader is implemented. Today:
 
-- The registry loader rejects unknown fields at the top level, in an agent entry and under
-  `maintenance`. A registry that carried `support_depth` would fail to load, and the onboarding,
-  maintenance and publication commands all load the registry.
-- No entry carries the table, and no command reads a depth enrollment from anywhere.
+- The registry loader reads the table and rejects a registry that breaks a field rule above or
+  rule 5 or 6 (`crates/xtask/src/agent_registry/support_depth.rs`). It rejects unknown fields in
+  the table as it does elsewhere. It decides nothing that rule 12 leaves to a second input, so
+  it does not check a target against `union.expected_targets` or a depth record.
+- Two selectors that carry different `mode` names for one `command_path` are accepted, whatever
+  their predicates. Whether they overlap, as the support-depth contract's classification rule 2
+  uses the word, is not decided by the loader.
+- No entry carries the table, and no command acts on a depth enrollment. Nothing resolves a
+  policy from the table yet.
 - `onboard-agent --write` is the only command that writes the registry. It appends the new
   agent's entry, from an approval artifact or from command-line flags that describe the agent,
   and it renders no `maintenance` table into that entry. A maintainer adds release-watch

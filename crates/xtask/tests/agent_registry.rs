@@ -739,3 +739,224 @@ fn invalid_governance_comparison_kind_fails_closed() {
     let text = err.to_string();
     assert!(text.contains("unknown variant"), "{text}");
 }
+
+// Appended to the seeded registry, this table belongs to its last agent entry.
+const SUPPORT_DEPTH: &str = r#"
+[agents.support_depth]
+enabled_paths = ["maintenance"]
+
+[[agents.support_depth.enrollments]]
+lifecycle_path = "maintenance"
+version = "1.2.3"
+targets = ["linux-x64", "darwin-arm64"]
+
+[[agents.support_depth.enrollments.modes]]
+selector = "run-json"
+command_path = "aider run"
+mode = "headless"
+predicates = [{ flag = "--output-format", value = "json" }]
+
+[[agents.support_depth.enrollments.modes]]
+selector = "tui"
+command_path = "aider"
+mode = "interactive"
+targets = ["linux-x64"]
+
+[[agents.support_depth.enrollments.operations]]
+id = "run"
+serves = ["run-json"]
+templates = ["CORE", "SESSION"]
+shared_mapping = "mapped"
+not_applicable_permitted = ["X1"]
+
+[agents.support_depth.enrollments.operations.promise]
+r1 = "r"
+v1 = "v"
+g1 = "g"
+e1 = "e"
+a1 = "a"
+x1 = "x"
+x2 = "x"
+x3 = "x"
+x4 = "x"
+
+[[agents.support_depth.enrollments.operations]]
+id = "tui-excluded"
+serves = ["tui"]
+templates = ["EXCLUDED"]
+
+[[agents.support_depth.enrollments.capabilities]]
+id = "agent_api.run"
+operations = ["run"]
+"#;
+
+fn with_support_depth(edit: impl Fn(&str) -> String) -> Result<AgentRegistry, String> {
+    AgentRegistry::parse(&format!("{SEEDED_REGISTRY}{}", edit(SUPPORT_DEPTH)))
+        .map_err(|err| err.to_string())
+}
+
+#[test]
+fn support_depth_declaration_parses() {
+    let registry = with_support_depth(str::to_string).expect("parse support_depth");
+    let table = registry
+        .agents
+        .last()
+        .unwrap()
+        .support_depth
+        .as_ref()
+        .unwrap();
+    let declaration = &table.enrollments.as_ref().unwrap()[0];
+    assert_eq!(declaration.version, "1.2.3");
+    // BASE (9) + CORE (OUT3, LC2) + SESSION (S1); an exclusion carries EX1 alone.
+    assert_eq!(declaration.operations[0].obligations().len(), 12);
+    assert_eq!(declaration.operations[1].obligations().len(), 1);
+}
+
+#[test]
+fn support_depth_rejects_invalid_tables() {
+    let cases: &[(&str, &str, &str)] = &[
+        (
+            "enabled_paths = [\"maintenance\"]",
+            "enabled_paths = []",
+            "must be omitted when no path",
+        ),
+        (
+            "enabled_paths = [\"maintenance\"]",
+            "enabled_paths = [\"maintenance\", \"maintenance\"]",
+            "must not repeat",
+        ),
+        (
+            "version = \"1.2.3\"",
+            "version = \"v1.2.3\"",
+            "exact semantic version",
+        ),
+        (
+            "version = \"1.2.3\"",
+            "version = \"^1.2\"",
+            "exact semantic version",
+        ),
+        (
+            "targets = [\"linux-x64\"]",
+            "targets = [\"win32-x64\"]",
+            "do not list",
+        ),
+        (
+            "targets = [\"linux-x64\", \"darwin-arm64\"]",
+            "targets = [\"linux-x64\", \"darwin-arm64\", \"win32-x64\"]\nunknown = 1",
+            "unknown field",
+        ),
+        (
+            "mode = \"interactive\"",
+            "mode = \"Interactive\"",
+            "lowercase",
+        ),
+        (
+            "command_path = \"aider\"",
+            "command_path = \"aider \"",
+            "single spaces",
+        ),
+        (
+            "flag = \"--output-format\"",
+            "flag = \"output-format\"",
+            "start with `-`",
+        ),
+        (
+            "serves = [\"tui\"]",
+            "serves = [\"tui\", \"run-json\"]",
+            "excluded and also served",
+        ),
+        (
+            "templates = [\"EXCLUDED\"]",
+            "templates = [\"EXCLUDED\", \"CORE\"]",
+            "mode exclusion",
+        ),
+        (
+            "templates = [\"CORE\", \"SESSION\"]",
+            "templates = [\"SESSION\"]",
+            "output obligation",
+        ),
+        (
+            "templates = [\"CORE\", \"SESSION\"]",
+            "templates = [\"CORE\", \"TUI\"]",
+            "unknown variant",
+        ),
+        (
+            "not_applicable_permitted = [\"X1\"]",
+            "not_applicable_permitted = [\"FX1\"]",
+            "obligations of this operation",
+        ),
+        (
+            "shared_mapping = \"mapped\"\n",
+            "",
+            "shared_mapping is required",
+        ),
+        ("x4 = \"x\"", "x4 = \"\"", "must not be empty"),
+        ("x4 = \"x\"\n", "", "missing field `x4`"),
+        (
+            "operations = [\"run\"]",
+            "operations = []",
+            "at least one entry",
+        ),
+        (
+            "operations = [\"run\"]",
+            "operations = [\"tui-excluded\"]",
+            "not `mapped`",
+        ),
+        (
+            "id = \"agent_api.run\"",
+            "id = \"agent_api.run\"\noperations = [\"nope\"]",
+            "duplicate key",
+        ),
+        (
+            "shared_mapping = \"mapped\"",
+            "shared_mapping = \"wrapper_only\"",
+            "not `mapped`",
+        ),
+    ];
+    for (from, to, expected) in cases {
+        assert_eq!(
+            SUPPORT_DEPTH.matches(from).count(),
+            1,
+            "ambiguous case `{from}`"
+        );
+        let err = with_support_depth(|table| table.replace(from, to))
+            .expect_err(&format!("`{to}` must be rejected"));
+        assert!(
+            err.contains(expected),
+            "`{to}`: expected `{expected}` in `{err}`"
+        );
+    }
+
+    // Whole-table cases.
+    let dropped_mapping = with_support_depth(|table| {
+        table
+            .split("[[agents.support_depth.enrollments.capabilities]]")
+            .next()
+            .unwrap()
+            .to_string()
+    });
+    assert!(dropped_mapping
+        .unwrap_err()
+        .contains("no capability mapping names it"));
+    let unserved = with_support_depth(|table| {
+        format!(
+            "{table}\n[[agents.support_depth.enrollments.modes]]\nselector = \"extra\"\n\
+             command_path = \"aider extra\"\nmode = \"headless\"\n"
+        )
+    });
+    assert!(unserved.unwrap_err().contains("served by no operation"));
+    let empty = with_support_depth(|_| "\n[agents.support_depth]\n".to_string());
+    assert!(empty.unwrap_err().contains("must be omitted"));
+    let twice = with_support_depth(|table| {
+        let declaration = table
+            .split_once("[[agents.support_depth.enrollments]]")
+            .unwrap()
+            .1;
+        format!("{table}\n[[agents.support_depth.enrollments]]{declaration}")
+    });
+    assert!(twice.unwrap_err().contains("more than once"));
+    let paths_only = with_support_depth(|_| {
+        "\n[agents.support_depth]\nenabled_paths = [\"onboarding\"]\n".into()
+    });
+    assert!(paths_only.is_ok());
+}

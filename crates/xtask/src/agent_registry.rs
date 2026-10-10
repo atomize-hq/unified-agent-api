@@ -8,6 +8,8 @@ use std::{
 
 #[path = "agent_registry/release_watch.rs"]
 mod release_watch;
+#[path = "agent_registry/support_depth.rs"]
+pub mod support_depth;
 
 use crate::capability_projection::{
     resolve_capability_publication_target, validate_config_key_allowlist,
@@ -139,6 +141,8 @@ pub struct AgentRegistryEntry {
     pub scaffold: ScaffoldMetadata,
     #[serde(default)]
     pub maintenance: MaintenanceMetadata,
+    #[serde(default)]
+    pub support_depth: Option<support_depth::SupportDepth>,
 }
 
 impl AgentRegistryEntry {
@@ -172,6 +176,9 @@ impl AgentRegistryEntry {
         self.release.validate()?;
         self.scaffold.validate()?;
         self.maintenance.validate(self)?;
+        if let Some(support_depth) = &self.support_depth {
+            support_depth.validate()?;
+        }
 
         Ok(())
     }

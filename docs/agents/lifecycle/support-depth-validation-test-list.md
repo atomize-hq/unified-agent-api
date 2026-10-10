@@ -268,8 +268,13 @@ Must fail:
   anything checks that a mapping is complete, and how a mapping states an operation that the
   upstream CLI does not offer on one target, since rule 5 leaves the capability not
   depth-qualified there.
-- A covered mode is named by a selector whose form comes with the registry contract's schema
-  revision. Annex B fixes that the name is kept, not what it looks like.
+  The registry contract's rule 5 answers the second part: the operation is declared with modes
+  whose `targets` leave that target out, and the capability is not depth-qualified there.
+- A covered mode is named by the `selector` of the registry declaration's `modes` entry that
+  first covered it. The registry loader refuses two selectors with one `command_path` and `mode`.
+  It does not decide whether two selectors with different `mode` names overlap, which
+  classification rule 2 makes an error. Decide where policy resolution checks that, and against
+  which acquired input.
 - A generation is committed from the time the integration branch holds the record it wrote or
   continued, which the merge of its packet brings about. Until then the next dispatch replaces it,
   or a maintainer narrows the declaration and reopens it, and check 2 has no earlier record to
