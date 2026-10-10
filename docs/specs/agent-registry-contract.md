@@ -197,9 +197,10 @@ An agent may legitimately watch one source and acquire from another.
 The [support-depth contract](support-depth-contract.md) owns the rules for support depth: what a
 depth enrollment selects, how one resolves, what the remainder is, what a lifecycle path is and
 what enabling one requires. This section states only what the registry owns for them: where a
-depth enrollment is declared, where the enablement of a lifecycle path is recorded, what absence
-means and who may change either. Where it applies one of those rules it does not redefine it, and
-a term it does not define has the meaning the support-depth contract gives it.
+depth enrollment is declared and in what form, where the enablement of a lifecycle path is
+recorded, what absence means and who may change either. Where it applies one of those rules it
+does not redefine it, and a term it does not define has the meaning the support-depth contract
+gives it.
 
 While the support-depth contract is a Draft this section binds nothing.
 
@@ -249,6 +250,7 @@ x4 = "..."
 id = "tui-excluded"
 serves = ["tui"]
 templates = ["EXCLUDED"]
+rationale = "..."
 
 [[agents.support_depth.enrollments.capabilities]]
 id = "agent_api.run"
@@ -268,23 +270,25 @@ facts. A **depth enrollment declaration** (below, a declaration) is one entry of
 | `enabled_paths` | The lifecycle paths enabled for this agent: `maintenance`, `onboarding` or both, with this agent as the bounded production scope that the support-depth contract's path enablement asks for. It MUST be omitted when no path is enabled, and it MUST NOT repeat a path. |
 | `enrollments` | One declaration for each depth enrollment the maintainer has approved for this agent. It MUST be omitted when there is none. |
 | `lifecycle_path` | MUST be `maintenance` or `onboarding`. |
-| `version` | MUST be one exact semantic version: the string that `detected_release.target_version` and the manifest root's `versions/<version>.json` use for that version. A range, a wildcard, a prefix such as `v` and a moving name such as `latest` are invalid. |
+| `version` | MUST be one exact semantic version, `MAJOR.MINOR.PATCH` with no prerelease and no build metadata: the string that `detected_release.target_version` and the manifest root's `versions/<version>.json` use for that version. A range, a wildcard, a prefix such as `v` and a moving name such as `latest` are invalid. |
 | `targets` | MUST list at least one target, without repeats. Each names a target in `union.expected_targets` of the manifest root's `RULES.json`, or a target that the version's depth record, as the integration branch holds it, already covers. Rule 12 covers any other target. |
 
 The table MUST be omitted when it would hold neither key.
 
 A declaration states its selection in three lists. In the tables below a **name** is a string of
-lowercase ASCII letters, digits, `.`, `_` and `-` that starts with a letter or a digit.
+lowercase ASCII letters, digits, `.`, `_` and `-` that starts with a letter or a digit. No entry
+of a list is empty or holds whitespace. For `predicates`, `not_applicable_permitted` and
+`capabilities`, an empty list states what an omitted one states.
 
 `modes` lists the depth enrollment selectors of the declaration. Each selects one invocation mode.
 
 | Field | Rule |
 | --- | --- |
 | `selector` | A name, unique in the declaration. It is the name the support-depth contract's Annex B says a covered mode keeps. |
-| `command_path` | The command tokens separated by single spaces, the form the maintenance request contract's `command_path` uses, such as `codex exec`. |
+| `command_path` | The form the maintenance request contract's `command_path` uses: the entry's `agent_id`, then the command tokens, separated by single spaces, such as `codex exec`. No token is a flag. |
 | `mode` | A name for the mode of that command, such as `headless` or `interactive`. A declaration MUST NOT carry two selectors with the same `command_path` and `mode`. |
-| `predicates` | Optional. The flags and values that select the mode. Each entry states a `flag`, which starts with `-` and holds no whitespace, and MAY state a `value`, which is not empty. A selector MUST NOT name a flag twice. A mode that the command's defaults select states none. |
-| `targets` | Optional. The targets the mode is selected on, where they are fewer than the declaration's: at least one, without repeats, each listed in the declaration's `targets`. When it is omitted the mode is selected on every target of the declaration. |
+| `predicates` | Optional. The flags and values that select the mode. Each entry states a `flag`, which starts with `-`, names a flag and holds no whitespace and no `=`, and MAY state a `value`, which is not empty. A selector MUST NOT name a flag twice. A mode that the command's defaults select states none. |
+| `targets` | Optional. The targets the mode is selected on: at least one, without repeats, each listed in the declaration's `targets`. When it is omitted the mode is selected on every target of the declaration. |
 
 `operations` lists the operations of the declaration. An entry is also the classification entry
 for the modes it serves: it assigns their obligation templates.
@@ -292,10 +296,11 @@ for the modes it serves: it assigns their obligation templates.
 | Field | Rule |
 | --- | --- |
 | `id` | A name, unique in the declaration. |
-| `serves` | The `selector` of each mode the operation serves: at least one, without repeats, each declared in `modes`. |
+| `serves` | The `selector` of each mode the operation serves: at least one, without repeats, each declared in `modes`. A mode exclusion serves exactly one mode. |
 | `templates` | The obligation templates the promise selects, by the names the support-depth contract gives them: at least one, without repeats. An entry whose only template is `EXCLUDED` is a mode exclusion. `EXCLUDED` MUST NOT be listed with another template. |
 | `shared_mapping` | `wrapper_only`, `mapped` or `proposed_extension`. Required, except in a mode exclusion, which MUST NOT carry it. |
 | `promise` | What the promise states for each BASE dimension, under the keys `r1`, `v1`, `g1`, `e1`, `a1`, `x1`, `x2`, `x3` and `x4`. Every key is required and none is empty. Required, except in a mode exclusion, which MUST NOT carry it. |
+| `rationale` | Why the mode is excluded. Required and not empty in a mode exclusion. Any other entry MUST NOT carry it. |
 | `not_applicable_permitted` | Optional. The ids of the obligations for which the promise permits a `not_applicable` result, without repeats. Each MUST be a BASE obligation or one that the entry's templates select. A mode exclusion MUST NOT carry it. |
 
 `capabilities` lists the capability mappings of the declaration. It is omitted when the
@@ -303,7 +308,7 @@ declaration claims no capability.
 
 | Field | Rule |
 | --- | --- |
-| `id` | A capability id, unique in the declaration. The declaration claims the capability. |
+| `id` | A capability id, which is a name, unique in the declaration. The declaration claims the capability. |
 | `operations` | The `id` of each operation through which the agent's adapter honors the capability: at least one, without repeats, each an operation of the declaration whose `shared_mapping` is `mapped`. |
 
 Rules:
@@ -329,10 +334,10 @@ Rules:
    the agent's adapter honors it. The other policy entries the maintainer approves for the
    agent's depth scope tuples, such as classification entries, mode exclusions and overrides, are
    stated in the same `support_depth` table.
-5. The three lists above carry what rule 4 lists, and they are the executable schema revision
-   that the support-depth contract's path enablement requires of this contract. A declaration
-   MUST satisfy all of the following:
-   - It lists at least one mode and at least one operation.
+5. The three lists above carry what rule 4 lists, apart from what the end of this rule leaves
+   out, and they are the executable schema revision that the support-depth contract's path
+   enablement requires of this contract. A declaration MUST satisfy all of the following:
+   - It lists at least one mode, and at least one operation that is not a mode exclusion.
    - Every target in its `targets` has at least one mode selected on it.
    - Every mode is served by at least one operation. A mode that a mode exclusion serves is
      served by no other operation.
@@ -345,12 +350,23 @@ Rules:
 
    A mapping names operations of its own declaration only. A capability that the adapter also
    honors through an operation the declaration does not select therefore cannot be claimed,
-   because its mapping could not be complete. An operation that the upstream CLI does not offer
-   on a target is declared with modes whose `targets` leave that target out.
+   because its mapping could not be complete. It follows that an operation which backs a
+   capability can be declared only together with every other operation that backs it: declared
+   alone it would be `mapped` with no complete mapping to name it, and declaring it
+   `wrapper_only` would be false. The support-depth contract lets a claimed capability's mapping
+   hold an operation that is not depth-enrolled, and this revision cannot state that case. An
+   operation that the upstream CLI does not offer on a target is declared with modes whose
+   `targets` leave that target out.
 
-   This revision defines no field for an override, and none for an `M` obligation in
-   `not_applicable_permitted`. Under it no override can be approved, and no promise permits
-   `not_applicable` for an `M` obligation. A later revision of this contract adds either.
+   This revision leaves out four things, and a later revision of this contract adds each when
+   it is needed:
+   - an override. Under this revision none can be approved.
+   - a compatibility rule that extends evidence to another version or target. Under this
+     revision none can be approved.
+   - an `M` obligation in `not_applicable_permitted`. Under this revision no promise permits
+     `not_applicable` for one.
+   - a mapping that names an operation outside its declaration, as the paragraph above states.
+
    Adopting this revision enables no path and adds no declaration.
 6. A declaration selects one exact upstream version of one agent on one lifecycle path. An entry
    MUST NOT carry two declarations with the same `version`, whether they name the same lifecycle
@@ -379,7 +395,10 @@ Rules:
     contract's Bindings rules say when a generation freezes P, and its depth admission predicate
     requires a frozen P to be current. Once a generation of a version is committed, removing the
     version's declaration, or changing it so that it covers or claims less than that generation's
-    selection does, un-enrolls nothing. The support-depth contract's Annex B states what a
+    selection does, un-enrolls nothing. A `selector` names what its `command_path`, `mode` and
+    `predicates` select. Keeping the name while changing any of the three so that it selects
+    less covers less under that name, although the name itself is kept. The support-depth
+    contract's Annex B states what a
     selection covers and claims, and how a later selection is compared with it. Such a change
     leaves what the selection covers or claims without the policy it needs. Where the tree that
     holds the registry also holds a depth record of the version that covers or claims more than the
@@ -393,7 +412,7 @@ Rules:
     Anything else that keeps a version's policy from being resolved is missing policy for that
     agent and version, which the support-depth contract treats as an error: a target that is
     neither in `union.expected_targets` nor covered by the version's depth record as the
-    integration branch holds it, missing operations, or a depth record in the same tree that covers
+    integration branch holds it, or a depth record in the same tree that covers
     or claims more than the version's declaration does, a removed declaration included. Rule 2
     holds in each of these cases. A reader MUST NOT treat an invalid registry or missing policy as
     "not depth-enrolled".
@@ -416,6 +435,14 @@ Only the loader is implemented. Today:
   rule 5 or 6 (`crates/xtask/src/agent_registry/support_depth.rs`). It rejects unknown fields in
   the table as it does elsewhere. It decides nothing that rule 12 leaves to a second input, so
   it does not check a target against `union.expected_targets` or a depth record.
+- No route enforces the support-depth contract yet. Until one does, every command refuses a
+  registry in which an entry carries the table, so that a declared version is never handled as
+  if it were not depth-enrolled (`AgentRegistry::parse`). The onboarding, maintenance and
+  publication commands all load the registry. The change that lands enforcement removes the
+  refusal.
+- `mode` is a free name, so the loader cannot tell a headless mode from another. That a mode
+  exclusion does not reach a headless mode, as the support-depth contract's classification rule
+  7 requires, is not decided by the loader.
 - Two selectors that carry different `mode` names for one `command_path` are accepted, whatever
   their predicates. Whether they overlap, as the support-depth contract's classification rule 2
   uses the word, is not decided by the loader.

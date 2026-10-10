@@ -20,7 +20,16 @@ pub struct SupportDepth {
 }
 
 impl SupportDepth {
-    pub(super) fn validate(&self) -> Result<(), AgentRegistryError> {
+    pub(super) fn validate(&self, agent_id: &str) -> Result<(), AgentRegistryError> {
+        self.validate_table(agent_id).map_err(|err| match err {
+            AgentRegistryError::Validation(message) => {
+                invalid(format!("agent `{agent_id}`: {message}"))
+            }
+            other => other,
+        })
+    }
+
+    fn validate_table(&self, agent_id: &str) -> Result<(), AgentRegistryError> {
         if self.enabled_paths.is_none() && self.enrollments.is_none() {
             return Err(invalid(
                 "support_depth must be omitted when it holds neither `enabled_paths` nor `enrollments`",
@@ -47,7 +56,7 @@ impl SupportDepth {
             }
             let mut versions = BTreeSet::new();
             for declaration in enrollments {
-                declaration.validate()?;
+                declaration.validate(agent_id)?;
                 if !versions.insert(declaration.version.as_str()) {
                     return Err(invalid(format!(
                         "support_depth.enrollments declares version `{}` more than once",
@@ -80,15 +89,15 @@ pub struct DepthEnrollmentDeclaration {
 }
 
 impl DepthEnrollmentDeclaration {
-    fn validate(&self) -> Result<(), AgentRegistryError> {
+    fn validate(&self, agent_id: &str) -> Result<(), AgentRegistryError> {
         let at = format!("support_depth.enrollments[version={}]", self.version);
 
-        let exact = semver::Version::parse(&self.version)
-            .map(|parsed| parsed.to_string() == self.version)
+        let bare = semver::Version::parse(&self.version)
+            .map(|parsed| parsed.pre.is_empty() && parsed.build.is_empty())
             .unwrap_or(false);
-        if !exact {
+        if !bare {
             return Err(invalid(format!(
-                "{at}.version must be one exact semantic version"
+                "{at}.version must be one exact semantic version, `MAJOR.MINOR.PATCH`"
             )));
         }
         let targets = unique_non_empty(&format!("{at}.targets"), &self.targets)?;
@@ -102,7 +111,7 @@ impl DepthEnrollmentDeclaration {
         let mut used_targets = BTreeSet::new();
         for mode in &self.modes {
             let mode_at = format!("{at}.modes[selector={}]", mode.selector);
-            mode.validate(&mode_at)?;
+            mode.validate(&mode_at, agent_id)?;
             if !selectors.insert(mode.selector.as_str()) {
                 return Err(invalid(format!("{mode_at} is declared more than once")));
             }
@@ -133,9 +142,13 @@ impl DepthEnrollmentDeclaration {
         }
 
         // Operations: each serves declared modes, and an excluded mode has no other operation.
-        if self.operations.is_empty() {
+        if self
+            .operations
+            .iter()
+            .all(OperationDeclaration::is_excluded)
+        {
             return Err(invalid(format!(
-                "{at}.operations must list at least one operation"
+                "{at}.operations must list at least one operation that is not a mode exclusion"
             )));
         }
         let mut operations = BTreeMap::new();
@@ -176,7 +189,7 @@ impl DepthEnrollmentDeclaration {
         let mut capability_ids = BTreeSet::new();
         let mut named = BTreeSet::new();
         for mapping in &self.capabilities {
-            validate_non_empty_scalar(&format!("{at}.capabilities.id"), &mapping.id)?;
+            validate_name(&format!("{at}.capabilities.id"), &mapping.id)?;
             let cap_at = format!("{at}.capabilities[id={}]", mapping.id);
             if !capability_ids.insert(mapping.id.as_str()) {
                 return Err(invalid(format!("{cap_at} is declared more than once")));
@@ -188,7 +201,7 @@ impl DepthEnrollmentDeclaration {
                     }
                     Some(_) => {
                         return Err(invalid(format!(
-                            "{cap_at}.operations names `{id}`, whose shared_mapping is not `mapped`"
+                            "{cap_at}.operations names `{id}`, which is not a `mapped` operation"
                         )));
                     }
                     None => {
@@ -227,28 +240,37 @@ pub struct ModeSelector {
 }
 
 impl ModeSelector {
-    fn validate(&self, at: &str) -> Result<(), AgentRegistryError> {
+    fn validate(&self, at: &str, agent_id: &str) -> Result<(), AgentRegistryError> {
         validate_name(&format!("{at}.selector"), &self.selector)?;
         validate_name(&format!("{at}.mode"), &self.mode)?;
-        if self.command_path.is_empty()
-            || self
-                .command_path
-                .split(' ')
-                .any(|token| token.is_empty() || token.contains(char::is_whitespace))
+        let mut tokens = self.command_path.split(' ');
+        if tokens.next() != Some(agent_id)
+            || tokens.any(|token| {
+                token.is_empty() || token.starts_with('-') || token.contains(char::is_whitespace)
+            })
         {
             return Err(invalid(format!(
-                "{at}.command_path must be command tokens separated by single spaces"
+                "{at}.command_path must be `{agent_id}` followed by command tokens, separated by \
+                 single spaces, and none of them a flag"
             )));
         }
         let mut flags = BTreeSet::new();
         for predicate in &self.predicates {
             let flag = predicate.flag.as_str();
-            if !flag.starts_with('-') || flag.contains(char::is_whitespace) {
+            if !flag.starts_with('-')
+                || flag.trim_start_matches('-').is_empty()
+                || flag.contains(|c: char| c.is_whitespace() || c == '=')
+            {
                 return Err(invalid(format!(
-                    "{at}.predicates flag `{flag}` must start with `-` and hold no whitespace"
+                    "{at}.predicates flag `{flag}` must start with `-`, name a flag and hold no \
+                     whitespace or `=`"
                 )));
             }
-            if predicate.value.as_deref() == Some("") {
+            if predicate
+                .value
+                .as_deref()
+                .is_some_and(|v| v.trim().is_empty())
+            {
                 return Err(invalid(format!(
                     "{at}.predicates value for `{flag}` must not be empty"
                 )));
@@ -283,6 +305,8 @@ pub struct OperationDeclaration {
     pub promise: Option<BasePromise>,
     #[serde(default)]
     pub not_applicable_permitted: Vec<ObligationId>,
+    #[serde(default)]
+    pub rationale: Option<String>,
 }
 
 impl OperationDeclaration {
@@ -316,18 +340,30 @@ impl OperationDeclaration {
 
         if self.is_excluded() {
             if self.templates.len() != 1
+                || self.serves.len() != 1
                 || self.shared_mapping.is_some()
                 || self.promise.is_some()
                 || !self.not_applicable_permitted.is_empty()
             {
                 return Err(invalid(format!(
-                    "{at} is a mode exclusion: `EXCLUDED` must be its only template and it must \
-                     carry no `shared_mapping`, `promise` or `not_applicable_permitted`"
+                    "{at} is a mode exclusion: `EXCLUDED` must be its only template, it must \
+                     serve exactly one mode and it must carry no `shared_mapping`, `promise` or \
+                     `not_applicable_permitted`"
                 )));
             }
-            return Ok(());
+            return match self.rationale.as_deref() {
+                Some(rationale) => validate_non_empty_scalar(&format!("{at}.rationale"), rationale),
+                None => Err(invalid(format!(
+                    "{at}.rationale is required for a mode exclusion"
+                ))),
+            };
         }
 
+        if self.rationale.is_some() {
+            return Err(invalid(format!(
+                "{at}.rationale belongs to a mode exclusion only"
+            )));
+        }
         if self.shared_mapping.is_none() {
             return Err(invalid(format!("{at}.shared_mapping is required")));
         }
@@ -348,7 +384,8 @@ impl OperationDeclaration {
             if !obligations.contains(id) || !permitted.insert(id) {
                 return Err(invalid(format!(
                     "{at}.not_applicable_permitted must name obligations of this operation, \
-                     without repeats (got `{id:?}`)"
+                     without repeats (got `{}`)",
+                    format!("{id:?}").to_uppercase()
                 )));
             }
         }
@@ -423,6 +460,7 @@ pub enum ObligationTemplate {
 
 impl ObligationTemplate {
     /// The obligations the template adds, as the support-depth contract's template table lists.
+    /// `EXCLUDED` gives `EX1`, which an excluded mode has in place of BASE.
     pub fn obligations(self) -> &'static [ObligationId] {
         use ObligationId::*;
         match self {
@@ -520,9 +558,15 @@ fn unique_non_empty<'a>(
     values: &'a [String],
 ) -> Result<BTreeSet<&'a str>, AgentRegistryError> {
     let set: BTreeSet<&str> = values.iter().map(String::as_str).collect();
-    if values.is_empty() || set.len() != values.len() || set.contains("") {
+    if values.is_empty()
+        || set.len() != values.len()
+        || set
+            .iter()
+            .any(|v| v.is_empty() || v.contains(char::is_whitespace))
+    {
         return Err(invalid(format!(
-            "{field} must list at least one entry, without repeats or empty entries"
+            "{field} must list at least one entry, without repeats, and no entry may be empty or \
+             hold whitespace"
         )));
     }
     Ok(set)

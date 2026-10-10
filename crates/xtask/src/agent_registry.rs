@@ -52,6 +52,22 @@ impl AgentRegistry {
     }
 
     pub fn parse(raw: &str) -> Result<Self, AgentRegistryError> {
+        let registry = Self::parse_unenforced(raw)?;
+        // No route enforces depth admission yet, and the support-depth contract forbids reading
+        // a declared version as not depth-enrolled. Remove this refusal with the change that
+        // lands that enforcement.
+        if let Some(agent) = registry.agents.iter().find(|a| a.support_depth.is_some()) {
+            return Err(AgentRegistryError::Validation(format!(
+                "agent `{}` carries `support_depth`, which no command enforces yet",
+                agent.agent_id
+            )));
+        }
+        Ok(registry)
+    }
+
+    /// Parses and validates a registry without the refusal `parse` adds for `support_depth`.
+    /// For the table's own tests, and for the code that will resolve policy from it.
+    pub fn parse_unenforced(raw: &str) -> Result<Self, AgentRegistryError> {
         let registry = toml_edit::de::from_str::<Self>(raw)?;
         registry.validate()?;
         Ok(registry)
@@ -177,7 +193,7 @@ impl AgentRegistryEntry {
         self.scaffold.validate()?;
         self.maintenance.validate(self)?;
         if let Some(support_depth) = &self.support_depth {
-            support_depth.validate()?;
+            support_depth.validate(&self.agent_id)?;
         }
 
         Ok(())
