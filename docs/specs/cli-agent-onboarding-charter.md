@@ -319,8 +319,8 @@ Rules:
    table does on the maintenance path. A run's input contract is not one:
    [Present behavior](#present-behavior) says why. Until a revision of this charter names that
    artifact, who writes it and who may replace it, repository validation has nothing but the
-   record itself to compare a create-lane record's P and O with. The support-depth contract's
-   Path enablement requires that revision before the onboarding path is enabled.
+   record itself to compare a create-lane record's P and O identities with. The support-depth
+   contract's Path enablement requires that revision before the onboarding path is enabled.
 8. `runtime-follow-on --write` and `repair-runtime-evidence` make reporting effects only. Each MUST
    NOT list an acceptance entry and MUST NOT change what the depth record states under P or O.
    Adapter code that a write run lands can advertise a capability. On its branch that code is a

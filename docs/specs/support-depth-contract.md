@@ -269,9 +269,11 @@ Rules:
    of operations through which that agent's adapter honors the capability, covering every flow
    the adapter exposes for it. That mapping is part of the depth record. The capability is
    **depth-qualified** for one `(agent, version, target)` only when every operation in that set is
-   depth-enrolled on that target and qualified there, and at least one `M` obligation of the
-   mapping has the result `verified` on that target. The mapping of a claimed capability MUST name
-   at least one operation, and policy resolution MUST refuse one that names none.
+   depth-enrolled on that target and qualified there, and at least one of that capability's `M`
+   obligations, of an operation in the set, has the result `verified` on that target. An operation
+   is depth-enrolled on a target when the record's selection holds a depth scope tuple for it on
+   that target. The mapping of a claimed capability MUST name at least one operation, and policy
+   resolution MUST refuse one that names none.
 6. A capability that no depth enrollment claims is **not assessed**. It is neither qualified nor
    failed.
 7. The charter's promotion allowlist is an exception to the two-backend threshold only. It is not
@@ -579,7 +581,9 @@ The following **record invariants** hold for every depth-gated output:
    identity. A change to a dependency outside the bound evidence is not within this invariant. A
    promise is published as qualified, or a capability as depth-qualified, only when every result
    the claim rests on is published as `verified`, or as `not_applicable` where P permits it. A
-   tuple the record selects MUST NOT be published as not depth-enrolled.
+   capability is published as depth-qualified for a target only when its mapping meets
+   [Shared mapping](#shared-mapping-and-capabilities) rule 5 on that target. A tuple the record
+   selects MUST NOT be published as not depth-enrolled.
 4. Every acceptance effect other than listing an acceptance entry MUST have an acceptance entry
    made for what the record stated when the effect was made. A promise is published as qualified,
    or a capability as depth-qualified, only while an acceptance entry exists that was made for

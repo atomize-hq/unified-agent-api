@@ -20,9 +20,9 @@ states how a maintenance request carries P and O. The
 [onboarding charter](../../specs/cli-agent-onboarding-charter.md#support-depth) names no second
 committed statement of them on the create lane yet. Where a check below reads "the frozen request
 or approval", an onboarding generation has only its approval's Event fields beside the record.
-Checks 1 and 3 are therefore decided for P and O on the maintenance path only. The contract's Path
-enablement requires the charter to name that statement before the onboarding path is enabled, and
-the two checks cover the create lane from then.
+Checks 1 and 3 are therefore decided against a second statement on the maintenance path only. The
+contract's Path enablement requires the charter to name that statement before the onboarding path
+is enabled, and the two checks cover the create lane from then.
 
 ## Checks
 
@@ -36,7 +36,7 @@ integration branch tip it would replace.
 | 3 | Any revision | The revision holds a frozen request or approval for a record's version, and the record's Event, P or O is not that generation's | 2 |
 | 4 | Merge | What a depth record states, its Event or a part, changes while the merge result holds no frozen request or approval for the record's version | 2 |
 | 5 | Any revision | A published result is neither the result the record states nor `unverified`, or is not `unverified` although the record does not yet state it or the P or the O that its E references is not the one the record states | 3 |
-| 12 | Any revision | A promise is published as qualified, or a capability as depth-qualified, while a result the claim rests on is published as anything other than `verified` or a permitted `not_applicable`, or a capability is published as depth-qualified for a target on which an operation of its mapping is not depth-enrolled or no `M` obligation of the mapping is published as `verified` | 3 |
+| 12 | Any revision | A promise is published as qualified, or a capability as depth-qualified, while a result the claim rests on is published as anything other than `verified` or a permitted `not_applicable`, or a capability is published as depth-qualified for a target on which an operation of its mapping is not depth-enrolled or none of that capability's `M` obligations is published as `verified` | 3 |
 | 6 | Any revision | A tuple the record selects is published as not depth-enrolled | 3 |
 | 7 | Any revision | A result is published as `verified`, or a promise or capability as qualified or depth-qualified on it, and the record states it as `verified` and binds no evidence for it, or binds evidence that is absent or has another content identity | 3 |
 | 8 | Any revision | A promise is published as qualified, or a capability as depth-qualified, and no acceptance entry identifies what the record states | 4 |
@@ -133,7 +133,8 @@ The [maintenance request contract](../../specs/maintenance-request-contract-v1.m
 requires a packet freeze that names the generation before a depth-enrolled generation's closeout.
 A packet freeze commits nothing: a generation is committed when its packet merges. The cases below
 are decided by depth admission, not by a check above. Its inputs are the stand-down markers on the
-integration branch tip, and the request and the depth record in the merge result. Today
+integration branch tip, whether that tip holds a depth record of the version, and the request, the
+depth record and the registry declaration in the merge result. Today
 `close-agent-maintenance` refuses when the version has no marker. Nothing checks which generation a
 marker names, and nothing is checked at the integration step.
 
@@ -150,12 +151,13 @@ Must be admitted:
   holds no record of it. Each dispatch resets the packet branch and writes a first record. A
   declaration narrowed between two dispatches yields a smaller first record, and nothing of the
   earlier generation is due.
-- **Marker corrected.** The marker was declared for a generation that a dispatch had just replaced.
-  It is then changed to name the generation on the packet branch. This holds whether or not a
-  declaration narrowed between the two dispatches left that generation a smaller selection.
-- **Narrowed before the merge.** Under a packet freeze a maintainer narrows the declaration on the
-  integration branch, the packet branch is reset, a new generation opens with the narrower P, the
-  marker is changed to name it, and it is closed and merged. The tip holds no record of the
+- **Marker corrected.** The tip holds no record of the version. The marker was declared for a
+  generation that a dispatch had just replaced. It is then changed to name the generation on the
+  packet branch. This holds whether or not a declaration narrowed between the two dispatches left
+  that generation a smaller selection.
+- **Narrowed, generation replaced.** Under a packet freeze a maintainer narrows the declaration on
+  the integration branch, the packet branch is reset, a new generation opens with the narrower P,
+  the marker is changed to name it, and it is closed and merged. The tip holds no record of the
   version, so no generation of it was committed and nothing of the first one is due.
 
 Must be refused:
@@ -165,8 +167,8 @@ Must be refused:
   result itself carries a marker.
 - **Another generation closed.** The tip's marker names one generation, and the request, record and
   closeout in the merge result belong to another generation of the same version.
-- **Narrowed after the packet freeze.** The declaration is narrowed after the marker was declared,
-  and the generation the marker names arrives unchanged. Its record covers more than the
+- **Narrowed, original generation arrives.** The declaration is narrowed after the marker was
+  declared, and the generation the marker names arrives unchanged. Its record covers more than the
   declaration does, which the registry contract treats as missing policy.
 - **Digest-only marker after a re-freeze.** The marker states only `request_sha256`, and a
   re-freeze after it was declared changed the request file. The marker no longer names the
@@ -203,9 +205,9 @@ Must be published as listed:
 - **Qualified over an unsupported backend.** The row's `backend_support` is `unsupported` and the
   one capability its record claims is published as depth-qualified for the target. The row stays
   `unsupported`: depth facts raise no state.
-- **Capability not served on the target.** The record claims a capability, and one of its mapped
-  operations is not depth-enrolled on the row's target, or none of them is. The capability is not
-  published as depth-qualified for that target, so the row is not `supported`.
+- **Mapped operation not enrolled on the target.** The record claims a capability, and one of its
+  mapped operations is not depth-enrolled on the row's target. The capability is not published as
+  depth-qualified for that target, so the row is not `supported`.
 - **Declared, no record yet.** The registry declares the row's version and target, and no
   generation has frozen its policy. The row is depth-enrolled, states that its obligations are not
   yet frozen, and derives `uaa_support` as a row without depth facts does.

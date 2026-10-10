@@ -622,7 +622,7 @@ For a depth-enrolled generation:
 5. Whoever declares or changes a marker does so by a change to the integration branch that the
    packet branch does not carry. No command or workflow declares or changes a marker. A marker that
    nonetheless reaches the integration branch with a packet branch's merge is no packet freeze
-   before that merge and is one from it, and for rule 1 that merge is when it is declared. Whoever
+   before that merge and is one from it, so automation stands down from that merge. Whoever
    works the packet with the maintainer's authority makes the change: for example a maintainer, a
    contributor, or the coding agent that is handed the packet pull request, whether or not
    `execute-agent-maintenance` runs that agent. The
@@ -642,10 +642,13 @@ closed and merged as a generation other than the one its worker stood automation
 one that a dispatch or a maintainer's run opened in between, and the closeout would accept work
 that nobody working the packet had seen.
 
-A generation is not committed before its packet merges, so a maintainer can narrow the registry
-declaration while a packet is open and a generation that replaces it then has less due. That
-narrowing is a change to the registry on the integration branch. Nothing refuses it, and the
-registry's history shows it.
+A generation is not committed before its packet merges. While the integration branch holds no
+depth record of the version, a maintainer can therefore narrow the registry declaration while a
+packet is open, and a generation that replaces the open one, on a packet branch that no longer
+holds the earlier record, then has less due. That narrowing is a change to the registry on the
+integration branch. Nothing refuses it, and the registry's history shows it. Where the integration
+branch holds a record of the version, or the tree the new generation freezes in still holds the
+earlier one, depth enrollment rule 7 requires the new P to cover it.
 
 ### Relay execution
 
