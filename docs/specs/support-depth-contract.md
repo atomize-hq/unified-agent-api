@@ -1,6 +1,6 @@
 # Support-Depth Contract
 
-Status: Draft, awaiting maintainer approval
+Status: Normative
 Date (UTC): 2026-10-02
 Scope: semantic support obligations, their evidence and bindings, depth enrollment, depth admission of writes to depth-gated outputs, path enablement and additive shared integration, for the maintenance and onboarding lifecycles
 
