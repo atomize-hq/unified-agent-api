@@ -8,9 +8,9 @@ does not enumerate the checks. This note carries the checks and the attack scena
 review rounds produced, so they become tests of the validator instead of contract prose.
 
 Annex B of the contract defines the depth record: its file, what it states, its three identities
-and its acceptance entries. That definition is not executable yet. The key names, the form of an
-operation and the serialization the digests are taken over are left to an executable revision. The
-checks below stay non-normative until they are implemented. Each one then becomes normative in the
+and its acceptance entries. Its sections B.6 and B.7 are revision 1 of the record's encoding and of the serialization the
+digests are taken over, and `crates/xtask/src/depth_record.rs` reads a record by them. No command
+calls that reader yet. The checks below stay non-normative until they are implemented. Each one then becomes normative in the
 manifest root's validator spec together with its code and its tests, as the existing validator
 checks did: in one change, or a day apart. Until then the checks and scenarios are the acceptance
 test of the record's definition: every check has to be decidable from a record as Annex B defines
@@ -273,10 +273,10 @@ Must fail:
 - A covered mode is named by the `selector` of the registry declaration's `modes` entry that
   first covered it. The registry loader refuses two selectors with one `command_path` and `mode`.
   It does not decide whether two selectors with different `mode` names overlap, which
-  classification rule 2 makes an error where their effects or requirements differ. Nor does it
-  decide whether a kept `selector` name still selects what it selected in the record the
-  integration branch holds, so check 2 passes a mode narrowed under its old name. Decide where
-  policy resolution checks that, and against which acquired input.
+  classification rule 2 makes an error where their effects or requirements differ. Annex B.4
+  rule 7 decides the other question: a kept `selector` whose command path, mode or predicates
+  differ from the record the integration branch holds is another mode, so check 2 fails a mode
+  narrowed under its old name.
 - A generation is committed from the time the integration branch holds the record it wrote or
   continued, which the merge of its packet brings about. Until then the next dispatch replaces it,
   or a maintainer narrows the declaration and reopens it, and check 2 has no earlier record to
@@ -334,17 +334,24 @@ Must fail:
 - A freeze that records an Event the target version's depth record already states, with no
   standing request that states it, is a first freeze under an unchanged Event: P is frozen again
   and the record's Event does not change. Decide whether it refuses.
-- The digests are taken over a serialization that the executable revision fixes. Until it does,
-  no identity can be computed, and checks 3, 8, 9, 11 and 13 have nothing to compare. Where the
-  repository already takes an identity over a structured value it serializes a typed value with
-  serde, and test vectors are needed before two implementations can be said to agree.
+- The digests are taken over the serialization Annex B.7 fixes, with one test vector. The
+  reader refuses a record whose part does not have the identity it states, which is check 13.
+  Checks 3, 8, 9 and 11 compare a record with a request, an entry or a second tree and still
+  have no caller.
+- Revision 1 reads a covered mode as kept only when its selector, command path, mode and
+  predicates are all unchanged, so a selector cannot be widened in place. Decide whether a
+  later revision needs to tell a widened selector from a narrowed one.
+- Revision 1 states the independently required acceptance work as surfaces with targets, taken
+  from the request. The contract does not define that work further. Decide whether the
+  evaluator needs more than the name identity and the targets.
 - A consumer requires the current executable revision of the record and rejects any other, and what
   a record states changes only through a generation of its own version. A second executable
   revision would therefore leave unreadable every held record whose version gets no new generation.
   The revision that follows revision 1 has to say how such a record is read.
-- How a policy identity comes to differ after a change to a shared governing rule, such as an
-  obligation template in the contract. Annex B has the policy part state the whole binding and
-  leaves the form in which it states the governing rules to the executable revision.
+- A policy identity differs after a change to an obligation template because the policy part
+  states BASE and each selected template's obligations as P resolved them. A governing rule
+  that is neither, such as a classification rule, changes the identity through the part's
+  `rules_revision`, which the change has to bump by hand. Nothing checks that it did.
 - `prepare-agent-closeout` and `close-agent-maintenance` each list an entry for the closeout they
   write. Annex B names a closeout by content identity, so one closeout can leave two entries when
   the prepared artifact is edited before it is recorded, the first naming the prepared artifact.
@@ -399,8 +406,8 @@ Must fail:
   under `crates/`. The support matrix reads it only for its content identity. A result that the
   support-depth contract's reuse and invalidation rules invalidate through a dependency outside the
   bound evidence cannot be seen from the record and that evidence. Decide what the generator reads
-  to publish such a result as `unverified`, and whether the executable revision confines bound
-  evidence to `reports/**`.
+  to publish such a result as `unverified`. Revision 1 does not confine bound evidence to
+  `reports/**`: a file reference is any repository-relative path.
 - On the create lane a dry run freezes O from an acquired surface that is already in the manifest
   root and is not a write run's output. Today the write run's executor is the only create-lane
   writer of `snapshots/`, both modes of `runtime-follow-on` require the lifecycle stage `enrolled`,

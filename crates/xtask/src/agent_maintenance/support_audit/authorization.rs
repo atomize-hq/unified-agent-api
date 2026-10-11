@@ -33,7 +33,8 @@ const REQUIRED_KEYS: [&str; 13] = [
     "authorization_evidence_ref",
 ];
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, serde::Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct DebtInventoryRow {
     pub row_id: String,
     pub agent_id: String,
