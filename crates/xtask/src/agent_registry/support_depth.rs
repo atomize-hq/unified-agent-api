@@ -458,6 +458,12 @@ pub enum ObligationTemplate {
     Excluded,
 }
 
+/// The revision of the governing rules that a policy part states: what each obligation id
+/// requires, the classification rules and a capability's minimum semantics, as the support-depth
+/// contract has them. Change it in the commit that changes one of those, so that a P frozen
+/// before the change stops being current.
+pub const GOVERNING_RULES_REVISION: &str = "1";
+
 impl ObligationTemplate {
     /// The obligations the template adds, as the support-depth contract's template table lists.
     /// `EXCLUDED` gives `EX1`, which an excluded mode has in place of BASE.

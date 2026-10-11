@@ -1276,6 +1276,7 @@ The policy part:
 | --- | --- |
 | `identity` | The policy identity. |
 | `selection` | `{ "agent_id", "enrollment" }`. `enrollment` is the declaration in the form the [registry contract](agent-registry-contract.md#support-depth) gives one, with the same member names and the same rules, except where rule 1 of this section fixes the written form: `lifecycle_path`, `version`, `targets`, `modes`, `operations` and `capabilities`. Under that rule `predicates`, `not_applicable_permitted` and `capabilities` are always written, as `[]` where the declaration states none. It states the operations with their promises, the modes and required values of each, the targets, where a promise permits `not_applicable`, the capability mappings, the classification entries and the mode exclusions. Revision 1 has no override. |
+| `rules_revision` | The revision of the governing rules when P was frozen, a string that is not blank. |
 | `base` | The BASE obligation ids as P resolved them. |
 | `templates` | One `{ "template", "obligations" }` for each obligation template an operation of the selection selects, stating the obligations the template added when P was frozen. |
 | `path_enabled` | Whether the selection's lifecycle path was enabled for the agent when P was frozen. |
@@ -1283,11 +1284,15 @@ The policy part:
 
 `base` and `templates` state which obligations the governing rules select. Without them a change
 to an obligation template would leave a frozen P with the same identity and another meaning.
-Revision 1 states no other governing rule. A change to what an obligation id requires, to a
-classification rule or to a capability's minimum semantics therefore changes no policy identity.
-The change that makes one MUST name the depth-enrolled versions it reaches, and each of them
-receives no further acceptance effect until a new generation has frozen P. Evidence produced
-before the change is not evidence for the changed rule, as [Bindings](#bindings) rule 3 states.
+
+`rules_revision` stands for the governing rules that those two members do not state: what an
+obligation id requires, the classification rules and a capability's minimum semantics. The
+repository holds one current value, beside the template table that policy resolution reads, and
+the first is `"1"`. A change to one of those rules MUST change that value in the same commit.
+Policy resolution then gives another policy identity, a P frozen before the change is no longer
+current, and evidence produced under it serves the new P only through a reuse binding. Without
+this member such a change would leave every frozen P with the same identity, and
+[Bindings](#bindings) rules 3 and 5 could not be decided from a record.
 
 The obligations part:
 

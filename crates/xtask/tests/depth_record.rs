@@ -52,6 +52,7 @@ fn record() -> Value {
                 ],
                 "capabilities": [{ "id": "agent_api.run", "operations": ["run"] }]
             } },
+            "rules_revision": "1",
             "base": ["A1", "E1", "G1", "R1", "V1", "X1", "X2", "X3", "X4"],
             "templates": [
                 { "template": "EXCLUDED", "obligations": ["EX1"] },
@@ -207,6 +208,9 @@ fn depth_record_rejects_what_the_annex_refuses() {
         }),
         ("event must state every field", |r| {
             r["event"]["opened_from"] = json!(" ")
+        }),
+        ("policy.rules_revision", |r| {
+            r["policy"]["rules_revision"] = json!(" ")
         }),
         ("policy.base", |r| r["policy"]["base"] = json!(["R1", "R1"])),
         ("policy.templates", |r| {

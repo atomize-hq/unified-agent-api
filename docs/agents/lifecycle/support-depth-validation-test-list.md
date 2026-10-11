@@ -350,7 +350,8 @@ Must fail:
   The revision that follows revision 1 has to say how such a record is read.
 - A policy identity differs after a change to an obligation template because the policy part
   states BASE and each selected template's obligations as P resolved them. A governing rule
-  that is neither, such as a classification rule, changes no identity by itself.
+  that is neither, such as a classification rule, changes the identity through the part's
+  `rules_revision`, which the change has to bump by hand. Nothing checks that it did.
 - `prepare-agent-closeout` and `close-agent-maintenance` each list an entry for the closeout they
   write. Annex B names a closeout by content identity, so one closeout can leave two entries when
   the prepared artifact is edited before it is recorded, the first naming the prepared artifact.

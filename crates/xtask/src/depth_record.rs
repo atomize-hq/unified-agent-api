@@ -57,6 +57,8 @@ pub enum Event {
 pub struct PolicyPart {
     pub identity: String,
     pub selection: Selection,
+    /// `GOVERNING_RULES_REVISION` as it stood when P was frozen.
+    pub rules_revision: String,
     /// The governing rules as P resolved them: BASE, and each template the selection selects.
     pub base: Vec<ObligationId>,
     pub templates: Vec<TemplateRule>,
@@ -335,6 +337,9 @@ impl DepthRecord {
             return Err(
                 "policy.templates must state each template the selection selects, once".to_string(),
             );
+        }
+        if self.policy.rules_revision.trim().is_empty() {
+            return Err("policy.rules_revision must name a revision".to_string());
         }
         unique("policy.base", self.policy.base.iter())?;
         unique(
