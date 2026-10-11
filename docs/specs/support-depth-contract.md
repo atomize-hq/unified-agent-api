@@ -1179,6 +1179,10 @@ Rules:
 3. A P that renames, divides, merges or reclassifies operations changes which operations serve a
    covered mode. It neither renames nor drops the mode. A mode that P comes to exclude under
    classification rule 7 stays in the list and names the classification entry that excludes it.
+   The registry contract requires a declaration to keep one operation that is not a mode
+   exclusion, so P cannot come to exclude the mode that a selection's last such operation
+   serves. That operation keeps its classification, and its results stay `unverified` until
+   they are verified.
 4. A listed mode counts as covered on a target only where an operation of the resolved selection
    serves it on that target, or where the mode names the classification entry that excludes it.
    A mode or a target listed with neither is lacking for rule 5.
@@ -1301,10 +1305,10 @@ The obligations part:
 | `identity` | The obligations identity. |
 | `policy_identity` | The policy identity that O was frozen under. |
 | `targets` | The targets that O is frozen for, without repeats. |
-| `acquired_inputs` | A file reference for each acquired input that O was derived from. |
+| `acquired_inputs` | A file reference for each acquired input that O was derived from. A path does not repeat. |
 | `operations` | One `{ "id", "surfaces", "obligations" }` for each operation: the surfaces it owns and its obligation ids. An `M` obligation is not listed. An operation has one for each capability mapping that names it. Operation ids do not repeat. |
 | `classification_required` | One `{ "operation", "surface" }` for each surface of an operation that carries a unit that is `classification_required`. |
-| `acceptance_work` | The independently required acceptance work: one `{ "surface", "targets" }` for each name-level item the generation's request holds as required, with the targets it is required on. On the onboarding path the approval artifact holds no such item and the list is `[]`. |
+| `acceptance_work` | The independently required acceptance work: one `{ "surface", "targets" }` for each name-level item the generation's request holds as required, with the targets it is required on. A surface has one entry, which states every target. On the onboarding path the approval artifact holds no such item and the list is `[]`. |
 
 The execution part:
 
@@ -1312,7 +1316,7 @@ The execution part:
 | --- | --- |
 | `identity` | The execution identity. |
 | `policy_identity`, `obligations_identity` | The P and O identities that E references. |
-| `results` | One `{ "obligation", "result", "rationale", "evidence" }` for each result. `obligation` is an obligation reference and does not repeat. `result` is `"verified"`, `"unverified"`, `"failed"` or `"not_applicable"`. `rationale` is optional: a `not_applicable` result MUST state one that is not blank and no other result may. `evidence` is a list of file references, and only a `verified` result may bind any. The implementation identities that [Bindings](#bindings) gives E are stated by that evidence. |
+| `results` | One `{ "obligation", "result", "rationale", "evidence" }` for each result. `obligation` is an obligation reference and does not repeat. `result` is `"verified"`, `"unverified"`, `"failed"` or `"not_applicable"`. `rationale` is optional: a `not_applicable` result MUST state one that is not blank and no other result may. `evidence` is a list of file references in which a path does not repeat, and only a `verified` result may bind any. The implementation identities that [Bindings](#bindings) gives E are stated by that evidence. |
 | `reuse_bindings` | One `{ "obligation", "policy_identity", "obligations_identity" }` for each reused obligation: the P and O that its evidence was produced under. `obligation` does not repeat. |
 | `debt_grants` | A debt row for each grant that E materializes for the version. Row ids do not repeat. |
 | `debt_retired` | The row ids of the baseline rows that E retires. A transition from P's baseline is a grant or a retirement stated here, and no row is both. |

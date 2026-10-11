@@ -338,6 +338,11 @@ Must fail:
   reader refuses a record whose part does not have the identity it states, which is check 13.
   Checks 3, 8, 9 and 11 compare a record with a request, an entry or a second tree and still
   have no caller.
+- A declaration keeps at least one operation that is not a mode exclusion, so a version whose
+  only covered mode turns out to be interactive-only cannot have it excluded and stays at
+  insufficient depth. Dropping that rule later is a compatible change and adding it later is
+  not. Decide, once depth admission can tell a first enrollment from a continuation, whether
+  the rule moves there and binds a first enrollment only.
 - Revision 1 reads a covered mode as kept only when its selector, command path, mode and
   predicates are all unchanged, so a selector cannot be widened in place. Decide whether a
   later revision needs to tell a widened selector from a narrowed one.
