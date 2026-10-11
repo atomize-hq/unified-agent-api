@@ -52,10 +52,10 @@ fn record() -> Value {
                 ],
                 "capabilities": [{ "id": "agent_api.run", "operations": ["run"] }]
             } },
-            "base": ["R1", "V1", "G1", "E1", "A1", "X1", "X2", "X3", "X4"],
+            "base": ["A1", "E1", "G1", "R1", "V1", "X1", "X2", "X3", "X4"],
             "templates": [
-                { "template": "CORE", "obligations": ["OUT3", "LC2"] },
-                { "template": "EXCLUDED", "obligations": ["EX1"] }
+                { "template": "EXCLUDED", "obligations": ["EX1"] },
+                { "template": "CORE", "obligations": ["LC2", "OUT3"] }
             ],
             "path_enabled": true,
             "debt_baseline": [debt_row("row-1")]
@@ -63,11 +63,11 @@ fn record() -> Value {
         "obligations": {
             "identity": SHA,
             "policy_identity": SHA,
-            "targets": ["linux-x64", "darwin-arm64"],
+            "targets": ["darwin-arm64", "linux-x64"],
             "acquired_inputs": [{ "path": "cli_manifests/aider/snapshots/1.2.3/union.json",
                                   "sha256": SHA }],
             "operations": [{ "id": "run", "surfaces": [surface()],
-                             "obligations": ["R1", "OUT3", "LC2"] }],
+                             "obligations": ["LC2", "OUT3", "R1"] }],
             "classification_required": [{ "operation": "run", "surface": surface() }],
             "acceptance_work": [{ "surface": surface(), "targets": ["linux-x64"] }]
         },
@@ -76,13 +76,13 @@ fn record() -> Value {
             "policy_identity": SHA,
             "obligations_identity": SHA,
             "results": [
-                { "obligation": obligation("R1", "linux-x64"), "result": "verified",
-                  "evidence": [{ "path": "crates/aider/tests/run.rs", "sha256": SHA }] },
-                { "obligation": obligation("X1", "linux-x64"), "result": "not_applicable",
-                  "rationale": "no credential is read", "evidence": [] },
                 { "obligation": { "operation": "run", "capability": "agent_api.run",
                                   "target": "linux-x64" },
-                  "result": "unverified", "evidence": [] }
+                  "result": "unverified", "evidence": [] },
+                { "obligation": obligation("X1", "linux-x64"), "result": "not_applicable",
+                  "rationale": "no credential is read", "evidence": [] },
+                { "obligation": obligation("R1", "linux-x64"), "result": "verified",
+                  "evidence": [{ "path": "crates/aider/tests/run.rs", "sha256": SHA }] }
             ],
             "reuse_bindings": [{ "obligation": obligation("R1", "linux-x64"),
                                  "policy_identity": SHA, "obligations_identity": SHA }],
@@ -115,7 +115,7 @@ fn parse(raw: &str) -> Result<DepthRecord, String> {
 #[test]
 fn depth_record_digest_matches_the_contract_vector() {
     // Annex B.7's vector: member names sorted, no whitespace, `identity` left out.
-    let part = json!({ "identity": "left out", "z": "a", "a": ["é\n", true, null] });
+    let part = json!({ "z": "a", "a": ["é\n", true, null], "identity": "left out" });
     assert_eq!(
         part_identity(&part).unwrap(),
         "1019655b4e277dabfe0cb08487ef861e99531f65f058a980e76a1927afe4c441"
@@ -183,7 +183,7 @@ fn depth_record_rejects_what_the_annex_refuses() {
             r["acceptance_entries"][0]["backs"] = json!("merge")
         }),
         ("must be left out", |r| {
-            r["execution"]["results"][0]["rationale"] = Value::Null
+            r["execution"]["results"][2]["rationale"] = Value::Null
         }),
         ("must be written", |r| {
             let mode = &mut r["policy"]["selection"]["enrollment"]["modes"][1];
@@ -213,11 +213,11 @@ fn depth_record_rejects_what_the_annex_refuses() {
             r["policy"]["templates"].as_array_mut().unwrap().pop();
         }),
         ("policy.templates", |r| {
-            r["policy"]["templates"][1] = json!({ "template": "QUERY", "obligations": [] });
+            r["policy"]["templates"][0] = json!({ "template": "QUERY", "obligations": [] });
         }),
         ("policy.templates", |r| {
-            let rule = r["policy"]["templates"][0].clone();
-            r["policy"]["templates"][1] = rule;
+            let rule = r["policy"]["templates"][1].clone();
+            r["policy"]["templates"][0] = rule;
         }),
         ("policy.debt_baseline", |r| {
             let row = r["policy"]["debt_baseline"][0].clone();
@@ -225,6 +225,18 @@ fn depth_record_rejects_what_the_annex_refuses() {
                 .as_array_mut()
                 .unwrap()
                 .push(row);
+        }),
+        ("rows of agent `aider` only", |r| {
+            r["policy"]["debt_baseline"][0]["agent_id"] = json!("codex");
+        }),
+        ("`targets` must list its entries in ascending order", |r| {
+            r["obligations"]["targets"] = json!(["linux-x64", "darwin-arm64"]);
+        }),
+        ("`results` must list its entries in ascending order", |r| {
+            r["execution"]["results"].as_array_mut().unwrap().reverse();
+        }),
+        ("granted or retired, never both", |r| {
+            r["execution"]["debt_retired"] = json!(["row-1"]);
         }),
         ("obligations.policy_identity", |r| {
             r["obligations"]["policy_identity"] = json!("x")
@@ -252,17 +264,17 @@ fn depth_record_rejects_what_the_annex_refuses() {
             r["execution"]["obligations_identity"] = json!(&SHA[1..]);
         }),
         ("execution.results must not repeat", |r| {
-            let result = r["execution"]["results"][0].clone();
+            let result = r["execution"]["results"][2].clone();
             r["execution"]["results"]
                 .as_array_mut()
                 .unwrap()
                 .push(result);
         }),
-        ("never both", |r| {
-            r["execution"]["results"][0]["obligation"]["capability"] = json!("agent_api.run");
+        ("exactly one of", |r| {
+            r["execution"]["results"][2]["obligation"]["capability"] = json!("agent_api.run");
         }),
-        ("never both", |r| {
-            r["execution"]["results"][2]["obligation"] =
+        ("exactly one of", |r| {
+            r["execution"]["results"][0]["obligation"] =
                 json!({ "operation": "run", "target": "linux-x64" });
         }),
         ("states a rationale", |r| {
@@ -275,13 +287,13 @@ fn depth_record_rejects_what_the_annex_refuses() {
             r["execution"]["results"][1]["rationale"] = json!(" ")
         }),
         ("states a rationale", |r| {
-            r["execution"]["results"][0]["rationale"] = json!("why")
+            r["execution"]["results"][2]["rationale"] = json!("why")
         }),
         ("only a `verified` result binds evidence", |r| {
-            r["execution"]["results"][0]["result"] = json!("failed");
+            r["execution"]["results"][2]["result"] = json!("failed");
         }),
         ("sha256 of `crates/aider/tests/run.rs`", |r| {
-            r["execution"]["results"][0]["evidence"][0]["sha256"] = json!("x");
+            r["execution"]["results"][2]["evidence"][0]["sha256"] = json!("x");
         }),
         ("execution.reuse_bindings must not repeat", |r| {
             let binding = r["execution"]["reuse_bindings"][0].clone();
@@ -290,7 +302,7 @@ fn depth_record_rejects_what_the_annex_refuses() {
                 .unwrap()
                 .push(binding);
         }),
-        ("never both", |r| {
+        ("exactly one of", |r| {
             r["execution"]["reuse_bindings"][0]["obligation"]["capability"] = json!("c");
         }),
         ("execution.reuse_bindings.policy_identity", |r| {
@@ -352,6 +364,10 @@ fn depth_record_rejects_what_the_annex_refuses() {
     }
 
     assert!(parse("not json").unwrap_err().contains("parse JSON"));
+    // A member stated twice is refused, although the last one would read as a valid record.
+    let twice = sealed(record()).replacen('{', r#"{"schema_version":2,"#, 1);
+    let err = parse(&twice).unwrap_err();
+    assert!(err.contains("duplicate field `schema_version`"), "{err}");
     let err = DepthRecord::parse(&sealed(record()), "aider", "1.2.4").unwrap_err();
     assert!(err.contains("must name agent"), "{err}");
 }
@@ -368,6 +384,18 @@ fn depth_record_coverage_comparison_names_what_a_later_selection_lacks() {
     };
 
     assert!(later(|_| ()).is_empty());
+    // The order a declaration writes its predicates in selects nothing.
+    let two = |order: [usize; 2]| {
+        let flags = [
+            json!({ "flag": "--output-format", "value": "json" }),
+            json!({ "flag": "-q" }),
+        ];
+        let mut record = record();
+        record["policy"]["selection"]["enrollment"]["modes"][0]["predicates"] =
+            json!([flags[order[0]], flags[order[1]]]);
+        parse(&sealed(record)).unwrap()
+    };
+    assert!(two([1, 0]).lacking_from(&two([0, 1])).is_empty());
     // Renaming the operation that serves a mode, or covering more, lacks nothing.
     assert!(later(|e| {
         e["operations"][0]["id"] = json!("run-renamed");
@@ -399,4 +427,177 @@ fn depth_record_coverage_comparison_names_what_a_later_selection_lacks() {
         }),
         ["capability `agent_api.run`"]
     );
+}
+
+fn sealed_with(edit: impl Fn(&mut Value)) -> Result<DepthRecord, String> {
+    let mut r = record();
+    edit(&mut r);
+    parse(&sealed(r))
+}
+
+fn rec_with(edit: impl Fn(&mut Value)) -> DepthRecord {
+    let mut r = record();
+    edit(&mut r["policy"]["selection"]["enrollment"]);
+    parse(&sealed(r)).expect("variant record must parse")
+}
+
+/// B.7 rule 3, built here from the written record and not through `stated_sha256`.
+#[test]
+fn acceptance_digest_is_taken_over_the_event_and_the_three_parts() {
+    for early in [false, true] {
+        let mut record = record();
+        if early {
+            record["obligations"] = Value::Null;
+            record["execution"] = Value::Null;
+        }
+        let raw = sealed(record);
+        let written: Value = serde_json::from_str(&raw).unwrap();
+        let stated = json!({
+            "event": written["event"], "policy": written["policy"],
+            "obligations": written["obligations"], "execution": written["execution"]
+        });
+        assert_eq!(
+            parse(&raw).unwrap().stated_sha256().unwrap(),
+            part_identity(&stated).unwrap()
+        );
+    }
+}
+
+#[test]
+fn digest_characters() {
+    let real = "0123456789abcdef".repeat(4);
+    let with = |s: String| {
+        sealed_with(move |r| {
+            r["execution"]["results"][2]["evidence"][0]["sha256"] = json!(s.clone())
+        })
+    };
+    with(real.clone()).expect("a digest with hex letters is valid");
+    for bad in [
+        format!("{real}0"),
+        format!("{}g", &real[1..]),
+        real.to_uppercase(),
+        format!("{}f", &real[1..]).replace('f', "F"),
+    ] {
+        let err = with(bad.clone()).expect_err(&bad);
+        assert!(err.contains("64 lowercase hexadecimal"), "{bad}: {err}");
+    }
+}
+
+#[test]
+fn file_paths() {
+    for bad in [
+        "a//b", "a/", "./a", "a/./b", "a/../b", "../a", "/a", "a\\b", "",
+    ] {
+        let err = sealed_with(|r| r["obligations"]["acquired_inputs"][0]["path"] = json!(bad))
+            .expect_err(bad);
+        assert!(err.contains("repository-relative path"), "{bad:?}: {err}");
+    }
+    for ok in ["a", "a/b.json", ".hidden/x", "a/b..c", "docs/é.md"] {
+        sealed_with(|r| r["obligations"]["acquired_inputs"][0]["path"] = json!(ok))
+            .unwrap_or_else(|e| panic!("{ok}: {e}"));
+    }
+}
+
+#[test]
+fn event_fields_and_the_onboarding_path() {
+    for field in [
+        "request_commit",
+        "request_recorded_at",
+        "trigger_kind",
+        "opened_from",
+    ] {
+        let err = sealed_with(|r| r["event"][field] = json!(" ")).expect_err(field);
+        assert!(
+            err.contains("event must state every field"),
+            "{field}: {err}"
+        );
+    }
+    let onboarding = |edit: &dyn Fn(&mut Value)| {
+        let mut r = record();
+        r["event"] = json!({"lifecycle_path": "onboarding", "approval_commit": "abc", "approval_recorded_at": "2026-10-10T00:00:00Z"});
+        r["policy"]["selection"]["enrollment"]["lifecycle_path"] = json!("onboarding");
+        edit(&mut r);
+        parse(&sealed(r))
+    };
+    onboarding(&|_| ()).expect("an onboarding record parses");
+    for field in ["approval_commit", "approval_recorded_at"] {
+        let err = onboarding(&|r| r["event"][field] = json!("")).expect_err(field);
+        assert!(
+            err.contains("event must state every field"),
+            "{field}: {err}"
+        );
+    }
+    // an onboarding event under a maintenance selection, and the reverse
+    let err = sealed_with(|r| r["event"] = json!({"lifecycle_path": "onboarding", "approval_commit": "a", "approval_recorded_at": "b"})).unwrap_err();
+    assert!(err.contains("event.lifecycle_path"), "{err}");
+    let err = onboarding(&|r| {
+        r["event"] = json!({"lifecycle_path": "maintenance", "request_commit": "a", "request_recorded_at": "b", "trigger_kind": "c", "opened_from": "d"})
+    })
+    .unwrap_err();
+    assert!(err.contains("event.lifecycle_path"), "{err}");
+}
+
+#[test]
+fn a_repeated_template_when_every_selected_template_is_stated() {
+    let err = sealed_with(|r| {
+        let rule = r["policy"]["templates"][0].clone();
+        r["policy"]["templates"].as_array_mut().unwrap().push(rule);
+    })
+    .unwrap_err();
+    assert!(err.contains("policy.templates"), "{err}");
+}
+
+#[test]
+fn lacking_from_compares_all_four_parts_of_a_mode_and_the_capability_id() {
+    let earlier = parse(&sealed(record())).unwrap();
+    assert_eq!(
+        rec_with(|e| e["modes"][0]["command_path"] = json!("aider exec")).lacking_from(&earlier),
+        ["mode `run-json`"]
+    );
+    assert_eq!(
+        rec_with(|e| e["modes"][0]["mode"] = json!("batch")).lacking_from(&earlier),
+        ["mode `run-json`"]
+    );
+    assert_eq!(
+        rec_with(|e| e["capabilities"][0]["id"] = json!("agent_api.other")).lacking_from(&earlier),
+        ["capability `agent_api.run`"]
+    );
+}
+
+#[test]
+fn proving_run_closeout_entry() {
+    let entry = |sha: &str| json!({"backs": "proving_run_closeout", "record_sha256": SHA, "closeout": {"path": "docs/x.json", "sha256": sha}});
+    sealed_with(|r| {
+        r["acceptance_entries"]
+            .as_array_mut()
+            .unwrap()
+            .push(entry(SHA))
+    })
+    .expect("valid entry");
+    let err = sealed_with(|r| {
+        r["acceptance_entries"]
+            .as_array_mut()
+            .unwrap()
+            .push(entry("x"))
+    })
+    .unwrap_err();
+    assert!(err.contains("acceptance_entries.closeout"), "{err}");
+}
+
+#[test]
+fn a_predicate_that_states_only_a_flag() {
+    // the registry contract's own example is `predicates = [{ flag = "--json" }]`
+    sealed_with(|r| {
+        r["policy"]["selection"]["enrollment"]["modes"][0]["predicates"] =
+            json!([{"flag": "--json"}]);
+    })
+    .expect("a flag-only predicate is a valid record member");
+}
+
+#[test]
+fn part_identity_refuses_non_ascii_member_names() {
+    assert!(part_identity(&json!({"é": "x"}))
+        .unwrap_err()
+        .contains("not ASCII"));
+    assert!(part_identity(&json!({"ok": [{"\u{1F600}": "x"}]})).is_err());
 }

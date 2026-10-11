@@ -1083,8 +1083,11 @@ root. A root's validator spec adopts it by a section that says so.
 B.6 and B.7 are the first executable revision of this annex, revision 1: the key names and value
 encodings of the record, the form in which an operation, its promise and an invocation mode are
 stated, and the serialization the digests in B.3 and B.5 are taken over. It is among the
-revisions that [Path enablement](#path-enablement) item 1 requires. No validator spec adopts this
-annex yet, so under record invariant 1 no manifest root may hold a depth record.
+revisions that [Path enablement](#path-enablement) item 1 requires.
+
+The validator specs of the `codex`, `claude_code` and `opencode` roots adopt this annex and state
+no check for a record. A manifest root MUST NOT hold a depth record until its validator spec
+states the checks that [Complete mediation](#complete-mediation) rule 7 requires.
 
 ### B.1 File and revision
 
@@ -1191,7 +1194,7 @@ Rules:
    that excludes it. The registry contract already requires every mode of a declaration to be
    served, so every listed mode counts as covered under rule 4.
 7. A record lacks a covered mode of the record it replaces unless it lists a mode with the same
-   `selector`, `command_path`, `mode` and `predicates`. A kept name that selects anything else is
+   `selector`, `command_path`, `mode` and set of `predicates`. A kept name that selects anything else is
    another mode. A selection covers more by adding a selector, never by changing one.
 
 ### B.5 Acceptance entries
@@ -1225,13 +1228,22 @@ named. Two choices in this annex add structure:
 This section and B.7 are revision 1. Every object below takes exactly the members listed. A
 consumer MUST reject a member that is not listed and a listed member that is missing.
 
-1. One content has one written form. A member marked optional is left out when it states
-   nothing and is never `null`. Every other member is written, an empty list as `[]`. The only
-   `null` values are the `obligations` and `execution` members of a part not yet produced.
+1. One content has one written form:
+   - A member marked optional is left out when it states nothing and is never `null`. Every
+     other member is written, an empty list as `[]`. The only `null` values are the
+     `obligations` and `execution` members of a part not yet produced. No object states a
+     member twice.
+   - `enrollment` is written as the declaration writes it: its lists in the declaration's
+     order, and a mode's `targets` present only where the declaration states it. That order is
+     part of what P states, so a declaration that is reordered is a changed P.
+   - `acceptance_entries` is in the order the entries were made.
+   - Every other list is a set. It is written without repeats, in ascending byte order of its
+     entries' B.7 serialization.
 2. Apart from `schema_version` a record holds no number. Every digest is 64 lowercase
    hexadecimal characters.
 3. A **file reference** is `{ "path", "sha256" }`: a repository-relative path with `/`
-   separators and no `.` or `..` segment, and the content identity of the file.
+   separators, no backslash and no empty, `.` or `..` segment, and the content identity of the
+   file.
 4. A **surface** is a name identity as the
    [maintenance request contract](maintenance-request-contract-v1.md) defines it:
    `{ "surface_kind", "command_path", "surface_id" }`.
@@ -1239,7 +1251,7 @@ consumer MUST reject a member that is not listed and a listed member that is mis
    each key of the row: `row_id`, `agent_id`, `surface_kind`, `command_path`, `surface_id`,
    `current_reason`, `blocker_class`, `owner`, `milestone`, `follow_on`, `evidence_ref`,
    `scope_target_triples`, `authorized_at_version` and `authorization_evidence_ref`. Each is a
-   string, except `scope_target_triples`, which is the list of targets in ascending byte order.
+   string, except `scope_target_triples`, which is the list of targets.
 6. An **obligation reference** is `{ "operation", "id", "target" }`, where `id` is an obligation
    id. For the `M` obligation of a capability it is `{ "operation", "capability", "target" }`
    and has no `id`. It states exactly one of the two.
@@ -1249,7 +1261,7 @@ The record:
 | Member | Value |
 | --- | --- |
 | `schema_version` | `1`. |
-| `event` | The Event. `lifecycle_path` is `"maintenance"` or `"onboarding"` and MUST be the selection's. With it, the maintenance Event states `request_commit`, `request_recorded_at`, `trigger_kind` and `opened_from`, and the onboarding Event `approval_commit` and `approval_recorded_at`, each a non-empty string written as its request or approval artifact writes it. |
+| `event` | The Event. `lifecycle_path` is `"maintenance"` or `"onboarding"` and MUST be the selection's. With it, the maintenance Event states `request_commit`, `request_recorded_at`, `trigger_kind` and `opened_from`, and the onboarding Event `approval_commit` and `approval_recorded_at`, each a string that is not blank, written as its request or approval artifact writes it. |
 | `policy` | The policy part. |
 | `obligations` | The obligations part, or `null` while not yet produced. |
 | `execution` | The execution part, or `null` while not yet produced. |
@@ -1260,14 +1272,19 @@ The policy part:
 | Member | Value |
 | --- | --- |
 | `identity` | The policy identity. |
-| `selection` | `{ "agent_id", "enrollment" }`. `enrollment` is the declaration in the form the [registry contract](agent-registry-contract.md#support-depth) gives one, with the same member names and the same rules: `lifecycle_path`, `version`, `targets`, `modes`, `operations` and `capabilities`. Rule 1 applies to it, so `predicates`, `not_applicable_permitted` and `capabilities` are always written. It states the operations with their promises, the modes and required values of each, the targets, where a promise permits `not_applicable`, the capability mappings, the classification entries and the mode exclusions. Revision 1 has no override. |
+| `selection` | `{ "agent_id", "enrollment" }`. `enrollment` is the declaration in the form the [registry contract](agent-registry-contract.md#support-depth) gives one, with the same member names and the same rules, rule 1 aside: `lifecycle_path`, `version`, `targets`, `modes`, `operations` and `capabilities`. Rule 1 applies to it, so `predicates`, `not_applicable_permitted` and `capabilities` are always written, as `[]` where the declaration states none. It states the operations with their promises, the modes and required values of each, the targets, where a promise permits `not_applicable`, the capability mappings, the classification entries and the mode exclusions. Revision 1 has no override. |
 | `base` | The BASE obligation ids as P resolved them. |
 | `templates` | One `{ "template", "obligations" }` for each obligation template an operation of the selection selects, stating the obligations the template added when P was frozen. |
 | `path_enabled` | Whether the selection's lifecycle path was enabled for the agent when P was frozen. |
-| `debt_baseline` | The frozen delegation and the initial authorization baseline: a debt row for every row in force for the agent when P was frozen. Row ids do not repeat. |
+| `debt_baseline` | The frozen delegation and the initial authorization baseline: a debt row for every row in force for the agent when P was frozen. Each row's `agent_id` is the selection's, and row ids do not repeat. |
 
-`base` and `templates` state the governing rules. Without them a change to an obligation template
-would leave a frozen P with the same identity and another meaning.
+`base` and `templates` state which obligations the governing rules select. Without them a change
+to an obligation template would leave a frozen P with the same identity and another meaning.
+Revision 1 states no other governing rule. A change to what an obligation id requires, to a
+classification rule or to a capability's minimum semantics therefore changes no policy identity.
+The change that makes one MUST name the depth-enrolled versions it reaches, and each of them
+receives no further acceptance effect until a new generation has frozen P. Evidence produced
+before the change is not evidence for the changed rule, as [Bindings](#bindings) rule 3 states.
 
 The obligations part:
 
@@ -1279,7 +1296,7 @@ The obligations part:
 | `acquired_inputs` | A file reference for each acquired input that O was derived from. |
 | `operations` | One `{ "id", "surfaces", "obligations" }` for each operation: the surfaces it owns and its obligation ids. An `M` obligation is not listed. An operation has one for each capability mapping that names it. Operation ids do not repeat. |
 | `classification_required` | One `{ "operation", "surface" }` for each unit that is `classification_required`, named by the surface that carries it. |
-| `acceptance_work` | The independently required acceptance work: one `{ "surface", "targets" }` for each name-level item the generation's request holds as required, with the targets it is required on. |
+| `acceptance_work` | The independently required acceptance work: one `{ "surface", "targets" }` for each name-level item the generation's request, or on the onboarding path its approval artifact, holds as required, with the targets it is required on. |
 
 The execution part:
 
@@ -1287,10 +1304,10 @@ The execution part:
 | --- | --- |
 | `identity` | The execution identity. |
 | `policy_identity`, `obligations_identity` | The P and O identities that E references. |
-| `results` | One `{ "obligation", "result", "rationale", "evidence" }` for each result. `obligation` is an obligation reference and does not repeat. `result` is `"verified"`, `"unverified"`, `"failed"` or `"not_applicable"`. `rationale` is optional: a `not_applicable` result MUST state it and no other result may. `evidence` is a list of file references, and only a `verified` result may bind any. The implementation identities that [Bindings](#bindings) gives E are stated by that evidence. |
+| `results` | One `{ "obligation", "result", "rationale", "evidence" }` for each result. `obligation` is an obligation reference and does not repeat. `result` is `"verified"`, `"unverified"`, `"failed"` or `"not_applicable"`. `rationale` is optional: a `not_applicable` result MUST state one that is not blank and no other result may. `evidence` is a list of file references, and only a `verified` result may bind any. The implementation identities that [Bindings](#bindings) gives E are stated by that evidence. |
 | `reuse_bindings` | One `{ "obligation", "policy_identity", "obligations_identity" }` for each reused obligation: the P and O that its evidence was produced under. `obligation` does not repeat. |
 | `debt_grants` | A debt row for each grant that E materializes for the version. Row ids do not repeat. |
-| `debt_retired` | The row ids of the baseline rows that E retires. A transition from P's baseline is a grant or a retirement stated here. |
+| `debt_retired` | The row ids of the baseline rows that E retires. A transition from P's baseline is a grant or a retirement stated here, and no row is both. |
 
 An acceptance entry states `backs`, `record_sha256` and one further member:
 
@@ -1318,9 +1335,9 @@ results are published.
    `{ "event", "policy", "obligations", "execution" }` whose members are those of the record as
    they then stood, a part not yet produced as `null`.
 4. Rule 1 of B.6 makes the serialization deterministic: a content has one written form, so one
-   part has one digest.
+   part has one digest. A consumer MUST reject a record that is not in that form.
 
-Test vector for rule 2. The part `{"identity":"left out","z":"a","a":["é\n",true,null]}` is
+Test vector for rule 2. The part `{"z":"a","a":["é\n",true,null],"identity":"left out"}` is
 serialized as the 32 bytes of `{"a":["é\n",true,null],"z":"a"}`, in which `é` is the two bytes
 `c3 a9` and `\n` is the two-character escape. Its identity is
 `1019655b4e277dabfe0cb08487ef861e99531f65f058a980e76a1927afe4c441`.

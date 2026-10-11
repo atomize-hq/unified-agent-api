@@ -10,8 +10,7 @@ review rounds produced, so they become tests of the validator instead of contrac
 Annex B of the contract defines the depth record: its file, what it states, its three identities
 and its acceptance entries. Its sections B.6 and B.7 are revision 1 of the record's encoding and of the serialization the
 digests are taken over, and `crates/xtask/src/depth_record.rs` reads a record by them. No command
-calls that reader yet. The
-checks below stay non-normative until they are implemented. Each one then becomes normative in the
+calls that reader yet. The checks below stay non-normative until they are implemented. Each one then becomes normative in the
 manifest root's validator spec together with its code and its tests, as the existing validator
 checks did: in one change, or a day apart. Until then the checks and scenarios are the acceptance
 test of the record's definition: every check has to be decidable from a record as Annex B defines
@@ -274,10 +273,10 @@ Must fail:
 - A covered mode is named by the `selector` of the registry declaration's `modes` entry that
   first covered it. The registry loader refuses two selectors with one `command_path` and `mode`.
   It does not decide whether two selectors with different `mode` names overlap, which
-  classification rule 2 makes an error where their effects or requirements differ. Nor does it
-  decide whether a kept `selector` name still selects what it selected in the record the
-  integration branch holds, so check 2 passes a mode narrowed under its old name. Decide where
-  policy resolution checks that, and against which acquired input.
+  classification rule 2 makes an error where their effects or requirements differ. Annex B.4
+  rule 7 decides the other question: a kept `selector` whose command path, mode or predicates
+  differ from the record the integration branch holds is another mode, so check 2 fails a mode
+  narrowed under its old name.
 - A generation is committed from the time the integration branch holds the record it wrote or
   continued, which the merge of its packet brings about. Until then the next dispatch replaces it,
   or a maintainer narrows the declaration and reopens it, and check 2 has no earlier record to
@@ -336,9 +335,9 @@ Must fail:
   standing request that states it, is a first freeze under an unchanged Event: P is frozen again
   and the record's Event does not change. Decide whether it refuses.
 - The digests are taken over the serialization Annex B.7 fixes, with one test vector. The
-  reader refuses a record whose part does not have the identity it states, which is the
-  single-record half of check 11. Checks 3, 8, 9 and 13 compare a record with a request, an
-  entry or a second tree and still have no caller.
+  reader refuses a record whose part does not have the identity it states, which is check 13.
+  Checks 3, 8, 9 and 11 compare a record with a request, an entry or a second tree and still
+  have no caller.
 - Revision 1 reads a covered mode as kept only when its selector, command path, mode and
   predicates are all unchanged, so a selector cannot be widened in place. Decide whether a
   later revision needs to tell a widened selector from a narrowed one.
@@ -406,8 +405,8 @@ Must fail:
   under `crates/`. The support matrix reads it only for its content identity. A result that the
   support-depth contract's reuse and invalidation rules invalidate through a dependency outside the
   bound evidence cannot be seen from the record and that evidence. Decide what the generator reads
-  to publish such a result as `unverified`, and whether the executable revision confines bound
-  evidence to `reports/**`.
+  to publish such a result as `unverified`. Revision 1 does not confine bound evidence to
+  `reports/**`: a file reference is any repository-relative path.
 - On the create lane a dry run freezes O from an acquired surface that is already in the manifest
   root and is not a write run's output. Today the write run's executor is the only create-lane
   writer of `snapshots/`, both modes of `runtime-follow-on` require the lifecycle stage `enrolled`,

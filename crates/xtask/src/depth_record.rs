@@ -17,7 +17,6 @@ use crate::agent_registry::support_depth::{
     DepthEnrollmentDeclaration, LifecyclePath, ObligationId, ObligationTemplate,
 };
 
-pub const DEPTH_RECORD_FILE_NAME: &str = "depth-record.json";
 pub const DEPTH_RECORD_SCHEMA_VERSION: u64 = 1;
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
@@ -220,8 +219,9 @@ impl DepthRecord {
                  revision is read"
             ));
         }
+        // Read from the text, not from `value`, which has already dropped a repeated member.
         let record: Self =
-            serde_json::from_value(value.clone()).map_err(|err| format!("depth record: {err}"))?;
+            serde_json::from_str(raw).map_err(|err| format!("depth record: {err}"))?;
         // One content has one written form, so an optional member is left out and never `null`.
         if json(&record)? != value {
             return Err(
@@ -232,6 +232,7 @@ impl DepthRecord {
         }
         record
             .validate(agent_id, version)
+            .and_then(|()| ordered("", &value))
             .map_err(|err| format!("depth record: {err}"))?;
         Ok(record)
     }
@@ -258,7 +259,8 @@ impl DepthRecord {
                 kept.selector == mode.selector
                     && kept.command_path == mode.command_path
                     && kept.mode == mode.mode
-                    && kept.predicates == mode.predicates
+                    && kept.predicates.len() == mode.predicates.len()
+                    && kept.predicates.iter().all(|p| mode.predicates.contains(p))
             });
             let Some(kept) = kept else {
                 lacking.push(format!("mode `{}`", mode.selector));
@@ -336,6 +338,16 @@ impl DepthRecord {
         }
         unique("policy.base", self.policy.base.iter())?;
         unique("policy.debt_baseline", row_ids(&self.policy.debt_baseline))?;
+        if self
+            .policy
+            .debt_baseline
+            .iter()
+            .any(|row| row.agent_id != agent_id)
+        {
+            return Err(format!(
+                "policy.debt_baseline must hold rows of agent `{agent_id}` only"
+            ));
+        }
 
         if let Some(part) = &self.obligations {
             identity("obligations", &part.identity, part)?;
@@ -396,6 +408,9 @@ impl DepthRecord {
             }
             unique("execution.debt_grants", row_ids(&part.debt_grants))?;
             unique("execution.debt_retired", part.debt_retired.iter())?;
+            if row_ids(&part.debt_grants).any(|id| part.debt_retired.contains(id)) {
+                return Err("execution: a debt row is granted or retired, never both".to_string());
+            }
         }
 
         for entry in &self.acceptance_entries {
@@ -478,6 +493,35 @@ fn write_canonical(value: &Value, out: &mut Vec<u8>) -> Result<(), String> {
     Ok(())
 }
 
+/// A list the record derives is written in ascending order of its entries' canonical bytes. The
+/// enrollment keeps the declaration's order, and acceptance entries the order they were made in.
+fn ordered(at: &str, value: &Value) -> Result<(), String> {
+    match value {
+        Value::Array(items) => {
+            let mut previous: Option<Vec<u8>> = None;
+            for item in items {
+                ordered(at, item)?;
+                let mut bytes = Vec::new();
+                if at != "acceptance_entries" && write_canonical(item, &mut bytes).is_ok() {
+                    if previous.as_ref().is_some_and(|previous| *previous >= bytes) {
+                        return Err(format!(
+                            "`{at}` must list its entries in ascending order, without repeats"
+                        ));
+                    }
+                    previous = Some(bytes);
+                }
+            }
+        }
+        Value::Object(members) => {
+            for (name, member) in members.iter().filter(|(name, _)| *name != "enrollment") {
+                ordered(name, member)?;
+            }
+        }
+        _ => {}
+    }
+    Ok(())
+}
+
 fn identity<T: Serialize>(part: &str, stated: &str, value: &T) -> Result<(), String> {
     if stated != part_identity(value)? {
         return Err(format!(
@@ -503,11 +547,8 @@ fn sha256(field: &str, value: &str) -> Result<(), String> {
 
 fn file_ref(field: &str, file: &FileRef) -> Result<(), String> {
     let path = &file.path;
-    if path.is_empty()
-        || path.starts_with('/')
-        || path.contains('\\')
-        || path.split('/').any(|part| matches!(part, "" | "." | ".."))
-    {
+    // An empty segment covers an empty path, a leading `/`, a trailing `/` and `//`.
+    if path.contains('\\') || path.split('/').any(|part| matches!(part, "" | "." | "..")) {
         return Err(format!(
             "{field}: `{path}` must be a repository-relative path"
         ));
@@ -518,8 +559,8 @@ fn file_ref(field: &str, file: &FileRef) -> Result<(), String> {
 fn obligation_ref(field: &str, obligation: &ObligationRef) -> Result<(), String> {
     if obligation.id.is_some() == obligation.capability.is_some() {
         return Err(format!(
-            "{field}: an obligation of `{}` states `id`, or `capability` for an `M` obligation, \
-             and never both",
+            "{field}: an obligation of `{}` states exactly one of `id` and `capability`, the \
+             second for an `M` obligation",
             obligation.operation
         ));
     }
