@@ -248,6 +248,31 @@ fn depth_record_rejects_what_the_annex_refuses() {
         ("granted or retired, never both", |r| {
             r["execution"]["debt_retired"] = json!(["row-1"]);
         }),
+        ("obligations.acceptance_work must not repeat", |r| {
+            // One name identity split over two rows states the same work in a second form.
+            let mut split = r["obligations"]["acceptance_work"][0].clone();
+            split["targets"] = json!(["darwin-arm64"]);
+            r["obligations"]["acceptance_work"]
+                .as_array_mut()
+                .unwrap()
+                .insert(0, split);
+        }),
+        ("obligations.acquired_inputs must not repeat", |r| {
+            let mut again = r["obligations"]["acquired_inputs"][0].clone();
+            again["sha256"] = json!("1".repeat(64));
+            r["obligations"]["acquired_inputs"]
+                .as_array_mut()
+                .unwrap()
+                .push(again);
+        }),
+        ("on linux-x64] must not repeat", |r| {
+            let mut again = r["execution"]["results"][2]["evidence"][0].clone();
+            again["sha256"] = json!("1".repeat(64));
+            r["execution"]["results"][2]["evidence"]
+                .as_array_mut()
+                .unwrap()
+                .push(again);
+        }),
         ("obligations.policy_identity", |r| {
             r["obligations"]["policy_identity"] = json!("x")
         }),

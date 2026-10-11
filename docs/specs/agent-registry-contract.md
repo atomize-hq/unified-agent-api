@@ -337,7 +337,11 @@ Rules:
 5. The three lists above carry what rule 4 lists, apart from what the end of this rule leaves
    out, and they are the executable schema revision that the support-depth contract's path
    enablement requires of this contract. A declaration MUST satisfy all of the following:
-   - It lists at least one mode, and at least one operation that is not a mode exclusion.
+   - It lists at least one mode, and at least one operation that is not a mode exclusion. A
+     declaration of mode exclusions alone would carry no promise and so no depth scope tuple,
+     and this loader cannot tell a headless mode from another, so nothing else here keeps a
+     whole selection from being excluded. It follows that a selection's last such operation
+     cannot become a mode exclusion, as the support-depth contract's Annex B.4 rule 3 states.
    - Every target in its `targets` has at least one mode selected on it.
    - Every mode is served by at least one operation. A mode that a mode exclusion serves is
      served by no other operation.

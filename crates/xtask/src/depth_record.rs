@@ -368,6 +368,15 @@ impl DepthRecord {
             for input in &part.acquired_inputs {
                 file_ref("obligations.acquired_inputs", input)?;
             }
+            // One file and one name identity each have one entry, or one content has two forms.
+            unique(
+                "obligations.acquired_inputs",
+                part.acquired_inputs.iter().map(|input| &input.path),
+            )?;
+            unique(
+                "obligations.acceptance_work",
+                part.acceptance_work.iter().map(|work| &work.surface),
+            )?;
         }
 
         if let Some(part) = &self.execution {
@@ -402,6 +411,7 @@ impl DepthRecord {
                 for evidence in &result.evidence {
                     file_ref(&at, evidence)?;
                 }
+                unique(&at, result.evidence.iter().map(|evidence| &evidence.path))?;
             }
             for binding in &part.reuse_bindings {
                 obligation_ref("execution.reuse_bindings", &binding.obligation)?;
