@@ -226,6 +226,12 @@ fn depth_record_rejects_what_the_annex_refuses() {
                 .unwrap()
                 .push(row);
         }),
+        ("policy.debt_baseline: a target holds no whitespace", |r| {
+            r["policy"]["debt_baseline"][0]["scope_target_triples"] = json!(["a b"]);
+        }),
+        ("execution.debt_grants: a target holds no whitespace", |r| {
+            r["execution"]["debt_grants"][0]["scope_target_triples"] = json!(["a\\b"]);
+        }),
         ("rows of agent `aider` only", |r| {
             r["policy"]["debt_baseline"][0]["agent_id"] = json!("codex");
         }),
@@ -601,3 +607,6 @@ fn part_identity_refuses_non_ascii_member_names() {
         .contains("not ASCII"));
     assert!(part_identity(&json!({"ok": [{"\u{1F600}": "x"}]})).is_err());
 }
+
+#[path = "depth_record/order.rs"]
+mod order;

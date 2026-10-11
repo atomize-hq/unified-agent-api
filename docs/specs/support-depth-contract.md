@@ -1235,7 +1235,9 @@ consumer MUST reject a member that is not listed and a listed member that is mis
      member twice.
    - `enrollment` is written as the declaration writes it: its lists in the declaration's
      order, and a mode's `targets` present only where the declaration states it. That order is
-     part of what P states, so a declaration that is reordered is a changed P.
+     part of what P states, so a declaration that is reordered is a changed P. Whether a
+     record's `enrollment` agrees with the declaration is not decided by the record alone and
+     belongs to depth admission.
    - `acceptance_entries` is in the order the entries were made.
    - Every other list is a set. It is written without repeats, in ascending byte order of its
      entries' B.7 serialization.
@@ -1251,7 +1253,8 @@ consumer MUST reject a member that is not listed and a listed member that is mis
    each key of the row: `row_id`, `agent_id`, `surface_kind`, `command_path`, `surface_id`,
    `current_reason`, `blocker_class`, `owner`, `milestone`, `follow_on`, `evidence_ref`,
    `scope_target_triples`, `authorized_at_version` and `authorization_evidence_ref`. Each is a
-   string, except `scope_target_triples`, which is the list of targets.
+   string, except `scope_target_triples`, which is the list of targets. A target holds no
+   whitespace, `"` or `\`.
 6. An **obligation reference** is `{ "operation", "id", "target" }`, where `id` is an obligation
    id. For the `M` obligation of a capability it is `{ "operation", "capability", "target" }`
    and has no `id`. It states exactly one of the two.
@@ -1272,7 +1275,7 @@ The policy part:
 | Member | Value |
 | --- | --- |
 | `identity` | The policy identity. |
-| `selection` | `{ "agent_id", "enrollment" }`. `enrollment` is the declaration in the form the [registry contract](agent-registry-contract.md#support-depth) gives one, with the same member names and the same rules, rule 1 aside: `lifecycle_path`, `version`, `targets`, `modes`, `operations` and `capabilities`. Rule 1 applies to it, so `predicates`, `not_applicable_permitted` and `capabilities` are always written, as `[]` where the declaration states none. It states the operations with their promises, the modes and required values of each, the targets, where a promise permits `not_applicable`, the capability mappings, the classification entries and the mode exclusions. Revision 1 has no override. |
+| `selection` | `{ "agent_id", "enrollment" }`. `enrollment` is the declaration in the form the [registry contract](agent-registry-contract.md#support-depth) gives one, with the same member names and the same rules, except where rule 1 of this section fixes the written form: `lifecycle_path`, `version`, `targets`, `modes`, `operations` and `capabilities`. Under that rule `predicates`, `not_applicable_permitted` and `capabilities` are always written, as `[]` where the declaration states none. It states the operations with their promises, the modes and required values of each, the targets, where a promise permits `not_applicable`, the capability mappings, the classification entries and the mode exclusions. Revision 1 has no override. |
 | `base` | The BASE obligation ids as P resolved them. |
 | `templates` | One `{ "template", "obligations" }` for each obligation template an operation of the selection selects, stating the obligations the template added when P was frozen. |
 | `path_enabled` | Whether the selection's lifecycle path was enabled for the agent when P was frozen. |
@@ -1295,8 +1298,8 @@ The obligations part:
 | `targets` | The targets that O is frozen for, without repeats. |
 | `acquired_inputs` | A file reference for each acquired input that O was derived from. |
 | `operations` | One `{ "id", "surfaces", "obligations" }` for each operation: the surfaces it owns and its obligation ids. An `M` obligation is not listed. An operation has one for each capability mapping that names it. Operation ids do not repeat. |
-| `classification_required` | One `{ "operation", "surface" }` for each unit that is `classification_required`, named by the surface that carries it. |
-| `acceptance_work` | The independently required acceptance work: one `{ "surface", "targets" }` for each name-level item the generation's request, or on the onboarding path its approval artifact, holds as required, with the targets it is required on. |
+| `classification_required` | One `{ "operation", "surface" }` for each surface of an operation that carries a unit that is `classification_required`. |
+| `acceptance_work` | The independently required acceptance work: one `{ "surface", "targets" }` for each name-level item the generation's request holds as required, with the targets it is required on. On the onboarding path the approval artifact holds no such item and the list is `[]`. |
 
 The execution part:
 

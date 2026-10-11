@@ -337,7 +337,10 @@ impl DepthRecord {
             );
         }
         unique("policy.base", self.policy.base.iter())?;
-        unique("policy.debt_baseline", row_ids(&self.policy.debt_baseline))?;
+        unique(
+            "policy.debt_baseline",
+            debt_rows("policy.debt_baseline", &self.policy.debt_baseline)?,
+        )?;
         if self
             .policy
             .debt_baseline
@@ -406,7 +409,10 @@ impl DepthRecord {
                     &binding.obligations_identity,
                 )?;
             }
-            unique("execution.debt_grants", row_ids(&part.debt_grants))?;
+            unique(
+                "execution.debt_grants",
+                debt_rows("execution.debt_grants", &part.debt_grants)?,
+            )?;
             unique("execution.debt_retired", part.debt_retired.iter())?;
             if row_ids(&part.debt_grants).any(|id| part.debt_retired.contains(id)) {
                 return Err("execution: a debt row is granted or retired, never both".to_string());
@@ -501,15 +507,17 @@ fn ordered(at: &str, value: &Value) -> Result<(), String> {
             let mut previous: Option<Vec<u8>> = None;
             for item in items {
                 ordered(at, item)?;
-                let mut bytes = Vec::new();
-                if at != "acceptance_entries" && write_canonical(item, &mut bytes).is_ok() {
-                    if previous.as_ref().is_some_and(|previous| *previous >= bytes) {
-                        return Err(format!(
-                            "`{at}` must list its entries in ascending order, without repeats"
-                        ));
-                    }
-                    previous = Some(bytes);
+                if at == "acceptance_entries" {
+                    continue;
                 }
+                let mut bytes = Vec::new();
+                write_canonical(item, &mut bytes)?;
+                if previous.as_ref().is_some_and(|previous| *previous >= bytes) {
+                    return Err(format!(
+                        "`{at}` must list its entries in ascending order, without repeats"
+                    ));
+                }
+                previous = Some(bytes);
             }
         }
         Value::Object(members) => {
@@ -565,6 +573,24 @@ fn obligation_ref(field: &str, obligation: &ObligationRef) -> Result<(), String>
         ));
     }
     Ok(())
+}
+
+/// The row ids, once every target of every row is one both orders of B.6 rule 1 agree on.
+fn debt_rows<'a>(
+    field: &str,
+    rows: &'a [DebtInventoryRow],
+) -> Result<impl Iterator<Item = &'a String>, String> {
+    let plain =
+        |target: &String| !target.contains(|c: char| c.is_whitespace() || "\"\\".contains(c));
+    if rows
+        .iter()
+        .any(|row| !row.scope_target_triples.iter().all(plain))
+    {
+        return Err(format!(
+            "{field}: a target holds no whitespace, `\"` or `\\`"
+        ));
+    }
+    Ok(row_ids(rows))
 }
 
 fn row_ids(rows: &[DebtInventoryRow]) -> impl Iterator<Item = &String> {
