@@ -51,13 +51,79 @@ expected_post_run_debt_count = 2
 surface_kind = "commands"
 command_path = "claude_code install"
 surface_id = "install"
-evidence_ref = "docs/specs/unified-agent-api/non-tui-support-debt.md"
+evidence_ref = "cli_manifests/claude_code/reports/2.1.287/coverage.any.json"
 
 [[support_surface_audit.unbaselined_gap_surface]]
 surface_kind = "flags"
 command_path = "claude_code install"
 surface_id = "--force"
-evidence_ref = "docs/specs/unified-agent-api/non-tui-support-debt.md"
+evidence_ref = "cli_manifests/claude_code/reports/2.1.287/coverage.any.json"
+
+[[support_surface_audit.unbaselined_gap_surface]]
+surface_kind = "flags"
+command_path = "claude_code plugin configure"
+surface_id = "--json"
+evidence_ref = "cli_manifests/claude_code/reports/2.1.287/coverage.any.json"
+
+[[support_surface_audit.unbaselined_gap_surface]]
+surface_kind = "flags"
+command_path = "claude_code plugin configure"
+surface_id = "--values-stdin"
+evidence_ref = "cli_manifests/claude_code/reports/2.1.287/coverage.any.json"
+
+[[support_surface_audit.unbaselined_gap_surface]]
+surface_kind = "flags"
+command_path = "claude_code plugin install"
+surface_id = "--registry"
+evidence_ref = "cli_manifests/claude_code/reports/2.1.287/coverage.any.json"
+
+[[support_surface_audit.unbaselined_gap_surface]]
+surface_kind = "flags"
+command_path = "claude_code plugin list"
+surface_id = "--data-size"
+evidence_ref = "cli_manifests/claude_code/reports/2.1.287/coverage.any.json"
+
+[[support_surface_audit.unbaselined_gap_surface]]
+surface_kind = "flags"
+command_path = "claude_code plugin marketplace add"
+surface_id = "--json"
+evidence_ref = "cli_manifests/claude_code/reports/2.1.287/coverage.any.json"
+
+[[support_surface_audit.unbaselined_gap_surface]]
+surface_kind = "flags"
+command_path = "claude_code plugin marketplace remove"
+surface_id = "--json"
+evidence_ref = "cli_manifests/claude_code/reports/2.1.287/coverage.any.json"
+
+[[support_surface_audit.unbaselined_gap_surface]]
+surface_kind = "flags"
+command_path = "claude_code plugin marketplace update"
+surface_id = "--json"
+evidence_ref = "cli_manifests/claude_code/reports/2.1.287/coverage.any.json"
+
+[[support_surface_audit.unbaselined_gap_surface]]
+surface_kind = "global_flags"
+command_path = "claude_code"
+surface_id = "--desktop"
+evidence_ref = "cli_manifests/claude_code/reports/2.1.287/coverage.any.json"
+
+[[support_surface_audit.unbaselined_gap_surface]]
+surface_kind = "positional_args"
+command_path = "claude_code plugin configure"
+surface_id = "plugin"
+evidence_ref = "cli_manifests/claude_code/reports/2.1.287/coverage.any.json"
+
+[[support_surface_audit.unbaselined_gap_surface]]
+surface_kind = "subcommands"
+command_path = "claude_code plugin configure"
+surface_id = "configure"
+evidence_ref = "cli_manifests/claude_code/reports/2.1.287/coverage.any.json"
+
+[[support_surface_audit.unbaselined_gap_surface]]
+surface_kind = "subcommands"
+command_path = "claude_code plugin test"
+surface_id = "test"
+evidence_ref = "cli_manifests/claude_code/reports/2.1.287/coverage.any.json"
 
 [[support_surface_audit.preexisting_unsupported_surface]]
 surface_kind = "commands"
@@ -81,6 +147,61 @@ surface_kind = "flags"
 command_path = "claude_code install"
 surface_id = "--force"
 
+[[support_surface_audit.missing_wrapper_support]]
+surface_kind = "flags"
+command_path = "claude_code plugin configure"
+surface_id = "--json"
+
+[[support_surface_audit.missing_wrapper_support]]
+surface_kind = "flags"
+command_path = "claude_code plugin configure"
+surface_id = "--values-stdin"
+
+[[support_surface_audit.missing_wrapper_support]]
+surface_kind = "flags"
+command_path = "claude_code plugin install"
+surface_id = "--registry"
+
+[[support_surface_audit.missing_wrapper_support]]
+surface_kind = "flags"
+command_path = "claude_code plugin list"
+surface_id = "--data-size"
+
+[[support_surface_audit.missing_wrapper_support]]
+surface_kind = "flags"
+command_path = "claude_code plugin marketplace add"
+surface_id = "--json"
+
+[[support_surface_audit.missing_wrapper_support]]
+surface_kind = "flags"
+command_path = "claude_code plugin marketplace remove"
+surface_id = "--json"
+
+[[support_surface_audit.missing_wrapper_support]]
+surface_kind = "flags"
+command_path = "claude_code plugin marketplace update"
+surface_id = "--json"
+
+[[support_surface_audit.missing_wrapper_support]]
+surface_kind = "global_flags"
+command_path = "claude_code"
+surface_id = "--desktop"
+
+[[support_surface_audit.missing_wrapper_support]]
+surface_kind = "positional_args"
+command_path = "claude_code plugin configure"
+surface_id = "plugin"
+
+[[support_surface_audit.missing_wrapper_support]]
+surface_kind = "subcommands"
+command_path = "claude_code plugin configure"
+surface_id = "configure"
+
+[[support_surface_audit.missing_wrapper_support]]
+surface_kind = "subcommands"
+command_path = "claude_code plugin test"
+surface_id = "test"
+
 [[support_surface_audit.missing_backend_support]]
 surface_kind = "commands"
 command_path = "claude_code install"
@@ -90,6 +211,61 @@ surface_id = "install"
 surface_kind = "flags"
 command_path = "claude_code install"
 surface_id = "--force"
+
+[[support_surface_audit.missing_backend_support]]
+surface_kind = "flags"
+command_path = "claude_code plugin configure"
+surface_id = "--json"
+
+[[support_surface_audit.missing_backend_support]]
+surface_kind = "flags"
+command_path = "claude_code plugin configure"
+surface_id = "--values-stdin"
+
+[[support_surface_audit.missing_backend_support]]
+surface_kind = "flags"
+command_path = "claude_code plugin install"
+surface_id = "--registry"
+
+[[support_surface_audit.missing_backend_support]]
+surface_kind = "flags"
+command_path = "claude_code plugin list"
+surface_id = "--data-size"
+
+[[support_surface_audit.missing_backend_support]]
+surface_kind = "flags"
+command_path = "claude_code plugin marketplace add"
+surface_id = "--json"
+
+[[support_surface_audit.missing_backend_support]]
+surface_kind = "flags"
+command_path = "claude_code plugin marketplace remove"
+surface_id = "--json"
+
+[[support_surface_audit.missing_backend_support]]
+surface_kind = "flags"
+command_path = "claude_code plugin marketplace update"
+surface_id = "--json"
+
+[[support_surface_audit.missing_backend_support]]
+surface_kind = "global_flags"
+command_path = "claude_code"
+surface_id = "--desktop"
+
+[[support_surface_audit.missing_backend_support]]
+surface_kind = "positional_args"
+command_path = "claude_code plugin configure"
+surface_id = "plugin"
+
+[[support_surface_audit.missing_backend_support]]
+surface_kind = "subcommands"
+command_path = "claude_code plugin configure"
+surface_id = "configure"
+
+[[support_surface_audit.missing_backend_support]]
+surface_kind = "subcommands"
+command_path = "claude_code plugin test"
+surface_id = "test"
 
 [[support_surface_audit.required_uplifts_this_run]]
 surface_kind = "commands"
@@ -108,6 +284,149 @@ required_writes = [
 surface_kind = "flags"
 command_path = "claude_code install"
 surface_id = "--force"
+reason = "unbaselined_gap"
+required_writes = [
+  "wrapper",
+  "backend",
+  "manifest",
+  "publication",
+  "packet_docs",
+]
+
+[[support_surface_audit.required_uplifts_this_run]]
+surface_kind = "flags"
+command_path = "claude_code plugin configure"
+surface_id = "--json"
+reason = "unbaselined_gap"
+required_writes = [
+  "wrapper",
+  "backend",
+  "manifest",
+  "publication",
+  "packet_docs",
+]
+
+[[support_surface_audit.required_uplifts_this_run]]
+surface_kind = "flags"
+command_path = "claude_code plugin configure"
+surface_id = "--values-stdin"
+reason = "unbaselined_gap"
+required_writes = [
+  "wrapper",
+  "backend",
+  "manifest",
+  "publication",
+  "packet_docs",
+]
+
+[[support_surface_audit.required_uplifts_this_run]]
+surface_kind = "flags"
+command_path = "claude_code plugin install"
+surface_id = "--registry"
+reason = "unbaselined_gap"
+required_writes = [
+  "wrapper",
+  "backend",
+  "manifest",
+  "publication",
+  "packet_docs",
+]
+
+[[support_surface_audit.required_uplifts_this_run]]
+surface_kind = "flags"
+command_path = "claude_code plugin list"
+surface_id = "--data-size"
+reason = "unbaselined_gap"
+required_writes = [
+  "wrapper",
+  "backend",
+  "manifest",
+  "publication",
+  "packet_docs",
+]
+
+[[support_surface_audit.required_uplifts_this_run]]
+surface_kind = "flags"
+command_path = "claude_code plugin marketplace add"
+surface_id = "--json"
+reason = "unbaselined_gap"
+required_writes = [
+  "wrapper",
+  "backend",
+  "manifest",
+  "publication",
+  "packet_docs",
+]
+
+[[support_surface_audit.required_uplifts_this_run]]
+surface_kind = "flags"
+command_path = "claude_code plugin marketplace remove"
+surface_id = "--json"
+reason = "unbaselined_gap"
+required_writes = [
+  "wrapper",
+  "backend",
+  "manifest",
+  "publication",
+  "packet_docs",
+]
+
+[[support_surface_audit.required_uplifts_this_run]]
+surface_kind = "flags"
+command_path = "claude_code plugin marketplace update"
+surface_id = "--json"
+reason = "unbaselined_gap"
+required_writes = [
+  "wrapper",
+  "backend",
+  "manifest",
+  "publication",
+  "packet_docs",
+]
+
+[[support_surface_audit.required_uplifts_this_run]]
+surface_kind = "global_flags"
+command_path = "claude_code"
+surface_id = "--desktop"
+reason = "unbaselined_gap"
+required_writes = [
+  "wrapper",
+  "backend",
+  "manifest",
+  "publication",
+  "packet_docs",
+]
+
+[[support_surface_audit.required_uplifts_this_run]]
+surface_kind = "positional_args"
+command_path = "claude_code plugin configure"
+surface_id = "plugin"
+reason = "unbaselined_gap"
+required_writes = [
+  "wrapper",
+  "backend",
+  "manifest",
+  "publication",
+  "packet_docs",
+]
+
+[[support_surface_audit.required_uplifts_this_run]]
+surface_kind = "subcommands"
+command_path = "claude_code plugin configure"
+surface_id = "configure"
+reason = "unbaselined_gap"
+required_writes = [
+  "wrapper",
+  "backend",
+  "manifest",
+  "publication",
+  "packet_docs",
+]
+
+[[support_surface_audit.required_uplifts_this_run]]
+surface_kind = "subcommands"
+command_path = "claude_code plugin test"
+surface_id = "test"
 reason = "unbaselined_gap"
 required_writes = [
   "wrapper",
@@ -141,6 +460,72 @@ surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
 surface_kind = "flags"
 command_path = "claude_code install"
 surface_id = "--force"
+surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
+
+[[support_surface_audit.publication_impacts]]
+surface_kind = "flags"
+command_path = "claude_code plugin configure"
+surface_id = "--json"
+surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
+
+[[support_surface_audit.publication_impacts]]
+surface_kind = "flags"
+command_path = "claude_code plugin configure"
+surface_id = "--values-stdin"
+surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
+
+[[support_surface_audit.publication_impacts]]
+surface_kind = "flags"
+command_path = "claude_code plugin install"
+surface_id = "--registry"
+surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
+
+[[support_surface_audit.publication_impacts]]
+surface_kind = "flags"
+command_path = "claude_code plugin list"
+surface_id = "--data-size"
+surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
+
+[[support_surface_audit.publication_impacts]]
+surface_kind = "flags"
+command_path = "claude_code plugin marketplace add"
+surface_id = "--json"
+surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
+
+[[support_surface_audit.publication_impacts]]
+surface_kind = "flags"
+command_path = "claude_code plugin marketplace remove"
+surface_id = "--json"
+surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
+
+[[support_surface_audit.publication_impacts]]
+surface_kind = "flags"
+command_path = "claude_code plugin marketplace update"
+surface_id = "--json"
+surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
+
+[[support_surface_audit.publication_impacts]]
+surface_kind = "global_flags"
+command_path = "claude_code"
+surface_id = "--desktop"
+surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
+
+[[support_surface_audit.publication_impacts]]
+surface_kind = "positional_args"
+command_path = "claude_code plugin configure"
+surface_id = "plugin"
+surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
+
+[[support_surface_audit.publication_impacts]]
+surface_kind = "subcommands"
+command_path = "claude_code plugin configure"
+surface_id = "configure"
+surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
+
+[[support_surface_audit.publication_impacts]]
+surface_kind = "subcommands"
+command_path = "claude_code plugin test"
+surface_id = "test"
 surface_doc = "docs/specs/unified-agent-api/support-matrix.md"
 
 [execution_contract]
