@@ -249,6 +249,38 @@
       "download_url": "https://github.com/openai/codex/releases/download/rust-v0.156.1/codex-x86_64-unknown-linux-musl.tar.gz",
       "sha256": "aff46539a83aff86e3c62c592bce2c50d95391f9df289afaf03a50c01d14533d",
       "size_bytes": 107380357
+    },
+    {
+      "codex_version": "0.162.0",
+      "target_triple": "aarch64-apple-darwin",
+      "asset_name": "codex-aarch64-apple-darwin.tar.gz",
+      "download_url": "https://github.com/openai/codex/releases/download/rust-v0.162.0/codex-aarch64-apple-darwin.tar.gz",
+      "sha256": "98e9413a1bd167ae573723939ff178e6d44f1bb21d5cda960dbeb2fa65f49104",
+      "size_bytes": 98089521
+    },
+    {
+      "codex_version": "0.162.0",
+      "target_triple": "aarch64-unknown-linux-musl",
+      "asset_name": "codex-aarch64-unknown-linux-musl.tar.gz",
+      "download_url": "https://github.com/openai/codex/releases/download/rust-v0.162.0/codex-aarch64-unknown-linux-musl.tar.gz",
+      "sha256": "15162a9b59edf8e512b27414ec0b7db22e6424a1262b0eee8666643e0d295c2f",
+      "size_bytes": 103628302
+    },
+    {
+      "codex_version": "0.162.0",
+      "target_triple": "x86_64-pc-windows-msvc",
+      "asset_name": "codex-x86_64-pc-windows-msvc.exe",
+      "download_url": "https://github.com/openai/codex/releases/download/rust-v0.162.0/codex-x86_64-pc-windows-msvc.exe",
+      "sha256": "dce685d569526ef4712fa82d20ff20e1309baad5fcd34215e1126698f611242f",
+      "size_bytes": 334656464
+    },
+    {
+      "codex_version": "0.162.0",
+      "target_triple": "x86_64-unknown-linux-musl",
+      "asset_name": "codex-x86_64-unknown-linux-musl.tar.gz",
+      "download_url": "https://github.com/openai/codex/releases/download/rust-v0.162.0/codex-x86_64-unknown-linux-musl.tar.gz",
+      "sha256": "8daf67f6261161aa5939d8d42a516032d760406216779d7ce6040f242140ff73",
+      "size_bytes": 111393227
     }
   ]
 }
