@@ -133,8 +133,11 @@ fn support_depth_accepts_what_the_registry_alone_does_not_decide() {
             "targets = [\"linux-x64\"]",
             "targets = [\"linux-x64\", \"darwin-arm64\"]",
         ),
-        // Whether forwarding suffices for a template other than `MANAGED` is not decided here.
-        ("forwarding = false", "forwarding = true"),
+        // Whether forwarding suffices for a conditional template is not decided here.
+        (
+            "templates = [\"CORE\", \"SESSION\"]\nshared_mapping = \"mapped\"\nforwarding = false\nnot_applicable_permitted = [\"X1\", \"OUT3\"]",
+            "templates = [\"OPAQUE\"]\nshared_mapping = \"mapped\"\nforwarding = true\nnot_applicable_permitted = [\"X1\"]",
+        ),
     ];
     for (from, to) in cases {
         assert_eq!(SUPPORT_DEPTH.matches(from).count(), 1, "ambiguous `{from}`");
@@ -222,9 +225,24 @@ fn support_depth_rejects_invalid_tables() {
         ("forwarding = false\n", "", "forwarding is required"),
         ("forwarding = false", "forwarding = \"no\"", "invalid type"),
         (
-            "templates = [\"CORE\", \"SESSION\"]\nshared_mapping = \"mapped\"\nforwarding = false",
-            "templates = [\"MANAGED\"]\nshared_mapping = \"mapped\"\nforwarding = true",
-            "cannot be true for a promise that selects `MANAGED`",
+            "templates = [\"CORE\", \"SESSION\"]\nshared_mapping = \"mapped\"\nforwarding = false\nnot_applicable_permitted = [\"X1\", \"OUT3\"]",
+            "templates = [\"MANAGED\"]\nshared_mapping = \"mapped\"\nforwarding = true\nnot_applicable_permitted = [\"X1\"]",
+            "cannot be true for a promise that selects",
+        ),
+        (
+            "templates = [\"CORE\", \"SESSION\"]\nshared_mapping = \"mapped\"\nforwarding = false\nnot_applicable_permitted = [\"X1\", \"OUT3\"]",
+            "templates = [\"CORE\", \"OPAQUE\"]\nshared_mapping = \"mapped\"\nforwarding = true\nnot_applicable_permitted = [\"X1\"]",
+            "cannot be true for a promise that selects",
+        ),
+        (
+            "templates = [\"CORE\", \"SESSION\"]\nshared_mapping = \"mapped\"\nforwarding = false\nnot_applicable_permitted = [\"X1\", \"OUT3\"]",
+            "templates = [\"SESSION\", \"OPAQUE\"]\nshared_mapping = \"mapped\"\nforwarding = true\nnot_applicable_permitted = [\"X1\"]",
+            "cannot be true for a promise that selects",
+        ),
+        (
+            "templates = [\"CORE\", \"SESSION\"]\nshared_mapping = \"mapped\"\nforwarding = false\nnot_applicable_permitted = [\"X1\", \"OUT3\"]",
+            "templates = [\"QUERY\"]\nshared_mapping = \"mapped\"\nforwarding = true\nnot_applicable_permitted = [\"X1\"]",
+            "cannot be true for a promise that selects",
         ),
         ("shared_mapping = \"mapped\"", "shared_mapping = \"wrapper_only\"", "not a `mapped` operation"),
         ("x4 = \"x\"", "x4 = \"\"", "must not be empty"),

@@ -373,10 +373,22 @@ impl OperationDeclaration {
         }
         match self.forwarding {
             None => return Err(invalid(format!("{at}.forwarding is required"))),
-            // The template table: forwarding to the upstream CLI never suffices for `MANAGED`.
-            Some(true) if self.templates.contains(&ObligationTemplate::Managed) => {
+            // The template table: forwarding to the upstream CLI never meets the whole promise of
+            // these. `QUERY` is never for a parsed-record promise, and its `OUT2` is one.
+            Some(true)
+                if self.templates.iter().any(|template| {
+                    matches!(
+                        template,
+                        ObligationTemplate::Core
+                            | ObligationTemplate::Session
+                            | ObligationTemplate::Query
+                            | ObligationTemplate::Managed
+                    )
+                }) =>
+            {
                 return Err(invalid(format!(
-                    "{at}.forwarding cannot be true for a promise that selects `MANAGED`"
+                    "{at}.forwarding cannot be true for a promise that selects `CORE`, \
+                     `SESSION`, `QUERY` or `MANAGED`"
                 )))
             }
             Some(_) => {}
