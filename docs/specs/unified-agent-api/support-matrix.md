@@ -74,13 +74,13 @@ Support publication MUST preserve these distinctions:
 
 Both publication targets MUST be derived in a single pass from one shared support row model.
 Each published row MUST describe exactly one `(agent, version, target)` tuple.
-Publication MUST contain exactly one row for every `(agent, version, target)` tuple implied by the committed root set, each root's `current.json.expected_targets`, and each root's committed `versions/*.json` metadata.
+Publication MUST contain exactly one row for every `(agent, version, target)` tuple implied by the committed root set, each root's `current.json.expected_targets`, and each root's committed `versions/*.json` metadata, and for every tuple that [Support depth](#support-depth) rule 4 implies.
 
 The publication row set is exact:
 
 - omitting an implied tuple is invalid publication state
 - duplicating a tuple is invalid publication state
-- publishing a tuple not implied by committed manifest metadata is invalid publication state
+- publishing a tuple implied neither by committed manifest metadata nor by Support depth rule 4 is invalid publication state
 
 The canonical row field order is:
 
@@ -247,9 +247,10 @@ Rules:
    version metadata, a target that a registry declaration of the version lists implies one as
    well. These rows extend the row set of
    [Shared support row model](#shared-support-row-model), and on them:
-   - a row whose version has no committed version metadata states `manifest_support` and
-     `backend_support` as `unsupported`, derives `uaa_support` from them and has no evidence
-     notes. Its depth facts state the scope as the support-depth contract requires, which for
+   - a row whose version has no committed version metadata states `manifest_support` as
+     `unsupported`, derives `backend_support` and its evidence notes from the version's coverage
+     report for the target as for any row, which gives `unsupported` and no notes where there is
+     no report, and derives `uaa_support` from them. Its depth facts state the scope as the support-depth contract requires, which for
      obligations not yet frozen is insufficient depth; and
    - `pointer_promotion` is derived from the target's pointer files as it is for an expected
      target, whether or not `expected_targets` lists the target, and a target with no pointer

@@ -381,7 +381,7 @@ Must fail:
 - A depth record can exist without its version's `versions/<version>.json`: it is written at the
   first freeze, before acquisition writes the metadata, the docs-only lane writes none, and the
   metadata can be removed while `reports/<version>/` is kept. Support matrix rule 4 now has the
-  record imply its rows in those cases, with `unsupported` name-level states, and rule 3 applies
+  record imply its rows in those cases, with `manifest_support` `unsupported`, and rule 3 applies
   to every record. A target that is no longer expected takes its `pointer_promotion` from its
   pointer files. The generator implements neither yet: it reads pointer files only for expected
   targets and derives rows from metadata.
