@@ -438,3 +438,62 @@ fn markdown_lists_a_promises_templates_in_declaration_order() {
         "{markdown}"
     );
 }
+
+/// Result rule 1: a result counts only where the obligations part is frozen for the row's target.
+/// O is frozen for linux only; E states a verified `EX1` on darwin too, bound to evidence that is in
+/// the revision.
+#[test]
+fn a_result_stated_for_a_target_o_is_not_frozen_for_is_unverified() {
+    use xtask::depth_record::DepthResult;
+    let mut r = record();
+    r["policy"]["selection"]["enrollment"]["modes"][1]
+        .as_object_mut()
+        .unwrap()
+        .remove("targets");
+    r["obligations"]["targets"] = json!([LINUX]);
+    r["execution"]["results"]
+        .as_array_mut()
+        .unwrap()
+        .push(result(
+            json!({ "operation": "tui-excluded", "id": "EX1", "target": DARWIN }),
+            "verified",
+        ));
+    let record = sealed(r, true);
+    assert_eq!(
+        facts(&record, LINUX).mode_exclusions[0].result,
+        DepthResult::Verified
+    );
+    let darwin = facts(&record, DARWIN);
+    assert!(!darwin.obligations_frozen);
+    assert_eq!(darwin.mode_exclusions[0].result, DepthResult::Unverified);
+}
+
+/// The artifact is revision 2 when any row carries depth facts, wherever that row stands.
+#[test]
+fn the_artifact_is_revision_2_when_any_row_carries_depth_facts() {
+    let linux = facts(&sealed(record(), true), LINUX);
+    let row = |agent: &str, depth: Option<DepthFacts>| SupportRow {
+        agent: agent.to_string(),
+        version: "1.2.3".to_string(),
+        target: LINUX.to_string(),
+        manifest_support: ManifestSupportState::Supported,
+        backend_support: BackendSupportState::Supported,
+        uaa_support: UaaSupportState::Supported,
+        pointer_promotion: PointerPromotionState::None,
+        evidence_notes: Vec::new(),
+        depth,
+    };
+    let schema = |rows: &[SupportRow]| {
+        let json = render_publication_bundle(rows, String::new()).unwrap().json;
+        serde_json::from_str::<Value>(&json).unwrap()["schema_version"].clone()
+    };
+    assert_eq!(
+        schema(&[row("aider", Some(linux.clone())), row("codex", None)]),
+        json!(2)
+    );
+    assert_eq!(
+        schema(&[row("aider", None), row("codex", Some(linux))]),
+        json!(2)
+    );
+    assert_eq!(schema(&[row("aider", None), row("codex", None)]), json!(1));
+}

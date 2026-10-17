@@ -83,16 +83,7 @@ pub fn derive_depth_facts(
     target: &str,
     evidence_sha256: &dyn Fn(&str) -> Option<String>,
 ) -> Result<Option<DepthFacts>, String> {
-    let covered = record.is_some_and(|record| {
-        let enrollment = &record.policy.selection.enrollment;
-        enrollment.modes.iter().any(|mode| {
-            mode.targets
-                .as_ref()
-                .unwrap_or(&enrollment.targets)
-                .iter()
-                .any(|t| t == target)
-        })
-    });
+    let covered = record.is_some_and(|record| covers(record, target));
     match record {
         // A declared target the record does not cover still lists the record's capabilities.
         Some(record) if covered || declared => Facts::new(record, target, evidence_sha256).derive(),
@@ -113,6 +104,18 @@ pub fn apply_depth(uaa_support: UaaSupportState, facts: Option<&DepthFacts>) -> 
         }
         _ => uaa_support,
     }
+}
+
+/// Whether the record's selection selects a mode on the target.
+fn covers(record: &DepthRecord, target: &str) -> bool {
+    let enrollment = &record.policy.selection.enrollment;
+    enrollment.modes.iter().any(|mode| {
+        mode.targets
+            .as_ref()
+            .unwrap_or(&enrollment.targets)
+            .iter()
+            .any(|t| t == target)
+    })
 }
 
 fn not_yet_frozen() -> DepthFacts {
@@ -141,7 +144,9 @@ impl<'a> Facts<'a> {
         evidence_sha256: &'a dyn Fn(&str) -> Option<String>,
     ) -> Self {
         let obligations = record.obligations.as_ref();
-        let frozen = obligations.is_some_and(|o| o.targets.iter().any(|t| t == target));
+        // O frozen for a target the selection does not cover freezes nothing that row publishes.
+        let frozen = covers(record, target)
+            && obligations.is_some_and(|o| o.targets.iter().any(|t| t == target));
         let current = match (obligations, &record.execution) {
             (Some(o), Some(e)) => {
                 e.policy_identity == record.policy.identity && e.obligations_identity == o.identity

@@ -373,6 +373,13 @@ fn a_row_whose_obligations_are_not_frozen_states_so() {
         .unwrap()
         .unwrap();
     assert!(win.promises.is_empty() && win.mode_exclusions.is_empty());
+    // O frozen for a target the selection does not cover freezes nothing there.
+    let mut wider = self::record();
+    wider["obligations"]["targets"] = json!([LINUX, DARWIN, "win32-x64"]);
+    let wider = derive_depth_facts(Some(&sealed(wider, true)), true, "win32-x64", &none)
+        .unwrap()
+        .unwrap();
+    assert!(!wider.obligations_frozen);
     assert_eq!(win.capabilities.len(), 1);
     assert!(!win.capabilities[0].depth_qualified);
     assert_eq!(
