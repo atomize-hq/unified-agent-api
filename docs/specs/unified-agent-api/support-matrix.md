@@ -245,7 +245,7 @@ Rules:
 4. For a version that has committed version metadata, a target that the version's depth record
    covers, or that a registry declaration of the version lists, implies a row for that agent,
    version and target, whether or not `current.json.expected_targets` still lists the target.
-5. In the next revision of the JSON artifact the row model includes, for a depth-enrolled row and
+5. In revision 2 of the JSON artifact the row model includes, for a depth-enrolled row and
    its target:
    - each promise of the record's selection that serves a covered mode on the target, with every
      obligation of that promise and the obligation's published result;
@@ -279,13 +279,14 @@ Rules:
    [Support debt inventory](#support-debt-inventory) puts it. Neither is a second place for the
    facts of rule 5.
 9. `schema_version` 1 of the JSON artifact is the row model of the sections above. The facts of
-   rule 5 and the derivation of rule 6 belong to the next revision of the artifact. That revision
-   is an executable schema revision of this spec, among those the support-depth contract's path
-   enablement requires to be adopted, and this revision of the spec does not define its fields.
-   In it, the exact row set and the row model are those of the sections above as rules 4 and 5
-   extend them, and a row without depth facts has exactly the fields and the values it has in
-   revision 1. A reader of the artifact MUST require the revision it supports, and it MUST NOT
-   read an artifact of another revision as one that holds no depth-enrolled row.
+   rule 5 and the derivation of rule 6 belong to revision 2, which
+   [Revision 2 of the JSON artifact](#revision-2-of-the-json-artifact) defines. That revision is
+   an executable schema revision of this spec, among those the support-depth contract's path
+   enablement requires to be adopted. In it, the exact row set and the row model are those of
+   the sections above as rules 4 and 5 extend them, and a row without depth facts has exactly
+   the fields and the values it has in revision 1. A reader of the artifact MUST require the
+   revision it supports, and it MUST NOT read an artifact of another revision as one that holds
+   no depth-enrolled row.
 10. [Separation from the capability matrix](#separation-from-the-capability-matrix) holds for
     depth-enrolled rows as well. A row's capability-level fact says whether a capability is
     depth-qualified. It never says that a backend advertises the capability, and the capability
@@ -302,9 +303,90 @@ published results of that target. Without the revision of rule 9, a reader writt
 would take a `uaa_support` that depends on depth facts for one derived from manifest and backend
 support alone.
 
+### Revision 2 of the JSON artifact
+
+Revision 2 writes `schema_version` 2. A depth-enrolled row has one member after the eight of
+revision 1, `depth`, and a row without depth facts has none. The artifact is written as revision 2
+when any row carries depth facts and as revision 1 otherwise, so the two agree on every row
+without depth facts. A reader that supports revision 2 therefore also reads revision 1, as an
+artifact in which no row carries depth facts. Every object below takes exactly the
+members listed, and a reader MUST reject any other.
+
+`depth`:
+
+| Member | Value |
+| --- | --- |
+| `obligations_frozen` | `true` when the version's depth record selects a mode on the row's target and states an obligations part frozen for that target, otherwise `false`. A row whose version has no depth record has `false` and the three lists `[]`. A row whose record covers no mode on its target has no promises and no mode exclusions, and still lists the record's capabilities. |
+| `promises` | One entry for each operation of the record's selection that is not a mode exclusion and serves a mode selected on the row's target, in ascending order of `operation`. |
+| `mode_exclusions` | One `{ "mode", "operation", "result" }` for each mode selected on the row's target that a mode exclusion serves: the mode's selector, the exclusion's operation id and the published result of its `EX1` obligation. In ascending order of `operation`. |
+| `capabilities` | One `{ "id", "depth_qualified" }` for each capability the record's mappings claim, in ascending order of `id`. |
+
+A promise:
+
+| Member | Value |
+| --- | --- |
+| `operation` | The operation id. |
+| `templates` | The obligation templates its declaration selects, in the declaration's order. |
+| `qualified` | Whether the promise is published as qualified. |
+| `outcomes` | Each of `"insufficient_depth"`, `"authorized_debt"` and `"classification_required"` that applies, in that order. |
+| `obligations` | `[]` while `obligations_frozen` is `false`. Otherwise one `{ "id", "result" }` for each obligation id the obligations part states for the operation, which is the set the policy part resolves for it, in the order `R1`, `V1`, `G1`, `E1`, `A1`, `X1` to `X4`, `OUT1` to `OUT4`, `LC1` to `LC4`, `FX1`, `S1`, `N1`, `B1`, `MCP1`, `EX1`, then one `{ "capability", "result" }` for each capability mapping that names the operation, its `M` obligation, in ascending order of `capability`. |
+
+A `result` is `"verified"`, `"unverified"`, `"failed"` or `"not_applicable"`, the published result
+that the support-depth contract's record invariant 3 decides:
+
+1. A result is `unverified` unless the record's obligations part is frozen for the row's target,
+   its execution part references the policy and obligations identities that the record states,
+   and it states a result for the obligation on the row's target.
+2. A stated `verified` result is `unverified` unless it binds at least one file and each file it
+   binds is in the revision with the content identity the record states.
+3. A stated `not_applicable` result is `unverified` unless the promise's `not_applicable_permitted`
+   names the obligation. No promise permits it for an `M` obligation.
+4. Any other stated result is published as stated.
+
+The other values:
+
+- A promise is qualified when `obligations_frozen` is `true`, every obligation in its
+  `obligations` is `verified` or `not_applicable`, no unit of its operation is
+  `classification_required`, and the record lists an acceptance entry made for what the record
+  states now, as the support-depth contract's record invariant 4 requires.
+- `insufficient_depth` applies when `obligations_frozen` is `false` or an obligation's result is
+  `unverified` or `failed`. `classification_required` applies when the obligations part lists a
+  unit of the operation as `classification_required`. `authorized_debt` applies when a debt row in
+  force authorizes the record's version, lists the row's target and has as its name identity a
+  surface the obligations part assigns to the operation. The rows in force are the policy part's
+  `debt_baseline`, in which, while the execution part references the identities the record
+  states, each row it grants is replaced by its grant and each row it retires is removed.
+- A capability is depth-qualified when every operation its mapping names is a promise of the row
+  that is qualified. Each such operation carries the capability's `M` obligation, so the
+  shared mapping rule's requirement that one of them be `verified` is then met.
+- `qualified` states qualification. Revision 2 does not state the support-depth contract's
+  qualified forwarding outcome, because the policy part does not record whether a promise
+  forwards to the upstream CLI, and a promise's `templates` settle it only for some templates.
+  Until a revision states it, a report cannot tell a qualified forwarding promise from another
+  qualified promise. A mode exclusion is stated by `mode_exclusions`, a row that is not depth-enrolled by the
+  absence of `depth`, and an unresolved depth enrollment by the failure of publication.
+
+Publication MUST fail when the record's obligations part is frozen for the row's target and, for
+an operation that serves a mode selected on the target, states no obligation set or one other than
+the set the policy part resolves: its `base` and the obligations its `templates` state for the
+operation's templates, or for a mode exclusion those of `EXCLUDED` alone. Such a row would have no
+truthful `obligations`, and a promise could qualify on a shorter list than its own.
+
+These values are what the record and the evidence it binds decide. Whether a route may publish a
+change to them is depth admission, which the support-depth contract owns: in particular, a result
+that its reuse and invalidation rules invalidate through a dependency outside the bound evidence
+is not visible here.
+
+The Markdown projection states the same facts. After an agent's table, each depth-enrolled row of
+that agent has a level-four heading `Depth facts:` followed by the agent, the version and the
+target, each in backticks, then a line
+`Obligations frozen: yes` or `no`, and, for each list that is not empty, a table: promises with
+their templates, `qualified`, outcomes and every obligation's result; mode exclusions with their
+operation and `EX1` result; and capabilities with `depth_qualified`.
+
 ### Present behavior
 
-None of this section is implemented. Source references are to `staging` at `f61534be`. Today:
+Revision 2 is defined and nothing writes it. Source references are to `staging` at `f61534be`. Today:
 
 - No manifest root holds a depth record and the registry declares no depth enrollment, so no row is
   depth-enrolled.
@@ -317,6 +399,10 @@ None of this section is implemented. Source references are to `staging` at `f615
   (`crates/xtask/src/support_matrix/derive.rs:471`).
 - The generator loads the agent registry to find the manifest roots it publishes
   (`crates/xtask/src/support_matrix/derive.rs:258-269`) and reads nothing else from it.
+- `crates/xtask/src/support_matrix/depth.rs` derives a row's depth facts from a depth record and
+  the content identities of the files it binds, applies rule 6 to `uaa_support`, and renders the
+  facts as Markdown. It is not at `f61534be`. The generator calls none of it and gives every row
+  no depth facts.
 - The JSON artifact is written with `schema_version` 1
   (`crates/xtask/src/support_matrix/publication.rs:20-31`). Inside a workspace,
   `manifest-validate` requires that value (`crates/xtask/src/manifest_validate.rs:635-652`).
@@ -329,7 +415,8 @@ None of this section is implemented. Source references are to `staging` at `f615
   rows with the derived ones, and compares the published Markdown with its own copy of the row
   rendering (`crates/xtask/src/agent_maintenance/drift/publication.rs:211-277`,
   `crates/xtask/src/agent_maintenance/drift/shared.rs:134-162`). For a depth-enrolled row each of
-  them would read the state that rule 6 yields.
+  them would read the state that rule 6 yields. The drift check's copy of the row rendering does
+  not render depth facts.
 
 ## Verification checklist
 

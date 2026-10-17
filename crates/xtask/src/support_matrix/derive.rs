@@ -350,6 +350,8 @@ fn derive_rows_for_loaded_root(root: &LoadedAgentRoot) -> Result<Vec<SupportRow>
                 uaa_support,
                 pointer_promotion,
                 evidence_notes,
+                // ponytail: no depth facts until the evaluator gates writing them.
+                depth: None,
             });
         }
     }
