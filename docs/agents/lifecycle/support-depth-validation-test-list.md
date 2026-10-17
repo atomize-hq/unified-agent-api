@@ -397,10 +397,10 @@ Must fail:
   claimed capability is depth-qualified, even where the record claims one capability and the agent
   advertises many. The row names the capabilities in `depth.capabilities`, and a reader of the
   one column does not see them.
-- Rule 6 of the support matrix spec lists every capability the record claims on every
-  depth-enrolled row of the version, so a target on which no operation of a capability's mapping
-  is enrolled publishes that capability as not depth-qualified and its row cannot be
-  `supported`. Decide whether that is intended, or whether a capability is assessed only on the
+- Revision 2 lists every capability the record claims on every depth-enrolled row of the
+  version, a declared target the record does not yet cover included, so a target on which no
+  operation of a capability's mapping is enrolled publishes that capability as not
+  depth-qualified and rule 6 keeps its row from being `supported`. Decide whether that is intended, or whether a capability is assessed only on the
   targets its mapping's operations are enrolled on.
 - `support-matrix` regenerates every agent's rows. A run made for one agent can find that another
   agent's row would rise because that agent's record now supports it. The support-depth contract
@@ -409,10 +409,12 @@ Must fail:
   regeneration. Decide which route publishes the raise under the owning path's authority, and how a
   refused run names the row that blocked it.
 - The support-depth contract's Publication table has an outcome for a qualified forwarding promise
-  and none for a qualified promise of another kind. Revision 2 of the support matrix states both
-  through a promise's `qualified`, and a promise to which no outcome applies has `outcomes: []`.
-  It does not say whether a promise forwards: a reader tells that from `templates`. Decide
-  whether P should state it.
+  and none for a qualified promise of another kind. Revision 2 of the support matrix states
+  qualification through a promise's `qualified`, a promise to which no outcome applies has
+  `outcomes: []`, and it cannot state the qualified forwarding outcome because P does not record
+  whether a promise forwards. A promise's `templates` settle that only where the template
+  table's forwarding column is a plain yes or never. Decide whether the registry declaration
+  states it.
 - Bound evidence is named by path and can lie outside the manifest root, such as a test source
   under `crates/`. The support matrix reads it only for its content identity. A result that the
   support-depth contract's reuse and invalidation rules invalidate through a dependency outside the

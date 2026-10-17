@@ -25,8 +25,14 @@ pub fn render_publication_bundle(
     rows: &[SupportRow],
     runtime_support_data: String,
 ) -> Result<PublicationBundle, String> {
+    // Revision 2 carries depth facts; revision 1 cannot, so a row with them makes the artifact 2.
+    let schema_version = if rows.iter().any(|row| row.depth.is_some()) {
+        2
+    } else {
+        1
+    };
     let json = serde_json::to_string_pretty(&SupportMatrixArtifact {
-        schema_version: 1,
+        schema_version,
         rows: rows.to_vec(),
     })
     .map_err(|err| format!("serialize support-matrix json: {err}"))?;

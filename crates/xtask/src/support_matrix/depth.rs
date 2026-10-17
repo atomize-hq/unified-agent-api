@@ -93,10 +93,12 @@ pub fn derive_depth_facts(
                 .any(|t| t == target)
         })
     });
-    let Some(record) = record.filter(|_| covered) else {
-        return Ok(declared.then(not_yet_frozen));
-    };
-    Facts::new(record, target, evidence_sha256).derive()
+    match record {
+        // A declared target the record does not cover still lists the record's capabilities.
+        Some(record) if covered || declared => Facts::new(record, target, evidence_sha256).derive(),
+        None if declared => Ok(Some(not_yet_frozen())),
+        _ => Ok(None),
+    }
 }
 
 /// Rule 6: a row that the name-level derivation makes `supported` is `partial` unless every
@@ -197,6 +199,7 @@ impl<'a> Facts<'a> {
         let mut mode_exclusions = Vec::new();
         let mut qualified = BTreeSet::new();
         for (id, op) in &on_target {
+            let stated = self.stated_obligations(op)?;
             if op.is_excluded() {
                 for mode in &op.serves {
                     mode_exclusions.push(ModeExclusionFacts {
@@ -208,7 +211,7 @@ impl<'a> Facts<'a> {
                 }
                 continue;
             }
-            let promise = self.promise(op)?;
+            let promise = self.promise(op, stated.as_ref());
             if promise.qualified {
                 qualified.insert(*id);
             }
@@ -240,24 +243,57 @@ impl<'a> Facts<'a> {
         }))
     }
 
-    fn promise(&self, op: &OperationDeclaration) -> Result<PromiseFacts, String> {
+    /// O's obligation set for the operation while O is frozen for the target. It must be the
+    /// set P resolves, so that no promise qualifies on a shorter list than its own.
+    fn stated_obligations(
+        &self,
+        op: &OperationDeclaration,
+    ) -> Result<Option<BTreeSet<ObligationId>>, String> {
+        if !self.frozen {
+            return Ok(None);
+        }
+        let stated = self
+            .record
+            .obligations
+            .iter()
+            .flat_map(|o| &o.operations)
+            .find(|stated| stated.id == op.id)
+            .ok_or_else(|| {
+                format!(
+                    "depth record: the obligations part states no obligation set for \
+                     operation `{}`",
+                    op.id
+                )
+            })?;
+        let policy = &self.record.policy;
+        let mut resolved: BTreeSet<ObligationId> = policy
+            .templates
+            .iter()
+            .filter(|rule| op.templates.contains(&rule.template))
+            .flat_map(|rule| rule.obligations.iter().copied())
+            .collect();
+        if !op.is_excluded() {
+            resolved.extend(policy.base.iter().copied());
+        }
+        let stated: BTreeSet<ObligationId> = stated.obligations.iter().copied().collect();
+        if stated != resolved {
+            return Err(format!(
+                "depth record: the obligations part states an obligation set for operation `{}` \
+                 that is not the one its policy resolves",
+                op.id
+            ));
+        }
+        Ok(Some(stated))
+    }
+
+    fn promise(
+        &self,
+        op: &OperationDeclaration,
+        stated: Option<&BTreeSet<ObligationId>>,
+    ) -> PromiseFacts {
         let mut obligations = Vec::new();
-        if self.frozen {
-            let stated = self
-                .record
-                .obligations
-                .iter()
-                .flat_map(|o| &o.operations)
-                .find(|stated| stated.id == op.id)
-                .ok_or_else(|| {
-                    format!(
-                        "depth record: the obligations part states no obligation set for \
-                         operation `{}`",
-                        op.id
-                    )
-                })?;
-            let ids: BTreeSet<ObligationId> = stated.obligations.iter().copied().collect();
-            for id in ids {
+        if let Some(ids) = stated {
+            for &id in ids {
                 let reference = self.reference(&op.id, Some(id), None);
                 obligations.push(PublishedObligation {
                     id: Some(id),
@@ -303,29 +339,37 @@ impl<'a> Facts<'a> {
             outcomes.insert(Outcome::AuthorizedDebt);
         }
 
-        Ok(PromiseFacts {
+        PromiseFacts {
             operation: op.id.clone(),
             templates: op.templates.iter().map(name).collect(),
             qualified: !insufficient && !classification_required && self.accepted,
             outcomes: outcomes.into_iter().collect(),
             obligations,
-        })
+        }
     }
 
-    /// A grant that E materializes for the version, on the target, for a surface the operation
-    /// owns.
+    /// A debt row in force for the version on the target covers a surface the operation owns.
+    /// The rows in force are P's baseline, with each row E grants or retires replaced by E's
+    /// grant or removed, while E references the P and O the record states.
     fn authorized_debt(&self, op: &OperationDeclaration) -> bool {
-        let (Some(o), Some(e)) = (&self.record.obligations, &self.record.execution) else {
+        let Some(stated) = self
+            .record
+            .obligations
+            .iter()
+            .flat_map(|o| &o.operations)
+            .find(|stated| stated.id == op.id)
+        else {
             return false;
         };
-        if !self.current {
-            return false;
-        }
-        let Some(stated) = o.operations.iter().find(|stated| stated.id == op.id) else {
-            return false;
+        let (grants, retired) = match &self.record.execution {
+            Some(e) if self.current => (e.debt_grants.as_slice(), e.debt_retired.as_slice()),
+            _ => (&[][..], &[][..]),
         };
+        let baseline = self.record.policy.debt_baseline.iter().filter(|row| {
+            !retired.contains(&row.row_id) && !grants.iter().any(|g| g.row_id == row.row_id)
+        });
         let version = &self.enrollment().version;
-        e.debt_grants.iter().any(|row| {
+        grants.iter().chain(baseline).any(|row| {
             row.authorized_at_version == *version
                 && row.scope_target_triples.contains(self.target)
                 && stated

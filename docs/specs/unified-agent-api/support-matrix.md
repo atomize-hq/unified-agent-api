@@ -245,7 +245,7 @@ Rules:
 4. For a version that has committed version metadata, a target that the version's depth record
    covers, or that a registry declaration of the version lists, implies a row for that agent,
    version and target, whether or not `current.json.expected_targets` still lists the target.
-5. In the next revision of the JSON artifact the row model includes, for a depth-enrolled row and
+5. In revision 2 of the JSON artifact the row model includes, for a depth-enrolled row and
    its target:
    - each promise of the record's selection that serves a covered mode on the target, with every
      obligation of that promise and the obligation's published result;
@@ -306,14 +306,16 @@ support alone.
 ### Revision 2 of the JSON artifact
 
 Revision 2 writes `schema_version` 2. A depth-enrolled row has one member after the eight of
-revision 1, `depth`, and a row without depth facts has none. Every object below takes exactly the
+revision 1, `depth`, and a row without depth facts has none. The artifact is written as revision 2
+when any row carries depth facts and as revision 1 otherwise, so the two agree on every row
+without depth facts. Every object below takes exactly the
 members listed, and a reader MUST reject any other.
 
 `depth`:
 
 | Member | Value |
 | --- | --- |
-| `obligations_frozen` | `true` when the version's depth record states an obligations part frozen for the row's target, otherwise `false`. A row that is depth-enrolled only because the registry declares its version and target, or whose record covers no mode on the target, has `false` and the three lists `[]`. |
+| `obligations_frozen` | `true` when the version's depth record states an obligations part frozen for the row's target, otherwise `false`. A row whose version has no depth record has `false` and the three lists `[]`. A row whose record covers no mode on its target has no promises and no mode exclusions, and still lists the record's capabilities. |
 | `promises` | One entry for each operation of the record's selection that is not a mode exclusion and serves a mode selected on the row's target, in ascending order of `operation`. |
 | `mode_exclusions` | One `{ "mode", "operation", "result" }` for each mode selected on the row's target that a mode exclusion serves: the mode's selector, the exclusion's operation id and the published result of its `EX1` obligation. In ascending order of `operation`. |
 | `capabilities` | One `{ "id", "depth_qualified" }` for each capability the record's mappings claim, in ascending order of `id`. |
@@ -326,14 +328,14 @@ A promise:
 | `templates` | The obligation templates its declaration selects, in the declaration's order. |
 | `qualified` | Whether the promise is published as qualified. |
 | `outcomes` | Each of `"insufficient_depth"`, `"authorized_debt"` and `"classification_required"` that applies, in that order. |
-| `obligations` | `[]` while `obligations_frozen` is `false`. Otherwise one `{ "id", "result" }` for each obligation id the obligations part states for the operation, in the order `R1`, `V1`, `G1`, `E1`, `A1`, `X1` to `X4`, `OUT1` to `OUT4`, `LC1` to `LC4`, `FX1`, `S1`, `N1`, `B1`, `MCP1`, `EX1`, then one `{ "capability", "result" }` for each capability mapping that names the operation, its `M` obligation, in ascending order of `capability`. |
+| `obligations` | `[]` while `obligations_frozen` is `false`. Otherwise one `{ "id", "result" }` for each obligation id the obligations part states for the operation, which is the set the policy part resolves for it, in the order `R1`, `V1`, `G1`, `E1`, `A1`, `X1` to `X4`, `OUT1` to `OUT4`, `LC1` to `LC4`, `FX1`, `S1`, `N1`, `B1`, `MCP1`, `EX1`, then one `{ "capability", "result" }` for each capability mapping that names the operation, its `M` obligation, in ascending order of `capability`. |
 
 A `result` is `"verified"`, `"unverified"`, `"failed"` or `"not_applicable"`, the published result
 that the support-depth contract's record invariant 3 decides:
 
-1. A result is `unverified` unless the record's execution part references the policy and
-   obligations identities that the record states and states a result for the obligation on the
-   row's target.
+1. A result is `unverified` unless the record's obligations part is frozen for the row's target,
+   its execution part references the policy and obligations identities that the record states,
+   and it states a result for the obligation on the row's target.
 2. A stated `verified` result is `unverified` unless it binds at least one file and each file it
    binds is in the revision with the content identity the record states.
 3. A stated `not_applicable` result is `unverified` unless the promise's `not_applicable_permitted`
@@ -348,21 +350,26 @@ The other values:
   states now, as the support-depth contract's record invariant 4 requires.
 - `insufficient_depth` applies when `obligations_frozen` is `false` or an obligation's result is
   `unverified` or `failed`. `classification_required` applies when the obligations part lists a
-  unit of the operation as `classification_required`. `authorized_debt` applies when the record's
-  execution part references the identities the record states and materializes a debt grant for
-  the record's version that lists the row's target and whose name identity is a surface the
-  obligations part assigns to the operation.
+  unit of the operation as `classification_required`. `authorized_debt` applies when a debt row in
+  force authorizes the record's version, lists the row's target and has as its name identity a
+  surface the obligations part assigns to the operation. The rows in force are the policy part's
+  `debt_baseline`, in which, while the execution part references the identities the record
+  states, each row it grants is replaced by its grant and each row it retires is removed.
 - A capability is depth-qualified when every operation its mapping names is a promise of the row
   that is qualified. Each such operation carries the capability's `M` obligation, so the
   shared mapping rule's requirement that one of them be `verified` is then met.
-- The support-depth contract's qualified forwarding outcome is stated by `qualified`. The record
-  does not say whether a promise forwards to the upstream CLI. A reader that needs to tell a
-  forwarding promise from another reads its `templates` against that contract's template table.
-  A mode exclusion is stated by `mode_exclusions`, a row that is not depth-enrolled by the
+- `qualified` states qualification. Revision 2 does not state the support-depth contract's
+  qualified forwarding outcome, because the policy part does not record whether a promise
+  forwards to the upstream CLI, and a promise's `templates` settle it only for some templates.
+  Until a revision states it, a report cannot tell a qualified forwarding promise from another
+  qualified promise. A mode exclusion is stated by `mode_exclusions`, a row that is not depth-enrolled by the
   absence of `depth`, and an unresolved depth enrollment by the failure of publication.
 
-Publication MUST fail when the record's obligations part is frozen for the row's target and states
-no obligation set for the operation of a promise; such a row has no truthful `obligations`.
+Publication MUST fail when the record's obligations part is frozen for the row's target and, for
+an operation that serves a mode selected on the target, states no obligation set or one other than
+the set the policy part resolves: its `base` and the obligations its `templates` state for the
+operation's templates, or for a mode exclusion those of `EXCLUDED` alone. Such a row would have no
+truthful `obligations`, and a promise could qualify on a shorter list than its own.
 
 These values are what the record and the evidence it binds decide. Whether a route may publish a
 change to them is depth admission, which the support-depth contract owns: in particular, a result

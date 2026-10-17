@@ -92,7 +92,8 @@ fn record() -> Value {
             "acquired_inputs": [],
             "operations": [{ "id": "run", "surfaces": [surface()],
                              "obligations": ["A1", "E1", "G1", "R1", "V1", "X1", "X2", "X3", "X4",
-                                             "OUT3", "LC2"] }],
+                                             "OUT3", "LC2"] },
+                           { "id": "tui-excluded", "surfaces": [], "obligations": ["EX1"] }],
             "classification_required": [],
             "acceptance_work": []
         },
@@ -366,10 +367,77 @@ fn a_row_whose_obligations_are_not_frozen_states_so() {
         derive_depth_facts(Some(&record), false, "win32-x64", &none).unwrap(),
         None
     );
+    // A declared target the record does not cover still lists the record's capabilities, so
+    // rule 6 lowers its row.
+    let win = derive_depth_facts(Some(&record), true, "win32-x64", &none)
+        .unwrap()
+        .unwrap();
+    assert!(win.promises.is_empty() && win.mode_exclusions.is_empty());
+    assert_eq!(win.capabilities.len(), 1);
+    assert!(!win.capabilities[0].depth_qualified);
     assert_eq!(
-        derive_depth_facts(Some(&record), true, "win32-x64", &none).unwrap(),
-        Some(declared)
+        apply_depth(UaaSupportState::Supported, Some(&win)),
+        UaaSupportState::Partial
     );
+}
+
+#[test]
+fn an_obligation_set_other_than_the_one_policy_resolves_is_refused() {
+    for (operation, set) in [
+        (0, json!(["OUT3"])),
+        (0, json!([])),
+        (
+            0,
+            json!(["A1", "E1", "G1", "R1", "V1", "X1", "X2", "X3", "X4", "OUT3", "LC2", "S1"]),
+        ),
+        (1, json!([])),
+        (1, json!(["EX1", "R1"])),
+    ] {
+        let mut record = record();
+        record["obligations"]["operations"][operation]["obligations"] = set.clone();
+        let record = sealed(record, true);
+        let err = derive_depth_facts(Some(&record), false, LINUX, &|_| None).unwrap_err();
+        assert!(
+            err.contains("not the one its policy resolves"),
+            "{set}: {err}"
+        );
+    }
+    // The exclusion is checked only where its mode is selected.
+    let mut record = record();
+    record["obligations"]["operations"][1]["obligations"] = json!([]);
+    let record = sealed(record, true);
+    derive_depth_facts(Some(&record), false, DARWIN, &|_| None).expect("tui is linux-only");
+}
+
+#[test]
+fn debt_in_force_is_the_baseline_as_e_grants_or_retires_it() {
+    let row = |row_id: &str, targets: Value| {
+        json!({
+            "row_id": row_id, "agent_id": "aider", "surface_kind": "flags",
+            "command_path": "aider run", "surface_id": "--output-format", "current_reason": "r",
+            "blocker_class": "b", "owner": "o", "milestone": "m", "follow_on": "f",
+            "evidence_ref": "e", "scope_target_triples": targets,
+            "authorized_at_version": "1.2.3", "authorization_evidence_ref": "a"
+        })
+    };
+    let debt = |edit: &dyn Fn(&mut Value)| {
+        let mut record = record();
+        record["policy"]["debt_baseline"] = json!([row("row-1", json!([LINUX]))]);
+        edit(&mut record);
+        facts(&sealed(record, true), LINUX).promises[0]
+            .outcomes
+            .contains(&Outcome::AuthorizedDebt)
+    };
+    assert!(debt(&|_| ()), "a baseline row in force");
+    assert!(!debt(&|r| r["execution"]["debt_retired"] = json!(["row-1"])));
+    assert!(!debt(
+        &|r| r["execution"]["debt_grants"] = json!([row("row-1", json!([DARWIN]))])
+    ));
+    // A stale E neither retires nor replaces a baseline row.
+    assert!(debt(&|r| {
+        r["execution"]["debt_retired"] = json!(["row-1"]);
+        r["execution"]["policy_identity"] = json!(sha('a'));
+    }));
 }
 
 #[test]
@@ -413,6 +481,13 @@ fn revision_2_rows_carry_depth_facts_and_other_rows_are_unchanged() {
     );
 
     let bundle = render_publication_bundle(&[enrolled], String::new()).unwrap();
+    assert!(
+        bundle.json.starts_with("{\n  \"schema_version\": 2,"),
+        "{}",
+        bundle.json
+    );
+    let plain_bundle = render_publication_bundle(&[row(None)], String::new()).unwrap();
+    assert!(plain_bundle.json.starts_with("{\n  \"schema_version\": 1,"));
     let expected = "\n#### Depth facts: `aider` `1.2.3` `linux-x64`\n\nObligations frozen: yes\n\n\
         | promise | templates | qualified | outcomes | obligations |\n|---|---|---|---|---|\n\
         | `run` | `CORE` | yes | — | `R1` verified; `V1` verified; `G1` verified; `E1` verified; \
@@ -422,3 +497,6 @@ fn revision_2_rows_carry_depth_facts_and_other_rows_are_unchanged() {
         \n| capability | depth_qualified |\n|---|---|\n| `agent_api.run` | yes |\n";
     assert!(bundle.markdown.ends_with(expected), "{}", bundle.markdown);
 }
+
+#[path = "support_matrix_depth/more.rs"]
+mod more;
