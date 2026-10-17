@@ -510,6 +510,25 @@ fn support_depth_states_the_one_version_an_approval_approves() {
             "\n[support-depth]\nversion = \"1.2.3\"\n",
             "unknown field `support-depth`",
         ),
+        // Appended after the last table, a dotted key lands inside it.
+        (
+            "approval-depth-dotted",
+            "",
+            "\nsupport_depth.version = \"1.2.3\"\n",
+            "belongs at the root",
+        ),
+        (
+            "approval-depth-descriptor",
+            "",
+            "\n[descriptor.support_depth]\nversion = \"1.2.3\"\n",
+            "has `support_depth` at `descriptor.support_depth`",
+        ),
+        (
+            "approval-depth-array",
+            "",
+            "\n[[descriptor.notes]]\nsupport_depth = \"1.2.3\"\n",
+            "has `support_depth` at `descriptor.notes[0].support_depth`",
+        ),
     ] {
         let err = load_around(name, prepended, appended).expect_err(name);
         assert!(err.contains(expected), "{name}: {err}");

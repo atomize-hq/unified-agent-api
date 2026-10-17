@@ -224,6 +224,15 @@ fn parse_approval_document(
             relative_path.display()
         )));
     }
+    // So would one placed inside another table, as an appended dotted key lands in the last.
+    for (key, item) in root.iter() {
+        if let Some(path) = nested_support_depth(item, key) {
+            return Err(ApprovalArtifactError::Validation(format!(
+                "approval artifact `{}` has `support_depth` at `{path}`; it belongs at the root",
+                relative_path.display()
+            )));
+        }
+    }
     let artifact_version = required_string(root, "artifact_version", relative_path)?;
     validate_artifact_version(relative_path, &artifact_version)?;
     let support_depth_version = parse_support_depth(root, relative_path)?;
@@ -373,6 +382,32 @@ const ROOT_KEYS: [&str; 10] = [
     "descriptor",
     "support_depth",
 ];
+
+/// The path of a `support_depth` key inside `item`, a value of the root.
+fn nested_support_depth(item: &toml_edit::Item, at: &str) -> Option<String> {
+    let tables: Vec<(String, &dyn toml_edit::TableLike)> =
+        match (item.as_table_like(), item.as_array_of_tables()) {
+            (Some(table), _) => vec![(at.to_string(), table)],
+            (None, Some(tables)) => tables
+                .iter()
+                .enumerate()
+                .map(|(index, table)| {
+                    (format!("{at}[{index}]"), table as &dyn toml_edit::TableLike)
+                })
+                .collect(),
+            _ => return None,
+        };
+    tables.into_iter().find_map(|(at, table)| {
+        table.iter().find_map(|(key, child)| {
+            let path = format!("{at}.{key}");
+            if key == "support_depth" {
+                Some(path)
+            } else {
+                nested_support_depth(child, &path)
+            }
+        })
+    })
+}
 
 /// The charter's support-depth rule 3: `[support_depth]` holds exactly `version`, one exact
 /// upstream version `MAJOR.MINOR.PATCH`.
