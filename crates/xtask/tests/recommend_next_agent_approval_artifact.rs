@@ -430,3 +430,88 @@ fn deferred_maintenance_hashes_are_whitespace_stable() {
         _ => panic!("expected deferred maintenance in both approvals"),
     }
 }
+
+/// A root key goes before the first table, a table after the last one.
+fn load_around(
+    fixture_name: &str,
+    prepended: &str,
+    appended: &str,
+) -> Result<Option<String>, String> {
+    let fixture = fixture_root(fixture_name);
+    seed_canonical_packet(&fixture);
+    let approval_rel = "docs/agents/lifecycle/opencode-onboarding/governance/approved-agent.toml";
+    let contents = recommendation_approval(
+        "opencode",
+        "opencode",
+        "opencode-onboarding",
+        None,
+        "docs/agents/selection/cli-agent-selection-packet.md",
+        enrolled_maintenance(),
+    );
+    write_text(
+        &fixture.join(approval_rel),
+        &format!("{prepended}{contents}{appended}"),
+    );
+    load_approval_artifact(&fixture, approval_rel)
+        .map(|artifact| artifact.support_depth_version)
+        .map_err(|err| err.to_string())
+}
+
+#[test]
+fn support_depth_states_the_one_version_an_approval_approves() {
+    assert_eq!(load_around("approval-depth-none", "", ""), Ok(None));
+    assert_eq!(
+        load_around(
+            "approval-depth-version",
+            "",
+            "\n[support_depth]\nversion = \"1.2.3\"\n"
+        ),
+        Ok(Some("1.2.3".to_string()))
+    );
+    let cases = [
+        ("version = \"1.2\"", "one exact semantic version"),
+        ("version = \"v1.2.3\"", "one exact semantic version"),
+        ("version = \"1.2.3-rc.1\"", "one exact semantic version"),
+        ("version = \"1.2.3+build\"", "one exact semantic version"),
+        ("version = \"latest\"", "one exact semantic version"),
+        ("version = 1", "must be a string"),
+        ("", "missing required field `version`"),
+        (
+            "version = \"1.2.3\"\ntargets = [\"linux-x64\"]",
+            "unknown field `support_depth.targets`",
+        ),
+    ];
+    for (index, (body, expected)) in cases.iter().enumerate() {
+        let err = load_around(
+            &format!("approval-depth-case-{index}"),
+            "",
+            &format!("\n[support_depth]\n{body}\n"),
+        )
+        .expect_err(body);
+        assert!(err.contains(expected), "`{body}`: {err}");
+    }
+    // Not a table, or a misspelled one, is refused rather than read as approving nothing.
+    for (name, prepended, appended, expected) in [
+        (
+            "approval-depth-scalar",
+            "support_depth = \"1.2.3\"\n",
+            "",
+            "must be a table",
+        ),
+        (
+            "approval-depth-other",
+            "notes = \"x\"\n",
+            "",
+            "unknown field `notes`",
+        ),
+        (
+            "approval-depth-typo",
+            "",
+            "\n[support-depth]\nversion = \"1.2.3\"\n",
+            "unknown field `support-depth`",
+        ),
+    ] {
+        let err = load_around(name, prepended, appended).expect_err(name);
+        assert!(err.contains(expected), "{name}: {err}");
+    }
+}

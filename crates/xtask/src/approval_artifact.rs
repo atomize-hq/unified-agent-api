@@ -45,6 +45,9 @@ pub struct ApprovalArtifact {
     pub sha256: String,
     pub descriptor: ApprovalDescriptor,
     pub maintenance: ApprovalMaintenance,
+    /// The one exact upstream version the approval approves a depth enrollment for, from its
+    /// `[support_depth]` table. `None` approves no depth enrollment.
+    pub support_depth_version: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -214,8 +217,16 @@ fn parse_approval_document(
         ))
     })?;
 
+    // A misspelled `[support_depth]` would otherwise read as approving no depth enrollment.
+    if let Some((key, _)) = root.iter().find(|(key, _)| !ROOT_KEYS.contains(key)) {
+        return Err(ApprovalArtifactError::Validation(format!(
+            "approval artifact `{}` has unknown field `{key}`",
+            relative_path.display()
+        )));
+    }
     let artifact_version = required_string(root, "artifact_version", relative_path)?;
     validate_artifact_version(relative_path, &artifact_version)?;
+    let support_depth_version = parse_support_depth(root, relative_path)?;
     let comparison_ref = required_string(root, "comparison_ref", relative_path)?;
     if comparison_ref != COMPARISON_REF_PATH {
         return Err(ApprovalArtifactError::Validation(format!(
@@ -292,6 +303,7 @@ fn parse_approval_document(
     let maintenance = parse_maintenance(maintenance, relative_path)?;
 
     Ok(ApprovalArtifact {
+        support_depth_version,
         relative_path: relative_path.display().to_string(),
         canonical_path: canonical_path.to_path_buf(),
         sha256: hex::encode(Sha256::digest(bytes)),
@@ -347,6 +359,49 @@ fn parse_approval_document(
         },
         maintenance,
     })
+}
+
+const ROOT_KEYS: [&str; 10] = [
+    "artifact_version",
+    "comparison_ref",
+    "selection_mode",
+    "recommended_agent_id",
+    "approved_agent_id",
+    "approval_commit",
+    "approval_recorded_at",
+    "override_reason",
+    "descriptor",
+    "support_depth",
+];
+
+/// The charter's support-depth rule 3: `[support_depth]` holds exactly `version`, one exact
+/// upstream version `MAJOR.MINOR.PATCH`.
+fn parse_support_depth(
+    root: &dyn toml_edit::TableLike,
+    relative_path: &Path,
+) -> Result<Option<String>, ApprovalArtifactError> {
+    if root.get("support_depth").is_none() {
+        return Ok(None);
+    }
+    let table = required_table(root, "support_depth", relative_path)?;
+    if let Some((key, _)) = table.iter().find(|(key, _)| *key != "version") {
+        return Err(ApprovalArtifactError::Validation(format!(
+            "approval artifact `{}` has unknown field `support_depth.{key}`",
+            relative_path.display()
+        )));
+    }
+    let version = required_string(table, "version", relative_path)?;
+    let bare = semver::Version::parse(&version)
+        .map(|parsed| parsed.pre.is_empty() && parsed.build.is_empty())
+        .unwrap_or(false);
+    if !bare {
+        return Err(ApprovalArtifactError::Validation(format!(
+            "approval artifact `{}` field `support_depth.version` must be one exact semantic \
+             version, `MAJOR.MINOR.PATCH`",
+            relative_path.display()
+        )));
+    }
+    Ok(Some(version))
 }
 
 fn validate_artifact_version(

@@ -582,6 +582,7 @@ mod tests {
         fs::create_dir_all(&workspace_root).expect("create workspace root");
 
         let approval = ApprovalArtifact {
+            support_depth_version: None,
             relative_path:
                 "docs/agents/lifecycle/gemini-cli-onboarding/governance/approved-agent.toml"
                     .to_string(),
