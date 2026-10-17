@@ -27,6 +27,7 @@ id = "run"
 serves = ["run-json"]
 templates = ["CORE", "SESSION"]
 shared_mapping = "mapped"
+forwarding = false
 not_applicable_permitted = ["X1", "OUT3"]
 
 [agents.support_depth.enrollments.operations.promise]
@@ -132,6 +133,8 @@ fn support_depth_accepts_what_the_registry_alone_does_not_decide() {
             "targets = [\"linux-x64\"]",
             "targets = [\"linux-x64\", \"darwin-arm64\"]",
         ),
+        // Whether forwarding suffices for a template other than `MANAGED` is not decided here.
+        ("forwarding = false", "forwarding = true"),
     ];
     for (from, to) in cases {
         assert_eq!(SUPPORT_DEPTH.matches(from).count(), 1, "ambiguous `{from}`");
@@ -207,6 +210,7 @@ fn support_depth_rejects_invalid_tables() {
         (TEMPLATES, "templates = [\"CORE\"]\noverride = \"x\"", "unknown field"),
         (EXCLUDED, "templates = [\"EXCLUDED\", \"CORE\"]", "mode exclusion"),
         (EXCLUDED, "templates = [\"EXCLUDED\"]\nshared_mapping = \"wrapper_only\"", "mode exclusion"),
+        (EXCLUDED, "templates = [\"EXCLUDED\"]\nforwarding = false", "mode exclusion"),
         (EXCLUDED, "templates = [\"EXCLUDED\"]\nnot_applicable_permitted = [\"EX1\"]", "mode exclusion"),
         (EXCLUDED, "templates = [\"EXCLUDED\"]\npromise = { r1 = \"r\", v1 = \"v\", g1 = \"g\", e1 = \"e\", a1 = \"a\", x1 = \"x\", x2 = \"x\", x3 = \"x\", x4 = \"x\" }", "mode exclusion"),
         ("rationale = \"interactive only\"\n", "", "rationale is required"),
@@ -215,6 +219,13 @@ fn support_depth_rejects_invalid_tables() {
         (NA, "not_applicable_permitted = [\"X1\", \"X1\"]", "without repeats"),
         (NA, "not_applicable_permitted = [\"M\"]", "unknown variant"),
         ("shared_mapping = \"mapped\"\n", "", "shared_mapping is required"),
+        ("forwarding = false\n", "", "forwarding is required"),
+        ("forwarding = false", "forwarding = \"no\"", "invalid type"),
+        (
+            "templates = [\"CORE\", \"SESSION\"]\nshared_mapping = \"mapped\"\nforwarding = false",
+            "templates = [\"MANAGED\"]\nshared_mapping = \"mapped\"\nforwarding = true",
+            "cannot be true for a promise that selects `MANAGED`",
+        ),
         ("shared_mapping = \"mapped\"", "shared_mapping = \"wrapper_only\"", "not a `mapped` operation"),
         ("x4 = \"x\"", "x4 = \"\"", "must not be empty"),
         ("r1 = \"r\"", "r1 = \"\"", "must not be empty"),

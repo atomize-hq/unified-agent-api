@@ -409,12 +409,11 @@ Must fail:
   regeneration. Decide which route publishes the raise under the owning path's authority, and how a
   refused run names the row that blocked it.
 - The support-depth contract's Publication table has an outcome for a qualified forwarding promise
-  and none for a qualified promise of another kind. Revision 2 of the support matrix states
-  qualification through a promise's `qualified`, a promise to which no outcome applies has
-  `outcomes: []`, and it cannot state the qualified forwarding outcome because P does not record
-  whether a promise forwards. A promise's `templates` settle that only where the template
-  table's forwarding column is a plain yes or never. Decide whether the registry declaration
-  states it.
+  and none for a qualified promise of another kind. The registry declaration states `forwarding`
+  for each promise, revision 2 of the support matrix states `qualified_forwarding` for a
+  qualified forwarding promise, and a qualified promise of another kind has `qualified: true`
+  with no qualification outcome. Whether forwarding suffices for a template whose forwarding
+  column is conditional is the maintainer's call, and only `MANAGED` is refused mechanically.
 - Bound evidence is named by path and can lie outside the manifest root, such as a test source
   under `crates/`. The support matrix reads it only for its content identity. A result that the
   support-depth contract's reuse and invalidation rules invalidate through a dependency outside the

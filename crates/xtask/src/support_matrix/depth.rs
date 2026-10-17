@@ -48,11 +48,12 @@ pub struct PublishedObligation {
 }
 
 /// The outcomes of the support-depth contract's Publication table that can apply to a promise of
-/// a depth-enrolled row. Qualification is stated by `qualified`; a mode exclusion, a row that is
-/// not depth-enrolled and an unresolved enrollment are not stated per promise.
+/// a depth-enrolled row. A mode exclusion, a row that is not depth-enrolled and an unresolved
+/// enrollment are not stated per promise.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Outcome {
+    QualifiedForwarding,
     InsufficientDepth,
     AuthorizedDebt,
     ClassificationRequired,
@@ -344,10 +345,21 @@ impl<'a> Facts<'a> {
             outcomes.insert(Outcome::AuthorizedDebt);
         }
 
+        let qualified = !insufficient && !classification_required && self.accepted;
+        // A qualified forwarding promise has every obligation `verified`, not merely permitted
+        // `not_applicable`.
+        if qualified
+            && op.forwarding == Some(true)
+            && obligations
+                .iter()
+                .all(|o| o.result == DepthResult::Verified)
+        {
+            outcomes.insert(Outcome::QualifiedForwarding);
+        }
         PromiseFacts {
             operation: op.id.clone(),
             templates: op.templates.iter().map(name).collect(),
-            qualified: !insufficient && !classification_required && self.accepted,
+            qualified,
             outcomes: outcomes.into_iter().collect(),
             obligations,
         }

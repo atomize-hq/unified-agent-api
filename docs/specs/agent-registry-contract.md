@@ -233,6 +233,7 @@ id = "exec-json-run"
 serves = ["exec-json"]
 templates = ["CORE", "SESSION"]
 shared_mapping = "mapped"
+forwarding = false
 not_applicable_permitted = ["X1"]
 
 [agents.support_depth.enrollments.operations.promise]
@@ -299,6 +300,7 @@ for the modes it serves: it assigns their obligation templates.
 | `serves` | The `selector` of each mode the operation serves: at least one, without repeats, each declared in `modes`. A mode exclusion serves exactly one mode. |
 | `templates` | The obligation templates the promise selects, by the names the support-depth contract gives them: at least one, without repeats. An entry whose only template is `EXCLUDED` is a mode exclusion. `EXCLUDED` MUST NOT be listed with another template. |
 | `shared_mapping` | `wrapper_only`, `mapped` or `proposed_extension`. Required, except in a mode exclusion, which MUST NOT carry it. |
+| `forwarding` | `true` when the promise is met by forwarding the invocation to the upstream CLI, the question the support-depth contract's template table answers for each template, otherwise `false`. Required, except in a mode exclusion, which MUST NOT carry it. It MUST NOT be `true` when `templates` lists `MANAGED`, for which that table says forwarding never suffices. Whether it suffices for the other templates is the maintainer's decision under that table. |
 | `promise` | What the promise states for each BASE dimension, under the keys `r1`, `v1`, `g1`, `e1`, `a1`, `x1`, `x2`, `x3` and `x4`. Every key is required and none is empty. Required, except in a mode exclusion, which MUST NOT carry it. |
 | `rationale` | Why the mode is excluded. Required and not empty in a mode exclusion. Any other entry MUST NOT carry it. |
 | `not_applicable_permitted` | Optional. The ids of the obligations for which the promise permits a `not_applicable` result, without repeats. Each MUST be a BASE obligation or one that the entry's templates select. A mode exclusion MUST NOT carry it. |

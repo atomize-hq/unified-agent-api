@@ -328,7 +328,7 @@ A promise:
 | `operation` | The operation id. |
 | `templates` | The obligation templates its declaration selects, in the declaration's order. |
 | `qualified` | Whether the promise is published as qualified. |
-| `outcomes` | Each of `"insufficient_depth"`, `"authorized_debt"` and `"classification_required"` that applies, in that order. |
+| `outcomes` | Each of `"qualified_forwarding"`, `"insufficient_depth"`, `"authorized_debt"` and `"classification_required"` that applies, in that order. |
 | `obligations` | `[]` while `obligations_frozen` is `false`. Otherwise one `{ "id", "result" }` for each obligation id the obligations part states for the operation, which is the set the policy part resolves for it, in the order `R1`, `V1`, `G1`, `E1`, `A1`, `X1` to `X4`, `OUT1` to `OUT4`, `LC1` to `LC4`, `FX1`, `S1`, `N1`, `B1`, `MCP1`, `EX1`, then one `{ "capability", "result" }` for each capability mapping that names the operation, its `M` obligation, in ascending order of `capability`. |
 
 A `result` is `"verified"`, `"unverified"`, `"failed"` or `"not_applicable"`, the published result
@@ -349,6 +349,9 @@ The other values:
   `obligations` is `verified` or `not_applicable`, no unit of its operation is
   `classification_required`, and the record lists an acceptance entry made for what the record
   states now, as the support-depth contract's record invariant 4 requires.
+- `qualified_forwarding` applies when the promise is qualified, its declaration states
+  `forwarding = true`, and every obligation in its `obligations` is `verified`. A permitted
+  `not_applicable` result qualifies a promise but not as qualified forwarding.
 - `insufficient_depth` applies when `obligations_frozen` is `false` or an obligation's result is
   `unverified` or `failed`. `classification_required` applies when the obligations part lists a
   unit of the operation as `classification_required`. `authorized_debt` applies when a debt row in
@@ -359,11 +362,7 @@ The other values:
 - A capability is depth-qualified when every operation its mapping names is a promise of the row
   that is qualified. Each such operation carries the capability's `M` obligation, so the
   shared mapping rule's requirement that one of them be `verified` is then met.
-- `qualified` states qualification. Revision 2 does not state the support-depth contract's
-  qualified forwarding outcome, because the policy part does not record whether a promise
-  forwards to the upstream CLI, and a promise's `templates` settle it only for some templates.
-  Until a revision states it, a report cannot tell a qualified forwarding promise from another
-  qualified promise. A mode exclusion is stated by `mode_exclusions`, a row that is not depth-enrolled by the
+- A mode exclusion is stated by `mode_exclusions`, a row that is not depth-enrolled by the
   absence of `depth`, and an unresolved depth enrollment by the failure of publication.
 
 Publication MUST fail when the record's obligations part is frozen for the row's target and, for

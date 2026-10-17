@@ -3,7 +3,7 @@
 use super::*;
 
 fn promise_op(id: &str, serves: Value, templates: Value) -> Value {
-    json!({ "id": id, "serves": serves, "templates": templates, "shared_mapping": "mapped",
+    json!({ "id": id, "serves": serves, "templates": templates, "shared_mapping": "mapped", "forwarding": false,
             "not_applicable_permitted": [],
             "promise": { "r1": "r", "v1": "v", "g1": "g", "e1": "e", "a1": "a",
                          "x1": "x", "x2": "x", "x3": "x", "x4": "x" } })

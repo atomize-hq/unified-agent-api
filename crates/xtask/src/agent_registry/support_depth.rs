@@ -301,6 +301,9 @@ pub struct OperationDeclaration {
     pub templates: Vec<ObligationTemplate>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub shared_mapping: Option<SharedMapping>,
+    /// Whether the promise is met by forwarding the invocation to the upstream CLI.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub forwarding: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub promise: Option<BasePromise>,
     #[serde(default)]
@@ -342,13 +345,14 @@ impl OperationDeclaration {
             if self.templates.len() != 1
                 || self.serves.len() != 1
                 || self.shared_mapping.is_some()
+                || self.forwarding.is_some()
                 || self.promise.is_some()
                 || !self.not_applicable_permitted.is_empty()
             {
                 return Err(invalid(format!(
                     "{at} is a mode exclusion: `EXCLUDED` must be its only template, it must \
-                     serve exactly one mode and it must carry no `shared_mapping`, `promise` or \
-                     `not_applicable_permitted`"
+                     serve exactly one mode and it must carry no `shared_mapping`, `forwarding`, \
+                     `promise` or `not_applicable_permitted`"
                 )));
             }
             return match self.rationale.as_deref() {
@@ -366,6 +370,16 @@ impl OperationDeclaration {
         }
         if self.shared_mapping.is_none() {
             return Err(invalid(format!("{at}.shared_mapping is required")));
+        }
+        match self.forwarding {
+            None => return Err(invalid(format!("{at}.forwarding is required"))),
+            // The template table: forwarding to the upstream CLI never suffices for `MANAGED`.
+            Some(true) if self.templates.contains(&ObligationTemplate::Managed) => {
+                return Err(invalid(format!(
+                    "{at}.forwarding cannot be true for a promise that selects `MANAGED`"
+                )))
+            }
+            Some(_) => {}
         }
         match &self.promise {
             Some(promise) => promise.validate(at)?,

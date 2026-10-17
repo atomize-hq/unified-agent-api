@@ -69,7 +69,7 @@ fn record() -> Value {
                 ],
                 "operations": [
                     { "id": "run", "serves": ["run-json"], "templates": ["CORE"],
-                      "shared_mapping": "mapped", "not_applicable_permitted": ["X1"],
+                      "shared_mapping": "mapped", "forwarding": false, "not_applicable_permitted": ["X1"],
                       "promise": { "r1": "r", "v1": "v", "g1": "g", "e1": "e", "a1": "a",
                                    "x1": "x", "x2": "x", "x3": "x", "x4": "x" } },
                     { "id": "tui-excluded", "serves": ["tui"], "templates": ["EXCLUDED"],
@@ -309,6 +309,34 @@ fn qualification_needs_an_acceptance_entry_for_what_the_record_states_now() {
     changed["event"]["request_commit"] = json!("def");
     let changed = DepthRecord::parse(&changed.to_string(), "aider", "1.2.3").unwrap();
     assert!(!facts(&changed, LINUX).promises[0].qualified);
+}
+
+#[test]
+fn a_qualified_forwarding_promise_has_every_obligation_verified() {
+    let outcomes = |forwarding: bool, edit: &dyn Fn(&mut Value), accept: bool| {
+        let mut record = record();
+        record["policy"]["selection"]["enrollment"]["operations"][0]["forwarding"] =
+            json!(forwarding);
+        edit(&mut record);
+        let promise = facts(&sealed(record, accept), LINUX).promises[0].clone();
+        (promise.qualified, promise.outcomes)
+    };
+    assert_eq!(
+        outcomes(true, &|_| (), true),
+        (true, vec![Outcome::QualifiedForwarding])
+    );
+    assert_eq!(outcomes(false, &|_| (), true), (true, vec![]));
+    assert_eq!(outcomes(true, &|_| (), false), (false, vec![]));
+    // A permitted `not_applicable` qualifies the promise, but not as qualified forwarding.
+    let not_applicable = |r: &mut Value| {
+        let results = r["execution"]["results"].as_array_mut().unwrap();
+        let at = results
+            .iter()
+            .position(|r| r["obligation"] == id("X1", LINUX))
+            .unwrap();
+        results[at] = result(id("X1", LINUX), "not_applicable");
+    };
+    assert_eq!(outcomes(true, &not_applicable, true), (true, vec![]));
 }
 
 #[test]
