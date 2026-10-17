@@ -6,7 +6,7 @@ Refresh planned from `docs/agents/lifecycle/opencode-maintenance/governance/main
 
 - basis ref: `cli_manifests/opencode/latest_validated.txt`
 - trigger kind: `upstream_release_detected`
-- request sha256: `d7333ad47e5115637f38c7cac2d661b4e18d864879bebd768d12f077d97cbaf9`
+- request sha256: `7ec3e536c4dbc44b399b27acd124ccb1d4b2fc91663a17f434dca97f4b3e810f`
 - canonical handoff: `docs/agents/lifecycle/opencode-maintenance/HANDOFF.md`
 - derivative pr summary: `docs/agents/lifecycle/opencode-maintenance/governance/pr-summary.md`
 
