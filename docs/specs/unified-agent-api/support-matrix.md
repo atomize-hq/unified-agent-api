@@ -238,13 +238,22 @@ Rules:
    nothing else. Such a file may lie outside the intake categories. Reading it for its content
    identity loads no support evidence, and it is the one evidence read this section makes outside
    those categories.
-3. A depth record of a version that has committed version metadata is invalid publication state
-   when it cannot be read, states a schema revision other than the current one or does not follow
+3. A depth record is invalid publication state when it cannot be read, states a schema revision other than the current one or does not follow
    Annex B of the support-depth contract. Publication MUST fail. It MUST NOT publish that
    version's rows as rows without depth facts.
-4. For a version that has committed version metadata, a target that the version's depth record
-   covers, or that a registry declaration of the version lists, implies a row for that agent,
-   version and target, whether or not `current.json.expected_targets` still lists the target.
+4. A target that a version's depth record covers implies a row for that agent, version and
+   target, whether or not the version has committed version metadata and whether or not
+   `current.json.expected_targets` still lists the target. For a version that has committed
+   version metadata, a target that a registry declaration of the version lists implies one as
+   well. These rows extend the row set of
+   [Shared support row model](#shared-support-row-model), and on them:
+   - a row whose version has no committed version metadata states `manifest_support` and
+     `backend_support` as `unsupported`, derives `uaa_support` from them and has no evidence
+     notes. Its depth facts state the scope as the support-depth contract requires, which for
+     obligations not yet frozen is insufficient depth; and
+   - `pointer_promotion` is derived from the target's pointer files as it is for an expected
+     target, whether or not `expected_targets` lists the target, and a target with no pointer
+     file has no pointer.
 5. In revision 2 of the JSON artifact the row model includes, for a depth-enrolled row and
    its target:
    - each promise of the record's selection that serves a covered mode on the target, with every
@@ -299,7 +308,9 @@ row would not say which capabilities were assessed, and that contract requires a
 to be named by its exact scope. Without the condition of rule 6, a row would stay `supported` on
 name coverage alone while a capability its depth enrollment claims is unverified. Without rule 4,
 removing a target from `expected_targets` would remove a depth-enrolled row, and with it the
-published results of that target. Without the revision of rule 9, a reader written for revision 1
+published results of that target, and a depth record written before its version's metadata, or
+kept after the metadata is removed, would be published nowhere, although the support-depth
+contract's Bindings rule 7 has its scope reported as insufficient depth. Without the revision of rule 9, a reader written for revision 1
 would take a `uaa_support` that depends on depth facts for one derived from manifest and backend
 support alone.
 

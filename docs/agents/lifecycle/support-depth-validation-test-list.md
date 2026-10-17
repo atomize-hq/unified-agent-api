@@ -380,13 +380,11 @@ Must fail:
   show which actor changed the acquired inputs.
 - A depth record can exist without its version's `versions/<version>.json`: it is written at the
   first freeze, before acquisition writes the metadata, the docs-only lane writes none, and the
-  metadata can be removed while `reports/<version>/` is kept. The row set is derived from the
-  metadata, so such a version has no rows, and the support matrix spec's rule 3 does not reach its
-  record. Bindings rule 7 of the support-depth contract has that scope reported as insufficient
-  depth, and the support matrix is where depth facts are published. Decide whether a record implies
-  its rows in those cases, or where else that scope is reported. For a target that is no longer
-  expected the row is kept, and its `pointer_promotion` has no defined source, because pointer
-  files are read only for expected targets.
+  metadata can be removed while `reports/<version>/` is kept. Support matrix rule 4 now has the
+  record imply its rows in those cases, with `unsupported` name-level states, and rule 3 applies
+  to every record. A target that is no longer expected takes its `pointer_promotion` from its
+  pointer files. The generator implements neither yet: it reads pointer files only for expected
+  targets and derives rows from metadata.
 - A depth-enrolled row states every obligation's result, and one promise can have more than a dozen
   obligations. Decide how the Markdown projection renders them so that it still agrees with the
   JSON artifact.
@@ -412,8 +410,10 @@ Must fail:
   and none for a qualified promise of another kind. The registry declaration states `forwarding`
   for each promise, revision 2 of the support matrix states `qualified_forwarding` for a
   qualified forwarding promise, and a qualified promise of another kind has `qualified: true`
-  with no qualification outcome. Whether forwarding suffices for a template whose forwarding
-  column is conditional is the maintainer's call, and only `MANAGED` is refused mechanically.
+  with no qualification outcome. The registry refuses `forwarding = true` for `CORE`, `SESSION`,
+  `QUERY` and `MANAGED`, whose forwarding column never admits it, and whether forwarding
+  suffices under the conditions the column states for the other templates is the maintainer's
+  call.
 - Bound evidence is named by path and can lie outside the manifest root, such as a test source
   under `crates/`. The support matrix reads it only for its content identity. A result that the
   support-depth contract's reuse and invalidation rules invalidate through a dependency outside the
