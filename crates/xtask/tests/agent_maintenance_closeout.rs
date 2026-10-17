@@ -7,6 +7,9 @@ use serde_json::json;
 mod agent_registry {
     pub use xtask::agent_registry::*;
 }
+mod depth_record {
+    pub use xtask::depth_record::*;
+}
 
 // `closeout.rs` is pulled in by path, so its `super::stand_down` needs a sibling here.
 mod stand_down {

@@ -8,6 +8,8 @@ use serde::{Deserialize, Serialize};
 
 #[path = "support_matrix/consistency.rs"]
 mod consistency;
+#[path = "support_matrix/depth.rs"]
+pub mod depth;
 #[path = "support_matrix/derive.rs"]
 mod derive;
 #[path = "support_matrix/publication.rs"]
@@ -70,6 +72,9 @@ pub struct SupportRow {
     pub pointer_promotion: PointerPromotionState,
     #[serde(default)]
     pub evidence_notes: Vec<String>,
+    /// Revision 2 only: present exactly on a depth-enrolled row.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub depth: Option<depth::DepthFacts>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

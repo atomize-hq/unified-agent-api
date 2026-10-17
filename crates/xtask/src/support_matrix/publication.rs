@@ -25,8 +25,14 @@ pub fn render_publication_bundle(
     rows: &[SupportRow],
     runtime_support_data: String,
 ) -> Result<PublicationBundle, String> {
+    // Revision 2 carries depth facts; revision 1 cannot, so a row with them makes the artifact 2.
+    let schema_version = if rows.iter().any(|row| row.depth.is_some()) {
+        2
+    } else {
+        1
+    };
     let json = serde_json::to_string_pretty(&SupportMatrixArtifact {
-        schema_version: 1,
+        schema_version,
         rows: rows.to_vec(),
     })
     .map_err(|err| format!("serialize support-matrix json: {err}"))?;
@@ -55,9 +61,12 @@ pub fn render_publication_artifacts(
 fn render_markdown_projection(rows: &[SupportRow]) -> String {
     let mut out = String::new();
     let mut current_agent: Option<&str> = None;
+    // An agent's depth facts follow its table.
+    let mut depth = String::new();
 
     for row in rows {
         if current_agent != Some(row.agent.as_str()) {
+            out.push_str(&std::mem::take(&mut depth));
             if current_agent.is_some() {
                 out.push('\n');
             }
@@ -84,7 +93,16 @@ fn render_markdown_projection(rows: &[SupportRow]) -> String {
             row.pointer_promotion.as_str(),
             notes
         ));
+        if let Some(facts) = &row.depth {
+            depth.push_str(&super::depth::render_markdown(
+                &row.agent,
+                &row.version,
+                &row.target,
+                facts,
+            ));
+        }
     }
+    out.push_str(&depth);
 
     out
 }
@@ -224,6 +242,7 @@ mod tests {
                     "backend report includes backend-only surface outside unified support"
                         .to_string(),
                 ],
+                depth: None,
             },
             SupportRow {
                 agent: "codex".to_string(),
@@ -234,6 +253,7 @@ mod tests {
                 uaa_support: UaaSupportState::Unsupported,
                 pointer_promotion: PointerPromotionState::None,
                 evidence_notes: vec!["current root snapshot omits this target".to_string()],
+                depth: None,
             },
         ]
     }

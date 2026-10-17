@@ -18,6 +18,9 @@ mod prepare_publication {
 mod agent_registry {
     pub use xtask::agent_registry::*;
 }
+mod depth_record {
+    pub use xtask::depth_record::*;
+}
 mod capability_publication {
     pub use xtask::capability_publication::*;
 }
