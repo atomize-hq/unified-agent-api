@@ -1,0 +1,424 @@
+use std::collections::BTreeMap;
+
+use serde_json::{json, Value};
+use xtask::depth_record::{part_identity, DepthRecord};
+use xtask::support_matrix::depth::{apply_depth, derive_depth_facts, DepthFacts, Outcome};
+use xtask::support_matrix::{
+    render_publication_bundle, BackendSupportState, ManifestSupportState, PointerPromotionState,
+    SupportRow, UaaSupportState,
+};
+
+const LINUX: &str = "linux-x64";
+const DARWIN: &str = "darwin-arm64";
+const EVIDENCE: &str = "crates/aider/tests/run.rs";
+
+fn sha(byte: char) -> String {
+    byte.to_string().repeat(64)
+}
+
+fn surface() -> Value {
+    json!({ "surface_kind": "flags", "command_path": "aider run", "surface_id": "--output-format" })
+}
+
+fn result(obligation: Value, result: &str) -> Value {
+    let evidence = if result == "verified" {
+        json!([{ "path": EVIDENCE, "sha256": sha('e') }])
+    } else {
+        json!([])
+    };
+    let mut value = json!({ "obligation": obligation, "result": result, "evidence": evidence });
+    if result == "not_applicable" {
+        value["rationale"] = json!("no credential is read");
+    }
+    value
+}
+
+fn id(id: &str, target: &str) -> Value {
+    json!({ "operation": "run", "id": id, "target": target })
+}
+
+/// Every obligation of `run` and the exclusion's `EX1` verified on linux, nothing on darwin.
+fn record() -> Value {
+    let mut results: Vec<Value> = [
+        "A1", "E1", "G1", "R1", "V1", "X1", "X2", "X3", "X4", "OUT3", "LC2",
+    ]
+    .iter()
+    .map(|o| result(id(o, LINUX), "verified"))
+    .collect();
+    results.push(result(
+        json!({ "operation": "run", "capability": "agent_api.run", "target": LINUX }),
+        "verified",
+    ));
+    results.push(result(
+        json!({ "operation": "tui-excluded", "id": "EX1", "target": LINUX }),
+        "verified",
+    ));
+    json!({
+        "schema_version": 1,
+        "event": { "lifecycle_path": "maintenance", "request_commit": "abc", "opened_from": "w",
+                   "request_recorded_at": "t", "trigger_kind": "upstream_release_detected" },
+        "policy": {
+            "identity": "",
+            "selection": { "agent_id": "aider", "enrollment": {
+                "lifecycle_path": "maintenance", "version": "1.2.3", "targets": [LINUX, DARWIN],
+                "modes": [
+                    { "selector": "run-json", "command_path": "aider run", "mode": "headless",
+                      "predicates": [{ "flag": "--output-format", "value": "json" }] },
+                    { "selector": "tui", "command_path": "aider", "mode": "interactive",
+                      "predicates": [], "targets": [LINUX] }
+                ],
+                "operations": [
+                    { "id": "run", "serves": ["run-json"], "templates": ["CORE"],
+                      "shared_mapping": "mapped", "not_applicable_permitted": ["X1"],
+                      "promise": { "r1": "r", "v1": "v", "g1": "g", "e1": "e", "a1": "a",
+                                   "x1": "x", "x2": "x", "x3": "x", "x4": "x" } },
+                    { "id": "tui-excluded", "serves": ["tui"], "templates": ["EXCLUDED"],
+                      "not_applicable_permitted": [], "rationale": "interactive only" }
+                ],
+                "capabilities": [{ "id": "agent_api.run", "operations": ["run"] }]
+            } },
+            "rules_revision": "1",
+            "base": ["A1", "E1", "G1", "R1", "V1", "X1", "X2", "X3", "X4"],
+            "templates": [
+                { "template": "CORE", "obligations": ["LC2", "OUT3"] },
+                { "template": "EXCLUDED", "obligations": ["EX1"] }
+            ],
+            "path_enabled": true,
+            "debt_baseline": []
+        },
+        "obligations": {
+            "identity": "", "policy_identity": "",
+            "targets": [LINUX, DARWIN],
+            "acquired_inputs": [],
+            "operations": [{ "id": "run", "surfaces": [surface()],
+                             "obligations": ["A1", "E1", "G1", "R1", "V1", "X1", "X2", "X3", "X4",
+                                             "OUT3", "LC2"] }],
+            "classification_required": [],
+            "acceptance_work": []
+        },
+        "execution": {
+            "identity": "", "policy_identity": "", "obligations_identity": "",
+            "results": results,
+            "reuse_bindings": [], "debt_grants": [], "debt_retired": []
+        },
+        "acceptance_entries": []
+    })
+}
+
+/// Every list the record derives is a set in ascending canonical order.
+fn sorted(value: &mut Value, at: &str) {
+    match value {
+        Value::Array(items) => {
+            items.iter_mut().for_each(|item| sorted(item, at));
+            if at != "acceptance_entries" {
+                items.sort_by_key(|item| item.to_string());
+            }
+        }
+        Value::Object(members) => {
+            for (name, member) in members.iter_mut().filter(|(name, _)| *name != "enrollment") {
+                sorted(member, name);
+            }
+        }
+        _ => {}
+    }
+}
+
+/// Seals the identities, links E to P and O, and, when `accept`, lists an entry made for what
+/// the sealed record states.
+fn sealed(mut record: Value, accept: bool) -> DepthRecord {
+    sorted(&mut record, "");
+    record["policy"]["identity"] = json!(part_identity(&record["policy"]).unwrap());
+    let policy = record["policy"]["identity"].clone();
+    if record["obligations"].is_object() {
+        record["obligations"]["policy_identity"] = policy.clone();
+        record["obligations"]["identity"] = json!(part_identity(&record["obligations"]).unwrap());
+    }
+    if record["execution"].is_object() {
+        if record["execution"]["policy_identity"] == json!("") {
+            record["execution"]["policy_identity"] = policy;
+        }
+        record["execution"]["obligations_identity"] = record["obligations"]["identity"].clone();
+        record["execution"]["identity"] = json!(part_identity(&record["execution"]).unwrap());
+    }
+    let parsed = DepthRecord::parse(&record.to_string(), "aider", "1.2.3").expect("parse record");
+    if accept {
+        record["acceptance_entries"] = json!([{ "backs": "promotion", "targets": [LINUX],
+                                                "record_sha256": parsed.stated_sha256().unwrap() }]);
+    }
+    DepthRecord::parse(&record.to_string(), "aider", "1.2.3").expect("parse record")
+}
+
+fn facts_with(
+    record: &DepthRecord,
+    target: &str,
+    files: &BTreeMap<&str, String>,
+) -> Option<DepthFacts> {
+    let lookup = |path: &str| files.get(path).cloned();
+    derive_depth_facts(Some(record), false, target, &lookup).expect("derive facts")
+}
+
+fn facts(record: &DepthRecord, target: &str) -> DepthFacts {
+    facts_with(record, target, &BTreeMap::from([(EVIDENCE, sha('e'))])).expect("depth-enrolled")
+}
+
+fn results(facts: &DepthFacts) -> Vec<(String, String)> {
+    facts.promises[0]
+        .obligations
+        .iter()
+        .map(|o| {
+            let id =
+                o.id.map(|id| {
+                    serde_json::to_value(id)
+                        .unwrap()
+                        .as_str()
+                        .unwrap()
+                        .to_string()
+                })
+                .or_else(|| o.capability.clone().map(|c| format!("M {c}")))
+                .unwrap();
+            let result = serde_json::to_value(o.result).unwrap();
+            (id, result.as_str().unwrap().to_string())
+        })
+        .collect()
+}
+
+fn unverified_count(facts: &DepthFacts) -> usize {
+    results(facts)
+        .iter()
+        .filter(|(_, r)| r == "unverified")
+        .count()
+}
+
+#[test]
+fn a_verified_and_accepted_record_qualifies_its_promise_and_capability() {
+    let record = sealed(record(), true);
+    let linux = facts(&record, LINUX);
+    assert!(linux.obligations_frozen);
+    let run = &linux.promises[0];
+    assert_eq!(run.operation, "run");
+    assert_eq!(run.templates, ["CORE"]);
+    assert!(run.qualified, "{run:?}");
+    assert!(run.outcomes.is_empty());
+    assert_eq!(results(&linux).len(), 12);
+    assert_eq!(unverified_count(&linux), 0);
+    assert_eq!(results(&linux).last().unwrap().0, "M agent_api.run");
+    assert_eq!(linux.mode_exclusions.len(), 1);
+    assert_eq!(linux.mode_exclusions[0].mode, "tui");
+    assert_eq!(linux.mode_exclusions[0].operation, "tui-excluded");
+    assert_eq!(linux.capabilities.len(), 1);
+    assert!(linux.capabilities[0].depth_qualified);
+    assert_eq!(
+        apply_depth(UaaSupportState::Supported, Some(&linux)),
+        UaaSupportState::Supported
+    );
+
+    // Darwin has no results and no exclusion: insufficient, and the capability lowers the row.
+    let darwin = facts(&record, DARWIN);
+    assert_eq!(darwin.promises[0].outcomes, [Outcome::InsufficientDepth]);
+    assert!(!darwin.promises[0].qualified);
+    assert_eq!(unverified_count(&darwin), 12);
+    assert!(darwin.mode_exclusions.is_empty());
+    assert!(!darwin.capabilities[0].depth_qualified);
+    assert_eq!(
+        apply_depth(UaaSupportState::Supported, Some(&darwin)),
+        UaaSupportState::Partial
+    );
+    for state in [UaaSupportState::Partial, UaaSupportState::Unsupported] {
+        assert_eq!(apply_depth(state, Some(&darwin)), state);
+    }
+    assert_eq!(
+        apply_depth(UaaSupportState::Supported, None),
+        UaaSupportState::Supported
+    );
+}
+
+#[test]
+fn a_result_is_published_as_unverified_where_invariant_3_says() {
+    let record = sealed(record(), true);
+    // Bound evidence absent, or with another content identity.
+    for files in [BTreeMap::new(), BTreeMap::from([(EVIDENCE, sha('f'))])] {
+        let linux = facts_with(&record, LINUX, &files).unwrap();
+        assert_eq!(unverified_count(&linux), 12);
+        assert!(!linux.promises[0].qualified);
+        assert!(!linux.capabilities[0].depth_qualified);
+        assert_eq!(
+            linux.mode_exclusions[0].result,
+            xtask::depth_record::DepthResult::Unverified
+        );
+    }
+
+    // E references another P.
+    let mut stale = self::record();
+    stale["execution"]["policy_identity"] = json!(sha('a'));
+    let linux = facts(&sealed(stale, true), LINUX);
+    assert_eq!(unverified_count(&linux), 12);
+
+    // A verified result that binds no evidence.
+    let mut unbound = self::record();
+    unbound["execution"]["results"][0]["evidence"] = json!([]);
+    let linux = facts(&sealed(unbound, true), LINUX);
+    assert_eq!(unverified_count(&linux), 1);
+    assert!(!linux.promises[0].qualified);
+
+    // `failed` stays `failed`.
+    let mut failed = self::record();
+    failed["execution"]["results"][0] = result(id("A1", LINUX), "failed");
+    let linux = facts(&sealed(failed, true), LINUX);
+    assert!(results(&linux).contains(&("A1".to_string(), "failed".to_string())));
+    assert_eq!(linux.promises[0].outcomes, [Outcome::InsufficientDepth]);
+}
+
+#[test]
+fn not_applicable_stands_only_where_the_promise_permits_it() {
+    let edit = |obligation: Value| {
+        let mut record = record();
+        let results = record["execution"]["results"].as_array_mut().unwrap();
+        let at = results
+            .iter()
+            .position(|r| r["obligation"] == obligation)
+            .unwrap();
+        results[at] = result(obligation, "not_applicable");
+        facts(&sealed(record, true), LINUX)
+    };
+
+    let permitted = edit(id("X1", LINUX));
+    assert!(results(&permitted).contains(&("X1".to_string(), "not_applicable".to_string())));
+    assert!(permitted.promises[0].qualified);
+
+    let refused = edit(id("V1", LINUX));
+    assert!(results(&refused).contains(&("V1".to_string(), "unverified".to_string())));
+    assert!(!refused.promises[0].qualified);
+
+    let m = edit(json!({ "operation": "run", "capability": "agent_api.run", "target": LINUX }));
+    assert!(results(&m).contains(&("M agent_api.run".to_string(), "unverified".to_string())));
+    assert!(!m.capabilities[0].depth_qualified);
+}
+
+#[test]
+fn qualification_needs_an_acceptance_entry_for_what_the_record_states_now() {
+    let linux = facts(&sealed(record(), false), LINUX);
+    assert_eq!(unverified_count(&linux), 0);
+    assert!(linux.promises[0].outcomes.is_empty());
+    assert!(!linux.promises[0].qualified);
+    assert!(!linux.capabilities[0].depth_qualified);
+
+    // An entry made before the record changed identifies nothing it states now.
+    let accepted = sealed(record(), true);
+    let mut changed = serde_json::to_value(&accepted).unwrap();
+    changed["event"]["request_commit"] = json!("def");
+    let changed = DepthRecord::parse(&changed.to_string(), "aider", "1.2.3").unwrap();
+    assert!(!facts(&changed, LINUX).promises[0].qualified);
+}
+
+#[test]
+fn classification_required_and_authorized_debt_are_outcomes_of_the_promise() {
+    let mut record = record();
+    record["obligations"]["classification_required"] =
+        json!([{ "operation": "run", "surface": surface() }]);
+    record["execution"]["debt_grants"] = json!([{
+        "row_id": "row-1", "agent_id": "aider", "surface_kind": "flags",
+        "command_path": "aider run", "surface_id": "--output-format", "current_reason": "r",
+        "blocker_class": "b", "owner": "o", "milestone": "m", "follow_on": "f",
+        "evidence_ref": "e", "scope_target_triples": [LINUX],
+        "authorized_at_version": "1.2.3", "authorization_evidence_ref": "a"
+    }]);
+    let record = sealed(record, true);
+    let linux = facts(&record, LINUX);
+    assert_eq!(
+        linux.promises[0].outcomes,
+        [Outcome::AuthorizedDebt, Outcome::ClassificationRequired]
+    );
+    assert!(!linux.promises[0].qualified);
+    // The grant is for linux only.
+    assert_eq!(
+        facts(&record, DARWIN).promises[0].outcomes,
+        [Outcome::InsufficientDepth, Outcome::ClassificationRequired]
+    );
+}
+
+#[test]
+fn a_row_whose_obligations_are_not_frozen_states_so() {
+    let mut early = record();
+    early["obligations"] = Value::Null;
+    early["execution"] = Value::Null;
+    let linux = facts(&sealed(early, false), LINUX);
+    assert!(!linux.obligations_frozen);
+    assert!(linux.promises[0].obligations.is_empty());
+    assert_eq!(linux.promises[0].outcomes, [Outcome::InsufficientDepth]);
+    assert!(!linux.capabilities[0].depth_qualified);
+
+    // O frozen for linux only.
+    let mut partial = record();
+    partial["obligations"]["targets"] = json!([LINUX]);
+    let record = sealed(partial, true);
+    assert!(facts(&record, LINUX).obligations_frozen);
+    assert!(!facts(&record, DARWIN).obligations_frozen);
+
+    // No record, or one that covers no mode on the target: depth-enrolled only if declared.
+    let none = |_: &str| None;
+    assert_eq!(derive_depth_facts(None, false, LINUX, &none).unwrap(), None);
+    let declared = derive_depth_facts(None, true, LINUX, &none)
+        .unwrap()
+        .unwrap();
+    assert!(!declared.obligations_frozen && declared.promises.is_empty());
+    assert!(declared.capabilities.is_empty());
+    assert_eq!(
+        derive_depth_facts(Some(&record), false, "win32-x64", &none).unwrap(),
+        None
+    );
+    assert_eq!(
+        derive_depth_facts(Some(&record), true, "win32-x64", &none).unwrap(),
+        Some(declared)
+    );
+}
+
+#[test]
+fn a_frozen_obligations_part_without_the_operation_is_refused() {
+    let mut record = record();
+    record["obligations"]["operations"] = json!([]);
+    let record = sealed(record, true);
+    let err = derive_depth_facts(Some(&record), false, LINUX, &|_| None).unwrap_err();
+    assert!(
+        err.contains("no obligation set for operation `run`"),
+        "{err}"
+    );
+}
+
+#[test]
+fn revision_2_rows_carry_depth_facts_and_other_rows_are_unchanged() {
+    let row = |depth: Option<DepthFacts>| SupportRow {
+        agent: "aider".to_string(),
+        version: "1.2.3".to_string(),
+        target: LINUX.to_string(),
+        manifest_support: ManifestSupportState::Supported,
+        backend_support: BackendSupportState::Supported,
+        uaa_support: UaaSupportState::Supported,
+        pointer_promotion: PointerPromotionState::None,
+        evidence_notes: Vec::new(),
+        depth,
+    };
+    let plain = serde_json::to_value(row(None)).unwrap();
+    assert!(
+        plain.get("depth").is_none(),
+        "a row without depth facts carries no marker"
+    );
+
+    let linux = facts(&sealed(record(), true), LINUX);
+    let enrolled = row(Some(linux.clone()));
+    let value = serde_json::to_value(&enrolled).unwrap();
+    assert_eq!(value["depth"]["promises"][0]["qualified"], json!(true));
+    assert_eq!(
+        serde_json::from_value::<SupportRow>(value).unwrap(),
+        enrolled
+    );
+
+    let bundle = render_publication_bundle(&[enrolled], String::new()).unwrap();
+    let expected = "\n#### Depth facts: `aider` `1.2.3` `linux-x64`\n\nObligations frozen: yes\n\n\
+        | promise | templates | qualified | outcomes | obligations |\n|---|---|---|---|---|\n\
+        | `run` | `CORE` | yes | — | `R1` verified; `V1` verified; `G1` verified; `E1` verified; \
+        `A1` verified; `X1` verified; `X2` verified; `X3` verified; `X4` verified; `OUT3` verified; \
+        `LC2` verified; `M agent_api.run` verified |\n\
+        \n| mode exclusion | operation | `EX1` |\n|---|---|---|\n| `tui` | `tui-excluded` | verified |\n\
+        \n| capability | depth_qualified |\n|---|---|\n| `agent_api.run` | yes |\n";
+    assert!(bundle.markdown.ends_with(expected), "{}", bundle.markdown);
+}

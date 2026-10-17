@@ -55,9 +55,12 @@ pub fn render_publication_artifacts(
 fn render_markdown_projection(rows: &[SupportRow]) -> String {
     let mut out = String::new();
     let mut current_agent: Option<&str> = None;
+    // An agent's depth facts follow its table.
+    let mut depth = String::new();
 
     for row in rows {
         if current_agent != Some(row.agent.as_str()) {
+            out.push_str(&std::mem::take(&mut depth));
             if current_agent.is_some() {
                 out.push('\n');
             }
@@ -84,7 +87,16 @@ fn render_markdown_projection(rows: &[SupportRow]) -> String {
             row.pointer_promotion.as_str(),
             notes
         ));
+        if let Some(facts) = &row.depth {
+            depth.push_str(&super::depth::render_markdown(
+                &row.agent,
+                &row.version,
+                &row.target,
+                facts,
+            ));
+        }
     }
+    out.push_str(&depth);
 
     out
 }
@@ -224,6 +236,7 @@ mod tests {
                     "backend report includes backend-only surface outside unified support"
                         .to_string(),
                 ],
+                depth: None,
             },
             SupportRow {
                 agent: "codex".to_string(),
@@ -234,6 +247,7 @@ mod tests {
                 uaa_support: UaaSupportState::Unsupported,
                 pointer_promotion: PointerPromotionState::None,
                 evidence_notes: vec!["current root snapshot omits this target".to_string()],
+                depth: None,
             },
         ]
     }
