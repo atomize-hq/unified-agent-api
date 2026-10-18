@@ -78,6 +78,9 @@ pub struct CapabilityFacts {
 /// covers no mode on the target and `declared` (the registry declares the record's version and
 /// lists the target) is false. `evidence_sha256` gives the content identity of a committed file,
 /// or `None` when the revision does not hold it.
+///
+/// `record` MUST come from `DepthRecord::parse` with the row's agent and version: nothing here
+/// repeats the reader's checks or compares the record's selection with the row.
 pub fn derive_depth_facts(
     record: Option<&DepthRecord>,
     declared: bool,

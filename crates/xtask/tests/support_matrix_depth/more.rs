@@ -255,8 +255,8 @@ fn authorized_debt_needs_a_current_e_and_a_grant_for_this_version_target_and_sur
         outcomes(record(), vec![grant("1.2.3", LINUX, "--output-format")]),
         authorized
     );
-    // a grant of another version, for another target, or for a surface the operation does not own
-    assert!(outcomes(record(), vec![grant("1.2.2", LINUX, "--output-format")]).is_empty());
+    // a grant for another target, or for a surface the operation does not own; the reader
+    // refuses a grant of another version
     assert!(outcomes(record(), vec![grant("1.2.3", DARWIN, "--output-format")]).is_empty());
     assert!(outcomes(record(), vec![grant("1.2.3", LINUX, "--not-owned")]).is_empty());
     // the match may be the second grant, or the second surface of the operation

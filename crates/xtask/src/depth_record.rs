@@ -418,6 +418,15 @@ impl DepthRecord {
                 "execution.debt_grants",
                 debt_rows("execution.debt_grants", &part.debt_grants, agent_id)?,
             )?;
+            if part
+                .debt_grants
+                .iter()
+                .any(|row| row.authorized_at_version != version)
+            {
+                return Err(format!(
+                    "execution.debt_grants must authorize version `{version}` only"
+                ));
+            }
             unique("execution.debt_retired", part.debt_retired.iter())?;
             if row_ids(&part.debt_grants).any(|id| part.debt_retired.contains(id)) {
                 return Err("execution: a debt row is granted or retired, never both".to_string());
@@ -586,7 +595,11 @@ fn debt_rows<'a>(
     rows: &'a [DebtInventoryRow],
     agent_id: &str,
 ) -> Result<impl Iterator<Item = &'a String>, String> {
-    if rows.iter().any(|row| row.agent_id != agent_id) {
+    // A surface names its agent only by the root of its command path, so both must name it.
+    if rows
+        .iter()
+        .any(|row| row.agent_id != agent_id || row.command_path.split(' ').next() != Some(agent_id))
+    {
         return Err(format!("{field} must hold rows of agent `{agent_id}` only"));
     }
     let plain =
