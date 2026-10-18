@@ -430,3 +430,193 @@ fn deferred_maintenance_hashes_are_whitespace_stable() {
         _ => panic!("expected deferred maintenance in both approvals"),
     }
 }
+
+/// A root key goes before the first table, a table after the last one.
+fn load_around(
+    fixture_name: &str,
+    prepended: &str,
+    appended: &str,
+) -> Result<Option<String>, String> {
+    load_edited(fixture_name, |contents| {
+        format!("{prepended}{contents}{appended}")
+    })
+}
+
+/// The approval the other tests write, as `edit` changes it.
+fn load_edited(
+    fixture_name: &str,
+    edit: impl Fn(String) -> String,
+) -> Result<Option<String>, String> {
+    let fixture = fixture_root(fixture_name);
+    seed_canonical_packet(&fixture);
+    let approval_rel = "docs/agents/lifecycle/opencode-onboarding/governance/approved-agent.toml";
+    let contents = recommendation_approval(
+        "opencode",
+        "opencode",
+        "opencode-onboarding",
+        None,
+        "docs/agents/selection/cli-agent-selection-packet.md",
+        enrolled_maintenance(),
+    );
+    write_text(&fixture.join(approval_rel), &edit(contents));
+    load_approval_artifact(&fixture, approval_rel)
+        .map(|artifact| artifact.support_depth_version)
+        .map_err(|err| err.to_string())
+}
+
+#[test]
+fn a_support_depth_key_is_found_in_an_array_nested_in_an_array() {
+    let err = load_around(
+        "approval-depth-nested-array",
+        "",
+        "\n[descriptor.extra]\nnotes = [[{ support_depth = { version = \"1.2.3\" } }]]\n",
+    )
+    .expect_err("nested array");
+    assert!(
+        err.contains("has `support_depth` at `descriptor.extra.notes[0][0].support_depth`"),
+        "{err}"
+    );
+}
+
+#[test]
+fn an_unsupported_artifact_version_is_reported_before_an_unknown_root_key() {
+    let err = load_edited("approval-depth-future", |contents| {
+        contents.replace(
+            "artifact_version = \"1\"",
+            "artifact_version = \"2\"\nnew_key = 1",
+        )
+    })
+    .expect_err("future version");
+    assert!(err.contains("unsupported `artifact_version` `2`"), "{err}");
+}
+
+#[test]
+fn support_depth_states_the_one_version_an_approval_approves() {
+    assert_eq!(load_around("approval-depth-none", "", ""), Ok(None));
+    assert_eq!(
+        load_around(
+            "approval-depth-version",
+            "",
+            "\n[support_depth]\nversion = \"1.2.3\"\n"
+        ),
+        Ok(Some("1.2.3".to_string()))
+    );
+    let cases = [
+        ("version = \"1.2\"", "one exact semantic version"),
+        ("version = \"v1.2.3\"", "one exact semantic version"),
+        ("version = \"1.2.3-rc.1\"", "one exact semantic version"),
+        ("version = \"1.2.3+build\"", "one exact semantic version"),
+        ("version = \"latest\"", "one exact semantic version"),
+        ("version = 1", "must be a string"),
+        ("", "missing required field `version`"),
+        (
+            "version = \"1.2.3\"\ntargets = [\"linux-x64\"]",
+            "unknown field `support_depth.targets`",
+        ),
+    ];
+    for (index, (body, expected)) in cases.iter().enumerate() {
+        let err = load_around(
+            &format!("approval-depth-case-{index}"),
+            "",
+            &format!("\n[support_depth]\n{body}\n"),
+        )
+        .expect_err(body);
+        assert!(err.contains(expected), "`{body}`: {err}");
+    }
+    // Not a table, or a misspelled one, is refused rather than read as approving nothing.
+    for (name, prepended, appended, expected) in [
+        (
+            "approval-depth-scalar",
+            "support_depth = \"1.2.3\"\n",
+            "",
+            "must be a table",
+        ),
+        (
+            "approval-depth-other",
+            "notes = \"x\"\n",
+            "",
+            "unknown field `notes`",
+        ),
+        (
+            "approval-depth-typo",
+            "",
+            "\n[support-depth]\nversion = \"1.2.3\"\n",
+            "unknown field `support-depth`",
+        ),
+        // Appended after the last table, a dotted key lands inside it.
+        (
+            "approval-depth-dotted",
+            "",
+            "\nsupport_depth.version = \"1.2.3\"\n",
+            "belongs at the root",
+        ),
+        (
+            "approval-depth-descriptor",
+            "",
+            "\n[descriptor.support_depth]\nversion = \"1.2.3\"\n",
+            "has `support_depth` at `descriptor.support_depth`",
+        ),
+        (
+            "approval-depth-array",
+            "",
+            "\n[[descriptor.notes]]\nsupport_depth = \"1.2.3\"\n",
+            "has `support_depth` at `descriptor.notes[0].support_depth`",
+        ),
+        (
+            "approval-depth-inline-array",
+            "",
+            "\n[descriptor.extra]\nnotes = [{ support_depth = { version = \"1.2.3\" } }]\n",
+            "has `support_depth` at `descriptor.extra.notes[0].support_depth`",
+        ),
+    ] {
+        let err = load_around(name, prepended, appended).expect_err(name);
+        assert!(err.contains(expected), "{name}: {err}");
+    }
+}
+
+#[test]
+fn a_root_key_is_known_by_its_exact_name() {
+    // A misspelling in case alone is refused as well.
+    let err = load_around(
+        "approval-depth-case",
+        "",
+        "\n[Support_Depth]\nversion = \"1.2.3\"\n",
+    )
+    .expect_err("case");
+    assert!(err.contains("unknown field `Support_Depth`"), "{err}");
+}
+
+#[test]
+fn a_support_depth_key_below_the_root_is_found_wherever_it_lies() {
+    for (name, appended, path) in [
+        // Any entry of an array, not only the first.
+        (
+            "approval-depth-second-table",
+            "\n[[descriptor.notes]]\nname = \"a\"\n\n[[descriptor.notes]]\nsupport_depth = \"1.2.3\"\n",
+            "descriptor.notes[1].support_depth",
+        ),
+        (
+            "approval-depth-second-inline",
+            "\n[descriptor.extra]\nnotes = [{ name = \"a\" }, { support_depth = \"1.2.3\" }]\n",
+            "descriptor.extra.notes[1].support_depth",
+        ),
+        // An inline table directly below a table.
+        (
+            "approval-depth-inline-child",
+            "\n[descriptor.extra]\nnested = { support_depth = { version = \"1.2.3\" } }\n",
+            "descriptor.extra.nested.support_depth",
+        ),
+        // A key that is not the first of its table.
+        (
+            "approval-depth-later-key",
+            "\n[descriptor.extra]\nname = \"a\"\nsupport_depth = \"1.2.3\"\n",
+            "descriptor.extra.support_depth",
+        ),
+    ] {
+        let err = load_around(name, "", appended).expect_err(name);
+        assert!(
+            err.contains(&format!("has `support_depth` at `{path}`")),
+            "{name}: {err}"
+        );
+    }
+}

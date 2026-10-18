@@ -291,9 +291,24 @@ Rules:
    is under the registry contract's rule 8 for a declaration whose path is not enabled: nothing of
    it is frozen on the create lane, and no create-lane command makes an acceptance effect for its
    depth scope tuples. A declaration that a maintainer moves to the maintenance path after the
-   generation's proving-run closeout is recorded as `closed` is outside this rule. This revision
-   does not define the field that carries the version. It belongs to an executable schema revision
-   of this charter, adopted before the onboarding path is enabled.
+   generation's proving-run closeout is recorded as `closed` is outside this rule.
+
+   The approval states the version in a root table:
+
+   ```toml
+   [support_depth]
+   version = "1.2.3"
+   ```
+
+   `version` is one exact upstream version, `MAJOR.MINOR.PATCH` with no prerelease and no build
+   metadata, in the form the registry contract's `version` rule requires. The table holds no
+   other key, and an approval without it states no version. The table states what the approval
+   approves and is not authority: the registry declaration is, as the support-depth contract's
+   depth enrollment rule 7 requires. `artifact_version` stays `"1"`: the
+   table is optional, and a loader of the approval artifact MUST reject a root key it does not
+   know, and a `support_depth` key anywhere but the root, so that a misspelled root table, or
+   one placed below the root, is refused rather than read as an approval that states no version. This is the executable schema revision of this charter that the support-depth
+   contract's path enablement requires for the onboarding path.
 4. Before P is frozen, the agent's manifest root MUST hold version metadata for the approved exact
    upstream version, a `RULES.json` under which the declared targets meet the registry contract's
    `targets` rule, and a validator spec that adopts Annex B of the support-depth contract. A
@@ -352,10 +367,13 @@ it, and the depth record's Event would name an approval that says nothing of dep
 
 ### Present behavior
 
-None of this section is implemented. Source references are to `staging` at `f61534be`. Today:
+Only the approval loader's reading of rule 3 is implemented. Source references are to `staging` at `f61534be`. Today:
 
 - An approval artifact carries `approval_commit` and `approval_recorded_at`
-  (`crates/xtask/src/approval_artifact.rs:246-249`) and no upstream version.
+  (`crates/xtask/src/approval_artifact.rs:246-249`). The approval loader reads the
+  `[support_depth]` table of rule 3 and refuses an unknown root key; that is not at `f61534be`.
+  No committed approval carries the table, no command writes it, and no create-lane command acts
+  on the version it states.
 - `onboard-agent --write` scaffolds the manifest root with a `current.json` and placeholder
   directories (`crates/xtask/src/onboard_agent/preview.rs:282-320`). It writes no version
   metadata, no `RULES.json` and no validator spec. The `aider` and `gemini_cli` roots have neither
