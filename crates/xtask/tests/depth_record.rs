@@ -3,13 +3,13 @@ use xtask::depth_record::{part_identity, AcceptanceEntry, DepthRecord};
 
 const SHA: &str = "0000000000000000000000000000000000000000000000000000000000000000";
 
-fn debt_row(row_id: &str) -> Value {
+fn debt_row(row_id: &str, version: &str) -> Value {
     json!({
         "row_id": row_id, "agent_id": "aider", "surface_kind": "flags",
         "command_path": "aider run", "surface_id": "--watch", "current_reason": "r",
         "blocker_class": "b", "owner": "o", "milestone": "m", "follow_on": "f",
         "evidence_ref": "e", "scope_target_triples": ["darwin-arm64", "linux-x64"],
-        "authorized_at_version": "1.2.2", "authorization_evidence_ref": "a"
+        "authorized_at_version": version, "authorization_evidence_ref": "a"
     })
 }
 
@@ -59,7 +59,7 @@ fn record() -> Value {
                 { "template": "CORE", "obligations": ["LC2", "OUT3"] }
             ],
             "path_enabled": true,
-            "debt_baseline": [debt_row("row-1")]
+            "debt_baseline": [debt_row("row-1", "1.2.2")]
         },
         "obligations": {
             "identity": SHA,
@@ -87,7 +87,7 @@ fn record() -> Value {
             ],
             "reuse_bindings": [{ "obligation": obligation("R1", "linux-x64"),
                                  "policy_identity": SHA, "obligations_identity": SHA }],
-            "debt_grants": [debt_row("row-1")],
+            "debt_grants": [debt_row("row-1", "1.2.3")],
             "debt_retired": ["row-2"]
         },
         "acceptance_entries": [
@@ -236,9 +236,39 @@ fn depth_record_rejects_what_the_annex_refuses() {
         ("execution.debt_grants: a target holds no whitespace", |r| {
             r["execution"]["debt_grants"][0]["scope_target_triples"] = json!(["a\\b"]);
         }),
-        ("rows of agent `aider` only", |r| {
-            r["policy"]["debt_baseline"][0]["agent_id"] = json!("codex");
-        }),
+        (
+            "policy.debt_baseline must hold rows of agent `aider` only",
+            |r| {
+                r["policy"]["debt_baseline"][0]["agent_id"] = json!("codex");
+            },
+        ),
+        // A grant's surface identity names no agent, so only this keeps another agent's
+        // grant from authorizing this agent's debt.
+        (
+            "execution.debt_grants must hold rows of agent `aider` only",
+            |r| {
+                r["execution"]["debt_grants"][0]["agent_id"] = json!("codex");
+            },
+        ),
+        // The agent is named a second time by the root of the command path.
+        (
+            "policy.debt_baseline must hold rows of agent `aider` only",
+            |r| {
+                r["policy"]["debt_baseline"][0]["command_path"] = json!("codex exec");
+            },
+        ),
+        (
+            "execution.debt_grants must hold rows of agent `aider` only",
+            |r| {
+                r["execution"]["debt_grants"][0]["command_path"] = json!("aiderx run");
+            },
+        ),
+        (
+            "execution.debt_grants must authorize version `1.2.3` only",
+            |r| {
+                r["execution"]["debt_grants"][0]["authorized_at_version"] = json!("1.2.2");
+            },
+        ),
         ("`targets` must list its entries in ascending order", |r| {
             r["obligations"]["targets"] = json!(["linux-x64", "darwin-arm64"]);
         }),

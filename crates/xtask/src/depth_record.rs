@@ -344,18 +344,8 @@ impl DepthRecord {
         unique("policy.base", self.policy.base.iter())?;
         unique(
             "policy.debt_baseline",
-            debt_rows("policy.debt_baseline", &self.policy.debt_baseline)?,
+            debt_rows("policy.debt_baseline", &self.policy.debt_baseline, agent_id)?,
         )?;
-        if self
-            .policy
-            .debt_baseline
-            .iter()
-            .any(|row| row.agent_id != agent_id)
-        {
-            return Err(format!(
-                "policy.debt_baseline must hold rows of agent `{agent_id}` only"
-            ));
-        }
 
         if let Some(part) = &self.obligations {
             identity("obligations", &part.identity, part)?;
@@ -426,8 +416,17 @@ impl DepthRecord {
             }
             unique(
                 "execution.debt_grants",
-                debt_rows("execution.debt_grants", &part.debt_grants)?,
+                debt_rows("execution.debt_grants", &part.debt_grants, agent_id)?,
             )?;
+            if part
+                .debt_grants
+                .iter()
+                .any(|row| row.authorized_at_version != version)
+            {
+                return Err(format!(
+                    "execution.debt_grants must authorize version `{version}` only"
+                ));
+            }
             unique("execution.debt_retired", part.debt_retired.iter())?;
             if row_ids(&part.debt_grants).any(|id| part.debt_retired.contains(id)) {
                 return Err("execution: a debt row is granted or retired, never both".to_string());
@@ -590,11 +589,22 @@ fn obligation_ref(field: &str, obligation: &ObligationRef) -> Result<(), String>
     Ok(())
 }
 
-/// The row ids, once every target of every row is one both orders of B.6 rule 1 agree on.
+/// The row ids, once every row is the agent's under B.6 rule 5 and every target of every row
+/// is one both orders of B.6 rule 1 agree on.
 fn debt_rows<'a>(
     field: &str,
     rows: &'a [DebtInventoryRow],
+    agent_id: &str,
 ) -> Result<impl Iterator<Item = &'a String>, String> {
+    // A surface names its agent only by the root of its command path, so both must name it.
+    if rows
+        .iter()
+        .any(|row| row.agent_id != agent_id || row.command_path.split(' ').next() != Some(agent_id))
+    {
+        return Err(format!(
+            "{field} must hold rows of agent `{agent_id}` only, on command paths rooted at it"
+        ));
+    }
     let plain =
         |target: &String| !target.contains(|c: char| c.is_whitespace() || "\"\\".contains(c));
     if rows
