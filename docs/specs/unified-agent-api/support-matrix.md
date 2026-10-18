@@ -74,13 +74,13 @@ Support publication MUST preserve these distinctions:
 
 Both publication targets MUST be derived in a single pass from one shared support row model.
 Each published row MUST describe exactly one `(agent, version, target)` tuple.
-Publication MUST contain exactly one row for every `(agent, version, target)` tuple implied by the committed root set, each root's `current.json.expected_targets`, and each root's committed `versions/*.json` metadata.
+Publication MUST contain exactly one row for every `(agent, version, target)` tuple implied by the committed root set, each root's `current.json.expected_targets`, and each root's committed `versions/*.json` metadata, and for every tuple that [Support depth](#support-depth) rule 4 implies.
 
 The publication row set is exact:
 
 - omitting an implied tuple is invalid publication state
 - duplicating a tuple is invalid publication state
-- publishing a tuple not implied by committed manifest metadata is invalid publication state
+- publishing a tuple implied neither by committed manifest metadata nor by Support depth rule 4 is invalid publication state
 
 The canonical row field order is:
 
@@ -238,13 +238,23 @@ Rules:
    nothing else. Such a file may lie outside the intake categories. Reading it for its content
    identity loads no support evidence, and it is the one evidence read this section makes outside
    those categories.
-3. A depth record of a version that has committed version metadata is invalid publication state
-   when it cannot be read, states a schema revision other than the current one or does not follow
+3. A depth record is invalid publication state when it cannot be read, states a schema revision other than the current one or does not follow
    Annex B of the support-depth contract. Publication MUST fail. It MUST NOT publish that
    version's rows as rows without depth facts.
-4. For a version that has committed version metadata, a target that the version's depth record
-   covers, or that a registry declaration of the version lists, implies a row for that agent,
-   version and target, whether or not `current.json.expected_targets` still lists the target.
+4. A target that a version's depth record covers implies a row for that agent, version and
+   target, whether or not the version has committed version metadata and whether or not
+   `current.json.expected_targets` still lists the target. For a version that has committed
+   version metadata, a target that a registry declaration of the version lists implies one as
+   well. These rows extend the row set of
+   [Shared support row model](#shared-support-row-model), and on them:
+   - a row whose version has no committed version metadata states `manifest_support` as
+     `unsupported`, derives `backend_support` and its evidence notes from the version's coverage
+     report for the target as for any row, which gives `unsupported` and no notes where there is
+     no report, and derives `uaa_support` from them. Its depth facts state the scope as the support-depth contract requires, which for
+     obligations not yet frozen is insufficient depth; and
+   - `pointer_promotion` is derived from the target's pointer files as it is for an expected
+     target, whether or not `expected_targets` lists the target, and a target with no pointer
+     file has no pointer.
 5. In revision 2 of the JSON artifact the row model includes, for a depth-enrolled row and
    its target:
    - each promise of the record's selection that serves a covered mode on the target, with every
@@ -299,7 +309,9 @@ row would not say which capabilities were assessed, and that contract requires a
 to be named by its exact scope. Without the condition of rule 6, a row would stay `supported` on
 name coverage alone while a capability its depth enrollment claims is unverified. Without rule 4,
 removing a target from `expected_targets` would remove a depth-enrolled row, and with it the
-published results of that target. Without the revision of rule 9, a reader written for revision 1
+published results of that target, and a depth record written before its version's metadata, or
+kept after the metadata is removed, would be published nowhere, although the support-depth
+contract's Bindings rule 7 has its scope reported as insufficient depth. Without the revision of rule 9, a reader written for revision 1
 would take a `uaa_support` that depends on depth facts for one derived from manifest and backend
 support alone.
 
@@ -328,7 +340,7 @@ A promise:
 | `operation` | The operation id. |
 | `templates` | The obligation templates its declaration selects, in the declaration's order. |
 | `qualified` | Whether the promise is published as qualified. |
-| `outcomes` | Each of `"insufficient_depth"`, `"authorized_debt"` and `"classification_required"` that applies, in that order. |
+| `outcomes` | Each of `"qualified_forwarding"`, `"insufficient_depth"`, `"authorized_debt"` and `"classification_required"` that applies, in that order. |
 | `obligations` | `[]` while `obligations_frozen` is `false`. Otherwise one `{ "id", "result" }` for each obligation id the obligations part states for the operation, which is the set the policy part resolves for it, in the order `R1`, `V1`, `G1`, `E1`, `A1`, `X1` to `X4`, `OUT1` to `OUT4`, `LC1` to `LC4`, `FX1`, `S1`, `N1`, `B1`, `MCP1`, `EX1`, then one `{ "capability", "result" }` for each capability mapping that names the operation, its `M` obligation, in ascending order of `capability`. |
 
 A `result` is `"verified"`, `"unverified"`, `"failed"` or `"not_applicable"`, the published result
@@ -349,6 +361,9 @@ The other values:
   `obligations` is `verified` or `not_applicable`, no unit of its operation is
   `classification_required`, and the record lists an acceptance entry made for what the record
   states now, as the support-depth contract's record invariant 4 requires.
+- `qualified_forwarding` applies when the promise is qualified, its declaration states
+  `forwarding = true`, and every obligation in its `obligations` is `verified`. A permitted
+  `not_applicable` result qualifies a promise but not as qualified forwarding.
 - `insufficient_depth` applies when `obligations_frozen` is `false` or an obligation's result is
   `unverified` or `failed`. `classification_required` applies when the obligations part lists a
   unit of the operation as `classification_required`. `authorized_debt` applies when a debt row in
@@ -359,11 +374,7 @@ The other values:
 - A capability is depth-qualified when every operation its mapping names is a promise of the row
   that is qualified. Each such operation carries the capability's `M` obligation, so the
   shared mapping rule's requirement that one of them be `verified` is then met.
-- `qualified` states qualification. Revision 2 does not state the support-depth contract's
-  qualified forwarding outcome, because the policy part does not record whether a promise
-  forwards to the upstream CLI, and a promise's `templates` settle it only for some templates.
-  Until a revision states it, a report cannot tell a qualified forwarding promise from another
-  qualified promise. A mode exclusion is stated by `mode_exclusions`, a row that is not depth-enrolled by the
+- A mode exclusion is stated by `mode_exclusions`, a row that is not depth-enrolled by the
   absence of `depth`, and an unresolved depth enrollment by the failure of publication.
 
 Publication MUST fail when the record's obligations part is frozen for the row's target and, for

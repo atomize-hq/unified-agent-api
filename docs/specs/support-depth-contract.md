@@ -1360,7 +1360,9 @@ Source references are to `staging` at `f61534be` and use the abbreviations of An
 
 - `xtask/depth_record.rs` reads a record and decides what B.6 and B.7 require, the digest of
   B.5 and the comparison of B.4. It is not at `f61534be`. No command calls it.
-- No manifest root holds a depth record, and no command reads or writes one.
+- No manifest root holds a depth record, and no command reads or writes one. Revision 1 gained
+  the declaration's `forwarding` member before any record existed, so no record of an earlier
+  form is held anywhere.
 - The commands that parse a version's coverage reports open them by exact name or scan
   `reports/<version>/` for names that begin with `coverage.` and end with `.json`.
   `manifest-validate` and the support matrix do the first

@@ -69,7 +69,7 @@ fn record() -> Value {
                 ],
                 "operations": [
                     { "id": "run", "serves": ["run-json"], "templates": ["CORE"],
-                      "shared_mapping": "mapped", "not_applicable_permitted": ["X1"],
+                      "shared_mapping": "mapped", "forwarding": false, "not_applicable_permitted": ["X1"],
                       "promise": { "r1": "r", "v1": "v", "g1": "g", "e1": "e", "a1": "a",
                                    "x1": "x", "x2": "x", "x3": "x", "x4": "x" } },
                     { "id": "tui-excluded", "serves": ["tui"], "templates": ["EXCLUDED"],
@@ -309,6 +309,54 @@ fn qualification_needs_an_acceptance_entry_for_what_the_record_states_now() {
     changed["event"]["request_commit"] = json!("def");
     let changed = DepthRecord::parse(&changed.to_string(), "aider", "1.2.3").unwrap();
     assert!(!facts(&changed, LINUX).promises[0].qualified);
+}
+
+/// Makes the `run` promise an `OPAQUE` one, for which forwarding suffices.
+fn opaque(record: &mut Value, forwarding: bool) {
+    let run = &mut record["policy"]["selection"]["enrollment"]["operations"][0];
+    run["templates"] = json!(["OPAQUE"]);
+    run["forwarding"] = json!(forwarding);
+    record["policy"]["templates"][0] =
+        json!({ "template": "OPAQUE", "obligations": ["LC1", "OUT1"] });
+    let ids = [
+        "A1", "E1", "G1", "R1", "V1", "X1", "X2", "X3", "X4", "OUT1", "LC1",
+    ];
+    record["obligations"]["operations"][0]["obligations"] = json!(ids);
+    let results = record["execution"]["results"].as_array_mut().unwrap();
+    for (from, to) in [("OUT3", "OUT1"), ("LC2", "LC1")] {
+        let at = results
+            .iter()
+            .position(|r| r["obligation"] == id(from, LINUX))
+            .unwrap();
+        results[at] = result(id(to, LINUX), "verified");
+    }
+}
+
+#[test]
+fn a_qualified_forwarding_promise_has_every_obligation_verified() {
+    let outcomes = |forwarding: bool, edit: &dyn Fn(&mut Value), accept: bool| {
+        let mut record = record();
+        opaque(&mut record, forwarding);
+        edit(&mut record);
+        let promise = facts(&sealed(record, accept), LINUX).promises[0].clone();
+        (promise.qualified, promise.outcomes)
+    };
+    assert_eq!(
+        outcomes(true, &|_| (), true),
+        (true, vec![Outcome::QualifiedForwarding])
+    );
+    assert_eq!(outcomes(false, &|_| (), true), (true, vec![]));
+    assert_eq!(outcomes(true, &|_| (), false), (false, vec![]));
+    // A permitted `not_applicable` qualifies the promise, but not as qualified forwarding.
+    let not_applicable = |r: &mut Value| {
+        let results = r["execution"]["results"].as_array_mut().unwrap();
+        let at = results
+            .iter()
+            .position(|r| r["obligation"] == id("X1", LINUX))
+            .unwrap();
+        results[at] = result(id("X1", LINUX), "not_applicable");
+    };
+    assert_eq!(outcomes(true, &not_applicable, true), (true, vec![]));
 }
 
 #[test]

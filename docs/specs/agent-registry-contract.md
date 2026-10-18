@@ -233,6 +233,7 @@ id = "exec-json-run"
 serves = ["exec-json"]
 templates = ["CORE", "SESSION"]
 shared_mapping = "mapped"
+forwarding = false
 not_applicable_permitted = ["X1"]
 
 [agents.support_depth.enrollments.operations.promise]
@@ -299,6 +300,7 @@ for the modes it serves: it assigns their obligation templates.
 | `serves` | The `selector` of each mode the operation serves: at least one, without repeats, each declared in `modes`. A mode exclusion serves exactly one mode. |
 | `templates` | The obligation templates the promise selects, by the names the support-depth contract gives them: at least one, without repeats. An entry whose only template is `EXCLUDED` is a mode exclusion. `EXCLUDED` MUST NOT be listed with another template. |
 | `shared_mapping` | `wrapper_only`, `mapped` or `proposed_extension`. Required, except in a mode exclusion, which MUST NOT carry it. |
+| `forwarding` | `true` when the promise is met by forwarding the invocation to the upstream CLI, the question the support-depth contract's template table answers for each template, otherwise `false`. Required, except in a mode exclusion, which MUST NOT carry it. It MUST NOT be `true` when `templates` lists `CORE`, `SESSION`, `QUERY` or `MANAGED`: that table says forwarding is never the whole promise of the first two and never suffices for `MANAGED`, and every `QUERY` promise is a parsed-record promise, for which it never suffices. Whether it suffices under the conditions the table states for the other templates is the maintainer's decision. |
 | `promise` | What the promise states for each BASE dimension, under the keys `r1`, `v1`, `g1`, `e1`, `a1`, `x1`, `x2`, `x3` and `x4`. Every key is required and none is empty. Required, except in a mode exclusion, which MUST NOT carry it. |
 | `rationale` | Why the mode is excluded. Required and not empty in a mode exclusion. Any other entry MUST NOT carry it. |
 | `not_applicable_permitted` | Optional. The ids of the obligations for which the promise permits a `not_applicable` result, without repeats. Each MUST be a BASE obligation or one that the entry's templates select. A mode exclusion MUST NOT carry it. |
@@ -428,8 +430,11 @@ run asserts, neither of which the support-depth contract accepts as authority. W
 `enabled_paths`, the only way to withdraw the authorization for a path would be to delete the
 declarations made on it. A version that has no committed generation would then read as never
 selected, so withdrawing the authorization would send its work back to the rules that predate the
-support-depth contract, which that contract's path enablement forbids. Neither failure can occur
-before the table is in use. They are what the two keys prevent from then on.
+support-depth contract, which that contract's path enablement forbids. Without an operation's
+`forwarding`, nothing would state whether a promise forwards to the upstream CLI, and a report could
+not keep the support-depth contract's qualified forwarding outcome apart from another qualified
+promise, as that contract's Publication section requires. None of these failures can occur before
+the table is in use. They are what the three keys prevent from then on.
 
 ### Present behavior
 

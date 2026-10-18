@@ -44,7 +44,7 @@ fn record() -> Value {
                 ],
                 "operations": [
                     { "id": "run", "serves": ["run-json"], "templates": ["CORE"],
-                      "shared_mapping": "mapped", "not_applicable_permitted": ["X1"],
+                      "shared_mapping": "mapped", "forwarding": false, "not_applicable_permitted": ["X1"],
                       "promise": { "r1": "r", "v1": "v", "g1": "g", "e1": "e", "a1": "a",
                                    "x1": "x", "x2": "x", "x3": "x", "x4": "x" } },
                     { "id": "tui-excluded", "serves": ["tui"], "templates": ["EXCLUDED"],
