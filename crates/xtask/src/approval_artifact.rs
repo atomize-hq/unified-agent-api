@@ -217,6 +217,8 @@ fn parse_approval_document(
         ))
     })?;
 
+    let artifact_version = required_string(root, "artifact_version", relative_path)?;
+    validate_artifact_version(relative_path, &artifact_version)?;
     // A misspelled `[support_depth]` would otherwise read as approving no depth enrollment.
     if let Some((key, _)) = root.iter().find(|(key, _)| !ROOT_KEYS.contains(key)) {
         return Err(ApprovalArtifactError::Validation(format!(
@@ -233,8 +235,6 @@ fn parse_approval_document(
             )));
         }
     }
-    let artifact_version = required_string(root, "artifact_version", relative_path)?;
-    validate_artifact_version(relative_path, &artifact_version)?;
     let support_depth_version = parse_support_depth(root, relative_path)?;
     let comparison_ref = required_string(root, "comparison_ref", relative_path)?;
     if comparison_ref != COMPARISON_REF_PATH {
@@ -395,15 +395,16 @@ fn nested_support_depth(item: &toml_edit::Item, at: &str) -> Option<String> {
                     (format!("{at}[{index}]"), table as &dyn toml_edit::TableLike)
                 })
                 .collect(),
-            _ => item
-                .as_array()?
-                .iter()
-                .enumerate()
-                .filter_map(|(index, value)| {
-                    let table = value.as_inline_table()?;
-                    Some((format!("{at}[{index}]"), table as &dyn toml_edit::TableLike))
-                })
-                .collect(),
+            _ => {
+                return item
+                    .as_array()?
+                    .iter()
+                    .enumerate()
+                    .find_map(|(index, value)| {
+                        let value = toml_edit::Item::Value(value.clone());
+                        nested_support_depth(&value, &format!("{at}[{index}]"))
+                    });
+            }
         };
     tables.into_iter().find_map(|(at, table)| {
         table.iter().find_map(|(key, child)| {

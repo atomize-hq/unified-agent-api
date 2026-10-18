@@ -367,7 +367,7 @@ it, and the depth record's Event would name an approval that says nothing of dep
 
 ### Present behavior
 
-None of this section is implemented. Source references are to `staging` at `f61534be`. Today:
+Only the approval loader's reading of rule 3 is implemented. Source references are to `staging` at `f61534be`. Today:
 
 - An approval artifact carries `approval_commit` and `approval_recorded_at`
   (`crates/xtask/src/approval_artifact.rs:246-249`). The approval loader reads the
