@@ -395,7 +395,17 @@ fn nested_support_depth(item: &toml_edit::Item, at: &str) -> Option<String> {
                     (format!("{at}[{index}]"), table as &dyn toml_edit::TableLike)
                 })
                 .collect(),
-            _ => return None,
+            _ => match item.as_array() {
+                Some(values) => values
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(index, value)| {
+                        let table = value.as_inline_table()?;
+                        Some((format!("{at}[{index}]"), table as &dyn toml_edit::TableLike))
+                    })
+                    .collect(),
+                None => return None,
+            },
         };
     tables.into_iter().find_map(|(at, table)| {
         table.iter().find_map(|(key, child)| {

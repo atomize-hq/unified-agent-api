@@ -529,6 +529,12 @@ fn support_depth_states_the_one_version_an_approval_approves() {
             "\n[[descriptor.notes]]\nsupport_depth = \"1.2.3\"\n",
             "has `support_depth` at `descriptor.notes[0].support_depth`",
         ),
+        (
+            "approval-depth-inline-array",
+            "",
+            "\n[descriptor.extra]\nnotes = [{ support_depth = { version = \"1.2.3\" } }]\n",
+            "has `support_depth` at `descriptor.extra.notes[0].support_depth`",
+        ),
     ] {
         let err = load_around(name, prepended, appended).expect_err(name);
         assert!(err.contains(expected), "{name}: {err}");

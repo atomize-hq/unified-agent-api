@@ -306,8 +306,8 @@ Rules:
    approves and is not authority: the registry declaration is, as the support-depth contract's
    depth enrollment rule 7 requires. `artifact_version` stays `"1"`: the
    table is optional, and a loader of the approval artifact MUST reject a root key it does not
-   know, and a `support_depth` key anywhere but the root, so that a misspelled or misplaced
-   table is refused rather than read as an approval that states no version. This is the executable schema revision of this charter that the support-depth
+   know, and a `support_depth` key anywhere but the root, so that a misspelled root table, or
+   one placed below the root, is refused rather than read as an approval that states no version. This is the executable schema revision of this charter that the support-depth
    contract's path enablement requires for the onboarding path.
 4. Before P is frozen, the agent's manifest root MUST hold version metadata for the approved exact
    upstream version, a `RULES.json` under which the declared targets meet the registry contract's
