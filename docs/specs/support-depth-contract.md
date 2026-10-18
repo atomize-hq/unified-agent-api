@@ -1318,7 +1318,7 @@ The execution part:
 | `policy_identity`, `obligations_identity` | The P and O identities that E references. |
 | `results` | One `{ "obligation", "result", "rationale", "evidence" }` for each result. `obligation` is an obligation reference and does not repeat. `result` is `"verified"`, `"unverified"`, `"failed"` or `"not_applicable"`. `rationale` is optional: a `not_applicable` result MUST state one that is not blank and no other result may. `evidence` is a list of file references in which a path does not repeat, and only a `verified` result may bind any. The implementation identities that [Bindings](#bindings) gives E are stated by that evidence. |
 | `reuse_bindings` | One `{ "obligation", "policy_identity", "obligations_identity" }` for each reused obligation: the P and O that its evidence was produced under. `obligation` does not repeat. |
-| `debt_grants` | A debt row for each grant that E materializes for the version. Row ids do not repeat. |
+| `debt_grants` | A debt row for each grant that E materializes for the version. Each row's `agent_id` is the selection's, and row ids do not repeat. |
 | `debt_retired` | The row ids of the baseline rows that E retires. A transition from P's baseline is a grant or a retirement stated here, and no row is both. |
 
 An acceptance entry states `backs`, `record_sha256` and one further member:

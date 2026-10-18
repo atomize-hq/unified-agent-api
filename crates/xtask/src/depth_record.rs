@@ -344,18 +344,8 @@ impl DepthRecord {
         unique("policy.base", self.policy.base.iter())?;
         unique(
             "policy.debt_baseline",
-            debt_rows("policy.debt_baseline", &self.policy.debt_baseline)?,
+            debt_rows("policy.debt_baseline", &self.policy.debt_baseline, agent_id)?,
         )?;
-        if self
-            .policy
-            .debt_baseline
-            .iter()
-            .any(|row| row.agent_id != agent_id)
-        {
-            return Err(format!(
-                "policy.debt_baseline must hold rows of agent `{agent_id}` only"
-            ));
-        }
 
         if let Some(part) = &self.obligations {
             identity("obligations", &part.identity, part)?;
@@ -426,7 +416,7 @@ impl DepthRecord {
             }
             unique(
                 "execution.debt_grants",
-                debt_rows("execution.debt_grants", &part.debt_grants)?,
+                debt_rows("execution.debt_grants", &part.debt_grants, agent_id)?,
             )?;
             unique("execution.debt_retired", part.debt_retired.iter())?;
             if row_ids(&part.debt_grants).any(|id| part.debt_retired.contains(id)) {
@@ -594,7 +584,11 @@ fn obligation_ref(field: &str, obligation: &ObligationRef) -> Result<(), String>
 fn debt_rows<'a>(
     field: &str,
     rows: &'a [DebtInventoryRow],
+    agent_id: &str,
 ) -> Result<impl Iterator<Item = &'a String>, String> {
+    if rows.iter().any(|row| row.agent_id != agent_id) {
+        return Err(format!("{field} must hold rows of agent `{agent_id}` only"));
+    }
     let plain =
         |target: &String| !target.contains(|c: char| c.is_whitespace() || "\"\\".contains(c));
     if rows

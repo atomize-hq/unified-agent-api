@@ -236,9 +236,20 @@ fn depth_record_rejects_what_the_annex_refuses() {
         ("execution.debt_grants: a target holds no whitespace", |r| {
             r["execution"]["debt_grants"][0]["scope_target_triples"] = json!(["a\\b"]);
         }),
-        ("rows of agent `aider` only", |r| {
-            r["policy"]["debt_baseline"][0]["agent_id"] = json!("codex");
-        }),
+        (
+            "policy.debt_baseline must hold rows of agent `aider` only",
+            |r| {
+                r["policy"]["debt_baseline"][0]["agent_id"] = json!("codex");
+            },
+        ),
+        // A grant's surface identity names no agent, so only this keeps another agent's
+        // grant from authorizing this agent's debt.
+        (
+            "execution.debt_grants must hold rows of agent `aider` only",
+            |r| {
+                r["execution"]["debt_grants"][0]["agent_id"] = json!("codex");
+            },
+        ),
         ("`targets` must list its entries in ascending order", |r| {
             r["obligations"]["targets"] = json!(["linux-x64", "darwin-arm64"]);
         }),
