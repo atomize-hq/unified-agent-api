@@ -497,3 +497,66 @@ fn the_artifact_is_revision_2_when_any_row_carries_depth_facts() {
     );
     assert_eq!(schema(&[row("aider", None), row("codex", None)]), json!(1));
 }
+
+#[test]
+fn qualified_forwarding_is_listed_first_and_only_for_a_qualified_promise() {
+    let outcomes = |edit: &dyn Fn(&mut Value)| {
+        let mut r = record();
+        opaque(&mut r, true);
+        r["execution"]["debt_grants"] = json!([grant("1.2.3", LINUX, "--output-format")]);
+        edit(&mut r);
+        facts(&sealed(r, true), LINUX).promises[0].outcomes.clone()
+    };
+    // It is the first outcome, and a debt row in force does not keep it from applying.
+    assert_eq!(
+        outcomes(&|_| ()),
+        [Outcome::QualifiedForwarding, Outcome::AuthorizedDebt]
+    );
+    // A unit of the operation that is `classification_required` keeps the promise unqualified.
+    assert_eq!(
+        outcomes(&|r| {
+            r["obligations"]["classification_required"] =
+                json!([{ "operation": "run", "surface": surface() }])
+        }),
+        [Outcome::AuthorizedDebt, Outcome::ClassificationRequired]
+    );
+
+    // O frozen for linux only: darwin lists no obligations, and none of them is unverified.
+    let mut r = record();
+    opaque(&mut r, true);
+    r["obligations"]["targets"] = json!([LINUX]);
+    let darwin = facts(&sealed(r, true), DARWIN);
+    assert!(darwin.promises[0].obligations.is_empty());
+    assert!(!darwin.promises[0].qualified);
+    assert_eq!(darwin.promises[0].outcomes, [Outcome::InsufficientDepth]);
+}
+
+#[test]
+fn the_qualified_forwarding_outcome_is_published_under_its_spec_name() {
+    let mut r = record();
+    opaque(&mut r, true);
+    let row = SupportRow {
+        agent: "aider".to_string(),
+        version: "1.2.3".to_string(),
+        target: LINUX.to_string(),
+        manifest_support: ManifestSupportState::Supported,
+        backend_support: BackendSupportState::Supported,
+        uaa_support: UaaSupportState::Supported,
+        pointer_promotion: PointerPromotionState::None,
+        evidence_notes: Vec::new(),
+        depth: Some(facts(&sealed(r, true), LINUX)),
+    };
+    let value = serde_json::to_value(&row).unwrap();
+    assert_eq!(
+        value["depth"]["promises"][0]["outcomes"],
+        json!(["qualified_forwarding"])
+    );
+    let bundle = render_publication_bundle(&[row], String::new()).unwrap();
+    assert!(
+        bundle
+            .markdown
+            .contains("| `run` | `OPAQUE` | yes | qualified_forwarding | "),
+        "{}",
+        bundle.markdown
+    );
+}

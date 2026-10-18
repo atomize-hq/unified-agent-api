@@ -430,8 +430,11 @@ run asserts, neither of which the support-depth contract accepts as authority. W
 `enabled_paths`, the only way to withdraw the authorization for a path would be to delete the
 declarations made on it. A version that has no committed generation would then read as never
 selected, so withdrawing the authorization would send its work back to the rules that predate the
-support-depth contract, which that contract's path enablement forbids. Neither failure can occur
-before the table is in use. They are what the two keys prevent from then on.
+support-depth contract, which that contract's path enablement forbids. Without an operation's
+`forwarding`, nothing would state whether a promise forwards to the upstream CLI, and a report could
+not keep the support-depth contract's qualified forwarding outcome apart from another qualified
+promise, as that contract's Publication section requires. None of these failures can occur before
+the table is in use. They are what the three keys prevent from then on.
 
 ### Present behavior
 

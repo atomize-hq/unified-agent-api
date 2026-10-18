@@ -357,3 +357,56 @@ fn support_depth_rejects_invalid_tables() {
         assert!(err.contains(expected), "expected `{expected}` in `{err}`");
     }
 }
+
+#[test]
+fn forwarding_follows_the_template_table() {
+    const FROM: &str = "templates = [\"CORE\", \"SESSION\"]\nshared_mapping = \"mapped\"\nforwarding = false\nnot_applicable_permitted = [\"X1\", \"OUT3\"]";
+    assert_eq!(SUPPORT_DEPTH.matches(FROM).count(), 1);
+    let forwarding = |templates: &str| {
+        let to = format!("templates = [{templates}]\nshared_mapping = \"mapped\"\nforwarding = true\nnot_applicable_permitted = [\"X1\"]");
+        with_support_depth(|table| table.replace(FROM, &to))
+    };
+    // Accepted: a promise that selects none of the four templates the table never admits.
+    // `MCP` and `REMOTE` add no output or lifecycle obligation, so `OPAQUE` stands beside them.
+    for templates in [
+        r#""OPAQUE""#,
+        r#""DIAG""#,
+        r#""ADMIN""#,
+        r#""LAUNCH""#,
+        r#""MCP", "OPAQUE""#,
+        r#""REMOTE", "OPAQUE""#,
+    ] {
+        forwarding(templates).unwrap_or_else(|err| panic!("[{templates}] must load: {err}"));
+    }
+    // Refused: any of the four, wherever it stands in the list and beside another of them.
+    let refused = "cannot be true for a promise that selects";
+    for template in ["CORE", "SESSION", "QUERY", "MANAGED"] {
+        for templates in [
+            format!(r#""{template}", "OPAQUE""#),
+            format!(r#""OPAQUE", "{template}""#),
+        ] {
+            let err = forwarding(&templates).expect_err(&templates);
+            assert!(err.contains(refused), "[{templates}]: {err}");
+        }
+    }
+    let err = forwarding(r#""CORE", "SESSION""#).unwrap_err();
+    assert!(err.contains(refused), "{err}");
+
+    // A mode exclusion carries no `forwarding` of either value, and every other promise states it.
+    for (from, to, expected) in [
+        (
+            "templates = [\"EXCLUDED\"]",
+            "templates = [\"EXCLUDED\"]\nforwarding = true",
+            "mode exclusion",
+        ),
+        (
+            "shared_mapping = \"mapped\"\nforwarding = false\n",
+            "shared_mapping = \"wrapper_only\"\n",
+            "forwarding is required",
+        ),
+    ] {
+        assert_eq!(SUPPORT_DEPTH.matches(from).count(), 1, "ambiguous `{from}`");
+        let err = with_support_depth(|table| table.replace(from, to)).unwrap_err();
+        assert!(err.contains(expected), "`{to}`: {err}");
+    }
+}
