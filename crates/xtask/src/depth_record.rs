@@ -589,7 +589,8 @@ fn obligation_ref(field: &str, obligation: &ObligationRef) -> Result<(), String>
     Ok(())
 }
 
-/// The row ids, once every target of every row is one both orders of B.6 rule 1 agree on.
+/// The row ids, once every row is the agent's under B.6 rule 5 and every target of every row
+/// is one both orders of B.6 rule 1 agree on.
 fn debt_rows<'a>(
     field: &str,
     rows: &'a [DebtInventoryRow],
@@ -600,7 +601,9 @@ fn debt_rows<'a>(
         .iter()
         .any(|row| row.agent_id != agent_id || row.command_path.split(' ').next() != Some(agent_id))
     {
-        return Err(format!("{field} must hold rows of agent `{agent_id}` only"));
+        return Err(format!(
+            "{field} must hold rows of agent `{agent_id}` only, on command paths rooted at it"
+        ));
     }
     let plain =
         |target: &String| !target.contains(|c: char| c.is_whitespace() || "\"\\".contains(c));

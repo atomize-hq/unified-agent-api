@@ -484,6 +484,10 @@ fn debt_in_force_is_the_baseline_as_e_grants_or_retires_it() {
             .contains(&Outcome::AuthorizedDebt)
     };
     assert!(debt(&|_| ()), "a baseline row in force");
+    // A baseline row authorized for another version authorizes nothing for this one.
+    assert!(!debt(
+        &|r| r["policy"]["debt_baseline"][0]["authorized_at_version"] = json!("1.2.2")
+    ));
     assert!(!debt(&|r| r["execution"]["debt_retired"] = json!(["row-1"])));
     assert!(!debt(
         &|r| r["execution"]["debt_grants"] = json!([row("row-1", json!([DARWIN]))])

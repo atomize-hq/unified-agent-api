@@ -155,3 +155,49 @@ fn a_retired_row_among_several_grants_is_refused() {
     .unwrap_err();
     assert!(err.contains("granted or retired, never both"), "{err}");
 }
+
+#[test]
+fn a_debt_row_that_is_not_the_records_is_refused_wherever_it_stands() {
+    // Another agent, the same agent in another case, a command path rooted elsewhere or not
+    // rooted at all, in either list, before or after the record's own row.
+    type Edit = fn(&mut Value);
+    let rows: [(&str, Edit); 5] = [
+        ("agent", |row| row["agent_id"] = json!("codex")),
+        ("case", |row| row["agent_id"] = json!("Aider")),
+        ("path", |row| row["command_path"] = json!("aiderx run")),
+        ("blank root", |row| {
+            row["command_path"] = json!(" aider run")
+        }),
+        ("tab", |row| row["command_path"] = json!("aider\trun")),
+    ];
+    for (part, list) in [("policy", "debt_baseline"), ("execution", "debt_grants")] {
+        for (what, edit) in rows {
+            for at in [0, 1] {
+                let err = sealed_with(|r| {
+                    let mut other = r[part][list][0].clone();
+                    other["row_id"] = json!("row-0");
+                    edit(&mut other);
+                    r[part][list].as_array_mut().unwrap().insert(at, other);
+                })
+                .unwrap_err();
+                let expected = format!("{part}.{list} must hold rows of agent `aider` only");
+                assert!(err.contains(&expected), "{list}, {what}, at {at}: {err}");
+            }
+        }
+    }
+    // A grant of another version, before or after the record's own.
+    for at in [0, 1] {
+        let err = sealed_with(|r| {
+            let mut other = r["execution"]["debt_grants"][0].clone();
+            other["row_id"] = json!("row-0");
+            other["authorized_at_version"] = json!("1.2.2");
+            r["execution"]["debt_grants"]
+                .as_array_mut()
+                .unwrap()
+                .insert(at, other);
+        })
+        .unwrap_err();
+        let expected = "execution.debt_grants must authorize version `1.2.3` only";
+        assert!(err.contains(expected), "at {at}: {err}");
+    }
+}
