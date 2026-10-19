@@ -1360,8 +1360,9 @@ serialized as the 32 bytes of `{"a":["é\n",true,null],"z":"a"}`, in which `é` 
 Source references are to `staging` at `f61534be` and use the abbreviations of Annex A. Today:
 
 - `xtask/depth_record.rs` reads a record and decides what B.6 and B.7 require, the digest of
-  B.5 and the comparison of B.4. It is not at `f61534be`. No command calls it.
-- No manifest root holds a depth record, and no command reads or writes one. Revision 1 gained
+  B.5, the comparison of B.4, and whether a record states what a maintenance request froze. It is
+  not at `f61534be`. `manifest-validate` calls it, for the checks its validator specs state.
+- No manifest root holds a depth record, and no command writes one. Revision 1 gained
   the declaration's `forwarding` member before any record existed, so no record of an earlier
   form is held anywhere.
 - The commands that parse a version's coverage reports open them by exact name or scan
@@ -1382,12 +1383,14 @@ Source references are to `staging` at `f61534be` and use the abbreviations of An
 - `manifest-validate` reads one manifest root (`xtask/manifest_validate.rs:140-149`). Inside a
   workspace it also checks the support-matrix artifact, and for that it loads the registry and
   the manifest roots the support matrix publishes (`xtask/manifest_validate.rs:576-690`,
-  `xtask/support_matrix/consistency.rs:163-170`, `xtask/support_matrix/derive.rs:258-270`). It
-  reads no lifecycle record, working file or second tree, so it cannot yet decide a record
-  invariant.
-- In the three roots that have them, `RULES.json` describes `reports/<version>/` as holding
-  coverage reports and `SCHEMA.json` defines no shape for a depth record. This revision changes
-  neither file.
+  `xtask/support_matrix/consistency.rs:163-170`, `xtask/support_matrix/derive.rs:258-270`). Since
+  `f61534be` it also reads the root's depth records, the agent's standing maintenance request and
+  its lifecycle record, and decides checks 1, 3, 10 and 13 of the validation test list, which the
+  three validator specs state. It reads no second tree.
+- In the three roots that have them, `RULES.json` names the record's path as
+  `storage.committed.reports.depth_record`, which is how a root states that it adopts this annex.
+  `SCHEMA.json` defines no shape for a depth record: the typed reader rejects any member B.6 does
+  not define.
 - The repository's existing content identities are SHA-256 digests of a file's bytes, such as
   `request_sha256`, of a rendered text, such as `prompt_sha256`, or of a typed value's
   serialization, such as a proving-run closeout's `release_watch_sha256`.

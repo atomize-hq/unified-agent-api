@@ -12,6 +12,7 @@ This document defines the deterministic validator contract for `cli_manifests/op
 - `SCHEMA.json`
 - `VERSION_METADATA_SCHEMA.json`
 - committed files under `cli_manifests/opencode/`
+- inside a workspace, the inputs that [Depth records](#depth-records) lists
 
 ## Current committed expectations
 
@@ -44,12 +45,69 @@ This document defines the deterministic validator contract for `cli_manifests/op
 ## Depth records
 
 This root adopts the depth record that Annex B of `docs/specs/support-depth-contract.md` defines.
-A depth-enrolled version's record is `reports/<version>/depth-record.json`. Annex B defines what
-the record states, its identities and its acceptance entries, and the support-depth contract
-states the invariants a record must satisfy. This spec restates neither.
+A depth-enrolled version's record is `reports/<version>/depth-record.json`, and `RULES.json`
+names that path as `storage.committed.reports.depth_record`. A root whose `RULES.json` names no
+such path does not adopt Annex B. Annex B defines what the record states, its identities and its
+acceptance entries, and the support-depth contract states the invariants a record must satisfy.
+This spec restates neither. The checks below are the ones that contract's complete mediation
+rule 7 requires this spec to state. Their numbers are those of
+`docs/agents/lifecycle/support-depth-validation-test-list.md`.
 
-While the support-depth contract is a Draft this section binds nothing.
+### Inputs
 
-Present behavior: `xtask codex-validate` does not read a depth record, and this spec states no
-check for one. Complete mediation rule 7 and path enablement item 4 of the support-depth contract
-say when the checks that enforce its record invariants are stated here.
+Inside a workspace the validator also reads, for the agent whose registry entry has this
+manifest root:
+
+- each `reports/<version>/depth-record.json`, through the record reader of Annex B for that agent
+  and version;
+- the agent's standing maintenance request,
+  `docs/agents/lifecycle/<agent_id>-maintenance/governance/maintenance-request.toml`, for its
+  Event (`request_commit`, `request_recorded_at`, `trigger_kind` and `opened_from`),
+  `detected_release.target_version` and `[support_depth]` table only. Nothing else in it is
+  checked here, so a first-freeze placeholder passes;
+- when the root holds a record, the agent's lifecycle record,
+  `docs/agents/lifecycle/<onboarding_pack_prefix>/governance/lifecycle-state.json`, the files it
+  names, and `docs/agents/lifecycle/<agent_id>-maintenance/governance/maintenance-closeout.json`.
+
+Outside a workspace no registry entry names the record's agent, so the validator cannot read a
+record there.
+
+### Checks (normative)
+
+Violations:
+
+- `DEPTH_RECORD_UNADOPTED`: the root holds a record and `RULES.json` names no depth record path
+  (record invariant 1).
+- `DEPTH_RECORD_UNANCHORED`: the root holds a record and no registry entry names its agent,
+  because validation runs outside a workspace or no entry has this manifest root.
+- `DEPTH_RECORD_INVALID` (check 13): a record is not readable, does not parse, states another
+  revision, or states a P, O or E identity that is not the digest of its part.
+- `DEPTH_RECORD_NOT_THE_REQUESTS` (check 3): the standing request is for a version whose record
+  does not state the request's Event, the P identity of its `[support_depth]` table, and its O
+  identity, or no O while the table states none. A request without the table froze no P, so no
+  record of its version states what it froze.
+- `DEPTH_RECORD_MISSING` (check 1): the standing request's `[support_depth]` table shows that its
+  generation froze P, and its version has no record.
+- `DEPTH_REQUEST_UNREADABLE`: the standing request is not TOML of the shape the inputs above
+  read.
+- `DEPTH_LIFECYCLE_DANGLING` (check 10): the root holds a record and the agent's lifecycle record
+  does not load with the files it names, by path and, where it states one, content identity; or
+  it states `proving_run_closeout_written` and names no proving-run closeout; or it states
+  `maintenance_closeout_written` while the revision holds no maintenance closeout.
+
+`RULES.json` that names a depth record path other than `<root>/reports/<version>/depth-record.json`
+is invalid configuration.
+
+Checks 1 and 3 are decided against the maintenance request only. An onboarding generation has only
+its approval's Event beside the record, and the onboarding charter names no second statement of its
+P and O yet, so until it does neither check reaches the create lane.
+
+Checks 5, 6, 7, 8 and 12 concern the support publication and are not this validator's. Checks 2, 4,
+9 and 11 compare a merge result with the integration branch tip, which this validator does not
+read.
+
+### Present behavior
+
+The checks above are implemented in `crates/xtask/src/manifest_validate/depth.rs`. No root holds a
+depth record and no request carries a `[support_depth]` table, so none of them fails on the
+committed tree. The relay's validating loader still rejects the table as an unknown key.

@@ -332,7 +332,8 @@
         "current_union_pointer": "cli_manifests/opencode/current.json"
       },
       "reports": {
-        "json": "cli_manifests/opencode/reports/<version>/coverage.<filter>.json"
+        "json": "cli_manifests/opencode/reports/<version>/coverage.<filter>.json",
+        "depth_record": "cli_manifests/opencode/reports/<version>/depth-record.json"
       }
     },
     "pointers": {

@@ -446,7 +446,8 @@
       },
       "reports": {
         "json": "cli_manifests/codex/reports/<version>/coverage.<filter>.json",
-        "markdown_optional": "cli_manifests/codex/reports/<version>/coverage.<filter>.md"
+        "markdown_optional": "cli_manifests/codex/reports/<version>/coverage.<filter>.md",
+        "depth_record": "cli_manifests/codex/reports/<version>/depth-record.json"
       }
     },
     "pointers": {
