@@ -250,8 +250,6 @@ impl DepthRecord {
         Ok(record)
     }
 
-    /// The digest an acceptance entry is made over: the Event and the three parts, identities
-    /// included, acceptance entries left out.
     /// Why the record does not state what `request` froze, under rule 4 of the maintenance request
     /// contract's request fields: the request's Event, its P identity, and its O identity, or no O
     /// while it states none. A request without the table froze no P, so no record states it.
@@ -267,6 +265,8 @@ impl DepthRecord {
             .then_some("the record's O is not the one the request froze")
     }
 
+    /// The digest an acceptance entry is made over: the Event and the three parts, identities
+    /// included, acceptance entries left out.
     pub fn stated_sha256(&self) -> Result<String, String> {
         let mut stated = serde_json::Map::new();
         stated.insert("event".to_string(), json(&self.event)?);

@@ -247,7 +247,10 @@ Must fail:
 - An onboarding record's Event is not compared with its approval. The approval loader validates
   `approval_commit` and `approval_recorded_at` but does not keep them, and checks 1 and 3 reach
   the create lane only once the charter names a second statement of its P and O. Decide the
-  Event comparison with that statement.
+  Event comparison with that statement. A maintenance request for a version whose record states an
+  onboarding Event fails check 3 today, because its Event is not the record's. That holds only if
+  no maintenance generation may continue an onboarding record, which the question below on a
+  declaration moved to another lifecycle path has to settle.
 - Clearing a drift side state with no maintenance closeout in the revision is reached by no
   invariant. It cannot be a state rule, because agents with no maintenance closeout have no drift
   state either.

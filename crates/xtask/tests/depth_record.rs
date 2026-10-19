@@ -667,5 +667,9 @@ fn part_identity_refuses_non_ascii_member_names() {
     assert!(part_identity(&json!({"ok": [{"\u{1F600}": "x"}]})).is_err());
 }
 
+#[path = "depth_record/closeout_form.rs"]
+mod closeout_form;
 #[path = "depth_record/order.rs"]
 mod order;
+#[path = "depth_record/request_binding.rs"]
+mod request_binding;

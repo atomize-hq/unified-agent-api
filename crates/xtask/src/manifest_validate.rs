@@ -91,7 +91,8 @@ struct ValidateCtx {
     parity_exclusions_schema_version: Option<u32>,
     parity_exclusions_raw: Option<Vec<ParityExclusionUnit>>,
     parity_exclusions: Option<ParityExclusionsIndex>,
-    depth_record_adopted: bool,
+    depth_record_path: Option<String>,
+    rules_path: PathBuf,
 }
 
 pub fn run(args: Args) -> i32 {
@@ -264,7 +265,6 @@ fn run_inner(args: Args, default_root: Option<&str>) -> Result<Vec<Violation>, F
         .filter(|ex| ex.schema_version == 1)
         .map(|ex| build_parity_exclusions_index(&ex.units));
 
-    let depth_record_adopted = depth::adopted(&rules)?;
     let mut ctx = ValidateCtx {
         root,
         required_target: rules.union.required_target,
@@ -278,7 +278,8 @@ fn run_inner(args: Args, default_root: Option<&str>) -> Result<Vec<Violation>, F
         parity_exclusions_schema_version,
         parity_exclusions_raw,
         parity_exclusions,
-        depth_record_adopted,
+        depth_record_path: rules.storage.committed.reports.depth_record,
+        rules_path,
     };
 
     if matches!(args.mode, Mode::Fix) {

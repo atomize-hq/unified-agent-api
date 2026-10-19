@@ -336,23 +336,27 @@ Violations:
   (record invariant 1).
 - `DEPTH_RECORD_UNANCHORED`: the root holds a record and no registry entry names its agent,
   because validation runs outside a workspace or no entry has this manifest root.
-- `DEPTH_RECORD_INVALID` (check 13): a record is not readable, does not parse, states another
-  revision, or states a P, O or E identity that is not the digest of its part.
+- `DEPTH_RECORD_PATH_INVALID`: `RULES.json` names a depth record path other than
+  `<root>/reports/<version>/depth-record.json`, where `<root>` is this root's path in the
+  workspace. Outside a workspace the root has no such path, so this is not checked there.
+- `DEPTH_RECORD_INVALID` (check 13): anything is at a record's path that is not a readable record,
+  or a record does not parse, states another revision, or states a P, O or E identity that is not
+  the digest of its part.
 - `DEPTH_RECORD_NOT_THE_REQUESTS` (check 3): the standing request is for a version whose record
   does not state the request's Event, the P identity of its `[support_depth]` table, and its O
   identity, or no O while the table states none. A request without the table froze no P, so no
   record of its version states what it froze.
 - `DEPTH_RECORD_MISSING` (check 1): the standing request's `[support_depth]` table shows that its
   generation froze P, and its version has no record.
-- `DEPTH_REQUEST_UNREADABLE`: the standing request is not TOML of the shape the inputs above
-  read.
+- `DEPTH_REQUEST_UNREADABLE`: a standing request is there and cannot be read as text, or is not
+  TOML of the shape the inputs above read. An absent request is no request.
 - `DEPTH_LIFECYCLE_DANGLING` (check 10): the root holds a record and the agent's lifecycle record
   does not load with the files it names, by path and, where it states one, content identity; or
-  it states `proving_run_closeout_written` and names no proving-run closeout; or it states
-  `maintenance_closeout_written` while the revision holds no maintenance closeout.
-
-`RULES.json` that names a depth record path other than `<root>/reports/<version>/depth-record.json`
-is invalid configuration.
+  it states `proving_run_closeout_written` and names no proving-run closeout; or the proving-run
+  closeout it names is not held; or it states `maintenance_closeout_written` and the agent's
+  maintenance closeout is not held. A closeout is held when the file at its path is a closeout of
+  its kind in form. The lifecycle record names the proving-run closeout by path alone, so this
+  validator decides no more than that.
 
 Checks 1 and 3 are decided against the maintenance request only. An onboarding generation has only
 its approval's Event beside the record, and the onboarding charter names no second statement of its

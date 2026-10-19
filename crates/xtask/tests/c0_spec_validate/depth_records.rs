@@ -88,6 +88,58 @@ fn assert_fails_with(codex_dir: &Path, code: &str) {
     );
 }
 
+/// As `assert_fails_with`, and the violation is reported at `path`, relative to the workspace.
+fn assert_fails_at(codex_dir: &Path, code: &str, path: &str) {
+    let (passed, report) = validate(codex_dir);
+    let at = format!("{code} error {path} ");
+    assert!(
+        !passed && report.lines().any(|line| line.starts_with(&at)),
+        "expected {code} at {path}:\n{report}"
+    );
+}
+
+fn record_path() -> String {
+    format!("cli_manifests/codex/reports/{VERSION}/depth-record.json")
+}
+
+fn request_path() -> String {
+    format!("{MAINTENANCE}/maintenance-request.toml")
+}
+
+/// A record that also states O, whose identity a request can freeze.
+fn record_with_obligations() -> Value {
+    let mut record = record();
+    let policy = record["policy"]["identity"].clone();
+    record["obligations"] = json!({
+        "identity": "", "policy_identity": policy, "targets": [REQUIRED_TARGET],
+        "acquired_inputs": [], "operations": [], "classification_required": [],
+        "acceptance_work": []
+    });
+    record["obligations"]["identity"] = json!(part_identity(&record["obligations"]).unwrap());
+    record
+}
+
+/// The standing request, with `edit` applied to the text `write_request` writes.
+fn edit_request(workspace: &Path, edit: impl Fn(String) -> String) {
+    let path = workspace.join(request_path());
+    write_text(&path, &edit(fs::read_to_string(&path).unwrap()));
+}
+
+/// The lifecycle record, approval and publication packet codex holds, as the lifecycle test copies.
+fn copy_lifecycle(workspace: &Path) {
+    for file in [
+        "lifecycle-state.json",
+        "approved-agent.toml",
+        "publication-ready.json",
+    ] {
+        let src = workspace_root().join(GOVERNANCE).join(file);
+        write_text(
+            &workspace.join(GOVERNANCE).join(file),
+            &fs::read_to_string(src).unwrap(),
+        );
+    }
+}
+
 #[test]
 fn c0_validate_reads_a_depth_record_and_refuses_one_that_does_not_parse() {
     let temp = make_temp_dir("ccm-c0-depth-parse");
@@ -100,6 +152,15 @@ fn c0_validate_reads_a_depth_record_and_refuses_one_that_does_not_parse() {
     let mut stale = record();
     stale["policy"]["path_enabled"] = json!(true);
     write_record(&codex_dir, &stale);
+    assert_fails_at(&codex_dir, "DEPTH_RECORD_INVALID", &record_path());
+
+    // A record that cannot be read is not taken for no record.
+    let path = codex_dir.join(format!("reports/{VERSION}/depth-record.json"));
+    fs::remove_file(&path).unwrap();
+    std::os::unix::fs::symlink("absent.json", &path).unwrap();
+    assert_fails_with(&codex_dir, "DEPTH_RECORD_INVALID");
+    fs::remove_file(&path).unwrap();
+    fs::create_dir(&path).unwrap();
     assert_fails_with(&codex_dir, "DEPTH_RECORD_INVALID");
 }
 
@@ -117,7 +178,25 @@ fn c0_validate_refuses_a_depth_record_in_a_root_that_does_not_adopt_annex_b() {
     write_json(&rules_path, &rules);
     assert_fails_with(&codex_dir, "DEPTH_RECORD_UNADOPTED");
 
-    // A root that names the record elsewhere is a RULES.json error.
+    // The record is not read any further: the root has not adopted the reader that would.
+    let mut stale = record();
+    stale["policy"]["path_enabled"] = json!(true);
+    write_record(&codex_dir, &stale);
+    let (_, report) = validate(&codex_dir);
+    assert!(
+        report.contains("DEPTH_RECORD_UNADOPTED") && !report.contains("DEPTH_RECORD_INVALID"),
+        "{report}"
+    );
+
+    // A root that names the record elsewhere, another root's place included, is misconfigured.
+    rules["storage"]["committed"]["reports"]["depth_record"] =
+        json!("cli_manifests/opencode/reports/<version>/depth-record.json");
+    write_json(&rules_path, &rules);
+    assert_fails_at(
+        &codex_dir,
+        "DEPTH_RECORD_PATH_INVALID",
+        "cli_manifests/codex/RULES.json",
+    );
     rules["storage"]["committed"]["reports"]["depth_record"] = json!("record.json");
     write_json(&rules_path, &rules);
     let (passed, report) = validate(&codex_dir);
@@ -148,7 +227,17 @@ fn c0_validate_requires_the_record_to_state_what_the_standing_request_froze() {
         "2222222222222222222222222222222222222222",
         Some(&policy),
     );
-    assert_fails_with(&codex_dir, "DEPTH_RECORD_NOT_THE_REQUESTS");
+    assert_fails_at(&codex_dir, "DEPTH_RECORD_NOT_THE_REQUESTS", &record_path());
+    // Every member of the Event is compared, not only the commit.
+    for (stated, other) in [
+        (RECORDED_AT, "2026-10-11T00:00:00Z"),
+        ("upstream_release_detected", "manual"),
+        (OPENED_FROM, ".github/workflows/other.yml"),
+    ] {
+        write_request(&temp, COMMIT, Some(&policy));
+        edit_request(&temp, |text| text.replace(stated, other));
+        assert_fails_with(&codex_dir, "DEPTH_RECORD_NOT_THE_REQUESTS");
+    }
     write_request(&temp, COMMIT, Some(&"0".repeat(64)));
     assert_fails_with(&codex_dir, "DEPTH_RECORD_NOT_THE_REQUESTS");
     write_request(&temp, COMMIT, None);
@@ -157,7 +246,7 @@ fn c0_validate_requires_the_record_to_state_what_the_standing_request_froze() {
     // Check 1: the request froze P and the version has no record.
     fs::remove_file(codex_dir.join(format!("reports/{VERSION}/depth-record.json"))).unwrap();
     write_request(&temp, COMMIT, Some(&policy));
-    assert_fails_with(&codex_dir, "DEPTH_RECORD_MISSING");
+    assert_fails_at(&codex_dir, "DEPTH_RECORD_MISSING", &request_path());
     write_request(&temp, COMMIT, None);
     let (passed, report) = validate(&codex_dir);
     assert!(
@@ -198,10 +287,231 @@ fn c0_validate_requires_the_lifecycle_record_of_an_agent_with_a_depth_record_to_
     let (passed, report) = validate(&codex_dir);
     assert!(passed, "every reported file is held:\n{report}");
 
+    // A file at a closeout's path that is not a closeout of its kind is not held.
+    let maintenance_closeout = temp.join(MAINTENANCE).join("maintenance-closeout.json");
+    let held = fs::read_to_string(&maintenance_closeout).unwrap();
+    write_text(&maintenance_closeout, "{}\n");
+    assert_fails_with(&codex_dir, "DEPTH_LIFECYCLE_DANGLING");
+    write_text(&maintenance_closeout, &held);
+    let lifecycle_path = temp.join(GOVERNANCE).join("lifecycle-state.json");
+    let mut lifecycle: Value =
+        serde_json::from_str(&fs::read_to_string(&lifecycle_path).unwrap()).unwrap();
+    lifecycle["closeout_baseline_path"] = json!("cli_manifests/codex/RULES.json");
+    write_json(&lifecycle_path, &lifecycle);
+    assert_fails_with(&codex_dir, "is not a proving-run closeout");
+    lifecycle["closeout_baseline_path"] = Value::Null;
+    write_json(&lifecycle_path, &lifecycle);
+
     // A packet that is not the one the lifecycle record names.
     write_text(
         &temp.join(GOVERNANCE).join("publication-ready.json"),
         "{}\n",
     );
+    assert_fails_at(
+        &codex_dir,
+        "DEPTH_LIFECYCLE_DANGLING",
+        &format!("{GOVERNANCE}/lifecycle-state.json"),
+    );
+}
+
+#[test]
+fn c0_validate_reads_only_the_closeout_evidence_a_lifecycle_record_states() {
+    let temp = make_temp_dir("ccm-c0-depth-evidence");
+    let codex_dir = materialize_minimal_valid_workspace(&temp);
+    copy_lifecycle(&temp);
+
+    // Check 10 is the check of an agent that has a depth record. Codex's lifecycle record states
+    // `maintenance_closeout_written` and this revision holds no maintenance closeout.
+    let (passed, report) = validate(&codex_dir);
+    assert!(
+        passed,
+        "an agent with no record is not held to it:\n{report}"
+    );
+
+    // Evidence the lifecycle record requires and has not satisfied reports nothing yet.
+    write_record(&codex_dir, &record());
+    let path = temp.join(GOVERNANCE).join("lifecycle-state.json");
+    let stated: Value = serde_json::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
+    let mut state = stated.clone();
+    let satisfied = state["satisfied_evidence"].as_array_mut().unwrap();
+    satisfied.retain(|id| id != "maintenance_closeout_written");
+    write_json(&path, &state);
+    let (passed, report) = validate(&codex_dir);
+    assert!(
+        passed,
+        "evidence that is required alone is not reported:\n{report}"
+    );
+
+    // `proving_run_closeout_written` names a proving-run closeout that is held, the maintenance
+    // closeout held as well. The closeout is claude_code's, which is in form.
+    write_text(
+        &temp.join(MAINTENANCE).join("maintenance-closeout.json"),
+        &fs::read_to_string(
+            workspace_root()
+                .join(MAINTENANCE)
+                .join("maintenance-closeout.json"),
+        )
+        .unwrap(),
+    );
+    let mut state = stated.clone();
+    for key in ["required_evidence", "satisfied_evidence"] {
+        let ids = state[key].as_array_mut().unwrap();
+        ids.push(json!("proving_run_closeout_written"));
+    }
+    write_json(&path, &state);
     assert_fails_with(&codex_dir, "DEPTH_LIFECYCLE_DANGLING");
+    let closeout = format!("{GOVERNANCE}/proving-run-closeout.json");
+    let source =
+        "docs/agents/lifecycle/claude-code-cli-onboarding/governance/proving-run-closeout.json";
+    write_text(
+        &temp.join(&closeout),
+        &fs::read_to_string(workspace_root().join(source)).unwrap(),
+    );
+    state["closeout_baseline_path"] = json!(closeout);
+    write_json(&path, &state);
+    let (passed, report) = validate(&codex_dir);
+    assert!(
+        passed,
+        "a proving-run closeout that is named and in form is held:\n{report}"
+    );
+}
+
+#[test]
+fn c0_validate_requires_the_record_to_state_the_obligations_the_request_froze() {
+    let temp = make_temp_dir("ccm-c0-depth-obligations");
+    let codex_dir = materialize_minimal_valid_workspace(&temp);
+    let early = record();
+    let policy = early["policy"]["identity"].as_str().unwrap().to_string();
+    let full = record_with_obligations();
+    let obligations = full["obligations"]["identity"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let freezing = |obligations: &str| {
+        write_request(&temp, COMMIT, Some(&policy));
+        edit_request(&temp, |text| {
+            format!("{text}obligations_identity = \"{obligations}\"\n")
+        });
+    };
+
+    // The request froze P and O, and the record states both.
+    write_record(&codex_dir, &full);
+    freezing(&obligations);
+    let (passed, report) = validate(&codex_dir);
+    assert!(
+        passed,
+        "a record that states the request's O passes:\n{report}"
+    );
+
+    // Another O, a request that froze none, and a request that froze an O the record lacks.
+    freezing(&"0".repeat(64));
+    assert_fails_with(&codex_dir, "DEPTH_RECORD_NOT_THE_REQUESTS");
+    write_request(&temp, COMMIT, Some(&policy));
+    assert_fails_with(&codex_dir, "DEPTH_RECORD_NOT_THE_REQUESTS");
+    write_record(&codex_dir, &early);
+    freezing(&obligations);
+    assert_fails_with(&codex_dir, "DEPTH_RECORD_NOT_THE_REQUESTS");
+    write_request(&temp, COMMIT, Some(&policy));
+    let (passed, report) = validate(&codex_dir);
+    assert!(
+        passed,
+        "O is not yet produced while the request froze none:\n{report}"
+    );
+}
+
+#[test]
+fn c0_validate_refuses_a_depth_record_it_cannot_attribute_to_an_agent() {
+    let temp = make_temp_dir("ccm-c0-depth-unanchored");
+    let codex_dir = materialize_minimal_valid_workspace(&temp);
+
+    // No registry entry has the manifest root. The copy of codex's root names its own records.
+    let unregistered = temp.join("cli_manifests/unregistered");
+    copy_dir_recursive(&codex_dir, &unregistered);
+    let rules_path = unregistered.join("RULES.json");
+    let mut rules: Value = serde_json::from_str(&fs::read_to_string(&rules_path).unwrap()).unwrap();
+    rules["storage"]["committed"]["reports"]["depth_record"] =
+        json!("cli_manifests/unregistered/reports/<version>/depth-record.json");
+    write_json(&rules_path, &rules);
+    let (passed, report) = validate(&unregistered);
+    assert!(
+        passed,
+        "a root with no record needs no registry entry:\n{report}"
+    );
+    write_record(&unregistered, &record());
+    assert_fails_at(
+        &unregistered,
+        "DEPTH_RECORD_UNANCHORED",
+        &format!("cli_manifests/unregistered/reports/{VERSION}/depth-record.json"),
+    );
+
+    // Outside a workspace there is no registry to ask.
+    let outside = make_temp_dir("ccm-c0-depth-outside").join("codex");
+    copy_dir_recursive(&codex_dir, &outside);
+    let (passed, report) = validate(&outside);
+    assert!(
+        passed,
+        "a root with no record needs no workspace:\n{report}"
+    );
+    write_record(&outside, &record());
+    assert_fails_at(
+        &outside,
+        "DEPTH_RECORD_UNANCHORED",
+        &format!("reports/{VERSION}/depth-record.json"),
+    );
+}
+
+#[test]
+fn c0_validate_names_the_root_it_is_given_as_the_registry_does() {
+    let temp = make_temp_dir("ccm-c0-depth-root-forms");
+    let codex_dir = materialize_minimal_valid_workspace(&temp);
+    let mut stale = record();
+    stale["policy"]["path_enabled"] = json!(true);
+    write_record(&codex_dir, &stale);
+
+    // The root is the same root whether it is given through `..` or through a symlink.
+    let dotted = temp.join("cli_manifests/../cli_manifests/codex");
+    assert_fails_at(&dotted, "DEPTH_RECORD_INVALID", &record_path());
+    let linked = temp.join("linked");
+    std::os::unix::fs::symlink(&codex_dir, &linked).unwrap();
+    assert_fails_at(&linked, "DEPTH_RECORD_INVALID", &record_path());
+}
+
+#[test]
+fn c0_validate_refuses_a_standing_request_that_is_not_the_toml_it_reads() {
+    let temp = make_temp_dir("ccm-c0-depth-unreadable");
+    let codex_dir = materialize_minimal_valid_workspace(&temp);
+    // The request is read whether or not the root holds a record.
+    for text in ["this is [not toml\n", "request_commit = 5\n"] {
+        write_text(&temp.join(request_path()), text);
+        assert_fails_at(&codex_dir, "DEPTH_REQUEST_UNREADABLE", &request_path());
+    }
+
+    // A request that cannot be read as text is not TOML either, and neither is a directory.
+    let request = temp.join(request_path());
+    fs::write(&request, [0xff_u8, 0xfe, b'=']).unwrap();
+    assert_fails_at(&codex_dir, "DEPTH_REQUEST_UNREADABLE", &request_path());
+    fs::remove_file(&request).unwrap();
+    fs::create_dir(&request).unwrap();
+    assert_fails_at(&codex_dir, "DEPTH_REQUEST_UNREADABLE", &request_path());
+
+    // An absent request is no request.
+    fs::remove_dir(&request).unwrap();
+    let (passed, report) = validate(&codex_dir);
+    assert!(passed, "a request that is not there is not read:\n{report}");
+}
+
+#[test]
+fn c0_validate_requires_a_record_of_a_frozen_p_whether_or_not_the_root_adopts_annex_b() {
+    let temp = make_temp_dir("ccm-c0-depth-frozen-unadopted");
+    let codex_dir = materialize_minimal_valid_workspace(&temp);
+    let rules_path = codex_dir.join("RULES.json");
+    let mut rules: Value = serde_json::from_str(&fs::read_to_string(&rules_path).unwrap()).unwrap();
+    rules["storage"]["committed"]["reports"]
+        .as_object_mut()
+        .unwrap()
+        .remove("depth_record");
+    write_json(&rules_path, &rules);
+    let policy = record()["policy"]["identity"].as_str().unwrap().to_string();
+    write_request(&temp, COMMIT, Some(&policy));
+    assert_fails_at(&codex_dir, "DEPTH_RECORD_MISSING", &request_path());
 }

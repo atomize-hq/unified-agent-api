@@ -11,25 +11,13 @@ use std::{
 use serde::Deserialize;
 use xtask::{
     agent_lifecycle::{self, EvidenceId},
+    agent_maintenance::closeout,
     agent_registry::AgentRegistry,
     depth_record::{DepthRecord, Event, RequestBinding, DEPTH_RECORD_FILE_NAME},
+    proving_run_closeout,
 };
 
-use super::{rel_path, workspace_root_for, FatalError, Rules, ValidateCtx, Violation};
-
-const LIFECYCLE_ROOT: &str = "docs/agents/lifecycle";
-
-/// Whether `RULES.json` adopts Annex B, which it does by naming where a record is held.
-pub(super) fn adopted(rules: &Rules) -> Result<bool, FatalError> {
-    let expected = format!("/reports/<version>/{DEPTH_RECORD_FILE_NAME}");
-    match rules.storage.committed.reports.depth_record.as_deref() {
-        None => Ok(false),
-        Some(path) if path.ends_with(&expected) => Ok(true),
-        Some(path) => Err(FatalError::Rules(format!(
-            "unsupported storage.committed.reports.depth_record={path} (expected <root>{expected})"
-        ))),
-    }
-}
+use super::{rel_path, workspace_root_for, ValidateCtx, Violation};
 
 /// The standing request, read only for what checks 1 and 3 compare. The validating loader
 /// refuses a `[support_depth]` table while no depth enrollment can be declared, and refuses a
@@ -66,7 +54,8 @@ pub(super) fn validate_depth_records(ctx: &ValidateCtx, violations: &mut Vec<Vio
         violations.push(violation(code, rel_path(&base, path), message));
     };
 
-    if !files.is_empty() && !ctx.depth_record_adopted {
+    // `RULES.json` adopts Annex B by naming where a record is held.
+    if !files.is_empty() && ctx.depth_record_path.is_none() {
         for (_, path) in &files {
             let message = "RULES.json names no depth record, so this root does not adopt Annex B";
             fail("DEPTH_RECORD_UNADOPTED", path, message.to_string());
@@ -80,11 +69,23 @@ pub(super) fn validate_depth_records(ctx: &ValidateCtx, violations: &mut Vec<Vio
         }
         return;
     };
+    let root = rel_path(&workspace, &root_dir);
+    let expected = format!("{root}/reports/<version>/{DEPTH_RECORD_FILE_NAME}");
+    if let Some(named) = ctx
+        .depth_record_path
+        .as_deref()
+        .filter(|named| *named != expected)
+    {
+        let message = format!(
+            "storage.committed.reports.depth_record names `{named}`; this root holds its records at `{expected}`"
+        );
+        let rules = fs::canonicalize(&ctx.rules_path).unwrap_or_else(|_| ctx.rules_path.clone());
+        fail("DEPTH_RECORD_PATH_INVALID", &rules, message);
+    }
     // A registry that does not load fails the support publication check already.
     let Ok(registry) = AgentRegistry::load(&workspace) else {
         return;
     };
-    let root = rel_path(&workspace, &root_dir);
     let Some(entry) = registry
         .agents
         .iter()
@@ -113,11 +114,18 @@ pub(super) fn validate_depth_records(ctx: &ValidateCtx, violations: &mut Vec<Vio
 
     // Checks 1 and 3, against the standing request. The onboarding path has no second statement
     // of P and O yet, so these checks are decided on the maintenance path only.
-    let maintenance = format!("{LIFECYCLE_ROOT}/{}-maintenance/governance", entry.agent_id);
-    let request_path = workspace
-        .join(&maintenance)
-        .join("maintenance-request.toml");
-    if let Ok(text) = fs::read_to_string(&request_path) {
+    let request_path = workspace.join(agent_lifecycle::maintenance_request_path(&entry.agent_id));
+    // A request that is absent is no request. One that is there and cannot be read fails, as a
+    // record that cannot be read does.
+    let text = match fs::read_to_string(&request_path) {
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => None,
+        Err(err) => {
+            fail("DEPTH_REQUEST_UNREADABLE", &request_path, err.to_string());
+            None
+        }
+        Ok(text) => Some(text),
+    };
+    if let Some(text) = text {
         match toml_edit::de::from_str::<StandingRequest>(&text) {
             Err(err) => fail("DEPTH_REQUEST_UNREADABLE", &request_path, err.to_string()),
             Ok(request) => {
@@ -166,7 +174,7 @@ pub(super) fn validate_depth_records(ctx: &ValidateCtx, violations: &mut Vec<Vio
     if files.is_empty() {
         return;
     }
-    let lifecycle = agent_lifecycle::lifecycle_state_path(&entry.scaffold.onboarding_pack_prefix);
+    let lifecycle = agent_lifecycle::lifecycle_state_path_for_entry(entry);
     let lifecycle_path = workspace.join(&lifecycle);
     if !lifecycle_path.is_file() {
         return;
@@ -174,10 +182,16 @@ pub(super) fn validate_depth_records(ctx: &ValidateCtx, violations: &mut Vec<Vio
     match agent_lifecycle::load_lifecycle_state(&workspace, &lifecycle) {
         Err(err) => fail("DEPTH_LIFECYCLE_DANGLING", &lifecycle_path, err.to_string()),
         Ok(state) => {
+            // A closeout is held when the file at its path is a closeout of its kind in form; the
+            // lifecycle record names the proving-run closeout by path alone.
+            let held = |path: &Path, form: fn(&str) -> Result<(), String>| {
+                fs::read_to_string(path)
+                    .map_err(|err| err.to_string())
+                    .and_then(|text| form(&text))
+            };
             let satisfied = |id| state.satisfied_evidence.contains(&id);
-            if satisfied(EvidenceId::ProvingRunCloseoutWritten)
-                && state.closeout_baseline_path.is_none()
-            {
+            let proving = state.closeout_baseline_path.as_deref();
+            if satisfied(EvidenceId::ProvingRunCloseoutWritten) && proving.is_none() {
                 let message = "`proving_run_closeout_written` names no proving-run closeout";
                 fail(
                     "DEPTH_LIFECYCLE_DANGLING",
@@ -185,15 +199,24 @@ pub(super) fn validate_depth_records(ctx: &ValidateCtx, violations: &mut Vec<Vio
                     message.to_string(),
                 );
             }
-            let closeout = workspace
-                .join(&maintenance)
-                .join("maintenance-closeout.json");
-            if satisfied(EvidenceId::MaintenanceCloseoutWritten) && !closeout.is_file() {
-                let message = format!(
-                    "`maintenance_closeout_written` reports `{}`, which the revision does not hold",
-                    rel_path(&workspace, &closeout)
-                );
-                fail("DEPTH_LIFECYCLE_DANGLING", &lifecycle_path, message);
+            if let Some(path) = proving {
+                if let Err(err) = held(
+                    &workspace.join(path),
+                    proving_run_closeout::check_closeout_form,
+                ) {
+                    let message = format!("`{path}` is not a proving-run closeout: {err}");
+                    fail("DEPTH_LIFECYCLE_DANGLING", &lifecycle_path, message);
+                }
+            }
+            let closeout_path = request_path.with_file_name("maintenance-closeout.json");
+            if satisfied(EvidenceId::MaintenanceCloseoutWritten) {
+                if let Err(err) = held(&closeout_path, closeout::check_closeout_form) {
+                    let path = rel_path(&workspace, &closeout_path);
+                    let message = format!(
+                        "`maintenance_closeout_written` reports `{path}`, which is not a maintenance closeout: {err}"
+                    );
+                    fail("DEPTH_LIFECYCLE_DANGLING", &lifecycle_path, message);
+                }
             }
         }
     }
@@ -207,9 +230,10 @@ fn record_files(root: &Path) -> Vec<(String, PathBuf)> {
     let mut files: Vec<_> = entries
         .flatten()
         .map(|entry| entry.path().join(DEPTH_RECORD_FILE_NAME))
-        .filter(|path| path.is_file())
+        // Any entry at the name is a record, so one that cannot be read fails rather than hides.
+        .filter(|path| fs::symlink_metadata(path).is_ok())
         .filter_map(|path| {
-            let version = path.parent()?.file_name()?.to_str()?.to_string();
+            let version = path.parent()?.file_name()?.to_string_lossy().into_owned();
             Some((version, path))
         })
         .collect();
