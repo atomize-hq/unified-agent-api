@@ -64,6 +64,7 @@ pub fn run(args: Args) -> Result<(), String> {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct SupportRow {
     pub agent: String,
     pub version: String,

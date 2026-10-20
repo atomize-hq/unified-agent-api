@@ -100,7 +100,7 @@ impl DepthEnrollmentDeclaration {
                 "{at}.version must be one exact semantic version, `MAJOR.MINOR.PATCH`"
             )));
         }
-        let targets = unique_non_empty(&format!("{at}.targets"), &self.targets)?;
+        let targets = target_names(&format!("{at}.targets"), &self.targets)?;
 
         // Modes: unique names, and one selector for a command path and mode.
         if self.modes.is_empty() {
@@ -123,7 +123,7 @@ impl DepthEnrollmentDeclaration {
             match &mode.targets {
                 None => used_targets.extend(targets.iter().copied()),
                 Some(narrowed) => {
-                    for target in unique_non_empty(&format!("{mode_at}.targets"), narrowed)? {
+                    for target in target_names(&format!("{mode_at}.targets"), narrowed)? {
                         if !targets.contains(target) {
                             return Err(invalid(format!(
                                 "{mode_at}.targets names `{target}`, which the declaration's \
@@ -583,6 +583,28 @@ fn validate_name(field: &str, value: &str) -> Result<(), AgentRegistryError> {
              letters, digits, `.`, `_` and `-`"
         )))
     }
+}
+
+/// As `unique_non_empty`, and each target is a plain name, as a target triple is: a target names
+/// a manifest root's pointer files, so it is never a path.
+fn target_names<'a>(
+    field: &str,
+    values: &'a [String],
+) -> Result<BTreeSet<&'a str>, AgentRegistryError> {
+    let set = unique_non_empty(field, values)?;
+    let plain = |target: &str| {
+        !matches!(target, "." | "..")
+            && target
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '_'))
+    };
+    if let Some(target) = set.iter().find(|target| !plain(target)) {
+        return Err(invalid(format!(
+            "{field} names `{target}`; a target is a plain name of ASCII letters, digits, `.`, `-` \
+             and `_`"
+        )));
+    }
+    Ok(set)
 }
 
 fn unique_non_empty<'a>(

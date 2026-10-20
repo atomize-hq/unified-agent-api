@@ -246,9 +246,11 @@ Rules:
    well. These rows extend the row set of
    [Shared support row model](#shared-support-row-model), and on them:
    - a row whose version has no committed version metadata states `manifest_support` as
-     `unsupported`, derives `backend_support` and its evidence notes from the version's coverage
-     report for the target as for any row, which gives `unsupported` and no notes where there is
-     no report, and derives `uaa_support` from them. Its depth facts state the scope as the support-depth contract requires, which for
+     `unsupported`, derives `backend_support` and its evidence notes as for any row, which gives
+     `unsupported` and no report note where there is no coverage report for the target, and the
+     note that the current root snapshot omits the target where the version is the one that
+     snapshot records and it has no input for the target, and derives `uaa_support` from them.
+     Its depth facts state the scope as the support-depth contract requires, which for
      obligations not yet frozen is insufficient depth; and
    - `pointer_promotion` is derived from the target's pointer files as it is for an expected
      target, whether or not `expected_targets` lists the target, and a target with no pointer
@@ -400,12 +402,17 @@ record, so the committed artifact is revision 1. Today:
 
 - The generator reads each published root's `reports/<version>/depth-record.json` through Annex
   B's reader (`crates/xtask/src/depth_record.rs`). It fails publication on a record that does not
-  read, and on one in a root whose `RULES.json` names no `storage.committed.reports.depth_record`,
-  which is how a root adopts Annex B: aider and gemini_cli have no `RULES.json` and adopt nothing.
+  read; on one in a root whose `RULES.json` does not name
+  `<manifest root>/reports/<version>/depth-record.json` as `storage.committed.reports.depth_record`,
+  which is how a root adopts Annex B (aider and gemini_cli have no `RULES.json` and adopt nothing);
+  and on one in a registry root the support matrix does not publish.
   It derives rule 4's rows from what a record covers and reads pointer files for those targets
   whether or not `expected_targets` lists them. It derives each row's depth facts and applies
-  rule 6 in `crates/xtask/src/support_matrix/depth.rs`, reading each bound file for its SHA-256
-  only.
+  rule 6 in `crates/xtask/src/support_matrix/depth.rs`. A bound file is in the revision when git
+  tracks a regular file at its path, and only such a file is read, for its SHA-256 only. An
+  untracked or ignored file, git's own files and a symlink are not in the revision whatever they
+  hold, so a result bound to one is `unverified`, and evidence a change adds counts once it is
+  staged.
 - It reads no registry declaration: the registry loader refuses a `support_depth` table until
   route wiring admits one. So no row is depth-enrolled by declaration, and rule 4 implies no row
   from a declaration.

@@ -628,3 +628,111 @@ fn check_agent_drift_entrypoint_exits_one_when_workspace_root_is_missing() {
     assert_eq!(output.status.code(), Some(1));
     assert!(String::from_utf8_lossy(&output.stderr).contains("could not resolve workspace root"));
 }
+
+/// A depth record that holds only its event and policy, for opencode `1.0.0` on linux-x64, in a
+/// root that adopts Annex B, with the support artifacts republished from the rows it implies, as
+/// the change that adds a record republishes them.
+fn seed_opencode_depth_record(fixture: &std::path::Path) {
+    let root = fixture.join("cli_manifests/opencode");
+    let mut record = serde_json::json!({
+        "schema_version": 1,
+        "event": { "lifecycle_path": "maintenance",
+                   "request_commit": "1111111111111111111111111111111111111111",
+                   "request_recorded_at": "2026-10-10T00:00:00Z",
+                   "opened_from": ".github/workflows/agent-maintenance-open-pr.yml",
+                   "trigger_kind": "upstream_release_detected" },
+        "policy": {
+            "identity": "",
+            "selection": { "agent_id": "opencode", "enrollment": {
+                "lifecycle_path": "maintenance", "version": "1.0.0", "targets": ["linux-x64"],
+                "modes": [{ "selector": "run-json", "command_path": "opencode run",
+                            "mode": "headless",
+                            "predicates": [{ "flag": "--output-format", "value": "json" }] }],
+                "operations": [{ "id": "run", "serves": ["run-json"], "templates": ["CORE"],
+                                 "shared_mapping": "wrapper_only", "forwarding": false,
+                                 "not_applicable_permitted": [],
+                                 "promise": { "r1": "r", "v1": "v", "g1": "g", "e1": "e",
+                                              "a1": "a", "x1": "x", "x2": "x", "x3": "x",
+                                              "x4": "x" } }],
+                "capabilities": []
+            } },
+            "rules_revision": "1",
+            "base": ["A1", "E1", "G1", "R1", "V1", "X1", "X2", "X3", "X4"],
+            "templates": [{ "template": "CORE", "obligations": ["LC2", "OUT3"] }],
+            "path_enabled": false,
+            "debt_baseline": []
+        },
+        "obligations": null,
+        "execution": null,
+        "acceptance_entries": []
+    });
+    record["policy"]["identity"] =
+        serde_json::json!(depth_record::part_identity(&record["policy"]).unwrap());
+    write_text(
+        &root.join("reports/1.0.0/depth-record.json"),
+        &record.to_string(),
+    );
+    let rules = serde_json::json!({ "storage": { "committed": { "reports": {
+        "depth_record": "cli_manifests/opencode/reports/<version>/depth-record.json" } } } });
+    write_text(&root.join("RULES.json"), &rules.to_string());
+
+    let bundle = xtask::support_matrix::generate_publication_artifacts(fixture)
+        .expect("generate support publication");
+    write_text(
+        &fixture.join("cli_manifests/support_matrix/current.json"),
+        &bundle.json,
+    );
+    write_text(
+        &fixture.join("docs/specs/unified-agent-api/support-matrix.md"),
+        &bundle.markdown,
+    );
+    write_text(
+        &fixture.join("crates/agent_api/src/runtime_support_data.rs"),
+        &bundle.runtime_support_data,
+    );
+}
+
+fn support_publication_finding(fixture: &std::path::Path) -> Result<(), String> {
+    let report = check_agent_drift(fixture, "opencode").expect("drift report");
+    match report
+        .findings
+        .iter()
+        .find(|finding| finding.category == DriftCategory::SupportPublication)
+    {
+        None => Ok(()),
+        Some(finding) => Err(finding.summary.clone()),
+    }
+}
+
+#[test]
+fn check_agent_drift_accepts_support_artifacts_that_publish_depth_facts() {
+    let fixture = fixture_root("agent-maintenance-drift-depth-facts");
+    seed_publication_inputs(&fixture);
+    seed_opencode_depth_record(&fixture);
+
+    let published: serde_json::Value = serde_json::from_str(
+        &fs::read_to_string(fixture.join("cli_manifests/support_matrix/current.json")).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(published["schema_version"], 2);
+    assert_eq!(support_publication_finding(&fixture), Ok(()));
+}
+
+#[test]
+fn check_agent_drift_reports_a_support_artifact_revision_its_rows_do_not_call_for() {
+    let fixture = fixture_root("agent-maintenance-drift-depth-revision");
+    seed_publication_inputs(&fixture);
+    seed_opencode_depth_record(&fixture);
+
+    // Revision 1 over rows that carry depth facts.
+    let path = fixture.join("cli_manifests/support_matrix/current.json");
+    let mut published: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
+    published["schema_version"] = serde_json::json!(1);
+    write_text(&path, &published.to_string());
+    let summary = support_publication_finding(&fixture).expect_err("revision drift");
+    assert!(
+        summary.contains("schema_version must be 2 for these rows (got 1)"),
+        "{summary}"
+    );
+}

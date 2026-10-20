@@ -631,9 +631,54 @@ fn c0_validate_requires_the_published_depth_facts_to_be_the_ones_the_record_deci
         edit(&|artifact| artifact["schema_version"] = json!(1)),
         "SUPPORT_MATRIX_SCHEMA_INVALID",
     );
-    // A depth fact in a member revision 2 does not define is refused, not ignored.
+    // And an artifact that says it has them where no row does.
     fails_with(
-        edit(&|artifact| artifact["rows"][at]["depth"]["qualified"] = json!(true)),
-        "SUPPORT_MATRIX_INVALID_JSON",
+        edit(&|artifact| {
+            for row in artifact["rows"].as_array_mut().unwrap() {
+                row.as_object_mut().unwrap().remove("depth");
+            }
+        }),
+        "SUPPORT_MATRIX_SCHEMA_INVALID",
     );
+    // A member the revision does not define is refused, not ignored, in `depth`, in a row and in
+    // the artifact.
+    let edits: [&dyn Fn(&mut Value); 3] = [
+        &|artifact| artifact["rows"][at]["depth"]["qualified"] = json!(true),
+        &|artifact| artifact["rows"][at]["qualified"] = json!(true),
+        &|artifact| artifact["qualified"] = json!(true),
+    ];
+    for unknown in edits {
+        fails_with(edit(unknown), "SUPPORT_MATRIX_INVALID_JSON");
+    }
+}
+
+#[test]
+fn c0_validate_accepts_the_row_a_record_implies_for_a_version_without_metadata() {
+    let temp = make_temp_dir("ccm-c0-depth-record-only");
+    let codex_dir = materialize_minimal_valid_workspace(&temp);
+    // A record for a version that no `versions/<version>.json` describes yet.
+    let mut record = record();
+    record["policy"]["selection"]["enrollment"]["version"] = json!("0.62.0");
+    record["policy"]["identity"] = json!(part_identity(&record["policy"]).unwrap());
+    write_text(
+        &codex_dir.join("reports/0.62.0/depth-record.json"),
+        &record.to_string(),
+    );
+    let (passed, report) = validate(&codex_dir);
+    assert!(passed, "{report}");
+
+    let published: Value = serde_json::from_str(
+        &fs::read_to_string(temp.join("cli_manifests/support_matrix/current.json")).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(published["schema_version"], json!(2));
+    let row = published["rows"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|row| row["agent"] == json!("codex") && row["version"] == json!("0.62.0"))
+        .expect("the record implies a row");
+    assert_eq!(row["target"], json!(REQUIRED_TARGET));
+    assert_eq!(row["manifest_support"], json!("unsupported"));
+    assert!(row.get("depth").is_some());
 }

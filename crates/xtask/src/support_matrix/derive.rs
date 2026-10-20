@@ -28,6 +28,8 @@ use super::{
 pub(super) struct AgentRoot {
     pub(super) agent: String,
     pub(super) root: PathBuf,
+    /// The root's path in the workspace, which names where it holds its depth records.
+    manifest_root: String,
     /// Evidence a depth record binds is named relative to the workspace.
     workspace: PathBuf,
 }
@@ -37,6 +39,7 @@ impl AgentRoot {
         Self {
             agent: agent.to_string(),
             root: workspace_root.join(manifest_root),
+            manifest_root: manifest_root.to_string(),
             workspace: workspace_root.to_path_buf(),
         }
     }
@@ -50,7 +53,8 @@ pub(super) struct LoadedAgentRoot {
     pub(super) layout: RootIntakeLayout,
     pub(super) versions: Vec<VersionMetadata>,
     records: BTreeMap<String, DepthRecord>,
-    workspace: PathBuf,
+    /// The content identity of each file the records bind, where the revision holds it.
+    evidence: BTreeMap<String, String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -259,6 +263,21 @@ pub(super) fn enrolled_agent_roots(workspace_root: &Path) -> Result<Vec<AgentRoo
     let registry =
         AgentRegistry::load(workspace_root).map_err(|err| format!("load agent registry: {err}"))?;
 
+    // A root the support matrix does not publish would publish its depth facts nowhere.
+    for entry in registry
+        .agents
+        .iter()
+        .filter(|entry| !entry.publication.support_matrix_enabled)
+    {
+        let root = workspace_root.join(&entry.manifest_root);
+        if !depth_record::record_files(&root).is_empty() {
+            return Err(format!(
+                "{}: holds a depth record, and the support matrix does not publish agent `{}`",
+                root.display(),
+                entry.agent_id
+            ));
+        }
+    }
     Ok(registry
         .support_matrix_entries()
         .map(|entry| AgentRoot::new(workspace_root, &entry.agent_id, &entry.manifest_root))
@@ -288,7 +307,7 @@ fn derive_rows_for_loaded_root(root: &LoadedAgentRoot) -> Result<Vec<SupportRow>
         .copied()
         .chain(root.records.keys().map(String::as_str))
         .collect::<BTreeSet<_>>();
-    let evidence = |path: &str| depth_record::file_sha256(&root.workspace.join(path));
+    let evidence = |path: &str| root.evidence.get(path).cloned();
     let mut rows = Vec::new();
 
     for version in versions {
@@ -353,7 +372,8 @@ fn derive_rows_for_loaded_root(root: &LoadedAgentRoot) -> Result<Vec<SupportRow>
 
 pub(super) fn load_agent_root(root: &AgentRoot) -> Result<LoadedAgentRoot, String> {
     let posture = read_current_root_posture(&root.root)?;
-    let records = read_depth_records(&root.root, &root.agent)?;
+    let records = read_depth_records(root)?;
+    let evidence = depth_record::bound_evidence(&root.workspace, records.values())?;
     let covered = records
         .values()
         .flat_map(depth::covered_targets)
@@ -370,32 +390,38 @@ pub(super) fn load_agent_root(root: &AgentRoot) -> Result<LoadedAgentRoot, Strin
         layout,
         versions,
         records,
-        workspace: root.workspace.clone(),
+        evidence,
     })
 }
 
 /// The root's depth records by version. A record that does not read fails publication rather than
 /// leaving its version's rows without depth facts (Support depth rule 3), and so does one in a root
-/// whose `RULES.json` does not adopt Annex B (record invariant 1).
-fn read_depth_records(root: &Path, agent: &str) -> Result<BTreeMap<String, DepthRecord>, String> {
-    let files = depth_record::record_files(root);
+/// whose `RULES.json` does not adopt Annex B by naming where the root holds its records (record
+/// invariant 1), as `manifest-validate` requires.
+fn read_depth_records(root: &AgentRoot) -> Result<BTreeMap<String, DepthRecord>, String> {
+    let files = depth_record::record_files(&root.root);
     if files.is_empty() {
         return Ok(BTreeMap::new());
     }
-    let rules = fs::read_to_string(root.join("RULES.json"))
+    let expected = format!(
+        "{}/reports/<version>/{}",
+        root.manifest_root,
+        depth_record::DEPTH_RECORD_FILE_NAME
+    );
+    let rules = fs::read_to_string(root.root.join("RULES.json"))
         .ok()
         .and_then(|text| serde_json::from_str::<serde_json::Value>(&text).ok());
     let adopted = rules.is_some_and(|rules| {
-        rules
-            .pointer("/storage/committed/reports/depth_record")
-            .is_some_and(serde_json::Value::is_string)
+        rules.pointer("/storage/committed/reports/depth_record")
+            == Some(&serde_json::Value::String(expected.clone()))
     });
     if !adopted {
         return Err(format!(
-            "{}: holds a depth record, and its RULES.json names no storage.committed.reports.depth_record, so the root does not adopt Annex B",
-            root.display()
+            "{}: holds a depth record, and its RULES.json does not name storage.committed.reports.depth_record `{expected}`, so the root does not adopt Annex B",
+            root.root.display()
         ));
     }
+    let agent = &root.agent;
     files
         .into_iter()
         .map(|(version, path)| {

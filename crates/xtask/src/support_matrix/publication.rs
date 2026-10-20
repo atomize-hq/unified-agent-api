@@ -15,7 +15,9 @@ pub struct PublicationBundle {
     pub runtime_support_data: String,
 }
 
+/// A reader rejects any member the artifact's revision does not define (Support depth rule 9).
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct SupportMatrixArtifact {
     pub schema_version: u8,
     pub rows: Vec<SupportRow>,
