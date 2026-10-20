@@ -2464,6 +2464,34 @@
         "Broader policy implementation remains staged by the proposal; uaa-0041 and uaa-0042 own related semantic/accounting work, uaa-0053 owns subsequent OpenCode expansion, and uaa-0066 owns staged lifecycle acceptance."
       ],
       "priority": "P2"
+    },
+    {
+      "id": "uaa-0073",
+      "title": "Finish support-depth acceptance-effect validation and enforce integration before path enablement",
+      "status": "todo",
+      "bucket": "agent_api.maintenance",
+      "type": "task",
+      "priority": "P1",
+      "kickoff": {
+        "prompt": [
+          "Finish enforcement slice 2b: make validation check 9 normative with spec text, code and tests for every acceptance-effect category in docs/specs/support-depth-contract.md, comparing the candidate with the integration tip.",
+          "Keep acceptance-entry scope as Annex B defines it; do not invent per-target or per-effect authority. Cover pointers/runtime projection, version status and passed targets, marker retirement, closeouts, lifecycle acceptance/reference attribution, entry listing, qualification, and added advertising.",
+          "Before any production path is enabled, the maintainer must install the approved strict staging ruleset: require a PR, the merge checks, and branches up to date, with no acceptance bypass. The light push job detects after writes and supplies no prevention.",
+          "MA2 parity-acquire with commit=true and ref=staging must satisfy Final depth admission as an integration step or refuse. A required AUTOMATION_TOKEN ensures event delivery but confers no ruleset bypass.",
+          "Re-establish Annex A against the enforcing revision, land reviewed gate evidence and the isolated end-to-end proof, and obtain per-agent enablement authorization before lifting production refusals."
+        ],
+        "files_to_read": [
+          "docs/specs/support-depth-contract.md",
+          "docs/agents/lifecycle/support-depth-validation-test-list.md",
+          "cli_manifests/codex/VALIDATOR_SPEC.md",
+          "crates/xtask/src/manifest_validate/depth/merge.rs",
+          ".github/workflows/depth-tip.yml",
+          ".github/workflows/parity-acquire.yml"
+        ]
+      },
+      "notes": [
+        "Approved 2026-10-20: slice 2a implements checks 2, 4 and 11 plus tip CI; all of check 9 remains slice 2b. Staging ruleset installation is the maintainer's action before enablement. No production depth declaration is enabled by slice 2a."
+      ]
     }
   ]
 }

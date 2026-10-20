@@ -44,7 +44,7 @@ on:
         value: ${{ jobs.union.outputs.audit_exit_code }}
     secrets:
       AUTOMATION_TOKEN:
-        description: "PAT used to push acquired artifacts so the packet PR's CI re-runs"
+        description: "Required when commit is true: PAT used to push acquired artifacts so validation runs"
         required: false
   workflow_dispatch:
     inputs:
@@ -89,6 +89,19 @@ jobs:
       required_target: ${{ steps.plan.outputs.required_target }}
       source_date_epoch: ${{ steps.metadata.outputs.source_date_epoch }}
     steps:
+      - name: Require an automation token for committing acquisition
+        shell: bash
+        env:
+          COMMIT_ARTIFACTS: ${{ inputs.commit }}
+          # This job may learn whether the delivery credential exists, but must not receive it.
+          HAS_AUTOMATION_TOKEN: ${{ secrets.AUTOMATION_TOKEN != '' }}
+        run: |
+          set -euo pipefail
+          if [ "$COMMIT_ARTIFACTS" = "true" ] && [ "$HAS_AUTOMATION_TOKEN" != "true" ]; then
+            echo "::error title=Missing automation token::AUTOMATION_TOKEN is required when commit=true so acquired commits trigger validation. Use commit=false for read-only acquisition." >&2
+            exit 1
+          fi
+
       - uses: actions/checkout@v5
         with:
           ref: ${{ inputs.ref }}
@@ -474,10 +487,10 @@ jobs:
       - uses: actions/checkout@v5
         with:
           ref: ${{ inputs.ref }}
-          # Pushes authenticated with GITHUB_TOKEN do not start new workflow runs. Without a PAT
-          # the packet PR would keep showing the CI result from the pre-acquisition commit, so a
-          # maintainer would be reviewing a green check that never saw the acquired artifacts.
-          token: ${{ secrets.AUTOMATION_TOKEN || github.token }}
+          # The plan refuses committing runs without this PAT: GITHUB_TOKEN pushes do not start
+          # validation. Read-only runs use the job token and leave no persisted credential.
+          token: ${{ inputs.commit && secrets.AUTOMATION_TOKEN || github.token }}
+          persist-credentials: ${{ inputs.commit }}
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
 

@@ -1389,7 +1389,11 @@ Source references are to `staging` at `f61534be` and use the abbreviations of An
   three validator specs state. Through the support-matrix check it decides checks 5, 6, 7, 8 and
   12: the support matrix reads the depth records of every root it publishes, and each file a
   record binds for its content identity, and the check compares each published row's depth facts
-  with the derived ones. It reads no second tree.
+  with the derived ones. With `--tip`, it also reads the integration-tip records and their registry
+  from Git objects, and a changed onboarding record's versioned approval, to decide checks 2, 4
+  and 11. PR validation compares the test merge with its first parent; light push-to-staging
+  validation compares event SHA with event.before. Check 9, route admission and tip-conditional
+  integration remain prerequisites before enablement (uaa-0073 in docs/backlog.json).
 - In the three roots that have them, `RULES.json` names the record's path as
   `storage.committed.reports.depth_record`, which is how a root states that it adopts this annex.
   `SCHEMA.json` defines no shape for a depth record: the typed reader rejects any member B.6 does

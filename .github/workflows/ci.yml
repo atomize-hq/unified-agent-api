@@ -271,82 +271,60 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - id: codex-artifacts
-        name: Detect Codex committed artifacts
-        shell: bash
-        run: |
-          set -euo pipefail
-          shopt -s nullglob
-          files=(cli_manifests/codex/versions/*.json)
-          if (( ${#files[@]} > 0 )); then
-            echo "has_versions=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "has_versions=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Skip (no Codex artifacts committed yet)
-        if: ${{ steps.codex-artifacts.outputs.has_versions != 'true' }}
-        shell: bash
-        run: echo "No cli_manifests/codex/versions/*.json; skipping manifest-validate."
-
+        with:
+          fetch-depth: 2
       - uses: dtolnay/rust-toolchain@stable
-        if: ${{ steps.codex-artifacts.outputs.has_versions == 'true' }}
+      - uses: Swatinem/rust-cache@v2
 
-      - name: xtask manifest-validate
-        if: ${{ steps.codex-artifacts.outputs.has_versions == 'true' }}
+      - name: xtask manifest-validate (codex root)
         shell: bash
+        env:
+          DEPTH_TIP: ${{ github.event_name == 'pull_request' && github.base_ref == 'staging' && 'HEAD^1' || '' }}
         run: |
           set -euo pipefail
-          cargo run -p xtask -- manifest-validate --root cli_manifests/codex
+          ARGS=(--root cli_manifests/codex)
+          if [ -n "$DEPTH_TIP" ]; then ARGS+=(--tip "$DEPTH_TIP"); fi
+          cargo run -p xtask -- manifest-validate "${ARGS[@]}"
 
   claude-validate-artifacts:
     name: Validate Claude Code committed artifacts
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 2
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
 
       - name: xtask manifest-validate (claude_code root)
         shell: bash
+        env:
+          DEPTH_TIP: ${{ github.event_name == 'pull_request' && github.base_ref == 'staging' && 'HEAD^1' || '' }}
         run: |
           set -euo pipefail
-          cargo run -p xtask -- manifest-validate --root cli_manifests/claude_code
+          ARGS=(--root cli_manifests/claude_code)
+          if [ -n "$DEPTH_TIP" ]; then ARGS+=(--tip "$DEPTH_TIP"); fi
+          cargo run -p xtask -- manifest-validate "${ARGS[@]}"
 
   opencode-validate-artifacts:
     name: Validate OpenCode committed artifacts
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - id: opencode-artifacts
-        name: Detect OpenCode committed artifacts
-        shell: bash
-        run: |
-          set -euo pipefail
-          shopt -s nullglob
-          files=(cli_manifests/opencode/versions/*.json)
-          if (( ${#files[@]} > 0 )); then
-            echo "has_versions=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "has_versions=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Skip (no OpenCode artifacts committed yet)
-        if: ${{ steps.opencode-artifacts.outputs.has_versions != 'true' }}
-        shell: bash
-        run: echo "No cli_manifests/opencode/versions/*.json; skipping manifest-validate."
-
+        with:
+          fetch-depth: 2
       - uses: dtolnay/rust-toolchain@stable
-        if: ${{ steps.opencode-artifacts.outputs.has_versions == 'true' }}
+      - uses: Swatinem/rust-cache@v2
 
       - name: xtask manifest-validate (opencode root)
-        if: ${{ steps.opencode-artifacts.outputs.has_versions == 'true' }}
         shell: bash
+        env:
+          DEPTH_TIP: ${{ github.event_name == 'pull_request' && github.base_ref == 'staging' && 'HEAD^1' || '' }}
         run: |
           set -euo pipefail
-          cargo run -p xtask -- manifest-validate --root cli_manifests/opencode
-
-      - uses: dtolnay/rust-toolchain@stable
+          ARGS=(--root cli_manifests/opencode)
+          if [ -n "$DEPTH_TIP" ]; then ARGS+=(--tip "$DEPTH_TIP"); fi
+          cargo run -p xtask -- manifest-validate "${ARGS[@]}"
 
       # `manifest-validate` covers the committed artifacts; the acquisition descriptors are a
       # separate surface that is only exercised at CI-dispatch time. Resolve every enrolled

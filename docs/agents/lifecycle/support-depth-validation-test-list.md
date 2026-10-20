@@ -10,11 +10,11 @@ review rounds produced, so they become tests of the validator instead of contrac
 Annex B of the contract defines the depth record: its file, what it states, its three identities
 and its acceptance entries. Its sections B.6 and B.7 are revision 1 of the record's encoding and of the serialization the
 digests are taken over, and `crates/xtask/src/depth_record.rs` reads a record by them.
-`manifest-validate` and the support matrix generator call that reader. Checks 1, 3, 5, 6, 7, 8,
-10, 12 and 13 are normative in the validator specs of the three roots that adopt Annex B, with
-their code and tests, checks 5, 6, 7, 8 and 12 through the support publication. The other checks
-stay
-non-normative until they are implemented. Each one then becomes normative in the
+`manifest-validate` and the support matrix generator call that reader. Checks 1, 2, 3, 4, 5, 6, 7, 8,
+10, 11, 12 and 13 are normative in the validator specs of the three roots that adopt Annex B, with
+their code and tests, checks 5, 6, 7, 8 and 12 through the support publication and checks 2, 4
+and 11 through `manifest-validate --tip <rev>`. Check 9 stays non-normative until enforcement
+slice 2b (uaa-0073 in docs/backlog.json). Each one then becomes normative in the
 manifest root's validator spec together with its code and its tests, as the existing validator
 checks did: in one change, or a day apart. Until then the checks and scenarios are the acceptance
 test of the record's definition: every check has to be decidable from a record as Annex B defines
@@ -238,10 +238,13 @@ Must fail:
   backs any later acceptance effect, such as a hand pointer advance after a genuine closeout.
 - Invariant 2 is defined by who may change a binding. History does not show the actor, so for E
   it is checkable only structurally.
-- The validator specs state the inputs of checks 1, 3, 10 and 13: the registry entry that names
-  the root, the agent's standing maintenance request and its lifecycle record. The merge checks
-  also need the integration branch tip, and the spec change that makes them normative has to
-  state it.
+- The validator specs state the one-tree inputs and the additional inputs for checks 2, 4 and 11:
+  the explicit integration-tip commit and its records/registry, plus a versioned approval for a
+  changed onboarding record. Check 2 preserves the old entry sequence as an unchanged prefix.
+  Check 4 compares statements with entries excluded and covers first creation too; its matching
+  maintenance request must carry the depth P table, and an approval cannot substitute for another
+  lifecycle path. The caller supplies the test merge's first parent for a PR and event.before for
+  a push. Check 11 follows from checking each part's digest in both records (check 13).
 - `manifest-validate` reads the standing request's `[support_depth]` table without the validating
   loader, which rejects the table as an unknown key until a depth enrollment can be declared.
   When the loader accepts it, rule 4 of the request contract's request fields is the comparison
@@ -353,8 +356,9 @@ Must fail:
 - The digests are taken over the serialization Annex B.7 fixes, with one test vector. The
   reader refuses a record whose part does not have the identity it states, which is check 13.
   `manifest-validate` decides check 3. Check 8 is decided through the support publication, which
-  qualifies nothing unless an entry identifies what the record states. Checks 9 and 11 compare a
-  record with a second tree and still have no caller.
+  qualifies nothing unless an entry identifies what the record states. With --tip, checks 2 and 4
+  compare records across two trees and check 11 follows from check 13 in each. Check 9 still needs
+  acceptance-effect detection in slice 2b (uaa-0073 in docs/backlog.json).
 - A declaration keeps at least one operation that is not a mode exclusion, so a version whose
   only covered mode turns out to be interactive-only cannot have it excluded and stays at
   insufficient depth. Dropping that rule later is a compatible change and adding it later is
