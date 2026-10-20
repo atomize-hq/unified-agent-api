@@ -217,8 +217,6 @@ admission. This section states only what this spec owns: which rows carry depth 
 facts are read from, what such a row states, how its `uaa_support` is derived, and the revision of
 the JSON artifact that carries them. It uses that contract's terms and redefines none of them.
 
-While the support-depth contract is a Draft this section binds nothing.
-
 Rules:
 
 1. A row is **depth-enrolled** when, in the tree being published, either of these holds: the depth
@@ -397,37 +395,31 @@ operation and `EX1` result; and capabilities with `depth_qualified`.
 
 ### Present behavior
 
-Revision 2 is defined and nothing writes it. Source references are to `staging` at `f61534be`. Today:
+The generator writes revision 2 when a row carries depth facts. No manifest root holds a depth
+record, so the committed artifact is revision 1. Today:
 
-- No manifest root holds a depth record and the registry declares no depth enrollment, so no row is
-  depth-enrolled.
-- `uaa_support` is derived from `manifest_support`, `backend_support` and whether the row has
-  evidence notes (`crates/xtask/src/support_matrix/derive.rs:704-723`). The derivation reads no
-  capability.
-- Root intake opens a version's coverage reports by exact file name
-  (`crates/xtask/src/support_matrix/derive.rs:575-600`). It would not open `depth-record.json`.
-  It reads pointer files only for the targets `expected_targets` lists
-  (`crates/xtask/src/support_matrix/derive.rs:471`).
-- The generator loads the agent registry to find the manifest roots it publishes
-  (`crates/xtask/src/support_matrix/derive.rs:258-269`) and reads nothing else from it.
-- `crates/xtask/src/support_matrix/depth.rs` derives a row's depth facts from a depth record and
-  the content identities of the files it binds, applies rule 6 to `uaa_support`, and renders the
-  facts as Markdown. It is not at `f61534be`. The generator calls none of it and gives every row
-  no depth facts.
-- The JSON artifact is written with `schema_version` 1
-  (`crates/xtask/src/support_matrix/publication.rs:20-31`). Inside a workspace,
-  `manifest-validate` requires that value (`crates/xtask/src/manifest_validate.rs:635-652`).
-- `uaa_support` has three readers besides the Markdown projection. The consistency check behind
-  `support-matrix --check` and `manifest-validate` compares it with the derived state
-  (`crates/xtask/src/support_matrix/consistency.rs:362-366`). The `markdown_support_claim`
-  governance check compares a claimed `uaa_support` with the currently derived rows
-  (`crates/xtask/src/agent_maintenance/drift/governance.rs:436-520`). The drift check's
-  publication comparison parses the JSON artifact without checking `schema_version`, compares whole
-  rows with the derived ones, and compares the published Markdown with its own copy of the row
-  rendering (`crates/xtask/src/agent_maintenance/drift/publication.rs:211-277`,
-  `crates/xtask/src/agent_maintenance/drift/shared.rs:134-162`). For a depth-enrolled row each of
-  them would read the state that rule 6 yields. The drift check's copy of the row rendering does
-  not render depth facts.
+- The generator reads each published root's `reports/<version>/depth-record.json` through Annex
+  B's reader (`crates/xtask/src/depth_record.rs`). It fails publication on a record that does not
+  read, and on one in a root whose `RULES.json` names no `storage.committed.reports.depth_record`,
+  which is how a root adopts Annex B: aider and gemini_cli have no `RULES.json` and adopt nothing.
+  It derives rule 4's rows from what a record covers and reads pointer files for those targets
+  whether or not `expected_targets` lists them. It derives each row's depth facts and applies
+  rule 6 in `crates/xtask/src/support_matrix/depth.rs`, reading each bound file for its SHA-256
+  only.
+- It reads no registry declaration: the registry loader refuses a `support_depth` table until
+  route wiring admits one. So no row is depth-enrolled by declaration, and rule 4 implies no row
+  from a declaration.
+- `support-matrix --check` requires the committed artifacts to equal a fresh generation. The
+  consistency check behind it and behind `manifest-validate` compares every published row with
+  the derived one, depth facts included (`SUPPORT_MATRIX_DEPTH_MISMATCH`). So a change to a record,
+  or to a file it binds, regenerates the publication in the same change.
+- Every reader of the JSON artifact requires the revision its rows are written in
+  (`SupportMatrixArtifact::revision_error`): `manifest-validate` and the drift check's publication
+  comparison. The drift check renders the Markdown it compares with the generator's renderer. The
+  `markdown_support_claim` governance check compares a claim with the derived rows, which carry
+  rule 6.
+- The generator decides what a record decides. Whether a route may publish a change it derives is
+  depth admission, which no route evaluates yet.
 
 ## Verification checklist
 

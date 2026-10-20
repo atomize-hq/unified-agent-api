@@ -640,15 +640,12 @@ fn validate_support_matrix_publication(ctx: &ValidateCtx, violations: &mut Vec<V
         }
     };
 
-    if artifact.schema_version != 1 {
+    if let Some(err) = artifact.revision_error() {
         violations.push(Violation {
             code: "SUPPORT_MATRIX_SCHEMA_INVALID",
             path: rel_path(&workspace_root, &artifact_path),
             json_pointer: Some("/schema_version".to_string()),
-            message: format!(
-                "support_matrix/current.json.schema_version must be 1 (got {})",
-                artifact.schema_version
-            ),
+            message: format!("support_matrix/current.json: {err}"),
             unit: Some("support_matrix"),
             command_path: None,
             key_or_name: None,

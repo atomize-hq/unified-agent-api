@@ -5,12 +5,7 @@ use std::{
 };
 
 use crate::{
-    agent_registry::AgentRegistryEntry,
-    capability_publication as capability_publication_mod,
-    support_matrix::{
-        BackendSupportState, ManifestSupportState, PointerPromotionState, SupportRow,
-        UaaSupportState,
-    },
+    agent_registry::AgentRegistryEntry, capability_publication as capability_publication_mod,
 };
 use serde::Deserialize;
 
@@ -129,36 +124,6 @@ pub(super) fn parse_capability_matrix_agent_support(
             path.display()
         ))
     }
-}
-
-pub(super) fn render_support_markdown_section(rows: &[SupportRow]) -> String {
-    if rows.is_empty() {
-        return String::new();
-    }
-
-    let mut out = String::new();
-    out.push_str(&format!("### `{}`\n\n", rows[0].agent));
-    out.push_str("| agent | version | target | manifest_support | backend_support | uaa_support | pointer_promotion | evidence_notes |\n");
-    out.push_str("|---|---|---|---|---|---|---|---|\n");
-    for row in rows {
-        let notes = if row.evidence_notes.is_empty() {
-            "—".to_string()
-        } else {
-            row.evidence_notes.join("; ")
-        };
-        out.push_str(&format!(
-            "| `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | {} |\n",
-            row.agent,
-            row.version,
-            row.target,
-            manifest_support_str(row.manifest_support),
-            backend_support_str(row.backend_support),
-            uaa_support_str(row.uaa_support),
-            pointer_promotion_str(row.pointer_promotion),
-            notes
-        ));
-    }
-    out
 }
 
 pub(super) fn extract_support_markdown_section(
@@ -309,38 +274,6 @@ pub(super) type ManifestCurrent = capability_publication_mod::ManifestCurrent;
 pub(super) struct ReleaseDocPackages {
     pub published_crates: Vec<String>,
     pub publish_order: Vec<String>,
-}
-
-fn manifest_support_str(value: ManifestSupportState) -> &'static str {
-    match value {
-        ManifestSupportState::Supported => "supported",
-        ManifestSupportState::Unsupported => "unsupported",
-    }
-}
-
-fn backend_support_str(value: BackendSupportState) -> &'static str {
-    match value {
-        BackendSupportState::Supported => "supported",
-        BackendSupportState::Partial => "partial",
-        BackendSupportState::Unsupported => "unsupported",
-    }
-}
-
-fn uaa_support_str(value: UaaSupportState) -> &'static str {
-    match value {
-        UaaSupportState::Supported => "supported",
-        UaaSupportState::Partial => "partial",
-        UaaSupportState::Unsupported => "unsupported",
-    }
-}
-
-fn pointer_promotion_str(value: PointerPromotionState) -> &'static str {
-    match value {
-        PointerPromotionState::None => "none",
-        PointerPromotionState::LatestSupported => "latest_supported",
-        PointerPromotionState::LatestValidated => "latest_validated",
-        PointerPromotionState::LatestSupportedAndValidated => "latest_supported_and_validated",
-    }
 }
 
 fn extract_markdown_code_list(block: &str, heading: &str) -> Result<Vec<String>, String> {

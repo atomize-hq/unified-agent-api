@@ -69,8 +69,35 @@ fn write_request(workspace: &Path, request_commit: &str, policy: Option<&str>) {
     );
 }
 
-/// Validate, returning whether it passed and what it reported.
+/// Validate as a change has to be validated: with the support publication regenerated for the
+/// tree, as the change that writes a record regenerates it. Returns whether it passed and what it
+/// reported.
 fn validate(codex_dir: &Path) -> (bool, String) {
+    republish(codex_dir);
+    validate_as_published(codex_dir)
+}
+
+/// Rewrite the support matrix artifact from the generator's rows, where the tree derives them. A
+/// tree that does not derive keeps its publication, which then fails as well.
+fn republish(codex_dir: &Path) {
+    let Some(workspace) = fs::canonicalize(codex_dir)
+        .ok()
+        .and_then(|dir| Some(dir.parent()?.parent()?.to_path_buf()))
+    else {
+        return;
+    };
+    if let Ok(rows) = xtask::support_matrix::derive_rows(&workspace) {
+        let bundle = xtask::support_matrix::render_publication_bundle(&rows, String::new())
+            .expect("render publication");
+        write_text(
+            &workspace.join("cli_manifests/support_matrix/current.json"),
+            &bundle.json,
+        );
+    }
+}
+
+/// Validate with the publication as it stands.
+fn validate_as_published(codex_dir: &Path) -> (bool, String) {
     let output = run_xtask_validate(codex_dir);
     let report = format!(
         "{}{}",
@@ -112,7 +139,11 @@ fn record_with_obligations() -> Value {
     let policy = record["policy"]["identity"].clone();
     record["obligations"] = json!({
         "identity": "", "policy_identity": policy, "targets": [REQUIRED_TARGET],
-        "acquired_inputs": [], "operations": [], "classification_required": [],
+        "acquired_inputs": [],
+        "operations": [{ "id": "exec", "surfaces": [],
+                         "obligations": ["A1", "E1", "G1", "LC2", "OUT3", "R1", "V1", "X1", "X2",
+                                         "X3", "X4"] }],
+        "classification_required": [],
         "acceptance_work": []
     });
     record["obligations"]["identity"] = json!(part_identity(&record["obligations"]).unwrap());
@@ -546,4 +577,63 @@ fn c0_validate_requires_a_record_of_a_frozen_p_whether_or_not_the_root_adopts_an
     let policy = record()["policy"]["identity"].as_str().unwrap().to_string();
     write_request(&temp, COMMIT, Some(&policy));
     assert_fails_at(&codex_dir, "DEPTH_RECORD_MISSING", &request_path());
+}
+
+#[test]
+fn c0_validate_requires_the_published_depth_facts_to_be_the_ones_the_record_decides() {
+    let temp = make_temp_dir("ccm-c0-depth-publication");
+    let codex_dir = materialize_minimal_valid_workspace(&temp);
+    write_record(&codex_dir, &record());
+    let (passed, report) = validate(&codex_dir);
+    assert!(passed, "the regenerated publication passes:\n{report}");
+
+    let path = temp.join("cli_manifests/support_matrix/current.json");
+    let published: Value = serde_json::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
+    assert_eq!(published["schema_version"], json!(2));
+    let at = published["rows"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .position(|row| row.get("depth").is_some())
+        .expect("the record's row is depth-enrolled");
+    let edit = |edit: &dyn Fn(&mut Value)| {
+        let mut artifact = published.clone();
+        edit(&mut artifact);
+        write_json(&path, &artifact);
+        validate_as_published(&codex_dir)
+    };
+    let fails_with = |(passed, report): (bool, String), code: &str| {
+        assert!(
+            !passed && report.contains(code),
+            "expected {code}:\n{report}"
+        );
+    };
+
+    // Check 6: a tuple the record selects published as not depth-enrolled, in the revision that
+    // has no depth facts at all.
+    fails_with(
+        edit(&|artifact| {
+            artifact["rows"][at]
+                .as_object_mut()
+                .unwrap()
+                .remove("depth");
+            artifact["schema_version"] = json!(1);
+        }),
+        "SUPPORT_MATRIX_DEPTH_MISMATCH",
+    );
+    // Check 5: obligations published as frozen that no frozen O states.
+    fails_with(
+        edit(&|artifact| artifact["rows"][at]["depth"]["obligations_frozen"] = json!(true)),
+        "SUPPORT_MATRIX_DEPTH_MISMATCH",
+    );
+    // A row with depth facts in an artifact that says it has none.
+    fails_with(
+        edit(&|artifact| artifact["schema_version"] = json!(1)),
+        "SUPPORT_MATRIX_SCHEMA_INVALID",
+    );
+    // A depth fact in a member revision 2 does not define is refused, not ignored.
+    fails_with(
+        edit(&|artifact| artifact["rows"][at]["depth"]["qualified"] = json!(true)),
+        "SUPPORT_MATRIX_INVALID_JSON",
+    );
 }

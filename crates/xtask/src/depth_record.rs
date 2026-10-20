@@ -4,9 +4,13 @@
 //! identities, the digest an acceptance entry is made over, and how the coverage of two records
 //! is compared, and whether it states what a maintenance request froze. Whether the parts agree
 //! with each other or with the registry is depth admission, and is not decided here. Nothing
-//! writes a record yet; `manifest-validate` reads one.
+//! writes a record yet; `manifest-validate` and the support matrix generator read one.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    fs,
+    path::{Path, PathBuf},
+};
 
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
@@ -20,6 +24,34 @@ use crate::agent_registry::support_depth::{
 pub const DEPTH_RECORD_SCHEMA_VERSION: u64 = 1;
 /// The record's file in `reports/<version>/` of its manifest root (Annex B.1).
 pub const DEPTH_RECORD_FILE_NAME: &str = "depth-record.json";
+
+/// Every `reports/<version>/depth-record.json` under a manifest root, by version. Anything at the
+/// name counts, a dangling symlink or a directory included, so a reader fails on it rather than
+/// taking it for no record.
+pub fn record_files(root: &Path) -> Vec<(String, PathBuf)> {
+    let Ok(entries) = fs::read_dir(root.join("reports")) else {
+        return Vec::new();
+    };
+    let mut files: Vec<_> = entries
+        .flatten()
+        .map(|entry| entry.path().join(DEPTH_RECORD_FILE_NAME))
+        .filter(|path| fs::symlink_metadata(path).is_ok())
+        .filter_map(|path| {
+            let version = path.parent()?.file_name()?.to_string_lossy().into_owned();
+            Some((version, path))
+        })
+        .collect();
+    files.sort();
+    files
+}
+
+/// The content identity of a file a record binds: the SHA-256 of its bytes, or `None` when the
+/// revision does not hold it.
+pub fn file_sha256(path: &Path) -> Option<String> {
+    fs::read(path)
+        .ok()
+        .map(|bytes| hex::encode(Sha256::digest(bytes)))
+}
 
 /// What a maintenance request states of the generation it froze: its Event, and the P and O
 /// identities of its `[support_depth]` table, both `None` when it has none.

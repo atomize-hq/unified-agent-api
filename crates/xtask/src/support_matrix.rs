@@ -14,6 +14,8 @@ pub mod depth;
 mod derive;
 #[path = "support_matrix/publication.rs"]
 mod publication;
+#[path = "support_matrix/runtime_support.rs"]
+mod runtime_support;
 
 use publication::{validate_publication_artifacts, write_publication_artifacts};
 
@@ -29,8 +31,8 @@ pub use derive::render_agent_api_runtime_support_data_for_agent_root;
 pub use derive::render_agent_api_runtime_support_data_for_test_roots;
 pub use derive::runtime_support_family_is_embedded;
 pub use publication::{
-    render_publication_artifacts, render_publication_bundle, PublicationBundle,
-    SupportMatrixArtifact,
+    render_markdown_projection, render_publication_artifacts, render_publication_bundle,
+    PublicationBundle, SupportMatrixArtifact,
 };
 
 pub const JSON_OUTPUT_PATH: &str = "cli_manifests/support_matrix/current.json";

@@ -8,9 +8,9 @@ use crate::{
     agent_registry::{AgentRegistry, AgentRegistryEntry, REGISTRY_RELATIVE_PATH},
     release_doc,
     support_matrix::{
-        render_agent_api_runtime_support_data_for_agent_root, runtime_support_family_is_embedded,
-        validate_publication_consistency, SupportMatrixArtifact, SupportRow,
-        AGENT_API_RUNTIME_SUPPORT_DATA_OUTPUT_PATH,
+        render_agent_api_runtime_support_data_for_agent_root, render_markdown_projection,
+        runtime_support_family_is_embedded, validate_publication_consistency,
+        SupportMatrixArtifact, SupportRow, AGENT_API_RUNTIME_SUPPORT_DATA_OUTPUT_PATH,
     },
 };
 
@@ -228,6 +228,9 @@ pub(super) fn inspect_support_publication(
         }
     };
 
+    if let Some(err) = json_artifact.revision_error() {
+        issues.push(format!("{SUPPORT_MATRIX_JSON_PATH}: {err}"));
+    }
     if let Err(consistency_issues) =
         validate_publication_consistency(workspace_root, &json_artifact.rows)
     {
@@ -272,7 +275,7 @@ pub(super) fn inspect_support_publication(
         }
     };
 
-    let expected_section = shared::render_support_markdown_section(expected_rows);
+    let expected_section = render_markdown_projection(expected_rows);
     match shared::extract_support_markdown_section(&markdown, &entry.agent_id) {
         Ok(section) if section.trim_end() == expected_section.trim_end() => {}
         Ok(_) => issues.push(

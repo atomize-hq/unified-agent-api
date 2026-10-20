@@ -1361,7 +1361,7 @@ Source references are to `staging` at `f61534be` and use the abbreviations of An
 
 - `xtask/depth_record.rs` reads a record and decides what B.6 and B.7 require, the digest of
   B.5, the comparison of B.4, and whether a record states what a maintenance request froze. It is
-  not at `f61534be`. `manifest-validate` calls it, for the checks its validator specs state.
+  not at `f61534be`. `manifest-validate` and the support matrix generator call it.
 - No manifest root holds a depth record, and no command writes one. Revision 1 gained
   the declaration's `forwarding` member before any record existed, so no record of an earlier
   form is held anywhere.
@@ -1371,8 +1371,8 @@ Source references are to `staging` at `f61534be` and use the abbreviations of An
   (`xtask/manifest_validate/versions.rs:279-316`, `xtask/support_matrix/derive.rs:575-600`). The
   support-surface audit and `maintenance-audit-status` do the second
   (`xtask/agent_maintenance/support_audit.rs:598-620`,
-  `xtask/agent_maintenance/audit_status/evidence.rs:174-204`). None of them would open
-  `depth-record.json`.
+  `xtask/agent_maintenance/audit_status/evidence.rs:174-204`). None of them would take
+  `depth-record.json` for a coverage report.
 - `prepare-agent-closeout` lists every regular file directly under `reports/<version>/` as a
   version-scoped manifest artifact of the packet. It refuses when it finds no such artifact: no
   file there, none under `snapshots/<version>/` and no `versions/<version>.json`
@@ -1386,7 +1386,10 @@ Source references are to `staging` at `f61534be` and use the abbreviations of An
   `xtask/support_matrix/consistency.rs:163-170`, `xtask/support_matrix/derive.rs:258-270`). Since
   `f61534be` it also reads the root's depth records, the agent's standing maintenance request and
   its lifecycle record, and decides checks 1, 3, 10 and 13 of the validation test list, which the
-  three validator specs state. It reads no second tree.
+  three validator specs state. Through the support-matrix check it decides checks 5, 6, 7, 8 and
+  12: the support matrix reads the depth records of every root it publishes, and each file a
+  record binds for its content identity, and the check compares each published row's depth facts
+  with the derived ones. It reads no second tree.
 - In the three roots that have them, `RULES.json` names the record's path as
   `storage.committed.reports.depth_record`, which is how a root states that it adopts this annex.
   `SCHEMA.json` defines no shape for a depth record: the typed reader rejects any member B.6 does
