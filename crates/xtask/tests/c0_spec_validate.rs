@@ -612,6 +612,8 @@ fn run_xtask_validate(codex_dir: &Path) -> std::process::Output {
     cmd.output().expect("spawn xtask codex-validate")
 }
 
+#[path = "c0_spec_validate/depth_records.rs"]
+mod depth_records;
 #[path = "c0_spec_validate/happy_path.rs"]
 mod happy_path;
 #[path = "c0_spec_validate/reported_versions.rs"]

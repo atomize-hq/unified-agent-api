@@ -14,6 +14,7 @@ use thiserror::Error;
 use crate::support_matrix::{self, SupportMatrixArtifact};
 
 mod current;
+mod depth;
 mod fix_mode;
 mod models;
 mod pointer_consistency;
@@ -90,6 +91,8 @@ struct ValidateCtx {
     parity_exclusions_schema_version: Option<u32>,
     parity_exclusions_raw: Option<Vec<ParityExclusionUnit>>,
     parity_exclusions: Option<ParityExclusionsIndex>,
+    depth_record_path: Option<String>,
+    rules_path: PathBuf,
 }
 
 pub fn run(args: Args) -> i32 {
@@ -275,6 +278,8 @@ fn run_inner(args: Args, default_root: Option<&str>) -> Result<Vec<Violation>, F
         parity_exclusions_schema_version,
         parity_exclusions_raw,
         parity_exclusions,
+        depth_record_path: rules.storage.committed.reports.depth_record,
+        rules_path,
     };
 
     if matches!(args.mode, Mode::Fix) {
@@ -323,6 +328,9 @@ fn run_inner(args: Args, default_root: Option<&str>) -> Result<Vec<Violation>, F
 
     // 7) Support-matrix publication drift checks reuse the shared support-matrix policy.
     validate_support_matrix_publication(&ctx, &mut violations);
+
+    // 8) Depth records.
+    depth::validate_depth_records(&ctx, &mut violations);
 
     violations.sort_by(|a, b| {
         a.sort_key()

@@ -1,5 +1,8 @@
 use serde::Deserialize;
 
+// ponytail: a `[support_depth]` table is rejected as an unknown key, which request contract rule 1
+// requires while no depth enrollment can be declared. Accepting it brings rules 1, 3 and 4; rule 4
+// is `DepthRecord::request_mismatch`, the comparison `manifest-validate` already makes.
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(super) struct RawMaintenanceRequest {

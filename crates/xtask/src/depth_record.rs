@@ -2,9 +2,9 @@
 //!
 //! This module decides only what the annex says a record decides by itself: its form, its three
 //! identities, the digest an acceptance entry is made over, and how the coverage of two records
-//! is compared. Whether the parts agree with each other, with the registry or with a request is
-//! depth admission, and is not decided here. Nothing writes a record yet and no command reads
-//! one.
+//! is compared, and whether it states what a maintenance request froze. Whether the parts agree
+//! with each other or with the registry is depth admission, and is not decided here. Nothing
+//! writes a record yet; `manifest-validate` reads one.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -18,6 +18,17 @@ use crate::agent_registry::support_depth::{
 };
 
 pub const DEPTH_RECORD_SCHEMA_VERSION: u64 = 1;
+/// The record's file in `reports/<version>/` of its manifest root (Annex B.1).
+pub const DEPTH_RECORD_FILE_NAME: &str = "depth-record.json";
+
+/// What a maintenance request states of the generation it froze: its Event, and the P and O
+/// identities of its `[support_depth]` table, both `None` when it has none.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RequestBinding {
+    pub event: Event,
+    pub policy_identity: Option<String>,
+    pub obligations_identity: Option<String>,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -237,6 +248,21 @@ impl DepthRecord {
             .and_then(|()| ordered("", &value))
             .map_err(|err| format!("depth record: {err}"))?;
         Ok(record)
+    }
+
+    /// Why the record does not state what `request` froze, under rule 4 of the maintenance request
+    /// contract's request fields: the request's Event, its P identity, and its O identity, or no O
+    /// while it states none. A request without the table froze no P, so no record states it.
+    pub fn request_mismatch(&self, request: &RequestBinding) -> Option<&'static str> {
+        if self.event != request.event {
+            return Some("the record's Event is not the request's");
+        }
+        if request.policy_identity.as_ref() != Some(&self.policy.identity) {
+            return Some("the record's P is not the one the request froze");
+        }
+        let obligations = self.obligations.as_ref().map(|part| &part.identity);
+        (obligations != request.obligations_identity.as_ref())
+            .then_some("the record's O is not the one the request froze")
     }
 
     /// The digest an acceptance entry is made over: the Event and the three parts, identities

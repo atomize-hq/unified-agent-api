@@ -9,8 +9,10 @@ review rounds produced, so they become tests of the validator instead of contrac
 
 Annex B of the contract defines the depth record: its file, what it states, its three identities
 and its acceptance entries. Its sections B.6 and B.7 are revision 1 of the record's encoding and of the serialization the
-digests are taken over, and `crates/xtask/src/depth_record.rs` reads a record by them. No command
-calls that reader yet. The checks below stay non-normative until they are implemented. Each one then becomes normative in the
+digests are taken over, and `crates/xtask/src/depth_record.rs` reads a record by them.
+`manifest-validate` calls that reader. Checks 1, 3, 10 and 13 are normative in the validator specs
+of the three roots that adopt Annex B, with their code and tests. The other checks stay
+non-normative until they are implemented. Each one then becomes normative in the
 manifest root's validator spec together with its code and its tests, as the existing validator
 checks did: in one change, or a day apart. Until then the checks and scenarios are the acceptance
 test of the record's definition: every check has to be decidable from a record as Annex B defines
@@ -234,9 +236,21 @@ Must fail:
   backs any later acceptance effect, such as a hand pointer advance after a genuine closeout.
 - Invariant 2 is defined by who may change a binding. History does not show the actor, so for E
   it is checkable only structurally.
-- The existing validator specs describe a validator that reads one manifest root. The checks also
-  need the registry, lifecycle records, working files and the integration branch tip. The spec
-  change that makes a check normative has to state those inputs.
+- The validator specs state the inputs of checks 1, 3, 10 and 13: the registry entry that names
+  the root, the agent's standing maintenance request and its lifecycle record. The merge checks
+  also need the integration branch tip, and the spec change that makes them normative has to
+  state it.
+- `manifest-validate` reads the standing request's `[support_depth]` table without the validating
+  loader, which rejects the table as an unknown key until a depth enrollment can be declared.
+  When the loader accepts it, rule 4 of the request contract's request fields is the comparison
+  check 3 makes, `DepthRecord::request_mismatch`.
+- An onboarding record's Event is not compared with its approval. The approval loader validates
+  `approval_commit` and `approval_recorded_at` but does not keep them, and checks 1 and 3 reach
+  the create lane only once the charter names a second statement of its P and O. Decide the
+  Event comparison with that statement. A maintenance request for a version whose record states an
+  onboarding Event fails check 3 today, because its Event is not the record's. That holds only if
+  no maintenance generation may continue an onboarding record, which the question below on a
+  declaration moved to another lifecycle path has to settle.
 - Clearing a drift side state with no maintenance closeout in the revision is reached by no
   invariant. It cannot be a state rule, because agents with no maintenance closeout have no drift
   state either.
@@ -336,8 +350,8 @@ Must fail:
   and the record's Event does not change. Decide whether it refuses.
 - The digests are taken over the serialization Annex B.7 fixes, with one test vector. The
   reader refuses a record whose part does not have the identity it states, which is check 13.
-  Checks 3, 8, 9 and 11 compare a record with a request, an entry or a second tree and still
-  have no caller.
+  `manifest-validate` decides check 3. Checks 8, 9 and 11 compare a record with an entry or a
+  second tree and still have no caller.
 - A declaration keeps at least one operation that is not a mode exclusion, so a version whose
   only covered mode turns out to be interactive-only cannot have it excluded and stays at
   insufficient depth. Dropping that rule later is a compatible change and adding it later is
@@ -361,12 +375,11 @@ Must fail:
   write. Annex B names a closeout by content identity, so one closeout can leave two entries when
   the prepared artifact is edited before it is recorded, the first naming the prepared artifact.
   Decide whether the first is wanted.
-- Whether the record's shape needs an entry in each root's `SCHEMA.json`, or a typed loader that
-  rejects unknown fields suffices, as it does for the registry and the request. `RULES.json`
-  describes `reports/<version>/` as holding coverage reports only, and the record's path is added
-  there with the code that reads it. Read literally, the validator specs' `schemas` check and the
-  `ci_validation` note in `RULES.json` cover every committed artifact, while the code validates
-  named files only.
+- The record's shape is decided by its typed reader, which rejects unknown members, as it is for
+  the registry and the request; `SCHEMA.json` has no entry for it. `RULES.json` names the record's
+  path as `storage.committed.reports.depth_record`, and that is how a root states that it adopts
+  Annex B. Read literally, the validator specs' `schemas` check and the `ci_validation` note in
+  `RULES.json` cover every committed artifact, while the code validates named files only.
 - When a declaration renames or divides an operation whose mode a record already covers,
   something has to say which covered mode the new operations serve. The registry declaration's
   `serves` states it.

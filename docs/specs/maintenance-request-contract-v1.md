@@ -723,7 +723,10 @@ unchanged, and [Packet freeze](#packet-freeze) rule 3 says what the stand-down m
 None of this section is implemented, and it has no effect until a depth enrollment exists. Today:
 
 - No request carries `[support_depth]`, and `--from-request` reads a fixed list of recorded
-  fields and regenerates the rest.
+  fields and regenerates the rest. Every validating loader rejects the table as an unknown key.
+  `manifest-validate` reads the standing request's Event, target version and table without
+  validating the rest of it, and compares them with the version's depth record, as rule 4
+  compares them; that is check 3 of the support-depth validation test list.
 - The workflows that open a packet commit the maintenance root only. A depth record written under
   the manifest root at the first freeze would not be in the opening commit, so the re-freeze
   inside `parity-acquire`, which runs on a fresh checkout of the packet branch, would not find

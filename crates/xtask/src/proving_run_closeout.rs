@@ -291,6 +291,14 @@ pub fn has_unresolved_placeholders(closeout: &ProvingRunCloseout) -> bool {
     !unresolved_placeholder_fields(closeout).is_empty()
 }
 
+/// Why `text` is not a proving-run closeout in form, without the linkage to an approval and a
+/// lifecycle record that `load_validated_closeout` checks.
+pub fn check_closeout_form(text: &str) -> Result<(), String> {
+    serde_json::from_str::<RawProvingRunCloseout>(text)
+        .map(drop)
+        .map_err(|err| err.to_string())
+}
+
 pub fn load_validated_closeout(
     workspace_root: &Path,
     closeout_path: &Path,

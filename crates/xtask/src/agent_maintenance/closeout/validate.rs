@@ -42,6 +42,14 @@ struct RawMaintenanceFinding {
     surfaces: Vec<String>,
 }
 
+/// Why `text` is not a maintenance closeout in form, without the linkage to its request that
+/// `load_linked_closeout` checks.
+pub fn check_closeout_form(text: &str) -> Result<(), String> {
+    serde_json::from_str::<RawMaintenanceCloseout>(text)
+        .map(drop)
+        .map_err(|err| err.to_string())
+}
+
 pub fn load_linked_closeout(
     workspace_root: &Path,
     request_path: &Path,

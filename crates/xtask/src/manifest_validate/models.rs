@@ -73,6 +73,27 @@ pub(super) struct Rules {
     pub(super) globals: RulesGlobals,
     #[serde(default)]
     pub(super) parity_exclusions: Option<RulesParityExclusions>,
+    #[serde(default)]
+    pub(super) storage: RulesStorage,
+}
+
+#[derive(Debug, Default, Deserialize)]
+pub(super) struct RulesStorage {
+    #[serde(default)]
+    pub(super) committed: RulesStorageCommitted,
+}
+
+#[derive(Debug, Default, Deserialize)]
+pub(super) struct RulesStorageCommitted {
+    #[serde(default)]
+    pub(super) reports: RulesStorageReports,
+}
+
+/// `depth_record` is stated where the root's validator spec adopts Annex B of the support-depth
+/// contract. A root that states none MUST NOT hold a depth record (record invariant 1).
+#[derive(Debug, Default, Deserialize)]
+pub(super) struct RulesStorageReports {
+    pub(super) depth_record: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
