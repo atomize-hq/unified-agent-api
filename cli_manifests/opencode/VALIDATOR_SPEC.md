@@ -95,12 +95,12 @@ Violations:
 - `DEPTH_REQUEST_UNREADABLE`: a standing request is there and cannot be read as text, or is not
   TOML of the shape the inputs above read. An absent request is no request.
 - `DEPTH_LIFECYCLE_DANGLING` (check 10): the root holds a record and the agent's lifecycle record
-  does not load with the files it names, by path and, where it states one, content identity; or
-  it states `proving_run_closeout_written` and names no proving-run closeout; or the proving-run
-  closeout it names is not held; or it states `maintenance_closeout_written` and the agent's
-  maintenance closeout is not held. A closeout is held when the file at its path is a closeout of
-  its kind in form. The lifecycle record names the proving-run closeout by path alone, so this
-  validator decides no more than that.
+  is there and does not load with the files it names, by path and, where it states one, content
+  identity; or it states `proving_run_closeout_written` and names no proving-run closeout; or the
+  proving-run closeout it names is not held; or it states `maintenance_closeout_written` and the
+  agent's maintenance closeout is not held. An absent lifecycle record is no lifecycle record. A
+  closeout is held when the file at its path is a closeout of its kind in form. The lifecycle
+  record names the proving-run closeout by path alone, so this validator decides no more than that.
 
 Checks 1 and 3 are decided against the maintenance request only. An onboarding generation has only
 its approval's Event beside the record, and the onboarding charter names no second statement of its

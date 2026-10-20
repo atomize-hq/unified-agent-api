@@ -32,7 +32,7 @@ fn every_closeout_the_repository_holds_is_in_form() {
             read.push(name);
         }
     }
-    // Three maintenance closeouts and four proving-run closeouts are committed; reading none would
+    // Three maintenance closeouts and five proving-run closeouts are committed; reading none would
     // pass for the wrong reason.
-    assert!(read.len() >= 7, "the closeouts this test read: {read:?}");
+    assert!(read.len() >= 8, "the closeouts this test read: {read:?}");
 }

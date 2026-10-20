@@ -374,6 +374,22 @@ fn c0_validate_reads_only_the_closeout_evidence_a_lifecycle_record_states() {
         passed,
         "a proving-run closeout that is named and in form is held:\n{report}"
     );
+
+    // A lifecycle record that is there and cannot be read fails, as a record that cannot be read
+    // does. One that is absent is no lifecycle record.
+    fs::remove_file(&path).unwrap();
+    fs::create_dir(&path).unwrap();
+    assert_fails_at(
+        &codex_dir,
+        "DEPTH_LIFECYCLE_DANGLING",
+        &format!("{GOVERNANCE}/lifecycle-state.json"),
+    );
+    fs::remove_dir(&path).unwrap();
+    let (passed, report) = validate(&codex_dir);
+    assert!(
+        passed,
+        "an absent lifecycle record has nothing to report:\n{report}"
+    );
 }
 
 #[test]
@@ -474,6 +490,19 @@ fn c0_validate_names_the_root_it_is_given_as_the_registry_does() {
     let linked = temp.join("linked");
     std::os::unix::fs::symlink(&codex_dir, &linked).unwrap();
     assert_fails_at(&linked, "DEPTH_RECORD_INVALID", &record_path());
+
+    // The rules file a violation names is where it is in the workspace, not where the root was given.
+    let rules_path = codex_dir.join("RULES.json");
+    let mut rules: Value = serde_json::from_str(&fs::read_to_string(&rules_path).unwrap()).unwrap();
+    rules["storage"]["committed"]["reports"]["depth_record"] = json!("record.json");
+    write_json(&rules_path, &rules);
+    for root in [&dotted, &linked] {
+        assert_fails_at(
+            root,
+            "DEPTH_RECORD_PATH_INVALID",
+            "cli_manifests/codex/RULES.json",
+        );
+    }
 }
 
 #[test]
@@ -493,9 +522,12 @@ fn c0_validate_refuses_a_standing_request_that_is_not_the_toml_it_reads() {
     fs::remove_file(&request).unwrap();
     fs::create_dir(&request).unwrap();
     assert_fails_at(&codex_dir, "DEPTH_REQUEST_UNREADABLE", &request_path());
+    fs::remove_dir(&request).unwrap();
+    std::os::unix::fs::symlink(temp.join("missing.toml"), &request).unwrap();
+    assert_fails_at(&codex_dir, "DEPTH_REQUEST_UNREADABLE", &request_path());
 
     // An absent request is no request.
-    fs::remove_dir(&request).unwrap();
+    fs::remove_file(&request).unwrap();
     let (passed, report) = validate(&codex_dir);
     assert!(passed, "a request that is not there is not read:\n{report}");
 }

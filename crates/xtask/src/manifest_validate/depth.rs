@@ -116,9 +116,9 @@ pub(super) fn validate_depth_records(ctx: &ValidateCtx, violations: &mut Vec<Vio
     // of P and O yet, so these checks are decided on the maintenance path only.
     let request_path = workspace.join(agent_lifecycle::maintenance_request_path(&entry.agent_id));
     // A request that is absent is no request. One that is there and cannot be read fails, as a
-    // record that cannot be read does.
+    // record that cannot be read does; a dangling symlink is there.
     let text = match fs::read_to_string(&request_path) {
-        Err(err) if err.kind() == std::io::ErrorKind::NotFound => None,
+        Err(_) if fs::symlink_metadata(&request_path).is_err() => None,
         Err(err) => {
             fail("DEPTH_REQUEST_UNREADABLE", &request_path, err.to_string());
             None
@@ -176,7 +176,8 @@ pub(super) fn validate_depth_records(ctx: &ValidateCtx, violations: &mut Vec<Vio
     }
     let lifecycle = agent_lifecycle::lifecycle_state_path_for_entry(entry);
     let lifecycle_path = workspace.join(&lifecycle);
-    if !lifecycle_path.is_file() {
+    // An absent lifecycle record is no lifecycle record. One that is there and cannot be read fails.
+    if fs::symlink_metadata(&lifecycle_path).is_err() {
         return;
     }
     match agent_lifecycle::load_lifecycle_state(&workspace, &lifecycle) {
