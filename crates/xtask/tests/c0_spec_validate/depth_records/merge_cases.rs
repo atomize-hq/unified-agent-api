@@ -217,6 +217,22 @@ fn new_records_without_a_candidate_registry_cannot_skip_freeze_checks() {
 }
 
 #[test]
+fn symlinking_a_record_or_its_report_directories_cannot_hide_removal() {
+    for component in ["file", "version", "reports"] {
+        let (_temp, root, tip) = baseline(Some(&record()));
+        let path = match component {
+            "file" => root.join(format!("reports/{VERSION}/depth-record.json")),
+            "version" => root.join(format!("reports/{VERSION}")),
+            _ => root.join("reports"),
+        };
+        let saved = root.join(format!("saved-{component}"));
+        fs::rename(&path, &saved).unwrap();
+        std::os::unix::fs::symlink(&saved, &path).unwrap();
+        fails(&root, &tip, "DEPTH_RECORD_INVALID");
+    }
+}
+
+#[test]
 fn merge_checks_the_result_against_the_integration_parent_not_the_stale_branch() {
     let (temp, root, base) = baseline(Some(&record()));
     git(temp.path(), &["switch", "-qc", "candidate"]);

@@ -144,7 +144,8 @@ Additional inputs: this root's `reports/<version>/depth-record.json` entries in 
 tree (including an entry of the wrong file kind), and the tip's registry entry naming the root.
 The tip registry is read even when this root has no tip record, to detect relocated anchors.
 Tip records are read from Git objects through Annex B's reader, never from a checkout of that
-revision. Candidate records remain anchored to the candidate registry; removing that anchor,
+revision. A candidate record must be a regular readable file, with no symlink below its manifest
+root on the path to it; `DEPTH_RECORD_INVALID` rejects that substitution in a comparison. Candidate records remain anchored to the candidate registry; removing that anchor,
 adoption, or all candidate records does not exempt the tip's records from comparison.
 
 For a changed or newly created onboarding record only, the validator also reads the canonical

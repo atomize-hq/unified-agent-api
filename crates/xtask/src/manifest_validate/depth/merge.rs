@@ -136,7 +136,7 @@ pub(in crate::manifest_validate) fn validate(
             .join(&version)
             .join(DEPTH_RECORD_FILE_NAME);
         let relative = rel_path(&workspace, &path);
-        let raw = match fs::read_to_string(&path) {
+        let raw = match read_record(&root_dir, &path) {
             Ok(raw) => raw,
             Err(error) => {
                 let code = if previous.contains_key(&version)
@@ -271,6 +271,23 @@ fn emit(violations: &mut Vec<Violation>, code: &'static str, path: String, messa
     if !violations.iter().any(|v| v.code == code && v.path == path) {
         violations.push(violation(code, path, message));
     }
+}
+
+/// A checkout cannot hold a versioned file through a tracked directory symlink. Following one
+/// would hide removal of the canonical Git path while reading the old content from elsewhere.
+fn read_record(root: &Path, path: &Path) -> std::io::Result<String> {
+    let mut current = root.to_path_buf();
+    for component in path
+        .strip_prefix(root)
+        .expect("record below root")
+        .components()
+    {
+        current.push(component);
+        if fs::symlink_metadata(&current)?.file_type().is_symlink() {
+            return Err(std::io::Error::new(std::io::ErrorKind::InvalidData, "a canonical depth record cannot be reached through a symlink below its manifest root"));
+        }
+    }
+    fs::read_to_string(path)
 }
 
 /// Normalize dot segments without following a candidate-controlled root symlink.
